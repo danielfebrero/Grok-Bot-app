@@ -1,0 +1,35 @@
+sha:/etc/sand-box-image-sha	9848d41623fef1fe1cf55f3cea69e6c89217680a717bd22f8415ac52aea29c82
+sha:/exec-daemon/agent-sdk/canvas-sdk-version	7097038342ce00f3d2c329dc6ec5e73973619883c0b1505b4cf5f00c5b5a44b3
+sha:/exec-daemon/index.js	398f56d5f25fc12102fb0fbba642a7387aaa373d3747868b7ff7ea1e68dcda6e
+sha:/exec-daemon/package.json	bb0f8d80bafa0d4cf743a3a0cff1ba1ee1389e90547be247ed306eaa7cdf621f
+sha:/opt/sand/deps/runtime-deps-manifest.json	6c4675be85b492ec56719658dca5348d555e2be6e2fcc996bbfcf0f30ca3805a
+sha:/opt/sand/sand-host/host-main.cjs	eef0ccbb19f591f7ccbbbe2d1220f874484e4dbc367a9259c1888aa5f35ab46b
+sha:/opt/sand/sand-host/sand-eval-runner.cjs	2ef6385b99841a7b0158dc54416dd03d58599d51bde4897ddf86fd8ac2605a1b
+sha:/opt/sand/sand-host/version	1ae90f6033f262f0b32c3476dffd8c515519c4e34c70cbae2dab81c107f172d0
+sha:/usr/local/bin/box-doctor	909216f6c7fbaf8f42b94e059c6bb59e0be9b6a54e87978abbd9b47142035345
+sha:/usr/local/bin/cursor_agent_store_fuse_version	88ddf3212950844b92e0a217a4f51825b0844545e68b3db31ec00c44190dc419
+sha:/usr/local/bin/sand-supervisor-contract.mjs	562fd0f07cbb15fe84fcecf6b62ed350b0b585418cf48559440248d32046575e
+sha:/usr/local/bin/sand-supervisor.mjs	144b7f3cf175f565aac96196120b8bb072c517e35f3bfc7af11e1c20256632a7
+sha:/usr/local/bin/start-sand-box	ea56422a8d4cd4bfec8f385df31cc6b68e3854690bb08df6a40d24271ce12ce5
+sha:/usr/local/libexec/sand/sand-daemon-supervisor	cc797c2eb25b3086da8fdb1f94b354d3e9e6f8d70c36c10356706ddf15c4d8d4
+sha:/usr/local/share/sand-box-scripts/version	9848d41623fef1fe1cf55f3cea69e6c89217680a717bd22f8415ac52aea29c82
+sha:/var/lib/sand-daemon-supervisor/orbitd/bundled/manifest.json	246f1e4babac7e0c745f6ec5aa3b41aa2c5e1b438230f50437da77825ec04499
+tree:/home/box/reference	cb6b1c14f0a9a1be09435ab1f5a442be001605791ce12b8360d9128d9c6136ea (2 fichiers)
+tree:/home/box/sand-data/managed-skills	ff6be5f334bfe1e0c294b0b32fa3ca5df22febaa9ad3d9a2557d81cc3a5dfc22 (52 fichiers)
+tree:/var/lib/sand-daemon-supervisor/orbitd/releases	9df516415584fe5ede287865418f37d195601ab64b9b49e9266b3c0cf0d54ed6 (2 fichiers)
+ver:agent_store_fuse.commit	c466eee79eae1153f17022c61ab07a57fcf272e3
+ver:box_scripts_version (/usr/local/share/sand-box-scripts/version)	4098fb0
+ver:canvas_sdk_version	89ca36a58d4a539264772bdf3a8c425a2cd7c47e84f47c215f84dff75449ec55
+ver:chrome	Google Chrome 154.0.8037.97
+ver:debian_version	13.7
+ver:exec_daemon.buildTimestamp	2026-10-14T14:48:45.409Z
+ver:exec_daemon.gitCommit	unknown
+ver:exec_daemon.name	@anysphere/exec-daemon-runtime
+ver:image_sha (/etc/sand-box-image-sha)	4098fb0
+ver:node (/exec-daemon/node)	v22.14.0
+ver:node (system)	v20.19.2
+ver:orbitd.bundled_revision	88287498b7278d865be0a9d54e3cbaae9eded227
+ver:orbitd.releases	28b0833c5707e1c919cee4d4ab5a8ad0eeac9c46
+ver:python3	Python 3.13.5
+ver:runtime	anyrun
+ver:sand_host_version (/opt/sand/sand-host/version)	701b86e

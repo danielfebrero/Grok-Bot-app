@@ -1,0 +1,26 @@
+--- 2026-10-16_06-51/meta/dpkg-packages.txt
++++ 2026-10-16_09-48/meta/dpkg-packages.txt
+@@ -141,6 +141,7 @@
+ libcap2	1:2.75-10+deb13u1+b3	amd64
+ libcap2-bin	1:2.75-10+deb13u1+b3	amd64
+ libcares2	1.34.5-1+deb13u1	amd64
++libcbor0.10	0.10.2-2	amd64
+ libcc1-0	14.2.0-19	amd64
+ libcdio-cdda2t64	10.2+2.0.2-1+b1	amd64
+ libcdio-paranoia2t64	10.2+2.0.2-1+b1	amd64
+@@ -200,6 +201,7 @@
+ libexttextcat-data	3.4.7-1	all
+ libffi8	3.4.8-2	amd64
+ libfftw3-double3	3.3.10-2+b1	amd64
++libfido2-1	1.15.0-1+b1	amd64
+ libflac14	1.5.0+ds-2	amd64
+ libflite1	2.2-7	amd64
+ libfontconfig1	2.15.0-2.3	amd64
+@@ -931,6 +933,7 @@
+ novnc	1:1.6.0-2	all
+ npm	9.2.0~ds1-3	all
+ ocl-icd-libopencl1	2.3.3-1	amd64
++openssh-client	1:10.0p1-7+deb13u4	amd64
+ openssl	3.5.7-1~deb13u3	amd64
+ openssl-provider-legacy	3.5.7-1~deb13u3	amd64
+ passwd	1:4.17.4-2	amd64

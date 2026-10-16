@@ -1,0 +1,858 @@
+/*
+ * ELSON, INC — "Fashion Casual Presentation"
+ * A faithful pptxgenjs rebuild of a 36-slide 16:9 deck (13.333in x 7.5in).
+ *
+ * Run:  node 12aa4f1a-1cef-4714-bbd5-43059a90a7ec_grok_final.js
+ *
+ * Photographs in the original are replaced by flat grey placeholders drawn with
+ * native shapes (see `photo` / `photoDot`); no binary assets are embedded.
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+// ---------------------------------------------------------------- palette
+const C = {
+  ink:     '232224',  // theme dk1 — headline black
+  slate:   '5F5F5F',  // theme dk2 — sub-heads
+  gray:    '808080',  // body copy
+  gray2:   '919092',  // muted body copy
+  mist:    'F5F5F5',  // theme lt2 — track behind skill bars
+  white:   'FFFFFF',
+  accent:  'D79349',  // theme accent1 — brand orange
+  accent2: 'B97429',  // accent2 — darker orange
+  accent3: '965F22',  // accent3 — brown
+  accent4: 'DCA466',  // accent4 — light orange (used for the 2nd half of titles)
+  hair:    'CCCCCC',  // dashed leader lines
+  photo:   'CECECE',  // stand-in colour for the deck's photo placeholders
+  photoTx: 'BFBFBF',  // caption colour inside a placeholder
+};
+
+const HEAD = 'Raleway Black';   // theme major font
+const BODY = 'Montserrat';      // theme minor font
+
+// ---------------------------------------------------------------- primitives
+const NOLINE = { type: 'none' };
+
+/** Any preset autoshape, solid filled. `transparency` is 0..100 (%). */
+function shape(s, kind, x, y, w, h, color, opts = {}) {
+  const { transparency, ...rest } = opts;
+  const fill = transparency ? { color, transparency } : { color };
+  s.addShape(kind, Object.assign({ x, y, w, h, fill, line: NOLINE }, rest));
+}
+
+/** Flat colour rectangle — by far the deck's most common element. */
+function block(s, x, y, w, h, color, opts = {}) {
+  shape(s, 'rect', x, y, w, h, color, opts);
+}
+
+/** Horizontal rule / connector. */
+function rule(s, x, y, w, color, opts = {}) {
+  s.addShape('line', { x, y, w, h: 0, line: Object.assign({ color, width: 1 }, opts) });
+}
+
+/** Free-form polygon; `pts` are fractions (0..1) of the bounding box. */
+function poly(s, x, y, w, h, color, pts) {
+  s.addShape('custGeom', {
+    x, y, w, h,
+    fill: { color },
+    line: NOLINE,
+    points: pts.map(p => ({ x: p[0] * w, y: p[1] * h })).concat([{ close: true }]),
+  });
+}
+
+/** Text with the deck defaults (Montserrat, top aligned, no auto-shrink). */
+function txt(s, content, opts) {
+  s.addText(content, Object.assign({ fontFace: BODY, color: C.ink, valign: 'top', isTextBox: true }, opts));
+}
+
+/** Section headline: black first half + orange second half, in Raleway Black. */
+function title(s, x, y, w, h, first, second, opts = {}) {
+  const { fontSize = 40, color = C.accent4 } = opts;
+  const rest = Object.assign({}, opts);
+  delete rest.fontSize; delete rest.color;
+  txt(s, [
+    { text: first, options: { fontSize, fontFace: HEAD, color: C.ink } },
+    { text: second, options: { fontSize, fontFace: HEAD, color } },
+  ], Object.assign({ x, y, w, h }, rest));
+}
+
+/** 11pt grey running copy on 1.5 line spacing — the deck's paragraph style. */
+function body(s, x, y, w, h, text, opts = {}) {
+  txt(s, text, Object.assign({ x, y, w, h, fontSize: 11, color: C.gray, lineSpacingMultiple: 1.5 }, opts));
+}
+
+/** 16pt bold slate sub-heading. */
+function lead(s, x, y, w, h, text, opts = {}) {
+  txt(s, text, Object.assign({ x, y, w, h, fontSize: 16, bold: true, color: C.slate }, opts));
+}
+
+// ---------------------------------------------------------------- photo stand-ins
+/** Rectangular placeholder standing in for a photograph. */
+function photo(s, x, y, w, h) {
+  block(s, x, y, w, h, C.photo);
+  s.addText('[image]', {
+    x, y, w, h, fontFace: BODY, fontSize: Math.max(9, Math.min(14, w * 3)),
+    color: C.photoTx, align: 'center', valign: 'middle',
+  });
+}
+
+/** Circular photo placeholder (the deck crops some pictures to circles). */
+function photoDot(s, x, y, d) {
+  s.addShape('ellipse', { x, y, w: d, h: d, fill: { color: C.photo }, line: NOLINE });
+  s.addText('[image]', {
+    x, y, w: d, h: d, fontFace: BODY, fontSize: 9, color: C.photoTx,
+    align: 'center', valign: 'middle',
+  });
+}
+
+/** White pricing card with the deck's very soft drop shadow. */
+function card(s, x, y, w, h) {
+  s.addShape('rect', {
+    x, y, w, h,
+    fill: { color: C.white },
+    line: NOLINE,
+    shadow: { type: 'outer', color: '000000', opacity: 0.1, blur: 20, offset: 0, angle: 90 },
+  });
+}
+
+// ---------------------------------------------------------------- icon stand-ins
+/** Hamburger / "menu" mark on the cover. */
+function iconMenu(s, x, y, w, h) {
+  const bar = h * 0.16;
+  for (let i = 0; i < 3; i++) {
+    s.addShape('roundRect', {
+      x, y: y + i * (h - bar) / 2, w, h: bar,
+      fill: { color: C.accent4 }, line: NOLINE, rectRadius: bar / 2,
+    });
+  }
+}
+
+/** City skyline glyph (white, sits on the orange "Est. 2006" card). */
+function iconBuildings(s, x, y, w, h) {
+  const towers = [[0.00, 0.42, 0.26, 0.58], [0.30, 0.00, 0.26, 1.00],
+                  [0.60, 0.55, 0.20, 0.45], [0.84, 0.05, 0.16, 0.95]];
+  towers.forEach(t => block(s, x + t[0] * w, y + t[1] * h, t[2] * w, t[3] * h, C.white));
+}
+
+/** Shopping-bag glyph. */
+function iconBag(s, x, y, w, h) {
+  poly(s, x, y + h * 0.38, w, h * 0.62, C.white, [[0.08, 0], [0.92, 0], [1, 1], [0, 1]]);
+  s.addShape('arc', {
+    x: x + w * 0.28, y: y + h * 0.06, w: w * 0.44, h: h * 0.62,
+    line: { color: C.white, width: 2 }, angleRange: [180, 360],
+  });
+}
+
+/** Five-point star badge. */
+function iconStar(s, x, y, w, h) {
+  s.addShape('star5', { x, y, w, h, fill: { color: C.white }, line: NOLINE });
+}
+
+/** Row of three round social buttons (twitter / facebook / linkedin). */
+function iconSocial(s, x, y, w, h) {
+  const d = h, gap = (w - 3 * d) / 2;
+  for (let i = 0; i < 3; i++) {
+    const cx = x + i * (d + gap);
+    if (i === 2) block(s, cx, y, d, d, C.white);
+    else s.addShape('ellipse', { x: cx, y, w: d, h: d, fill: { color: C.white }, line: NOLINE });
+    s.addText(['t', 'f', 'in'][i], {
+      x: cx, y, w: d, h: d, fontFace: BODY, fontSize: 7, bold: true,
+      color: C.accent, align: 'center', valign: 'middle',
+    });
+  }
+}
+
+// -- the four white pictograms riding the process arrows on slide 28 --
+
+/** Crosshair / target. */
+function iconTarget(s, x, y, w, h) {
+  s.addShape('donut', { x, y, w, h, fill: { color: C.white }, line: NOLINE });
+  s.addShape('ellipse', { x: x + w * 0.36, y: y + h * 0.36, w: w * 0.28, h: h * 0.28,
+                          fill: { color: C.white }, line: NOLINE });
+  block(s, x + w * 0.46, y - h * 0.12, w * 0.08, h * 0.3, C.white);
+  block(s, x + w * 0.46, y + h * 0.82, w * 0.08, h * 0.3, C.white);
+  block(s, x - w * 0.12, y + h * 0.46, w * 0.3, h * 0.08, C.white);
+  block(s, x + w * 0.82, y + h * 0.46, w * 0.3, h * 0.08, C.white);
+}
+
+/** Two people. */
+function iconPeople(s, x, y, w, h) {
+  [[0.02, 0.46, 0.14], [0.50, 0.58, 0.11]].forEach(p => {
+    const [px, ph, r] = p;
+    s.addShape('ellipse', { x: x + px * w + w * 0.06, y: y + (1 - ph - r * 2.2) * h,
+                            w: r * 2 * w, h: r * 2 * h, fill: { color: C.white }, line: NOLINE });
+    poly(s, x + px * w, y + (1 - ph) * h, w * 0.46, ph * h, C.white,
+         [[0.5, 0], [1, 0.55], [1, 1], [0, 1], [0, 0.55]]);
+  });
+}
+
+/** Megaphone. */
+function iconMegaphone(s, x, y, w, h) {
+  poly(s, x + w * 0.18, y + h * 0.2, w * 0.82, h * 0.6, C.white,
+       [[1, 0], [1, 1], [0.18, 0.72], [0, 0.72], [0, 0.28], [0.18, 0.28]]);
+  block(s, x, y + h * 0.36, w * 0.2, h * 0.28, C.white);
+  block(s, x + w * 0.3, y + h * 0.72, w * 0.22, h * 0.28, C.white);
+}
+
+/** Handshake — two cuffs meeting at a clasp. */
+function iconHandshake(s, x, y, w, h) {
+  poly(s, x, y + h * 0.18, w, h * 0.64, C.white,
+       [[0, 0.1], [0.22, 0], [0.5, 0.42], [0.78, 0], [1, 0.1],
+        [0.78, 1], [0.5, 0.68], [0.22, 1]]);
+}
+
+/** Trophy pictogram inside the big orange circle. */
+function iconTrophy(s, x, y, w, h) {
+  poly(s, x + w * 0.14, y, w * 0.72, h * 0.6, C.white,
+       [[0, 0], [1, 0], [0.86, 0.78], [0.62, 1], [0.38, 1], [0.14, 0.78]]);
+  block(s, x + w * 0.44, y + h * 0.58, w * 0.12, h * 0.24, C.white);
+  block(s, x + w * 0.26, y + h * 0.82, w * 0.48, h * 0.14, C.white);
+}
+
+// ---------------------------------------------------------------- slides
+// 01 — Cover
+function slide01(s) {
+  block(s, 0, 2.658, 1.685, 4.842, C.accent);
+  photo(s, 0.634, 4.771, 3.479, 2.174);
+  rule(s, 3.349, 5.643, 2.337, C.accent);
+  title(s, 2.49, 2.341, 4.669, 1.717, 'EL', 'SON', { wrap: false, fontSize: 96, color: C.accent });
+  txt(s, [
+    { text: 'EL', options: { fontSize: 8, fontFace: HEAD, color: C.gray, transparency: 45 } },
+    { text: 'SON, INC', options: { fontSize: 8, fontFace: HEAD, color: C.accent, transparency: 45 } },
+  ], { x: 0.578, y: 0.59, w: 0.821, h: 0.236, wrap: false });
+  iconMenu(s, 2.651, 0.544, 0.384, 0.226);
+  txt(s, 'Modern An Casual', { x: 4.546, y: 0.437, w: 3.083, h: 0.411, align: 'justify', lineSpacingMultiple: 1.5, fontSize: 14, color: C.slate });
+  txt(s, [
+    { text: 'www.elsoncasual.com', options: { fontSize: 12, color: C.gray, breakLine: true } },
+    { text: '@elson_casual', options: { fontSize: 12, color: C.gray } },
+  ], { x: 4.563, y: 6.194, w: 2.103, h: 0.673, lineSpacingMultiple: 1.5 });
+  txt(s, 'Fashion Casual Presentation', { x: 2.551, y: 3.977, w: 4.237, h: 0.404, fontSize: 18, color: C.slate });
+  block(s, 3.646, 0, 7, 1.717, C.accent, { transparency: 95 });
+  photo(s, 7.633, 0.729, 5.047, 6.771);
+  txt(s, 'See More:', { x: 4.383, y: 5.66, w: 1.677, h: 0.415, align: 'justify', lineSpacingMultiple: 1.5, fontSize: 14, bold: true, color: C.slate });
+}
+
+// 02 — Table of content
+function slide02(s) {
+  title(s, 0.603, 2.048, 5.671, 0.774, 'TABLE ', 'OF CONTENT', { wrap: false });
+  txt(s, '01. About Us', { x: 7.624, y: 0.713, w: 1.582, h: 0.37, wrap: false, fontSize: 16, color: C.slate });
+  txt(s, '02. Our Team', { x: 7.624, y: 1.226, w: 1.708, h: 0.37, wrap: false, fontSize: 16, color: C.slate });
+  txt(s, '03. Services', { x: 7.624, y: 1.738, w: 1.499, h: 0.37, wrap: false, fontSize: 16, color: C.slate });
+  txt(s, '04. Portfolio', { x: 7.624, y: 2.25, w: 1.564, h: 0.37, wrap: false, fontSize: 16, color: C.slate });
+  txt(s, '05. Gallery', { x: 7.624, y: 2.763, w: 1.433, h: 0.37, wrap: false, fontSize: 16, bold: true, color: C.accent4 });
+  txt(s, '06. Client Testimony', { x: 7.624, y: 3.275, w: 2.49, h: 0.37, wrap: false, fontSize: 16, color: C.slate });
+  txt(s, '07. Quotes', { x: 7.624, y: 3.788, w: 1.405, h: 0.37, wrap: false, fontSize: 16, color: C.slate });
+  txt(s, '08. Contact Information', { x: 7.624, y: 4.3, w: 2.898, h: 0.37, wrap: false, fontSize: 16, color: C.slate });
+  txt(s, '3', { x: 11.699, y: 0.73, w: 0.312, h: 0.337, wrap: false, align: 'right', fontSize: 14, color: C.slate });
+  txt(s, '11', { x: 11.669, y: 1.242, w: 0.342, h: 0.337, wrap: false, align: 'right', fontSize: 14, color: C.slate });
+  txt(s, '15', { x: 11.615, y: 1.755, w: 0.397, h: 0.337, wrap: false, align: 'right', fontSize: 14, color: C.slate });
+  txt(s, '20', { x: 11.56, y: 2.267, w: 0.451, h: 0.337, wrap: false, align: 'right', fontSize: 14, color: C.slate });
+  txt(s, '24', { x: 11.559, y: 2.78, w: 0.453, h: 0.337, wrap: false, align: 'right', fontSize: 14, bold: true, color: C.accent4 });
+  txt(s, '33', { x: 11.578, y: 3.292, w: 0.433, h: 0.337, wrap: false, align: 'right', fontSize: 14, color: C.slate });
+  txt(s, '34', { x: 11.559, y: 3.804, w: 0.453, h: 0.337, wrap: false, align: 'right', fontSize: 14, color: C.slate });
+  txt(s, '35', { x: 11.576, y: 4.317, w: 0.435, h: 0.337, wrap: false, align: 'right', fontSize: 14, color: C.slate });
+  rule(s, 0, 1.755, 3.458, C.accent);
+  block(s, 6.708, 0, 6.022, 5.745, C.accent, { transparency: 95 });
+  photo(s, 0, 3.788, 5.671, 2.962);
+}
+
+// 03 — About Elson
+function slide03(s) {
+  block(s, 0.708, 0.729, 6.625, 6.771, C.accent, { transparency: 95 });
+  block(s, 9.688, 0.75, 3.042, 4.021, C.accent);
+  title(s, 1.521, 1.483, 4.479, 1.447, 'ABOUT ELSON ', 'FASHION HERE');
+  body(s, 1.562, 4.346, 3.688, 1.458, 'Conse lectus ornare, viverra ctetur adipiscing elit. Pell entesque scelerisque Eoncao libero a pellentesque. Morbi orci sit amet, con se lect us  ornare, viverra ctetur adipiamet, conse lec tu s ornare, viverra ctetur');
+  txt(s, 'Est. 2006', { x: 10.093, y: 1.985, w: 2.231, h: 0.46, align: 'center', lineSpacingMultiple: 1.5, fontSize: 16, bold: true, color: C.white });
+  iconBuildings(s, 10.846, 1.406, 0.725, 0.548);
+  txt(s, 'Aliquet nibh biba prae senttristique gna sit amet. Aliquet nibh biba t met', { x: 10.031, y: 2.405, w: 2.355, h: 0.903, align: 'center', lineSpacingMultiple: 1.5, fontSize: 11, color: C.white });
+  rule(s, 0.708, 4.151, 2.5, C.accent);
+  photo(s, 5.667, 3.75, 5.958, 3.021);
+}
+
+// 04 — The Elson philosophy
+function slide04(s) {
+  block(s, 0, 0.792, 2.688, 4.021, C.accent);
+  title(s, 5.295, 1.812, 4.479, 1.447, 'THE ELSON ', 'PHILOSOPHY ');
+  body(s, 5.292, 4.972, 3.458, 0.903, 'Eloncao libero a pellentesque. Morbi orci sit amet, ctetur adipiamet, conse lectus ornare, viverra ctetur adipiscing elit');
+  lead(s, 5.295, 4.659, 2.988, 0.37, 'The Philosophy One');
+  body(s, 9.188, 4.972, 3.458, 0.903, 'Eloncao libero a pellentesque. Morbi orci sit amet, ctetur adipiamet, conse lectus ornare, viverra ctetur adipiscing elit');
+  lead(s, 9.191, 4.659, 2.988, 0.37, 'The Philosophy Two');
+  photo(s, 0.688, 1.771, 4, 5.729);
+  photo(s, 9.667, 0.792, 3.667, 2.958);
+  rule(s, 3.542, 4.13, 3.458, C.accent);
+}
+
+// 05 — The Elson fashion casual
+function slide05(s) {
+  block(s, 1.656, 0, 9.927, 7.5, C.accent, { transparency: 95 });
+  block(s, 10.688, 0, 2.645, 6.771, C.accent);
+  title(s, 4.181, 1.375, 5.485, 1.447, 'THE ELSON ', 'FASHION CASUAL');
+  lead(s, 4.223, 3.608, 4.281, 0.37, 'Introduction Elson Here');
+  body(s, 4.223, 3.965, 4.925, 1.18, 'Aliquaet nibh praesent tristique magna sit enlig dolor amet. isus pretium quam vulputate dign issim. Enim agi cinec badui nunc mattis enim ut tellus maelem entum ien alain mamad sita necis bargan eli necis badui ultrices. conse', { align: 'justify' });
+  body(s, 4.223, 5.217, 4.925, 0.903, 'Enim agi cinec badui nunc mattis enim ut tellus maelem entum ien alain mamad sita necis bargan eli necis badui ultrices. Conse cinec badui nunc mattis enim ut ', { align: 'justify' });
+  txt(s, 'Creative Style', { x: 11.04, y: 4.312, w: 2.065, h: 0.415, lineSpacingMultiple: 1.5, bullet: { characterCode: '2713' }, fontSize: 14, bold: true, color: C.white, transparency: 15 });
+  txt(s, 'Best Collection', { x: 11.04, y: 4.926, w: 2.065, h: 0.415, lineSpacingMultiple: 1.5, bullet: { characterCode: '2713' }, fontSize: 14, bold: true, color: C.white, transparency: 15 });
+  txt(s, 'Trusted ', { x: 11.04, y: 5.54, w: 2.065, h: 0.415, lineSpacingMultiple: 1.5, bullet: { characterCode: '2713' }, fontSize: 14, bold: true, color: C.white, transparency: 15 });
+  photo(s, 0, 0.729, 3.625, 6.042);
+  photo(s, 9.708, 0.729, 3.625, 2.833);
+}
+
+// 06 — The Elson's missions
+function slide06(s) {
+  block(s, 0.708, 0.792, 7.958, 2.917, C.accent);
+  txt(s, 'THE ELSON’S MISSIONS HERE', { x: 1.521, y: 1.416, w: 5.146, h: 1.447, fontSize: 40, fontFace: HEAD, color: C.white });
+  txt(s, 'Lorem ipsum dolor sit amet, conse lectus ornare, viverra ctetur adipiscing elit. Pellentesque', { x: 2.271, y: 4.626, w: 3.938, h: 0.622, align: 'justify', lineSpacingMultiple: 1.5, fontSize: 11, color: C.gray2 });
+  lead(s, 2.271, 4.172, 3.083, 0.455, 'Bought A Half Interest', { align: 'justify', lineSpacingMultiple: 1.5 });
+  txt(s, '01 ', { x: 1.521, y: 4.08, w: 1.479, h: 0.721, align: 'justify', lineSpacingMultiple: 1.5, fontSize: 28, bold: true, color: C.slate });
+  txt(s, 'Lorem ipsum dolor sit amet, conse lectus ornare, viverra ctetur adipiscing elit. Pellentesque', { x: 2.271, y: 6.086, w: 3.938, h: 0.622, align: 'justify', lineSpacingMultiple: 1.5, fontSize: 11, color: C.gray2 });
+  lead(s, 2.271, 5.632, 3.083, 0.455, 'Start With Casual Thing', { align: 'justify', lineSpacingMultiple: 1.5 });
+  txt(s, '02 ', { x: 1.521, y: 5.54, w: 1.479, h: 0.721, align: 'justify', lineSpacingMultiple: 1.5, fontSize: 28, bold: true, color: C.slate });
+  photo(s, 6.667, 1.729, 6.667, 5.771);
+}
+
+// 07 — Story behind Elson
+function slide07(s) {
+  block(s, 0.667, 3.375, 2.009, 4.125, C.accent, { transparency: 95 });
+  block(s, 7.625, 0, 3.042, 3.75, C.accent);
+  title(s, 1.521, 1.353, 5.146, 1.447, 'STORY BEHIND ', 'ELSON FASHION');
+  lead(s, 1.599, 3.881, 2.664, 0.37, 'Story, 14 Sep 2009');
+  body(s, 1.599, 4.196, 4.721, 0.903, 'Aliquet nibh present danod lasio tristique magna sit amet. Risus pretium quamd dioal vulputate dignissim. Enim necis ila dui nuntAliquet nibh present danodndna ', { align: 'justify' });
+  lead(s, 1.599, 5.433, 2.648, 0.37, 'Story, 28 Jan 2012');
+  body(s, 1.599, 5.723, 4.721, 0.903, 'Aliquet nibh present danod lasio tristique magna sit amet. Risus pretium quamd dioal vulputate dignissim. Enim necis ila dui nuntAliquet nibh present danodndna ', { align: 'justify' });
+  photo(s, 8.667, 0.729, 4, 6.042);
+}
+
+// 08 — Elson's history
+function slide08(s) {
+  block(s, 2.646, 0.771, 3.042, 5, C.accent);
+  title(s, 6.516, 1.666, 5.609, 0.774, 'ELSON’S ', 'HISTORY');
+  lead(s, 6.537, 3.463, 2.359, 0.37, 'History, Jan 2002');
+  body(s, 6.537, 3.792, 2.871, 0.903, 'Aliquet nibh present lasio tristique magna sit amet. Risus pretium qu am vulputate dignissim', { align: 'justify' });
+  rule(s, 9.083, 2.797, 4.25, C.accent4, { width: 3 });
+  lead(s, 6.537, 5.106, 2.359, 0.37, 'History, Sep 2010');
+  body(s, 6.537, 5.435, 2.871, 0.903, 'Aliquet nibh present lasio tristique magna sit amet. Risus pretium qu am vulputate dignissim', { align: 'justify' });
+  lead(s, 9.662, 3.463, 2.359, 0.37, 'History, Mar 2004');
+  body(s, 9.662, 3.792, 2.871, 0.903, 'Aliquet nibh present lasio tristique magna sit amet. Risus pretium qu am vulputate dignissim', { align: 'justify' });
+  lead(s, 9.662, 5.106, 2.359, 0.37, 'History, Nov 2012');
+  body(s, 9.662, 5.435, 2.871, 0.903, 'Aliquet nibh present lasio tristique magna sit amet. Risus pretium qu am vulputate dignissim', { align: 'justify' });
+  photo(s, 0.646, 1.771, 4, 2.392);
+  photo(s, 0.646, 4.379, 4, 2.392);
+}
+
+// 09 — Be smart, choose your choice
+function slide09(s) {
+  photo(s, 0.667, 3.75, 9.958, 3.75);
+  block(s, 6.667, 0, 5.017, 6.729, C.accent, { transparency: 95 });
+  title(s, 0.638, 1.426, 5.843, 1.447, 'BE SMART CHOOSE ', 'YOUR CHOICE HERE');
+  block(s, 7.708, 0.771, 4.958, 5, C.accent);
+  txt(s, 'Fashion For Men', { x: 8.225, y: 1.976, w: 3.612, h: 0.462, lineSpacingMultiple: 1.5, fontSize: 16, bold: true, color: C.white });
+  txt(s, 'Tristique nulla aliquet enim tortor at auctor urna nunc id. Maecenas accum san lacus vel facilisis', { x: 8.225, y: 2.385, w: 3.956, h: 0.625, align: 'justify', lineSpacingMultiple: 1.5, fontSize: 11, color: C.white });
+  txt(s, '01', { x: 8.225, y: 1.242, w: 1.458, h: 0.819, lineSpacingMultiple: 1.5, fontSize: 32, bold: true, color: C.white });
+  txt(s, 'Fashion For Woman', { x: 8.225, y: 4.032, w: 3.612, h: 0.462, lineSpacingMultiple: 1.5, fontSize: 16, bold: true, color: C.white });
+  txt(s, 'Tristique nulla aliquet enim tortor at auctor urna nunc id. Maecenas accum san lacus vel facilisis', { x: 8.225, y: 4.441, w: 3.956, h: 0.625, align: 'justify', lineSpacingMultiple: 1.5, fontSize: 11, color: C.white });
+  txt(s, '02', { x: 8.225, y: 3.298, w: 1.458, h: 0.819, lineSpacingMultiple: 1.5, fontSize: 32, bold: true, color: C.white });
+}
+
+// 10 — Elson's collection
+function slide10(s) {
+  block(s, 10.68, 0, 1.986, 3.75, C.accent, { transparency: 95 });
+  title(s, 2.938, 0.957, 7.458, 0.774, 'ELSON’S ', 'COLLECTION', { align: 'center' });
+  body(s, 1.865, 6.039, 3.188, 0.625, 'Lorem ipsum dolor sit amet, conse lectus ornare, viverra ctetua', { align: 'center' });
+  txt(s, 'Detail Collection', { x: 2.653, y: 5.803, w: 1.611, h: 0.252, align: 'center', fontSize: 9, italic: true, color: C.gray });
+  lead(s, 2.24, 5.495, 2.438, 0.37, 'Collection One', { align: 'center' });
+  body(s, 5.073, 6.039, 3.188, 0.625, 'Lorem ipsum dolor sit amet, conse lectus ornare, viverra ctetua', { align: 'center' });
+  txt(s, 'Detail Collection', { x: 5.861, y: 5.803, w: 1.611, h: 0.252, align: 'center', fontSize: 9, italic: true, color: C.gray });
+  lead(s, 5.448, 5.495, 2.438, 0.37, 'Collection Two', { align: 'center' });
+  body(s, 8.281, 6.039, 3.188, 0.625, 'Lorem ipsum dolor sit amet, conse lectus ornare, viverra ctetua', { align: 'center' });
+  txt(s, 'Detail Collection', { x: 9.07, y: 5.803, w: 1.611, h: 0.252, align: 'center', fontSize: 9, italic: true, color: C.gray });
+  lead(s, 8.656, 5.495, 2.438, 0.37, 'Collection Three', { align: 'center' });
+  photo(s, 2.01, 2.213, 2.896, 3.021);
+  photo(s, 5.219, 2.213, 2.896, 3.021);
+  photo(s, 8.427, 2.24, 2.896, 3.021);
+}
+
+// 11 — Know about our collection
+function slide11(s) {
+  block(s, 0.688, 3.75, 2.021, 3.75, C.accent, { transparency: 95 });
+  body(s, 1.542, 4.388, 4.445, 1.18, 'Conse lectus ornare, viverra ctetur adipiscing elit. Pell entesque scelerisque Eoncao libero a pellentesque. Morbi orci sit amet, con se lect us  ornare, viverra ctetur adipiamet, conse lec tu s ornare, viverra ctetur');
+  block(s, 9.521, 0, 3.812, 7.5, C.accent);
+  title(s, 1.492, 1.357, 5.11, 1.447, 'KNOW ABOUT ', 'OUR COLLECTION');
+  txt(s, 'Style With Love', { x: 9.941, y: 1.373, w: 2.541, h: 0.462, lineSpacingMultiple: 1.5, fontSize: 16, bold: true, color: C.white });
+  txt(s, 'Tristique nulla aliquet enim tortor at auctor urna nunc id. Maecenasi', { x: 9.941, y: 1.782, w: 2.847, h: 0.625, align: 'justify', lineSpacingMultiple: 1.5, fontSize: 11, color: C.white });
+  txt(s, '01', { x: 9.941, y: 0.681, w: 1.026, h: 0.819, lineSpacingMultiple: 1.5, fontSize: 32, bold: true, color: C.white, transparency: 45 });
+  txt(s, 'Casual Consultant', { x: 9.941, y: 3.579, w: 2.541, h: 0.462, lineSpacingMultiple: 1.5, fontSize: 16, bold: true, color: C.white });
+  txt(s, 'Tristique nulla aliquet enim tortor at auctor urna nunc id. Maecenasi', { x: 9.941, y: 3.988, w: 2.847, h: 0.625, align: 'justify', lineSpacingMultiple: 1.5, fontSize: 11, color: C.white });
+  txt(s, '02', { x: 9.941, y: 2.887, w: 1.026, h: 0.819, lineSpacingMultiple: 1.5, fontSize: 32, bold: true, color: C.white, transparency: 45 });
+  txt(s, 'Fashion Designing', { x: 9.941, y: 5.785, w: 2.541, h: 0.462, lineSpacingMultiple: 1.5, fontSize: 16, bold: true, color: C.white });
+  txt(s, 'Tristique nulla aliquet enim tortor at auctor urna nunc id. Maecenasi', { x: 9.941, y: 6.194, w: 2.847, h: 0.625, align: 'justify', lineSpacingMultiple: 1.5, fontSize: 11, color: C.white });
+  txt(s, '03', { x: 9.941, y: 5.093, w: 1.026, h: 0.819, lineSpacingMultiple: 1.5, fontSize: 32, bold: true, color: C.white, transparency: 45 });
+  rule(s, 0, 3.11, 3.729, C.accent4, { width: 3 });
+  photoDot(s, 7.028, 0.647, 1.794);
+  photoDot(s, 7.028, 2.853, 1.794);
+  photoDot(s, 7.028, 5.059, 1.794);
+}
+
+// 12 — Future is here
+function slide12(s) {
+  block(s, 6.667, 0.75, 5.021, 3.221, C.accent);
+  title(s, 0.583, 3.333, 5.021, 0.774, 'FUTURE ', 'IS HERE');
+  lead(s, 0.604, 5.323, 2.493, 0.37, 'Casual Collections');
+  body(s, 0.604, 5.704, 3.317, 0.625, 'Aliquet nibh present lasio tristique mag na sit amet. Risus pretium qua viverra pl', { align: 'justify' });
+  txt(s, '100+', { x: 0.615, y: 4.816, w: 1.399, h: 0.505, fontSize: 24, bold: true, color: C.accent, transparency: 45 });
+  lead(s, 4.408, 5.323, 2.493, 0.37, 'Newest Project');
+  body(s, 4.408, 5.704, 3.317, 0.625, 'Aliquet nibh present lasio tristique mag na sit amet. Risus pretium qua viverra pl', { align: 'justify' });
+  txt(s, '90k', { x: 4.418, y: 4.816, w: 1.399, h: 0.505, fontSize: 24, bold: true, color: C.accent, transparency: 45 });
+  photo(s, 0.667, 0, 7.104, 2.833);
+  photo(s, 8.677, 1.708, 4.073, 5.042);
+}
+
+// 13 — We know all you need
+function slide13(s) {
+  block(s, 4.688, 2.896, 4.021, 4.604, C.accent, { transparency: 95 });
+  title(s, 7.406, 1.199, 4.76, 1.447, 'WE KNOW ALL ', 'YOU NEED HERE');
+  lead(s, 7.436, 3.505, 2.535, 0.37, '01. Fashion Solution', { wrap: false });
+  body(s, 7.434, 3.858, 5.232, 0.904, 'Aliquaet nibh praesent tristique anit smagna sit amet. Risus pretium quam vulputate dignissim. Enimagi cinec duir nunc mattis enim ut tellus maele tu s ornare, viverra ctetur', { align: 'justify' });
+  lead(s, 7.429, 5.011, 2.668, 0.37, '02. The Modern Style', { wrap: false });
+  body(s, 7.427, 5.364, 5.232, 0.904, 'Aliquaet nibh praesent tristique anit smagna sit amet. Risus pretium quam vulputate dignissim. Enimagi cinec duir nunc mattis enim ut tellus maele tu s ornare, viverra ctetur', { align: 'justify' });
+  rule(s, 9.604, 2.958, 3.729, C.accent4, { width: 3 });
+  photo(s, 0.667, 0.771, 2.94, 6.021);
+  photo(s, 3.748, 0.771, 2.94, 6.021);
+}
+
+// 14 — We make sure you're satisfied
+function slide14(s) {
+  block(s, 9.521, 0.75, 3.812, 5.021, C.accent);
+  photo(s, 0, 0.75, 2.688, 6);
+  title(s, 3.091, 1.456, 5.638, 1.447, 'WE MAKE SURE ', 'YOU’RE SATISFIED');
+  body(s, 3.091, 4.507, 4.284, 1.18, 'Conse lectus ornare, viverra ctetur adipiscing elit. Pell entesque scelerisque Eoncao libero a pellentesque. Morbi orci sit amet, con se lect us  ornare, viverra cte tur adipiamet, conse lec tu s ornare, viverr');
+  txt(s, 'Making Your Communities Stronger', { x: 10.1, y: 2.106, w: 3.108, h: 0.863, lineSpacingMultiple: 1.5, fontSize: 16, bold: true, color: C.white });
+  iconBag(s, 10.223, 1.59, 0.336, 0.363);
+  rule(s, 1.896, 4.328, 2.646, C.accent4, { width: 3 });
+  photo(s, 7.667, 3.75, 5.021, 3);
+}
+
+// 15 — Stylish with us
+function slide15(s) {
+  block(s, 4.688, 2.708, 4.021, 4.792, C.accent, { transparency: 96 });
+  block(s, 2.604, 5.731, 9.099, 1.769, C.accent);
+  photo(s, 0.646, 0, 6.021, 6.771);
+  title(s, 7.514, 1.56, 5.056, 0.774, 'STYLISH ', 'WITH US');
+  lead(s, 7.514, 3.523, 4.045, 0.37, 'High Style Exceptional Service.');
+  body(s, 7.514, 3.892, 5.232, 1.18, 'Aliquaet nibh praesent tristique anit smagna sit amet. Risus pretium quam vulputate dignissim. Enimagi cinec duir nunc mat tis enim ut tellus maele tu s ornare, viverra ctetur viverra ctetur adipiscing elit. Pell entesque scelerisque oncao');
+  iconStar(s, 7.64, 6.165, 0.558, 0.53);
+  txt(s, 'Bringing Premium Casual Style To People', { x: 8.489, y: 6.039, w: 2.776, h: 0.768, lineSpacingMultiple: 1.5, fontSize: 14, bold: true, color: C.white });
+}
+
+// 16 — Keep calm and we make solution
+function slide16(s) {
+  block(s, 7.708, 0, 5.625, 7.5, C.accent);
+  photo(s, 0, 3.78, 7.708, 3.75);
+  photoDot(s, 9.495, 0.447, 2.052);
+  photoDot(s, 9.495, 3.885, 2.052);
+  txt(s, [
+    { text: 'KEEP CALM AND', options: { fontSize: 40, fontFace: HEAD, breakLine: true } },
+    { text: 'WE MAKE SOLUTION', options: { fontSize: 40, fontFace: HEAD, color: C.accent4 } },
+  ], { x: 0.887, y: 1.523, w: 5.96, h: 1.447 });
+  rule(s, 0, 1.161, 2.651, C.accent4, { width: 3 });
+  txt(s, 'Paistique anit smagna sit amet. Risus pret ium quam vulputate dignissi enia', { x: 8.646, y: 2.938, w: 3.75, h: 0.625, align: 'center', lineSpacingMultiple: 1.5, fontSize: 11, color: C.white });
+  txt(s, 'Collection One', { x: 9.302, y: 2.643, w: 2.438, h: 0.37, align: 'center', fontSize: 16, bold: true, color: C.white });
+  txt(s, 'Paistique anit smagna sit amet. Risus pret ium quam vulputate dignissi enia', { x: 8.646, y: 6.376, w: 3.75, h: 0.625, align: 'center', lineSpacingMultiple: 1.5, fontSize: 11, color: C.white });
+  txt(s, 'Collection One', { x: 9.302, y: 6.082, w: 2.438, h: 0.37, align: 'center', fontSize: 16, bold: true, color: C.white });
+}
+
+// 17 — Meet our team
+function slide17(s) {
+  block(s, 1.708, 0.708, 5.928, 6.792, C.accent, { transparency: 95 });
+  block(s, 0, 3.708, 6.667, 3.083, C.accent);
+  title(s, 7.978, 1.729, 4.84, 0.774, 'MEET OUR ', 'TEAM');
+  body(s, 7.978, 4.37, 4.692, 1.458, 'Vulputatera esent tristique anit smagna sit amet. Risus pre tium quam dignissim. Enimagi cinec duir nunc mattis enim ut tellus maelem entum tristique anit smagna sit amet. Risus pre magna sit amet. Risus pretium quam vulputate tium quam dignissim. Enimagi ci', { align: 'justify' });
+  txt(s, 'Quis varius quam quisque id diam vel. Ut minenim ', { x: 0.643, y: 5.661, w: 2.462, h: 0.625, align: 'center', lineSpacingMultiple: 1.5, fontSize: 11, color: C.white });
+  txt(s, [
+    { text: 'C', options: { fontSize: 11, italic: true, color: C.white } },
+    { text: 'EO & Founder', options: { fontSize: 11, italic: true, color: C.white } },
+  ], { x: 0.886, y: 5.309, w: 1.975, h: 0.349, align: 'center', lineSpacingMultiple: 1.5 });
+  txt(s, 'Kimberly Joss', { x: 0.643, y: 4.957, w: 2.462, h: 0.46, align: 'center', lineSpacingMultiple: 1.5, fontSize: 16, bold: true, color: C.white });
+  txt(s, 'Quis varius quam quisque id diam vel. Ut minenim b', { x: 3.317, y: 5.661, w: 2.462, h: 0.625, align: 'center', lineSpacingMultiple: 1.5, fontSize: 11, color: C.white });
+  txt(s, 'General Manager', { x: 3.648, y: 5.31, w: 1.8, h: 0.349, align: 'center', lineSpacingMultiple: 1.5, fontSize: 11, italic: true, color: C.white });
+  txt(s, 'Stephanie Joe', { x: 3.317, y: 4.957, w: 2.462, h: 0.46, align: 'center', lineSpacingMultiple: 1.5, fontSize: 16, bold: true, color: C.white });
+  rule(s, 10.229, 2.911, 3.104, C.accent4, { width: 3 });
+  lead(s, 7.978, 4.021, 2.875, 0.37, 'Our Professional Team', { wrap: false });
+  photo(s, 0.641, 1.708, 2.466, 3.083);
+  photo(s, 3.315, 1.708, 2.466, 3.083);
+}
+
+// 18 — Meet our CEO and founder
+function slide18(s) {
+  block(s, 0.646, 3.75, 9.042, 3, C.accent);
+  txt(s, 'Elson’s CEO & Founder', { x: 1.521, y: 4.317, w: 2.625, h: 0.349, lineSpacingMultiple: 1.5, fontSize: 11, italic: true, color: C.white });
+  txt(s, 'Aliquet nibh praesent tristique oal magna sit amet. Risus pretium micasa lo quam vulputate dignissim. enim nec. nibh praesent tristique oal magna sit amet quam', { x: 1.517, y: 4.769, w: 4.723, h: 0.903, align: 'justify', lineSpacingMultiple: 1.5, fontSize: 11, color: C.white });
+  txt(s, 'Kimberly Joss', { x: 1.517, y: 3.929, w: 2.207, h: 0.46, align: 'justify', lineSpacingMultiple: 1.5, fontSize: 16, bold: true, color: C.white });
+  block(s, 1.6, 6.252, 3.8, 0.05, C.mist, { transparency: 55 });
+  block(s, 1.6, 6.252, 3.45, 0.05, C.white);
+  txt(s, '90%', { x: 5.641, y: 6.131, w: 0.58, h: 0.269, margin: 0, align: 'justify', lineSpacingMultiple: 1.5, fontSize: 12, color: C.white });
+  txt(s, 'Type Your Skill Here', { x: 1.606, y: 5.869, w: 2.102, h: 0.248, margin: 0, lineSpacingMultiple: 1.5, fontSize: 11, italic: true, color: C.white });
+  title(s, 1.517, 1.488, 4.703, 1.447, 'MEET OUR CEO ', 'AND FOUNDER');
+  photo(s, 6.667, 0.75, 6.667, 4.979);
+}
+
+// 19 — About Elson's general manager
+function slide19(s) {
+  photo(s, 0.667, 0, 5.713, 5.771);
+  block(s, 3.667, 3.75, 9.021, 3.062, C.accent);
+  title(s, 6.826, 1.3, 5.861, 1.447, 'ABOUT ELSON’S ', 'GENERAL MANAGER');
+  txt(s, 'Elson’s  General Manager', { x: 6.83, y: 4.392, w: 2.625, h: 0.349, lineSpacingMultiple: 1.5, fontSize: 11, italic: true, color: C.white });
+  txt(s, 'Aliquet nibh praesent tristique oal magna sit amet. Risus pretium micasa lo quam vulputate dignissim. enim nec. nibh praesent tristique oal magna sit amet quam', { x: 6.826, y: 4.845, w: 4.723, h: 0.903, align: 'justify', lineSpacingMultiple: 1.5, fontSize: 11, color: C.white });
+  txt(s, 'Stephanie Joe', { x: 6.826, y: 4.004, w: 2.207, h: 0.46, align: 'justify', lineSpacingMultiple: 1.5, fontSize: 16, bold: true, color: C.white });
+  block(s, 6.909, 6.328, 3.8, 0.05, C.mist, { transparency: 55 });
+  block(s, 6.909, 6.328, 3.45, 0.05, C.white);
+  txt(s, '90%', { x: 11.012, y: 6.207, w: 0.58, h: 0.269, margin: 0, align: 'justify', lineSpacingMultiple: 1.5, fontSize: 12, color: C.white });
+  txt(s, 'Type Your Skill Here', { x: 6.915, y: 5.944, w: 2.102, h: 0.248, margin: 0, lineSpacingMultiple: 1.5, fontSize: 11, italic: true, color: C.white });
+  photoDot(s, 4.328, 4.255, 2.052);
+}
+
+// 20 — The Elson's designer
+function slide20(s) {
+  block(s, 0.646, 3.75, 12.688, 3.062, C.accent);
+  txt(s, 'Praesent tristique anit smagna sit amet. Risus pre tium quam vulputate dignissim. Enimagi cinec duir nunc mattis enim ut tellus maelem Aliquaet nibh pe num iena nec dui ultrices. Minas consectetur adip isc ing elit, sed tollo do eiusmod tempsmagna sit amet preellus maelem enim ut tellus dignissim. Enimagi cinec duir nunc', { x: 1.521, y: 4.165, w: 4.757, h: 1.736, lineSpacingMultiple: 1.5, fontSize: 11, color: C.white });
+  txt(s, [
+    { text: 'O', options: { fontSize: 11, italic: true, color: C.white } },
+    { text: 'ur  Master Designer', options: { fontSize: 11, italic: true, color: C.white } },
+  ], { x: 7.146, y: 5.399, w: 1.975, h: 0.349, align: 'center', lineSpacingMultiple: 1.5 });
+  txt(s, 'Marry Christina', { x: 6.903, y: 4.981, w: 2.462, h: 0.504, align: 'center', lineSpacingMultiple: 1.5, fontSize: 18, bold: true, color: C.white });
+  iconSocial(s, 7.777, 5.899, 0.714, 0.196);
+  txt(s, 'Assistant Designer', { x: 10.233, y: 5.397, w: 1.975, h: 0.349, align: 'center', lineSpacingMultiple: 1.5, fontSize: 11, italic: true, color: C.white });
+  txt(s, 'William Smith', { x: 9.99, y: 4.979, w: 2.462, h: 0.504, align: 'center', lineSpacingMultiple: 1.5, fontSize: 18, bold: true, color: C.white });
+  iconSocial(s, 10.864, 5.897, 0.714, 0.196);
+  title(s, 1.517, 1.467, 4.703, 1.447, 'THE ELSON’S ', 'DESIGNER HERE');
+  photo(s, 6.667, 0.688, 2.934, 4.104);
+  photo(s, 9.754, 0.688, 2.934, 4.104);
+}
+
+// 21 — Trending product
+function slide21(s) {
+  photo(s, 0.667, 0, 10.062, 3.75);
+  block(s, 7.667, 1.688, 5.021, 5.125, C.accent);
+  title(s, 0.567, 4.236, 6.099, 0.774, 'TRENDING ', 'PRODUCT');
+  body(s, 0.567, 5.629, 3.734, 0.903, 'Aquiela nulla aliquet enim tortor at auct orurna nunc id. Mae cenas accu msan lacus vel facilisis volutpat est velit ege sta');
+  txt(s, 'Product One', { x: 8.355, y: 2.715, w: 2.655, h: 0.462, lineSpacingMultiple: 1.5, fontSize: 16, bold: true, color: C.white });
+  txt(s, 'Aliquaet nibh praesent tristique anit sma gna sit amet. Risus pretium quam vulputate dig nissim. Enimagi cinec duir nunc ', { x: 8.355, y: 3.124, w: 3.624, h: 0.903, align: 'justify', lineSpacingMultiple: 1.5, fontSize: 11, color: C.white });
+  txt(s, '01', { x: 8.355, y: 2.022, w: 1.458, h: 0.819, lineSpacingMultiple: 1.5, fontSize: 32, bold: true, color: C.white, transparency: 45 });
+  txt(s, 'Product Two', { x: 8.355, y: 4.958, w: 2.655, h: 0.462, lineSpacingMultiple: 1.5, fontSize: 16, bold: true, color: C.white });
+  txt(s, 'Aliquaet nibh praesent tristique anit sma gna sit amet. Risus pretium quam vulputate dig nissim. Enimagi cinec duir nunc ', { x: 8.355, y: 5.367, w: 3.624, h: 0.903, align: 'justify', lineSpacingMultiple: 1.5, fontSize: 11, color: C.white });
+  txt(s, '02', { x: 8.355, y: 4.265, w: 1.458, h: 0.819, lineSpacingMultiple: 1.5, fontSize: 32, bold: true, color: C.white, transparency: 45 });
+  rule(s, 0, 5.257, 3.104, C.accent4, { width: 3 });
+}
+
+// 22 — Our special collection
+function slide22(s) {
+  block(s, 7.667, 0, 3.092, 7.5, C.accent);
+  block(s, 0, 0.763, 9.637, 3.125, C.accent, { transparency: 95 });
+  title(s, 0.604, 1.752, 3.899, 1.447, 'OUR SPECIAL ', 'COLLECTION');
+  lead(s, 0.606, 4.325, 2.879, 0.37, 'We Bring Special Style', { wrap: false });
+  body(s, 0.604, 4.678, 4.25, 1.458, 'Praesent tristique anit smagna sit amet. Risus pre tium quam vulputate dignissim. Enimagi cinec duir nunc mattis enim ut tellus maelem Aliquaet nibh pentum iena nec dui ultrices. Minas consectetur adip iscing elit, sed tollo do adip isci', { align: 'justify' });
+  photo(s, 5.625, 1.75, 7.062, 5.75);
+}
+
+// 23 — The casual is opportunities
+function slide23(s) {
+  photo(s, 0.667, 0.729, 5.021, 6.771);
+  block(s, 4.625, 3.562, 8.042, 3.312, C.accent);
+  shape(s, 'roundRect', 7.281, 4.09, 0.03, 0.9, C.white, { transparency: 45, rectRadius: 0.015 });
+  txt(s, 'Best Services', { x: 5.081, y: 4.523, w: 2.136, h: 0.46, align: 'center', lineSpacingMultiple: 1.5, fontSize: 16, color: C.white });
+  txt(s, '90%', { x: 5.081, y: 3.911, w: 2.136, h: 0.729, align: 'center', lineSpacingMultiple: 1.5, fontSize: 28, bold: true, color: C.white });
+  txt(s, 'Tristique aliquet enim tortor at auctor urna nunc nulla aliuetTristique  enim tor Vulputatera esent tristique anit smagna sit amet. Risus pre tium ', { x: 7.506, y: 4.09, w: 4.28, h: 0.903, align: 'justify', lineSpacingMultiple: 1.5, fontSize: 11, color: C.white });
+  shape(s, 'roundRect', 7.281, 5.603, 0.03, 0.9, C.white, { transparency: 45, rectRadius: 0.015 });
+  txt(s, 'New Missions', { x: 5.081, y: 6.035, w: 2.136, h: 0.46, align: 'center', lineSpacingMultiple: 1.5, fontSize: 16, color: C.white });
+  txt(s, '2022', { x: 5.081, y: 5.441, w: 2.136, h: 0.729, align: 'center', lineSpacingMultiple: 1.5, fontSize: 28, bold: true, color: C.white });
+  txt(s, 'Tristique aliquet enim tortor at auctor urna nunc nulla aliuetTristique  enim tor Vulputatera esent tristique anit smagna sit amet. Risus pre tium ', { x: 7.506, y: 5.602, w: 4.28, h: 0.903, align: 'justify', lineSpacingMultiple: 1.5, fontSize: 11, color: C.white });
+  title(s, 6.667, 1.432, 5.119, 1.447, 'THE CASUAL IS ', 'OPPORTUNITIES');
+}
+
+// 24 — Trusted product
+function slide24(s) {
+  block(s, 6.667, 2.708, 3.042, 4.167, C.accent);
+  txt(s, [
+    { text: 'Lorem ipsum dolor sit amet, conse lectus ornare, viverra ctetur adipiscing elit. Pellentesque', options: { fontSize: 11, color: C.gray2 } },
+    { text: ' anit smI', options: { fontSize: 11, color: C.gray } },
+  ], { x: 1.317, y: 3.976, w: 4.104, h: 0.625, align: 'justify', lineSpacingMultiple: 1.5 });
+  lead(s, 1.317, 3.522, 3.083, 0.455, 'The Solution One', { align: 'justify', lineSpacingMultiple: 1.5 });
+  txt(s, '01 ', { x: 0.567, y: 3.43, w: 1.479, h: 0.721, align: 'justify', lineSpacingMultiple: 1.5, fontSize: 28, bold: true, color: C.slate });
+  txt(s, [
+    { text: 'Lorem ipsum dolor sit amet, conse lectus ornare, viverra ctetur adipiscing elit. Pellentesque', options: { fontSize: 11, color: C.gray2 } },
+    { text: ' anit smI', options: { fontSize: 11, color: C.gray } },
+  ], { x: 1.317, y: 5.478, w: 4.104, h: 0.625, align: 'justify', lineSpacingMultiple: 1.5 });
+  lead(s, 1.317, 5.024, 3.083, 0.455, 'The Solution Two', { align: 'justify', lineSpacingMultiple: 1.5 });
+  txt(s, '02 ', { x: 0.567, y: 4.932, w: 1.479, h: 0.721, align: 'justify', lineSpacingMultiple: 1.5, fontSize: 28, bold: true, color: C.slate });
+  title(s, 0.567, 1.464, 6.099, 0.774, 'TRUSTED ', 'PRODUCT');
+  rule(s, 0, 2.568, 3.625, C.accent4, { width: 3 });
+  txt(s, 'We Are Love Of Nature Always Continues', { x: 9.969, y: 5.647, w: 3.042, h: 0.863, lineSpacingMultiple: 1.5, fontSize: 16, bold: true, color: '706F71' });
+  rule(s, 8.667, 5.478, 2.708, C.accent4);
+  photo(s, 7.688, 0, 5.646, 4.792);
+}
+
+// 25 — The elegant fashion
+function slide25(s) {
+  photo(s, 0.688, 3.75, 9.958, 3);
+  block(s, 7.708, 0.771, 4.938, 5.062, C.accent);
+  title(s, 0.6, 1.196, 6.859, 0.774, 'THE ELEGANT ', 'FASHION');
+  body(s, 0.604, 2.371, 4.104, 0.903, 'Nulla aliuetTristique  enim tor Vulputatera esent tristique anit smagna sit amet. Risus pre tium qu am dignissim. Enimagi cinec duir nunc');
+  txt(s, 'Modern Style', { x: 8.316, y: 1.818, w: 2.541, h: 0.462, lineSpacingMultiple: 1.5, fontSize: 16, bold: true, color: C.white });
+  txt(s, 'Tristique aliquet enim tortor at auctor urna nunc nulla aliuetTristique  enim tor Vulputatera esent tristique anit smagna sit amet.', { x: 8.316, y: 2.227, w: 3.913, h: 0.903, align: 'justify', lineSpacingMultiple: 1.5, fontSize: 11, color: C.white });
+  txt(s, '01', { x: 8.316, y: 1.125, w: 1.026, h: 0.819, lineSpacingMultiple: 1.5, fontSize: 32, bold: true, color: C.white, transparency: 45 });
+  txt(s, 'Urban Style', { x: 8.316, y: 4.04, w: 2.541, h: 0.462, lineSpacingMultiple: 1.5, fontSize: 16, bold: true, color: C.white });
+  txt(s, 'Tristique aliquet enim tortor at auctor urna nunc nulla aliuetTristique  enim tor Vulputatera esent tristique anit smagna sit amet.', { x: 8.316, y: 4.449, w: 3.913, h: 0.903, align: 'justify', lineSpacingMultiple: 1.5, fontSize: 11, color: C.white });
+  txt(s, '02', { x: 8.316, y: 3.348, w: 1.026, h: 0.819, lineSpacingMultiple: 1.5, fontSize: 32, bold: true, color: C.white, transparency: 45 });
+}
+
+// 26 — Client's testimony
+function slide26(s) {
+  block(s, 0, 3.75, 13.333, 3.062, C.accent, { transparency: 96 });
+  title(s, 2.667, 0.932, 8, 0.774, 'CLIENT’S ', 'TESTIMONY', { align: 'center' });
+  lead(s, 0.899, 5.399, 2.015, 0.37, 'Client, Jan 2016', { wrap: false, align: 'center' });
+  body(s, 0.735, 5.69, 2.342, 0.627, 'Aliquaet nibh prnt tri stique anit smaa  sit amet. Risus', { align: 'center' });
+  lead(s, 4.053, 5.399, 2.053, 0.37, 'Client, Mar 2018', { wrap: false, align: 'center' });
+  body(s, 3.909, 5.69, 2.342, 0.627, 'Aliquaet nibh prnt tri stique anit smaa  sit amet. Risus', { align: 'center' });
+  lead(s, 7.214, 5.399, 2.079, 0.37, 'Client, Mei 2020', { wrap: false, align: 'center' });
+  body(s, 7.082, 5.69, 2.342, 0.627, 'Aliquaet nibh prnt tri stique anit smaa  sit amet. Risus', { align: 'center' });
+  lead(s, 10.4, 5.399, 2.053, 0.37, 'Client, Nov 2021', { wrap: false, align: 'center' });
+  body(s, 10.256, 5.69, 2.342, 0.627, 'Aliquaet nibh prnt tri stique anit smaa  sit amet. Risus', { align: 'center' });
+  photo(s, 0.594, 2.458, 2.625, 2.583);
+  photo(s, 3.767, 2.458, 2.625, 2.583);
+  photo(s, 6.941, 2.458, 2.625, 2.583);
+  photo(s, 10.115, 2.458, 2.625, 2.583);
+}
+
+// 27 — Break time now
+function slide27(s) {
+  title(s, 0.524, 0.896, 5.499, 2.524, 'BREAK ', 'TIME NOW', { fontSize: 72 });
+  txt(s, 'Let’s Grab Your Snack And Drink', { x: 0.58, y: 4.754, w: 2.753, h: 1.054, lineSpacingMultiple: 1.5, fontSize: 20, color: C.gray });
+  body(s, 9.958, 1.904, 2.75, 0.625, 'Lorem ipsum dolor sit amet, con se lectus ornare, viverra sala');
+  txt(s, '30:00', { x: 8.476, y: 1.755, w: 1.78, h: 0.721, align: 'justify', lineSpacingMultiple: 1.5, fontSize: 28, bold: true, color: C.slate });
+  rule(s, 0, 3.75, 3.604, C.accent4, { width: 3 });
+  block(s, 4.646, 4.754, 2.021, 2.746, C.accent);
+  block(s, 7.688, 1.062, 5.646, 2.142, C.accent, { transparency: 96 });
+  photo(s, 5.667, 3.75, 7.021, 3.75);
+}
+
+// 28 — Business infographic
+function slide28(s) {
+  poly(s, 4.802, 2.924, 5.146, 1.107, C.accent, [[0.395, 1], [1, 1], [0.908, 0.571], [0.397, 0.571], [0.397, 0.571], [0.315, 0.002], [0.315, 0], [0, 0], [0, 0.715], [0.315, 0.715], [0.395, 0.992], [0.395, 1]]);
+  poly(s, 4.802, 3.876, 5.702, 0.8, C.accent2, [[0.285, 1], [0.358, 0.995], [1, 0.995], [0.917, 0.394], [0.358, 0.394], [0.358, 0.394], [0.285, 0.004], [0.285, 0.001], [0.284, 0.001], [0.284, 0], [0.284, 0.001], [0, 0.001], [0, 1], [0.285, 1], [0.285, 1]]);
+  poly(s, 4.802, 4.828, 5.693, 0.791, C.accent3, [[0.285, 0.997], [0.359, 0.596], [0.917, 0.596], [1, 0], [0.357, 0], [0.357, 0], [0.285, 0.005], [0.285, 0], [0, 0], [0, 1], [0.285, 1], [0.285, 0.997]]);
+  poly(s, 4.802, 5.447, 5.149, 1.115, C.accent4, [[0.315, 0.991], [0.397, 0.425], [0.907, 0.425], [1, 0.001], [0.397, 0.001], [0.397, 0], [0.396, 0.001], [0.395, 0.001], [0.395, 0.005], [0.314, 0.284], [0.314, 0.29], [0, 0.29], [0, 1], [0.315, 1], [0.315, 0.991]]);
+  shape(s, 'ellipse', 10.81, 3.889, 1.709, 1.709, C.accent);
+  txt(s, 'Business Main Plan', { x: 7.281, y: 3.629, w: 2.159, h: 0.342, valign: 'middle', margin: 4, fontSize: 12, color: C.white });
+  txt(s, 'The Value Of Business', { x: 7.281, y: 4.259, w: 2.748, h: 0.342, valign: 'middle', margin: 4, fontSize: 12, color: C.white });
+  txt(s, 'The Marketing Producy', { x: 7.281, y: 4.891, w: 2.748, h: 0.342, valign: 'middle', margin: 4, fontSize: 12, color: C.white });
+  txt(s, 'The Quality Product', { x: 7.281, y: 5.504, w: 2.159, h: 0.342, valign: 'middle', margin: 4, fontSize: 12, color: C.white });
+  iconPeople(s, 5.366, 4.075, 0.381, 0.335);
+  iconTarget(s, 5.366, 3.132, 0.381, 0.381);
+  iconMegaphone(s, 5.375, 4.996, 0.364, 0.381);
+  iconTrophy(s, 11.336, 4.413, 0.658, 0.662);
+  iconHandshake(s, 5.367, 6.05, 0.38, 0.253);
+  title(s, 4.662, 1.216, 7.29, 0.774, 'BUSINESS ', 'INFOGRAPHIC');
+  photo(s, 0, 0, 3.72, 7.5);
+}
+
+// 29 — SWOT analysis
+function slide29(s) {
+  title(s, 3.87, 3.086, 5.593, 0.774, 'SWOT ', 'ANALYSIS', { align: 'center' });
+  shape(s, 'flowChartProcess', 1.828, 4.154, 1.511, 1.511, C.accent);
+  txt(s, 'S', { x: 2.286, y: 4.405, w: 0.595, h: 1.01, wrap: false, align: 'center', fontSize: 54, fontFace: HEAD, color: C.white });
+  body(s, 1.297, 6.232, 2.574, 0.625, 'Quis variusuam Ut miao pine nim blandit volu tpataec', { align: 'center' });
+  lead(s, 1.435, 5.762, 2.297, 0.459, '01. Strength', { align: 'center', lineSpacingMultiple: 1.5 });
+  shape(s, 'flowChartProcess', 9.994, 4.154, 1.511, 1.511, C.accent4);
+  txt(s, 'T', { x: 10.412, y: 4.405, w: 0.675, h: 1.01, wrap: false, align: 'center', fontSize: 54, fontFace: HEAD, color: C.white });
+  body(s, 9.463, 6.232, 2.574, 0.625, 'Quis variusuam Ut miao pine nim blandit volu tpataec', { align: 'center' });
+  lead(s, 9.601, 5.762, 2.297, 0.459, '01. Threat', { align: 'center', lineSpacingMultiple: 1.5 });
+  shape(s, 'flowChartProcess', 4.541, 4.154, 1.511, 1.511, C.accent2);
+  txt(s, 'W', { x: 4.847, y: 4.405, w: 0.9, h: 1.01, wrap: false, align: 'center', fontSize: 54, fontFace: HEAD, color: C.white });
+  body(s, 4.019, 6.232, 2.574, 0.625, 'Quis variusuam Ut miao pine nim blandit volu tpataec', { align: 'center' });
+  lead(s, 4.157, 5.762, 2.297, 0.459, '02. Weakness', { align: 'center', lineSpacingMultiple: 1.5 });
+  shape(s, 'flowChartProcess', 7.272, 4.154, 1.511, 1.511, C.accent3);
+  txt(s, 'O', { x: 7.673, y: 4.405, w: 0.709, h: 1.01, wrap: false, align: 'center', fontSize: 54, fontFace: HEAD, color: C.white });
+  body(s, 6.741, 6.232, 2.574, 0.625, 'Quis variusuam Ut miao pine nim blandit volu tpataec', { align: 'center' });
+  lead(s, 6.879, 5.762, 2.297, 0.459, '03. Opportunity', { align: 'center', lineSpacingMultiple: 1.5 });
+  photo(s, 0, 0, 13.333, 2.75);
+}
+
+// 30 — Pyramid infographic
+function slide30(s) {
+  title(s, 2.79, 0.862, 7.753, 0.774, 'PYRAMID ', 'INFOGRAPHIC', { align: 'center' });
+  poly(s, 2.898, 4.791, 2.931, 1.082, '6E5233', [[0.745, 0.248], [0.5, 0], [0.255, 0.248], [0, 0.488], [0.257, 0.749], [0.5, 1], [0.739, 0.753], [1, 0.488], [0.745, 0.248]]);
+  poly(s, 3.286, 4.127, 2.157, 0.803, '4B3011', [[0.745, 0.249], [0.499, 0], [0.255, 0.249], [0, 0.489], [0.255, 0.748], [0.499, 1], [0.745, 0.748], [1, 0.489], [0.745, 0.249]]);
+  poly(s, 3.676, 3.475, 1.379, 0.499, '5C3A14', [[0.742, 0.218], [0.498, 0], [0.26, 0.228], [0, 0.471], [0.26, 0.748], [0.498, 1], [0.736, 0.748], [1, 0.471], [0.742, 0.218]]);
+  poly(s, 2.579, 5.319, 1.784, 1.341, C.accent4, [[1, 1], [1, 0.413], [0.985, 0.404], [0.181, 0], [0.179, 0], [0, 0.498], [1, 1]]);
+  poly(s, 3.361, 3.7, 1.011, 1.057, C.accent2, [[1, 1], [1, 0.25], [0.973, 0.238], [0.323, 0.004], [0.32, 0], [0, 0.637], [1, 1]]);
+  poly(s, 2.967, 4.52, 1.396, 1.192, C.accent3, [[1, 0.34], [0.982, 0.333], [0.229, 0], [0, 0.555], [1, 1], [1, 0.34]]);
+  poly(s, 3.74, 2.28, 0.623, 1.531, C.accent, [[1, 1], [1, 0], [0, 0.847], [1, 1]]);
+  poly(s, 4.363, 5.313, 1.789, 1.341, 'A57B4C', [[0, 1], [0, 0.413], [0.016, 0.404], [0.819, 0], [1, 0.498], [0, 1]]);
+  poly(s, 4.363, 3.71, 1.016, 1.057, '8B571F', [[0, 1], [0, 0.25], [0.029, 0.238], [0.674, 0.004], [0.681, 0], [1, 0.637], [0, 1]]);
+  poly(s, 4.363, 4.52, 1.401, 1.192, '70471A', [[0, 0.34], [0.021, 0.333], [0.771, 0], [1, 0.555], [0, 1], [0, 0.34]]);
+  poly(s, 4.363, 2.28, 0.623, 1.531, 'A16E37', [[0, 1], [0, 0], [1, 0.847], [0, 1]]);
+  rule(s, 1.663, 5.712, 1.304, C.hair, { width: 1, dashType: 'dash' });
+  rule(s, 2.724, 2.924, 1.39, C.hair, { width: 1, dashType: 'dash' });
+  rule(s, 2.427, 4.021, 1.313, C.hair, { width: 1, dashType: 'dash' });
+  rule(s, 2.049, 4.925, 1.353, C.hair, { width: 1, dashType: 'dash' });
+  txt(s, 'Data One', { x: 0.672, y: 2.68, w: 1.982, h: 0.37, align: 'right', lineSpacingMultiple: 1.5, fontSize: 12, bold: true, color: C.accent });
+  txt(s, 'Data Four', { x: -0.458, y: 5.451, w: 1.982, h: 0.37, align: 'right', lineSpacingMultiple: 1.5, fontSize: 12, bold: true, color: C.accent4 });
+  txt(s, 'Data Two', { x: 0.359, y: 3.762, w: 1.982, h: 0.37, align: 'right', lineSpacingMultiple: 1.5, fontSize: 12, bold: true, color: C.accent2 });
+  txt(s, 'Data Three', { x: -0.044, y: 4.677, w: 1.982, h: 0.37, align: 'right', lineSpacingMultiple: 1.5, fontSize: 12, bold: true, color: C.accent3 });
+  body(s, 6.883, 3.598, 2.825, 0.625, 'Ut minenim blandit volutpatris tique nulla aliquet eni nullas');
+  lead(s, 6.883, 3.188, 2.207, 0.46, 'The Topic Here', { lineSpacingMultiple: 1.5 });
+  txt(s, '01', { x: 6.872, y: 2.593, w: 0.996, h: 0.746, lineSpacingMultiple: 1.5, fontSize: 28, bold: true, color: C.accent4, transparency: 45 });
+  body(s, 9.805, 3.598, 2.825, 0.625, 'Ut minenim blandit volutpatris tique nulla aliquet eni nullas');
+  lead(s, 9.805, 3.188, 2.599, 0.459, 'The Topic Here', { lineSpacingMultiple: 1.5 });
+  txt(s, '02', { x: 9.794, y: 2.593, w: 0.996, h: 0.746, lineSpacingMultiple: 1.5, fontSize: 28, bold: true, color: C.accent4, transparency: 45 });
+  body(s, 6.883, 5.472, 2.825, 0.625, 'Ut minenim blandit volutpatris tique nulla aliquet eni nullas');
+  lead(s, 6.883, 5.061, 2.566, 0.459, 'The Topic Here', { lineSpacingMultiple: 1.5 });
+  txt(s, '03', { x: 6.872, y: 4.466, w: 0.996, h: 0.746, lineSpacingMultiple: 1.5, fontSize: 28, bold: true, color: C.accent4, transparency: 45 });
+  body(s, 9.805, 5.472, 2.825, 0.625, 'Ut minenim blandit volutpatris tique nulla aliquet eni nullas');
+  lead(s, 9.805, 5.061, 2.369, 0.459, 'The Topic Here', { lineSpacingMultiple: 1.5 });
+  txt(s, '04', { x: 9.794, y: 4.466, w: 0.996, h: 0.746, lineSpacingMultiple: 1.5, fontSize: 28, bold: true, color: C.accent4, transparency: 45 });
+}
+
+// 31 — Elson's timeline (1/2)
+function slide31(s) {
+  body(s, 2.474, 5.259, 3.968, 0.625, 'Quis variusuam Ut miaopinenim blandit volutpataec vasteus. nec dui ultrices', { align: 'center' });
+  lead(s, 3.31, 4.789, 2.297, 0.459, '01. Project One', { align: 'center', lineSpacingMultiple: 1.5 });
+  body(s, 7.579, 5.259, 3.968, 0.625, 'Quis variusuam Ut miaopinenim blandit volutpataec vasteus. nec dui ultrices', { align: 'center' });
+  lead(s, 8.414, 4.789, 2.297, 0.459, '02. Project Two', { align: 'center', lineSpacingMultiple: 1.5 });
+  txt(s, 'Tokyo, 22 Jan 2022', { x: 3, y: 2.325, w: 2.917, h: 0.415, align: 'center', lineSpacingMultiple: 1.5, fontSize: 14, color: C.gray2 });
+  txt(s, 'NYC, 05 Mar 2022', { x: 8.104, y: 2.325, w: 2.917, h: 0.415, align: 'center', lineSpacingMultiple: 1.5, fontSize: 14, color: C.gray2 });
+  title(s, 3.375, 0.807, 6.583, 0.774, 'ELSON’S ', 'TIMELINE', { align: 'center' });
+  rule(s, 4.458, 3.75, 8.875, C.accent, { width: 2, dashType: 'dash' });
+  photoDot(s, 3.562, 2.854, 1.792);
+  photoDot(s, 8.667, 2.854, 1.792);
+}
+
+// 32 — Elson's timeline (2/2)
+function slide32(s) {
+  body(s, 2.474, 5.259, 3.968, 0.625, 'Quis variusuam Ut miaopinenim blandit volutpataec vasteus. nec dui ultrices', { align: 'center' });
+  lead(s, 3.31, 4.789, 2.297, 0.459, '03. Project Three', { align: 'center', lineSpacingMultiple: 1.5 });
+  body(s, 7.579, 5.259, 3.968, 0.625, 'Quis variusuam Ut miaopinenim blandit volutpataec vasteus. nec dui ultrices', { align: 'center' });
+  lead(s, 8.414, 4.789, 2.297, 0.459, '04. Project Four', { align: 'center', lineSpacingMultiple: 1.5 });
+  txt(s, 'London, 20 Jun 2022', { x: 3, y: 2.325, w: 2.917, h: 0.415, align: 'center', lineSpacingMultiple: 1.5, fontSize: 14, color: C.gray2 });
+  txt(s, 'Dubai, 05 Sept 2022', { x: 8.104, y: 2.325, w: 2.917, h: 0.415, align: 'center', lineSpacingMultiple: 1.5, fontSize: 14, color: C.gray2 });
+  title(s, 3.375, 0.807, 6.583, 0.774, 'ELSON’S ', 'TIMELINE', { align: 'center' });
+  rule(s, 0, 3.75, 10.042, C.accent, { width: 2, dashType: 'dash' });
+  photoDot(s, 3.562, 2.854, 1.792);
+  photoDot(s, 8.667, 2.854, 1.792);
+}
+
+// 33 — Pricing tables
+function slide33(s) {
+  card(s, 1.094, 2.045, 3.396, 4.792);
+  txt(s, 'FASHION FOR MEN', { x: 1.299, y: 2.615, w: 2.987, h: 0.438, align: 'center', fontSize: 20, fontFace: HEAD, color: C.slate });
+  txt(s, [
+    { text: '$', options: { fontSize: 54, bold: true, color: C.accent, superscript: true } },
+    { text: '239', options: { fontSize: 66, bold: true, color: C.accent } },
+  ], { x: 1.688, y: 3.666, w: 2.209, h: 1.212, wrap: false, align: 'center' });
+  body(s, 1.23, 5.039, 3.125, 0.622, 'Lorem ipsum dolor sit amet, conse lectus ornare, viverra ctetur a', { align: 'center' });
+  shape(s, 'roundRect', 2.057, 5.982, 1.47, 0.394, C.accent4, { rectRadius: 0.197 });
+  txt(s, 'See More', { x: 2.057, y: 5.982, w: 1.47, h: 0.394, valign: 'middle', align: 'center', fontSize: 12, color: C.white });
+  card(s, 4.991, 2.045, 3.396, 4.792);
+  txt(s, 'WAMAN FASHION', { x: 5.195, y: 2.615, w: 2.987, h: 0.438, align: 'center', fontSize: 20, fontFace: HEAD, color: C.slate });
+  txt(s, [
+    { text: '$', options: { fontSize: 54, bold: true, color: C.accent, superscript: true } },
+    { text: '399', options: { fontSize: 66, bold: true, color: C.accent } },
+  ], { x: 5.563, y: 3.666, w: 2.251, h: 1.212, wrap: false, align: 'center' });
+  body(s, 5.126, 5.039, 3.125, 0.622, 'Lorem ipsum dolor sit amet, conse lectus ornare, viverra ctetur a', { align: 'center' });
+  shape(s, 'roundRect', 5.954, 5.982, 1.47, 0.394, C.accent4, { rectRadius: 0.197 });
+  txt(s, 'See More', { x: 5.954, y: 5.982, w: 1.47, h: 0.394, valign: 'middle', align: 'center', fontSize: 12, color: C.white });
+  card(s, 8.843, 2.045, 3.396, 4.792);
+  txt(s, 'CUSTOM CASUAL', { x: 9.048, y: 2.615, w: 2.987, h: 0.438, align: 'center', fontSize: 20, fontFace: HEAD, color: C.slate });
+  txt(s, [
+    { text: '$', options: { fontSize: 54, bold: true, color: C.accent, superscript: true } },
+    { text: '834', options: { fontSize: 66, bold: true, color: C.accent } },
+  ], { x: 9.38, y: 3.666, w: 2.321, h: 1.212, wrap: false, align: 'center' });
+  body(s, 8.979, 5.039, 3.125, 0.622, 'Lorem ipsum dolor sit amet, conse lectus ornare, viverra ctetur a', { align: 'center' });
+  shape(s, 'roundRect', 9.806, 5.982, 1.47, 0.394, C.accent4, { rectRadius: 0.197 });
+  txt(s, 'See More', { x: 9.806, y: 5.982, w: 1.47, h: 0.394, valign: 'middle', align: 'center', fontSize: 12, color: C.white });
+  block(s, 1.094, 2.045, 3.4, 0.083, C.accent4);
+  block(s, 4.991, 2.045, 3.4, 0.083, C.accent4);
+  block(s, 8.843, 2.045, 3.4, 0.083, C.accent4);
+  txt(s, 'Start From', { x: 2.057, y: 3.385, w: 1.47, h: 0.337, align: 'center', fontSize: 14, color: C.gray });
+  txt(s, 'Start From', { x: 5.954, y: 3.385, w: 1.47, h: 0.337, align: 'center', fontSize: 14, color: C.gray });
+  txt(s, 'Start From', { x: 9.806, y: 3.385, w: 1.47, h: 0.337, align: 'center', fontSize: 14, color: C.gray });
+  title(s, 3.375, 0.807, 6.583, 0.774, 'PRICING ', 'TABLES', { align: 'center' });
+}
+
+// 34 — Quote
+function slide34(s) {
+  txt(s, 'FASHION IS THE ARMOR TO SURVIVE THE REALITY OF EVERYDAY LIFE.', { x: 7.109, y: 2.565, w: 5.227, h: 1.515, fontSize: 28, fontFace: HEAD });
+  txt(s, '“', { x: 7.094, y: 1.784, w: 0.835, h: 1.212, fontSize: 66, fontFace: HEAD, color: C.accent4 });
+  txt(s, 'Quote By Your Name', { x: 7.11, y: 4.403, w: 1.944, h: 0.286, fontSize: 11, italic: true, color: C.gray });
+  block(s, 9.162, 4.566, 1.535, 0.03, C.accent2);
+  block(s, 2.688, 0.708, 10.042, 5.073, C.accent, { transparency: 95 });
+  block(s, 3.625, 3.75, 3.022, 3.75, C.accent);
+  photo(s, 0.688, 1.677, 4.938, 5.073);
+}
+
+// 35 — Let's get connected
+function slide35(s) {
+  title(s, 1.576, 1.68, 4.479, 1.447, 'LET’S GET ', 'CONNECTED ');
+  body(s, 1.576, 4.5, 2.06, 0.625, 'Marketing Pop-Up, 4 - 5 Sidney Street, N4 3HQ', { align: 'justify' });
+  lead(s, 1.576, 4.123, 1.822, 0.459, 'Our Address', { align: 'justify', lineSpacingMultiple: 1.5 });
+  txt(s, [
+    { text: 'www.elson.com', options: { fontSize: 11, color: C.gray, breakLine: true } },
+    { text: 'office@', options: { fontSize: 11, color: C.gray } },
+    { text: 'elson', options: { fontSize: 11, color: C.gray } },
+    { text: '.com', options: { fontSize: 11, color: C.gray } },
+  ], { x: 4.039, y: 5.837, w: 1.998, h: 0.653, lineSpacingMultiple: 1.5 });
+  lead(s, 4.039, 5.472, 1.822, 0.459, 'Follow Us', { align: 'justify', lineSpacingMultiple: 1.5 });
+  txt(s, [
+    { text: '(+62) 000 0000 0000', options: { fontSize: 11, color: C.gray, breakLine: true } },
+    { text: '(0725) 00000', options: { fontSize: 11, color: C.gray } },
+  ], { x: 1.576, y: 5.837, w: 1.998, h: 0.653, align: 'justify', lineSpacingMultiple: 1.5 });
+  lead(s, 1.576, 5.472, 1.822, 0.459, 'Get In Touch', { align: 'justify', lineSpacingMultiple: 1.5 });
+  txt(s, [
+    { text: 'Monday – Saturday', options: { fontSize: 11, color: C.gray, breakLine: true } },
+    { text: '08.00 AM – ', options: { fontSize: 11, color: C.gray } },
+    { text: '05', options: { fontSize: 11, color: C.gray } },
+    { text: '.00 PM', options: { fontSize: 11, color: C.gray } },
+  ], { x: 4.039, y: 4.485, w: 1.998, h: 0.653, align: 'justify', lineSpacingMultiple: 1.5 });
+  lead(s, 4.039, 4.123, 1.822, 0.459, 'Office Hours', { align: 'justify', lineSpacingMultiple: 1.5 });
+  block(s, 9.667, 3.75, 3.022, 3.75, C.accent);
+  block(s, 0.667, 0, 9, 3.75, C.accent, { transparency: 95 });
+  photo(s, 6.667, 0.75, 5.021, 6.75);
+}
+
+// 36 — Thanks
+function slide36(s) {
+  title(s, 6.543, 1.424, 5.724, 1.717, 'THA', 'NKS', { wrap: false, fontSize: 96, color: C.accent });
+  txt(s, 'And See You Next Time', { x: 6.604, y: 3.081, w: 4.431, h: 0.505, fontSize: 24, color: C.slate });
+  block(s, 2.688, 0, 10.042, 5.781, C.accent, { transparency: 95 });
+  block(s, 3.625, 4.798, 4.042, 2.703, C.accent);
+  rule(s, 8.604, 4.109, 4.729, C.accent, { width: 2.5 });
+  photo(s, 0.667, 0.812, 5.104, 6.688);
+}
+
+// ---------------------------------------------------------------- assembly
+const SLIDES = [
+  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09,
+  slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18,
+  slide19, slide20, slide21, slide22, slide23, slide24, slide25, slide26, slide27,
+  slide28, slide29, slide30, slide31, slide32, slide33, slide34, slide35, slide36,
+];
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'ELSON_16x9', width: 13.333, height: 7.5 });
+  pptx.layout = 'ELSON_16x9';
+  pptx.author = 'ELSON, INC';
+  pptx.title = 'Elson — Fashion Casual Presentation';
+
+  SLIDES.forEach(fn => {
+    const s = pptx.addSlide();
+    s.background = { color: C.white };
+    fn(s);
+  });
+
+  const out = path.join(__dirname, '12aa4f1a-1cef-4714-bbd5-43059a90a7ec_grok_final.pptx');
+  return pptx.writeFile({ fileName: out }).then(() => console.log('wrote ' + out));
+}
+
+build().catch(err => { console.error(err); process.exit(1); });
