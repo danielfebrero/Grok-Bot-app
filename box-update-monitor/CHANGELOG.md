@@ -9,6 +9,58 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-16 20:52 (Paris) — snapshot `2026-10-16_19-51` → `2026-10-16_20-52`
+
+**Hot-update du host bundle** : **sand-host** `ab82d14` → `e94d68c` (`upgrade-e94d68c`) ; agent-store-fuse `2b14739` → `6b0d3f3` (pointeur `/usr/local/bin/cursor_agent_store_fuse_version`). Image `885e54d`, exec-daemon, orbitd, Chrome 155.0.8059.84, Node, Python inchangés. Fichiers : +0 / −0 / ~6.
+
+- **Bugfix** : `box-chrome` — avant un cold launch **ungoogled-chromium**, suppression de `Default/Sync Data` si le profil a été écrit par Chrome 155 (évite un crash CDP immédiat ; commenté dans le launcher).
+- **Change** : host bundle `0.72.0-pre.44` → `0.72.0-pre.45` ; renommage erreur image `CONTENT_SAFETY_BLOCKED_ERROR` → `GENERATE_IMAGE_CONTENT_SAFETY_BLOCKED_ERROR` ; outil iOS home `SAND_IOS_CONTROL_HOME_TOOL_NAME` (remplace le filtre `SAND_UPDATE_TASK_TOOL_NAME` / `TASK_LIST_FILTERS`).
+- **Features** : RPCs routines agent `ListGrokBotAgentRoutines` / `SetGrokBotAgentRoutineEnabled` ; outil `ReadTranscript` (`/transcripts/sessions`) ; unification compte xAI/Cursor (`StartXaiUnificationCursorAccountProof`, `DeselectXaiUnificationCursorAccount`, `EnterpriseGrokConflictingAccount`) ; `RequestVirtualCard` ; CDN Origin `gitcdn.origin*.cursor.com` (`ORIGIN_GIT_CDN_HOST_BY_GIT_HOST`) ; élargissement scopes connecteurs (payroll / foundations / lending…).
+- **Perf** : —
+- **Autre/infra** : rebuilds `host-main.cjs` / `sand-eval-runner.cjs` ; bump fuse opaque.
+
+Rapport : [reports/2026-10-16_20-52.md](reports/2026-10-16_20-52.md).
+
+
+## 2026-10-16 19:51 (Paris) — snapshot `2026-10-16_17-51` → `2026-10-16_19-51`
+
+**Hot-update du host bundle** : **sand-host** `c24203b` → `ab82d14` (`upgrade-ab82d14`). Image `885e54d`, agent-store-fuse `2b14739`, exec-daemon, orbitd, Chrome, Node, Python inchangés. Fichiers : +0 / −0 / ~19 (7 sous `/opt/sand`, 12 `managed-skills`).
+
+- **Bugfix** : —
+- **Change** : `box-chrome` gagne le bascule **ungoogled-chromium** (`SAND_BOX_BROWSER_UNGOOGLED` / marker `/tmp/sand-box-browser-ungoogled`, attente `/tmp/sand-box-experiments-ready`, `record_box_browser` / `use_running_browser`) ; markers contrat `BOX_BROWSER_UNGOOGLED_MARKER_PATH` / `BOX_EXPERIMENTS_READY_MARKER_PATH` ; alias d’actions Computer (`COMPUTER_ACTION_ALIAS_SHIM`, `double_click` / `click_with_text`) ; prompt Slack perso (`grok_bot_personal_slack`) ; recherche connecteur « search first » par défaut.
+- **Features** : Merge Bot Origin (`GetMergeBotSettings` / `SetMergeBotConsent` / `SetOriginReviewPreferences`) ; `CommandeerChange` ; directory cross-tier Grok Bot ; métriques steer-wait pendant tool call.
+- **Perf** : —
+- **Autre/infra** : host `0.72.0-pre.42` → `0.72.0-pre.44` ; rebuilds host + UA governor / fingerprint profiles ; refresh skills managed (booking / shopping / channels…).
+
+Rapport : [reports/2026-10-16_19-51.md](reports/2026-10-16_19-51.md).
+
+
+## 2026-10-16 17:51 (Paris) — snapshot `2026-10-16_16-48` → `2026-10-16_17-51`
+
+**Hot-update du host bundle** : **sand-host** `885e54d` → `c24203b` (`upgrade-c24203b`). Image `885e54d`, fuse `2b14739`, exec-daemon, orbitd, Chrome, Node, Python inchangés. Fichiers : +0 / −0 / ~4.
+
+- **Bugfix** : —
+- **Change** : Auto-review / Smart Mode — chemins bloqués autonomes (`BLOCKED_AUTONOMOUS_PATHS`, `BLOCKED_AUTONOMOUS_COURIER`), retry `SHELL_APPROVAL_RETRY`, outcomes `TRUTHFUL_BLOCK_*` ; événement `AUTO_REVIEW_APPROVAL_EVENT` / `BOX_DISK_PRESSURE_EVENT` ; garde install MCP `grok_bot.mcp.install_guard` + `InstallPlugin` ; `WakeParent` exposé côté host ; effort routines `ManagedAutomationEffortLevel`.
+- **Features** : —
+- **Perf** : —
+- **Autre/infra** : host `0.72.0-pre.41` → `0.72.0-pre.42` ; retrait gates identité durable / PlanetScale / Temporal create (symbols). Rebuilds `host-main` / `sand-eval-runner`.
+
+Rapport : [reports/2026-10-16_17-51.md](reports/2026-10-16_17-51.md).
+
+
+## 2026-10-16 16:48 (Paris) — snapshot `2026-10-16_13-52` → `2026-10-16_16-48`
+
+**Mise à jour de l'ordinateur** (nouveau pod / image) : **image** `4098fb0` → `885e54d` ; box-scripts `885e54d` ; Chrome **154.0.8037.97 → 155.0.8059.84** ; exec-daemon build `2026-10-14T14:48` → `2026-10-16T07:52` ; canvas-sdk hash changé ; agent-store-fuse `fa2b05b` → `2b14739`. sand-host reste `885e54d` au boot (hot-updates suivants). Fichiers : +1951 / −1 / ~128 (gros volume sous `/usr/local/lib/node_modules`, Chrome `/opt/google/chrome`, exec-daemon).
+
+- **Bugfix** : —
+- **Change** : runtime image + Chrome 155 ; rebuild exec-daemon / canvas-sdk ; nouveaux binaires sous `/usr/local/bin`.
+- **Features** : —
+- **Perf** : —
+- **Autre/infra** : Update Computer complète (image SHA, paquets npm globaux massifs). Détail fichier dans le rapport.
+
+Rapport : [reports/2026-10-16_16-48.md](reports/2026-10-16_16-48.md).
+
+
 ## 2026-10-16 13:52 (Paris) — snapshot `2026-10-16_10-54` → `2026-10-16_13-52`
 
 Versions touchées : agent-store-fuse `c466eee` → `fa2b05b` (pointeur `/usr/local/bin/cursor_agent_store_fuse_version`) ; image `4098fb0`, sand-host `885e54d`, exec-daemon, orbitd, Chrome, Node, Python inchangés. Fichiers : +0 / −0 / ~1.

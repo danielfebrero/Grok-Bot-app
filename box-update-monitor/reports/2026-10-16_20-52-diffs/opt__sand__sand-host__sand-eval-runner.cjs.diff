@@ -1,0 +1,2724 @@
+--- 2026-10-16_19-51:/opt/sand/sand-host/sand-eval-runner.cjs
++++ 2026-10-16_20-52:/opt/sand/sand-host/sand-eval-runner.cjs
+@@ -6211,8 +6211,36 @@
+     "use strict";
+ 
+     QUICKBOOKS_ONLINE_NATIVE_MCP_SCOPES = [
+-      "com.intuit.quickbooks.accounting",
+-      "openid"
++      "foundations.tools.businessreports.read",
++      "foundations.tools.bi-dashboard",
++      "foundations.tools.transactions.write",
++      "foundations.tools.companyprofile.read",
++      "foundations.tools.companyprofile.write",
++      "payroll.tools.tax.read",
++      "payroll.tools.employer.read",
++      "payroll.tools.employer.manage",
++      "payroll.tools.run.read",
++      "payroll.tools.run.manage",
++      "payroll.tools.employee.read",
++      "payroll.tools.employee.manage",
++      "worker-mgmt.tools.employee.read",
++      "worker-mgmt.tools.employee.manage",
++      "sales.tools.invoice.read",
++      "sales.tools.invoice",
++      "sales.tools.estimate.read",
++      "sales.tools.estimate",
++      "sales.tools.payment-link.read",
++      "sales.tools.payment-link",
++      "sales.tools.settings.read",
++      "sales.tools.settings",
++      "sales.tools.salesorder.read",
++      "sales.tools.salesorder",
++      "contact.tools.customer.read",
++      "contact.tools.customer",
++      "catalog.tools.item.read",
++      "catalog.tools.item",
++      "lending.tools.servicing.read",
++      "money-onboarding.tools.application"
+     ];
+ 
+   }
+@@ -6869,6 +6897,7 @@
+       clientRegistration: "static",
+       rejectsCustomSchemeRedirects: true,
+       unauthenticatedConnect: false,
++      unauthenticatedEndpointBlocked: true,
+       backendOnlyTokenExchange: true,
+       scopes: [...QUICKBOOKS_ONLINE_NATIVE_MCP_SCOPES]
+     }
+@@ -7277,7 +7306,7 @@
+ 
+ }
+ 
+-var ORIGIN_STAGE_HOSTS, ORIGIN_API_HOST_BY_GIT_HOST, ORIGIN_GIT_HOST_BY_API_HOST, ORIGIN_INTERNAL_HOST_BY_API_HOST;
++var ORIGIN_STAGE_HOSTS, ORIGIN_API_HOST_BY_GIT_HOST, ORIGIN_GIT_CDN_HOST_BY_GIT_HOST, ORIGIN_GIT_HOST_BY_API_HOST, ORIGIN_INTERNAL_HOST_BY_API_HOST;
+ 
+ var init_origin_stages = __esm({
+ 
+@@ -7292,6 +7321,7 @@
+ 
+         stage: "prod",
+         gitHost: "origin.cursor.com",
++        gitCdnHost: "gitcdn.origin.cursor.com",
+         apiHost: "api.origin.cursor.com",
+         internalHost: "origin-prod.internal.cursor.com"
+       }
+@@ -7300,6 +7330,7 @@
+ 
+         stage: "staging",
+         gitHost: "origin-staging.cursor.com",
++        gitCdnHost: "gitcdn.origin-staging.cursor.com",
+         apiHost: "api.origin-staging.cursor.com",
+         internalHost: "origin-staging.internal.cursor.com"
+       }
+@@ -7308,6 +7339,7 @@
+ 
+         stage: "test",
+         gitHost: "origin-test.cursor.com",
++        gitCdnHost: "gitcdn.origin-test.cursor.com",
+         apiHost: "api.origin-test.cursor.com",
+         internalHost: "origin-test.internal.cursor.com"
+       }
+@@ -7316,6 +7348,8 @@
+ 
+     ORIGIN_API_HOST_BY_GIT_HOST = new Map(ORIGIN_STAGE_HOSTS.map((entry) => [entry.gitHost, entry.apiHost]));
+ 
++    ORIGIN_GIT_CDN_HOST_BY_GIT_HOST = new Map(ORIGIN_STAGE_HOSTS.map((entry) => [entry.gitHost, entry.gitCdnHost]));
++
+     ORIGIN_GIT_HOST_BY_API_HOST = new Map(ORIGIN_STAGE_HOSTS.map((entry) => [entry.apiHost, entry.gitHost]));
+ 
+     ORIGIN_INTERNAL_HOST_BY_API_HOST = new Map(ORIGIN_STAGE_HOSTS.map((entry) => [entry.apiHost, entry.internalHost]));
+@@ -8895,19 +8929,19 @@
+       /**
+        * Checks whether a phrase appears at token boundaries.
+        */
+-      _hasWholeTokenPhrase(text3, phrase) {
++      _hasWholeTokenPhrase(text3, phrase2) {
+ 
+-        if (!text3 || !phrase)
++        if (!text3 || !phrase2)
+           return false;
+ 
+-        if (text3 === phrase)
++        if (text3 === phrase2)
+           return true;
+ 
+-        for (let start = text3.indexOf(phrase);
++        for (let start = text3.indexOf(phrase2);
+  start !== -1;
+- start = text3.indexOf(phrase, start + 1)) {
++ start = text3.indexOf(phrase2, start + 1)) {
+ 
+-          const end = start + phrase.length;
++          const end = start + phrase2.length;
+ 
+           if ((start === 0 || WHITESPACE.test(text3[start - 1])) && (end === text3.length || WHITESPACE.test(text3[end]))) {
+ 
+@@ -9331,6 +9365,42 @@
+ );
+ 
+ 
++// ../packages/utils/dist/count-lines.js
++function countLines(data2) {
++
++  let lines2 = 1;
++
++  let i = 0;
++
++  for (;
++ ;
++ ) {
++
++    const next = data2.indexOf("\n", i);
++
++    if (next === -1)
++      return lines2;
++
++    lines2++;
++
++    i = next + 1;
++
++  }
++
++}
++
++var init_count_lines = __esm({
++
++  "../packages/utils/dist/count-lines.js"() {
++
++    "use strict";
++
++  }
++
++}
++);
++
++
+ // ../packages/utils/dist/escape-html.js
+ function escapeHtml(value) {
+ 
+@@ -31301,6 +31371,8 @@
+ 
+     init_command_score();
+ 
++    init_count_lines();
++
+     init_escape_html();
+ 
+     init_find_executable();
+@@ -82723,13 +82795,13 @@
+ 
+   color = color.replace(trimLeft, "").replace(trimRight, "").toLowerCase();
+ 
+-  var named = false;
++  var named2 = false;
+ 
+   if (names[color]) {
+ 
+     color = names[color];
+ 
+-    named = true;
++    named2 = true;
+ 
+   }
+  else if (color == "transparent") {
+@@ -82831,7 +82903,7 @@
+       g: parseIntFromHex(match2[2]),
+       b: parseIntFromHex(match2[3]),
+       a: convertHexToDecimal(match2[4]),
+-      format: named ? "name" : "hex8"
++      format: named2 ? "name" : "hex8"
+     }
+ ;
+ 
+@@ -82844,7 +82916,7 @@
+       r: parseIntFromHex(match2[1]),
+       g: parseIntFromHex(match2[2]),
+       b: parseIntFromHex(match2[3]),
+-      format: named ? "name" : "hex"
++      format: named2 ? "name" : "hex"
+     }
+ ;
+ 
+@@ -82858,7 +82930,7 @@
+       g: parseIntFromHex(match2[2] + "" + match2[2]),
+       b: parseIntFromHex(match2[3] + "" + match2[3]),
+       a: convertHexToDecimal(match2[4] + "" + match2[4]),
+-      format: named ? "name" : "hex8"
++      format: named2 ? "name" : "hex8"
+     }
+ ;
+ 
+@@ -82871,7 +82943,7 @@
+       r: parseIntFromHex(match2[1] + "" + match2[1]),
+       g: parseIntFromHex(match2[2] + "" + match2[2]),
+       b: parseIntFromHex(match2[3] + "" + match2[3]),
+-      format: named ? "name" : "hex"
++      format: named2 ? "name" : "hex"
+     }
+ ;
+ 
+@@ -429530,7 +429602,7 @@
+ 
+   static $() {
+ 
+-    return ["AgentRunRequest|1 conversation_state #0|2 action #1|3 model_details #2|9 requested_model #3?|4 mcp_tools #4|5 conversation_id 9?|6 mcp_file_system_options #5?|7 skill_options #6?|8 custom_system_prompt 9?|11 subagent_type_name 9?|12 exclude_workspace_context 8?|13 harness 9?|14 selected_subagent_models #3*|15 selected_subagent_model_details #2*|16 conversation_group_id 9?|17 pre_fetched_blobs #7*|18 dev_raw_model_slug 9?|19 client_supports_inline_images 8?|20 subagent_model_overrides #8*|21 can_create_cloud_subagents 8?|22 suppress_subagent_progress_update_tool 8?|23 client_supports_send_to_user 8?|24 computer_use_coordinate_mode 9?|25 run_id 9?|26 agent_session_id 9?|28 client_supports_routed_model_update 8?|29 system_prompt_spec #9?|30 client_llm_gateway_credential #10?|31 client_supports_preview_card 8?|32 started_as_new_project 8?|33 first_project_onboarding 8?|34 next_interaction_query_id 13?|35 voice_call_notes #11?", ConversationStateStructure, ConversationAction, ModelDetails2, RequestedModel, McpTools, McpFileSystemOptions, SkillOptions, PreFetchedBlob, SubagentModelOverride, SystemPromptSpec, ClientLlmGatewayCredential, VoiceCallNotes];
++    return ["AgentRunRequest|1 conversation_state #0|2 action #1|3 model_details #2|9 requested_model #3?|4 mcp_tools #4|5 conversation_id 9?|6 mcp_file_system_options #5?|7 skill_options #6?|8 custom_system_prompt 9?|11 subagent_type_name 9?|12 exclude_workspace_context 8?|13 harness 9?|14 selected_subagent_models #3*|15 selected_subagent_model_details #2*|16 conversation_group_id 9?|17 pre_fetched_blobs #7*|18 dev_raw_model_slug 9?|19 client_supports_inline_images 8?|20 subagent_model_overrides #8*|21 can_create_cloud_subagents 8?|22 suppress_subagent_progress_update_tool 8?|23 client_supports_send_to_user 8?|24 computer_use_coordinate_mode 9?|25 run_id 9?|26 agent_session_id 9?|28 client_supports_routed_model_update 8?|29 system_prompt_spec #9?|30 client_llm_gateway_credential #10?|31 client_supports_preview_card 8?|32 started_as_new_project 8?|33 first_project_onboarding 8?|34 next_interaction_query_id 13?|35 voice_call_notes #11?|36 transcript_parent_conversation_id 9?", ConversationStateStructure, ConversationAction, ModelDetails2, RequestedModel, McpTools, McpFileSystemOptions, SkillOptions, PreFetchedBlob, SubagentModelOverride, SystemPromptSpec, ClientLlmGatewayCredential, VoiceCallNotes];
+ 
+   }
+ 
+@@ -438878,6 +438950,7 @@
+     suppress_subagent_progress_update_tool: "SAFE",
+     run_id: "SAFE",
+     agent_session_id: "SAFE",
++    transcript_parent_conversation_id: "SAFE",
+     // Custom subagent names (user-defined in workspace config) also flow through this field,
+     // so classify as CODE since names may contain identifying or project-specific info.
+     subagent_type_name: "CODE",
+@@ -553409,6 +553482,8 @@
+ 
+ 
+ // ../packages/agent/dist/tools/core/formatting.js
++init_dist4();
++
+ function formatCodeBlock(codeBlock, options2) {
+ 
+   let result;
+@@ -553450,7 +553525,7 @@
+ 
+     }
+ 
+-    const numLinesInCodeBlock = codeBlock.content.split("\n").length;
++    const numLinesInCodeBlock = countLines(codeBlock.content);
+ 
+     const endLineNumber = codeBlock.startLineNumber + numLinesInCodeBlock - 1;
+ 
+@@ -604463,6 +604538,8 @@
+ 
+     this.heldUnifiedPlanSignInRequired = false;
+ 
++    this.previousSubscriptionRefundRefusal = "";
++
+     proto3.util.initPartial(data2, this);
+ 
+   }
+@@ -604493,7 +604570,7 @@
+ 
+   static $() {
+ 
+-    return ["GetUnificationIntentResponse|1 enabled 8|2 intent #0?|3 merge_status #1|4 merged_at #2?|5 email_update_status #3|6 linked_grok_account #4?|7 grok_reselection_allowed 8|8 cursor_account_linking_eligible 8|9 linked_grok_account_has_grok_bot_entitlement 8|10 has_previously_selected_grok_account 8|11 continue_with_free_eligible 8|12 legacy_billing_settlement #5?|13 x_first_linking_available 8|14 blocked_by_cursor_team 8|15 same_email_grok_account_linked 8|16 grok_email_account_exists 8?|17 grok_email_can_proceed_without_suggestion 8?|18 legacy_privacy_acknowledgement_required 8|19 grok_email_linked_to_different_email 8?|20 held_unified_plan_carry_over_eligible 8|21 x_waits_for_grok_sign_in 8|23 grok_bot_data_transfer_blocked 8|24 held_unified_plan_sign_in_required 8", UnificationIntent, IndividualUnificationMergeStatus, Timestamp, IndividualUnificationEmailUpdateStatus, CollapseLinkedGrokAccount, LegacyBillingSettlement];
++    return ["GetUnificationIntentResponse|1 enabled 8|2 intent #0?|3 merge_status #1|4 merged_at #2?|5 email_update_status #3|6 linked_grok_account #4?|7 grok_reselection_allowed 8|8 cursor_account_linking_eligible 8|9 linked_grok_account_has_grok_bot_entitlement 8|10 has_previously_selected_grok_account 8|11 continue_with_free_eligible 8|12 legacy_billing_settlement #5?|13 x_first_linking_available 8|14 blocked_by_cursor_team 8|15 same_email_grok_account_linked 8|16 grok_email_account_exists 8?|17 grok_email_can_proceed_without_suggestion 8?|18 legacy_privacy_acknowledgement_required 8|19 grok_email_linked_to_different_email 8?|20 held_unified_plan_carry_over_eligible 8|21 x_waits_for_grok_sign_in 8|23 grok_bot_data_transfer_blocked 8|24 held_unified_plan_sign_in_required 8|25 previous_subscription_refund_refusal 9", UnificationIntent, IndividualUnificationMergeStatus, Timestamp, IndividualUnificationEmailUpdateStatus, CollapseLinkedGrokAccount, LegacyBillingSettlement];
+ 
+   }
+ 
+@@ -605757,6 +605834,8 @@
+ 
+     this.emailUpdateStatus = IndividualUnificationEmailUpdateStatus.UNSPECIFIED;
+ 
++    this.previousSubscriptionRefundRefusal = "";
++
+     proto3.util.initPartial(data2, this);
+ 
+   }
+@@ -605787,7 +605866,7 @@
+ 
+   static $() {
+ 
+-    return ["FinalizeIndividualUnificationResponse|1 merge_status #0|2 merged_at #1?|3 email_update_status #2|4 legacy_billing_settlement #3?|5 x_account_refusal #4?", IndividualUnificationMergeStatus, Timestamp, IndividualUnificationEmailUpdateStatus, LegacyBillingSettlement, UnificationIntentXAccountRefusal];
++    return ["FinalizeIndividualUnificationResponse|1 merge_status #0|2 merged_at #1?|3 email_update_status #2|4 legacy_billing_settlement #3?|5 x_account_refusal #4?|6 previous_subscription_refund_refusal 9", IndividualUnificationMergeStatus, Timestamp, IndividualUnificationEmailUpdateStatus, LegacyBillingSettlement, UnificationIntentXAccountRefusal];
+ 
+   }
+ 
+@@ -610688,6 +610767,57 @@
+ }
+ ;
+ 
++var EnterpriseGrokConflictingAccount = class _EnterpriseGrokConflictingAccount extends __protoMessage3135 {
++
++  constructor(data2) {
++
++    super();
++
++    this.cursorUserId = 0;
++
++    this.name = "";
++
++    this.email = "";
++
++    this.xaiPlan = "";
++
++    proto3.util.initPartial(data2, this);
++
++  }
++
++  static fromBinary(bytes, options2) {
++
++    return new _EnterpriseGrokConflictingAccount().fromBinary(bytes, options2);
++
++  }
++
++  static fromJson(jsonValue2, options2) {
++
++    return new _EnterpriseGrokConflictingAccount().fromJson(jsonValue2, options2);
++
++  }
++
++  static fromJsonString(jsonString, options2) {
++
++    return new _EnterpriseGrokConflictingAccount().fromJsonString(jsonString, options2);
++
++  }
++
++  static equals(a, b2) {
++
++    return proto3.util.equals(_EnterpriseGrokConflictingAccount, a, b2);
++
++  }
++
++  static $() {
++
++    return ["EnterpriseGrokConflictingAccount|1 cursor_user_id 5|2 xai_user_id 9?|3 name 9|4 email 9|5 xai_plan 9|6 last_active_at #0?", Timestamp];
++
++  }
++
++}
++;
++
+ var EnterpriseGrokMigrationEligibility = class _EnterpriseGrokMigrationEligibility extends __protoMessage3135 {
+ 
+   constructor(data2) {
+@@ -610700,6 +610830,8 @@
+ 
+     this.reason = "";
+ 
++    this.conflictingAccounts = [];
++
+     proto3.util.initPartial(data2, this);
+ 
+   }
+@@ -610730,7 +610862,7 @@
+ 
+   static $() {
+ 
+-    return ["EnterpriseGrokMigrationEligibility|1 status #0|2 issues #1*|3 reason 9|4 started_at #2?|5 completed_at #2?", EnterpriseGrokMigrationEligibilityStatus, EnterpriseGrokMigrationIssue, Timestamp];
++    return ["EnterpriseGrokMigrationEligibility|1 status #0|2 issues #1*|3 reason 9|4 started_at #2?|5 completed_at #2?|6 conflicting_accounts #3*", EnterpriseGrokMigrationEligibilityStatus, EnterpriseGrokMigrationIssue, Timestamp, EnterpriseGrokConflictingAccount];
+ 
+   }
+ 
+@@ -610839,6 +610971,8 @@
+ 
+     this.legacyPrivacyAcknowledged = false;
+ 
++    this.consentedDeleteCursorUserIds = [];
++
+     proto3.util.initPartial(data2, this);
+ 
+   }
+@@ -610869,7 +611003,7 @@
+ 
+   static $() {
+ 
+-    return ["StartEnterpriseGrokMigrationRequest|1 organization_id 9|2 acknowledgments 9*|3 terms_version 9|4 marketing_opted_out 8?|5 legacy_privacy_acknowledged 8"];
++    return ["StartEnterpriseGrokMigrationRequest|1 organization_id 9|2 acknowledgments 9*|3 terms_version 9|4 marketing_opted_out 8?|5 legacy_privacy_acknowledged 8|6 consented_delete_cursor_user_ids 5*"];
+ 
+   }
+ 
+@@ -610972,6 +611106,8 @@
+ 
+     this.legacyPrivacyAcknowledgementRequired = false;
+ 
++    this.conflictingAccounts = [];
++
+     proto3.util.initPartial(data2, this);
+ 
+   }
+@@ -611002,7 +611138,7 @@
+ 
+   static $() {
+ 
+-    return ["GetEnterpriseGrokMigrationStatusResponse|1 migration #0?|2 legacy_privacy_acknowledgement_required 8|3 eligibility #1?", EnterpriseGrokMigration, EnterpriseGrokMigrationEligibility];
++    return ["GetEnterpriseGrokMigrationStatusResponse|1 migration #0?|2 legacy_privacy_acknowledgement_required 8|3 eligibility #1?|4 conflicting_accounts #2*", EnterpriseGrokMigration, EnterpriseGrokMigrationEligibility, EnterpriseGrokConflictingAccount];
+ 
+   }
+ 
+@@ -744107,6 +744243,8 @@
+ 
+ var import_node_path7 = __toESM(require("node:path"), 1);
+ 
++init_dist4();
++
+ var AGENT_TOOLS_DIR = "agent-tools";
+ 
+ var BIDI_APPEND_LIMIT_BYTES = 50 * 1024 * 1024;
+@@ -744182,30 +744320,6 @@
+ 
+ var AGENT_TOOLS_FILE_WRITE_THRESHOLD_BYTES = 2e4;
+ 
+-function countOutputFileLines(content) {
+-
+-  let lineCount = 1;
+-
+-  let searchFrom = 0;
+-
+-  while (true) {
+-
+-    const newlineAt = content.indexOf("\n", searchFrom);
+-
+-    if (newlineAt === -1) {
+-
+-      return lineCount;
+-
+-    }
+-
+-    lineCount += 1;
+-
+-    searchFrom = newlineAt + 1;
+-
+-  }
+-
+-}
+-
+ function truncateUtf8(text3, maxBytes) {
+ 
+   if (text3.length > maxBytes) {
+@@ -744258,7 +744372,7 @@
+ (0, import_node_crypto4.randomUUID)()}
+ .txt`);
+ 
+-  const lineCount = countOutputFileLines(contentToWrite);
++  const lineCount = countLines(contentToWrite);
+ 
+   const result = await writeExecutor.execute(ctx, new WriteArgs({
+ 
+@@ -755425,7 +755539,11 @@
+     namespace: payload.server,
+     namespaceStatus: payload.serverStatus,
+     namespaceError: payload.serverError,
+-    namespaceDescription: payload.serverDescription,
++    ...payload.serverDescription === void 0 ? {
++}
++ : {
++ namespaceDescription: payload.serverDescription }
++,
+     tools: payload.tools
+   }
+ ;
+@@ -756364,17 +756482,15 @@
+ 
+         let discoveryMissRefreshed = false;
+ 
+-        const refreshScopedDiscoveryOnce = async () => {
++        const refreshScopedDiscovery = async (refreshPolicy, serverIdentifier = args.server) => {
+ 
+-          if (discoveryMissRefreshed || args.server === void 0 || options2?.resourceAccessor === void 0 || requestsBuiltinNamespace) {
++          if (serverIdentifier === void 0 || options2?.resourceAccessor === void 0 || requestsBuiltinNamespace) {
+ 
+             return false;
+ 
+           }
+ 
+-          discoveryMissRefreshed = true;
+-
+-          const refreshed = await resolveMcpServersForExecution(ctx, options2.resourceAccessor, snapshotDescriptors, allowInteractiveMcpAuth, [args.server], McpRefreshPolicy.FORCE_IF_MISSING);
++          const refreshed = await resolveMcpServersForExecution(ctx, options2.resourceAccessor, snapshotDescriptors, allowInteractiveMcpAuth, [serverIdentifier], refreshPolicy);
+ 
+           if (!refreshed.live) {
+ 
+@@ -756389,6 +756505,21 @@
+         }
+ ;
+ 
++        const refreshScopedDiscoveryOnce = async () => {
++
++          if (discoveryMissRefreshed || args.server === void 0 || options2?.resourceAccessor === void 0 || requestsBuiltinNamespace) {
++
++            return false;
++
++          }
++
++          discoveryMissRefreshed = true;
++
++          return await refreshScopedDiscovery(McpRefreshPolicy.FORCE_IF_MISSING);
++
++        }
++;
++
+         if (args.server !== void 0 && servers.some((server) => server.descriptor.serverIdentifier === args.server)) {
+ 
+           spanCtxt.span.setAttribute("serverName", args.server);
+@@ -756583,11 +756714,9 @@
+ 
+         let serverPayload = descriptorToServerPayload(resolvedServer, serverDetailOptions);
+ 
+-        const serverIsUsable = serverPayload.serverStatus === void 0 || serverPayload.serverStatus === "ready";
+-
+-        const replaceFromRefreshedCatalog = () => {
++        const replaceFromRefreshedCatalog = (serverIdentifier = args.server) => {
+ 
+-          const refreshedServer = servers.find((server) => server.descriptor.serverIdentifier === args.server);
++          const refreshedServer = servers.find((server) => server.descriptor.serverIdentifier === serverIdentifier);
+ 
+           if (refreshedServer === void 0) {
+ 
+@@ -756604,6 +756733,36 @@
+         }
+ ;
+ 
++        if (serverPayload.serverStatus === "needsGrant" && options2?.requestTargetedNeedsGrant !== void 0) {
++
++          const resolution = await options2.requestTargetedNeedsGrant({
++
++            serverIdentifier: args.server
++          }
++);
++
++          if (resolution?.kind === "not-supported") {
++
++            serverPayload = {
++
++              server: serverPayload.server,
++              serverStatus: serverPayload.serverStatus,
++              serverError: resolution.message,
++              tools: serverPayload.tools
++            }
++;
++
++          }
++ else if (resolution?.kind === "granted-for-this-turn" && await refreshScopedDiscovery(McpRefreshPolicy.FORCE, resolution.serverIdentifier)) {
++
++            replaceFromRefreshedCatalog(resolution.serverIdentifier);
++
++          }
++
++        }
++
++        const serverIsUsable = serverPayload.serverStatus === void 0 || serverPayload.serverStatus === "ready";
++
+         if (args.toolName === void 0) {
+ 
+           if (serverPayload.tools.length === 0 && serverIsUsable && await refreshScopedDiscoveryOnce()) {
+@@ -757167,9 +757326,9 @@
+ 
+   }
+ 
+-  const named = new Set(Array.from(description9.matchAll(STATED_BOOLEAN_DEFAULT), (match2) => match2[1]?.toLowerCase()));
++  const named2 = new Set(Array.from(description9.matchAll(STATED_BOOLEAN_DEFAULT), (match2) => match2[1]?.toLowerCase()));
+ 
+-  const [only, ...others] = named;
++  const [only, ...others] = named2;
+ 
+   if (only === void 0 || others.length > 0)
+     return void 0;
+@@ -793722,6 +793881,14 @@
+ 
+ }
+ 
++async function recordToolResultsCompletedBeforeDeferral(error63, toolPromises, shouldRecord) {
++
++  const settled = await Promise.allSettled(toolPromises);
++
++  completedToolResultsByDeferredError.set(error63, settled.flatMap((outcome) => outcome.status === "fulfilled" && shouldRecord(outcome.value) ? [outcome.value] : []));
++
++}
++
+ var toolResultsSettledBeforeCancelKey = createKey(/* @__PURE__ */ Symbol.for("@anysphere/agent/toolResultsSettledBeforeCancel"), void 0);
+ 
+ var streamErrorsBeforeToolExecution = /* @__PURE__ */ new WeakSet();
+@@ -796074,9 +796241,7 @@
+ 
+       if (error63 instanceof DeferredInteractionResponseError) {
+ 
+-        const settled = await Promise.allSettled(toolPromises);
+-
+-        completedToolResultsByDeferredError.set(error63, settled.flatMap((outcome) => outcome.status === "fulfilled" && isValidToolResult(outcome.value.id) ? [outcome.value] : []));
++        await recordToolResultsCompletedBeforeDeferral(error63, toolPromises, (result) => isValidToolResult(result.id));
+ 
+         throw error63;
+ 
+@@ -796626,6 +796791,50 @@
+ 
+ }
+ 
++function setPendingToolCallsAwaitingResponse(pendingMessage, awaitingResponse) {
++
++  try {
++
++    const parsed = JSON.parse(pendingMessage);
++
++    if (parsed.role !== "assistant") {
++
++      return pendingMessage;
++
++    }
++
++    const {
++ pendingToolCallsAwaitingResponse: _awaitingResponse, ...cursor }
++ = parsed.providerOptions?.cursor ?? {
++}
++;
++
++    parsed.providerOptions = {
++
++      ...parsed.providerOptions,
++      cursor: awaitingResponse ? {
++ ...cursor, pendingToolCallsAwaitingResponse: true }
++ : cursor
++    }
++;
++
++    return JSON.stringify(parsed);
++
++  }
++ catch {
++
++    return pendingMessage;
++
++  }
++
++}
++
++function arePendingToolCallsAwaitingResponse(message) {
++
++  return message.providerOptions?.cursor?.pendingToolCallsAwaitingResponse === true;
++
++}
++
+ function getAdmittedEffectiveToolName(descriptor2, allowedToolNames) {
+ 
+   return descriptor2.effectiveNativeToolCall !== void 0 && allowedToolNames?.has(descriptor2.toolName) === true ? descriptor2.effectiveNativeToolCall.toolName : void 0;
+@@ -808713,7 +808922,7 @@
+ 
+ }
+ 
+-function countLines(text3) {
++function countLines2(text3) {
+ 
+   if (text3.length === 0) {
+ 
+@@ -809058,7 +809267,7 @@
+ 
+     character_count: text3.length,
+     word_count: timeUxStatsPattern(samples, "word", replaceRe2js, () => countWords(text3, patterns)),
+-    line_count: countLines(text3),
++    line_count: countLines2(text3),
+     paragraph_count: countParagraphs(text3),
+     sentence_count: countSentences(text3, patterns, samples),
+     heading_count: timeUxStatsPattern(samples, "heading", replaceRe2js, () => countHeadings(textWithoutFencedCodeBlocks, patterns)),
+@@ -810479,11 +810688,27 @@
+ 
+   }
+ 
+-  async checkpointToolResultsCompletedBeforeDeferral({
++  async checkpointParkedToolCalls({
++ ctx, stateHandler, pendingToolCalls, deferral, onStateUpdate }
++) {
++
++    await this.checkpointPendingToolCalls({
++
++      ctx,
++      stateHandler,
++      pendingToolCalls: pendingToolCalls.map((pending) => setPendingToolCallsAwaitingResponse(pending, true)),
++      completedToolResults: getToolResultsCompletedBeforeDeferral(deferral),
++      onStateUpdate
++    }
++);
++
++  }
++
++  async checkpointPendingToolCalls({
+  ctx, stateHandler, pendingToolCalls, completedToolResults, onStateUpdate, failureLogMessage = "Failed to checkpoint tool results completed before the deferred interaction" }
+ ) {
+ 
+-    if (completedToolResults.length === 0 || onStateUpdate === void 0) {
++    if (onStateUpdate === void 0) {
+ 
+       return;
+ 
+@@ -811817,12 +812042,12 @@
+ 
+           await pendingToolCallsCheckpointWrite;
+ 
+-          await this.checkpointToolResultsCompletedBeforeDeferral({
++          await this.checkpointParkedToolCalls({
+ 
+             ctx,
+             stateHandler,
+             pendingToolCalls: checkpointedPendingToolCalls,
+-            completedToolResults: getToolResultsCompletedBeforeDeferral(error63),
++            deferral: error63,
+             onStateUpdate
+           }
+ );
+@@ -811832,18 +812057,24 @@
+ 
+           await pendingToolCallsCheckpointWrite;
+ 
+-          await this.checkpointToolResultsCompletedBeforeDeferral({
++          const keptToolResults = toolResultsSettledBeforeCancel.filter((message) => message.role === "tool" && message.content.every((part) => keepCompletedBeforeCancel(part.toolName)));
+ 
+-            // The step's context is cancelled, and the checkpoint must still land.
+-            ctx: ctx.withDetached(),
+-            stateHandler,
+-            pendingToolCalls: checkpointedPendingToolCalls,
+-            completedToolResults: toolResultsSettledBeforeCancel.filter((message) => message.role === "tool" && message.content.every((part) => keepCompletedBeforeCancel(part.toolName))),
+-            onStateUpdate,
+-            failureLogMessage: "Failed to checkpoint tool results completed before a cancel"
+-          }
++          if (keptToolResults.length > 0) {
++
++            await this.checkpointPendingToolCalls({
++
++              // The step's context is cancelled, and the checkpoint must still land.
++              ctx: ctx.withDetached(),
++              stateHandler,
++              pendingToolCalls: checkpointedPendingToolCalls,
++              completedToolResults: keptToolResults,
++              onStateUpdate,
++              failureLogMessage: "Failed to checkpoint tool results completed before a cancel"
++            }
+ );
+ 
++          }
++
+         }
+ 
+         throw error63;
+@@ -819170,6 +819401,8 @@
+ // ../packages/agent/dist/actions/execute-plan-action-handler.js
+ init_dist();
+ 
++init_dist4();
++
+ 
+ // ../packages/agent/dist/utils/prompt-prefix-telemetry.js
+ var userInfoRerenderedCounter = createCounter("agent.prompt_prefix.user_info_rerendered", {
+@@ -820665,7 +820898,7 @@
+ 
+     const planFileContent = resolvedPlanContent.unwrap(PrivacyCapability.UNSAFE_ALWAYS_ALLOWED);
+ 
+-    const endLine = Math.max(1, resolvedPlanContent.split("\n").length);
++    const endLine = countLines(planFileContent);
+ 
+     const selectedPlanPath = (planFileAvailability === "unavailable" ? void 0 : planFilePath2) ?? action.planFileUri?.unwrap(PrivacyCapability.UNSAFE_ALWAYS_ALLOWED) ?? "cursor-plan://plan.md";
+ 
+@@ -822334,7 +822567,7 @@
+ 
+   }
+ 
+-  async executePendingToolCalls(ctx, rootPromptExecutor, stateHandler, mergedMcpTools, requestContext, invocationId) {
++  async executePendingToolCalls(ctx, rootPromptExecutor, stateHandler, mergedMcpTools, requestContext, invocationId, onStateUpdate) {
+ 
+     const pendingMessages = stateHandler.getRawPendingMessages();
+ 
+@@ -822407,6 +822640,23 @@
+  messages, lastMessage, completedToolResults }
+  = pending;
+ 
++    const rawPendingMessages = pendingMessages.map((pendingMessage) => pendingMessage.unwrap(PrivacyCapability.UNSAFE_ALWAYS_ALLOWED));
++
++    if (arePendingToolCallsAwaitingResponse(lastMessage)) {
++
++      await this.checkpointPendingToolCalls({
++
++        ctx,
++        stateHandler,
++        pendingToolCalls: rawPendingMessages.map((pendingMessage) => setPendingToolCallsAwaitingResponse(pendingMessage, false)),
++        completedToolResults: [],
++        onStateUpdate,
++        failureLogMessage: "Failed to checkpoint resumed tool calls"
++      }
++);
++
++    }
++
+     const contracts = readPendingToolExecutionContracts(lastMessage);
+ 
+     const {
+@@ -822523,12 +822773,44 @@
+ 
+       }
+ 
+-      return Promise.all(toolPromises);
++      const settledBeforeResume = new Set(completedToolResults.values());
++
++      return Promise.all(toolPromises).catch(async (error63) => {
++
++        if (error63 instanceof DeferredInteractionResponseError) {
++
++          await recordToolResultsCompletedBeforeDeferral(error63, toolPromises, (result) => !settledBeforeResume.has(result));
++
++        }
++
++        throw error63;
++
++      }
++);
+ 
+     }
+ ;
+ 
+-    const toolResults = await (rootPromptExecutor.runWithToolCallEventRecorder?.(ctx, executePending) ?? executePending(ctx));
++    const toolResults = await (rootPromptExecutor.runWithToolCallEventRecorder?.(ctx, executePending) ?? executePending(ctx)).catch(async (error63) => {
++
++      if (error63 instanceof DeferredInteractionResponseError) {
++
++        await this.checkpointParkedToolCalls({
++
++          ctx,
++          stateHandler,
++          pendingToolCalls: rawPendingMessages,
++          deferral: error63,
++          onStateUpdate
++        }
++);
++
++      }
++
++      throw error63;
++
++    }
++);
+ 
+     messages.push(...toolResults);
+ 
+@@ -822564,7 +822846,7 @@
+ 
+       const mergedMcpTools = this.mergeRequestContextTools(mcpTools, requestContext.tools);
+ 
+-      const completedPendingTools = await this.executePendingToolCalls(ctx, rootPromptExecutor, stateHandler, mergedMcpTools, requestContext, invocationId);
++      const completedPendingTools = await this.executePendingToolCalls(ctx, rootPromptExecutor, stateHandler, mergedMcpTools, requestContext, invocationId, onStateUpdate);
+ 
+       if (completedPendingTools) {
+ 
+@@ -822629,7 +822911,7 @@
+ 
+     const mergedMcpTools = this.mergeRequestContextTools(mcpTools, requestContext.tools);
+ 
+-    const completedPendingTools = await this.executePendingToolCalls(ctx, rootPromptExecutor, stateHandler, mergedMcpTools, requestContext, invocationId);
++    const completedPendingTools = await this.executePendingToolCalls(ctx, rootPromptExecutor, stateHandler, mergedMcpTools, requestContext, invocationId, onStateUpdate);
+ 
+     if (completedPendingTools) {
+ 
+@@ -831550,6 +831832,8 @@
+ 
+     const elapsedMs3 = getPendingToolCallElapsedMs(parsed);
+ 
++    const awaitingResponse = arePendingToolCallsAwaitingResponse(parsed);
++
+     let toolResults = [];
+ 
+     let rawErrorMessages = [];
+@@ -831624,7 +831908,9 @@
+       }
+ );
+ 
+-      const result = resolved?.result ?? formatInterruptedToolResult({
++      const result = resolved?.result ?? (awaitingResponse ? `Error: ${
++toolIdentifier === "SHELL" ? "Shell command" : content.toolName}
++ did not complete: it paused to wait for the user's response, and the next message arrived first.` : formatInterruptedToolResult({
+ 
+         toolCallId: content.toolCallId,
+         toolName: content.toolName,
+@@ -831632,7 +831918,7 @@
+         elapsedMs: elapsedMs3,
+         cause: interruptionCause
+       }
+-);
++));
+ 
+       if (resolved?.isError !== false) {
+ 
+@@ -840589,13 +840875,13 @@
+ 
+ }
+ 
+-var CONTENT_SAFETY_BLOCKED_ERROR = "The image provider blocked this request under its content policy. This often happens when the description names trademarked characters, brands, or real people. Try describing the subject in your own words instead.";
++var GENERATE_IMAGE_CONTENT_SAFETY_BLOCKED_ERROR = "The image provider blocked this request under its content policy. This often happens when the description names trademarked characters, brands, or real people. Try describing the subject in your own words instead.";
+ 
+ function getGenerateImageUserFacingErrorMessage(error63) {
+ 
+   if (isContentSafetyBlockedError(error63)) {
+ 
+-    return CONTENT_SAFETY_BLOCKED_ERROR;
++    return GENERATE_IMAGE_CONTENT_SAFETY_BLOCKED_ERROR;
+ 
+   }
+ 
+@@ -840751,9 +841037,9 @@
+ 
+   return new CustomToolCallError(ToolErrorClassification.CONTENT_REFUSED, {
+ 
+-    clientVisibleErrorMessage: CONTENT_SAFETY_BLOCKED_ERROR,
+-    modelVisibleErrorMessage: CONTENT_SAFETY_BLOCKED_ERROR,
+-    error: CONTENT_SAFETY_BLOCKED_ERROR
++    clientVisibleErrorMessage: GENERATE_IMAGE_CONTENT_SAFETY_BLOCKED_ERROR,
++    modelVisibleErrorMessage: GENERATE_IMAGE_CONTENT_SAFETY_BLOCKED_ERROR,
++    error: GENERATE_IMAGE_CONTENT_SAFETY_BLOCKED_ERROR
+   }
+ );
+ 
+@@ -864270,11 +864556,11 @@
+ 
+ }
+ 
+-function decapitalize(phrase) {
++function decapitalize(phrase2) {
+ 
+-  const first = phrase[0];
++  const first = phrase2[0];
+ 
+-  return first == null ? phrase : first.toLowerCase() + phrase.slice(1);
++  return first == null ? phrase2 : first.toLowerCase() + phrase2.slice(1);
+ 
+ }
+ 
+@@ -864958,6 +865244,10 @@
+ }
+ );
+ 
++var NO_FOLLOW = Object.freeze({
++}
++);
++
+ var RESERVED_ENTRYPOINT_FILES = {
+ 
+   declaration: "entrypoint.ts",
+@@ -866081,13 +866371,13 @@
+ 
+   const phrases = listener.events.map((kind) => {
+ 
+-    const phrase = githubEventPhrase(kind);
++    const phrase2 = githubEventPhrase(kind);
+ 
+     return isGithubCiEventKind(kind) && listener.ciBranch != null ? `${
+-phrase}
++phrase2}
+  on ${
+ listener.ciBranch}
+-` : phrase;
++` : phrase2;
+ 
+   }
+ );
+@@ -873211,7 +873501,6 @@
+   meetingReply: "steering",
+   taskThread: "steering",
+   taskCleanup: "steering",
+-  taskStatus: "steering",
+   spendGuardAnswer: "steering",
+   mcpUnavailable: "state",
+   mcpStillLoading: "state",
+@@ -874156,7 +874445,7 @@
+ 
+   const claimed = [];
+ 
+-  let named = 0;
++  let named2 = 0;
+ 
+   for (const title of [...titles].sort((a, b2) => b2.length - a.length)) {
+ 
+@@ -874166,13 +874455,13 @@
+ 
+     if (free.length === 0) continue;
+ 
+-    named += 1;
++    named2 += 1;
+ 
+     claimed.push(...free);
+ 
+   }
+ 
+-  return named;
++  return named2;
+ 
+ }
+ 
+@@ -897685,6 +897974,14 @@
+     }
+ ,
+     /**
++     * A DRAFT intent stays DRAFT while a Cursor account added with
++     * StartXaiUnificationCursorAccountProof, other than the selected one, has
++     * only an expired sign-in: the advance refuses with FAILED_PRECONDITION
++     * [WKE=unification:cursor-account-proof-expired]. The message carries
++     * [CURSOR_USER_IDS=<id>,...] with those accounts'
++     * CollapseCandidate.cursor_user_id values. Signing in to an account again
++     * or removing it with DeselectXaiUnificationCursorAccount clears it.
++     *
+      * @generated from rpc aiserver.v1.DashboardService.AdvanceXaiUnificationIntent
+      */
+     advanceXaiUnificationIntent: {
+@@ -910440,7 +910737,7 @@
+ function sandClientBaseVersionOf(clientAppVersion) {
+ 
+   return stampedVersionBaseOf(clientAppVersion) ?? stampedVersionBaseOf(
+-    true ? "0.72.0-pre.44" : void 0
++    true ? "0.72.0-pre.45" : void 0
+   ) ?? SAND_CLIENT_FALLBACK_BASE_VERSION;
+ 
+ }
+@@ -925742,7 +926039,7 @@
+ 
+   const attrsStart = key.search(TRAILING_ATTRS);
+ 
+-  const named = attrsStart > role.length;
++  const named2 = attrsStart > role.length;
+ 
+   const keyStart = body.startsWith("- '") ? 3 : 2;
+ 
+@@ -925761,7 +926058,7 @@
+     depth,
+     body,
+     role,
+-    named,
++    named: named2,
+     valued: hasValue,
+     bareAttrs,
+     reffed,
+@@ -943894,7 +944191,7 @@
+ 
+ 
+ // src/shared/agents/agent-tasks.ts
+-var SAND_AGENT_TASK_STATUSES = ["in_progress", "pending", "done"];
++var SAND_AGENT_TASK_STATUSES = ["open", "done"];
+ 
+ var SAND_AGENT_TASK_NAME_MAX_CHARS = 120;
+ 
+@@ -943974,7 +944271,7 @@
+ taskId}
+  is done, so nothing was done. Reopen it with ${
+ GROK_BOT_TOOL_NAMES.UpdateTask}
+- (status: in_progress) and call again with this task_id, or call again without task_id ${
++ (status: open) and call again with this task_id, or call again without task_id ${
+ withoutTaskId}
+ .`
+     );
+@@ -948796,7 +949093,7 @@
+ 
+       invariant(ordinal != null && name17 != null, "cron nth weekday out of range");
+ 
+-      const phrase = `the ${
++      const phrase2 = `the ${
+ ordinal}
+  ${
+ name17}
+@@ -948804,9 +949101,9 @@
+ 
+       return {
+  lead: `On ${
+-phrase}
++phrase2}
+ `, on: ` on ${
+-phrase}
++phrase2}
+ ` }
+ ;
+ 
+@@ -966880,13 +967177,13 @@
+ 
+ }
+ 
+-function annotated(found, named) {
++function annotated(found, named2) {
+ 
+   const byName2 = new Map(
+-    named.flatMap((fact) => [[memoryIdFor(fact.text), fact], [fact.text, fact]])
++    named2.flatMap((fact) => [[memoryIdFor(fact.text), fact], [fact.text, fact]])
+   );
+ 
+-  const spellings = themesOf(named);
++  const spellings = themesOf(named2);
+ 
+   return found.map((record4) => {
+ 
+@@ -966910,11 +967207,11 @@
+ 
+ }
+ 
+-function themesOf(named) {
++function themesOf(named2) {
+ 
+   const spellings = /* @__PURE__ */ new Map();
+ 
+-  for (const fact of named) {
++  for (const fact of named2) {
+ 
+     const theme = fact.theme ?? "";
+ 
+@@ -969944,22 +970241,22 @@
+ 
+ function speakerList(participants) {
+ 
+-  const named = participants.slice(0, GROK_BOT_SESSION_PARTICIPANTS_PROMPT_MAX);
++  const named2 = participants.slice(0, GROK_BOT_SESSION_PARTICIPANTS_PROMPT_MAX);
+ 
+-  const rest = participants.length - named.length;
++  const rest = participants.length - named2.length;
+ 
+   if (rest > 0) return `${
+-named.join(", ")}
++named2.join(", ")}
+ , and ${
+ rest}
+  more`;
+ 
+-  if (named.length <= 2) return named.join(" and ");
++  if (named2.length <= 2) return named2.join(" and ");
+ 
+   return `${
+-named.slice(0, -1).join(", ")}
++named2.slice(0, -1).join(", ")}
+ , and ${
+-named[named.length - 1]}
++named2[named2.length - 1]}
+ `;
+ 
+ }
+@@ -970936,9 +971233,7 @@
+  returned.`),
+   name: external_exports3.string().trim().min(1).max(SAND_AGENT_TASK_NAME_MAX_CHARS).optional().describe("A new name. Leaves the rest of the document as it is."),
+   description: external_exports3.string().trim().min(1).max(SAND_AGENT_TASK_DESCRIPTION_MAX_CHARS).optional().describe("A new one-phrase description, under 60 characters."),
+-  status: external_exports3.enum(SAND_AGENT_TASK_STATUSES).optional().describe(
+-    "in_progress while you are actively working on it, pending when it is not finished but you are not working on it now, or done."
+-  ),
++  status: external_exports3.enum(SAND_AGENT_TASK_STATUSES).optional().describe("open or done."),
+   body: external_exports3.string().optional().describe("The whole new markdown body below the frontmatter, replacing the current body."),
+   old_string: external_exports3.string().optional().describe(
+     "Exact text in the current document (frontmatter included) to replace. Must appear exactly once. Pair with new_string."
+@@ -970950,13 +971245,11 @@
+ }
+ );
+ 
+-var TASK_LIST_FILTERS = ["open", "done"];
+-
+ var readTaskParameters = external_exports3.object({
+ 
+   task_id: external_exports3.string().trim().optional().describe("The task to read. Omit to list your tasks with their ids."),
+-  status: external_exports3.enum(TASK_LIST_FILTERS).optional().describe(
+-    "With task_id omitted, which tasks to list: open (the default) for those not done yet, or done for your most recently done ones."
++  status: external_exports3.enum(SAND_AGENT_TASK_STATUSES).optional().describe(
++    "With task_id omitted, which tasks to list: open (the default) or done for your most recently done ones."
+   )
+ }
+ );
+@@ -971117,7 +971410,7 @@
+  Use exactly one way: set any of name, description, status, and body to change just those parts;
+  or replace one exact snippet (old_string plus new_string);
+  or rewrite the whole document (content). The frontmatter must keep a non-empty name and a short one-phrase description;
+- status is in_progress, pending, or done. Set status: done only when the work is actually finished or has moved into other tasks after a split or merge the user asked for. Wait for the result before you tell the user the task is updated, and do not end the turn in the same step.`,
++ status is open or done. Set status: done only when the work is actually finished or has moved into other tasks after a split or merge the user asked for. Wait for the result before you tell the user the task is updated, and do not end the turn in the same step.`,
+       parameters: updateTaskParameters,
+       describeActivity: (args) => ({
+  target: args.task_id }
+@@ -971142,7 +971435,7 @@
+ TASK_CONCEPT}
+  Read a task before working on it whenever you are not sure you have its latest content, for example when the user writes in its thread. A done task can still be read, and reopened with ${
+ SAND_UPDATE_TASK_TOOL_NAME}
+- status: in_progress.`,
++ status: open.`,
+       parameters: readTaskParameters,
+       describeActivity: (args) => args.task_id === void 0 ? void 0 : {
+  target: args.task_id }
+@@ -971172,9 +971465,7 @@
+ task.name}
+  (${
+ task.description}
+-), ${
+-task.status}
+-, updated ${
++), updated ${
+ new Date(task.updatedAtMs).toISOString().slice(0, 16).replace("T", " ")}
+  UTC`
+             )
+@@ -971266,16 +971557,13 @@
+   `- To keep an exchange with another agent in a task's thread, pass that task_id to ${
+ GROK_BOT_TOOL_NAMES.SendToAgent}
+ . Without it, the agent's replies land in the main chat.`,
+-  `- A task's status shows the user whether you are working on it: in_progress while you actively work on it (a new task starts in_progress), pending when it is not done but you are not working on it right now. Set it with ${
+-SAND_UPDATE_TASK_TOOL_NAME}
+- when that changes, for example pending once you stop to wait on the user or on something else to land, and in_progress when you pick it back up.`,
+   `- Set status: done with ${
+ SAND_UPDATE_TASK_TOOL_NAME}
+- as soon as nothing is left to do or wait on for a task, in the same turn you report its result, after the result is in its thread and the main chat, without waiting to be asked. Keep it not done while it still has next steps or waits on the user or on something else to land, and set it done once you learn that has happened. Also set done any task you notice is clearly finished, was dropped by the user, or moved into other tasks.`,
++ as soon as nothing is left to do or wait on for a task, in the same turn you report its result, after the result is in its thread and the main chat, without waiting to be asked. Keep it open while it still has next steps or waits on the user or on something else to land, and set it done once you learn that has happened. Also set done any task you notice is clearly finished, was dropped by the user, or moved into other tasks.`,
+   "- The user can mark a task finished from their list, which sets it done. When they do, stop working on it.",
+   `- To pick a done task back up, find it with ${
+ SAND_READ_TASK_TOOL_NAME}
+- and status: done, then set status: in_progress with ${
++ and status: done, then set status: open with ${
+ SAND_UPDATE_TASK_TOOL_NAME}
+ . A message the user sends in a done task's thread reopens it for you.`
+ ].join("\n");
+@@ -973900,6 +974188,56 @@
+ 
+ var VIRTUAL_CARD_POLL_SCHEDULE = VIRTUAL_CARD_POLL_DELAYS_SECONDS.join(", then ");
+ 
++var RETRY_AFTER_CARD_SWITCH_RULE = `Call ${
++GROK_BOT_TOOL_NAMES.RequestVirtualCard}
++ again for this purchase only after the user says they added or switched to another card in Link. When you raise the card again, tell them they can pick that card in the card's payment method picker.`;
++
++var FINAL_LINK_REFUSALS = {
++
++  daily_limit: {
++
++    cardNote: "This purchase is over your Stripe Link daily spend limit. No charge was made.",
++    agentDetail: "the purchase would go over the user's Link daily spend limit",
++    retryRule: `This limit is final for today: do not call ${
++GROK_BOT_TOOL_NAMES.RequestVirtualCard}
++ again for this purchase today.`
++  }
++,
++  amount_limit: {
++
++    cardNote: "This amount is over the Stripe Link limit for one purchase. No charge was made.",
++    agentDetail: "the amount is over Link's limit for one purchase",
++    retryRule: `This limit caps each purchase, not each day: do not call ${
++GROK_BOT_TOOL_NAMES.RequestVirtualCard}
++ again for this amount or a larger one. Offer a smaller purchase if that suits the user.`
++  }
++,
++  approval_count_limit: {
++
++    cardNote: "You reached the Stripe Link limit on approved purchases. No charge was made.",
++    agentDetail: "the user has reached Link's limit on approved purchases",
++    retryRule: `Link does not say when this limit resets: do not call ${
++GROK_BOT_TOOL_NAMES.RequestVirtualCard}
++ again for this purchase, and do not promise the user a reset time.`
++  }
++,
++  no_eligible_card: {
++
++    cardNote: "Your Stripe Link wallet has no card that Link accepts for this purchase. No charge was made.",
++    agentDetail: "the user's Link wallet has no card that Link accepts for this purchase",
++    retryRule: RETRY_AFTER_CARD_SWITCH_RULE
++  }
++,
++  amex: {
++
++    cardNote: "Stripe Link does not accept American Express for this purchase. No charge was made.",
++    agentDetail: "Link does not accept American Express for this purchase",
++    retryRule: RETRY_AFTER_CARD_SWITCH_RULE
++  }
++
++}
++;
++
+ 
+ // ../packages/grok-bot-harness/src/runner/wake-outcomes.ts
+ function inertDraftText(value) {
+@@ -978670,7 +979008,7 @@
+ 
+ function defineAgentTools(spec) {
+ 
+-  const named = new Set(spec.include.tools ?? []);
++  const named2 = new Set(spec.include.tools ?? []);
+ 
+   const namedOmissions = toolStrings(spec.omit.tools);
+ 
+@@ -978688,7 +979026,7 @@
+ 
+     const reason = namedOmissions.get(tool);
+ 
+-    if (named.has(tool) && reason !== void 0) {
++    if (named2.has(tool) && reason !== void 0) {
+ 
+       throw new Error(`${
+ tool}
+@@ -978696,7 +979034,7 @@
+ 
+     }
+ 
+-    if (named.has(tool)) {
++    if (named2.has(tool)) {
+ 
+       offered.add(tool);
+ 
+@@ -988332,6 +988670,73 @@
+ }
+ ;
+ 
++var HOME_KINDS = [
++  "light",
++  "switch",
++  "outlet",
++  "fan",
++  "thermostat",
++  "blinds",
++  "lock",
++  "garageDoor",
++  "door",
++  "window",
++  "securitySystem"
++];
++
++var KIND_LABELS = {
++
++  light: {
++ one: "light", many: "lights" }
++,
++  switch: {
++ one: "switch", many: "switches" }
++,
++  outlet: {
++ one: "outlet", many: "outlets" }
++,
++  fan: {
++ one: "fan", many: "fans" }
++,
++  thermostat: {
++ one: "thermostat", many: "thermostats" }
++,
++  blinds: {
++ one: "set of blinds", many: "sets of blinds" }
++,
++  lock: {
++ one: "lock", many: "locks" }
++,
++  garageDoor: {
++ one: "garage door", many: "garage doors" }
++,
++  door: {
++ one: "door", many: "doors" }
++,
++  window: {
++ one: "window", many: "windows" }
++,
++  securitySystem: {
++ one: "security system", many: "security systems" }
++
++}
++;
++
++var MAX_CHANGES = 100;
++
++var MAX_SUMMARY_ACTIONS = 3;
++
++var SINGLE_CHANGE_FIELDS = [
++  "home",
++  "room",
++  "accessory",
++  "service",
++  "kind",
++  "all",
++  "control",
++  "value"
++];
++
+ function isSwitchControl(control) {
+ 
+   return SWITCH_CONTROLS.some((candidate) => candidate === control);
+@@ -988378,7 +988783,7 @@
+ 
+ function withChoiceSpelled(args) {
+ 
+-  if (!isChoiceControl(args.control)) {
++  if (args.control === void 0 || !isChoiceControl(args.control)) {
+ 
+     return args;
+ 
+@@ -988412,66 +988817,165 @@
+ 
+ var name = (what) => string2().trim().min(1).describe(what);
+ 
++var CONTROLS = [...SWITCH_CONTROLS, ...LEVEL_CONTROLS, ...CHOICE_CONTROL_NAMES];
++
++var COUNTED_CONTROLS = /* @__PURE__ */ new Set([
++  "power",
++  "active",
++  "brightness",
++  "hue",
++  "saturation",
++  "colorTemperature",
++  "rotationSpeed"
++]);
++
++var VALUE_TYPES = union([boolean2(), number2(), string2()]);
++
++var VALUE_ERROR = "power and active take true or false;
++ lock, door, security system, and thermostat mode controls take one of their names;
++ every other control takes a number";
++
++var changeParameters = object({
++
++  id: name("A service's id, or an accessory's id when only one of its services has the control."),
++  accessory: name("That accessory's name, which must match."),
++  room: name("Its room, which must match.").optional(),
++  home: name("Its home, as home above.").optional(),
++  kind: _enum2(HOME_KINDS).optional().describe("Its service's kind, which must match;
++ the approval card counts by it."),
++  control: _enum2(CONTROLS).describe("As control above."),
++  value: VALUE_TYPES.describe("As value above.")
++}
++).refine(({
++ control, value }
++) => valueFits(control, value), {
++
++  error: VALUE_ERROR,
++  path: ["value"]
++}
++).transform(withChoiceSpelled);
++
+ var controlHomeParameters = mobileLocalToolParameters({
+ 
+-  home: name(
+-    `The home's name as ${
+-SAND_IOS_READ_HOME_TOOL_NAME}
+- returns it. Required when the phone has more than one home.`
+-  ).optional(),
++  home: name("The home's name. Required when the phone has more than one home.").optional(),
+   room: name(
+-    `The accessory's room as ${
+-SAND_IOS_READ_HOME_TOOL_NAME}
+- returns it. Pass it when two accessories share a name.`
++    "The accessory's room. Pass it when names repeat across rooms, or with all."
+   ).optional(),
+-  accessory: name(`The accessory's name as ${
+-SAND_IOS_READ_HOME_TOOL_NAME}
+- returns it.`),
++  accessory: name("The accessory's name, unless all is true.").optional(),
+   service: name(
+-    `The service's name as ${
+-SAND_IOS_READ_HOME_TOOL_NAME}
+- returns it. Pass it only when the accessory has more than one service with this control.`
++    "The service's name, when the accessory has more than one service with the control."
+   ).optional(),
+-  control: _enum2([...SWITCH_CONTROLS, ...LEVEL_CONTROLS, ...CHOICE_CONTROL_NAMES]).describe(
+-    "What to change, as the read result lists it under controls: power (lights, switches, outlets), active (fans), brightness, hue, saturation, colorTemperature, targetTemperature (thermostats), rotationSpeed (fans), targetPosition (blinds, doors, windows), lockTargetState (locks), targetDoorState (garage doors), securitySystemTargetState (security systems), or targetHeatingCoolingState (thermostat mode)."
++  kind: _enum2(HOME_KINDS).optional().describe("With all and no accessory, change only services of this kind."),
++  all: boolean2().optional().describe("True to change every match that has the control."),
++  control: _enum2(CONTROLS).optional().describe("What to change, as the read result lists it under controls."),
++  value: VALUE_TYPES.optional().describe(
++    "The new value: true or false for power and active, one of its values from the read result for a lock, door, security system, or thermostat mode, otherwise a number in its range (percent;
++ hue in degrees, colorTemperature in mireds, targetTemperature in \xB0C)."
+   ),
+-  value: union([boolean2(), number2(), string2()]).describe(
+-    "The new absolute value: true or false for power and active;
+- one of the control's values from the read result for lockTargetState (unsecured, secured), targetDoorState (open, closed), securitySystemTargetState (stayArm, awayArm, nightArm, disarmed), and targetHeatingCoolingState (off, heat, cool, auto);
+- otherwise a number in the control's range from the read result (brightness, saturation, rotationSpeed, and targetPosition in percent, hue in degrees, colorTemperature in mireds, targetTemperature in \xB0C)."
++  changes: array(changeParameters).min(1).max(MAX_CHANGES).optional().describe(
++    "Instead of the fields above, changes, each with its own control and value and each id once."
+   )
+ }
+-).refine(({
+- control, value }
+-) => valueFits(control, value), {
++).superRefine((args, ctx) => {
++
++  if (args.changes === void 0) {
++
++    checkSingleChange(args, ctx);
++
++    return;
++
++  }
++
++  const mixed = SINGLE_CHANGE_FIELDS.filter((key) => args[key] !== void 0);
++
++  if (mixed.length > 0) {
++
++    ctx.addIssue({
++
++      code: "custom",
++      message: `pass changes alone, without ${
++mixed.join(", ")}
++`,
++      path: ["changes"]
++    }
++);
++
++  }
++
++  const ids = args.changes.map(({
++ id }
++) => id);
++
++  const repeated = ids.find((id, index) => ids.indexOf(id) !== index);
++
++  if (repeated !== void 0) {
++
++    ctx.addIssue({
++
++      code: "custom",
++      message: `id "${
++repeated}
++" is in changes more than once`,
++      path: ["changes"]
++    }
++);
++
++  }
+ 
+-  error: "power and active take true or false;
+- lock, door, security system, and thermostat mode controls take one of their names;
+- every other control takes a number",
+-  path: ["value"]
+ }
+ ).transform(withChoiceSpelled);
+ 
+-function describeControlHome({
+- home, room, accessory, service, control, value }
+-) {
++function checkSingleChange({
++ accessory, kind, all, control, value }
++, ctx) {
+ 
+-  const target = service === void 0 ? `"${
+-accessory}
+-"` : `"${
+-service}
+-" on "${
+-accessory}
+-"`;
++  if (control === void 0 || value === void 0) {
+ 
+-  const where = [
+-    ...room === void 0 ? [] : [` in "${
+-room}
+-"`],
+-    ...home === void 0 ? [] : [` at "${
+-home}
+-"`]
+-  ].join("");
++    ctx.addIssue({
++
++      code: "custom",
++      message: "pass control and value, or changes",
++      path: [control === void 0 ? "control" : "value"]
++    }
++);
++
++  }
++ else if (!valueFits(control, value)) {
++
++    ctx.addIssue({
++ code: "custom", message: VALUE_ERROR, path: ["value"] }
++);
++
++  }
++
++  if (all !== true && accessory === void 0) {
++
++    ctx.addIssue({
++
++      code: "custom",
++      message: "pass accessory, all: true to change every match, or changes",
++      path: ["accessory"]
++    }
++);
++
++  }
++
++  if (kind !== void 0 && accessory !== void 0) {
++
++    ctx.addIssue({
++
++      code: "custom",
++      message: "kind works only with all: true and no accessory;
++ pass service to pick one service",
++      path: ["kind"]
++    }
++);
++
++  }
++
++}
++
++function phrase(control, value, target) {
+ 
+   if (isSwitchControl(control)) {
+ 
+@@ -988479,19 +988983,13 @@
+ value === true ? "on" : "off"}
+  ${
+ target}
+-${
+-where}
+ `;
+ 
+   }
+ 
+   if (isChoiceControl(control)) {
+ 
+-    return choiceOf(control, value)?.(`${
+-target}
+-${
+-where}
+-`);
++    return choiceOf(control, value)?.(target);
+ 
+   }
+ 
+@@ -988501,8 +988999,6 @@
+ label.name}
+  of ${
+ target}
+-${
+-where}
+  to ${
+ String(value)}
+ ${
+@@ -988511,6 +989007,243 @@
+ 
+ }
+ 
++function accessoriesNamed({
++ accessory, kind, all }
++) {
++
++  if (all !== true) {
++
++    return `"${
++accessory}
++"`;
++
++  }
++
++  if (accessory !== void 0) {
++
++    return `every "${
++accessory}
++"`;
++
++  }
++
++  return `every ${
++kind === void 0 ? "accessory" : KIND_LABELS[kind].one}
++`;
++
++}
++
++function placeOf(room, home) {
++
++  return [
++    ...room === void 0 ? [] : [` in "${
++room}
++"`],
++    ...home === void 0 ? [] : [` at "${
++home}
++"`]
++  ].join("");
++
++}
++
++function describeSingleChange(args) {
++
++  const {
++ home, room, service, control, value }
++ = args;
++
++  if (control === void 0) {
++
++    return void 0;
++
++  }
++
++  const accessories = accessoriesNamed(args);
++
++  const target = service === void 0 ? accessories : `"${
++service}
++" on ${
++accessories}
++`;
++
++  return phrase(control, value, `${
++target}
++${
++placeOf(room, home)}
++`);
++
++}
++
++function groupsOf(changes, keyOf) {
++
++  const groups = /* @__PURE__ */ new Map();
++
++  for (const change of changes) {
++
++    const key = keyOf(change);
++
++    const group = groups.get(key);
++
++    groups.set(key, {
++
++      first: group?.first ?? change,
++      accessories: [...group?.accessories ?? [], change.accessory]
++    }
++);
++
++  }
++
++  return [...groups.values()];
++
++}
++
++function listOf3(items) {
++
++  const rest = [...items];
++
++  const last = rest.pop() ?? "";
++
++  return rest.length === 0 ? last : `${
++rest.join(", ")}
++ and ${
++last}
++`;
++
++}
++
++function counted({
++ first, accessories }
++) {
++
++  if (accessories.length === 1) {
++
++    return `"${
++first.accessory}
++"`;
++
++  }
++
++  return `${
++accessories.length}
++ ${
++first.kind === void 0 ? "accessories" : KIND_LABELS[first.kind].many}
++`;
++
++}
++
++function named({
++ accessories }
++) {
++
++  return listOf3(accessories.map((accessory) => `"${
++accessory}
++"`));
++
++}
++
++function actionOf2(group, target) {
++
++  const {
++ control, value, home }
++ = group.first;
++
++  return phrase(control, value, `${
++target}
++${
++placeOf(void 0, home)}
++`) ?? "";
++
++}
++
++function homesOf(changes) {
++
++  const homes = [...new Set(changes.flatMap(({
++ home }
++) => home === void 0 ? [] : [home]))];
++
++  return homes.length === 0 ? "" : ` at ${
++listOf3(homes.map((home) => `"${
++home}
++"`))}
++`;
++
++}
++
++function sentenceOf(actions2) {
++
++  return actions2.map(
++    (action, index) => index === 0 ? action : action.charAt(0).toLowerCase() + action.slice(1)
++  ).join(";
++ ");
++
++}
++
++function describeChanges(changes) {
++
++  const details = changes.map(
++    ({
++ accessory, room, home, control, value }
++) => phrase(control, value, `"${
++accessory}
++"${
++placeOf(room, home)}
++`)
++  );
++
++  if (details.some((detail) => detail === void 0)) {
++
++    return void 0;
++
++  }
++
++  if (changes.length === 1) {
++
++    return details.join("");
++
++  }
++
++  const namedChanges = changes.filter(({
++ control }
++) => !COUNTED_CONTROLS.has(control));
++
++  const countedChanges = changes.filter(({
++ control }
++) => COUNTED_CONTROLS.has(control));
++
++  const namedActions = groupsOf(
++    namedChanges,
++    ({
++ control, value, home }
++) => JSON.stringify([control, value, home ?? null])
++  ).map((group) => actionOf2(group, named(group)));
++
++  const countedGroups = groupsOf(
++    countedChanges,
++    ({
++ control, value, kind, home }
++) => JSON.stringify([control, value, kind ?? null, home ?? null])
++  );
++
++  const countedActions = countedGroups.length > MAX_SUMMARY_ACTIONS ? [
++    `Change ${
++countedChanges.length}
++ ${
++namedChanges.length === 0 ? "" : "more "}
++accessories${
++homesOf(countedChanges)}
++`
++  ] : countedGroups.map((group) => actionOf2(group, counted(group)));
++
++  return [sentenceOf([...namedActions, ...countedActions]), ...details].join("\n");
++
++}
++
++function describeControlHome(args) {
++
++  return args.changes === void 0 ? describeSingleChange(args) : describeChanges(args.changes);
++
++}
++
+ var IOS_CONTROL_HOME_TOOL = defineMobileLocalTool({
+ 
+   toolId: SAND_IOS_CONTROL_HOME_TOOL_ID,
+@@ -988522,29 +989255,49 @@
+   notRepeatable: {
+  checkWith: SAND_IOS_READ_HOME_TOOL_NAME }
+ ,
+-  description: `Control an accessory in the user's Apple Home (HomeKit) on their iPhone: turn lights, switches, outlets, and fans on or off;
++  description: `Control accessories in the user's Apple Home (HomeKit) on their iPhone: turn lights, switches, outlets, and fans on or off;
+  set brightness, color, fan speed, or the position of blinds, doors, and windows;
+- lock or unlock a lock;
++ lock or unlock;
+  open or close a garage door;
+  arm or disarm a security system;
+- or set a thermostat's mode or target temperature. Use it when the user asks to change something in their home. Call ${
++ or set a thermostat. Call ${
++SAND_IOS_READ_HOME_TOOL_NAME}
++ first. Only the controls it lists can change;
++ values are absolute. Change one accessory by name with control and value;
++ names match exactly, apart from case and spacing. Change every match the same way with all: true and the room, accessory, service, or kind that pick them. Or pass changes, a list of ids from ${
+ SAND_IOS_READ_HOME_TOOL_NAME}
+- first and pass names exactly as it returns them;
+- names match regardless of case and spacing, but nothing looser. Only the controls ${
++, for any set you choose, such as lights whose names start with C, half of them at random, or some on and others off. A call that matches nothing or has a value out of range changes nothing and says why. One change returns its target and the value written;
++ all and changes return results, one per service or change, with status changed, unreachable (nothing written), unconfirmed (it may have changed;
++ call ${
+ SAND_IOS_READ_HOME_TOOL_NAME}
+- lists for a service can change. When no single accessory or service matches, or the value is outside the control's range or values, the call changes nothing and says why, with the candidate names. Each call sets one control to an absolute value. The result is JSON: the home, room, accessory, service, control, and the value the phone wrote. Tell the user what changed.`,
++ before retrying), or failed with the error. Tell the user what changed and what didn't.`,
+   conciseStaticContext: "Change the user's Apple Home accessories when they ask: lights, switches, fans, blinds, locks, garage doors, security systems, or thermostats.",
+   parameters: controlHomeParameters,
+   inputOf: ({
+- home, room, accessory, service, control, value }
++ home, room, accessory, service, kind, all, control, value, changes }
+ ) => ({
+ 
+     home,
+     room,
+     accessory,
+     service,
++    kind,
++    all,
+     control,
+-    value
++    value,
++    changes: changes?.map(({
++ id, accessory: accessory2, room: room2, home: home2, kind: kind2, control: control2, value: value2 }
++) => ({
++
++      id,
++      accessory: accessory2,
++      room: room2,
++      home: home2,
++      kind: kind2,
++      control: control2,
++      value: value2
++    }
++))
+   }
+ ),
+   describeCall: (input2) => {
+@@ -988581,12 +989334,14 @@
+   osPermission: "home",
+   description: `Read the user's Apple Home (HomeKit) setup on their iPhone: homes, rooms, accessories, and each accessory's current state, such as whether a light is on, its brightness, a thermostat's temperature, whether a lock is locked, whether a garage door is open, or whether a security system is armed. Use it whenever the user asks about their home, lights, thermostat, locks, garage doors, security system, or sensors, and before ${
+ SAND_IOS_CONTROL_HOME_TOOL_NAME}
+- to get an accessory's exact name. It only reads;
++ to get an accessory's exact name and id. It only reads;
+  use ${
+ SAND_IOS_CONTROL_HOME_TOOL_NAME}
+- to change something. The result is JSON: homes with name, primary (true for the user's main home in Apple Home), rooms, and accessories (name, room, category when Apple Home files it as a door, lock, garage door opener, window, or security system, reachable, and services with kind, name, state, and the controls ${
++ to change something. The result is JSON: homes with name, primary (true for the user's main home in Apple Home), rooms, and accessories (id, name, room, category when Apple Home files it as a door, lock, garage door opener, window, or security system, reachable, and services with id, kind, name, state, and the controls ${
++SAND_IOS_CONTROL_HOME_TOOL_NAME}
++ accepts, each with its range or values), and truncated. Ids are stable, so ${
+ SAND_IOS_CONTROL_HOME_TOOL_NAME}
+- accepts, each with its range or values), and truncated. The primary home comes first. When truncated is true, accessories past a size limit were left out, though every home and room is still listed;
++ changes can name exactly the services you pick. The primary home comes first. When truncated is true, accessories past a size limit were left out, though every home and room is still listed;
+  pass home to read one home, and tell the user if what they asked about may be among those left out. Temperatures are in \xB0C. An accessory that is not reachable may show an old state, and a service's stale lists the state keys its accessory did not answer for just now, which may be old too.`,
+   conciseStaticContext: "Read the user's Apple Home accessories and their state when they ask about their home.",
+   parameters: readHomeParameters,
+@@ -989928,14 +990683,14 @@
+ 
+ function describeSetAlarmCall(args) {
+ 
+-  const named = args.label === void 0 ? "" : ` called "${
++  const named2 = args.label === void 0 ? "" : ` called "${
+ args.label}
+ "`;
+ 
+   if (args.kind === "alarm") {
+ 
+     return args.time === void 0 ? void 0 : `Set an alarm${
+-named}
++named2}
+  for ${
+ args.time}
+ `;
+@@ -989943,7 +990698,7 @@
+   }
+ 
+   return args.durationSeconds === void 0 ? void 0 : `Start a timer${
+-named}
++named2}
+  for ${
+ describeDuration(args.durationSeconds)}
+ `;
+@@ -990038,11 +990793,11 @@
+ 
+   const deviceName = args.deviceName?.trim();
+ 
+-  const named = deviceName === void 0 || deviceName.length === 0 ? void 0 : deviceName;
++  const named2 = deviceName === void 0 || deviceName.length === 0 ? void 0 : deviceName;
+ 
+   if (isComputerUseToolId(args.toolId)) {
+ 
+-    return computerUsePermissionText(named ?? COMPUTER_USE_DEVICE_FALLBACK);
++    return computerUsePermissionText(named2 ?? COMPUTER_USE_DEVICE_FALLBACK);
+ 
+   }
+ 
+@@ -990050,7 +990805,7 @@
+ 
+   const specTitle = tool?.permissionCardTitle;
+ 
+-  const device = named ?? PHONE_LOCAL_TOOL_DEVICE_FALLBACK;
++  const device = named2 ?? PHONE_LOCAL_TOOL_DEVICE_FALLBACK;
+ 
+   return {
+ 
+@@ -996836,7 +997591,7 @@
+ taskId}
+  is done, so nothing was sent. To post its results or continue the work there, reopen it with ${
+ GROK_BOT_TOOL_NAMES.UpdateTask}
+- (status: in_progress), send again with this task_id, then set it done. Send its results in full in the main chat too, without task_id.`
++ (status: open), send again with this task_id, then set it done. Send its results in full in the main chat too, without task_id.`
+     );
+ 
+   }
+@@ -1005964,7 +1006719,7 @@
+ 
+   const ledger = humanOnlyReviewLedger(args.options.toolDecisions, args.toolCallId);
+ 
+-  const counted = (result, cause = "none") => requests.increment(args.ctx, 1, {
++  const counted2 = (result, cause = "none") => requests.increment(args.ctx, 1, {
+  result, cause }
+ );
+ 
+@@ -1005972,7 +1006727,7 @@
+ 
+     ledger.ruleRefused();
+ 
+-    counted("cancelled");
++    counted2("cancelled");
+ 
+     return {
+  allowed: false, reason: SAND_OUTBOUND_CALL_CANCELLED_REASON }
+@@ -1005986,7 +1006741,7 @@
+ 
+     ledger.ruleRefused();
+ 
+-    counted("no_reviewer");
++    counted2("no_reviewer");
+ 
+     return {
+  allowed: false, reason: SAND_OUTBOUND_CALL_UNAVAILABLE_REASON }
+@@ -1006057,7 +1006812,7 @@
+ 
+   if (approval.approved) {
+ 
+-    counted("approved");
++    counted2("approved");
+ 
+     return {
+  allowed: true }
+@@ -1006065,9 +1006820,9 @@
+ 
+   }
+ 
+-  if (approval.retired === void 0) counted("declined");
++  if (approval.retired === void 0) counted2("declined");
+ 
+-  else counted("retired", approval.retired);
++  else counted2("retired", approval.retired);
+ 
+   return {
+  allowed: false, reason: approval.reason ?? "The user declined." }
+@@ -1011295,6 +1012050,11 @@
+     const line = JSON.stringify({
+ 
+       role: message.role,
++      ...message.speaker === void 0 ? {
++}
++ : {
++ speaker: message.speaker }
++,
+       message: {
+  content: [{
+  type: "text", text: boundedText(message.text) }
+@@ -1012001,6 +1012761,8 @@
+ 
+ var TRANSCRIPT_SELF_PATH = "/transcripts/self";
+ 
++var TRANSCRIPT_SESSIONS_PATH = "/transcripts/sessions";
++
+ function transcriptPath(target) {
+ 
+   switch (target.kind) {
+@@ -1012093,6 +1012855,32 @@
+ 
+ }
+ 
++function searchHitOf(path32, hit, query2) {
++
++  return {
++
++    path: path32,
++    position: hit.position,
++    snippet: `(${
++hit.speaker ?? hit.role}
++) ${
++transcriptExcerpt(hit.text, query2)}
++`,
++    ...hit.score === void 0 ? {
++}
++ : {
++ score: hit.score }
++,
++    ...hit.at === void 0 ? {
++}
++ : {
++ at: hit.at }
++
++  }
++;
++
++}
++
+ var transcriptSearch = createInProcessSearch({
+ 
+   rankers: {
+@@ -1012233,6 +1013021,37 @@
+ 
+   }
+ 
++  async function searchReadable(ctx, request3) {
++
++    if (reader.searchReadableTranscripts === void 0) {
++
++      return refused(
++        "Searching every conversation at once is not available here. Search one conversation at a time."
++      );
++
++    }
++
++    const outcome = await reader.searchReadableTranscripts(ctx, request3);
++
++    if (outcome.kind === "refused") return refused(outcome.message);
++
++    return {
++
++      ...outcome,
++      hits: outcome.hits.map(
++        (hit) => searchHitOf(
++          hit.sessionId === void 0 ? TRANSCRIPT_SELF_PATH : transcriptPath({
++ kind: "session", sessionId: hit.sessionId }
++),
++          hit,
++          request3.query
++        )
++      )
++    }
++;
++
++  }
++
+   return {
+ 
+     root: "/transcripts",
+@@ -1012331,56 +1013150,40 @@
+ ,
+     search: async (ctx, _access, request3) => {
+ 
+-      const path32 = request3.under ?? TRANSCRIPT_SELF_PATH;
+-
+-      const target = transcriptTargetOfPath(path32);
+-
+-      if (target === void 0) return refused(`No transcript at ${
+-path32}
+-.`);
+-
+       const query2 = request3.query.trim();
+ 
+       if (query2.length === 0) return refused("The query is empty.");
+ 
+-      const base = transcriptPath(target);
++      const portRequest = {
+ 
+-      const toHit = (hit) => ({
+-
+-        path: base,
+-        position: hit.position,
+-        snippet: `(${
+-hit.role}
+-) ${
+-transcriptExcerpt(hit.text, query2)}
+-`,
+-        ...hit.score === void 0 ? {
++        query: query2,
++        match: request3.match,
++        limit: request3.limit,
++        ...request3.ranker === void 0 ? {
+ }
+  : {
+- score: hit.score }
+-,
+-        ...hit.at === void 0 ? {
+-}
+- : {
+- at: hit.at }
++ ranker: request3.ranker }
+ 
+       }
+-);
++;
+ 
+-      if (reader.searchTranscript !== void 0) {
++      const path32 = request3.under ?? TRANSCRIPT_SELF_PATH;
+ 
+-        const outcome = await reader.searchTranscript(ctx, target, {
++      if (path32 === TRANSCRIPT_SESSIONS_PATH) return await searchReadable(ctx, portRequest);
+ 
+-          query: query2,
+-          match: request3.match,
+-          limit: request3.limit,
+-          ...request3.ranker === void 0 ? {
+-}
+- : {
+- ranker: request3.ranker }
++      const target = transcriptTargetOfPath(path32);
+ 
+-        }
+-);
++      if (target === void 0) return refused(`No transcript at ${
++path32}
++.`);
++
++      const base = transcriptPath(target);
++
++      const toHit = (hit) => searchHitOf(base, hit, query2);
++
++      if (reader.searchTranscript !== void 0) {
++
++        const outcome = await reader.searchTranscript(ctx, target, portRequest);
+ 
+         if (outcome.kind === "refused") return refused(outcome.message);
+ 
+@@ -1012403,7 +1013206,14 @@
+         path: String(entry.position),
+         position: entry.position,
+         fields: {
+- text: entry.text }
++
++          text: entry.text,
++          ...entry.speaker === void 0 ? {
++}
++ : {
++ speaker: entry.speaker }
++
++        }
+ ,
+         snippet: ""
+       }
+@@ -1012461,7 +1013271,7 @@
+ var searchParameters = {
+ 
+   query: external_exports3.string().trim().optional().describe(
+-    "Search the transcript instead of reading its newest messages. Returns the matching positions, newest or most relevant first;
++    "Search the transcript instead of reading its newest messages. Matches what was said and the name of who said it. Returns the matching positions, newest or most relevant first;
+  read one in context with around."
+   ),
+   match: external_exports3.enum(MATCH_MODES).optional().catch(void 0).describe(
+@@ -1012475,6 +1013285,14 @@
+ }
+ ;
+ 
++var allConversationsParameter = {
++
++  all_conversations: external_exports3.boolean().optional().describe(
++    "With query, search this conversation and your other recent conversations together instead of one. Each match names the session_id to read it with."
++  )
++}
++;
++
+ var readTranscriptParameters = (subagentToolName, subagent) => external_exports3.object({
+ 
+   session_id: optionalId(
+@@ -1012503,9 +1013321,18 @@
+ }
+ );
+ 
+-var searchableReadTranscriptParameters = (subagentToolName, subagent) => readTranscriptParameters(subagentToolName, subagent).extend(searchParameters);
++var searchableReadTranscriptParameters = (subagentToolName, subagent, acrossConversations) => {
++
++  const searchable = readTranscriptParameters(subagentToolName, subagent).extend(searchParameters);
++
++  return acrossConversations ? searchable.extend(allConversationsParameter) : searchable;
++
++}
++;
+ 
+-var searchArgsSchema = external_exports3.object(searchParameters);
++var searchArgsSchema = external_exports3.object({
++ ...searchParameters, ...allConversationsParameter }
++);
+ 
+ function targetOf(args) {
+ 
+@@ -1012515,7 +1013342,7 @@
+ 
+   const subagentId = presentId(args.subagent_id);
+ 
+-  const named = [
++  const named2 = [
+     ...sessionId === void 0 ? [] : [{
+  kind: "session", sessionId }
+ ],
+@@ -1012527,13 +1013354,13 @@
+ ]
+   ];
+ 
+-  if (named.length > 1) {
++  if (named2.length > 1) {
+ 
+     throw new SandToolInputError("Pass at most one of session_id, agent_id, or subagent_id.");
+ 
+   }
+ 
+-  return named[0] ?? {
++  return named2[0] ?? {
+  kind: "self" }
+ ;
+ 
+@@ -1012725,6 +1013552,72 @@
+ 
+ }
+ 
++function renderSearchAcross(query2, result) {
++
++  const label = result.label ?? "your conversations";
++
++  const notice = coverageNotice(result.coverage);
++
++  if (result.hits.length === 0) {
++
++    return [
++      `No messages in ${
++label}
++ match "${
++query2}
++" (${
++result.searched}
++ searched).`,
++      ...notice === void 0 ? [] : [notice],
++      "Try other words, or search one conversation with session_id."
++    ].join("\n");
++
++  }
++
++  const count2 = result.hits.length;
++
++  return [
++    `${
++count2}
++ ${
++count2 === 1 ? "match" : "matches"}
++ for "${
++query2}
++" in ${
++label}
++ (${
++result.searched}
++ messages searched${
++result.ranker === void 0 ? "" : `, ranked by ${
++result.ranker}
++`}
++):`,
++    ...result.hits.map((hit) => {
++
++      const target = transcriptTargetOfPath(hit.path);
++
++      const where = target?.kind === "session" ? `session_id ${
++target.sessionId}
++` : "this conversation";
++
++      return `- ${
++where}
++, position ${
++hit.position}
++ ${
++hit.snippet}
++`;
++
++    }
++),
++    ...notice === void 0 ? [] : [notice],
++    `Read a match in context: call ${
++GROK_BOT_TOOL_NAMES.ReadTranscript}
++ again with that match's session_id (none for this conversation) and around=<position>.`
++  ].join("\n");
++
++}
++
+ function presentArguments(args) {
+ 
+   return Object.fromEntries(
+@@ -1012737,20 +1013630,34 @@
+ 
+ var READ_TRANSCRIPT_SEARCH_DESCRIPTION = "To find something said long ago, pass query to search the whole transcript, then read a match in context with around. Search covers only messages that were said, never reasoning or tool calls.";
+ 
++var READ_TRANSCRIPT_SEARCH_ACROSS_DESCRIPTION = "Add all_conversations to search this conversation and your other recent conversations together.";
++
+ function offersSearch(deps) {
+ 
+   return deps.search === true && deps.subagent?.review === void 0;
+ 
+ }
+ 
++function offersSearchAcross(deps) {
++
++  return offersSearch(deps) && deps.subagent === void 0 && deps.transcriptReader.searchReadableTranscripts !== void 0;
++
++}
++
+ function readTranscriptDescription(deps) {
+ 
+   const base = readTranscriptBaseDescription(deps);
+ 
++  const search = offersSearchAcross(deps) ? `${
++READ_TRANSCRIPT_SEARCH_DESCRIPTION}
++ ${
++READ_TRANSCRIPT_SEARCH_ACROSS_DESCRIPTION}
++` : READ_TRANSCRIPT_SEARCH_DESCRIPTION;
++
+   return offersSearch(deps) ? `${
+ base}
+  ${
+-READ_TRANSCRIPT_SEARCH_DESCRIPTION}
++search}
+ ` : base;
+ 
+ }
+@@ -1012789,12 +1013696,14 @@
+ 
+   const searchable = offersSearch(deps);
+ 
++  const searchAcross = offersSearchAcross(deps);
++
+   return defineCommunicateTool(deps, {
+ 
+     id: "SEARCH_CONVERSATIONS",
+     name: SAND_READ_TRANSCRIPT_TOOL_NAME,
+     description: readTranscriptDescription(deps),
+-    parameters: searchable ? searchableReadTranscriptParameters(deps.subagentToolName, subagent) : readTranscriptParameters(deps.subagentToolName, subagent),
++    parameters: searchable ? searchableReadTranscriptParameters(deps.subagentToolName, subagent, searchAcross) : readTranscriptParameters(deps.subagentToolName, subagent),
+     execute: async (ctx, args, toolDeps) => {
+ 
+       const target = targetOf(args);
+@@ -1012835,13 +1013744,31 @@
+ 
+       const query2 = presentId(searchArgs.query);
+ 
++      const across = searchArgs.all_conversations === true;
++
++      if (across && target.kind !== "self") {
++
++        throw new SandToolInputError(
++          "Pass all_conversations or one of session_id, agent_id, or subagent_id, not both."
++        );
++
++      }
++
++      if (across && query2 === void 0) {
++
++        throw new SandToolInputError(
++          "all_conversations only searches. Pass a query, or read one conversation with session_id."
++        );
++
++      }
++
+       if (query2 !== void 0) {
+ 
+         const found = await virtualMount.search(ctx, access4, {
+ 
+           query: query2,
+           match: searchArgs.match ?? "ranked",
+-          under: path32,
++          under: across ? TRANSCRIPT_SESSIONS_PATH : path32,
+           limit: Math.min(
+             args.limit ?? READ_TRANSCRIPT_SEARCH_DEFAULT_LIMIT,
+             SAND_TRANSCRIPT_MAX_MESSAGES
+@@ -1012849,7 +1013776,9 @@
+         }
+ );
+ 
+-        return found.kind === "refused" ? found.message : renderSearch(query2, found);
++        if (found.kind === "refused") return found.message;
++
++        return across ? renderSearchAcross(query2, found) : renderSearch(query2, found);
+ 
+       }
+ 
+@@ -1013105,7 +1014034,7 @@
+ 
+ function causeIn(phrases, error63) {
+ 
+-  return phrases.find(([phrase]) => error63.includes(phrase))?.[1] ?? "unclassified";
++  return phrases.find(([phrase2]) => error63.includes(phrase2))?.[1] ?? "unclassified";
+ 
+ }
+ 
+@@ -1019173,12 +1020102,12 @@
+ 
+   if (role === "text" && rest.startsWith(":")) return void 0;
+ 
+-  const named = SNAPSHOT_QUOTED_NAME_PATTERN.exec(rest);
++  const named2 = SNAPSHOT_QUOTED_NAME_PATTERN.exec(rest);
+ 
+-  if (named?.[1] !== void 0 && named[2] !== void 0) {
++  if (named2?.[1] !== void 0 && named2[2] !== void 0) {
+ 
+     return {
+- role, name: unescapeName(named[1]), attributes: named[2] }
++ role, name: unescapeName(named2[1]), attributes: named2[2] }
+ ;
+ 
+   }
+@@ -1019948,7 +1020877,7 @@
+ 
+   const redactor = () => loadRedactor(deps.secureValues, deps.now ?? Date.now);
+ 
+-  const counted = (ctx, tool, redact) => redact === void 0 ? void 0 : (text3) => {
++  const counted2 = (ctx, tool, redact) => redact === void 0 ? void 0 : (text3) => {
+ 
+     const redacted = redact(text3);
+ 
+@@ -1019979,7 +1020908,7 @@
+ 
+       }
+ 
+-      return counted(ctx, tool, loaded.redact);
++      return counted2(ctx, tool, loaded.redact);
+ 
+     }
+ 
+@@ -1020390,15 +1021319,15 @@
+ 
+ function confirmForm(args) {
+ 
+-  const named = `${
++  const named2 = `${
+ args.verb}
+  ${
+ args.label ?? "this contact"}
+ ?`;
+ 
+-  const fits = clampLine(named, USER_FORM_MAX_TITLE_LENGTH) === named;
++  const fits = clampLine(named2, USER_FORM_MAX_TITLE_LENGTH) === named2;
+ 
+-  const title = fits ? named : `${
++  const title = fits ? named2 : `${
+ args.verb}
+  this contact?`;
+ 
+@@ -1040063,9 +1040992,9 @@
+ 
+ function titleProperty(properties) {
+ 
+-  const named = richTextTitle(properties.title) ?? richTextTitle(properties.Name);
++  const named2 = richTextTitle(properties.title) ?? richTextTitle(properties.Name);
+ 
+-  if (named !== void 0) return named;
++  if (named2 !== void 0) return named2;
+ 
+   for (const value of Object.values(properties)) {
+ 
+@@ -1042380,7 +1043309,7 @@
+   if (deps.toolCallId !== void 0) deps.toolDecisions?.askAPerson(deps.toolCallId);
+ 
+   return "Asked the user to authorize the card;
+- your turn is over. If they approve, they finish on Link's page and you'll be resumed with the spend request id to poll. If they deny, you'll be resumed with that instead.";
++ your turn is over. If they approve, they finish on Link's page and you'll be resumed with the spend request id to poll. If they deny, or Link refuses the card, you'll be resumed with that and what to do next.";
+ 
+ }
+ 
+@@ -1052113,7 +1053042,7 @@
+ 
+ function connectorCardDedupeKey(emission) {
+ 
+-  const named = connectorCardAccountFields(emission.accountKey).accountKey;
++  const named2 = connectorCardAccountFields(emission.accountKey).accountKey;
+ 
+   const row = `${
+ emission.serverId}
+@@ -1052130,10 +1053059,10 @@
+ `;
+ 
+   return `${
+-named == null ? row : `${
++named2 == null ? row : `${
+ row}
+ :${
+-named}
++named2}
+ `}
+ ${
+ reauth}
+@@ -1053908,6 +1054837,12 @@
+ 
+ }
+ 
++function targetedNeedsGrantRequestForTurn(args) {
++
++  return args.canAuthenticateConnectors ? args.request : void 0;
++
++}
++
+ var connectorDiscoveryTools = {
+ 
+   decidedBy: "connectorAccess",
+@@ -1053941,6 +1054876,13 @@
+ 
+     const canAuthenticateConnectors = ctx.decisions.offers("AuthenticateMcpServer") && host.mcpManagement != null;
+ 
++    const requestTargetedNeedsGrant = targetedNeedsGrantRequestForTurn({
++
++      canAuthenticateConnectors,
++      request: host.mcp?.requestTargetedNeedsGrant
++    }
++);
++
+     const [statusName, entry] = dynamicToolRegistry !== void 0 ? ["namespaceStatus", "namespace"] : ["serverStatus", "server"];
+ 
+     const unusableUntilConnected = `MCP authentication: a ${
+@@ -1053978,6 +1054920,13 @@
+ }
+  : {
+  isMcpToolBlocked: readonlyCallOptions.isMcpToolBlocked }
++,
++        ...requestTargetedNeedsGrant === void 0 ? {
++}
++ : {
++
++          requestTargetedNeedsGrant: (args) => requestTargetedNeedsGrant(args)
++        }
+ 
+       }
+ ),
+@@ -1060377,7 +1061326,7 @@
+ // ../packages/grok-bot-harness/src/mcp/gmail-attachment-guard.ts
+ var COMPOSE_TOOLS = ["create_draft", "update_draft", "send_message"];
+ 
+-var KIND_LABELS = {
++var KIND_LABELS2 = {
+ 
+   pdf: "PDF",
+   png: "PNG",
+@@ -1060571,7 +1061520,7 @@
+   return `Not called: the attachment ${
+ filename}
+  is incomplete or isn't a valid ${
+-KIND_LABELS[verdict.kind]}
++KIND_LABELS2[verdict.kind]}
+  file, so the email would arrive without it. Create the draft with no attachments, then attach the file with ${
+ GROK_BOT_TOOL_NAMES.UploadFile}
+  using destination.draftId. Nothing was created or sent.`;
+@@ -1086192,6 +1087141,8 @@
+ 
+ var import_jschardet = __toESM(require_jschardet(), 1);
+ 
++init_count_lines();
++
+ init_encoding_browser();
+ 
+ var LineEnding;
+@@ -1086372,29 +1087323,6 @@
+ 
+ }
+ 
+-function countLines2(data2) {
+-
+-  let lines2 = 1;
+-
+-  let i = 0;
+-
+-  for (;
+- ;
+- ) {
+-
+-    const next = data2.indexOf("\n", i);
+-
+-    if (next === -1)
+-      return lines2;
+-
+-    lines2++;
+-
+-    i = next + 1;
+-
+-  }
+-
+-}
+-
+ function getFormatForBuffer(header) {
+ 
+   if (header.length === 0) {
+@@ -1090576,7 +1091504,7 @@
+ 
+                 mergedOutput.size += notice.length;
+ 
+-                mergedOutput.lineCount += notice.split("\n").length - 1;
++                mergedOutput.lineCount += countLines(notice) - 1;
+ 
+               }
+ 
+@@ -1128855,6 +1129783,10 @@
+ FileBasedTokenStore.saveLocks = /* @__PURE__ */ new Map();
+ 
+ 
++// ../packages/local-exec/dist/mcp.js
++init_dist4();
++
++
+ // ../packages/local-exec/dist/mcp-file-system-writer.js
+ var import_node_crypto49 = require("node:crypto");
+ 
+@@ -1131877,7 +1132809,7 @@
+ 
+   const contentToWrite = textContent2.slice(0, MAX_OUTPUT_FILE_SIZE);
+ 
+-  const lineCount = countOutputFileLines(contentToWrite);
++  const lineCount = countLines(contentToWrite);
+ 
+   const actualSize = Buffer.byteLength(contentToWrite, "utf8");
+ 
+@@ -1132225,9 +1133157,9 @@
+ 
+       const toolDef = tools.find((t) => t.clientKey === serverIdentifier && t.toolName === args.toolName);
+ 
+-      const named = tools.find((t) => t.name === args.name);
++      const named2 = tools.find((t) => t.name === args.name);
+ 
+-      const sameTool = named === void 0 || (toolDef !== void 0 ? named === toolDef : named.toolName === args.toolName && (named.clientKey === serverIdentifier || named.providerIdentifier === serverIdentifier));
++      const sameTool = named2 === void 0 || (toolDef !== void 0 ? named2 === toolDef : named2.toolName === args.toolName && (named2.clientKey === serverIdentifier || named2.providerIdentifier === serverIdentifier));
+ 
+       if (!sameTool) {
+ 
+@@ -1138286,7 +1139218,7 @@
+ 
+           const fullContent = await watchdog(ctx, "readText", 3e3, () => readText2(resolvedPath, args.encodingHint));
+ 
+-          const totalLines = await watchdog(ctx, "countLines", 3e3, () => countLines2(fullContent));
++          const totalLines = await watchdog(ctx, "countLines", 3e3, () => countLines(fullContent));
+ 
+           const rangedRead = tryApplyRequestedReadRange(fullContent, totalLines, args);
+ 

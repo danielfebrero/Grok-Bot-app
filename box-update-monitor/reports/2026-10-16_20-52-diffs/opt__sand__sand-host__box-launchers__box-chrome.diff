@@ -1,0 +1,28 @@
+--- 2026-10-16_19-51:/opt/sand/sand-host/box-launchers/box-chrome
++++ 2026-10-16_20-52:/opt/sand/sand-host/box-launchers/box-chrome
+@@ -254,6 +254,17 @@
+ 		mv -f "${BOX_BROWSER_RUNNING_FILE}.$$" "${BOX_BROWSER_RUNNING_FILE}" 2>/dev/null || true
+ }
+ 
++# Chromium 139 dies right after it starts serving CDP on a profile whose
++# Default/Sync Data store Google Chrome 155 wrote. ungoogled-chromium blocks
++# its own requests to Google's hosts and so never syncs
++# (https://github.com/ungoogled-software/ungoogled-chromium/blob/master/README.md),
++# so its cold launch drops the store and Chrome rebuilds it on its next launch.
++drop_sync_store_for_ungoogled() {
++	[ "${CHROME_BIN}" = "${UNGOOGLED_CHROMIUM}" ] || return 0
++	[ ! -L "${CHROME_PROFILE}/Default" ] || return 0
++	rm -rf -- "${CHROME_PROFILE}/Default/Sync Data" 2>/dev/null || true
++}
++
+ use_running_browser() {
+ 	local recorded=""
+ 	read -r recorded 2>/dev/null <"${BOX_BROWSER_RUNNING_FILE}" || true
+@@ -312,6 +323,7 @@
+ 	started_ms="$(date +%s%3N)"
+ 	if [ "${CHROME_PORT_HELD}" -eq 0 ]; then
+ 		record_box_browser
++		drop_sync_store_for_ungoogled
+ 		launch_chrome --no-startup-window
+ 	else
+ 		use_running_browser
