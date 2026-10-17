@@ -1,0 +1,11 @@
+--- 2026-10-17_04-53/meta/versions.txt
++++ 2026-10-17_07-46/meta/versions.txt
+@@ -10,7 +10,7 @@
+ canvas_sdk_version	2e4bf3688ee105072a8725db207384faea6276c8b6bee9a0c3b5e7b47be18f7e
+ orbitd.bundled_revision	88287498b7278d865be0a9d54e3cbaae9eded227
+ orbitd.releases	28b0833c5707e1c919cee4d4ab5a8ad0eeac9c46
+-agent_store_fuse.commit	a1a81f5c090c9d233ccaa134facafee049f28ecd
++agent_store_fuse.commit	7b5b1ae14f0189f3e47501769e1c7c533ba4e3b0
+ chrome	Google Chrome 155.0.8059.84
+ node (/exec-daemon/node)	v22.14.0
+ node (system)	v20.19.2
