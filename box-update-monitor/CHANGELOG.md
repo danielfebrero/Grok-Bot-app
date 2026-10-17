@@ -9,6 +9,33 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-17 20:55 (Paris) — snapshot `2026-10-17_17-51` → `2026-10-17_20-55`
+
+**Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` `agent-store-fuse-x64-11e1cc7…-bk.tar.gz` → `…-8751971…-bk.tar.gz` (commit `11e1cc76cb923695c26ea4a6b1b06b6394f2e590` → `8751971e71fcf55810bc4ea69bfcb0d12ded88a5`). Image `e94d68c`, box-scripts `e94d68c`, sand-host `dfa5e11`, exec-daemon, orbitd, canvas-sdk, Chrome 155.0.8059.84, Node, Python, Debian inchangés. Fichiers : +0 / −0 / ~1.
+
+- **Bugfix** : —
+- **Change** : —
+- **Features** : —
+- **Perf** : —
+- **Autre/infra** : bump binaire agent-store-fuse (nouvelle révision du tarball S3), aucun autre composant touché.
+
+Rapport : [reports/2026-10-17_20-55.md](reports/2026-10-17_20-55.md).
+
+---
+
+## 2026-10-17 17:51 (Paris) — snapshot `2026-10-17_09-52` → `2026-10-17_17-51`
+
+**Vraie mise à jour de l'ordinateur (nouvelle image + hot-update sand-host)** : image `885e54d` → `e94d68c` (`/etc/sand-box-image-sha`, box-scripts idem), puis sand-host `e94d68c` → `dfa5e11` (`supervisor_status.hostVersion` idem, `lastCommandId` `upgrade-e94d68c` → `None`). exec-daemon rebuild (buildTimestamp `2026-10-16T07:52:43Z` → `2026-10-16T18:31:37Z`). agent-store-fuse, orbitd, canvas-sdk, Chrome 155.0.8059.84, Node, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +4 / −1 / ~48.
+
+- **Bugfix** : —
+- **Change** : skills gérées rafraîchies — `shopping` (9234 → 14021), `instacart`, `source-control`, `code-changes`, `routines`, `purchases`, playbooks `bestbuy`/`costco`/`ebay`/`etsy`/`target` ; `cache.json` màj. `reference/debugging-the-box.md` mis à jour. Suppression de `/opt/sand/sand-host/unified-diff-worker.js`.
+- **Features** : nouveau module natif **`sand-window-capture`** ajouté sous `/opt/sand/deps/sand-window-capture/` (`sand_window_capture.node`, `index.js`, `package.json`) ; nouvelle skill gérée **`orders-and-returns`**.
+- **Perf** : —
+- **Autre/infra** : host-main.cjs / sand-eval-runner.cjs / agent-store-worker.cjs / content-search worker rebuild ; box-scripts (`box-doctor`, `sand-fingerprint-profiles.mjs`, `sand-ua-governor.mjs`, `start-window`), `box-chrome`, `box-contract.generated.mjs`, `runtime-deps-manifest.json` màj ; webauthn-proxy (`.crx`/`.id`/update.xml + policies Chrome + native-messaging host) tourné ; pnpm store index remanié. Meta `dpkg-packages.txt` : −`libcbor0.10` (trio FIDO2 toujours flottant). agent-store-fuse inchangé (`11e1cc7`).
+
+Rapport : [reports/2026-10-17_17-51.md](reports/2026-10-17_17-51.md).
+
+---
 ## 2026-10-17 09:52 (Paris) — snapshot `2026-10-17_07-46` → `2026-10-17_09-52`
 
 **Bump agent-store-fuse + réapparition dpkg du trio FIDO2/SSH** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` `agent-store-fuse-x64-7b5b1ae…-bk.tar.gz` → `…-11e1cc7…-bk.tar.gz` (commit `7b5b1ae14f0189f3e47501769e1c7c533ba4e3b0` → `11e1cc76cb923695c26ea4a6b1b06b6394f2e590`). Meta `dpkg-packages.txt` : +`openssh-client` 1:10.0p1-7+deb13u4, `libfido2-1` 1.15.0-1+b1, `libcbor0.10` 0.10.2-2 (trio déjà vu le 2026-10-15 10:54 puis retiré à 12:51 — signal d’énumération flottante, pas une install neuve). Image `885e54d`, box-scripts `885e54d`, sand-host `e94d68c`, exec-daemon, orbitd, canvas-sdk, Chrome 155.0.8059.84, Node, Python, Debian inchangés. Fichiers : +0 / −0 / ~1.
