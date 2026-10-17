@@ -9,6 +9,34 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-17 09:52 (Paris) — snapshot `2026-10-17_07-46` → `2026-10-17_09-52`
+
+**Bump agent-store-fuse + réapparition dpkg du trio FIDO2/SSH** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` `agent-store-fuse-x64-7b5b1ae…-bk.tar.gz` → `…-11e1cc7…-bk.tar.gz` (commit `7b5b1ae14f0189f3e47501769e1c7c533ba4e3b0` → `11e1cc76cb923695c26ea4a6b1b06b6394f2e590`). Meta `dpkg-packages.txt` : +`openssh-client` 1:10.0p1-7+deb13u4, `libfido2-1` 1.15.0-1+b1, `libcbor0.10` 0.10.2-2 (trio déjà vu le 2026-10-15 10:54 puis retiré à 12:51 — signal d’énumération flottante, pas une install neuve). Image `885e54d`, box-scripts `885e54d`, sand-host `e94d68c`, exec-daemon, orbitd, canvas-sdk, Chrome 155.0.8059.84, Node, Python, Debian inchangés. Fichiers : +0 / −0 / ~1.
+
+- **Bugfix** : —
+- **Change** : —
+- **Features** : —
+- **Perf** : —
+- **Autre/infra** : bump binaire agent-store-fuse (nouvelle révision du tarball S3) ; réapparition méta dpkg du trio FIDO2/`openssh-client` (pas de preuve d’uninstall/reinstall silencieux sans vérif locale).
+
+Rapport : [reports/2026-10-17_09-52.md](reports/2026-10-17_09-52.md).
+
+---
+
+## 2026-10-17 07:46 (Paris) — snapshot `2026-10-17_04-53` → `2026-10-17_07-46`
+
+**Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` `agent-store-fuse-x64-a1a81f5…-bk.tar.gz` → `…-7b5b1ae…-bk.tar.gz` (commit `a1a81f5c090c9d233ccaa134facafee049f28ecd` → `7b5b1ae14f0189f3e47501769e1c7c533ba4e3b0`). Image `885e54d`, box-scripts `885e54d`, sand-host `e94d68c`, exec-daemon, orbitd, canvas-sdk, Chrome 155.0.8059.84, Node, Python, Debian inchangés. Fichiers : +0 / −0 / ~1.
+
+- **Bugfix** : —
+- **Change** : —
+- **Features** : —
+- **Perf** : —
+- **Autre/infra** : bump binaire agent-store-fuse (nouvelle révision du tarball S3), aucun autre composant touché.
+
+Rapport : [reports/2026-10-17_07-46.md](reports/2026-10-17_07-46.md).
+
+---
+
 ## 2026-10-17 04:53 (Paris) — snapshot `2026-10-17_02-48` → `2026-10-17_04-53`
 
 **Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` `agent-store-fuse-x64-b33355a…-bk.tar.gz` → `…-a1a81f5…-bk.tar.gz` (commit `b33355adce4abcfa2c2d843e8a138c963e718220` → `a1a81f5c090c9d233ccaa134facafee049f28ecd`). Image `885e54d`, box-scripts `885e54d`, sand-host `e94d68c`, exec-daemon, orbitd, canvas-sdk, Chrome 155.0.8059.84, Node, Python, Debian inchangés. Fichiers : +0 / −0 / ~1.
