@@ -1,0 +1,101 @@
+--- 2026-10-17_09-52:/opt/sand/sand-host/extensions/content-search/search-index-worker.cjs
++++ 2026-10-17_17-51:/opt/sand/sand-host/extensions/content-search/search-index-worker.cjs
+@@ -108,9 +108,13 @@
+ // src/host/storage/sqlite-busy.ts
+ var SQLITE_BUSY = 5;
+ var SQLITE_LOCKED = 6;
++var SQLITE_NOMEM = 7;
+ var SQLITE_IOERR = 10;
+ var SQLITE_CORRUPT = 11;
+ var SQLITE_CANTOPEN = 14;
++var SQLITE_TOOBIG = 18;
++var SQLITE_MISMATCH = 20;
++var SQLITE_RANGE = 25;
+ var SQLITE_NOTADB = 26;
+ var SQLITE_PRIMARY_CODES = /* @__PURE__ */ new Map([
+   ["SQLITE_BUSY", SQLITE_BUSY],
+@@ -130,6 +134,19 @@
+   }
+   return void 0;
+ }
++function sqliteResultCode(error) {
++  if (!(error instanceof Error) || !("errcode" in error)) return void 0;
++  const { errcode } = error;
++  return typeof errcode === "number" && Number.isSafeInteger(errcode) && errcode >= 0 ? errcode : void 0;
++}
++function isSqliteBusyError(error) {
++  const code = sqlitePrimaryCode(error);
++  return code === SQLITE_BUSY || code === SQLITE_LOCKED;
++}
++function isSqliteInputOrMemoryError(error) {
++  const code = sqlitePrimaryCode(error);
++  return code === SQLITE_NOMEM || code === SQLITE_TOOBIG || code === SQLITE_MISMATCH || code === SQLITE_RANGE;
++}
+ function isSqliteCorruptError(error) {
+   const code = sqlitePrimaryCode(error);
+   return code === SQLITE_CORRUPT || code === SQLITE_NOTADB;
+@@ -872,6 +889,13 @@
+   db.exec("PRAGMA query_only = ON");
+   return db;
+ }
++function boundRowLimit(limit) {
++  const rowLimit = Math.min(Math.floor(limit), Number.MAX_SAFE_INTEGER);
++  return rowLimit > 0 ? rowLimit : 0;
++}
++function isSearchIndexUnreadable(error) {
++  return sqliteResultCode(error) !== void 0 && !isSqliteBusyError(error) && !isSqliteInputOrMemoryError(error);
++}
+ function ensureSearchIndexSchema(db, isFtsEnabled) {
+   db.exec(CORE_SCHEMA);
+   if (isFtsEnabled) db.exec(FTS_SCHEMA);
+@@ -978,7 +1002,7 @@
+   };
+ }
+ function searchTerms(query) {
+-  return query.normalize("NFKC").trim().split(/\s+/).filter((term) => term.length > 0).slice(0, FTS_QUERY_MAX_TERMS);
++  return query.normalize("NFKC").replaceAll("\0", " ").trim().split(/\s+/).filter((term) => term.length > 0).slice(0, FTS_QUERY_MAX_TERMS);
+ }
+ function buildFtsMatchQuery(query) {
+   const terms = searchTerms(query);
+@@ -1042,8 +1066,9 @@
+   return results;
+ }
+ function searchMessages(db, query, limit, isFtsEnabled) {
+-  if (limit <= 0) return [];
+-  if (!isFtsEnabled) return searchMessagesPlain(db, query, limit);
++  const rowLimit = boundRowLimit(limit);
++  if (rowLimit <= 0) return [];
++  if (!isFtsEnabled) return searchMessagesPlain(db, query, rowLimit);
+   const match = buildFtsMatchQuery(query);
+   if (match == null) return [];
+   const rows = db.prepare(
+@@ -1060,7 +1085,7 @@
+ 			 JOIN messages_fts ON messages_fts.rowid = matched.match_rowid
+ 			 WHERE messages_fts MATCH ?
+ 			 ORDER BY matched.ts DESC`
+-  ).all(match, limit, match);
++  ).all(match, rowLimit, match);
+   return collectMessageMatches(
+     rows,
+     (row) => typeof row.snippet === "string" ? flattenSnippet(row.snippet) : null
+@@ -1137,8 +1162,9 @@
+   ).all(limit);
+ }
+ function searchMedia(db, query, limit, isFtsEnabled) {
+-  if (limit <= 0) return [];
+-  const rows = mediaMatchRows(db, query, limit, isFtsEnabled);
++  const rowLimit = boundRowLimit(limit);
++  if (rowLimit <= 0) return [];
++  const rows = mediaMatchRows(db, query, rowLimit, isFtsEnabled);
+   const results = [];
+   for (const row of rows) {
+     const agentId = parseAgentId(row.agentId);
+@@ -1576,7 +1602,7 @@
+         ok: false,
+         message: errorMessage(error),
+         errorClass: errorLogTag(error),
+-        isIndexCorrupt: isSqliteCorruptError(error)
++        isIndexUnreadable: isSearchIndexUnreadable(error)
+       };
+     }
+     port2.postMessage(response);

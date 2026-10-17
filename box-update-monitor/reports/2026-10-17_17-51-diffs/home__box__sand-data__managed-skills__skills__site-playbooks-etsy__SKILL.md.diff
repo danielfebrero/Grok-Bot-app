@@ -1,0 +1,21 @@
+--- 2026-10-17_09-52:/home/box/sand-data/managed-skills/skills/site-playbooks-etsy/SKILL.md
++++ 2026-10-17_17-51:/home/box/sand-data/managed-skills/skills/site-playbooks-etsy/SKILL.md
+@@ -49,7 +49,7 @@
+ Then open https://www.etsy.com/search?q=<query with + for spaces><&order=highest_reviews|most_recent|price_asc|price_desc><&min=<n>&max=<n>><&is_handmade=true><&free_shipping=true> in the same tab and wait 4 s.
+ With a page script iterate div.js-merch-stash-check-listing.v2-listing-card, dedupe by data-listing-id, and read data-shop-id, a.v2-listing-card__img href (cut at ?) and aria-label (title), img src, .currency-symbol plus .currency-value, any "Original Price" amount, the "N star rating with M reviews" aria-label, and whether the card contains "Ad from shop", "Bestseller", "Free shipping".
+ Take one screenshot. If a captcha, sign in or password, 2FA, or payment prompt appears at any point, stop and report it with the URL.
+-Report a table of listing_id, title, shop_id, listing_url, price, original_price, rating, review_count, badges, is_ad, free_shipping, in page order with ads flagged.
++Report a table of listing_id, title, shop_id, listing_url, image_url, price, original_price, rating, review_count, badges, is_ad, free_shipping, in page order with ads flagged.
+ Ground rules for this Task. A Timeout or a net::ERR_* code from browser_navigate means the box cannot reach that host. Do not retry it, even if the tool result says to, and do not run DNS or connectivity checks. Move to the next source this Task names, or report the code and URL. An HTTP block (403, 419, 429, 503) follows this Task's own rule. Work in the tab you start in. Do not open a second tab, and switch tabs only when a tool result names a page you did not intend. In-page tabs are part of the page. A page script is an async (page) => function: run it with browser_run_code if you hold it. Without it, read rendered text from browser_snapshot or browser_find, read a <script> tag from the HTML that curl fetches in the box shell, and report a field neither yields as unreadable, never visible text in its place. Name the read you used. Snapshot a page state once. After a click, a scroll, or a wait this Task calls for, take one new snapshot. Do not snapshot the same state twice. Report as soon as the stop rule above is met, one line per item, only the fields asked for, no page dumps.
+ ```
+ 
+@@ -71,8 +71,7 @@
+ | free_shipping | contains `Free shipping` |
+ 
+ - The hidden `<form action="/cart/listing.php">` in each card carries `<input name="listing_id">` and `<input name="listing_url">` as a stable fallback for id and URL.
+-- There is no embedded listing JSON. No `__INITIAL_STATE__`, no `ld+json` listings;
+- `Etsy.Context.data` is only locale and currency config.
++- The one `ld+json` block is an `ItemList` of the first few listings only (name, url, shop as `brand`, image, offer price), so read the cards for the full page. There is no `__INITIAL_STATE__`.
+ - About 23 of about 59 page one cards are ads, and `data-listing-id` repeats about 6 times per card across nested nodes. Never infer organic from position;
+  always dedupe by id.
+ - The result count is no longer surfaced numerically. Report `result_count_text` as null.

@@ -1,0 +1,9 @@
+snapshot	2026-10-17_17-51
+created	2026-10-17 17:51:25 CEST
+label	auto: changement détecté (sha:/etc/sand-box-image-sha, sha:/exec-daemon/index.js, sha:/exec-daemon/package.json, sha:/opt/sand/deps/runtime-deps-manifest.json, sha:/opt/sand/sand-host/host-main.cjs)
+files	15576
+text_copies	3292
+big_text_gz	5
+unreadable	0
+bytes_hashed	1751389377
+duration_s	5.6

@@ -1,0 +1,495 @@
+--- 2026-10-17_09-52:/exec-daemon/canvas-runtime/canvas-runtime-grok.esm.js
++++ 2026-10-17_17-51:/exec-daemon/canvas-runtime/canvas-runtime-grok.esm.js
+@@ -24667,20 +24667,80 @@
+ var CANVAS_DESIGN_SELECT_MESSAGE_TYPE = "cursor-canvas-design-select";
+ var CANVAS_DESIGN_CLEAR_MESSAGE_TYPE = "cursor-canvas-design-clear";
+ var CANVAS_DESIGN_PICKED_MESSAGE_TYPE = "cursor-canvas-design-picked";
++var CANVAS_DESIGN_TRACK_MESSAGE_TYPE = "cursor-canvas-design-track";
++var CANVAS_DESIGN_RECTS_MESSAGE_TYPE = "cursor-canvas-design-rects";
++var CANVAS_DESIGN_FOCUS_MESSAGE_TYPE = "cursor-canvas-design-focus";
++var CANVAS_DESIGN_DISMISS_MESSAGE_TYPE = "cursor-canvas-design-dismiss";
+ var CANVAS_DESIGN_TEXT_EXCERPT_MAX_CHARS = 200;
+ var CANVAS_DESIGN_PROP_VALUE_MAX_CHARS = 120;
+ var CANVAS_DESIGN_STACK_MAX_DEPTH = 12;
++var CANVAS_DESIGN_TRACK_MAX_COUNT = 64;
++var CANVAS_DESIGN_TRACK_ID_MAX_CHARS = 64;
++function canvasDesignRectsMessage(rects) {
++  return { type: CANVAS_DESIGN_RECTS_MESSAGE_TYPE, rects };
++}
+ function isCanvasDesignClearMessage(data) {
+   return isRecord(data) && data["type"] === CANVAS_DESIGN_CLEAR_MESSAGE_TYPE;
+ }
++function canvasDesignDismissMessage() {
++  return { type: CANVAS_DESIGN_DISMISS_MESSAGE_TYPE };
++}
+ function isRecord(value) {
+   return typeof value === "object" && value !== null;
+ }
++function isPositiveInteger(value) {
++  return Number.isSafeInteger(value) && value > 0;
++}
++function parseAnchor(raw2) {
++  if (!isRecord(raw2) || !isPositiveInteger(raw2["line"]) || !isPositiveInteger(raw2["column"])) {
++    return void 0;
++  }
++  return { line: raw2["line"], column: raw2["column"] };
++}
+ var CANVAS_DESIGN_NAME_MAX_CHARS = 64;
+ var JSX_NAME_PATTERN = /^[A-Za-z_$][\w$-]*(?:\.[A-Za-z_$][\w$-]*)*$/;
+ function isCanvasDesignJsxName(value) {
+   return typeof value === "string" && value.length <= CANVAS_DESIGN_NAME_MAX_CHARS && JSX_NAME_PATTERN.test(value);
+ }
++var TRACK_ID_PATTERN = /^[\w-]+$/;
++function isCanvasDesignTrackId(value) {
++  return typeof value === "string" && value.length > 0 && value.length <= CANVAS_DESIGN_TRACK_ID_MAX_CHARS && TRACK_ID_PATTERN.test(value);
++}
++function parseCanvasDesignTrackMessage(data) {
++  if (!isRecord(data) || data["type"] !== CANVAS_DESIGN_TRACK_MESSAGE_TYPE) {
++    return void 0;
++  }
++  const rawPicks = data["picks"];
++  if (!Array.isArray(rawPicks) || rawPicks.length > CANVAS_DESIGN_TRACK_MAX_COUNT) {
++    return void 0;
++  }
++  const picks = [];
++  for (const raw2 of rawPicks) {
++    if (!isRecord(raw2) || !isCanvasDesignTrackId(raw2["id"])) {
++      return void 0;
++    }
++    const anchor = parseAnchor(raw2["anchor"]);
++    if (anchor === void 0) {
++      return void 0;
++    }
++    const text2 = raw2["text"];
++    if (text2 !== void 0 && (typeof text2 !== "string" || text2.length === 0)) {
++      return void 0;
++    }
++    picks.push({
++      id: raw2["id"],
++      anchor,
++      ...text2 === void 0 ? {} : { text: text2.slice(0, CANVAS_DESIGN_TEXT_EXCERPT_MAX_CHARS) }
++    });
++  }
++  return { type: CANVAS_DESIGN_TRACK_MESSAGE_TYPE, picks };
++}
++function parseCanvasDesignFocusMessage(data) {
++  if (!isRecord(data) || data["type"] !== CANVAS_DESIGN_FOCUS_MESSAGE_TYPE) {
++    return void 0;
++  }
++  return isCanvasDesignTrackId(data["id"]) ? { type: CANVAS_DESIGN_FOCUS_MESSAGE_TYPE, id: data["id"] } : void 0;
++}
+ function parseCanvasDesignModeMessage(data) {
+   if (!isRecord(data) || data["type"] !== CANVAS_DESIGN_MODE_MESSAGE_TYPE) {
+     return void 0;
+@@ -25045,59 +25105,123 @@
+   }
+   return entries.length === 0 ? void 0 : { entries };
+ }
++function boundedText(raw2) {
++  return raw2.replace(/\s+/g, " ").trim().slice(0, CANVAS_DESIGN_TEXT_EXCERPT_MAX_CHARS);
++}
+ function excerptText(element) {
+   const innerText = element.innerText;
+-  const raw2 = typeof innerText === "string" ? innerText : element.textContent ?? "";
+-  return raw2.replace(/\s+/g, " ").trim().slice(0, CANVAS_DESIGN_TEXT_EXCERPT_MAX_CHARS);
++  return boundedText(typeof innerText === "string" ? innerText : element.textContent ?? "");
+ }
+-function selectionFrom(resolution, depth) {
+-  const picked = resolution.entries[depth];
++function rectOf(bounds) {
++  return { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height };
++}
++function rangeRect(range, fallback) {
++  const bounds = typeof range.getBoundingClientRect === "function" ? range.getBoundingClientRect() : void 0;
++  return bounds === void 0 || bounds.width === 0 && bounds.height === 0 ? rectOf(fallback.getBoundingClientRect()) : rectOf(bounds);
++}
++function selectionFrom(pick) {
++  const picked = pick.resolution.entries[pick.depth];
+   if (picked === void 0) {
+     return void 0;
+   }
+-  const rect = picked.dom.getBoundingClientRect();
+-  return {
+-    stack: resolution.entries.slice(depth).map((resolved) => resolved.entry),
++  const base = {
++    stack: pick.resolution.entries.slice(pick.depth).map((resolved) => resolved.entry),
+     tag: picked.dom.tagName.toLowerCase(),
++    ...pick.point === void 0 ? {} : { point: pick.point }
++  };
++  if (pick.text !== void 0) {
++    return { ...base, kind: "text", text: pick.text.excerpt, rect: pick.text.rect };
++  }
++  return {
++    ...base,
++    kind: "element",
+     text: excerptText(picked.dom),
+-    rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
++    rect: rectOf(picked.dom.getBoundingClientRect())
+   };
+ }
+-function themeIsLight() {
+-  const theme = globalThis.__cursorCanvas?.state?.get("theme");
+-  return theme?.kind === "light" || theme?.kind === "hc-light";
++function selectedRange() {
++  const selection = document.getSelection();
++  if (selection === null || selection.isCollapsed || selection.rangeCount === 0) {
++    return void 0;
++  }
++  const range = selection.getRangeAt(0);
++  return boundedText(range.toString()).length === 0 ? void 0 : range;
+ }
++function anchorKey(anchor) {
++  return `${anchor.line}:${anchor.column}`;
++}
++var PICK_INK = "16,128,243";
+ function createRing() {
+   const ring = document.createElement("div");
+   const s = ring.style;
+   s.position = "fixed";
+   s.pointerEvents = "none";
+   s.zIndex = "2147483646";
+-  s.borderRadius = "4px";
++  s.borderRadius = "8px";
+   s.boxSizing = "border-box";
+   s.display = "none";
+   s.transition = "top 60ms ease-out, left 60ms ease-out, width 60ms ease-out, height 60ms ease-out";
+   return ring;
+ }
+-function placeRing(ring, element, style) {
+-  if (element === void 0 || !element.isConnected) {
++function placeRing(ring, rect, style) {
++  if (rect === void 0) {
+     ring.style.display = "none";
+     return;
+   }
+-  const rect = element.getBoundingClientRect();
+-  const ink = themeIsLight() ? "17,17,17" : "245,245,245";
++  const pad2 = 4;
+   ring.style.display = "block";
+-  ring.style.left = `${rect.left - 2}px`;
+-  ring.style.top = `${rect.top - 2}px`;
+-  ring.style.width = `${rect.width + 4}px`;
+-  ring.style.height = `${rect.height + 4}px`;
+-  if (style === "pick") {
+-    ring.style.border = `1.5px solid rgba(${ink},0.9)`;
+-    ring.style.background = `rgba(${ink},0.06)`;
+-  } else {
+-    ring.style.border = `1px dashed rgba(${ink},0.55)`;
+-    ring.style.background = `rgba(${ink},0.03)`;
++  ring.style.left = `${rect.x - pad2}px`;
++  ring.style.top = `${rect.y - pad2}px`;
++  ring.style.width = `${rect.width + pad2 * 2}px`;
++  ring.style.height = `${rect.height + pad2 * 2}px`;
++  ring.style.border = `1.5px solid rgba(${PICK_INK},${style === "pick" ? 0.9 : 0.7})`;
++  ring.style.background = `rgba(${PICK_INK},${style === "pick" ? 0.12 : 0.08})`;
++}
++function rectOfElement(element) {
++  return element === void 0 || !element.isConnected ? void 0 : rectOf(element.getBoundingClientRect());
++}
++function rangeOfText(element, excerpt) {
++  const positions = [];
++  let normalized = "";
++  let pendingSpace = false;
++  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
++  for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
++    const text2 = node;
++    for (let offset = 0; offset < text2.data.length; offset += 1) {
++      const char = text2.data[offset] ?? "";
++      if (/\s/.test(char)) {
++        pendingSpace = normalized.length > 0;
++        continue;
++      }
++      if (pendingSpace) {
++        normalized += " ";
++        positions.push({ node: text2, offset });
++        pendingSpace = false;
++      }
++      normalized += char;
++      positions.push({ node: text2, offset });
++    }
+   }
++  const start = normalized.indexOf(excerpt);
++  const first = positions[start];
++  const last = positions[start + excerpt.length - 1];
++  if (start < 0 || first === void 0 || last === void 0) return void 0;
++  const range = document.createRange();
++  range.setStart(first.node, first.offset);
++  range.setEnd(last.node, last.offset + 1);
++  return range;
++}
++function rectOfTracked(pick, element) {
++  if (element === void 0 || !element.isConnected) return null;
++  if (pick.text !== void 0) {
++    const range = rangeOfText(element, pick.text);
++    if (range !== void 0) return rangeRect(range, element);
++  }
++  return rectOf(element.getBoundingClientRect());
++}
++var BUBBLE_CURSOR_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22"><path d="M2 20.5V6.5A4.5 4.5 0 0 1 6.5 2h9A4.5 4.5 0 0 1 20 6.5v5a4.5 4.5 0 0 1-4.5 4.5H7.2Z" fill="#fff"/><path d="M3.5 17.4V6.5a3 3 0 0 1 3-3h9a3 3 0 0 1 3 3v5a3 3 0 0 1-3 3H6.6Z" fill="#1080f3"/></svg>';
++function bubbleCursor() {
++  return `url("data:image/svg+xml,${encodeURIComponent(BUBBLE_CURSOR_SVG)}") 3 20, crosshair`;
+ }
+ function postToParent(message) {
+   if (typeof window === "undefined" || window.parent === window) {
+@@ -25108,16 +25232,24 @@
+   } catch {
+   }
+ }
++var REMEMBERED_PICKS_MAX = 256;
+ function installCanvasDesignPicker() {
+   const anchors = readCanvasSourceAnchorsGlobal();
+   if (anchors === void 0 || typeof window === "undefined" || typeof document === "undefined") {
+-    return;
++    return () => {
++    };
+   }
+   let enabled = false;
+   let hoverRing;
+   let pickRing;
+   let hovered;
+   let current;
++  let textPickPending = false;
++  let tracked = [];
++  const remembered = /* @__PURE__ */ new Map();
++  let rectsFrame;
++  let mutations;
++  const view = window;
+   const rings = () => {
+     if (hoverRing === void 0 || pickRing === void 0) {
+       hoverRing = createRing();
+@@ -25126,13 +25258,80 @@
+     }
+     return { hover: hoverRing, pick: pickRing };
+   };
++  const pickedRect = () => {
++    if (current === void 0) return void 0;
++    if (current.text !== void 0) {
++      const range = selectedRange();
++      const dom = current.resolution.entries[current.depth]?.dom;
++      return range !== void 0 && dom !== void 0 ? rangeRect(range, dom) : current.text.rect;
++    }
++    return rectOfElement(current.resolution.entries[current.depth]?.dom);
++  };
+   const reposition = () => {
+     const { hover, pick } = rings();
+-    placeRing(hover, enabled ? hovered : void 0, "hover");
+-    placeRing(pick, current?.resolution.entries[current.depth]?.dom, "pick");
++    placeRing(hover, enabled ? rectOfElement(hovered) : void 0, "hover");
++    placeRing(pick, pickedRect(), "pick");
++  };
++  const remember = (resolution) => {
++    if (remembered.size >= REMEMBERED_PICKS_MAX) remembered.clear();
++    for (const resolved of resolution.entries) {
++      remembered.set(anchorKey(resolved.entry.anchor), resolved.dom);
++    }
++  };
++  const elementFor = (anchor) => {
++    const key2 = anchorKey(anchor);
++    const known = remembered.get(key2);
++    if (known !== void 0 && known.isConnected) return known;
++    const found = document.querySelector(`[${CANVAS_SOURCE_ATTRIBUTE}="${key2}"]`);
++    if (found !== null) remembered.set(key2, found);
++    return found ?? void 0;
++  };
++  const postRects = () => {
++    rectsFrame = void 0;
++    if (tracked.length === 0) return;
++    postToParent(
++      canvasDesignRectsMessage(
++        tracked.map((pick) => ({
++          id: pick.id,
++          rect: rectOfTracked(pick, elementFor(pick.anchor))
++        }))
++      )
++    );
++  };
++  const scheduleRects = () => {
++    if (tracked.length === 0 || rectsFrame !== void 0) return;
++    rectsFrame = view.requestAnimationFrame(postRects);
++  };
++  const onLayoutChange = () => {
++    reposition();
++    scheduleRects();
++  };
++  const watchLayout = (shouldWatch) => {
++    const isWatching = mutations !== void 0;
++    if (shouldWatch === isWatching) return;
++    if (shouldWatch) {
++      window.addEventListener("scroll", onLayoutChange, true);
++      window.addEventListener("resize", onLayoutChange);
++      mutations = new MutationObserver(scheduleRects);
++      mutations.observe(document.documentElement, {
++        subtree: true,
++        childList: true,
++        attributes: true,
++        characterData: true
++      });
++    } else {
++      window.removeEventListener("scroll", onLayoutChange, true);
++      window.removeEventListener("resize", onLayoutChange);
++      mutations?.disconnect();
++      mutations = void 0;
++      if (rectsFrame !== void 0) {
++        view.cancelAnimationFrame(rectsFrame);
++        rectsFrame = void 0;
++      }
++    }
+   };
+   const publish = () => {
+-    const selection = current === void 0 ? void 0 : selectionFrom(current.resolution, current.depth);
++    const selection = current === void 0 ? void 0 : selectionFrom(current);
+     postToParent({ type: CANVAS_DESIGN_PICKED_MESSAGE_TYPE, selection: selection ?? null });
+     reposition();
+   };
+@@ -25144,21 +25343,54 @@
+       reposition();
+     }
+   };
++  const pointOf = (event) => ({
++    x: event.clientX,
++    y: event.clientY
++  });
++  const onMouseDown = (event) => {
++    if (event.button === 0) textPickPending = false;
++  };
++  const onMouseUp = (event) => {
++    if (event.button !== 0) return;
++    const range = selectedRange();
++    if (range === void 0) return;
++    const resolution = resolveCanvasSelection(range.commonAncestorContainer);
++    const dom = resolution?.entries[0]?.dom;
++    if (resolution === void 0 || dom === void 0) return;
++    remember(resolution);
++    current = {
++      resolution,
++      depth: 0,
++      point: pointOf(event),
++      text: { excerpt: boundedText(range.toString()), rect: rangeRect(range, dom) }
++    };
++    textPickPending = true;
++    publish();
++  };
+   const onClick = (event) => {
+     if (event.button !== 0) {
+       return;
+     }
+     event.preventDefault();
+     event.stopPropagation();
++    if (textPickPending) {
++      textPickPending = false;
++      return;
++    }
+     const resolution = resolveCanvasSelection(event.target);
+-    current = resolution === void 0 ? void 0 : { resolution, depth: 0 };
++    if (resolution !== void 0) remember(resolution);
++    current = resolution === void 0 ? void 0 : { resolution, depth: 0, point: pointOf(event) };
+     publish();
+   };
+   const onKeyDown = (event) => {
+-    if (event.key === "Escape" && current !== void 0) {
++    if (event.key !== "Escape") return;
++    if (current !== void 0) {
+       current = void 0;
++      textPickPending = false;
+       publish();
++      return;
+     }
++    postToParent(canvasDesignDismissMessage());
+   };
+   const setEnabled = (next) => {
+     if (next === enabled) {
+@@ -25167,28 +25399,30 @@
+     enabled = next;
+     if (enabled) {
+       document.addEventListener("mousemove", onMove, true);
++      document.addEventListener("mousedown", onMouseDown, true);
++      document.addEventListener("mouseup", onMouseUp, true);
+       document.addEventListener("click", onClick, true);
+       document.addEventListener("keydown", onKeyDown, true);
+-      window.addEventListener("scroll", reposition, true);
+-      window.addEventListener("resize", reposition);
+-      document.documentElement.style.cursor = "crosshair";
++      document.documentElement.style.cursor = bubbleCursor();
+     } else {
+       document.removeEventListener("mousemove", onMove, true);
++      document.removeEventListener("mousedown", onMouseDown, true);
++      document.removeEventListener("mouseup", onMouseUp, true);
+       document.removeEventListener("click", onClick, true);
+       document.removeEventListener("keydown", onKeyDown, true);
+-      window.removeEventListener("scroll", reposition, true);
+-      window.removeEventListener("resize", reposition);
+       document.documentElement.style.cursor = "";
+       hovered = void 0;
++      textPickPending = false;
+       if (current !== void 0) {
+         current = void 0;
+         publish();
+-        return;
+       }
+     }
++    watchLayout(enabled || tracked.length > 0);
+     reposition();
++    if (enabled) scheduleRects();
+   };
+-  window.addEventListener("message", (event) => {
++  const onMessage = (event) => {
+     if (event.source !== window.parent) {
+       return;
+     }
+@@ -25198,6 +25432,7 @@
+       return;
+     }
+     if (isCanvasDesignClearMessage(event.data)) {
++      textPickPending = false;
+       if (current !== void 0) {
+         current = void 0;
+         publish();
+@@ -25208,12 +25443,46 @@
+     if (select !== void 0 && current !== void 0) {
+       const depth = current.depth + select.depth;
+       if (current.resolution.entries[depth] !== void 0) {
+-        current = { resolution: current.resolution, depth };
++        const { text: _text, ...element } = current;
++        current = { ...element, depth };
+         publish();
+       }
++      return;
+     }
+-  });
++    const track = parseCanvasDesignTrackMessage(event.data);
++    if (track !== void 0) {
++      tracked = track.picks;
++      watchLayout(enabled || tracked.length > 0);
++      postRects();
++      return;
++    }
++    const focus = parseCanvasDesignFocusMessage(event.data);
++    if (focus !== void 0) {
++      const pick = tracked.find((item) => item.id === focus.id);
++      const element = pick === void 0 ? void 0 : elementFor(pick.anchor);
++      if (element !== void 0) {
++        const isReducedMotion = typeof view.matchMedia === "function" && view.matchMedia("(prefers-reduced-motion: reduce)").matches;
++        element.scrollIntoView({
++          block: "center",
++          inline: "nearest",
++          behavior: isReducedMotion ? "auto" : "smooth"
++        });
++        scheduleRects();
++      }
++    }
++  };
++  window.addEventListener("message", onMessage);
+   postToParent({ type: CANVAS_DESIGN_CAPABLE_MESSAGE_TYPE, sourceFile: anchors.sourceFile });
++  return () => {
++    window.removeEventListener("message", onMessage);
++    setEnabled(false);
++    tracked = [];
++    watchLayout(false);
++    hoverRing?.remove();
++    pickRing?.remove();
++    hoverRing = void 0;
++    pickRing = void 0;
++  };
+ }
+ 
+ // src/canvas-table-scroll-fade.ts

@@ -1,0 +1,38 @@
+--- 2026-10-17_09-52:/opt/sand/sand-host/box-scripts/box-doctor
++++ 2026-10-17_17-51:/opt/sand/sand-host/box-scripts/box-doctor
+@@ -194,7 +194,7 @@
+ 	fi
+ }
+ 
+-DESKTOP_DISPLAY="${SAND_DOCTOR_DISPLAY:-:1}"
++DESKTOP_DISPLAY="${SAND_DOCTOR_DISPLAY:-${DISPLAY:-:1}}"
+ 
+ probe_display_ready() { xdpyinfo -display "$1" >/dev/null 2>&1; }
+ 
+@@ -202,7 +202,11 @@
+ 	(exec 3<>"/dev/tcp/127.0.0.1/$1") >/dev/null 2>&1
+ }
+ 
+-probe_process_running() { pgrep -x "$1" >/dev/null 2>&1; }
++probe_client_on_display() {
++	local tree
++	tree="$(xwininfo -display "$2" -root -tree 2>/dev/null)" || return 1
++	[[ "${tree}" == *"(\"$1\" "* ]]
++}
+ 
+ retry_probe() {
+ 	local attempts="${DESKTOP_PROBE_ATTEMPTS:-6}" delay="${DESKTOP_PROBE_DELAY_S:-0.5}"
+@@ -247,10 +251,11 @@
+ }
+ 
+ check_compositor() {
+-	if retry_probe probe_process_running xfwm4 && retry_probe probe_process_running picom; then
++	if retry_probe probe_client_on_display xfwm4 "${DESKTOP_DISPLAY}" &&
++		retry_probe probe_client_on_display picom "${DESKTOP_DISPLAY}"; then
+ 		pass compositor "window manager (xfwm4) + compositor (picom) running on ${DESKTOP_DISPLAY}"
+ 	else
+-		fail compositor "compositor stack down (xfwm4/picom); windows lose decorations/compositing"
++		fail compositor "compositor stack down (xfwm4/picom) on ${DESKTOP_DISPLAY}; windows lose decorations/compositing"
+ 	fi
+ }
+ 

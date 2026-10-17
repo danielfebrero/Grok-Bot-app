@@ -1,0 +1,17 @@
+--- 2026-10-17_09-52:/home/box/sand-data/managed-skills/skills/site-playbooks-bestbuy/SKILL.md
++++ 2026-10-17_17-51:/home/box/sand-data/managed-skills/skills/site-playbooks-bestbuy/SKILL.md
+@@ -32,11 +32,11 @@
+ )\.p/, or matches /\/product\/[^/]+\/([A-Z0-9]{
+ 10}
+ )/;
+- the SKU is the skuId value or the seven digits before ".p", and a /product/ link gives the bsin instead. Keep one entry per product in page order, up to 12.
+-For each entry read the anchor text as the title, and the price text and the availability button text of its card as rendered. Report a field you cannot read as unreadable, never a guess.
++ the SKU is the skuId value, the seven digits before ".p", or the digits after "/sku/", and a /product/ link gives the bsin. Keep one entry per product in page order, up to 12.
++For each entry read the anchor text as the title, and from its card the img src, the price, any "The price was" amount, the "Rating X out of 5 stars with N reviews" text, and the availability button text. Report a field you cannot read as unreadable, never a guess.
+ Drop entries whose title is a different product type from the query. Apply <price cap or filter> if given.
+ Take one screenshot of the grid.
+-If the script finds no product links, report no_results when the page says nothing matched, else results_unreadable. Report a table of sku or bsin, title, price, card availability label, and url (https://www.bestbuy.com/site/<sku>.p?skuId=<sku>, or the /product/ link), plus how many cards the page showed.
++If the script finds no product links, report no_results when the page says nothing matched, else results_unreadable. Report a table of sku or bsin, title, image, price, was price, rating, review count, card availability label, and url (https://www.bestbuy.com/site/<sku>.p?skuId=<sku>, or the /product/ link), plus how many cards the page showed.
+ Ground rules for this Task. A Timeout or a net::ERR_* code from browser_navigate means the box cannot reach that host. Do not retry it, even if the tool result says to, and do not run DNS or connectivity checks. Move to the next source this Task names, or report the code and URL. An HTTP block (403, 419, 429, 503) follows this Task's own rule. Work in the tab you start in. Do not open a second tab, and switch tabs only when a tool result names a page you did not intend. In-page tabs are part of the page. A page script is an async (page) => function: run it with browser_run_code if you hold it. Without it, read rendered text from browser_snapshot or browser_find, read a <script> tag from the HTML that curl fetches in the box shell, and report a field neither yields as unreadable, never visible text in its place. Name the read you used. Snapshot a page state once. After a click, a scroll, or a wait this Task calls for, take one new snapshot. Do not snapshot the same state twice. Report as soon as the stop rule above is met, one line per item, only the fields asked for, no page dumps.
+ ```
+ 

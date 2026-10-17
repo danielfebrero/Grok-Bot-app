@@ -1,0 +1,42 @@
+--- 2026-10-17_09-52:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
++++ 2026-10-17_17-51:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
+@@ -17351,6 +17351,7 @@
+     super();
+     this.prompt = "";
+     this.referenceImagePaths = [];
++    this.keyframes = [];
+     proto3.util.initPartial(data, this);
+   }
+   static fromBinary(bytes, options) {
+@@ -17366,7 +17367,30 @@
+     return proto3.util.equals(_GenerateVideoArgs, a, b);
+   }
+   static $() {
+-    return ["GenerateVideoArgs|1 prompt 9|2 file_path 9?|3 image_path 9?|4 reference_image_paths 9*|5 duration_seconds 13?|6 aspect_ratio 9?|7 resolution 9?|8 last_frame_path 9?"];
++    return ["GenerateVideoArgs|1 prompt 9|2 file_path 9?|3 image_path 9?|4 reference_image_paths 9*|5 duration_seconds 13?|6 aspect_ratio 9?|7 resolution 9?|8 last_frame_path 9?|9 keyframes #0*", GenerateVideoKeyframe];
++  }
++};
++var GenerateVideoKeyframe = class _GenerateVideoKeyframe extends __protoMessage374 {
++  constructor(data) {
++    super();
++    this.imagePath = "";
++    this.timestampSeconds = 0;
++    proto3.util.initPartial(data, this);
++  }
++  static fromBinary(bytes, options) {
++    return new _GenerateVideoKeyframe().fromBinary(bytes, options);
++  }
++  static fromJson(jsonValue, options) {
++    return new _GenerateVideoKeyframe().fromJson(jsonValue, options);
++  }
++  static fromJsonString(jsonString, options) {
++    return new _GenerateVideoKeyframe().fromJsonString(jsonString, options);
++  }
++  static equals(a, b) {
++    return proto3.util.equals(_GenerateVideoKeyframe, a, b);
++  }
++  static $() {
++    return ["GenerateVideoKeyframe|1 image_path 9|2 timestamp_seconds 1"];
+   }
+ };
+ var GenerateVideoResult = class _GenerateVideoResult extends __protoMessage374 {

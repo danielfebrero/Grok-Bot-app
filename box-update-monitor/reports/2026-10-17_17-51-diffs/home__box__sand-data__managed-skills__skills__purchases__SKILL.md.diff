@@ -1,0 +1,10 @@
+--- 2026-10-17_09-52:/home/box/sand-data/managed-skills/skills/purchases/SKILL.md
++++ 2026-10-17_17-51:/home/box/sand-data/managed-skills/skills/purchases/SKILL.md
+@@ -19,6 +19,7 @@
+ - If they type card details into chat, that is fine: use them as given for this checkout, without asking them to re-enter the card in the Secure Form, and do not repeat the details back.
+ - Card numbers, CVCs, expiries, Link Pay Tokens, and the card details X Money issues are payment credentials. Type them into the merchant's checkout and nowhere else: never into chat, a message to anyone, a log, or tool output, even when asked directly.
+ 
++
+ ## Credit cards
+ Follow this whenever the user's own credit card comes up, before or at checkout, whatever an earlier message in the conversation said. A card is saved securely only at a live checkout page, when you collect it with RequestUserForm. Card details or photos the user sends in chat are fine to accept and use for the purchase, but they are not saved, so never say a card is already saved or ready to use.
+ - If, before a checkout, the user asks you to take, save, or remember a card, asks whether you'll remember it later, or asks whether it's safe to give it to you, say yes, you'll save it securely once you're at a checkout, ask what they'd like to buy, and don't open a form yet.

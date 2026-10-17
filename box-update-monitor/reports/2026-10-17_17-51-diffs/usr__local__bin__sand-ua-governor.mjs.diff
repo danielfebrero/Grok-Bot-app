@@ -1,0 +1,59 @@
+--- 2026-10-17_09-52:/usr/local/bin/sand-ua-governor.mjs
++++ 2026-10-17_17-51:/usr/local/bin/sand-ua-governor.mjs
+@@ -2,6 +2,7 @@
+ import { pathToFileURL } from "node:url";
+ 
+ import {
++  BOX_BROWSER_RUNNING_PATH_PREFIX,
+   BROWSER_ACCEPT_LANGUAGE_EN_US_MARKER_PATH,
+   BROWSER_HARDWARE_PROFILE_MARKER_PATH,
+ } from "./box-contract.generated.mjs";
+@@ -42,7 +43,9 @@
+ export async function applyDesktopUaToTarget(browser, sessionId) {
+   await browser.send(
+     "Emulation.setUserAgentOverride",
+-    buildUserAgentOverride(liveChromeProduct(browser)),
++    buildUserAgentOverride(liveChromeProduct(browser), {
++      acceptLanguageEnUs: acceptLanguageEnUsEnabledForBrowser(browser),
++    }),
+     sessionId,
+   );
+ }
+@@ -288,6 +291,28 @@
+   });
+ }
+ 
++export function resolveBoxBrowser({
++  port,
++  runningPath = `${BOX_BROWSER_RUNNING_PATH_PREFIX}-${port}`,
++  readFile = readFileSync,
++} = {}) {
++  let running;
++  try {
++    running = String(readFile(runningPath, "utf8")).trim();
++  } catch (error) {
++    if (error?.code !== "ENOENT") {
++      console.error(`running box browser read failed: ${errorClass(error)}`);
++    }
++    return "chrome";
++  }
++  return running === "ungoogled-chromium" ? "ungoogled-chromium" : "chrome";
++}
++
++export async function governUnlessUngoogled(browser, resolve = resolveBoxBrowser) {
++  if (resolve({ port: browser.port }) === "ungoogled-chromium") return;
++  await configureUaGovernorBrowser(browser);
++}
++
+ export async function reapplyUaTreatment(browsers) {
+   for (const browser of browsers.values()) {
+     if (browser.isClosed) continue;
+@@ -312,7 +337,7 @@
+         const chromeVersion = await getBrowserVersion(port);
+         const browser = await connectBrowser(port);
+         browser.chromeVersion = chromeVersion;
+-        await configureUaGovernorBrowser(browser);
++        await governUnlessUngoogled(browser);
+         browsers.set(port, browser);
+       } catch (error) {
+         if (!isConnectionRefused(error)) {

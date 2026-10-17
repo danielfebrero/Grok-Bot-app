@@ -1,0 +1,10 @@
+--- 2026-10-17_09-52:/opt/sand/sand-host/box-scripts/start-window
++++ 2026-10-17_17-51:/opt/sand/sand-host/box-scripts/start-window
+@@ -95,6 +95,7 @@
+ 		--auth-token local \
+ 		--rg-path /exec-daemon/rg \
+ 		--computer-use-enabled \
++		--computer-use-lazy-init \
+ 		--computer-use-api-width "${COMPUTER_USE_API_WIDTH}" \
+ 		--computer-use-api-height "${COMPUTER_USE_API_HEIGHT}" \
+ 		--mcp-meta-tool-enabled \

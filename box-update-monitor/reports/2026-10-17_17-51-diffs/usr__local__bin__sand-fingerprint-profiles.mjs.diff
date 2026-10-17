@@ -1,0 +1,32 @@
+--- 2026-10-17_09-52:/usr/local/bin/sand-fingerprint-profiles.mjs
++++ 2026-10-17_17-51:/usr/local/bin/sand-fingerprint-profiles.mjs
+@@ -56,7 +56,7 @@
+   };
+ }
+ 
+-function buildUserAgentMetadata(product) {
++function buildUserAgentMetadata(product, acceptLanguageEnUs) {
+   const { major, full } = chromeProductFromUserAgentProduct(product);
+   const { brands, fullVersionList } = chromeBrandList(major, full);
+   return {
+@@ -70,16 +70,17 @@
+     mobile: false,
+     bitness: "64",
+     wow64: false,
++    ...(acceptLanguageEnUs ? { formFactors: ["Desktop"] } : {}),
+   };
+ }
+ 
+-export function buildUserAgentOverride(product) {
++export function buildUserAgentOverride(product, { acceptLanguageEnUs = false } = {}) {
+   const { major } = chromeProductFromUserAgentProduct(product);
+   return {
+     userAgent: `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${major}.0.0.0 Safari/537.36`,
+-    acceptLanguage: "en-US,en",
++    acceptLanguage: acceptLanguageEnUs ? "en-US,en-GB,en" : "en-US,en",
+     platform: "Linux x86_64",
+-    userAgentMetadata: buildUserAgentMetadata(product),
++    userAgentMetadata: buildUserAgentMetadata(product, acceptLanguageEnUs),
+   };
+ }
+ 

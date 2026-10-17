@@ -1,0 +1,31 @@
+--- 2026-10-17_09-52:/home/box/sand-data/managed-skills/skills/site-playbooks-costco/SKILL.md
++++ 2026-10-17_17-51:/home/box/sand-data/managed-skills/skills/site-playbooks-costco/SKILL.md
+@@ -34,18 +34,21 @@
+ ### Dispatch snippet
+ 
+ ```
+-On costco.com, read the price and availability for <product URL, or item number, or name>. Read only: never add to cart, sign in, or buy a membership.
+-browser_navigate <https://www.costco.com/p/-/<slug>/<itemId> if known, else https://www.costco.com/s?keyword=<url-encoded name>> in the current tab, wait 4 s. On a search page, snapshot once, open the first result whose title matches the name, wait 4 s.
+-On the product page read the h1 title and its id (the item number), the price shown and its label (Online Price or Warehouse Price), the stock state (Out of Stock, Low Stock, or an Add to Cart control), and the fulfillment card with the ZIP and warehouse it shows. If a ZIP was given and the card shows another, set it through the card's ZIP control once and re-read.
+-If the price shows "Sign In for Price", report member_price_hidden and do not sign in. If the page says warehouse pricing or availability may vary and shows no warehouse stock, report warehouse_unverified.
+-If an HTTP 429 or blank page, a captcha, a sign-in, 2FA, or payment prompt appears, reload once after 5 s for the 429 or blank page only, then stop and report it with the URL.
+-Take one screenshot. Report the URL, title, item number, price and its label, online stock state, the ZIP and warehouse the card shows and what it says about stock, and the screenshot path.
++On costco.com, read price and stock for <product URL, item number, or name>. Read only: never add to cart, sign in, or buy a membership.
++Open <https://www.costco.com/p/-/<slug>/<itemId>, or https://www.costco.com/s?keyword=<url-encoded name> then its first match>;
++ wait 4 s after each load.
++Run the page script async (page) => page.locator('script[type="application/ld+json"]').allTextContents() for title, url (ends in the item number), brand, image, rating, price.
++Read the price label (Online or Warehouse Price), stock (Out of Stock, Low Stock, or Add to Cart), and the fulfillment card's ZIP and warehouse. If its ZIP differs from one given, set it once there and re-read.
++"Sign In for Price" is member_price_hidden;
++ never sign in. "Warehouse pricing or availability may vary" with no warehouse stock shown is warehouse_unverified.
++On a 429 or blank page, reload once after 5 s. On a captcha, sign-in, 2FA, payment prompt, or second 429, stop and report it with the URL.
++Take one screenshot. Report URL, title, item number, brand, image URL, rating, price and label, online stock, the card's ZIP, warehouse and stock note, screenshot path.
+ Ground rules for this Task. A Timeout or a net::ERR_* code from browser_navigate means the box cannot reach that host. Do not retry it, even if the tool result says to, and do not run DNS or connectivity checks. Move to the next source this Task names, or report the code and URL. An HTTP block (403, 419, 429, 503) follows this Task's own rule. Work in the tab you start in. Do not open a second tab, and switch tabs only when a tool result names a page you did not intend. In-page tabs are part of the page. A page script is an async (page) => function: run it with browser_run_code if you hold it. Without it, read rendered text from browser_snapshot or browser_find, read a <script> tag from the HTML that curl fetches in the box shell, and report a field neither yields as unreadable, never visible text in its place. Name the read you used. Snapshot a page state once. After a click, a scroll, or a wait this Task calls for, take one new snapshot. Do not snapshot the same state twice. Report as soon as the stop rule above is met, one line per item, only the fields asked for, no page dumps.
+ ```
+ 
+ ### Read the result
+ 
+-- JSON-LD: `offers.price` and `offers.priceCurrency` are the online price, `sku` the internal SKU, `name` the title, and the item number is the last path segment of `url`. `offers.availability` can read `OutOfStock` while the page lists a price, so take stock from the rendered page and the fulfillment card (`data-testid="fulfillment-zipCode-and-warehouse-selector"`), not from the JSON-LD.
++- JSON-LD: `offers.price` and `offers.priceCurrency` are the online price, `sku` the internal SKU, `name` the title, the item number is the last path segment of `url`, and `brand.name`, `image`, and `aggregateRating` (`ratingValue`, `ratingCount`) give the brand, picture and rating. `offers.availability` can read `OutOfStock` while the page lists a price, so take stock from the rendered page and the fulfillment card (`data-testid="fulfillment-zipCode-and-warehouse-selector"`), not from the JSON-LD.
+ - `Online Price` marks a delivered price and `Warehouse Price` a warehouse one. `Warehouse pricing may vary` or `Item may be available in your local warehouse` is not a stock promise: report `warehouse_unverified`. `Sign In for Price` is `member_price_hidden`.
+ 
+ ### When blocked

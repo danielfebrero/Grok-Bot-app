@@ -1,0 +1,14 @@
+--- 2026-10-17_09-52:/home/box/sand-data/managed-skills/skills/code-changes/SKILL.md
++++ 2026-10-17_17-51:/home/box/sand-data/managed-skills/skills/code-changes/SKILL.md
+@@ -53,9 +53,9 @@
+ ## Cursor Origin
+ Origin is Cursor's source-control platform and an alternative to GitHub. In repository or pull-request discussions, a capitalized "Origin" means this product;
+  lowercase `origin` in Git commands or shell output usually means the repository's Git remote.
+-- Origin repositories, files, directories, and commits are browsed at `https://cursor.com/codebase/<origin-owner>/<origin-repo>/...`. Pull-request review links use routes under `https://cursor.com/codebase`.
++- A folder is `https://cursor.com/codebase/<owner>/<repo>/tree/<ref>/<folder-path>`. A file is `https://cursor.com/codebase/<owner>/<repo>/blob/<ref>/<path>`. `<owner>` is the Origin namespace slug. `<ref>` is the branch, tag, or full commit SHA, and a ref that contains a slash is one path segment with the slash written as `%2F`. A file link may end with `#L<line>` or `#L<start>-L<end>`. `/tree/` is the folder route and `/blob/` is the file route. A commit is `https://cursor.com/codebase/<owner>/<repo>/commit/<sha>`. The repository page is `https://cursor.com/codebase/<owner>/<repo>`.
+ - Treat mentions of Origin and `cursor.com/codebase` links as ordinary source-control context without asking the user what Origin is. Origin owner and repository slugs are their own coordinates, so never guess them from GitHub coordinates;
+  use the supplied URL or look them up.
+-- When you mention an Origin pull request in chat, write it as a markdown link to its full `https://cursor.com/codebase/<origin-owner>/<origin-repo>/pull/<number>` URL so the inline Origin PR chip can render. A bare `#<number>` or a `github.com/.../pull/...` URL gets no chip for an Origin PR.
++- When you mention an Origin pull request in chat, write it as a markdown link to its full `https://cursor.com/codebase/<owner>/<repo>/pull/<number>` URL so the inline Origin PR chip can render. A bare `#<number>` or a `github.com/.../pull/...` URL gets no chip for an Origin PR.
+ - Read and act on Origin through the built-in `cursor-origin-*` tools, which use the user's own Origin authorization: `get_repository` for one repository and its forge of record, `list_namespaces` and `list_repositories` to find repositories, `list_pull_requests` and `pull_request_read` for pull requests, `checks_read` for CI, and `create_pull_request_review`, `create_pull_request_inline_comment`, and `update_pull_request` for reviews, comments, and pull-request edits. The `source-control` skill, when it is listed, covers their shapes.
+ - Merging a pull request, updating its branch, restacking or re-parenting a stack, reading raw mirror status, and reading rulesets or access grants are outside those tools: hand them to a Cursor cloud agent.

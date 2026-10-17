@@ -1,0 +1,25 @@
+--- 2026-10-17_09-52:/home/box/sand-data/managed-skills/skills/site-playbooks-ebay/SKILL.md
++++ 2026-10-17_17-51:/home/box/sand-data/managed-skills/skills/site-playbooks-ebay/SKILL.md
+@@ -62,7 +62,7 @@
+ Split a price like "$92.92$109.32" into price and was price. Subtitle segment 0 is the condition.
+ Flag a card as sponsored if its last row, with U+2063 and whitespace stripped, reads "sponsored".
+ Read h1.srp-controls__count-heading for the result count. Take one screenshot.
+-Report a table of itemId, url https://www.ebay.com/itm/<id>, title, condition, price, shipping, location, seller, format, watchers or sold count, sponsored.
++Report a table of itemId, url https://www.ebay.com/itm/<id>, title, image src, condition, price, was price, shipping, location, seller, format, watchers or sold count, sponsored.
+ Ground rules for this Task. A Timeout or a net::ERR_* code from browser_navigate means the box cannot reach that host. Do not retry it, even if the tool result says to, and do not run DNS or connectivity checks. Move to the next source this Task names, or report the code and URL. An HTTP block (403, 419, 429, 503) follows this Task's own rule. Work in the tab you start in. Do not open a second tab, and switch tabs only when a tool result names a page you did not intend. In-page tabs are part of the page. A page script is an async (page) => function: run it with browser_run_code if you hold it. Without it, read rendered text from browser_snapshot or browser_find, read a <script> tag from the HTML that curl fetches in the box shell, and report a field neither yields as unreadable, never visible text in its place. Name the read you used. Snapshot a page state once. After a click, a scroll, or a wait this Task calls for, take one new snapshot. Do not snapshot the same state twice. Report as soon as the stop rule above is met, one line per item, only the fields asked for, no page dumps.
+ ```
+ 
+@@ -126,11 +126,11 @@
+ Read eBay item <itemId>. Read only, never click Buy It Now, Place bid, Make offer, Add to Watchlist, Add to cart, or Sign in.
+ Open https://www.ebay.com/itm/<itemId>. Wait 2.5 s.
+ If the title is "Access Denied", "Error Page | eBay", or "Pardon Our Interruption", or a captcha, sign in or password, 2FA, or payment prompt appears, stop and report the wall and the URL. Do not reload and do not open another eBay URL.
+-With a page script read h1.x-item-title__mainTitle span.ux-textspans, .x-price-primary .ux-textspans, .x-bid-count .ux-textspans, .ux-timer__time .ux-textspans, the content of meta[itemprop="endDate"], .x-item-condition-text .ux-textspans, .x-sellercard-atf__info__about-seller a, .x-sellercard-atf__data-item-block, .ux-labels-values--shipping, the .ux-layout-section-evo__item--table-view dl pairs, and link[rel="canonical"] href.
++With a page script read h1.x-item-title__mainTitle span.ux-textspans, .x-price-primary .ux-textspans, .x-bid-count .ux-textspans, .ux-timer__time .ux-textspans, the content of meta[itemprop="endDate"], .x-item-condition-text .ux-textspans, .x-sellercard-atf__info__about-seller a, .x-sellercard-atf__data-item-block, .ux-labels-values--shipping, the .ux-layout-section-evo__item--table-view dl pairs, link[rel="canonical"] href, and meta[property="og:image"] content.
+ Format is auction when the bid count node is present, otherwise Buy It Now. For an ended listing read .x-item-sold-history for "Sold on <date>".
+ If the title node is missing and no wall appeared, report item_not_found with the page title.
+ Take one screenshot of the title and price block.
+-Report itemId, url, title, price, format, bids, time left and end date, condition, seller and feedback, shipping, up to 8 item specifics, and whether the listing has ended.
++Report itemId, url, title, image URL, price, format, bids, time left and end date, condition, seller and feedback, shipping, up to 8 item specifics, and whether the listing has ended.
+ Ground rules for this Task. A Timeout or a net::ERR_* code from browser_navigate means the box cannot reach that host. Do not retry it, even if the tool result says to, and do not run DNS or connectivity checks. Move to the next source this Task names, or report the code and URL. An HTTP block (403, 419, 429, 503) follows this Task's own rule. Work in the tab you start in. Do not open a second tab, and switch tabs only when a tool result names a page you did not intend. In-page tabs are part of the page. A page script is an async (page) => function: run it with browser_run_code if you hold it. Without it, read rendered text from browser_snapshot or browser_find, read a <script> tag from the HTML that curl fetches in the box shell, and report a field neither yields as unreadable, never visible text in its place. Name the read you used. Snapshot a page state once. After a click, a scroll, or a wait this Task calls for, take one new snapshot. Do not snapshot the same state twice. Report as soon as the stop rule above is met, one line per item, only the fields asked for, no page dumps.
+ ```
+ 

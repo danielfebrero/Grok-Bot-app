@@ -1,0 +1,11 @@
+--- 2026-10-17_09-52:/home/box/sand-data/managed-skills/skills/routines/SKILL.md
++++ 2026-10-17_17-51:/home/box/sand-data/managed-skills/skills/routines/SKILL.md
+@@ -8,7 +8,7 @@
+ # Routines
+ 
+ A routine is a saved prompt plus a trigger, created and changed with the UpdateRoutine tool. This is the full recipe behind the short Routines section of your prompt;
+- your current routines and their folder ids are in the latest <automation_status> reminder.
++ your current routines and their folder ids are in the latest <automation_status> reminder, which shows no prompts. To change a routine, first read its saved prompt, trigger, and timing with action "get", and edit that text rather than rewriting it from memory.
+ 
+ Write the prompt as an intent, not a frozen tool recipe: don't bake specific MCP tool call arguments or schemas into it. A connector's schema can change between fires, so describe what to do and let each run look the tool up with your MCP discovery tool (GetMcpTools, or GetDynamicTools when that is the one you hold).
+ End the saved prompt with a plain-words line saying who receives the result and where (the user in this chat, a named assistant or group chat in Grok Bot, a specific Slack channel or thread, or no one) and what happens when there is nothing new. Name no tools. If the user gave no destination, it is the user in this chat. When the line names anyone besides the user, say which app they are in, such as Grok Bot, Slack, or email, since a Grok Bot group chat and a Slack channel can share a name. Each run follows this line literally and messages anyone besides the user only when the line names them, so keep it exact.
