@@ -1,5 +1,5 @@
 # Version/build courante de l'app Grok Bot sur la box
-# capturée le 2026-10-17 20:55:11 CEST (snapshot 2026-10-17_20-55)
+# capturée le 2026-10-17 22:49:06 CEST (snapshot 2026-10-17_22-49)
 # Box update (Update Computer) = change image_sha ; hot-update host = change sand_host_version
 
 image_sha (/etc/sand-box-image-sha)	e94d68c
@@ -14,7 +14,7 @@ exec_daemon.buildTimestamp	2026-10-16T18:31:37.574Z
 canvas_sdk_version	2e4bf3688ee105072a8725db207384faea6276c8b6bee9a0c3b5e7b47be18f7e
 orbitd.bundled_revision	88287498b7278d865be0a9d54e3cbaae9eded227
 orbitd.releases	28b0833c5707e1c919cee4d4ab5a8ad0eeac9c46
-agent_store_fuse.commit	8751971e71fcf55810bc4ea69bfcb0d12ded88a5
+agent_store_fuse.commit	950c523ed958e35438ef498efd2692b2889d3cac
 chrome	Google Chrome 155.0.8059.84
 node (/exec-daemon/node)	v22.14.0
 node (system)	v20.19.2
