@@ -9,6 +9,34 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-17 23:51 (Paris) — snapshot `2026-10-17_22-49` → `2026-10-17_23-51`
+
+**Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` `agent-store-fuse-x64-950c523…-bk.tar.gz` → `…-83859fd…-bk.tar.gz` (commit `950c523ed958e35438ef498efd2692b2889d3cac` → `83859fd850b7319f60c5f707fa4bf87e3b454128`). Image `e94d68c`, box-scripts `e94d68c`, sand-host `dfa5e11`, exec-daemon, orbitd, canvas-sdk, Chrome 155.0.8059.84, Node, Python, Debian inchangés. Fichiers : +0 / −0 / ~1.
+
+- **Bugfix** : —
+- **Change** : —
+- **Features** : —
+- **Perf** : —
+- **Autre/infra** : bump binaire agent-store-fuse (nouvelle révision du tarball S3), aucun autre composant touché.
+
+Rapport : [reports/2026-10-17_23-51.md](reports/2026-10-17_23-51.md).
+
+---
+
+## 2026-10-17 22:49 (Paris) — snapshot `2026-10-17_20-55` → `2026-10-17_22-49`
+
+**Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` `agent-store-fuse-x64-8751971…-bk.tar.gz` → `…-950c523…-bk.tar.gz` (commit `8751971e71fcf55810bc4ea69bfcb0d12ded88a5` → `950c523ed958e35438ef498efd2692b2889d3cac`). Image `e94d68c`, box-scripts `e94d68c`, sand-host `dfa5e11`, exec-daemon, orbitd, canvas-sdk, Chrome 155.0.8059.84, Node, Python, Debian inchangés. Fichiers : +0 / −0 / ~1.
+
+- **Bugfix** : —
+- **Change** : —
+- **Features** : —
+- **Perf** : —
+- **Autre/infra** : bump binaire agent-store-fuse (nouvelle révision du tarball S3), aucun autre composant touché.
+
+Rapport : [reports/2026-10-17_22-49.md](reports/2026-10-17_22-49.md).
+
+---
+
 ## 2026-10-17 20:55 (Paris) — snapshot `2026-10-17_17-51` → `2026-10-17_20-55`
 
 **Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` `agent-store-fuse-x64-11e1cc7…-bk.tar.gz` → `…-8751971…-bk.tar.gz` (commit `11e1cc76cb923695c26ea4a6b1b06b6394f2e590` → `8751971e71fcf55810bc4ea69bfcb0d12ded88a5`). Image `e94d68c`, box-scripts `e94d68c`, sand-host `dfa5e11`, exec-daemon, orbitd, canvas-sdk, Chrome 155.0.8059.84, Node, Python, Debian inchangés. Fichiers : +0 / −0 / ~1.

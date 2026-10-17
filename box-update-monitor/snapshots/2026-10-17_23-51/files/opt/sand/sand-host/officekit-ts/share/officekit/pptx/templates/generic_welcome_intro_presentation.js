@@ -1,0 +1,1123 @@
+/* Recreation of "144a6105-db22-4237-8f53-7bb5be4d5b4e.pptx" with pptxgenjs.
+ * 56 slides, 13.333 x 7.5 in. Photographic placeholders are drawn as flat
+ * rectangles labelled "[image]" (raster images are intentionally not embedded).
+ */
+'use strict';
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+// ---------------------------------------------------------------- palette --
+const C = {
+  dark: '44302E',   // accent1
+  gold: 'D09D2E',   // accent2
+  orange: 'D16224', // accent3
+  red: 'BF3F25',    // accent4
+  cream: 'E3DECA',  // accent5
+  green: '6AA391',  // accent6
+  ink: '414042',    // tx1
+  ink50: '202021',  // tx1 lumMod 50%
+  gray: '8D8B8F',   // tx1 lumMod 60% lumOff 40%
+  body: '4A494C',   // muted body copy
+  white: 'FFFFFF',
+  bg: 'F2F2F2',     // slide background (bg2 lumMod 95%)
+  land: 'D9D8DA',   // unhighlighted map land
+  track: 'E6E6E6',  // progress-bar track
+};
+// tint(hex, k): mix a colour toward white; shade(hex, k): mix toward black.
+const hex = (c) => [parseInt(c.slice(0, 2), 16), parseInt(c.slice(2, 4), 16), parseInt(c.slice(4, 6), 16)];
+const toHex = (a) => a.map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0').toUpperCase()).join('');
+const mix = (a, b, t) => toHex(hex(a).map((v, i) => v + (hex(b)[i] - v) * t));
+const tint = (c, k) => mix(c, 'FFFFFF', k);
+const shade = (c, k) => mix(c, '000000', k);
+
+const FONT = 'Montserrat';
+const LIGHT = 'Montserrat Light';
+const SEMI = 'Montserrat SemiBold';
+const XBOLD = 'Montserrat ExtraBold';
+
+// ------------------------------------------------------------ lorem texts --
+const L_FULL = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. ';
+const L_DUIS = 'Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.';
+const L_ONE = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit';
+const L_SED = 'Lorem ipsum dolor sit amet, consectetur adipisg elit, sed do. ';
+const L_SEDDO = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do';
+const L_CELL = 'Lorem ipsum dolor sit, consectetur. ';
+const L_TEMPOR = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor';
+const L_DOLORE = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore';
+const L_MAGNA = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ';
+const L_SHORT = 'Lorem ipsum dolor sit amet, consectetur';
+const L_LABORET = 'Lorem ipsum dolor sit aet, consectet adipiscing sed. Incididunt ut laboret.';
+const L_INCID = 'Incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco';
+const L_INCID_S = 'Incididunt ut labore et dolore magna aliqua. Ut enim ad minim.';
+const L_INCID_M = 'Incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud.';
+
+// ---------------------------------------------------------------- helpers --
+/** plain text box; all coordinates in inches, sizes in points */
+function txt(s, text, x, y, w, h, o) {
+  s.addText(text, Object.assign({
+    x, y, w, h, fontFace: FONT, fontSize: 11, color: C.ink, margin: 0, valign: 'top', wrap: false, isTextBox: true,
+  }, o));
+}
+/** body copy (Montserrat Light, muted) */
+function body(s, text, x, y, w, h, o) {
+  txt(s, text, x, y, w, h, Object.assign({ fontFace: LIGHT, fontSize: 10, color: C.body, wrap: true, lineSpacingMultiple: 1.2 }, o));
+}
+const NOLINE = { type: 'none' };
+/** filled shape with no outline: shp(slide, kind, x, y, w, h, colour, extraOpts) */
+function shp(s, kind, x, y, w, h, color, o, transparency) {
+  s.addShape(kind, Object.assign({ x, y, w, h, fill: { color, transparency }, line: NOLINE }, o));
+}
+const rect = (s, x, y, w, h, c, o) => shp(s, 'rect', x, y, w, h, c, o);
+const ell = (s, x, y, w, h, c, o, t) => shp(s, 'ellipse', x, y, w, h, c, o, t);
+const rrect = (s, x, y, w, h, c, r, o) => shp(s, 'roundRect', x, y, w, h, c, Object.assign({ rectRadius: r }, o));
+/** mid-tone of an accent, matching the deck's light-to-solid gradients */
+const mid = (c) => mix(tint(c, 0.4), c, 0.55);
+/** linear gradient faked with thin slices (pptxgenjs has no gradient fill) */
+function gradRect(s, x, y, w, h, c1, c2, dir, steps) {
+  const n = steps || 28;
+  const vertical = dir === 'v';
+  for (let i = 0; i < n; i++) {
+    const c = mix(c1, c2, i / (n - 1));
+    if (vertical) rect(s, x, y + (h * i) / n, w, h / n + 0.006, c);
+    else rect(s, x + (w * i) / n, y, w / n + 0.006, h, c);
+  }
+}
+/** rounded badge with a soft two-tone look (reference uses a gradient fill) */
+function gradRound(s, x, y, w, h, c1, c2, radius) {
+  rrect(s, x, y, w, h, mix(c1, c2, 0.5), radius === undefined ? 0.14 : radius);
+}
+// NOTE: the reference deck contains no embedded raster images at all - every
+// picture frame is an empty PowerPoint picture placeholder, which renders as
+// blank space. Those regions are therefore left empty here as well.
+
+/** section heading used by most infographic slides */
+function heading(s, title, sub, opts) {
+  const o = opts || {};
+  txt(s, title, 3.4, 0.4, 6.53, 0.4, { align: 'center', fontSize: 23, bold: true, color: o.color || C.ink50, wrap: true });
+  if (sub) body(s, sub, 4.374, 0.8, 4.585, 0.39, { align: 'center', fontSize: 10, color: o.subColor || C.ink50 });
+}
+
+// ============================================================== slides 1-9 =
+// Cover / "hello" / single-statement layouts.
+
+function slide01(s) {
+  s.background = { color: C.dark };
+  ell(s, 4.546, 1.629, 4.242, 4.242, C.dark, null, 26);
+  txt(s, 'HELLO!', 5.702, 3.447, 1.928, 0.606, { align: 'center', fontSize: 36, bold: true, color: C.white });
+}
+
+function slide02(s) {
+  rect(s, 6.212, 2.033, 6.524, 3.443, mix(C.dark, C.bg, 0.2));
+  txt(s, 'HELLO!', 7.193, 2.86, 1.928, 0.606, { fontSize: 36, bold: true, color: C.white });
+  body(s, L_DUIS, 7.09, 3.746, 4.614, 1.179, { fontSize: 11, color: C.white, lineSpacingMultiple: 1.5 });
+}
+
+function slide03(s) {
+  rect(s, 0, 1.403, 7.259, 4.701, C.dark);
+  txt(s, 'Welcome\nMessage', 1.023, 2.426, 2.537, 1.212, { fontSize: 36, bold: true, color: C.white, lineSpacingMultiple: 1 });
+  body(s, L_FULL, 0.923, 3.862, 5.025, 1.179, { fontSize: 11, color: C.white, lineSpacingMultiple: 1.5 });
+  txt(s, 'Joshua Webb', 9.173, 4.997, 2.414, 0.404, { align: 'center', fontSize: 24, bold: true });
+  txt(s, 'Chief Technology Officer', 8.852, 5.435, 3.115, 0.303, { align: 'center', fontSize: 18 });
+}
+
+// "You Title" + paragraph, positioned differently on slides 4/6/7/9.
+function titleAndCopy(s, tx, ty, tw, cx, cy, cw, ch, text, align, size) {
+  txt(s, size ? 'Our Goals' : 'You Title', tx, ty, tw, 0.404, { align: align || 'center', fontSize: 24, bold: true });
+  body(s, text, cx, cy, cw, ch, { fontSize: 11, color: C.ink, align: align === 'right' ? 'right' : 'left', lineSpacingMultiple: 1.5 });
+}
+
+function slide04(s) { titleAndCopy(s, 1.807, 2.72, 1.546, 1.807, 3.329, 3.624, 1.734, L_FULL); }
+
+function slide05(s) {
+  titleAndCopy(s, 2.39, 2.908, 1.546, 1.536, 3.402, 2.516, 1.179, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore etdolore.', 'right');
+  titleAndCopy(s, 9.348, 2.908, 1.546, 9.307, 3.402, 2.516, 1.179, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore etdolore.');
+}
+
+function slide06(s) { titleAndCopy(s, 8.23, 3.75, 1.546, 8.189, 4.372, 3.624, 1.734, L_FULL); }
+function slide07(s) { titleAndCopy(s, 1.428, 2.75, 1.546, 1.386, 3.372, 3.624, 1.734, L_FULL); }
+
+function slide08(s) {
+  rect(s, 0.003, 5.363, 13.319, 2.137, C.dark);
+  txt(s, 'Gregory Whitley', 5.215, 4.324, 2.903, 0.404, { align: 'center', fontSize: 24, bold: true });
+  txt(s, 'CEO & Founder', 5.693, 4.795, 1.948, 0.303, { align: 'center', fontSize: 18 });
+  body(s, L_FULL + L_DUIS.split('Excepteur')[0], {
+    x: 2.7, y: 5.802, w: 7.933, h: 1.179, fontSize: 11, color: C.white, align: 'center', lineSpacingMultiple: 1.5,
+  });
+}
+
+function slide09(s) {
+  titleAndCopy(s, 2.42, 2.272, 1.723, 1.135, 3.003, 5.025, 2.289, L_FULL + L_DUIS, null, true);
+}
+
+// ============================================================ slides 10-16 =
+// Agenda family.
+
+/** flat vector illustration from the reference: calendar + clock + foliage */
+function agendaIllustration(s) {
+  [[10.1, 2.24, 1.41], [8.48, 1.25, 2.07], [5.1, 3.26, 2.22], [10.11, 2.6, 2.53], [6.18, 1.31, 2.21], [9.97, 4.03, 1.55]]
+    .forEach(([x, y, d]) => ell(s, x, y, d, d, C.gold, null, 93));
+  // calendar
+  rect(s, 6.865, 3.492, 3.884, 2.827, tint(C.green, 0.8));
+  rect(s, 6.865, 2.737, 3.884, 0.755, tint(C.orange, 0.6));
+  for (let r = 0; r < 3; r++) {
+    for (let c = 0; c < 5; c++) {
+      rrect(s, 7.106 + c * 0.714, 4.134 + r * 0.674, 0.547, 0.547, C.white, 0.08);
+    }
+  }
+  for (let c = 0; c < 5; c++) {
+    rect(s, 7.27 + c * 0.749, 2.638, 0.091, 0.521, C.gold);
+    ell(s, 7.224 + c * 0.749, 3.022, 0.183, 0.183, C.white);
+  }
+  rect(s, 7.782, 4.78, 0.628, 0.609, 'FFCC00');
+  // clock
+  ell(s, 9.751, 3.811, 2.491, 2.491, C.gold);
+  ell(s, 9.965, 4.025, 2.065, 2.064, C.white);
+  rect(s, 10.997, 5.032, 0.66, 0.05, C.gold);
+  rect(s, 10.974, 4.28, 0.05, 0.78, C.gold);
+  ell(s, 10.889, 4.949, 0.216, 0.216, C.gray);
+  // foreground props (hourglass, notepad)
+  rect(s, 5.731, 2.707, 1.189, 2.346, tint(C.cream, 0.25));
+  rect(s, 5.819, 4.275, 1.44, 2.017, tint(C.dark, 0.6));
+}
+
+function slide10(s) {
+  agendaIllustration(s);
+  txt(s, 'Agenda', 1.285, 2.234, 3.512, 1.07, { fontSize: 57.6, bold: true, color: C.gold });
+  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud. ',
+    { x: 1.288, y: 3.421, w: 3.524, h: 0.931, fontSize: 10.5 });
+  gradRect(s, 1.93, 4.712, 2.118, 0.54, C.dark, C.gold, 'h');
+  txt(s, 'Start', 1.93, 4.803, 2.118, 0.303, { align: 'center', fontSize: 18, bold: true, color: C.white });
+}
+
+const AGENDA_ROWS = [
+  ['10:00', 'About Company'], ['10:15', 'Meet Our Team'], ['10:30', 'Status Update'],
+  ['10:55', 'Issues and Cases'], ['12:15', 'Breakdowns of Project'], ['12:35', 'Questions'],
+];
+
+function slide11(s) {
+  txt(s, 'Agenda', 7.934, 0.664, 3.512, 0.707, { fontSize: 36, bold: true, color: C.gold });
+  AGENDA_ROWS.forEach(([time, label], i) => {
+    const y = 2.054 + i * 0.809;
+    txt(s, time, 6.913, y, 0.9, 0.384, { fontSize: 16.8, bold: true, color: C.gold });
+    txt(s, label, 7.934, y, 3.2, 0.384, { fontSize: 16.8, bold: true });
+    s.addShape('line', { x: 8.034, y: 2.638 + i * 0.822, w: 5.299, h: 0, line: { color: C.white, width: 3.25 } });
+  });
+}
+
+function slide12(s) {
+  rect(s, 6.072, 0, 7.261, 3.75, C.white);
+  txt(s, 'Agenda', 7.706, 1.285, 3.994, 1.212, { fontSize: 66, bold: true, color: C.gold });
+  ['01. About Company', '02. Meet Our Team', '03. Our Cases', '04. Infographics', '05. Breakdowns of Project', '06. Questions']
+    .forEach((label, i) => txt(s, label, 1.706, 1.496 + i * 0.809, 3.6, 0.384, { fontSize: 16.8, bold: true }));
+}
+
+// Slides 13 & 14 share a timeline-strip layout, mirrored left/right.
+const STRIP_ITEMS = [
+  ['About Us', L_INCID], ['Our Team', L_INCID_S], ['Cases', L_INCID_M], ['Break', L_INCID],
+];
+const STRIP_ITEMS_2 = [
+  ['Business', L_INCID], ['Analysis', L_INCID_S], ['Contact Us', L_INCID_M], ['Questions', L_INCID],
+];
+
+function timeStrip(s, barX, times, colX, items, titleX, titleY, bodyY) {
+  rect(s, barX, 3.24, 9.072, 0.51, C.white);
+  times.forEach(([time, x, gold], i) => {
+    txt(s, time, { x, y: 3.308, w: 0.75, h: 0.323, align: 'center', fontSize: 13.2, bold: true, color: gold ? C.gold : C.ink });
+    s.addShape('line', { x: colX[i], y: 3.328, w: 0, h: 0.328, line: { color: C.ink, width: 1.2 } });
+  });
+  items.forEach(([title, text], i) => {
+    txt(s, title, titleX[i], titleY, 1.499, 0.4, { align: 'center', fontSize: 15.6, bold: true });
+    body(s, text, titleX[i], bodyY, 1.499, 1.05, { fontSize: 9, color: C.ink, lineSpacingMultiple: 1.3 });
+  });
+}
+
+function slide13(s) {
+  txt(s, 'Agenda', 4.336, 1.262, 3.7, 1.367, { fontSize: 66, bold: true, color: C.gold });
+  timeStrip(s, 4.261,
+    [['09:00', 4.943], ['09:20', 7.007, true], ['10:00', 9.121], ['10:30', 11.16, true]],
+    [6.343, 8.378, 10.412, 12.446], STRIP_ITEMS, [4.693, 6.701, 8.818, 10.826], 4.205, 4.714);
+}
+
+function slide14(s) {
+  txt(s, 'Agenda', 5.078, 1.262, 3.994, 1.212, { fontSize: 66, bold: true, color: C.gold });
+  timeStrip(s, 0,
+    [['11:00', 1.497], ['11:20', 3.562, true], ['12:15', 5.676], ['12:25', 7.713, true]],
+    [0.863, 2.897, 4.931, 6.966], STRIP_ITEMS_2, [1.229, 3.215, 5.347, 7.333], 4.205, 4.662);
+}
+
+function slide15(s) {
+  const rows = [
+    ['09:00 - 09:55', 'About Company', C.dark], ['10:00 - 10:15', 'Meet Our Team', C.gold],
+    ['10:20 - 10:40', 'Status Update', C.orange], ['12:20 - 13:00', 'Questions', C.cream],
+  ];
+  rows.forEach(([time, title, col], i) => {
+    const y = 1.341 + i * 1.378;
+    gradRound(s, 1.473, y, 2.011, 0.889, tint(col, 0.4), col);
+    txt(s, time, 1.473, y + 0.253, 2.011, 0.37, { align: 'center', fontSize: 16, bold: true, color: C.white });
+    txt(s, title, 4.185, [1.381, 2.759, 4.137, 5.514][i], 2.774, 0.364, { fontSize: 15.6, bold: true });
+    body(s, L_LABORET, 4.185, [1.732, 3.045, 4.441, 5.868][i], 2.774, 0.487, { fontSize: 10, color: C.ink });
+  });
+}
+
+function slide16(s) {
+  gradRect(s, 0, 0, 3.31, 7.5, C.dark, C.gold, 'v', 40);
+  const rows = [['01', '10:00', 'Introduction'], ['02', '10:30', 'Our Team'], ['03', '11:00', 'Infographic'], ['04', '11:20', 'Questions']];
+  rows.forEach(([num, time, title], i) => {
+    txt(s, num, 1.19, 1.02 + i * 1.367, 1.0, 0.841, { align: 'center', fontSize: 44, bold: true, color: C.white });
+    txt(s, time, 4.43, 1.106 + i * 1.371, 1.2, 0.525, { fontSize: 25.2, bold: true, color: C.gold });
+    txt(s, title, 4.383, 1.589 + i * 1.367, 2.6, 0.525, { fontSize: 25.2, bold: true });
+  });
+}
+
+// ============================================================ slides 17-20 =
+// 30/60/90-day tables. Cell gaps in the reference are 3pt borders painted in
+// the background colour.
+const GAP = { type: 'solid', color: C.bg, pt: 3 };
+const GAPS = [GAP, GAP, GAP, GAP];
+
+function slide17(s) {
+  const head = [{ text: '', options: { fill: { color: C.bg }, border: GAPS } }];
+  [['30 Days', C.dark], ['60 Days', C.gold], ['90 Days', C.orange]].forEach(([label, col]) => {
+    head.push({ text: label, options: { colspan: 4, fill: { color: mid(col) }, color: C.white, fontSize: 14, align: 'center', valign: 'middle', border: GAPS } });
+  });
+  const weeks = [{ text: '', options: { fill: { color: C.bg }, border: GAPS } }];
+  [C.dark, C.gold, C.orange].forEach((col) => {
+    for (let w = 1; w <= 4; w++) {
+      weeks.push({ text: 'Week ' + w, options: { fill: { color: mix(C.bg, tint(col, 0.6), 0.34) }, color: C.ink, fontSize: 11, align: 'center', valign: 'middle', border: GAPS } });
+    }
+  });
+  const rows = [head, weeks];
+  for (let r = 1; r <= 8; r++) {
+    const row = [{ text: 'Title 0' + r, options: { fill: { color: 'D9D9D9' }, color: C.ink, fontSize: 12, fontFace: SEMI, align: 'center', valign: 'middle', border: GAPS } }];
+    for (let c = 0; c < 12; c++) row.push({ text: '', options: { fill: { color: 'E9E9E9' }, border: GAPS } });
+    rows.push(row);
+  }
+  s.addTable(rows, {
+    x: 0.84, y: 0.739, w: 11.654, colW: [1.732].concat(Array(12).fill(0.827)),
+    rowH: Array(10).fill(0.602), fontFace: FONT, margin: 0,
+  });
+  // schedule arrows overlaid on the grid
+  [[2.857, 2.027, 1.942], [4.504, 2.629, 2.195], [5.529, 3.231, 1.615], [6.997, 3.833, 1.813],
+   [7.421, 4.435, 2.049], [8.166, 5.037, 2.485], [10.254, 5.638, 1.784], [10.879, 6.24, 1.615]]
+    .forEach(([x, y, w]) => {
+      s.addShape('homePlate', { x, y, w, h: 0.425, fill: { color: C.white }, line: { type: 'none' } });
+      txt(s, 'Date 01 - Date 02', { x, y: y + 0.087, w: w - 0.2, h: 0.252, align: 'center', fontSize: 9, italic: true });
+    });
+}
+
+function slide18(s) {
+  const accents = [C.dark, C.gold, C.orange, C.red];
+  const head = [{ text: '', options: { fill: { color: C.bg }, border: GAPS } }];
+  ['30 Days', '60 Days', '90 Days'].forEach((label) => head.push({
+    text: label, options: { fill: { color: 'D9D9D9' }, color: C.ink, fontSize: 12, align: 'center', valign: 'middle', border: GAPS },
+  }));
+  const rows = [head];
+  for (let r = 1; r <= 8; r++) {
+    const col = accents[(r - 1) % 4];
+    const row = [{ text: 'Task 0' + r, options: { fill: { color: mix(col, tint(col, 0.6), 0.5) }, color: C.white, bold: true, fontSize: 12, align: 'center', valign: 'middle', border: GAPS } }];
+    for (let c = 0; c < 3; c++) {
+      row.push({ text: L_CELL, options: { fill: { color: tint(col, 0.8) }, color: C.ink, fontSize: 9, fontFace: LIGHT, align: 'center', valign: 'middle', border: GAPS } });
+    }
+    rows.push(row);
+  }
+  s.addTable(rows, { x: 0.925, y: 1.04, w: 11.575, colW: [2.126, 3.15, 3.15, 3.15], rowH: Array(9).fill(0.602), fontFace: FONT, margin: 0 });
+}
+
+function slide19(s) {
+  const LEAD = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut ';
+  const texts = [
+    [LEAD + 'lab  dolore magna aliqua. ', LEAD + 'labo  dolore magna aliqua. Ut enim ad minim veniam, quis nostrud',
+      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed eiusmod tempor incididunt ut la  dolore magna aliqua.'],
+    [LEAD + 'labo  dolore magna aliqua..', LEAD + 'labo  dolore magna aliqua. ', LEAD + 'labo  dolore magna aliqua.'],
+    [LEAD + 'labo  dolore magna aliqua. ', LEAD + 'labo  dolore magna aliqua.', LEAD + 'labo  dolore magna aliqua. '],
+  ];
+  const accents = [C.dark, C.gold, C.orange];
+  const blank = (color) => ({ text: '', options: { fill: { color }, border: GAPS } });
+  const head = [blank(C.bg)].concat(accents.map((col, i) => ({
+    text: 'Infodata 0' + (i + 1),
+    options: { fill: { color: mid(col) }, color: C.white, fontSize: 14, align: 'center', valign: 'middle', border: GAPS },
+  })));
+  const rows = [head].concat(accents.map((col, r) => [blank(mid(col))].concat(texts[r].map((t) => ({
+    text: t,
+    options: { fill: { color: C.white }, color: C.ink, fontSize: 10, fontFace: LIGHT, valign: 'middle', margin: [14, 14, 14, 20], border: GAPS },
+  })))));
+  s.addTable(rows, { x: 1.62, y: 1.337, w: 10.093, colW: [0.748, 3.115, 3.115, 3.115], rowH: [0.669, 1.385, 1.385, 1.385], fontFace: FONT, margin: 0 });
+  // vertical row captions (table cells cannot hold rotated text)
+  ['30 Days', '60 Days', '90 Days'].forEach((label, i) => txt(s, label, 1.056, 2.006 + i * 1.385, 1.385, 1.29,
+    { rotate: 270, align: 'center', valign: 'middle', fontSize: 14, bold: true, color: C.white }));
+}
+
+function slide20(s) {
+  [['30 Days', C.dark, 1.341], ['60 Days', C.gold, 3.426], ['90 Days', C.orange, 5.51]].forEach(([label, col, y], i) => {
+    gradRound(s, 1.668, y, 2.011, 0.889, tint(col, 0.4), col);
+    txt(s, label, 1.668, y + 0.26, 2.011, 0.37, { align: 'center', fontSize: 16, bold: true, color: C.white });
+    body(s, 'Lorem ipsum dolor sit amet, consectet adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna.',
+      { x: 4.206, y: [1.378, 3.411, 5.511][i], w: 3.102, h: 0.938, fontSize: 10, color: C.ink, lineSpacingMultiple: 1.5 });
+  });
+}
+
+// ============================================================ slides 21-27 =
+// McKinsey 7S and the SWOT family.
+
+function slide21(s) {
+  heading(s, 'McKinsey 7S Model', null, { color: C.ink50 });
+  // hexagon web: six coloured nodes around a white hub
+  const nodes = [
+    [6.038, 1.535, C.gold], [7.77, 2.535, C.orange], [7.77, 4.535, C.dark],
+    [6.038, 5.535, C.gold], [4.306, 4.535, C.orange], [4.306, 2.535, C.dark],
+  ];
+  const cx = nodes.map(([x, y]) => [x + 0.62, y + 0.62]);
+  cx.forEach((a, i) => cx.forEach((b, j) => {
+    if (j > i) s.addShape('line', { x: a[0], y: a[1], w: b[0] - a[0], h: b[1] - a[1], line: { color: C.ink, width: 1.2 }, flipH: b[0] < a[0], flipV: b[1] < a[1] });
+  }));
+  cx.forEach((a) => s.addShape('line', { x: Math.min(a[0], 6.658), y: Math.min(a[1], 4.155), w: Math.abs(6.658 - a[0]), h: Math.abs(4.155 - a[1]), line: { color: C.ink, width: 1.2 }, flipH: a[0] > 6.658, flipV: a[1] > 4.155 }));
+  nodes.forEach(([x, y, col]) => ell(s, x, y, 1.24, 1.24, mid(col)));
+  ell(s, 6.038, 3.535, 1.24, 1.24, C.white);
+  const labels = [
+    ['Strategy', 2.22, 1.583, 'right'], ['Skill', 1.42, 3.556, 'right'], ['Staff', 2.22, 5.379, 'right'],
+    ['Structure', 9.626, 1.62, 'left'], ['System', 10.249, 3.52, 'left'], ['Style', 9.559, 5.388, 'left'],
+  ];
+  labels.forEach(([label, x, y, align]) => {
+    txt(s, label, { x, y, w: 1.666, h: 0.26, align, fontSize: 14, bold: true, wrap: true });
+    body(s, L_ONE, { x, y: y + 0.29, w: 1.666, h: 0.747, fontSize: 10, align, color: C.body });
+  });
+}
+
+/** SWOT quadrant leaf (rounded on three corners in the reference) */
+function swotLeaf(s, x, y, w, h, col, letter, lx, ly, lw, size) {
+  rrect(s, x, y, w, h, mid(col), 0.55);
+  txt(s, letter, lx, ly, lw, 1.212, { align: 'center', fontSize: size || 72, bold: true, color: C.white });
+}
+
+function swotSideLabel(s, title, tx, ty, tw, align, bx, by, bw, size) {
+  txt(s, title, tx, ty, tw, 0.236, { align, fontSize: size || 14, bold: true, color: C.ink50, wrap: true });
+  body(s, L_SED, bx, by, bw, 0.707, { fontSize: 10, align, color: C.ink50 });
+}
+
+function slide22(s) {
+  heading(s, 'SWOT Analysis', L_ONE);
+  swotLeaf(s, 4.28, 1.821, 2.382, 2.384, C.cream, 'S', 5.254, 2.443, 0.519);
+  swotLeaf(s, 6.778, 1.821, 2.382, 2.384, C.dark, 'W', 7.561, 2.443, 0.947);
+  swotLeaf(s, 4.28, 4.321, 2.382, 2.384, C.orange, 'T', 5.25, 4.984, 0.503);
+  swotLeaf(s, 6.778, 4.321, 2.382, 2.384, C.gold, 'O', 7.62, 4.984, 0.682);
+  swotSideLabel(s, 'Strengths', 2.069, 2.023, 1.684, 'right', 2.069, 2.309, 1.684);
+  swotSideLabel(s, 'Threats', 2.069, 5.516, 1.684, 'right', 2.069, 5.809, 1.684);
+  swotSideLabel(s, 'Weaknesses', 9.769, 2.023, 1.684, 'left', 9.769, 2.309, 1.684);
+  swotSideLabel(s, 'Opportunities', 9.769, 5.516, 1.684, 'left', 9.769, 5.809, 1.684);
+}
+
+function slide23(s) {
+  // right-hand illustration: dashboard, magnifier, books
+  ell(s, 5.88, 2.743, 2.011, 1.932, C.gold, null, 92);
+  ell(s, 8.706, 1.965, 1.112, 1.032, C.gold, null, 92);
+  ell(s, 9.918, 2.325, 1.137, 1.138, C.gold, null, 92);
+  gradRect(s, 6.85, 2.731, 3.715, 2.214, tint(C.orange, 0.4), tint(C.orange, 0.4), 'v', 2);
+  rect(s, 7.005, 2.87, 3.415, 1.929, C.white);
+  rrect(s, 7.15, 3.022, 1.865, 0.27, mix(tint(C.orange, 0.4), C.orange, 0.5), 0.13);
+  [[7.15, 3.432, C.dark], [8.767, 3.819, C.orange], [8.767, 4.136, C.gold], [8.767, 4.452, C.orange]]
+    .forEach(([x, y, col]) => rect(s, x, y, 0.199, 0.198, col));
+  [[7.444, 3.432], [7.444, 3.521], [7.444, 3.63]].forEach(([x, y]) => s.addShape('line', { x, y, w: 1.54, h: 0, line: { color: 'E6E7E8', width: 1.1 } }));
+  [3.819, 3.909, 4.018, 4.129, 3.037, 3.124].forEach((y) => s.addShape('line', { x: 9.102, y, w: 1.183, h: 0, line: { color: 'E6E7E8', width: 1.1 } }));
+  gradRect(s, 6.85, 4.945, 3.715, 0.332, tint(C.orange, 0.4), C.orange, 'h');
+  gradRect(s, 8.108, 5.261, 1.205, 0.446, tint(C.orange, 0.4), C.orange, 'v', 8);
+  ell(s, 9.9, 3.35, 1.35, 1.35, tint(C.cream, 0.3), { line: { color: C.orange, width: 3 } }, 30);
+  txt(s, 'SWOT\nANALYSIS', 1.572, 2.25, 3.745, 1.36, { fontSize: 40, color: C.ink50, fontFace: SEMI, lineSpacingMultiple: 1.15, wrap: true });
+  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut. ',
+    { x: 1.572, y: 3.849, w: 3.44, h: 0.796, fontSize: 9, color: C.ink50 });
+}
+
+function slide24(s) {
+  heading(s, 'SWOT Analysis', L_ONE);
+  // eight alternating tiles: coloured letter cards and white text cards
+  [[8.745, 2.205], [2.481, 4.296], [6.661, 4.295], [4.578, 2.205]].forEach(([x, y]) =>
+    rrect(s, x, y, 2.09, 2.09, C.white, 0.14));
+  swotLeaf(s, 2.481, 2.205, 2.09, 2.09, C.dark, 'S', 3.248, 2.562, 0.643);
+  swotLeaf(s, 4.571, 4.295, 2.09, 2.092, C.gold, 'W', 5.059, 4.655, 1.175);
+  swotLeaf(s, 6.661, 2.205, 2.09, 2.09, C.orange, 'O', 7.311, 2.562, 0.847);
+  swotLeaf(s, 8.752, 4.295, 2.09, 2.092, C.cream, 'T', 9.519, 4.655, 0.624);
+  swotSideLabel(s, 'Strengths', 3.082, 4.901, 1.015, 'center', 2.747, 5.21, 1.684);
+  swotSideLabel(s, 'Opportunities', 7.062, 4.901, 1.438, 'center', 6.93, 5.21, 1.684);
+  swotSideLabel(s, 'Weaknesses', 5.047, 2.722, 1.297, 'center', 4.853, 3.067, 1.684);
+  swotSideLabel(s, 'Threats', 9.448, 2.722, 0.775, 'center', 8.97, 3.067, 1.684);
+}
+
+function slide25(s) {
+  heading(s, 'SWOT Analysis', L_ONE);
+  rrect(s, 4.688, 1.618, 3.965, 1.559, C.white, 0.5);
+  txt(s, 'SWOT', 5.588, 1.98, 2.23, 0.808, { align: 'center', fontSize: 48, bold: true, color: C.gold, fontFace: XBOLD });
+  [[6.19, C.orange], [6.437, C.dark], [6.694, C.red], [6.952, C.green]].forEach(([x, col]) =>
+    ell(s, x, 3.318, 0.21, 0.21, col));
+  // connectors fanning out from the hub down to the four circles
+  [[2.859, 3.424], [5.401, 1.141], [6.8, 1.141], [7.057, 3.424]].forEach(([x, w], i) => {
+    const toRight = i > 1;
+    s.addShape('line', { x, y: 3.372, w, h: 1.476, line: { color: C.ink50, width: 0.9 }, flipH: !toRight });
+  });
+  [[2.155, C.dark], [4.711, C.gold], [7.239, C.orange], [9.78, C.cream]].forEach(([x, col]) =>
+    ell(s, x, 5.099, 1.41, 1.41, mid(col)));
+}
+
+function slide26(s) {
+  heading(s, 'SWOT Analysis', L_ONE);
+  // four bands; each is a narrow letter block butted against a wider text block
+  const bands = [
+    { col: C.dark, lx: 2.057, w1: 1.259, tx: 3.207, w2: 2.667, y: 2.377, label: 'Strengths', labX: 3.828, labW: 0.871, bodyX: 3.684, labY: 2.773, bodyY: 3.063, letter: 'S' },
+    { col: C.gold, lx: 6.719, w1: 2.483, tx: 8.865, w2: 2.661, y: 2.377, label: 'Weaknesses', labX: 9.523, labW: 1.115, bodyX: 9.376, labY: 2.811, bodyY: 3.063, letter: 'W' },
+    { col: C.orange, lx: 1.783, w1: 1.62, tx: 3.123, w2: 2.75, y: 4.894, label: 'Threats', labX: 3.828, labW: 1.232, bodyX: 3.714, labY: 5.295, bodyY: 5.56, letter: 'O' },
+    { col: C.cream, lx: 7.41, w1: 1.358, tx: 8.451, w2: 3.075, y: 4.894, label: 'Opportunities', labX: 9.359, labW: 0.664, bodyX: 9.225, labY: 5.281, bodyY: 5.56, letter: 'T' },
+  ];
+  bands.forEach((b) => {
+    const fill = mid(b.col);
+    rect(s, b.lx, b.y, b.w1, 1.512, fill);
+    rect(s, b.tx, b.y, b.w2, 1.512, fill);
+    txt(s, b.letter, b.lx - 0.55, b.y - 0.42, 1.6, 1.5, { align: 'center', fontSize: 80, bold: true, color: mix(b.col, tint(b.col, 0.4), 0.3) });
+    txt(s, b.label, b.labX, b.labY, b.labW + 0.9, 0.22, { fontSize: 12, bold: true, color: C.white, wrap: true });
+    body(s, L_SED, b.bodyX, b.bodyY, 2.197, 0.477, { fontSize: 8, color: C.white });
+  });
+}
+
+function slide27(s) {
+  heading(s, 'SWOT Analysis', L_ONE);
+  // donut split into four coloured arcs around a white hub
+  [[C.gold, 180, 270], [C.orange, 270, 360], [C.cream, 0, 90], [C.dark, 90, 180]].forEach(([col, a1, a2]) => {
+    s.addShape('blockArc', {
+      x: 4.571, y: 2.137, w: 4.181, h: 4.188, angleRange: [a1, a2], arcThicknessRatio: 0.22,
+      fill: { color: mid(col) }, line: { type: 'none' },
+    });
+  });
+  ell(s, 5.208, 2.774, 2.906, 2.913, C.white);
+  txt(s, 'SWOT', 5.794, 3.897, 1.858, 0.673, { align: 'center', fontSize: 40, bold: true, color: C.gold, fontFace: XBOLD });
+  [[4.109, 2.316], [8.231, 2.316], [4.109, 5.8], [8.231, 5.8]].forEach(([x, y], i) =>
+    s.addShape('line', { x, y, w: 0.983, h: 0.347, line: { color: C.ink50, width: 1.25 }, flipH: i % 2 === 1, flipV: i > 1 }));
+  const labels = [['Strengths', 2.167, 2.056, 'right', 2.307], ['Threats', 2.167, 5.623, 'right', 5.949],
+    ['Weaknesses', 9.574, 2.056, 'left', 2.307], ['Opportunities', 9.574, 5.623, 'left', 5.949]];
+  labels.forEach(([label, x, y, align, by]) => {
+    txt(s, label, { x, y, w: 1.684, h: 0.22, align: 'center', fontSize: 13, bold: true, color: C.ink50, wrap: true });
+    body(s, L_SED, { x, y: by, w: 1.684, h: 0.707, fontSize: 10, align, color: C.ink50 });
+  });
+}
+
+// ============================================================ slides 28-30 =
+// "Process Infographic" — four coloured cards, three visual variants.
+const PROCESS_COLORS = [C.dark, C.gold, C.orange, C.red];
+
+function slide28(s) {
+  heading(s, 'Process Infographic', null, { color: C.ink });
+  PROCESS_COLORS.forEach((col, i) => {
+    const x = 1.543 + i * 2.675;
+    const fill = mid(col);
+    rrect(s, x, 3.31, 2.222, 2.732, fill, 0.2);
+    ell(s, x + 0.548, 2.745, 1.125, 1.125, fill, { line: { color: 'D9D9D9', width: 2 } });
+    body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.', x + 0.5, 4.223, 1.207, 1.014, { fontSize: 10, align: 'center', color: C.white });
+    txt(s, 'Infodata 0' + (i + 1), x + 0.33, 5.237, 1.62, 0.384, { align: 'center', fontSize: 16.8, bold: true, color: C.white });
+  });
+}
+
+function slide29(s) {
+  heading(s, 'Process Infographic', null, { color: C.ink });
+  PROCESS_COLORS.forEach((col, i) => {
+    const x = 1.238 + i * 2.921;
+    rrect(s, x, 2.795, 2.12, 2.67, mid(col), 0.18);
+    rrect(s, x - 0.263, 3.68, 2.646, 0.543, C.white, 0.27);
+    txt(s, 'Infodata 0' + (i + 1), x - 0.263, 3.729, 2.646, 0.384, { align: 'center', fontSize: 16.8, bold: true, color: col });
+    body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit sed.', x + 0.296, 4.533, 1.528, 0.72, { fontSize: 9, align: 'center', color: C.white });
+  });
+}
+
+function slide30(s) {
+  heading(s, 'Process Infographic', null, { color: C.ink });
+  PROCESS_COLORS.forEach((col, i) => {
+    const x = 1.174 + i * 2.883;
+    rrect(s, x, 2.974, 2.336, 2.897, mid(col), 0.14);
+    rrect(s, x + 0.11, 3.55, 2.226, 2.32, C.bg, 0.14, { line: { color: col, width: 1.5 } });
+    txt(s, 'Infodata 0' + (i + 1), x + 0.2, 3.116, 1.94, 0.385, { align: 'center', fontSize: 16.85, bold: true, color: C.white });
+    body(s, L_TEMPOR, x + 0.4, 4.606, 1.537, 0.961, { fontSize: 9, align: 'center', color: C.body });
+  });
+}
+
+// ============================================================ slides 31-33 =
+// "Circles Infographic".
+
+function slide31(s) {
+  heading(s, 'Circles Infographic', L_ONE);
+  // two interlocking crescents
+  ell(s, 8.568, 1.693, 3.36, 4.503, C.green);
+  ell(s, 6.855, 2.192, 3.36, 4.506, C.dark);
+  ell(s, 8.6, 3.4, 1.9, 1.9, C.bg);
+  txt(s, 'Guarantee', 1.405, 2.75, 1.548, 0.337, { fontSize: 20, bold: true, color: C.ink50 });
+  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo',
+    { x: 1.31, y: 3.146, w: 4.742, h: 0.812, fontSize: 9, color: C.ink50 });
+  [['Brand', 1.368, 0.898, C.dark, 1.271], ['Market', 3.866, 1.048, C.green, 3.781]].forEach(([label, x, w, col, bx]) => {
+    rect(s, x, 4.568, w, 0.337, col);
+    txt(s, label, x + 0.03, 4.578, w, 0.32, { fontSize: 20, bold: true, color: C.white });
+    body(s, L_SEDDO, bx, 4.963, 1.875, 0.63, { fontSize: 9, color: C.ink50 });
+  });
+}
+
+function slide32(s) {
+  heading(s, 'Circles Infographic', L_ONE);
+  // three thick arcs forming a ring
+  [[C.green, 90, 210], [C.orange, 330, 90], [C.dark, 210, 330]].forEach(([col, a1, a2]) => {
+    s.addShape('blockArc', { x: 6.668, y: 0.936, w: 5.344, h: 5.849, angleRange: [a1, a2], arcThicknessRatio: 0.42, fill: { color: col }, line: { type: 'none' } });
+    s.addShape('blockArc', { x: 7.15, y: 1.45, w: 4.38, h: 4.82, angleRange: [a1 + 6, a2 - 6], arcThicknessRatio: 0.3, fill: { color: shade(col, 0.25) }, line: { type: 'none' } });
+  });
+  txt(s, 'Business\nTerms\nAgreement', 8.675, 2.069, 2.423, 1.464, { fontSize: 29, bold: true, color: C.ink50, lineSpacingMultiple: 1.05, wrap: true });
+  body(s, L_MAGNA, 8.592, 3.617, 3.224, 0.633, { fontSize: 9, color: C.ink50 });
+  [['Brand', C.dark, 4.542, 2.031, 6.838, 4.795, 7.324, 0.584], ['Experience', C.orange, 5.134, 2.936, 6.838, 5.387, 6.838, 1.071],
+    ['Commission', C.green, 5.726, 1.561, 6.729, 5.983, 6.729, 1.182]].forEach(([label, col, y, wFill, , , lx, lw]) => {
+    rect(s, 8.186, y, 3.787, 0.062, 'D9D9D9');
+    rect(s, 8.186, y, wFill, 0.062, col);
+    ell(s, 8.061, y - 0.13, 0.321, 0.321, C.white);
+    txt(s, label, lx, y - 0.155, lw + 0.2, 0.219, { align: 'right', fontSize: 13, bold: true, color: C.ink50 });
+  });
+}
+
+function slide33(s) {
+  heading(s, 'Circles Infographic', L_ONE);
+  // pie split into four quadrants with a hole in the middle
+  [[C.gold, 180, 270], [C.orange, 270, 360], [C.green, 0, 90], [C.dark, 90, 180]].forEach(([col, a1, a2]) => {
+    s.addShape('blockArc', { x: 1.446, y: 1.807, w: 4.669, h: 4.673, angleRange: [a1, a2], arcThicknessRatio: 0.62, fill: { color: col }, line: { type: 'none' } });
+  });
+  const items = [['Advantage', C.dark, 7.013, 2.602, 1.453, 6.902], ['Distribution', C.gold, 10.271, 2.602, 1.585, 10.179],
+    ['Equipment', C.orange, 7.013, 4.761, 1.476, 6.902], ['Improvement', C.green, 10.271, 4.761, 1.814, 10.179]];
+  items.forEach(([label, col, x, y, w, bx]) => {
+    txt(s, label, { x, y, w: w + 0.4, h: 0.303, fontSize: 18, bold: true, color: col });
+    body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed eiusmod tempor incididunt.',
+      { x: bx, y: y + 0.393, w: 2.192, h: 0.808, fontSize: 9, color: C.ink50 });
+  });
+}
+
+// ============================================================ slides 34-36 =
+// Timelines.
+
+function slide34(s) {
+  // alternating bars with up/down pointers
+  const bars = [[0.446, 3.712, C.dark, 'down'], [2.536, 3.542, C.gold, 'up'], [4.627, 3.712, C.orange, 'down'],
+    [6.717, 3.542, C.dark, 'up'], [8.807, 3.712, C.gold, 'down'], [10.898, 3.542, C.orange, 'up']];
+  bars.forEach(([x, y, col, dir]) => {
+    gradRect(s, x, y, 1.99, 0.415, tint(col, 0.4), col, 'v', 6);
+    s.addShape(dir === 'up' ? 'triangle' : 'triangle', {
+      x: x + 0.7, y: dir === 'up' ? y - 0.24 : y + 0.4, w: 0.59, h: 0.26,
+      fill: { color: dir === 'up' ? tint(col, 0.4) : col }, line: { type: 'none' }, flipV: dir !== 'up',
+    });
+  });
+  const items = [['2004', 0.869, 5.019, 0.713, 5.311], ['2018', 4.998, 5.019, 4.845, 5.311], ['2026', 9.187, 5.019, 9.032, 5.311],
+    ['2012', 2.968, 2.328, 2.818, 2.62], ['2024', 7.097, 2.328, 6.95, 2.62], ['2031', 11.286, 2.328, 11.154, 2.62]];
+  items.forEach(([year, tx, ty, bx, by]) => {
+    txt(s, year, tx, ty, 1.249, 0.292, { align: 'center', fontSize: 13, bold: true });
+    body(s, L_ONE, bx, by, 1.55, 0.793, { fontSize: 9, align: 'center', color: C.body, lineSpacingMultiple: 1.5 });
+  });
+}
+
+function slide35(s) {
+  s.addShape('line', { x: 0, y: 3.781, w: 13.333, h: 0, line: { color: C.ink, width: 2, dashType: 'sysDot' } });
+  const cards = [
+    ['1996', 1.352, 1.512, C.dark, 'top'], ['2003', 3.16, 3.955, C.gold, 'bottom'], ['2007', 4.964, 1.512, C.orange, 'top'],
+    ['2012', 6.766, 3.955, C.dark, 'bottom'], ['2015', 8.573, 1.512, C.gold, 'top'], ['2029', 10.377, 3.955, C.orange, 'bottom'],
+  ];
+  cards.forEach(([year, x, y, col, side], i) => {
+    rrect(s, x, y, 1.602, 2.042, C.white, 0.14);
+    const barY = side === 'top' ? 1.812 : 5.354;
+    gradRect(s, x, barY, 1.602, 0.342, tint(col, 0.4), col, 'v', 5);
+    txt(s, year, { x, y: barY + 0.046, w: 1.602, h: 0.236, align: 'center', fontSize: 14, bold: true, color: C.white });
+    body(s, L_SHORT, x + 0.21, side === 'top' ? 2.321 : 4.417, 1.173, 0.697, { fontSize: 9, align: 'center', color: C.body, lineSpacingMultiple: 1.5 });
+    const dotX = 2.016 + i * 1.8055;
+    ell(s, dotX, 3.655, 0.259, 0.253, tint(col, 0.4));
+    ell(s, dotX + 0.065, 3.719, 0.128, 0.125, col);
+  });
+}
+
+function slide36(s) {
+  heading(s, 'Timeline Infographic', null, { color: C.ink50 });
+  const years = ['2009', '2014', '2018', '2024', '2028', '2032'];
+  const cols = [C.dark, C.gold, C.orange, C.dark, C.gold, C.orange];
+  years.forEach((year, i) => {
+    const x = 1.104 + i * 1.977;
+    const col = cols[i];
+    ell(s, x, 3.132, 1.247, 1.243, mid(col));
+    if (i < 5) rect(s, x + 0.6, 3.35, 2.0, 0.8, mix(tint(col, 0.4), cols[i + 1], 0.5));
+    ell(s, x, 3.132, 1.247, 1.243, mid(col));
+    ell(s, x + 0.146, 3.274, 0.955, 0.958, C.white);
+    txt(s, year, x - 0.101, 5.23, 1.463, 0.409, { align: 'center', fontSize: 14, bold: true });
+    body(s, L_SHORT, x - 0.225, 5.5, 1.695, 0.555, { fontSize: 9, align: 'center', color: C.body, lineSpacingMultiple: 1.5 });
+  });
+}
+
+// ============================================================ slides 37-45 =
+// Photo-grid layouts (photos replaced by placeholders).
+
+function infoBlock(s, title, tx, ty, tw, bx, by, bw, text, align, size) {
+  const a = align || 'center';
+  const pad = 0.6;
+  const x = a === 'right' ? tx - pad : a === 'center' ? tx - pad / 2 : tx;
+  txt(s, title, { x, y: ty, w: tw + pad, h: 0.269, align: a, fontSize: size || 16, bold: true });
+  body(s, text, bx, by, bw, 0.891, { fontSize: 10, align: a, color: C.ink, lineSpacingMultiple: 1.2 });
+}
+
+function slide37(s) {
+  infoBlock(s, 'Infodata 01', 4.905, 1.365, 1.297, 4.13, 1.818, 2.316, L_DOLORE, 'right');
+  infoBlock(s, 'Infodata 02', 4.893, 4.655, 1.343, 3.981, 5.12, 2.464, L_DOLORE, 'right');
+  infoBlock(s, 'Infodata 03', 7.098, 1.365, 1.343, 6.973, 1.818, 2.464, L_DOLORE, 'left');
+  infoBlock(s, 'Infodata 04', 7.077, 4.655, 1.364, 6.973, 5.12, 2.464, L_DOLORE, 'left');
+}
+
+function slide38(s) {
+  infoBlock(s, 'Infodata 01', 1.581, 1.265, 1.297, 1.072, 1.602, 2.316, L_DOLORE);
+  infoBlock(s, 'Infodata 02', 5.995, 4.965, 1.343, 5.509, 5.302, 2.316, L_DOLORE);
+  infoBlock(s, 'Infodata 03', 10.384, 1.265, 1.343, 9.897, 1.602, 2.316, L_DOLORE);
+}
+
+function slide39(s) {
+  heading(s, 'Our Projects', L_ONE, { color: C.ink, subColor: C.body });
+  for (let i = 0; i < 4; i++) {
+    infoBlock(s, 'Infodata 0' + (i + 1), 1.84 + i * 2.78, 5.623, 1.3, 1.643 + i * 2.78, 5.892, 1.69, L_SEDDO);
+  }
+}
+
+function slide40(s) {
+  heading(s, 'Our Projects', L_ONE, { color: C.ink, subColor: C.body });
+  const xs = [0, 2.7, 5.393, 8.087, 10.78];
+  xs.forEach((x, i) => {
+    infoBlock(s, 'Title 0' + (i + 1), x + 0.9, 5.398, 0.86, x + 0.49, 5.667, 1.69, L_SEDDO);
+  });
+}
+
+function slide41(s) {
+  const xs = [0, 3.368, 6.735, 10.101];
+  xs.forEach((x, i) => {
+    infoBlock(s, 'Project 0' + (i + 1), x + 1.06, 3.269, 1.2, x + 0.79, 3.538, 1.69, L_SEDDO);
+  });
+}
+
+function slide42(s) {
+  heading(s, 'Our Projects', L_ONE, { color: C.ink, subColor: C.body });
+  body(s, L_FULL + L_DUIS, 2.583, 5.413, 8.167, 0.891, { fontSize: 10, align: 'center', color: C.ink, lineSpacingMultiple: 1.2 });
+}
+
+function slide43(s) {
+  heading(s, 'Our Projects', L_ONE, { color: C.ink, subColor: C.body });
+  [[2.37, 1.934], [6.235, 5.822], [10.122, 9.709]].forEach(([tx, bx], i) =>
+    infoBlock(s, 'Title 0' + (i + 1), tx, 1.938, 0.86, bx, 2.207, 1.69, L_SEDDO));
+}
+
+function slide44(s) {
+  txt(s, 'Our Company', 0.973, 2.792, 2.449, 0.404, { align: 'center', fontSize: 24, bold: true });
+  body(s, L_FULL, 0.843, 3.376, 3.311, 1.415, { fontSize: 10, color: C.ink, lineSpacingMultiple: 1.2 });
+  // white diamonds: [centreX, centreY, diagonal]; the square side is diagonal/sqrt(2)
+  [[6.30, 2.24, 2.08], [5.14, 2.85, 1.30], [5.90, 3.40, 3.37], [7.62, 2.90, 2.43],
+   [9.29, 4.05, 2.76], [5.90, 5.27, 1.88], [10.80, 5.37, 1.64], [11.85, 3.50, 0.70]]
+    .forEach(([cx2, cy2, diag]) => {
+      const side = diag / Math.SQRT2;
+      rrect(s, cx2 - side / 2, cy2 - side / 2, side, side, C.white, 0.1, { rotate: 45 });
+    });
+}
+
+function slide45(s) {
+  txt(s, 'Marketing plan:', 0.842, 3.103, 2.455, 0.3, { align: 'right', fontSize: 16, bold: true, wrap: true });
+  body(s, 'Discuss the strategies you\u2019ll use to build awareness for your business and attract new customers or clients.',
+    { x: 0.842, y: 3.55, w: 2.455, h: 1.1, fontSize: 11, align: 'right', color: C.body });
+  txt(s, 'Situation analysis: ', 9.735, 3.203, 2.7, 0.3, { fontSize: 16, bold: true, wrap: true });
+  body(s, 'Use market research to explain the competitive landscape, key demographics and the current status of your industry. ',
+    { x: 9.735, y: 3.65, w: 2.7, h: 1.1, fontSize: 11, color: C.body });
+}
+
+// ============================================================ slides 46-56 =
+// Continent maps. The reference draws each country as a detailed freeform;
+// here every landmass is approximated by a soft blob at the same bounding
+// box, so the composition and the highlight colours still read correctly.
+const MAP_FILL = { L: C.land, D: C.dark, G: C.gold, O: C.orange, N: C.green, C: C.cream, R: C.red };
+// Each landmass: [x, y, w, h, fillKey, outline] where outline is a closed
+// polygon in 0-99 bounding-box units (x0,y0,x1,y1,...). The outlines are
+// simplified traces of the reference deck's country freeforms.
+const MAP_SHAPES = {
+  46: [
+    [6.37,0.59,6.6,4.24,'O',[98,58,70,41,46,41,46,22,27,58,26,40,6,63,2,50,0,77,12,99,25,79,36,89,58,82,62,97,69,73,83,66,78,86]],
+    [8.22,4.1,2.45,1.81,'D',[99,20,77,1,75,24,51,39,22,15,1,52,12,70,36,72,42,91,59,94,78,72,71,47]],
+    [7.14,3.97,1.62,0.9,'L',[17,89,29,68,54,99,83,89,99,44,74,7,55,0,35,11,35,35,2,37]],
+    [8.01,5.05,1.14,1.27,'L',[99,35,84,54,69,39,31,99,0,48,22,0,41,6,45,34]],
+    [9.11,6.44,1.8,0.65,'L',[47,6,42,24,34,28,31,22,30,30,33,52,36,55,41,52,43,58,51,26]],
+    [8.79,4.19,1.28,0.62,'L',[0,33,53,99,99,53,34,0]],
+    [10.37,4.59,0.73,0.91,'L',[80,35,70,25,59,48,19,66,68,60]],
+    [6.66,5.28,0.84,0.7,'L',[97,61,85,59,66,23,26,1,1,18,38,99,96,77]],
+    [7.03,4.91,0.77,0.69,'L',[92,95,89,23,0,3,24,68]],
+    [7.71,5.05,0.58,0.61,'L',[99,37,59,75,70,95,5,88,0,55,38,55,74,4]],
+    [7.52,4.59,0.68,0.45,'L',[65,99,88,42,73,61,0,8,0,52,23,40]],
+    [9.94,5.78,0.42,0.7,'L',[71,46,34,43,24,30,31,14,48,14,45,40]],
+    [8.96,5.46,0.35,0.77,'L',[99,39,61,56,80,99,65,65,28,69,0,43,56,0]],
+    [7.7,4.98,0.57,0.44,'L',[94,12,77,20,71,0,5,32,2,94,40,94]],
+    [6.31,4.78,0.76,0.32,'L',[98,37,88,8,40,1,2,36,8,80,53,98,96,81]],
+    [7.38,4.75,0.56,0.39,'L',[15,71,33,60,69,99,99,63,43,0,31,20,0,13]],
+    [9.17,5.81,0.35,0.61,'L',[98,32,28,0,1,15,17,80,54,98,35,48]],
+    [9.29,6.35,0.76,0.27,'L',[99,32,86,10,56,99,77,89,83,44,96,47]],
+    [9.35,5.69,0.33,0.61,'L',[99,71,43,98,72,48,0,7,71,12,44,30]],
+    [6.83,5.03,0.39,0.4,'L',[32,75,59,98,99,88,67,42,76,20,52,0,0,49]],
+  ],
+  47: [
+    [1.26,1.96,6.23,3.31,'O',[98,38,50,0,31,14,34,37,8,31,0,54,16,63,18,96,27,98,32,72,59,97,70,83,86,86]],
+    [2.85,4.35,2.65,1.64,'L',[97,46,88,42,90,33,80,51,68,51,54,16,34,18,15,0,0,5,5,53,18,35,75,99,74,71]],
+    [2.38,4.93,2.37,1.49,'L',[96,58,40,1,30,19,22,20,8,7,0,15,16,75,37,62,75,98,88,72,99,68]],
+    [1.4,4.02,1.41,2.18,'L',[83,75,97,97,38,90,48,63,3,21,62,1,69,17,40,27,70,44]],
+    [4.83,5.17,1.31,0.91,'D',[56,18,34,24,32,0,1,39,10,92,29,90,43,60,55,98,92,78,74,15]],
+    [5.17,4.71,1.2,0.69,'L',[97,1,13,15,2,49,27,65,1,87,9,98,53,86]],
+  ],
+  48: [
+    [5.98,1.97,4.95,4.26,'O',[99,17,72,0,74,23,62,36,37,38,19,21,0,48,13,71,43,73,51,90,70,94,89,72,77,46]],
+    [6.95,2.42,2.74,1.29,'L',[1,36,33,92,59,99,99,42,94,28,85,31,85,10,61,22,29,0,29,24,9,18]],
+    [10.91,2.91,1.2,2.49,'L',[82,29,68,21,72,23,64,24,62,43,13,66,45,59,52,64,55,56,80,53]],
+    [10.37,3.36,0.42,0.72,'L',[86,21,59,70,87,81,20,94,7,48,83,1]],
+    [10.56,3.95,0.4,0.65,'L',[41,3,0,14,26,31,11,36,35,78,89,54]],
+  ],
+  49: [
+    [2.2,4.37,5.41,1.96,'O',[99,75,99,49,92,42,86,54,84,39,80,36,77,42,80,47,84,46,79,50,81,58,84,51,84,56,94,67,94,82,97,81,99,88]],
+    [4.68,2.41,1.26,2.1,'L',[70,46,34,42,38,38,25,30,31,28,31,14,49,14,51,23,41,32,46,40]],
+    [1.69,1.43,1.06,2.34,'L',[98,37,61,55,88,86,79,99,65,64,27,68,0,41,46,0,63,8,58,24]],
+    [2.33,2.45,1.02,1.87,'L',[98,32,28,0,1,15,30,59,17,80,54,99,28,71,35,48,65,57]],
+    [2.85,2.07,0.98,1.89,'G',[99,71,44,99,40,87,76,72,74,50,0,6,72,12,46,32]],
+    [2.75,4.15,2.26,0.78,'L',[99,31,86,5,59,92,52,88,56,99,77,88,83,42,93,46]],
+    [2.61,2.19,0.98,1.11,'L',[99,79,24,0,0,23,16,55,60,55,74,95]],
+    [2.98,3.2,0.62,0.54,'L',[99,35,76,1,0,26,43,99]],
+  ],
+  50: [
+    [7.34,1.49,4.57,5.19,'O',[99,27,45,29,33,16,36,5,24,0,14,4,21,13,0,44,9,53,17,47,37,94,44,71,73,50,69,33,83,38,86,50]],
+    [6.03,1.18,2.43,2.62,'L',[99,14,87,1,68,5,34,56,0,57,18,76,8,88,40,87,53,99,70,92,57,76,93,37,80,19]],
+    [9.13,2.53,1.36,0.71,'L',[3,20,22,64,98,94,97,59,59,49,16,1]],
+    [10.48,3.18,0.84,1.07,'L',[92,69,66,49,81,26,4,2,32,84,52,57,90,99]],
+    [10.56,2.88,0.51,0.31,'L',[4,47,6,82,39,99,98,74,91,21,75,11,27,7]],
+  ],
+  51: [
+    [2.71,3.62,3.16,2.66,'O',[43,95,45,88,50,90,58,99,67,85,98,74,98,57,82,56,64,22,46,19,20,0,11,4,14,16,1,19,0,26]],
+    [3.91,2.27,3.11,2.51,'N',[99,86,86,68,82,21,61,9,38,22,18,1,10,8,0,2,14,29,10,41,41,80,91,99]],
+    [1.31,1.85,2.74,1.14,'D',[57,97,59,87,99,79,97,36,85,7,63,18,45,0,15,16,14,32,3,29,2,65,19,97,54,85]],
+    [3.28,2.71,1.46,1.41,'L',[62,99,99,86,65,42,71,19,33,1,0,49,5,63]],
+    [5.41,4.53,1.14,1.63,'L',[98,40,48,14,38,65,0,78,18,99,40,96,77,76,74,67]],
+    [4,5.74,1.62,1.06,'L',[52,16,35,51,35,38,7,27,0,56,11,99,58,78,99,40,87,0]],
+    [2.77,2.74,0.96,0.86,'L',[12,56,8,92,21,99,83,51,99,2,17,12,1,29]],
+    [3.99,1.84,0.83,0.68,'L',[77,98,97,36,64,0,2,14,35,86,58,66]],
+    [3.2,1.51,1.06,0.5,'L',[97,62,74,28,55,37,1,2,32,87,98,99]],
+    [2.73,3.41,0.61,0.76,'L',[11,94,70,83,81,66,55,42,99,26,88,0,12,21]],
+    [5.27,4.62,0.73,0.57,'L',[99,21,89,0,50,57,13,62,0,51,10,88,70,99]],
+    [3.77,1.97,0.54,0.47,'L',[96,88,59,11,0,5,12,49,64,64,90,99]],
+    [2.6,3.43,0.23,0.67,'L',[79,43,56,26,99,0,0,48,59,99]],
+    [2.26,3.03,0.39,0.23,'L',[9,55,99,0,70,37,78,65,32,99,5,81]],
+  ],
+  52: [
+    [7.4,1.14,3.29,4.28,'L',[96,85,78,93,90,95,66,99,59,91,20,90,0,73,0,54,51,60,57,42,54,54,67,59,53,66,54,79,70,87,76,69]],
+    [5.67,3.27,4.49,2.89,'O',[47,45,38,35,38,6,32,7,25,0,17,11,23,17,16,20,22,23,18,34,25,39,20,48,31,32,29,38,34,33]],
+    [9.94,0.95,2.3,3.38,'L',[99,19,73,61,82,71,71,65,82,72,48,99,0,39,55,1,80,8,65,16,83,14,79,24]],
+    [8.29,5.84,1.13,0.74,'L',[64,39,0,1,81,99,99,65,74,80]],
+  ],
+  53: [
+    [8.85,1.55,2.87,3.01,'D',[99,31,52,99,40,52,0,31,10,9,35,0,38,10,61,9,40,20,65,13]],
+    [8.89,3.57,1.45,3.21,'O',[99,12,53,1,26,7,1,82,26,89,39,72,30,67,49,56,42,51,79,43,78,22]],
+    [8.73,3.23,0.68,3.65,'N',[91,11,57,2,22,44,32,66,1,70,26,74,0,76,76,87,23,79]],
+    [8.32,1.94,0.92,1.36,'L',[93,93,99,65,57,40,88,14,45,0,18,26,1,22,43,78]],
+    [8.49,1.02,0.88,1.22,'L',[78,81,95,39,54,30,64,1,13,23,0,65,74,99]],
+    [9.17,2.65,0.89,1.01,'L',[94,75,92,48,34,0,0,9,14,98]],
+    [8.9,1.04,0.99,0.85,'L',[51,98,43,51,0,26,10,4,12,27,25,0,99,33]],
+    [9.68,3.37,0.61,0.66,'L',[96,71,53,6,11,4,0,34,60,73,48,96,81,98]],
+    [8.34,1.83,0.43,0.47,'L',[15,79,34,99,97,24,16,10,0,55,25,50]],
+    [9.77,1.32,0.36,0.53,'L',[94,87,67,59,84,30,33,0,5,23,38,62,35,91]],
+    [9.99,4.25,0.39,0.42,'L',[91,61,73,28,14,2,12,89,64,99]],
+    [10.01,1.5,0.3,0.3,'L',[91,45,85,0,28,0,0,42,47,99,51,81,91,81]],
+    [10.27,1.52,0.22,0.27,'L',[6,17,11,99,55,97,99,45,46,6]],
+  ],
+  54: [
+    [4.92,1.01,1.58,1.57,'D',[77,89,99,75,86,61,82,1,46,4,32,12,36,29,0,55,58,99]],
+    [6.51,3.64,1.46,1.45,'L',[95,9,36,3,19,49,1,60,50,66,52,87,91,99,84,77,96,71,87,42]],
+    [4.65,2.08,1.26,1.2,'L',[81,65,97,63,99,40,34,0,41,64,0,71,4,86,19,84,31,99]],
+    [6.84,5.79,1.27,1.12,'N',[99,35,86,35,87,1,32,35,21,20,21,47,0,49,13,93,63,90]],
+    [6.3,1.37,1.21,1.17,'L',[30,77,41,71,98,95,99,11,76,3,60,22,14,0,0,22,0,52]],
+    [7.25,2.32,1.28,1.01,'L',[96,29,90,1,19,1,13,51,0,74,11,97,54,97,68,78,73,99]],
+    [5.59,2.21,1.21,0.95,'L',[84,76,99,27,93,4,74,0,26,37,21,69,0,76,22,99,29,82,77,88]],
+    [7.89,4.86,0.82,1.33,'L',[76,6,40,6,47,39,0,27,26,37,18,99,96,28,94,0]],
+    [6.48,5.38,1.03,1,'L',[37,93,61,94,68,11,97,5,1,2,27,85]],
+    [8.1,2.91,1.15,0.89,'D',[92,60,58,34,62,21,52,7,33,0,0,61,20,90,43,99,80,86,99,60]],
+    [6.61,2.21,0.8,1.27,'L',[86,74,78,67,99,49,99,25,14,3,19,43,0,57,21,84,5,86,32,99]],
+    [6.48,4.39,0.94,1.07,'O',[82,85,99,50,84,49,81,21,5,12,17,55,1,93,93,96]],
+    [4.28,1.88,0.93,1.03,'L',[42,98,94,93,99,19,68,0,1,48,5,87]],
+    [8.71,3.13,0.8,1.06,'L',[96,2,16,10,28,21,67,29,0,66,6,99,72,50]],
+    [7.46,1.51,0.94,0.85,'O',[78,94,90,78,63,22,79,39,77,3,4,0,3,96]],
+    [7.83,4.13,0.85,0.82,'L',[74,18,10,0,0,32,15,70,50,98,99,87]],
+    [7.26,4.69,0.9,0.78,'L',[85,9,54,10,66,52,17,27,12,95,93,59]],
+    [5.78,2.99,0.92,0.75,'N',[85,4,12,4,0,78,30,99,73,75,99,24]],
+    [4.58,1.12,0.93,0.74,'L',[99,41,93,14,64,1,0,99,36,99]],
+    [6.68,3.21,1,0.67,'L',[91,57,61,0,0,56,14,99,39,67,61,78,99,69]],
+  ],
+  55: [
+    [5.47,2.22,4.22,3.93,'O',[99,50,72,0,67,19,46,1,2,32,5,68,44,59,56,70,60,62,58,70,74,82,90,78]],
+    [11.01,4.94,1.85,2.06,'D',[16,82,16,73,11,72,10,64,0,77]],
+    [8.37,1.3,1.58,1.02,'L',[36,57,27,48,14,50,20,61,18,54,21,59,24,56,34,62,36,67]],
+    [7.21,1.1,1.17,0.95,'L',[99,74,99,28,72,16,50,36,43,27,45,46,78,61,88,77,80,89,99,99]],
+    [9.9,1.78,1.19,0.55,'L',[34,33,29,26,23,15,34,27,37,33,36,33,38,36]],
+    [11.05,2.47,0.35,0.79,'L',[5,23,8,28,15,26,21,34,7,35,0,24,2,21]],
+    [10.74,3.18,0.47,0.35,'L',[75,87,63,87,56,75,28,57,10,16,35,38]],
+    [12.13,2.8,0.48,0.34,'L',[61,20,49,18,39,29,33,22,67,1,55,18,64,12]],
+  ],
+  56: [
+    [0.46,2.96,3.08,2.34,'D',[99,81,80,62,80,11,53,0,33,35,53,68,42,86,64,56]],
+    [6.92,4.39,1.88,1.8,'D',[99,52,95,28,52,21,50,0,27,0,27,43,0,43,25,71,39,64,57,94,70,99,70,81,97,65]],
+    [4.37,3.37,1.47,1.72,'L',[95,97,95,74,42,33,42,0,2,0,6,34,29,43,18,48,36,79,70,99]],
+    [5.57,1.93,1.72,0.98,'L',[0,0,12,74,27,99,38,91,41,97,41,86,99,86,99,0]],
+    [2.67,5.93,1.73,0.87,'G',[69,54,65,56,61,53,61,48,60,53,57,54,52,38,57,36,60,30]],
+    [9.25,2.11,1.15,1.31,'L',[1,26,28,35,35,48,42,36,80,35,67,22,24,22,31,11]],
+    [8.27,1.84,1.1,1.23,'L',[8,61,10,99,78,99,57,79,56,63,64,47,99,24,34,12,29,0,0,7]],
+    [5.39,1.93,0.89,1.44,'L',[94,62,43,50,19,0,4,0,4,99,99,99]],
+    [5,3.37,0.86,1.29,'L',[0,0,0,44,89,99,90,97,87,84,93,84,97,85,99,83,99,0]],
+    [9.65,5.34,1.1,0.96,'L',[77,4,72,11,34,0,0,3,2,12,18,9,30,23,51,18,87,99,99,69]],
+    [10.78,2.77,1.13,0.89,'L',[76,87,99,87,72,97,55,67,0,67,9,39,38,38,62,0,80,0]],
+    [4.34,2.52,1.16,0.85,'L',[93,55,94,5,26,16,17,1,7,0,4,99,92,99]],
+    [6.57,4.3,0.87,0.98,'L',[0,0,0,99,40,88,98,88,99,0]],
+    [4.32,1.93,1.12,0.73,'L',[99,83,98,0,25,0,23,56,25,26,0,19,29,98]],
+    [5.74,4.3,0.83,0.98,'L',[13,0,12,17,1,16,11,49,0,79,99,99,99,0]],
+    [8.48,3.63,0.96,0.85,'L',[97,78,60,0,0,0,18,33,17,89,90,99]],
+    [6.28,2.77,1.01,0.79,'N',[0,0,0,99,99,99,99,0]],
+    [8.89,2.37,0.87,0.9,'L',[97,38,83,99,37,99,0,30,34,0,84,29,81,55]],
+    [7.29,2.58,1.09,0.69,'L',[73,87,88,89,98,99,97,0,0,0,0,85]],
+    [6.57,3.56,1.01,0.74,'L',[99,0,0,0,0,99,99,99]],
+    [7.44,4.3,1.23,0.6,'L',[97,15,97,0,0,0,35,14,35,71,77,97,99,98]],
+    [7.29,3.17,1.25,0.57,'L',[99,99,82,9,63,0,0,0,0,67,23,67,23,99]],
+    [7.29,1.93,1.07,0.65,'L',[99,88,96,78,91,0,0,0,0,99,99,99]],
+    [5.86,3.37,0.72,0.93,'L',[99,99,0,99,0,0,59,0,59,20,99,20]],
+    [10.22,3.85,1.21,0.54,'O',[90,98,0,97,20,66,39,67,62,0]],
+    [10.12,4.38,1.26,0.48,'L',[98,22,96,2,30,0,0,58,37,52,71,97,94,3]],
+    [9.09,3.27,0.58,1.04,'L',[98,67,91,0,21,0,33,12,0,43,28,78,73,98]],
+    [7.58,3.75,1.07,0.55,'L',[99,30,93,18,95,6,89,0,0,0,0,99,99,99]],
+    [8.36,3.07,0.93,0.61,'O',[75,92,80,99,85,66,99,48,83,0,0,1,13,92]],
+    [9.94,4.66,0.69,0.8,'L',[95,62,52,0,0,0,14,90,73,98]],
+  ],
+};
+function mapBlobs(s, n) {
+  const shapes = MAP_SHAPES[n].slice();
+  // unhighlighted land goes down first so the coloured countries stay on top
+  shapes.sort((a, b) => (a[4] === 'L' ? 0 : 1) - (b[4] === 'L' ? 0 : 1));
+  shapes.forEach(([x, y, w, h, key, poly]) => {
+    const points = [];
+    // custGeom points are relative to the shape's own origin
+    for (let i = 0; i < poly.length; i += 2) points.push({ x: (poly[i] / 99) * w, y: (poly[i + 1] / 99) * h });
+    points.push({ close: true });
+    s.addShape('custGeom', { x, y, w, h, points, fill: { color: MAP_FILL[key] }, line: { color: C.bg, width: 0.75 } });
+  });
+}
+
+/** two-line map title: e.g. "ASIA" in orange over "MAP" in gold */
+function mapTitle(s, first, x, y, w, align) {
+  s.addText([
+    { text: first, options: { color: C.orange, breakLine: true } },
+    { text: 'MAP', options: { color: C.gold } },
+  ], { x, y, w, h: 1.313, align: align || 'left', fontSize: 36, fontFace: XBOLD, margin: 0, lineSpacingMultiple: 1, valign: 'top' });
+}
+/** small label sitting on top of a map */
+function mapLabels(s, rows) {
+  rows.forEach(([text, x, y, w, h, size, white]) => txt(s, text, {
+    x, y, w: w + 0.9, h, fontSize: size, fontFace: LIGHT, color: white ? C.white : C.ink50,
+  }));
+}
+
+function slide46(s) {
+  mapBlobs(s, 46);
+  mapTitle(s, 'ASIA', 0.915, 0.562, 2.415);
+  mapLabels(s, [['Russia', 8.88, 3.12, 1.08, 0.39, 23, true], ['China', 9.11, 5.04, 0.55, 0.22, 13, true],
+    ['Kazakhastan', 7.67, 4.36, 0.8, 0.15, 9], ['Mongolia', 9.2, 4.46, 0.47, 0.12, 7], ['Japan', 11.05, 4.94, 0.61, 0.24, 14],
+    ['Indonesia', 8.3, 6.75, 1.02, 0.25, 15], ['India', 8.3, 5.62, 0.29, 0.13, 8], ['Iran', 7.32, 5.18, 0.24, 0.15, 9],
+    ['Turkey', 6.25, 4.56, 0.38, 0.13, 8], ['Saudi Arabia', 6.08, 5.72, 0.7, 0.13, 8]]);
+  txt(s, 'Statistic', 1.003, 3.174, 1.643, 0.471, { fontSize: 28, bold: true, color: C.ink50, fontFace: SEMI });
+  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam.',
+    { x: 0.908, y: 3.736, w: 4.26, h: 0.631, fontSize: 10.5, color: C.ink50 });
+  [['Russia', '85%', 1.085, 1.432, C.gold], ['China', '43%', 3.293, 3.616, C.dark]].forEach(([name, pct, x, px, col]) => {
+    txt(s, name, { x, y: 4.823, w: 1.31, h: 0.471, align: 'center', fontSize: 28, color: col, fontFace: SEMI });
+    txt(s, pct, px, 5.311, 0.6, 0.337, { fontSize: 20, bold: true, color: col, fontFace: SEMI });
+  });
+}
+
+function slide47(s) {
+  mapBlobs(s, 47);
+  mapTitle(s, 'CENTRAL ASIA', 7.949, 0.562, 4.31, 'right');
+  mapLabels(s, [['Kazakhastan', 3.67, 3.51, 2.14, 0.39, 23, true], ['Kyrgyzstan', 6.17, 4.99, 0.92, 0.2, 12],
+    ['Turkmenistan', 3.1, 5.49, 1.01, 0.17, 10], ['Tajikistan', 6.13, 5.49, 0.78, 0.2, 12],
+    ['Uzbekistan', 3.59, 4.79, 0.78, 0.17, 10], ['Caspian Sea', 0.85, 5.49, 1.05, 0.2, 12]]);
+  ell(s, 8.517, 2.701, 1.281, 1.282, C.dark);
+  ell(s, 8.219, 4.543, 1.878, 1.878, C.orange);
+  txt(s, '1658', 8.517, 3.154, 1.281, 0.404, { align: 'center', fontSize: 18, color: C.white, fontFace: SEMI });
+  txt(s, '2374', 8.219, 5.246, 1.878, 0.505, { align: 'center', fontSize: 24, color: C.white, fontFace: SEMI });
+  [[10.333, 2.927, C.dark], [10.378, 4.961, C.gold]].forEach(([x, y, col]) => {
+    txt(s, 'Title Here', { x, y, w: 1.861, h: 0.409, fontSize: 16, bold: true, color: col });
+    body(s, L_ONE, x + 0.045, y + 0.3, 2.32, 0.769, { fontSize: 10, color: C.ink50 });
+  });
+}
+
+function slide48(s) {
+  mapBlobs(s, 48);
+  mapTitle(s, 'EAST ASIA', 0.915, 0.562, 3.885);
+  mapLabels(s, [['China', 8.17, 4.17, 1.07, 0.42, 25, true], ['Mongolia', 7.96, 2.97, 0.85, 0.22, 13],
+    ['Japan', 11.73, 4.34, 0.55, 0.22, 13], ['Taiwan', 10.5, 5.67, 0.54, 0.19, 11],
+    ['South\nKorea', 10.96, 4.05, 0.29, 0.24, 7], ['North\nKorea', 10.83, 3.56, 0.29, 0.24, 7]]);
+  [[3.931, C.dark, 10], [5.621, C.gold, 7]].forEach(([y, col, count], row) => {
+    txt(s, 'Title Here', 1.06, y - 0.79, 1.9, 0.3, { fontSize: 16, bold: true, color: row ? col : C.ink50 });
+    body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit', 1.06, y - 0.5, 2.4, 0.45, { fontSize: 10, color: C.ink50 });
+    for (let i = 0; i < count; i++) {
+      const x = 1.06 + i * 0.315;
+      ell(s, x + 0.075, y, 0.09, 0.09, col);
+      rrect(s, x + 0.03, y + 0.12, 0.19, 0.4, col, 0.05);
+    }
+  });
+}
+
+function slide49(s) {
+  mapBlobs(s, 49);
+  mapTitle(s, 'SOUTHEAST ASIA', 7.125, 0.562, 5.133, 'right');
+  mapLabels(s, [['Indonesia', 4.67, 6.41, 0.82, 0.2, 12], ['Myanmar', 0.96, 2.84, 0.81, 0.2, 12],
+    ['Philippines', 5.9, 3.38, 0.93, 0.2, 12], ['Vietnam', 3.64, 2.65, 0.72, 0.2, 12], ['Malaysia', 3.3, 4.33, 0.71, 0.2, 12]]);
+  [['Malaysia', C.orange, 2.81, 3.662, 3.575, '68%', 10.958, 3.88, 0.72], ['Vietnam', C.gold, 4.588, 5.37, 5.287, '30%', 9.914, 5.602, 0.32]]
+    .forEach(([name, col, ty, barY, dotY, pct, px, py, frac]) => {
+      txt(s, name, 8.42, ty, 1.861, 0.409, { fontSize: 16, bold: true, color: col });
+      body(s, 'Lorem ipsum dolor sit amet', 8.43, ty + 0.27, 2.32, 0.34, { fontSize: 10, color: C.ink50 });
+      rect(s, 8.603, barY, 3.754, 0.074, 'DEDEDE');
+      rect(s, 8.603, barY, 3.754 * frac, 0.074, col);
+      ell(s, 8.525, dotY, 0.24, 0.24, col);
+      txt(s, pct, px, py, 0.42, 0.236, { align: 'center', fontSize: 14, bold: true, color: col, fontFace: LIGHT });
+    });
+}
+
+function slide50(s) {
+  mapBlobs(s, 50);
+  mapTitle(s, 'SOUTH ASIA', 0.915, 0.562, 3.885);
+  mapLabels(s, [['India', 8.71, 3.57, 0.92, 0.42, 25, true], ['Pakistan', 6.14, 1.85, 0.96, 0.27, 16],
+    ['Bangladesh', 10.63, 4.26, 0.84, 0.17, 10], ['Nepal', 9.72, 2.36, 0.53, 0.22, 13], ['Bhutan', 10.63, 2.69, 0.42, 0.13, 8]]);
+  txt(s, 'About India', 0.95, 3.991, 3.258, 0.572, { fontSize: 28, bold: true, color: C.dark });
+  body(s, L_FULL + 'PLACEHOLDER',
+    { x: 1.038, y: 4.614, w: 4.412, h: 1.5, fontSize: 11, color: C.ink50 });
+}
+
+function slide51(s) {
+  mapBlobs(s, 51);
+  mapTitle(s, 'WESTERN ASIA', 7.125, 0.562, 5.133, 'right');
+  mapLabels(s, [['Iran', 5.28, 3.19, 0.63, 0.39, 23, true], ['Saudi Arabia', 1.34, 5.2, 1.58, 0.3, 18],
+    ['Turkey', 1.31, 1.48, 0.84, 0.3, 18], ['Azerbaijan', 4.84, 2.07, 0.96, 0.22, 13], ['Iraq', 3.73, 3.33, 0.44, 0.27, 16],
+    ['Oman', 6.46, 5.6, 0.44, 0.17, 10], ['Yemen', 5.05, 6.53, 0.5, 0.17, 10]]);
+  [['Turkey', C.dark, 8.79, 3.786, 1.503, '65%', 8.718], ['Saudi Arabia', C.orange, 9.916, 3.288, 2.002, '83%', 9.862],
+    ['Iran', C.green, 11.086, 4.335, 0.955, '32%', 11.014]].forEach(([name, col, x, y, h, pct, px]) => {
+    rect(s, x, 2.788, 0.433, 2.501, tint(C.ink, 0.8));
+    rect(s, x, y, 0.433, h, col);
+    txt(s, name, x - 0.45, y + h - 0.9, 1.33, 0.22, { align: 'center', rotate: 270, fontSize: 12, color: C.white, fontFace: SEMI });
+    txt(s, pct, px, 5.56, 0.65, 0.37, { align: 'center', fontSize: 16, color: col, fontFace: LIGHT });
+  });
+  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt',
+    { x: 8.353, y: 6.037, w: 3.909, h: 0.516, fontSize: 10.5, align: 'center', color: C.ink50 });
+}
+
+function slide52(s) {
+  mapBlobs(s, 52);
+  mapTitle(s, 'NORTH AMERICA', 0.915, 0.562, 5.158);
+  mapLabels(s, [['USA', 8.66, 5.37, 0.41, 0.24, 14, true], ['Canada', 8.15, 4.1, 0.75, 0.24, 14],
+    ['Mexico', 8.13, 6.32, 0.54, 0.19, 11], ['Guatemala', 8.9, 6.59, 0.54, 0.12, 7]]);
+  // paired bar chart: orange front bar, dark back bar
+  const bars = [[1.076, 0.672, 0.305], [1.774, 1.953, 1.267], [2.466, 1.607, 0.811], [3.158, 2.285, 1.172], [3.856, 1.607, 0.45], [4.548, 3.208, 2.096]];
+  bars.forEach(([x, h1, h2], i) => {
+    rect(s, x, 5.901 - h1, 0.162, h1, C.orange);
+    rect(s, x + 0.16, 5.901 - h2, 0.162, h2, C.ink50);
+    txt(s, ['2006', '2009', '2012', '2015', '2018', '2023'][i], x - 0.17, 6.112, 0.667, 0.303, { align: 'center', fontSize: 12, color: C.ink50 });
+  });
+}
+
+function slide53(s) {
+  mapBlobs(s, 53);
+  s.addText([
+    { text: 'SOUTH AMERICA ', options: { color: C.orange } },
+    { text: 'MAP', options: { color: C.gold } },
+  ], { x: 0.915, y: 0.562, w: 4.835, h: 1.313, fontSize: 36, fontFace: XBOLD, margin: 0, lineSpacingMultiple: 1, wrap: true });
+  mapLabels(s, [['Brazil', 10.36, 2.65, 0.54, 0.24, 14, true], ['Peru', 7.99, 2.75, 0.47, 0.24, 14],
+    ['Chile', 8.26, 4.5, 0.53, 0.25, 15], ['Argentina', 9.87, 5.28, 0.97, 0.24, 14]]);
+  txt(s, 'Statistic Title', 0.958, 3.147, 3.258, 0.505, { fontSize: 24, bold: true, color: C.ink50, fontFace: SEMI });
+  body(s, L_MAGNA, 1.038, 3.59, 5.548, 0.537, { fontSize: 11, color: C.ink50 });
+  [['Brazil', C.dark, 4.514, 3.36], ['Argentina', C.orange, 5.196, 5.28], ['Chile', C.green, 5.88, 2.06]].forEach(([name, col, y, w]) => {
+    rrect(s, 1.039, y, 5.678, 0.427, 'E9E9E9', 0.21);
+    rrect(s, 1.039, y, w, 0.427, col, 0.21);
+    txt(s, name, 1.335, y + 0.11, 1.3, 0.2, { fontSize: 11, color: C.white, fontFace: SEMI });
+  });
+}
+
+function slide54(s) {
+  mapBlobs(s, 54);
+  mapTitle(s, 'AFRICA ', 7.428, 0.56, 4.835, 'right');
+  // leader lines: dot -> horizontal rule -> label
+  const pins = [['Algeria', 2.42, 3.07, C.dark, 'left', 3.45, 3.34], ['Egypt', 8.99, 1.7, C.gold, 'right', 8.04, 1.84],
+    ['Nigeria', 2.83, 1.57, C.green, 'left', 3.87, 1.7], ['Ethiopia', 9.59, 3.16, C.dark, 'right', 9.04, 3.43],
+    ['Angola', 4.19, 4.62, C.gold, 'left', 5.37, 5.03], ['South Africa', 8.44, 5.96, C.green, 'right', 7.77, 6.5]];
+  pins.forEach(([label, lx, ly, col, side, gx, gy]) => {
+    txt(s, label, lx, ly, 1.5, 0.22, { align: side === 'left' ? 'right' : 'left', fontSize: 12, fontFace: LIGHT, color: C.ink50 });
+    s.addShape('line', { x: gx, y: gy + 0.11, w: 1.27, h: 0, line: { color: C.gray, width: 1.75, dashType: 'sysDot' } });
+    const dx = side === 'left' ? gx - 0.28 : gx + 1.27;
+    ell(s, dx, gy, 0.239, 0.234, tint(col, 0.4));
+    ell(s, dx + 0.06, gy + 0.059, 0.118, 0.116, col);
+  });
+  txt(s, 'Title Here', 0.981, 5.545, 3.258, 0.37, { fontSize: 16, color: C.ink50, fontFace: SEMI });
+  body(s, L_MAGNA, 1.077, 5.899, 3.502, 0.651, { fontSize: 9, color: C.ink50 });
+}
+
+function slide55(s) {
+  mapBlobs(s, 55);
+  mapTitle(s, 'OCEANIA', 0.915, 0.562, 5.158);
+  mapLabels(s, [['Australia', 6.84, 3.64, 1.58, 0.44, 26, true], ['New Zeland', 10.31, 5.53, 1.17, 0.24, 14],
+    ['Papua New Guinea', 9.56, 0.93, 2.15, 0.27, 16], ['Solomon Islands', 10.54, 1.86, 1.03, 0.15, 9],
+    ['Fiji', 12.29, 2.6, 0.14, 0.12, 7], ['Vanuatu', 11.36, 2.79, 0.42, 0.12, 7], ['New Caledonia', 10.09, 3.02, 0.74, 0.12, 7]]);
+  txt(s, 'Title Here', 1.069, 3.455, 1.26, 0.303, { fontSize: 16, bold: true, color: C.ink50 });
+  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna.',
+    { x: 0.941, y: 3.818, w: 3.52, h: 0.606, fontSize: 10, color: C.ink50 });
+  [['53%', C.dark, 1.019, 1.578, 1.451], ['47%', C.orange, 3.133, 3.694, 3.568]].forEach(([pct, col, fx, px, bx]) => {
+    ell(s, fx + 0.06, 4.63, 0.24, 0.24, col);
+    rrect(s, fx + 0.02, 4.9, 0.33, 0.55, col, 0.08);
+    txt(s, pct, px, 4.671, 0.75, 0.404, { fontSize: 24, bold: true, color: col });
+    body(s, 'Lorem ipsum dolor sit amet', bx, 5.068, 1.69, 0.454, { fontSize: 9, color: C.ink50 });
+  });
+}
+
+// slide 56 - USA map: state abbreviations sit on the blobs
+const USA_LABELS = [
+  ['WA', 4.89, 2.19, 10], ['OR', 4.83, 2.92, 10], ['CA', 4.95, 4.22, 10], ['NV', 5.35, 3.79, 10], ['ID', 5.75, 2.95, 10],
+  ['MT', 6.43, 2.27, 10], ['WY', 6.68, 3.11, 10, 1], ['UT', 6.14, 3.83, 10], ['AZ', 6.14, 4.67, 10], ['CO', 6.96, 3.85, 10],
+  ['NM', 6.91, 4.65, 10], ['ND', 7.72, 2.18, 10], ['SD', 7.76, 2.83, 10], ['NE', 7.86, 3.4, 10], ['KS', 8.02, 3.98, 10],
+  ['OK', 8.23, 4.52, 10], ['TX', 7.98, 5.17, 10, 1], ['MN', 8.54, 2.45, 10], ['IA', 8.77, 3.29, 10, 1], ['MO', 8.82, 3.99, 10],
+  ['AR', 8.87, 4.6, 10], ['LA', 8.86, 5.12, 10], ['WI', 9.24, 2.78, 10], ['IL', 9.37, 3.66, 10], ['MS', 9.25, 4.93, 10],
+  ['MI', 10.0, 3.07, 10], ['IN', 9.82, 3.66, 10], ['KY', 9.98, 4.14, 10], ['TN', 9.72, 4.44, 10], ['AL', 9.71, 4.95, 10],
+  ['GA', 10.17, 4.96, 10], ['OH', 10.25, 3.66, 10], ['WA', 10.55, 3.95, 7], ['NC', 10.81, 4.46, 10], ['SC', 10.57, 4.77, 10],
+  ['FL', 10.49, 5.82, 10], ['VA', 10.9, 4.16, 7, 1], ['PA', 10.83, 3.49, 7], ['NY', 11.36, 3.15, 7], ['ME', 12.25, 2.66, 7],
+  ['VT', 11.76, 2.86, 6], ['NH', 11.9, 2.99, 6], ['MA', 11.82, 3.23, 6], ['CT', 11.76, 3.37, 6], ['RI', 11.97, 3.46, 6],
+  ['NJ', 11.48, 3.73, 6], ['MD', 11.23, 3.85, 6],
+];
+
+function slide56(s) {
+  mapBlobs(s, 56);
+  s.addText([
+    { text: 'USA ', options: { color: C.orange } },
+    { text: 'MAP', options: { color: C.gold } },
+  ], { x: 5.409, y: 0.378, w: 2.516, h: 0.606, align: 'center', fontSize: 36, fontFace: XBOLD, margin: 0 });
+  mapLabels(s, USA_LABELS.map(([t, x, y, sz, w]) => [t, x, y, 0.2, 0.18, sz, w]));
+  mapLabels(s, [['Alaska', 2.09, 2.41, 0.63, 0.24, 14], ['Hawaii', 3.54, 5.59, 0.66, 0.24, 14], ['Washington', 11.65, 4.07, 1.2, 0.24, 14]]);
+  // location pin near Washington
+  ell(s, 11.033, 3.58, 0.229, 0.229, C.green);
+  s.addShape('triangle', { x: 11.053, y: 3.74, w: 0.19, h: 0.24, fill: { color: C.green }, line: { type: 'none' }, flipV: true });
+}
+
+// ------------------------------------------------------------------ main --
+const BUILDERS = [
+  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
+  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
+  slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29, slide30,
+  slide31, slide32, slide33, slide34, slide35, slide36, slide37, slide38, slide39, slide40,
+  slide41, slide42, slide43, slide44, slide45, slide46, slide47, slide48, slide49, slide50,
+  slide51, slide52, slide53, slide54, slide55, slide56,
+];
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'WIDE', width: 13.333, height: 7.5 });
+  pptx.layout = 'WIDE';
+  pptx.theme = { headFontFace: FONT, bodyFontFace: FONT };
+  BUILDERS.forEach((fn) => {
+    const s = pptx.addSlide();
+    s.background = { color: C.bg };
+    fn(s);
+  });
+  return pptx.writeFile({ fileName: path.join(__dirname, '144a6105-db22-4237-8f53-7bb5be4d5b4e_grok_final.pptx') });
+}
+
+build().then((f) => console.log('wrote', f)).catch((e) => { console.error(e); process.exit(1); });
