@@ -1,0 +1,28 @@
+--- 2026-10-18_10-47:/home/box/sand-data/managed-skills/skills/shopping/SKILL.md
++++ 2026-10-18_17-49:/home/box/sand-data/managed-skills/skills/shopping/SKILL.md
+@@ -70,14 +70,23 @@
+ 5. Get the pick. If the user delegated with exact criteria and one product clearly wins, choose it, say why, and still show it before checkout.
+ 6. Check variants. Size, color, quantity, pack count, and subscription versus one-time purchase change the price. For the product the user is choosing, have the subagent read each option combination its page offers, with that combination's price, stock, image URL, and page URL;
+  on a store with no site playbook, the page script from step 1 returns them as a product group's variants. Ask with a question widget when the user did not specify and the options are real;
+- otherwise take the default and say so. When more than one variant is open, ask about them together in one short message instead of one question at a time.
++ otherwise take the default and say so. A saved size (see Sizes and preferences) answers the size question only, so still ask about any other open variant. When more than one variant is open, ask about them together in one short message instead of one question at a time.
+ 7. Add to cart. For several items, repeat the search, compare, and add cycle, then review once.
+ 8. Review the cart from a screenshot, then send the user the cart summary: one line per item with the product as a link, its brand, the variant (size, color, pack count), quantity, unit price, and the seller when it is not the store itself, then the subtotal, shipping, tax, and total as far as the page shows them, with the cart screenshot attached at its saved path. When the cart changes, send a fresh summary so the latest one always matches the cart.
+ 9. Shipping address. Reuse the account's saved address when memory or the page confirms it is the right one. If the page needs an address typed and the Cursor-managed `vault` skill is in your catalog, follow that skill: use the user's saved contact, and ask for only what it lacks with `RequestUserForm` kind "contact". Without that skill, ask with `RequestUserForm`, with fields targeted at the live checkout page. Confirm the chosen address with the user before you continue.
+ 10. Ask about a promo code before the final page if the checkout has a field for one and the user has not mentioned one.
+ 11. Reach the final review page. Screenshot it. Check the subtotal, tax, shipping, and total against what you presented.
+ 12. Pay (see Paying and confirming).
+-13. Screenshot the order confirmation and report the order number, the total charged, and the delivery estimate. Save a stated preference (a default retailer, a size) with `UpdateMemory` only when the user confirmed it.
++13. Screenshot the order confirmation and report the order number, the total charged, and the delivery estimate. Save any size or preference you learned along the way that is not in memory yet (see Sizes and preferences).
++
++## Sizes and preferences
++
++The user should not have to repeat a size or a brand rule they already told you.
++
++- Before you ask for a size, check the Memory section for their size in this brand, then their general size for this kind of item. Use what is saved and say which entry you used ("your usual Aritzia M"). Ask only when nothing is saved or the brand's size chart says this item runs differently.
++- Brands size differently, so keep fit per brand and item type ("Levi's 501 jeans: 32x30", "Nike running shoes run small, size up half"), not one size for everything.
++- When the user states a size, a fit note, a brand they like or avoid, a default retailer, or a material or ingredient rule, save it with `UpdateMemory`, one fact per entry with the brand and item type. Then name what you saved in one short line of your next message ("Saved: Nike running shoes, 10.5"), even when the rest of the reply is about something else, so they can tell you not to keep it. If they do, remove it.
++- A new size replaces the old one for that brand and item type, whether the user simply states it or says the last one did not fit (then wait until they confirm the new size). Before you write it, remove every older entry for that brand and item type in the Memory section, so memory never holds two sizes for the same brand and item.
+ 
+ ## Presenting choices
+ 

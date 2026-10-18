@@ -1,0 +1,246 @@
+--- 2026-10-18_10-47:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
++++ 2026-10-18_17-49:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
+@@ -385,8 +385,10 @@
+ var LEGACY_SAND_BOX_REFERENCE_DIR = `${SAND_BOX_HOME_DIR}/sand-reference`;
+ var DEBUGGING_THE_BOX_FILE = "debugging-the-box.md";
+ var SAND_APP_UI_FILE = "app-ui.md";
++var SAND_APP_ACTIONS_FILE = "app-actions.md";
+ var SAND_BOX_DEBUGGING_REFERENCE_PATH = `${SAND_BOX_REFERENCE_DIR}/${DEBUGGING_THE_BOX_FILE}`;
+ var SAND_APP_UI_REFERENCE_PATH = `${SAND_BOX_REFERENCE_DIR}/${SAND_APP_UI_FILE}`;
++var SAND_APP_ACTIONS_REFERENCE_PATH = `${SAND_BOX_REFERENCE_DIR}/${SAND_APP_ACTIONS_FILE}`;
+ function readUserDataDirArg(argv) {
+   for (let i = 0; i < argv.length; i++) {
+     const arg = argv[i];
+@@ -16236,6 +16238,7 @@
+     this.updatedAtMs = protoInt64.zero;
+     this.ownerSessionId = "";
+     this.version = protoInt64.zero;
++    this.tag = "";
+     proto3.util.initPartial(data, this);
+   }
+   static fromBinary(bytes, options) {
+@@ -16251,7 +16254,7 @@
+     return proto3.util.equals(_TrackedTaskView, a, b);
+   }
+   static $() {
+-    return ["TrackedTaskView|1 key 9|2 title 9|3 status_id 9|4 status_label 9|5 owner 9|6 parent_key 9|7 links #0*|8 updated_at_ms 4|9 owner_session_id 9|10 version 4", TrackedTaskLinkView];
++    return ["TrackedTaskView|1 key 9|2 title 9|3 status_id 9|4 status_label 9|5 owner 9|6 parent_key 9|7 links #0*|8 updated_at_ms 4|9 owner_session_id 9|10 version 4|11 tag 9", TrackedTaskLinkView];
+   }
+ };
+ var TrackedTaskStatusView = class _TrackedTaskStatusView extends __protoMessage372 {
+@@ -16279,6 +16282,31 @@
+     return ["TrackedTaskStatusView|1 id 9|2 label 9|3 category 9|4 task_count 13"];
+   }
+ };
++var TrackedTaskTagView = class _TrackedTaskTagView extends __protoMessage372 {
++  constructor(data) {
++    super();
++    this.id = "";
++    this.label = "";
++    this.color = "";
++    this.taskCount = 0;
++    proto3.util.initPartial(data, this);
++  }
++  static fromBinary(bytes, options) {
++    return new _TrackedTaskTagView().fromBinary(bytes, options);
++  }
++  static fromJson(jsonValue, options) {
++    return new _TrackedTaskTagView().fromJson(jsonValue, options);
++  }
++  static fromJsonString(jsonString, options) {
++    return new _TrackedTaskTagView().fromJsonString(jsonString, options);
++  }
++  static equals(a, b) {
++    return proto3.util.equals(_TrackedTaskTagView, a, b);
++  }
++  static $() {
++    return ["TrackedTaskTagView|1 id 9|2 label 9|3 color 9|4 task_count 13"];
++  }
++};
+ var TrackedTaskMemberView = class _TrackedTaskMemberView extends __protoMessage372 {
+   constructor(data) {
+     super();
+@@ -16337,6 +16365,7 @@
+     this.truncated = false;
+     this.matchingCount = 0;
+     this.message = "";
++    this.tags = [];
+     proto3.util.initPartial(data, this);
+   }
+   static fromBinary(bytes, options) {
+@@ -16352,7 +16381,7 @@
+     return proto3.util.equals(_ListTrackedTasksSuccess, a, b);
+   }
+   static $() {
+-    return ["ListTrackedTasksSuccess|1 tasks #0*|2 statuses #1*|3 members #2*|4 older_closed_count 13|5 truncated 8|6 matching_count 13|7 message 9", TrackedTaskView, TrackedTaskStatusView, TrackedTaskMemberView];
++    return ["ListTrackedTasksSuccess|1 tasks #0*|2 statuses #1*|3 members #2*|4 older_closed_count 13|5 truncated 8|6 matching_count 13|7 message 9|8 tags #3*", TrackedTaskView, TrackedTaskStatusView, TrackedTaskMemberView, TrackedTaskTagView];
+   }
+ };
+ var ListTrackedTasksError = class _ListTrackedTasksError extends __protoMessage372 {
+@@ -16440,7 +16469,7 @@
+     return proto3.util.equals(_NewTrackedTask, a, b);
+   }
+   static $() {
+-    return ["NewTrackedTask|1 client_ref 9?|2 title 9|3 status 9?|4 owner 9?|5 parent 9?|6 links #0*", TrackedTaskLinkInput];
++    return ["NewTrackedTask|1 client_ref 9?|2 title 9|3 status 9?|4 owner 9?|5 parent 9?|6 links #0*|7 tag 9?", TrackedTaskLinkInput];
+   }
+ };
+ var CreateTrackedTasksArgs = class _CreateTrackedTasksArgs extends __protoMessage372 {
+@@ -16622,7 +16651,7 @@
+     return proto3.util.equals(_TrackedTaskUpdate, a, b);
+   }
+   static $() {
+-    return ["TrackedTaskUpdate|1 key 9|2 title 9?|3 status 9?|4 owner 9?|5 parent 9?|6 position #0?|7 add_links #1*|8 remove_links #1*|9 version 4", TrackedTaskPosition, TrackedTaskLinkInput];
++    return ["TrackedTaskUpdate|1 key 9|2 title 9?|3 status 9?|4 owner 9?|5 parent 9?|6 position #0?|7 add_links #1*|8 remove_links #1*|9 version 4|10 tag 9?", TrackedTaskPosition, TrackedTaskLinkInput];
+   }
+ };
+ var UpdateTrackedTasksArgs = class _UpdateTrackedTasksArgs extends __protoMessage372 {
+@@ -17035,6 +17064,139 @@
+     return ["UpdateTrackedTaskStatusesToolCall|1 args #0|2 result #1", UpdateTrackedTaskStatusesArgs, UpdateTrackedTaskStatusesResult];
+   }
+ };
++var TrackedTaskTagInput = class _TrackedTaskTagInput extends __protoMessage372 {
++  constructor(data) {
++    super();
++    this.label = "";
++    proto3.util.initPartial(data, this);
++  }
++  static fromBinary(bytes, options) {
++    return new _TrackedTaskTagInput().fromBinary(bytes, options);
++  }
++  static fromJson(jsonValue, options) {
++    return new _TrackedTaskTagInput().fromJson(jsonValue, options);
++  }
++  static fromJsonString(jsonString, options) {
++    return new _TrackedTaskTagInput().fromJsonString(jsonString, options);
++  }
++  static equals(a, b) {
++    return proto3.util.equals(_TrackedTaskTagInput, a, b);
++  }
++  static $() {
++    return ["TrackedTaskTagInput|1 id 9?|2 label 9|3 color 9?"];
++  }
++};
++var UpdateTrackedTaskTagsArgs = class _UpdateTrackedTaskTagsArgs extends __protoMessage372 {
++  constructor(data) {
++    super();
++    this.toolCallId = "";
++    this.tags = [];
++    proto3.util.initPartial(data, this);
++  }
++  static fromBinary(bytes, options) {
++    return new _UpdateTrackedTaskTagsArgs().fromBinary(bytes, options);
++  }
++  static fromJson(jsonValue, options) {
++    return new _UpdateTrackedTaskTagsArgs().fromJson(jsonValue, options);
++  }
++  static fromJsonString(jsonString, options) {
++    return new _UpdateTrackedTaskTagsArgs().fromJsonString(jsonString, options);
++  }
++  static equals(a, b) {
++    return proto3.util.equals(_UpdateTrackedTaskTagsArgs, a, b);
++  }
++  static $() {
++    return ["UpdateTrackedTaskTagsArgs|1 tool_call_id 9|2 tags #0*", TrackedTaskTagInput];
++  }
++};
++var UpdateTrackedTaskTagsSuccess = class _UpdateTrackedTaskTagsSuccess extends __protoMessage372 {
++  constructor(data) {
++    super();
++    this.tags = [];
++    this.message = "";
++    proto3.util.initPartial(data, this);
++  }
++  static fromBinary(bytes, options) {
++    return new _UpdateTrackedTaskTagsSuccess().fromBinary(bytes, options);
++  }
++  static fromJson(jsonValue, options) {
++    return new _UpdateTrackedTaskTagsSuccess().fromJson(jsonValue, options);
++  }
++  static fromJsonString(jsonString, options) {
++    return new _UpdateTrackedTaskTagsSuccess().fromJsonString(jsonString, options);
++  }
++  static equals(a, b) {
++    return proto3.util.equals(_UpdateTrackedTaskTagsSuccess, a, b);
++  }
++  static $() {
++    return ["UpdateTrackedTaskTagsSuccess|1 tags #0*|2 message 9", TrackedTaskTagView];
++  }
++};
++var UpdateTrackedTaskTagsError = class _UpdateTrackedTaskTagsError extends __protoMessage372 {
++  constructor(data) {
++    super();
++    this.error = "";
++    proto3.util.initPartial(data, this);
++  }
++  static fromBinary(bytes, options) {
++    return new _UpdateTrackedTaskTagsError().fromBinary(bytes, options);
++  }
++  static fromJson(jsonValue, options) {
++    return new _UpdateTrackedTaskTagsError().fromJson(jsonValue, options);
++  }
++  static fromJsonString(jsonString, options) {
++    return new _UpdateTrackedTaskTagsError().fromJsonString(jsonString, options);
++  }
++  static equals(a, b) {
++    return proto3.util.equals(_UpdateTrackedTaskTagsError, a, b);
++  }
++  static $() {
++    return ["UpdateTrackedTaskTagsError|1 error 9"];
++  }
++};
++var UpdateTrackedTaskTagsResult = class _UpdateTrackedTaskTagsResult extends __protoMessage372 {
++  constructor(data) {
++    super();
++    this.result = { case: void 0 };
++    proto3.util.initPartial(data, this);
++  }
++  static fromBinary(bytes, options) {
++    return new _UpdateTrackedTaskTagsResult().fromBinary(bytes, options);
++  }
++  static fromJson(jsonValue, options) {
++    return new _UpdateTrackedTaskTagsResult().fromJson(jsonValue, options);
++  }
++  static fromJsonString(jsonString, options) {
++    return new _UpdateTrackedTaskTagsResult().fromJsonString(jsonString, options);
++  }
++  static equals(a, b) {
++    return proto3.util.equals(_UpdateTrackedTaskTagsResult, a, b);
++  }
++  static $() {
++    return ["UpdateTrackedTaskTagsResult|1 success #0 result|2 error #1 result", UpdateTrackedTaskTagsSuccess, UpdateTrackedTaskTagsError];
++  }
++};
++var UpdateTrackedTaskTagsToolCall = class _UpdateTrackedTaskTagsToolCall extends __protoMessage372 {
++  constructor(data) {
++    super();
++    proto3.util.initPartial(data, this);
++  }
++  static fromBinary(bytes, options) {
++    return new _UpdateTrackedTaskTagsToolCall().fromBinary(bytes, options);
++  }
++  static fromJson(jsonValue, options) {
++    return new _UpdateTrackedTaskTagsToolCall().fromJson(jsonValue, options);
++  }
++  static fromJsonString(jsonString, options) {
++    return new _UpdateTrackedTaskTagsToolCall().fromJsonString(jsonString, options);
++  }
++  static equals(a, b) {
++    return proto3.util.equals(_UpdateTrackedTaskTagsToolCall, a, b);
++  }
++  static $() {
++    return ["UpdateTrackedTaskTagsToolCall|1 args #0|2 result #1", UpdateTrackedTaskTagsArgs, UpdateTrackedTaskTagsResult];
++  }
++};
+ 
+ // ../packages/proto/dist/generated/agent/v1/cloud_canvas_tool_pb.js
+ var __protoPackage74 = "agent.v1.";
+@@ -19788,7 +19950,7 @@
+     return proto3.util.equals(_ToolCall, a, b);
+   }
+   static $() {
+-    return ["ToolCall|1 shell_tool_call #0 tool|3 delete_tool_call #1 tool|4 glob_tool_call #2 tool|5 grep_tool_call #3 tool|8 read_tool_call #4 tool|9 update_todos_tool_call #5 tool|10 read_todos_tool_call #6 tool|12 edit_tool_call #7 tool|13 ls_tool_call #8 tool|14 read_lints_tool_call #9 tool|15 mcp_tool_call #10 tool|16 sem_search_tool_call #11 tool|17 create_plan_tool_call #12 tool|18 web_search_tool_call #13 tool|19 task_tool_call #14 tool|20 list_mcp_resources_tool_call #15 tool|21 read_mcp_resource_tool_call #16 tool|22 apply_agent_diff_tool_call #17 tool|23 ask_question_tool_call #18 tool|24 fetch_tool_call #19 tool|25 switch_mode_tool_call #20 tool|28 generate_image_tool_call #21 tool|29 record_screen_tool_call #22 tool|30 computer_use_tool_call #23 tool|31 write_shell_stdin_tool_call #24 tool|32 reflect_tool_call #25 tool|33 setup_vm_environment_tool_call #26 tool|34 truncated_tool_call #27 tool|35 start_grind_execution_tool_call #28 tool|36 start_grind_planning_tool_call #29 tool|37 web_fetch_tool_call #30 tool|38 report_bugfix_results_tool_call #31 tool|39 ai_attribution_tool_call #32 tool|40 pr_management_tool_call #33 tool|41 mcp_auth_tool_call #34 tool|42 await_tool_call #35 tool|43 blame_by_file_path_tool_call #36 tool|44 get_mcp_tools_tool_call #37 tool|45 report_bug_tool_call #38 tool|46 set_active_branch_tool_call #39 tool|48 communicate_update_tool_call #40 tool|49 send_final_summary_tool_call #41 tool|51 replace_env_tool_call #42 tool|52 edit_pr_labels_tool_call #43 tool|53 record_ci_investigation_findings_tool_call #44 tool|55 send_message_tool_call #45 tool|56 fetch_cloud_agent_data_tool_call #46 tool|58 send_to_user_tool_call #47 tool|61 pi_read_tool_call #48 tool|62 pi_bash_tool_call #49 tool|63 pi_edit_tool_call #50 tool|64 pi_write_tool_call #51 tool|65 pi_grep_tool_call #52 tool|66 pi_find_tool_call #53 tool|67 pi_ls_tool_call #54 tool|68 connect_scm_tool_call #55 tool|69 search_conversations_tool_call #56 tool|70 create_goal_tool_call #57 tool|71 update_goal_tool_call #58 tool|73 get_agent_status_tool_call #59 tool|74 send_to_agent_tool_call #60 tool|75 read_agent_transcript_tool_call #61 tool|76 create_agent_tool_call #62 tool|77 stop_agent_tool_call #63 tool|79 write_canvas_tool_call #64 tool|80 read_canvas_tool_call #65 tool|81 generate_video_tool_call #66 tool|82 x_search_tool_call #67 tool|83 get_origin_pr_code_tour_tool_call #68 tool|84 update_origin_pr_code_tour_tool_call #69 tool|85 list_tracked_tasks_tool_call #70 tool|86 create_tracked_tasks_tool_call #71 tool|87 update_tracked_tasks_tool_call #72 tool|88 delete_tracked_tasks_tool_call #73 tool|89 update_tracked_task_statuses_tool_call #74 tool|90 create_project_tool_call #75 tool|54 hook_additional_contexts #76*|57 tool_call_id 9?|59 started_at_ms 4?|60 completed_at_ms 4?", ShellToolCall, DeleteToolCall, GlobToolCall, GrepToolCall, ReadToolCall, UpdateTodosToolCall, ReadTodosToolCall, EditToolCall, LsToolCall, ReadLintsToolCall, McpToolCall, SemSearchToolCall, CreatePlanToolCall, WebSearchToolCall, TaskToolCall, ListMcpResourcesToolCall, ReadMcpResourceToolCall, ApplyAgentDiffToolCall, AskQuestionToolCall, FetchToolCall, SwitchModeToolCall, GenerateImageToolCall, RecordScreenToolCall, ComputerUseToolCall, WriteShellStdinToolCall, ReflectToolCall, SetupVmEnvironmentToolCall, TruncatedToolCall, StartGrindExecutionToolCall, StartGrindPlanningToolCall, WebFetchToolCall, ReportBugfixResultsToolCall, AiAttributionToolCall, PrManagementToolCall, McpAuthToolCall, AwaitToolCall, BlameByFilePathToolCall, GetMcpToolsToolCall, ReportBugToolCall, SetActiveBranchToolCall, CommunicateUpdateToolCall, SendFinalSummaryToolCall, ReplaceEnvToolCall, EditPrLabelsToolCall, RecordCiInvestigationFindingsToolCall, SendMessageToolCall, FetchCloudAgentDataToolCall, SendToUserToolCall, PiReadToolCall, PiBashToolCall, PiEditToolCall, PiWriteToolCall, PiGrepToolCall, PiFindToolCall, PiLsToolCall, ConnectScmToolCall, SearchConversationsToolCall, CreateGoalToolCall, UpdateGoalToolCall, GetAgentStatusToolCall, SendToAgentToolCall, ReadAgentTranscriptToolCall, CreateAgentToolCall, StopAgentToolCall, WriteCanvasToolCall, ReadCanvasToolCall, GenerateVideoToolCall, XSearchToolCall, GetPrCodeTourToolCall, UpdatePrCodeTourToolCall, ListTrackedTasksToolCall, CreateTrackedTasksToolCall, UpdateTrackedTasksToolCall, DeleteTrackedTasksToolCall, UpdateTrackedTaskStatusesToolCall, CreateProjectToolCall, HookAdditionalContext];
++    return ["ToolCall|1 shell_tool_call #0 tool|3 delete_tool_call #1 tool|4 glob_tool_call #2 tool|5 grep_tool_call #3 tool|8 read_tool_call #4 tool|9 update_todos_tool_call #5 tool|10 read_todos_tool_call #6 tool|12 edit_tool_call #7 tool|13 ls_tool_call #8 tool|14 read_lints_tool_call #9 tool|15 mcp_tool_call #10 tool|16 sem_search_tool_call #11 tool|17 create_plan_tool_call #12 tool|18 web_search_tool_call #13 tool|19 task_tool_call #14 tool|20 list_mcp_resources_tool_call #15 tool|21 read_mcp_resource_tool_call #16 tool|22 apply_agent_diff_tool_call #17 tool|23 ask_question_tool_call #18 tool|24 fetch_tool_call #19 tool|25 switch_mode_tool_call #20 tool|28 generate_image_tool_call #21 tool|29 record_screen_tool_call #22 tool|30 computer_use_tool_call #23 tool|31 write_shell_stdin_tool_call #24 tool|32 reflect_tool_call #25 tool|33 setup_vm_environment_tool_call #26 tool|34 truncated_tool_call #27 tool|35 start_grind_execution_tool_call #28 tool|36 start_grind_planning_tool_call #29 tool|37 web_fetch_tool_call #30 tool|38 report_bugfix_results_tool_call #31 tool|39 ai_attribution_tool_call #32 tool|40 pr_management_tool_call #33 tool|41 mcp_auth_tool_call #34 tool|42 await_tool_call #35 tool|43 blame_by_file_path_tool_call #36 tool|44 get_mcp_tools_tool_call #37 tool|45 report_bug_tool_call #38 tool|46 set_active_branch_tool_call #39 tool|48 communicate_update_tool_call #40 tool|49 send_final_summary_tool_call #41 tool|51 replace_env_tool_call #42 tool|52 edit_pr_labels_tool_call #43 tool|53 record_ci_investigation_findings_tool_call #44 tool|55 send_message_tool_call #45 tool|56 fetch_cloud_agent_data_tool_call #46 tool|58 send_to_user_tool_call #47 tool|61 pi_read_tool_call #48 tool|62 pi_bash_tool_call #49 tool|63 pi_edit_tool_call #50 tool|64 pi_write_tool_call #51 tool|65 pi_grep_tool_call #52 tool|66 pi_find_tool_call #53 tool|67 pi_ls_tool_call #54 tool|68 connect_scm_tool_call #55 tool|69 search_conversations_tool_call #56 tool|70 create_goal_tool_call #57 tool|71 update_goal_tool_call #58 tool|73 get_agent_status_tool_call #59 tool|74 send_to_agent_tool_call #60 tool|75 read_agent_transcript_tool_call #61 tool|76 create_agent_tool_call #62 tool|77 stop_agent_tool_call #63 tool|79 write_canvas_tool_call #64 tool|80 read_canvas_tool_call #65 tool|81 generate_video_tool_call #66 tool|82 x_search_tool_call #67 tool|83 get_origin_pr_code_tour_tool_call #68 tool|84 update_origin_pr_code_tour_tool_call #69 tool|85 list_tracked_tasks_tool_call #70 tool|86 create_tracked_tasks_tool_call #71 tool|87 update_tracked_tasks_tool_call #72 tool|88 delete_tracked_tasks_tool_call #73 tool|89 update_tracked_task_statuses_tool_call #74 tool|90 create_project_tool_call #75 tool|91 update_tracked_task_tags_tool_call #76 tool|54 hook_additional_contexts #77*|57 tool_call_id 9?|59 started_at_ms 4?|60 completed_at_ms 4?", ShellToolCall, DeleteToolCall, GlobToolCall, GrepToolCall, ReadToolCall, UpdateTodosToolCall, ReadTodosToolCall, EditToolCall, LsToolCall, ReadLintsToolCall, McpToolCall, SemSearchToolCall, CreatePlanToolCall, WebSearchToolCall, TaskToolCall, ListMcpResourcesToolCall, ReadMcpResourceToolCall, ApplyAgentDiffToolCall, AskQuestionToolCall, FetchToolCall, SwitchModeToolCall, GenerateImageToolCall, RecordScreenToolCall, ComputerUseToolCall, WriteShellStdinToolCall, ReflectToolCall, SetupVmEnvironmentToolCall, TruncatedToolCall, StartGrindExecutionToolCall, StartGrindPlanningToolCall, WebFetchToolCall, ReportBugfixResultsToolCall, AiAttributionToolCall, PrManagementToolCall, McpAuthToolCall, AwaitToolCall, BlameByFilePathToolCall, GetMcpToolsToolCall, ReportBugToolCall, SetActiveBranchToolCall, CommunicateUpdateToolCall, SendFinalSummaryToolCall, ReplaceEnvToolCall, EditPrLabelsToolCall, RecordCiInvestigationFindingsToolCall, SendMessageToolCall, FetchCloudAgentDataToolCall, SendToUserToolCall, PiReadToolCall, PiBashToolCall, PiEditToolCall, PiWriteToolCall, PiGrepToolCall, PiFindToolCall, PiLsToolCall, ConnectScmToolCall, SearchConversationsToolCall, CreateGoalToolCall, UpdateGoalToolCall, GetAgentStatusToolCall, SendToAgentToolCall, ReadAgentTranscriptToolCall, CreateAgentToolCall, StopAgentToolCall, WriteCanvasToolCall, ReadCanvasToolCall, GenerateVideoToolCall, XSearchToolCall, GetPrCodeTourToolCall, UpdatePrCodeTourToolCall, ListTrackedTasksToolCall, CreateTrackedTasksToolCall, UpdateTrackedTasksToolCall, DeleteTrackedTasksToolCall, UpdateTrackedTaskStatusesToolCall, CreateProjectToolCall, UpdateTrackedTaskTagsToolCall, HookAdditionalContext];
+   }
+ };
+ var TruncatedToolCallArgs = class _TruncatedToolCallArgs extends __protoMessage381 {

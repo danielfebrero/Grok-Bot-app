@@ -1,0 +1,13 @@
+--- 2026-10-18_10-47:/opt/sand/sand-host/extensions/content-search/search-index-worker.cjs
++++ 2026-10-18_17-49:/opt/sand/sand-host/extensions/content-search/search-index-worker.cjs
+@@ -548,8 +548,10 @@
+ var LEGACY_SAND_BOX_REFERENCE_DIR = `${SAND_BOX_HOME_DIR}/sand-reference`;
+ var DEBUGGING_THE_BOX_FILE = "debugging-the-box.md";
+ var SAND_APP_UI_FILE = "app-ui.md";
++var SAND_APP_ACTIONS_FILE = "app-actions.md";
+ var SAND_BOX_DEBUGGING_REFERENCE_PATH = `${SAND_BOX_REFERENCE_DIR}/${DEBUGGING_THE_BOX_FILE}`;
+ var SAND_APP_UI_REFERENCE_PATH = `${SAND_BOX_REFERENCE_DIR}/${SAND_APP_UI_FILE}`;
++var SAND_APP_ACTIONS_REFERENCE_PATH = `${SAND_BOX_REFERENCE_DIR}/${SAND_APP_ACTIONS_FILE}`;
+ function readUserDataDirArg(argv) {
+   for (let i = 0; i < argv.length; i++) {
+     const arg = argv[i];
