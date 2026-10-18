@@ -9,6 +9,20 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-18 09:47 (Paris) — snapshot `2026-10-17_23-51` → `2026-10-18_09-47`
+
+**Installation de nouveaux paquets APT (client OpenSSH + support FIDO2/clé de sécurité)** : trois paquets Debian ajoutés — `openssh-client 1:10.0p1-7+deb13u4`, `libfido2-1 1.15.0-1+b1`, `libcbor0.10 0.10.2-2`. `libfido2` + `libcbor` sont les dépendances de l'authentification FIDO2/U2F (clés de sécurité `ed25519-sk`/`ecdsa-sk`) qu'`openssh-client` tire. Aucune version de composant runtime ne bouge : image `e94d68c`, box-scripts `e94d68c`, sand-host `dfa5e11`, exec-daemon (buildTimestamp `2026-10-16T18:31:37Z`), orbitd, canvas-sdk, agent-store-fuse `83859fd…`, Chrome 155.0.8059.84, Node 22.14.0/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers périmètre : +0 / −0 / ~0 (changement vu uniquement dans `meta/dpkg-packages.txt`).
+
+- **Bugfix** : —
+- **Change** : —
+- **Features** : **`openssh-client`** installé sur la box (commande `ssh`/`scp`/`ssh-keygen` disponibles) avec support des clés de sécurité FIDO2/U2F via `libfido2-1` + `libcbor0.10`.
+- **Perf** : —
+- **Autre/infra** : 3 paquets APT ajoutés (`openssh-client`, `libfido2-1`, `libcbor0.10`), aucun paquet retiré ni mis à niveau, aucun autre composant runtime touché.
+
+Rapport : [reports/2026-10-18_09-47.md](reports/2026-10-18_09-47.md).
+
+---
+
 ## 2026-10-17 23:51 (Paris) — snapshot `2026-10-17_22-49` → `2026-10-17_23-51`
 
 **Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` `agent-store-fuse-x64-950c523…-bk.tar.gz` → `…-83859fd…-bk.tar.gz` (commit `950c523ed958e35438ef498efd2692b2889d3cac` → `83859fd850b7319f60c5f707fa4bf87e3b454128`). Image `e94d68c`, box-scripts `e94d68c`, sand-host `dfa5e11`, exec-daemon, orbitd, canvas-sdk, Chrome 155.0.8059.84, Node, Python, Debian inchangés. Fichiers : +0 / −0 / ~1.
@@ -130,7 +144,6 @@ Rapport : [reports/2026-10-17_04-53.md](reports/2026-10-17_04-53.md).
 
 Rapport : [reports/2026-10-17_00-49.md](reports/2026-10-17_00-49.md).
 
-
 ## 2026-10-16 20:52 (Paris) — snapshot `2026-10-16_19-51` → `2026-10-16_20-52`
 
 **Hot-update du host bundle** : **sand-host** `ab82d14` → `e94d68c` (`upgrade-e94d68c`) ; agent-store-fuse `2b14739` → `6b0d3f3` (pointeur `/usr/local/bin/cursor_agent_store_fuse_version`). Image `885e54d`, exec-daemon, orbitd, Chrome 155.0.8059.84, Node, Python inchangés. Fichiers : +0 / −0 / ~6.
@@ -142,7 +155,6 @@ Rapport : [reports/2026-10-17_00-49.md](reports/2026-10-17_00-49.md).
 - **Autre/infra** : rebuilds `host-main.cjs` / `sand-eval-runner.cjs` ; bump fuse opaque.
 
 Rapport : [reports/2026-10-16_20-52.md](reports/2026-10-16_20-52.md).
-
 
 ## 2026-10-16 19:51 (Paris) — snapshot `2026-10-16_17-51` → `2026-10-16_19-51`
 
@@ -156,7 +168,6 @@ Rapport : [reports/2026-10-16_20-52.md](reports/2026-10-16_20-52.md).
 
 Rapport : [reports/2026-10-16_19-51.md](reports/2026-10-16_19-51.md).
 
-
 ## 2026-10-16 17:51 (Paris) — snapshot `2026-10-16_16-48` → `2026-10-16_17-51`
 
 **Hot-update du host bundle** : **sand-host** `885e54d` → `c24203b` (`upgrade-c24203b`). Image `885e54d`, fuse `2b14739`, exec-daemon, orbitd, Chrome, Node, Python inchangés. Fichiers : +0 / −0 / ~4.
@@ -168,7 +179,6 @@ Rapport : [reports/2026-10-16_19-51.md](reports/2026-10-16_19-51.md).
 - **Autre/infra** : host `0.72.0-pre.41` → `0.72.0-pre.42` ; retrait gates identité durable / PlanetScale / Temporal create (symbols). Rebuilds `host-main` / `sand-eval-runner`.
 
 Rapport : [reports/2026-10-16_17-51.md](reports/2026-10-16_17-51.md).
-
 
 ## 2026-10-16 16:48 (Paris) — snapshot `2026-10-16_13-52` → `2026-10-16_16-48`
 
@@ -182,7 +192,6 @@ Rapport : [reports/2026-10-16_17-51.md](reports/2026-10-16_17-51.md).
 
 Rapport : [reports/2026-10-16_16-48.md](reports/2026-10-16_16-48.md).
 
-
 ## 2026-10-16 13:52 (Paris) — snapshot `2026-10-16_10-54` → `2026-10-16_13-52`
 
 Versions touchées : agent-store-fuse `c466eee` → `fa2b05b` (pointeur `/usr/local/bin/cursor_agent_store_fuse_version`) ; image `4098fb0`, sand-host `885e54d`, exec-daemon, orbitd, Chrome, Node, Python inchangés. Fichiers : +0 / −0 / ~1.
@@ -194,7 +203,6 @@ Versions touchées : agent-store-fuse `c466eee` → `fa2b05b` (pointeur `/usr/lo
 - **Autre/infra** : bump agent-store-fuse (rebuild opaque / oscillation du pin S3). Seul le fichier de version change.
 
 Rapport : [reports/2026-10-16_13-52.md](reports/2026-10-16_13-52.md).
-
 
 ## 2026-10-16 10:54 (Paris) — snapshot `2026-10-16_09-48` → `2026-10-16_10-54`
 
@@ -208,7 +216,6 @@ Rapport : [reports/2026-10-16_13-52.md](reports/2026-10-16_13-52.md).
 
 Rapport : [reports/2026-10-16_10-54.md](reports/2026-10-16_10-54.md).
 
-
 ## 2026-10-16 09:48 (Paris) — snapshot `2026-10-16_06-51` → `2026-10-16_09-48`
 
 Versions touchées : agent-store-fuse `32d54e6` → `c466eee` (pointeur `/usr/local/bin/cursor_agent_store_fuse_version`) ; image `4098fb0`, sand-host `701b86e`, exec-daemon, orbitd, Chrome, Node, Python inchangés. Fichiers : +0 / −0 / ~1.
@@ -220,7 +227,6 @@ Versions touchées : agent-store-fuse `32d54e6` → `c466eee` (pointeur `/usr/lo
 - **Autre/infra** : bump agent-store-fuse (rebuild opaque / oscillation du pin S3). Seul le fichier de version change.
 
 Rapport : [reports/2026-10-16_09-48.md](reports/2026-10-16_09-48.md).
-
 
 ## 2026-10-16 06:51 (Paris) — snapshot `2026-10-16_05-47` → `2026-10-16_06-51`
 
@@ -234,7 +240,6 @@ Versions touchées : agent-store-fuse `2d5462d` → `32d54e6` (pointeur `/usr/lo
 
 Rapport : [reports/2026-10-16_06-51.md](reports/2026-10-16_06-51.md).
 
-
 ## 2026-10-16 05:47 (Paris) — snapshot `2026-10-16_03-49` → `2026-10-16_05-47`
 
 Versions touchées : agent-store-fuse `916fd2f` → `2d5462d` (pointeur `/usr/local/bin/cursor_agent_store_fuse_version`) ; image `4098fb0`, sand-host `701b86e`, exec-daemon, orbitd, Chrome, Node, Python inchangés. Fichiers : +0 / −0 / ~1.
@@ -247,7 +252,6 @@ Versions touchées : agent-store-fuse `916fd2f` → `2d5462d` (pointeur `/usr/lo
 
 Rapport : [reports/2026-10-16_05-47.md](reports/2026-10-16_05-47.md).
 
-
 ## 2026-10-16 03:49 (Paris) — snapshot `2026-10-16_02-50` → `2026-10-16_03-49`
 
 Versions touchées : agent-store-fuse `67b6811` → `916fd2f` (pointeur `/usr/local/bin/cursor_agent_store_fuse_version`) ; image `4098fb0`, sand-host `701b86e`, exec-daemon, orbitd, Chrome, Node, Python inchangés. Fichiers : +0 / −0 / ~1.
@@ -259,7 +263,6 @@ Versions touchées : agent-store-fuse `67b6811` → `916fd2f` (pointeur `/usr/lo
 - **Autre/infra** : bump agent-store-fuse (rebuild opaque / oscillation du pin S3). Seul le fichier de version change.
 
 Rapport : [reports/2026-10-16_03-49.md](reports/2026-10-16_03-49.md).
-
 
 ## 2026-10-16 02:50 (Paris) — snapshot `2026-10-16_00-49` → `2026-10-16_02-50`
 
@@ -285,7 +288,6 @@ Versions touchées : agent-store-fuse `b64fcb3` → `49b7f26` (pointeur `/usr/lo
 
 Rapport : [reports/2026-10-16_00-49.md](reports/2026-10-16_00-49.md).
 
-
 ## 2026-10-15 23:46 (Paris) — snapshot `2026-10-15_20-47` → `2026-10-15_23-46`
 
 Versions touchées : agent-store-fuse `6bd47b6` → `b64fcb3` (pointeur `/usr/local/bin/cursor_agent_store_fuse_version`) ; image `4098fb0`, sand-host `701b86e`, exec-daemon, orbitd, Chrome, Node, Python inchangés. Fichiers : +0 / −0 / ~1.
@@ -297,7 +299,6 @@ Versions touchées : agent-store-fuse `6bd47b6` → `b64fcb3` (pointeur `/usr/lo
 - **Autre/infra** : bump agent-store-fuse (rebuild opaque / oscillation du pin S3). Seul le fichier de version change.
 
 Rapport : [reports/2026-10-15_23-46.md](reports/2026-10-15_23-46.md).
-
 
 ## 2026-10-15 20:47 (Paris) — snapshot `2026-10-15_18-45` → `2026-10-15_20-47`
 
@@ -311,7 +312,6 @@ Versions touchées : agent-store-fuse `a5f7c61` → `6bd47b6` (pointeur `/usr/lo
 
 Rapport : [reports/2026-10-15_20-47.md](reports/2026-10-15_20-47.md).
 
-
 ## 2026-10-15 18:45 (Paris) — snapshot `2026-10-15_17-46` → `2026-10-15_18-45`
 
 Versions touchées : agent-store-fuse `f624c0a` → `a5f7c61` (pointeur `/usr/local/bin/cursor_agent_store_fuse_version`) ; image `4098fb0`, sand-host `701b86e`, exec-daemon, orbitd, Chrome, Node, Python inchangés. Fichiers : +0 / −0 / ~1.
@@ -323,7 +323,6 @@ Versions touchées : agent-store-fuse `f624c0a` → `a5f7c61` (pointeur `/usr/lo
 - **Autre/infra** : bump agent-store-fuse (rebuild opaque / oscillation du pin, comme les snapshots précédents). Seul le fichier de version change.
 
 Rapport : [reports/2026-10-15_18-45.md](reports/2026-10-15_18-45.md).
-
 
 ## 2026-10-15 17:46 (Paris) — snapshot `2026-10-15_12-51` → `2026-10-15_17-46`
 
@@ -349,7 +348,6 @@ Versions touchées : **image** `726deab` → `4098fb0` (box scripts idem) ; exec
 
 Rapport : [reports/2026-10-15_12-51.md](reports/2026-10-15_12-51.md).
 
-
 ## 2026-10-15 10:54 (Paris) — snapshot `2026-10-15_07-46` → `2026-10-15_10-54`
 
 Versions touchées : agent-store-fuse `0c3b083` → `7516de1` (pointeur `/usr/local/bin/cursor_agent_store_fuse_version`) ; **nouveau support WebAuthn / FIDO2 côté box**. image `726deab`, sand-host `4098fb0`, exec-daemon, orbitd, Chrome 154.0.8037.97, Node, Python inchangés. Fichiers : +0 / −0 / ~2.
@@ -361,7 +359,6 @@ Versions touchées : agent-store-fuse `0c3b083` → `7516de1` (pointeur `/usr/lo
 - **Autre/infra** : bump agent-store-fuse (rebuild opaque / oscillation du pin, comme les snapshots précédents).
 
 Rapport : [reports/2026-10-15_10-54.md](reports/2026-10-15_10-54.md).
-
 
 ## 2026-10-15 07:46 (Paris) — snapshot `2026-10-15_06-52` → `2026-10-15_07-46`
 
@@ -375,7 +372,6 @@ Versions touchées : agent-store-fuse `51fd48b` → `0c3b083` (pointeur `/usr/lo
 
 Rapport : [reports/2026-10-15_07-46.md](reports/2026-10-15_07-46.md).
 
-
 ## 2026-10-15 06:52 (Paris) — snapshot `2026-10-15_02-52` → `2026-10-15_06-52`
 
 Versions touchées : agent-store-fuse `b811a50` → `51fd48b` (pointeur `/usr/local/bin/cursor_agent_store_fuse_version` vers la nouvelle archive) ; image `726deab`, sand-host `4098fb0`, exec-daemon, orbitd, Chrome, Node, Python inchangés. Fichiers : +0 / −0 / ~1.
@@ -387,7 +383,6 @@ Versions touchées : agent-store-fuse `b811a50` → `51fd48b` (pointeur `/usr/lo
 - **Autre/infra** : nouveau build agent-store-fuse (rebuild opaque / oscillation du pin, classement hypothétique). Seul le fichier de version change : le binaire `cursor-agent-store-fuse` garde le **même hash** (`47779169…`) que dans les snapshots `19:48`, `20:51`, `21:45`, `22:54`, `00:50`, `01:49` et `02:52`.
 
 Rapport : [reports/2026-10-15_06-52.md](reports/2026-10-15_06-52.md).
-
 
 ## 2026-10-15 02:52 (Paris) — snapshot `2026-10-15_01-49` → `2026-10-15_02-52`
 
@@ -401,7 +396,6 @@ Versions touchées : agent-store-fuse `791571b` → `b811a50` (pointeur `/usr/lo
 
 Rapport : [reports/2026-10-15_02-52.md](reports/2026-10-15_02-52.md).
 
-
 ## 2026-10-15 01:49 (Paris) — snapshot `2026-10-15_00-50` → `2026-10-15_01-49`
 
 Versions touchées : agent-store-fuse `0c0f4a8` → `791571b` (pointeur `/usr/local/bin/cursor_agent_store_fuse_version` vers la nouvelle archive) ; image `726deab`, sand-host `4098fb0`, exec-daemon, orbitd, Chrome, Node, Python inchangés. Fichiers : +0 / −0 / ~1.
@@ -413,7 +407,6 @@ Versions touchées : agent-store-fuse `0c0f4a8` → `791571b` (pointeur `/usr/lo
 - **Autre/infra** : nouveau build agent-store-fuse (rebuild opaque / oscillation du pin, classement hypothétique). Seul le fichier de version change : le binaire `cursor-agent-store-fuse` garde le **même hash** (`47779169…`) que dans les snapshots `19:48`, `20:51`, `21:45`, `22:54` et `00:50`.
 
 Rapport : [reports/2026-10-15_01-49.md](reports/2026-10-15_01-49.md).
-
 
 ## 2026-10-15 00:50 (Paris) — snapshot `2026-10-14_22-54` → `2026-10-15_00-50`
 
