@@ -9,6 +9,20 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-18 17:49 (Paris) — snapshot `2026-10-18_10-47` → `2026-10-18_17-49`
+
+**Hot-update sand-host `dfa5e11` → `fcbae14`** (commande superviseur `upgrade-fcbae14`, sans Update de l'ordinateur) + skill gérée `shopping` mise à jour. Image `e94d68c`, box-scripts `e94d68c`, exec-daemon (buildTimestamp `2026-10-16T18:31:37Z`), orbitd, canvas-sdk, agent-store-fuse `ceef14e…`, Chrome 155.0.8059.84, Node 22.14.0/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~8.
+
+- **Bugfix** : —
+- **Change** : skill gérée `shopping` — nouvelle section « Sizes and preferences » : taille/marque/préférences lues en mémoire avant de demander, sauvegardées automatiquement par marque et type d'article (`UpdateMemory`, une entrée par fait, annoncée en une ligne), une nouvelle taille remplace l'ancienne ; une taille sauvée ne répond qu'à la question de taille (les autres variantes restent demandées). Remplace l'ancienne règle « sauver seulement si l'utilisateur confirme ». `managed-skills/cache.json` rafraîchi.
+- **Features** : **tags sur les tâches suivies (tracked tasks)** — `TrackedTaskView`/`NewTrackedTask`/`TrackedTaskUpdate` gagnent un champ `tag`, nouveau message `TrackedTaskTagView` (id, label, color, task_count), `ListTrackedTasksSuccess` renvoie `tags`, et nouvel outil **`UpdateTrackedTaskTags`** (`TrackedTaskTagInput`, Args/Success/Error/Result/ToolCall) dans `host-main.cjs` et `agent-isolation/agent-store-worker.cjs`. Nouvelle constante de référence **`/home/box/reference/app-actions.md`** (`SAND_APP_ACTIONS_REFERENCE_PATH`) à côté d'`app-ui.md` et `debugging-the-box.md` — fichier pas encore présent sur la box au moment du snapshot.
+- **Perf** : —
+- **Autre/infra** : `sand-eval-runner.cjs` re-bundlé (renommages d'identifiants esbuild, +~107 Ko) ; `box-store-vacuum-worker.cjs` et `search-index-worker.cjs` ne gagnent que la constante `app-actions.md`.
+
+Rapport : [reports/2026-10-18_17-49.md](reports/2026-10-18_17-49.md).
+
+---
+
 ## 2026-10-18 10:47 (Paris) — snapshot `2026-10-18_09-47` → `2026-10-18_10-47`
 
 **Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` `agent-store-fuse-x64-83859fd…-bk.tar.gz` → `…-ceef14e…-bk.tar.gz` (commit `83859fd850b7319f60c5f707fa4bf87e3b454128` → `ceef14e97398202da50cc3ce8a9bb64959d5de4c`). Image `e94d68c`, box-scripts `e94d68c`, sand-host `dfa5e11`, exec-daemon, orbitd, canvas-sdk, Chrome 155.0.8059.84, Node, Python, Debian inchangés. Fichiers : +0 / −0 / ~1.
