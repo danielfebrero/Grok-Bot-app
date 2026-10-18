@@ -9,6 +9,20 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-18 10:47 (Paris) — snapshot `2026-10-18_09-47` → `2026-10-18_10-47`
+
+**Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` `agent-store-fuse-x64-83859fd…-bk.tar.gz` → `…-ceef14e…-bk.tar.gz` (commit `83859fd850b7319f60c5f707fa4bf87e3b454128` → `ceef14e97398202da50cc3ce8a9bb64959d5de4c`). Image `e94d68c`, box-scripts `e94d68c`, sand-host `dfa5e11`, exec-daemon, orbitd, canvas-sdk, Chrome 155.0.8059.84, Node, Python, Debian inchangés. Fichiers : +0 / −0 / ~1.
+
+- **Bugfix** : —
+- **Change** : —
+- **Features** : —
+- **Perf** : —
+- **Autre/infra** : bump binaire agent-store-fuse (nouvelle révision du tarball S3), aucun autre composant touché.
+
+Rapport : [reports/2026-10-18_10-47.md](reports/2026-10-18_10-47.md).
+
+---
+
 ## 2026-10-18 09:47 (Paris) — snapshot `2026-10-17_23-51` → `2026-10-18_09-47`
 
 **Installation de nouveaux paquets APT (client OpenSSH + support FIDO2/clé de sécurité)** : trois paquets Debian ajoutés — `openssh-client 1:10.0p1-7+deb13u4`, `libfido2-1 1.15.0-1+b1`, `libcbor0.10 0.10.2-2`. `libfido2` + `libcbor` sont les dépendances de l'authentification FIDO2/U2F (clés de sécurité `ed25519-sk`/`ecdsa-sk`) qu'`openssh-client` tire. Aucune version de composant runtime ne bouge : image `e94d68c`, box-scripts `e94d68c`, sand-host `dfa5e11`, exec-daemon (buildTimestamp `2026-10-16T18:31:37Z`), orbitd, canvas-sdk, agent-store-fuse `83859fd…`, Chrome 155.0.8059.84, Node 22.14.0/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers périmètre : +0 / −0 / ~0 (changement vu uniquement dans `meta/dpkg-packages.txt`).
