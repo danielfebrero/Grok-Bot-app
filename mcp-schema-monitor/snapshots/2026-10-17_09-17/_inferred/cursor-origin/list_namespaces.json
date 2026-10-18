@@ -1,0 +1,43 @@
+{
+  "namespace": "cursor-origin",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-17T09:15:56+02:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "namespaces": {
+          "items": {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "slug": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "viewerCanCreateRepositories": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "slug",
+              "type",
+              "viewerCanCreateRepositories"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "namespaces"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "list_namespaces"
+}

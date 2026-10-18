@@ -1,0 +1,59 @@
+{
+  "namespace": "cursor-github",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-18T09:19:17+02:00",
+    "responseKind": "json",
+    "schema": {
+      "items": {
+        "properties": {
+          "additions": {
+            "type": "integer"
+          },
+          "blob_url": {
+            "type": "string"
+          },
+          "changes": {
+            "type": "integer"
+          },
+          "contents_url": {
+            "type": "string"
+          },
+          "deletions": {
+            "type": "integer"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "patch": {
+            "type": "string"
+          },
+          "raw_url": {
+            "type": "string"
+          },
+          "sha": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "additions",
+          "blob_url",
+          "changes",
+          "contents_url",
+          "deletions",
+          "filename",
+          "patch",
+          "raw_url",
+          "sha",
+          "status"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "source": "inferred"
+  },
+  "tool": "list_pull_request_files"
+}

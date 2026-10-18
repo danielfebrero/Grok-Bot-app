@@ -1,0 +1,34 @@
+{
+  "description": "Search Users The search string is query, not q. Usernames it returns are 1 to 15 letters, digits or underscores.",
+  "inputSchema": {
+    "properties": {
+      "expansions": {
+        "description": "A comma separated list of fields to expand.",
+        "type": "string"
+      },
+      "max_results": {
+        "type": "integer"
+      },
+      "next_token": {
+        "type": "string"
+      },
+      "post.fields": {
+        "description": "A comma separated list of Post fields to display.",
+        "type": "string"
+      },
+      "query": {
+        "type": "string"
+      },
+      "user.fields": {
+        "description": "A comma separated list of User fields to display.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "search_users"
+}

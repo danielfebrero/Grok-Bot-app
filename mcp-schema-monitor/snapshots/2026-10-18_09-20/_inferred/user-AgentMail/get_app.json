@@ -1,0 +1,59 @@
+{
+  "namespace": "user-AgentMail",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-18T09:20:12+02:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "appId": {
+          "type": "string"
+        },
+        "categories": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "description": {
+          "type": "string"
+        },
+        "logoUrl": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "ownerSignupLimit": {
+          "type": "integer"
+        },
+        "privacyUrl": {
+          "type": "string"
+        },
+        "slug": {
+          "type": "string"
+        },
+        "termsUrl": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "appId",
+        "categories",
+        "description",
+        "logoUrl",
+        "name",
+        "ownerSignupLimit",
+        "privacyUrl",
+        "slug",
+        "termsUrl",
+        "updatedAt"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "get_app"
+}

@@ -1,0 +1,17 @@
+{
+  "description": "Create webhook",
+  "inputSchema": {
+    "properties": {
+      "url": {
+        "description": "The URL the webhook delivers events to.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "url"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "create_webhooks"
+}

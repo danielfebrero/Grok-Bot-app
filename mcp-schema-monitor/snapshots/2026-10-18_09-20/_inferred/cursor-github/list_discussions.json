@@ -1,0 +1,146 @@
+{
+  "namespace": "cursor-github",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-18T09:19:17+02:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "repository": {
+          "properties": {
+            "discussions": {
+              "properties": {
+                "nodes": {
+                  "items": {
+                    "properties": {
+                      "answerChosenAt": {
+                        "type": "null"
+                      },
+                      "author": {
+                        "properties": {
+                          "login": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "login"
+                        ],
+                        "type": "object"
+                      },
+                      "category": {
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "slug": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "slug"
+                        ],
+                        "type": "object"
+                      },
+                      "closed": {
+                        "type": "boolean"
+                      },
+                      "comments": {
+                        "properties": {
+                          "totalCount": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "totalCount"
+                        ],
+                        "type": "object"
+                      },
+                      "createdAt": {
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "isAnswered": {
+                        "type": [
+                          "boolean",
+                          "null"
+                        ]
+                      },
+                      "number": {
+                        "type": "integer"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "updatedAt": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "answerChosenAt",
+                      "author",
+                      "category",
+                      "closed",
+                      "comments",
+                      "createdAt",
+                      "id",
+                      "isAnswered",
+                      "number",
+                      "title",
+                      "updatedAt",
+                      "url"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "pageInfo": {
+                  "properties": {
+                    "endCursor": {
+                      "type": "string"
+                    },
+                    "hasNextPage": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "endCursor",
+                    "hasNextPage"
+                  ],
+                  "type": "object"
+                },
+                "totalCount": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "nodes",
+                "pageInfo",
+                "totalCount"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "discussions"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "repository"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "list_discussions"
+}

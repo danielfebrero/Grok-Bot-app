@@ -1,0 +1,44 @@
+{
+  "namespace": "user-AgentMail",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-17T09:17:13+02:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "createdAt": {
+          "type": "string"
+        },
+        "direction": {
+          "type": "string"
+        },
+        "entry": {
+          "type": "string"
+        },
+        "entryType": {
+          "type": "string"
+        },
+        "inboxId": {
+          "type": "string"
+        },
+        "listType": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "createdAt",
+        "direction",
+        "entry",
+        "entryType",
+        "inboxId",
+        "listType",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "get_list_entry"
+}

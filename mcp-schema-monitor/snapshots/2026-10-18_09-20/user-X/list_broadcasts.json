@@ -1,0 +1,24 @@
+{
+  "description": "List broadcasts",
+  "inputSchema": {
+    "properties": {
+      "broadcast.fields": {
+        "description": "A comma separated list of Broadcast fields to display.",
+        "type": "string"
+      },
+      "ids": {
+        "description": "Comma-separated broadcast IDs to retrieve instead of listing broadcasts.",
+        "type": "string"
+      },
+      "max_results": {
+        "type": "integer"
+      },
+      "pagination_token": {
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "list_broadcasts"
+}

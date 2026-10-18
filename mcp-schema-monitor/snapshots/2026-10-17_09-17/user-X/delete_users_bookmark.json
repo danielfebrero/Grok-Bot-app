@@ -1,0 +1,20 @@
+{
+  "description": "Delete Bookmark",
+  "inputSchema": {
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "tweet_id": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "tweet_id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "delete_users_bookmark"
+}

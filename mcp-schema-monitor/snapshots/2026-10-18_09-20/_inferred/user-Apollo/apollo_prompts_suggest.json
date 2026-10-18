@@ -1,0 +1,13 @@
+{
+  "namespace": "user-Apollo",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-14T16:24:10+02:00",
+    "responseKind": "text",
+    "schema": {
+      "contentMediaType": "text/plain",
+      "type": "string"
+    },
+    "source": "inferred"
+  },
+  "tool": "apollo_prompts_suggest"
+}

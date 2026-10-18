@@ -1,0 +1,95 @@
+{
+  "namespace": "cursor-origin",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-18T09:20:12+02:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "author": {
+          "properties": {
+            "date": {
+              "type": "string"
+            },
+            "email": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "date",
+            "email",
+            "name"
+          ],
+          "type": "object"
+        },
+        "committer": {
+          "properties": {
+            "date": {
+              "type": "string"
+            },
+            "email": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "date",
+            "email",
+            "name"
+          ],
+          "type": "object"
+        },
+        "message": {
+          "type": "string"
+        },
+        "parents": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "sha": {
+          "type": "string"
+        },
+        "stats": {
+          "properties": {
+            "additions": {
+              "type": "integer"
+            },
+            "deletions": {
+              "type": "integer"
+            },
+            "total": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "additions",
+            "deletions",
+            "total"
+          ],
+          "type": "object"
+        },
+        "tree": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "author",
+        "committer",
+        "message",
+        "parents",
+        "sha",
+        "stats",
+        "tree"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "commit_read"
+}
