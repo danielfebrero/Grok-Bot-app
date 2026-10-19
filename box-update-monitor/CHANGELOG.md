@@ -23,6 +23,20 @@ Rapport : [reports/2026-10-19_18-11.md](reports/2026-10-19_18-11.md).
 
 ---
 
+## 2026-10-19 17:45 (Paris) — snapshot `2026-10-19_17-01` → `2026-10-19_17-45`
+
+**Hot-update sand-host `fcbae14` → `9d2ac1b`** (commande superviseur `upgrade-9d2ac1b`, sans Update de l'ordinateur). Image `fcbae14`, box-scripts `fcbae14`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, agent-store-fuse `3710b68…`, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +2 / −0 / ~14.
+
+- **Bugfix** : `agent-store-worker.cjs` — le salvage SQLite « in place » refuse désormais les liens symboliques dans `sand-data` (hook `afterLinkCheck` + `refuseSandDataDatabaseLinksSync`) avant d'ouvrir la base : durcissement de l'isolation des stores. `start-desktop.sh` — isolation du desktop : `PYTHONNOUSERSITE=1` (websockify ne charge plus un site Python utilisateur restauré par un copy-in), `x11vnc -norc` et `picom --config /dev/null` (ignore tout fichier de conf utilisateur). `box-plank` passe `python3 -I` (mode isolé).
+- **Change** : skill gérée `purchases` — **X Money devient le wallet par défaut** : quand il est connecté on paie avec, sauf si Dani nomme Stripe Link ou sa propre carte ; si X Money est installé mais `needsAuth`, on `AuthenticateMcpServer` dans le même tour (connexion en un tap) au lieu de le proposer ; un appel « X Money non connecté » = rien débité, reconnecter puis retenter une fois. `managed-skills/cache.json` rafraîchi. Rebuild des gros bundles `host-main.cjs` (30,34→30,41 Mo), `sand-eval-runner.cjs`, `officekit-ts/lib/office.mjs`, `pdf-worker.js`.
+- **Features** : **cohérence géo du navigateur via l'IP d'egress** — deux nouveaux scripts `box-scripts/sand-egress-timezone.mjs` (+291, résout pays/région/fuseau depuis l'IP de sortie via des providers géo en HTTP/TLS) et `box-scripts/sand-locale-match.mjs` (+192, table `PRINCIPAL_TIME_ZONES` par code pays + helpers `isKnownTimeZone`/`resolveTimeZone`/`parseZoneTab`). `sand-ua-governor.mjs` élargi (+253/−47) pour aligner fuseau/locale du navigateur sur la localisation d'egress. Nouvelles constantes de contrat `BROWSER_EGRESS_TIMEZONE_MARKER_PATH` (`/tmp/sand-browser-egress-timezone`) et `TAILNET_HOST_SUFFIXES_PATH` (`/var/lib/sand/tailnet/host-suffixes`) dans `box-contract.generated.mjs`.
+- **Perf** : —
+- **Autre/infra** : `sand-cookie-persist.mjs` étendu (+64/−5) ; `box-launchers/box-chrome` retravaillé (+107/−21, suite du durcissement d'isolation des profils).
+
+Rapport : [reports/2026-10-19_17-45.md](reports/2026-10-19_17-45.md).
+
+---
+
 ## 2026-10-19 12:49 (Paris) — snapshot `2026-10-19_07-48` → `2026-10-19_12-49`
 
 **Patch LOCAL du lanceur `box-chrome` (édit agent « Infra », pas une mise à jour plateforme)** + bump agent-store-fuse + 3 nouveaux paquets Debian installés à chaud. La version de sand-host ne change pas (`fcbae14`), seul le fichier `/opt/sand/sand-host/box-launchers/box-chrome` a été réécrit sur place (mtime 12:35). Image `fcbae14`, box-scripts `fcbae14`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~2.
