@@ -1,0 +1,17 @@
+{
+  "description": "Add a chat moderator",
+  "inputSchema": {
+    "properties": {
+      "user_id": {
+        "description": "The user to appoint as a moderator.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "user_id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "add_chat_moderator"
+}

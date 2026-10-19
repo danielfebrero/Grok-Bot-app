@@ -1,0 +1,34 @@
+{
+  "description": "List scheduled calls",
+  "inputSchema": {
+    "properties": {
+      "end_time": {
+        "description": "Calls starting before this time (RFC 3339). Defaults to 24 hours after start_time.",
+        "type": "string"
+      },
+      "expansions": {
+        "description": "A comma separated list of fields to expand.",
+        "type": "string"
+      },
+      "max_results": {
+        "description": "The most calls to return. Defaults to 20.",
+        "type": "integer"
+      },
+      "scheduled_call.fields": {
+        "description": "A comma separated list of ScheduledCall fields to display.",
+        "type": "string"
+      },
+      "start_time": {
+        "description": "Calls still running at this time or starting after it (RFC 3339). Defaults to now.",
+        "type": "string"
+      },
+      "user.fields": {
+        "description": "A comma separated list of User fields to display.",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "list_scheduled_calls"
+}

@@ -8,7 +8,7 @@
    },
    "cadence": "weekly",
    "category": "a",
-   "reason": "non lancé : un crawl consomme plusieurs crédits ; à jouer en hebdo",
+   "reason": "réponse d'erreur Tavily le 2026-10-19 (endpoint non supporté sans clé API : keyless = Search et Extract) ; schéma non conservé",
    "status": "not-run"
   },
   "tavily_extract": {
@@ -19,7 +19,7 @@
    },
    "cadence": "weekly",
    "category": "a",
-   "reason": "réponse d'erreur Tavily (extraction refusée), retentée chaque semaine",
+   "reason": "réponse d'erreur Tavily le 2026-10-19 (plafond mensuel keyless atteint) ; retentée chaque semaine",
    "status": "not-run"
   },
   "tavily_map": {
@@ -29,7 +29,8 @@
    },
    "cadence": "weekly",
    "category": "a",
-   "status": "executed"
+   "reason": "réponse d'erreur Tavily le 2026-10-19 (endpoint non supporté sans clé API) ; le schéma inféré conservé depuis le 2026-10-14 décrit cette enveloppe d'erreur",
+   "status": "not-run"
   },
   "tavily_research": {
    "cadence": "never",

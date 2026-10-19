@@ -1,0 +1,25 @@
+{
+  "namespace": "cursor-origin",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-19T09:16:14+02:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "limitHit": {
+          "type": "boolean"
+        },
+        "matches": {
+          "items": {},
+          "type": "array"
+        }
+      },
+      "required": [
+        "limitHit",
+        "matches"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "grep_contents"
+}

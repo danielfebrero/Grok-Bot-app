@@ -1,0 +1,14 @@
+{
+  "description": "Get webhook",
+  "inputSchema": {
+    "properties": {
+      "webhook_config.fields": {
+        "description": "A comma separated list of WebhookConfig fields to display.",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_webhooks"
+}

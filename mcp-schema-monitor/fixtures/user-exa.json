@@ -9,7 +9,7 @@
    },
    "cadence": "weekly",
    "category": "a",
-   "reason": "HTTP 429 Exa (rate limit gratuit) après backoff de 5 min ; retenté chaque semaine",
+   "reason": "HTTP 429 Exa (rate limit gratuit) le 2026-10-19, encore après une nouvelle tentative à +5 min ; retenté chaque semaine",
    "status": "not-run"
   },
   "web_search_exa": {
@@ -20,7 +20,7 @@
    },
    "cadence": "weekly",
    "category": "a",
-   "reason": "HTTP 429 Exa (rate limit gratuit) après backoff de 5 min ; retenté chaque semaine",
+   "reason": "HTTP 429 Exa (rate limit gratuit) le 2026-10-19, encore après une nouvelle tentative à +5 min ; retenté chaque semaine",
    "status": "not-run"
   }
  },

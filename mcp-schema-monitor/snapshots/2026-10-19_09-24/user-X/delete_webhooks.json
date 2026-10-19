@@ -1,0 +1,16 @@
+{
+  "description": "Delete webhook",
+  "inputSchema": {
+    "properties": {
+      "webhook_id": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "webhook_id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "delete_webhooks"
+}
