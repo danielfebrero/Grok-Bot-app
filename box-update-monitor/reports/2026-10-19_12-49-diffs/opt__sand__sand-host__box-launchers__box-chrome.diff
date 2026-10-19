@@ -1,0 +1,34 @@
+--- 2026-10-19_07-48:/opt/sand/sand-host/box-launchers/box-chrome
++++ 2026-10-19_12-49:/opt/sand/sand-host/box-launchers/box-chrome
+@@ -35,7 +35,13 @@
+ 			mkdir -p /home/box/chrome-profile
+ 			mv "${LEGACY_CHROME_PROFILE}" "${CHROME_PROFILE}" 2>/dev/null || true
+ 		fi
+-		SAND_CHROME_PROFILE_DIR="${CHROME_PROFILE}" /usr/local/bin/link-chrome-session || true
++		# Infra 2026-10-19: honor .no-session-link guard dropped by the 10-18 update.
++		# A profile carrying this marker (e.g. Fork-6) keeps its own cookies and
++		# is NOT symlinked into the shared Default store. Profiles without it are
++		# unchanged.
++		if [ ! -e "${CHROME_PROFILE}/.no-session-link" ] && [ ! -e "${CHROME_PROFILE}/Default/.no-session-link" ]; then
++			SAND_CHROME_PROFILE_DIR="${CHROME_PROFILE}" /usr/local/bin/link-chrome-session || true
++		fi
+ 	fi
+ else
+ 	CHROME_PROFILE="${CHROME_USER_DATA_DIR:-/home/box/chrome-profile}"
+@@ -283,6 +289,16 @@
+ # that value over the login.
+ restore_cookie_seed() {
+ 	local out
++	# Infra 2026-10-19: dedicated agent-* profiles must stay isolated. The shared
++	# seed (/home/box/sand-data/chrome-cookie-seed.json) is captured from the
++	# primary/Fork jar and would recontaminate @2026xxxxxx with whatever account
++	# lives in that jar (historically @the_notabot). Skip restore for those
++	# profiles; Forks and the primary profile keep the stock behavior.
++	case "${CHROME_PROFILE}" in
++	*/chrome-profile/agent-* | */chrome-profile/agent-*/)
++		return 0
++		;;
++	esac
+ 	[ -s "${SAND_COOKIE_SEED:-}" ] && [ -x "${SAND_COOKIE_NODE:-}" ] && [ -r "${SAND_COOKIE_PERSIST:-}" ] || return 0
+ 	out="$(timeout "${CHROME_COOKIE_RESTORE_WAIT_S:-5}" "${SAND_COOKIE_NODE}" "${SAND_COOKIE_PERSIST}" \
+ 		--restore-port "${CHROME_DEBUG_PORT}" </dev/null 2>&1 9>&-)" || true

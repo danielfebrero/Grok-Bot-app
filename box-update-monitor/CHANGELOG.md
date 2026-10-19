@@ -9,6 +9,20 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-19 12:49 (Paris) — snapshot `2026-10-19_07-48` → `2026-10-19_12-49`
+
+**Patch LOCAL du lanceur `box-chrome` (édit agent « Infra », pas une mise à jour plateforme)** + bump agent-store-fuse + 3 nouveaux paquets Debian installés à chaud. La version de sand-host ne change pas (`fcbae14`), seul le fichier `/opt/sand/sand-host/box-launchers/box-chrome` a été réécrit sur place (mtime 12:35). Image `fcbae14`, box-scripts `fcbae14`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~2.
+
+- **Bugfix** : `box-chrome` — isolation des profils dédiés `agent-*`. `restore_cookie_seed()` saute désormais les profils `*/chrome-profile/agent-*` : le seed partagé (`chrome-cookie-seed.json`, capturé depuis le jar primaire/Fork) ne recontamine plus ces profils avec le compte qui vit dans ce jar (historiquement `@the_notabot`). Forks et profil primaire gardent le comportement d'origine.
+- **Change** : `box-chrome` — respect d'un garde `.no-session-link` (déposé par la mise à jour du 10-18) : un profil portant ce marqueur (ex. Fork-6) à la racine ou dans `Default/` n'est plus symlinké dans le store de session partagé (`Default`) et garde ses propres cookies ; les profils sans marqueur sont inchangés.
+- **Features** : —
+- **Perf** : —
+- **Autre/infra** : pointeur agent-store-fuse `/usr/local/bin/cursor_agent_store_fuse_version` commit `c3100ae2…` → `121487c4…` (rebuild/bump du tarball S3, sans effet de surface). 3 paquets Debian apparus (installés à chaud, image inchangée) : `libcbor0.10` 0.10.2-2, `libfido2-1` 1.15.0-1+b1, `openssh-client` 1:10.0p1-7+deb13u4 — dépendances FIDO2/WebAuthn + client SSH.
+
+Rapport : [reports/2026-10-19_12-49.md](reports/2026-10-19_12-49.md).
+
+---
+
 ## 2026-10-19 03:48 (Paris) — snapshot `2026-10-18_21-50` → `2026-10-19_03-48`
 
 **Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` `agent-store-fuse-x64-ffc4c79…-bk.tar.gz` → `…-fa281da…-bk.tar.gz` (commit `ffc4c79c6e4b888e1e2176a2ea1dd604f0a79816` → `fa281da1c3dd719e0b1c14822ce60a49b99111bc`). Image `e94d68c`, box-scripts `e94d68c`, sand-host `fcbae14`, exec-daemon, orbitd, canvas-sdk, Chrome 155.0.8059.84, Node, Python, Debian inchangés. Fichiers : +0 / −0 / ~1.
