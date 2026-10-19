@@ -1,0 +1,454 @@
+#!/usr/bin/env node
+'use strict';
+
+/**
+ * "artgallery" — 20 slide deck, rebuilt with pptxgenjs.
+ *
+ * Photographs in the source deck are replaced by flat grey rectangles
+ * (`photo()` below); everything else is recreated with native shapes.
+ */
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ─── Deck-wide constants ──────────────────────────────────────────── */
+
+const SLIDE_W = 20;
+const SLIDE_H = 11.25;
+
+const INK = '0C0909'; // near-black: body copy, rules, filled blocks
+const PAPER = 'FFFFFF';
+const PHOTO = '7F7F7F'; // stand-in fill for the deck's photography
+
+const F_MED = 'Inter Tight Medium';
+const F_TIGHT = 'Inter Tight';
+const F_TIGHT_LIGHT = 'Inter Tight Light';
+const F_LIGHT = 'Inter Light';
+
+/* Every text frame in the source deck shares these body properties:
+   top anchored, ~0.1in side / 0.05in vertical insets, "resize shape to fit". */
+const TEXT_BASE = {
+  margin: [7.2, 7.2, 3.6, 3.6], // lIns, rIns, bIns, tIns (points)
+  valign: 'top',
+  fit: 'resize',
+  isTextBox: true,
+};
+
+/* Named text roles, taken straight from the source run properties. */
+const DISPLAY = { fontFace: F_MED, fontSize: 344 }; // cover word-mark
+const TITLE = { fontFace: F_MED, fontSize: 80 };
+const TITLE_SM = { fontFace: F_MED, fontSize: 72 };
+const STAT = { fontFace: F_MED, fontSize: 66 };
+const NUMBER = { fontFace: F_MED, fontSize: 60 };
+const LEAD = { fontFace: F_TIGHT, fontSize: 40 };
+const CTA = { fontFace: F_MED, fontSize: 32 };
+const HEADING = { fontFace: F_MED, fontSize: 24 };
+const FOOT_VALUE = { fontFace: F_TIGHT, fontSize: 24 };
+const CAPTION = { fontFace: F_TIGHT, fontSize: 20 };
+const BODY = { fontFace: F_LIGHT, fontSize: 20, lineSpacingMultiple: 1.5 };
+
+/* The two "go" buttons: black square + white ↗ chevron drawn from 3 strokes. */
+const BTN_LG = { box: 0.991, arrow: 0.353, stroke: 4.5 };
+const BTN_SM = { box: 0.64, arrow: 0.252, stroke: 3.2 };
+const ARROW_HEAD = 0.68; // head arm length, as a fraction of the arrow box
+
+/* ─── Primitive helpers ────────────────────────────────────────────── */
+
+// [x, y, w, h] boxes keep the per-slide code close to the original geometry.
+function text(slide, body, [x, y, w, h], opts) {
+  slide.addText(body, Object.assign({ x, y, w, h }, TEXT_BASE, opts));
+}
+
+// Merge one or more text roles and paint them in the deck's two ink colours.
+function ink(...roles) {
+  return Object.assign({ color: INK }, ...roles);
+}
+
+function paper(...roles) {
+  return Object.assign({ color: PAPER }, ...roles);
+}
+
+// Placeholder for a raster image in the source deck.
+function photo(slide, [x, y, w, h], rotate) {
+  slide.addShape('rect', { x, y, w, h, fill: { color: PHOTO }, rotate: rotate || 0 });
+}
+
+function block(slide, [x, y, w, h], color) {
+  slide.addShape('rect', { x, y, w, h, fill: { color: color || INK } });
+}
+
+function hRule(slide, x, y, w, color, width) {
+  slide.addShape('line', { x, y, w, h: 0, line: { color, width } });
+}
+
+function vRule(slide, x, y, h, color, width) {
+  slide.addShape('line', { x, y, w: 0, h, line: { color, width } });
+}
+
+function arrowButton(slide, x, y, spec) {
+  block(slide, [x, y, spec.box, spec.box]);
+  const a = spec.arrow;
+  const ax = x + (spec.box - a) / 2;
+  const ay = y + (spec.box - a) / 2;
+  const stroke = { color: PAPER, width: spec.stroke };
+  const head = a * ARROW_HEAD;
+  slide.addShape('line', { x: ax, y: ay, w: a, h: a, flipV: true, line: stroke }); // shaft ↗
+  slide.addShape('line', { x: ax + a - head, y: ay, w: head, h: 0, line: stroke }); // head, top arm
+  slide.addShape('line', { x: ax + a, y: ay, w: 0, h: head, line: stroke }); // head, right arm
+}
+
+function newSlide(pptx, dark) {
+  const slide = pptx.addSlide();
+  slide.background = { color: dark ? INK : PAPER };
+  return slide;
+}
+
+/* Cover / closing slides share a footer strip. */
+function coverFooter(slide) {
+  text(slide, 'Follow Us', [0.623, 9.901, 4.888, 0.438], paper(CAPTION, { align: 'left' }));
+  text(slide, 'Instagram | Tiktok | Youtube', [0.623, 10.359, 4.888, 0.505], paper(FOOT_VALUE, { align: 'left' }));
+  text(slide, 'Made with Love', [14.488, 9.901, 4.888, 0.438], paper(CAPTION, { align: 'right' }));
+  text(slide, 'Official Artgallery Corp', [14.488, 10.359, 4.888, 0.505], paper(FOOT_VALUE, { align: 'right' }));
+}
+
+/* number + heading + paragraph, the deck's recurring list item */
+function numberedItem(slide, { num, numX, textX, y, heading, body }) {
+  text(slide, num, [numX, y, 1.404, 1.111], ink(NUMBER));
+  text(slide, heading, [textX, y + 0.148, 4.913, 0.505], ink(HEADING));
+  text(slide, body, [textX, y + 0.79, 7.415, 1.557], ink(BODY));
+}
+
+/* ─── Copy reused across several slides ────────────────────────────── */
+
+const LOREM_SHORT =
+  'Duis diam nullam dis tincidu ornare tincidunt. Sapien tristique mattis taciti placerat curabitur ipsum metus dolor ridicu suam litora duta auctor adipiscing.';
+const LOREM_FRAME =
+  'Duis diam nullam dis tincidu ornare tincidun Sapien tristique mattis taciti cerat curabitur ipsum metus dolor ridicu. Quam litora auctor adipiscing vestibulum proin rhoncus netusa saliquam fermentum ornare dapibus.';
+const HEADING_SPEAKS = 'Art That Speaks Without Words';
+const EYES = 'Beyond What the Eyes Can See';
+
+/* ─── Slide builders ───────────────────────────────────────────────── */
+
+function slide01(pptx) {
+  const s = newSlide(pptx, true);
+  text(s, 'artgallery', [-0.475, -1.189, 20.895, 5.892], paper({ align: 'center' }, DISPLAY));
+  coverFooter(s);
+  photo(s, [5.57, 3.859, 8.468, 5.434], 348.11);
+}
+
+function slide02(pptx) {
+  const s = newSlide(pptx);
+  photo(s, [0, 0, 8.256, 5.302]);
+  photo(s, [8.38, 0, 11.62, 5.302]);
+  text(s, 'Welcome to the world of visuals', [0.956, 6.13, 7.3, 4.14], ink(TITLE));
+  text(
+    s,
+    'Duis diam nullam dis tincidunt ornare tincidunt. Sapien tristique mattis taciti placerat curabitur ipsum metus dolor ridiculus. Quam litora dui id auctor adipiscing vestibulum proin rhoncus netus.',
+    [9.353, 6.314, 9.691, 1.557],
+    ink(BODY)
+  );
+  text(
+    s,
+    [
+      { text: '2K+ ', options: ink(LEAD, { fontFace: F_MED }) },
+      { text: 'Gallery on display', options: ink(LEAD, { fontFace: F_TIGHT_LIGHT }) },
+    ],
+    [9.353, 8.193, 6.211, 0.774],
+    { color: INK }
+  );
+}
+
+function slide03(pptx) {
+  const s = newSlide(pptx);
+  text(s, 'Art That Speaks Without Words', [1.185, 0.901, 10.473, 2.794], ink(TITLE));
+  text(
+    s,
+    'Duis diam nullam dis tincidu ornare tincidunt. Sapien tristique mattis taciti placerat curabitur ipsum metus dolor ridiculus. Quam litora dui id auctor adipiscing vestibulum proin rhoncus netus. Aliquam fermentum ornare dapibus ornare convallis egestas adipiscing nisi. Sollicitudin laore etas egestas sodales.',
+    [1.185, 4.293, 7.337, 3.071],
+    ink(BODY)
+  );
+  photo(s, [10.652, 0.674, 8.739, 4.512]);
+  photo(s, [12.054, 5.397, 7.337, 5.179]);
+}
+
+function slide04(pptx) {
+  const s = newSlide(pptx, true);
+  text(s, 'More Than Just a Gallery, It’s an Experience', [1.185, 0.901, 8.444, 4.14], paper(TITLE));
+  hRule(s, 1.325, 5.937, 1.37, PAPER, 3);
+  text(
+    s,
+    'Duis diam nullam dis tincidu ornare tincidun. Sapien tristique mattis taciti placerat curabitur ipsum metus dolor ridiculus. Quam litora dui id auctor adipiscing vestibulum proin rhoncus netus. Aliquam fermentum ornare dapibus ornare convallis egestas adipiscing nisi. Sollicitudin laore etas egestas sodales.',
+    [3.167, 5.625, 7.337, 3.071],
+    paper(BODY)
+  );
+  photo(s, [11.379, 2.629, 8.283, 8.283]);
+}
+
+function slide05(pptx) {
+  const s = newSlide(pptx);
+  text(s, 'Where Creativity Meets Canvas', [1.185, 0.901, 8.444, 2.794], ink(TITLE));
+  text(
+    s,
+    'Duis diam nullam dis tincidu ornare tincidunt. Sapien tristique mattis taciti placerat curabitur ipsum metus dolor ridiculus. Quam litora dutasa auctor adipiscing vestibu suma proin rhoncus netus. Aliquam fermen tumana ornare dapibus ornare rune convallis egestas adipiscing nisi. Sollicitudin laore etas egestas sodales.',
+    [1.185, 4.089, 5.468, 4.586],
+    ink(BODY)
+  );
+  photo(s, [7.304, 4.089, 5.739, 6.457]);
+
+  // right-hand index: a rule above each entry plus one closing rule
+  const entries = [
+    { label: 'Story Behind Every Stroke', w: 4.338 },
+    { label: HEADING_SPEAKS, w: 4.913 },
+    { label: 'Colors That Speak Louder', w: 4.13 },
+    { label: 'Abstract Everything In Between', w: 4.913 },
+    { label: EYES, w: 4.913 },
+  ];
+  const step = 1.21;
+  entries.forEach((entry, i) => {
+    hRule(s, 13.913, 0.901 + i * step, 5.261, INK, 1.5);
+    text(s, entry.label, [14.261, 1.254 + i * step, entry.w, 0.505], ink(HEADING));
+  });
+  hRule(s, 13.913, 0.901 + entries.length * step, 5.261, INK, 1.5);
+}
+
+function slide06(pptx) {
+  const s = newSlide(pptx, true);
+  text(s, 'The Story Behind Every Stroke', [1.185, 0.901, 8.444, 4.14], paper(TITLE));
+  text(
+    s,
+    'Duis diam nullam dis tincidu ornare tincidunt sapien tristique mattis taciti placerat curabitur ipsum metus dolor ridiculus. Quam litora dui id auctor adipiscing vestibulum proin rhoncus netus. Aliquam fermen tuman ornare dapibus ornare convallis egestas adipis.',
+    [1.185, 5.433, 6.523, 3.071],
+    paper(BODY)
+  );
+  photo(s, [8.884, 2.032, 10.192, 6.802], 346.09);
+}
+
+function slide07(pptx) {
+  const s = newSlide(pptx);
+  text(s, 'Art Through the Eyes of the Artists', [1.185, 0.901, 11.387, 2.794], ink(TITLE));
+  text(
+    s,
+    'Duis diam nullam dis tincidu ornare tincidunt. Sapien tristique mattis taciti placerat curabitur ipsum metus dolor ridiculus. Quam litora dui id auctor adipiscing vestibu proin rhoncus netus Aliquam fermentum ornare art dapibus.',
+    [1.185, 4.089, 6.565, 2.566],
+    ink(BODY)
+  );
+  text(s, '2.490', [1.185, 7.05, 6.211, 1.212], ink(STAT));
+  text(s, EYES, [1.185, 8.269, 4.975, 1.447], ink(LEAD));
+  photo(s, [8.856, 4.112, 5.477, 6.237]);
+  photo(s, [14.523, 4.112, 5.477, 6.237]);
+}
+
+function slide08(pptx) {
+  const s = newSlide(pptx);
+  [1.364, 7.076, 12.788].forEach(x => photo(s, [x, 4.703, 5.455, 5.646]));
+  text(s, 'Colors That Speak Louder Than Words', [1.185, 0.901, 14.93, 2.794], ink(TITLE));
+  block(s, [13.955, 3.601, 6.045, 2.205]);
+  text(s, '85%', [14.729, 4.097, 2.77, 1.212], paper(STAT));
+  text(s, EYES, [16.999, 4.316, 2.487, 0.774], paper(CAPTION));
+}
+
+function slide09(pptx) {
+  const s = newSlide(pptx);
+  photo(s, [9.172, 0.901, 9.644, 3.733]);
+  text(s, 'Abstract, Realism, and Everything In Between', [1.185, 0.901, 7.53, 5.486], ink(TITLE));
+
+  // caption bar over the photo
+  block(s, [9.172, 0.901, 6.438, 1.171]);
+  text(s, '01. Story Behind Every Stroke', [9.641, 1.234, 5.31, 0.505], paper(HEADING));
+
+  // pull quote under the title
+  vRule(s, 1.282, 7.064, 1.402, INK, 2.25);
+  text(
+    s,
+    'Duis diam nullam dis tincidunt ornare tincidunt. Sapien tristique mattis taciti placerat curabitur ipsum metus.',
+    [1.667, 6.916, 5.285, 1.557],
+    ink(BODY)
+  );
+
+  [
+    { num: '02', heading: HEADING_SPEAKS, y: 5.364 },
+    { num: '03', heading: 'Colors That Speak Louder', y: 8.149 },
+  ].forEach(item => {
+    text(s, item.num, [9.172, item.y, 2.926, 1.447], ink(TITLE));
+    text(s, item.heading, [11.22, item.y, 4.913, 0.505], ink(HEADING));
+    text(s, LOREM_SHORT, [11.22, item.y + 0.642, 7.415, 1.557], ink(BODY));
+  });
+}
+
+function slide10(pptx) {
+  const s = newSlide(pptx);
+  photo(s, [11.719, 0.49, 7.647, 10.269]);
+  text(s, 'Step Into the Mind of a Masterpiece', [1.136, 4.901, 10.011, 2.794], ink(TITLE));
+  text(
+    s,
+    'Duis diam nullam dis tincidu ornare tincidunt. Sapien tristiqu mattis taciti placerat curabitur ipsum metus dolor ridiculus. Quam litora us auctor adipiscing vestibulum proin rhoncus netus. Aliquam fermen ornare dapibus ornare convallis egestas adipiscing nisi. ',
+    [1.136, 8.024, 9.279, 2.061],
+    ink(BODY)
+  );
+  block(s, [6.977, 1.43, 6.045, 2.205]);
+  text(s, '85%', [7.752, 1.926, 2.77, 1.212], paper(STAT));
+  text(s, EYES, [10.022, 2.145, 2.487, 0.774], paper(CAPTION));
+}
+
+function slide11(pptx) {
+  const s = newSlide(pptx);
+  text(s, 'When Walls Become Portals to Imagination', [1.185, 0.901, 8.181, 3.736], ink(TITLE_SM));
+  text(
+    s,
+    'Duis diam nullam dis tincidu ornare tincidunt. Sapien tristique mattis taciti placerat curabitur ipsum metus dolor ridiculus. Quam litora dui id auctor adipiscing vestibulum proin rhoncus netus. Aliquam fermentum ornare dapibus ornare convallis egestas.',
+    [1.185, 5.077, 7.337, 2.566],
+    ink(BODY)
+  );
+  [0.628, 5.692].forEach(y => [10.0, 15.07].forEach(x => photo(s, [x, y, 4.93, 4.93])));
+}
+
+function slide12(pptx) {
+  const s = newSlide(pptx);
+  text(s, 'Bridging Cultures Through Art', [1.185, 0.901, 10.084, 2.794], ink(TITLE));
+  [
+    { num: '01', numX: 1.185, textX: 2.589, y: 4.411 },
+    { num: '02', numX: 1.185, textX: 2.589, y: 7.474 },
+    { num: '03', numX: 10.595, textX: 11.999, y: 4.411 },
+    { num: '04', numX: 10.595, textX: 11.999, y: 7.474 },
+  ].forEach(item => numberedItem(s, { ...item, heading: HEADING_SPEAKS, body: LOREM_SHORT }));
+}
+
+function slide13(pptx) {
+  const s = newSlide(pptx);
+  [8.512, 14.195].forEach(x => {
+    photo(s, [x, 0.479, 5.488, 10.293]);
+    arrowButton(s, x, 9.78, BTN_LG);
+  });
+  text(s, 'Timeless Beauty in Every Frame', [1.185, 0.901, 6.815, 4.14], ink(TITLE));
+  text(s, LOREM_FRAME, [1.185, 5.625, 6.303, 2.566], ink(BODY));
+}
+
+function slide14(pptx) {
+  const s = newSlide(pptx);
+  text(s, 'Beyond What the Eyes Can See', [1.185, 1.028, 8.815, 2.794], ink(TITLE));
+  text(
+    s,
+    'Duis diam nullam dis tincidunt ornare tincidunt. Sapien tristique mattis taciti placerat curabitur ipsum metus dolor ridiculus. Quam litora dui id auctor adipiscing vestibulum proin rhoncus aliquam fermentum ornare dapibus canu ornare convallis egestas blandit adipiscing nisi. Sollicitudin laoreet egestas sodales habitas amet metus. Condimentum lobortis libero hac fames accum.',
+    [1.185, 4.37, 9.015, 3.071],
+    ink(BODY)
+  );
+  text(s, 'Discover Now', [1.185, 7.855, 3.587, 0.64], ink(CTA));
+  arrowButton(s, 4.363, 7.855, BTN_SM);
+  [0.333, 3.912, 7.491].forEach(y => photo(s, [11.533, y, 8.067, 3.425]));
+}
+
+function slide15(pptx) {
+  const s = newSlide(pptx);
+  photo(s, [9.742, 0.476, 9.677, 6.935]);
+  arrowButton(s, 9.742, 6.42, BTN_LG);
+  text(
+    s,
+    'Duis diam nullam dis tincidu ornare tincidunt. Sapien tristique mattis taciti placerat curabitur ipsum metus dolor ridiculus. Quam litora dui ida auctor adipiscing vestibulum proin rhoncus netus saliquam.',
+    [1.056, 0.476, 7.337, 2.061],
+    ink(BODY)
+  );
+  text(
+    s,
+    'Duis diam nullam dis tincidu ornare tincidunt. Sapien tristique mattis taciti placerat curabitur ipsum metus dolor ridiculus suam litora auctor adipiscing.',
+    [1.056, 2.797, 7.337, 1.557],
+    ink(BODY)
+  );
+  text(s, 'Discover Now', [1.056, 4.786, 3.587, 0.64], ink(CTA));
+  arrowButton(s, 4.234, 4.786, BTN_SM);
+  text(s, 'Inspiring the Next Generation of Artists', [1.056, 7.476, 11.396, 2.794], ink(TITLE));
+}
+
+function slide16(pptx) {
+  const s = newSlide(pptx);
+  text(s, 'Behind Every Masterpiece, a Visionary', [7.111, 0.901, 11.473, 4.14], ink({ align: 'right' }, TITLE));
+  text(s, LOREM_FRAME, [12.281, 5.357, 6.303, 2.566], ink({ align: 'right' }, BODY));
+  photo(s, [1.091, 1.402, 9.349, 8.475], 352.88);
+}
+
+function slide17(pptx) {
+  const s = newSlide(pptx);
+  text(s, 'Where Art & Community Converge', [1.185, 0.901, 8.815, 4.14], ink(TITLE));
+  text(
+    s,
+    'Duis diam nullam dis tincidunt ornare tincidu sapien tristique mattis taciti placerat curabitur ipsum metus dolor ridiculus. Quam litora auctor covera adipiscing vestibulum proin rhoncus aliquam fermentum ornare dapibus canu artist ornare convallis egestas blandit adipiscing nisi sollicitudin laoret egestas.',
+    [1.181, 5.48, 7.185, 3.071],
+    ink(BODY)
+  );
+  [1.463, 4.377, 7.44].forEach((y, i) =>
+    numberedItem(s, {
+      num: ['01', '02', '03'][i],
+      numX: 10.0,
+      textX: 11.404,
+      y,
+      heading: HEADING_SPEAKS,
+      body: LOREM_SHORT,
+    })
+  );
+}
+
+function slide18(pptx) {
+  const s = newSlide(pptx);
+  photo(s, [13.098, 3.122, 6.245, 7.519]);
+  arrowButton(s, 13.098, 3.122, BTN_LG);
+  text(s, 'Let the Walls Tell Their Stories', [1.185, 0.901, 10.962, 2.794], ink(TITLE));
+  text(
+    s,
+    'Duis diam nullam dis tincidunt ornare tincidunt. Sapien tristique mattis taciti placerat curabitur ipsum metus dolor ridiculus. Quam litora dui idanu aucto adipiscing vestibulum proin rhoncus aliquam fermentum ornare its dapibus canu ornare convallis egestas blandit adipiscing nisata. Sollicitudin laoret egestas sodales habitas amet metus condimentum lobortis libero.',
+    [1.185, 4.385, 5.254, 5.091],
+    ink(BODY)
+  );
+  text(s, '87%', [7.229, 5.226, 3.015, 1.212], ink(STAT));
+  text(
+    s,
+    'Duis diam nullam dis tincidunt ornare tincidunt. Sapien tristique mattis taciti placerat curabitur ipsum metus dolor ridiculus. Quam litora dui iduna auctor adipiscing vestibulum proin rhoncus aliquam ferment umas ornare dapibus canu ornare convallis egestas.',
+    [7.229, 6.56, 5.254, 3.576],
+    ink(BODY)
+  );
+}
+
+function slide19(pptx) {
+  const s = newSlide(pptx);
+  text(s, 'Art That Resonates With You', [1.361, 0.874, 7.028, 4.14], ink(TITLE));
+  text(
+    s,
+    'Duis diam nullam dis tincidunt ornare tincidunt. Sapien tristique mattis taciti placerat curabitur ipsum metus dolor ridiculus. Quam litora dui idanu aucto adipiscing vestibulum proin.',
+    [1.361, 5.286, 5.254, 2.566],
+    ink(BODY)
+  );
+  text(s, 'Discover Now', [1.361, 8.235, 3.587, 0.64], ink(CTA));
+  arrowButton(s, 4.539, 8.235, BTN_SM);
+  photo(s, [8.389, 0.319, 11.194, 10.611]);
+}
+
+function slide20(pptx) {
+  const s = newSlide(pptx, true);
+  text(s, 'Thanks', [2.03, -1.189, 15.939, 5.89], paper({ align: 'center' }, DISPLAY));
+  coverFooter(s);
+  photo(s, [5.57, 3.859, 8.468, 5.434], 348.11);
+}
+
+/* ─── Build & save ─────────────────────────────────────────────────── */
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'ARTGALLERY', width: SLIDE_W, height: SLIDE_H });
+  pptx.layout = 'ARTGALLERY';
+  pptx.title = 'artgallery';
+
+  [
+    slide01, slide02, slide03, slide04, slide05,
+    slide06, slide07, slide08, slide09, slide10,
+    slide11, slide12, slide13, slide14, slide15,
+    slide16, slide17, slide18, slide19, slide20,
+  ].forEach(builder => builder(pptx));
+
+  return pptx;
+}
+
+build()
+  .writeFile({ fileName: path.join(__dirname, '09fcb6bc-424f-4eec-8690-133faf8f65b3_grok_final.pptx') })
+  .then(file => console.log('wrote', file))
+  .catch(err => {
+    console.error(err);
+    process.exit(1);
+  });
