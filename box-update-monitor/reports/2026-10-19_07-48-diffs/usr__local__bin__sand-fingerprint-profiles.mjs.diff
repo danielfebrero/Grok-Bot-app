@@ -1,0 +1,28 @@
+--- 2026-10-19_05-47:/usr/local/bin/sand-fingerprint-profiles.mjs
++++ 2026-10-19_07-48:/usr/local/bin/sand-fingerprint-profiles.mjs
+@@ -74,11 +74,23 @@
+   };
+ }
+ 
+-export function buildUserAgentOverride(product, { acceptLanguageEnUs = false } = {}) {
++const ACCEPT_LANGUAGE_LIST_RE =
++  /^[A-Za-z]{1,8}(?:-[A-Za-z0-9]{1,8})*(?:,[A-Za-z]{1,8}(?:-[A-Za-z0-9]{1,8})*)*$/;
++
++function configuredAcceptLanguage(value) {
++  return typeof value === "string" && value.length <= 128 && ACCEPT_LANGUAGE_LIST_RE.test(value)
++    ? value
++    : "en-US,en-GB,en";
++}
++
++export function buildUserAgentOverride(
++  product,
++  { acceptLanguageEnUs = false, acceptLanguage = "" } = {},
++) {
+   const { major } = chromeProductFromUserAgentProduct(product);
+   return {
+     userAgent: `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${major}.0.0.0 Safari/537.36`,
+-    acceptLanguage: acceptLanguageEnUs ? "en-US,en-GB,en" : "en-US,en",
++    acceptLanguage: acceptLanguageEnUs ? configuredAcceptLanguage(acceptLanguage) : "en-US,en",
+     platform: "Linux x86_64",
+     userAgentMetadata: buildUserAgentMetadata(product, acceptLanguageEnUs),
+   };

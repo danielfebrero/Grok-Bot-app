@@ -1,0 +1,9 @@
+snapshot	2026-10-19_07-48
+created	2026-10-19 07:48:37 CEST
+label	auto: changement détecté (sha:/etc/sand-box-image-sha, sha:/exec-daemon/index.js, sha:/exec-daemon/package.json, sha:/opt/sand/deps/runtime-deps-manifest.json, sha:/usr/local/bin/box-doctor)
+files	15580
+text_copies	3295
+big_text_gz	5
+unreadable	0
+bytes_hashed	1756355898
+duration_s	4.6

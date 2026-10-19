@@ -1,0 +1,17 @@
+--- 2026-10-19_05-47:/opt/sand/deps/sand-devicecheck/package.json
++++ 2026-10-19_07-48:/opt/sand/deps/sand-devicecheck/package.json
+@@ -0,0 +1,14 @@
++{
++  "name": "sand-devicecheck",
++  "version": "1.0.0",
++  "description": "Native DeviceCheck token mint and VM marker read for the Sand desktop app",
++  "main": "index.js",
++  "private": true,
++  "scripts": {
++    "install": "node-gyp rebuild"
++  },
++  "gypfile": true,
++  "dependencies": {
++    "node-addon-api": "^8.0.0"
++  }
++}

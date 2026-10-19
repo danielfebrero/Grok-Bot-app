@@ -1,0 +1,1413 @@
+--- 2026-10-19_05-47:/exec-daemon/index.js
++++ 2026-10-19_07-48:/exec-daemon/index.js
+@@ -43485,7 +43485,14 @@
+ async warmRemoteAccessServer(t,u){
+ return await runControlSpan(t,"exec_daemon.warmRemoteAccessServer",(async t=>{
+ try{
+-return await this.remoteAccessService.warmCursorServer(t,u.commit,u.port,u.connectionToken),new T.Ks}
++const p=u.downloadBaseUrl;
++return await this.remoteAccessService.warmCursorServer(t,u.commit,u.port,u.connectionToken,""===p?{
++}
++:{
++downloadBaseUrl:p,tarballIntegrity:{
++kind:"signed"}
++}
++),new T.Ks}
+ catch(t){
+ throw createInternalError("Failed to warm remote access server",t)}
+ }
+@@ -44333,7 +44340,7 @@
+ ,"./src/setup.ts"(t,u,p){
+ "use strict";
+ p.d(u,{
+-Sg:()=>$n,My:()=>setupDaemon}
++Sg:()=>zn,My:()=>setupDaemon}
+ );
+ var m=p("node:child_process"),g=p("node:crypto"),v=p("node:fs"),b=p("node:os"),S=p.n(b),w=p("node:path"),E=p.n(w),x=p("../agent-exec/dist/index.js"),C=p("../context/dist/logger.js"),T=p("../context/dist/otel.js"),R=p("../utils/dist/workspace-paths.js");
+ function getDataDir(){
+@@ -49380,7 +49387,16 @@
+ p<t;
+ )p+=getWarmCursorServerBackoffMs(u),u++;
+ return u}
+-(3e4);
++(3e4),Pn=/^cloud-agent-artifacts-[0-9a-z-]+-an\.s3[.-][0-9a-z-]+\.amazonaws\.com$/,An=/^s3[.-][0-9a-z-]+\.amazonaws\.com$/;
++function assertTenantDownloadBaseUrl(t){
++let u;
++try{
++u=new URL(t.trim())}
++catch{
++throw new Lr.T("download_base_url is not a valid URL",Fr.C.InvalidArgument)}
++const p=u.pathname.split("/").filter((t=>""!==t))[0]??"",m=p.startsWith("cloud-agent-artifacts-")&&p.endsWith("-an"),g=Pn.test(u.hostname)||An.test(u.hostname)&&m;
++if("https:"!==u.protocol||""!==u.username||""!==u.password||""!==u.port||""!==u.search||""!==u.hash||!g)throw new Lr.T("download_base_url must be an https URL on the tenant artifact bucket host, without a query string",Fr.C.InvalidArgument);
++return u.toString().replace(/\/+$/,"")}
+ class PromiseLock{
+ isLocked=!1;
+ queue=[];
+@@ -49395,12 +49411,12 @@
+ const t=this.queue.shift();
+ t&&t()}
+ }
+-const Pn="tarball-sha256";
++const jn="tarball-sha256";
+ async function recordedTarballSha256(t){
+-return await j().readFile(E().join(t,Pn),"utf8").then((t=>t.trim()),(()=>{
++return await j().readFile(E().join(t,jn),"utf8").then((t=>t.trim()),(()=>{
+ }
+ ))}
+-const An={
++const In={
+ kind:"unverified"}
+ ;
+ class CursorServerTarballDigestMismatchError extends Error{
+@@ -49560,17 +49576,21 @@
+ digestMismatches=new Map;
+ serverDataDir;
+ downloadBaseUrl;
++downloadBaseUrlOverrideValidator;
+ constructor(t){
+-this.serverDataDir=t?.serverDataDir??(0,w.join)(S().homedir(),".cursor-server"),this.downloadBaseUrl=t?.downloadBaseUrl??"https://cursor.blob.core.windows.net/remote-releases"}
++this.serverDataDir=t?.serverDataDir??(0,w.join)(S().homedir(),".cursor-server"),this.downloadBaseUrl=t?.downloadBaseUrl??"https://cursor.blob.core.windows.net/remote-releases",this.downloadBaseUrlOverrideValidator=t?.downloadBaseUrlOverrideValidator??assertTenantDownloadBaseUrl}
++resolveDownloadBaseUrl(t){
++return void 0===t||""===t.trim()?this.downloadBaseUrl:this.downloadBaseUrlOverrideValidator(t)}
+ async downloadCursorServer(t,u,p){
++const m=this.resolveDownloadBaseUrl(p?.downloadBaseUrl);
+ try{
+ vn.debug(t,"Downloading cursor server (download-only)",{
+ commit:u}
+ );
+-const m=Date.now(),g=await this.downloadCursorServer_(t,u,p?.tarballIntegrity??An,p?.installedBuildUse);
++const g=Date.now(),v=await this.downloadCursorServer_(t,u,p?.tarballIntegrity??In,p?.installedBuildUse,m);
+ return vn.info(t,"Cursor server download-only completed",{
+-commit:u,outcome:g,durationMs:Date.now()-m}
+-),"cached"===g}
++commit:u,outcome:v,durationMs:Date.now()-g}
++),"cached"===v}
+ catch(p){
+ if(isTarballIntegrityRefusal(p))throw p;
+ throw vn.error(t,"Failed to download cursor server (download-only)",p,{
+@@ -49578,24 +49598,25 @@
+ ),new Lr.T("Failed to download cursor server",Fr.C.Internal)}
+ }
+ async warmCursorServer(t,u,p,g,v){
+-const b=v?.host??"0.0.0.0",S=v?.connectionTokenDelivery??"argv",w=v?.existingServerOnPort??"reuse-or-kill",x=v?.tarballIntegrity??An;
++const b=v?.host??"0.0.0.0",S=v?.connectionTokenDelivery??"argv",w=v?.existingServerOnPort??"reuse-or-kill",x=v?.tarballIntegrity??In;
+ if(g.length<10)throw new Lr.T("Connection token is too short",Fr.C.InvalidArgument);
+-let C=this.commitLocks.get(u);
+-C||(C=new PromiseLock,this.commitLocks.set(u,C));
+-const T=await C.acquire();
++const C=this.resolveDownloadBaseUrl(v?.downloadBaseUrl);
++let T=this.commitLocks.get(u);
++T||(T=new PromiseLock,this.commitLocks.set(u,T));
++const R=await T.acquire();
+ try{
+ try{
+ vn.debug(t,"Ensuring cursor server is downloaded",{
+ commit:u}
+ );
+ const p=Date.now();
+-await this.downloadCursorServer_(t,u,x,v?.installedBuildUse),vn.debug(t,"Cursor server download check completed",{
++await this.downloadCursorServer_(t,u,x,v?.installedBuildUse,C),vn.debug(t,"Cursor server download check completed",{
+ commit:u,durationMs:Date.now()-p}
+ )}
+ catch(p){
+ if(isTarballIntegrityRefusal(p))throw p;
+ throw vn.error(t,"Failed to download cursor server",p,{
+-commit:u}
++commit:u,downloadBaseUrl:C}
+ ),new Lr.T("Failed to download cursor server",Fr.C.Internal)}
+ if("reuse-or-kill"===w){
+ const m=`http://localhost:${
+@@ -49639,10 +49660,10 @@
+ await this.killServerOnPort(t,p,m)}
+ }
+ const{
+-launch:C,binDir:T,commitDir:R}
++launch:T,binDir:R,commitDir:k}
+ =this.getServerPath(u);
+ await this.storeConnectionTokenHash(u,g);
+-const k=await async function prepareCursorServerConnectionTokenArg(t){
++const P=await async function prepareCursorServerConnectionTokenArg(t){
+ if("argv"===t.delivery)return{
+ arg:`--connection-token=${
+ t.connectionToken}
+@@ -49669,19 +49690,19 @@
+ }
+ }
+ ({
+-commitDir:R,port:p,connectionToken:g,delivery:S}
+-),P=(0,Je.D9)(m.spawn,C.command,[...C.args,`--host=${
++commitDir:k,port:p,connectionToken:g,delivery:S}
++),A=(0,Je.D9)(m.spawn,T.command,[...T.args,`--host=${
+ b}
+ `,`--port=${
+ p}
+-`,k.arg,`--extensions-dir=${
++`,P.arg,`--extensions-dir=${
+ bn}
+ `],{
+-detached:!0,stdio:"ignore",cwd:T}
++detached:!0,stdio:"ignore",cwd:R}
+ );
+-P.unref();
++A.unref();
+ try{
+-void 0!==P.pid&&await(v?.onSpawned?.(P.pid));
++void 0!==A.pid&&await(v?.onSpawned?.(A.pid));
+ const m=kn;
+ let b=0,S=null;
+ for(;
+@@ -49718,8 +49739,8 @@
+ await assertCursorServerHoldsToken({
+ port:p,connectionToken:g,timeoutMs:v}
+ );
+-const t=void 0===P.pid?"other":await loopbackListenerOwner({
+-pid:P.pid,port:p}
++const t=void 0===A.pid?"other":await loopbackListenerOwner({
++pid:A.pid,port:p}
+ );
+ if("spawn"!==t)throw new CursorServerPortHeldError(p,"unseen"===t?"no listening socket for the port is visible in /proc/net/tcp":"the listening socket is held by a process outside this spawn")}
+ return vn.info(t,`Successfully started cursor server at http://localhost:${
+@@ -49729,7 +49750,7 @@
+ `,{
+ commit:u,port:p,retryCount:b}
+ ),{
+-spawnedPid:P.pid}
++spawnedPid:A.pid}
+ }
+ catch(g){
+ if(g instanceof CursorServerPortHeldError)throw g;
+@@ -49759,13 +49780,13 @@
+ else await p(["/PID",String(t),"/T","/F"]).catch((()=>{
+ }
+ ))}
+-(P.pid),m instanceof CursorServerPortHeldError)throw m;
++(A.pid),m instanceof CursorServerPortHeldError)throw m;
+ throw new Lr.T("Failed to start cursor server",Fr.C.Internal)}
+ finally{
+-await k.cleanup()}
++await P.cleanup()}
+ }
+ finally{
+-T()}
++R()}
+ }
+ getServerPath(t){
+ const u=(0,w.join)(this.serverDataDir,"bin"),p=(0,w.join)(u,t);
+@@ -49942,78 +49963,78 @@
+ .`,{
+ port:u}
+ )}
+-async downloadCursorServer_(t,u,p,m){
+-let b=this.downloadCommitLocks.get(u);
+-b||(b=new PromiseLock,this.downloadCommitLocks.set(u,b));
+-const w=await b.acquire();
++async downloadCursorServer_(t,u,p,m,b=this.downloadBaseUrl){
++let w=this.downloadCommitLocks.get(u);
++w||(w=new PromiseLock,this.downloadCommitLocks.set(u,w));
++const x=await w.acquire();
+ try{
+ if(!u||!/^[a-zA-Z0-9\-_.]+$/.test(u))throw new Error("Invalid commit format");
+-const b={
++const w={
+ os:S().platform(),arch:S().arch()}
+-,w=`${
+-this.downloadBaseUrl}
++,x=`${
++b}
+ /${
+ u}
+ /vscode-reh-${
+-b.os}
++w.os}
+ -${
+-b.arch}
++w.arch}
+ .tar.gz`,{
+-binDir:x}
+-=this.getServerPath(u),C=E().join(x,u),T=(0,g.randomUUID)(),R=`${
+-C}
++binDir:C}
++=this.getServerPath(u),T=E().join(C,u),R=(0,g.randomUUID)(),k=`${
++T}
+ -dirty-${
++R}
++`,P=`${
+ T}
+-`,k=`${
+-C}
+ -download-${
+-T}
++R}
+ .tar.gz`;
+-await j().mkdir(x,{
++await j().mkdir(C,{
+ recursive:!0}
+ );
+-let P=await this.expectedTarballSha256(t,{
+-commit:u,tarballUrl:w,platform:b,integrity:p}
++let A=await this.expectedTarballSha256(t,{
++commit:u,tarballUrl:x,platform:w,integrity:p}
+ );
+-const A=await j().access(C).then((()=>!0),(()=>!1));
+-let I;
+-if(A){
+-if(I=await recordedTarballSha256(C),void 0===P||I===P)return vn.info(t,"Server already exists",{
+-finalDir:C,recordedSha256:I}
++const I=await j().access(T).then((()=>!0),(()=>!1));
++let M;
++if(I){
++if(M=await recordedTarballSha256(T),void 0===A||M===A)return vn.info(t,"Server already exists",{
++finalDir:T,recordedSha256:M}
+ ),"cached";
+ const p=await(m?.(u));
+ if(void 0!==p)throw new CursorServerInstallInUseError({
+-commit:u,user:p,recordedSha256:I,expectedSha256:P}
++commit:u,user:p,recordedSha256:M,expectedSha256:A}
+ );
+ vn.info(t,"Server on disk is not verified against this digest;
+  fetching it again",{
+-finalDir:C,recordedSha256:I,expectedSha256:P}
++finalDir:T,recordedSha256:M,expectedSha256:A}
+ )}
+-if(void 0!==P){
++if(void 0!==A){
+ const t=this.digestMismatches.get(`${
+ u}
+ :${
+-P}
++A}
+ `);
+ if(void 0!==t&&Date.now()-t.atMs<3e5)throw new CursorServerTarballDigestMismatchError({
+-commit:u,expectedSha256:P,actualSha256:t.actualSha256}
++commit:u,expectedSha256:A,actualSha256:t.actualSha256}
+ )}
+-await j().rm(R,{
++await j().rm(k,{
+ recursive:!0,force:!0}
+ ).catch((()=>{
+ }
+ ));
+ try{
+ vn.debug(t,"Starting server download",{
+-url:w,tempDir:R}
++url:x,tempDir:k}
+ );
+-const S=Date.now();
+-let x;
+-await j().mkdir(R,{
++const b=Date.now();
++let S;
++await j().mkdir(k,{
+ recursive:!0}
+ );
+-const M=await this.fetch(w);
+-if(void 0===P)x=await function extractStream(t,u,p){
++const C=await this.fetch(x);
++if(void 0===A)S=await function extractStream(t,u,p){
+ return new Promise(((m,v)=>{
+ const b=spawnTar(t,{
+ source:"-",destinationDir:p}
+@@ -50026,7 +50047,7 @@
+ fail(new Error(`${
+ t}
+  did not finish within 60 seconds`))}
+-),jn))}
++),Mn))}
+ ;
+ b.on("close",(t=>{
+ 0===t?(C=!0,u.resume(),oneSideDone("Tarball download")):fail(new Error(`tar exited with code ${
+@@ -50038,37 +50059,37 @@
+ x=!0,oneSideDone("Tar extraction")}
+ )),u.on("error",fail),u.pipe(b.stdin)}
+ ))}
+-(t,M,R),vn.info(t,"Server package downloaded and extracted",{
+-sha256:x,durationMs:Date.now()-S}
++(t,C,k),vn.info(t,"Server package downloaded and extracted",{
++sha256:S,durationMs:Date.now()-b}
+ );
+ else{
+-if(x=await async function hashInto(t,u){
++if(S=await async function hashInto(t,u){
+ const p=(0,g.createHash)("sha256"),m=new Nr.Transform({
+ transform(t,u,m){
+ p.update(t),m(null,t)}
+ }
+ );
+ return await(0,O.pipeline)(t,m,u),p.digest("hex")}
+-(M,(0,v.createWriteStream)(k,{
++(C,(0,v.createWriteStream)(P,{
+ mode:384}
+ )),vn.info(t,"Server package downloaded successfully",{
+-sha256:x,durationMs:Date.now()-S}
+-),x!==P&&"signed"===p.kind){
++sha256:S,durationMs:Date.now()-b}
++),S!==A&&"signed"===p.kind){
+ const m=await this.signedTarballSha256(t,{
+-commit:u,tarballUrl:w,platform:b,keys:p.keys}
++commit:u,tarballUrl:x,platform:w,keys:p.keys}
+ );
+-m===x&&(vn.info(t,"Tarball was republished between fetches;
++m===S&&(vn.info(t,"Tarball was republished between fetches;
+  the fresh .sig matches",{
+-commit:u,sha256:x}
+-),P=m)}
+-if(x!==P)throw this.digestMismatches.set(`${
++commit:u,sha256:S}
++),A=m)}
++if(S!==A)throw this.digestMismatches.set(`${
+ u}
+ :${
+-P}
++A}
+ `,{
+-actualSha256:x,atMs:Date.now()}
++actualSha256:S,atMs:Date.now()}
+ ),new CursorServerTarballDigestMismatchError({
+-commit:u,expectedSha256:P,actualSha256:x}
++commit:u,expectedSha256:A,actualSha256:S}
+ );
+ const m=Date.now();
+ await function extractTarball(t,{
+@@ -50083,7 +50104,7 @@
+ b||(b=!0,clearTimeout(S),v.kill(),g(t))}
+ ,S=setTimeout((()=>{
+ fail(new Error("Tar extraction timed out after 60 seconds"))}
+-),jn);
++),Mn);
+ v.on("close",(t=>{
+ clearTimeout(S),b||(0===t?(b=!0,m()):fail(new Error(`tar exited with code ${
+ t}
+@@ -50091,13 +50112,13 @@
+ )),v.on("error",fail)}
+ ))}
+ (t,{
+-tarball:k,destinationDir:R}
++tarball:P,destinationDir:k}
+ ),vn.info(t,"Server package extracted successfully",{
+-tempDir:R,durationMs:Date.now()-m}
+-),await j().rm(k,{
++tempDir:k,durationMs:Date.now()-m}
++),await j().rm(P,{
+ force:!0}
+ )}
+-const D=cursorServerLaunch(R).command;
++const D=cursorServerLaunch(k).command;
+ await j().chmod(D,493);
+ try{
+ const t=j().constants.X_OK;
+@@ -50106,32 +50127,32 @@
+ throw new Error(`Server binary is not accessible at ${
+ D}
+ `)}
+-await j().writeFile(E().join(R,Pn),x,"utf8");
+-const N=A?`${
+-C}
+--unverified-${
++await j().writeFile(E().join(k,jn),S,"utf8");
++const N=I?`${
+ T}
++-unverified-${
++R}
+ `:void 0;
+ if(void 0!==N){
+ const t=await(m?.(u));
+ if(void 0!==t)throw new CursorServerInstallInUseError({
+-commit:u,user:t,recordedSha256:I,expectedSha256:x}
++commit:u,user:t,recordedSha256:M,expectedSha256:S}
+ )}
+ vn.debug(t,"Moving server to final location",{
+-tempDir:R,finalDir:C,displacedDir:N}
++tempDir:k,finalDir:T,displacedDir:N}
+ );
+ const L=Date.now();
+-void 0!==N&&await j().rename(C,N);
++void 0!==N&&await j().rename(T,N);
+ try{
+-await j().rename(R,C)}
++await j().rename(k,T)}
+ catch(u){
+-if(void 0!==N)await j().rename(N,C).catch((()=>{
++if(void 0!==N)await j().rename(N,T).catch((()=>{
+ }
+ ));
+-else if(await recordedTarballSha256(C)===x)return vn.info(t,"Another process installed this build during the download;
++else if(await recordedTarballSha256(T)===S)return vn.info(t,"Another process installed this build during the download;
+  using it",{
+-finalDir:C,sha256:x}
+-),await j().rm(R,{
++finalDir:T,sha256:S}
++),await j().rm(k,{
+ recursive:!0,force:!0}
+ ).catch((()=>{
+ }
+@@ -50146,23 +50167,23 @@
+ displacedDir:N}
+ )}
+ )),vn.debug(t,`Successfully downloaded server at ${
+-C}
++T}
+ `,{
+-commit:u,finalDir:C}
++commit:u,finalDir:T}
+ ),"downloaded"}
+ catch(t){
+-throw await j().rm(k,{
++throw await j().rm(P,{
+ force:!0}
+ ).catch((()=>{
+ }
+-)),await j().rm(R,{
++)),await j().rm(k,{
+ recursive:!0,force:!0}
+ ).catch((()=>{
+ }
+ )),t}
+ }
+ finally{
+-w()}
++x()}
+ }
+ async expectedTarballSha256(t,{
+ commit:u,tarballUrl:p,platform:m,integrity:g}
+@@ -50222,7 +50243,7 @@
+ )).on("error",m)}
+ ))}
+ }
+-const jn=6e4;
++const Mn=6e4;
+ function spawnTar(t,{
+ source:u,destinationDir:p}
+ ){
+@@ -50236,7 +50257,7 @@
+ data:u.toString()}
+ )}
+ )),m}
+-var In=p("./src/request-context-disk-cache.ts");
++var Dn=p("./src/request-context-disk-cache.ts");
+ class ScopedSecretStore{
+ onValuesAdded;
+ byScope=new Map;
+@@ -50282,10 +50303,10 @@
+ getWorkspacePath(){
+ return this.innerExecutor.getWorkspacePath()}
+ }
+-const Mn=9e4,Dn=Mn-(0,$e.WR)(void 0);
++const Nn=9e4,Ln=Nn-(0,$e.WR)(void 0);
+ function sessionMcpLoadTimeoutMs(t){
+-return"command"in t?Math.max(Mn,(0,$e.WR)(t.startupTimeoutSec)+Dn):Mn}
+-const Nn=(0,C.h)("exec-daemon-shell-oom-kill"),Ln="/sys/fs/cgroup";
++return"command"in t?Math.max(Nn,(0,$e.WR)(t.startupTimeoutSec)+Ln):Nn}
++const Fn=(0,C.h)("exec-daemon-shell-oom-kill"),Un="/sys/fs/cgroup";
+ function readFileOrUndefined(t){
+ try{
+ return(0,v.readFileSync)(t,"utf8")}
+@@ -50295,7 +50316,7 @@
+ function selfAndAncestors(t){
+ const u=[];
+ for(let p=t;
+-p.startsWith(Ln);
++p.startsWith(Un);
+ p=E().dirname(p))u.push(p);
+ return u}
+ function parseOomKillCount(t){
+@@ -50337,7 +50358,7 @@
+ const u=(0,Je.NG)();
+ if("armed"===u.kind)return u.workloadCgroupDir;
+ const p=t("/proc/self/cgroup")?.split("\n").find((t=>t.startsWith("0::/")));
+-return void 0===p?void 0:E().join(Ln,p.slice(3))}
++return void 0===p?void 0:E().join(Un,p.slice(3))}
+ (this.read),this.memoryEventsDir=void 0===this.commandCgroupDir?void 0:function findMemoryEventsDir(t,u=readFileOrUndefined){
+ return selfAndAncestors(t).find((t=>void 0!==parseOomKillCount(u(E().join(t,"memory.events")))))}
+ (this.commandCgroupDir,this.read))),this.memoryEventsDir}
+@@ -50367,7 +50388,7 @@
+ for await(const b of t.execute(p,m,g)){
+ if("exit"===b.event.case){
+ const t=b.event.value,g=u.finish(v,t);
+-void 0!==g&&(t.oomKill=g.oomKill,Nn.warn(p,"Shell command OOM kill detected",{
++void 0!==g&&(t.oomKill=g.oomKill,Fn.warn(p,"Shell command OOM kill detected",{
+ kind:k.R_[g.oomKill.kind],memoryLimitBytes:g.oomKill.memoryLimitBytes.toString(),memoryEventsDir:g.memoryEventsDir,oomKillsDuringCommand:g.oomKillsDuringCommand,exitCode:0|t.code,toolCallId:m.toolCallId}
+ ))}
+ yield b}
+@@ -50376,8 +50397,8 @@
+ }
+ (u,this.probe)}
+ }
+-const Fn=(0,C.h)("exec-daemon");
+-const Un=(0,C.h)("exec-daemon"),Bn=m.execFileSync,$n="CURSOR_EXEC_DAEMON_DATA_DIR";
++const Bn=(0,C.h)("exec-daemon");
++const $n=(0,C.h)("exec-daemon"),qn=m.execFileSync,zn="CURSOR_EXEC_DAEMON_DATA_DIR";
+ function summarizeUnknownError(t){
+ return t instanceof Error?{
+ errorForLogger:t,metadata:{
+@@ -50429,9 +50450,9 @@
+ try{
+ v.mkdirSync(u,{
+ recursive:!0,mode:b}
+-),v.chmodSync(u,b),Un.info(p,m)}
++),v.chmodSync(u,b),$n.info(p,m)}
+ catch(t){
+-Un.error(p,g,{
++$n.error(p,g,{
+ error:t instanceof Error?t.message:String(t)}
+ )}
+ }
+@@ -50508,7 +50529,7 @@
+ globalContext:u,workspacePaths:p,logLevel:m,isBrowserEnabled:R=!1,isCursorSelfControlEnabled:k=!1,isCloudRulesEnabled:j=!1,isComputerUseEnabled:O=!1,lazyComputerUseInit:I=!1,computerUseApiWidth:M,computerUseApiHeight:D,desktopLeaseEnforce:N=!1,isSecretRedactionEnabled:L=!1,isRecordScreenEnabled:F=!1,agentStoreConflictNoticesEnabled:U=!1,agentStoreQuotaNoticesEnabled:B=!1,isGenerateImageEnabled:$=!1,isMcpMetaToolEnabled:q=!0,stripAgentSkillContent:z=!1,filterModelDisabledSkills:H=!1,agentStoreSkillsDir:J,getDynamicAgentStoreSkillRoots:G,isMcpMetaToolSlimDescriptors:W=!1,mcpInputSchemaJson:V=!1,isSandboxEnabled:Y=!1,sandboxPolicyJson:X,getThirdPartyExtensibilityEnabled:Z=()=>!0,chromeExecutablePath:Q,mcpConfig:ee,mcpToolTimeouts:te=new Map,httpMcpToolsFile:re,gitService:oe,surface:ie="cloud",dataDir:ae,projectDir:le,readOnlyBareMode:ue=!1,readOnlyBareRepoPath:de="/workspace/readonly-pod-bare.git",disableRequestContextDiskCache:pe=!1,includePluginsInRequestContext:he=!0,exposeMcpFileSystemForSessionMcp:me=!1}
+ =t,fe=p[0];
+ if(void 0===fe)throw new Error("setupDaemon requires at least one workspace path");
+-const ge=ae??process.env[$n],_e=ge?E().join(ge,"logs"):Be.c6e,ve=(0,Ge.VO)(ge),be=t.artifactRootResolver??(()=>({
++const ge=ae??process.env[zn],_e=ge?E().join(ge,"logs"):Be.c6e,ve=(0,Ge.VO)(ge),be=t.artifactRootResolver??(()=>({
+ artifactsRootPath:ve,rootKind:"local"}
+ )),Se=new Ge.cB({
+ resolveRoot:be,detectAgentStoreBackedAlias:void 0===t.artifactRootResolver&&void 0===ge}
+@@ -50528,7 +50549,7 @@
+ return u}
+ (m)}
+ catch(p){
+-Un.warn(t,"Failed to create a plugin data directory for MCP server",{
++$n.warn(t,"Failed to create a plugin data directory for MCP server",{
+ serverName:u,errorMessage:p instanceof Error?p.message:String(p)}
+ )}
+ return function withInheritedExecDaemonEnv(t,u=process.env){
+@@ -50562,7 +50583,7 @@
+ ))}
+ }
+ catch(u){
+-Un.error(t,"Failed to parse MCP config",u)}
++$n.error(t,"Failed to parse MCP config",u)}
+ }
+ ));
+ const Pe={
+@@ -50574,11 +50595,11 @@
+ }
+ ).filter((t=>"url"in t)).length}
+ ,Ae=le??getProjectDir(fe);
+-Un.info(u,"Starting exec-daemon",{
++$n.info(u,"Starting exec-daemon",{
+ logLevel:m,workspacePath:fe,projectDir:Ae,browserEnabled:R,cursorSelfControlEnabled:k,mcpConfigSummary:Pe,cloudRulesEnabled:j,computerUseEnabled:O,secretRedactionEnabled:L,recordScreenEnabled:F,orbitOperationReportingEnabled:void 0!==t.orbitOperationReporter,chromeExecutablePath:Q}
+ );
+ const je=new Be.xK7;
+-Un.info(u,"Resolved exec-daemon workspaces",{
++$n.info(u,"Resolved exec-daemon workspaces",{
+ workspacePath:fe,workspacePaths:p}
+ );
+ const Oe=new MockDecisionProvider,Ie=new Be.$1H(fe);
+@@ -50591,7 +50612,7 @@
+ const p=`Binary not found: '${
+ t}
+ ' is not a valid executable or not in PATH`;
+-Un.error(u,p),process.stderr.write(`${
++$n.error(u,p),process.stderr.write(`${
+ p}
+ \n`),process.exit(1)}
+ }
+@@ -50604,7 +50625,7 @@
+ v.accessSync(p.cmd,m)}
+ catch{
+ g=!0}
+-g&&Un.warn(u,"ffmpeg not found in PATH - screen recording will not work. Please install ffmpeg to use the recordScreen tool.");
++g&&$n.warn(u,"ffmpeg not found in PATH - screen recording will not work. Please install ffmpeg to use the recordScreen tool.");
+ const b=t.recordScreenArtifactsDir??ve,S=we;
+ for(const t of[b,S])ensureDirWithDataDirPolicy({
+ dir:t,globalContext:u,successLogMessage:`Recording directory created/verified: ${
+@@ -50634,7 +50655,7 @@
+ recursive:!0}
+ )}
+ catch(t){
+-Un.warn(u,`Failed to create terminals directory under ${
++$n.warn(u,`Failed to create terminals directory under ${
+ Ae}
+  - the prompt-advertised terminals folder may not exist until a shell backgrounds`,{
+ error:t instanceof Error?t.message:String(t)}
+@@ -50642,7 +50663,7 @@
+ const De=new MockDiagnosticsProvider,Ne=new MockCodebaseReferenceProvider,Le=new $e.i9({
+ }
+ );
+-te.size>0&&Un.info(u,"MCP tool-call timeouts configured",{
++te.size>0&&$n.info(u,"MCP tool-call timeouts configured",{
+ serverNames:[...te.keys()]}
+ );
+ const Fe=function mcpBrowserOpenLogDir(t=S().tmpdir()){
+@@ -50670,7 +50691,7 @@
+ ({
+ serverName:u,serverConfig:p,dir:Fe}
+ ),(0,Ut.Iw)()),g=te.get(u);
+-return void 0!==g&&(0,$e.l$)(m,g)&&Un.info(t,"Applied MCP tool-call timeouts",{
++return void 0!==g&&(0,$e.l$)(m,g)&&$n.info(t,"Applied MCP tool-call timeouts",{
+ serverName:u,toolTimeoutSec:g.toolTimeoutSec,toolTimeoutCount:Object.keys(g.toolTimeouts??{
+ }
+ ).length}
+@@ -50683,14 +50704,14 @@
+ if(void 0!==ke){
+ const t=ke.mcpServers;
+ await runSetupStepSpan(u,"exec_daemon.setup.load_static_mcp_servers",(async u=>{
+-Un.info(u,"Exec-daemon received MCP config",{
++$n.info(u,"Exec-daemon received MCP config",{
+ ...Pe,transports:Object.fromEntries(Object.entries(t).map((([t,u])=>[t,"command"in u?"stdio":"url"in u?"http":"unknown"])))}
+ );
+ for(const[p,m]of Object.entries(t)){
+ if(!("command"in m))continue;
+ const loadConfiguredClient=async t=>{
+ const u=await loadStdioServer(t,p,await prepareStdioSpawnConfig(t,p,m));
+-return Un.info(t,"Exec-daemon MCP server loaded",{
++return $n.info(t,"Exec-daemon MCP server loaded",{
+ serverName:p}
+ ),u}
+ ;
+@@ -50701,7 +50722,7 @@
+ const{
+ errorForLogger:g,metadata:v}
+ =summarizeUnknownError(t);
+-Un.error(u,"Exec-daemon MCP server failed to start",g,{
++$n.error(u,"Exec-daemon MCP server failed to start",g,{
+ serverName:p,...getMcpServerLogMetadata(m),...v,stderrTail:(0,$e.S2)(t)}
+ )}
+ continue}
+@@ -50729,7 +50750,7 @@
+ if(p instanceof LazyMcpClient)try{
+ await p.ensureLoaded(t)}
+ catch(p){
+-Un.warn(t,"Failed to load session MCP server",{
++$n.warn(t,"Failed to load session MCP server",{
+ serverName:u,errorMessage:p instanceof Error?p.message:String(p),stderrTail:(0,$e.S2)(p)}
+ )}
+ }
+@@ -50745,7 +50766,7 @@
+ ).then((async()=>{
+ u.length>0&&await(dt?.(t))}
+ )).catch((u=>{
+-Un.warn(t,"Failed to refresh MCP state after kick-only load",{
++$n.warn(t,"Failed to refresh MCP state after kick-only load",{
+ errorMessage:u instanceof Error?u.message:String(u)}
+ )}
+ ))}
+@@ -50772,7 +50793,7 @@
+ try{
+ await(v?.close?.())}
+ catch(p){
+-Un.warn(t,"Failed to close replaced MCP client",{
++$n.warn(t,"Failed to close replaced MCP client",{
+ serverName:u,errorMessage:p instanceof Error?p.message:String(p)}
+ )}
+ }
+@@ -50785,7 +50806,7 @@
+ }
+ }
+ catch(u){
+-Un.error(t,"Failed to parse MCP config for session",u instanceof Error?u:void 0)}
++$n.error(t,"Failed to parse MCP config for session",u instanceof Error?u:void 0)}
+ const S=[];
+ if(!0===p?.removeMissing&&void 0!==b){
+ const u=new Set(b);
+@@ -50796,11 +50817,11 @@
+ try{
+ await(m?.close?.())}
+ catch(u){
+-Un.warn(t,"Failed to close removed session MCP client",{
++$n.warn(t,"Failed to close removed session MCP client",{
+ serverName:p,errorMessage:u instanceof Error?u.message:String(u)}
+ )}
+ }
+-S.length>0&&Un.info(t,"Removed session MCP servers",{
++S.length>0&&$n.info(t,"Removed session MCP servers",{
+ removedServerNames:S}
+ )}
+ const w=!0===b?.every((t=>pt.has(t)));
+@@ -50811,18 +50832,18 @@
+ try{
+ return await v.promises.readFile(re,"utf-8")}
+ catch(t){
+-return void Un.error(u,"Failed to read HTTP MCP tools file",{
++return void $n.error(u,"Failed to read HTTP MCP tools file",{
+ path:re,error:t}
+ )}
+ }
+ )():void 0;
+ if(vt)try{
+ const t=JSON.parse(vt);
+-t.length>0&&(_t=new Be.J2t(t.map(x.uvp)),Un.info(u,"Parsed HTTP MCP tools for file system discovery",{
++t.length>0&&(_t=new Be.J2t(t.map(x.uvp)),$n.info(u,"Parsed HTTP MCP tools for file system discovery",{
+ toolCount:t.length,source:"file"}
+ ))}
+ catch(t){
+-Un.error(u,"Failed to parse HTTP MCP tools JSON",t)}
++$n.error(u,"Failed to parse HTTP MCP tools JSON",t)}
+ const bt=_t?new Be.cND([ut,_t]):ut;
+ let St;
+ const Tt=Pe.serverNames.length>0,kt=_t||Tt||me;
+@@ -50835,7 +50856,7 @@
+ let It=!1;
+ Y&&(It=(0,ze.K3)(void 0,{
+ cwd:fe,ctx:u}
+-),It||Un.warn(u,"Sandbox was requested but is not supported in this environment. Continuing with sandbox disabled."));
++),It||$n.warn(u,"Sandbox was requested but is not supported in this environment. Continuing with sandbox disabled."));
+ const Bt=(()=>{
+ if(!It)return{
+ type:"insecure_none"}
+@@ -50844,7 +50865,7 @@
+ const t=(0,ze.$6)(JSON.parse(X));
+ return(0,ze.l7)(t,fe)}
+ catch(t){
+-Un.error(u,"Failed to parse sandbox policy, using default policy",{
++$n.error(u,"Failed to parse sandbox policy, using default policy",{
+ error:t}
+ )}
+ return{
+@@ -50863,7 +50884,7 @@
+ return await t.load()}
+ ,Ht=await loadHooksConfig(),Jt=new MutableHooksConfigLeaseImpl(Ht),Gt=(0,ze.Fn)(),Wt=(0,ze.fi)(),Vt=(0,Be.pvL)(t.recordScreenDisplay),Kt=function resolveExecutablePath(t){
+ try{
+-const u=(0,Je.D9)(Bn,"which",[t],{
++const u=(0,Je.D9)(qn,"which",[t],{
+ encoding:"utf8",stdio:["ignore","pipe","ignore"],timeout:500}
+ ).trim();
+ return u.length>0?u:void 0}
+@@ -50873,7 +50894,7 @@
+ ("xdpyinfo");
+ let Yt;
+ await runSetupStepSpan(u,"exec_daemon.setup.init_computer_use",(async u=>{
+-Un.info(u,"computer_use_startup_config",{
++$n.info(u,"computer_use_startup_config",{
+ computerUseEnabled:O,lazyComputerUseInit:I,computerUseApiWidth:M,computerUseApiHeight:D,recordScreenEnabled:F,recordScreenDisplayOption:t.recordScreenDisplay,resolvedDisplay:Vt,displayEnv:process.env.DISPLAY,hasXdpyinfo:void 0!==Kt,xdpyinfoPath:Kt}
+ ),Yt=await async function buildExecDaemonComputerUseExecutor(t,u,p=Et){
+ const{
+@@ -50938,7 +50959,7 @@
+ enforce:N,releaseHeldInput:()=>Xt.releaseHeldInput()}
+ );
+ let Qt;
+-Un.info(u,"loading resource provider",{
++$n.info(u,"loading resource provider",{
+ computerUseEnabled:O,computerUseRunning:void 0!==Yt,desktopLeaseEnforce:N}
+ ),L&&(await(0,Mt.wM)(),Qt=new Mt.LK,Qt.refreshFromEnv(process.env));
+ const er=Qt?()=>Qt.getRedactor():void 0,tr=Qt?new ScopedSecretStore((t=>Qt.retainSecretValues(t,process.env))):void 0,nr=F?new ExecDaemonPolishedRecordingRenderer:void 0,sr=new Be.aZ7(bt);
+@@ -50971,8 +50992,8 @@
+ workspacePath:fe,bareRepoPath:ar,mcpStateAccessor:sr,stripAgentSkillContent:z,filterModelDisabledSkills:H,options:{
+ projectDir:Ae,getSandboxEnabled:()=>It,getSandboxSupported:()=>It,getMcpFileSystemOptions:St?async(t,u)=>St.getMcpFileSystemOptions(t,u):void 0,mcpMetaToolEnabled:q,mcpMetaToolSlimDescriptors:q&&W,mcpInputSchemaJson:V,getArtifactsFolder,secretRedactionEnabled:!!er,getComputerUseSupported:()=>void 0!==Yt}
+ }
+-):pe?buildFullRequestContextExecutor(he):new In.vs({
+-createFullExecutor:()=>buildFullRequestContextExecutor(!0),read:t=>(0,In.gc)(t,In.Tk),getPluginRules:t=>Qe.getAllCursorRules(t),getPluginAgentSkills:t=>Qe.getAllAgentSkills(t),getPluginSubagents:()=>st.getAllSubagents(),dedupeRules:removeDuplicatedAgentSkillRules,updateBaked:async(t,u)=>{
++):pe?buildFullRequestContextExecutor(he):new Dn.vs({
++createFullExecutor:()=>buildFullRequestContextExecutor(!0),read:t=>(0,Dn.gc)(t,Dn.Tk),getPluginRules:t=>Qe.getAllCursorRules(t),getPluginAgentSkills:t=>Qe.getAllAgentSkills(t),getPluginSubagents:()=>st.getAllSubagents(),dedupeRules:removeDuplicatedAgentSkillRules,updateBaked:async(t,u)=>{
+ u.agentSkills=projectAgentSkillsForRequestContext(u.agentSkills);
+ const p=await sr.getState(t),m=q&&W,g=(0,Be.bXp)(p,{
+ internalBrowserProvidersOnly:m,inputSchemaJson:V}
+@@ -50983,11 +51004,11 @@
+ }
+ ),mr=createAgentStoreSkillsMountLatch({
+ roots:Ke,reloadRoots:()=>Ye.reloadSkillRoots(),onReloaded:t=>{
+-Un.info(u,"Agent store skills mount found",{
++$n.info(u,"Agent store skills mount found",{
+ roots:t}
+ )}
+ ,onUnresponsive:t=>{
+-Un.warn(u,"Agent store skills mount did not respond;
++$n.warn(u,"Agent store skills mount did not respond;
+  giving up on discovering it",{
+ root:t}
+ )}
+@@ -51027,24 +51048,24 @@
+ );
+ !function registerExecDaemonWebpCodec(t){
+ const u=(0,Be.Zu2)();
+-return u.registered?(Fn.info(t,"webp_codec.startup",{
++return u.registered?(Bn.info(t,"webp_codec.startup",{
+ registered:!0}
+-),u):(Fn.error(t,"webp_codec.startup.unavailable",{
++),u):(Bn.error(t,"webp_codec.startup.unavailable",{
+ registered:!1,reason:u.reason,platform:"linux",arch:"x64"}
+ ),u)}
+ (Sr);
+ const b={
+ pendingDecisionStore:Oe,fileChangeTracker:Ie,gitExecutor:je,ignoreService:Me,grepProvider:At,permissionsService:$t,workspacePaths:p,diagnosticsProvider:De,getCanvasDiagnostics:v?.getCanvasDiagnostics,beginCanvasSave:v?.beginCanvasSave,mcpLease:Pt,mcpStateAccessor:sr,ensureMcpServersLoaded,cursorRulesService:et,cloudRulesService:nt,subagentsService:it,repositoryProvider:Ne,projectDir:Ae,sharedRequestContextExecutor:yr,shellManager:void 0,_sandboxPolicyResolver:void 0,_defaultSandboxPolicy:Bt,mcpFileOutputThresholdBytes:void 0,terminalExecutor:Gt,getSandboxEnabled:()=>It,getSandboxSupported:()=>It,computerUseExecutor:void 0!==Yt&&void 0!==Zt?(0,Be.f8t)(Zt,Yt):Yt,enableRecordScreen:F,recordScreenArtifactsDir:t.recordScreenArtifactsDir??ve,recordScreenDisplay:(0,Be.pvL)(t.recordScreenDisplay),polishedRecordingRenderer:nr,getArtifactsFolder,secretRedactionEnabled:!!er,registerRedactedReadExecutor:!!er,shellCoreWrapper:er&&tr?t=>new qe.sR(new ScopedSecretsShellCoreExecutor(t,tr),er):void 0,shellExtraEnvProvider:t.shellExtraEnvProvider,getMountedAgentStores:t.getMountedAgentStores,getMcpFileSystemOptions:St?async(t,u)=>St.getMcpFileSystemOptions(t,u):void 0,mcpMetaToolEnabled:q,mcpMetaToolSlimDescriptors:q&&W,mcpInputSchemaJson:V,getAgentSkills:async t=>projectAgentSkillsForRequestContext(await tt.getAllAgentSkills(t)),agentStoreConflictDrainer:m}
+ ,w=new Be.DvK(b);
+-if(Un.info(Sr,"resource provider loaded",{
++if($n.info(Sr,"resource provider loaded",{
+ hooksConfig:Ht}
+ ),F&&O&&Yt){
+ const t=Yt,u=w.getRecordScreenExecutor();
+ u&&computerUseExecutorHasInputEventLogger(t)&&(u.setOnRecordingStarted((u=>{
+-Un.info(Sr,"Recording started, connecting InputEventLogger to X11Executor"),t.setInputEventLogger(u)}
++$n.info(Sr,"Recording started, connecting InputEventLogger to X11Executor"),t.setInputEventLogger(u)}
+ )),u.setOnRecordingStopped((()=>{
+-Un.info(Sr,"Recording stopped, disconnecting InputEventLogger from X11Executor"),t.setInputEventLogger(void 0)}
+-)),Un.info(Sr,"InputEventLogger wiring configured for polished recordings"))}
++$n.info(Sr,"Recording stopped, disconnecting InputEventLogger from X11Executor"),t.setInputEventLogger(void 0)}
++)),$n.info(Sr,"InputEventLogger wiring configured for polished recordings"))}
+ const E=function resolveExecDaemonGlobalHookContext(t){
+ const u=t?.env??process.env,p=u.CURSOR_CLOUD_AGENT_USER_EMAIL_ADDRESS?.trim()??"",m=t?.userEmail?.trim()??"";
+ return{
+@@ -51055,7 +51076,7 @@
+ ),C=new CliHooksExecutor(Ht,at,E,Wt,t.promptHookClient,void 0,void 0,{
+ enableClaudeNestedHookSpecificOutputCompatibility:t.enableClaudeNestedHookSpecificOutputCompatibility,commandHookPayloadTransport:t.commandHookPayloadTransport,runtimeHooks:t.runtimeHooks}
+ );
+-Un.info(Sr,"Exec-daemon loaded hook executor",{
++$n.info(Sr,"Exec-daemon loaded hook executor",{
+ hasUserHooks:!!Ht.userHooks,hasProjectHooks:!!Ht.projectHooks}
+ );
+ const createWorkspaceResources=t=>{
+@@ -51095,17 +51116,17 @@
+ (k,t.orbitOperationReporter),j=new Be.yJf(new ListableHooksResourceAccessor(P,C,(t=>({
+ conversation_id:t.get(x.WWy)??"",generation_id:t.get(x.JT2)??"",model:t.get(x.dBo)??"unknown"}
+ )),Pt,void 0,void 0,Jt),m);
+-return Un.info(Sr,"Exec-daemon loaded resources",{
++return $n.info(Sr,"Exec-daemon loaded resources",{
+ resourceCount:[...j.entries()].length}
+ ),{
+ resources:j,gitService:Ce,remoteAccessService:Te,requestContextExecutor:yr,ptyManager:Re,artifactUploadManagerProvider:Se,hookExecutor:C,mcpFileSystemWriter:St,secretRedactionState:Qt,scopedSecretStore:tr,reloadAgentSkills:async t=>{
+ try{
+ const u=await loadHooksConfig();
+-Jt.setConfig(u),C.updateConfig(u),Un.info(t,"Reloaded hook configuration summary",{
++Jt.setConfig(u),C.updateConfig(u),$n.info(t,"Reloaded hook configuration summary",{
+ ...summarizeHooksConfigForLogging(u)}
+ )}
+ catch(u){
+-Un.warn(t,"Failed to reload hook configuration;
++$n.warn(t,"Failed to reload hook configuration;
+  keeping previous hooks config",{
+ error:u instanceof Error?u.message:String(u)}
+ )}
+@@ -51116,7 +51137,7 @@
+ ,setWorkspacePaths:t=>{
+ const p=T?.provider;
+ T=void 0===t?void 0:createWorkspaceResources([...t]),p?.dispose().catch((t=>{
+-Un.warn(u,"Failed to dispose replaced workspace resources",{
++$n.warn(u,"Failed to dispose replaced workspace resources",{
+ errorMessage:t instanceof Error?t.message:String(t)}
+ )}
+ ))}
+@@ -51125,7 +51146,7 @@
+ ,getComputerUseSupported:()=>void 0!==Yt,desktopLeaseStore:Zt,loadSessionMcpServers,closeMcpClients:()=>Le.closeAllClients()}
+ }
+ catch(t){
+-throw wr?.recordException(t instanceof Error?t:new Error(String(t))),Un.error(Sr,"error creating resource provider",{
++throw wr?.recordException(t instanceof Error?t:new Error(String(t))),$n.error(Sr,"error creating resource provider",{
+ error:t instanceof Error?t.message:String(t)}
+ ),t}
+ finally{
+@@ -51609,7 +51630,7 @@
+ return void T.error(u,"Failed to create OTLP exporter",t)}
+ T.info(u,"Building resource attributes...");
+ const v=function buildResource(t){
+-const u=g().platform(),p=g().arch(),m=g().release(),v=process.version,b=t.serviceVersion??"0f09884f67008ddabdaa7012a4bb646fb1051c8f"??"unknown",S=g().hostname(),w=resourceFromAttributes({
++const u=g().platform(),p=g().arch(),m=g().release(),v=process.version,b=t.serviceVersion??"0793aec04f17264d9db1d8363d25fc3a0b7056e4"??"unknown",S=g().hostname(),w=resourceFromAttributes({
+ "service.name":"exec-daemon","service.version":b,"host.name":S,"os.type":u,"os.version":m,"process.runtime.name":"node","process.runtime.version":v,"client.os.platform":u,"client.os.release":m,"client.arch":p,"client.node.version":v,"deployment.environment":"pod",...t.traceAttributes??{
+ }
+ }
+@@ -63355,7 +63376,7 @@
+ options:p,protocols:v}
+ }
+ }
+-,"../../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=77c6ee065ffd446c891e26297b3de31aebbe74ac99c_7c0ebdbfa31b907d43e1d7dddf6f25e4/node_modules/@modelcontextprotocol/sdk/dist/esm/client/auth.js"(t,u,p){
++,"../../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=d6585ecc3ef25fb368c06a7be3232df8c0e9380e7f3_e6eb960237b900ab984764623283adc4/node_modules/@modelcontextprotocol/sdk/dist/esm/client/auth.js"(t,u,p){
+ "use strict";
+ let m;
+ async function random(t){
+@@ -63385,7 +63406,7 @@
+ p.d(u,{
+ D_:()=>UnauthorizedError,j2:()=>auth,eH:()=>extractWWWAuthenticateParams}
+ ),m=globalThis.crypto?.webcrypto??globalThis.crypto??Promise.resolve().then(p.t.bind(p,"node:crypto",19)).then((t=>t.webcrypto));
+-var g=p("../../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=77c6ee065ffd446c891e26297b3de31aebbe74ac99c_7c0ebdbfa31b907d43e1d7dddf6f25e4/node_modules/@modelcontextprotocol/sdk/dist/esm/types.js"),v=p("../../node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/classic/schemas.js"),b=p("../../node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/classic/compat.js"),S=p("../../node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/core.js"),w=p("../../node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/api.js");
++var g=p("../../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=d6585ecc3ef25fb368c06a7be3232df8c0e9380e7f3_e6eb960237b900ab984764623283adc4/node_modules/@modelcontextprotocol/sdk/dist/esm/types.js"),v=p("../../node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/classic/schemas.js"),b=p("../../node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/classic/compat.js"),S=p("../../node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/core.js"),w=p("../../node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/api.js");
+ const E=v.OZ5().superRefine(((t,u)=>{
+ if(!URL.canParse(t))return u.addIssue({
+ code:b.eq.custom,message:"URL must be parseable",fatal:!0}
+@@ -63423,7 +63444,7 @@
+ ).strip(),v.Ikc({
+ token:v.YjP(),token_type_hint:v.YjP().optional()}
+ ).strip();
+-var M=p("../../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=77c6ee065ffd446c891e26297b3de31aebbe74ac99c_7c0ebdbfa31b907d43e1d7dddf6f25e4/node_modules/@modelcontextprotocol/sdk/dist/esm/server/auth/errors.js");
++var M=p("../../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=d6585ecc3ef25fb368c06a7be3232df8c0e9380e7f3_e6eb960237b900ab984764623283adc4/node_modules/@modelcontextprotocol/sdk/dist/esm/server/auth/errors.js");
+ class UnauthorizedError extends Error{
+ constructor(t){
+ super(t??"Unauthorized")}
+@@ -63620,7 +63641,7 @@
+ return C=p.status,p}
+ ;
+ let T;
+-for(let g=0;
++for(let g=void 0!==x&&!0===t.registrationStartsUntyped?.()?x:0;
+ g<w.length;
+ g++){
+ const v=w[g];
+@@ -63835,7 +63856,7 @@
+ if(!v.ok)throw await parseErrorResponse(v);
+ return I.parse(await v.json())}
+ }
+-,"../../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=77c6ee065ffd446c891e26297b3de31aebbe74ac99c_7c0ebdbfa31b907d43e1d7dddf6f25e4/node_modules/@modelcontextprotocol/sdk/dist/esm/server/auth/errors.js"(t,u,p){
++,"../../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=d6585ecc3ef25fb368c06a7be3232df8c0e9380e7f3_e6eb960237b900ab984764623283adc4/node_modules/@modelcontextprotocol/sdk/dist/esm/server/auth/errors.js"(t,u,p){
+ "use strict";
+ p.d(u,{
+ Gy:()=>InvalidGrantError,Pg:()=>InvalidClientError,W5:()=>OAuthError,WX:()=>m,g:()=>UnauthorizedClientError,gP:()=>ServerError,gr:()=>InvalidClientMetadataError,pv:()=>TemporarilyUnavailableError}
+@@ -63905,7 +63926,7 @@
+ const m={
+ [InvalidRequestError.errorCode]:InvalidRequestError,[InvalidClientError.errorCode]:InvalidClientError,[InvalidGrantError.errorCode]:InvalidGrantError,[UnauthorizedClientError.errorCode]:UnauthorizedClientError,[UnsupportedGrantTypeError.errorCode]:UnsupportedGrantTypeError,[InvalidScopeError.errorCode]:InvalidScopeError,[AccessDeniedError.errorCode]:AccessDeniedError,[ServerError.errorCode]:ServerError,[TemporarilyUnavailableError.errorCode]:TemporarilyUnavailableError,[UnsupportedResponseTypeError.errorCode]:UnsupportedResponseTypeError,[UnsupportedTokenTypeError.errorCode]:UnsupportedTokenTypeError,[InvalidTokenError.errorCode]:InvalidTokenError,[MethodNotAllowedError.errorCode]:MethodNotAllowedError,[TooManyRequestsError.errorCode]:TooManyRequestsError,[InvalidClientMetadataError.errorCode]:InvalidClientMetadataError,[InsufficientScopeError.errorCode]:InsufficientScopeError,[InvalidTargetError.errorCode]:InvalidTargetError}
+ }
+-,"../../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=77c6ee065ffd446c891e26297b3de31aebbe74ac99c_7c0ebdbfa31b907d43e1d7dddf6f25e4/node_modules/@modelcontextprotocol/sdk/dist/esm/types.js"(t,u,p){
++,"../../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=d6585ecc3ef25fb368c06a7be3232df8c0e9380e7f3_e6eb960237b900ab984764623283adc4/node_modules/@modelcontextprotocol/sdk/dist/esm/types.js"(t,u,p){
+ "use strict";
+ p.d(u,{
+ TF:()=>wt,gd:()=>Re,gH:()=>ke,Sq:()=>H,GU:()=>xr,u9:()=>Ht,K1:()=>Jt,Mg:()=>ve,$9:()=>ur,n_:()=>mr,wR:()=>q,O4:()=>U,HM:()=>ft,oQ:()=>xe,Ql:()=>we,Sc:()=>Ee,Rk:()=>ie,OR:()=>$,aE:()=>v,xI:()=>Rt,Yu:()=>tt,O$:()=>Be,cv:()=>Fe,zR:()=>Ce,a5:()=>Te,WT:()=>St,Nh:()=>McpError,tC:()=>le,_r:()=>pe,br:()=>gt,EV:()=>S,ve:()=>He,hh:()=>Je,Iu:()=>b,ki:()=>Se,fH:()=>Tt,eK:()=>isInitializeRequest,wU:()=>isInitializedNotification,LW:()=>isJSONRPCErrorResponse,lg:()=>isJSONRPCNotification,vo:()=>isJSONRPCRequest,ig:()=>isJSONRPCResultResponse,bZ:()=>isTaskAugmentedRequestParams}
+@@ -70709,7 +70730,7 @@
+ ,"../constants/dist/mcp.js"(t,u,p){
+ "use strict";
+ p.d(u,{
+-G$:()=>k,tl:()=>I,TI:()=>m,Qy:()=>E,uS:()=>applyMcpOAuthProviderAuthorizationParams,RJ:()=>getCanonicalMcpOAuthRedirectUris,sr:()=>getRestMcpProviderIdForUrlPath,NC:()=>isEntraAuthorizationUrl,OY:()=>mcpOAuthLoopbackRedirectUrl,U_:()=>mcpResourceUrlValidatorForUrl,vI:()=>parseRestMcpProviderMetadataFromPrm,TS:()=>stripConsentPrompt}
++Xm:()=>R,G$:()=>P,tl:()=>M,TI:()=>m,Qy:()=>E,uS:()=>applyMcpOAuthProviderAuthorizationParams,RJ:()=>getCanonicalMcpOAuthRedirectUris,sr:()=>getRestMcpProviderIdForUrlPath,NC:()=>isEntraAuthorizationUrl,OY:()=>mcpOAuthLoopbackRedirectUrl,U_:()=>mcpResourceUrlValidatorForUrl,vI:()=>parseRestMcpProviderMetadataFromPrm,TS:()=>stripConsentPrompt}
+ );
+ const m="cursor/requiresConfirmation";
+ const g="https://grok.com/connectors-oauth-exchange-code/",v="https://x.com/i/connectors/oauth_callback",b={
+@@ -70719,7 +70740,7 @@
+ ,S={
+ provider:"x-money",clientRegistration:"static",rejectsCustomSchemeRedirects:!0,unauthenticatedConnect:!1,backendOnlyTokenExchange:!0,registeredAppRedirectUris:[g,v]}
+ ,w={
+-provider:"quickbooks-online",clientRegistration:"static",rejectsCustomSchemeRedirects:!0,unauthenticatedConnect:!1,unauthenticatedEndpointBlocked:!0,backendOnlyTokenExchange:!0,scopes:["foundations.tools.businessreports.read","foundations.tools.bi-dashboard","foundations.tools.transactions.write","foundations.tools.companyprofile.read","foundations.tools.companyprofile.write","payroll.tools.tax.read","payroll.tools.employer.read","payroll.tools.employer.manage","payroll.tools.run.read","payroll.tools.run.manage","payroll.tools.employee.read","payroll.tools.employee.manage","worker-mgmt.tools.employee.read","worker-mgmt.tools.employee.manage","sales.tools.invoice.read","sales.tools.invoice","sales.tools.estimate.read","sales.tools.estimate","sales.tools.payment-link.read","sales.tools.payment-link","sales.tools.settings.read","sales.tools.settings","sales.tools.salesorder.read","sales.tools.salesorder","contact.tools.customer.read","contact.tools.customer","catalog.tools.item.read","catalog.tools.item","lending.tools.servicing.read","money-onboarding.tools.application"]}
++provider:"quickbooks-online",clientRegistration:"static",rejectsCustomSchemeRedirects:!0,requiresHostedCallback:!0,unauthenticatedConnect:!1,unauthenticatedEndpointBlocked:!0,backendOnlyTokenExchange:!0,scopes:["com.intuit.quickbooks.accounting","foundations.tools.businessreports.read","foundations.tools.bi-dashboard","foundations.tools.transactions.write","foundations.tools.companyprofile.read","foundations.tools.companyprofile.write","payroll.tools.tax.read","payroll.tools.employer.read","payroll.tools.employer.manage","payroll.tools.run.read","payroll.tools.run.manage","payroll.tools.employee.read","payroll.tools.employee.manage","worker-mgmt.tools.employee.read","worker-mgmt.tools.employee.manage","sales.tools.invoice.read","sales.tools.invoice","sales.tools.estimate.read","sales.tools.estimate","sales.tools.payment-link.read","sales.tools.payment-link","sales.tools.settings.read","sales.tools.settings","sales.tools.salesorder.read","sales.tools.salesorder","contact.tools.customer.read","contact.tools.customer","catalog.tools.item.read","catalog.tools.item","lending.tools.servicing.read","money-onboarding.tools.application"]}
+ ,E="x-cursor-auth",x={
+ notConnected:"scm_not_connected",tokenUnavailable:"scm_token_unavailable",tokenRejected:"scm_token_rejected",repoNotAccessible:"scm_repo_not_accessible",orgBlocked:"scm_org_blocked"}
+ ;
+@@ -70796,10 +70817,10 @@
+ ],["bigquery.googleapis.com",{
+ ...b,scopes:["https://www.googleapis.com/auth/bigquery"]}
+ ],["api.x.com",{
+-provider:"x",clientRegistration:"static",unauthenticatedConnect:!1,rejectsCustomSchemeRedirects:!1,scopes:["tweet.read","users.read","follows.read","space.read","mute.read","like.read","list.read","list.write","block.read","block.write","bookmark.read","bookmark.write","dm.read","dm.write","developer.billing.write","developer.write","offline.access"],pinsScopesOverConfiguredScopes:!0}
++provider:"x",clientRegistration:"static",unauthenticatedConnect:!1,rejectsCustomSchemeRedirects:!1,pinsScopesOverConfiguredScopes:!0}
+ ],["mcp.money-dev.x.com",S],["mcp.money-staging.x.com",S],["mcp.money.x.com",S],["connectors-gateway.grok.gcp.mouseion.dev",C],["connectors-gateway.grok.com",C],["mcp.hubspot.com",{
+ provider:"hubspot",clientRegistration:"static",rejectsCustomSchemeRedirects:!0,unauthenticatedConnect:!1,backendOnlyTokenExchange:!0}
+-],["mcp-e2e.quickbooks.intuit.com",w],["setup.shopify.com",{
++],["mcp.quickbooks.intuit.com",w],["setup.shopify.com",{
+ provider:"shopify",clientRegistration:"static",unauthenticatedConnect:!0,rejectsCustomSchemeRedirects:!1}
+ ]]);
+ function getMcpOAuthProviderPolicyForUrl(t){
+@@ -70812,6 +70833,7 @@
+ return function getMcpOAuthProviderPolicy(t){
+ return T.get(t.toLowerCase())}
+ (u)}
++const R="https://gtm-api.corp.anysphere.co";
+ function withTrailingSlash(t){
+ return t.endsWith("/")?t:`${
+ t}
+@@ -70825,7 +70847,7 @@
+ p.href}
+  (or origin)`);
+ return m}
+-const R=/^\/shops\/[A-Za-z0-9-]+\/mcp$/;
++const k=/^\/shops\/[A-Za-z0-9-]+\/mcp$/;
+ function parsedUrlOrUndefined(t){
+ if(void 0!==t)try{
+ return new URL(t)}
+@@ -70835,7 +70857,7 @@
+ async function validateShopifyMerchantMcpResource(t,u){
+ if(void 0===u)return;
+ const p=new URL(t),m=parsedUrlOrUndefined(u);
+-if(!(void 0!==m&&m.origin===p.origin&&(m.pathname===p.pathname||R.test(m.pathname))))throw new Error(`Protected resource ${
++if(!(void 0!==m&&m.origin===p.origin&&(m.pathname===p.pathname||k.test(m.pathname))))throw new Error(`Protected resource ${
+ u}
+  does not match expected ${
+ p.href}
+@@ -70843,8 +70865,8 @@
+ return m}
+ function mcpResourceUrlValidatorForUrl(t,u){
+ if(function gtmMcpOmitsResourceIndicator(t,u){
+-const p=u?.gtmApiOrigin??"https://gtm-api.corp.anysphere.co";
+-if(void 0===t)return!1;
++const p=u.gtmApiOrigin;
++if(void 0===t||void 0===p)return!1;
+ let m,g;
+ try{
+ m=new URL(t),g=new URL(p)}
+@@ -70867,22 +70889,22 @@
+ const u=new Set(t.searchParams.getAll("prompt").flatMap((t=>t.split(" "))).filter((t=>""!==t&&"consent"!==t)));
+ t.searchParams.delete("prompt"),u.size>0&&t.searchParams.set("prompt",[...u].join(" "))}
+ new Set([...T].filter((([,t])=>"google-workspace"===t.provider)).map((([t])=>t)));
+-const k="https://ptht05hbb1ssoooe.public.blob.vercel-storage.com/assets/uploads/cursorlogomcpv3.svg",P="https://www.cursor.com/agents/mcp/oauth/callback",A="https://www.cursor.com/bot/mcp/oauth/callback",j={
+-portal:P,grokBotBounce:A}
++const P="https://ptht05hbb1ssoooe.public.blob.vercel-storage.com/assets/uploads/cursorlogomcpv3.svg",A="https://www.cursor.com/agents/mcp/oauth/callback",j="https://www.cursor.com/bot/mcp/oauth/callback",O={
++portal:A,grokBotBounce:j}
+ ;
+-const O="grokbot://mcp/oauth/callback",I="http://localhost:8787/callback",M="gb",D="gd";
++const I="grokbot://mcp/oauth/callback",M="http://localhost:8787/callback",D="gb",N="gd";
+ new Set(["outlook","outlook-calendar","onedrive","teams"]);
+ new Set(["teams"]);
+-const N=[18787,28787,31787];
++const L=[18787,28787,31787];
+ function mcpOAuthLoopbackCallbackUrlForPort(t){
+-const u=new URL(I);
++const u=new URL(M);
+ return u.port=String(t),u.toString()}
+-new Map([[M,O],["gw",g],[D,I],["xa",v],...N.map((t=>[`${
+-D}
++new Map([[D,I],["gw",g],[N,M],["xa",v],...L.map((t=>[`${
++N}
+ ${
+ t}
+ `,mcpOAuthLoopbackCallbackUrlForPort(t)]))]);
+-new Map([[O,M],[A,M],[g,"gw"],[v,"xa"]]);
++new Map([[I,D],[j,D],[g,"gw"],[v,"xa"]]);
+ function isLoopbackHttpUri(t){
+ try{
+ const u=new URL(t);
+@@ -70893,16 +70915,16 @@
+ return!1}
+ }
+ function mcpOAuthLoopbackRedirectUrl(t){
+-const u=t.redirectUrl??I;
++const u=t.redirectUrl??M;
+ if(!0!==t.loopbackIpv4||!isLoopbackHttpUri(u))return u;
+ const p=new URL(u);
+ return p.hostname="127.0.0.1",p.toString()}
+ mcpOAuthLoopbackRedirectUrl({
+ loopbackIpv4:!0}
+ );
+-function getCanonicalMcpOAuthRedirectUris(t,u=j){
++function getCanonicalMcpOAuthRedirectUris(t,u=O){
+ const p=new Set,m=void 0!==t&&isLoopbackHttpUri(t);
+-return t&&!m&&p.add(t),p.add(u.portal),t===O&&p.add(u.grokBotBounce),p.add(I),t&&m&&p.add(t),Array.from(p)}
++return t&&!m&&p.add(t),p.add(u.portal),t===I&&p.add(u.grokBotBounce),p.add(M),t&&m&&p.add(t),Array.from(p)}
+ }
+ ,"../context/dist/core.js"(t,u,p){
+ "use strict";
+@@ -82629,6 +82651,18 @@
+ )))}
+ }
+ const ze=Math.min(8,Math.max(1,Math.floor(Ee.availableParallelism()/2)));
++class ParsedIgnoreCache{
++constructor(t){
++this.maxLookups=t,this.instances=new Map,this.lookups=0}
++get(t,u){
++this.lookups>=this.maxLookups&&this.clear(),this.lookups++;
++let p=this.instances.get(t);
++return void 0===p&&(p=Ae().add(u),this.instances.set(t,p)),p}
++delete(t){
++this.instances.delete(t)}
++clear(){
++this.instances.clear(),this.lookups=0}
++}
+ class LocalIgnoreService{
+ constructor(t,u,p,m,g,v){
+ this.gitExecutor=t,this.gitIgnoreMapping=u,this.cursorIgnoreMapping=p,this.teamSettingsService=m,this.rootDirectories=g,this.scanEnvironment=v,this.gitIgnoreCache=new Ce.q({
+@@ -82641,12 +82675,9 @@
+ max:200}
+ ),this.hasGitDirCache=new Ce.q({
+ max:1e3}
+-),this.gitParsedIgnoreCache=new Map,this.cursorParsedIgnoreCache=new Map,this.unwalkedFolders=g.flatMap((t=>getProtectedFoldersUnder(t,v)))}
++),this.gitParsedIgnoreCache=new ParsedIgnoreCache(1e4),this.cursorParsedIgnoreCache=new ParsedIgnoreCache(1e4),this.unwalkedFolders=g.flatMap((t=>getProtectedFoldersUnder(t,v)))}
+ static getRipwalkCache(){
+ return LocalIgnoreService.ripwalkCache??=new RipwalkTtlCache,LocalIgnoreService.ripwalkCache}
+-getIgnoreInstance(t,u,p){
+-let m=p.get(t);
+-return m||(m=Ae().add(u),p.set(t,m)),m}
+ hasNoWorkspaceFolders(){
+ return 0===Object.keys(this.gitIgnoreMapping).length&&0===Object.keys(this.cursorIgnoreMapping).length}
+ async resolveLookupRoot(t){
+@@ -82808,7 +82839,7 @@
+ if(E.ignored&&!E.unignored)return!0}
+ return!1}
+ checkIgnored(t,u,p){
+-return this.testIgnored(t,u,((t,u)=>this.getIgnoreInstance(t,u,p)))}
++return this.testIgnored(t,u,((t,u)=>p.get(t,u)))}
+ async listCursorIgnoreFilesByRoot(t){
+ const u=await this.resolveLookupRoot(t),p=[];
+ for(const[t,v]of Object.entries(this.cursorIgnoreMapping)){
+@@ -82865,7 +82896,7 @@
+ max:1}
+ ),this.hasGitDirCache=new Ce.q({
+ max:1}
+-),this.gitParsedIgnoreCache=new Map,this.cursorParsedIgnoreCache=new Map,this.gitRepoMappingPromise=void 0}
++),this.gitParsedIgnoreCache.clear(),this.cursorParsedIgnoreCache.clear(),this.gitRepoMappingPromise=void 0}
+ async handleCursorIgnoreCreated(t){
+ const u=(0,g.dirname)(t),p=await(0,Pe.yR)(t),m=LocalIgnoreService.parseIgnoreRules(p);
+ this.cursorIgnoreMapping[u]=m,this.cursorParsedIgnoreCache.delete(u),this.cursorIgnoreCache.clear()}
+@@ -99056,7 +99087,7 @@
+ var m=t[p];
+ if("string"==typeof m)return m}
+ }
+-var V=p("node:child_process"),Y=p("../constants/dist/mcp.js"),X=p("../metrics/dist/index.js"),Z=p("../proto/dist/generated/agent/v1/mcp_pb.js"),Q=p("../utils/dist/workload-spawn.js"),ee=p("../../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=77c6ee065ffd446c891e26297b3de31aebbe74ac99c_7c0ebdbfa31b907d43e1d7dddf6f25e4/node_modules/@modelcontextprotocol/sdk/dist/esm/client/auth.js");
++var V=p("node:child_process"),Y=p("../constants/dist/mcp.js"),X=p("../metrics/dist/index.js"),Z=p("../proto/dist/generated/agent/v1/mcp_pb.js"),Q=p("../utils/dist/workload-spawn.js"),ee=p("../../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=d6585ecc3ef25fb368c06a7be3232df8c0e9380e7f3_e6eb960237b900ab984764623283adc4/node_modules/@modelcontextprotocol/sdk/dist/esm/client/auth.js");
+ function isZ4Schema(t){
+ return!!t._zod}
+ function safeParse(t,u){
+@@ -99078,7 +99109,7 @@
+ return}
+ return u}
+ }
+-var te=p("../../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=77c6ee065ffd446c891e26297b3de31aebbe74ac99c_7c0ebdbfa31b907d43e1d7dddf6f25e4/node_modules/@modelcontextprotocol/sdk/dist/esm/types.js");
++var te=p("../../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=d6585ecc3ef25fb368c06a7be3232df8c0e9380e7f3_e6eb960237b900ab984764623283adc4/node_modules/@modelcontextprotocol/sdk/dist/esm/types.js");
+ function isTerminal(t){
+ return"completed"===t||"failed"===t||"cancelled"===t}
+ Symbol("Let zodToJsonSchema decide on which parser to use");
+@@ -101037,7 +101068,7 @@
+ constructor(t){
+ this._identifier=t.identifier,this._redirectUrl=t.redirectUrl,this._serverUrl=t.serverUrl,this._restMcpProviderMetadata=t.restMcpProviderMetadata,this.validateResourceURL=!0===t.restMcpProviderMetadata?.omitResourceIndicator?async()=>{
+ }
+-:(0,Y.U_)(t.serverUrl),this._clientMetadata=t.clientMetadata,this._scopes=t.scopes,this._tokens=t.tokens,this._clientInformation=t.clientInformation,this._saveTokens=t.saveTokens,this._prepareForRefresh=t.prepareForRefresh,this._releaseRefreshLeaseOnError=t.releaseRefreshLeaseOnError,this._invalidateCredentials=t.invalidateCredentials,this._saveClientInformation=t.saveClientInformation,this.addClientAuthentication=t.addClientAuthentication}
++:(0,Y.U_)(t.serverUrl,t.gtmMcpMatch),this._clientMetadata=t.clientMetadata,this._scopes=t.scopes,this._tokens=t.tokens,this._clientInformation=t.clientInformation,this._saveTokens=t.saveTokens,this._prepareForRefresh=t.prepareForRefresh,this._releaseRefreshLeaseOnError=t.releaseRefreshLeaseOnError,this._invalidateCredentials=t.invalidateCredentials,this._saveClientInformation=t.saveClientInformation,this.addClientAuthentication=t.addClientAuthentication}
+ get redirectUrl(){
+ return this._redirectUrl}
+ get clientMetadata(){
+@@ -101121,7 +101152,9 @@
+ storedClientInformation:await m.loadClientInformation(),staticClientInformation:S}
+ );
+ return new InMemoryOAuthClientProvider({
+-identifier:u,redirectUrl:b,serverUrl:p.url,restMcpProviderMetadata:v,clientMetadata:{
++identifier:u,redirectUrl:b,serverUrl:p.url,restMcpProviderMetadata:v,gtmMcpMatch:t.gtmMcpMatch??{
++gtmApiOrigin:Y.Xm}
++,clientMetadata:{
+ redirect_uris:(0,Y.RJ)(b),token_endpoint_auth_method:"none",grant_types:[...$e],response_types:[...qe],client_name:"Cursor",logo_uri:Y.G$}
+ ,scopes:p.auth?.scopes,tokens:await m.loadTokens(),clientInformation:w,saveTokens:t=>m.saveTokens(t),prepareForRefresh:()=>m.prepareForRefresh?.()??Promise.resolve(),releaseRefreshLeaseOnError:t=>m.releaseRefreshLeaseOnError?.(t)??Promise.resolve(),invalidateCredentials:m.invalidateCredentials?t=>m.invalidateCredentials(t):void 0,saveClientInformation:t=>m.saveClientInformation(t),addClientAuthentication:m.tokenEndpointAuth?.({
+ clientId:w?.client_id}
+@@ -101195,32 +101228,32 @@
+ }
+ }
+ ))}
+-static async fromStreamableHttp(t,u,p,m,v,b,S,w){
+-const E=new URL(u.url);
++static async fromStreamableHttp(t,u,p,m,v,b,S,w,E){
++const x=new URL(u.url);
+ v=v??Y.tl;
+-const x=await createInMemoryOAuthClientProvider({
+-serverName:t,config:u,tokenStorage:p,authRedirectUrl:v,fetchImpl:b}
+-),C=x.tokens(),T=(0,g.mtU)(u.url,m),R=T.headers,k=b??(globalThis.fetch?globalThis.fetch.bind(globalThis):void 0),P=void 0!==T.cursorAuthHeaderValue&&void 0!==T.cursorAuthOrigin&&void 0!==k?(0,g.utF)((()=>T.cursorAuthHeaderValue),T.cursorAuthOrigin,k):k,buildLoggedFetch=t=>void 0===P||void 0===S?P:(0,g.jIB)({
+-fetch:P,logger:S.logger,metadata:{
++const C=await createInMemoryOAuthClientProvider({
++serverName:t,config:u,tokenStorage:p,authRedirectUrl:v,fetchImpl:b,gtmMcpMatch:E}
++),T=C.tokens(),R=(0,g.mtU)(u.url,m),k=R.headers,P=b??(globalThis.fetch?globalThis.fetch.bind(globalThis):void 0),A=void 0!==R.cursorAuthHeaderValue&&void 0!==R.cursorAuthOrigin&&void 0!==P?(0,g.utF)((()=>R.cursorAuthHeaderValue),R.cursorAuthOrigin,P):P,buildLoggedFetch=t=>void 0===A||void 0===S?A:(0,g.jIB)({
++fetch:A,logger:S.logger,metadata:{
+ ...S.metadata,transportType:t}
+ }
+-),A=McpSdkClient.createClient(),isConnectAuthFailure=t=>t instanceof ee.D_||(0,g.Gpm)(t),exchangeAuthorizationCode=async u=>{
+-if(!x.hasClientInformation())throw new Error("OAuth client registration has not completed. The MCP server may not support dynamic client registration or the registration failed.");
+-await(0,ee.j2)(x,{
+-serverUrl:E.toString(),authorizationCode:u,...void 0!==P?{
+-fetchFn:P}
++),j=McpSdkClient.createClient(),isConnectAuthFailure=t=>t instanceof ee.D_||(0,g.Gpm)(t),exchangeAuthorizationCode=async u=>{
++if(!C.hasClientInformation())throw new Error("OAuth client registration has not completed. The MCP server may not support dynamic client registration or the registration failed.");
++await(0,ee.j2)(C,{
++serverUrl:x.toString(),authorizationCode:u,...void 0!==A?{
++fetchFn:A}
+ :{
+ }
+ }
+ ),w&&(0,g.VDJ)({
+ logger:w,event:"mcp_oauth_callback_completion",metadata:{
+-identifier:t,...(0,g.q2e)(E.toString()),...(0,g.tBH)(x.tokens(),{
++identifier:t,...(0,g.q2e)(x.toString()),...(0,g.tBH)(C.tokens(),{
+ expiresInIsFresh:!0}
+ )}
+ }
+ )}
+ ,createRequiresAuthenticationClient=p=>{
+-const m=x.lastRedirectUrl?.toString?.()??"",g=new McpSdkClient(t,A,{
++const m=C.lastRedirectUrl?.toString?.()??"",g=new McpSdkClient(t,j,{
+ oauthLifecycleLogger:w,initialState:{
+ kind:"requires_authentication",url:m,callback:async t=>{
+ try{
+@@ -101234,48 +101267,48 @@
+ `)}
+ }
+ }
+-,authProvider:x,authCodeExchange:exchangeAuthorizationCode,sessionId:p,config:u}
++,authProvider:C,authCodeExchange:exchangeAuthorizationCode,sessionId:p,config:u}
+ );
+ return g}
+ ,connectSse=async()=>{
+-const p=new SSEClientTransport(E,{
+-authProvider:x,requestInit:{
++const p=new SSEClientTransport(x,{
++authProvider:C,requestInit:{
+ headers:{
+-"User-Agent":"Cursor/1.0.0",...R??{
++"User-Agent":"Cursor/1.0.0",...k??{
+ }
+ }
+ }
+ ,fetch:buildLoggedFetch("sse")}
+ );
+ try{
+-return await A.connect(p),new McpSdkClient(t,A,{
++return await j.connect(p),new McpSdkClient(t,j,{
+ initialState:{
+ kind:"ready"}
+-,authProvider:x,authCodeExchange:exchangeAuthorizationCode,config:u,oauthLifecycleLogger:w}
++,authProvider:C,authCodeExchange:exchangeAuthorizationCode,config:u,oauthLifecycleLogger:w}
+ )}
+ catch(u){
+ if(await p.close().catch((()=>{
+ }
+ )),isConnectAuthFailure(u))return w&&(0,g.VDJ)({
+ logger:w,event:"mcp_oauth_state_transition",metadata:{
+-identifier:t,from:"connecting",to:"needsAuth",cause:"connect_auth_error",transport:"sse",refreshTokenPresent:Boolean(C?.refresh_token),...(0,g.q2e)(E.toString()),...(0,g.X5z)(u)}
++identifier:t,from:"connecting",to:"needsAuth",cause:"connect_auth_error",transport:"sse",refreshTokenPresent:Boolean(T?.refresh_token),...(0,g.q2e)(x.toString()),...(0,g.X5z)(u)}
+ }
+ ),createRequiresAuthenticationClient();
+ throw u}
+ }
+ ;
+ if("sse"===u.type)return connectSse();
+-const j=new StreamableHTTPClientTransport(E,{
+-authProvider:x,requestInit:{
++const O=new StreamableHTTPClientTransport(x,{
++authProvider:C,requestInit:{
+ headers:{
+-"User-Agent":"Cursor/1.0.0",...R??{
++"User-Agent":"Cursor/1.0.0",...k??{
+ }
+ }
+ }
+ ,fetch:buildLoggedFetch("streamableHttp")}
+ );
+ try{
+-await A.connect(j);
++await j.connect(O);
+ const p=function sessionlessInitializeOf(t,u,p){
+ const m=u.protocolVersion;
+ if(void 0!==u.sessionId||void 0===m)return;
+@@ -101291,13 +101324,13 @@
+ }
+ ,credentialFingerprint:p()}
+ }
+-(A,j,(()=>mcpCredentialFingerprint({
+-url:u.url,headers:m,accessToken:x.tokens()?.access_token}
++(j,O,(()=>mcpCredentialFingerprint({
++url:u.url,headers:m,accessToken:C.tokens()?.access_token}
+ )));
+-return new McpSdkClient(t,A,{
++return new McpSdkClient(t,j,{
+ initialState:{
+ kind:"ready"}
+-,authProvider:x,authCodeExchange:exchangeAuthorizationCode,sessionId:j.sessionId,protocolVersion:j.protocolVersion,...void 0===p?{
++,authProvider:C,authCodeExchange:exchangeAuthorizationCode,sessionId:O.sessionId,protocolVersion:O.protocolVersion,...void 0===p?{
+ }
+ :{
+ sessionlessInitialize:p}
+@@ -101306,9 +101339,9 @@
+ catch(u){
+ if(isConnectAuthFailure(u))return w&&(0,g.VDJ)({
+ logger:w,event:"mcp_oauth_state_transition",metadata:{
+-identifier:t,from:"connecting",to:"needsAuth",cause:"connect_auth_error",transport:"streamableHttp",refreshTokenPresent:Boolean(C?.refresh_token),...(0,g.q2e)(E.toString()),...(0,g.X5z)(u)}
++identifier:t,from:"connecting",to:"needsAuth",cause:"connect_auth_error",transport:"streamableHttp",refreshTokenPresent:Boolean(T?.refresh_token),...(0,g.q2e)(x.toString()),...(0,g.X5z)(u)}
+ }
+-),createRequiresAuthenticationClient(j.sessionId);
++),createRequiresAuthenticationClient(O.sessionId);
+ if((0,g.PKk)(u))return connectSse();
+ throw u}
+ }
+@@ -101325,57 +101358,57 @@
+ kind:"ready"}
+ ,sessionId:g.sessionId,protocolVersion:g.protocolVersion,config:u}
+ )}
+-static async fromCachedSession(t,u,p,m,v,b=Y.tl,S,w,E){
+-const x=new URL(u.url),C=await createInMemoryOAuthClientProvider({
+-serverName:t,config:u,tokenStorage:m,authRedirectUrl:b,fetchImpl:S}
++static async fromCachedSession(t,u,p,m,v,b=Y.tl,S,w,E,x){
++const C=new URL(u.url),T=await createInMemoryOAuthClientProvider({
++serverName:t,config:u,tokenStorage:m,authRedirectUrl:b,fetchImpl:S,gtmMcpMatch:x}
+ ),{
+-transportHeaders:T,baseFetch:R}
+-=restMcpTransportFetch(u.url,v,S),k=new StreamableHTTPClientTransport(x,{
+-authProvider:C,sessionId:p.sessionId,requestInit:{
++transportHeaders:R,baseFetch:k}
++=restMcpTransportFetch(u.url,v,S),P=new StreamableHTTPClientTransport(C,{
++authProvider:T,sessionId:p.sessionId,requestInit:{
+ headers:{
+-"User-Agent":"Cursor/1.0.0",...T??{
++"User-Agent":"Cursor/1.0.0",...R??{
+ }
+ }
+ }
+-,fetch:void 0!==R&&void 0!==w?(0,g.jIB)({
+-fetch:R,logger:w.logger,metadata:{
++,fetch:void 0!==k&&void 0!==w?(0,g.jIB)({
++fetch:k,logger:w.logger,metadata:{
+ ...w.metadata,transportType:"streamableHttp"}
+ }
+-):R}
++):k}
+ );
+-k.setProtocolVersion(p.protocolVersion);
+-const P=McpSdkClient.createClient();
+-return await P.connect(k),new McpSdkClient(t,P,{
++P.setProtocolVersion(p.protocolVersion);
++const A=McpSdkClient.createClient();
++return await A.connect(P),new McpSdkClient(t,A,{
+ initialState:{
+ kind:"ready"}
+-,authProvider:C,sessionId:k.sessionId,protocolVersion:p.protocolVersion,...void 0===p.instructions?{
++,authProvider:T,sessionId:P.sessionId,protocolVersion:p.protocolVersion,...void 0===p.instructions?{
+ }
+ :{
+ resumedInstructions:p.instructions}
+ ,config:u,oauthLifecycleLogger:E}
+ )}
+-static async fromSessionlessInitialize(t,u,p,m,g,v=Y.tl,b){
+-const S=await createInMemoryOAuthClientProvider({
+-serverName:t,config:u,tokenStorage:m,authRedirectUrl:v,fetchImpl:b}
++static async fromSessionlessInitialize(t,u,p,m,g,v=Y.tl,b,S){
++const w=await createInMemoryOAuthClientProvider({
++serverName:t,config:u,tokenStorage:m,authRedirectUrl:v,fetchImpl:b,gtmMcpMatch:S}
+ );
+ if(mcpCredentialFingerprint({
+-url:u.url,headers:g,accessToken:S.tokens()?.access_token}
++url:u.url,headers:g,accessToken:w.tokens()?.access_token}
+ )!==p.credentialFingerprint)return;
+ const{
+-transportHeaders:w,baseFetch:E}
+-=restMcpTransportFetch(u.url,g,b),x=new StreamableHTTPClientTransport(new URL(u.url),{
+-authProvider:S,requestInit:{
++transportHeaders:E,baseFetch:x}
++=restMcpTransportFetch(u.url,g,b),C=new StreamableHTTPClientTransport(new URL(u.url),{
++authProvider:w,requestInit:{
+ headers:{
+-"User-Agent":"Cursor/1.0.0",...w??{
++"User-Agent":"Cursor/1.0.0",...E??{
+ }
+ }
+ }
+-,fetch:E}
+-),C=McpSdkClient.createClient();
+-return await C.connect(new ReplayedInitializeTransport(x,p.result)),new McpSdkClient(t,C,{
++,fetch:x}
++),T=McpSdkClient.createClient();
++return await T.connect(new ReplayedInitializeTransport(C,p.result)),new McpSdkClient(t,T,{
+ initialState:{
+ kind:"ready"}
+-,authProvider:S,sessionlessInitialize:p,config:u}
++,authProvider:w,sessionlessInitialize:p,config:u}
+ )}
+ get sessionId(){
+ return this._sessionId}
+@@ -102879,7 +102912,7 @@
+ }
+ new Map;
+ new Set,new Set(["connection_attempt"]),new Set(["health_probe"]);
+-p("../../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=77c6ee065ffd446c891e26297b3de31aebbe74ac99c_7c0ebdbfa31b907d43e1d7dddf6f25e4/node_modules/@modelcontextprotocol/sdk/dist/esm/client/auth.js"),p("../../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=77c6ee065ffd446c891e26297b3de31aebbe74ac99c_7c0ebdbfa31b907d43e1d7dddf6f25e4/node_modules/@modelcontextprotocol/sdk/dist/esm/server/auth/errors.js");
++p("../../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=d6585ecc3ef25fb368c06a7be3232df8c0e9380e7f3_e6eb960237b900ab984764623283adc4/node_modules/@modelcontextprotocol/sdk/dist/esm/client/auth.js"),p("../../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=d6585ecc3ef25fb368c06a7be3232df8c0e9380e7f3_e6eb960237b900ab984764623283adc4/node_modules/@modelcontextprotocol/sdk/dist/esm/server/auth/errors.js");
+ Error;
+ Error;
+ const A=new Set(["UnauthorizedError","InvalidGrantError","InvalidTokenError","InvalidClientError","UnauthorizedClientError"]),j=new Set(["invalid_grant","invalid_token","invalid_client","unauthorized_client"]),O=[/\btoken (?:has |is )?expired\b/i,/\btoken (?:was|is) invalid\b/i,/\binvalid (?:refresh[ _]?)?token\b/i,/\btoken (?:has been |was )?revoked\b/i];
+@@ -105460,7 +105493,7 @@
+ }
+ class WarmRemoteAccessServerRequest extends __protoMessage3{
+ constructor(t){
+-super(),this.commit="",this.port=0,this.connectionToken="",m.C.util.initPartial(t,this)}
++super(),this.commit="",this.port=0,this.connectionToken="",this.downloadBaseUrl="",m.C.util.initPartial(t,this)}
+ static fromBinary(t,u){
+ return(new WarmRemoteAccessServerRequest).fromBinary(t,u)}
+ static fromJson(t,u){
+@@ -105470,7 +105503,7 @@
+ static equals(t,u){
+ return m.C.util.equals(WarmRemoteAccessServerRequest,t,u)}
+ static $(){
+-return["WarmRemoteAccessServerRequest|1 commit 9|2 port 5|3 connection_token 9"]}
++return["WarmRemoteAccessServerRequest|1 commit 9|2 port 5|3 connection_token 9|4 download_base_url 9"]}
+ }
+ class WarmRemoteAccessServerResponse extends __protoMessage3{
+ constructor(t){
+@@ -107515,7 +107548,7 @@
+ static equals(t,u){
+ return m.C.util.equals(SmartModeClassifierSuccess,t,u)}
+ static $(){
+-return["SmartModeClassifierSuccess|1 decision #0|2 block_reason 9?|3 proposed_allow_rule 9?|4 applied_rules #1*|5 proposed_allow_rule_replaces 9?",H,SmartModeClassifierAppliedRule]}
++return["SmartModeClassifierSuccess|1 decision #0|2 block_reason 9?|3 proposed_allow_rule 9?|4 applied_rules #1*|5 proposed_allow_rule_replaces 9?|6 blocked_effect 9?|7 irreversible 8?",H,SmartModeClassifierAppliedRule]}
+ }
+ class SmartModeClassifierAppliedRule extends smart_mode_classifier_exec_pb_protoMessage3{
+ constructor(t){

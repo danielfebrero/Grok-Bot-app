@@ -1,0 +1,12 @@
+--- 2026-10-19_05-47:/usr/local/bin/box-xvfb
++++ 2026-10-19_07-48:/usr/local/bin/box-xvfb
+@@ -34,8 +34,7 @@
+ 	candidates="$(
+ 		{
+ 			display_owner_pids "${n}"
+-			for path in /proc/[0-9]*/cmdline; do
+-				[ -r "${path}" ] || continue
++			for path in $(grep -slz -- 'Xvfb' /proc/[0-9]*/cmdline 2>/dev/null); do
+ 				pid="${path%/cmdline}"
+ 				printf '%s\n' "${pid##*/}"
+ 			done

@@ -1,0 +1,47 @@
+--- 2026-10-19_05-47:/usr/local/bin/sand-ua-governor.mjs
++++ 2026-10-19_07-48:/usr/local/bin/sand-ua-governor.mjs
+@@ -1,4 +1,4 @@
+-import { existsSync, readFileSync } from "node:fs";
++import { readFileSync } from "node:fs";
+ import { pathToFileURL } from "node:url";
+ 
+ import {
+@@ -45,6 +45,7 @@
+     "Emulation.setUserAgentOverride",
+     buildUserAgentOverride(liveChromeProduct(browser), {
+       acceptLanguageEnUs: acceptLanguageEnUsEnabledForBrowser(browser),
++      acceptLanguage: browser.acceptLanguage,
+     }),
+     sessionId,
+   );
+@@ -102,18 +103,26 @@
+   return browser.hardwareProfileEnabled === true;
+ }
+ 
+-export function resolveAcceptLanguageEnUsEnabled(
++export function readAcceptLanguageEnUsMarker(
+   markerPath = BROWSER_ACCEPT_LANGUAGE_EN_US_MARKER_PATH,
+ ) {
+-  return existsSync(markerPath);
++  try {
++    return readFileSync(markerPath, "utf8");
++  } catch (error) {
++    if (error?.code === "ENOENT") return null;
++    console.error(`accept-language marker read failed: ${errorClass(error)}`);
++    return "";
++  }
+ }
+ 
+ export function acceptLanguageEnUsEnabledForBrowser(
+   browser,
+-  resolve = resolveAcceptLanguageEnUsEnabled,
++  resolve = readAcceptLanguageEnUsMarker,
+ ) {
+   if (!Object.prototype.hasOwnProperty.call(browser, "acceptLanguageEnUsEnabled")) {
+-    browser.acceptLanguageEnUsEnabled = resolve() === true;
++    const marker = resolve();
++    browser.acceptLanguageEnUsEnabled = marker != null;
++    browser.acceptLanguage = marker ?? "";
+   }
+   return browser.acceptLanguageEnUsEnabled === true;
+ }

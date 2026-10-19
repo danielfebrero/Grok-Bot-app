@@ -1,0 +1,12 @@
+--- 2026-10-19_05-47:/opt/sand/deps/sand-devicecheck/index.js
++++ 2026-10-19_07-48:/opt/sand/deps/sand-devicecheck/index.js
+@@ -0,0 +1,9 @@
++// Copyright Anysphere Inc.
++
++const binding = require("./build/Release/sand_devicecheck.node");
++
++module.exports = {
++  isSupported: binding.isSupported,
++  generateToken: binding.generateToken,
++  hvVmmPresent: binding.hvVmmPresent,
++};

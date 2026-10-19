@@ -1,0 +1,10 @@
+--- 2026-10-19_05-47:/usr/local/bin/start-window
++++ 2026-10-19_07-48:/usr/local/bin/start-window
+@@ -95,6 +95,7 @@
+ 		--auth-token local \
+ 		--rg-path /exec-daemon/rg \
+ 		--computer-use-enabled \
++		--computer-use-lazy-init \
+ 		--computer-use-api-width "${COMPUTER_USE_API_WIDTH}" \
+ 		--computer-use-api-height "${COMPUTER_USE_API_HEIGHT}" \
+ 		--mcp-meta-tool-enabled \

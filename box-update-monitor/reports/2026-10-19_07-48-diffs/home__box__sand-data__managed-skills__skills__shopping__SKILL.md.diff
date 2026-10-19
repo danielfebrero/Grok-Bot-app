@@ -1,0 +1,75 @@
+--- 2026-10-19_05-47:/home/box/sand-data/managed-skills/skills/shopping/SKILL.md
++++ 2026-10-19_07-48:/home/box/sand-data/managed-skills/skills/shopping/SKILL.md
+@@ -2,8 +2,10 @@
+ name: shopping
+ description: >-
+   When the user asks you to buy, order, reorder, or compare a product on Amazon
+-  or any other retail site, or sends a product link to purchase, before you open
+-  the store or add anything to a cart.
++  or any other retail site, asks which of two or three products to get or
++  whether one costs less at another store, or sends a product link to purchase,
++  before you open the store or add anything to a cart, alongside any store's
++  site playbook.
+ ---
+ # Shopping and checkout
+ 
+@@ -16,6 +18,8 @@
+ - "Buy a 65-inch TV under $800 with good reviews" is a compare-then-buy with a budget.
+ - "Find me a good travel stroller" is browsing;
+  the deliverable is a shortlist before anything goes in a cart.
++- "Which of these two should I get?" or "Is it cheaper at Target?", about two or three specific products or one product at several stores, is a comparison;
++ the deliverable is the side-by-side view in Comparing offers, and the user picks.
+ - A pasted product link goes straight to that product page.
+ - A photo or screenshot of a product ("buy this", "find these shoes") is a search: name what you see (brand, model, color) and search for it, then confirm the match with the user before it goes in a cart.
+ - A list (a packing list, "a phone case, a charger, and a screen protector") is one cart with several items: search each, then review once.
+@@ -31,7 +35,7 @@
+ 
+ ## Flow
+ 
+-1. Open the results or the linked product page with the subagent. Only the subagent's final message reaches you, so list in its task every fact you need back for each top candidate: its own product page URL, name, brand, price as shown and any was price, stock state, rating and review count, delivery date, seller, the product image URLs with the main one first, the options it comes in (such as color or size), and up to six key specs as label and value, the same specs for every candidate. Most stores publish these facts as JSON-LD, so on a store with no site playbook have it run this page script on each product page and read the rendered page only for what the script misses: `async (page) => {
++1. Open the results or the linked product page with the subagent. Only the subagent's final message reaches you, so list in its task every fact you need back for each top candidate: its own product page URL, name, brand, price as shown and any was price, stock state, rating and review count, delivery date, seller, the product image URLs with the main one first, the options it comes in (such as color or size), and up to six key specs as label and value, the same specs for every candidate. For a comparison (see Comparing offers), also list the shipping cost, any membership perk the page shows, the return window and who pays return shipping (from the store's return policy page when the product page does not say), and the model number or pack size. Most stores publish these facts as JSON-LD, so on a store with no site playbook have it run this page script on each product page and read the rendered page only for what the script misses: `async (page) => {
+  const o = [], a = (v) => [].concat(v ?? []), u = (i) => i?.url ?? i?.contentUrl ?? i, x = (n) => a(n.offers?.offers ?? n.offers).slice(0, 2), w = (n) => {
+  if (Object(n) !== n) return;
+  if (Array.isArray(n)) return n.forEach(w);
+@@ -61,13 +65,14 @@
+  }
+ `. When a store blocks its product pages, have it take the facts from the search results instead, including each result's thumbnail image URL;
+  the accessibility snapshot carries no image URLs, so it reads them from the result cards' images with a page script. For a compare across stores, check two or three stores the user would buy from in parallel subagents, and note each store that blocked the subagent or had no match.
+-2. Fill the gaps before you present. A shortlist the user can choose from has a photo, a price, a rating, the stock state, and the specs that set the candidates apart for each product. When the report leaves out one of these for a candidate, look first in what you already read, such as a "Page image:" line from an earlier WebFetch of that page, then call WebFetch on the product pages still missing facts, all in parallel;
++2. Fill the gaps before you present. A shortlist the user can choose from has a photo, a price, a rating, the stock state, and the specs that set the candidates apart for each product;
++ a comparison also needs the extra facts step 1 lists for one. When the report leaves out one of these for a candidate, look first in what you already read, such as a "Page image:" line from an earlier WebFetch of that page, then call WebFetch on the product pages still missing facts, all in parallel;
+  its output starts with a "Page image:" line when the page has a photo. Ask the subagent again only for what WebFetch could not read, and leave out a fact no page showed. Many stores refuse WebFetch, even with a 404, while serving the subagent's browser, so a product page the subagent opened and read in this task is a live link however WebFetch answered.
+ 3. When the site wants a sign-in, a one-time code, or a verify-you-are-human check, follow the Cursor-managed `sign-in` skill in its order, which ends with the Secure Form (`RequestUserForm`) and then handing over the screen with `request_box_help` and one instruction ("Sign in to your <service> account"). Never send a question widget before these;
+  the tool is the ask. After a receipt or a hand-back, dispatch the subagent again;
+  the session persists across turns.
+-4. Compare. For a visual choice (looks, color, a spec table), take a Screenshot and attach the saved path. Summarize price, rating, delivery date, and the specs the user cares about (see Presenting choices).
+-5. Get the pick. If the user delegated with exact criteria and one product clearly wins, choose it, say why, and still show it before checkout.
++4. Compare. For a visual choice (looks, color, a spec table), take a Screenshot and attach the saved path. Summarize price, rating, delivery date, and the specs the user cares about (see Presenting choices). For a comparison, follow Comparing offers instead.
++5. Get the pick. If the user delegated with exact criteria ("order whichever is cheaper delivered") and one product clearly wins, choose it, say why, and still show it before checkout. "Which should I get?" asks for your recommendation, not for you to choose, so the user still picks.
+ 6. Check variants. Size, color, quantity, pack count, and subscription versus one-time purchase change the price. For the product the user is choosing, have the subagent read each option combination its page offers, with that combination's price, stock, image URL, and page URL;
+  on a store with no site playbook, the page script from step 1 returns them as a product group's variants. Ask with a question widget when the user did not specify and the options are real;
+  otherwise take the default and say so. A saved size (see Sizes and preferences) answers the size question only, so still ask about any other open variant. When more than one variant is open, ask about them together in one short message instead of one question at a time.
+@@ -90,12 +95,22 @@
+ 
+ ## Presenting choices
+ 
+-- When `SendToUser` has a `shopping` field, show products in it instead of a text list: every shortlist, and a single product the user asked about or picked. Fill the gaps first (step 2), but a photo, rating, or spec you still could not get is only left out of that product's entry, never a reason to send a text list. Link each offer to the product's own page that you or the subagent read, and use a search results page only for a product whose own page nobody opened. In `content`, give your pick and the main tradeoff, and name each store that blocked you or had no match.
++- When `SendToUser` has a `shopping` field, show products in it instead of a text list: every shortlist, and a single product the user asked about or picked. Fill the gaps first (step 2), but a photo, rating, or spec you still could not get is only left out of that product's entry, never a reason to send a text list. Link each offer to the product's own page that you or the subagent read, and use a search results page only for a product whose own page nobody opened. In `content`, give your pick and the main tradeoff, and name each store that blocked you or had no match. A comparison fills the field as Comparing offers says.
+ - Without that field, show three to five candidates that differ on something that matters, one per line as `- [Item name](https://item-page-url), $25.60, short note`. The note carries what sets it apart, such as the rating with review count, the delivery date, the seller, or a spec the user asked about.
+ - Attach a screenshot when the choice is visual or the spec table is dense. A summary alone is enough for a reorder.
+ - Name the tradeoff plainly ("$40 more for the version with a battery indicator"). Do not pad the list with near-duplicates.
+ - Use a question widget for the pick when the shortlist is short and every option is a real product you saw. Otherwise send the summary and let the user reply.
+ 
++## Comparing offers
++
++When the user is choosing between two or three specific products, or the same product at different stores ("which of these two?", "is it cheaper at Target?"), put the offers side by side. Send the side-by-side view and the recommendation, not a shortlist as well.
++
++- Every comparison covers the delivered price (item plus shipping and tax as far as the page shows), the delivery date, the membership perks that apply (Prime, Walmart+, a free shipping threshold), the return window and who pays return shipping, and the seller and its rating, even when the user said which specs matter most. Add the specs the user named after those.
++- Read the return window from the product page or the store's return policy page. When neither shows it, write "not shown" rather than a typical value.
++- For the same product at several stores, confirm the model number or pack size matches before comparing prices, and say when it does not.
++- When `SendToUser` has a `shopping` field, put the comparison there. Give each offer its `delivery`, its shipping and return terms as `policies`, and its perk as `note`. Two or three products get a `compare` with rows for "price", "rating", and the specs every product lists, and the recommendation as its `verdict`. One product at several stores is one product with an offer per store. Without that field, use one column per offer in a compact table, or one line per offer on a channel that shows plain text.
++- End with a one-line recommendation and the reason ("Target: $12 less delivered and a 90-day return window, arrives a day later"), then ask which one they want, with a `followUps` reply per offer when you sent the `shopping` field.
++
+ ## Paying and confirming
+ 
+ - The user must have asked to buy this specific item. Never spend on your own initiative, and never buy to hold a price.

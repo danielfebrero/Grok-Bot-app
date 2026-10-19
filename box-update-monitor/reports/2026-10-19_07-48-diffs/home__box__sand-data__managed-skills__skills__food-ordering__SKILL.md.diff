@@ -1,0 +1,8 @@
+--- 2026-10-19_05-47:/home/box/sand-data/managed-skills/skills/food-ordering/SKILL.md
++++ 2026-10-19_07-48:/home/box/sand-data/managed-skills/skills/food-ordering/SKILL.md
+@@ -80,4 +80,4 @@
+ 
+ ## Site playbooks
+ 
+-Before you dispatch the browser subagent, Read the `site-playbooks-doordash`, `site-playbooks-instacart`, or `site-playbooks-costco` skill in this catalog, whichever names the site you are about to use, and paste the Dispatch snippet of the job that matches your step (a read-only lookup, or a cart and checkout) into the Task text. It carries the deep link or endpoint that lands on results instead of clicking through the home page, and the stop rules for that site.
++Before you dispatch the browser subagent, Read the `site-playbooks-doordash` skill in this catalog, if it names the site you are about to use, and paste the Dispatch snippet of the job that matches your step (a read-only lookup, or a cart and checkout) into the Task text. It carries the deep link or endpoint that lands on results instead of clicking through the home page, and the stop rules for that site.

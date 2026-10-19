@@ -1,0 +1,1061 @@
+--- 2026-10-19_05-47:/exec-daemon/canvas-runtime/canvas-runtime.esm.js
++++ 2026-10-19_07-48:/exec-daemon/canvas-runtime/canvas-runtime.esm.js
+@@ -10679,11 +10679,11 @@
+         ReactDOMSharedInternals.p = previousPriority, ReactSharedInternals.T = prevTransition, releaseRootPooledCache(root3, remainingLanes);
+       }
+     }
+-    function captureCommitPhaseErrorOnRoot(rootFiber, sourceFiber, error) {
++    function captureCommitPhaseErrorOnRoot(rootFiber2, sourceFiber, error) {
+       sourceFiber = createCapturedValueAtFiber(error, sourceFiber);
+-      sourceFiber = createRootErrorUpdate(rootFiber.stateNode, sourceFiber, 2);
+-      rootFiber = enqueueUpdate(rootFiber, sourceFiber, 2);
+-      null !== rootFiber && (markRootUpdated$1(rootFiber, 2), ensureRootIsScheduled(rootFiber));
++      sourceFiber = createRootErrorUpdate(rootFiber2.stateNode, sourceFiber, 2);
++      rootFiber2 = enqueueUpdate(rootFiber2, sourceFiber, 2);
++      null !== rootFiber2 && (markRootUpdated$1(rootFiber2, 2), ensureRootIsScheduled(rootFiber2));
+     }
+     function captureCommitPhaseError(sourceFiber, nearestMountedAncestor, error) {
+       if (3 === sourceFiber.tag)
+@@ -13894,15 +13894,15 @@
+       parentComponent = emptyContextObject;
+       return parentComponent;
+     }
+-    function updateContainerImpl(rootFiber, lane, element2, container, parentComponent, callback) {
++    function updateContainerImpl(rootFiber2, lane, element2, container, parentComponent, callback) {
+       parentComponent = getContextForSubtree(parentComponent);
+       null === container.context ? container.context = parentComponent : container.pendingContext = parentComponent;
+       container = createUpdate(lane);
+       container.payload = { element: element2 };
+       callback = void 0 === callback ? null : callback;
+       null !== callback && (container.callback = callback);
+-      element2 = enqueueUpdate(rootFiber, container, lane);
+-      null !== element2 && (scheduleUpdateOnFiber(element2, rootFiber, lane), entangleTransitions(element2, rootFiber, lane));
++      element2 = enqueueUpdate(rootFiber2, container, lane);
++      null !== element2 && (scheduleUpdateOnFiber(element2, rootFiber2, lane), entangleTransitions(element2, rootFiber2, lane));
+     }
+     function markRetryLaneImpl(fiber, retryLane) {
+       fiber = fiber.memoizedState;
+@@ -28680,6 +28680,10 @@
+ var Chip = Pill;
+ 
+ // ../canvas-shared/dist/canvas-design-mode.js
++var CANVAS_DESIGN_CURSOR_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22"><path d="M2 20.5V6.5A4.5 4.5 0 0 1 6.5 2h9A4.5 4.5 0 0 1 20 6.5v5a4.5 4.5 0 0 1-4.5 4.5H7.2Z" fill="#fff"/><path d="M3.5 17.4V6.5a3 3 0 0 1 3-3h9a3 3 0 0 1 3 3v5a3 3 0 0 1-3 3H6.6Z" fill="#1080f3"/></svg>';
++function canvasDesignCursor() {
++  return `url("data:image/svg+xml,${encodeURIComponent(CANVAS_DESIGN_CURSOR_SVG)}") 3 20, crosshair`;
++}
+ var CANVAS_DESIGN_CAPABLE_MESSAGE_TYPE = "cursor-canvas-design-capable";
+ var CANVAS_DESIGN_MODE_MESSAGE_TYPE = "cursor-canvas-design-mode";
+ var CANVAS_DESIGN_SELECT_MESSAGE_TYPE = "cursor-canvas-design-select";
+@@ -28688,12 +28692,20 @@
+ var CANVAS_DESIGN_TRACK_MESSAGE_TYPE = "cursor-canvas-design-track";
+ var CANVAS_DESIGN_RECTS_MESSAGE_TYPE = "cursor-canvas-design-rects";
+ var CANVAS_DESIGN_FOCUS_MESSAGE_TYPE = "cursor-canvas-design-focus";
++var CANVAS_DESIGN_HOVER_MESSAGE_TYPE = "cursor-canvas-design-hover";
+ var CANVAS_DESIGN_DISMISS_MESSAGE_TYPE = "cursor-canvas-design-dismiss";
+ var CANVAS_DESIGN_TEXT_EXCERPT_MAX_CHARS = 200;
+ var CANVAS_DESIGN_PROP_VALUE_MAX_CHARS = 120;
+ var CANVAS_DESIGN_STACK_MAX_DEPTH = 12;
+ var CANVAS_DESIGN_TRACK_MAX_COUNT = 64;
+ var CANVAS_DESIGN_TRACK_ID_MAX_CHARS = 64;
++function parseCanvasDesignHoverMessage(data) {
++  if (!isRecord(data) || data["type"] !== CANVAS_DESIGN_HOVER_MESSAGE_TYPE) {
++    return void 0;
++  }
++  const id = data["id"];
++  return id === null || isCanvasDesignTrackId(id) ? { type: CANVAS_DESIGN_HOVER_MESSAGE_TYPE, id } : void 0;
++}
+ function canvasDesignRectsMessage(rects) {
+   return { type: CANVAS_DESIGN_RECTS_MESSAGE_TYPE, rects };
+ }
+@@ -28709,6 +28721,9 @@
+ function isPositiveInteger(value) {
+   return Number.isSafeInteger(value) && value > 0;
+ }
++function isNonNegativeInteger(value) {
++  return Number.isSafeInteger(value) && value >= 0;
++}
+ function parseAnchor(raw2) {
+   if (!isRecord(raw2) || !isPositiveInteger(raw2["line"]) || !isPositiveInteger(raw2["column"])) {
+     return void 0;
+@@ -28741,14 +28756,24 @@
+     if (anchor === void 0) {
+       return void 0;
+     }
++    const occurrence = raw2["occurrence"];
++    if (occurrence !== void 0 && !isNonNegativeInteger(occurrence)) {
++      return void 0;
++    }
+     const text2 = raw2["text"];
+     if (text2 !== void 0 && (typeof text2 !== "string" || text2.length === 0)) {
+       return void 0;
+     }
++    const textOffset = raw2["textOffset"];
++    if (textOffset !== void 0 && (text2 === void 0 || !isNonNegativeInteger(textOffset))) {
++      return void 0;
++    }
+     picks.push({
+       id: raw2["id"],
+       anchor,
+-      ...text2 === void 0 ? {} : { text: text2.slice(0, CANVAS_DESIGN_TEXT_EXCERPT_MAX_CHARS) }
++      ...occurrence === void 0 ? {} : { occurrence },
++      ...text2 === void 0 ? {} : { text: text2.slice(0, CANVAS_DESIGN_TEXT_EXCERPT_MAX_CHARS) },
++      ...textOffset === void 0 ? {} : { textOffset }
+     });
+   }
+   return { type: CANVAS_DESIGN_TRACK_MESSAGE_TYPE, picks };
+@@ -28914,21 +28939,24 @@
+ var cspKeyword = (keyword) => `${CSP_QUOTE}${keyword}${CSP_QUOTE}`;
+ var CSP_NONE = cspKeyword("none");
+ var CSP_UNSAFE_INLINE = cspKeyword("unsafe-inline");
+-var CANVAS_FRAME_CONTENT_SECURITY_POLICY = [
+-  ["default-src", CSP_NONE],
+-  ["script-src", CSP_UNSAFE_INLINE, "blob:"],
+-  ["sandbox", CANVAS_FRAME_SANDBOX],
+-  ["style-src", CSP_UNSAFE_INLINE],
+-  ["img-src", "data:", "blob:"],
+-  ["font-src", "data:"],
+-  ["connect-src", CSP_NONE],
+-  ["worker-src", CSP_NONE],
+-  ["child-src", CSP_NONE],
+-  ["frame-src", CSP_NONE],
+-  ["object-src", CSP_NONE],
+-  ["base-uri", CSP_NONE],
+-  ["form-action", CSP_NONE]
+-].map((parts) => parts.join(" ")).join("; ");
++function canvasFrameContentSecurityPolicy(sandbox) {
++  return [
++    ["default-src", CSP_NONE],
++    ["script-src", CSP_UNSAFE_INLINE, "blob:"],
++    ["sandbox", sandbox],
++    ["style-src", CSP_UNSAFE_INLINE],
++    ["img-src", "data:", "blob:"],
++    ["font-src", "data:"],
++    ["connect-src", CSP_NONE],
++    ["worker-src", CSP_NONE],
++    ["child-src", CSP_NONE],
++    ["frame-src", CSP_NONE],
++    ["object-src", CSP_NONE],
++    ["base-uri", CSP_NONE],
++    ["form-action", CSP_NONE]
++  ].map((parts) => parts.join(" ")).join("; ");
++}
++var CANVAS_FRAME_CONTENT_SECURITY_POLICY = canvasFrameContentSecurityPolicy(CANVAS_FRAME_SANDBOX);
+ var CANVAS_FRAME_PERMISSIONS_POLICY = [
+   "accelerometer",
+   "camera",
+@@ -28968,6 +28996,42 @@
+ var CANVAS_SOURCE_ATTRIBUTE = "data-cursor-source";
+ var CANVAS_JSX_DEV_GLOBAL = "jsxDEV";
+ 
++// src/design-mode-scroll.ts
++function applyDesignModeScrollAt(doc, x2, y3, deltaX, deltaY) {
++  const win = doc.defaultView;
++  if (win === null) return;
++  let el = doc.elementFromPoint(x2, y3);
++  while (el !== null && el !== doc.body && el !== doc.documentElement) {
++    const style = win.getComputedStyle(el);
++    const overflowY = style.overflowY;
++    const overflowX = style.overflowX;
++    const canConsumeY = deltaY !== 0 && (overflowY === "auto" || overflowY === "scroll") && el.scrollHeight > el.clientHeight && (deltaY < 0 ? el.scrollTop > 0 : el.scrollTop + el.clientHeight < el.scrollHeight - 1);
++    const canConsumeX = deltaX !== 0 && (overflowX === "auto" || overflowX === "scroll") && el.scrollWidth > el.clientWidth && (deltaX < 0 ? el.scrollLeft > 0 : el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
++    if (canConsumeY || canConsumeX) {
++      el.scrollBy(INSTANT(deltaX, deltaY));
++      return;
++    }
++    el = el.parentElement;
++  }
++  win.scrollBy(INSTANT(deltaX, deltaY));
++}
++var INSTANT = (left, top) => ({
++  left,
++  top,
++  behavior: "instant"
++});
++var LINE_HEIGHT_PX = 16;
++function wheelDeltaPixels(event, viewport) {
++  switch (event.deltaMode) {
++    case 1:
++      return { deltaX: event.deltaX * LINE_HEIGHT_PX, deltaY: event.deltaY * LINE_HEIGHT_PX };
++    case 2:
++      return { deltaX: event.deltaX * viewport.width, deltaY: event.deltaY * viewport.height };
++    default:
++      return { deltaX: event.deltaX, deltaY: event.deltaY };
++  }
++}
++
+ // src/canvas-source-anchors.ts
+ var MAX_PROPS = 16;
+ var componentAnchors = /* @__PURE__ */ new WeakMap();
+@@ -29057,6 +29121,9 @@
+   const sourceFile = raw2.sourceFile;
+   return typeof sourceFile === "string" && sourceFile.length > 0 ? { sourceFile } : void 0;
+ }
++function sameFiber(left, right) {
++  return left === right || left.alternate === right || right.alternate === left;
++}
+ function fiberOf(node) {
+   let current = node;
+   while (current !== null) {
+@@ -29112,7 +29179,8 @@
+             anchor,
+             props: snapshotPrimitiveProps(props ?? {})
+           },
+-          dom: fiber.stateNode
++          dom: fiber.stateNode,
++          fiber
+         });
+       }
+     } else if (typeof fiber.type !== "string" && lastHost !== void 0) {
+@@ -29120,7 +29188,8 @@
+       if (value !== void 0) {
+         entries.push({
+           entry: { kind: "component", name: value.name, anchor: value.anchor, props: value.props },
+-          dom: lastHost
++          dom: lastHost,
++          fiber
+         });
+       }
+     }
+@@ -29128,6 +29197,69 @@
+   }
+   return entries.length === 0 ? void 0 : { entries };
+ }
++function isHostFiber(fiber) {
++  return typeof fiber.type === "string" && fiber.stateNode instanceof Element;
++}
++function rootFiber() {
++  const walker = document.createTreeWalker(document.documentElement, NodeFilter.SHOW_ELEMENT);
++  for (let node = walker.currentNode; node !== null; node = walker.nextNode()) {
++    for (const key2 of Object.keys(node)) {
++      if (key2.startsWith("__reactContainer$")) {
++        const mounted = node[key2];
++        const live = mounted?.stateNode?.current;
++        return live ?? mounted;
++      }
++    }
++  }
++  return void 0;
++}
++function firstHostOf(fiber) {
++  const pending = fiber.child ? [fiber.child] : [];
++  while (pending.length > 0) {
++    const node = pending.pop();
++    if (node.sibling) pending.push(node.sibling);
++    if (isHostFiber(node)) return node.stateNode;
++    if (node.child) pending.push(node.child);
++  }
++  return void 0;
++}
++function indexAnchoredParts() {
++  const index = /* @__PURE__ */ new Map();
++  const root2 = rootFiber();
++  const pending = root2?.child ? [root2.child] : [];
++  const add = (anchor, part) => {
++    const key2 = anchorKey(anchor);
++    const parts = index.get(key2);
++    if (parts === void 0) index.set(key2, [part]);
++    else parts.push(part);
++  };
++  while (pending.length > 0) {
++    const fiber = pending.pop();
++    if (fiber.sibling) pending.push(fiber.sibling);
++    if (fiber.child) pending.push(fiber.child);
++    if (isHostFiber(fiber)) {
++      const props = fiber.memoizedProps;
++      const anchor = parseAttributeAnchor(props?.[CANVAS_SOURCE_ATTRIBUTE]);
++      if (anchor !== void 0) add(anchor, { element: fiber.stateNode, fiber });
++    } else if (typeof fiber.type !== "string") {
++      const value = componentAnchorOf(fiber);
++      const first = value === void 0 ? void 0 : firstHostOf(fiber);
++      if (value !== void 0 && first !== void 0) {
++        add(value.anchor, { element: first, fiber });
++      }
++    }
++  }
++  return index;
++}
++function withOccurrences(resolution, index) {
++  return {
++    entries: resolution.entries.map((resolved) => {
++      const parts = index.get(anchorKey(resolved.entry.anchor)) ?? [];
++      const occurrence = parts.findIndex((part) => sameFiber(part.fiber, resolved.fiber));
++      return occurrence <= 0 ? resolved : { ...resolved, entry: { ...resolved.entry, occurrence } };
++    })
++  };
++}
+ function boundedText(raw2) {
+   return raw2.replace(/\s+/g, " ").trim().slice(0, CANVAS_DESIGN_TEXT_EXCERPT_MAX_CHARS);
+ }
+@@ -29138,94 +29270,103 @@
+ function rectOf(bounds) {
+   return { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height };
+ }
++function unionOf(rects) {
++  if (rects.length === 0) return void 0;
++  let x2 = Number.POSITIVE_INFINITY;
++  let y3 = Number.POSITIVE_INFINITY;
++  let right = Number.NEGATIVE_INFINITY;
++  let bottom = Number.NEGATIVE_INFINITY;
++  for (const rect of rects) {
++    x2 = Math.min(x2, rect.x);
++    y3 = Math.min(y3, rect.y);
++    right = Math.max(right, rect.x + rect.width);
++    bottom = Math.max(bottom, rect.y + rect.height);
++  }
++  return { x: x2, y: y3, width: right - x2, height: bottom - y3 };
++}
+ function rangeRect(range2, fallback) {
+   const bounds = typeof range2.getBoundingClientRect === "function" ? range2.getBoundingClientRect() : void 0;
+   return bounds === void 0 || bounds.width === 0 && bounds.height === 0 ? rectOf(fallback.getBoundingClientRect()) : rectOf(bounds);
+ }
+-function selectionFrom(pick) {
+-  const picked = pick.resolution.entries[pick.depth];
+-  if (picked === void 0) {
+-    return void 0;
+-  }
+-  const base = {
+-    stack: pick.resolution.entries.slice(pick.depth).map((resolved) => resolved.entry),
+-    tag: picked.dom.tagName.toLowerCase(),
+-    ...pick.point === void 0 ? {} : { point: pick.point }
+-  };
+-  if (pick.text !== void 0) {
+-    return { ...base, kind: "text", text: pick.text.excerpt, rect: pick.text.rect };
++function lineRectsOf(range2) {
++  const boxes = typeof range2.getClientRects === "function" ? Array.from(range2.getClientRects()) : [];
++  const lines = [];
++  for (const box of boxes) {
++    if (box.width <= 0 || box.height <= 0) continue;
++    const last = lines[lines.length - 1];
++    const middle = box.y + box.height / 2;
++    if (last !== void 0 && Math.abs(middle - (last.y + last.height / 2)) < Math.min(box.height, last.height) / 2) {
++      lines[lines.length - 1] = unionOf([last, rectOf(box)]) ?? last;
++    } else {
++      lines.push(rectOf(box));
++    }
+   }
++  return lines;
++}
++function runGeometry(range2, within) {
++  const lines = lineRectsOf(range2);
++  const rect = unionOf(lines) ?? rangeRect(range2, within);
++  const last = lines[lines.length - 1] ?? rect;
++  const isRtl = typeof getComputedStyle === "function" && getComputedStyle(within).direction === "rtl";
+   return {
+-    ...base,
+-    kind: "element",
+-    text: excerptText(picked.dom),
+-    rect: rectOf(picked.dom.getBoundingClientRect())
++    rect,
++    lines,
++    point: { x: isRtl ? last.x : last.x + last.width, y: last.y + last.height }
+   };
+ }
+-function selectedRange() {
+-  const selection = document.getSelection();
+-  if (selection === null || selection.isCollapsed || selection.rangeCount === 0) {
+-    return void 0;
+-  }
+-  const range2 = selection.getRangeAt(0);
+-  return boundedText(range2.toString()).length === 0 ? void 0 : range2;
+-}
+-function anchorKey(anchor) {
+-  return `${anchor.line}:${anchor.column}`;
+-}
+-var PICK_INK = "16,128,243";
+-function createRing() {
+-  const ring = document.createElement("div");
+-  const s2 = ring.style;
+-  s2.position = "fixed";
+-  s2.pointerEvents = "none";
+-  s2.zIndex = "2147483646";
+-  s2.borderRadius = "8px";
+-  s2.boxSizing = "border-box";
+-  s2.display = "none";
+-  s2.transition = "top 60ms ease-out, left 60ms ease-out, width 60ms ease-out, height 60ms ease-out";
+-  return ring;
+-}
+-function placeRing(ring, rect, style) {
+-  if (rect === void 0) {
+-    ring.style.display = "none";
+-    return;
+-  }
+-  const pad2 = 4;
+-  ring.style.display = "block";
+-  ring.style.left = `${rect.x - pad2}px`;
+-  ring.style.top = `${rect.y - pad2}px`;
+-  ring.style.width = `${rect.width + pad2 * 2}px`;
+-  ring.style.height = `${rect.height + pad2 * 2}px`;
+-  ring.style.border = `1.5px solid rgba(${PICK_INK},${style === "pick" ? 0.9 : 0.7})`;
+-  ring.style.background = `rgba(${PICK_INK},${style === "pick" ? 0.12 : 0.08})`;
+-}
+-function rectOfElement(element2) {
+-  return element2 === void 0 || !element2.isConnected ? void 0 : rectOf(element2.getBoundingClientRect());
+-}
+-function rangeOfText(element2, excerpt) {
++function normalizedTextOf(element2) {
+   const positions = [];
+-  let normalized = "";
++  let text2 = "";
+   let pendingSpace = false;
+   const walker = document.createTreeWalker(element2, NodeFilter.SHOW_TEXT);
+   for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+-    const text2 = node;
+-    for (let offset = 0; offset < text2.data.length; offset += 1) {
+-      const char = text2.data[offset] ?? "";
++    const data = node.data;
++    for (let offset = 0; offset < data.length; offset += 1) {
++      const char = data[offset] ?? "";
+       if (/\s/.test(char)) {
+-        pendingSpace = normalized.length > 0;
++        pendingSpace = text2.length > 0;
+         continue;
+       }
+       if (pendingSpace) {
+-        normalized += " ";
+-        positions.push({ node: text2, offset });
++        text2 += " ";
++        positions.push({ node, offset });
+         pendingSpace = false;
+       }
+-      normalized += char;
+-      positions.push({ node: text2, offset });
++      text2 += char;
++      positions.push({ node, offset });
++    }
++  }
++  return { text: text2, positions };
++}
++function offsetOfRange(element2, range2, excerpt) {
++  const { text: text2, positions } = normalizedTextOf(element2);
++  let index = -1;
++  try {
++    index = positions.findIndex(
++      (position) => range2.comparePoint(position.node, position.offset) >= 0
++    );
++  } catch {
++    return void 0;
++  }
++  if (index < 0) return void 0;
++  if (text2.startsWith(excerpt, index)) return index;
++  if (text2.startsWith(excerpt, index + 1)) return index + 1;
++  return void 0;
++}
++function rangeOfText(element2, excerpt, near) {
++  if (excerpt.length === 0) return void 0;
++  const { text: text2, positions } = normalizedTextOf(element2);
++  let start = -1;
++  if (near !== void 0 && text2.startsWith(excerpt, near)) {
++    start = near;
++  } else {
++    for (let at = text2.indexOf(excerpt); at >= 0; at = text2.indexOf(excerpt, at + 1)) {
++      if (start < 0 || near !== void 0 && Math.abs(at - near) < Math.abs(start - near)) {
++        start = at;
++      }
++      if (near === void 0) break;
+     }
+   }
+-  const start = normalized.indexOf(excerpt);
+   const first = positions[start];
+   const last = positions[start + excerpt.length - 1];
+   if (start < 0 || first === void 0 || last === void 0) return void 0;
+@@ -29234,17 +29375,106 @@
+   range2.setEnd(last.node, last.offset + 1);
+   return range2;
+ }
+-function rectOfTracked(pick, element2) {
+-  if (element2 === void 0 || !element2.isConnected) return null;
+-  if (pick.text !== void 0) {
+-    const range2 = rangeOfText(element2, pick.text);
+-    if (range2 !== void 0) return rangeRect(range2, element2);
+-  }
+-  return rectOf(element2.getBoundingClientRect());
+-}
+-var BUBBLE_CURSOR_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22"><path d="M2 20.5V6.5A4.5 4.5 0 0 1 6.5 2h9A4.5 4.5 0 0 1 20 6.5v5a4.5 4.5 0 0 1-4.5 4.5H7.2Z" fill="#fff"/><path d="M3.5 17.4V6.5a3 3 0 0 1 3-3h9a3 3 0 0 1 3 3v5a3 3 0 0 1-3 3H6.6Z" fill="#1080f3"/></svg>';
+-function bubbleCursor() {
+-  return `url("data:image/svg+xml,${encodeURIComponent(BUBBLE_CURSOR_SVG)}") 3 20, crosshair`;
++function isLiveRange(range2) {
++  return !range2.collapsed && range2.startContainer.isConnected && range2.endContainer.isConnected;
++}
++function pointInBox(point, box) {
++  return { dx: point.x - box.x, dy: point.y - box.y, width: box.width, height: box.height };
++}
++function pointFromBox(point, box) {
++  return {
++    x: Math.round(box.x + (point.width > 0 ? point.dx / point.width * box.width : point.dx)),
++    y: Math.round(box.y + (point.height > 0 ? point.dy / point.height * box.height : point.dy))
++  };
++}
++function anchorKey(anchor) {
++  return `${anchor.line}:${anchor.column}`;
++}
++function partKey(anchor, occurrence) {
++  return `${anchorKey(anchor)}#${occurrence ?? 0}`;
++}
++function selectedRange() {
++  const selection = document.getSelection();
++  if (selection === null || selection.isCollapsed || selection.rangeCount === 0) {
++    return void 0;
++  }
++  const range2 = selection.getRangeAt(0);
++  return boundedText(range2.toString()).length === 0 ? void 0 : range2;
++}
++var PICK_INK = "16,128,243";
++var RING_PAD_PX = 4;
++var OVERLAY_Z_INDEX = "2147483646";
++var TINT_ALPHA = { rest: 0.14, lit: 0.26 };
++var STYLE_ATTRIBUTE = "data-cursor-design-mode";
++var bubbleCursor = canvasDesignCursor;
++function designModeStyle() {
++  return [
++    `*, *::before, *::after { cursor: inherit !important; }`,
++    `html { cursor: ${bubbleCursor()} !important; }`,
++    `body, body * { -webkit-user-select: text !important; user-select: text !important; }`,
++    `::selection { background: rgba(${PICK_INK},${TINT_ALPHA.lit}) !important; color: inherit !important; }`
++  ].join("\n");
++}
++function fixedBox() {
++  const box = document.createElement("div");
++  const s2 = box.style;
++  s2.position = "fixed";
++  s2.pointerEvents = "none";
++  s2.zIndex = OVERLAY_Z_INDEX;
++  s2.boxSizing = "border-box";
++  s2.display = "none";
++  return box;
++}
++function placeBox(box, rect, pad2) {
++  if (rect === void 0) {
++    box.style.display = "none";
++    return;
++  }
++  box.style.display = "block";
++  box.style.left = `${rect.x - pad2}px`;
++  box.style.top = `${rect.y - pad2}px`;
++  box.style.width = `${rect.width + pad2 * 2}px`;
++  box.style.height = `${rect.height + pad2 * 2}px`;
++}
++function createOverlay() {
++  const hover = fixedBox();
++  const pick = fixedBox();
++  for (const [ring, alpha] of [
++    [hover, { border: 0.7, fill: 0.08 }],
++    [pick, { border: 0.9, fill: 0.12 }]
++  ]) {
++    ring.style.borderRadius = "8px";
++    ring.style.border = `1.5px solid rgba(${PICK_INK},${alpha.border})`;
++    ring.style.background = `rgba(${PICK_INK},${alpha.fill})`;
++  }
++  for (const box of [hover, pick]) box.style.transition = "none";
++  const tints = [];
++  document.body.append(hover, pick);
++  return {
++    setHover: (rect) => placeBox(hover, rect, RING_PAD_PX),
++    setPick: (rect) => placeBox(pick, rect, RING_PAD_PX),
++    setTints: (next) => {
++      while (tints.length < next.length) {
++        const tint = fixedBox();
++        tint.style.borderRadius = "3px";
++        tint.style.transition = "none";
++        document.body.append(tint);
++        tints.push(tint);
++      }
++      tints.forEach((tint, index) => {
++        const wanted = next[index];
++        placeBox(tint, wanted?.rect, 0);
++        if (wanted !== void 0) tint.style.background = `rgba(${PICK_INK},${wanted.alpha})`;
++      });
++    },
++    owns: (node) => node === hover || node === pick || tints.includes(node),
++    remove: () => {
++      hover.remove();
++      pick.remove();
++      for (const tint of tints) tint.remove();
++      tints.length = 0;
++    }
++  };
+ }
+ function postToParent(message) {
+   if (typeof window === "undefined" || window.parent === window) {
+@@ -29256,6 +29486,7 @@
+   }
+ }
+ var REMEMBERED_PICKS_MAX = 256;
++var CONTROL_SELECTOR = "a,button,input,select,textarea,summary,label,[contenteditable],[role=button],[role=link]";
+ function installCanvasDesignPicker() {
+   const anchors = readCanvasSourceAnchorsGlobal();
+   if (anchors === void 0 || typeof window === "undefined" || typeof document === "undefined") {
+@@ -29263,101 +29494,258 @@
+     };
+   }
+   let enabled = false;
+-  let hoverRing;
+-  let pickRing;
++  let overlay;
++  let styleTag;
+   let hovered;
++  let isPressing = false;
+   let current;
++  let lastPublished;
+   let textPickPending = false;
+   let tracked = [];
++  let litTrackedId = null;
+   const remembered = /* @__PURE__ */ new Map();
++  let anchorIndex;
+   let rectsFrame;
+   let mutations;
++  let resizes;
+   const view = window;
+-  const rings = () => {
+-    if (hoverRing === void 0 || pickRing === void 0) {
+-      hoverRing = createRing();
+-      pickRing = createRing();
+-      document.body.append(hoverRing, pickRing);
+-    }
+-    return { hover: hoverRing, pick: pickRing };
+-  };
+-  const pickedRect = () => {
+-    if (current === void 0) return void 0;
+-    if (current.text !== void 0) {
+-      const range2 = selectedRange();
+-      const dom = current.resolution.entries[current.depth]?.dom;
+-      return range2 !== void 0 && dom !== void 0 ? rangeRect(range2, dom) : current.text.rect;
+-    }
+-    return rectOfElement(current.resolution.entries[current.depth]?.dom);
+-  };
+-  const reposition = () => {
+-    const { hover, pick } = rings();
+-    placeRing(hover, enabled ? rectOfElement(hovered) : void 0, "hover");
+-    placeRing(pick, pickedRect(), "pick");
++  const paint = () => {
++    overlay ??= createOverlay();
++    return overlay;
++  };
++  const watchSize = (element2) => {
++    resizes?.observe(element2);
++  };
++  const freshIndex = () => {
++    anchorIndex = indexAnchoredParts();
++    return anchorIndex;
++  };
++  const resolvePick = (target) => {
++    const resolution = resolveCanvasSelection(target);
++    return resolution === void 0 ? void 0 : withOccurrences(resolution, freshIndex());
+   };
+   const remember = (resolution) => {
+     if (remembered.size >= REMEMBERED_PICKS_MAX) remembered.clear();
+     for (const resolved of resolution.entries) {
+-      remembered.set(anchorKey(resolved.entry.anchor), resolved.dom);
++      remembered.set(partKey(resolved.entry.anchor, resolved.entry.occurrence), resolved.dom);
++      watchSize(resolved.dom);
+     }
+   };
+-  const elementFor = (anchor) => {
+-    const key2 = anchorKey(anchor);
++  const elementFor = (anchor, occurrence) => {
++    const key2 = partKey(anchor, occurrence);
+     const known = remembered.get(key2);
+     if (known !== void 0 && known.isConnected) return known;
+-    const found = document.querySelector(`[${CANVAS_SOURCE_ATTRIBUTE}="${key2}"]`);
+-    if (found !== null) remembered.set(key2, found);
+-    return found ?? void 0;
++    const lookup = (index) => index.get(anchorKey(anchor))?.[occurrence ?? 0]?.element;
++    const wasIndexed = anchorIndex !== void 0;
++    let found = lookup(anchorIndex ?? freshIndex());
++    if (wasIndexed && (found === void 0 || !found.isConnected)) found = lookup(freshIndex());
++    if (found === void 0 || !found.isConnected) return void 0;
++    remembered.set(key2, found);
++    watchSize(found);
++    return found;
++  };
++  const pickedElement = (pick) => {
++    const resolved = pick.resolution.entries[pick.depth];
++    if (resolved === void 0) return void 0;
++    return resolved.dom.isConnected ? resolved.dom : elementFor(resolved.entry.anchor, resolved.entry.occurrence);
++  };
++  const runOf = (pick) => {
++    const element2 = pickedElement(pick);
++    if (pick.text === void 0 || element2 === void 0) return void 0;
++    if (!isLiveRange(pick.text.range) || !element2.contains(pick.text.range.commonAncestorContainer)) {
++      const found = rangeOfText(element2, pick.text.excerpt, pick.text.offset);
++      if (found === void 0) return void 0;
++      pick.text.range = found;
++    }
++    return runGeometry(pick.text.range, element2);
++  };
++  const selectionFrom = (pick) => {
++    const picked = pick.resolution.entries[pick.depth];
++    const element2 = pickedElement(pick);
++    if (picked === void 0 || element2 === void 0) return void 0;
++    const base = {
++      stack: pick.resolution.entries.slice(pick.depth).map((resolved) => resolved.entry),
++      tag: element2.tagName.toLowerCase()
++    };
++    if (pick.text !== void 0) {
++      const run = runOf(pick);
++      if (run === void 0) return void 0;
++      return {
++        ...base,
++        kind: "text",
++        text: pick.text.excerpt,
++        rect: run.rect,
++        point: run.point,
++        ...pick.text.offset === void 0 ? {} : { textOffset: pick.text.offset }
++      };
++    }
++    const rect = rectOf(element2.getBoundingClientRect());
++    return {
++      ...base,
++      kind: "element",
++      text: excerptText(element2),
++      rect,
++      ...pick.point === void 0 ? {} : { point: pointFromBox(pick.point, rect) }
++    };
++  };
++  const placeOfTracked = (pick) => {
++    const element2 = elementFor(pick.anchor, pick.occurrence);
++    if (element2 === void 0 || !element2.isConnected) return { rect: null, lines: [] };
++    if (pick.text !== void 0) {
++      const range2 = rangeOfText(element2, pick.text, pick.textOffset);
++      if (range2 !== void 0) return runGeometry(range2, element2);
++    }
++    return { rect: rectOf(element2.getBoundingClientRect()), lines: [] };
++  };
++  const reposition = () => {
++    const { setHover, setPick, setTints } = paint();
++    if (!enabled) {
++      setHover(void 0);
++      setPick(void 0);
++      setTints([]);
++      return;
++    }
++    const tints = [];
++    let pickRect;
++    const picked = current === void 0 ? void 0 : pickedElement(current);
++    if (current !== void 0) {
++      if (current.text !== void 0) {
++        const run = runOf(current);
++        for (const line of run?.lines ?? []) tints.push({ rect: line, alpha: TINT_ALPHA.lit });
++        if (run !== void 0 && run.lines.length === 0) pickRect = run.rect;
++      } else if (picked !== void 0) {
++        pickRect = rectOf(picked.getBoundingClientRect());
++      }
++    }
++    for (const pick of tracked) {
++      const isLit = pick.id === litTrackedId;
++      const place = placeOfTracked(pick);
++      if (pick.text !== void 0) {
++        const alpha = isLit ? TINT_ALPHA.lit : TINT_ALPHA.rest;
++        for (const line of place.lines) tints.push({ rect: line, alpha });
++      } else if (isLit && place.rect !== null && pickRect === void 0) {
++        pickRect = place.rect;
++      }
++    }
++    setPick(pickRect);
++    setTints(tints);
++    const hoverRect = hovered === void 0 || !hovered.isConnected || isPressing || picked !== void 0 && current?.text === void 0 && hovered === picked ? void 0 : rectOf(hovered.getBoundingClientRect());
++    setHover(hoverRect);
++  };
++  const publish = () => {
++    const selection = current === void 0 ? void 0 : selectionFrom(current);
++    const message = {
++      type: CANVAS_DESIGN_PICKED_MESSAGE_TYPE,
++      selection: selection ?? null
++    };
++    lastPublished = JSON.stringify(message);
++    postToParent(message);
++    reposition();
++  };
++  const republishIfMoved = () => {
++    if (current === void 0) return;
++    const selection = selectionFrom(current);
++    if (selection === void 0) return;
++    const message = {
++      type: CANVAS_DESIGN_PICKED_MESSAGE_TYPE,
++      selection
++    };
++    const encoded = JSON.stringify(message);
++    if (encoded === lastPublished) return;
++    lastPublished = encoded;
++    postToParent(message);
+   };
+   const postRects = () => {
+     rectsFrame = void 0;
++    reposition();
++    republishIfMoved();
+     if (tracked.length === 0) return;
+     postToParent(
+       canvasDesignRectsMessage(
+-        tracked.map((pick) => ({
+-          id: pick.id,
+-          rect: rectOfTracked(pick, elementFor(pick.anchor))
+-        }))
++        tracked.map((pick) => {
++          const place = placeOfTracked(pick);
++          return {
++            id: pick.id,
++            rect: place.rect,
++            ...place.point === void 0 ? {} : { point: place.point }
++          };
++        })
+       )
+     );
+   };
+   const scheduleRects = () => {
+-    if (tracked.length === 0 || rectsFrame !== void 0) return;
++    if (tracked.length === 0 && current === void 0 || rectsFrame !== void 0) return;
+     rectsFrame = view.requestAnimationFrame(postRects);
+   };
+   const onLayoutChange = () => {
+     reposition();
+     scheduleRects();
+   };
++  const onWheel = (event) => {
++    if (!enabled || event.ctrlKey || event.defaultPrevented) return;
++    event.preventDefault();
++    const { deltaX, deltaY } = wheelDeltaPixels(event, {
++      width: view.innerWidth,
++      height: view.innerHeight
++    });
++    applyDesignModeScrollAt(document, event.clientX, event.clientY, deltaX, deltaY);
++    if (rectsFrame !== void 0) {
++      view.cancelAnimationFrame(rectsFrame);
++      rectsFrame = void 0;
++    }
++    postRects();
++  };
++  const isOwnNode = (node) => node === styleTag || overlay !== void 0 && overlay.owns(node);
++  const onMutations = (records) => {
++    if (!records.some((record) => !isOwnNode(record.target))) return;
++    anchorIndex = void 0;
++    scheduleRects();
++  };
++  const onSettled = (event) => {
++    if (!(event.target instanceof Node) || !isOwnNode(event.target)) scheduleRects();
++  };
+   const watchLayout = (shouldWatch) => {
+     const isWatching = mutations !== void 0;
+     if (shouldWatch === isWatching) return;
+     if (shouldWatch) {
+       window.addEventListener("scroll", onLayoutChange, true);
+       window.addEventListener("resize", onLayoutChange);
+-      mutations = new MutationObserver(scheduleRects);
++      document.addEventListener("transitionend", onSettled, true);
++      document.addEventListener("animationend", onSettled, true);
++      document.addEventListener("load", onSettled, true);
++      mutations = new MutationObserver(onMutations);
+       mutations.observe(document.documentElement, {
+         subtree: true,
+         childList: true,
+         attributes: true,
+         characterData: true
+       });
++      if (typeof ResizeObserver === "function") {
++        resizes = new ResizeObserver(scheduleRects);
++        resizes.observe(document.documentElement);
++        if (document.body !== null) resizes.observe(document.body);
++        for (const element2 of remembered.values()) resizes.observe(element2);
++      }
++      const fonts = document.fonts;
++      void fonts?.ready?.then(() => {
++        if (mutations !== void 0) scheduleRects();
++      });
+     } else {
+       window.removeEventListener("scroll", onLayoutChange, true);
+       window.removeEventListener("resize", onLayoutChange);
++      document.removeEventListener("transitionend", onSettled, true);
++      document.removeEventListener("animationend", onSettled, true);
++      document.removeEventListener("load", onSettled, true);
+       mutations?.disconnect();
+       mutations = void 0;
++      resizes?.disconnect();
++      resizes = void 0;
+       if (rectsFrame !== void 0) {
+         view.cancelAnimationFrame(rectsFrame);
+         rectsFrame = void 0;
+       }
+     }
+   };
+-  const publish = () => {
+-    const selection = current === void 0 ? void 0 : selectionFrom(current);
+-    postToParent({ type: CANVAS_DESIGN_PICKED_MESSAGE_TYPE, selection: selection ?? null });
+-    reposition();
+-  };
+   const onMove = (event) => {
+     const resolution = resolveCanvasSelection(event.target);
+     const next = resolution?.entries[0]?.dom;
+@@ -29366,27 +29754,59 @@
+       reposition();
+     }
+   };
++  const onLeave = (event) => {
++    const leftFrame = event.target === document || event.target === document.documentElement || event.relatedTarget === null;
++    if (!leftFrame) return;
++    const wasPressing = isPressing;
++    isPressing = false;
++    if (hovered === void 0 && !wasPressing) return;
++    hovered = void 0;
++    reposition();
++  };
+   const pointOf = (event) => ({
+     x: event.clientX,
+     y: event.clientY
+   });
+   const onMouseDown = (event) => {
+-    if (event.button === 0) textPickPending = false;
++    if (event.button !== 0) return;
++    isPressing = true;
++    textPickPending = false;
++    const target = event.target;
++    if (target instanceof Element && target.closest(CONTROL_SELECTOR) !== null) {
++      event.preventDefault();
++    }
++    reposition();
++  };
++  const onDragStart = (event) => {
++    event.preventDefault();
+   };
+   const onMouseUp = (event) => {
+     if (event.button !== 0) return;
++    isPressing = false;
+     const range2 = selectedRange();
+-    if (range2 === void 0) return;
+-    const resolution = resolveCanvasSelection(range2.commonAncestorContainer);
++    if (range2 === void 0) {
++      reposition();
++      return;
++    }
++    const resolution = resolvePick(range2.commonAncestorContainer);
+     const dom = resolution?.entries[0]?.dom;
+-    if (resolution === void 0 || dom === void 0) return;
++    if (resolution === void 0 || dom === void 0) {
++      reposition();
++      return;
++    }
+     remember(resolution);
++    const excerpt = boundedText(range2.toString());
+     current = {
+       resolution,
+       depth: 0,
+-      point: pointOf(event),
+-      text: { excerpt: boundedText(range2.toString()), rect: rangeRect(range2, dom) }
++      point: void 0,
++      text: {
++        excerpt,
++        offset: offsetOfRange(dom, range2, excerpt),
++        range: range2.cloneRange()
++      }
+     };
++    document.getSelection()?.removeAllRanges();
+     textPickPending = true;
+     publish();
+   };
+@@ -29400,9 +29820,14 @@
+       textPickPending = false;
+       return;
+     }
+-    const resolution = resolveCanvasSelection(event.target);
++    const resolution = resolvePick(event.target);
+     if (resolution !== void 0) remember(resolution);
+-    current = resolution === void 0 ? void 0 : { resolution, depth: 0, point: pointOf(event) };
++    const dom = resolution?.entries[0]?.dom;
++    current = resolution === void 0 || dom === void 0 ? void 0 : {
++      resolution,
++      depth: 0,
++      point: pointInBox(pointOf(event), dom.getBoundingClientRect())
++    };
+     publish();
+   };
+   const onKeyDown = (event) => {
+@@ -29422,20 +29847,34 @@
+     enabled = next;
+     if (enabled) {
+       document.addEventListener("mousemove", onMove, true);
++      document.addEventListener("mouseleave", onLeave, true);
+       document.addEventListener("mousedown", onMouseDown, true);
+       document.addEventListener("mouseup", onMouseUp, true);
+       document.addEventListener("click", onClick, true);
++      document.addEventListener("dragstart", onDragStart, true);
+       document.addEventListener("keydown", onKeyDown, true);
++      window.addEventListener("wheel", onWheel, { capture: true, passive: false });
+       document.documentElement.style.cursor = bubbleCursor();
++      styleTag = document.createElement("style");
++      styleTag.setAttribute(STYLE_ATTRIBUTE, "");
++      styleTag.textContent = designModeStyle();
++      document.head.append(styleTag);
+     } else {
+       document.removeEventListener("mousemove", onMove, true);
++      document.removeEventListener("mouseleave", onLeave, true);
+       document.removeEventListener("mousedown", onMouseDown, true);
+       document.removeEventListener("mouseup", onMouseUp, true);
+       document.removeEventListener("click", onClick, true);
++      document.removeEventListener("dragstart", onDragStart, true);
+       document.removeEventListener("keydown", onKeyDown, true);
++      window.removeEventListener("wheel", onWheel, { capture: true });
+       document.documentElement.style.cursor = "";
++      styleTag?.remove();
++      styleTag = void 0;
+       hovered = void 0;
++      isPressing = false;
+       textPickPending = false;
++      litTrackedId = null;
+       if (current !== void 0) {
+         current = void 0;
+         publish();
+@@ -29465,9 +29904,16 @@
+     const select = parseCanvasDesignSelectMessage(event.data);
+     if (select !== void 0 && current !== void 0) {
+       const depth = current.depth + select.depth;
+-      if (current.resolution.entries[depth] !== void 0) {
++      const climbedTo = current.resolution.entries[depth];
++      if (climbedTo !== void 0) {
+         const { text: _text, ...element2 } = current;
+-        current = { ...element2, depth };
++        const from = pickedElement(current);
++        const to = pickedElement({ ...element2, depth });
++        const point = element2.point === void 0 || from === void 0 || to === void 0 ? element2.point : pointInBox(
++          pointFromBox(element2.point, rectOf(from.getBoundingClientRect())),
++          to.getBoundingClientRect()
++        );
++        current = { ...element2, depth, point };
+         publish();
+       }
+       return;
+@@ -29475,14 +29921,24 @@
+     const track = parseCanvasDesignTrackMessage(event.data);
+     if (track !== void 0) {
+       tracked = track.picks;
++      if (litTrackedId !== null && !tracked.some((pick) => pick.id === litTrackedId)) {
++        litTrackedId = null;
++      }
+       watchLayout(enabled || tracked.length > 0);
++      reposition();
+       postRects();
+       return;
+     }
++    const hover = parseCanvasDesignHoverMessage(event.data);
++    if (hover !== void 0) {
++      litTrackedId = hover.id;
++      reposition();
++      return;
++    }
+     const focus = parseCanvasDesignFocusMessage(event.data);
+     if (focus !== void 0) {
+       const pick = tracked.find((item) => item.id === focus.id);
+-      const element2 = pick === void 0 ? void 0 : elementFor(pick.anchor);
++      const element2 = pick === void 0 ? void 0 : elementFor(pick.anchor, pick.occurrence);
+       if (element2 !== void 0) {
+         const isReducedMotion = typeof view.matchMedia === "function" && view.matchMedia("(prefers-reduced-motion: reduce)").matches;
+         element2.scrollIntoView({
+@@ -29501,10 +29957,8 @@
+     setEnabled(false);
+     tracked = [];
+     watchLayout(false);
+-    hoverRing?.remove();
+-    pickRing?.remove();
+-    hoverRing = void 0;
+-    pickRing = void 0;
++    overlay?.remove();
++    overlay = void 0;
+   };
+ }
+ 
