@@ -9,6 +9,20 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-20 00:51 (Paris) — snapshot `2026-10-19_23-49` → `2026-10-20_00-51`
+
+**Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` `agent-store-fuse-x64-0bf656c5…-bk.tar.gz` → `…-9538a950…-bk.tar.gz` (commit `0bf656c51076a112ddb0a73b19841c856506514f` → `9538a9503bf6600c8a0b1156a3298a092e30c48f`). Image `fcbae14`, box-scripts `fcbae14`, sand-host `9d2ac1b`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~1.
+
+- **Bugfix** : —
+- **Change** : —
+- **Features** : —
+- **Perf** : —
+- **Autre/infra** : bump binaire agent-store-fuse (nouvelle révision du tarball S3), aucun autre composant touché.
+
+Rapport : [reports/2026-10-20_00-51.md](reports/2026-10-20_00-51.md).
+
+---
+
 ## 2026-10-19 18:49 (Paris) — snapshot `2026-10-19_18-11` → `2026-10-19_18-49`
 
 **Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` `agent-store-fuse-x64-0daaf281…-bk.tar.gz` → `…-eee3e6b3…-bk.tar.gz` (commit `0daaf281e4dbc842e7dbe9e6d05d22f1b76c3742` → `eee3e6b3af8cbd0cf6e47bc1966c2a4b613ae441`). Image `fcbae14`, box-scripts `fcbae14`, sand-host `9d2ac1b`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~1.
