@@ -1,0 +1,21 @@
+--- 2026-10-19_17-01:/opt/sand/sand-host/box-scripts/box-contract.generated.mjs
++++ 2026-10-19_17-45:/opt/sand/sand-host/box-scripts/box-contract.generated.mjs
+@@ -1,4 +1,4 @@
+-// @generated SignedSource<<db515b3b5969a9459e1fe301b6e21068cf9d003813426dd9ca367713a1a36c55>>
++// @generated SignedSource<<3721c0661b4787b927bff82d2f06817040a71a915fd0caa77c34ad297e229e7b>>
+ // Emitted by scripts/gen-box-contract.mts from sand/src/shared/box/box-contract.ts;
+ // regenerate with `pnpm --filter sand run gen:box-contract`.
+ export const ENABLE_SPOOF_GPU_MARKER_PATH = "/tmp/sand-enable-spoof-gpu";
+@@ -7,6 +7,7 @@
+ export const BOX_EXPERIMENTS_READY_MARKER_PATH = "/tmp/sand-box-experiments-ready";
+ export const BOX_BROWSER_RUNNING_PATH_PREFIX = "/tmp/sand-box-browser-running";
+ export const BROWSER_ACCEPT_LANGUAGE_EN_US_MARKER_PATH = "/tmp/sand-browser-accept-language-en-us";
++export const BROWSER_EGRESS_TIMEZONE_MARKER_PATH = "/tmp/sand-browser-egress-timezone";
+ export const WEB_BOT_AUTH_SIGNED_CACHE_PATH = "/tmp/sand-web-bot-auth-signed.json";
+ export const WEB_BOT_AUTH_SIGNED_TTL_MS = 120000;
+ export const WEB_BOT_AUTH_SIGNATURE_SOURCES = ["fresh","box_cache","fleet_cache"];
+@@ -17,3 +18,4 @@
+ export const SAND_BOX_NOVNC_TOKEN_DIR = "/tmp/sand-novnc-tokens.d";
+ export const SAND_BOX_DISPLAY_HEADER = "x-sand-display";
+ export const SAND_BOX_WINDOW_OWNER_HEADER = "x-sand-window-owner";
++export const TAILNET_HOST_SUFFIXES_PATH = "/var/lib/sand/tailnet/host-suffixes";

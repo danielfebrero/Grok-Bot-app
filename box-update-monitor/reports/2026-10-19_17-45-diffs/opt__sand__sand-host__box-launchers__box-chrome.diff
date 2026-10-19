@@ -1,0 +1,190 @@
+--- 2026-10-19_17-01:/opt/sand/sand-host/box-launchers/box-chrome
++++ 2026-10-19_17-45:/opt/sand/sand-host/box-launchers/box-chrome
+@@ -15,6 +15,71 @@
+ 	done
+ fi
+ 
++SAND_TAILNET_SUFFIX_FILE="${SAND_TAILNET_SUFFIX_FILE:-/var/lib/sand/tailnet/host-suffixes}"
++SAND_TAILNET_SUFFIXES=()
++sand_tailnet_add_suffix() {
++	local suffix="${1,,}"
++	suffix="${suffix#.}"
++	suffix="${suffix%.}"
++	case "${suffix}" in
++	"" | *[!a-z0-9.-]* | .* | *. | *..*) return ;;
++	*.*) ;;
++	*) return ;;
++	esac
++	case " ${SAND_TAILNET_SUFFIXES[*]-} " in *" ${suffix} "*) return ;; esac
++	SAND_TAILNET_SUFFIXES+=("${suffix}")
++}
++# The box env's list counts too, so a host list that failed to land on disk
++# still keeps tailnet hosts out of the everyday profile.
++if [ "${SAND_BOX_TAILNET_PROFILE:-0}" != "1" ]; then
++	if [ -r "${SAND_TAILNET_SUFFIX_FILE}" ]; then
++		while IFS= read -r sand_tailnet_suffix || [ -n "${sand_tailnet_suffix}" ]; do
++			sand_tailnet_add_suffix "${sand_tailnet_suffix}"
++		done <"${SAND_TAILNET_SUFFIX_FILE}"
++	fi
++	IFS=$', \t\n' read -r -d '' -a SAND_TAILNET_ENV_SUFFIXES <<<"${SAND_TAILNET_HOST_SUFFIXES:-}" || true
++	for sand_tailnet_suffix in "${SAND_TAILNET_ENV_SUFFIXES[@]}"; do
++		sand_tailnet_add_suffix "${sand_tailnet_suffix}"
++	done
++fi
++
++sand_url_host() {
++	local rest="${1#*://}"
++	rest="${rest%%[/?#]*}"
++	rest="${rest##*@}"
++	case "${rest}" in
++	\[*) rest="${rest%%]*}]" ;;
++	*) rest="${rest%%:*}" ;;
++	esac
++	while [ "${rest%.}" != "${rest}" ]; do rest="${rest%.}"; done
++	printf '%s' "${rest,,}"
++}
++
++sand_is_tailnet_host() {
++	local host="$1" suffix
++	for suffix in "${SAND_TAILNET_SUFFIXES[@]}"; do
++		[ "${host}" = "${suffix}" ] && return 0
++		case "${host}" in *".${suffix}") return 0 ;; esac
++	done
++	return 1
++}
++
++# An untrusted-turn clone is forked from the owner's box, so it inherits the
++# tailnet host list but has no tailnet route. Tailnet hosts stay blocked in the
++# everyday browser there, and the tailnet browser never starts.
++SAND_UNTRUSTED_CLONE_MARKER="${SAND_UNTRUSTED_CLONE_MARKER:-/var/lib/sand/untrusted-clone/marker}"
++if [ "${#SAND_TAILNET_SUFFIXES[@]}" -gt 0 ] && [ ! -e "${SAND_UNTRUSTED_CLONE_MARKER}" ]; then
++	for sand_opened_url in "$@"; do
++		case "${sand_opened_url}" in
++		http://* | https://*)
++			if sand_is_tailnet_host "$(sand_url_host "${sand_opened_url}")"; then
++				exec "${SAND_TAILNET_CHROME:-/usr/local/bin/box-tailnet-chrome}" "$@"
++			fi
++			;;
++		esac
++	done
++fi
++
+ if [ -r /usr/local/bin/box-cgroups.sh ]; then
+ 	# shellcheck source=/dev/null
+ 	. /usr/local/bin/box-cgroups.sh
+@@ -35,13 +100,7 @@
+ 			mkdir -p /home/box/chrome-profile
+ 			mv "${LEGACY_CHROME_PROFILE}" "${CHROME_PROFILE}" 2>/dev/null || true
+ 		fi
+-		# Infra 2026-10-19: honor .no-session-link guard dropped by the 10-18 update.
+-		# A profile carrying this marker (e.g. Fork-6) keeps its own cookies and
+-		# is NOT symlinked into the shared Default store. Profiles without it are
+-		# unchanged.
+-		if [ ! -e "${CHROME_PROFILE}/.no-session-link" ] && [ ! -e "${CHROME_PROFILE}/Default/.no-session-link" ]; then
+-			SAND_CHROME_PROFILE_DIR="${CHROME_PROFILE}" /usr/local/bin/link-chrome-session || true
+-		fi
++		SAND_CHROME_PROFILE_DIR="${CHROME_PROFILE}" /usr/local/bin/link-chrome-session || true
+ 	fi
+ else
+ 	CHROME_PROFILE="${CHROME_USER_DATA_DIR:-/home/box/chrome-profile}"
+@@ -93,8 +152,28 @@
+ 	--disable-blink-features=AutomationControlled
+ )
+ SAND_EGRESS_PROXY_FILE=/tmp/sand-egress-proxy
++SAND_EGRESS_PROXY_ADDR=""
+ if [ -r "${SAND_EGRESS_PROXY_FILE}" ]; then
+ 	SAND_EGRESS_PROXY_ADDR="$(sed -n 1p "${SAND_EGRESS_PROXY_FILE}" 2>/dev/null || true)"
++fi
++
++sand_tailnet_pac() {
++	local fallback=DIRECT suffix
++	[ -z "${SAND_EGRESS_PROXY_ADDR}" ] || fallback="PROXY ${SAND_EGRESS_PROXY_ADDR}"
++	printf 'function FindProxyForURL(url, host) {\n'
++	printf '  host = host.toLowerCase().replace(/\\.+$/, "");\n'
++	printf '  if (host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host === "::1") return "DIRECT";\n' # pragma: allowlist secret
++	for suffix in "${SAND_TAILNET_SUFFIXES[@]}"; do
++		printf '  if (host === "%s" || dnsDomainIs(host, ".%s")) return "PROXY 127.0.0.1:9";\n' "${suffix}" "${suffix}"
++	done
++	printf '  return "%s";\n}\n' "${fallback}"
++}
++
++if [ "${#SAND_TAILNET_SUFFIXES[@]}" -gt 0 ]; then
++	CHROME_FLAGS+=(
++		--proxy-pac-url="data:application/x-ns-proxy-autoconfig;base64,$(sand_tailnet_pac | base64 -w0)"
++	)
++elif [ -r "${SAND_EGRESS_PROXY_FILE}" ]; then
+ 	if [ -n "${SAND_EGRESS_PROXY_ADDR}" ]; then
+ 		CHROME_FLAGS+=(
+ 			--proxy-server="http://${SAND_EGRESS_PROXY_ADDR}"
+@@ -169,10 +248,19 @@
+ 	-u SAND_GATEWAY_TOKEN
+ 	-u SAND_EGRESS_TUNNEL_BEARER
+ 	DISPLAY="${DISPLAY:-:1}"
+-	HOME=/home/box
++	HOME="${SAND_CHROME_HOME:-/home/box}"
+ 	XDG_RUNTIME_DIR="${CHROME_XDG}"
+ 	DBUS_SESSION_BUS_ADDRESS="${CHROME_DBUS_ADDRESS}"
+ )
++if [ -n "${SAND_CHROME_HOME:-}" ]; then
++	CHROME_ENV+=(
++		XDG_CONFIG_HOME="${SAND_CHROME_HOME}/.config"
++		XDG_CACHE_HOME="${SAND_CHROME_HOME}/.cache"
++		XDG_DATA_HOME="${SAND_CHROME_HOME}/.local/share"
++		XDG_STATE_HOME="${SAND_CHROME_HOME}/.local/state"
++		TMPDIR="${SAND_CHROME_HOME}/tmp"
++	)
++fi
+ if [ "$(id -u)" -eq 0 ]; then
+ 	CHROME_ENV=(runuser -u box -- "${CHROME_ENV[@]}")
+ fi
+@@ -289,29 +377,27 @@
+ # that value over the login.
+ restore_cookie_seed() {
+ 	local out
+-	# Infra 2026-10-19: dedicated agent-* profiles must stay isolated. The shared
+-	# seed (/home/box/sand-data/chrome-cookie-seed.json) is captured from the
+-	# primary/Fork jar and would recontaminate @2026xxxxxx with whatever account
+-	# lives in that jar (historically @the_notabot). Skip restore for those
+-	# profiles; Forks and the primary profile keep the stock behavior.
+-	case "${CHROME_PROFILE}" in
+-	*/chrome-profile/agent-* | */chrome-profile/agent-*/)
+-		return 0
+-		;;
+-	esac
+ 	[ -s "${SAND_COOKIE_SEED:-}" ] && [ -x "${SAND_COOKIE_NODE:-}" ] && [ -r "${SAND_COOKIE_PERSIST:-}" ] || return 0
+ 	out="$(timeout "${CHROME_COOKIE_RESTORE_WAIT_S:-5}" "${SAND_COOKIE_NODE}" "${SAND_COOKIE_PERSIST}" \
+ 		--restore-port "${CHROME_DEBUG_PORT}" </dev/null 2>&1 9>&-)" || true
+ 	[ -z "${out}" ] || printf '%s\n' "${out}" 2>/dev/null >>"${SAND_COOKIE_RESTORE_LOG:-/dev/null}" || true
+ }
+ 
++# Both profiles share the box-chrome window class on one display, so the wait
++# matches a visible window owned by this profile's own browser process.
++chrome_window_up() {
++	local pid
++	pid="$(profile_browser_pid)" || return 1
++	DISPLAY="${DISPLAY:-:1}" xdotool search --onlyvisible --pid "${pid}" >/dev/null 2>&1
++}
++
+ wait_for_chrome() {
+ 	local visible="$1" end=$((SECONDS + CHROME_LAUNCH_WAIT_S))
+ 	CHROME_CDP_READY_MS=""
+ 	while :; do
+ 		if chrome_ready; then
+ 			[ -n "${CHROME_CDP_READY_MS}" ] || CHROME_CDP_READY_MS="$(date +%s%3N)"
+-			if [ "${visible}" -eq 0 ] || DISPLAY="${DISPLAY:-:1}" xdotool search --onlyvisible --class chrome >/dev/null 2>&1; then
++			if [ "${visible}" -eq 0 ] || chrome_window_up; then
+ 				return
+ 			fi
+ 		fi
+@@ -385,9 +471,9 @@
+ # profile that lost the grant heals itself.
+ if [ -f "${SAND_WEBAUTHN_MARKER}" ] && [ -r "${SAND_WEBAUTHN_ID_FILE}" ] &&
+ 	! chrome_ready && command -v python3 >/dev/null 2>&1; then
+-	SAND_INCOGNITO_SEED=(python3 -)
++	SAND_INCOGNITO_SEED=(python3 -I -)
+ 	if [ "$(id -u)" -eq 0 ]; then
+-		SAND_INCOGNITO_SEED=(runuser -u box -- python3 -)
++		SAND_INCOGNITO_SEED=(runuser -u box -- python3 -I -)
+ 	fi
+ 	"${SAND_INCOGNITO_SEED[@]}" "${CHROME_PROFILE}/Default/Preferences" "$(cat "${SAND_WEBAUTHN_ID_FILE}")" <<'SAND_INCOGNITO_EOF' || true
+ import json, os, sys

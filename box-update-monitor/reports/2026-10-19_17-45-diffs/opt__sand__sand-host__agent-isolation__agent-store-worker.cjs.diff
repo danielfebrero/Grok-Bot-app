@@ -1,0 +1,125 @@
+--- 2026-10-19_17-01:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
++++ 2026-10-19_17-45:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
+@@ -859,10 +859,14 @@
+   return db;
+ }
+ function openSqliteForSalvageInPlace(options) {
+-  const { dbPath } = options;
++  const { dbPath, afterLinkCheck } = options;
++  const refuseLinks = () => {
++    refuseSandDataDatabaseLinksSync(dbPath);
++    afterLinkCheck?.(dbPath);
++  };
+   if (!(0, import_node_fs5.existsSync)(dbPath)) return void 0;
+   const open = () => {
+-    refuseSandDataDatabaseLinksSync(dbPath);
++    refuseLinks();
+     const db = new import_node_sqlite2.DatabaseSync(dbPath);
+     try {
+       checkSandDataDatabaseSync(db, dbPath);
+@@ -895,7 +899,7 @@
+     } catch (retryError) {
+       if (isSqliteCorruptError(retryError)) {
+         try {
+-          refuseSandDataDatabaseLinksSync(dbPath);
++          refuseLinks();
+           return new import_node_sqlite2.DatabaseSync(dbPath);
+         } catch (error2) {
+           reportFallback("sqlite_recovery", error2);
+@@ -4245,6 +4249,7 @@
+ ]);
+ 
+ // ../packages/proto/dist/runtime/compact.js
++var NO_FIELD_MODIFIER = {};
+ function defineOwn(target, key, value) {
+   Object.defineProperty(target, key, {
+     value,
+@@ -4261,9 +4266,18 @@
+   const ref = refs[Number(token.slice(1))];
+   return typeof ref === "function" ? { kind: "message", T: ref } : { kind: "enum", T: runtime.getEnumType(ref) };
+ }
++function fieldModifier(mod) {
++  if (mod === "?") {
++    return { opt: true };
++  }
++  if (mod === "*") {
++    return { repeated: true };
++  }
++  return mod === void 0 ? NO_FIELD_MODIFIER : { oneof: mod };
++}
+ function fieldsFromDescriptor(runtime, descriptor) {
+-  const entries = descriptor[0].split("|");
+-  const refs = descriptor.slice(1);
++  const [text, ...refs] = descriptor;
++  const entries = text.split("|");
+   const fields = [];
+   for (let i = 1; i < entries.length; i++) {
+     const tokens = entries[i].split(" ");
+@@ -4287,15 +4301,7 @@
+       });
+       continue;
+     }
+-    const field = Object.assign({ no, name }, fieldType(runtime, refs, type));
+-    if (mod === "?") {
+-      field.opt = true;
+-    } else if (mod === "*") {
+-      field.repeated = true;
+-    } else if (mod !== void 0) {
+-      field.oneof = mod;
+-    }
+-    fields.push(field);
++    fields.push(Object.assign({ no, name }, fieldType(runtime, refs, type), fieldModifier(mod)));
+   }
+   return fields;
+ }
+@@ -4306,17 +4312,26 @@
+ }
+ var CompactMessage = class extends Message {
+   static get typeName() {
+-    const cls = this;
++    const cls = compactMessageClass(this);
+     return defineOwn(cls, "typeName", cls.$p() + nameFromDescriptor(cls.$()));
+   }
+   static get fields() {
+-    const cls = this;
++    const cls = compactMessageClass(this);
+     const descriptor = cls.$();
+     const runtime = cls.runtime;
+     const thunk = () => fieldsFromDescriptor(runtime, descriptor);
+     return defineOwn(cls, "fields", runtime.util.newFieldList(thunk));
+   }
+ };
++function isCompactMessageClass(cls) {
++  return typeof Reflect.get(cls, "$") === "function" && typeof Reflect.get(cls, "$p") === "function";
++}
++function compactMessageClass(cls) {
++  if (!isCompactMessageClass(cls)) {
++    throw new TypeError(`${cls.name} has no compact message descriptor`);
++  }
++  return cls;
++}
+ function enumLocalNames(enumName, names) {
+   const prefix = (enumName.charAt(0) + enumName.slice(1).replace(/[A-Z]/g, (c) => "_" + c)).toLowerCase() + "_";
+   const stripped = [];
+@@ -15598,7 +15613,7 @@
+     return ["SendToAgentRecipient|1 kind #0|2 id 9|3 display_name 9", SendToAgentRecipient_Kind];
+   }
+ };
+-var SendToAgentRecipient_Kind = /* @__PURE__ */ enumType(proto3, __protoPackage73, "SendToAgentRecipient.Kind", [[0, "UNSPECIFIED"], [1, "MAIN_BOT"]], 1);
++var SendToAgentRecipient_Kind = /* @__PURE__ */ enumType(proto3, __protoPackage73, "SendToAgentRecipient.Kind", [[0, "UNSPECIFIED"], [1, "MAIN_BOT"], [2, "PROJECT_SESSION"]], 1);
+ var SendToAgentError = class _SendToAgentError extends __protoMessage372 {
+   constructor(data) {
+     super();
+@@ -21728,9 +21743,9 @@
+ // ../packages/agent-kv/dist/blob-store.js
+ function toUint8Array(b) {
+   const buffer = b.buffer;
+-  if (typeof SharedArrayBuffer !== "undefined" && buffer instanceof SharedArrayBuffer)
+-    return new Uint8Array(b);
+-  return new Uint8Array(buffer, b.byteOffset, b.byteLength);
++  if (buffer instanceof ArrayBuffer)
++    return new Uint8Array(buffer, b.byteOffset, b.byteLength);
++  return new Uint8Array(b);
+ }
+ var inMemoryGetBlobLatency = createHistogram("agent_kv.in_memory.get_blob.duration_ms", {
+   description: "Duration of InMemoryBlobStore getBlob operations in milliseconds"

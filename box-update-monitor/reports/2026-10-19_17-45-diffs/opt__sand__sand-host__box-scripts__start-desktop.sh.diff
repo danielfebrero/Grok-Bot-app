@@ -1,0 +1,27 @@
+--- 2026-10-19_17-01:/opt/sand/sand-host/box-scripts/start-desktop.sh
++++ 2026-10-19_17-45:/opt/sand/sand-host/box-scripts/start-desktop.sh
+@@ -26,6 +26,8 @@
+ 
+ export DISPLAY="${DISPLAY:-:1}"
+ export HOME="${HOME:-/home/box}"
++# Copy-in may restore packages into the user site, and websockify is Python.
++export PYTHONNOUSERSITE=1
+ export XDG_RUNTIME_DIR="${SAND_XDG_RUNTIME_DIR:-${XDG_RUNTIME_DIR:-/tmp/xdg-runtime}}"
+ mkdir -p "${XDG_RUNTIME_DIR}"
+ chmod 700 "${XDG_RUNTIME_DIR}" || true
+@@ -132,6 +134,7 @@
+ 	-shared
+ 	-forever
+ 	-noxdamage
++	-norc
+ 	-rfbport "${VNC_PORT}"
+ 	-quiet
+ )
+@@ -174,6 +177,7 @@
+ done
+ 
+ PICOM_ARGS=(
++	--config /dev/null
+ 	--backend xrender
+ 	--no-vsync
+ 	--no-frame-pacing

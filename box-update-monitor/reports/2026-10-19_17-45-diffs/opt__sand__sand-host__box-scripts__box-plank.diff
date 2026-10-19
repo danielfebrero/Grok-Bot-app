@@ -1,0 +1,11 @@
+--- 2026-10-19_17-01:/opt/sand/sand-host/box-scripts/box-plank
++++ 2026-10-19_17-45:/opt/sand/sand-host/box-scripts/box-plank
+@@ -1,7 +1,7 @@
+ #!/usr/bin/env bash
+ set -uo pipefail
+ 
+-python3 - "${DISPLAY:-}" 2>/dev/null <<'PY' || true
++python3 -I - "${DISPLAY:-}" 2>/dev/null <<'PY' || true
+ import ctypes
+ import sys
+ import time

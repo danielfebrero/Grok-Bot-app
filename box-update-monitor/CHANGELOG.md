@@ -9,6 +9,20 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-19 18:11 (Paris) — snapshot `2026-10-19_17-45` → `2026-10-19_18-11`
+
+**Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` `agent-store-fuse-x64-3710b68…-bk.tar.gz` → `…-0daaf281…-bk.tar.gz` (commit `3710b68cac818498e91f6515c3ee5cfcc635ce77` → `0daaf281e4dbc842e7dbe9e6d05d22f1b76c3742`). Image `fcbae14`, box-scripts `fcbae14`, sand-host `9d2ac1b`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~1.
+
+- **Bugfix** : —
+- **Change** : —
+- **Features** : —
+- **Perf** : —
+- **Autre/infra** : bump binaire agent-store-fuse (nouvelle révision du tarball S3), aucun autre composant touché.
+
+Rapport : [reports/2026-10-19_18-11.md](reports/2026-10-19_18-11.md).
+
+---
+
 ## 2026-10-19 12:49 (Paris) — snapshot `2026-10-19_07-48` → `2026-10-19_12-49`
 
 **Patch LOCAL du lanceur `box-chrome` (édit agent « Infra », pas une mise à jour plateforme)** + bump agent-store-fuse + 3 nouveaux paquets Debian installés à chaud. La version de sand-host ne change pas (`fcbae14`), seul le fichier `/opt/sand/sand-host/box-launchers/box-chrome` a été réécrit sur place (mtime 12:35). Image `fcbae14`, box-scripts `fcbae14`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~2.

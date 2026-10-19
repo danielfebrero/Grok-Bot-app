@@ -1,0 +1,14 @@
+--- 2026-10-19_17-01:/opt/sand/sand-host/pdf-worker.js
++++ 2026-10-19_17-45:/opt/sand/sand-host/pdf-worker.js
+@@ -31996,7 +31996,10 @@
+ // ../packages/agent/src/tools/core/read/pdf-worker.ts
+ async function extractPdfTextWorker(params) {
+   const buffer = Buffer.isBuffer(params.bytes) ? params.bytes : Buffer.from(params.bytes);
+-  const parser = new PDFParse({ data: buffer });
++  const parser = new PDFParse({
++    data: buffer,
++    ...params.disableEval === true ? { isEvalSupported: false } : {}
++  });
+   try {
+     const result = await parser.getText();
+     return {
