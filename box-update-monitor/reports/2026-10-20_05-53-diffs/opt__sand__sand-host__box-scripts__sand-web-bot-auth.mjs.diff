@@ -1,0 +1,126 @@
+--- 2026-10-20_04-46:/opt/sand/sand-host/box-scripts/sand-web-bot-auth.mjs
++++ 2026-10-20_05-53:/opt/sand/sand-host/box-scripts/sand-web-bot-auth.mjs
+@@ -1,8 +1,16 @@
+-import { appendFileSync, existsSync, renameSync, watch, writeFileSync } from "node:fs";
++import {
++  appendFileSync,
++  existsSync,
++  readFileSync,
++  renameSync,
++  watch,
++  writeFileSync,
++} from "node:fs";
+ import { basename, dirname } from "node:path";
+ import { pathToFileURL } from "node:url";
+ 
+ import {
++  SAND_BOX_TAILNET_CHROME_CDP_PORT,
+   WEB_BOT_AUTH_SIGNATURE_SOURCES,
+   WEB_BOT_AUTH_SIGNED_CACHE_PATH,
+   WEB_BOT_AUTH_SIGNED_TTL_MS,
+@@ -18,6 +26,7 @@
+ 
+ export const WEB_BOT_AUTH_MARKER = "/tmp/sand-web-bot-auth";
+ export const TUNNEL_CLIENT_MARKER = "/tmp/sand-egress-tunnel-client";
++export const SAND_TAILNET_SUFFIX_FILE = "/var/lib/sand/tailnet/host-suffixes";
+ export const WEB_BOT_AUTH_SIGNED_MAX_ENTRIES = 64;
+ export const WEB_BOT_AUTH_FAILURE_REPORT_INTERVAL_MS = 60_000;
+ export const WEB_BOT_AUTH_FAILURE_COUNT_MAX = 10_000;
+@@ -208,6 +217,29 @@
+   return true;
+ }
+ 
++export function readTailnetHostSuffixes({
++  file = SAND_TAILNET_SUFFIX_FILE,
++  env = process.env.SAND_TAILNET_HOST_SUFFIXES,
++} = {}) {
++  let listed = "";
++  try {
++    listed = readFileSync(file, "utf8");
++  } catch (error) {
++    if (error?.code !== "ENOENT") log(`tailnet host list unreadable: ${String(error)}`);
++  }
++  const suffixes = new Set();
++  for (const raw of `${listed}\n${env ?? ""}`.split(/[\s,]+/)) {
++    const suffix = raw.toLowerCase().replace(/^\./, "").replace(/\.$/, "");
++    if (/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(suffix)) suffixes.add(suffix);
++  }
++  return [...suffixes];
++}
++
++export function isUnderTailnetSuffix(hostname, suffixes) {
++  const host = hostname.toLowerCase().replace(/\.+$/, "");
++  return suffixes.some((suffix) => host === suffix || host.endsWith(`.${suffix}`));
++}
++
+ function parseSignatureHeaders(value) {
+   if (value == null || typeof value !== "object") return null;
+   const parsed = {};
+@@ -540,6 +572,7 @@
+   signer,
+   isEnabled = () => false,
+   signedOriginCache,
++  tailnetSuffixes = [],
+ }) {
+   let headers = null;
+   let signatureSource = undefined;
+@@ -548,7 +581,9 @@
+     const request = params?.request;
+     const requestUrl = typeof request?.url === "string" ? new URL(request.url) : null;
+     const isSigningCandidate = () =>
+-      isEnabled() && isWebBotAuthSigningCandidate(params, topFrameId, requestUrl);
++      isEnabled() &&
++      isWebBotAuthSigningCandidate(params, topFrameId, requestUrl) &&
++      !isUnderTailnetSuffix(requestUrl.hostname, tailnetSuffixes);
+     if (isSigningCandidate()) {
+       consideredOrigin = requestUrl.origin;
+       const signed = await signer.getHeaders({ origin: requestUrl.origin });
+@@ -577,7 +612,7 @@
+ export async function configureWebBotAuthBrowser(
+   browser,
+   signer,
+-  { isEnabled = () => false, signedOriginCache, failures } = {},
++  { isEnabled = () => false, signedOriginCache, failures, tailnetSuffixes = [] } = {},
+ ) {
+   const topFrameBySession = new Map();
+   const enableFetch = async (sessionId) => {
+@@ -623,6 +658,7 @@
+         signer,
+         isEnabled,
+         signedOriginCache,
++        tailnetSuffixes,
+       });
+     }
+   });
+@@ -649,6 +685,7 @@
+     prefetchToken = async () => {},
+     signedOriginCache,
+     failures,
++    tailnetSuffixes = readTailnetHostSuffixes(),
+   }) {
+     this.signer = signer;
+     this.discoverPorts = discoverPorts;
+@@ -657,6 +694,7 @@
+     this.prefetchToken = prefetchToken;
+     this.signedOriginCache = signedOriginCache;
+     this.failures = failures;
++    this.tailnetSuffixes = tailnetSuffixes;
+     this.browsers = new Map();
+   }
+ 
+@@ -684,6 +722,7 @@
+         log(`token prefetch failed: ${String(error)}`);
+       });
+       for (const port of this.discoverPorts()) {
++        if (port === SAND_BOX_TAILNET_CHROME_CDP_PORT) continue;
+         const existing = this.browsers.get(port);
+         if (existing != null && !existing.isClosed) continue;
+         let browser = null;
+@@ -693,6 +732,7 @@
+             isEnabled: () => this.isEnabled(),
+             signedOriginCache: this.signedOriginCache,
+             failures: this.failures,
++            tailnetSuffixes: this.tailnetSuffixes,
+           });
+           this.browsers.set(port, browser);
+         } catch {

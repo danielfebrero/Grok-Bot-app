@@ -1,0 +1,13 @@
+--- 2026-10-20_04-46:/home/box/sand-data/managed-skills/skills/group-chat-turns/SKILL.md
++++ 2026-10-20_05-53:/home/box/sand-data/managed-skills/skills/group-chat-turns/SKILL.md
+@@ -1,8 +1,8 @@
+ ---
+ name: group-chat-turns
+ description: >-
+-  When a user message starts with a [room "…"] tag: you are taking a turn in a
+-  group chat room, not your private chat, so read this before replying.
++  When a user message starts with a [Group chat: "…"] tag: you are taking a turn
++  in a group chat room, not your private chat, so read this before replying.
+ ---
+ # Group chat turns
+ 

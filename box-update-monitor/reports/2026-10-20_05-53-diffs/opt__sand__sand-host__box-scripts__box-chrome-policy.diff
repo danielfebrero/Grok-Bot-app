@@ -1,0 +1,34 @@
+--- 2026-10-20_04-46:/opt/sand/sand-host/box-scripts/box-chrome-policy
++++ 2026-10-20_05-53:/opt/sand/sand-host/box-scripts/box-chrome-policy
+@@ -33,9 +33,19 @@
+ 	0) rm -f "${onepassword_marker}" 2>/dev/null || true ;;
+ esac
+ 
+-if [ ! -w "${policy_file}" ]; then
+-	exit 0
++# https://chromeenterprise.google/policies/#WebRtcIPHandlingUrl (a dangling marker link counts as set)
++webrtc=""
++webrtc_marker="${SAND_BOX_BROWSER_WEBRTC_PROXY_ONLY_FILE:-/tmp/sand-box-browser-webrtc-proxy-only}"
++if [ "${SAND_BOX_BROWSER_WEBRTC_PROXY_ONLY:-0}" = "1" ] || [ -e "${webrtc_marker}" ] ||
++	[ -L "${webrtc_marker}" ]; then
++	webrtc='"WebRtcIPHandlingUrl":[{"url":"*","handling":"disable_non_proxied_udp"}]'
+ fi
++exit_unapplied() {
++	[ -z "${webrtc}" ] || exit 3
++	exit "$1"
++}
++
++{ [ -f "${policy_file}" ] && : >>"${policy_file}"; } 2>/dev/null || exit_unapplied 0
+ 
+ entries=""
+ onepassword_entry=""
+@@ -60,7 +70,7 @@
+ fi
+ 
+ if [ -n "${entries}" ]; then
+-	printf '{"ExtensionSettings":{%s}%s}\n' "${entries}" "${devtools}" >"${policy_file}"
++	printf '{"ExtensionSettings":{%s}%s%s}\n' "${entries}" "${devtools}" "${webrtc:+,${webrtc}}" >"${policy_file}" || exit_unapplied 1
+ else
+-	printf '{}\n' >"${policy_file}"
++	printf '{%s}\n' "${webrtc}" >"${policy_file}" || exit_unapplied 1
+ fi

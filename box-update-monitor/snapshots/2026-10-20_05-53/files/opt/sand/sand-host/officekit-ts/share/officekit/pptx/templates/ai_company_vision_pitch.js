@@ -1,0 +1,813 @@
+/**
+ * Recreates the "Neura" AI pitch deck (18 slides, 13.333 x 7.5 in) with pptxgenjs.
+ * Raster/vector artwork from the original file is represented by simple
+ * programmatic placeholders (rectangles / ellipses / labelled boxes).
+ */
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ theme */
+const C = {
+  ink: '1D1D1D',       // accent4 - default slide background
+  teal: '0C4441',      // accent5 - dark panel / deep background
+  green: '9FEF9C',     // accent1
+  yellow: 'F8FE05',    // accent2
+  sage: '96C182',      // accent6
+  mint: 'D5E6CD',      // accent6 40% lum - headline highlight
+  pale: 'C0DAB4',      // accent6 tint used on slides 1/2/4
+  moss: '709162',      // accent6 75% lum - big stat numbers
+  olive: '4B6041',
+  white: 'FFFFFF',
+  smoke: 'E7E6E6',     // bg2
+  silver: 'D0CFCF',    // bg2 90% lum - hairlines
+  grey: 'ADACAC',
+  lemon: 'FCFF9B',     // accent2 tint
+};
+const MAJOR = 'Manrope Medium';
+const MINOR = 'Manrope';
+const W = 13.333, H = 7.5;
+
+/* ---------------------------------------------------------------- helpers */
+const shape = (s, kind, o) => s.addShape(kind, o);
+const rect = (s, o) => s.addShape('rect', o);
+const round = (s, o) => s.addShape('roundRect', o);
+const oval = (s, o) => s.addShape('ellipse', o);
+
+/** corner radius from the OOXML "adj" value (1/100000 of the short side) */
+const radius = (adj, w, h) => (adj / 100000) * Math.min(w, h);
+
+/** text box; defaults mirror the deck's body style */
+function text(s, runs, o) {
+  s.addText(runs, Object.assign({ fontFace: MINOR, fontSize: 18, color: C.white, valign: 'top' }, o));
+}
+
+/** two-tone headline: white lead-in + coloured tail */
+function headline(s, lead, tail, o) {
+  const f = { fontFace: MAJOR, fontSize: o.fontSize || 48, charSpacing: -1.5, lineSpacingMultiple: 0.9 };
+  const runs = [{ text: lead, options: Object.assign({ color: o.leadColor || C.white }, f) }];
+  if (tail) runs.push({ text: tail, options: Object.assign({ color: o.tailColor || C.mint }, f) });
+  text(s, runs, Object.assign({ h: 1.0 }, o, { fontFace: MAJOR }));
+}
+
+/**
+ * Decorative vertical light bands: [x, y, height, tone, strength].
+ * Each band is a soft gradient in the source; it is rebuilt here as a short
+ * stack of segments whose opacity ramps away from the band's anchored end
+ * (yellow bands are anchored at the top, white/sage ones at the bottom).
+ */
+const TONE = { W: C.white, Y: C.yellow, S: C.sage };
+const BAND_STEPS = 8;
+function bands(s, list) {
+  list.forEach(([x, y, h, tone, a]) => {
+    const seg = h / BAND_STEPS;
+    for (let i = 0; i < BAND_STEPS; i++) {
+      const t = tone === 'Y' ? i : BAND_STEPS - 1 - i;        // 0 = strongest end
+      const alpha = a * (1 - t / BAND_STEPS) * 0.55;
+      rect(s, {
+        x, y: y + i * seg, w: 0.879, h: seg + 0.01,
+        fill: { color: TONE[tone], transparency: 100 - alpha }, line: { type: 'none' },
+      });
+    }
+  });
+}
+
+/** stepped radial wash used on the three "full bleed" slides */
+function radialBackdrop(s, cx, cy) {
+  rect(s, { x: 0, y: 0, w: W, h: H, fill: { color: C.teal }, line: { type: 'none' } });
+  for (let i = 9; i >= 1; i--) {
+    const r = 4.0 + i * 2.2;
+    oval(s, {
+      x: cx - r, y: cy - r, w: r * 2, h: r * 2,
+      fill: { color: C.olive, transparency: 100 - 48 / i }, line: { type: 'none' },
+    });
+  }
+}
+
+/** the small "N" brand mark (placeholder for the logo graphic) */
+function logoMark(s, x, y, w, h, color) {
+  text(s, 'N', {
+    x, y: y - h * 0.14, w, h: h * 1.3, align: 'center', valign: 'middle', bold: true, italic: true,
+    fontFace: MAJOR, fontSize: Math.round(h * 78), color: color || C.white, margin: 0,
+  });
+}
+
+/** icon glyphs from the original are stood in for by light line-art rings */
+function icon(s, x, y, w, h, color) {
+  const c = color || C.green;
+  h = h || w;
+  oval(s, { x, y, w, h, fill: { type: 'none' }, line: { color: c, width: 1.25 } });
+  oval(s, { x: x + w * 0.33, y: y + h * 0.33, w: w * 0.34, h: h * 0.34, fill: { color: c }, line: { type: 'none' } });
+}
+
+/** blend two hex colours, t = 0 -> a, t = 1 -> b */
+function mix(a, b, t) {
+  const ch = (h, i) => parseInt(h.substr(i * 2, 2), 16);
+  const v = (i) => Math.round(ch(a, i) + (ch(b, i) - ch(a, i)) * t).toString(16).padStart(2, '0');
+  return (v(0) + v(1) + v(2)).toUpperCase();
+}
+
+/** left-to-right gradient fill, faked with vertical slices */
+function gradRect(s, o) {
+  const n = o.steps || 12;
+  for (let i = 0; i < n; i++) {
+    rect(s, {
+      x: o.x + (o.w / n) * i, y: o.y, w: o.w / n + 0.01, h: o.h,
+      fill: { color: mix(o.from, o.to, i / (n - 1)) }, line: { type: 'none' },
+    });
+  }
+}
+
+/**
+ * Rounded rectangle carrying a colour ramp, faked by stacking progressively
+ * smaller rounded rects pinned to one corner or edge. `from` is the colour at
+ * that anchor, `to` the colour at the opposite side; `anchor` is one of
+ * 't', 'b', 'tl', 'tr', 'bl', 'br'.
+ */
+function gradRound(s, o) {
+  const n = o.steps || 8, a = o.anchor || 't', rot = ((o.rotate || 0) * Math.PI) / 180;
+  const pinRight = a === 'tr' || a === 'br', pinBottom = a === 'b' || a === 'bl' || a === 'br';
+  const shrinkX = a.length === 2;
+  const cx = o.x + o.w / 2, cy = o.y + o.h / 2;
+  for (let i = 0; i < n; i++) {
+    const k = 1 - (i * 0.92) / n;
+    const w = shrinkX ? o.w * k : o.w, h = o.h * k;
+    // keep the anchored edge/corner still: shapes rotate about their own centre,
+    // so shift the centre by the (rotated) half-difference in size
+    const dx = ((pinRight ? 1 : -1) * (o.w - w)) / 2, dy = ((pinBottom ? 1 : -1) * (o.h - h)) / 2;
+    const ox = dx * Math.cos(rot) - dy * Math.sin(rot), oy = dx * Math.sin(rot) + dy * Math.cos(rot);
+    round(s, {
+      x: cx + ox - w / 2, y: cy + oy - h / 2, w, h,
+      rectRadius: o.r, rotate: o.rotate || 0,
+      fill: { color: mix(o.to, o.from, i / (n - 1)) }, line: { type: 'none' },
+    });
+  }
+}
+
+/** small document glyph used beside the contact details on the closing slide */
+function docIcon(s, x, y, w, h) {
+  rect(s, { x: x + w * 0.15, y: y + h * 0.05, w: w * 0.7, h: h * 0.9, fill: { color: C.white }, line: { type: 'none' } });
+}
+
+/** hairline + end dot, the deck's recurring "measurement" motif */
+function hairline(s, o) {
+  s.addShape('line', Object.assign({ line: { color: C.silver, width: 0.2 } }, o));
+}
+function dot(s, x, y) {
+  oval(s, { x, y, w: 0.079, h: 0.079, fill: { color: C.silver }, line: { type: 'none' } });
+}
+
+/** slide-master furniture: brand mark, rule and corner captions */
+function masterChrome(s) {
+  logoMark(s, 0.552, 0.35, 0.334, 0.283);
+  text(s, 'Neura', { x: 0.887, y: 0.369, w: 0.76, h: 0.283, fontFace: MAJOR, fontSize: 12, charSpacing: -0.9, lineSpacingMultiple: 0.9 });
+  s.addShape('line', { x: 0, y: 0.955, w: W, h: 0, line: { color: C.silver, width: 0.2, transparency: 40 } });
+  text(s, 'Powered By Neura', { x: 10.708, y: 0.356, w: 2.016, h: 0.252, fontFace: MAJOR, fontSize: 9 });
+  text(s, '2025', { x: 12.188, y: 0.352, w: 0.836, h: 0.252, fontFace: MAJOR, fontSize: 9, align: 'right' });
+}
+
+/**
+ * Dark teal panel covering one half of the slide, carrying its own band
+ * cluster. Call this before masterChrome so the logo/rule stay on top.
+ */
+function halfPanel(s, x) {
+  rect(s, { x, y: 0, w: 6.266, h: H, fill: { color: C.teal }, line: { type: 'none' } });
+  bands(s, BANDS_PANEL_LEFT.map(([bx, by, bh, tone, a]) => [bx + x, by, bh, tone, a]));
+}
+
+const LOREM = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Maecenas id tempor nunc. ';
+const LOREM_LONG = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed malesuada viverra tellus, ' +
+  'et egestas dui faucibus ac. Aliquam in luctus purus, ac venenatis purus. Sed nisi sem, viverra a nibh ' +
+  'sit amet, sagittis semper erat. Aenean id placerat leo, id euismod lectus. ';
+
+/** heading + paragraph + icon, repeated three times on slides 5, 6 and 7 */
+function featureRow(s, x, y, title, ic, titleW) {
+  text(s, title, { x, y, w: titleW || 3.395, h: 0.452, color: C.mint, lineSpacingMultiple: 1.25, paraSpaceAfter: 6 });
+  text(s, LOREM, { x, y: y + 0.376, w: 3.482, h: 0.587, fontSize: 12, lineSpacingMultiple: 1.25, paraSpaceAfter: 6 });
+  icon(s, ic[0], ic[1], ic[2], ic[3]);
+}
+
+/** numbered bullet ("01" + label) used on slides 10 and 11 */
+function numberedItem(s, y, num, label, w, h) {
+  text(s, num, { x: 8.798, y, w: 0.54, h: 0.382, fontSize: 16, color: C.sage, lineSpacingMultiple: 1.1, paraSpaceAfter: 6 });
+  text(s, label, { x: 9.338, y: y + 0.042, w: w || 3.525, h: h || 0.312, fontSize: 12, lineSpacingMultiple: 1.1, paraSpaceAfter: 6 });
+}
+
+/** big number + caption block (slides 10, 11) */
+function statBlock(s, x, y, value, valueW, caption, captionW, size, color, plus) {
+  let vx = x;
+  if (plus) {
+    text(s, '+', { x, y: y - 0.03, w: 0.361, h: 0.586, fontFace: MAJOR, fontSize: 32, color: C.smoke, charSpacing: -1.5, lineSpacingMultiple: 0.9 });
+    vx = x + 0.264;
+  }
+  const tall = size >= 60;
+  text(s, value, { x: vx, y, w: valueW, h: tall ? 1.01 : 0.646, fontFace: MAJOR, fontSize: size, color, charSpacing: -1.5, lineSpacingMultiple: 0.9 });
+  text(s, caption, { x: vx + 0.026, y: y + (tall ? 0.859 : 0.48), w: captionW, h: 0.312, fontSize: 12, lineSpacingMultiple: 1.1, paraSpaceAfter: 6 });
+}
+
+/** translucent "glass" card */
+function card(s, x, y, w, h, adj) {
+  round(s, {
+    x, y, w, h, rectRadius: radius(adj === undefined ? 5132 : adj, w, h),
+    fill: { color: C.white, transparency: 90 }, line: { color: C.white, width: 0.2, transparency: 60 },
+  });
+}
+
+/** labelled placeholder standing in for a bitmap in the source deck */
+function imagePlaceholder(s, x, y, w, h, label, transparency) {
+  rect(s, { x, y, w, h, fill: { color: C.silver, transparency: transparency === undefined ? 78 : transparency }, line: { type: 'none' } });
+  if (label) {
+    text(s, label, { x, y: y + h / 2 - 0.16, w, h: 0.32, fontSize: 11, color: C.silver, align: 'center' });
+  }
+}
+
+/* ------------------------------------------------------------ band tables */
+const BANDS_YELLOW_FULL = [
+  [1.570, -1.942, 7.354, 'Y', 15], [3.069, -1.942, 4.502, 'Y', 7], [2.314, -1.942, 5.793, 'Y', 10],
+  [0.812, -1.942, 5.389, 'Y', 10], [0.063, -1.942, 3.379, 'Y', 7],
+  [6.101, -1.942, 7.354, 'Y', 15], [7.599, -1.942, 4.502, 'Y', 7], [6.845, -1.942, 5.793, 'Y', 10],
+  [5.350, -1.942, 5.389, 'Y', 10], [4.594, -1.942, 3.379, 'Y', 7],
+  [10.631, -1.942, 7.354, 'Y', 15], [12.129, -1.942, 4.502, 'Y', 7], [11.375, -1.942, 5.793, 'Y', 10],
+  [9.880, -1.942, 5.389, 'Y', 10], [9.124, -1.942, 3.379, 'Y', 7],
+];
+/** white bands of the title/quote/closing slides, dy shifts the lower cluster */
+const whiteBandsFull = (dy) => [
+  [8.368, 1.882 + dy, 7.354, 'W', 10], [6.870, 4.735 + dy, 4.502, 'W', 2], [7.624, 3.443 + dy, 5.793, 'W', 5],
+  [9.103, 3.847 + dy, 5.389, 'W', 5], [9.859, 5.857 + dy, 3.379, 'W', 2],
+  [12.898, 1.890 + dy, 7.354, 'W', 10], [11.400, 4.743 + dy, 4.502, 'W', 2], [12.154, 3.451 + dy, 5.793, 'W', 5],
+  [3.968, 1.890 + dy, 7.354, 'W', 15], [2.470, 4.743 + dy, 4.502, 'W', 5], [3.224, 3.451 + dy, 5.793, 'W', 10],
+  [4.703, 3.856 + dy, 5.389, 'W', 10], [5.460, 5.865 + dy, 3.379, 'W', 5],
+  [-0.564, 1.890 + dy, 7.354, 'W', 10], [0.187, 3.856 + dy, 5.389, 'W', 5], [0.943, 5.865 + dy, 3.379, 'W', 2],
+];
+/** left-hand band cluster of the dark "panel" slides */
+const BANDS_PANEL_LEFT = [
+  [0.685, -0.081, 6.515, 'Y', 15], [2.184, -0.081, 3.663, 'Y', 7], [1.429, -0.053, 4.927, 'Y', 10],
+  [-0.066, -0.053, 4.522, 'Y', 10], [5.441, -0.053, 6.488, 'Y', 15], [4.690, -0.081, 4.550, 'Y', 10],
+  [3.934, -0.053, 2.513, 'Y', 7],
+  [3.048, 0.929, 6.652, 'W', 10], [1.550, 3.781, 3.800, 'W', 2], [2.304, 2.490, 5.064, 'W', 5],
+  [3.783, 2.894, 4.713, 'W', 5], [4.540, 4.904, 2.712, 'W', 2],
+];
+/** the narrow band trio that hugs the right edge */
+const BANDS_RIGHT = [
+  [12.944, 1.914, 5.672, 'W', 10], [11.445, 4.766, 2.819, 'W', 2], [12.200, 3.475, 4.138, 'W', 5],
+];
+/** sage band trio bleeding off the left edge */
+const BANDS_SAGE_LEFT = [
+  [-0.636, 1.672, 6.515, 'S', 15], [0.863, 4.524, 3.663, 'S', 5], [0.108, 3.233, 4.927, 'S', 10],
+];
+
+/* ------------------------------------------------------------ slide 1 ---- */
+function slide01(p) {
+  const s = p.addSlide();
+  s.background = { color: C.teal };
+  masterChrome(s);
+  bands(s, whiteBandsFull(0).concat(BANDS_YELLOW_FULL));
+
+  headline(s, 'Shaping the next ', 'generation of intelligence',
+    { x: 6.448, y: 1.11, w: 6.266, h: 2.282, tailColor: C.pale });
+  text(s, 'Exploring Intelligence Beyond Imagination',
+    { x: 6.478, y: 3.44, w: 3.969, h: 0.83, lineSpacingMultiple: 1.25, paraSpaceAfter: 6 });
+
+  s.addChart(p.ChartType.scatter, [
+    { name: 'X-Axis', values: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] },
+    { name: 'Series 1', values: [2, 1, 3, 3, 2.4, 4.4, 1.8, 2.3, 2, 5, 6, 5.6] },
+    { name: 'Series 2', values: [2.5, 3, 3, 2, 3, 3, 4, 4.5, 3, 4, 5, 6] },
+  ], {
+    x: 6.491, y: 4.708, w: 5.825, h: 2.265,
+    chartColors: [C.white, C.grey], lineSize: 2, lineSmooth: true, lineDataSymbol: 'none',
+    showLegend: false, catAxisMaxVal: 12, catAxisMinVal: 0, valAxisMaxVal: 7, valAxisMinVal: 0,
+    catAxisLabelColor: C.white, valAxisLabelColor: C.white,
+    catAxisLabelFontSize: 10, valAxisLabelFontSize: 10,
+    catAxisLabelFontFace: MINOR, valAxisLabelFontFace: MINOR,
+    catAxisLineColor: '2E5A57', valAxisLineShow: false,
+    valGridLine: { style: 'solid', color: '2E5A57', size: 0.5 }, catGridLine: { style: 'none' },
+  });
+
+  s.addShape('line', { x: 11.549, y: 4.476, w: 0, h: 2.154, line: { color: C.white, width: 0.75, dashType: 'lgDash' } });
+  round(s, {
+    x: 10.249, y: 3.921, w: 2.6, h: 0.555, rectRadius: 0.2775,
+    fill: { color: C.white, transparency: 80 }, line: { color: C.white, width: 0.2, transparency: 55 },
+  });
+  text(s, [
+    { text: 'Growth With ', options: { color: C.white } },
+    { text: 'Neura', options: { color: C.pale, bold: true } },
+  ], { x: 10.333, y: 3.952, w: 2.432, h: 0.452, align: 'center', lineSpacingMultiple: 1.25 });
+}
+
+/* ------------------------------------------------------------ slide 2 ---- */
+function slide02(p) {
+  const s = p.addSlide();
+  s.background = { color: C.ink };
+  halfPanel(s, 0);
+  masterChrome(s);
+  bands(s, BANDS_RIGHT);
+  round(s, {
+    x: 10.049, y: 3.75, w: 2.8, h: 2.795, rectRadius: radius(1760, 2.8, 2.795),
+    fill: { color: C.olive, transparency: 55 }, line: { type: 'none' },
+  });
+
+  headline(s, 'The future of ', 'artificial intelligence',
+    { x: 6.796, y: 1.331, w: 6.266, h: 1.555, tailColor: C.pale });
+
+  text(s, 'A New Era of Intelligent Innovation',
+    { x: 6.803, y: 2.971, w: 4.597, h: 0.413, fontSize: 16, lineSpacingMultiple: 1.25, paraSpaceAfter: 6 });
+  text(s, LOREM + 'Morbi laoreet est quis vulputate varius. ',
+    { x: 6.803, y: 5.425, w: 2.961, h: 1.092, fontSize: 12, lineSpacingMultiple: 1.25, paraSpaceAfter: 6 });
+
+  // light rays behind the illustration
+  [[3.662, 3.922], [3.982, 3.370], [2.612, 4.206], [2.305, 4.242], [2.086, 4.634], [4.325, 4.455], [1.595, 4.183]]
+    .forEach(([x, y]) => rect(s, { x, y, w: 0.033, h: 2.1, fill: { color: C.sage, transparency: 88 }, line: { type: 'none' } }));
+
+  icon(s, 6.917, 3.831, 0.646, 0.649);
+  aiChip(s, 1.62, 2.10, 3.15, 3.30);
+}
+
+/** stylised "AI" processor illustration (stands in for the source artwork) */
+function aiChip(s, x, y, w, h) {
+  const pinW = 0.44, pinH = 0.1;
+  for (let i = 0; i < 3; i++) {
+    rect(s, { x: x + w - 0.44, y: y + 0.82 + i * 0.55, w: pinW, h: pinH, fill: { color: C.ink }, line: { type: 'none' }, rotate: 345 });
+    rect(s, { x: x - 0.10, y: y + 1.45 + i * 0.55, w: pinW, h: pinH, fill: { color: C.ink }, line: { type: 'none' }, rotate: 345 });
+  }
+  round(s, { x: x + 0.10, y: y + 0.03, w: w - 0.48, h: h - 0.28, rectRadius: 0.28, fill: { color: C.white, transparency: 60 }, line: { type: 'none' }, rotate: 345 });
+  gradRound(s, {
+    x: x + 0.18, y: y + 0.09, w: w - 0.62, h: h - 0.44, r: 0.24, rotate: 345,
+    from: '2C5C3C', to: 'CFE313', anchor: 'tl', steps: 16,
+  });
+  round(s, { x: x + 0.30, y: y + 0.22, w: w - 0.86, h: h - 0.70, rectRadius: 0.20, fill: { type: 'none' }, line: { color: C.sage, width: 0.5, transparency: 40 }, rotate: 345 });
+  text(s, 'AI', {
+    x: x + 0.45, y: y + 1.0, w: w - 1.3, h: 1.2, align: 'center', fontFace: MAJOR, fontSize: 66,
+    bold: true, color: 'A9C022', rotate: 345,
+  });
+  oval(s, { x: x + 3.15, y: y + 2.38, w: 0.22, h: 0.22, fill: { color: C.white, transparency: 30 }, line: { type: 'none' } });
+}
+
+/* ------------------------------------------------------------ slide 3 ---- */
+function slide03(p) {
+  const s = p.addSlide();
+  radialBackdrop(s, 0.5, 7.2);
+  masterChrome(s);
+  bands(s, whiteBandsFull(1.08).concat(BANDS_YELLOW_FULL));
+
+  headline(s, 'Intelligence in ', 'motion', { x: 2.602, y: 1.25, w: 8.129, h: 0.828, align: 'center' });
+  round(s, {
+    x: 3.224, y: 3.254, w: 6.885, h: 1.749, rectRadius: 0.8745,
+    fill: { color: C.white, transparency: 90 }, line: { color: C.white, width: 0.2, transparency: 55 },
+  });
+  text(s, 'Let\u2019s get Started.. ', {
+    x: 3.649, y: 3.835, w: 5.894, h: 0.586, fontFace: MAJOR, fontSize: 32, color: C.silver,
+    charSpacing: -1.5, lineSpacingMultiple: 0.9,
+  });
+  oval(s, { x: 8.577, y: 3.703, w: 0.85, h: 0.85, fill: { color: '84B84E' }, line: { type: 'none' } });
+  logoMark(s, 8.817, 3.971, 0.371, 0.314);
+  text(s, 'Shaping the Next Phase of AI Evolution', {
+    x: 4.322, y: 6.257, w: 4.69, h: 0.382, fontSize: 16, align: 'center', lineSpacingMultiple: 1.1, paraSpaceAfter: 6,
+  });
+}
+
+/* ------------------------------------------------------------ slide 4 ---- */
+function slide04(p) {
+  const s = p.addSlide();
+  s.background = { color: C.ink };
+  halfPanel(s, 0);
+  masterChrome(s);
+  headline(s, 'Welcome to the ', 'future of AI',
+    { x: 6.796, y: 1.331, w: 6.266, h: 1.555, tailColor: C.pale });
+  text(s, 'A New Era of Intelligent Innovation',
+    { x: 7.377, y: 2.971, w: 4.597, h: 0.413, fontSize: 16, lineSpacingMultiple: 1.25, paraSpaceAfter: 6 });
+
+
+  text(s, 'We want explores how artificial intelligence is transforming industries, enhancing ' +
+    'decision-making, and unlocking new opportunities for innovation. From automation to ethical AI, ' +
+    'we\'ll dive into the technologies shaping tomorrow.',
+    { x: 6.803, y: 5.425, w: 5.102, h: 1.092, fontSize: 12, lineSpacingMultiple: 1.25, paraSpaceAfter: 6 });
+  bands(s, BANDS_RIGHT);
+  icon(s, 6.933, 2.997, 0.384, 0.384);
+}
+
+/* ------------------------------------------------------------ slide 5 ---- */
+function slide05(p) {
+  const s = p.addSlide();
+  s.background = { color: C.ink };
+  halfPanel(s, 0);
+  masterChrome(s);
+  headline(s, 'Adaptive intelligent ', 'learning systems', { x: 6.796, y: 1.21, w: 6.266, h: 1.555 });
+  bands(s, BANDS_RIGHT);
+
+  featureRow(s, 7.974, 2.995, 'Autonomous learning', [7.426, 3.071, 0.301, 0.401]);
+  featureRow(s, 7.974, 4.267, 'Real-time decision making', [7.361, 4.315, 0.449, 0.449]);
+  featureRow(s, 7.974, 5.540, 'Self-optimization', [7.355, 5.541, 0.449, 0.449]);
+}
+
+/* ------------------------------------------------------------ slide 6 ---- */
+function slide06(p) {
+  const s = p.addSlide();
+  s.background = { color: C.ink };
+  halfPanel(s, 7.067);
+  masterChrome(s);
+
+  headline(s, 'Human-Centered ', 'Artificial Intelligence',
+    { x: 0.859, y: 1.203, w: 6.266, h: 1.434, fontSize: 44 });
+  featureRow(s, 1.583, 3.036, 'Natural language interaction', [0.971, 3.100, 0.413, 0.413], 3.977);
+  featureRow(s, 1.583, 4.308, 'Emotional recognition', [0.934, 4.360, 0.534, 0.445]);
+  featureRow(s, 1.583, 5.581, 'User-first intelligence', [0.957, 5.581, 0.449, 0.449]);
+  logoMark(s, 11.805, 4.584, 0.396, 0.341, C.sage);
+}
+
+/* ------------------------------------------------------------ slide 7 ---- */
+function slide07(p) {
+  const s = p.addSlide();
+  s.background = { color: C.ink };
+  halfPanel(s, 0);
+  masterChrome(s);
+  headline(s, 'Scalable Intelligent ', 'Automation Solutions',
+    { x: 6.796, y: 1.21, w: 6.681, h: 1.434, fontSize: 44 });
+  bands(s, BANDS_RIGHT);
+
+  featureRow(s, 7.974, 2.995, 'Reduced operational cost', [7.251, 3.064, 0.612, 0.408]);
+  featureRow(s, 7.974, 4.267, 'Accelerated workflows', [7.361, 4.315, 0.449, 0.449]);
+  featureRow(s, 7.974, 5.540, 'Scalable efficiency', [7.355, 5.541, 0.449, 0.449]);
+}
+
+/* ------------------------------------------------------------ slide 8 ---- */
+function slide08(p) {
+  const s = p.addSlide();
+  s.background = { color: C.ink };
+  halfPanel(s, 0);
+  masterChrome(s);
+  headline(s, 'AI Market ', 'Growth', { x: 6.796, y: 1.21, w: 6.266, h: 0.828 });
+  bands(s, BANDS_RIGHT);
+  measureFrame(s);
+
+  text(s, '$827B', {
+    x: 1.244, y: 3.124, w: 3.778, h: 1.313, align: 'center', fontFace: MAJOR, fontSize: 80,
+    charSpacing: -1.5, lineSpacingMultiple: 0.9,
+  });
+  text(s, 'Global AI spending', { x: 1.884, y: 1.245, w: 2.498, h: 0.413, fontSize: 16, align: 'center', lineSpacingMultiple: 1.25, paraSpaceAfter: 6 });
+  text(s, 'By 2030', { x: 1.884, y: 5.903, w: 2.498, h: 0.413, fontSize: 16, align: 'center', lineSpacingMultiple: 1.25, paraSpaceAfter: 6 });
+  text(s, LOREM, { x: 6.759, y: 6.022, w: 4.27, h: 0.587, fontSize: 12, lineSpacingMultiple: 1.25, paraSpaceAfter: 6 });
+  text(s, 'Global investment in artificial intelligence continues accelerating year over year.',
+    { x: 7.473, y: 2.102, w: 4.597, h: 0.678, fontSize: 16, lineSpacingMultiple: 1.1, paraSpaceAfter: 6 });
+
+  card(s, 6.861, 3.061, 5.464, 2.681, 4484);
+  imagePlaceholder(s, 7.355, 3.777, 2.017, 1.651);
+  text(s, 'Global Market', { x: 7.433, y: 3.189, w: 1.861, h: 0.452, color: C.mint, lineSpacingMultiple: 1.25, paraSpaceAfter: 6 });
+  [3.463, 4.586].forEach((y) => {
+    text(s, '+40,214', { x: 9.807, y, w: 2.163, h: 0.503, fontFace: MAJOR, fontSize: 20, color: C.lemon, valign: 'bottom', paraSpaceAfter: 6 });
+    text(s, 'Lorem ipsum dolor sit amet', { x: 9.807, y: y + 0.409, w: 2.337, h: 0.335, fontSize: 12, lineSpacingMultiple: 1.25, paraSpaceAfter: 6 });
+  });
+  icon(s, 6.92, 2.197, 0.488, 0.488);
+}
+
+/** the thin bracket that frames the left statistic panel (slides 8 and 12) */
+function measureFrame(s) {
+  hairline(s, { x: 0, y: 6.545, w: 6.266, h: 0 });
+  hairline(s, { x: 0.733, y: 0.955, w: 0, h: 5.59 });
+  hairline(s, { x: 5.521, y: 0.955, w: 0, h: 5.59 });
+  [[0.695, 0.918], [0.695, 6.511], [5.482, 0.918], [5.482, 6.511]].forEach(([x, y]) => dot(s, x, y));
+}
+
+/* ------------------------------------------------------------ slide 9 ---- */
+function slide09(p) {
+  const s = p.addSlide();
+  s.background = { color: C.ink };
+  masterChrome(s);
+  bands(s, BANDS_SAGE_LEFT);
+  headline(s, 'Adoption ', 'Rate', { x: 0.957, y: 1.258, w: 8.0, h: 0.828 });
+
+  const rowY = [4.067, 4.709, 5.351, 5.996];
+  for (let c = 0; c < 11; c++) {
+    for (let r = 0; r < 4; r++) {
+      if (r === 0 && c < 2) continue;
+      gradRound(s, { x: 0.957 + c * 0.6215, y: rowY[r], w: 0.526, h: 0.526, r: 0.09, from: '35703C', to: 'E4EF08', anchor: 'bl', steps: 6 });
+    }
+  }
+  for (let c = 0; c < 6; c++) {
+    for (let r = 0; r < 4; r++) {
+      if (r === 0 && c === 5) continue;
+      round(s, {
+        x: 8.720 + c * 0.6183, y: rowY[r], w: 0.526, h: 0.526, rectRadius: 0.09,
+        fill: { color: C.white, transparency: 50 }, line: { color: C.white, width: 0.2, transparency: 60 },
+      });
+    }
+  }
+
+  text(s, '65%', { x: 5.304, y: 2.457, w: 2.547, h: 1.313, fontFace: MAJOR, fontSize: 80, color: C.moss, charSpacing: -1.5, lineSpacingMultiple: 0.9 });
+  text(s, '35%', { x: 8.646, y: 2.457, w: 2.547, h: 1.313, fontFace: MAJOR, fontSize: 80, color: C.smoke, charSpacing: -1.5, lineSpacingMultiple: 0.9 });
+  text(s, 'Of companies already use AI in core business processes',
+    { x: 1.462, y: 2.149, w: 3.222, h: 0.678, fontSize: 16, lineSpacingMultiple: 1.1, paraSpaceAfter: 6 });
+  text(s, [
+    { text: 'Companies already use ', options: { color: C.white } },
+    { text: 'Neura', options: { color: C.sage } },
+  ], { x: 5.258, y: 3.529, w: 2.715, h: 0.335, fontSize: 12, lineSpacingMultiple: 1.25, paraSpaceAfter: 6 });
+
+  hairline(s, { x: 8.248, y: 0.955, w: 0, h: 6.545 });
+  dot(s, 8.209, 0.915);
+  bands(s, BANDS_RIGHT);
+  icon(s, 0.976, 2.244, 0.488, 0.488);
+}
+
+/* ----------------------------------------------------------- slide 10 ---- */
+function slide10(p) {
+  const s = p.addSlide();
+  s.background = { color: C.ink };
+  masterChrome(s);
+  bands(s, BANDS_RIGHT);
+  headline(s, 'Productivity ', 'Acceleration', { x: 8.742, y: 1.159, w: 4.587, h: 1.555 });
+  hairline(s, { x: 8.248, y: 0.955, w: 0, h: 6.545 });
+  dot(s, 8.209, 0.915);
+
+  text(s, 'AI-driven automation significantly : ',
+    { x: 8.742, y: 3.044, w: 4.39, h: 0.382, fontSize: 16, lineSpacingMultiple: 1.1, paraSpaceAfter: 6 });
+  numberedItem(s, 3.611, '01', 'Boosts operational performance ');
+  numberedItem(s, 4.196, '02', 'Streamlines workflows');
+  numberedItem(s, 4.782, '03', 'Reduces repetitive manual tasks across departments.', 2.928, 0.534);
+  text(s, LOREM, { x: 9.282, y: 5.814, w: 3.145, h: 0.756, fontSize: 12, lineSpacingMultiple: 1.1, paraSpaceAfter: 6 });
+  icon(s, 8.864, 5.940, 0.301, 0.401);
+
+  // concentric progress arcs; the innermost one carries a lime -> yellow ramp
+  [[0.669, 1.367, 7.103, C.pale, C.pale, 0.205, 305.2],
+   [1.767, 2.399, 5.040, C.olive, C.olive, 0.254, 215.6],
+   [2.684, 3.330, 3.178, '4D7731', 'B7CB15', 0.399, 125.4],
+  ].forEach(([x, y, d, from, to, thick, start]) => {
+    const sweep = 360 + 35.7 - start, slices = from === to ? 1 : 6;
+    for (let i = slices - 1; i >= 0; i--) {
+      shape(s, 'blockArc', {
+        x, y, w: d, h: d, fill: { color: mix(to, from, i / Math.max(slices - 1, 1)) }, line: { type: 'none' },
+        angleRange: [start, (start + (sweep * (i + 1)) / slices) % 360], arcThicknessRatio: thick, rotate: 324.8,
+      });
+    }
+  });
+  oval(s, { x: 3.743, y: 4.390, w: 0.916, h: 0.916, fill: { color: '84B84E' }, line: { type: 'none' } });
+  logoMark(s, 4.042, 4.724, 0.40, 0.338);
+
+  statBlock(s, 2.751, 1.349, '+42%', 1.470, 'Workflow efficiency', 1.720, 36, C.smoke);
+  statBlock(s, 1.095, 4.962, '+57%', 1.449, 'Processing speed', 1.720, 36, C.smoke);
+  statBlock(s, 4.273, 5.838, '+38%', 1.512, 'Cost reduction', 1.720, 36, C.smoke);
+}
+
+/* ----------------------------------------------------------- slide 11 ---- */
+function slide11(p) {
+  const s = p.addSlide();
+  s.background = { color: C.ink };
+  masterChrome(s);
+  card(s, 0.956, 2.988, 6.743, 2.054, 4484);
+  bands(s, BANDS_SAGE_LEFT.concat(BANDS_RIGHT));
+  headline(s, 'Global AI ', 'Integration', { x: 0.888, y: 1.25, w: 4.587, h: 1.555 });
+  hairline(s, { x: 8.248, y: 0.955, w: 0, h: 6.545 });
+  dot(s, 8.209, 0.915);
+
+  text(s, 'AI-driven automation significantly : ',
+    { x: 8.742, y: 1.25, w: 4.39, h: 0.382, fontSize: 16, lineSpacingMultiple: 1.1, paraSpaceAfter: 6 });
+  numberedItem(s, 1.816, '01', 'AI expands worldwide');
+  numberedItem(s, 2.409, '02', 'New opportunities for automation');
+  numberedItem(s, 2.988, '03', 'Competitive advantage.');
+  text(s, LOREM, { x: 9.282, y: 5.814, w: 3.145, h: 0.756, fontSize: 12, lineSpacingMultiple: 1.1, paraSpaceAfter: 6 });
+
+  statBlock(s, 0.830, 5.435, '92', 1.878, 'Countries adopting AI', 1.845, 60, C.moss, true);
+  statBlock(s, 2.936, 5.435, '40%', 1.920, 'Global workforce impacted', 2.243, 60, C.moss, true);
+  statBlock(s, 5.437, 5.435, '$1.2T', 2.194, 'Productivity gain', 1.720, 60, C.moss, true);
+
+  imagePlaceholder(s, 1.676, 3.374, 5.234, 1.667, '[image]', 90);
+  icon(s, 8.692, 5.948, 0.488, 0.488);
+}
+
+/* ----------------------------------------------------------- slide 12 ---- */
+function slide12(p) {
+  const s = p.addSlide();
+  s.background = { color: C.ink };
+  halfPanel(s, 0);
+  masterChrome(s);
+  headline(s, 'Experience ', 'Enhancement', { x: 6.796, y: 1.21, w: 6.266, h: 1.555 });
+  bands(s, BANDS_RIGHT);
+  measureFrame(s);
+
+  text(s, '+72%', {
+    x: 1.244, y: 3.124, w: 3.778, h: 1.313, align: 'center', fontFace: MAJOR, fontSize: 80,
+    charSpacing: -1.5, lineSpacingMultiple: 0.9,
+  });
+  text(s, 'Highlight', { x: 1.884, y: 1.245, w: 2.498, h: 0.413, fontSize: 16, align: 'center', lineSpacingMultiple: 1.25, paraSpaceAfter: 6 });
+  text(s, 'Improvement', { x: 1.884, y: 5.903, w: 2.498, h: 0.413, fontSize: 16, align: 'center', lineSpacingMultiple: 1.25, paraSpaceAfter: 6 });
+  text(s, LOREM, { x: 6.798, y: 6.022, w: 5.024, h: 0.587, fontSize: 12, lineSpacingMultiple: 1.25, paraSpaceAfter: 6 });
+  text(s, 'Personalized and intelligent user experiences powered by AI improve engagement, ' +
+    'satisfaction, and long-term loyalty across digital platforms.',
+    { x: 7.525, y: 2.903, w: 4.69, h: 1.271, fontSize: 16, lineSpacingMultiple: 1.1, paraSpaceAfter: 6 });
+  icon(s, 6.982, 2.948, 0.43, 0.43);
+}
+
+/* ----------------------------------------------------------- slide 13 ---- */
+function slide13(p) {
+  const s = p.addSlide();
+  radialBackdrop(s, 12.8, 0.3);
+  masterChrome(s);
+  bands(s, whiteBandsFull(0).concat(BANDS_YELLOW_FULL));
+
+  card(s, 3.514, 1.610, 6.278, 1.354, 4484);
+  text(s, 'Why AI Matters Now ?', {
+    x: 3.707, y: 1.934, w: 5.894, h: 0.707, align: 'center', fontFace: MAJOR, fontSize: 40,
+    charSpacing: -1.5, lineSpacingMultiple: 0.9,
+  });
+  text(s, '\u201CAI is no longer experimental \u2014 it\u2019s now a core driver of innovation and competitive ' +
+    'advantage. Those who adopt it today gain smarter insights, automation, and scalable growth. \u201C', {
+    x: 0.812, y: 3.366, w: 11.709, h: 2.524, align: 'center', fontFace: MAJOR, fontSize: 40,
+    charSpacing: -1.5, lineSpacingMultiple: 0.9,
+  });
+}
+
+/* ----------------------------------------------------------- slide 14 ---- */
+function slide14(p) {
+  const s = p.addSlide();
+  s.background = { color: C.ink };
+  masterChrome(s);
+  bands(s, BANDS_SAGE_LEFT.concat(BANDS_RIGHT));
+  donut3d(s);
+
+  headline(s, 'Year-to-Year AI ', 'Technology Adoption', { x: 0.957, y: 1.21, w: 7.958, h: 1.555 });
+  [['Adoption rising', 'From 12% in 2018 as AI becomes more accessible', 3.387, 1.089, 0.335],
+   ['Projected to reach', '68% by 2025 as AI evolves into a standard business requirement', 4.920, 1.348, 0.587],
+  ].forEach(([title, body, y, h, bh]) => {
+    card(s, 1.119, y, 5.106, h);
+    text(s, title, { x: 1.948, y: y + 0.215, w: 3.145, h: 0.351, color: C.mint, margin: 0, lineSpacingMultiple: 1.25, paraSpaceAfter: 6 });
+    text(s, body, { x: 1.842, y: y + 0.539, w: 4.028, h: bh, fontSize: 12, lineSpacingMultiple: 1.25, paraSpaceAfter: 6 });
+  });
+  icon(s, 1.392, 3.638, 0.373, 0.288);
+  icon(s, 1.406, 5.144, 0.344, 0.344);
+  hairline(s, { x: 8.248, y: 0.955, w: 0, h: 6.545 });
+  dot(s, 8.209, 0.915);
+}
+
+/** flattened 3-D pie standing in for the source illustration */
+function donut3d(s) {
+  // small dark wedge behind, then the dominant bright wedge in front
+  wedge(s, 10.90, 2.85, 1.95, 1.40, 0.70, [330, 120], '3C4E36', '4B6041');
+  wedge(s, 8.65, 3.00, 3.15, 1.80, 0.80, [120, 330], '96A415', 'CBDD1B');
+  shape(s, 'pie', { x: 8.65, y: 3.00, w: 3.15, h: 1.80, angleRange: [120, 240], fill: { color: '9FB01B' }, line: { type: 'none' } });
+  text(s, '68%', { x: 8.966, y: 2.538, w: 1.983, h: 1.01, align: 'center', fontFace: MAJOR, fontSize: 54, bold: true, charSpacing: -1.1 });
+  text(s, '12%', { x: 10.784, y: 2.937, w: 1.983, h: 0.66, align: 'center', fontFace: MAJOR, fontSize: 36, bold: true, charSpacing: -1.1 });
+  text(s, 'Growth in2025 ', { x: 9.109, y: 3.484, w: 1.983, h: 0.346, align: 'center', fontFace: MAJOR, fontSize: 16, bold: true, charSpacing: -0.8 });
+  text(s, 'From 2012', { x: 10.897, y: 3.432, w: 1.983, h: 0.267, align: 'center', fontFace: MAJOR, fontSize: 10.5, bold: true, charSpacing: -0.8 });
+}
+
+/** an extruded pie wedge: the slice repeated downwards, then the top face */
+function wedge(s, x, y, w, h, depth, angles, side, top) {
+  for (let i = 24; i >= 0; i--) {
+    shape(s, 'pie', {
+      x, y: y + (depth * i) / 24, w, h, angleRange: angles,
+      fill: { color: side }, line: { type: 'none' },
+    });
+  }
+  shape(s, 'pie', { x, y, w, h, angleRange: angles, fill: { color: top }, line: { type: 'none' } });
+}
+
+/* ----------------------------------------------------------- slide 15 ---- */
+function slide15(p) {
+  const s = p.addSlide();
+  s.background = { color: C.ink };
+  masterChrome(s);
+  round(s, {
+    x: 0.708, y: 2.234, w: 6.874, h: 4.311, rectRadius: radius(1807, 6.874, 4.311),
+    fill: { type: 'none' }, line: { color: C.white, width: 0.2, transparency: 55 },
+  });
+  headline(s, 'AI Impact ', 'by Industry', { x: 0.638, y: 1.232, w: 6.944, h: 0.828, leadColor: C.mint, tailColor: C.white });
+  round(s, {
+    x: 0.708, y: 2.234, w: 6.874, h: 0.706, rectRadius: radius(11505, 6.874, 0.706),
+    fill: { color: C.moss }, line: { type: 'none' },
+  });
+  gradRect(s, { x: 1.4, y: 2.234, w: 6.182, h: 0.706, from: mix(C.moss, C.teal, 0.15), to: C.teal });
+
+  const head = (t, align) => ({ text: t, options: { fontFace: MAJOR, fontSize: 18, color: C.white, align, bold: align === 'center', margin: [4, 4, 4, align === 'left' ? 14 : 4] } });
+  const cell = (t, align, opts) => ({ text: t, options: Object.assign({ fontFace: MINOR, fontSize: 16, color: C.white, align, margin: [4, 4, 4, align === 'left' ? 40 : 4] }, opts) });
+  const pct = (t) => ({ text: t, options: { fontFace: MAJOR, fontSize: 20, color: C.smoke, align: 'center', margin: [4, 4, 4, 4] } });
+  s.addTable([
+    [head('Effect', 'left'), head('Percent', 'center'), head('Scale', 'center')],
+    [cell('Finance', 'left'), pct('+78%'), cell('High', 'center')],
+    [cell('Healthcare', 'left'), pct('+64%'), cell(' Medium', 'center')],
+    [cell('Logistics ', 'left'), pct(' +52%'), cell('High', 'center')],
+    [cell('Retail ', 'left'), pct('+70%'), cell('Medium', 'center')],
+  ], {
+    x: 0.948, y: 2.137, w: 6.353, colW: [2.229, 2.406, 1.718], rowH: 0.882,
+    valign: 'middle', margin: [4, 4, 4, 4], border: { type: 'none' }, fill: { type: 'none' },
+  });
+
+  hairline(s, { x: 8.248, y: 0.955, w: 0, h: 6.545 });
+  dot(s, 8.209, 0.915);
+  s.addShape('line', { x: 5.557, y: 2.234, w: 0, h: 4.311, line: { color: C.white, width: 0.2, transparency: 55 } });
+  s.addShape('line', { x: 3.182, y: 2.234, w: 0, h: 4.311, line: { color: C.white, width: 0.2, transparency: 55 } });
+  text(s, LOREM_LONG, { x: 8.741, y: 4.948, w: 3.644, h: 1.597, fontSize: 12, lineSpacingMultiple: 1.25, paraSpaceAfter: 6 });
+
+  [['AI Influence', 1.349], ['Future Shift', 3.092]].forEach(([title, y]) => {
+    card(s, 8.596, y, 3.741, 1.379);
+    text(s, title, { x: 9.425, y: y + 0.234, w: 2.173, h: 0.351, color: C.mint, margin: 0, lineSpacingMultiple: 1.25, paraSpaceAfter: 6 });
+    text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. ',
+      { x: 9.319, y: y + 0.558, w: 2.389, h: 0.587, fontSize: 12, lineSpacingMultiple: 1.25, paraSpaceAfter: 6 });
+  });
+  icon(s, 8.909, 1.583, 0.384, 0.384);
+  icon(s, 8.875, 3.325, 0.360, 0.360);
+  [[1.136, 3.325, 0.271], [1.136, 4.211, 0.251], [1.105, 5.107, 0.333, 0.229], [1.136, 5.951, 0.271, 0.292]]
+    .forEach(([x, y, w, h]) => icon(s, x, y, w, h || w));
+}
+
+/* ----------------------------------------------------------- slide 16 ---- */
+function slide16(p) {
+  const s = p.addSlide();
+  s.background = { color: C.ink };
+  masterChrome(s);
+  bands(s, [[-0.330, 1.966, 5.672, 'S', 15], [1.168, 4.819, 2.819, 'S', 5], [0.414, 3.527, 4.138, 'S', 10]]);
+  hairline(s, { x: 8.248, y: 0.955, w: 0, h: 6.545 });
+  dot(s, 8.209, 0.915);
+  headline(s, 'AI Workflow ', 'Ecosystem', { x: 8.742, y: 1.159, w: 4.587, h: 1.555 });
+  text(s, LOREM_LONG, { x: 8.741, y: 4.948, w: 3.644, h: 1.597, fontSize: 12, lineSpacingMultiple: 1.25, paraSpaceAfter: 6 });
+
+  // staggered cards, back to front
+  [[2.727, 3.816, '2B2B2B', 'E8E8E8'], [2.134, 3.145, '0F4A42', '6DA451'],
+   [1.629, 2.449, '2B2B2B', 'E8E8E8'], [1.036, 1.662, '0F4A42', '6DA451'],
+  ].forEach(([x, y, from, to]) => {
+    gradRound(s, { x, y, w: 2.428, h: 2.512, r: 0.42, from, to, anchor: 'tl', steps: 22 });
+  });
+
+  [['Data ', 4.055, 2.609, 1.428, 0.699, 17165], [' Model ', 4.583, 3.326, 1.520, 1.036, 13154],
+   ['Automation ', 5.153, 4.043, 2.009, 1.520, 11817], ['Optimization', 5.746, 4.759, 2.009, 1.520, 15660],
+  ].forEach(([label, x, y, w, tw, adj]) => {
+    round(s, { x, y, w, h: 0.519, rectRadius: radius(adj, w, 0.519), fill: { color: C.white, transparency: 90 }, line: { color: C.white, width: 0.2, transparency: 60 } });
+    text(s, label, { x: x + 0.26, y: y + 0.057, w: tw, h: 0.351, color: C.mint, margin: 0, lineSpacingMultiple: 1.25, paraSpaceAfter: 6 });
+  });
+  bands(s, BANDS_RIGHT);
+  [[4.361, 4.243, 0.303], [3.063, 2.658, 0.421], [4.898, 4.918, 0.313], [3.806, 3.534, 0.290]]
+    .forEach(([x, y, d]) => icon(s, x, y, d, d, C.white));
+}
+
+/* ----------------------------------------------------------- slide 17 ---- */
+function slide17(p) {
+  const s = p.addSlide();
+  s.background = { color: C.ink };
+  masterChrome(s);
+  headline(s, 'Core ', 'Technology Pillars', { x: 8.742, y: 1.159, w: 4.587, h: 2.282 });
+
+  // three cylinders: [body x, body y, body height, top y, body colour, cap, disc, label]
+  [[4.903, 3.919, 3.581, 3.374, '336B47', '477F4A', C.pale, 'ECFCEB', 'Analytics'],
+   [3.244, 4.633, 2.867, 4.112, '9FA201', 'BEC205', 'FEFFCD', 'FCFF9B', 'Networks'],
+   [1.585, 5.397, 2.103, 4.851, '336B47', '477F4A', C.pale, 'ECFCEB', 'Machine'],
+  ].forEach(([x, y, h, capY, bodyL, bodyR, cap, disc, label]) => {
+    gradRect(s, { x, y, w: 1.891, h, from: bodyL, to: bodyR, steps: 10 });
+    oval(s, { x, y: capY, w: 1.889, h: 1.091, fill: { color: cap }, line: { type: 'none' } });
+    oval(s, { x: x + 0.283, y: capY + 0.164, w: 1.322, h: 0.763, fill: { color: disc }, line: { type: 'none' } });
+    text(s, label, {
+      x: x + 0.334, y: capY + 0.302, w: 1.215, h: 0.402, align: 'center', valign: 'middle',
+      fontFace: MAJOR, fontSize: 16, color: C.grey, lineSpacingMultiple: 1.2,
+    });
+  });
+
+  hairline(s, { x: 8.248, y: 0.955, w: 0, h: 6.545 });
+  dot(s, 8.209, 0.915);
+  text(s, LOREM_LONG, { x: 8.741, y: 4.948, w: 3.644, h: 1.597, fontSize: 12, lineSpacingMultiple: 1.25, paraSpaceAfter: 6 });
+
+  [['Machine Learning', 0.876, 3.734, 2.227, 1.129], ['Deep Neural Networks', 2.548, 2.554, 2.492, 1.501],
+   ['Predictive Analytics', 5.228, 2.017, 2.243, 1.362],
+  ].forEach(([label, x, y, w, tw]) => {
+    round(s, { x, y, w, h: 0.924, rectRadius: radius(11817, w, 0.924), fill: { color: C.white, transparency: 90 }, line: { color: C.white, width: 0.2, transparency: 60 } });
+    text(s, label, { x: x + 0.742, y: y + 0.137, w: tw, h: 0.65, color: C.mint, margin: 0, lineSpacingMultiple: 1.1, paraSpaceAfter: 6 });
+  });
+  icon(s, 1.127, 4.007, 0.314, 0.377);
+  icon(s, 2.754, 2.826, 0.380, 0.380);
+  icon(s, 5.435, 2.300, 0.344, 0.344);
+}
+
+/* ----------------------------------------------------------- slide 18 ---- */
+function slide18(p) {
+  const s = p.addSlide();
+  radialBackdrop(s, 12.8, 0.3);
+  bands(s, whiteBandsFull(0).concat(BANDS_YELLOW_FULL));
+
+  text(s, 'Let\u2019s Build the Future Together', {
+    x: 1.823, y: 0.903, w: 9.687, h: 0.828, align: 'center', fontFace: MAJOR, fontSize: 48,
+    charSpacing: -1.5, lineSpacingMultiple: 0.9,
+  });
+  round(s, {
+    x: 3.224, y: 2.858, w: 6.885, h: 1.749, rectRadius: 0.8745,
+    fill: { color: C.white, transparency: 90 }, line: { color: C.white, width: 0.2, transparency: 55 },
+  });
+  text(s, [
+    { text: 'Connect with ', options: { color: C.white } },
+    { text: 'NEURA', options: { color: C.mint } },
+  ], { x: 3.649, y: 3.44, w: 5.894, h: 0.586, fontFace: MAJOR, fontSize: 32, charSpacing: -1.5, lineSpacingMultiple: 0.9 });
+  oval(s, { x: 8.577, y: 3.308, w: 0.85, h: 0.85, fill: { color: '84B84E' }, line: { type: 'none' } });
+  logoMark(s, 8.817, 3.576, 0.371, 0.314);
+
+  [['contact@neura.ai', 0.978], ['+1 (000) 123-4567', 5.267], ['www.neura.ai', 10.233]].forEach(([label, x]) => {
+    docIcon(s, x, 6.132, 0.301, 0.401);
+    text(s, label, { x: x + 0.438, y: 6.132, w: 2.362, h: 0.382, fontSize: 16, lineSpacingMultiple: 1.1, paraSpaceAfter: 6 });
+  });
+}
+
+/* -------------------------------------------------------------- assemble - */
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'DECK', width: W, height: H });
+pptx.layout = 'DECK';
+pptx.theme = { headFontFace: MAJOR, bodyFontFace: MINOR };
+pptx.title = 'Neura - Shaping the next generation of intelligence';
+
+[slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09,
+ slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18]
+  .forEach((build) => build(pptx));
+
+pptx.writeFile({ fileName: path.join(__dirname, '06c46e6a-f4c5-4c24-b0a5-853cc5159e2c_grok_final.pptx') })
+  .then((f) => console.log('wrote', f));

@@ -1,0 +1,77 @@
+--- 2026-10-20_04-46:/opt/sand/sand-host/box-launchers/box-chrome
++++ 2026-10-20_05-53:/opt/sand/sand-host/box-launchers/box-chrome
+@@ -151,6 +151,7 @@
+ 	--remote-debugging-address=127.0.0.1
+ 	--disable-blink-features=AutomationControlled
+ )
++SAND_EGRESS_PROXY_ADDR=""
+ SAND_EGRESS_PROXY_FILE=/tmp/sand-egress-proxy
+ SAND_EGRESS_PROXY_ADDR=""
+ if [ -r "${SAND_EGRESS_PROXY_FILE}" ]; then
+@@ -175,10 +176,9 @@
+ 	)
+ elif [ -r "${SAND_EGRESS_PROXY_FILE}" ]; then
+ 	if [ -n "${SAND_EGRESS_PROXY_ADDR}" ]; then
+-		CHROME_FLAGS+=(
+-			--proxy-server="http://${SAND_EGRESS_PROXY_ADDR}"
+-			--proxy-bypass-list="localhost;127.0.0.1;[::1]" # pragma: allowlist secret
+-		)
++		CHROME_FLAGS+=(--proxy-server="http://${SAND_EGRESS_PROXY_ADDR}")
++		SAND_EGRESS_PROXY_BYPASS_FLAG=${#CHROME_FLAGS[@]}
++		CHROME_FLAGS+=(--proxy-bypass-list="localhost;127.0.0.1;[::1]") # pragma: allowlist secret
+ 	fi
+ fi
+ SAND_BOX_BROWSER_RUNNING=/tmp/sand-box-browser-running
+@@ -189,7 +189,7 @@
+ }
+ resolve_box_browser() {
+ 	local ticks
+-	if [ ! -e "${BOX_BROWSER_RUNNING_FILE}" ] && [ -x "${UNGOOGLED_CHROMIUM}" ] && ! box_browser_ungoogled_wanted; then
++	if [ ! -e "${BOX_BROWSER_RUNNING_FILE}" ]; then
+ 		ticks=$((${SAND_BOX_BROWSER_GATE_WAIT_S:-5} * 10))
+ 		while [ "${ticks}" -gt 0 ] && [ ! -e "${SAND_BOX_EXPERIMENTS_READY_FILE:-/tmp/sand-box-experiments-ready}" ]; do
+ 			sleep 0.1
+@@ -212,7 +212,31 @@
+ ungoogled-chromium) CHROME_BIN="${UNGOOGLED_CHROMIUM}" ;;
+ *) CHROME_BIN=google-chrome-stable ;;
+ esac
+-/usr/local/bin/box-chrome-policy || true
++SAND_BOX_BROWSER_NO_LOCAL_DNS="${SAND_BOX_BROWSER_NO_LOCAL_DNS:-0}"
++if [ -e "${SAND_BOX_BROWSER_NO_LOCAL_DNS_FILE:-/tmp/sand-box-browser-no-local-dns}" ]; then
++	SAND_BOX_BROWSER_NO_LOCAL_DNS=1
++fi
++if [ "${SAND_BOX_BROWSER_NO_LOCAL_DNS}" = "1" ] && [ -n "${SAND_EGRESS_PROXY_BYPASS_FLAG:-}" ]; then
++	CHROME_FLAGS[SAND_EGRESS_PROXY_BYPASS_FLAG]="--proxy-bypass-list=<-loopback>;localhost;127.0.0.1;[::1]" # pragma: allowlist secret
++	CHROME_FLAGS+=("--host-resolver-rules=MAP * ~NOTFOUND , EXCLUDE localhost , EXCLUDE 127.0.0.1 , EXCLUDE ::1") # pragma: allowlist secret
++fi
++SAND_CHROME_DISABLE_QUIC="${SAND_CHROME_DISABLE_QUIC:-0}"
++if [ -e "${SAND_CHROME_DISABLE_QUIC_FILE:-/tmp/sand-chrome-disable-quic}" ]; then
++	SAND_CHROME_DISABLE_QUIC=1
++fi
++if [ "${SAND_CHROME_DISABLE_QUIC}" = "1" ]; then
++	CHROME_FLAGS+=(--disable-quic)
++fi
++policy_status=0
++box_chrome_policy=/usr/local/bin/box-chrome-policy
++case "$0" in
++/*/box-launchers/box-chrome)
++	if [ -x "${0%/box-launchers/box-chrome}/box-scripts/box-chrome-policy" ]; then
++		box_chrome_policy="${0%/box-launchers/box-chrome}/box-scripts/box-chrome-policy"
++	fi
++	;;
++esac
++"${box_chrome_policy}" || policy_status=$?
+ SAND_WEBAUTHN_ID_FILE=/usr/local/share/sand-webauthn-proxy.id
+ SAND_WEBAUTHN_MARKER=/home/box/.sand-webauthn-proxy-enabled
+ CHROME_LOG="/tmp/chrome${DISPLAY:-:1}.log"
+@@ -424,6 +448,10 @@
+ 	attempt="$(next_launch_attempt)"
+ 	started_ms="$(date +%s%3N)"
+ 	if [ "${CHROME_PORT_HELD}" -eq 0 ]; then
++		if [ "${policy_status:-0}" = 3 ]; then
++			echo "box-chrome: sand_box_browser_webrtc_proxy_only is on but its managed policy could not be written; not launching" >&2
++			exit 1
++		fi
+ 		record_box_browser
+ 		drop_sync_store_for_ungoogled
+ 		launch_chrome --no-startup-window

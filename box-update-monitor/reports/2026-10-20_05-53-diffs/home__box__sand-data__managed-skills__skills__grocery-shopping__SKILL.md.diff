@@ -1,0 +1,22 @@
+--- 2026-10-20_04-46:/home/box/sand-data/managed-skills/skills/grocery-shopping/SKILL.md
++++ 2026-10-20_05-53:/home/box/sand-data/managed-skills/skills/grocery-shopping/SKILL.md
+@@ -12,7 +12,7 @@
+ 
+ ## Entry points
+ 
+-- "Do my weekly Safeway order" is a repeat cart. Start from the user's usual list in memory and the store's buy-again page.
++- "Do my weekly Safeway order" or "restock the usual" is a repeat cart. Start from the user's usual list in memory and the store's buy-again page. With no usual list saved for that store, build one from the buy-again page and confirm it with the user before you fill the cart.
+ - "Get everything for tacos for six" is a recipe. Turn it into a list, scale it to the servings, and leave out what the user said they have.
+ - A pasted list, or a photo of a handwritten list, is the list itself.
+ - "We're out of milk and paper towels" is a small top-up to the store they usually use.
+@@ -50,8 +50,8 @@
+ 
+ ## Remembering the usual order
+ 
+-- After the first order at a store, offer once to remember it as their usual list there, along with any substitution rules they stated ("no substitutes for oat milk", "any brand of bananas is fine"). Save with `UpdateMemory` only after they agree.
+-- When they change the usual list, replace that entry rather than adding a second list for the same store.
++- After the first order at a store, offer once to remember it as their usual list there, with each item's brand, size, and usual quantity, along with any substitution rules they stated ("no substitutes for oat milk", "any brand of bananas is fine"). Save with `UpdateMemory` only after they agree.
++- When they add, drop, or swap an item, or change a quantity, replace that entry rather than adding a second list for the same store, and name the change in one short line. An item that was out of stock this time stays on the list.
+ - For a weekly habit, offer a routine that builds the cart on their usual day and sends the cart summary for approval. The routine stops at the cart, and the user approves checkout each time. Read the Cursor-managed `routines` skill before you create it.
+ 
+ ## Pitfalls

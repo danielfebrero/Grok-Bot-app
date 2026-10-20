@@ -1,0 +1,10 @@
+--- 2026-10-20_04-46:/home/box/sand-data/managed-skills/skills/add-connector/SKILL.md
++++ 2026-10-20_05-53:/home/box/sand-data/managed-skills/skills/add-connector/SKILL.md
+@@ -16,6 +16,7 @@
+ Call SearchPlugins with what you're after in natural language — the service name works. It is read-only, so it needs no confirmation. Every result carries a STABLE plugin id, an install state, and what it includes; branch on that:
+ - **`installed=yes`**: don't reinstall. Check what's behind it — GetPlugin lists the plugin's MCP servers with their ids and statuses, and GetMcpServerStatus shows the same runtime view across everything. If a server reads needsAuth, go to step 4. Otherwise tell the user it's already connected and offer to manage it instead (e.g. save usage instructions with SetMcpInstructions, or reconnect a stuck one with RestartMcpServers). A plugin the user's team provides also reads `installed=yes` (`team-default` / `team-required`) — it is already theirs, so there is nothing to install.
+ - **`installed=no`**: install it (step 3). If several entries plausibly match an ambiguous name, send a question widget listing only the real matches and let the user pick — never invent options.
++- **Only related plugins match**: the catalog has no connector for the service itself. Tell the user this. Name the closest match as a substitute, and tell the user what it cannot do. If the user wants the service itself, go to step 5. A package that is not in the catalog, and that the service does not publish, is not vetted. Tell the user this before you add it.
+ - **Nothing matches**: go to step 5.
+ 
+ ## 3. Read the detail, then install

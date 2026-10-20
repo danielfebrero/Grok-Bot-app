@@ -1,0 +1,543 @@
+#!/usr/bin/env bash
+# >>> box-chrome port table (from sand/src/shared/box/box-contract.ts; regenerate: pnpm --filter sand run gen:box-ports) >>>
+SAND_BOX_CDP_PORT_BASE=9222
+# <<< box-chrome port table <<<
+/usr/local/bin/ensure-machine-id || true
+
+if [ -n "${CURSOR_MCP_BROWSER_OPEN_LOG:-}" ]; then
+	for sand_opened_url in "$@"; do
+		case "${sand_opened_url}" in
+		http://* | https://*)
+			printf '%s\topen\t%s\n' "$(date +%s%3N)" "${sand_opened_url}" \
+				>>"${CURSOR_MCP_BROWSER_OPEN_LOG}" 2>/dev/null || true
+			;;
+		esac
+	done
+fi
+
+SAND_TAILNET_SUFFIX_FILE="${SAND_TAILNET_SUFFIX_FILE:-/var/lib/sand/tailnet/host-suffixes}"
+SAND_TAILNET_SUFFIXES=()
+sand_tailnet_add_suffix() {
+	local suffix="${1,,}"
+	suffix="${suffix#.}"
+	suffix="${suffix%.}"
+	case "${suffix}" in
+	"" | *[!a-z0-9.-]* | .* | *. | *..*) return ;;
+	*.*) ;;
+	*) return ;;
+	esac
+	case " ${SAND_TAILNET_SUFFIXES[*]-} " in *" ${suffix} "*) return ;; esac
+	SAND_TAILNET_SUFFIXES+=("${suffix}")
+}
+# The box env's list counts too, so a host list that failed to land on disk
+# still keeps tailnet hosts out of the everyday profile.
+if [ "${SAND_BOX_TAILNET_PROFILE:-0}" != "1" ]; then
+	if [ -r "${SAND_TAILNET_SUFFIX_FILE}" ]; then
+		while IFS= read -r sand_tailnet_suffix || [ -n "${sand_tailnet_suffix}" ]; do
+			sand_tailnet_add_suffix "${sand_tailnet_suffix}"
+		done <"${SAND_TAILNET_SUFFIX_FILE}"
+	fi
+	IFS=$', \t\n' read -r -d '' -a SAND_TAILNET_ENV_SUFFIXES <<<"${SAND_TAILNET_HOST_SUFFIXES:-}" || true
+	for sand_tailnet_suffix in "${SAND_TAILNET_ENV_SUFFIXES[@]}"; do
+		sand_tailnet_add_suffix "${sand_tailnet_suffix}"
+	done
+fi
+
+sand_url_host() {
+	local rest="${1#*://}"
+	rest="${rest%%[/?#]*}"
+	rest="${rest##*@}"
+	case "${rest}" in
+	\[*) rest="${rest%%]*}]" ;;
+	*) rest="${rest%%:*}" ;;
+	esac
+	while [ "${rest%.}" != "${rest}" ]; do rest="${rest%.}"; done
+	printf '%s' "${rest,,}"
+}
+
+sand_is_tailnet_host() {
+	local host="$1" suffix
+	for suffix in "${SAND_TAILNET_SUFFIXES[@]}"; do
+		[ "${host}" = "${suffix}" ] && return 0
+		case "${host}" in *".${suffix}") return 0 ;; esac
+	done
+	return 1
+}
+
+# An untrusted-turn clone is forked from the owner's box, so it inherits the
+# tailnet host list but has no tailnet route. Tailnet hosts stay blocked in the
+# everyday browser there, and the tailnet browser never starts.
+SAND_UNTRUSTED_CLONE_MARKER="${SAND_UNTRUSTED_CLONE_MARKER:-/var/lib/sand/untrusted-clone/marker}"
+if [ "${#SAND_TAILNET_SUFFIXES[@]}" -gt 0 ] && [ ! -e "${SAND_UNTRUSTED_CLONE_MARKER}" ]; then
+	for sand_opened_url in "$@"; do
+		case "${sand_opened_url}" in
+		http://* | https://*)
+			if sand_is_tailnet_host "$(sand_url_host "${sand_opened_url}")"; then
+				exec "${SAND_TAILNET_CHROME:-/usr/local/bin/box-tailnet-chrome}" "$@"
+			fi
+			;;
+		esac
+	done
+fi
+
+if [ -r /usr/local/bin/box-cgroups.sh ]; then
+	# shellcheck source=/dev/null
+	. /usr/local/bin/box-cgroups.sh
+	sand_cgroup_join "${SAND_CGROUP_INTERACTIVE_NAME:-interactive}"
+fi
+
+BOX_DISPLAY_NUM="${DISPLAY#:}"
+BOX_DISPLAY_NUM="${BOX_DISPLAY_NUM%%.*}"
+BOX_PRIMARY_XDG="/tmp/xdg-runtime-box"
+if [ "${BOX_DISPLAY_NUM:-1}" -ge 2 ] 2>/dev/null; then
+	CHROME_PROFILE="${CHROME_USER_DATA_DIR:-/home/box/chrome-profile/Fork-${BOX_DISPLAY_NUM}}"
+	CHROME_XDG="/tmp/xdg-runtime-box-${BOX_DISPLAY_NUM}"
+	CHROME_DEBUG_PORT="${SAND_CHROME_REMOTE_DEBUG_PORT:-$((SAND_BOX_CDP_PORT_BASE + BOX_DISPLAY_NUM))}"
+	export SAND_DESKTOP_UNIT=":${BOX_DISPLAY_NUM}"
+	if [ -z "${CHROME_USER_DATA_DIR:-}" ]; then
+		LEGACY_CHROME_PROFILE="/home/box/chrome-profile-${BOX_DISPLAY_NUM}"
+		if [ -d "${LEGACY_CHROME_PROFILE}" ] && [ ! -L "${LEGACY_CHROME_PROFILE}" ] && [ ! -e "${CHROME_PROFILE}" ]; then
+			mkdir -p /home/box/chrome-profile
+			mv "${LEGACY_CHROME_PROFILE}" "${CHROME_PROFILE}" 2>/dev/null || true
+		fi
+		SAND_CHROME_PROFILE_DIR="${CHROME_PROFILE}" /usr/local/bin/link-chrome-session || true
+	fi
+else
+	CHROME_PROFILE="${CHROME_USER_DATA_DIR:-/home/box/chrome-profile}"
+	CHROME_XDG="${BOX_PRIMARY_XDG}"
+	CHROME_DEBUG_PORT="${SAND_CHROME_REMOTE_DEBUG_PORT:-$((SAND_BOX_CDP_PORT_BASE + 1))}"
+fi
+CHROME_DBUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-}"
+if [ "$(id -u)" -eq 0 ]; then
+	CHROME_DBUS_ADDRESS=""
+fi
+if [ -r "${CHROME_XDG}/dbus-session-address" ]; then
+	CHROME_DBUS_ADDRESS="$(cat "${CHROME_XDG}/dbus-session-address" 2>/dev/null || true)"
+fi
+CHROME_FLAGS=(
+	--no-sandbox
+	--disable-dev-shm-usage
+	--password-store=basic
+	--no-first-run
+	--no-default-browser-check
+	--hide-crash-restore-bubble
+	--start-maximized
+	--class=box-chrome
+	--user-data-dir="${CHROME_PROFILE}"
+)
+# WebGL on this GPU-less Xvfb box. Default --enable-unsafe-swiftshader keeps a
+# software context and prints ANGLE(... SwiftShader Device (Subzero) ...).
+# sand_enable_spoof_gpu writes /tmp/sand-enable-spoof-gpu (or set
+# SAND_ENABLE_SPOOF_GPU=1) so we launch with --use-angle=gl instead: no WebGL
+# context, and no SwiftShader renderer string. SAND_CHROME_LEGACY_GPU=1
+# restores blocklist-ignore + software WebGPU. Chrome must restart to pick up
+# a marker flip.
+if [ "${SAND_CHROME_LEGACY_GPU:-0}" = "1" ]; then
+	CHROME_FLAGS+=(
+		--ignore-gpu-blocklist
+		--enable-unsafe-webgpu
+	)
+elif [ "${SAND_ENABLE_SPOOF_GPU:-0}" = "1" ] || [ -e "${SAND_ENABLE_SPOOF_GPU_FILE:-/tmp/sand-enable-spoof-gpu}" ]; then
+	CHROME_FLAGS+=(
+		--use-angle=gl
+	)
+else
+	CHROME_FLAGS+=(
+		--enable-unsafe-swiftshader
+	)
+fi
+CHROME_FLAGS+=(
+	--remote-debugging-port="${CHROME_DEBUG_PORT}"
+	--remote-debugging-address=127.0.0.1
+	--disable-blink-features=AutomationControlled
+)
+SAND_EGRESS_PROXY_ADDR=""
+SAND_EGRESS_PROXY_FILE=/tmp/sand-egress-proxy
+SAND_EGRESS_PROXY_ADDR=""
+if [ -r "${SAND_EGRESS_PROXY_FILE}" ]; then
+	SAND_EGRESS_PROXY_ADDR="$(sed -n 1p "${SAND_EGRESS_PROXY_FILE}" 2>/dev/null || true)"
+fi
+
+sand_tailnet_pac() {
+	local fallback=DIRECT suffix
+	[ -z "${SAND_EGRESS_PROXY_ADDR}" ] || fallback="PROXY ${SAND_EGRESS_PROXY_ADDR}"
+	printf 'function FindProxyForURL(url, host) {\n'
+	printf '  host = host.toLowerCase().replace(/\\.+$/, "");\n'
+	printf '  if (host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host === "::1") return "DIRECT";\n' # pragma: allowlist secret
+	for suffix in "${SAND_TAILNET_SUFFIXES[@]}"; do
+		printf '  if (host === "%s" || dnsDomainIs(host, ".%s")) return "PROXY 127.0.0.1:9";\n' "${suffix}" "${suffix}"
+	done
+	printf '  return "%s";\n}\n' "${fallback}"
+}
+
+if [ "${#SAND_TAILNET_SUFFIXES[@]}" -gt 0 ]; then
+	CHROME_FLAGS+=(
+		--proxy-pac-url="data:application/x-ns-proxy-autoconfig;base64,$(sand_tailnet_pac | base64 -w0)"
+	)
+elif [ -r "${SAND_EGRESS_PROXY_FILE}" ]; then
+	if [ -n "${SAND_EGRESS_PROXY_ADDR}" ]; then
+		CHROME_FLAGS+=(--proxy-server="http://${SAND_EGRESS_PROXY_ADDR}")
+		SAND_EGRESS_PROXY_BYPASS_FLAG=${#CHROME_FLAGS[@]}
+		CHROME_FLAGS+=(--proxy-bypass-list="localhost;127.0.0.1;[::1]") # pragma: allowlist secret
+	fi
+fi
+SAND_BOX_BROWSER_RUNNING=/tmp/sand-box-browser-running
+BOX_BROWSER_RUNNING_FILE="${SAND_BOX_BROWSER_RUNNING}-${CHROME_DEBUG_PORT}"
+UNGOOGLED_CHROMIUM=/opt/ungoogled-chromium/chrome
+box_browser_ungoogled_wanted() {
+	[ "${SAND_BOX_BROWSER_UNGOOGLED:-0}" = "1" ] || [ -e "${SAND_BOX_BROWSER_UNGOOGLED_FILE:-/tmp/sand-box-browser-ungoogled}" ]
+}
+resolve_box_browser() {
+	local ticks
+	if [ ! -e "${BOX_BROWSER_RUNNING_FILE}" ]; then
+		ticks=$((${SAND_BOX_BROWSER_GATE_WAIT_S:-5} * 10))
+		while [ "${ticks}" -gt 0 ] && [ ! -e "${SAND_BOX_EXPERIMENTS_READY_FILE:-/tmp/sand-box-experiments-ready}" ]; do
+			sleep 0.1
+			ticks=$((ticks - 1))
+		done
+	fi
+	if box_browser_ungoogled_wanted && [ -x "${UNGOOGLED_CHROMIUM}" ]; then
+		printf ungoogled-chromium
+	else
+		printf chrome
+	fi
+}
+UNGOOGLED_CHROMIUM_FLAGS=(
+	"--enable-features=ReducedSystemInfo,SpoofWebGLInfo,SetIpv6ProbeFalse"
+	"--disable-features=OptimizationGuideModelDownloading,OptimizationHintsFetching,OptimizationTargetPrediction,OptimizationHints,EnforcePrivacySandboxAttestations,Translate,MediaRouter,DialMediaRouteProvider,CalculateNativeWinOcclusion,InterestFeedContentSuggestions,CertificateTransparencyComponentUpdater,AutofillServerCommunication,PrivacySandboxSettings4,AutomationControlled,HttpsUpgrades"
+	--webrtc-ip-handling-policy=disable_non_proxied_udp
+)
+BOX_BROWSER="$(resolve_box_browser)"
+case "${BOX_BROWSER}" in
+ungoogled-chromium) CHROME_BIN="${UNGOOGLED_CHROMIUM}" ;;
+*) CHROME_BIN=google-chrome-stable ;;
+esac
+SAND_BOX_BROWSER_NO_LOCAL_DNS="${SAND_BOX_BROWSER_NO_LOCAL_DNS:-0}"
+if [ -e "${SAND_BOX_BROWSER_NO_LOCAL_DNS_FILE:-/tmp/sand-box-browser-no-local-dns}" ]; then
+	SAND_BOX_BROWSER_NO_LOCAL_DNS=1
+fi
+if [ "${SAND_BOX_BROWSER_NO_LOCAL_DNS}" = "1" ] && [ -n "${SAND_EGRESS_PROXY_BYPASS_FLAG:-}" ]; then
+	CHROME_FLAGS[SAND_EGRESS_PROXY_BYPASS_FLAG]="--proxy-bypass-list=<-loopback>;localhost;127.0.0.1;[::1]" # pragma: allowlist secret
+	CHROME_FLAGS+=("--host-resolver-rules=MAP * ~NOTFOUND , EXCLUDE localhost , EXCLUDE 127.0.0.1 , EXCLUDE ::1") # pragma: allowlist secret
+fi
+SAND_CHROME_DISABLE_QUIC="${SAND_CHROME_DISABLE_QUIC:-0}"
+if [ -e "${SAND_CHROME_DISABLE_QUIC_FILE:-/tmp/sand-chrome-disable-quic}" ]; then
+	SAND_CHROME_DISABLE_QUIC=1
+fi
+if [ "${SAND_CHROME_DISABLE_QUIC}" = "1" ]; then
+	CHROME_FLAGS+=(--disable-quic)
+fi
+policy_status=0
+box_chrome_policy=/usr/local/bin/box-chrome-policy
+case "$0" in
+/*/box-launchers/box-chrome)
+	if [ -x "${0%/box-launchers/box-chrome}/box-scripts/box-chrome-policy" ]; then
+		box_chrome_policy="${0%/box-launchers/box-chrome}/box-scripts/box-chrome-policy"
+	fi
+	;;
+esac
+"${box_chrome_policy}" || policy_status=$?
+SAND_WEBAUTHN_ID_FILE=/usr/local/share/sand-webauthn-proxy.id
+SAND_WEBAUTHN_MARKER=/home/box/.sand-webauthn-proxy-enabled
+CHROME_LOG="/tmp/chrome${DISPLAY:-:1}.log"
+BOX_CHROME_LAUNCHER_VERSION=4
+CHROME_FLAGS+=(--sand-box-chrome-launcher="${BOX_CHROME_LAUNCHER_VERSION}")
+CHROME_LAUNCH_WAIT_S=20
+CHROME_RELEASE_GRACE_S=10
+CHROME_PORT_WAIT_S=10
+CHROME_COOKIE_RESTORE_WAIT_S=5
+SAND_COOKIE_NODE=/exec-daemon/node
+SAND_COOKIE_PERSIST=/usr/local/bin/sand-cookie-persist.mjs
+SAND_COOKIE_SEED="${SAND_COOKIE_SEED_PATH:-/home/box/sand-data/chrome-cookie-seed.json}"
+SAND_COOKIE_RESTORE_LOG=/tmp/sand-cookie-launch-restore.log
+SAND_CHROME_PREPARE=0
+if [ "${1:-}" = "--sand-prepare" ]; then
+	SAND_CHROME_PREPARE=1
+	shift
+fi
+if [ "$(id -u)" -eq 0 ]; then
+	mkdir -p "${CHROME_PROFILE}" "${CHROME_XDG}" /workspace
+	chown box:box "${CHROME_PROFILE}" 2>/dev/null || true
+	chown -R box:box "${CHROME_XDG}" 2>/dev/null || true
+else
+	mkdir -p "${CHROME_PROFILE}" "${CHROME_XDG}" 2>/dev/null || true
+fi
+chmod 700 "${CHROME_PROFILE}" "${CHROME_XDG}" 2>/dev/null || true
+# Chrome watches /etc/localtime for zone changes only while TZ is unset in its environment
+# (https://chromium.googlesource.com/chromium/src/+/refs/tags/151.0.7922.169/services/device/time_zone_monitor/time_zone_monitor_linux.cc),
+# so the browser is launched without TZ and follows the box clock sand-box-timezone sets.
+CHROME_ENV=(
+	env
+	-u TZ
+	-u SAND_GATEWAY_TOKEN
+	-u SAND_EGRESS_TUNNEL_BEARER
+	DISPLAY="${DISPLAY:-:1}"
+	HOME="${SAND_CHROME_HOME:-/home/box}"
+	XDG_RUNTIME_DIR="${CHROME_XDG}"
+	DBUS_SESSION_BUS_ADDRESS="${CHROME_DBUS_ADDRESS}"
+)
+if [ -n "${SAND_CHROME_HOME:-}" ]; then
+	CHROME_ENV+=(
+		XDG_CONFIG_HOME="${SAND_CHROME_HOME}/.config"
+		XDG_CACHE_HOME="${SAND_CHROME_HOME}/.cache"
+		XDG_DATA_HOME="${SAND_CHROME_HOME}/.local/share"
+		XDG_STATE_HOME="${SAND_CHROME_HOME}/.local/state"
+		TMPDIR="${SAND_CHROME_HOME}/tmp"
+	)
+fi
+if [ "$(id -u)" -eq 0 ]; then
+	CHROME_ENV=(runuser -u box -- "${CHROME_ENV[@]}")
+fi
+
+chrome_ready() {
+	curl --max-time 1 -fsS "http://127.0.0.1:${CHROME_DEBUG_PORT}/json/version" >/dev/null 2>&1
+}
+
+# Headful Chrome serves CDP on 127.0.0.1:<port> and, when that is still held,
+# on [::1]:<port> for the rest of its life
+# (https://chromium.googlesource.com/chromium/src/+/refs/tags/154.0.8037.57/chrome/browser/devtools/remote_debugging_server.cc).
+# Handing a launch to a browser that is shutting down makes Chrome start a
+# second browser at once, and one that has not answered for 20 s is SIGKILLed
+# without waiting for it to exit
+# (https://chromium.googlesource.com/chromium/src/+/refs/tags/154.0.8037.57/chrome/browser/process_singleton_posix.cc);
+# the new browser then aborts on the old SingletonLock or lands on [::1]. So
+# box-chrome only hands a launch to a browser that answers CDP, keeps the
+# browser running past its last window, and starts a new one only once the old
+# process is gone and the port is free.
+chrome_on_ipv6_only() {
+	curl --max-time 1 -fsS "http://[::1]:${CHROME_DEBUG_PORT}/json/version" >/dev/null 2>&1
+}
+
+process_running() {
+	local state
+	state="$(sed 's/.*) //' "/proc/$1/stat" 2>/dev/null)" || return 1
+	[ -n "${state}" ] && [ "${state%% *}" != Z ]
+}
+
+profile_browser_pid() {
+	local pids pid
+	pids="$(pgrep -d, -x chrome 2>/dev/null)" || return 1
+	pid="$(ps -ww -o pid=,args= -p "${pids}" 2>/dev/null | awk -v want="--user-data-dir=${CHROME_PROFILE}" '
+		{ for (i = 2; i <= NF; i++) if ($i ~ /^--type=/) next }
+		{ for (i = 2; i <= NF; i++) if ($i == want) { print $1; exit } }')"
+	[ -n "${pid}" ] && printf '%s' "${pid}"
+}
+
+cdp_port_listening() {
+	[ -n "$(ss -ltnH "sport = :${CHROME_DEBUG_PORT}" 2>/dev/null)" ]
+}
+
+stop_browser() {
+	local pid="$1" target="$1" end
+	[ "$(ps -o pgid= -p "${pid}" 2>/dev/null | tr -d ' ')" = "${pid}" ] && target="-${pid}"
+	kill -TERM -- "${target}" 2>/dev/null || true
+	end=$((SECONDS + 3))
+	while process_running "${pid}" && [ "${SECONDS}" -lt "${end}" ]; do sleep 0.1; done
+	process_running "${pid}" && kill -KILL -- "${target}" 2>/dev/null
+	end=$((SECONDS + 10))
+	while process_running "${pid}" && [ "${SECONDS}" -lt "${end}" ]; do sleep 0.1; done
+}
+
+release_profile_browser() {
+	local pid end
+	if pid="$(profile_browser_pid)"; then
+		if ! chrome_on_ipv6_only; then
+			end=$((SECONDS + CHROME_RELEASE_GRACE_S))
+			while process_running "${pid}" && [ "${SECONDS}" -lt "${end}" ]; do
+				chrome_ready && return 0
+				sleep 0.1
+			done
+		fi
+		process_running "${pid}" && stop_browser "${pid}"
+		process_running "${pid}" && return 1
+	fi
+	end=$((SECONDS + CHROME_PORT_WAIT_S))
+	while cdp_port_listening; do
+		[ "${SECONDS}" -lt "${end}" ] || return 1
+		sleep 0.1
+	done
+}
+
+launch_chrome() {
+	local flags=("${CHROME_FLAGS[@]}")
+	[ "${CHROME_BIN}" != "${UNGOOGLED_CHROMIUM}" ] || flags+=("${UNGOOGLED_CHROMIUM_FLAGS[@]}")
+	setsid -f /usr/local/bin/box-bounded-log --run "${CHROME_LOG}" -- \
+		"${CHROME_ENV[@]}" \
+		nice -n 10 "${CHROME_BIN}" "${flags[@]}" "$@" \
+		</dev/null >/dev/null 2>&1 9>&-
+}
+
+record_box_browser() {
+	printf '%s\n' "${BOX_BROWSER}" >"${BOX_BROWSER_RUNNING_FILE}.$$" &&
+		mv -f "${BOX_BROWSER_RUNNING_FILE}.$$" "${BOX_BROWSER_RUNNING_FILE}" 2>/dev/null || true
+}
+
+# Chromium 139 dies right after it starts serving CDP on a profile whose
+# Default/Sync Data store Google Chrome 155 wrote. ungoogled-chromium blocks
+# its own requests to Google's hosts and so never syncs
+# (https://github.com/ungoogled-software/ungoogled-chromium/blob/master/README.md),
+# so its cold launch drops the store and Chrome rebuilds it on its next launch.
+drop_sync_store_for_ungoogled() {
+	[ "${CHROME_BIN}" = "${UNGOOGLED_CHROMIUM}" ] || return 0
+	[ ! -L "${CHROME_PROFILE}/Default" ] || return 0
+	rm -rf -- "${CHROME_PROFILE}/Default/Sync Data" 2>/dev/null || true
+}
+
+use_running_browser() {
+	local recorded=""
+	read -r recorded 2>/dev/null <"${BOX_BROWSER_RUNNING_FILE}" || true
+	if [ "${recorded}" = ungoogled-chromium ] && [ -x "${UNGOOGLED_CHROMIUM}" ]; then
+		CHROME_BIN="${UNGOOGLED_CHROMIUM}"
+	else
+		CHROME_BIN=google-chrome-stable
+	fi
+}
+
+# Chrome keeps session cookies only in memory
+# (https://chromium.googlesource.com/chromium/src/+/refs/tags/151.0.7922.169/net/cookies/cookie_monster.h),
+# so a cold launch comes up without them until the saved cookie seed is pushed
+# back in. That has to finish before Chrome is handed a URL: a page that loads
+# first gets a fresh session cookie under the same name, and the seed then saves
+# that value over the login.
+restore_cookie_seed() {
+	local out
+	[ -s "${SAND_COOKIE_SEED:-}" ] && [ -x "${SAND_COOKIE_NODE:-}" ] && [ -r "${SAND_COOKIE_PERSIST:-}" ] || return 0
+	out="$(timeout "${CHROME_COOKIE_RESTORE_WAIT_S:-5}" "${SAND_COOKIE_NODE}" "${SAND_COOKIE_PERSIST}" \
+		--restore-port "${CHROME_DEBUG_PORT}" </dev/null 2>&1 9>&-)" || true
+	[ -z "${out}" ] || printf '%s\n' "${out}" 2>/dev/null >>"${SAND_COOKIE_RESTORE_LOG:-/dev/null}" || true
+}
+
+# Both profiles share the box-chrome window class on one display, so the wait
+# matches a visible window owned by this profile's own browser process.
+chrome_window_up() {
+	local pid
+	pid="$(profile_browser_pid)" || return 1
+	DISPLAY="${DISPLAY:-:1}" xdotool search --onlyvisible --pid "${pid}" >/dev/null 2>&1
+}
+
+wait_for_chrome() {
+	local visible="$1" end=$((SECONDS + CHROME_LAUNCH_WAIT_S))
+	CHROME_CDP_READY_MS=""
+	while :; do
+		if chrome_ready; then
+			[ -n "${CHROME_CDP_READY_MS}" ] || CHROME_CDP_READY_MS="$(date +%s%3N)"
+			if [ "${visible}" -eq 0 ] || chrome_window_up; then
+				return
+			fi
+		fi
+		[ "${SECONDS}" -lt "${end}" ] || return 1
+		sleep 0.1
+	done
+}
+
+next_launch_attempt() {
+	local counter="${CHROME_PROFILE}/.sand-launch-count"
+	local boot="${SAND_BOX_BOOT_ID:-${SAND_BOX_BOOT_STARTED_AT_MS:-unknown}}"
+	local recorded_boot="" count=0
+	read -r recorded_boot count 2>/dev/null <"${counter}" || true
+	[ "${recorded_boot}" = "${boot}" ] && [ "${count}" -ge 0 ] 2>/dev/null || count=0
+	count=$((count + 1))
+	printf '%s %s\n' "${boot}" "${count}" 2>/dev/null >"${counter}" || true
+	printf '%s' "${count}"
+}
+
+start_chrome() {
+	local mode="$1" visible=1 started_ms attempt outcome duration_ms cdp_ready_ms launcher_fields
+	shift
+	[ "${mode}" = window ] || visible=0
+	attempt="$(next_launch_attempt)"
+	started_ms="$(date +%s%3N)"
+	if [ "${CHROME_PORT_HELD}" -eq 0 ]; then
+		if [ "${policy_status:-0}" = 3 ]; then
+			echo "box-chrome: sand_box_browser_webrtc_proxy_only is on but its managed policy could not be written; not launching" >&2
+			exit 1
+		fi
+		record_box_browser
+		drop_sync_store_for_ungoogled
+		launch_chrome --no-startup-window
+	else
+		use_running_browser
+	fi
+	if ! wait_for_chrome 0; then
+		outcome=cdp_timeout
+	else
+		cdp_ready_ms="${CHROME_CDP_READY_MS}"
+		restore_cookie_seed
+		if [ "${visible}" -eq 0 ]; then
+			outcome=ready
+		else
+			launch_chrome "$@"
+			if wait_for_chrome 1; then outcome=ready; else outcome=window_timeout; fi
+		fi
+		CHROME_CDP_READY_MS="${cdp_ready_ms}"
+	fi
+	duration_ms=$((${CHROME_CDP_READY_MS:-$(date +%s%3N)} - started_ms))
+	[ "${duration_ms}" -ge 0 ] || duration_ms=0
+	launcher_fields=",\"launcher\":${BOX_CHROME_LAUNCHER_VERSION}"
+	case "${SAND_BOX_CHROME_LAUNCHER_SOURCE:-}" in
+	bundle | image) launcher_fields+=",\"launcherSource\":\"${SAND_BOX_CHROME_LAUNCHER_SOURCE}\"" ;;
+	esac
+	printf '{"kind":"chrome_launch","display":%s,"mode":"%s","attempt":%s,"outcome":"%s","durationMs":%s%s}\n' \
+		"${BOX_DISPLAY_NUM:-1}" "${mode}" "${attempt}" "${outcome}" "${duration_ms}" "${launcher_fields}" \
+		2>/dev/null >>"${SAND_BOX_TELEMETRY_LOG:-/tmp/sand-box-telemetry.log}" || true
+	[ "${outcome}" = ready ]
+}
+
+exec 9>"${CHROME_PROFILE}/.sand-launch.lock"
+flock -w 90 9 || exit 1
+
+CHROME_PORT_HELD=0
+chrome_ready || release_profile_browser || CHROME_PORT_HELD=1
+
+# A force-installed extension gets NO incognito access by default, and Chrome
+# reports that by simply not proxying: an incognito window falls through to
+# Chrome's own WebAuthn stack, which in a box with no USB shows a "touch your
+# key" dialog that can never be satisfied. Grant it the same way the
+# chrome://extensions toggle does, by seeding the profile pref. Only while this
+# profile's Chrome is down — a running Chrome rewrites Preferences from memory
+# on exit and would drop the edit — and re-applied on every cold launch so a
+# profile that lost the grant heals itself.
+if [ -f "${SAND_WEBAUTHN_MARKER}" ] && [ -r "${SAND_WEBAUTHN_ID_FILE}" ] &&
+	! chrome_ready && command -v python3 >/dev/null 2>&1; then
+	SAND_INCOGNITO_SEED=(python3 -I -)
+	if [ "$(id -u)" -eq 0 ]; then
+		SAND_INCOGNITO_SEED=(runuser -u box -- python3 -I -)
+	fi
+	"${SAND_INCOGNITO_SEED[@]}" "${CHROME_PROFILE}/Default/Preferences" "$(cat "${SAND_WEBAUTHN_ID_FILE}")" <<'SAND_INCOGNITO_EOF' || true
+import json, os, sys
+
+prefs, extension_id = sys.argv[1], sys.argv[2]
+try:
+    with open(prefs, encoding="utf-8") as handle:
+        settings = json.load(handle)
+except (OSError, ValueError):
+    settings = {}
+entry = (
+    settings.setdefault("extensions", {})
+    .setdefault("settings", {})
+    .setdefault(extension_id, {})
+)
+if entry.get("incognito") is not True:
+    entry["incognito"] = True
+    os.makedirs(os.path.dirname(prefs), exist_ok=True)
+    with open(prefs, "w", encoding="utf-8") as handle:
+        json.dump(settings, handle, separators=(",", ":"))
+SAND_INCOGNITO_EOF
+fi
+
+if [ "${SAND_CHROME_PREPARE}" -eq 1 ]; then
+	if chrome_ready; then
+		wait_for_chrome 0
+	else
+		start_chrome prepare
+	fi
+	exit
+fi
+
+if chrome_ready; then
+	use_running_browser
+	launch_chrome "$@"
+	wait_for_chrome 1
+else
+	start_chrome window "$@"
+fi
