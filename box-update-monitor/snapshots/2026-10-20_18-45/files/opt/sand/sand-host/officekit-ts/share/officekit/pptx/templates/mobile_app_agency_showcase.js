@@ -1,0 +1,771 @@
+/**
+ * "Applix" mobile-app pitch deck (15 slides, 13.333 x 7.5 in)
+ * Rebuilt with pptxgenjs only. Photographs in the source deck are replaced
+ * by grey "[image]" placeholder rectangles; phone / watch mock-up frames are
+ * redrawn as native rounded rectangles.
+ */
+const pptxgen = require('pptxgenjs');
+const path = require('path');
+
+/* ------------------------------------------------------------------ palette */
+const C = {
+  red: 'F56150',        // accent3 - primary brand red
+  red2: 'DD413A',       // accent2 - gradient end
+  grad: 'E95145',       // flat stand-in for the red F56150 -> DD413A gradient
+  wine: 'A10F28',       // accent1 - the little "+" grids
+  ice: 'F2F8FF',        // accent5 - pale blue panels
+  white: 'FFFFFF',
+  black: '000000',
+  ink: '0D0D0D',        // tx1 lumMod 95%
+  gray: '808080',       // bg1 lumMod 50% - body copy
+  gray95: 'F2F2F2',     // bg1 lumMod 95% - body copy on red
+  rule: 'FF8974',       // thin accent rule on the quote slide
+  photo: 'CCCCCC',      // image placeholder fill
+  photoTx: 'E4E4E4',    // image placeholder caption
+  frame: '212121'       // phone / watch body
+};
+
+/* --------------------------------------------------------- freeform outlines
+ * Every entry is a closed path in a 0..1 box:
+ *   [x, y]                        -> lineTo (or moveTo for the first point)
+ *   [x, y, c1x, c1y, c2x, c2y]    -> cubic bezier
+ *   "z"                           -> close
+ */
+const PATH = {
+  // organic background blobs, one or two per slide layout
+  bg1a: [[0,0],[0.9997,0],[1,0.0096],[0.9681,0.1408,1,0.0571,0.9894,0.1046],[0.4962,0.9456],[0.3423,0.9456,0.4537,1.0181,0.3848,1.0181],[0,0.3618],"z"],
+  bg1b: [[0.5316,0],[1,0],[1,0.7366],[0.715,0.9717],[0.5493,0.9717,0.6692,1.0094,0.5951,1.0094],[0.0343,0.5469],[0.0343,0.4102,-0.0114,0.5091,-0.0114,0.448],"z"],
+  bg1c: [[0,0],[0.0795,0.0234],[0.8916,0.3839],[0.8916,0.6161,1.0361,0.448,1.0361,0.552],[0.0795,0.9766],[0,1],"z"],
+  bg2a: [[0.4882,0],[0.5538,0.0453,0.5119,0,0.5357,0.0151],[0.9728,0.743],[0.9728,0.9616,1.0091,0.8034,1.0091,0.9013],[0.9498,1],[0.0739,1],[0.0272,0.9222],[0.0272,0.7036,-0.0091,0.8618,-0.0091,0.764],[0.4225,0.0453],[0.4882,0,0.4406,0.0151,0.4644,0],"z"],
+  bg2b: [[0.5931,0],[0.6729,0.0386,0.622,0,0.6509,0.0129],[1,0.4207],[1,0.9652],[0.9702,1],[0.2161,1],[0.033,0.7861],[0.033,0.5998,-0.011,0.7347,-0.011,0.6512],[0.5134,0.0386],[0.5931,0,0.5354,0.0129,0.5643,0],"z"],
+  bg3a: [[0.2324,0],[1,0],[0.4122,0.954],[0.2752,0.954,0.3743,1.0153,0.313,1.0153],[0.0284,0.5534],[0.0284,0.3311,-0.0095,0.4921,-0.0095,0.3925],"z"],
+  bg3b: [[0.4594,0],[0.5302,0.0282,0.485,0,0.5106,0.0094],[0.9707,0.452],[0.9707,0.5882,1.0098,0.4896,1.0098,0.5506],[0.5426,1],[0,1],[0,0.402],[0.3885,0.0282],[0.4594,0,0.4081,0.0094,0.4337,0],"z"],
+  bg4a: [[0,0],[0.9472,0],[0.9702,0.0241],[0.9702,0.175,1.0099,0.0658,1.0099,0.1334],[0.2129,0.9687],[0.0689,0.9687,0.1732,1.0104,0.1087,1.0104],[0,0.8965],"z"],
+  bg5a: [[0.1553,0],[1,0],[1,1],[0.7365,1],[0.0352,0.2925],[0.0352,0.1213,-0.0117,0.2452,-0.0117,0.1685],"z"],
+  bg5b: [[0.0312,0],[1,0],[1,0.7937],[0.8541,0.9644],[0.7072,0.9644,0.8135,1.0119,0.7478,1.0119],[0.0304,0.1727],[0.0304,0.0009,-0.0101,0.1252,-0.0101,0.0483],"z"],
+  bg6a: [[0.3321,0],[0.4095,0.0405,0.3601,0,0.3881,0.0135],[0.9679,0.7454],[0.9679,0.941,1.0107,0.7995,1.0107,0.887],[0.9212,1],[0,1],[0,0.3619],[0.2546,0.0405],[0.3321,0,0.276,0.0135,0.304,0],"z"],
+  bg6b: [[0.1673,0],[0.2542,0.0442,0.1988,0,0.2302,0.0147],[0.966,0.919],[0.9998,0.9969,0.984,0.9411,0.9953,0.9683],[1,1],[0,1],[0,0.1431],[0.0805,0.0442],[0.1673,0,0.1045,0.0147,0.1359,0],"z"],
+  bg7a: [[0.7424,0],[1,0],[1,1],[0.0059,1],[0.0056,0.9991],[0.0401,0.8372,-0.0081,0.9436,0.0033,0.881],"z"],
+  bg7b: [[0.8961,0],[0.9905,0.0393,0.9302,0,0.9644,0.0131],[1,0.0488],[1,1],[0.0448,1],[0.0391,0.9943],[0.0391,0.8047,-0.013,0.9419,-0.013,0.857],[0.8016,0.0393],[0.8961,0,0.8277,0.0131,0.8619,0],"z"],
+  bg8a: [[0.5027,0],[1,0],[1,1],[0.5027,1],[0.0424,0.591],[0.0424,0.409,-0.0141,0.5407,-0.0141,0.4593],"z"],
+  bg9a: [[0,0],[1,0],[0.9975,0.0289],[0.9491,0.1278,0.991,0.0651,0.9749,0.0997],[0.1989,0.9439],[0.0081,0.986,0.1474,1,0.0717,1.014],[0,0.9819],"z"],
+  bg9b: [[0,0],[0.3651,0],[0.9469,0.4134],[0.9469,0.5955,1.0177,0.4637,1.0177,0.5452],[0.3776,1],[0,1],"z"],
+  bg10a: [[0,0],[1,0],[1,0.2558],[0.5814,1],[0.419,1],[0,0.2551],"z"],
+  bg10b: [[0.0269,0],[0.9731,0],[0.9843,0.0243],[0.9722,0.2354,1.0087,0.0895,1.0046,0.1781],[0.5672,0.9508],[0.4328,0.9508,0.5301,1.0164,0.4699,1.0164],[0.0278,0.2354],[0.0157,0.0243,-0.0046,0.1781,-0.0087,0.0895],"z"],
+  bg11a: [[0.5557,0],[1,0],[1,0.6696],[0.6668,1],[0.3624,1],[0.032,0.6723],[0.032,0.5193,-0.0107,0.6301,-0.0107,0.5616],"z"],
+  bg12a: [[0,0],[0.3576,0],[0.9802,0.8641],[0.9802,0.9964,1.0066,0.9006,1.0066,0.9599],[0.9777,1],[0.3129,1],[0,0.5657],"z"],
+  bg12b: [[0,0],[0.5579,0],[0.9692,0.3958],[0.9692,0.539,1.0103,0.4354,1.0103,0.4995],[0.5211,0.9703],[0.3723,0.9703,0.48,1.0099,0.4134,1.0099],[0,0.612],"z"],
+  bg13a: [[0.6524,0],[0.7182,0.0444,0.6762,0,0.7,0.0148],[1,0.5034],[1,1],[0,1],[0.5867,0.0444],[0.6524,0,0.6049,0.0148,0.6287,0],"z"],
+  bg13b: [[1,0],[1,1],[0.0429,1],[0.0318,0.988],[0.0565,0.7739,-0.0177,0.9219,-0.0094,0.832],[0.8786,0.0486],[0.9782,0.0018,0.9069,0.0237,0.9417,0.0081],"z"],
+  bg14a: [[0,0],[0.8488,0],[1,0.1734],[1,0.9186],[0.9493,0.9768],[0.8518,0.9768,0.9223,1.0077,0.8787,1.0077],"z"],
+  bg14b: [[0.0727,0],[1,0],[1,1],[0.0346,0.1754],[0.0346,0.0325,-0.0115,0.136,-0.0115,0.072],"z"],
+  bg15a: [[0.1809,0],[1,0],[0.4291,0.9669],[0.3347,0.9669,0.403,1.011,0.3607,1.011],[0.0196,0.4332],[0.0196,0.2733,-0.0065,0.389,-0.0065,0.3175],"z"],
+  bg15b: [[0.1258,0],[1,0],[1,1],[0.7823,1],[0.0506,0.304],[0.0506,0.0714,-0.0169,0.2398,-0.0169,0.1357],"z"],
+
+  // "Applix" triangular mark
+  logo: [[0.5112,0],[0.3627,0.7486],[0.5826,0.6689],[0.7006,0.7625],[0,1],[0.5112,0],"z",[0.4658,0.4624],[1,1],[0.5155,0.2114],[0.4657,0.4624],"z"],
+  // hamburger menu, three rounded bars
+  menu: [[0.9211,0.4297],[0.9211,0.4297],[0.0732,0.4297,0.0732,0.4297,0.0732,0.4297],[0,0.502,0.0479,0.4297,0,0.4659],[0.0732,0.6064,0,0.5703,0.0479,0.6064],[0.9211,0.6064,0.9211,0.6064,0.9211,0.6064],[0.9972,0.502,0.9465,0.6064,0.9972,0.5703],[0.9211,0.4297,0.9972,0.4659,0.9465,0.4297],"z",[0.0732,0.2169],[0.0732,0.2169],[0.9211,0.2169,0.9211,0.2169,0.9211,0.2169],[0.9972,0.1084,0.9465,0.2169,0.9972,0.1767],[0.9211,0,0.9972,0.0723,0.9465,0],[0.0732,0,0.0732,0,0.0732,0],[0,0.1084,0.0479,0,0,0.0723],[0.0732,0.2169,0,0.1767,0.0479,0.2169],"z",[0.9211,0.8193],[0.9211,0.8193],[0.0732,0.8193,0.0732,0.8193,0.0732,0.8193],[0,0.9277,0.0479,0.8193,0,0.8554],[0.0732,0.996,0,0.9598,0.0479,0.996],[0.9211,0.996,0.9211,0.996,0.9211,0.996],[0.9972,0.9277,0.9465,0.996,0.9972,0.9598],[0.9211,0.8193,0.9972,0.8554,0.9465,0.8193],"z"],
+  // long arrow used on the "Explore Now" button
+  arrow: [[0.3087,0],[0.9156,0],[1,0.0806,0.9622,0,1,0.0361],[1,0.6688],[0.9156,0.7494,1,0.7133,0.9622,0.7494],[0.8311,0.6688,0.8689,0.7494,0.8311,0.7133],[0.8311,0.2828],[0.1455,0.9748],[0.0265,0.9782,0.1136,1.007,0.0604,1.0086],[0.0229,0.8646,-0.0073,0.9478,-0.009,0.897],[0.7199,0.1611],[0.3087,0.1611],[0.2242,0.0806,0.262,0.1611,0.2242,0.1251],[0.3087,0,0.2242,0.0361,0.262,0],"z"],
+  // ">" chevron on the data-communication card
+  chevron: [[0.9466,0.4682],[0.9466,0.4682],[0.1068,0,0.1068,0,0.1068,0],[0,0,0.1068,0,0.0534,0],[0,0.0614,0,0.0297,0,0.0614],[0.7865,0.4979,0.7865,0.4979,0.7865,0.4979],[0,0.9364,0,0.9364,0,0.9364],[0,0.9979,0,0.9364,0,0.9661],[0.1068,0.9979,0.0534,0.9979,0.1068,0.9979],[0.9466,0.5297,0.9466,0.5297,0.9466,0.5297],[0.9964,0.4979,0.9964,0.5297,0.9964,0.4979],[0.9466,0.4682,0.9964,0.4979,0.9964,0.4682]],
+  // simple shield outline
+  shield: [[0.5,0],[0.98,0.19],[0.98,0.5],[0.5,1],[0.02,0.5],[0.02,0.19],"z"],
+  // open folder with a document peeking out
+  folder: [[0.06,0.28],[0.06,0.95],[0.94,0.95],[0.94,0.42],[0.44,0.42],[0.32,0.28],"z"],
+  // "person +" growth icon
+  person: [[0.624,0.757],[0.624,0.757],[0.445,0.579,0.499,0.698,0.445,0.658],[0.499,0.439,0.445,0.518,0.481,0.538],[0.551,0.34,0.517,0.399,0.551,0.439],[0.535,0.3,0.551,0.3,0.535,0.3],[0.551,0.2,0.535,0.3,0.551,0.239],[0.356,0,0.551,0.14,0.517,0],[0.141,0.2,0.177,0,0.141,0.14],[0.159,0.3,0.141,0.239,0.159,0.3],[0.141,0.34,0.159,0.3,0.141,0.3],[0.195,0.439,0.141,0.439,0.177,0.399],[0.247,0.579,0.213,0.538,0.247,0.518],[0.07,0.757,0.247,0.658,0.195,0.698],[0,0.777,0.07,0.757,0.034,0.757],[0,0.998,0,0.998,0,0.998],[0.801,0.998,0.801,0.998,0.801,0.998],[0.801,0.899,0.801,0.998,0.801,0.919],[0.624,0.757,0.801,0.858,0.748,0.797],"z",[0.855,0.439],[0.855,0.439],[0.855,0.279,0.855,0.279,0.855,0.279],[0.748,0.279,0.748,0.279,0.748,0.279],[0.748,0.439,0.748,0.439,0.748,0.439],[0.606,0.439,0.606,0.439,0.606,0.439],[0.606,0.559,0.606,0.559,0.606,0.559],[0.748,0.559,0.748,0.559,0.748,0.559],[0.748,0.718,0.748,0.718,0.748,0.718],[0.855,0.718,0.855,0.718,0.855,0.718],[0.855,0.559,0.855,0.559,0.855,0.559],[0.998,0.559,0.998,0.559,0.998,0.559],[0.998,0.439,0.998,0.439,0.998,0.439],[0.855,0.439],"z"],
+  // mouse cursor on the "1.620 App Download" chip
+  cursor: [[0,0],[1,0.358],[0.694,0.556],[0.908,0.771],[0.916,0.78],[0.923,0.79],[0.929,0.8],[0.932,0.811],[0.935,0.822],[0.937,0.834],[0.937,0.845],[0.935,0.857],[0.932,0.868],[0.929,0.879],[0.923,0.889],[0.916,0.899],[0.908,0.908],[0.899,0.916],[0.889,0.923],[0.879,0.929],[0.868,0.932],[0.857,0.935],[0.845,0.937],[0.834,0.937],[0.822,0.935],[0.811,0.932],[0.8,0.929],[0.79,0.923],[0.78,0.916],[0.771,0.908],[0.556,0.694],[0.358,1],[0,0],"z"],
+  // paper plane (e-mail)
+  plane: [[0.9,0.119],[0.138,0.476],[0.289,0.569],[0.754,0.273],[0.423,0.652],[0.718,0.828],[0.9,0.119],"z",[1,0],[0.762,0.93],[0.571,0.815],[0.407,1],[0.279,0.633],[0,0.469],[1,0],"z"],
+  // house (office address)
+  house: [[0.237,0.65],[0.237,0.813],[0.423,0.813],[0.423,0.65],[0.237,0.65],"z",[0.499,0.218],[0.901,0.597],[0.901,0.982],[0.9,0.988],[0.897,0.993],[0.893,0.997],[0.888,0.999],[0.882,1],[0.76,1],[0.76,0.65],[0.553,0.65],[0.553,1],[0.114,1],[0.108,0.999],[0.103,0.997],[0.099,0.993],[0.097,0.988],[0.096,0.982],[0.096,0.597],[0.499,0.218],"z",[0.5,0],[0.985,0.457],[0.991,0.463],[0.995,0.471],[0.999,0.479],[1,0.488],[1,0.496],[0.999,0.505],[0.995,0.513],[0.991,0.52],[0.985,0.528],[0.977,0.533],[0.969,0.538],[0.961,0.541],[0.952,0.542],[0.943,0.542],[0.934,0.541],[0.925,0.538],[0.917,0.533],[0.909,0.528],[0.5,0.142],[0.091,0.528],[0.084,0.533],[0.077,0.537],[0.069,0.54],[0.061,0.541],[0.053,0.542],[0.045,0.541],[0.037,0.54],[0.029,0.537],[0.022,0.533],[0.016,0.528],[0.009,0.52],[0.005,0.513],[0.002,0.505],[0,0.496],[0,0.488],[0.002,0.479],[0.005,0.471],[0.009,0.463],[0.016,0.457],[0.186,0.296],[0.186,0.121],[0.187,0.112],[0.19,0.105],[0.194,0.098],[0.199,0.092],[0.205,0.087],[0.212,0.084],[0.22,0.081],[0.229,0.081],[0.238,0.081],[0.245,0.084],[0.253,0.087],[0.259,0.092],[0.264,0.098],[0.268,0.105],[0.271,0.112],[0.272,0.121],[0.272,0.216],[0.5,0],"z"],
+  // social icons on the team slide
+  twitter: [[0.315,1],[0.898,0.282,0.692,1,0.898,0.616],[0.897,0.249,0.898,0.271,0.898,0.26],[1,0.119,0.937,0.213,0.972,0.169],[0.882,0.158,0.963,0.138,0.923,0.152],[0.972,0.019,0.924,0.127,0.957,0.077],[0.842,0.08,0.933,0.048,0.888,0.069],[0.692,0,0.804,0.031,0.751,0],[0.487,0.252,0.579,0,0.487,0.113],[0.492,0.31,0.487,0.272,0.489,0.291],[0.07,0.046,0.322,0.299,0.171,0.199],[0.042,0.174,0.052,0.084,0.042,0.127],[0.133,0.384,0.042,0.261,0.078,0.338],[0.041,0.352,0.1,0.382,0.068,0.37],[0.041,0.355],[0.205,0.602,0.041,0.477,0.111,0.579],[0.151,0.611,0.188,0.608,0.169,0.611],[0.112,0.607,0.138,0.611,0.125,0.609],[0.304,0.782,0.138,0.707,0.214,0.78],[0.049,0.89,0.233,0.85,0.145,0.89],[0,0.887,0.032,0.89,0.016,0.889],[0.315,1,0.091,0.959,0.199,1],"z"],
+  facebook: [[0.996,0.177],[0.996,0.177],[0.711,0.177,0.711,0.177,0.711,0.177],[0.643,0.236,0.679,0.177,0.643,0.196],[0.643,0.353,0.643,0.353,0.643,0.353],[0.996,0.353,0.996,0.353,0.996,0.353],[0.996,0.51,0.996,0.51,0.996,0.51],[0.643,0.51,0.643,0.51,0.643,0.51],[0.643,0.998,0.643,0.998,0.643,0.998],[0.317,0.998,0.317,0.998,0.317,0.998],[0.317,0.51,0.317,0.51,0.317,0.51],[0,0.51,0,0.51,0,0.51],[0,0.353,0,0.353,0,0.353],[0.317,0.353,0.317,0.353,0.317,0.353],[0.317,0.256,0.317,0.256,0.317,0.256],[0.711,0,0.317,0.119,0.462,0],[0.996,0,0.996,0,0.996,0],[0.996,0.177]],
+  instagram: [[0.501,0.81],[0.812,0.508,0.672,0.81,0.812,0.675],[0.799,0.423,0.812,0.479,0.807,0.45],[0.887,0.423],[0.887,0.845],[0.847,0.885,0.887,0.867,0.869,0.885],[0.151,0.885],[0.111,0.845,0.129,0.885,0.111,0.867],[0.111,0.423],[0.203,0.423],[0.19,0.508,0.195,0.45,0.19,0.479],[0.501,0.81,0.19,0.675,0.329,0.81],"z",[0.501,0.303],[0.702,0.498,0.612,0.303,0.702,0.391],[0.501,0.693,0.702,0.606,0.612,0.693],[0.3,0.498,0.39,0.693,0.3,0.606],[0.501,0.303,0.3,0.391,0.39,0.303],"z",[0.684,0.156],[0.729,0.111,0.684,0.132,0.704,0.111],[0.842,0.111],[0.887,0.156,0.867,0.111,0.887,0.132],[0.887,0.264],[0.842,0.309,0.887,0.288,0.867,0.309],[0.729,0.309],[0.684,0.264,0.704,0.309,0.684,0.288],[0.684,0.156,0.684,0.264,0.684,0.156],"z",[0,0.128],[0,0.872],[0.128,1,0,0.942,0.058,1],[0.872,1],[1,0.872,0.942,1,1,0.942],[1,0.128],[0.872,0,1,0.058,0.942,0],[0.128,0],[0,0.128,0.058,0,0,0.058],"z"]
+};
+
+/* ---------------------------------------------------------------- primitives */
+const NONE = { type: 'none' };
+const SOFT_SHADOW = { type: 'outer', color: '000000', blur: 25, offset: 0, angle: 90, opacity: 0.16 };
+const DROP_SHADOW = { type: 'outer', color: '000000', blur: 30, offset: 12, angle: 45, opacity: 0.12 };
+
+/** Draw a normalised freeform path inside the box (x, y, w, h). */
+function freeform(s, x, y, w, h, pts, opts) {
+  const geo = pts.map(p => {
+    if (p === 'z') return { close: true };
+    if (p.length === 6) {
+      return { x: p[0] * w, y: p[1] * h,
+        curve: { type: 'cubic', x1: p[2] * w, y1: p[3] * h, x2: p[4] * w, y2: p[5] * h } };
+    }
+    return { x: p[0] * w, y: p[1] * h };
+  });
+  s.addShape('custGeom', Object.assign({ x, y, w, h, points: geo, line: NONE }, opts));
+}
+
+/** 4 x 4 grid of tiny "+" marks (the deck's recurring corner decoration). */
+function plusGrid(s, x, y, color) {
+  const size = 1.01, at = [0.025, 0.341, 0.658, 0.974], d = 0.055;
+  at.forEach(gy => at.forEach(gx => s.addShape('mathPlus', {
+    x: x + gx * size - d / 2, y: y + gy * size - d / 2, w: d, h: d,
+    fill: { color: color || C.wine }, line: NONE
+  })));
+}
+
+/** Phone body drawn behind a screen placeholder. */
+function device(s, x, y, w, h) {
+  s.addShape('roundRect', { x, y, w, h, rectRadius: 0.135 * w, fill: { color: C.frame }, line: NONE });
+}
+
+/** Smart-watch: two straps behind a rounded case. */
+function watch(s) {
+  s.addShape('roundRect', { x: 4.10, y: 2.35, w: 1.40, h: 1.7, rectRadius: 0.2,
+    fill: { color: C.frame }, line: NONE });
+  s.addShape('roundRect', { x: 4.10, y: 5.30, w: 1.40, h: 1.65, rectRadius: 0.2,
+    fill: { color: C.frame }, line: NONE });
+  s.addShape('roundRect', { x: 3.649, y: 3.30, w: 2.33, h: 2.72, rectRadius: 0.62,
+    fill: { color: C.frame }, line: NONE });
+  s.addShape('roundRect', { x: 5.93, y: 4.15, w: 0.13, h: 0.42, rectRadius: 0.05,
+    fill: { color: '4A4A4A' }, line: NONE });
+}
+
+/** Grey stand-in for a photograph; `notch` adds the phone speaker cut-out. */
+function photo(s, x, y, w, h, radius, notch) {
+  s.addShape(radius ? 'roundRect' : 'rect', Object.assign({ x, y, w, h, fill: { color: C.photo }, line: NONE },
+    radius ? { rectRadius: radius } : {}));
+  s.addText('[image]', { x, y, w, h, align: 'center', valign: 'middle',
+    fontFace: 'Open Sans', fontSize: 11, color: C.photoTx });
+  if (notch) {
+    // extends above the screen edge so only its bottom corners stay rounded
+    s.addShape('roundRect', { x: x + 0.114 * w, y: y - 0.04 * w, w: 0.766 * w, h: 0.122 * w,
+      rectRadius: 0.04 * w, fill: { color: C.frame }, line: NONE });
+  }
+}
+
+/** Small pill-shaped section label ("About Us", "Our Service", ...). */
+function pill(s, label, x, y, w, h, opts) {
+  s.addText(label, Object.assign({
+    x, y, w, h, shape: 'roundRect', rectRadius: 0.19 * Math.min(w, h),
+    fill: { color: C.grad }, line: NONE,
+    fontFace: 'Open Sans', fontSize: 11, color: C.white, align: 'center', valign: 'middle'
+  }, opts));
+}
+
+/** Body copy: Open Sans 11pt grey, 150% leading, top aligned. */
+function body(s, text, x, y, w, h, opts) {
+  s.addText(text, Object.assign({ x, y, w, h, fontFace: 'Open Sans', fontSize: 11,
+    color: C.gray, valign: 'top', lineSpacingMultiple: 1.5 }, opts));
+}
+
+/** Poppins headline. */
+function heading(s, text, x, y, w, h, opts) {
+  s.addText(text, Object.assign({ x, y, w, h, fontFace: 'Poppins', fontSize: 32,
+    bold: true, color: C.black, valign: 'top' }, opts));
+}
+
+/** "Applix" logo lock-up, top-left of every slide. */
+function brand(s, light) {
+  freeform(s, 0.569, 0.408, 0.324, 0.283, PATH.logo, { fill: { color: light ? C.white : C.grad } });
+  s.addText('Applix', { x: 0.815, y: 0.312, w: 0.913, h: 0.379, fontFace: 'Poppins',
+    bold: true, fontSize: 12, color: light ? C.white : C.black, valign: 'top', lineSpacingMultiple: 1.5 });
+}
+
+/** "Next >" marker, bottom-right. */
+function nextTag(s, textColor, arrowColor) {
+  s.addText('Next', { x: 11.591, y: 6.823, w: 1.024, h: 0.269, align: 'right',
+    fontFace: 'Open Sans', fontSize: 10, color: textColor, valign: 'top' });
+  s.addShape('triangle', { x: 12.651, y: 6.9, w: 0.127, h: 0.109, rotate: 90,
+    fill: { color: arrowColor }, line: NONE });
+}
+
+/** Red rounded square holding a small white glyph. */
+function iconTile(s, x, y, size) {
+  s.addShape('roundRect', { x, y, w: size, h: size, rectRadius: 0.1314 * size,
+    fill: { color: C.grad }, line: NONE, shadow: DROP_SHADOW });
+}
+
+/** Red "check" bullet used on the pricing and process slides. */
+function check(s, x, y, size) {
+  s.addText('\u2713', { x: x - 0.05, y: y - 0.08, w: size + 0.1, h: size + 0.16,
+    fontFace: 'Open Sans', fontSize: 20, bold: true, color: C.red, align: 'center', valign: 'middle' });
+}
+
+/** Head with a support headset - outline only, sits on a red tile. */
+function headsetIcon(s, x, y, d) {
+  const ln = { color: C.white, width: 1.4 };
+  s.addShape('blockArc', { x: x + 0.06 * d, y: y + 0.08 * d, w: 0.88 * d, h: 0.66 * d,
+    angleRange: [180, 360], fill: { color: C.white }, line: NONE });
+  s.addShape('ellipse', { x: x + 0.2 * d, y: y + 0.2 * d, w: 0.6 * d, h: 0.6 * d, fill: NONE, line: ln });
+  [0.02, 0.86].forEach(fx => s.addShape('roundRect', { x: x + fx * d, y: y + 0.38 * d,
+    w: 0.12 * d, h: 0.26 * d, rectRadius: 0.05 * d, fill: { color: C.white }, line: NONE }));
+  s.addShape('line', { x: x + 0.88 * d, y: y + 0.64 * d, w: 0, h: 0.16 * d, line: ln });
+  s.addShape('line', { x: x + 0.6 * d, y: y + 0.8 * d, w: 0.28 * d, h: 0, line: ln });
+}
+
+/* -------------------------------------------------------- layout backdrops
+ * Each slide sits on one of 15 layouts: a pale panel, a red organic blob,
+ * a phone frame or two and the little "+" grid.
+ */
+const BACKDROP = {
+  1: s => {
+    freeform(s, 0, 0, 11.886, 6.969, PATH.bg1a, { fill: { color: C.white } });
+    freeform(s, 7.621, 0, 5.713, 6.926, PATH.bg1b, { fill: { color: C.grad } });
+    device(s, 8.368, 0.896, 2.777, 5.709);
+    plusGrid(s, 11.75, 5.336);
+    freeform(s, 0, 5.949, 0.513, 1.155, PATH.bg1c, { fill: { color: C.grad } });
+  },
+  2: s => {
+    freeform(s, 4.776, 2.421, 8.458, 5.079, PATH.bg2a, { fill: { color: C.ice } });
+    freeform(s, 6.373, 1.542, 6.961, 5.958, PATH.bg2b, { fill: { color: C.grad } });
+  },
+  3: s => {
+    freeform(s, 0.617, 0, 7.211, 4.444, PATH.bg3a, { fill: { color: C.ice } });
+    freeform(s, 0, 0.556, 6.68, 6.944, PATH.bg3b, { fill: { color: C.grad } });
+    device(s, 2.08, 1.436, 3.937, 6.064);
+  },
+  4: s => {
+    freeform(s, 0, 0, 7.268, 6.934, PATH.bg4a, { fill: { color: C.ice } });
+    plusGrid(s, 0, 6.097);
+  },
+  5: s => {
+    freeform(s, 5.767, 0, 7.566, 7.5, PATH.bg5a, { fill: { color: C.ice } });
+    freeform(s, 5.773, 0, 7.56, 6.463, PATH.bg5b, { fill: { color: C.grad } });
+    plusGrid(s, 12.11, 2.985);
+    device(s, 6.362, 0.712, 2.673, 5.495);
+    device(s, 9.189, 1.328, 2.673, 5.495);
+  },
+  6: s => {
+    freeform(s, 0, 0.569, 8.75, 6.931, PATH.bg6a, { fill: { color: C.ice } });
+    freeform(s, 0, 2.297, 6.394, 5.203, PATH.bg6b, { fill: { color: C.grad } });
+    device(s, 1.608, 0.938, 2.797, 5.751);
+    plusGrid(s, 0, 5.919);
+  },
+  7: s => {
+    freeform(s, 4.392, 0, 8.941, 7.5, PATH.bg7a, { fill: { color: C.ice } });
+    freeform(s, 7.454, 1.643, 5.879, 5.857, PATH.bg7b, { fill: { color: C.grad } });
+    plusGrid(s, 11.944, 1.296);
+    device(s, 6.245, -1.35, 2.797, 5.741);
+    device(s, 9.324, 0.875, 2.797, 5.751);
+  },
+  8: s => {
+    freeform(s, 6.669, 0, 6.664, 7.5, PATH.bg8a, { fill: { color: C.grad } });
+    device(s, 9.356, 0.875, 2.797, 5.751);
+    plusGrid(s, 0.246, 6.263);
+  },
+  9: s => {
+    freeform(s, 0, 0, 5.481, 5.038, PATH.bg9a, { fill: { color: C.ice } });
+    freeform(s, 0, 0, 5.329, 7.5, PATH.bg9b, { fill: { color: C.grad } });
+    device(s, 1.904, 0.875, 2.797, 5.751);
+    plusGrid(s, 12.085, 0.22);
+  },
+  10: s => {
+    freeform(s, 0, 0, 13.333, 7.5, PATH.bg10a, { fill: { color: C.ice } });
+    freeform(s, 2.421, 0, 8.491, 4.806, PATH.bg10b, { fill: { color: C.grad } });
+    s.addShape('roundRect', { x: 5.174, y: 2.454, w: 2.974, h: 4.236, rectRadius: 0.242,
+      fill: { color: C.white }, line: NONE, shadow: SOFT_SHADOW });
+    plusGrid(s, 0.246, 2.081);
+  },
+  11: s => {
+    freeform(s, 5.896, 0, 7.437, 7.5, PATH.bg11a, { fill: { color: C.ice } });
+    plusGrid(s, 0.226, 6.273);
+    s.addShape('roundRect', { x: 7.334, y: 1.168, w: 5.199, h: 5.199, rectRadius: 0.648,
+      rotate: 315, fill: { color: C.grad }, line: NONE });
+    device(s, 7.024, 0.848, 2.797, 5.751);
+    device(s, 9.933, 0.848, 2.797, 5.751);
+  },
+  12: s => {
+    freeform(s, 0, 0, 10.409, 7.5, PATH.bg12a, { fill: { color: C.ice } });
+    freeform(s, 0, 0, 6.672, 6.932, PATH.bg12b, { fill: { color: C.grad } });
+    device(s, 1.728, 0.875, 2.797, 5.751);
+    plusGrid(s, 0.246, 4.176);
+  },
+  13: s => {
+    freeform(s, 2.317, 0.736, 11.017, 6.764, PATH.bg13a, { fill: { color: C.ice } });
+    freeform(s, 9.696, 3.378, 3.637, 4.122, PATH.bg13b, { fill: { color: C.grad } });
+    plusGrid(s, 6.336, 5.535);
+    [[5.759, 1.533], [6.81, 3.967]].forEach(([x, y]) => s.addShape('roundRect', {
+      x, y, w: 5.588, h: 2.163, rectRadius: 0.176, fill: { color: C.white }, line: NONE, shadow: SOFT_SHADOW }));
+  },
+  14: s => {
+    freeform(s, 6.249, 0, 7.084, 6.177, PATH.bg14a, { fill: { color: C.ice } });
+    freeform(s, 9.204, 0, 4.13, 4.834, PATH.bg14b, { fill: { color: C.grad } });
+    plusGrid(s, 0.801, 5.545);
+  },
+  15: s => {
+    freeform(s, 0.398, 0, 12.268, 7.244, PATH.bg15a, { fill: { color: C.white } });
+    freeform(s, 6.199, 0, 7.134, 7.5, PATH.bg15b, { fill: { color: C.grad } });
+    plusGrid(s, 11.335, 0.632);
+    device(s, 7.405, 1.0, 4.437, 6.5);
+  }
+};
+
+/* -------------------------------------------------------------- text blocks */
+const LOREM_LONG = 'Lorem Ipsum\u00a0is simply dummy text of the printing and typesetting industry. ' +
+  'Lorem Ipsum has been the industry\u2019s standard dummy text of Ipsum\u00a0is simply the printing ' +
+  'and industry\u2019s standard.';
+const LOREM_MED = 'Lorem Ipsum\u00a0is simply dummy text of the printing and type setting industry. ' +
+  'Lorem Ipsum has been the industry\u2019s.';
+const LOREM_CARD = 'Lorem ipsum dolor sit amet, consec like tetuer adipiscing elit. Maecenas';
+
+/* -------------------------------------------------------------- slide 1 */
+function slide1(s) {
+  s.background = { color: C.ice };
+  BACKDROP[1](s);
+  photo(s, 8.555, 1.068, 2.402, 5.321, 0.252, true);
+  brand(s);
+  ['Home', 'About Us', 'Contact', 'More'].forEach((label, i) => s.addText(label, {
+    x: 2.572 + i * 0.843, y: 0.414, w: 1.024, h: 0.269,
+    fontFace: 'Open Sans', fontSize: 10, color: C.gray, align: 'center', valign: 'top' }));
+  s.addShape('triangle', { x: 5.838, y: 0.525, w: 0.105, h: 0.071, rotate: 180,
+    fill: { color: C.red }, line: NONE });
+
+  heading(s, 'Exploring the Mobile Frontier', 1.65, 1.556, 5.384, 3.13, { fontSize: 60 });
+  body(s, 'Navigating the World of Mobile Apps', 1.693, 4.663, 4.236, 0.417, { fontSize: 14 });
+
+  // header call to action
+  s.addShape('roundRect', { x: 11.356, y: 0.366, w: 1.016, h: 0.353, rectRadius: 0.067,
+    fill: NONE, line: { color: C.white, width: 1 } });
+  s.addText('Sign Up', { x: 11.473, y: 0.408, w: 0.781, h: 0.269, fontFace: 'Open Sans',
+    fontSize: 10, color: C.white, align: 'center', valign: 'top' });
+  freeform(s, 12.533, 0.467, 0.236, 0.152, PATH.menu, { fill: { color: C.white } });
+
+  // hero buttons
+  s.addShape('roundRect', { x: 1.78, y: 5.297, w: 1.661, h: 0.467, rectRadius: 0.089,
+    fill: { color: C.grad }, line: NONE, shadow: SOFT_SHADOW });
+  s.addText('Explore Now', { x: 1.906, y: 5.396, w: 1.118, h: 0.269, fontFace: 'Open Sans',
+    fontSize: 10, color: C.white, valign: 'top' });
+  freeform(s, 3.054, 5.466, 0.135, 0.142, PATH.arrow, { fill: { color: C.white }, rotate: 47 });
+  s.addShape('roundRect', { x: 3.563, y: 5.297, w: 1.262, h: 0.467, rectRadius: 0.089,
+    fill: { color: C.white }, line: NONE, shadow: SOFT_SHADOW });
+  s.addText('Start Now', { x: 3.635, y: 5.396, w: 1.118, h: 0.269, fontFace: 'Open Sans',
+    fontSize: 10, color: C.gray, align: 'center', valign: 'top' });
+
+  // floating stat card
+  s.addShape('roundRect', { x: 10.279, y: 3.238, w: 1.363, h: 1.105, rectRadius: 0.184,
+    fill: { color: C.white }, line: NONE, shadow: DROP_SHADOW });
+  body(s, 'App Usages', 10.38, 3.426, 1.16, 0.324, { fontSize: 10, align: 'center' });
+  heading(s, '455K', 10.279, 3.722, 1.363, 0.438, { fontSize: 20, align: 'center' });
+}
+
+/* -------------------------------------------------------------- slide 2 */
+function slide2(s) {
+  BACKDROP[2](s);
+  photo(s, 7.225, 0.561, 4.678, 6.939, 0.422);
+  quoteMark(s, 0.713, 2.129, 'F1F8FF');
+  nextTag(s, C.white, C.white);
+  brand(s);
+
+  s.addText([
+    { text: 'Mobile Apps ', options: { color: C.red } },
+    { text: 'Are The Brushstrokes Of Innovation On The Canvas Of Convenience.' }
+  ], { x: 1.271, y: 2.353, w: 5.395, h: 2.794, fontFace: 'Poppins', bold: true,
+    fontSize: 32, color: C.black, valign: 'top' });
+
+  body(s, 'Quote Of The Day', 1.892, 1.676, 2.919, 0.349);
+  s.addShape('line', { x: 1.35, y: 1.871, w: 0.405, h: 0, line: { color: C.rule, width: 1.5 } });
+  body(s, 'Mr. John Anderson', 1.296, 5.334, 2.919, 0.421, { fontSize: 14, color: C.black });
+  body(s, 'CEO of Company', 1.296, 5.715, 2.919, 0.349, { italic: true });
+  plusGrid(s, 11.735, 2.353);
+}
+
+/** Pair of closing quotation marks (rounded block + comma tail). */
+function quoteMark(s, x, y, color) {
+  [0, 0.44].forEach(dx => {
+    s.addShape('roundRect', { x: x + dx, y, w: 0.39, h: 0.38, rectRadius: 0.1,
+      fill: { color }, line: NONE });
+    s.addShape('roundRect', { x: x + dx + 0.20, y: y + 0.24, w: 0.19, h: 0.39, rectRadius: 0.095,
+      fill: { color }, line: NONE });
+  });
+}
+
+/* -------------------------------------------------------------- slide 3 */
+function slide3(s) {
+  BACKDROP[3](s);
+  heading(s, 'We Are App Agency\nBuilding High Level Of Smart App', 7.69, 2.17, 4.97, 1.717);
+  body(s, LOREM_LONG, 7.717, 4.676, 4.607, 1.183);
+  body(s, 'Description Here', 7.717, 4.244, 4.075, 0.337, { fontSize: 14, bold: true, color: C.black });
+  pill(s, 'About Us', 7.8, 1.664, 1.244, 0.395);
+  plusGrid(s, 0.388, 2.016);
+  brand(s);
+  photo(s, 2.344, 1.681, 3.406, 5.819, 0.357, true);
+}
+
+/* -------------------------------------------------------------- slide 4 */
+function slide4(s) {
+  BACKDROP[4](s);
+  nextTag(s, C.gray, C.red);
+  heading(s, 'Our Story\u00a0Behind Our Success & Achievement', 6.557, 1.735, 6.103, 1.178, { align: 'left' });
+  pill(s, 'About Us', 6.667, 1.229, 1.244, 0.395);
+  brand(s);
+  body(s, LOREM_LONG, 8.432, 3.943, 3.626, 1.46);
+  body(s, 'Description Here', 8.432, 3.511, 2.304, 0.337, { fontSize: 14, bold: true, color: C.black });
+  body(s, 'Read More. . .', 8.432, 5.613, 2.304, 0.286, { bold: true, italic: true, color: C.red });
+
+  photo(s, 1.417, 1.133, 3.912, 3.2, 0.289);
+  s.addShape('roundRect', { x: 3.834, y: 3.404, w: 3.912, h: 3.2, rectRadius: 0.3,
+    fill: { color: C.white }, line: NONE, shadow: SOFT_SHADOW });
+
+  // red caption card with a small "team" glyph
+  s.addShape('roundRect', { x: 1.417, y: 4.91, w: 3.633, h: 1.006, rectRadius: 0.151,
+    fill: { color: C.grad }, line: NONE, shadow: SOFT_SHADOW });
+  s.addText([{ text: 'Description' }, { text: ' Here' }], { x: 2.454, y: 5.027, w: 2.151, h: 0.417,
+    fontFace: 'Open Sans', fontSize: 14, bold: true, color: C.white, valign: 'top', lineSpacingMultiple: 1.5 });
+  body(s, 'Lorem Ipsum dolor\u00a0is simply', 2.454, 5.352, 2.413, 0.349, { color: C.white });
+  s.addShape('ellipse', { x: 1.925, y: 5.253, w: 0.14, h: 0.14, fill: { color: C.white }, line: NONE });
+  s.addShape('roundRect', { x: 1.86, y: 5.41, w: 0.27, h: 0.13, rectRadius: 0.05,
+    fill: { color: C.white }, line: NONE });
+  [[1.822, 5.32], [2.146, 5.32]].forEach(([x, y]) =>
+    s.addShape('ellipse', { x, y, w: 0.085, h: 0.085, fill: { color: C.white }, line: NONE }));
+
+  photo(s, 3.961, 3.547, 3.658, 2.914, 0.263);
+}
+
+/* -------------------------------------------------------------- slide 5 */
+function slide5(s) {
+  BACKDROP[5](s);
+  photo(s, 6.542, 0.878, 2.312, 5.121, 0.242, true);
+  photo(s, 9.368, 1.494, 2.312, 5.121, 0.242, true);
+  nextTag(s, C.gray, C.red);
+  brand(s);
+
+  heading(s, ' Building Brands\nThat Truly Matter\nTo People', 1.131, 2.44, 4.97, 1.717, { align: 'left' });
+  pill(s, 'Why Choose Us', 1.241, 1.934, 1.744, 0.395);
+  body(s, LOREM_LONG, 1.248, 5.119, 4.2, 1.183);
+
+  [['17M+', 'Download', 1.271, 2.202, 1.059], ['1.678+', 'Review', 3.387, 4.375, 1.206]]
+    .forEach(([num, label, nx, lx, nw]) => {
+      heading(s, num, nx, 4.582, nw, 0.438, { fontSize: 20 });
+      body(s, label, lx, 4.682, 1.19, 0.286);
+    });
+
+  s.addShape('roundRect', { x: 11.208, y: 3.585, w: 1.173, h: 0.911, rectRadius: 0.12,
+    fill: { color: C.white }, line: NONE, shadow: DROP_SHADOW });
+  heading(s, '12+', 11.263, 3.724, 1.059, 0.438, { fontSize: 20, align: 'center' });
+  body(s, 'Features', 11.263, 4.076, 1.059, 0.286, { align: 'center' });
+}
+
+/* -------------------------------------------------------------- slide 6 */
+function slide6(s) {
+  BACKDROP[6](s);
+  nextTag(s, C.gray, C.red);
+  brand(s);
+  heading(s, 'We Provide Best\nService', 6.893, 1.665, 4.831, 1.178, { align: 'left' });
+  pill(s, 'Our Service', 7.004, 1.159, 1.44, 0.395);
+
+  const SERVICES = [
+    { y: 3.186, title: '100% Protect System', w: 2.976 },
+    { y: 4.301, title: '24/7 Hour Costumer Support', w: 3.157 },
+    { y: 5.433, title: 'Cloud Integration', w: 2.223 }
+  ];
+  SERVICES.forEach((it, i) => {
+    iconTile(s, 7.004, it.y, 0.394);
+    s.addText(it.title, { x: 7.551, y: it.y + 0.031, w: it.w, h: 0.337, fontFace: 'Open Sans',
+      fontSize: 14, bold: true, color: C.black, valign: 'top' });
+    body(s, LOREM_MED, 7.551, it.y + 0.388, 4.831, 0.627);
+    if (i === 0) {
+      freeform(s, 7.075, 3.245, 0.252, 0.276, PATH.shield, { fill: NONE, line: { color: C.white, width: 1.4 } });
+      s.addText('\u2713', { x: 7.075, y: 3.27, w: 0.252, h: 0.22, fontFace: 'Open Sans', fontSize: 11,
+        bold: true, color: C.white, align: 'center', valign: 'middle' });
+    }
+    if (i === 1) headsetIcon(s, 7.063, 4.36, 0.276);
+    if (i === 2) freeform(s, 7.075, 5.53, 0.24, 0.24, PATH.folder, { fill: NONE, line: { color: C.white, width: 1.4 } });
+  });
+
+  photo(s, 1.796, 1.112, 2.42, 5.36, 0.254, true);
+  device(s, 2.862, 2.402, 2.797, 5.098);
+  photo(s, 3.05, 2.575, 2.42, 4.925, 0.254, true);
+}
+
+/* -------------------------------------------------------------- slide 7 */
+function slide7(s) {
+  BACKDROP[7](s);
+  nextTag(s, C.gray, C.red);
+  brand(s);
+
+  // white card (right) then red card (left)
+  s.addShape('roundRect', { x: 5.281, y: 4.716, w: 3.705, h: 1.483, rectRadius: 0.159,
+    fill: { color: C.white }, line: NONE, shadow: SOFT_SHADOW });
+  freeform(s, 5.756, 4.971, 0.267, 0.239, PATH.person, { fill: { color: C.red2 } });
+  s.addText('Growth Support', { x: 6.216, y: 4.881, w: 2.179, h: 0.418, fontFace: 'Open Sans',
+    fontSize: 14, bold: true, color: C.black, valign: 'top', lineSpacingMultiple: 1.5 });
+  body(s, LOREM_CARD, 5.63, 5.296, 3.223, 0.627);
+
+  s.addShape('roundRect', { x: 1.383, y: 4.716, w: 3.705, h: 1.483, rectRadius: 0.159,
+    fill: { color: C.grad }, line: NONE, shadow: DROP_SHADOW });
+  s.addText('App Maintenance', { x: 2.173, y: 4.863, w: 2.179, h: 0.418, fontFace: 'Open Sans',
+    fontSize: 14, bold: true, color: C.white, valign: 'top', lineSpacingMultiple: 1.5 });
+  body(s, LOREM_CARD, 1.732, 5.296, 3.209, 0.627, { color: C.gray95 });
+  freeform(s, 1.76, 4.928, 0.321, 0.321, PATH.shield, { fill: NONE, line: { color: C.white, width: 1.5 } });
+
+  heading(s, 'Accesibility For\nOur Best Customer', 1.251, 2.295, 4.712, 1.178);
+  pill(s, 'Benefits', 1.361, 1.789, 1.171, 0.395);
+  body(s, 'Lorem Ipsum\u00a0is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been.',
+    1.251, 3.601, 4.505, 0.627);
+
+  photo(s, 6.433, 0, 2.42, 4.174, 0);
+  photo(s, 9.512, 1.048, 2.42, 5.36, 0.254, true);
+}
+
+/* -------------------------------------------------------------- slide 8 */
+function slide8(s) {
+  s.background = { color: C.ice };
+  BACKDROP[8](s);
+  photo(s, 9.544, 1.048, 2.42, 5.36, 0.254, true);
+  nextTag(s, C.white, C.white);
+  brand(s);
+
+  heading(s, 'Exclusive\nAccess To Apps', 1.07, 2.555, 2.764, 1.717);
+  pill(s, 'Pricing Plan', 1.18, 2.049, 1.364, 0.395);
+  body(s, 'Lorem Ipsum\u00a0is simply dummy text of the printing and type setting industry. ',
+    1.002, 4.65, 2.678, 0.904);
+
+  const PLANS = [
+    { x: 4.39, name: 'Basic', who: 'For Single User', price: '$15' },
+    { x: 7.573, name: 'Premium', who: 'For Agencies', price: '$50' }
+  ];
+  PLANS.forEach(p => {
+    const dx = p.x - 4.39;
+    s.addShape('roundRect', { x: p.x, y: 1.632, w: 3.029, h: 4.236, rectRadius: 0.302,
+      fill: { color: C.white }, line: NONE, shadow: SOFT_SHADOW });
+    s.addText(p.name, { x: 4.647 + dx, y: 1.91, w: 2.515, h: 0.404, fontFace: 'Open Sans',
+      fontSize: 18, bold: true, color: C.black, align: 'center', valign: 'top' });
+    body(s, p.who, 4.946 + dx, 2.246, 1.917, 0.349, { align: 'center' });
+    s.addText([
+      { text: p.price, options: { fontFace: 'Poppins', fontSize: 32, bold: true, color: C.black } },
+      { text: '/Month', options: { fontFace: 'Open Sans', fontSize: 12, color: C.gray } }
+    ], { x: 4.647 + dx, y: 2.767, w: 2.515, h: 0.64, align: 'center', valign: 'top' });
+    s.addShape('line', { x: 4.79 + dx, y: 3.618, w: 2.228, h: 0, line: { color: C.red, width: 1 } });
+    [3.826, 4.159, 4.487].forEach(fy => {
+      check(s, 4.79 + dx, fy, 0.253);
+      body(s, 'Lorem Ipsum Is the like.', 5.101 + dx, fy, 1.917, 0.349);
+    });
+    pill(s, 'Choose Plan', 5.1 + dx, 5.102, 1.609, 0.395);
+  });
+}
+
+/* -------------------------------------------------------------- slide 9 */
+function slide9(s) {
+  BACKDROP[9](s);
+  photo(s, 2.092, 1.048, 2.42, 5.36, 0.254, true);
+  nextTag(s, C.gray, C.red);
+  brand(s, true);
+
+  body(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. ' +
+    'Fusce posuere, magna sed pulvinar osuere :', 6.04, 3.47, 5.92, 0.627);
+  heading(s, 'Work With Us To Get The Best Services', 6.04, 2.013, 5.661, 1.178);
+  pill(s, 'How It Works', 6.15, 1.507, 1.497, 0.395);
+
+  const STEPS = [
+    { n: '01', title: 'Download app', x: 6.145, tx: 6.693, y: 4.612 },
+    { n: '02', title: 'App Installation', x: 6.145, tx: 6.693, y: 5.586 },
+    { n: '03', title: 'Sign Up App', x: 9.303, tx: 9.85, y: 4.612 },
+    { n: '04', title: 'Notifications', x: 9.303, tx: 9.85, y: 5.586 }
+  ];
+  STEPS.forEach(st => {
+    iconTile(s, st.x, st.y, 0.394);
+    s.addText(st.n, { x: st.x - 0.037, y: st.y + 0.049, w: 0.468, h: 0.286, fontFace: 'Open Sans',
+      fontSize: 11, color: C.white, align: 'center', valign: 'top' });
+    s.addText(st.title, { x: st.tx, y: st.y - 0.074, w: 2.223, h: 0.337, fontFace: 'Open Sans',
+      fontSize: 14, bold: true, color: C.black, valign: 'top' });
+    body(s, 'Lorem ipsum dolor sit amet', st.tx, st.y + 0.158, 2.424, 0.349, { align: 'justify' });
+  });
+
+  // floating download chip
+  s.addShape('roundRect', { x: 0.85, y: 3.47, w: 2.105, h: 0.852, rectRadius: 0.104,
+    fill: { color: C.white }, line: NONE, shadow: DROP_SHADOW });
+  s.addShape('roundRect', { x: 1.064, y: 3.699, w: 0.394, h: 0.394, rectRadius: 0.052,
+    fill: { color: C.red2 }, line: NONE });
+  freeform(s, 1.175, 3.811, 0.17, 0.17, PATH.cursor, { fill: { color: C.white } });
+  heading(s, '1.620', 1.632, 3.58, 1.085, 0.438, { fontSize: 20 });
+  body(s, 'App Download', 1.657, 3.856, 1.172, 0.324, { fontSize: 10 });
+}
+
+/* -------------------------------------------------------------- slide 10 */
+function slide10(s) {
+  BACKDROP[10](s);
+  nextTag(s, C.gray, C.red);
+  brand(s);
+  heading(s, 'Meet The Team', 3.942, 1.555, 5.449, 0.64, { color: C.white, align: 'center' });
+  pill(s, 'Our Team', 5.985, 1.049, 1.364, 0.395, { fill: { color: C.white }, color: C.gray });
+
+  const TEAM = [
+    { name: 'Daniel Sebastian', role: 'UI/UX Designer', x: 2.093 },
+    { name: 'Andrea Maxwell', role: 'Product Manager', x: 5.308 },
+    { name: 'Joselyn Smith', role: 'Team Lead', x: 8.522 }
+  ];
+  TEAM.forEach(m => {
+    photo(s, m.x, 2.588, 2.718, 2.718, 0.157);
+    s.addText(m.name, { x: m.x + 0.043, y: 5.543, w: 2.632, h: 0.37, fontFace: 'Poppins',
+      bold: true, fontSize: 16, color: C.black, align: 'center', valign: 'top' });
+    body(s, m.role, m.x + 0.126, 5.808, 2.466, 0.35, { align: 'center' });
+  });
+
+  // social row under the highlighted card
+  freeform(s, 6.281, 6.296, 0.148, 0.148, PATH.twitter, { fill: { color: C.red } });
+  freeform(s, 6.577, 6.293, 0.148, 0.155, PATH.facebook, { fill: { color: C.red } });
+  freeform(s, 6.881, 6.296, 0.152, 0.152, PATH.instagram, { fill: { color: C.red } });
+}
+
+/* -------------------------------------------------------------- slide 11 */
+function slide11(s) {
+  BACKDROP[11](s);
+  photo(s, 7.212, 1.022, 2.42, 5.36, 0.254, true);
+  photo(s, 10.121, 1.022, 2.42, 5.36, 0.254, true);
+  nextTag(s, C.gray, C.red);
+  brand(s);
+
+  heading(s, 'Reduce Time For\nDeployment', 1.647, 2.396, 4.712, 1.178);
+  pill(s, 'Development', 1.758, 1.89, 1.639, 0.395);
+  body(s, LOREM_LONG.replace(/standard\.$/, 'standard like amet.'), 1.646, 4.108, 2.939, 1.737);
+
+  s.addShape('roundRect', { x: 5.12, y: 4.542, w: 2.863, h: 1.077, rectRadius: 0.159,
+    fill: { color: C.white }, line: NONE, shadow: SOFT_SHADOW });
+  heading(s, '+100,00', 5.3, 4.69, 1.967, 0.572, { fontSize: 28 });
+  body(s, 'Data Communication', 5.328, 5.123, 1.83, 0.346);
+  freeform(s, 7.567, 5.191, 0.123, 0.206, PATH.chevron, { fill: { color: C.red2 } });
+}
+
+/* -------------------------------------------------------------- slide 12 */
+function slide12(s) {
+  BACKDROP[12](s);
+  nextTag(s, C.gray, C.red);
+  brand(s, true);
+
+  heading(s, 'Overviews\u00a0How We Develope', 7.705, 1.99, 4.481, 1.178, { align: 'left' });
+  pill(s, 'Our Process', 7.815, 1.484, 1.639, 0.395);
+  body(s, LOREM_LONG, 7.718, 3.44, 4.2, 1.183);
+
+  ['Idea and Conceptualization', 'Planning and Strategy', 'Design & Development', 'Marketing and Promotion']
+    .forEach((label, i) => {
+      const y = 4.844 + i * (i < 3 ? 0.404 : 0.379);
+      const fy = [4.844, 5.248, 5.652, 6.031][i];
+      check(s, 7.833, fy + 0.046, 0.253);
+      s.addText(label, { x: 8.215, y: fy, w: 3.354, h: 0.337, fontFace: 'Open Sans',
+        fontSize: 14, bold: true, color: C.black, valign: 'top' });
+      void y;
+    });
+
+  photo(s, 1.916, 1.048, 2.42, 5.36, 0.254, true);
+  watch(s);
+  photo(s, 3.831, 3.488, 1.993, 2.394, 0.295);
+}
+
+/* -------------------------------------------------------------- slide 13 */
+function slide13(s) {
+  BACKDROP[13](s);
+  nextTag(s, C.white, C.white);
+  brand(s);
+
+  heading(s, 'Words From\nTrusted Peoples', 1.138, 2.724, 4.481, 1.178);
+  pill(s, 'Review', 1.248, 2.218, 1.129, 0.395);
+  body(s, LOREM_LONG, 1.181, 4.315, 4.2, 1.183);
+  body(s, 'Read More. . .', 1.181, 5.755, 2.304, 0.286, { bold: true, italic: true, color: C.red });
+
+  const QUOTES = [
+    { name: 'Mario Alexander', x: 7.613, y: 1.865, badge: [10.456, 1.288], avatar: [6.158, 1.865] },
+    { name: 'Rebecca Samantha', x: 8.664, y: 4.299, badge: [11.507, 3.722], avatar: [7.209, 4.299] }
+  ];
+  QUOTES.forEach(q => {
+    s.addShape('roundRect', { x: q.badge[0], y: q.badge[1], w: 0.499, h: 0.499, rectRadius: 0.066,
+      fill: { color: C.grad }, line: NONE, shadow: SOFT_SHADOW });
+    s.addText('\u201d', { x: q.badge[0], y: q.badge[1] + 0.02, w: 0.499, h: 0.44, fontFace: 'Poppins',
+      bold: true, fontSize: 26, color: C.white, align: 'center', valign: 'middle' });
+    s.addText(q.name, { x: q.x, y: q.y, w: 2.682, h: 0.337, fontFace: 'Poppins', bold: true,
+      fontSize: 14, color: C.black, valign: 'top' });
+    body(s, 'Costumer', q.x, q.y + 0.213, 1.388, 0.349);
+    body(s, 'Lorem Ipsum\u00a0is simply dummy text of the printing and typesetting industry. ' +
+      'Lorem Ipsum has been the industry\u2019s standard.', q.x, q.y + 0.608, 3.585, 0.904);
+    photo(s, q.avatar[0], q.avatar[1], 1.052, 1.052, 0.175);
+  });
+}
+
+/* -------------------------------------------------------------- slide 14 */
+function slide14(s) {
+  BACKDROP[14](s);
+  photo(s, 6.661, 0.861, 5.42, 5.778, 0.489);
+  nextTag(s, C.gray, C.red);
+  brand(s);
+
+  s.addShape('roundRect', { x: 1.253, y: 4.156, w: 7.436, h: 1.972, rectRadius: 0.223,
+    fill: { color: C.white }, line: NONE, shadow: SOFT_SHADOW });
+
+  const CONTACT = [
+    { label: 'Office :', value: '2546  Australia Street City', x: 2.34, y: 4.482 },
+    { label: 'Telephone :', value: '0953 \u2013 576970800000', x: 2.36, y: 5.212 },
+    { label: 'E-Mail :', value: 'applixmobile@Hotmail.com', x: 5.881, y: 4.496, vw: 2.613 },
+    { label: 'Website :', value: 'www.applixmobile.com', x: 5.881, y: 5.212 }
+  ];
+  CONTACT.forEach(c => {
+    s.addText(c.label, { x: c.x, y: c.y, w: 2.038, h: 0.337, fontFace: 'Open Sans',
+      fontSize: 14, bold: true, color: C.ink, valign: 'top' });
+    s.addText(c.value, { x: c.x, y: c.y + 0.293, w: c.vw || 2.201, h: 0.286, fontFace: 'Open Sans',
+      fontSize: 11, color: C.gray, valign: 'top' });
+  });
+
+  freeform(s, 1.784, 4.575, 0.286, 0.303, PATH.house, { fill: { color: C.red } });
+  telephoneIcon(s, 1.781, 5.325, 0.309, 0.316);
+  freeform(s, 5.313, 4.602, 0.309, 0.33, PATH.plane, { fill: { color: C.red } });
+  globeIcon(s, 5.312, 5.348, 0.377);
+
+  heading(s, 'Get In Touch Now', 1.21, 2.295, 4.481, 0.64);
+  pill(s, 'Contact', 1.32, 1.789, 1.129, 0.395);
+  body(s, 'Lorem Ipsum\u00a0is simply dummy text of the printing and typesetting industry like orem Ipsum has been.',
+    1.21, 3.032, 4.79, 0.627);
+}
+
+/** Retro handset built from primitives. */
+function telephoneIcon(s, x, y, w, h) {
+  s.addShape('blockArc', { x, y: y + 0.02 * h, w, h: h * 0.66, angleRange: [180, 360],
+    fill: { color: C.red }, line: NONE });
+  s.addShape('trapezoid', { x, y: y + 0.42 * h, w, h: h * 0.58, fill: { color: C.red }, line: NONE });
+  s.addShape('ellipse', { x: x + 0.36 * w, y: y + 0.60 * h, w: 0.28 * w, h: 0.28 * h,
+    fill: { color: C.white }, line: NONE });
+}
+
+/** Wire-frame globe built from primitives. */
+function globeIcon(s, x, y, d) {
+  s.addShape('ellipse', { x, y, w: d, h: d, fill: NONE, line: { color: C.red, width: 1.25 } });
+  s.addShape('ellipse', { x: x + 0.3 * d, y, w: 0.4 * d, h: d, fill: NONE, line: { color: C.red, width: 1.25 } });
+  s.addShape('line', { x, y: y + d / 2, w: d, h: 0, line: { color: C.red, width: 1.25 } });
+  s.addShape('line', { x: x + 0.08 * d, y: y + 0.25 * d, w: 0.84 * d, h: 0, line: { color: C.red, width: 1 } });
+  s.addShape('line', { x: x + 0.08 * d, y: y + 0.75 * d, w: 0.84 * d, h: 0, line: { color: C.red, width: 1 } });
+}
+
+/* -------------------------------------------------------------- slide 15 */
+function slide15(s) {
+  s.background = { color: C.ice };
+  BACKDROP[15](s);
+  brand(s);
+  s.addText([
+    { text: 'Thank', options: { bold: true, breakLine: true } },
+    { text: 'You.', options: { bold: false } }
+  ], { x: 1.728, y: 1.848, w: 4.707, h: 2.457, fontFace: 'Poppins', fontSize: 70,
+    color: C.black, valign: 'top' });
+  s.addText('For Your Attention', { x: 1.728, y: 4.306, w: 4.707, h: 0.64, fontFace: 'Poppins',
+    fontSize: 32, color: C.black, valign: 'top' });
+  body(s, 'Lorem Ipsum\u00a0is simply dummy text of the printing and typesetting industry. ',
+    1.728, 4.998, 4.437, 0.627);
+  s.addShape('roundRect', { x: 1.792, y: 5.903, w: 1.425, h: 0.467, rectRadius: 0.089,
+    fill: { color: C.grad }, line: NONE, shadow: SOFT_SHADOW });
+  s.addText('End Of Slide', { x: 1.946, y: 6.002, w: 1.118, h: 0.269, fontFace: 'Open Sans',
+    fontSize: 10, color: C.white, align: 'center', valign: 'top' });
+  photo(s, 7.703, 1.276, 3.838, 6.224, 0.402, true);
+}
+
+/* ------------------------------------------------------------------- build */
+const BUILDERS = [slide1, slide2, slide3, slide4, slide5, slide6, slide7, slide8,
+  slide9, slide10, slide11, slide12, slide13, slide14, slide15];
+
+const pres = new pptxgen();
+pres.defineLayout({ name: 'APPLIX', width: 13.333, height: 7.5 });
+pres.layout = 'APPLIX';
+pres.author = 'Applix';
+pres.title = 'Applix - Mobile App Presentation';
+
+BUILDERS.forEach(build => build(pres.addSlide()));
+
+pres.writeFile({ fileName: path.join(__dirname, '0108bb65-2b33-4138-a69a-18e0f9085e2c_grok_final.pptx') })
+  .then(f => console.log('wrote', f));
