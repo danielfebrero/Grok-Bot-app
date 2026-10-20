@@ -9,6 +9,34 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-20 05:53 (Paris) — snapshot `2026-10-20_04-46` → `2026-10-20_05-53`
+
+**Hot-update du host bundle sand-host `9d2ac1b` → `f4402d3`** (runtime : `hostVersion` / `lastCommandId` = `upgrade-f4402d3`), centré sur du durcissement réseau / navigateur de l'egress. En plus : rebuild agent-store-fuse (commit `fa90f8c…` → `a55aa761…`) et mise à jour des skills gérées. Image `fcbae14`, box-scripts `fcbae14`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +1 / −0 / ~15.
+
+- **Bugfix** : —
+- **Change** : `box-chrome-policy` applique désormais une politique Chrome `WebRtcIPHandlingUrl=disable_non_proxied_udp` quand le marqueur `sand-box-browser-webrtc-proxy-only` est présent, et sort en code 3 si la policy n'est pas applicable (au lieu de passer silencieusement). `host-main.cjs` (+300 Ko, `031155795dc4` → `91929a3bf59b`), `sand-eval-runner.cjs` et `agent-store-worker.cjs` recompilés.
+- **Features** : nouveaux marqueurs dans `box-contract.generated.mjs` — `EGRESS_TUNNEL_FAIL_CLOSED` (tunnel egress fail-closed), `BOX_BROWSER_WEBRTC_PROXY_ONLY`, `BOX_BROWSER_NO_LOCAL_DNS`, `BOX_BROWSER_DISABLE_QUIC`, plus un port CDP Chrome tailnet `SAND_BOX_TAILNET_CHROME_CDP_PORT=9600`. `sand-web-bot-auth.mjs` (+43/−3) ajoute une allowlist de suffixes d'hôtes tailnet (`/var/lib/sand/tailnet/host-suffixes` + env `SAND_TAILNET_HOST_SUFFIXES`) via `readTailnetHostSuffixes` / `isUnderTailnetSuffix`, passés au signataire web-bot-auth. Nouvelle skill gérée `recent-changes` (notes de changements datées livrées par l'app).
+- **Perf** : —
+- **Autre/infra** : skills gérées mises à jour (`cache.json`, `add-connector`, `grocery-shopping`, `group-chat-turns`, `shopping`, `source-control`) ; bump agent-store-fuse (pointeur `cursor_agent_store_fuse_version`).
+
+Rapport : [reports/2026-10-20_05-53.md](reports/2026-10-20_05-53.md).
+
+---
+
+## 2026-10-20 04:46 (Paris) — snapshot `2026-10-20_02-47` → `2026-10-20_04-46`
+
+**Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `5a61e3fe5b0f8ee5fa40cdd0e820a972d67b19bc` → `fa90f8c73caea3bb10f92228002869acf3272957`. Image `fcbae14`, box-scripts `fcbae14`, sand-host `9d2ac1b`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~1.
+
+- **Bugfix** : —
+- **Change** : —
+- **Features** : —
+- **Perf** : —
+- **Autre/infra** : bump binaire agent-store-fuse (nouvelle révision du tarball S3), aucun autre composant touché.
+
+Rapport : [reports/2026-10-20_04-46.md](reports/2026-10-20_04-46.md).
+
+---
+
 ## 2026-10-20 02:47 (Paris) — snapshot `2026-10-20_01-53` → `2026-10-20_02-47`
 
 **Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` `agent-store-fuse-x64-24e31f80…-bk.tar.gz` → `…-5a61e3fe…-bk.tar.gz` (commit `24e31f808a6e0a07deb4a1fd7a2f77056d769fec` → `5a61e3fe5b0f8ee5fa40cdd0e820a972d67b19bc`). Image `fcbae14`, box-scripts `fcbae14`, sand-host `9d2ac1b`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~1.
