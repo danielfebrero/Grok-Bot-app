@@ -1,0 +1,21 @@
+--- 2026-10-20_08-47:/var/lib/sand-daemon-supervisor/orbitd/releases/9d485bb31413a58524a425264c9489a49d8a42b5/manifest.json
++++ 2026-10-20_09-51:/var/lib/sand-daemon-supervisor/orbitd/releases/9d485bb31413a58524a425264c9489a49d8a42b5/manifest.json
+@@ -0,0 +1,18 @@
++{
++  "schema_version": 1,
++  "service": "orbitd",
++  "revision": "9d485bb31413a58524a425264c9489a49d8a42b5",
++  "targets": {
++    "x86_64-unknown-linux-gnu": {
++      "payload": {
++        "compression": "zstd",
++        "size_bytes": 6611610,
++        "sha256": "919e22554f5b6aba5ddd234dec1a7959d57178d98aa309de62164a779d47a5e8"
++      },
++      "executable": {
++        "size_bytes": 20514488,
++        "sha256": "5225b51e6041d2e49f5a0dfd869cf9ddea8a9f117b802277ce8728f1583aa97d"
++      }
++    }
++  }
++}
