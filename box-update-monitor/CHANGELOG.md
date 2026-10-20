@@ -9,6 +9,20 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-20 06:49 (Paris) — snapshot `2026-10-20_05-53` → `2026-10-20_06-49`
+
+**Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `a55aa761df916cd59dbe08e27086c267bd75f6bd` → `c4eb1906e2f8fb4d035cc5553502ce3584001c42` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`). Image `fcbae14`, box-scripts `fcbae14`, sand-host `f4402d3`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~1.
+
+- **Bugfix** : —
+- **Change** : —
+- **Features** : —
+- **Perf** : —
+- **Autre/infra** : bump binaire agent-store-fuse (nouvelle révision du tarball S3), aucun autre composant touché.
+
+Rapport : [reports/2026-10-20_06-49.md](reports/2026-10-20_06-49.md).
+
+---
+
 ## 2026-10-20 05:53 (Paris) — snapshot `2026-10-20_04-46` → `2026-10-20_05-53`
 
 **Hot-update du host bundle sand-host `9d2ac1b` → `f4402d3`** (runtime : `hostVersion` / `lastCommandId` = `upgrade-f4402d3`), centré sur du durcissement réseau / navigateur de l'egress. En plus : rebuild agent-store-fuse (commit `fa90f8c…` → `a55aa761…`) et mise à jour des skills gérées. Image `fcbae14`, box-scripts `fcbae14`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +1 / −0 / ~15.
