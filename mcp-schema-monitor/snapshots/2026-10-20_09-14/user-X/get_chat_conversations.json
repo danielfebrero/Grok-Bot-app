@@ -1,0 +1,32 @@
+{
+  "description": "Get Chat Conversations; unread state via chat_conversation.fields=unread,last_read_event_id,newest_event_id",
+  "inputSchema": {
+    "properties": {
+      "chat_conversation.fields": {
+        "description": "A comma separated list of ChatConversation fields to display.",
+        "type": "string"
+      },
+      "expansions": {
+        "description": "A comma separated list of fields to expand.",
+        "type": "string"
+      },
+      "max_results": {
+        "type": "integer"
+      },
+      "pagination_token": {
+        "type": "string"
+      },
+      "unread_only": {
+        "description": "Return only unread conversations. A page can be short; keep paging while has_more.",
+        "type": "boolean"
+      },
+      "user.fields": {
+        "description": "A comma separated list of User fields to display.",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_chat_conversations"
+}

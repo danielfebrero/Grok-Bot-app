@@ -1,0 +1,9 @@
+{
+  "description": "Get usage credits",
+  "inputSchema": {
+    "properties": {},
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_usage_credits"
+}

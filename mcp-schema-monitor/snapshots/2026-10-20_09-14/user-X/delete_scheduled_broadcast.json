@@ -1,0 +1,20 @@
+{
+  "description": "Delete a scheduled broadcast",
+  "inputSchema": {
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "roll_forward": {
+        "description": "Deprecated: recurring schedules are being retired and `true` will be rejected.",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "delete_scheduled_broadcast"
+}

@@ -1,0 +1,13 @@
+{
+  "namespace": "cursor-github",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-20T09:13:23+02:00",
+    "responseKind": "text",
+    "schema": {
+      "contentMediaType": "text/plain",
+      "type": "string"
+    },
+    "source": "inferred"
+  },
+  "tool": "get_pull_request_diff"
+}

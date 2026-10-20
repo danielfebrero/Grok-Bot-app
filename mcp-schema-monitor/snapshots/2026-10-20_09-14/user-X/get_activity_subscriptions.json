@@ -1,0 +1,21 @@
+{
+  "description": "Get X activity subscriptions",
+  "inputSchema": {
+    "properties": {
+      "max_results": {
+        "type": "integer"
+      },
+      "pagination_token": {
+        "description": "A base32hex-encoded pagination token.",
+        "type": "string"
+      },
+      "user_id": {
+        "description": "Only return subscriptions whose filter.user_id matches.",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_activity_subscriptions"
+}

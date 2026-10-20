@@ -1,0 +1,60 @@
+{
+  "namespace": "cursor-github",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-20T09:13:24+02:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "ref": {
+          "properties": {
+            "node_id": {
+              "type": "string"
+            },
+            "object": {
+              "properties": {
+                "sha": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "sha",
+                "type",
+                "url"
+              ],
+              "type": "object"
+            },
+            "ref": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "node_id",
+            "object",
+            "ref",
+            "url"
+          ],
+          "type": "object"
+        },
+        "tag": {
+          "type": "null"
+        }
+      },
+      "required": [
+        "ref",
+        "tag"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "get_tag"
+}
