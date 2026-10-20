@@ -1,0 +1,393 @@
+--- 2026-10-20_15-45:/opt/sand/sand-host/box-scripts/sand-ua-governor.mjs
++++ 2026-10-20_17-51:/opt/sand/sand-host/box-scripts/sand-ua-governor.mjs
+@@ -1,5 +1,7 @@
++import { createHash } from "node:crypto";
+ import { appendFileSync, readFileSync } from "node:fs";
+-import { pathToFileURL } from "node:url";
++import { dirname, join } from "node:path";
++import { fileURLToPath, pathToFileURL } from "node:url";
+ 
+ import {
+   BOX_BROWSER_RUNNING_PATH_PREFIX,
+@@ -33,6 +35,10 @@
+ export const EGRESS_TIME_ZONE_RETRY_MS = Object.freeze([5_000, 30_000, 120_000, 300_000]);
+ export const EGRESS_TIME_ZONE_GATE_WAIT_MS = 120_000;
+ 
++function delay(ms) {
++  return new Promise((resolve) => setTimeout(resolve, ms));
++}
++
+ function errorClass(error) {
+   return error?.code ?? error?.cause?.code ?? (error instanceof Error ? error.name : typeof error);
+ }
+@@ -76,14 +82,15 @@
+ }
+ 
+ const MARKER_GATE_ON = new Set(["1", "on", "true"]);
++const MARKER_CONTENTS_OFF = new Set(["0", "off", "false"]);
+ 
+-function resolveMarkerGate({ label, envValue, markerPath, readFile }) {
++function resolveMarkerGate({ label, envValue, markerPath, readFile, honorContents = false }) {
+   if (envValue != null && String(envValue).trim() !== "") {
+     return MARKER_GATE_ON.has(String(envValue).trim().toLowerCase());
+   }
+   try {
+-    readFile(markerPath);
+-    return true;
++    const contents = readFile(markerPath, "utf8");
++    return !honorContents || !MARKER_CONTENTS_OFF.has(String(contents).trim().toLowerCase());
+   } catch (error) {
+     if (
+       error == null ||
+@@ -91,7 +98,7 @@
+       !("code" in error) ||
+       error.code !== "ENOENT"
+     ) {
+-      console.error(
++      reportOnce(
+         `${label} marker read failed: ${error instanceof Error ? error.name : typeof error}`,
+       );
+     }
+@@ -104,7 +111,13 @@
+   markerPath = BROWSER_HARDWARE_PROFILE_MARKER_PATH,
+   readFile = readFileSync,
+ } = {}) {
+-  return resolveMarkerGate({ label: "hardware profile", envValue, markerPath, readFile });
++  return resolveMarkerGate({
++    label: "hardware profile",
++    envValue,
++    markerPath,
++    readFile,
++    honorContents: true,
++  });
+ }
+ 
+ export function resolveEgressTimeZoneGate({
+@@ -139,7 +152,7 @@
+     return readFileSync(markerPath, "utf8");
+   } catch (error) {
+     if (error?.code === "ENOENT") return null;
+-    console.error(`accept-language marker read failed: ${errorClass(error)}`);
++    reportOnce(`accept-language marker read failed: ${errorClass(error)}`);
+     return "";
+   }
+ }
+@@ -542,8 +555,272 @@
+   }
+ }
+ 
++export function openPageCount(browser) {
++  let pages = 0;
++  for (const type of browser.attachedTargetTypes?.values() ?? []) {
++    if (type === "page") pages += 1;
++  }
++  return pages;
++}
++
++export function resolveBrowserSettings({
++  resolveHardwareProfile = resolveHardwareProfileEnabled,
++  readAcceptLanguage = readAcceptLanguageEnUsMarker,
++  resolveEgressGate = resolveEgressTimeZoneGate,
++} = {}) {
++  return {
++    hardwareProfile: resolveHardwareProfile() === true,
++    acceptLanguage: readAcceptLanguage(),
++    egressTimeZone: resolveEgressGate(),
++  };
++}
++
++function onOff(value) {
++  return value ? "on" : "off";
++}
++
++export function changedBrowserSettings(browser, settings) {
++  const changes = [];
++  const has = (key) => Object.prototype.hasOwnProperty.call(browser, key);
++  if (has("hardwareProfileEnabled")) {
++    const before = onOff(browser.hardwareProfileEnabled === true);
++    const after = onOff(settings.hardwareProfile);
++    if (before !== after) changes.push(`hardware-profile ${before}->${after}`);
++  }
++  if (has("acceptLanguageEnUsEnabled")) {
++    const enabled = browser.acceptLanguageEnUsEnabled === true;
++    const wanted = settings.acceptLanguage != null;
++    if (enabled !== wanted) {
++      changes.push(`accept-language ${onOff(enabled)}->${onOff(wanted)}`);
++    } else if (wanted && (browser.acceptLanguage ?? "") !== settings.acceptLanguage) {
++      changes.push("accept-language value");
++    }
++  }
++  if (has("egressTimeZoneEnabled")) {
++    const before = onOff(browser.egressTimeZoneEnabled === true);
++    const after = onOff(settings.egressTimeZone === "on");
++    if (before !== after) changes.push(`egress-time-zone ${before}->${after}`);
++  }
++  return changes;
++}
++
++export function reattachIfSettingsChanged(browser, resolve = resolveBrowserSettings) {
++  if (browser.isClosed || !(browser.attachedTargetTypes instanceof Map)) return [];
++  if (openPageCount(browser) > 0) return [];
++  const changes = changedBrowserSettings(browser, resolve());
++  if (changes.length === 0) return [];
++  console.error(
++    `browser settings changed port=${browser.port} (${changes.join(", ")}); reattaching while no page is open`,
++  );
++  browser.close();
++  return changes;
++}
++
++const GOVERNOR_DIR = dirname(fileURLToPath(import.meta.url));
++export const UA_GOVERNOR_ENTRY = "sand-ua-governor.mjs";
++const LOCAL_MODULE_SPECIFIER = /\b(?:from|import)\s*\(?\s*["']\.\/([\w.-]+\.mjs)["']/g;
++
++export function governorCodeFingerprint(dir = GOVERNOR_DIR, readFile = readFileSync) {
++  const sources = new Map();
++  const pending = [UA_GOVERNOR_ENTRY];
++  while (pending.length > 0) {
++    const name = pending.pop();
++    if (sources.has(name)) continue;
++    const source = String(readFile(join(dir, name), "utf8"));
++    sources.set(name, source);
++    for (const match of source.matchAll(LOCAL_MODULE_SPECIFIER)) pending.push(match[1]);
++  }
++  const modules = [...sources.keys()].sort();
++  const hash = createHash("sha256");
++  for (const name of modules) hash.update(`${name}\0${sources.get(name)}\0`);
++  return { fingerprint: hash.digest("hex"), modules };
++}
++
++function readGovernorFingerprint(dir) {
++  try {
++    return governorCodeFingerprint(dir).fingerprint;
++  } catch (error) {
++    reportOnce(`governor code unreadable: ${errorClass(error)}`);
++    return null;
++  }
++}
++
++export const UPDATE_CHECK_INTERVAL_MS = 5_000;
++const UPDATE_CHECK_INTERVAL_MIN_MS = 100;
++
++export function updateCheckIntervalMs(raw = process.env.SAND_UA_GOVERNOR_UPDATE_CHECK_MS) {
++  const parsed = Number.parseInt(raw ?? "", 10);
++  if (!Number.isInteger(parsed) || parsed <= 0) return UPDATE_CHECK_INTERVAL_MS;
++  return Math.max(UPDATE_CHECK_INTERVAL_MIN_MS, parsed);
++}
++
++export function createCodeUpdateWatch({
++  dir = GOVERNOR_DIR,
++  intervalMs = UPDATE_CHECK_INTERVAL_MS,
++  now = Date.now,
++  fingerprint = readGovernorFingerprint,
++} = {}) {
++  const loaded = fingerprint(dir);
++  let checkedAtMs = now();
++  let lastSeen = loaded;
++  let settled = null;
++  return {
++    loaded,
++    intervalMs,
++    poll() {
++      if (loaded == null || now() - checkedAtMs < intervalMs) return settled;
++      checkedAtMs = now();
++      const seen = fingerprint(dir);
++      settled = seen != null && seen === lastSeen && seen !== loaded ? seen : null;
++      lastSeen = seen;
++      return settled;
++    },
++  };
++}
++
++const DEFAULT_DESKTOP_DIR = "/tmp/sand-desktop";
++export const UA_GOVERNOR_DESKTOP_GROUP = "shared";
++export const UA_GOVERNOR_DESKTOP_NAME = "ua-governor";
++
++export function readGovernorRegistration({
++  desktopDir = process.env.SAND_DESKTOP_DIR || DEFAULT_DESKTOP_DIR,
++  readFile = readFileSync,
++} = {}) {
++  const groupDir = join(desktopDir, UA_GOVERNOR_DESKTOP_GROUP);
++  const descriptorPath = join(groupDir, `${UA_GOVERNOR_DESKTOP_NAME}.json`);
++  let descriptor;
++  try {
++    descriptor = JSON.parse(String(readFile(descriptorPath, "utf8")));
++  } catch (error) {
++    if (error?.code !== "ENOENT") {
++      reportOnce(`desktop registration unreadable: ${errorClass(error)}`);
++    }
++    return { descriptorPath, pidFile: null, pid: null };
++  }
++  const pidFile =
++    typeof descriptor?.pidFile === "string" && descriptor.pidFile.length > 0
++      ? descriptor.pidFile
++      : join(groupDir, `${UA_GOVERNOR_DESKTOP_NAME}.pid`);
++  let pid = null;
++  try {
++    const parsed = Number.parseInt(String(readFile(pidFile, "utf8")).trim(), 10);
++    pid = Number.isInteger(parsed) && parsed > 0 ? parsed : null;
++  } catch (error) {
++    if (error?.code !== "ENOENT") reportOnce(`desktop pid file unreadable: ${errorClass(error)}`);
++  }
++  return { descriptorPath, pidFile, pid };
++}
++
++export function planGovernorRestart({ openPages, quietForMs, quietNeededMs, supervised }) {
++  if (openPages > 0) return "wait-for-pages";
++  if (quietForMs < quietNeededMs) return "wait-for-quiet";
++  return supervised() ? "restart" : "unsupervised";
++}
++
++function shortCode(fingerprint) {
++  return typeof fingerprint === "string" ? fingerprint.slice(0, 12) : "unknown";
++}
++
++export function isGovernorProcess(pid, procRoot = "/proc") {
++  let argv;
++  try {
++    argv = String(readFileSync(`${procRoot}/${pid}/cmdline`, "utf8")).split("\0");
++  } catch (error) {
++    if (error?.code !== "ENOENT" && error?.code !== "ESRCH") {
++      console.error(`pid ${pid} cmdline unreadable: ${errorClass(error)}`);
++    }
++    return false;
++  }
++  return (
++    argv.some((arg) => arg === UA_GOVERNOR_ENTRY || arg.endsWith(`/${UA_GOVERNOR_ENTRY}`)) &&
++    !argv.includes("--restart")
++  );
++}
++
++const RESTART_COMMAND_WAIT_MS = 20_000;
++const RESTART_COMMAND_POLL_MS = 250;
++
++export async function restartSupervisedGovernor({
++  desktopDir = process.env.SAND_DESKTOP_DIR || DEFAULT_DESKTOP_DIR,
++  procRoot = "/proc",
++  kill = (pid, signal) => process.kill(pid, signal),
++  waitMs = RESTART_COMMAND_WAIT_MS,
++  pollMs = RESTART_COMMAND_POLL_MS,
++  now = Date.now,
++  sleep = delay,
++  print = (line) => process.stdout.write(`${line}\n`),
++} = {}) {
++  const registration = readGovernorRegistration({ desktopDir });
++  if (registration.pidFile == null) {
++    print(
++      `the UA governor is not registered with the desktop supervisor (${registration.descriptorPath} is missing or unreadable), so nothing would relaunch it`,
++    );
++    return 1;
++  }
++  const { pid } = registration;
++  if (pid == null || !isGovernorProcess(pid, procRoot)) {
++    print(
++      `no UA governor is running at the pid in ${registration.pidFile}; the desktop supervisor relaunches a missing governor on its next tick`,
++    );
++    return 1;
++  }
++  try {
++    kill(pid, "SIGTERM");
++  } catch (error) {
++    print(`could not signal UA governor pid ${pid}: ${errorClass(error)}`);
++    return 1;
++  }
++  print(
++    `sent SIGTERM to UA governor pid ${pid}; waiting for the desktop supervisor to relaunch it`,
++  );
++  const deadline = now() + waitMs;
++  while (now() < deadline) {
++    await sleep(pollMs);
++    const next = readGovernorRegistration({ desktopDir }).pid;
++    if (next != null && next !== pid && isGovernorProcess(next, procRoot)) {
++      print(`UA governor relaunched as pid ${next}`);
++      return 0;
++    }
++  }
++  print(
++    `no relaunch within ${Math.round(waitMs / 1000)}s; check the desktop supervisor log (/tmp/sand-desktop-supervisor.log, or /tmp/sand-supervisor.log on a box without the uid split)`,
++  );
++  return 1;
++}
++
++function restartForCodeUpdate({ updates, openPages, quietForMs }) {
++  const pending = updates.poll();
++  if (pending == null) return;
++  const update = `code update ${shortCode(updates.loaded)} -> ${shortCode(pending)}`;
++  const plan = planGovernorRestart({
++    openPages,
++    quietForMs,
++    quietNeededMs: updates.intervalMs,
++    supervised: () => readGovernorRegistration().pid === process.pid,
++  });
++  if (plan === "wait-for-pages") {
++    reportOnce(`${update} pending; restarting once no governed browser has a page open`);
++  } else if (plan === "unsupervised") {
++    reportOnce(
++      `${update} pending; this governor is not under desktop supervision, so the new code loads on the next box start`,
++    );
++  } else if (plan === "restart") {
++    console.error(
++      `${update}; no governed browser has had a page open for ${quietForMs}ms; exiting so the desktop supervisor relaunches the governor on the new code`,
++    );
++    process.exit(0);
++  }
++}
++
+ async function main() {
++  const updates = createCodeUpdateWatch({ intervalMs: updateCheckIntervalMs() });
++  process.once("SIGTERM", () => {
++    console.error(`ua governor pid=${process.pid} stopping on SIGTERM`);
++    process.exit(0);
++  });
++  console.error(`ua governor started pid=${process.pid} code=${shortCode(updates.loaded)}`);
+   const browsers = new Map();
++  let lastActivityAtMs = Date.now();
+   for (;;) {
+     for (const port of discoverMonitorPorts()) {
+       const existing = browsers.get(port);
+@@ -554,20 +831,41 @@
+         browser.chromeVersion = chromeVersion;
+         await governUnlessUngoogled(browser);
+         browsers.set(port, browser);
++        lastActivityAtMs = Date.now();
+       } catch (error) {
+         if (!isConnectionRefused(error)) {
+           reportOnce(`monitor on CDP port ${port} not governed: ${errorClass(error)}`);
+         }
+       }
+     }
++    let openPages = 0;
+     for (const [port, browser] of browsers) {
+-      if (browser.isClosed) browsers.delete(port);
+-      else void tickEgressTimeZone(browser);
++      if (browser.isClosed) {
++        browsers.delete(port);
++        continue;
++      }
++      void tickEgressTimeZone(browser);
++      reattachIfSettingsChanged(browser);
++      openPages += openPageCount(browser);
+     }
+-    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
++    if (openPages > 0) lastActivityAtMs = Date.now();
++    restartForCodeUpdate({ updates, openPages, quietForMs: Date.now() - lastActivityAtMs });
++    await delay(POLL_INTERVAL_MS);
+   }
+ }
+ 
+ if (process.argv[1] != null && import.meta.url === pathToFileURL(process.argv[1]).href) {
+-  void main();
++  if (process.argv.includes("--restart")) {
++    restartSupervisedGovernor().then(
++      (code) => {
++        process.exitCode = code;
++      },
++      (error) => {
++        console.error(`restart failed: ${errorClass(error)}`);
++        process.exitCode = 1;
++      },
++    );
++  } else {
++    void main();
++  }
+ }

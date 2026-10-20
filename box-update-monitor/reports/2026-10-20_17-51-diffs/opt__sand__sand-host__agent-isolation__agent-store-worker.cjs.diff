@@ -1,0 +1,11 @@
+--- 2026-10-20_15-45:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
++++ 2026-10-20_17-51:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
+@@ -4324,7 +4324,7 @@
+   }
+ };
+ function isCompactMessageClass(cls) {
+-  return typeof Reflect.get(cls, "$") === "function" && typeof Reflect.get(cls, "$p") === "function";
++  return "$" in cls && typeof cls.$ === "function" && "$p" in cls && typeof cls.$p === "function";
+ }
+ function compactMessageClass(cls) {
+   if (!isCompactMessageClass(cls)) {

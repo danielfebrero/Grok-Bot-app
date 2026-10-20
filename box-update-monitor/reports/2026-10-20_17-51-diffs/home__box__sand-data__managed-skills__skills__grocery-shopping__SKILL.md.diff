@@ -1,0 +1,23 @@
+--- 2026-10-20_15-45:/home/box/sand-data/managed-skills/skills/grocery-shopping/SKILL.md
++++ 2026-10-20_17-51:/home/box/sand-data/managed-skills/skills/grocery-shopping/SKILL.md
+@@ -21,7 +21,7 @@
+ ## Before you start
+ 
+ - Pick the store: the one the user named, then their usual grocer from the Memory section, then ask. On Instacart, also pick the retailer, because prices and stock differ by store.
+-- Read the Memory section for the usual list at that store, brands and sizes they buy, dietary rules and allergies, brands to avoid, organic or other preferences, substitution rules, and household size.
++- Read the Memory section for the usual list at that store, brands and sizes they buy, dietary rules and allergies, brands to avoid, organic or other preferences, substitution rules, and household size. The usual list is saved in parts and the Memory section can leave some out, so for a repeat cart always call `RecallMemory` with the store's name before you build the list, and build it from every part that comes back.
+ - Run SearchPlugins for the grocer. Use a connector when one is installed. Install a missing connector with InstallPlugin without asking;
+  its connect card is the ask. Ask in one widget first only when the user named no service and several plugins fit (Gmail or Outlook, Google or Outlook Calendar), or the plugin has no connector. Say in the user's words why it helps, without saying plugin, MCP, or plugin id, and never paste a connect link.
+ - Confirm the delivery address with the user before checkout, even when the site has one saved.
+@@ -50,8 +50,9 @@
+ 
+ ## Remembering the usual order
+ 
+-- After the first order at a store, offer once to remember it as their usual list there, with each item's brand, size, and usual quantity, along with any substitution rules they stated ("no substitutes for oat milk", "any brand of bananas is fine"). Save with `UpdateMemory` only after they agree.
+-- When they add, drop, or swap an item, or change a quantity, replace that entry rather than adding a second list for the same store, and name the change in one short line. An item that was out of stock this time stays on the list.
++- After the first order at a store, offer once to remember it as their usual list there, with each item's brand, size, and usual quantity, along with any substitution rules they stated ("no substitutes for oat milk", "any brand of bananas is fine"). Save with `UpdateMemory` (action "write", type "journal") only after they agree.
++- One memory fact holds at most 500 characters, so a usual list takes several facts. Save the store's substitution rules as one fact, then the items in facts of about eight items each, and start every fact with the store and its part ("Fresh Basket usual list, part 2: ...").
++- Keep one usual list per store. When they add, drop, or swap an item, or change a quantity, rewrite only the part of that list that holds it instead of saving a second list for the same store: write the new text first, and forget the old text only after that write is saved, so a failed write never loses the part. When a part grows past about eight items, move the extra items into a new part. Name the change in one short line. An item that was out of stock this time stays on the list.
+ - For a weekly habit, offer a routine that builds the cart on their usual day and sends the cart summary for approval. The routine stops at the cart, and the user approves checkout each time. Read the Cursor-managed `routines` skill before you create it.
+ 
+ ## Pitfalls
