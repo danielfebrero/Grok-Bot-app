@@ -1,0 +1,34 @@
+{
+  "description": "Get Users List Memberships",
+  "inputSchema": {
+    "properties": {
+      "expansions": {
+        "description": "A comma separated list of fields to expand.",
+        "type": "string"
+      },
+      "id": {
+        "type": "string"
+      },
+      "list.fields": {
+        "description": "A comma separated list of List fields to display.",
+        "type": "string"
+      },
+      "max_results": {
+        "type": "integer"
+      },
+      "pagination_token": {
+        "type": "string"
+      },
+      "user.fields": {
+        "description": "A comma separated list of User fields to display.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_users_list_memberships"
+}

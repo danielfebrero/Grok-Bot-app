@@ -1,0 +1,124 @@
+{
+  "description": "Search the web for current information on any topic. Use for news, facts, or data beyond your knowledge cutoff. Returns snippets and source URLs.",
+  "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+      "country": {
+        "default": "",
+        "description": "Boost search results from a specific country. Must be a full country name (e.g., 'United States', 'Japan', 'Germany'). ISO country codes (e.g., 'us', 'jp') are not supported. Available only if topic is general. See https://docs.tavily.com/documentation/api-reference/search for the full list of supported countries.",
+        "type": "string"
+      },
+      "end_date": {
+        "default": "",
+        "description": "Will return all results before the specified end date. Required to be written in the format YYYY-MM-DD",
+        "type": "string"
+      },
+      "exact_match": {
+        "anyOf": [
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "description": "Only return results containing the exact phrase(s) in quotes in your query"
+      },
+      "exclude_domains": {
+        "default": [],
+        "description": "List of domains to specifically exclude, if the user asks to exclude a domain set this to the domain of the site",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "include_domains": {
+        "default": [],
+        "description": "A list of domains to specifically include in the search results, if the user asks to search on specific sites set this to the domain of the site",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "include_favicon": {
+        "default": false,
+        "description": "Whether to include the favicon URL for each result",
+        "type": "boolean"
+      },
+      "include_image_descriptions": {
+        "default": false,
+        "description": "Include a list of query-related images and their descriptions in the response",
+        "type": "boolean"
+      },
+      "include_images": {
+        "default": false,
+        "description": "Include a list of query-related images in the response",
+        "type": "boolean"
+      },
+      "include_raw_content": {
+        "default": false,
+        "description": "Include the cleaned and parsed HTML content of each search result",
+        "type": "boolean"
+      },
+      "max_results": {
+        "default": 5,
+        "description": "The maximum number of search results to return",
+        "type": "integer"
+      },
+      "query": {
+        "description": "Search query",
+        "type": "string"
+      },
+      "search_depth": {
+        "default": "basic",
+        "description": "The depth of the search. 'basic' for generic results, 'advanced' for more thorough search, 'fast' for optimized low latency with high relevance, 'ultra-fast' for prioritizing latency above all else",
+        "enum": [
+          "basic",
+          "advanced",
+          "fast",
+          "ultra-fast"
+        ],
+        "type": "string"
+      },
+      "start_date": {
+        "default": "",
+        "description": "Will return all results after the specified start date. Required to be written in the format YYYY-MM-DD.",
+        "type": "string"
+      },
+      "time_range": {
+        "anyOf": [
+          {
+            "enum": [
+              "day",
+              "week",
+              "month",
+              "year"
+            ],
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "description": "The time range back from the current date to include in the search results"
+      },
+      "topic": {
+        "default": "general",
+        "description": "Search category. Use 'general' for almost all searches, including current events and requests that combine news with other information. Use 'news' only when the user explicitly asks for news, headlines, or news coverage.",
+        "enum": [
+          "general",
+          "news"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "tavily_search"
+}

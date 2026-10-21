@@ -1,0 +1,28 @@
+{
+  "description": "Perform comprehensive research on a given topic or question. Use this tool when you need to gather information from multiple sources, including web pages, documents, and other resources, to answer a question or complete a task. Returns a detailed response based on the research findings. Rate limit: 20 requests per minute.",
+  "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+      "input": {
+        "description": "A comprehensive description of the research task",
+        "type": "string"
+      },
+      "model": {
+        "default": "auto",
+        "description": "Defines the degree of depth of the research. 'mini' is good for narrow tasks with few subtopics. 'pro' is good for broad tasks with many subtopics",
+        "enum": [
+          "mini",
+          "pro",
+          "auto"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "input"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "tavily_research"
+}

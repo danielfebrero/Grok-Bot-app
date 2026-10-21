@@ -1,0 +1,16 @@
+{
+  "description": "Mark Conversation as Read",
+  "inputSchema": {
+    "properties": {
+      "id": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "mark_chat_conversation_read"
+}

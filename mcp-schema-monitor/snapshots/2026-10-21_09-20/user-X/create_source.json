@@ -1,0 +1,22 @@
+{
+  "description": "Create a stream source",
+  "inputSchema": {
+    "properties": {
+      "name": {
+        "description": "Label for the source.",
+        "type": "string"
+      },
+      "region": {
+        "description": "Ingest region: us-east-1, us-east-2, us-west-1, us-west-2, ca-central-1, sa-east-1, eu-west-1, eu...",
+        "type": "string"
+      }
+    },
+    "required": [
+      "name",
+      "region"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "create_source"
+}

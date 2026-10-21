@@ -1,0 +1,74 @@
+{
+  "namespace": "user-AgentMail",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-21T09:20:17+02:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "createdAt": {
+          "type": "string"
+        },
+        "extractedHtml": {
+          "type": "string"
+        },
+        "from": {
+          "type": "string"
+        },
+        "html": {
+          "type": "string"
+        },
+        "inboxId": {
+          "type": "string"
+        },
+        "labels": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "messageId": {
+          "type": "string"
+        },
+        "size": {
+          "type": "integer"
+        },
+        "subject": {
+          "type": "string"
+        },
+        "threadId": {
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "string"
+        },
+        "to": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "updatedAt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "createdAt",
+        "extractedHtml",
+        "from",
+        "html",
+        "inboxId",
+        "labels",
+        "messageId",
+        "size",
+        "subject",
+        "threadId",
+        "timestamp",
+        "to",
+        "updatedAt"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "get_message"
+}
