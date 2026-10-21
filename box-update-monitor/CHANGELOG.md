@@ -9,6 +9,20 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-21 15:52 (Paris) — snapshot `2026-10-21_10-50` → `2026-10-21_15-52`
+
+**Resync cache des skills gérées uniquement** : seul `managed-skills/cache.json` change, et uniquement son champ `fetchedAt` (`1792545013011` → `1792587764308`, epoch ms), taille identique (585929 o), +1 / −1 ligne. Aucune skill ajoutée/retirée/modifiée sur le fond. Image `fcbae14`, box-scripts `fcbae14`, sand-host `2e44baf`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd (`28b0833c…` + `9d485bb3…`), canvas-sdk, agent-store-fuse `3878dfcf…`, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~1.
+
+- **Bugfix** : —
+- **Change** : —
+- **Features** : —
+- **Perf** : —
+- **Autre/infra** : simple rafraîchissement de l'horodatage de fetch du cache des skills gérées, bruit runtime sans impact fonctionnel.
+
+Rapport : [reports/2026-10-21_15-52.md](reports/2026-10-21_15-52.md).
+
+---
+
 ## 2026-10-21 10:50 (Paris) — snapshot `2026-10-21_07-44` → `2026-10-21_10-50`
 
 **Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `b0491f8a7c70605dc1679844ca49bfb4f2de66a4` → `3878dfcf21d45527d7379e22fb7f67f97ed415b4` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`). Image `fcbae14`, box-scripts `fcbae14`, sand-host `2e44baf`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd (`28b0833c…` + `9d485bb3…`), canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~1.
