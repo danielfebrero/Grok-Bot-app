@@ -9,6 +9,20 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-21 04:50 (Paris) — snapshot `2026-10-21_03-50` → `2026-10-21_04-50`
+
+**Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `66e136b901a9799e69d047e2675af556619a2d71` → `d5364abac6d43fc8679746dd9b5f6029d1aea6fb` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`). Image `fcbae14`, box-scripts `fcbae14`, sand-host `2e44baf`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd (`28b0833c…` + `9d485bb3…`), canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~1.
+
+- **Bugfix** : —
+- **Change** : —
+- **Features** : —
+- **Perf** : —
+- **Autre/infra** : bump binaire `agent-store-fuse` (tarball S3 `…-d5364ab…-bk.tar.gz`).
+
+Rapport : [reports/2026-10-21_04-50.md](reports/2026-10-21_04-50.md).
+
+---
+
 ## 2026-10-21 03:50 (Paris) — snapshot `2026-10-21_02-47` → `2026-10-21_03-50`
 
 **Hot-update du host bundle** : `sand_host_version` `124299b` → `2e44baf` (supervisor `upgrade-124299b` → `upgrade-2e44baf`), avec rebuild de `host-main.cjs`, `sand-eval-runner.cjs`, `agent-isolation/agent-store-worker.cjs`, `extensions/content-search/search-index-worker.cjs` et `extensions/codebase-telemetry/csnaps`. En parallèle, bump `agent-store-fuse` `51d2f82…` → `66e136b…` (tarball S3) et refresh de 7 skills gérées (`managed-skills`). Image `fcbae14`, box-scripts `fcbae14`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~14.

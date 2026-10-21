@@ -1,0 +1,641 @@
+/**
+ * "Real Estate Catalogue" — 10-slide deck rebuilt with pptxgenjs.
+ * Slide size 20 x 11.25 in (16:9). Raster photos in the source deck are
+ * replaced by flat placeholder rectangles labelled "[image]".
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+// ---------------------------------------------------------------------------
+// Design tokens
+// ---------------------------------------------------------------------------
+
+const SLIDE_W = 20;
+const SLIDE_H = 11.25;
+
+const C = {
+  dk1: '1B1B1B', // headline black
+  dk2: '242424', // sub-heading near-black
+  lt1: 'FDFDFD', // page white
+  taupe: '685A4C', // accent1 — light end of every brown gradient
+  espresso: '41382F', // accent2 — dark end of the page gradients
+  cocoa: '4E4339', // dark end of the card gradients
+  white: 'FDFDFD', // accent5
+  grey: '474747', // accent6 — body copy on white
+  starOn: 'FFC000',
+  starOff: 'FCE4A0',
+  ratingGrey: '909090',
+  // Slide 5's panels are 96.9% opaque taupe and slide 6's cards are 94.9%
+  // opaque; both sit on white, so the blends are baked in here.
+  taupeOn96: '6C5F51',
+  taupeOn95: '6E6154',
+  cocoaOn95: '554A40',
+};
+
+const SERIF = 'Playfair Display'; // display / headline face
+const SANS = 'Poppins'; // body face
+
+// Every text box in the source deck uses these Google-Slides insets.
+const INSET = { l: 0.1, t: 0.05, r: 0.1, b: 0.05 };
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+const hexByte = (hex, i) => parseInt(hex.substr(i * 2, 2), 16);
+
+function mixHex(from, to, t) {
+  return [0, 1, 2]
+    .map((i) => {
+      const v = Math.round(hexByte(from, i) + (hexByte(to, i) - hexByte(from, i)) * t);
+      return Math.max(0, Math.min(255, v)).toString(16).padStart(2, '0');
+    })
+    .join('')
+    .toUpperCase();
+}
+
+/**
+ * pptxgenjs has no gradient fill, so linear gradients are approximated with a
+ * grid of flat tiles. `dir` is the unit vector the colour ramps along and
+ * `hold` is the fraction of the box after which the ramp has fully arrived at
+ * `to` (matching the OOXML gradient stops of the original).
+ */
+function gradientFill(slide, box, dir, from, to, opts = {}) {
+  const hold = opts.hold === undefined ? 1 : opts.hold;
+  const tile = opts.tile || 0.6;
+  const nx = Math.max(1, Math.round(box.w / tile));
+  const ny = Math.max(1, Math.round(box.h / tile));
+  const projections = [[0, 0], [box.w, 0], [0, box.h], [box.w, box.h]].map(
+    ([x, y]) => x * dir[0] + y * dir[1]
+  );
+  const lo = Math.min(...projections);
+  const span = Math.max(...projections) - lo || 1;
+  const cw = box.w / nx;
+  const ch = box.h / ny;
+  // A backing rect at the exact bounds gives the shape one crisp anti-aliased
+  // outline; without it the tiles' own edges would blend with the page.
+  slide.addShape('rect', {
+    ...box,
+    fill: { color: mixHex(from, to, Math.min(1, 0.5 / hold)) },
+    line: { type: 'none' },
+  });
+  // Tiles overlap their neighbour so anti-aliasing leaves no hairline seams;
+  // the overlap is clipped so it never spills past the backing rect.
+  const bleed = 1.15;
+  for (let i = 0; i < nx; i++) {
+    for (let j = 0; j < ny; j++) {
+      const t = (((i + 0.5) * cw * dir[0] + (j + 0.5) * ch * dir[1] - lo) / span) / hold;
+      slide.addShape('rect', {
+        x: box.x + i * cw,
+        y: box.y + j * ch,
+        w: Math.min(cw * bleed, box.w - i * cw),
+        h: Math.min(ch * bleed, box.h - j * ch),
+        fill: { color: mixHex(from, to, Math.max(0, Math.min(1, t))) },
+        line: { type: 'none' },
+      });
+    }
+  }
+}
+
+const DIAG_DOWN = [Math.SQRT1_2, Math.SQRT1_2]; // to bottom-right
+const DIAG_UP_LEFT = [-Math.SQRT1_2, -Math.SQRT1_2]; // to top-left
+const DIAG_DOWN_LEFT = [-Math.SQRT1_2, Math.SQRT1_2]; // to bottom-left
+
+/** Page background: taupe in the upper-right fading to espresso. */
+function pageGradient(slide) {
+  gradientFill(slide, { x: 0, y: 0, w: SLIDE_W, h: SLIDE_H }, DIAG_DOWN_LEFT, C.taupe, C.espresso, {
+    hold: 0.66,
+    tile: 0.6,
+  });
+}
+
+/** The brown content cards: taupe top-left → cocoa bottom-right. */
+function cardGradient(slide, box) {
+  gradientFill(slide, box, DIAG_DOWN, C.taupe, C.cocoa, { hold: 1, tile: 0.35 });
+}
+
+/**
+ * Region a layout reserves for a photograph. The source deck ships these as
+ * empty picture placeholders, so they only contribute their declared fill —
+ * page white on the light layouts, nothing on the gradient slides. Always laid
+ * down before the coloured cards so it can never cover them.
+ */
+function photoArea(slide, box, fill) {
+  if (!fill) return;
+  slide.addShape('rect', { ...box, fill: { color: fill }, line: { type: 'none' } });
+}
+
+/** Text box using the source deck's insets; `opts` maps straight to pptxgenjs. */
+function text(slide, body, box, opts) {
+  slide.addText(body, {
+    ...box,
+    margin: [INSET.l * 72, INSET.r * 72, INSET.b * 72, INSET.t * 72],
+    valign: 'top',
+    ...opts,
+  });
+}
+
+/** Turn plain strings into separate paragraphs; `bullet` applies to each one. */
+function paragraphs(lines, bullet) {
+  return lines.map((line, i) => ({
+    text: line,
+    options: { breakLine: i < lines.length - 1, ...(bullet ? { bullet } : {}) },
+  }));
+}
+
+// The source uses marL/indent of 257175 EMU = 20.25 pt for its bulleted lists.
+const BULLET = { characterCode: '2022', indent: 20.25 };
+
+/**
+ * Circular badge. The source fills it with a taupe→espresso gradient running
+ * to the bottom-left, reproduced here as concentric circles shrinking towards
+ * the light corner.
+ */
+function badge(slide, box, label) {
+  const rings = 14;
+  const r = box.w / 2;
+  // A circle only samples the middle of its bounding box's diagonal ramp, so
+  // the visible tones span roughly 28%..85% of taupe→espresso, not the full run.
+  for (let i = 0; i < rings; i++) {
+    const t = i / (rings - 1); // 0 = outermost/darkest .. 1 = innermost/lightest
+    const rr = r * (1 - t * 0.88);
+    const cx = box.x + r - (r - rr) * Math.SQRT1_2;
+    const cy = box.y + r - (r - rr) * Math.SQRT1_2;
+    slide.addShape('ellipse', {
+      x: cx - rr, y: cy - rr, w: rr * 2, h: rr * 2,
+      fill: { color: mixHex(C.taupe, C.espresso, 0.85 - t * 0.57) },
+      line: { type: 'none' },
+    });
+  }
+  if (label) {
+    slide.addText(label, {
+      ...box, fontFace: SERIF, fontSize: 21, color: C.white,
+      align: 'center', valign: 'middle', margin: 0,
+    });
+  }
+}
+
+/** Small circle with a white tick — used on the cover and closing slides. */
+function checkBadge(slide, x, y, size) {
+  badge(slide, { x, y, w: size, h: size });
+  slide.addText('✓', {
+    x, y, w: size, h: size,
+    fontFace: 'Arial', fontSize: size * 50, bold: true, color: C.white,
+    align: 'center', valign: 'middle', margin: 0,
+  });
+}
+
+/**
+ * Rounded right arrow: a capsule shaft plus two rotated capsules forming the
+ * chevron. Matches the source's custom-geometry arrow more closely than the
+ * `rightArrow` preset, which has a solid triangular head.
+ */
+function arrowGlyph(slide, box, color) {
+  const thick = box.h * 0.235;
+  const tipX = box.x + box.w - thick / 2;
+  const tipY = box.y + box.h / 2;
+  slide.addShape('roundRect', {
+    x: box.x, y: tipY - thick / 2, w: box.w - thick / 2, h: thick,
+    rectRadius: thick / 2, fill: { color }, line: { type: 'none' },
+  });
+  const arm = box.h * 0.62;
+  const reach = (arm / 2 - thick / 2) * Math.SQRT1_2;
+  [[-1, 45], [1, -45]].forEach(([side, rotate]) => {
+    slide.addShape('roundRect', {
+      x: tipX - reach - arm / 2, y: tipY + side * reach - thick / 2,
+      w: arm, h: thick, rectRadius: thick / 2, rotate,
+      fill: { color }, line: { type: 'none' },
+    });
+  });
+}
+
+/** Circle with a white right-pointing arrow. */
+function arrowBadge(slide, x, y, size) {
+  badge(slide, { x, y, w: size, h: size });
+  arrowGlyph(slide, { x: x + size * 0.273, y: y + size * 0.312, w: size * 0.453, h: size * 0.375 }, C.white);
+}
+
+/** Four filled + one pale star, matching the 4.0 rating graphic. */
+function starRow(slide, x, y, size, pitch) {
+  for (let i = 0; i < 5; i++) {
+    slide.addShape('star5', {
+      x: x + i * pitch,
+      y,
+      w: size,
+      h: size,
+      fill: { color: i < 4 ? C.starOn : C.starOff },
+      line: { type: 'none' },
+    });
+  }
+}
+
+/** Header rule + "2030 Catalogue" / "Page NN" kicker line shared by all slides. */
+function headerBar(slide, opts) {
+  const tone = opts.dark ? C.white : C.grey;
+  slide.addShape('line', {
+    x: opts.ruleX,
+    y: 0.688,
+    w: opts.ruleW,
+    h: 0,
+    line: { color: opts.dark ? C.white : C.taupe, width: 0.75 },
+  });
+  text(slide, '2030 Catalogue', { x: opts.leftX, y: 0.486, w: 2.214, h: 0.404 }, {
+    fontFace: SANS,
+    fontSize: 18,
+    color: tone,
+    align: 'left',
+  });
+  text(slide, opts.page, { x: opts.pageX, y: 0.486, w: opts.pageW || 1.227, h: 0.404 }, {
+    fontFace: SANS,
+    fontSize: 18,
+    color: tone,
+    align: 'right',
+  });
+}
+
+/** Section headline in Playfair Display, 72 pt. */
+function headline(slide, body, box, opts = {}) {
+  text(slide, body, box, {
+    fontFace: SERIF,
+    fontSize: 72,
+    color: opts.color || C.espresso,
+    align: opts.align || 'left',
+    lineSpacingMultiple: 1.0,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Repeated copy
+// ---------------------------------------------------------------------------
+
+const LOREM_LONG =
+  'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce consequat quam sit ' +
+  'amet pellentesque rutrum. Curabitur ullamcorper maximus mi, vel blandit orci viverra ' +
+  'in. Praesent suscipit felis sem, sed tempus sapien cursus dapibus. Nullam mi odio, ' +
+  'aliquet eget tortor a, commodo. ';
+const LOREM_TAIL =
+  'Curabitur ullamcorper maximus mi, vel blandit orci viverra in. Praesent suscipit ' +
+  'felis sem, sed tempus sapien';
+const LOREM_SHORT =
+  'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce consequat quam sit ' +
+  'am etell entesque';
+const LOREM_ACHIEVE =
+  'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce consequat quam sit ' +
+  'am etell entesque rutru urabitur consectetur adipiscing elit. Fusce';
+
+// ---------------------------------------------------------------------------
+// Slide builders
+// ---------------------------------------------------------------------------
+
+// 1 — Cover: "Real Estate / Catalogue" over the full-bleed gradient.
+function slideCover(pptx) {
+  const s = pptx.addSlide();
+  pageGradient(s);
+  // The upper band repeats the gradient rotated 180°, so it lightens to the right.
+  gradientFill(s, { x: 0, y: 0, w: SLIDE_W, h: 6.542 }, DIAG_UP_LEFT, C.taupe, C.espresso, {
+    hold: 0.66,
+    tile: 0.6,
+  });
+
+  // Two empty picture placeholders (a 16.167 x 6.333 frame and a 1.446 circle)
+  // sit here in the source; both are unfilled, so only the gradient shows.
+  headerBar(s, { ruleX: 4.5, ruleW: 11.0, leftX: 0.918, pageX: 17.933, pageW: 1.149, page: 'Page 01', dark: true });
+
+  text(s, 'Real Estate', { x: 2.25, y: 1.042, w: 15.5, h: 3.45 }, {
+    fontFace: SERIF, fontSize: 199, color: C.white, align: 'center', bold: false, italic: false,
+  });
+  text(s, 'Catalogue', { x: 6.653, y: 3.908, w: 6.694, h: 1.717 }, {
+    fontFace: SERIF, fontSize: 96, color: C.white, align: 'center',
+  });
+
+  s.addShape('rect', { x: 1.002, y: 8.542, w: 6.082, h: 2.167, fill: { color: C.taupe }, line: { type: 'none' } });
+  text(
+    s,
+    paragraphs(['PRESENTED BY', 'THOMAS DUNE & TEAM']),
+    { x: 3.083, y: 9.152, w: 3.462, h: 0.945 },
+    { fontFace: SANS, fontSize: 20, color: C.white, align: 'left', lineSpacingMultiple: 1.3 }
+  );
+
+  [
+    { x: 10.0, textX: 10.484, label: 'Smart Home for Living' },
+    { x: 14.113, textX: 14.597, label: 'Modern and Professional' },
+  ].forEach((tag) => {
+    checkBadge(s, tag.x, 10.004, 0.441);
+    text(s, tag.label, { x: tag.textX, y: 9.991, w: 3.403, h: 0.467 }, {
+      fontFace: SANS, fontSize: 18, color: C.white, align: 'left', lineSpacingMultiple: 1.3,
+    });
+  });
+  return s;
+}
+
+// 2 — "About Introduction": photo panel left, copy right.
+function slideIntro(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: C.lt1 };
+  photoArea(s, { x: 0, y: 0, w: 8.0, h: 11.25 }, C.lt1);
+  headerBar(s, { ruleX: 11.417, ruleW: 6.268, leftX: 8.952, pageX: 17.87, pageW: 1.213, page: 'Page 02' });
+
+  headline(s, 'About Introduction', { x: 8.952, y: 2.312, w: 10.131, h: 1.313 }, { color: C.dk1 });
+
+  arrowBadge(s, 9.06, 5.162, 0.839);
+  text(s, 'Your Detail Sub Topic About Heading Here', { x: 9.985, y: 5.048, w: 5.937, h: 1.111 }, {
+    fontFace: SERIF, fontSize: 30, color: C.dk2, align: 'left',
+  });
+
+  text(
+    s,
+    paragraphs([LOREM_LONG, '', LOREM_TAIL]),
+    { x: 8.961, y: 6.625, w: 10.123, h: 2.602 },
+    { fontFace: SANS, fontSize: 16.5, color: C.grey, align: 'left', lineSpacingMultiple: 1.3 }
+  );
+  return s;
+}
+
+// 3 — "Homes Designed to Last Here": two numbered points beside stacked photos.
+function slideNumbered(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: C.lt1 };
+  photoArea(s, { x: 1.0, y: 1.792, w: 7.481, h: 4.167 }, C.lt1);
+  photoArea(s, { x: 1.0, y: 6.292, w: 7.481, h: 4.167 }, C.lt1);
+  headerBar(s, { ruleX: 4.5, ruleW: 11.0, leftX: 0.918, pageX: 17.865, pageW: 1.217, page: 'Page 03' });
+
+  headline(s, 'Homes Designed to Last Here', { x: 9.917, y: 2.017, w: 8.75, h: 2.524 });
+
+  [
+    { n: '01', badgeY: 5.72, leadY: 5.676, bulletY: 6.582 },
+    { n: '02', badgeY: 8.061, leadY: 8.017, bulletY: 8.923 },
+  ].forEach((item) => {
+    badge(s, { x: 10.028, y: item.badgeY, w: 0.992, h: 0.992 }, item.n);
+    text(s, LOREM_SHORT, { x: 11.131, y: item.leadY, w: 6.703, h: 0.798 }, {
+      fontFace: SANS, fontSize: 16.5, color: C.grey, align: 'left', lineSpacingMultiple: 1.3,
+    });
+    text(
+      s,
+      paragraphs(['Consectetur adipiscing elit', 'Fusce consequat quam'], BULLET),
+      { x: 11.131, y: item.bulletY, w: 4.548, h: 0.785 },
+      { fontFace: SERIF, fontSize: 16.5, color: C.dk2, align: 'left', lineSpacingMultiple: 1.3 }
+    );
+  });
+  return s;
+}
+
+// 4 — "Where Form Meets Function Here": rating block + stat card.
+function slideStatCard(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: C.lt1 };
+  photoArea(s, { x: 1.031, y: 5.271, w: 10.969, h: 5.188 }, C.lt1);
+  cardGradient(s, { x: 12.0, y: 5.271, w: 6.969, h: 5.188 });
+  headerBar(s, { ruleX: 4.5, ruleW: 11.0, leftX: 0.918, pageX: 17.854, page: 'Page 04' });
+
+  headline(s, 'Where Form Meets Function Here', { x: 1.031, y: 1.767, w: 9.083, h: 2.524 });
+
+  // Rating group, translated from its source position to y = 2.322.
+  starRow(s, 11.533, 2.323, 0.352, 0.349);
+  text(s, '4.0 Stars Rating', { x: 13.27, y: 2.322, w: 1.72, h: 0.345 }, {
+    fontFace: SANS, fontSize: 12, color: C.ratingGrey, align: 'left', lineSpacingMultiple: 1.3,
+  });
+  text(s, 'Type Your Subtitle Here', { x: 11.423, y: 2.699, w: 7.525, h: 0.571 }, {
+    fontFace: SERIF, fontSize: 24, color: C.dk2, align: 'left', lineSpacingMultiple: 1.3,
+  });
+  text(
+    s,
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce consequat quam sit amet pellentesque urabitur',
+    { x: 11.423, y: 3.494, w: 7.658, h: 0.798 },
+    { fontFace: SANS, fontSize: 16.5, color: C.grey, align: 'left', lineSpacingMultiple: 1.3 }
+  );
+
+  text(s, '150+', { x: 12.611, y: 5.939, w: 2.105, h: 0.909 }, {
+    fontFace: SERIF, fontSize: 48, color: C.white, align: 'left',
+  });
+  text(s, 'Subtitle Here', { x: 12.611, y: 7.127, w: 5.746, h: 0.571 }, {
+    fontFace: SERIF, fontSize: 24, color: C.white, align: 'left', lineSpacingMultiple: 1.3,
+  });
+  text(
+    s,
+    'Lorem ipsum dolor sit amet con sectetur adipiscing elit usce adipiscing elit. Fusce consequat quam sit amet',
+    { x: 12.611, y: 7.9, w: 5.746, h: 0.934 },
+    { fontFace: SANS, fontSize: 16.5, color: C.white, align: 'left' }
+  );
+  text(
+    s,
+    paragraphs(['Consectetur adip', 'Fusce consequat qua', 'Sit amet pellente'], BULLET),
+    { x: 12.611, y: 8.856, w: 3.201, h: 0.934 },
+    { fontFace: SANS, fontSize: 16.5, color: C.white, align: 'left' }
+  );
+  return s;
+}
+
+// 5 — "My Dream Home Journey Here": copy left, two rating cards right.
+function slideJourney(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: C.lt1 };
+  photoArea(s, { x: 10.0, y: -0.006, w: 7.0, h: 11.256 }, C.lt1);
+  [1.122, 5.958].forEach((cardY) => {
+    s.addShape('rect', { x: 14.0, y: cardY, w: 5.0, h: 4.5, fill: { color: C.taupeOn96 }, line: { type: 'none' } });
+  });
+  headerBar(s, { ruleX: 4.5, ruleW: 11.0, leftX: 0.918, pageX: 17.856, pageW: 1.226, page: 'Page 05' });
+
+  headline(s, 'My Dream Home Journey Here', { x: 0.917, y: 2.279, w: 7.998, h: 2.524 });
+  text(s, LOREM_LONG, { x: 0.91, y: 5.92, w: 8.005, h: 1.88 }, {
+    fontFace: SANS, fontSize: 16.5, color: C.grey, align: 'left', lineSpacingMultiple: 1.3,
+  });
+  arrowBadge(s, 1.051, 8.179, 0.791);
+
+  [1.952, 6.789].forEach((starY) => {
+    starRow(s, 14.723, starY, 0.3, 0.293);
+    text(s, '4.0 Stars Rating', { x: 14.639, y: starY + 0.44, w: 2.408, h: 0.386 }, {
+      fontFace: SANS, fontSize: 14, color: C.white, align: 'left', lineSpacingMultiple: 1.3,
+    });
+    text(s, 'Subtitle Here', { x: 14.639, y: starY + 1.249, w: 3.721, h: 0.581 }, {
+      fontFace: SERIF, fontSize: 24, color: C.white, align: 'left', lineSpacingMultiple: 1.3,
+    });
+    text(
+      s,
+      'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce Nullam mi odio',
+      { x: 14.639, y: starY + 1.83, w: 3.721, h: 1.01 },
+      { fontFace: SANS, fontSize: 18, color: C.white, align: 'left' }
+    );
+  });
+  return s;
+}
+
+// 6 — "About Creating My Ideal Home Here": four percentage columns.
+function slidePercentColumns(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: C.lt1 };
+  photoArea(s, { x: 0, y: 0, w: 8.0, h: 7.708 }, C.lt1);
+  headerBar(s, { ruleX: 11.399, ruleW: 6.268, leftX: 8.917, pageX: 17.856, page: 'Page 06' });
+
+  headline(s, 'About Creating My Ideal Home Here', { x: 8.833, y: 1.708, w: 10.131, h: 2.524 });
+
+  const columns = [
+    { cardX: 1.0, textX: 1.379, pct: '23%' },
+    { cardX: 5.599, textX: 5.978, pct: '16%' },
+    { cardX: 10.198, textX: 10.578, pct: '26%' },
+    { cardX: 14.798, textX: 15.177, pct: '35%' },
+  ];
+  // These four cards are the only 95%-opaque ones in the deck.
+  columns.forEach((col) =>
+    gradientFill(s, { x: col.cardX, y: 5.292, w: 4.167, h: 5.167 }, DIAG_DOWN, C.taupeOn95, C.cocoaOn95, { tile: 0.35 })
+  );
+  columns.forEach((col) => {
+    text(s, col.pct, { x: col.textX, y: 6.028, w: 2.408, h: 1.111 }, {
+      fontFace: SERIF, fontSize: 60, color: C.white, align: 'left',
+    });
+    text(s, 'Your Topic', { x: col.textX, y: 8.06, w: 3.408, h: 0.589 }, {
+      fontFace: SERIF, fontSize: 24, color: C.white, align: 'left', lineSpacingMultiple: 1.3,
+    });
+    text(
+      s,
+      'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce consequat',
+      { x: col.textX, y: 8.788, w: 3.408, h: 0.934 },
+      { fontFace: SANS, fontSize: 16.5, color: C.white, align: 'left' }
+    );
+  });
+  return s;
+}
+
+// 7 — "About Perfect Home Architecture": achievements on a wide brown panel.
+function slideAchievements(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: C.lt1 };
+  photoArea(s, { x: 0, y: 1.625, w: 8.0, h: 9.0 }, C.lt1);
+  cardGradient(s, { x: 5.562, y: 4.708, w: 14.438, h: 6.542 });
+  headerBar(s, { ruleX: 4.5, ruleW: 11.0, leftX: 0.918, pageX: 17.875, pageW: 1.206, page: 'Page 07' });
+
+  headline(s, 'About Perfect Home Architecture', { x: 9.365, y: 1.625, w: 9.717, h: 2.524 });
+
+  // Group offset: source children sit at x-0.874+9.365, y-5.828+5.888.
+  const dx = 9.365 - 0.874;
+  const dy = 5.888 - 5.828;
+  [
+    { stat: '278+', statY: 5.828, labelY: 6.508, copyY: 6.016 },
+    { stat: '98%', statY: 7.933, labelY: 8.612, copyY: 8.121 },
+  ].forEach((row) => {
+    text(s, row.stat, { x: 0.874 + dx, y: row.statY + dy, w: 2.105, h: 0.707 }, {
+      fontFace: SERIF, fontSize: 36, color: C.white, align: 'left',
+    });
+    text(s, 'Type Your Achievements', { x: 0.874 + dx, y: row.labelY + dy, w: 2.009, h: 0.656 }, {
+      fontFace: SERIF, fontSize: 16.5, color: C.white, align: 'left',
+    });
+    text(s, LOREM_ACHIEVE, { x: 3.325 + dx, y: row.copyY + dy, w: 6.951, h: 1.158 }, {
+      fontFace: SANS, fontSize: 16.5, color: C.white, align: 'left', lineSpacingMultiple: 1.3,
+    });
+  });
+  return s;
+}
+
+// 8 — "About Elegance In Every Detail": three photo + caption cards.
+function slideThreeCards(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: C.lt1 };
+  headerBar(s, { ruleX: 4.5, ruleW: 11.0, leftX: 0.918, pageX: 17.854, page: 'Page 08' });
+  headline(s, 'About Elegance In Every Detail', { x: 5.583, y: 1.208, w: 8.833, h: 2.524 }, { align: 'center' });
+
+  const cards = [
+    { cardX: 1.219, titleX: 2.175, copyX: 1.681 },
+    { cardX: 7.33, titleX: 8.286, copyX: 7.792 },
+    { cardX: 13.441, titleX: 14.397, copyX: 13.903 },
+  ];
+  cards.forEach((card) => cardGradient(s, { x: card.cardX, y: 7.625, w: 5.34, h: 2.833 }));
+  cards.forEach((card) => {
+    photoArea(s, { x: card.cardX, y: 4.625, w: 5.34, h: 3.0 }, C.lt1);
+    text(s, 'Subtitle Here', { x: card.titleX, y: 8.247, w: 3.427, h: 0.505 }, {
+      fontFace: SERIF, fontSize: 24, color: C.white, align: 'center',
+    });
+    text(
+      s,
+      'Lorem ipsum dolor sit amet, consectetur adipiscing elit ce consequat quam',
+      { x: card.copyX, y: 8.902, w: 4.417, h: 0.934 },
+      { fontFace: SANS, fontSize: 16.5, color: C.white, align: 'center' }
+    );
+  });
+  return s;
+}
+
+// 9 — "About Living By design Here": 2 x 2 topic grid on one brown panel.
+function slideTopicGrid(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: C.lt1 };
+  photoArea(s, { x: 11.0, y: 1.49, w: 7.917, h: 9.76 }, C.lt1);
+  cardGradient(s, { x: 0.918, y: 5.202, w: 10.076, h: 5.361 });
+  headerBar(s, { ruleX: 4.5, ruleW: 11.0, leftX: 0.918, pageX: 17.854, page: 'Page 09' });
+
+  headline(s, 'About  Living By design Here', { x: 0.889, y: 1.875, w: 9.082, h: 2.524 });
+
+  const cellX = [1.674, 6.189];
+  const cellY = [6.128, 8.207];
+  cellY.forEach((ty) => {
+    cellX.forEach((tx) => {
+      text(s, 'Your Topic Here', { x: tx, y: ty, w: 3.201, h: 0.571 }, {
+        fontFace: SERIF, fontSize: 24, color: C.white, align: 'left', lineSpacingMultiple: 1.3,
+      });
+      text(
+        s,
+        'Lorem ipsum dolor sit amet co ns ectetur adipiscing elit',
+        { x: tx, y: ty + 0.632, w: 4.049, h: 0.656 },
+        { fontFace: SANS, fontSize: 16.5, color: C.white, align: 'left' }
+      );
+    });
+  });
+  return s;
+}
+
+// 10 — Closing: "Thanks / See You Next Time" on the cover gradient.
+function slideThanks(pptx) {
+  const s = pptx.addSlide();
+  pageGradient(s);
+  // Empty 7 x 11.25 picture placeholder at x=13 — unfilled in the source.
+  headerBar(s, { ruleX: 4.5, ruleW: 6.333, leftX: 0.918, pageX: 11.0, pageW: 1.149, page: 'Page 10', dark: true });
+
+  text(s, 'Thanks', { x: 0.918, y: 3.563, w: 11.832, h: 4.123 }, {
+    fontFace: SERIF, fontSize: 239, color: C.white, align: 'left',
+  });
+  text(s, 'See You Next Time', { x: 0.918, y: 7.46, w: 9.082, h: 1.212 }, {
+    fontFace: SERIF, fontSize: 66, color: C.white, align: 'left',
+  });
+
+  [
+    { x: 1.083, textX: 1.567, label: 'Smart Home for Living' },
+    { x: 5.196, textX: 5.68, label: 'Modern and Professional' },
+  ].forEach((tag) => {
+    checkBadge(s, tag.x, 9.588, 0.441);
+    text(s, tag.label, { x: tag.textX, y: 9.575, w: 3.403, h: 0.467 }, {
+      fontFace: SANS, fontSize: 18, color: C.white, align: 'left', lineSpacingMultiple: 1.3,
+    });
+  });
+  return s;
+}
+
+// ---------------------------------------------------------------------------
+// Build
+// ---------------------------------------------------------------------------
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'CATALOGUE', width: SLIDE_W, height: SLIDE_H });
+  pptx.layout = 'CATALOGUE';
+  pptx.theme = { headFontFace: SERIF, bodyFontFace: SANS };
+  pptx.title = 'Real Estate Catalogue';
+
+  [
+    slideCover,
+    slideIntro,
+    slideNumbered,
+    slideStatCard,
+    slideJourney,
+    slidePercentColumns,
+    slideAchievements,
+    slideThreeCards,
+    slideTopicGrid,
+    slideThanks,
+  ].forEach((builder) => builder(pptx));
+
+  return pptx.writeFile({
+    fileName: path.join(__dirname, '0a0fd6d4-a069-4f5a-a4c4-13af9b990e13_grok_final.pptx'),
+  });
+}
+
+build().then((f) => console.log('wrote', f));

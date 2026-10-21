@@ -1,0 +1,803 @@
+/*
+ * Negai wa - Presentation Template (35 slides, 13.333 x 7.5 in)
+ * Recreated with pptxgenjs.  Every slide is built by a small builder
+ * function; shared visual idioms (running chrome, kickers, headings,
+ * body copy, oversized numerals, clip-art icons) live in the helpers below.
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+// ---------------------------------------------------------------- palette
+const NAVY       = '3D4C61';   // primary brand colour
+const GRAY       = '595959';   // headings / labels
+const GRAY_MID   = '808080';
+const GRAY_SOFT  = 'A6A6A6';   // body copy
+const GRAY_PALE  = 'BFBFBF';
+const GRAY_BOX   = 'D9D9D9';   // large tint panels
+const WHITE      = 'FFFFFF';
+const TAUPE      = '666357';
+const BROWN      = '594A42';
+const SCREEN     = 'EFEFEF';   // device screens
+const INK        = '181818';
+const INK_DEEP   = '0C0D11';
+const STEEL      = 'D2D3D5';
+const STEEL_DARK = 'A8A9AA';
+const CASE       = '333333';
+
+// ------------------------------------------------------------------ fonts
+const POPPINS  = 'Poppins';
+const SEMI     = 'Poppins SemiBold';
+const PLAYFAIR = 'Playfair Display';
+const LATO     = 'Lato';
+
+// The template repeats one filler sentence; body() slices it by length.
+const LOREM =
+  'Lorem ipsum dolor sit amet  lacus nulla ac netus nibh aliquet, porttitor ligula justo ' +
+  'libero vivamus porttitor dolor conubia mollit  Sapien nam suspendisse tincidunt eget ' +
+  'ante tincidunt  eros in auctor fringilla praesent at diam';
+
+// ---------------------------------------------------------------- helpers
+
+/** Header rule, footer rule and the four running labels shared by slides 2-34. */
+function chrome(s, pageLabel) {
+  s.addShape('line', { x: 2.07, y: 0.623, w: 9.707, h: 0, line: { color: NAVY, width: 0.5 } });
+  s.addShape('line', { x: 0.55, y: 6.83, w: 12.075, h: 0, line: { color: NAVY, width: 0.5 } });
+  const label = (x, y, w, t, size) =>
+    s.addText(t, { x, y, w, h: 0.252, valign: 'top', wrap: false, fontSize: size, fontFace: POPPINS, color: GRAY });
+  label(0.55, 0.49, 1.319, 'Negai Template', 10);
+  label(11.946, 0.49, 0.717, pageLabel, 9);
+  label(0.46, 6.907, 0.465, '2021', 9);
+  label(5.89, 6.907, 1.394, 'BringmeTheDesign', 9);
+  label(11.578, 6.907, 1.021, 'Lorem Ipsum', 9);
+}
+
+/** 16 pt Poppins eyebrow line that sits above every section heading. */
+function kicker(s, x, y, w, text) {
+  s.addText(text, { x, y, w, h: 0.37, valign: 'top', wrap: false, fontSize: 16, fontFace: POPPINS, color: GRAY });
+}
+
+/** 40 pt Poppins SemiBold section heading. */
+function heading(s, x, y, w, text, color) {
+  s.addText(text, {
+    x, y, w, h: 0.774, valign: 'top', wrap: false,
+    fontSize: 40, fontFace: SEMI, bold: true, color: color || GRAY,
+  });
+}
+
+/** Oversized Playfair numeral; the original pairs it with a smaller trailing space. */
+function bigNumber(s, x, y, w, h, text, color, size, spacing) {
+  const sz = size || 115;
+  const runOpts = { fontFace: PLAYFAIR, color: color || GRAY_MID };
+  if (spacing) runOpts.charSpacing = spacing;
+  s.addText([
+    { text, options: Object.assign({ fontSize: sz }, runOpts) },
+    { text: ' ', options: Object.assign({ fontSize: Math.round(sz * 0.766) }, runOpts) },
+  ], { x, y, w, h, align: 'center', valign: 'top', wrap: false });
+}
+
+/**
+ * Body copy block.  `spec` lists the runs: a positive number takes that many
+ * characters from the front of LOREM, 0 is a single space, a negative number
+ * takes the tail from that offset, 999 is the long double-length variant.
+ * Entries may be `[len, colour]` when a block mixes colours.
+ */
+function body(s, x, y, w, h, spec, color, align, size) {
+  const piece = (n) => (n === 0 ? ' ' : n === 999 ? LOREM.slice(0, 140) + LOREM
+    : n < 0 ? LOREM.slice(-n) : LOREM.slice(0, n));
+  const runs = spec.map((item) => {
+    const [len, tint] = Array.isArray(item) ? item : [item, color];
+    return { text: piece(len), options: { fontSize: size || 9, fontFace: LATO, color: tint } };
+  });
+  s.addText(runs, {
+    x, y, w, h, valign: 'top', lineSpacingMultiple: 1.5,
+    align: align && align !== 'left' ? align : undefined,
+  });
+}
+
+/**
+ * The template ships its picture frames empty - it contains no raster media at
+ * all - so an unfilled frame is drawn as nothing, exactly as the original does.
+ * Set SHOW_IMAGE_FRAMES to true to outline where a photo would be dropped in.
+ */
+const SHOW_IMAGE_FRAMES = false;
+function imagePlaceholder(s, x, y, w, h) {
+  if (!SHOW_IMAGE_FRAMES) return;
+  s.addShape('rect', { x, y, w, h, fill: { color: GRAY_BOX }, line: { color: GRAY_PALE, width: 0.75 } });
+  s.addText('[image]', {
+    x, y, w, h, align: 'center', valign: 'middle', fontSize: 11, fontFace: POPPINS, color: GRAY_MID,
+  });
+}
+
+// -------------------------------------------------------- drawn-icon set
+// The template's artwork is vector clip-art; it is rebuilt here from
+// native shapes so nothing has to be embedded as an image.
+
+// Outline of the angular "N" monogram, as fractions of its own bounding box.
+const MONOGRAM = [
+  [1, 0],      [0.2745, 0.272],  [0, 0.1967], [0, 0.529],
+  [0.2135, 0.5876], [0, 0.6676], [0, 1],      [0.7255, 0.728],
+  [1, 0.8033], [1, 0.471],       [0.7865, 0.4124], [1, 0.3324],
+];
+
+/** The monogram, sized and centred against the brand disc that encloses it. */
+function monogram(s, x, y, d, markColor) {
+  const w = d * 0.411, h = d * 0.839;
+  s.addShape('custGeom', {
+    x: x + d * 0.294, y: y + (d - h) / 2, w, h, fill: { color: markColor }, flipH: true,
+    points: MONOGRAM.map(([px, py], i) => ({ x: px * w, y: py * h, moveTo: i === 0 })).concat([{ close: true }]),
+  });
+}
+
+/** Globe on a stand: sphere, meridian ring, tilt handle, post and base (slide 27). */
+function globeIcon(s, x, y, w, h) {
+  const ring = { fill: { type: 'none' }, line: { color: NAVY, width: 9 } };
+  const d = w * 0.9;
+  s.addShape('ellipse', Object.assign({ x: x + w * 0.1, y, w: d, h: d }, ring));           // meridian
+  s.addShape('ellipse', Object.assign({ x, y: y + h * 0.04, w: d * 0.93, h: d * 0.93 }, ring)); // sphere
+  s.addShape('line', { x, y: y + h * 0.6, w: w * 0.17, h: w * 0.17, line: { color: NAVY, width: 9 }, flipV: true });
+  s.addShape('rect', { x: x + w * 0.44, y: y + h * 0.71, w: w * 0.07, h: h * 0.14, fill: { color: NAVY } });
+  s.addShape('roundRect', { x: x + w * 0.2, y: y + h * 0.83, w: w * 0.62, h: h * 0.07, fill: { color: NAVY }, rectRadius: 0.5 });
+}
+
+/** Desktop monitor outline that frames the 24h badge (slide 28). */
+function monitorIcon(s, x, y, w, h) {
+  s.addShape('roundRect', { x, y, w, h: h * 0.78, fill: { type: 'none' }, line: { color: NAVY, width: 12 }, rectRadius: 0.07 });
+  s.addShape('rect', { x: x + w * 0.44, y: y + h * 0.76, w: w * 0.12, h: h * 0.13, fill: { color: NAVY } });
+  s.addShape('roundRect', { x: x + w * 0.24, y: y + h * 0.87, w: w * 0.52, h: h * 0.11, fill: { color: NAVY }, rectRadius: 0.5 });
+  s.addShape('ellipse', { x: x + w * 0.79, y: y + h * 0.53, w: w * 0.09, h: w * 0.09, fill: { color: NAVY } });
+}
+
+/** "24" inside a ring whose top-right is broken by a reload arrow (slide 28). */
+function clockIcon(s, x, y, w, h) {
+  const d = Math.min(w, h) * 0.92;
+  const cx = x + w / 2, cy = y + h * 0.56;
+  s.addShape('blockArc', {
+    x: cx - d / 2, y: cy - d / 2, w: d, h: d,
+    fill: { color: NAVY }, angleRange: [310, 250], arcThicknessRatio: 0.13,
+  });
+  s.addText('24', {
+    x: cx - d / 2, y: cy - d / 2, w: d, h: d, align: 'center', valign: 'middle',
+    fontSize: Math.round(d * 30), fontFace: POPPINS, color: NAVY,
+  });
+  s.addShape('triangle', {
+    x: cx + d * 0.22, y: cy - d * 0.66, w: d * 0.3, h: d * 0.26, fill: { color: NAVY }, rotate: 90,
+  });
+}
+
+/** Three stacked books; the middle volume is shelved the other way round (slide 29). */
+function booksIcon(s, x, y, w, h) {
+  const bar = h * 0.3, gap = h * 0.35;
+  for (let i = 0; i < 3; i++) {
+    s.addShape('roundRect', {
+      x: x + (i === 1 ? 0 : w * 0.13), y: y + i * gap, w: w * 0.87, h: bar,
+      fill: { type: 'none' }, line: { color: NAVY, width: 7 }, rectRadius: 0.5,
+    });
+  }
+}
+
+/** Head-and-shoulders pictogram. */
+function personIcon(s, x, y, w, h, color) {
+  const head = w * 0.52;
+  s.addShape('ellipse', {
+    x: x + (w - head) / 2, y, w: head, h: head,
+    fill: { type: 'none' }, line: { color, width: 4.5 },
+  });
+  s.addShape('round2SameRect', {
+    x, y: y + h * 0.6, w, h: h * 0.4,
+    fill: { type: 'none' }, line: { color, width: 4.5 }, rectRadius: 0.3,
+  });
+}
+
+/** Card with a person on it (slide 32 bullet). */
+function listIcon(s, x, y, w, h) {
+  s.addShape('rect', { x, y, w: w * 0.82, h, fill: { type: 'none' }, line: { color: NAVY, width: 4.5 } });
+  personIcon(s, x + w * 0.2, y + h * 0.22, w * 0.42, h * 0.5, NAVY);
+  for (let i = 0; i < 3; i++) {
+    s.addShape('rect', { x: x + w * 0.82, y: y + h * (0.15 + i * 0.28), w: w * 0.18, h: h * 0.16, fill: { color: NAVY } });
+  }
+}
+
+/** Two opposed outline arrows meaning "exchange" (slide 33). */
+function exchangeIcon(s, x, y, w, h) {
+  const arrow = { fill: { type: 'none' }, line: { color: NAVY, width: 6 } };
+  s.addShape('leftArrow', Object.assign({ x, y, w: w * 0.78, h: h * 0.42 }, arrow));
+  s.addShape('rightArrow', Object.assign({ x: x + w * 0.22, y: y + h * 0.5, w: w * 0.78, h: h * 0.42 }, arrow));
+}
+
+/** Telephone handset: an open arc with a rounded pad at each end. */
+function phoneIcon(s, x, y, w, h) {
+  const OPEN = 225;                       // the gap in the arc faces up and right
+  s.addShape('blockArc', {
+    x, y, w, h, fill: { color: NAVY }, angleRange: [125, 55], arcThicknessRatio: 0.3, rotate: OPEN,
+  });
+  const cx = x + w / 2, cy = y + h / 2, r = w * 0.42, cw = w * 0.34, ch = h * 0.3;
+  [125 + OPEN, 55 + OPEN].forEach((deg) => {
+    const rad = (deg * Math.PI) / 180;
+    s.addShape('roundRect', {
+      x: cx + r * Math.cos(rad) - cw / 2, y: cy + r * Math.sin(rad) - ch / 2,
+      w: cw, h: ch, fill: { color: NAVY }, rectRadius: 0.45, rotate: (deg + 90) % 360,
+    });
+  });
+}
+
+/** All-in-one desktop computer (slide 30). */
+function imacDevice(s, x, y, w, h) {
+  s.addShape('roundRect', { x, y, w, h: h * 0.75, fill: { color: INK }, rectRadius: 0.03 });
+  s.addShape('rect', { x: x + w * 0.039, y: y + h * 0.051, w: w * 0.922, h: h * 0.648, fill: { color: INK_DEEP } });
+  s.addShape('rect', { x: x + w * 0.043, y: y + h * 0.057, w: w * 0.913, h: h * 0.637, fill: { color: SCREEN } });
+  s.addShape('ellipse', { x: x + w * 0.494, y: y + h * 0.021, w: 0.05, h: 0.05, fill: { color: '2C2C2C' } });
+  s.addShape('rect', { x, y: y + h * 0.751, w, h: h * 0.118, fill: { color: STEEL } });
+  s.addShape('rect', { x: x + w * 0.328, y: y + h * 0.851, w: w * 0.34, h: h * 0.145, fill: { color: STEEL } });
+  s.addShape('rect', { x: x + w * 0.328, y: y + h * 0.851, w: w * 0.275, h: h * 0.145, fill: { color: STEEL_DARK } });
+  s.addShape('roundRect', { x: x + w * 0.33, y: y + h * 0.983, w: w * 0.337, h: h * 0.017, fill: { color: INK }, rectRadius: 0.5 });
+}
+
+/** Tablet in a black case (slide 31). */
+function ipadDevice(s, x, y, w, h) {
+  s.addShape('roundRect', { x, y, w, h, fill: { color: CASE }, rectRadius: 0.07 });
+  s.addShape('roundRect', { x: x + w * 0.006, y: y + h * 0.003, w: w * 0.989, h: h * 0.992, fill: { color: INK }, rectRadius: 0.07 });
+  s.addShape('rect', { x: x + w * 0.06, y: y + h * 0.084, w: w * 0.881, h: h * 0.828, fill: { color: INK_DEEP } });
+  s.addShape('rect', { x: x + w * 0.065, y: y + h * 0.087, w: w * 0.871, h: h * 0.821, fill: { color: SCREEN } });
+  s.addShape('ellipse', { x: x + w * 0.49, y: y + h * 0.041, w: 0.058, h: 0.058, fill: { color: '2C2C2C' } });
+  s.addShape('ellipse', { x: x + w * 0.463, y: y + h * 0.93, w: 0.24, h: 0.244, fill: { color: CASE } });
+  s.addShape('ellipse', { x: x + w * 0.481, y: y + h * 0.943, w: 0.124, h: 0.124, fill: { color: INK } });
+}
+
+
+// ------------------------------------------------------------ slides
+
+function slide01(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: NAVY };
+  s.addShape('ellipse', { x: 1.02, y: 3.058, w: 1.435, h: 1.435, fill: { color: WHITE } });
+  monogram(s, 1.02, 3.058, 1.435, GRAY);
+  s.addShape('line', { x: 1.554, y: 3.493, w: 0.319, h: 0.179, line: { color: WHITE, width: 0.5 }, flipH: true });
+  s.addShape('line', { x: 1.598, y: 3.876, w: 0.316, h: 0.176, line: { color: WHITE, width: 0.5 }, flipH: true });
+  s.addText([
+    { text: "Negai wa", options: { fontSize: 54, fontFace: SEMI, color: WHITE } },
+    { text: " ", options: { fontSize: 44, fontFace: SEMI, color: WHITE } },
+  ], { x: 1.02, y: 4.706, w: 3.947, h: 1.01, valign: 'top', wrap: false });
+  s.addText("Presentation Tmplt", { x: 1.02, y: 5.716, w: 3.326, h: 0.404, valign: 'top', wrap: false, fontFace: POPPINS, color: WHITE, charSpacing: 3 });
+  s.addText("Lorem Ipsum", { x: 1.144, y: 6.225, w: 1.755, h: 0.303, valign: 'top', wrap: false, line: { color: WHITE, width: 0.75 }, fontSize: 12, fontFace: POPPINS, color: WHITE, charSpacing: 3 });
+}
+
+function slide02(pptx) {
+  const s = pptx.addSlide();
+  chrome(s, "Page 00");
+  s.addShape('rect', { x: 3.322, y: 2.54, w: 2.937, h: 2.746, fill: { color: NAVY } });
+  s.addText("WELCOME", { x: 4.937, y: 1.239, w: 3.301, h: 0.774, valign: 'top', wrap: false, fontSize: 40, fontFace: SEMI, color: NAVY, charSpacing: 3 });
+  s.addText("Minimal", { x: 3.745, y: 3.068, w: 2.514, h: 0.774, align: 'right', valign: 'top', wrap: false, fontSize: 40, fontFace: SEMI, color: WHITE, bold: true });
+  s.addText("Template", { x: 3.32, y: 3.638, w: 2.938, h: 0.774, align: 'right', valign: 'top', wrap: false, fontSize: 40, fontFace: SEMI, color: WHITE, bold: true });
+  body(s, 6.588, 4.089, 3.692, 1.237, [228, 0, 26, 0, 26], GRAY_SOFT);
+  kicker(s, 6.588, 3.787, 2.598, "Write Here About Text");
+  s.addShape('line', { x: 4.79, y: 4.586, w: 1.296, h: 0, line: { color: WHITE, width: 0.5 }, flipH: true });
+  bigNumber(s, 6.359, 2.012, 2.346, 2.036, "00", NAVY, 115, -3);
+  s.addText("Lorem Ipsum Dolor sit", { x: 5.777, y: 5.554, w: 2.013, h: 0.303, valign: 'top', wrap: false, line: { color: NAVY, width: 0.75 }, fontSize: 12, fontFace: POPPINS, color: GRAY });
+}
+
+function slide03(pptx) {
+  const s = pptx.addSlide();
+  chrome(s, "Page 01");
+  bigNumber(s, 1.193, 1.446, 1.135, 2.036, "1");
+  s.addShape('rect', { x: 8.077, y: 2.137, w: 5.256, h: 3.794, fill: { color: NAVY } });
+  kicker(s, 1.133, 3.254, 2.879, "Write Here About Image");
+  heading(s, 1.133, 3.482, 3.498, "Intoduction");
+  body(s, 1.133, 4.256, 4.232, 1.237, [228, 0, 26, 0, 95], GRAY_SOFT, 'justify');
+  imagePlaceholder(s, 6.744, 1.756, 5.441, 3.808);
+}
+
+function slide04(pptx) {
+  const s = pptx.addSlide();
+  chrome(s, "Page 02");
+  s.addText("BRIEF INTRODUCTION", { x: 3.311, y: 2.227, w: 6.813, h: 0.774, valign: 'top', wrap: false, fontSize: 40, fontFace: SEMI, color: NAVY, charSpacing: 3 });
+  body(s, 2.896, 3.813, 7.643, 1.237, [228, 0, 26, 0, 999, 0, 26], GRAY_SOFT, 'center');
+  kicker(s, 5.31, 3.443, 2.598, "Write Here About Text");
+  s.addText("Lorem Ipsum Dolor sit", { x: 5.602, y: 5.257, w: 2.013, h: 0.303, valign: 'top', wrap: false, line: { color: NAVY, width: 0.75 }, fontSize: 12, fontFace: POPPINS, color: GRAY });
+}
+
+function slide05(pptx) {
+  const s = pptx.addSlide();
+  chrome(s, "Page 03");
+  bigNumber(s, 1.077, 1.819, 1.31, 2.036, "2");
+  kicker(s, 0.975, 3.61, 2.879, "Write Here About Image");
+  heading(s, 0.975, 3.838, 3.91, "Lorem Ipsum");
+  body(s, 0.975, 4.612, 4.232, 1.237, [228, 0, 26, 0, 95], GRAY_SOFT, 'justify');
+  kicker(s, 9.252, 3.046, 2.879, "Write Here About Image");
+  body(s, 9.225, 3.525, 2.932, 1.464, [228, 0, 26, 0, 5], GRAY_SOFT, 'center');
+  s.addShape('rect', { x: 7.966, y: 4.238, w: 1.127, h: 2.106, fill: { color: NAVY, transparency: 41 } });
+  imagePlaceholder(s, 5.896, 1.618, 2.667, 4.271);
+}
+
+function slide06(pptx) {
+  const s = pptx.addSlide();
+  chrome(s, "Page 04");
+  bigNumber(s, 1.211, 1.603, 1.264, 2.036, "3");
+  kicker(s, 1.086, 3.656, 2.879, "Write Here About Image");
+  heading(s, 1.086, 3.885, 3.91, "Lorem Ipsum");
+  body(s, 1.086, 4.604, 4.232, 1.237, [228, 0, 26, 0, 95], GRAY_SOFT, 'justify');
+  s.addShape('rect', { x: 8.835, y: 2.883, w: 3.095, h: 2.81, fill: { color: WHITE } });
+  imagePlaceholder(s, 6.441, 1.588, 3.095, 2.81);
+  imagePlaceholder(s, 8.993, 3.031, 3.095, 2.81);
+}
+
+function slide07(pptx) {
+  const s = pptx.addSlide();
+  chrome(s, "Page 05");
+  bigNumber(s, 8.132, 0.966, 2.886, 4.931, "4", GRAY_BOX, 287);
+  s.addShape('rect', { x: 1.557, y: 1.369, w: 4.901, h: 4.652, fill: { color: NAVY } });
+  kicker(s, 7.466, 2.571, 2.879, "Write Here About Image");
+  heading(s, 7.466, 2.8, 3.91, "Lorem Ipsum");
+  body(s, 7.466, 4.212, 3.576, 1.237, [228, 0, 26, 0, 25], GRAY_SOFT, 'justify');
+  s.addText("Lorem Ipsum", { x: 7.552, y: 5.56, w: 1.497, h: 0.337, valign: 'top', wrap: false, line: { color: NAVY, width: 0.75 }, fontSize: 14, fontFace: SEMI, color: GRAY, bold: true });
+  imagePlaceholder(s, 0.55, 1.894, 5.367, 3.667);
+}
+
+function slide08(pptx) {
+  const s = pptx.addSlide();
+  chrome(s, "Page 06");
+  s.addText("Write Here About Image", { x: 3.81, y: 3.371, w: 5.554, h: 0.64, valign: 'top', wrap: false, fontSize: 32, fontFace: POPPINS, color: WHITE });
+  bigNumber(s, 1.678, 4.081, 1.206, 2.036, "5");
+  s.addText("Lorem Ipsum", { x: 2.684, y: 4.674, w: 2.187, h: 1.313, valign: 'top', fontSize: 36, fontFace: SEMI, color: GRAY, bold: true });
+  s.addShape('line', { x: 4.871, y: 4.806, w: 0, h: 1.069, line: { color: NAVY, width: 0.5 } });
+  body(s, 5.438, 5.099, 6.34, 0.783, [228, 0, 26, 0, 25], GRAY_SOFT, 'justify');
+  kicker(s, 5.438, 4.729, 2.879, "Write Here About Image");
+  s.addShape('rect', { x: 0, y: 1.032, w: 3.583, h: 2.94, fill: { color: NAVY } });
+  imagePlaceholder(s, 3.778, 1.032, 9.556, 2.94);
+}
+
+function slide09(pptx) {
+  const s = pptx.addSlide();
+  chrome(s, "Page 07");
+  s.addShape('rect', { x: 6.862, y: 0, w: 6.472, h: 7.5, fill: { color: GRAY_BOX } });
+  s.addShape('rect', { x: 7.969, y: 2.896, w: 3.809, h: 3.088, fill: { color: NAVY, transparency: 41 } });
+  s.addShape('ellipse', { x: 8.815, y: 1.671, w: 0.777, h: 0.777, fill: { color: NAVY } });
+  bigNumber(s, 8.975, 1.603, 0.535, 0.774, "1", WHITE, 40);
+  s.addShape('ellipse', { x: 11.778, y: 4.745, w: 0.777, h: 0.777, fill: { color: NAVY } });
+  bigNumber(s, 11.914, 4.678, 0.582, 0.774, "2", WHITE, 40);
+  bigNumber(s, 1.209, 1.714, 1.371, 2.036, "6");
+  kicker(s, 1.138, 3.523, 2.879, "Write Here About Image");
+  heading(s, 1.138, 3.751, 3.34, "Two Image");
+  body(s, 1.138, 4.525, 4.232, 1.237, [228, 0, 26, 0, 95], GRAY_SOFT, 'justify');
+  imagePlaceholder(s, 6.426, 1.107, 2.627, 3.108);
+  imagePlaceholder(s, 9.461, 3.238, 2.627, 3.108);
+}
+
+function slide10(pptx) {
+  const s = pptx.addSlide();
+  chrome(s, "Page 08");
+  s.addShape('rect', { x: 0.75, y: 1.848, w: 11.849, h: 4.533, fill: { color: GRAY_BOX } });
+  bigNumber(s, 6.529, 1.504, 1.163, 2.036, "7");
+  kicker(s, 6.525, 3.54, 2.879, "Write Here About Image");
+  heading(s, 6.525, 3.769, 3.91, "Lorem Ipsum");
+  body(s, 6.525, 4.487, 4.232, 1.237, [228, 0, 26, 0, 95], GRAY_SOFT, 'justify');
+  s.addText("Lorem Ipsum Dolor sit", { x: 2.025, y: 5.506, w: 2.314, h: 0.337, align: 'center', valign: 'top', wrap: false, line: { color: NAVY, width: 0.75 }, fontSize: 14, fontFace: POPPINS, color: NAVY });
+  s.addShape('rect', { x: 0, y: 4.487, w: 3.73, h: 0.89, fill: { color: NAVY, transparency: 41 } });
+  imagePlaceholder(s, 1.578, 1.487, 3.263, 3.891);
+}
+
+function slide11(pptx) {
+  const s = pptx.addSlide();
+  chrome(s, "Page 09");
+  s.addText([
+    { text: "Real happiness is cheap enough, yet how dearly we pay for its ", options: { fontSize: 24, fontFace: POPPINS, color: BROWN } },
+    { text: "counterfeit", options: { fontSize: 24, fontFace: SEMI, color: NAVY } },
+  ], { x: 7.75, y: 1.933, w: 4.197, h: 1.717, valign: 'top' });
+  body(s, 7.75, 4.01, 3.616, 1.464, [228, 0, 26, 0, 95], GRAY_SOFT, 'justify');
+  bigNumber(s, 1.655, 3.367, 1.375, 2.036, "8", GRAY_PALE, 115);
+  s.addText([
+    { text: "- ", options: { fontFace: POPPINS, color: BROWN } },
+    { text: "Hosea ", options: { fontFace: POPPINS, color: BROWN } },
+    { text: "Ballou", options: { fontFace: POPPINS, color: BROWN } },
+    { text: ", 1771", options: { fontFace: POPPINS, color: BROWN } },
+  ], { x: 8.772, y: 5.833, w: 2.593, h: 0.404, align: 'right', valign: 'top', wrap: false });
+  imagePlaceholder(s, 3.42, 1.361, 3.326, 4.136);
+  imagePlaceholder(s, 1.111, 1.361, 2.104, 2.861);
+}
+
+function slide12(pptx) {
+  const s = pptx.addSlide();
+  chrome(s, "Page 10");
+  s.addShape('rect', { x: 6.111, y: 1.282, w: 3.327, h: 4.702, fill: { color: NAVY } });
+  s.addText("With a few flowers in my garden, half a dozen pictures and some books, I live without envy", { x: 6.444, y: 2.684, w: 4.635, h: 1.447, valign: 'top', fontSize: 20, fontFace: POPPINS, color: WHITE });
+  s.addText([
+    { text: "Lope ", options: { fontFace: SEMI, color: WHITE } },
+    { text: "de Vega, 1562.", options: { fontFace: SEMI, color: WHITE } },
+  ], { x: 6.444, y: 4.208, w: 2.683, h: 0.404, valign: 'top', wrap: false });
+  bigNumber(s, 1.229, 1.47, 1.357, 2.036, "9");
+  kicker(s, 1.138, 3.523, 2.879, "Write Here About Image");
+  heading(s, 1.138, 3.751, 3.91, "Lorem Ipsum");
+  body(s, 1.138, 4.519, 4.232, 1.237, [228, 0, 26, 0, 95], GRAY_SOFT, 'justify');
+  s.addShape('rect', { x: 9.603, y: 5.094, w: 3.73, h: 1.11, fill: { color: NAVY, transparency: 41 } });
+  imagePlaceholder(s, 8.761, 1.282, 3.327, 4.702);
+}
+
+function slide13(pptx) {
+  const s = pptx.addSlide();
+  chrome(s, "Page 11");
+  bigNumber(s, 1.138, 1.715, 2.102, 2.036, "10");
+  kicker(s, 1.138, 3.523, 2.879, "Write Here About Image");
+  s.addText("Lorem Ipsum Dolor Sit", { x: 1.138, y: 3.751, w: 6.39, h: 0.774, valign: 'top', wrap: false, fontSize: 40, fontFace: SEMI, color: GRAY });
+  body(s, 1.138, 4.534, 4.232, 1.237, [228, 0, 26, 0, 95], GRAY_SOFT, 'justify');
+  s.addShape('rect', { x: 10.581, y: 2.738, w: 2.752, h: 3.31, fill: { color: NAVY, transparency: 41 } });
+  imagePlaceholder(s, 5.73, 2.619, 6.697, 3.429);
+}
+
+function slide14(pptx) {
+  const s = pptx.addSlide();
+  chrome(s, "Page 12");
+  bigNumber(s, 6.741, 1.715, 1.732, 2.036, "11");
+  kicker(s, 6.741, 3.561, 2.879, "Write Here About Image");
+  heading(s, 6.741, 3.853, 3.91, "Lorem Ipsum");
+  body(s, 6.741, 4.627, 4.232, 1.237, [228, 0, 26, 0, 95], GRAY_SOFT, 'justify');
+  imagePlaceholder(s, 0.924, 1.286, 2.076, 4.905);
+  imagePlaceholder(s, 3.163, 3.93, 2.076, 2.238);
+  imagePlaceholder(s, 3.163, 1.286, 2.076, 2.567);
+}
+
+function slide15(pptx) {
+  const s = pptx.addSlide();
+  chrome(s, "Page 13");
+  s.addShape('rect', { x: 0.924, y: 1.165, w: 5.129, h: 5.125, fill: { color: NAVY } });
+  bigNumber(s, 1.471, 1.561, 1.908, 2.036, "12", WHITE, 115);
+  s.addText("Write Here About Image", { x: 1.471, y: 3.36, w: 2.879, h: 0.37, valign: 'top', wrap: false, fontSize: 16, fontFace: POPPINS, color: WHITE });
+  heading(s, 1.471, 3.588, 3.91, "Lorem Ipsum", WHITE);
+  body(s, 1.471, 4.362, 4.232, 1.237, [228, 0, 26, 0, 95], WHITE, 'justify');
+  imagePlaceholder(s, 6.16, 1.143, 2.098, 5.125);
+  imagePlaceholder(s, 8.349, 3.744, 4.009, 2.524);
+  imagePlaceholder(s, 8.349, 1.143, 4.009, 2.524);
+}
+
+function slide16(pptx) {
+  const s = pptx.addSlide();
+  chrome(s, "Page  14");
+  kicker(s, 1.25, 4.188, 2.879, "Write Here About Image");
+  body(s, 1.25, 4.558, 4.232, 1.237, [228, 0, 26, 0, 95], GRAY_SOFT, 'justify');
+  s.addText([
+    { text: "One can furnish a room very luxuriously by taking out ", options: { fontSize: 24, fontFace: POPPINS, color: BROWN } },
+    { text: "furniture rather", options: { fontSize: 24, fontFace: SEMI, color: NAVY } },
+    { text: " than putting it in", options: { fontSize: 24, fontFace: POPPINS, color: BROWN } },
+  ], { x: 1.25, y: 1.794, w: 4.75, h: 1.717, valign: 'top' });
+  s.addShape('rect', { x: 7.489, y: 1.794, w: 4.254, h: 4, fill: { color: NAVY } });
+  imagePlaceholder(s, 7.642, 1.943, 3.937, 3.724);
+}
+
+function slide17(pptx) {
+  const s = pptx.addSlide();
+  chrome(s, "Page 15");
+  s.addShape('ellipse', { x: 1.694, y: 2.29, w: 2.813, h: 2.813, fill: { color: NAVY } });
+  monogram(s, 1.694, 2.29, 2.813, WHITE);
+  s.addShape('line', { x: 2.741, y: 3.143, w: 0.626, h: 0.35, line: { color: NAVY, width: 0.5 }, flipH: true });
+  s.addShape('line', { x: 2.828, y: 3.893, w: 0.619, h: 0.346, line: { color: NAVY, width: 0.5 }, flipH: true });
+  bigNumber(s, 7.285, 1.504, 1.835, 2.036, "13");
+  kicker(s, 7.285, 3.54, 2.686, "Write Here About Logo");
+  heading(s, 7.285, 3.794, 3.463, "Lorem Logo");
+  body(s, 7.285, 4.487, 4.232, 1.237, [228, 0, 26, 0, 95], GRAY_SOFT, 'justify');
+  s.addShape('line', { x: 6.077, y: 3.096, w: 0, h: 1.396, line: { color: NAVY, width: 0.5 } });
+}
+
+function slide18(pptx) {
+  const s = pptx.addSlide();
+  chrome(s, "Page 16");
+  bigNumber(s, 1.595, 1.406, 1.904, 2.036, "14");
+  kicker(s, 1.658, 3.443, 2.598, "Write Here About Text");
+  heading(s, 1.658, 3.696, 2.332, "Graphy");
+  body(s, 1.658, 4.483, 4.232, 1.237, [228, 0, 26, 0, 95], GRAY_SOFT, 'justify');
+  s.addText("Aa", { x: 7.479, y: 2.09, w: 1.257, h: 1.01, valign: 'top', wrap: false, fontSize: 54, fontFace: SEMI, color: NAVY, bold: true });
+  s.addText("Aa", { x: 7.479, y: 3.154, w: 0.456, h: 0.37, valign: 'top', wrap: false, fontSize: 16, fontFace: PLAYFAIR, color: GRAY });
+  s.addText("Ff", { x: 7.479, y: 3.702, w: 0.4, h: 0.37, valign: 'top', wrap: false, fontSize: 16, fontFace: PLAYFAIR, color: GRAY });
+  s.addText("Bb", { x: 8.146, y: 3.154, w: 0.468, h: 0.37, valign: 'top', wrap: false, fontSize: 16, fontFace: PLAYFAIR, color: GRAY });
+  s.addText("Gg", { x: 8.146, y: 3.702, w: 0.474, h: 0.37, valign: 'top', wrap: false, fontSize: 16, fontFace: PLAYFAIR, color: GRAY });
+  s.addText("Cc", { x: 8.878, y: 3.154, w: 0.465, h: 0.37, valign: 'top', wrap: false, fontSize: 16, fontFace: PLAYFAIR, color: GRAY });
+  s.addText("Hh", { x: 8.878, y: 3.702, w: 0.502, h: 0.37, valign: 'top', wrap: false, fontSize: 16, fontFace: PLAYFAIR, color: GRAY });
+  s.addText("Dd", { x: 9.54, y: 3.154, w: 0.512, h: 0.37, valign: 'top', wrap: false, fontSize: 16, fontFace: PLAYFAIR, color: GRAY });
+  s.addText("Ii", { x: 9.54, y: 3.702, w: 0.344, h: 0.37, valign: 'top', wrap: false, fontSize: 16, fontFace: PLAYFAIR, color: GRAY });
+  s.addText("Ee", { x: 10.115, y: 3.154, w: 0.456, h: 0.37, valign: 'top', wrap: false, fontSize: 16, fontFace: PLAYFAIR, color: GRAY });
+  s.addText("Jj", { x: 10.115, y: 3.702, w: 0.335, h: 0.37, valign: 'top', wrap: false, fontSize: 16, fontFace: PLAYFAIR, color: GRAY });
+  s.addText("Ee", { x: 10.641, y: 3.154, w: 0.456, h: 0.37, valign: 'top', wrap: false, fontSize: 16, fontFace: PLAYFAIR, color: GRAY });
+  s.addText("Kk", { x: 10.641, y: 3.702, w: 0.472, h: 0.37, valign: 'top', wrap: false, fontSize: 16, fontFace: PLAYFAIR, color: GRAY });
+  s.addText("Ll", { x: 7.479, y: 4.186, w: 0.398, h: 0.37, valign: 'top', wrap: false, fontSize: 16, fontFace: PLAYFAIR, color: GRAY });
+  s.addText("Rr", { x: 7.479, y: 4.641, w: 0.447, h: 0.37, valign: 'top', wrap: false, fontSize: 16, fontFace: PLAYFAIR, color: GRAY });
+  s.addText("Mm", { x: 8.146, y: 4.186, w: 0.598, h: 0.37, valign: 'top', wrap: false, fontSize: 16, fontFace: PLAYFAIR, color: GRAY });
+  s.addText("Ss", { x: 8.146, y: 4.641, w: 0.423, h: 0.37, valign: 'top', wrap: false, fontSize: 16, fontFace: PLAYFAIR, color: GRAY });
+  s.addText("Nn", { x: 8.878, y: 4.186, w: 0.503, h: 0.37, valign: 'top', wrap: false, fontSize: 16, fontFace: PLAYFAIR, color: GRAY });
+  s.addText("Tt", { x: 8.878, y: 4.641, w: 0.421, h: 0.37, valign: 'top', wrap: false, fontSize: 16, fontFace: PLAYFAIR, color: GRAY });
+  s.addText("Oo", { x: 9.54, y: 4.186, w: 0.491, h: 0.37, valign: 'top', wrap: false, fontSize: 16, fontFace: PLAYFAIR, color: GRAY });
+  s.addText("Uu", { x: 9.54, y: 4.641, w: 0.496, h: 0.37, valign: 'top', wrap: false, fontSize: 16, fontFace: PLAYFAIR, color: GRAY });
+  s.addText("Pp", { x: 10.115, y: 4.186, w: 0.463, h: 0.37, valign: 'top', wrap: false, fontSize: 16, fontFace: PLAYFAIR, color: GRAY });
+  s.addText("Vv", { x: 10.115, y: 4.641, w: 0.452, h: 0.37, valign: 'top', wrap: false, fontSize: 16, fontFace: PLAYFAIR, color: GRAY });
+  s.addText("Qq", { x: 10.641, y: 4.186, w: 0.495, h: 0.37, valign: 'top', wrap: false, fontSize: 16, fontFace: PLAYFAIR, color: GRAY });
+  s.addText("Ww", { x: 10.641, y: 4.641, w: 0.577, h: 0.37, valign: 'top', wrap: false, fontSize: 16, fontFace: PLAYFAIR, color: GRAY });
+  s.addText("Xx", { x: 7.479, y: 5.102, w: 0.46, h: 0.37, valign: 'top', wrap: false, fontSize: 16, fontFace: PLAYFAIR, color: GRAY });
+  s.addText("yy", { x: 8.146, y: 5.102, w: 0.43, h: 0.37, valign: 'top', wrap: false, fontSize: 16, fontFace: PLAYFAIR, color: GRAY });
+  s.addText("Zz", { x: 8.878, y: 5.102, w: 0.441, h: 0.37, valign: 'top', wrap: false, fontSize: 16, fontFace: PLAYFAIR, color: GRAY });
+  s.addShape('line', { x: 7.479, y: 3.637, w: 3.615, h: 0, line: { color: NAVY, width: 0.5 } });
+  s.addShape('line', { x: 7.479, y: 4.166, w: 3.615, h: 0, line: { color: NAVY, width: 0.5 } });
+  s.addShape('line', { x: 7.479, y: 4.593, w: 3.615, h: 0, line: { color: NAVY, width: 0.5 } });
+  s.addShape('line', { x: 7.479, y: 5.011, w: 3.615, h: 0, line: { color: NAVY, width: 0.5 } });
+  s.addShape('line', { x: 7.479, y: 5.486, w: 1.804, h: 0, line: { color: NAVY, width: 0.5 } });
+}
+
+function slide19(pptx) {
+  const s = pptx.addSlide();
+  chrome(s, "Page 17");
+  bigNumber(s, 1.454, 1.441, 1.757, 2.036, "15");
+  kicker(s, 1.443, 3.477, 2.879, "Write Here About Image");
+  heading(s, 1.443, 3.731, 3.959, "Lorem Image");
+  body(s, 1.443, 4.564, 4.232, 1.237, [228, 0, 26, 0, 95], GRAY_SOFT, 'justify');
+  s.addShape('rect', { x: 8.556, y: 2.762, w: 2.349, h: 1.908, fill: { color: WHITE } });
+  imagePlaceholder(s, 7.285, 2.879, 1.651, 1.778);
+  imagePlaceholder(s, 8.676, 2.599, 2.095, 2.256);
+  imagePlaceholder(s, 10.63, 2.879, 1.651, 1.778);
+}
+
+function slide20(pptx) {
+  const s = pptx.addSlide();
+  chrome(s, "Page 18");
+  s.addShape('ellipse', { x: 8.171, y: 1.897, w: 1.095, h: 1.095, fill: { color: GRAY } });
+  kicker(s, 8.246, 3.069, 0.945, "Colour");
+  s.addText("gray", { x: 8.432, y: 3.335, w: 0.6, h: 0.303, valign: 'top', wrap: false, fontSize: 12, fontFace: SEMI, color: GRAY });
+  s.addShape('ellipse', { x: 10.384, y: 1.897, w: 1.095, h: 1.095, fill: { color: NAVY } });
+  kicker(s, 10.459, 3.069, 0.945, "Colour");
+  s.addText("Blue - gray", { x: 10.387, y: 3.329, w: 1.149, h: 0.303, valign: 'top', wrap: false, fontSize: 12, fontFace: SEMI, color: GRAY });
+  s.addShape('ellipse', { x: 8.171, y: 3.869, w: 1.095, h: 1.095, fill: { color: GRAY_MID } });
+  s.addShape('ellipse', { x: 10.384, y: 3.869, w: 1.095, h: 1.095, fill: { color: GRAY_PALE } });
+  kicker(s, 8.246, 5.019, 0.945, "Colour");
+  kicker(s, 10.459, 5.019, 0.945, "Colour");
+  s.addText("White darker 25%", { x: 10.086, y: 5.389, w: 1.692, h: 0.303, valign: 'top', wrap: false, fontSize: 12, fontFace: SEMI, color: GRAY });
+  s.addText("White darker 50%", { x: 7.867, y: 5.373, w: 1.704, h: 0.303, valign: 'top', wrap: false, fontSize: 12, fontFace: SEMI, color: GRAY });
+  bigNumber(s, 1.361, 1.441, 1.941, 2.036, "16");
+  kicker(s, 1.443, 3.477, 2.879, "Write Here About Image");
+  heading(s, 1.443, 3.731, 4.01, "Lorem Colour");
+  body(s, 1.443, 4.564, 4.232, 1.237, [228, 0, 26, 0, 95], GRAY_SOFT, 'justify');
+}
+
+function slide21(pptx) {
+  const s = pptx.addSlide();
+  chrome(s, "Page 19");
+  s.addShape('rect', { x: 7.824, y: 2.46, w: 1.275, h: 1.113, fill: { color: NAVY } });
+  s.addShape('rect', { x: 9.099, y: 3.58, w: 1.275, h: 1.113, fill: { color: GRAY } });
+  s.addShape('rect', { x: 10.374, y: 2.451, w: 1.275, h: 1.113, fill: { color: GRAY_SOFT } });
+  s.addShape('rect', { x: 8.061, y: 2.766, w: 0.765, h: 0.377, fill: { type: 'none' }, line: { color: WHITE, width: 1 } });
+  s.addShape('rect', { x: 8.108, y: 2.868, w: 0.765, h: 0.377, fill: { type: 'none' }, line: { color: WHITE, width: 1 } });
+  s.addShape('triangle', { x: 9.409, y: 3.768, w: 0.623, h: 0.537, fill: { type: 'none' }, line: { color: WHITE, width: 1 } });
+  s.addShape('triangle', { x: 9.409, y: 3.893, w: 0.623, h: 0.537, fill: { type: 'none' }, line: { color: WHITE, width: 1 } });
+  s.addShape('flowChartInputOutput', { x: 10.627, y: 2.729, w: 0.723, h: 0.484, fill: { type: 'none' }, line: { color: WHITE, width: 1 } });
+  s.addShape('flowChartInputOutput', { x: 10.674, y: 2.797, w: 0.723, h: 0.484, fill: { type: 'none' }, line: { color: WHITE, width: 1 } });
+  bigNumber(s, 1.452, 1.441, 1.76, 2.036, "17");
+  kicker(s, 1.443, 3.477, 2.879, "Write Here About Image");
+  heading(s, 1.443, 3.731, 3.762, "Lorem Value");
+  body(s, 1.443, 4.564, 4.232, 1.237, [228, 0, 26, 0, 95], GRAY_SOFT, 'justify');
+  s.addText([
+    { text: "‘", options: { fontSize: 14, fontFace: POPPINS, color: GRAY_MID } },
+    { text: "Truth is ever to be found in simplicity, and not in the multiplicity and confusion of things", options: { fontSize: 14, fontFace: POPPINS, color: GRAY_MID } },
+    { text: "’", options: { fontSize: 14, fontFace: POPPINS, color: GRAY_MID } },
+  ], { x: 7.3, y: 4.282, w: 2.264, h: 1.279, align: 'center', valign: 'top' });
+  kicker(s, 7.462, 5.556, 1.909, "- Isaac Newton");
+  imagePlaceholder(s, 10.643, 3.844, 1.643, 1.749);
+}
+
+function slide22(pptx) {
+  const s = pptx.addSlide();
+  chrome(s, "Page 20");
+  bigNumber(s, 1.36, 1.441, 1.945, 2.036, "18");
+  kicker(s, 1.443, 3.477, 2.879, "Write Here About Image");
+  heading(s, 7.723, 3.769, 4.404, "Joshua Becker");
+  body(s, 1.443, 4.564, 4.232, 1.237, [228, 0, 26, 0, 95], GRAY_SOFT, 'justify');
+  s.addText("Minimalism isn’t about owning less than you need. It’s about owning exactly what you need", { x: 7.723, y: 4.897, w: 3.917, h: 1.313, valign: 'top', fontFace: POPPINS, color: TAUPE });
+  heading(s, 1.443, 3.731, 3.762, "Lorem Value");
+  s.addText("Beautifull quote", { x: 7.723, y: 3.477, w: 1.774, h: 0.346, valign: 'top', fontSize: 14, fontFace: POPPINS, color: TAUPE });
+}
+
+function slide23(pptx) {
+  const s = pptx.addSlide();
+  chrome(s, "Page 21");
+  bigNumber(s, 1.36, 1.441, 1.945, 2.036, "19");
+  kicker(s, 1.443, 3.477, 2.879, "Write Here About Image");
+  body(s, 1.443, 4.564, 4.232, 1.237, [228, 0, 26, 0, 95], GRAY_SOFT, 'justify');
+  heading(s, 1.443, 3.731, 3.762, "Lorem Value");
+  s.addShape('rect', { x: 7.382, y: 3.221, w: 2.092, h: 2.27, fill: { type: 'none' }, line: { color: NAVY, width: 1 } });
+  s.addShape('rect', { x: 10.296, y: 3.221, w: 2.092, h: 2.27, fill: { type: 'none' }, line: { color: NAVY, width: 1 } });
+  s.addText("Text Here", { x: 7.991, y: 3.98, w: 0.873, h: 0.278, valign: 'top', wrap: false, fontSize: 10.5, fontFace: POPPINS, color: GRAY });
+  body(s, 7.464, 4.198, 1.927, 0.985, [165], GRAY_SOFT, 'center', 7);
+  body(s, 10.354, 4.198, 1.927, 0.985, [165], GRAY_SOFT, 'center', 7);
+  s.addText("Architecture", { x: 7.724, y: 3.734, w: 1.406, h: 0.337, valign: 'top', wrap: false, fontSize: 14, fontFace: POPPINS, color: GRAY });
+  s.addText("Text Here", { x: 10.916, y: 3.98, w: 0.873, h: 0.278, valign: 'top', wrap: false, fontSize: 10.5, fontFace: POPPINS, color: GRAY });
+  s.addText("Architecture", { x: 10.65, y: 3.734, w: 1.406, h: 0.337, valign: 'top', wrap: false, fontSize: 14, fontFace: POPPINS, color: GRAY });
+  imagePlaceholder(s, 7.285, 1.968, 2.286, 1.358);
+  imagePlaceholder(s, 10.199, 1.968, 2.286, 1.358);
+}
+
+function slide24(pptx) {
+  const s = pptx.addSlide();
+  chrome(s, "Page 22");
+  s.addText("Minimalism is built around the idea that there’s nothing that you’re lacking", { x: 1.429, y: 1.887, w: 4.984, h: 1.313, valign: 'top', fontSize: 24, fontFace: POPPINS, color: TAUPE });
+  body(s, 1.429, 3.838, 4.414, 1.01, [[144, GRAY_SOFT], [-144, NAVY], [0, NAVY], [26, NAVY]], GRAY_SOFT, 'justify');
+  kicker(s, 1.429, 3.527, 2.879, "Write Here About Image");
+  body(s, 1.429, 4.755, 4.414, 1.01, [[144, GRAY_SOFT], [-144, NAVY], [0, NAVY], [26, NAVY]], GRAY_SOFT, 'justify');
+  s.addShape('rect', { x: 7.46, y: 2.254, w: 5.873, h: 0.786, fill: { color: NAVY } });
+  bigNumber(s, 10.821, 4.552, 2.25, 2.036, "20");
+  s.addText("Lorem ipsum dolor sit amet", { x: 7.716, y: 2.438, w: 4.062, h: 0.438, valign: 'top', wrap: false, fontSize: 20, fontFace: POPPINS, color: WHITE });
+  imagePlaceholder(s, 7.46, 3.2, 5.138, 2.565);
+}
+
+function slide25(pptx) {
+  const s = pptx.addSlide();
+  chrome(s, "Page 23");
+  s.addShape('line', { x: 6.256, y: 2.756, w: 0, h: 1.873, line: { color: NAVY, width: 0.5 } });
+  s.addText("Developer", { x: 6.746, y: 2.434, w: 4.414, h: 0.774, valign: 'top', fontSize: 40, fontFace: SEMI, color: TAUPE });
+  kicker(s, 6.746, 3.657, 2.879, "Write Here About Image");
+  body(s, 6.746, 4.006, 3.714, 1.237, [228, 0, 26], GRAY_MID, 'justify');
+  kicker(s, 6.746, 2.211, 1.252, "John Doe");
+  imagePlaceholder(s, 3.159, 2.308, 2.476, 2.698);
+}
+
+function slide26(pptx) {
+  const s = pptx.addSlide();
+  chrome(s, "Page 24");
+  s.addText("Development team", { x: 4.412, y: 0.993, w: 4.414, h: 0.572, align: 'center', valign: 'top', fontSize: 28, fontFace: SEMI, color: TAUPE });
+  body(s, 3.698, 1.523, 5.842, 0.555, [155], GRAY_MID, 'center');
+  s.addText("John Doe", { x: 3.159, y: 2.882, w: 1.268, h: 0.37, valign: 'top', wrap: false, fontSize: 16, fontFace: SEMI, color: GRAY });
+  s.addText("CEO & founder", { x: 3.159, y: 3.424, w: 1.629, h: 0.337, valign: 'top', wrap: false, fontSize: 14, fontFace: POPPINS, color: GRAY });
+  s.addText("See About CEO", { x: 3.159, y: 3.676, w: 1.459, h: 0.303, valign: 'top', wrap: false, fontSize: 12, fontFace: SEMI, color: GRAY });
+  s.addText("John Doe", { x: 3.159, y: 5.062, w: 1.268, h: 0.37, valign: 'top', wrap: false, fontSize: 16, fontFace: SEMI, color: GRAY });
+  s.addText("Executive Officer", { x: 3.159, y: 5.604, w: 1.815, h: 0.337, valign: 'top', wrap: false, fontSize: 14, fontFace: POPPINS, color: GRAY });
+  s.addText("See About Officer", { x: 3.159, y: 5.856, w: 1.676, h: 0.303, valign: 'top', wrap: false, fontSize: 12, fontFace: SEMI, color: GRAY });
+  s.addText("Jenny Doe", { x: 8.852, y: 2.882, w: 1.398, h: 0.37, align: 'right', valign: 'top', wrap: false, fontSize: 16, fontFace: SEMI, color: GRAY });
+  s.addText("Marketing advisor", { x: 8.363, y: 3.424, w: 1.96, h: 0.337, align: 'right', valign: 'top', wrap: false, fontSize: 14, fontFace: POPPINS, color: GRAY });
+  s.addText("See About Advisor", { x: 8.501, y: 3.676, w: 1.759, h: 0.303, align: 'right', valign: 'top', wrap: false, fontSize: 12, fontFace: SEMI, color: GRAY });
+  s.addText("Jenny Doe", { x: 8.852, y: 5.058, w: 1.398, h: 0.37, align: 'right', valign: 'top', wrap: false, fontSize: 16, fontFace: SEMI, color: GRAY });
+  s.addText("Marketing Platform", { x: 8.256, y: 5.6, w: 2.067, h: 0.337, align: 'right', valign: 'top', wrap: false, fontSize: 14, fontFace: POPPINS, color: GRAY });
+  s.addText("See About Platform", { x: 8.414, y: 5.852, w: 1.846, h: 0.303, align: 'right', valign: 'top', wrap: false, fontSize: 12, fontFace: SEMI, color: GRAY });
+  imagePlaceholder(s, 1.694, 2.317, 1.358, 1.612);
+  imagePlaceholder(s, 1.694, 4.61, 1.358, 1.612);
+  imagePlaceholder(s, 10.336, 4.61, 1.358, 1.612);
+  imagePlaceholder(s, 10.336, 2.317, 1.358, 1.612);
+}
+
+function slide27(pptx) {
+  const s = pptx.addSlide();
+  chrome(s, "Page 25");
+  s.addText("World Conferences", { x: 6.952, y: 1.785, w: 4.414, h: 1.447, valign: 'top', fontSize: 40, fontFace: SEMI, color: TAUPE });
+  body(s, 6.952, 3.859, 4.414, 1.01, [[144, GRAY_SOFT], [-144, NAVY], [0, NAVY], [26, NAVY]], GRAY_SOFT, 'justify');
+  kicker(s, 6.952, 3.547, 2.686, "Write Here About Logo");
+  body(s, 6.952, 4.776, 4.414, 1.01, [[144, GRAY_SOFT], [-144, NAVY], [0, NAVY], [26, NAVY]], GRAY_SOFT, 'justify');
+  s.addText("2021", { x: 2.644, y: 5.146, w: 1.17, h: 0.64, valign: 'top', wrap: false, fontSize: 32, fontFace: SEMI, color: GRAY });
+  globeIcon(s, 2.07, 1.955, 2.628, 3.114);
+}
+
+function slide28(pptx) {
+  const s = pptx.addSlide();
+  chrome(s, "Page 26");
+  monitorIcon(s, 4.745, 2.409, 3.495, 2.92);
+  clockIcon(s, 5.884, 2.979, 1.168, 1.334);
+  s.addText("Digital Platform ", { x: 4.253, y: 1.49, w: 4.414, h: 0.64, align: 'center', valign: 'top', fontSize: 32, fontFace: SEMI, color: NAVY });
+  s.addText("Digital Platform", { x: 1.041, y: 2.796, w: 3.212, h: 0.572, align: 'right', valign: 'top', wrap: false, fontSize: 28, fontFace: POPPINS, color: GRAY });
+  s.addText("2021", { x: 3.043, y: 3.922, w: 1.17, h: 0.64, align: 'right', valign: 'top', wrap: false, fontSize: 32, fontFace: SEMI, color: GRAY });
+  body(s, 1.197, 4.556, 3.056, 1.01, [155], GRAY_MID, 'right');
+  body(s, 8.68, 4.381, 3.407, 1.237, [[144, GRAY_SOFT], [-144, NAVY], [0, NAVY], [26, NAVY]], GRAY_SOFT, 'justify');
+  kicker(s, 8.68, 4.01, 2.879, "Write Here About Image");
+  s.addText("Lorem Ipsum", { x: 8.68, y: 2.796, w: 3.542, h: 0.707, valign: 'top', wrap: false, fontSize: 36, fontFace: SEMI, color: GRAY, bold: true });
+}
+
+function slide29(pptx) {
+  const s = pptx.addSlide();
+  chrome(s, "Page 27");
+  booksIcon(s, 2.07, 2.481, 2.556, 2.161);
+  s.addText("E - Book Platform", { x: 7.532, y: 2.1, w: 3.568, h: 0.572, valign: 'top', wrap: false, fontSize: 28, fontFace: POPPINS, color: GRAY });
+  body(s, 7.532, 3.428, 4.414, 1.01, [[144, GRAY_SOFT], [-144, NAVY], [0, NAVY], [26, NAVY]], GRAY_SOFT, 'justify');
+  kicker(s, 7.532, 3.116, 2.879, "Write Here About Image");
+  body(s, 7.532, 4.344, 4.414, 1.01, [[144, GRAY_SOFT], [-144, NAVY], [0, NAVY], [26, NAVY]], GRAY_SOFT, 'justify');
+  s.addText("2020", { x: 2.83, y: 4.875, w: 1.296, h: 0.64, valign: 'top', wrap: false, fontSize: 32, fontFace: SEMI, color: GRAY });
+}
+
+function slide30(pptx) {
+  const s = pptx.addSlide();
+  chrome(s, "Page 28");
+  imacDevice(s, 4.278, 2.076, 4.522, 3.642);
+  s.addText("Digital Platform", { x: 4.335, y: 1.224, w: 4.414, h: 0.64, align: 'center', valign: 'top', fontSize: 32, fontFace: SEMI, color: NAVY });
+  s.addText("Digital Platform", { x: 0.649, y: 2.78, w: 3.212, h: 0.572, align: 'right', valign: 'top', wrap: false, fontSize: 28, fontFace: POPPINS, color: GRAY });
+  s.addText("2021", { x: 2.65, y: 3.906, w: 1.17, h: 0.64, align: 'right', valign: 'top', wrap: false, fontSize: 32, fontFace: SEMI, color: GRAY });
+  body(s, 0.805, 4.54, 3.056, 1.01, [155], GRAY_MID, 'right');
+  body(s, 9.159, 4.365, 3.407, 1.237, [[144, GRAY_SOFT], [-144, NAVY], [0, NAVY], [26, NAVY]], GRAY_SOFT, 'justify');
+  kicker(s, 9.159, 3.994, 2.879, "Write Here About Image");
+  s.addText("Lorem Ipsum", { x: 9.159, y: 2.78, w: 3.542, h: 0.707, valign: 'top', wrap: false, fontSize: 36, fontFace: SEMI, color: GRAY, bold: true });
+  imagePlaceholder(s, 4.454, 2.262, 4.17, 2.34);
+}
+
+function slide31(pptx) {
+  const s = pptx.addSlide();
+  chrome(s, "Page 29");
+  ipadDevice(s, 4.975, 1.676, 3.226, 4.581);
+  s.addText("Mobile Platform", { x: 0.789, y: 2.78, w: 3.263, h: 0.572, align: 'right', valign: 'top', wrap: false, fontSize: 28, fontFace: POPPINS, color: GRAY });
+  s.addText("2021", { x: 2.841, y: 3.906, w: 1.17, h: 0.64, align: 'right', valign: 'top', wrap: false, fontSize: 32, fontFace: SEMI, color: GRAY });
+  body(s, 0.995, 4.54, 3.056, 1.01, [155], GRAY_MID, 'right');
+  body(s, 8.978, 4.365, 3.407, 1.237, [[144, GRAY_SOFT], [-144, NAVY], [0, NAVY], [26, NAVY]], GRAY_SOFT, 'justify');
+  kicker(s, 8.978, 3.994, 2.879, "Write Here About Image");
+  s.addText("Lorem Ipsum", { x: 8.978, y: 2.78, w: 3.542, h: 0.707, valign: 'top', wrap: false, fontSize: 36, fontFace: SEMI, color: GRAY, bold: true });
+  imagePlaceholder(s, 5.184, 2.059, 2.811, 3.776);
+}
+
+function slide32(pptx) {
+  const s = pptx.addSlide();
+  chrome(s, "Page 30");
+  s.addShape('ellipse', { x: 7.285, y: 1.766, w: 3, h: 3, fill: { color: NAVY } });
+  personIcon(s, 8.525, 2.244, 0.475, 0.562, WHITE);
+  s.addText("Platform Member", { x: 7.686, y: 2.896, w: 2.151, h: 0.37, valign: 'top', wrap: false, fontSize: 16, fontFace: POPPINS, color: WHITE });
+  body(s, 7.616, 3.343, 2.337, 0.783, [110], WHITE, 'center');
+  s.addShape('ellipse', { x: 10.018, y: 0.96, w: 1.507, h: 1.507, fill: { color: NAVY } });
+  s.addText("Mobile", { x: 10.3, y: 1.746, w: 0.938, h: 0.37, valign: 'top', wrap: false, fontSize: 16, fontFace: POPPINS, color: WHITE });
+  s.addText("60%", { x: 10.396, y: 1.328, w: 0.884, h: 0.505, valign: 'top', wrap: false, fontSize: 24, fontFace: POPPINS, color: WHITE });
+  s.addShape('ellipse', { x: 10.39, y: 3.49, w: 1.507, h: 1.507, fill: { color: GRAY_MID } });
+  s.addText("E-Book", { x: 10.673, y: 4.275, w: 0.982, h: 0.37, valign: 'top', wrap: false, fontSize: 16, fontFace: POPPINS, color: WHITE });
+  s.addText("30%", { x: 10.768, y: 3.858, w: 0.868, h: 0.505, valign: 'top', wrap: false, fontSize: 24, fontFace: POPPINS, color: WHITE });
+  s.addShape('ellipse', { x: 8.409, y: 5.045, w: 1.507, h: 1.507, fill: { color: GRAY } });
+  s.addText("Mac & Pc", { x: 8.556, y: 5.798, w: 1.236, h: 0.37, valign: 'top', wrap: false, fontSize: 16, fontFace: POPPINS, color: WHITE });
+  s.addText("10%", { x: 8.799, y: 5.386, w: 0.777, h: 0.505, valign: 'top', wrap: false, fontSize: 24, fontFace: POPPINS, color: WHITE });
+  s.addText("Platform User & Member", { x: 1.394, y: 1.74, w: 4.414, h: 1.447, valign: 'top', fontSize: 40, fontFace: SEMI, color: TAUPE });
+  listIcon(s, 1.853, 4.995, 0.45, 0.451);
+  personIcon(s, 1.853, 3.569, 0.45, 0.533, NAVY);
+  body(s, 2.408, 3.847, 3.021, 0.783, [116], GRAY_MID);
+  kicker(s, 2.42, 3.585, 1.357, "Write Here");
+  body(s, 2.408, 5.257, 3.021, 0.783, [116], GRAY_MID);
+  kicker(s, 2.42, 4.995, 1.357, "Write Here");
+}
+
+function slide33(pptx) {
+  const s = pptx.addSlide();
+  chrome(s, "Page 31");
+  s.addShape('rect', { x: 2.547, y: 5.479, w: 2.755, h: 0.524, fill: { color: NAVY } });
+  personIcon(s, 3.626, 3.152, 0.581, 0.671, NAVY);
+  body(s, 2.678, 4.047, 2.477, 1.01, [155], GRAY_MID, 'center');
+  s.addText("User Feedback", { x: 2.89, y: 5.539, w: 2.053, h: 0.404, valign: 'top', wrap: false, fontFace: POPPINS, color: WHITE });
+  exchangeIcon(s, 5.85, 3.75, 2.06, 1.2);
+  s.addShape('rect', { x: 8.277, y: 2.615, w: 2.739, h: 2.864, fill: { type: 'none' }, line: { color: NAVY, width: 1 } });
+  s.addShape('rect', { x: 8.277, y: 5.479, w: 2.755, h: 0.524, fill: { color: NAVY } });
+  body(s, 8.408, 4.047, 2.477, 1.01, [155], GRAY_MID, 'center');
+  s.addText("Customer Service", { x: 8.431, y: 5.539, w: 2.43, h: 0.404, valign: 'top', wrap: false, fontFace: POPPINS, color: WHITE });
+  phoneIcon(s, 9.389, 3.152, 0.674, 0.671);
+  s.addShape('rect', { x: 2.547, y: 2.615, w: 2.739, h: 2.864, fill: { type: 'none' }, line: { color: NAVY, width: 1 } });
+  s.addText("Customer Service", { x: 4.829, y: 1.149, w: 4.253, h: 0.64, valign: 'top', wrap: false, fontSize: 32, fontFace: SEMI, color: GRAY, bold: true });
+  body(s, 3.96, 1.792, 5.842, 0.555, [155], GRAY_MID, 'center');
+}
+
+function slide34(pptx) {
+  const s = pptx.addSlide();
+  chrome(s, "Page 32");
+  s.addShape('ellipse', { x: 1.869, y: 2.077, w: 3.3, h: 3.3, fill: { color: NAVY } });
+  s.addText("??", { x: 2.366, y: 2.671, w: 2.511, h: 2.423, valign: 'top', fontSize: 138, fontFace: SEMI, color: WHITE });
+  s.addText("Ask Question ?", { x: 6.588, y: 2.032, w: 3.538, h: 0.64, valign: 'top', wrap: false, fontSize: 32, fontFace: SEMI, color: GRAY, bold: true });
+  body(s, 6.588, 3.985, 4.71, 1.01, [228, 0, 26], GRAY_MID, 'justify');
+  kicker(s, 6.588, 3.615, 4.059, "Ask Qustion To development team");
+  s.addText("Contact Now", { x: 6.659, y: 5.553, w: 1.292, h: 0.303, valign: 'top', wrap: false, line: { color: NAVY, width: 0.75 }, fontSize: 12, fontFace: POPPINS, color: GRAY });
+  s.addText("www.BMTDdesign.com", { x: 6.588, y: 5.15, w: 2.416, h: 0.337, valign: 'top', wrap: false, fontSize: 14, fontFace: POPPINS, color: GRAY });
+}
+
+function slide35(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: NAVY };
+  s.addText("Thank’s", { x: 3.607, y: 2.703, w: 5.565, h: 1.717, valign: 'top', wrap: false, fontSize: 96, fontFace: SEMI, color: WHITE });
+  s.addText("Negai wa Development team", { x: 4.647, y: 4.05, w: 3.485, h: 0.37, valign: 'top', wrap: false, fontSize: 16, fontFace: POPPINS, color: WHITE });
+}
+
+
+// ------------------------------------------------------------------ main
+const BUILDERS = [
+  slide01, slide02, slide03, slide04, slide05, slide06, slide07,
+  slide08, slide09, slide10, slide11, slide12, slide13, slide14,
+  slide15, slide16, slide17, slide18, slide19, slide20, slide21,
+  slide22, slide23, slide24, slide25, slide26, slide27, slide28,
+  slide29, slide30, slide31, slide32, slide33, slide34, slide35,
+];
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.layout = 'LAYOUT_WIDE';           // 13.333 x 7.5 in
+  pptx.author = 'BringmeTheDesign';
+  pptx.title = 'Negai wa - Presentation Template';
+  BUILDERS.forEach((fn) => fn(pptx));
+  return pptx.writeFile({ fileName: path.join(__dirname, '00198c1c-a2ef-4968-8b59-558dfafd060a_grok_final.pptx') });
+}
+
+build().then((f) => console.log('wrote', f)).catch((e) => { console.error(e); process.exit(1); });
