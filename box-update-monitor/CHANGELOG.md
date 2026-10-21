@@ -9,6 +9,34 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-21 23:45 (Paris) — snapshot `2026-10-21_22-53` → `2026-10-21_23-45`
+
+**Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `bff4345e2ccaf95ea04e374515d3746ad4e43f72` → `35502a83a8f520e72e40090b98c37f95c3815ec6` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`). Image `fcbae14`, box-scripts `fcbae14`, sand-host `76b095c`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~1.
+
+- **Bugfix** : —
+- **Change** : —
+- **Features** : —
+- **Perf** : —
+- **Autre/infra** : bump binaire agent-store-fuse (nouvelle révision du tarball S3), aucun autre composant touché.
+
+Rapport : [reports/2026-10-21_23-45.md](reports/2026-10-21_23-45.md).
+
+---
+
+## 2026-10-21 22:53 (Paris) — snapshot `2026-10-21_19-53` → `2026-10-21_22-53`
+
+**Durcissement WebRTC de la policy Chrome + bump agent-store-fuse.** `/etc/opt/chrome/policies/managed/sand-webauthn.json` (394 → 467 o) ajoute `WebRtcIPHandlingUrl:[{"url":"*","handling":"disable_non_proxied_udp"}]` : empêche WebRTC d'exposer les IP locales/non-proxifiées via UDP non-proxifié — durcissement anti-fuite/fingerprint cohérent avec la pile navigateur/egress arrivée au snapshot 19-53. agent-store-fuse `43d57cf5…` → `bff4345…` (binaire `cursor-agent-store-fuse` 9455552 → 9466976 o + pointeur). **Les deux « suppressions » `onepassword-extension/*.crx` et `*.pem` du manifeste ne sont PAS de vraies suppressions box** : elles viennent de l'ajout de ces motifs aux exclusions de `perimeter.conf` (fichiers toujours présents et l'extension 1Password toujours force-installée live). Image `fcbae14`, box-scripts `fcbae14`, sand-host `76b095c`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −2 (exclusions perimeter) / ~3.
+
+- **Bugfix** : —
+- **Change** : policy Chrome `sand-webauthn.json` durcie côté WebRTC (`WebRtcIPHandlingUrl` → `disable_non_proxied_udp`).
+- **Features** : —
+- **Perf** : —
+- **Autre/infra** : durcissement confidentialité WebRTC (`disable_non_proxied_udp`) aligné sur la pile navigateur/egress du snapshot 19-53 ; bump binaire agent-store-fuse en parallèle. Note monitoring : `perimeter.conf` exclut désormais le crx/pem 1Password (bruit binaire), d'où les 2 retraits de manifeste. (Entrée rattrapée : la passe horaire de 22:52 avait publié le snapshot mais omis le CHANGELOG et la notification.)
+
+Rapport : [reports/2026-10-21_22-53.md](reports/2026-10-21_22-53.md).
+
+---
+
 ## 2026-10-21 19:53 (Paris) — snapshot `2026-10-21_15-52` → `2026-10-21_19-53`
 
 **Grosse hot-update sand-host `2e44baf` → `76b095c` : nouvelle pile navigateur (sessions/egress/anti-bot), extension 1Password forcée dans Chrome, et QEMU + toolchain installés dans l'image.** `host-main.cjs` (30 935 462 → 31 010 234 o) et `sand-eval-runner.cjs` modifiés. Nouveau dossier `/opt/sand/sand-host/box-runtime/` (12 fichiers) : `sand-cookie-persist.mjs`, `sand-cookie-import.mjs`, `sand-session-sync.mjs`, `cdp-cookies.mjs`, `sand-egress-tunnel` (binaire 2,6 Mo), `sand-egress-timezone.mjs`, `sand-locale-match.mjs`, `sand-ua-governor.mjs`, `sand-fingerprint-profiles.mjs`, `sand-web-bot-auth.mjs`, `box-contract.generated.mjs`, `manifest.json`. Nouveau script `box-scripts/box-keyring-unlock`. Nouveau `/opt/sand/onepassword-extension/` (crx 18 Mo, id `kfljpclplidgofjbmhhiddeebijcdkfb`) force-installé via la policy Chrome. agent-store-fuse `3878dfcf…` → `43d57cf5…` (bump en parallèle). Image `fcbae14`, box-scripts `fcbae14`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +20 / −0 / ~14 ; +104 paquets dpkg.
