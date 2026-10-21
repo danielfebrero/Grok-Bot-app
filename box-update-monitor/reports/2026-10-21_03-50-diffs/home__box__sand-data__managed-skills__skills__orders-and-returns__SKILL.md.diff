@@ -1,0 +1,34 @@
+--- 2026-10-21_02-47:/home/box/sand-data/managed-skills/skills/orders-and-returns/SKILL.md
++++ 2026-10-21_03-50:/home/box/sand-data/managed-skills/skills/orders-and-returns/SKILL.md
+@@ -31,9 +31,13 @@
+ 
+ ## Tracking
+ 
+-1. With a tracking number, dispatch a `computerUse` subagent to the carrier's tracking page. Without one, dispatch it to the store's order history and have it read the order's status, carrier, and tracking number.
+-2. Report the status, the expected or actual delivery date, the last scan with its place and time, and the tracking link. Attach a screenshot when the page shows a delivery photo or a map.
+-3. When the user wants updates until it arrives, offer a routine that checks the tracking page and messages them only when the status changes, and that ends once the package is delivered. Read the Cursor-managed `routines` skill before you create it.
++When `SendToUser` has a `shipment` field, report an order's status as a shipment card in it, one card per order. Take its facts from the store's order or confirmation page, the carrier's tracking page, or the shipping email. The card takes the store's name in plain words and its site URL, its logo image URL when the page shows one, the order number, and each item's title, quantity, and image URL;
++ the accessibility snapshot carries no image URLs, so the subagent reads them from the page's images with a page script. The card needs the store, the order number, and at least one item. Without that field or any of those, report in text instead. Set `stage` from the page's status: `placed` until it ships, `in_transit` once it ships, `arriving_today` when it is out for delivery or due today, `delivered`, `delayed` when the page says it is late or shows a delivery exception, or `cancelled`. Put the page's own status words in `status`, and the expected or actual delivery date in `expectedDeliveryDate` as YYYY-MM-DD. For a range, use its last day. Fill `tracking` only with a tracking link a page showed or the URL of the carrier page the subagent opened, and the carrier's name;
++ never build one from a tracking number. Leave out any value no page showed. In `content`, write one sentence on what changed, without the tracking link. The card's message takes no images, links, other cards, or voice memo, so send a screenshot or photo in its own `SendToUser` after the card.
++
++1. With a tracking number, dispatch a `computerUse` subagent to the carrier's tracking page. Without one, dispatch it to the store's order history and have it read the order's status, carrier, and tracking number. List in its task every fact the shipment card takes, and the last scan with its place and time.
++2. Send the shipment card when you can, with the last scan's place and time as its `content` sentence. Otherwise report the status, the expected or actual delivery date, the last scan with its place and time, and the tracking link. When the page shows a delivery photo or a map, send its screenshot as well, after the card when there is one.
++3. When the user wants updates until it arrives, offer a routine that checks the tracking page and messages them only when the stage or status changes, with a fresh shipment card when it can send one, and that ends once the package is delivered. Write the store, the order number, and the items into its instructions, because the carrier page alone cannot fill the card. Read the Cursor-managed `routines` skill before you create it.
+ 
+ ## Returns and exchanges
+ 
+@@ -53,12 +57,12 @@
+ ## Problems with an order
+ 
+ - For a missing, late, damaged, or wrong item, open the order's help options and report what the store offers (a refund, a replacement, a chat with support), then let the user choose.
+-- Before reporting a "delivered" package as missing, read the carrier's delivery details for a photo or a delivery location and share them, since they often show where it was left.
++- Before reporting a "delivered" package as missing, read the carrier's delivery details for a photo or a delivery location and share them, since they often show where it was left. Send a shipment card at stage `delivered` when you can, then the photo.
+ - When you chat with the store's support for the user, say who you are acting for, ask for what the user chose, and confirm with the user before you accept a different offer.
+ 
+ ## Price drops and restocks
+ 
+-- A watch is a routine. Create one that reads the product page on a schedule (once a day is usually enough), checks the price or the stock, messages the user only when the condition is met, and then ends. Read the Cursor-managed `routines` skill before you create it, and tell the user the product link, the condition, and how often it checks.
++- A watch is a routine that messages the user only when the condition is met, and then ends. Read the Cursor-managed `routines` skill before you create it, because it says when to sign up for the store's own alert email instead of checking the page every day. Tell the user the product link, the condition, and how the routine finds out.
+ - A watch only notifies. Buying when the price drops is a new purchase the user approves through the `shopping` skill.
+ - When the price drops on something the user already bought, say so if the order is still in its return window, because some stores adjust the price on request and a return and rebuy works at others. Read the store's policy page before you say which applies.
+ 

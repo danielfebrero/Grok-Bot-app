@@ -9,6 +9,27 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-21 03:50 (Paris) — snapshot `2026-10-21_02-47` → `2026-10-21_03-50`
+
+**Hot-update du host bundle** : `sand_host_version` `124299b` → `2e44baf` (supervisor `upgrade-124299b` → `upgrade-2e44baf`), avec rebuild de `host-main.cjs`, `sand-eval-runner.cjs`, `agent-isolation/agent-store-worker.cjs`, `extensions/content-search/search-index-worker.cjs` et `extensions/codebase-telemetry/csnaps`. En parallèle, bump `agent-store-fuse` `51d2f82…` → `66e136b…` (tarball S3) et refresh de 7 skills gérées (`managed-skills`). Image `fcbae14`, box-scripts `fcbae14`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~14.
+
+- **Bugfix** : —
+- **Features** :
+  - `content-search/search-index-worker.cjs` (+297) : indexation de nouveaux canaux **voice-call** (`voice:`) et **meeting-request** (`meeting-request:`) — brique d'appels vocaux / demandes de réunion.
+  - Skill `shopping` + `orders-and-returns` : nouvelles cartes **`shipment`** (statut d'expédition : `placed`/`in_transit`/`arriving_today`/`delivered`/`delayed`/`cancelled`) et **`order`/`purchase`** dans `SendToUser`, une carte par commande, avec image produit, tracking et date de livraison.
+  - Skill `routines` : nouveau pattern de veille prix/restock via **trigger email sur adresse taggée** (`name+watch-…@`) au lieu d'un cron, avec garde-fous (un seul signup, pas de compte/mot de passe, bascule en check quotidien si confirmation requise).
+- **Change** :
+  - Skill `sign-in` **réécrit** : le connecteur Gmail/Google devient la **voie préférée** (fini le « never sign in to Google in browser » absolu — sign-in navigateur autorisé quand l'utilisateur le veut) ; passthrough des **règles de mot de passe** (`Password rules:`) dans le Secure Form ; règle unifiée « valeur déjà envoyée en chat = pas de Secure Form ».
+  - Skill `shopping` : paiement durci — l'agent **re-vérifie la page de review** (re-navigation, pas de reload) juste avant paiement, ne place que la commande lue par le dernier widget, widget ready-to-buy nommant total + date.
+  - Skill `box-desktop` : consigne d'annoncer à l'utilisateur qu'une tâche navigateur/desktop longue (signup, code, formulaire) prendra quelques minutes, et de ne confirmer une étape qu'après le rapport.
+  - Skill `in-chat-forms` : une valeur déjà envoyée en chat ne nécessite pas de form.
+- **Perf** : —
+- **Autre/infra** : sand-host bump `124299b` → `2e44baf` (bundles host opaques) ; `codebase-telemetry/csnaps` reconstruit ; bump binaire `agent-store-fuse` (tarball S3 `…-66e136b…-bk.tar.gz`).
+
+Rapport : [reports/2026-10-21_03-50.md](reports/2026-10-21_03-50.md).
+
+---
+
 ## 2026-10-21 01:51 (Paris) — snapshot `2026-10-20_23-49` → `2026-10-21_01-51`
 
 **Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `77867cfa620c28ae52db1806d0591e419286a6c4` → `675292ce1da95b26f38f9bc4aaa691dcd1be6122` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`). Image `fcbae14`, box-scripts `fcbae14`, sand-host `124299b`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd (`28b0833c…` + `9d485bb3…`), canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~1.

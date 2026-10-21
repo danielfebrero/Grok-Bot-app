@@ -1,0 +1,372 @@
+--- 2026-10-21_02-47:/opt/sand/sand-host/extensions/content-search/search-index-worker.cjs
++++ 2026-10-21_03-50:/opt/sand/sand-host/extensions/content-search/search-index-worker.cjs
+@@ -475,13 +475,220 @@
+   return AUDIO_MIME_FROM_EXTENSION[extensionOf(filePath)];
+ }
+ 
++// ../packages/constants/dist/meeting-channel.js
++var MEETING_REQUEST_CHANNEL_PREFIX = "meeting-request:";
++var LEGACY_REQUEST_INDEX = /:\d{1,9}$/;
++var MeetingRequestChannelAddress = class _MeetingRequestChannelAddress {
++  constructor(meetingId) {
++    this.meetingId = meetingId;
++  }
++  static parse(channel) {
++    const trimmed = channel?.trim();
++    if (trimmed === void 0 || !trimmed.startsWith(MEETING_REQUEST_CHANNEL_PREFIX)) {
++      return null;
++    }
++    const meetingId = trimmed.slice(MEETING_REQUEST_CHANNEL_PREFIX.length).replace(LEGACY_REQUEST_INDEX, "").trim();
++    return meetingId.length === 0 ? null : new _MeetingRequestChannelAddress(meetingId);
++  }
++};
++MeetingRequestChannelAddress.platform = "meeting-request";
++
++// ../packages/voice-call-harness/dist/prompt/channel-platform.js
++var VOICE_CALL_CHANNEL_PLATFORM = "voice";
++
++// ../packages/voice-call-harness/dist/call/voice-channel.js
++var ADDRESS_PREFIX = `${VOICE_CALL_CHANNEL_PLATFORM}:`;
++var OWNER_STARTED_SOURCES = ["turn", "voice-call", "handoff-resume"];
++var VoiceCallChannel = class {
++  static address(callId) {
++    return `${ADDRESS_PREFIX}${callId}`;
++  }
++  static callIdOf(channel) {
++    if (channel === void 0 || !channel.startsWith(ADDRESS_PREFIX))
++      return null;
++    const callId = channel.slice(ADDRESS_PREFIX.length).trim();
++    return callId.length === 0 ? null : callId;
++  }
++  static isOwnerStarted(requestSource) {
++    return requestSource !== void 0 && OWNER_STARTED_SOURCES.includes(requestSource);
++  }
++};
++
++// src/shared/agents/bot-templates.ts
++function nonEmptyTrimmed(value) {
++  if (typeof value !== "string") return null;
++  const trimmed = value.trim();
++  return trimmed.length > 0 ? trimmed : null;
++}
++function parseDraftJson(command) {
++  try {
++    return { kind: "parsed", value: JSON.parse(command) };
++  } catch {
++    return { kind: "invalid" };
++  }
++}
++function parseBotTemplateDraftCommand(command) {
++  if (command == null) return null;
++  const parsed = parseDraftJson(command);
++  if (parsed.kind === "invalid") return null;
++  const raw = parsed.value;
++  if (raw == null || typeof raw !== "object") return null;
++  const name = nonEmptyTrimmed("name" in raw ? raw.name : null);
++  const avatarShape = nonEmptyTrimmed("avatar_shape" in raw ? raw.avatar_shape : null);
++  const avatarColor = nonEmptyTrimmed("avatar_color" in raw ? raw.avatar_color : null);
++  const body = nonEmptyTrimmed("body" in raw ? raw.body : null);
++  if (name == null || avatarShape == null || avatarColor == null || body == null) return null;
++  const visibilityRaw = "visibility" in raw ? raw.visibility : null;
++  const visibility = visibilityRaw === "public" || visibilityRaw === "team" ? visibilityRaw : void 0;
++  return {
++    name,
++    avatarShape,
++    avatarColor,
++    body,
++    ...visibility == null ? {} : { visibility }
++  };
++}
++
+ // src/shared/transcript/transcript.ts
++function isExpiredLocalToolPermissionEntry(entry) {
++  return entry.kind === "send-message" && entry.message.type === "local-tool-permission" && entry.message.ask.status === "expired";
++}
++function isBotShareAutoReviewEntry(entry) {
++  return entry.kind === "send-message" && entry.message.type === "auto-review-approval" && entry.message.approval.surface === "bot_share" && parseBotTemplateDraftCommand(entry.message.approval.command) != null;
++}
++function isBranchedEntry(entry) {
++  if (entry.kind === "message" || entry.kind === "send-message" || entry.kind === "user-attachment" || entry.kind === "notice") {
++    return entry.branched === true;
++  }
++  return false;
++}
+ function isOutboundAgentPeerMessageEntry(entry) {
+   return entry != null && entry.kind === "message" && entry.toAgent != null;
+ }
+ function isHiddenOutboundAgentPeerMessageEntry(entry) {
+   return isOutboundAgentPeerMessageEntry(entry) && entry.toAgent.kind !== "agent" && entry.toAgent.kind !== "cloud-agent";
+ }
++function channelAddressOf(entry) {
++  if (entry === void 0) return void 0;
++  if (entry.kind === "message") return entry.channel;
++  if (entry.kind === "send-message" && (entry.message.type === "text" || entry.message.type === "attachment" || entry.message.type === "visualization")) {
++    return entry.message.channel;
++  }
++  return void 0;
++}
++function isVoiceCallChannelEntry(entry) {
++  return VoiceCallChannel.callIdOf(channelAddressOf(entry)) !== null;
++}
++var MEETING_CHANNEL_PREFIX = "meeting:";
++function isMeetingChannelEntry(entry) {
++  const channel = channelAddressOf(entry);
++  if (channel === void 0 || !channel.startsWith(MEETING_CHANNEL_PREFIX)) return false;
++  return channel.slice(MEETING_CHANNEL_PREFIX.length).trim().length > 0;
++}
++function isMeetingRequestChannelEntry(entry) {
++  return MeetingRequestChannelAddress.parse(channelAddressOf(entry)) !== null;
++}
++function isOffChatChannelEntry(entry) {
++  return isVoiceCallChannelEntry(entry) || isMeetingChannelEntry(entry) || isMeetingRequestChannelEntry(entry);
++}
++
++// src/shared/transcript/silent-wake.ts
++function isSuppressedEntry(entry) {
++  return entry.kind === "message" && entry.suppressed != null;
++}
++
++// src/shared/transcript/timeline.ts
++var SAND_TEAM_SETUP_SLOT_KINDS = [
++  "plugins",
++  "secrets",
++  "skills",
++  "memories",
++  "automations",
++  "files",
++  "description"
++];
++function bySlotOrder(a, b) {
++  return SAND_TEAM_SETUP_SLOT_KINDS.indexOf(a.kind) - SAND_TEAM_SETUP_SLOT_KINDS.indexOf(b.kind);
++}
++function teamSharedSlots(event) {
++  if (event.slots !== void 0) return event.slots;
++  const memories = {
++    kind: "memories",
++    status: event.status,
++    ...event.toTeam === void 0 ? {} : { toTeam: event.toTeam },
++    ...event.justYou === void 0 ? {} : { justYou: event.justYou },
++    ...event.code === void 0 ? {} : { code: event.code }
++  };
++  const description = event.description === void 0 ? [] : [{ kind: "description", status: "done", description: event.description }];
++  return [memories, ...description];
++}
++function teamSharedSlot(event, kind) {
++  return teamSharedSlots(event).find(
++    (slot) => slot.kind === kind
++  );
++}
++function isTeamSetupSlotUnresolved(slot) {
++  switch (slot.kind) {
++    case "plugins":
++      return slot.status === "proposing" || slot.status === "proposed";
++    case "skills":
++      return slot.status === "pending" || slot.status === "proposed";
++    case "files":
++    case "secrets":
++      return slot.status === "proposed";
++    case "automations":
++      return slot.status === "proposed" && (slot.automations?.length ?? 0) > 0;
++    case "memories":
++      return slot.status === "sorting" || slot.status === "proposed";
++    case "description":
++      return slot.status === "pending";
++  }
++}
++function isTeamSharedEventUnresolved(event) {
++  return teamSharedSlots(event).some(isTeamSetupSlotUnresolved);
++}
++function teamSharedSlotRendersCard(slot) {
++  switch (slot.kind) {
++    case "description":
++      return false;
++    case "plugins":
++      return slot.status !== "empty" && slot.status !== "proposing";
++    case "skills":
++      return slot.status !== "empty";
++    case "memories":
++      return slot.status !== "done";
++    case "automations":
++      return (slot.automations?.length ?? 0) > 0;
++    case "secrets":
++    case "files":
++      return true;
++  }
++}
++function isBlankTeamSharedEvent(event) {
++  if (event.unshared === true || event.superseded === true) return false;
++  if (orderedTeamSharedSlots(event).some(teamSharedSlotRendersCard)) return false;
++  const plugins = teamSharedSlot(event, "plugins");
++  if (event.setup === true && plugins?.status === "proposing") return false;
++  return event.setup === true || isTeamSharedEventUnresolved(event);
++}
++function orderedTeamSharedSlots(event) {
++  return [...teamSharedSlots(event)].sort(bySlotOrder);
++}
++var TEAM_SETUP_CARD_KINDS = new Set(
++  SAND_TEAM_SETUP_SLOT_KINDS.filter((kind) => kind !== "description")
++);
++
++// src/shared/transcript/transcript-window-edge.ts
++var BACKGROUND_TASK_STOP_NOTICE_PREFIX = "A background task was stopped ";
++function isBackgroundTaskStopNotice(entry) {
++  return entry.kind === "notice" && entry.text.startsWith(BACKGROUND_TASK_STOP_NOTICE_PREFIX);
++}
++function isEmptyStreamingPreviewEntry(entry) {
++  return entry.kind === "send-message" && entry.streaming === true && entry.message.type === "text" && entry.message.content.length === 0;
++}
++function isTimelineHiddenEntry(entry) {
++  return isEmptyStreamingPreviewEntry(entry) || isSuppressedEntry(entry) || entry.kind === "tool-call" || isBackgroundTaskStopNotice(entry) || isExpiredLocalToolPermissionEntry(entry) || isBotShareAutoReviewEntry(entry) || isHiddenOutboundAgentPeerMessageEntry(entry) || isOffChatChannelEntry(entry) || entry.kind === "event" && entry.event.type === "desktop-goal" || entry.kind === "event" && entry.event.type === "team-shared" && isBlankTeamSharedEvent(entry.event);
++}
+ 
+ // src/host/sand-data-files.ts
+ var import_node_fs4 = require("node:fs");
+@@ -790,6 +997,7 @@
+   timestamp_ms INTEGER NOT NULL,
+   body TEXT NOT NULL,
+   seq INTEGER,
++  in_main_chat INTEGER NOT NULL CHECK (in_main_chat IN (0, 1)),
+   UNIQUE(agent_id, entry_id)
+ ) STRICT;
+ CREATE INDEX IF NOT EXISTS messages_agent_recency
+@@ -950,7 +1158,8 @@
+     entryId: entry.id,
+     role: entry.kind === "message" ? entry.role : "assistant",
+     timestampMs: wholeMs(entry.timestampMs),
+-    body: body.slice(0, INDEXED_BODY_MAX_CHARS)
++    body: body.slice(0, INDEXED_BODY_MAX_CHARS),
++    isInMainChat: !isBranchedEntry(entry) && !isTimelineHiddenEntry(entry)
+   };
+ }
+ function wholeMs(value) {
+@@ -1122,6 +1331,77 @@
+   const head = flat.slice(0, SNIPPET_CONTEXT_TOKENS * 8);
+   return head.length < flat.length ? `${head}\u2026` : head;
+ }
++function searchConversation(db, query, isFtsEnabled) {
++  db.exec("BEGIN");
++  try {
++    return {
++      matches: conversationMatches(db, query, isFtsEnabled),
++      isComplete: isMirroredBelow(readServerCursor(db, query.agentId), query.beforeSeq)
++    };
++  } finally {
++    db.exec("COMMIT");
++  }
++}
++function isMirroredBelow(cursor, beforeSeq) {
++  if (cursor === null || cursor.backfilledFromSeq !== 0) return false;
++  return beforeSeq === void 0 || cursor.toppedThroughSeq >= beforeSeq - 1;
++}
++function conversationMatches(db, { agentId, query, beforeSeq, limit }, isFtsEnabled) {
++  if (limit <= 0) return [];
++  const terms = searchTerms(query);
++  if (terms.length === 0) return [];
++  const seqBound = beforeSeq === void 0 ? "" : "AND m.seq < ?";
++  const seqArgs = beforeSeq === void 0 ? [] : [beforeSeq];
++  if (!isFtsEnabled) {
++    const rows2 = db.prepare(
++      `SELECT
++					m.entry_id AS entryId,
++					m.seq AS seq,
++					m.role AS role,
++					m.timestamp_ms AS timestampMs,
++					m.body AS snippet
++				 FROM messages m
++				 WHERE m.agent_id = ? AND m.seq IS NOT NULL AND m.in_main_chat = 1 ${seqBound}
++					AND ${termConjunction("m.body", terms)}
++				 ORDER BY m.seq DESC
++				 LIMIT ?`
++    ).all(agentId, ...seqArgs, ...terms, limit);
++    return collectConversationMatches(rows2, (snippet) => plainSnippet(snippet, terms));
++  }
++  const match = buildFtsMatchQuery(query);
++  if (match == null) return [];
++  const rows = db.prepare(
++    `SELECT
++				m.entry_id AS entryId,
++				m.seq AS seq,
++				m.role AS role,
++				m.timestamp_ms AS timestampMs,
++				snippet(messages_fts, 0, '', '', '\u2026', ${SNIPPET_CONTEXT_TOKENS}) AS snippet
++			 FROM messages_fts
++			 JOIN messages m ON m.id = messages_fts.rowid
++			 WHERE messages_fts MATCH ? AND m.agent_id = ? AND m.seq IS NOT NULL
++				AND m.in_main_chat = 1 ${seqBound}
++			 ORDER BY m.seq DESC
++			 LIMIT ?`
++  ).all(match, agentId, ...seqArgs, limit);
++  return collectConversationMatches(rows, flattenSnippet);
++}
++function collectConversationMatches(rows, snippetOf) {
++  const results = [];
++  for (const row of rows) {
++    if (typeof row.entryId !== "string" || typeof row.seq !== "number" || row.role !== "user" && row.role !== "assistant" || typeof row.timestampMs !== "number" || typeof row.snippet !== "string") {
++      continue;
++    }
++    results.push({
++      entryId: row.entryId,
++      seq: row.seq,
++      role: row.role,
++      timestampMs: row.timestampMs,
++      snippet: snippetOf(row.snippet)
++    });
++  }
++  return results;
++}
+ var MEDIA_SELECT_COLUMNS = `
+ 	md.agent_id AS agentId,
+ 	md.entry_id AS entryId,
+@@ -1197,13 +1477,14 @@
+ function prepareStatements(db) {
+   return {
+     upsertMessage: db.prepare(
+-      `INSERT INTO messages (agent_id, entry_id, role, timestamp_ms, body, seq)
+-			 VALUES (?, ?, ?, ?, ?, ?)
++      `INSERT INTO messages (agent_id, entry_id, role, timestamp_ms, body, seq, in_main_chat)
++			 VALUES (?, ?, ?, ?, ?, ?, ?)
+ 			 ON CONFLICT(agent_id, entry_id) DO UPDATE SET
+ 				role = excluded.role,
+ 				timestamp_ms = excluded.timestamp_ms,
+ 				body = excluded.body,
+-				seq = excluded.seq`
++				seq = excluded.seq,
++				in_main_chat = excluded.in_main_chat`
+     ),
+     deleteMessage: db.prepare("DELETE FROM messages WHERE agent_id = ? AND entry_id = ?"),
+     deleteAgentMessages: db.prepare("DELETE FROM messages WHERE agent_id = ?"),
+@@ -1420,7 +1701,8 @@
+         message.role,
+         message.timestampMs,
+         message.body,
+-        seq
++        seq,
++        message.isInMainChat ? 1 : 0
+       );
+     } else {
+       this.statements.deleteMessage.run(agentId, entry.id);
+@@ -1571,14 +1853,19 @@
+     port2.postMessage(response);
+   });
+ }
+-function runQuery(db, { kind, query, limit }, isFtsEnabled) {
+-  switch (kind) {
++function runQuery(db, query, isFtsEnabled) {
++  switch (query.kind) {
+     case "messages":
+-      return { kind, matches: searchMessages(db, query, limit, isFtsEnabled) };
++      return {
++        kind: query.kind,
++        matches: searchMessages(db, query.query, query.limit, isFtsEnabled)
++      };
+     case "media":
+-      return { kind, matches: searchMedia(db, query, limit, isFtsEnabled) };
++      return { kind: query.kind, matches: searchMedia(db, query.query, query.limit, isFtsEnabled) };
++    case "conversation":
++      return { kind: query.kind, ...searchConversation(db, query, isFtsEnabled) };
+     default: {
+-      const exhaustive = kind;
++      const exhaustive = query;
+       return exhaustive;
+     }
+   }

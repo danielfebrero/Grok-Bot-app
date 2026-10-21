@@ -1,0 +1,3906 @@
+--- 2026-10-21_02-47:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
++++ 2026-10-21_03-50:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
+@@ -9040,7 +9040,7 @@
+     return proto3.util.equals(_AskQuestionArgs_Question, a, b);
+   }
+   static $() {
+-    return ["AskQuestionArgs.Question|1 id 9|2 prompt 9|3 options #0*|4 allow_multiple 8", AskQuestionArgs_Option];
++    return ["AskQuestionArgs.Question|1 id 9|2 prompt 9|3 options #0*|4 allow_multiple 8|5 prompt_markdown 9?", AskQuestionArgs_Option];
+   }
+ };
+ var AskQuestionArgs_Option = class _AskQuestionArgs_Option extends __protoMessage329 {
+@@ -13762,7 +13762,7 @@
+   }
+ };
+ 
+-// ../packages/proto/dist/generated/agent/v1/pi_common_pb.js
++// ../packages/proto/dist/generated/agent/v1/connect_scm_tool_pb.js
+ var __protoPackage61 = "agent.v1.";
+ var __protoMessage360 = class extends CompactMessage {
+   static get runtime() {
+@@ -13772,957 +13772,7 @@
+     return __protoPackage61;
+   }
+ };
+-var PiTruncation = class _PiTruncation extends __protoMessage360 {
+-  constructor(data) {
+-    super();
+-    this.truncated = false;
+-    this.truncatedBy = "";
+-    this.totalLines = 0;
+-    this.outputLines = 0;
+-    this.outputBytes = 0;
+-    this.firstLineExceedsLimit = false;
+-    this.lastLinePartial = false;
+-    proto3.util.initPartial(data, this);
+-  }
+-  static fromBinary(bytes, options) {
+-    return new _PiTruncation().fromBinary(bytes, options);
+-  }
+-  static fromJson(jsonValue, options) {
+-    return new _PiTruncation().fromJson(jsonValue, options);
+-  }
+-  static fromJsonString(jsonString, options) {
+-    return new _PiTruncation().fromJsonString(jsonString, options);
+-  }
+-  static equals(a, b) {
+-    return proto3.util.equals(_PiTruncation, a, b);
+-  }
+-  static $() {
+-    return ["PiTruncation|1 truncated 8|2 truncated_by 9|3 total_lines 13|4 output_lines 13|5 output_bytes 13|6 max_lines 13?|7 max_bytes 13?|8 first_line_exceeds_limit 8|9 last_line_partial 8"];
+-  }
+-};
+-
+-// ../packages/proto/dist/generated/agent/v1/pi_read_tool_pb.js
+-var __protoPackage62 = "agent.v1.";
+-var __protoMessage361 = class extends CompactMessage {
+-  static get runtime() {
+-    return defineOwn(this, "runtime", proto3);
+-  }
+-  static $p() {
+-    return __protoPackage62;
+-  }
+-};
+-var PiReadToolCall = class _PiReadToolCall extends __protoMessage361 {
+-  constructor(data) {
+-    super();
+-    proto3.util.initPartial(data, this);
+-  }
+-  static fromBinary(bytes, options) {
+-    return new _PiReadToolCall().fromBinary(bytes, options);
+-  }
+-  static fromJson(jsonValue, options) {
+-    return new _PiReadToolCall().fromJson(jsonValue, options);
+-  }
+-  static fromJsonString(jsonString, options) {
+-    return new _PiReadToolCall().fromJsonString(jsonString, options);
+-  }
+-  static equals(a, b) {
+-    return proto3.util.equals(_PiReadToolCall, a, b);
+-  }
+-  static $() {
+-    return ["PiReadToolCall|1 args #0|2 result #1", PiReadToolArgs, PiReadToolResult];
+-  }
+-};
+-var PiReadToolArgs = class _PiReadToolArgs extends __protoMessage361 {
+-  constructor(data) {
+-    super();
+-    this.path = "";
+-    proto3.util.initPartial(data, this);
+-  }
+-  static fromBinary(bytes, options) {
+-    return new _PiReadToolArgs().fromBinary(bytes, options);
+-  }
+-  static fromJson(jsonValue, options) {
+-    return new _PiReadToolArgs().fromJson(jsonValue, options);
+-  }
+-  static fromJsonString(jsonString, options) {
+-    return new _PiReadToolArgs().fromJsonString(jsonString, options);
+-  }
+-  static equals(a, b) {
+-    return proto3.util.equals(_PiReadToolArgs, a, b);
+-  }
+-  static $() {
+-    return ["PiReadToolArgs|1 path 9|2 offset 5?|3 limit 5?"];
+-  }
+-};
+-var PiReadToolResult = class _PiReadToolResult extends __protoMessage361 {
+-  constructor(data) {
+-    super();
+-    this.result = { case: void 0 };
+-    proto3.util.initPartial(data, this);
+-  }
+-  static fromBinary(bytes, options) {
+-    return new _PiReadToolResult().fromBinary(bytes, options);
+-  }
+-  static fromJson(jsonValue, options) {
+-    return new _PiReadToolResult().fromJson(jsonValue, options);
+-  }
+-  static fromJsonString(jsonString, options) {
+-    return new _PiReadToolResult().fromJsonString(jsonString, options);
+-  }
+-  static equals(a, b) {
+-    return proto3.util.equals(_PiReadToolResult, a, b);
+-  }
+-  static $() {
+-    return ["PiReadToolResult|1 success #0 result|2 error #1 result", PiReadToolSuccess, PiReadToolError];
+-  }
+-};
+-var PiReadToolSuccess = class _PiReadToolSuccess extends __protoMessage361 {
+-  constructor(data) {
+-    super();
+-    this.output = "";
+-    proto3.util.initPartial(data, this);
+-  }
+-  static fromBinary(bytes, options) {
+-    return new _PiReadToolSuccess().fromBinary(bytes, options);
+-  }
+-  static fromJson(jsonValue, options) {
+-    return new _PiReadToolSuccess().fromJson(jsonValue, options);
+-  }
+-  static fromJsonString(jsonString, options) {
+-    return new _PiReadToolSuccess().fromJsonString(jsonString, options);
+-  }
+-  static equals(a, b) {
+-    return proto3.util.equals(_PiReadToolSuccess, a, b);
+-  }
+-  static $() {
+-    return ["PiReadToolSuccess|1 output 9|2 truncation #0?", PiTruncation];
+-  }
+-};
+-var PiReadToolError = class _PiReadToolError extends __protoMessage361 {
+-  constructor(data) {
+-    super();
+-    this.error = "";
+-    proto3.util.initPartial(data, this);
+-  }
+-  static fromBinary(bytes, options) {
+-    return new _PiReadToolError().fromBinary(bytes, options);
+-  }
+-  static fromJson(jsonValue, options) {
+-    return new _PiReadToolError().fromJson(jsonValue, options);
+-  }
+-  static fromJsonString(jsonString, options) {
+-    return new _PiReadToolError().fromJsonString(jsonString, options);
+-  }
+-  static equals(a, b) {
+-    return proto3.util.equals(_PiReadToolError, a, b);
+-  }
+-  static $() {
+-    return ["PiReadToolError|1 error 9"];
+-  }
+-};
+-
+-// ../packages/proto/dist/generated/agent/v1/pi_bash_tool_pb.js
+-var __protoPackage63 = "agent.v1.";
+-var __protoMessage362 = class extends CompactMessage {
+-  static get runtime() {
+-    return defineOwn(this, "runtime", proto3);
+-  }
+-  static $p() {
+-    return __protoPackage63;
+-  }
+-};
+-var PiBashToolCall = class _PiBashToolCall extends __protoMessage362 {
+-  constructor(data) {
+-    super();
+-    proto3.util.initPartial(data, this);
+-  }
+-  static fromBinary(bytes, options) {
+-    return new _PiBashToolCall().fromBinary(bytes, options);
+-  }
+-  static fromJson(jsonValue, options) {
+-    return new _PiBashToolCall().fromJson(jsonValue, options);
+-  }
+-  static fromJsonString(jsonString, options) {
+-    return new _PiBashToolCall().fromJsonString(jsonString, options);
+-  }
+-  static equals(a, b) {
+-    return proto3.util.equals(_PiBashToolCall, a, b);
+-  }
+-  static $() {
+-    return ["PiBashToolCall|1 args #0|2 result #1", PiBashToolArgs, PiBashToolResult];
+-  }
+-};
+-var PiBashToolArgs = class _PiBashToolArgs extends __protoMessage362 {
+-  constructor(data) {
+-    super();
+-    this.command = "";
+-    proto3.util.initPartial(data, this);
+-  }
+-  static fromBinary(bytes, options) {
+-    return new _PiBashToolArgs().fromBinary(bytes, options);
+-  }
+-  static fromJson(jsonValue, options) {
+-    return new _PiBashToolArgs().fromJson(jsonValue, options);
+-  }
+-  static fromJsonString(jsonString, options) {
+-    return new _PiBashToolArgs().fromJsonString(jsonString, options);
+-  }
+-  static equals(a, b) {
+-    return proto3.util.equals(_PiBashToolArgs, a, b);
+-  }
+-  static $() {
+-    return ["PiBashToolArgs|1 command 9|2 timeout 1?"];
+-  }
+-};
+-var PiBashToolResult = class _PiBashToolResult extends __protoMessage362 {
+-  constructor(data) {
+-    super();
+-    this.result = { case: void 0 };
+-    proto3.util.initPartial(data, this);
+-  }
+-  static fromBinary(bytes, options) {
+-    return new _PiBashToolResult().fromBinary(bytes, options);
+-  }
+-  static fromJson(jsonValue, options) {
+-    return new _PiBashToolResult().fromJson(jsonValue, options);
+-  }
+-  static fromJsonString(jsonString, options) {
+-    return new _PiBashToolResult().fromJsonString(jsonString, options);
+-  }
+-  static equals(a, b) {
+-    return proto3.util.equals(_PiBashToolResult, a, b);
+-  }
+-  static $() {
+-    return ["PiBashToolResult|1 success #0 result|2 error #1 result", PiBashToolSuccess, PiBashToolError];
+-  }
+-};
+-var PiBashToolSuccess = class _PiBashToolSuccess extends __protoMessage362 {
+-  constructor(data) {
+-    super();
+-    this.output = "";
+-    proto3.util.initPartial(data, this);
+-  }
+-  static fromBinary(bytes, options) {
+-    return new _PiBashToolSuccess().fromBinary(bytes, options);
+-  }
+-  static fromJson(jsonValue, options) {
+-    return new _PiBashToolSuccess().fromJson(jsonValue, options);
+-  }
+-  static fromJsonString(jsonString, options) {
+-    return new _PiBashToolSuccess().fromJsonString(jsonString, options);
+-  }
+-  static equals(a, b) {
+-    return proto3.util.equals(_PiBashToolSuccess, a, b);
+-  }
+-  static $() {
+-    return ["PiBashToolSuccess|1 output 9|2 truncation #0?|3 full_output_path 9?", PiTruncation];
+-  }
+-};
+-var PiBashToolError = class _PiBashToolError extends __protoMessage362 {
+-  constructor(data) {
+-    super();
+-    this.error = "";
+-    proto3.util.initPartial(data, this);
+-  }
+-  static fromBinary(bytes, options) {
+-    return new _PiBashToolError().fromBinary(bytes, options);
+-  }
+-  static fromJson(jsonValue, options) {
+-    return new _PiBashToolError().fromJson(jsonValue, options);
+-  }
+-  static fromJsonString(jsonString, options) {
+-    return new _PiBashToolError().fromJsonString(jsonString, options);
+-  }
+-  static equals(a, b) {
+-    return proto3.util.equals(_PiBashToolError, a, b);
+-  }
+-  static $() {
+-    return ["PiBashToolError|1 error 9|2 truncation #0?|3 full_output_path 9?", PiTruncation];
+-  }
+-};
+-
+-// ../packages/proto/dist/generated/agent/v1/pi_edit_tool_pb.js
+-var __protoPackage64 = "agent.v1.";
+-var __protoMessage363 = class extends CompactMessage {
+-  static get runtime() {
+-    return defineOwn(this, "runtime", proto3);
+-  }
+-  static $p() {
+-    return __protoPackage64;
+-  }
+-};
+-var PiEditReplacement = class _PiEditReplacement extends __protoMessage363 {
+-  constructor(data) {
+-    super();
+-    this.oldText = "";
+-    this.newText = "";
+-    proto3.util.initPartial(data, this);
+-  }
+-  static fromBinary(bytes, options) {
+-    return new _PiEditReplacement().fromBinary(bytes, options);
+-  }
+-  static fromJson(jsonValue, options) {
+-    return new _PiEditReplacement().fromJson(jsonValue, options);
+-  }
+-  static fromJsonString(jsonString, options) {
+-    return new _PiEditReplacement().fromJsonString(jsonString, options);
+-  }
+-  static equals(a, b) {
+-    return proto3.util.equals(_PiEditReplacement, a, b);
+-  }
+-  static $() {
+-    return ["PiEditReplacement|1 old_text 9|2 new_text 9"];
+-  }
+-};
+-var PiEditToolCall = class _PiEditToolCall extends __protoMessage363 {
+-  constructor(data) {
+-    super();
+-    proto3.util.initPartial(data, this);
+-  }
+-  static fromBinary(bytes, options) {
+-    return new _PiEditToolCall().fromBinary(bytes, options);
+-  }
+-  static fromJson(jsonValue, options) {
+-    return new _PiEditToolCall().fromJson(jsonValue, options);
+-  }
+-  static fromJsonString(jsonString, options) {
+-    return new _PiEditToolCall().fromJsonString(jsonString, options);
+-  }
+-  static equals(a, b) {
+-    return proto3.util.equals(_PiEditToolCall, a, b);
+-  }
+-  static $() {
+-    return ["PiEditToolCall|1 args #0|2 result #1", PiEditToolArgs, PiEditToolResult];
+-  }
+-};
+-var PiEditToolArgs = class _PiEditToolArgs extends __protoMessage363 {
+-  constructor(data) {
+-    super();
+-    this.path = "";
+-    this.edits = [];
+-    proto3.util.initPartial(data, this);
+-  }
+-  static fromBinary(bytes, options) {
+-    return new _PiEditToolArgs().fromBinary(bytes, options);
+-  }
+-  static fromJson(jsonValue, options) {
+-    return new _PiEditToolArgs().fromJson(jsonValue, options);
+-  }
+-  static fromJsonString(jsonString, options) {
+-    return new _PiEditToolArgs().fromJsonString(jsonString, options);
+-  }
+-  static equals(a, b) {
+-    return proto3.util.equals(_PiEditToolArgs, a, b);
+-  }
+-  static $() {
+-    return ["PiEditToolArgs|1 path 9|2 edits #0*", PiEditReplacement];
+-  }
+-};
+-var PiEditToolResult = class _PiEditToolResult extends __protoMessage363 {
+-  constructor(data) {
+-    super();
+-    this.result = { case: void 0 };
+-    proto3.util.initPartial(data, this);
+-  }
+-  static fromBinary(bytes, options) {
+-    return new _PiEditToolResult().fromBinary(bytes, options);
+-  }
+-  static fromJson(jsonValue, options) {
+-    return new _PiEditToolResult().fromJson(jsonValue, options);
+-  }
+-  static fromJsonString(jsonString, options) {
+-    return new _PiEditToolResult().fromJsonString(jsonString, options);
+-  }
+-  static equals(a, b) {
+-    return proto3.util.equals(_PiEditToolResult, a, b);
+-  }
+-  static $() {
+-    return ["PiEditToolResult|1 success #0 result|2 error #1 result|3 rejected #2 result", PiEditToolSuccess, PiEditToolError, PiEditToolRejected];
+-  }
+-};
+-var PiEditToolSuccess = class _PiEditToolSuccess extends __protoMessage363 {
+-  constructor(data) {
+-    super();
+-    this.output = "";
+-    this.diff = "";
+-    this.patch = "";
+-    proto3.util.initPartial(data, this);
+-  }
+-  static fromBinary(bytes, options) {
+-    return new _PiEditToolSuccess().fromBinary(bytes, options);
+-  }
+-  static fromJson(jsonValue, options) {
+-    return new _PiEditToolSuccess().fromJson(jsonValue, options);
+-  }
+-  static fromJsonString(jsonString, options) {
+-    return new _PiEditToolSuccess().fromJsonString(jsonString, options);
+-  }
+-  static equals(a, b) {
+-    return proto3.util.equals(_PiEditToolSuccess, a, b);
+-  }
+-  static $() {
+-    return ["PiEditToolSuccess|1 output 9|2 diff 9|3 patch 9|4 first_changed_line 13?"];
+-  }
+-};
+-var PiEditToolError = class _PiEditToolError extends __protoMessage363 {
+-  constructor(data) {
+-    super();
+-    this.error = "";
+-    proto3.util.initPartial(data, this);
+-  }
+-  static fromBinary(bytes, options) {
+-    return new _PiEditToolError().fromBinary(bytes, options);
+-  }
+-  static fromJson(jsonValue, options) {
+-    return new _PiEditToolError().fromJson(jsonValue, options);
+-  }
+-  static fromJsonString(jsonString, options) {
+-    return new _PiEditToolError().fromJsonString(jsonString, options);
+-  }
+-  static equals(a, b) {
+-    return proto3.util.equals(_PiEditToolError, a, b);
+-  }
+-  static $() {
+-    return ["PiEditToolError|1 error 9"];
+-  }
+-};
+-var PiEditToolRejected = class _PiEditToolRejected extends __protoMessage363 {
+-  constructor(data) {
+-    super();
+-    this.reason = "";
+-    proto3.util.initPartial(data, this);
+-  }
+-  static fromBinary(bytes, options) {
+-    return new _PiEditToolRejected().fromBinary(bytes, options);
+-  }
+-  static fromJson(jsonValue, options) {
+-    return new _PiEditToolRejected().fromJson(jsonValue, options);
+-  }
+-  static fromJsonString(jsonString, options) {
+-    return new _PiEditToolRejected().fromJsonString(jsonString, options);
+-  }
+-  static equals(a, b) {
+-    return proto3.util.equals(_PiEditToolRejected, a, b);
+-  }
+-  static $() {
+-    return ["PiEditToolRejected|1 reason 9"];
+-  }
+-};
+-
+-// ../packages/proto/dist/generated/agent/v1/pi_write_tool_pb.js
+-var __protoPackage65 = "agent.v1.";
+-var __protoMessage364 = class extends CompactMessage {
+-  static get runtime() {
+-    return defineOwn(this, "runtime", proto3);
+-  }
+-  static $p() {
+-    return __protoPackage65;
+-  }
+-};
+-var PiWriteToolCall = class _PiWriteToolCall extends __protoMessage364 {
+-  constructor(data) {
+-    super();
+-    proto3.util.initPartial(data, this);
+-  }
+-  static fromBinary(bytes, options) {
+-    return new _PiWriteToolCall().fromBinary(bytes, options);
+-  }
+-  static fromJson(jsonValue, options) {
+-    return new _PiWriteToolCall().fromJson(jsonValue, options);
+-  }
+-  static fromJsonString(jsonString, options) {
+-    return new _PiWriteToolCall().fromJsonString(jsonString, options);
+-  }
+-  static equals(a, b) {
+-    return proto3.util.equals(_PiWriteToolCall, a, b);
+-  }
+-  static $() {
+-    return ["PiWriteToolCall|1 args #0|2 result #1", PiWriteToolArgs, PiWriteToolResult];
+-  }
+-};
+-var PiWriteToolArgs = class _PiWriteToolArgs extends __protoMessage364 {
+-  constructor(data) {
+-    super();
+-    this.path = "";
+-    this.content = "";
+-    proto3.util.initPartial(data, this);
+-  }
+-  static fromBinary(bytes, options) {
+-    return new _PiWriteToolArgs().fromBinary(bytes, options);
+-  }
+-  static fromJson(jsonValue, options) {
+-    return new _PiWriteToolArgs().fromJson(jsonValue, options);
+-  }
+-  static fromJsonString(jsonString, options) {
+-    return new _PiWriteToolArgs().fromJsonString(jsonString, options);
+-  }
+-  static equals(a, b) {
+-    return proto3.util.equals(_PiWriteToolArgs, a, b);
+-  }
+-  static $() {
+-    return ["PiWriteToolArgs|1 path 9|2 content 9"];
+-  }
+-};
+-var PiWriteToolResult = class _PiWriteToolResult extends __protoMessage364 {
+-  constructor(data) {
+-    super();
+-    this.result = { case: void 0 };
+-    proto3.util.initPartial(data, this);
+-  }
+-  static fromBinary(bytes, options) {
+-    return new _PiWriteToolResult().fromBinary(bytes, options);
+-  }
+-  static fromJson(jsonValue, options) {
+-    return new _PiWriteToolResult().fromJson(jsonValue, options);
+-  }
+-  static fromJsonString(jsonString, options) {
+-    return new _PiWriteToolResult().fromJsonString(jsonString, options);
+-  }
+-  static equals(a, b) {
+-    return proto3.util.equals(_PiWriteToolResult, a, b);
+-  }
+-  static $() {
+-    return ["PiWriteToolResult|1 success #0 result|2 error #1 result|3 rejected #2 result", PiWriteToolSuccess, PiWriteToolError, PiWriteToolRejected];
+-  }
+-};
+-var PiWriteToolSuccess = class _PiWriteToolSuccess extends __protoMessage364 {
+-  constructor(data) {
+-    super();
+-    this.output = "";
+-    proto3.util.initPartial(data, this);
+-  }
+-  static fromBinary(bytes, options) {
+-    return new _PiWriteToolSuccess().fromBinary(bytes, options);
+-  }
+-  static fromJson(jsonValue, options) {
+-    return new _PiWriteToolSuccess().fromJson(jsonValue, options);
+-  }
+-  static fromJsonString(jsonString, options) {
+-    return new _PiWriteToolSuccess().fromJsonString(jsonString, options);
+-  }
+-  static equals(a, b) {
+-    return proto3.util.equals(_PiWriteToolSuccess, a, b);
+-  }
+-  static $() {
+-    return ["PiWriteToolSuccess|1 output 9"];
+-  }
+-};
+-var PiWriteToolError = class _PiWriteToolError extends __protoMessage364 {
+-  constructor(data) {
+-    super();
+-    this.error = "";
+-    proto3.util.initPartial(data, this);
+-  }
+-  static fromBinary(bytes, options) {
+-    return new _PiWriteToolError().fromBinary(bytes, options);
+-  }
+-  static fromJson(jsonValue, options) {
+-    return new _PiWriteToolError().fromJson(jsonValue, options);
+-  }
+-  static fromJsonString(jsonString, options) {
+-    return new _PiWriteToolError().fromJsonString(jsonString, options);
+-  }
+-  static equals(a, b) {
+-    return proto3.util.equals(_PiWriteToolError, a, b);
+-  }
+-  static $() {
+-    return ["PiWriteToolError|1 error 9"];
+-  }
+-};
+-var PiWriteToolRejected = class _PiWriteToolRejected extends __protoMessage364 {
+-  constructor(data) {
+-    super();
+-    this.reason = "";
+-    proto3.util.initPartial(data, this);
+-  }
+-  static fromBinary(bytes, options) {
+-    return new _PiWriteToolRejected().fromBinary(bytes, options);
+-  }
+-  static fromJson(jsonValue, options) {
+-    return new _PiWriteToolRejected().fromJson(jsonValue, options);
+-  }
+-  static fromJsonString(jsonString, options) {
+-    return new _PiWriteToolRejected().fromJsonString(jsonString, options);
+-  }
+-  static equals(a, b) {
+-    return proto3.util.equals(_PiWriteToolRejected, a, b);
+-  }
+-  static $() {
+-    return ["PiWriteToolRejected|1 reason 9"];
+-  }
+-};
+-
+-// ../packages/proto/dist/generated/agent/v1/pi_grep_tool_pb.js
+-var __protoPackage66 = "agent.v1.";
+-var __protoMessage365 = class extends CompactMessage {
+-  static get runtime() {
+-    return defineOwn(this, "runtime", proto3);
+-  }
+-  static $p() {
+-    return __protoPackage66;
+-  }
+-};
+-var PiGrepToolCall = class _PiGrepToolCall extends __protoMessage365 {
+-  constructor(data) {
+-    super();
+-    proto3.util.initPartial(data, this);
+-  }
+-  static fromBinary(bytes, options) {
+-    return new _PiGrepToolCall().fromBinary(bytes, options);
+-  }
+-  static fromJson(jsonValue, options) {
+-    return new _PiGrepToolCall().fromJson(jsonValue, options);
+-  }
+-  static fromJsonString(jsonString, options) {
+-    return new _PiGrepToolCall().fromJsonString(jsonString, options);
+-  }
+-  static equals(a, b) {
+-    return proto3.util.equals(_PiGrepToolCall, a, b);
+-  }
+-  static $() {
+-    return ["PiGrepToolCall|1 args #0|2 result #1", PiGrepToolArgs, PiGrepToolResult];
+-  }
+-};
+-var PiGrepToolArgs = class _PiGrepToolArgs extends __protoMessage365 {
+-  constructor(data) {
+-    super();
+-    this.pattern = "";
+-    proto3.util.initPartial(data, this);
+-  }
+-  static fromBinary(bytes, options) {
+-    return new _PiGrepToolArgs().fromBinary(bytes, options);
+-  }
+-  static fromJson(jsonValue, options) {
+-    return new _PiGrepToolArgs().fromJson(jsonValue, options);
+-  }
+-  static fromJsonString(jsonString, options) {
+-    return new _PiGrepToolArgs().fromJsonString(jsonString, options);
+-  }
+-  static equals(a, b) {
+-    return proto3.util.equals(_PiGrepToolArgs, a, b);
+-  }
+-  static $() {
+-    return ["PiGrepToolArgs|1 pattern 9|2 path 9?|3 glob 9?|4 ignore_case 8?|5 literal 8?|6 context 5?|7 limit 5?"];
+-  }
+-};
+-var PiGrepToolResult = class _PiGrepToolResult extends __protoMessage365 {
+-  constructor(data) {
+-    super();
+-    this.result = { case: void 0 };
+-    proto3.util.initPartial(data, this);
+-  }
+-  static fromBinary(bytes, options) {
+-    return new _PiGrepToolResult().fromBinary(bytes, options);
+-  }
+-  static fromJson(jsonValue, options) {
+-    return new _PiGrepToolResult().fromJson(jsonValue, options);
+-  }
+-  static fromJsonString(jsonString, options) {
+-    return new _PiGrepToolResult().fromJsonString(jsonString, options);
+-  }
+-  static equals(a, b) {
+-    return proto3.util.equals(_PiGrepToolResult, a, b);
+-  }
+-  static $() {
+-    return ["PiGrepToolResult|1 success #0 result|2 error #1 result", PiGrepToolSuccess, PiGrepToolError];
+-  }
+-};
+-var PiGrepToolSuccess = class _PiGrepToolSuccess extends __protoMessage365 {
+-  constructor(data) {
+-    super();
+-    this.output = "";
+-    this.linesTruncated = false;
+-    proto3.util.initPartial(data, this);
+-  }
+-  static fromBinary(bytes, options) {
+-    return new _PiGrepToolSuccess().fromBinary(bytes, options);
+-  }
+-  static fromJson(jsonValue, options) {
+-    return new _PiGrepToolSuccess().fromJson(jsonValue, options);
+-  }
+-  static fromJsonString(jsonString, options) {
+-    return new _PiGrepToolSuccess().fromJsonString(jsonString, options);
+-  }
+-  static equals(a, b) {
+-    return proto3.util.equals(_PiGrepToolSuccess, a, b);
+-  }
+-  static $() {
+-    return ["PiGrepToolSuccess|1 output 9|2 truncation #0?|3 match_limit_reached 13?|4 lines_truncated 8", PiTruncation];
+-  }
+-};
+-var PiGrepToolError = class _PiGrepToolError extends __protoMessage365 {
+-  constructor(data) {
+-    super();
+-    this.error = "";
+-    proto3.util.initPartial(data, this);
+-  }
+-  static fromBinary(bytes, options) {
+-    return new _PiGrepToolError().fromBinary(bytes, options);
+-  }
+-  static fromJson(jsonValue, options) {
+-    return new _PiGrepToolError().fromJson(jsonValue, options);
+-  }
+-  static fromJsonString(jsonString, options) {
+-    return new _PiGrepToolError().fromJsonString(jsonString, options);
+-  }
+-  static equals(a, b) {
+-    return proto3.util.equals(_PiGrepToolError, a, b);
+-  }
+-  static $() {
+-    return ["PiGrepToolError|1 error 9"];
+-  }
+-};
+-
+-// ../packages/proto/dist/generated/agent/v1/pi_find_tool_pb.js
+-var __protoPackage67 = "agent.v1.";
+-var __protoMessage366 = class extends CompactMessage {
+-  static get runtime() {
+-    return defineOwn(this, "runtime", proto3);
+-  }
+-  static $p() {
+-    return __protoPackage67;
+-  }
+-};
+-var PiFindToolCall = class _PiFindToolCall extends __protoMessage366 {
+-  constructor(data) {
+-    super();
+-    proto3.util.initPartial(data, this);
+-  }
+-  static fromBinary(bytes, options) {
+-    return new _PiFindToolCall().fromBinary(bytes, options);
+-  }
+-  static fromJson(jsonValue, options) {
+-    return new _PiFindToolCall().fromJson(jsonValue, options);
+-  }
+-  static fromJsonString(jsonString, options) {
+-    return new _PiFindToolCall().fromJsonString(jsonString, options);
+-  }
+-  static equals(a, b) {
+-    return proto3.util.equals(_PiFindToolCall, a, b);
+-  }
+-  static $() {
+-    return ["PiFindToolCall|1 args #0|2 result #1", PiFindToolArgs, PiFindToolResult];
+-  }
+-};
+-var PiFindToolArgs = class _PiFindToolArgs extends __protoMessage366 {
+-  constructor(data) {
+-    super();
+-    this.pattern = "";
+-    proto3.util.initPartial(data, this);
+-  }
+-  static fromBinary(bytes, options) {
+-    return new _PiFindToolArgs().fromBinary(bytes, options);
+-  }
+-  static fromJson(jsonValue, options) {
+-    return new _PiFindToolArgs().fromJson(jsonValue, options);
+-  }
+-  static fromJsonString(jsonString, options) {
+-    return new _PiFindToolArgs().fromJsonString(jsonString, options);
+-  }
+-  static equals(a, b) {
+-    return proto3.util.equals(_PiFindToolArgs, a, b);
+-  }
+-  static $() {
+-    return ["PiFindToolArgs|1 pattern 9|2 path 9?|3 limit 5?"];
+-  }
+-};
+-var PiFindToolResult = class _PiFindToolResult extends __protoMessage366 {
+-  constructor(data) {
+-    super();
+-    this.result = { case: void 0 };
+-    proto3.util.initPartial(data, this);
+-  }
+-  static fromBinary(bytes, options) {
+-    return new _PiFindToolResult().fromBinary(bytes, options);
+-  }
+-  static fromJson(jsonValue, options) {
+-    return new _PiFindToolResult().fromJson(jsonValue, options);
+-  }
+-  static fromJsonString(jsonString, options) {
+-    return new _PiFindToolResult().fromJsonString(jsonString, options);
+-  }
+-  static equals(a, b) {
+-    return proto3.util.equals(_PiFindToolResult, a, b);
+-  }
+-  static $() {
+-    return ["PiFindToolResult|1 success #0 result|2 error #1 result", PiFindToolSuccess, PiFindToolError];
+-  }
+-};
+-var PiFindToolSuccess = class _PiFindToolSuccess extends __protoMessage366 {
+-  constructor(data) {
+-    super();
+-    this.output = "";
+-    proto3.util.initPartial(data, this);
+-  }
+-  static fromBinary(bytes, options) {
+-    return new _PiFindToolSuccess().fromBinary(bytes, options);
+-  }
+-  static fromJson(jsonValue, options) {
+-    return new _PiFindToolSuccess().fromJson(jsonValue, options);
+-  }
+-  static fromJsonString(jsonString, options) {
+-    return new _PiFindToolSuccess().fromJsonString(jsonString, options);
+-  }
+-  static equals(a, b) {
+-    return proto3.util.equals(_PiFindToolSuccess, a, b);
+-  }
+-  static $() {
+-    return ["PiFindToolSuccess|1 output 9|2 truncation #0?|3 result_limit_reached 13?", PiTruncation];
+-  }
+-};
+-var PiFindToolError = class _PiFindToolError extends __protoMessage366 {
+-  constructor(data) {
+-    super();
+-    this.error = "";
+-    proto3.util.initPartial(data, this);
+-  }
+-  static fromBinary(bytes, options) {
+-    return new _PiFindToolError().fromBinary(bytes, options);
+-  }
+-  static fromJson(jsonValue, options) {
+-    return new _PiFindToolError().fromJson(jsonValue, options);
+-  }
+-  static fromJsonString(jsonString, options) {
+-    return new _PiFindToolError().fromJsonString(jsonString, options);
+-  }
+-  static equals(a, b) {
+-    return proto3.util.equals(_PiFindToolError, a, b);
+-  }
+-  static $() {
+-    return ["PiFindToolError|1 error 9"];
+-  }
+-};
+-
+-// ../packages/proto/dist/generated/agent/v1/pi_ls_tool_pb.js
+-var __protoPackage68 = "agent.v1.";
+-var __protoMessage367 = class extends CompactMessage {
+-  static get runtime() {
+-    return defineOwn(this, "runtime", proto3);
+-  }
+-  static $p() {
+-    return __protoPackage68;
+-  }
+-};
+-var PiLsToolCall = class _PiLsToolCall extends __protoMessage367 {
+-  constructor(data) {
+-    super();
+-    proto3.util.initPartial(data, this);
+-  }
+-  static fromBinary(bytes, options) {
+-    return new _PiLsToolCall().fromBinary(bytes, options);
+-  }
+-  static fromJson(jsonValue, options) {
+-    return new _PiLsToolCall().fromJson(jsonValue, options);
+-  }
+-  static fromJsonString(jsonString, options) {
+-    return new _PiLsToolCall().fromJsonString(jsonString, options);
+-  }
+-  static equals(a, b) {
+-    return proto3.util.equals(_PiLsToolCall, a, b);
+-  }
+-  static $() {
+-    return ["PiLsToolCall|1 args #0|2 result #1", PiLsToolArgs, PiLsToolResult];
+-  }
+-};
+-var PiLsToolArgs = class _PiLsToolArgs extends __protoMessage367 {
+-  constructor(data) {
+-    super();
+-    proto3.util.initPartial(data, this);
+-  }
+-  static fromBinary(bytes, options) {
+-    return new _PiLsToolArgs().fromBinary(bytes, options);
+-  }
+-  static fromJson(jsonValue, options) {
+-    return new _PiLsToolArgs().fromJson(jsonValue, options);
+-  }
+-  static fromJsonString(jsonString, options) {
+-    return new _PiLsToolArgs().fromJsonString(jsonString, options);
+-  }
+-  static equals(a, b) {
+-    return proto3.util.equals(_PiLsToolArgs, a, b);
+-  }
+-  static $() {
+-    return ["PiLsToolArgs|1 path 9?|2 limit 5?"];
+-  }
+-};
+-var PiLsToolResult = class _PiLsToolResult extends __protoMessage367 {
+-  constructor(data) {
+-    super();
+-    this.result = { case: void 0 };
+-    proto3.util.initPartial(data, this);
+-  }
+-  static fromBinary(bytes, options) {
+-    return new _PiLsToolResult().fromBinary(bytes, options);
+-  }
+-  static fromJson(jsonValue, options) {
+-    return new _PiLsToolResult().fromJson(jsonValue, options);
+-  }
+-  static fromJsonString(jsonString, options) {
+-    return new _PiLsToolResult().fromJsonString(jsonString, options);
+-  }
+-  static equals(a, b) {
+-    return proto3.util.equals(_PiLsToolResult, a, b);
+-  }
+-  static $() {
+-    return ["PiLsToolResult|1 success #0 result|2 error #1 result", PiLsToolSuccess, PiLsToolError];
+-  }
+-};
+-var PiLsToolSuccess = class _PiLsToolSuccess extends __protoMessage367 {
+-  constructor(data) {
+-    super();
+-    this.output = "";
+-    proto3.util.initPartial(data, this);
+-  }
+-  static fromBinary(bytes, options) {
+-    return new _PiLsToolSuccess().fromBinary(bytes, options);
+-  }
+-  static fromJson(jsonValue, options) {
+-    return new _PiLsToolSuccess().fromJson(jsonValue, options);
+-  }
+-  static fromJsonString(jsonString, options) {
+-    return new _PiLsToolSuccess().fromJsonString(jsonString, options);
+-  }
+-  static equals(a, b) {
+-    return proto3.util.equals(_PiLsToolSuccess, a, b);
+-  }
+-  static $() {
+-    return ["PiLsToolSuccess|1 output 9|2 truncation #0?|3 entry_limit_reached 13?", PiTruncation];
+-  }
+-};
+-var PiLsToolError = class _PiLsToolError extends __protoMessage367 {
+-  constructor(data) {
+-    super();
+-    this.error = "";
+-    proto3.util.initPartial(data, this);
+-  }
+-  static fromBinary(bytes, options) {
+-    return new _PiLsToolError().fromBinary(bytes, options);
+-  }
+-  static fromJson(jsonValue, options) {
+-    return new _PiLsToolError().fromJson(jsonValue, options);
+-  }
+-  static fromJsonString(jsonString, options) {
+-    return new _PiLsToolError().fromJsonString(jsonString, options);
+-  }
+-  static equals(a, b) {
+-    return proto3.util.equals(_PiLsToolError, a, b);
+-  }
+-  static $() {
+-    return ["PiLsToolError|1 error 9"];
+-  }
+-};
+-
+-// ../packages/proto/dist/generated/agent/v1/connect_scm_tool_pb.js
+-var __protoPackage69 = "agent.v1.";
+-var __protoMessage368 = class extends CompactMessage {
+-  static get runtime() {
+-    return defineOwn(this, "runtime", proto3);
+-  }
+-  static $p() {
+-    return __protoPackage69;
+-  }
+-};
+-var ConnectScmArgs = class _ConnectScmArgs extends __protoMessage368 {
++var ConnectScmArgs = class _ConnectScmArgs extends __protoMessage360 {
+   constructor(data) {
+     super();
+     this.toolCallId = "";
+@@ -14745,7 +13795,7 @@
+     return ["ConnectScmArgs|1 tool_call_id 9|2 github #0 target|3 gitlab #1 target|4 bitbucket #2 target|5 azure_devops #3 target|6 reconnect 8?|7 repo_url 9?|8 instance_host 9?", ConnectScmGithub, ConnectScmGitlab, ConnectScmBitbucket, ConnectScmAzureDevops];
+   }
+ };
+-var ConnectScmGitlab = class _ConnectScmGitlab extends __protoMessage368 {
++var ConnectScmGitlab = class _ConnectScmGitlab extends __protoMessage360 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -14766,7 +13816,7 @@
+     return ["ConnectScmGitlab|1 instance_id 9?"];
+   }
+ };
+-var ConnectScmBitbucket = class _ConnectScmBitbucket extends __protoMessage368 {
++var ConnectScmBitbucket = class _ConnectScmBitbucket extends __protoMessage360 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -14787,7 +13837,7 @@
+     return ["ConnectScmBitbucket|1 instance_id 9?"];
+   }
+ };
+-var ConnectScmAzureDevops = class _ConnectScmAzureDevops extends __protoMessage368 {
++var ConnectScmAzureDevops = class _ConnectScmAzureDevops extends __protoMessage360 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -14808,7 +13858,7 @@
+     return ["ConnectScmAzureDevops"];
+   }
+ };
+-var ConnectScmGithub = class _ConnectScmGithub extends __protoMessage368 {
++var ConnectScmGithub = class _ConnectScmGithub extends __protoMessage360 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -14829,7 +13879,7 @@
+     return ["ConnectScmGithub|1 repository #0|2 ghe_application 9?", ConnectScmGithubRepository];
+   }
+ };
+-var ConnectScmGithubRepository = class _ConnectScmGithubRepository extends __protoMessage368 {
++var ConnectScmGithubRepository = class _ConnectScmGithubRepository extends __protoMessage360 {
+   constructor(data) {
+     super();
+     this.owner = "";
+@@ -14852,7 +13902,7 @@
+     return ["ConnectScmGithubRepository|1 owner 9|2 repo 9"];
+   }
+ };
+-var ConnectScmResult = class _ConnectScmResult extends __protoMessage368 {
++var ConnectScmResult = class _ConnectScmResult extends __protoMessage360 {
+   constructor(data) {
+     super();
+     this.result = { case: void 0 };
+@@ -14874,7 +13924,7 @@
+     return ["ConnectScmResult|1 success #0 result|2 error #1 result|3 rejected #2 result|4 scm_target 9?", ConnectScmSuccess, ConnectScmError, ConnectScmRejected];
+   }
+ };
+-var ConnectScmSuccess = class _ConnectScmSuccess extends __protoMessage368 {
++var ConnectScmSuccess = class _ConnectScmSuccess extends __protoMessage360 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -14895,7 +13945,7 @@
+     return ["ConnectScmSuccess"];
+   }
+ };
+-var ConnectScmError = class _ConnectScmError extends __protoMessage368 {
++var ConnectScmError = class _ConnectScmError extends __protoMessage360 {
+   constructor(data) {
+     super();
+     this.error = "";
+@@ -14917,7 +13967,7 @@
+     return ["ConnectScmError|1 error 9"];
+   }
+ };
+-var ConnectScmRejected = class _ConnectScmRejected extends __protoMessage368 {
++var ConnectScmRejected = class _ConnectScmRejected extends __protoMessage360 {
+   constructor(data) {
+     super();
+     this.reason = "";
+@@ -14939,7 +13989,7 @@
+     return ["ConnectScmRejected|1 reason 9"];
+   }
+ };
+-var ConnectScmToolCall = class _ConnectScmToolCall extends __protoMessage368 {
++var ConnectScmToolCall = class _ConnectScmToolCall extends __protoMessage360 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -14960,7 +14010,7 @@
+     return ["ConnectScmToolCall|1 args #0|2 result #1", ConnectScmArgs, ConnectScmResult];
+   }
+ };
+-var ConnectScmRequestResponse = class _ConnectScmRequestResponse extends __protoMessage368 {
++var ConnectScmRequestResponse = class _ConnectScmRequestResponse extends __protoMessage360 {
+   constructor(data) {
+     super();
+     this.result = { case: void 0 };
+@@ -14982,7 +14032,7 @@
+     return ["ConnectScmRequestResponse|1 approved #0 result|2 rejected #1 result|3 failed #2 result", ConnectScmRequestResponse_Approved, ConnectScmRequestResponse_Rejected, ConnectScmRequestResponse_Failed];
+   }
+ };
+-var ConnectScmRequestResponse_Approved = class _ConnectScmRequestResponse_Approved extends __protoMessage368 {
++var ConnectScmRequestResponse_Approved = class _ConnectScmRequestResponse_Approved extends __protoMessage360 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -15003,7 +14053,7 @@
+     return ["ConnectScmRequestResponse.Approved|1 scm_target 9?"];
+   }
+ };
+-var ConnectScmRequestResponse_Rejected = class _ConnectScmRequestResponse_Rejected extends __protoMessage368 {
++var ConnectScmRequestResponse_Rejected = class _ConnectScmRequestResponse_Rejected extends __protoMessage360 {
+   constructor(data) {
+     super();
+     this.reason = "";
+@@ -15025,7 +14075,7 @@
+     return ["ConnectScmRequestResponse.Rejected|1 reason 9|2 recorded_args #0?", ConnectScmArgs];
+   }
+ };
+-var ConnectScmRequestResponse_Failed = class _ConnectScmRequestResponse_Failed extends __protoMessage368 {
++var ConnectScmRequestResponse_Failed = class _ConnectScmRequestResponse_Failed extends __protoMessage360 {
+   constructor(data) {
+     super();
+     this.error = "";
+@@ -15049,17 +14099,17 @@
+ };
+ 
+ // ../packages/proto/dist/generated/agent/v1/conversation_search_exec_pb.js
+-var __protoPackage70 = "agent.v1.";
+-var __protoMessage369 = class extends CompactMessage {
++var __protoPackage62 = "agent.v1.";
++var __protoMessage361 = class extends CompactMessage {
+   static get runtime() {
+     return defineOwn(this, "runtime", proto3);
+   }
+   static $p() {
+-    return __protoPackage70;
++    return __protoPackage62;
+   }
+ };
+-var ConversationSearchSource = /* @__PURE__ */ enumType(proto3, __protoPackage70, "ConversationSearchSource", [[0, "UNSPECIFIED"], [1, "LOCAL"], [2, "CLOUD_CACHE"]], 1);
+-var ConversationSearchArgs = class _ConversationSearchArgs extends __protoMessage369 {
++var ConversationSearchSource = /* @__PURE__ */ enumType(proto3, __protoPackage62, "ConversationSearchSource", [[0, "UNSPECIFIED"], [1, "LOCAL"], [2, "CLOUD_CACHE"]], 1);
++var ConversationSearchArgs = class _ConversationSearchArgs extends __protoMessage361 {
+   constructor(data) {
+     super();
+     this.query = "";
+@@ -15082,7 +14132,7 @@
+     return ["ConversationSearchArgs|1 query 9|2 tool_call_id 9|3 limit 5?"];
+   }
+ };
+-var ConversationSearchResult = class _ConversationSearchResult extends __protoMessage369 {
++var ConversationSearchResult = class _ConversationSearchResult extends __protoMessage361 {
+   constructor(data) {
+     super();
+     this.result = { case: void 0 };
+@@ -15104,7 +14154,7 @@
+     return ["ConversationSearchResult|1 success #0 result|2 error #1 result", ConversationSearchSuccess, ConversationSearchError];
+   }
+ };
+-var ConversationSearchSuccess = class _ConversationSearchSuccess extends __protoMessage369 {
++var ConversationSearchSuccess = class _ConversationSearchSuccess extends __protoMessage361 {
+   constructor(data) {
+     super();
+     this.hits = [];
+@@ -15129,7 +14179,7 @@
+     return ["ConversationSearchSuccess|1 hits #0*|2 truncated 8|3 partial 8|4 rebuilding 8", ConversationSearchHit];
+   }
+ };
+-var ConversationSearchHit = class _ConversationSearchHit extends __protoMessage369 {
++var ConversationSearchHit = class _ConversationSearchHit extends __protoMessage361 {
+   constructor(data) {
+     super();
+     this.conversationId = "";
+@@ -15154,7 +14204,7 @@
+     return ["ConversationSearchHit|1 conversation_id 9|2 title 9|3 source #0|4 updated_at_ms 3|5 snippet 9?", ConversationSearchSource];
+   }
+ };
+-var ConversationSearchError = class _ConversationSearchError extends __protoMessage369 {
++var ConversationSearchError = class _ConversationSearchError extends __protoMessage361 {
+   constructor(data) {
+     super();
+     this.error = "";
+@@ -15178,16 +14228,16 @@
+ };
+ 
+ // ../packages/proto/dist/generated/agent/v1/search_conversations_tool_pb.js
+-var __protoPackage71 = "agent.v1.";
+-var __protoMessage370 = class extends CompactMessage {
++var __protoPackage63 = "agent.v1.";
++var __protoMessage362 = class extends CompactMessage {
+   static get runtime() {
+     return defineOwn(this, "runtime", proto3);
+   }
+   static $p() {
+-    return __protoPackage71;
++    return __protoPackage63;
+   }
+ };
+-var SearchConversationsToolCall = class _SearchConversationsToolCall extends __protoMessage370 {
++var SearchConversationsToolCall = class _SearchConversationsToolCall extends __protoMessage362 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -15210,17 +14260,17 @@
+ };
+ 
+ // ../packages/proto/dist/generated/agent/v1/goal_tool_pb.js
+-var __protoPackage72 = "agent.v1.";
+-var __protoMessage371 = class extends CompactMessage {
++var __protoPackage64 = "agent.v1.";
++var __protoMessage363 = class extends CompactMessage {
+   static get runtime() {
+     return defineOwn(this, "runtime", proto3);
+   }
+   static $p() {
+-    return __protoPackage72;
++    return __protoPackage64;
+   }
+ };
+-var GoalStatus = /* @__PURE__ */ enumType(proto3, __protoPackage72, "GoalStatus", [[0, "UNSPECIFIED"], [1, "ACTIVE"], [2, "PAUSED"], [3, "COMPLETE"], [4, "CLEARED"]], 1);
+-var CreateGoalArgs = class _CreateGoalArgs extends __protoMessage371 {
++var GoalStatus = /* @__PURE__ */ enumType(proto3, __protoPackage64, "GoalStatus", [[0, "UNSPECIFIED"], [1, "ACTIVE"], [2, "PAUSED"], [3, "COMPLETE"], [4, "CLEARED"]], 1);
++var CreateGoalArgs = class _CreateGoalArgs extends __protoMessage363 {
+   constructor(data) {
+     super();
+     this.objective = "";
+@@ -15242,7 +14292,7 @@
+     return ["CreateGoalArgs|1 objective 9"];
+   }
+ };
+-var CreateGoalSuccess = class _CreateGoalSuccess extends __protoMessage371 {
++var CreateGoalSuccess = class _CreateGoalSuccess extends __protoMessage363 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -15263,7 +14313,7 @@
+     return ["CreateGoalSuccess"];
+   }
+ };
+-var GoalError = class _GoalError extends __protoMessage371 {
++var GoalError = class _GoalError extends __protoMessage363 {
+   constructor(data) {
+     super();
+     this.error = "";
+@@ -15285,7 +14335,7 @@
+     return ["GoalError|1 error 9"];
+   }
+ };
+-var CreateGoalResult = class _CreateGoalResult extends __protoMessage371 {
++var CreateGoalResult = class _CreateGoalResult extends __protoMessage363 {
+   constructor(data) {
+     super();
+     this.result = { case: void 0 };
+@@ -15307,7 +14357,7 @@
+     return ["CreateGoalResult|1 success #0 result|2 error #1 result", CreateGoalSuccess, GoalError];
+   }
+ };
+-var CreateGoalToolCall = class _CreateGoalToolCall extends __protoMessage371 {
++var CreateGoalToolCall = class _CreateGoalToolCall extends __protoMessage363 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -15328,7 +14378,7 @@
+     return ["CreateGoalToolCall|1 args #0|2 result #1", CreateGoalArgs, CreateGoalResult];
+   }
+ };
+-var UpdateGoalArgs = class _UpdateGoalArgs extends __protoMessage371 {
++var UpdateGoalArgs = class _UpdateGoalArgs extends __protoMessage363 {
+   constructor(data) {
+     super();
+     this.status = GoalStatus.UNSPECIFIED;
+@@ -15350,7 +14400,7 @@
+     return ["UpdateGoalArgs|1 status #0", GoalStatus];
+   }
+ };
+-var UpdateGoalSuccess = class _UpdateGoalSuccess extends __protoMessage371 {
++var UpdateGoalSuccess = class _UpdateGoalSuccess extends __protoMessage363 {
+   constructor(data) {
+     super();
+     this.status = GoalStatus.UNSPECIFIED;
+@@ -15372,7 +14422,7 @@
+     return ["UpdateGoalSuccess|1 status #0", GoalStatus];
+   }
+ };
+-var UpdateGoalResult = class _UpdateGoalResult extends __protoMessage371 {
++var UpdateGoalResult = class _UpdateGoalResult extends __protoMessage363 {
+   constructor(data) {
+     super();
+     this.result = { case: void 0 };
+@@ -15394,7 +14444,7 @@
+     return ["UpdateGoalResult|1 success #0 result|2 error #1 result", UpdateGoalSuccess, GoalError];
+   }
+ };
+-var UpdateGoalToolCall = class _UpdateGoalToolCall extends __protoMessage371 {
++var UpdateGoalToolCall = class _UpdateGoalToolCall extends __protoMessage363 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -15417,17 +14467,17 @@
+ };
+ 
+ // ../packages/proto/dist/generated/agent/v1/coordinator_tools_pb.js
+-var __protoPackage73 = "agent.v1.";
+-var __protoMessage372 = class extends CompactMessage {
++var __protoPackage65 = "agent.v1.";
++var __protoMessage364 = class extends CompactMessage {
+   static get runtime() {
+     return defineOwn(this, "runtime", proto3);
+   }
+   static $p() {
+-    return __protoPackage73;
++    return __protoPackage65;
+   }
+ };
+-var CreateAgentPlacementApprovalState = /* @__PURE__ */ enumType(proto3, __protoPackage73, "CreateAgentPlacementApprovalState", [[0, "UNSPECIFIED"], [1, "REQUIRED"], [2, "DENIED"]], 1);
+-var GetAgentStatusArgs = class _GetAgentStatusArgs extends __protoMessage372 {
++var CreateAgentPlacementApprovalState = /* @__PURE__ */ enumType(proto3, __protoPackage65, "CreateAgentPlacementApprovalState", [[0, "UNSPECIFIED"], [1, "REQUIRED"], [2, "DENIED"]], 1);
++var GetAgentStatusArgs = class _GetAgentStatusArgs extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.toolCallId = "";
+@@ -15450,7 +14500,7 @@
+     return ["GetAgentStatusArgs|1 tool_call_id 9|2 agent_ids 9*"];
+   }
+ };
+-var GetAgentStatusWorker = class _GetAgentStatusWorker extends __protoMessage372 {
++var GetAgentStatusWorker = class _GetAgentStatusWorker extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.bcId = "";
+@@ -15478,7 +14528,7 @@
+     return ["GetAgentStatusWorker|1 bc_id 9|2 name 9|3 lifecycle 9|4 turn_in_flight 8|5 last_terminal_turn_status 9|6 pr_url 9|7 last_activity_at_ms 4"];
+   }
+ };
+-var GetAgentStatusSuccess = class _GetAgentStatusSuccess extends __protoMessage372 {
++var GetAgentStatusSuccess = class _GetAgentStatusSuccess extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.workers = [];
+@@ -15501,7 +14551,7 @@
+     return ["GetAgentStatusSuccess|1 workers #0*|2 message 9", GetAgentStatusWorker];
+   }
+ };
+-var GetAgentStatusError = class _GetAgentStatusError extends __protoMessage372 {
++var GetAgentStatusError = class _GetAgentStatusError extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.error = "";
+@@ -15523,7 +14573,7 @@
+     return ["GetAgentStatusError|1 error 9"];
+   }
+ };
+-var GetAgentStatusResult = class _GetAgentStatusResult extends __protoMessage372 {
++var GetAgentStatusResult = class _GetAgentStatusResult extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.result = { case: void 0 };
+@@ -15545,7 +14595,7 @@
+     return ["GetAgentStatusResult|1 success #0 result|2 error #1 result", GetAgentStatusSuccess, GetAgentStatusError];
+   }
+ };
+-var GetAgentStatusToolCall = class _GetAgentStatusToolCall extends __protoMessage372 {
++var GetAgentStatusToolCall = class _GetAgentStatusToolCall extends __protoMessage364 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -15566,7 +14616,7 @@
+     return ["GetAgentStatusToolCall|1 args #0|2 result #1", GetAgentStatusArgs, GetAgentStatusResult];
+   }
+ };
+-var SendToAgentArgs = class _SendToAgentArgs extends __protoMessage372 {
++var SendToAgentArgs = class _SendToAgentArgs extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.toolCallId = "";
+@@ -15593,7 +14643,7 @@
+     return ["SendToAgentArgs|1 tool_call_id 9|2 agent_id 9|3 message 9|4 delivery 9|5 title 9|6 model 9?|7 tracked_task_keys 9*"];
+   }
+ };
+-var SendToAgentSuccess = class _SendToAgentSuccess extends __protoMessage372 {
++var SendToAgentSuccess = class _SendToAgentSuccess extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.workerBcId = "";
+@@ -15617,7 +14667,7 @@
+     return ["SendToAgentSuccess|1 worker_bc_id 9|2 delivered_as 9|3 message 9|4 recipient #0?", SendToAgentRecipient];
+   }
+ };
+-var SendToAgentRecipient = class _SendToAgentRecipient extends __protoMessage372 {
++var SendToAgentRecipient = class _SendToAgentRecipient extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.kind = SendToAgentRecipient_Kind.UNSPECIFIED;
+@@ -15641,8 +14691,8 @@
+     return ["SendToAgentRecipient|1 kind #0|2 id 9|3 display_name 9", SendToAgentRecipient_Kind];
+   }
+ };
+-var SendToAgentRecipient_Kind = /* @__PURE__ */ enumType(proto3, __protoPackage73, "SendToAgentRecipient.Kind", [[0, "UNSPECIFIED"], [1, "MAIN_BOT"], [2, "PROJECT_SESSION"]], 1);
+-var SendToAgentError = class _SendToAgentError extends __protoMessage372 {
++var SendToAgentRecipient_Kind = /* @__PURE__ */ enumType(proto3, __protoPackage65, "SendToAgentRecipient.Kind", [[0, "UNSPECIFIED"], [1, "MAIN_BOT"], [2, "PROJECT_SESSION"]], 1);
++var SendToAgentError = class _SendToAgentError extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.error = "";
+@@ -15664,7 +14714,7 @@
+     return ["SendToAgentError|1 error 9"];
+   }
+ };
+-var SendToAgentResult = class _SendToAgentResult extends __protoMessage372 {
++var SendToAgentResult = class _SendToAgentResult extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.result = { case: void 0 };
+@@ -15686,7 +14736,7 @@
+     return ["SendToAgentResult|1 success #0 result|2 error #1 result", SendToAgentSuccess, SendToAgentError];
+   }
+ };
+-var SendToAgentToolCall = class _SendToAgentToolCall extends __protoMessage372 {
++var SendToAgentToolCall = class _SendToAgentToolCall extends __protoMessage364 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -15707,7 +14757,7 @@
+     return ["SendToAgentToolCall|1 args #0|2 result #1", SendToAgentArgs, SendToAgentResult];
+   }
+ };
+-var ReadAgentTranscriptArgs = class _ReadAgentTranscriptArgs extends __protoMessage372 {
++var ReadAgentTranscriptArgs = class _ReadAgentTranscriptArgs extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.toolCallId = "";
+@@ -15732,7 +14782,7 @@
+     return ["ReadAgentTranscriptArgs|1 tool_call_id 9|2 agent_id 9|3 mode 9|4 max_turns 13"];
+   }
+ };
+-var ReadAgentTranscriptSuccess = class _ReadAgentTranscriptSuccess extends __protoMessage372 {
++var ReadAgentTranscriptSuccess = class _ReadAgentTranscriptSuccess extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.transcript = "";
+@@ -15755,7 +14805,7 @@
+     return ["ReadAgentTranscriptSuccess|1 transcript 9|2 truncated 8"];
+   }
+ };
+-var ReadAgentTranscriptError = class _ReadAgentTranscriptError extends __protoMessage372 {
++var ReadAgentTranscriptError = class _ReadAgentTranscriptError extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.error = "";
+@@ -15777,7 +14827,7 @@
+     return ["ReadAgentTranscriptError|1 error 9"];
+   }
+ };
+-var ReadAgentTranscriptResult = class _ReadAgentTranscriptResult extends __protoMessage372 {
++var ReadAgentTranscriptResult = class _ReadAgentTranscriptResult extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.result = { case: void 0 };
+@@ -15799,7 +14849,7 @@
+     return ["ReadAgentTranscriptResult|1 success #0 result|2 error #1 result", ReadAgentTranscriptSuccess, ReadAgentTranscriptError];
+   }
+ };
+-var ReadAgentTranscriptToolCall = class _ReadAgentTranscriptToolCall extends __protoMessage372 {
++var ReadAgentTranscriptToolCall = class _ReadAgentTranscriptToolCall extends __protoMessage364 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -15820,7 +14870,7 @@
+     return ["ReadAgentTranscriptToolCall|1 args #0|2 result #1", ReadAgentTranscriptArgs, ReadAgentTranscriptResult];
+   }
+ };
+-var CreateAgentArgs = class _CreateAgentArgs extends __protoMessage372 {
++var CreateAgentArgs = class _CreateAgentArgs extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.toolCallId = "";
+@@ -15845,7 +14895,7 @@
+     return ["CreateAgentArgs|1 tool_call_id 9|2 prompt 9|3 name 9?|4 model 9?|5 base_branch 9?|6 machine_type 9?|7 worker_id 9?|8 pool 9?|9 labels 9,9|10 environment_build_id 9?|11 environment_id 9?|12 repo_url 9?|13 tracked_task_keys 9*|14 fork_from 9?|15 fork_turns 13?"];
+   }
+ };
+-var CreateAgentSuccess = class _CreateAgentSuccess extends __protoMessage372 {
++var CreateAgentSuccess = class _CreateAgentSuccess extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.agentId = "";
+@@ -15868,7 +14918,7 @@
+     return ["CreateAgentSuccess|1 agent_id 9|2 message 9"];
+   }
+ };
+-var CreateAgentError = class _CreateAgentError extends __protoMessage372 {
++var CreateAgentError = class _CreateAgentError extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.error = "";
+@@ -15890,7 +14940,7 @@
+     return ["CreateAgentError|1 error 9|2 placement_approval_state #0?", CreateAgentPlacementApprovalState];
+   }
+ };
+-var CreateAgentResult = class _CreateAgentResult extends __protoMessage372 {
++var CreateAgentResult = class _CreateAgentResult extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.result = { case: void 0 };
+@@ -15912,7 +14962,7 @@
+     return ["CreateAgentResult|1 success #0 result|2 error #1 result", CreateAgentSuccess, CreateAgentError];
+   }
+ };
+-var CreateAgentToolCall = class _CreateAgentToolCall extends __protoMessage372 {
++var CreateAgentToolCall = class _CreateAgentToolCall extends __protoMessage364 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -15933,7 +14983,7 @@
+     return ["CreateAgentToolCall|1 args #0|2 result #1", CreateAgentArgs, CreateAgentResult];
+   }
+ };
+-var CreateProjectArgs = class _CreateProjectArgs extends __protoMessage372 {
++var CreateProjectArgs = class _CreateProjectArgs extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.toolCallId = "";
+@@ -15957,7 +15007,7 @@
+     return ["CreateProjectArgs|1 tool_call_id 9|2 prompt 9|3 name 9?|4 model 9?|5 base_branch 9?|6 machine_type 9?|7 worker_id 9?|8 pool 9?|9 labels 9,9|10 environment_build_id 9?|11 environment_id 9?|12 repo_url 9?"];
+   }
+ };
+-var CreateProjectSuccess = class _CreateProjectSuccess extends __protoMessage372 {
++var CreateProjectSuccess = class _CreateProjectSuccess extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.agentId = "";
+@@ -15980,7 +15030,7 @@
+     return ["CreateProjectSuccess|1 agent_id 9|2 message 9"];
+   }
+ };
+-var CreateProjectError = class _CreateProjectError extends __protoMessage372 {
++var CreateProjectError = class _CreateProjectError extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.error = "";
+@@ -16002,7 +15052,7 @@
+     return ["CreateProjectError|1 error 9|2 placement_approval_state #0?", CreateAgentPlacementApprovalState];
+   }
+ };
+-var CreateProjectResult = class _CreateProjectResult extends __protoMessage372 {
++var CreateProjectResult = class _CreateProjectResult extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.result = { case: void 0 };
+@@ -16024,7 +15074,7 @@
+     return ["CreateProjectResult|1 success #0 result|2 error #1 result", CreateProjectSuccess, CreateProjectError];
+   }
+ };
+-var CreateProjectToolCall = class _CreateProjectToolCall extends __protoMessage372 {
++var CreateProjectToolCall = class _CreateProjectToolCall extends __protoMessage364 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -16045,7 +15095,232 @@
+     return ["CreateProjectToolCall|1 args #0|2 result #1", CreateProjectArgs, CreateProjectResult];
+   }
+ };
+-var StopAgentArgs = class _StopAgentArgs extends __protoMessage372 {
++var StartProjectUpdatesArgs = class _StartProjectUpdatesArgs extends __protoMessage364 {
++  constructor(data) {
++    super();
++    this.toolCallId = "";
++    this.agentId = "";
++    proto3.util.initPartial(data, this);
++  }
++  static fromBinary(bytes, options) {
++    return new _StartProjectUpdatesArgs().fromBinary(bytes, options);
++  }
++  static fromJson(jsonValue, options) {
++    return new _StartProjectUpdatesArgs().fromJson(jsonValue, options);
++  }
++  static fromJsonString(jsonString, options) {
++    return new _StartProjectUpdatesArgs().fromJsonString(jsonString, options);
++  }
++  static equals(a, b) {
++    return proto3.util.equals(_StartProjectUpdatesArgs, a, b);
++  }
++  static $() {
++    return ["StartProjectUpdatesArgs|1 tool_call_id 9|2 agent_id 9"];
++  }
++};
++var StartProjectUpdatesSuccess = class _StartProjectUpdatesSuccess extends __protoMessage364 {
++  constructor(data) {
++    super();
++    this.agentId = "";
++    this.untilMs = protoInt64.zero;
++    this.wasOn = false;
++    this.message = "";
++    proto3.util.initPartial(data, this);
++  }
++  static fromBinary(bytes, options) {
++    return new _StartProjectUpdatesSuccess().fromBinary(bytes, options);
++  }
++  static fromJson(jsonValue, options) {
++    return new _StartProjectUpdatesSuccess().fromJson(jsonValue, options);
++  }
++  static fromJsonString(jsonString, options) {
++    return new _StartProjectUpdatesSuccess().fromJsonString(jsonString, options);
++  }
++  static equals(a, b) {
++    return proto3.util.equals(_StartProjectUpdatesSuccess, a, b);
++  }
++  static $() {
++    return ["StartProjectUpdatesSuccess|1 agent_id 9|2 until_ms 3|3 was_on 8|4 message 9"];
++  }
++};
++var StartProjectUpdatesError = class _StartProjectUpdatesError extends __protoMessage364 {
++  constructor(data) {
++    super();
++    this.error = "";
++    proto3.util.initPartial(data, this);
++  }
++  static fromBinary(bytes, options) {
++    return new _StartProjectUpdatesError().fromBinary(bytes, options);
++  }
++  static fromJson(jsonValue, options) {
++    return new _StartProjectUpdatesError().fromJson(jsonValue, options);
++  }
++  static fromJsonString(jsonString, options) {
++    return new _StartProjectUpdatesError().fromJsonString(jsonString, options);
++  }
++  static equals(a, b) {
++    return proto3.util.equals(_StartProjectUpdatesError, a, b);
++  }
++  static $() {
++    return ["StartProjectUpdatesError|1 error 9"];
++  }
++};
++var StartProjectUpdatesResult = class _StartProjectUpdatesResult extends __protoMessage364 {
++  constructor(data) {
++    super();
++    this.result = { case: void 0 };
++    proto3.util.initPartial(data, this);
++  }
++  static fromBinary(bytes, options) {
++    return new _StartProjectUpdatesResult().fromBinary(bytes, options);
++  }
++  static fromJson(jsonValue, options) {
++    return new _StartProjectUpdatesResult().fromJson(jsonValue, options);
++  }
++  static fromJsonString(jsonString, options) {
++    return new _StartProjectUpdatesResult().fromJsonString(jsonString, options);
++  }
++  static equals(a, b) {
++    return proto3.util.equals(_StartProjectUpdatesResult, a, b);
++  }
++  static $() {
++    return ["StartProjectUpdatesResult|1 success #0 result|2 error #1 result", StartProjectUpdatesSuccess, StartProjectUpdatesError];
++  }
++};
++var StartProjectUpdatesToolCall = class _StartProjectUpdatesToolCall extends __protoMessage364 {
++  constructor(data) {
++    super();
++    proto3.util.initPartial(data, this);
++  }
++  static fromBinary(bytes, options) {
++    return new _StartProjectUpdatesToolCall().fromBinary(bytes, options);
++  }
++  static fromJson(jsonValue, options) {
++    return new _StartProjectUpdatesToolCall().fromJson(jsonValue, options);
++  }
++  static fromJsonString(jsonString, options) {
++    return new _StartProjectUpdatesToolCall().fromJsonString(jsonString, options);
++  }
++  static equals(a, b) {
++    return proto3.util.equals(_StartProjectUpdatesToolCall, a, b);
++  }
++  static $() {
++    return ["StartProjectUpdatesToolCall|1 args #0|2 result #1", StartProjectUpdatesArgs, StartProjectUpdatesResult];
++  }
++};
++var StopProjectUpdatesArgs = class _StopProjectUpdatesArgs extends __protoMessage364 {
++  constructor(data) {
++    super();
++    this.toolCallId = "";
++    this.agentId = "";
++    proto3.util.initPartial(data, this);
++  }
++  static fromBinary(bytes, options) {
++    return new _StopProjectUpdatesArgs().fromBinary(bytes, options);
++  }
++  static fromJson(jsonValue, options) {
++    return new _StopProjectUpdatesArgs().fromJson(jsonValue, options);
++  }
++  static fromJsonString(jsonString, options) {
++    return new _StopProjectUpdatesArgs().fromJsonString(jsonString, options);
++  }
++  static equals(a, b) {
++    return proto3.util.equals(_StopProjectUpdatesArgs, a, b);
++  }
++  static $() {
++    return ["StopProjectUpdatesArgs|1 tool_call_id 9|2 agent_id 9"];
++  }
++};
++var StopProjectUpdatesSuccess = class _StopProjectUpdatesSuccess extends __protoMessage364 {
++  constructor(data) {
++    super();
++    this.agentId = "";
++    this.wasOn = false;
++    this.message = "";
++    proto3.util.initPartial(data, this);
++  }
++  static fromBinary(bytes, options) {
++    return new _StopProjectUpdatesSuccess().fromBinary(bytes, options);
++  }
++  static fromJson(jsonValue, options) {
++    return new _StopProjectUpdatesSuccess().fromJson(jsonValue, options);
++  }
++  static fromJsonString(jsonString, options) {
++    return new _StopProjectUpdatesSuccess().fromJsonString(jsonString, options);
++  }
++  static equals(a, b) {
++    return proto3.util.equals(_StopProjectUpdatesSuccess, a, b);
++  }
++  static $() {
++    return ["StopProjectUpdatesSuccess|1 agent_id 9|2 was_on 8|3 message 9"];
++  }
++};
++var StopProjectUpdatesError = class _StopProjectUpdatesError extends __protoMessage364 {
++  constructor(data) {
++    super();
++    this.error = "";
++    proto3.util.initPartial(data, this);
++  }
++  static fromBinary(bytes, options) {
++    return new _StopProjectUpdatesError().fromBinary(bytes, options);
++  }
++  static fromJson(jsonValue, options) {
++    return new _StopProjectUpdatesError().fromJson(jsonValue, options);
++  }
++  static fromJsonString(jsonString, options) {
++    return new _StopProjectUpdatesError().fromJsonString(jsonString, options);
++  }
++  static equals(a, b) {
++    return proto3.util.equals(_StopProjectUpdatesError, a, b);
++  }
++  static $() {
++    return ["StopProjectUpdatesError|1 error 9"];
++  }
++};
++var StopProjectUpdatesResult = class _StopProjectUpdatesResult extends __protoMessage364 {
++  constructor(data) {
++    super();
++    this.result = { case: void 0 };
++    proto3.util.initPartial(data, this);
++  }
++  static fromBinary(bytes, options) {
++    return new _StopProjectUpdatesResult().fromBinary(bytes, options);
++  }
++  static fromJson(jsonValue, options) {
++    return new _StopProjectUpdatesResult().fromJson(jsonValue, options);
++  }
++  static fromJsonString(jsonString, options) {
++    return new _StopProjectUpdatesResult().fromJsonString(jsonString, options);
++  }
++  static equals(a, b) {
++    return proto3.util.equals(_StopProjectUpdatesResult, a, b);
++  }
++  static $() {
++    return ["StopProjectUpdatesResult|1 success #0 result|2 error #1 result", StopProjectUpdatesSuccess, StopProjectUpdatesError];
++  }
++};
++var StopProjectUpdatesToolCall = class _StopProjectUpdatesToolCall extends __protoMessage364 {
++  constructor(data) {
++    super();
++    proto3.util.initPartial(data, this);
++  }
++  static fromBinary(bytes, options) {
++    return new _StopProjectUpdatesToolCall().fromBinary(bytes, options);
++  }
++  static fromJson(jsonValue, options) {
++    return new _StopProjectUpdatesToolCall().fromJson(jsonValue, options);
++  }
++  static fromJsonString(jsonString, options) {
++    return new _StopProjectUpdatesToolCall().fromJsonString(jsonString, options);
++  }
++  static equals(a, b) {
++    return proto3.util.equals(_StopProjectUpdatesToolCall, a, b);
++  }
++  static $() {
++    return ["StopProjectUpdatesToolCall|1 args #0|2 result #1", StopProjectUpdatesArgs, StopProjectUpdatesResult];
++  }
++};
++var StopAgentArgs = class _StopAgentArgs extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.toolCallId = "";
+@@ -16068,7 +15343,7 @@
+     return ["StopAgentArgs|1 tool_call_id 9|2 agent_id 9"];
+   }
+ };
+-var StopAgentSuccess = class _StopAgentSuccess extends __protoMessage372 {
++var StopAgentSuccess = class _StopAgentSuccess extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.workerBcId = "";
+@@ -16091,7 +15366,7 @@
+     return ["StopAgentSuccess|1 worker_bc_id 9|2 message 9"];
+   }
+ };
+-var StopAgentError = class _StopAgentError extends __protoMessage372 {
++var StopAgentError = class _StopAgentError extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.error = "";
+@@ -16113,7 +15388,7 @@
+     return ["StopAgentError|1 error 9"];
+   }
+ };
+-var StopAgentResult = class _StopAgentResult extends __protoMessage372 {
++var StopAgentResult = class _StopAgentResult extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.result = { case: void 0 };
+@@ -16135,7 +15410,7 @@
+     return ["StopAgentResult|1 success #0 result|2 error #1 result", StopAgentSuccess, StopAgentError];
+   }
+ };
+-var StopAgentToolCall = class _StopAgentToolCall extends __protoMessage372 {
++var StopAgentToolCall = class _StopAgentToolCall extends __protoMessage364 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -16156,7 +15431,7 @@
+     return ["StopAgentToolCall|1 args #0|2 result #1", StopAgentArgs, StopAgentResult];
+   }
+ };
+-var TrackedTaskDocumentInput = class _TrackedTaskDocumentInput extends __protoMessage372 {
++var TrackedTaskDocumentInput = class _TrackedTaskDocumentInput extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.path = "";
+@@ -16178,7 +15453,7 @@
+     return ["TrackedTaskDocumentInput|1 path 9|2 label 9?"];
+   }
+ };
+-var TrackedTaskUrlInput = class _TrackedTaskUrlInput extends __protoMessage372 {
++var TrackedTaskUrlInput = class _TrackedTaskUrlInput extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.url = "";
+@@ -16200,7 +15475,7 @@
+     return ["TrackedTaskUrlInput|1 url 9|2 label 9?"];
+   }
+ };
+-var TrackedTaskLinkInput = class _TrackedTaskLinkInput extends __protoMessage372 {
++var TrackedTaskLinkInput = class _TrackedTaskLinkInput extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.target = { case: void 0 };
+@@ -16222,7 +15497,7 @@
+     return ["TrackedTaskLinkInput|1 agent_id 9 target|2 pr_url 9 target|3 document #0 target|4 url #1 target", TrackedTaskDocumentInput, TrackedTaskUrlInput];
+   }
+ };
+-var TrackedTaskPrLinkView = class _TrackedTaskPrLinkView extends __protoMessage372 {
++var TrackedTaskPrLinkView = class _TrackedTaskPrLinkView extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.url = "";
+@@ -16246,7 +15521,7 @@
+     return ["TrackedTaskPrLinkView|1 url 9|2 opened_by_agent_id 9|3 counts_for_completion 8"];
+   }
+ };
+-var TrackedTaskLinkView = class _TrackedTaskLinkView extends __protoMessage372 {
++var TrackedTaskLinkView = class _TrackedTaskLinkView extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.target = { case: void 0 };
+@@ -16268,7 +15543,7 @@
+     return ["TrackedTaskLinkView|1 agent_id 9 target|2 pr #0 target|3 document #1 target|4 url #2 target", TrackedTaskPrLinkView, TrackedTaskDocumentInput, TrackedTaskUrlInput];
+   }
+ };
+-var TrackedTaskView = class _TrackedTaskView extends __protoMessage372 {
++var TrackedTaskView = class _TrackedTaskView extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.key = "";
+@@ -16300,7 +15575,7 @@
+     return ["TrackedTaskView|1 key 9|2 title 9|3 status_id 9|4 status_label 9|5 owner 9|6 parent_key 9|7 links #0*|8 updated_at_ms 4|9 owner_session_id 9|10 version 4|11 tag 9", TrackedTaskLinkView];
+   }
+ };
+-var TrackedTaskStatusView = class _TrackedTaskStatusView extends __protoMessage372 {
++var TrackedTaskStatusView = class _TrackedTaskStatusView extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.id = "";
+@@ -16325,7 +15600,7 @@
+     return ["TrackedTaskStatusView|1 id 9|2 label 9|3 category 9|4 task_count 13"];
+   }
+ };
+-var TrackedTaskTagView = class _TrackedTaskTagView extends __protoMessage372 {
++var TrackedTaskTagView = class _TrackedTaskTagView extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.id = "";
+@@ -16350,7 +15625,7 @@
+     return ["TrackedTaskTagView|1 id 9|2 label 9|3 color 9|4 task_count 13"];
+   }
+ };
+-var TrackedTaskMemberView = class _TrackedTaskMemberView extends __protoMessage372 {
++var TrackedTaskMemberView = class _TrackedTaskMemberView extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.name = "";
+@@ -16374,7 +15649,7 @@
+     return ["TrackedTaskMemberView|1 name 9|2 session_id 9|3 is_you 8"];
+   }
+ };
+-var ListTrackedTasksArgs = class _ListTrackedTasksArgs extends __protoMessage372 {
++var ListTrackedTasksArgs = class _ListTrackedTasksArgs extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.toolCallId = "";
+@@ -16398,7 +15673,7 @@
+     return ["ListTrackedTasksArgs|1 tool_call_id 9|2 keys 9*|3 status_categories 9*|4 owner 9?|5 linked_agent_id 9?"];
+   }
+ };
+-var ListTrackedTasksSuccess = class _ListTrackedTasksSuccess extends __protoMessage372 {
++var ListTrackedTasksSuccess = class _ListTrackedTasksSuccess extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.tasks = [];
+@@ -16427,7 +15702,7 @@
+     return ["ListTrackedTasksSuccess|1 tasks #0*|2 statuses #1*|3 members #2*|4 older_closed_count 13|5 truncated 8|6 matching_count 13|7 message 9|8 tags #3*", TrackedTaskView, TrackedTaskStatusView, TrackedTaskMemberView, TrackedTaskTagView];
+   }
+ };
+-var ListTrackedTasksError = class _ListTrackedTasksError extends __protoMessage372 {
++var ListTrackedTasksError = class _ListTrackedTasksError extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.error = "";
+@@ -16449,7 +15724,7 @@
+     return ["ListTrackedTasksError|1 error 9"];
+   }
+ };
+-var ListTrackedTasksResult = class _ListTrackedTasksResult extends __protoMessage372 {
++var ListTrackedTasksResult = class _ListTrackedTasksResult extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.result = { case: void 0 };
+@@ -16471,7 +15746,7 @@
+     return ["ListTrackedTasksResult|1 success #0 result|2 error #1 result", ListTrackedTasksSuccess, ListTrackedTasksError];
+   }
+ };
+-var ListTrackedTasksToolCall = class _ListTrackedTasksToolCall extends __protoMessage372 {
++var ListTrackedTasksToolCall = class _ListTrackedTasksToolCall extends __protoMessage364 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -16492,7 +15767,7 @@
+     return ["ListTrackedTasksToolCall|1 args #0|2 result #1", ListTrackedTasksArgs, ListTrackedTasksResult];
+   }
+ };
+-var NewTrackedTask = class _NewTrackedTask extends __protoMessage372 {
++var NewTrackedTask = class _NewTrackedTask extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.title = "";
+@@ -16515,7 +15790,7 @@
+     return ["NewTrackedTask|1 client_ref 9?|2 title 9|3 status 9?|4 owner 9?|5 parent 9?|6 links #0*|7 tag 9?", TrackedTaskLinkInput];
+   }
+ };
+-var CreateTrackedTasksArgs = class _CreateTrackedTasksArgs extends __protoMessage372 {
++var CreateTrackedTasksArgs = class _CreateTrackedTasksArgs extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.toolCallId = "";
+@@ -16538,7 +15813,7 @@
+     return ["CreateTrackedTasksArgs|1 tool_call_id 9|2 tasks #0*", NewTrackedTask];
+   }
+ };
+-var TrackedTaskCreated = class _TrackedTaskCreated extends __protoMessage372 {
++var TrackedTaskCreated = class _TrackedTaskCreated extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.clientRef = "";
+@@ -16562,7 +15837,7 @@
+     return ["TrackedTaskCreated|1 client_ref 9|2 key 9|3 version 4"];
+   }
+ };
+-var CreateTrackedTasksSuccess = class _CreateTrackedTasksSuccess extends __protoMessage372 {
++var CreateTrackedTasksSuccess = class _CreateTrackedTasksSuccess extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.created = [];
+@@ -16585,7 +15860,7 @@
+     return ["CreateTrackedTasksSuccess|1 created #0*|2 message 9", TrackedTaskCreated];
+   }
+ };
+-var CreateTrackedTasksError = class _CreateTrackedTasksError extends __protoMessage372 {
++var CreateTrackedTasksError = class _CreateTrackedTasksError extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.error = "";
+@@ -16607,7 +15882,7 @@
+     return ["CreateTrackedTasksError|1 error 9"];
+   }
+ };
+-var CreateTrackedTasksResult = class _CreateTrackedTasksResult extends __protoMessage372 {
++var CreateTrackedTasksResult = class _CreateTrackedTasksResult extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.result = { case: void 0 };
+@@ -16629,7 +15904,7 @@
+     return ["CreateTrackedTasksResult|1 success #0 result|2 error #1 result", CreateTrackedTasksSuccess, CreateTrackedTasksError];
+   }
+ };
+-var CreateTrackedTasksToolCall = class _CreateTrackedTasksToolCall extends __protoMessage372 {
++var CreateTrackedTasksToolCall = class _CreateTrackedTasksToolCall extends __protoMessage364 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -16650,7 +15925,7 @@
+     return ["CreateTrackedTasksToolCall|1 args #0|2 result #1", CreateTrackedTasksArgs, CreateTrackedTasksResult];
+   }
+ };
+-var TrackedTaskPosition = class _TrackedTaskPosition extends __protoMessage372 {
++var TrackedTaskPosition = class _TrackedTaskPosition extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.anchor = { case: void 0 };
+@@ -16672,7 +15947,7 @@
+     return ["TrackedTaskPosition|1 before_key 9 anchor|2 after_key 9 anchor"];
+   }
+ };
+-var TrackedTaskUpdate = class _TrackedTaskUpdate extends __protoMessage372 {
++var TrackedTaskUpdate = class _TrackedTaskUpdate extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.key = "";
+@@ -16697,7 +15972,7 @@
+     return ["TrackedTaskUpdate|1 key 9|2 title 9?|3 status 9?|4 owner 9?|5 parent 9?|6 position #0?|7 add_links #1*|8 remove_links #1*|9 version 4|10 tag 9?", TrackedTaskPosition, TrackedTaskLinkInput];
+   }
+ };
+-var UpdateTrackedTasksArgs = class _UpdateTrackedTasksArgs extends __protoMessage372 {
++var UpdateTrackedTasksArgs = class _UpdateTrackedTasksArgs extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.toolCallId = "";
+@@ -16720,7 +15995,7 @@
+     return ["UpdateTrackedTasksArgs|1 tool_call_id 9|2 updates #0*", TrackedTaskUpdate];
+   }
+ };
+-var TrackedTaskConflict = class _TrackedTaskConflict extends __protoMessage372 {
++var TrackedTaskConflict = class _TrackedTaskConflict extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.key = "";
+@@ -16747,7 +16022,7 @@
+     return ["TrackedTaskConflict|1 key 9|2 field 9|3 current_value 9|4 changed_by 9|5 changed_at_ms 4|6 current_version 4"];
+   }
+ };
+-var TrackedTaskUpdated = class _TrackedTaskUpdated extends __protoMessage372 {
++var TrackedTaskUpdated = class _TrackedTaskUpdated extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.key = "";
+@@ -16772,7 +16047,7 @@
+     return ["TrackedTaskUpdated|1 key 9|2 version 4|3 title 9|4 status_label 9"];
+   }
+ };
+-var UpdateTrackedTasksSuccess = class _UpdateTrackedTasksSuccess extends __protoMessage372 {
++var UpdateTrackedTasksSuccess = class _UpdateTrackedTasksSuccess extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.updated = [];
+@@ -16796,7 +16071,7 @@
+     return ["UpdateTrackedTasksSuccess|1 updated #0*|2 conflicts #1*|3 message 9", TrackedTaskUpdated, TrackedTaskConflict];
+   }
+ };
+-var UpdateTrackedTasksError = class _UpdateTrackedTasksError extends __protoMessage372 {
++var UpdateTrackedTasksError = class _UpdateTrackedTasksError extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.error = "";
+@@ -16818,7 +16093,7 @@
+     return ["UpdateTrackedTasksError|1 error 9"];
+   }
+ };
+-var UpdateTrackedTasksResult = class _UpdateTrackedTasksResult extends __protoMessage372 {
++var UpdateTrackedTasksResult = class _UpdateTrackedTasksResult extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.result = { case: void 0 };
+@@ -16840,7 +16115,7 @@
+     return ["UpdateTrackedTasksResult|1 success #0 result|2 error #1 result", UpdateTrackedTasksSuccess, UpdateTrackedTasksError];
+   }
+ };
+-var UpdateTrackedTasksToolCall = class _UpdateTrackedTasksToolCall extends __protoMessage372 {
++var UpdateTrackedTasksToolCall = class _UpdateTrackedTasksToolCall extends __protoMessage364 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -16861,7 +16136,7 @@
+     return ["UpdateTrackedTasksToolCall|1 args #0|2 result #1", UpdateTrackedTasksArgs, UpdateTrackedTasksResult];
+   }
+ };
+-var DeleteTrackedTasksArgs = class _DeleteTrackedTasksArgs extends __protoMessage372 {
++var DeleteTrackedTasksArgs = class _DeleteTrackedTasksArgs extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.toolCallId = "";
+@@ -16884,7 +16159,7 @@
+     return ["DeleteTrackedTasksArgs|1 tool_call_id 9|2 keys 9*"];
+   }
+ };
+-var DeleteTrackedTasksSuccess = class _DeleteTrackedTasksSuccess extends __protoMessage372 {
++var DeleteTrackedTasksSuccess = class _DeleteTrackedTasksSuccess extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.deletedKeys = [];
+@@ -16908,7 +16183,7 @@
+     return ["DeleteTrackedTasksSuccess|1 deleted_keys 9*|2 unparented_keys 9*|3 message 9"];
+   }
+ };
+-var DeleteTrackedTasksError = class _DeleteTrackedTasksError extends __protoMessage372 {
++var DeleteTrackedTasksError = class _DeleteTrackedTasksError extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.error = "";
+@@ -16930,7 +16205,7 @@
+     return ["DeleteTrackedTasksError|1 error 9"];
+   }
+ };
+-var DeleteTrackedTasksResult = class _DeleteTrackedTasksResult extends __protoMessage372 {
++var DeleteTrackedTasksResult = class _DeleteTrackedTasksResult extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.result = { case: void 0 };
+@@ -16952,7 +16227,7 @@
+     return ["DeleteTrackedTasksResult|1 success #0 result|2 error #1 result", DeleteTrackedTasksSuccess, DeleteTrackedTasksError];
+   }
+ };
+-var DeleteTrackedTasksToolCall = class _DeleteTrackedTasksToolCall extends __protoMessage372 {
++var DeleteTrackedTasksToolCall = class _DeleteTrackedTasksToolCall extends __protoMessage364 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -16973,7 +16248,7 @@
+     return ["DeleteTrackedTasksToolCall|1 args #0|2 result #1", DeleteTrackedTasksArgs, DeleteTrackedTasksResult];
+   }
+ };
+-var TrackedTaskStatusInput = class _TrackedTaskStatusInput extends __protoMessage372 {
++var TrackedTaskStatusInput = class _TrackedTaskStatusInput extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.label = "";
+@@ -16996,7 +16271,7 @@
+     return ["TrackedTaskStatusInput|1 id 9?|2 label 9|3 icon 9?|4 category 9"];
+   }
+ };
+-var UpdateTrackedTaskStatusesArgs = class _UpdateTrackedTaskStatusesArgs extends __protoMessage372 {
++var UpdateTrackedTaskStatusesArgs = class _UpdateTrackedTaskStatusesArgs extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.toolCallId = "";
+@@ -17019,7 +16294,7 @@
+     return ["UpdateTrackedTaskStatusesArgs|1 tool_call_id 9|2 statuses #0*", TrackedTaskStatusInput];
+   }
+ };
+-var UpdateTrackedTaskStatusesSuccess = class _UpdateTrackedTaskStatusesSuccess extends __protoMessage372 {
++var UpdateTrackedTaskStatusesSuccess = class _UpdateTrackedTaskStatusesSuccess extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.statuses = [];
+@@ -17042,7 +16317,7 @@
+     return ["UpdateTrackedTaskStatusesSuccess|1 statuses #0*|2 message 9", TrackedTaskStatusView];
+   }
+ };
+-var UpdateTrackedTaskStatusesError = class _UpdateTrackedTaskStatusesError extends __protoMessage372 {
++var UpdateTrackedTaskStatusesError = class _UpdateTrackedTaskStatusesError extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.error = "";
+@@ -17064,7 +16339,7 @@
+     return ["UpdateTrackedTaskStatusesError|1 error 9"];
+   }
+ };
+-var UpdateTrackedTaskStatusesResult = class _UpdateTrackedTaskStatusesResult extends __protoMessage372 {
++var UpdateTrackedTaskStatusesResult = class _UpdateTrackedTaskStatusesResult extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.result = { case: void 0 };
+@@ -17086,7 +16361,7 @@
+     return ["UpdateTrackedTaskStatusesResult|1 success #0 result|2 error #1 result", UpdateTrackedTaskStatusesSuccess, UpdateTrackedTaskStatusesError];
+   }
+ };
+-var UpdateTrackedTaskStatusesToolCall = class _UpdateTrackedTaskStatusesToolCall extends __protoMessage372 {
++var UpdateTrackedTaskStatusesToolCall = class _UpdateTrackedTaskStatusesToolCall extends __protoMessage364 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -17107,7 +16382,7 @@
+     return ["UpdateTrackedTaskStatusesToolCall|1 args #0|2 result #1", UpdateTrackedTaskStatusesArgs, UpdateTrackedTaskStatusesResult];
+   }
+ };
+-var TrackedTaskTagInput = class _TrackedTaskTagInput extends __protoMessage372 {
++var TrackedTaskTagInput = class _TrackedTaskTagInput extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.label = "";
+@@ -17129,7 +16404,7 @@
+     return ["TrackedTaskTagInput|1 id 9?|2 label 9|3 color 9?"];
+   }
+ };
+-var UpdateTrackedTaskTagsArgs = class _UpdateTrackedTaskTagsArgs extends __protoMessage372 {
++var UpdateTrackedTaskTagsArgs = class _UpdateTrackedTaskTagsArgs extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.toolCallId = "";
+@@ -17152,7 +16427,7 @@
+     return ["UpdateTrackedTaskTagsArgs|1 tool_call_id 9|2 tags #0*", TrackedTaskTagInput];
+   }
+ };
+-var UpdateTrackedTaskTagsSuccess = class _UpdateTrackedTaskTagsSuccess extends __protoMessage372 {
++var UpdateTrackedTaskTagsSuccess = class _UpdateTrackedTaskTagsSuccess extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.tags = [];
+@@ -17175,7 +16450,7 @@
+     return ["UpdateTrackedTaskTagsSuccess|1 tags #0*|2 message 9", TrackedTaskTagView];
+   }
+ };
+-var UpdateTrackedTaskTagsError = class _UpdateTrackedTaskTagsError extends __protoMessage372 {
++var UpdateTrackedTaskTagsError = class _UpdateTrackedTaskTagsError extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.error = "";
+@@ -17197,7 +16472,7 @@
+     return ["UpdateTrackedTaskTagsError|1 error 9"];
+   }
+ };
+-var UpdateTrackedTaskTagsResult = class _UpdateTrackedTaskTagsResult extends __protoMessage372 {
++var UpdateTrackedTaskTagsResult = class _UpdateTrackedTaskTagsResult extends __protoMessage364 {
+   constructor(data) {
+     super();
+     this.result = { case: void 0 };
+@@ -17219,7 +16494,7 @@
+     return ["UpdateTrackedTaskTagsResult|1 success #0 result|2 error #1 result", UpdateTrackedTaskTagsSuccess, UpdateTrackedTaskTagsError];
+   }
+ };
+-var UpdateTrackedTaskTagsToolCall = class _UpdateTrackedTaskTagsToolCall extends __protoMessage372 {
++var UpdateTrackedTaskTagsToolCall = class _UpdateTrackedTaskTagsToolCall extends __protoMessage364 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -17242,18 +16517,18 @@
+ };
+ 
+ // ../packages/proto/dist/generated/agent/v1/cloud_canvas_tool_pb.js
+-var __protoPackage74 = "agent.v1.";
+-var __protoMessage373 = class extends CompactMessage {
++var __protoPackage66 = "agent.v1.";
++var __protoMessage365 = class extends CompactMessage {
+   static get runtime() {
+     return defineOwn(this, "runtime", proto3);
+   }
+   static $p() {
+-    return __protoPackage74;
++    return __protoPackage66;
+   }
+ };
+-var WriteCanvasFailReason = /* @__PURE__ */ enumType(proto3, __protoPackage74, "WriteCanvasFailReason", [[0, "UNSPECIFIED"], [1, "TYPECHECK_FAILED"], [2, "COMPILE_FAILED"], [3, "TOO_LARGE"], [4, "UNAVAILABLE"], [5, "NOT_FOUND"], [6, "REFUSED"]], 1);
+-var ReadCanvasFailReason = /* @__PURE__ */ enumType(proto3, __protoPackage74, "ReadCanvasFailReason", [[0, "UNSPECIFIED"], [1, "NOT_FOUND"], [2, "UNAVAILABLE"], [3, "REFUSED"], [4, "INVALID_REFERENCE"]], 1);
+-var CloudCanvasToolDiagnosticPosition = class _CloudCanvasToolDiagnosticPosition extends __protoMessage373 {
++var WriteCanvasFailReason = /* @__PURE__ */ enumType(proto3, __protoPackage66, "WriteCanvasFailReason", [[0, "UNSPECIFIED"], [1, "TYPECHECK_FAILED"], [2, "COMPILE_FAILED"], [3, "TOO_LARGE"], [4, "UNAVAILABLE"], [5, "NOT_FOUND"], [6, "REFUSED"]], 1);
++var ReadCanvasFailReason = /* @__PURE__ */ enumType(proto3, __protoPackage66, "ReadCanvasFailReason", [[0, "UNSPECIFIED"], [1, "NOT_FOUND"], [2, "UNAVAILABLE"], [3, "REFUSED"], [4, "INVALID_REFERENCE"]], 1);
++var CloudCanvasToolDiagnosticPosition = class _CloudCanvasToolDiagnosticPosition extends __protoMessage365 {
+   constructor(data) {
+     super();
+     this.line = 0;
+@@ -17276,7 +16551,7 @@
+     return ["CloudCanvasToolDiagnosticPosition|1 line 5|2 character 5"];
+   }
+ };
+-var CloudCanvasToolDiagnosticRange = class _CloudCanvasToolDiagnosticRange extends __protoMessage373 {
++var CloudCanvasToolDiagnosticRange = class _CloudCanvasToolDiagnosticRange extends __protoMessage365 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -17297,7 +16572,7 @@
+     return ["CloudCanvasToolDiagnosticRange|1 start #0|2 end #0", CloudCanvasToolDiagnosticPosition];
+   }
+ };
+-var CloudCanvasToolDiagnostic = class _CloudCanvasToolDiagnostic extends __protoMessage373 {
++var CloudCanvasToolDiagnostic = class _CloudCanvasToolDiagnostic extends __protoMessage365 {
+   constructor(data) {
+     super();
+     this.message = "";
+@@ -17319,7 +16594,7 @@
+     return ["CloudCanvasToolDiagnostic|1 message 9|2 code 9?|3 severity 5?|4 range #0?", CloudCanvasToolDiagnosticRange];
+   }
+ };
+-var WriteCanvasArgs = class _WriteCanvasArgs extends __protoMessage373 {
++var WriteCanvasArgs = class _WriteCanvasArgs extends __protoMessage365 {
+   constructor(data) {
+     super();
+     this.contents = "";
+@@ -17341,7 +16616,7 @@
+     return ["WriteCanvasArgs|1 contents 9|2 canvas_id 9?|3 title 9?"];
+   }
+ };
+-var WriteCanvasSuccess = class _WriteCanvasSuccess extends __protoMessage373 {
++var WriteCanvasSuccess = class _WriteCanvasSuccess extends __protoMessage365 {
+   constructor(data) {
+     super();
+     this.canvasId = "";
+@@ -17364,7 +16639,7 @@
+     return ["WriteCanvasSuccess|1 canvas_id 9|2 title 9?|3 url 9"];
+   }
+ };
+-var WriteCanvasFailure = class _WriteCanvasFailure extends __protoMessage373 {
++var WriteCanvasFailure = class _WriteCanvasFailure extends __protoMessage365 {
+   constructor(data) {
+     super();
+     this.reason = WriteCanvasFailReason.UNSPECIFIED;
+@@ -17387,7 +16662,7 @@
+     return ["WriteCanvasFailure|1 reason #0|2 diagnostics #1*|3 detail 9?", WriteCanvasFailReason, CloudCanvasToolDiagnostic];
+   }
+ };
+-var WriteCanvasResult = class _WriteCanvasResult extends __protoMessage373 {
++var WriteCanvasResult = class _WriteCanvasResult extends __protoMessage365 {
+   constructor(data) {
+     super();
+     this.result = { case: void 0 };
+@@ -17409,7 +16684,7 @@
+     return ["WriteCanvasResult|1 success #0 result|2 failure #1 result", WriteCanvasSuccess, WriteCanvasFailure];
+   }
+ };
+-var WriteCanvasToolCall = class _WriteCanvasToolCall extends __protoMessage373 {
++var WriteCanvasToolCall = class _WriteCanvasToolCall extends __protoMessage365 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -17430,7 +16705,7 @@
+     return ["WriteCanvasToolCall|1 args #0|2 result #1", WriteCanvasArgs, WriteCanvasResult];
+   }
+ };
+-var ReadCanvasArgs = class _ReadCanvasArgs extends __protoMessage373 {
++var ReadCanvasArgs = class _ReadCanvasArgs extends __protoMessage365 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -17451,7 +16726,7 @@
+     return ["ReadCanvasArgs|1 canvas_id 9?|2 url 9?"];
+   }
+ };
+-var ReadCanvasSuccess = class _ReadCanvasSuccess extends __protoMessage373 {
++var ReadCanvasSuccess = class _ReadCanvasSuccess extends __protoMessage365 {
+   constructor(data) {
+     super();
+     this.canvasId = "";
+@@ -17475,7 +16750,7 @@
+     return ["ReadCanvasSuccess|1 canvas_id 9|2 title 9?|3 url 9|4 source 9"];
+   }
+ };
+-var ReadCanvasFailure = class _ReadCanvasFailure extends __protoMessage373 {
++var ReadCanvasFailure = class _ReadCanvasFailure extends __protoMessage365 {
+   constructor(data) {
+     super();
+     this.reason = ReadCanvasFailReason.UNSPECIFIED;
+@@ -17497,7 +16772,7 @@
+     return ["ReadCanvasFailure|1 reason #0|2 detail 9?", ReadCanvasFailReason];
+   }
+ };
+-var ReadCanvasResult = class _ReadCanvasResult extends __protoMessage373 {
++var ReadCanvasResult = class _ReadCanvasResult extends __protoMessage365 {
+   constructor(data) {
+     super();
+     this.result = { case: void 0 };
+@@ -17519,7 +16794,7 @@
+     return ["ReadCanvasResult|1 success #0 result|2 failure #1 result", ReadCanvasSuccess, ReadCanvasFailure];
+   }
+ };
+-var ReadCanvasToolCall = class _ReadCanvasToolCall extends __protoMessage373 {
++var ReadCanvasToolCall = class _ReadCanvasToolCall extends __protoMessage365 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -17542,16 +16817,16 @@
+ };
+ 
+ // ../packages/proto/dist/generated/agent/v1/generate_video_tool_pb.js
+-var __protoPackage75 = "agent.v1.";
+-var __protoMessage374 = class extends CompactMessage {
++var __protoPackage67 = "agent.v1.";
++var __protoMessage366 = class extends CompactMessage {
+   static get runtime() {
+     return defineOwn(this, "runtime", proto3);
+   }
+   static $p() {
+-    return __protoPackage75;
++    return __protoPackage67;
+   }
+ };
+-var GenerateVideoArgs = class _GenerateVideoArgs extends __protoMessage374 {
++var GenerateVideoArgs = class _GenerateVideoArgs extends __protoMessage366 {
+   constructor(data) {
+     super();
+     this.prompt = "";
+@@ -17575,7 +16850,7 @@
+     return ["GenerateVideoArgs|1 prompt 9|2 file_path 9?|3 image_path 9?|4 reference_image_paths 9*|5 duration_seconds 13?|6 aspect_ratio 9?|7 resolution 9?|8 last_frame_path 9?|9 keyframes #0*", GenerateVideoKeyframe];
+   }
+ };
+-var GenerateVideoKeyframe = class _GenerateVideoKeyframe extends __protoMessage374 {
++var GenerateVideoKeyframe = class _GenerateVideoKeyframe extends __protoMessage366 {
+   constructor(data) {
+     super();
+     this.imagePath = "";
+@@ -17598,7 +16873,7 @@
+     return ["GenerateVideoKeyframe|1 image_path 9|2 timestamp_seconds 1"];
+   }
+ };
+-var GenerateVideoResult = class _GenerateVideoResult extends __protoMessage374 {
++var GenerateVideoResult = class _GenerateVideoResult extends __protoMessage366 {
+   constructor(data) {
+     super();
+     this.result = { case: void 0 };
+@@ -17620,7 +16895,7 @@
+     return ["GenerateVideoResult|1 success #0 result|2 error #1 result", GenerateVideoSuccess, GenerateVideoError];
+   }
+ };
+-var GenerateVideoSuccess = class _GenerateVideoSuccess extends __protoMessage374 {
++var GenerateVideoSuccess = class _GenerateVideoSuccess extends __protoMessage366 {
+   constructor(data) {
+     super();
+     this.filePath = "";
+@@ -17643,7 +16918,7 @@
+     return ["GenerateVideoSuccess|1 file_path 9|2 duration_seconds 13"];
+   }
+ };
+-var GenerateVideoError = class _GenerateVideoError extends __protoMessage374 {
++var GenerateVideoError = class _GenerateVideoError extends __protoMessage366 {
+   constructor(data) {
+     super();
+     this.error = "";
+@@ -17665,7 +16940,7 @@
+     return ["GenerateVideoError|1 error 9"];
+   }
+ };
+-var GenerateVideoToolCall = class _GenerateVideoToolCall extends __protoMessage374 {
++var GenerateVideoToolCall = class _GenerateVideoToolCall extends __protoMessage366 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -17688,16 +16963,16 @@
+ };
+ 
+ // ../packages/proto/dist/generated/agent/v1/x_search_tool_pb.js
+-var __protoPackage76 = "agent.v1.";
+-var __protoMessage375 = class extends CompactMessage {
++var __protoPackage68 = "agent.v1.";
++var __protoMessage367 = class extends CompactMessage {
+   static get runtime() {
+     return defineOwn(this, "runtime", proto3);
+   }
+   static $p() {
+-    return __protoPackage76;
++    return __protoPackage68;
+   }
+ };
+-var XSearchArgs = class _XSearchArgs extends __protoMessage375 {
++var XSearchArgs = class _XSearchArgs extends __protoMessage367 {
+   constructor(data) {
+     super();
+     this.query = "";
+@@ -17721,7 +16996,7 @@
+     return ["XSearchArgs|1 query 9|2 from_date 9?|3 to_date 9?|4 allowed_x_handles 9*|5 excluded_x_handles 9*"];
+   }
+ };
+-var XSearchResult = class _XSearchResult extends __protoMessage375 {
++var XSearchResult = class _XSearchResult extends __protoMessage367 {
+   constructor(data) {
+     super();
+     this.result = { case: void 0 };
+@@ -17743,7 +17018,7 @@
+     return ["XSearchResult|1 success #0 result|2 error #1 result|3 rejected #2 result", XSearchSuccess, XSearchError, XSearchRejected];
+   }
+ };
+-var XSearchSuccess = class _XSearchSuccess extends __protoMessage375 {
++var XSearchSuccess = class _XSearchSuccess extends __protoMessage367 {
+   constructor(data) {
+     super();
+     this.answer = "";
+@@ -17766,7 +17041,7 @@
+     return ["XSearchSuccess|1 answer 9|2 citations #0*", XSearchCitation];
+   }
+ };
+-var XSearchCitation = class _XSearchCitation extends __protoMessage375 {
++var XSearchCitation = class _XSearchCitation extends __protoMessage367 {
+   constructor(data) {
+     super();
+     this.url = "";
+@@ -17789,7 +17064,7 @@
+     return ["XSearchCitation|1 url 9|2 title 9"];
+   }
+ };
+-var XSearchError = class _XSearchError extends __protoMessage375 {
++var XSearchError = class _XSearchError extends __protoMessage367 {
+   constructor(data) {
+     super();
+     this.error = "";
+@@ -17811,7 +17086,7 @@
+     return ["XSearchError|1 error 9"];
+   }
+ };
+-var XSearchRejected = class _XSearchRejected extends __protoMessage375 {
++var XSearchRejected = class _XSearchRejected extends __protoMessage367 {
+   constructor(data) {
+     super();
+     this.reason = "";
+@@ -17833,7 +17108,7 @@
+     return ["XSearchRejected|1 reason 9"];
+   }
+ };
+-var XSearchToolCall = class _XSearchToolCall extends __protoMessage375 {
++var XSearchToolCall = class _XSearchToolCall extends __protoMessage367 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -17856,16 +17131,16 @@
+ };
+ 
+ // ../packages/proto/dist/generated/agent/v1/get_pr_code_tour_tool_pb.js
+-var __protoPackage77 = "agent.v1.";
+-var __protoMessage376 = class extends CompactMessage {
++var __protoPackage69 = "agent.v1.";
++var __protoMessage368 = class extends CompactMessage {
+   static get runtime() {
+     return defineOwn(this, "runtime", proto3);
+   }
+   static $p() {
+-    return __protoPackage77;
++    return __protoPackage69;
+   }
+ };
+-var GetPrCodeTourArgs = class _GetPrCodeTourArgs extends __protoMessage376 {
++var GetPrCodeTourArgs = class _GetPrCodeTourArgs extends __protoMessage368 {
+   constructor(data) {
+     super();
+     this.toolCallId = "";
+@@ -17887,7 +17162,7 @@
+     return ["GetPrCodeTourArgs|1 tool_call_id 9|2 revision_id 9?|3 section_id 9?|4 head_sha 9?|5 pr_url 9?"];
+   }
+ };
+-var PrCodeTourRevisionSnapshot = class _PrCodeTourRevisionSnapshot extends __protoMessage376 {
++var PrCodeTourRevisionSnapshot = class _PrCodeTourRevisionSnapshot extends __protoMessage368 {
+   constructor(data) {
+     super();
+     this.revisionId = "";
+@@ -17918,7 +17193,7 @@
+     return ["PrCodeTourRevisionSnapshot|1 revision_id 9|2 status 9|3 head_sha 9|4 feedback 9|5 updated_at_ms 3|6 is_current 8|7 markdown 9|8 source 9|9 pr_url 9|10 edited_by_bc_id 9"];
+   }
+ };
+-var GetPrCodeTourSuccess = class _GetPrCodeTourSuccess extends __protoMessage376 {
++var GetPrCodeTourSuccess = class _GetPrCodeTourSuccess extends __protoMessage368 {
+   constructor(data) {
+     super();
+     this.revisions = [];
+@@ -17940,7 +17215,7 @@
+     return ["GetPrCodeTourSuccess|1 revisions #0*|2 section_id 9?", PrCodeTourRevisionSnapshot];
+   }
+ };
+-var GetPrCodeTourError = class _GetPrCodeTourError extends __protoMessage376 {
++var GetPrCodeTourError = class _GetPrCodeTourError extends __protoMessage368 {
+   constructor(data) {
+     super();
+     this.error = "";
+@@ -17962,7 +17237,7 @@
+     return ["GetPrCodeTourError|1 error 9"];
+   }
+ };
+-var GetPrCodeTourResult = class _GetPrCodeTourResult extends __protoMessage376 {
++var GetPrCodeTourResult = class _GetPrCodeTourResult extends __protoMessage368 {
+   constructor(data) {
+     super();
+     this.result = { case: void 0 };
+@@ -17984,7 +17259,7 @@
+     return ["GetPrCodeTourResult|1 success #0 result|2 error #1 result", GetPrCodeTourSuccess, GetPrCodeTourError];
+   }
+ };
+-var GetPrCodeTourToolCall = class _GetPrCodeTourToolCall extends __protoMessage376 {
++var GetPrCodeTourToolCall = class _GetPrCodeTourToolCall extends __protoMessage368 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -18007,17 +17282,17 @@
+ };
+ 
+ // ../packages/proto/dist/generated/agent/v1/update_pr_code_tour_tool_pb.js
+-var __protoPackage78 = "agent.v1.";
+-var __protoMessage377 = class extends CompactMessage {
++var __protoPackage70 = "agent.v1.";
++var __protoMessage369 = class extends CompactMessage {
+   static get runtime() {
+     return defineOwn(this, "runtime", proto3);
+   }
+   static $p() {
+-    return __protoPackage78;
++    return __protoPackage70;
+   }
+ };
+-var UpdatePrCodeTourExecutionMode = /* @__PURE__ */ enumType(proto3, __protoPackage78, "UpdatePrCodeTourExecutionMode", [[0, "UNSPECIFIED"], [1, "SERVER_SCHEDULED"], [2, "CLIENT_REQUIRED"], [3, "SKIPPED"], [4, "EDITED"]], 1);
+-var UpdatePrCodeTourArgs = class _UpdatePrCodeTourArgs extends __protoMessage377 {
++var UpdatePrCodeTourExecutionMode = /* @__PURE__ */ enumType(proto3, __protoPackage70, "UpdatePrCodeTourExecutionMode", [[0, "UNSPECIFIED"], [1, "SERVER_SCHEDULED"], [2, "CLIENT_REQUIRED"], [3, "SKIPPED"], [4, "EDITED"]], 1);
++var UpdatePrCodeTourArgs = class _UpdatePrCodeTourArgs extends __protoMessage369 {
+   constructor(data) {
+     super();
+     this.feedback = "";
+@@ -18041,7 +17316,7 @@
+     return ["UpdatePrCodeTourArgs|1 feedback 9|2 tool_call_id 9|3 base_sha 9?|4 head_sha 9?|5 source_revision_id 9?|6 revision_id 9?|7 markdown 9?|8 heading 9?|9 artifact_path 9?|10 artifact_alt 9?|11 scope_commit_hashes 9*|12 explicit_user_prompt 9?|13 pr_url 9?"];
+   }
+ };
+-var UpdatePrCodeTourResult = class _UpdatePrCodeTourResult extends __protoMessage377 {
++var UpdatePrCodeTourResult = class _UpdatePrCodeTourResult extends __protoMessage369 {
+   constructor(data) {
+     super();
+     this.result = { case: void 0 };
+@@ -18063,7 +17338,7 @@
+     return ["UpdatePrCodeTourResult|1 success #0 result|2 error #1 result", UpdatePrCodeTourSuccess, UpdatePrCodeTourError];
+   }
+ };
+-var UpdatePrCodeTourSuccess = class _UpdatePrCodeTourSuccess extends __protoMessage377 {
++var UpdatePrCodeTourSuccess = class _UpdatePrCodeTourSuccess extends __protoMessage369 {
+   constructor(data) {
+     super();
+     this.revisionId = "";
+@@ -18087,7 +17362,7 @@
+     return ["UpdatePrCodeTourSuccess|1 revision_id 9|2 message 9|3 execution_mode #0", UpdatePrCodeTourExecutionMode];
+   }
+ };
+-var UpdatePrCodeTourError = class _UpdatePrCodeTourError extends __protoMessage377 {
++var UpdatePrCodeTourError = class _UpdatePrCodeTourError extends __protoMessage369 {
+   constructor(data) {
+     super();
+     this.error = "";
+@@ -18109,7 +17384,7 @@
+     return ["UpdatePrCodeTourError|1 error 9"];
+   }
+ };
+-var UpdatePrCodeTourToolCall = class _UpdatePrCodeTourToolCall extends __protoMessage377 {
++var UpdatePrCodeTourToolCall = class _UpdatePrCodeTourToolCall extends __protoMessage369 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -18132,20 +17407,20 @@
+ };
+ 
+ // ../packages/proto/dist/generated/agent/v1/cursor_packages_pb.js
+-var __protoPackage79 = "agent.v1.";
+-var PackageType = /* @__PURE__ */ enumType(proto3, __protoPackage79, "PackageType", [[0, "UNSPECIFIED"], [1, "CURSOR_PROJECT"], [2, "CURSOR_PERSONAL"], [3, "CLAUDE_SKILL"], [4, "CLAUDE_PLUGIN"]], 1);
++var __protoPackage71 = "agent.v1.";
++var PackageType = /* @__PURE__ */ enumType(proto3, __protoPackage71, "PackageType", [[0, "UNSPECIFIED"], [1, "CURSOR_PROJECT"], [2, "CURSOR_PERSONAL"], [3, "CLAUDE_SKILL"], [4, "CLAUDE_PLUGIN"]], 1);
+ 
+ // ../packages/proto/dist/generated/agent/v1/agent_skills_pb.js
+-var __protoPackage80 = "agent.v1.";
+-var __protoMessage378 = class extends CompactMessage {
++var __protoPackage72 = "agent.v1.";
++var __protoMessage370 = class extends CompactMessage {
+   static get runtime() {
+     return defineOwn(this, "runtime", proto3);
+   }
+   static $p() {
+-    return __protoPackage80;
++    return __protoPackage72;
+   }
+ };
+-var AgentSkill = class _AgentSkill extends __protoMessage378 {
++var AgentSkill = class _AgentSkill extends __protoMessage370 {
+   constructor(data) {
+     super();
+     this.fullPath = "";
+@@ -18178,16 +17453,16 @@
+ };
+ 
+ // ../packages/proto/dist/generated/agent/v1/request_context_exec_pb.js
+-var __protoPackage81 = "agent.v1.";
+-var __protoMessage379 = class extends CompactMessage {
++var __protoPackage73 = "agent.v1.";
++var __protoMessage371 = class extends CompactMessage {
+   static get runtime() {
+     return defineOwn(this, "runtime", proto3);
+   }
+   static $p() {
+-    return __protoPackage81;
++    return __protoPackage73;
+   }
+ };
+-var SkillDescriptor = class _SkillDescriptor extends __protoMessage379 {
++var SkillDescriptor = class _SkillDescriptor extends __protoMessage371 {
+   constructor(data) {
+     super();
+     this.name = "";
+@@ -18214,7 +17489,7 @@
+     return ["SkillDescriptor|1 name 9|2 description 9|3 folder_path 9|4 enabled 8|5 parse_error 9?|6 readme_file_path 9|7 package_type #0", PackageType];
+   }
+ };
+-var SkillOptions = class _SkillOptions extends __protoMessage379 {
++var SkillOptions = class _SkillOptions extends __protoMessage371 {
+   constructor(data) {
+     super();
+     this.skillDescriptors = [];
+@@ -18236,7 +17511,7 @@
+     return ["SkillOptions|1 skill_descriptors #0*", SkillDescriptor];
+   }
+ };
+-var RequestContextRulesPart = class _RequestContextRulesPart extends __protoMessage379 {
++var RequestContextRulesPart = class _RequestContextRulesPart extends __protoMessage371 {
+   constructor(data) {
+     super();
+     this.rules = [];
+@@ -18259,7 +17534,7 @@
+     return ["RequestContextRulesPart|1 rules #0*|2 non_file_rules #0*|3 cloud_rule 9?", CursorRule];
+   }
+ };
+-var RequestContextSkillsPart = class _RequestContextSkillsPart extends __protoMessage379 {
++var RequestContextSkillsPart = class _RequestContextSkillsPart extends __protoMessage371 {
+   constructor(data) {
+     super();
+     this.agentSkills = [];
+@@ -18281,7 +17556,7 @@
+     return ["RequestContextSkillsPart|1 agent_skills #0*|2 skill_options #1?", AgentSkill, SkillOptions];
+   }
+ };
+-var RequestContextSubagentsPart = class _RequestContextSubagentsPart extends __protoMessage379 {
++var RequestContextSubagentsPart = class _RequestContextSubagentsPart extends __protoMessage371 {
+   constructor(data) {
+     super();
+     this.customSubagents = [];
+@@ -18303,7 +17578,7 @@
+     return ["RequestContextSubagentsPart|1 custom_subagents #0*", CustomSubagent];
+   }
+ };
+-var RequestContextMcpsPart = class _RequestContextMcpsPart extends __protoMessage379 {
++var RequestContextMcpsPart = class _RequestContextMcpsPart extends __protoMessage371 {
+   constructor(data) {
+     super();
+     this.tools = [];
+@@ -18328,17 +17603,17 @@
+ };
+ 
+ // ../packages/proto/dist/generated/agent/v1/selected_context_pb.js
+-var __protoPackage82 = "agent.v1.";
+-var __protoMessage380 = class extends CompactMessage {
++var __protoPackage74 = "agent.v1.";
++var __protoMessage372 = class extends CompactMessage {
+   static get runtime() {
+     return defineOwn(this, "runtime", proto3);
+   }
+   static $p() {
+-    return __protoPackage82;
++    return __protoPackage74;
+   }
+ };
+-var SelectedPluginCapabilityType = /* @__PURE__ */ enumType(proto3, __protoPackage82, "SelectedPluginCapabilityType", [[0, "UNSPECIFIED"], [1, "COMMAND"], [2, "SKILL"], [3, "SUBAGENT"]], 1);
+-var SelectedImage = class _SelectedImage extends __protoMessage380 {
++var SelectedPluginCapabilityType = /* @__PURE__ */ enumType(proto3, __protoPackage74, "SelectedPluginCapabilityType", [[0, "UNSPECIFIED"], [1, "COMMAND"], [2, "SKILL"], [3, "SUBAGENT"]], 1);
++var SelectedImage = class _SelectedImage extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.dataOrBlobId = { case: void 0 };
+@@ -18363,7 +17638,7 @@
+     return ["SelectedImage|1 blob_id 12 data_or_blob_id|8 data 12 data_or_blob_id|9 blob_id_with_data #0 data_or_blob_id|10 prompt_upload_ref #1 data_or_blob_id|2 uuid 9|3 path 9|4 dimension #2|7 mime_type 9", SelectedImage_BlobIdWithData, PromptUploadRef, SelectedImage_Dimension];
+   }
+ };
+-var SelectedImage_BlobIdWithData = class _SelectedImage_BlobIdWithData extends __protoMessage380 {
++var SelectedImage_BlobIdWithData = class _SelectedImage_BlobIdWithData extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.blobId = new Uint8Array(0);
+@@ -18386,7 +17661,7 @@
+     return ["SelectedImage.BlobIdWithData|1 blob_id 12|2 data 12"];
+   }
+ };
+-var SelectedImage_Dimension = class _SelectedImage_Dimension extends __protoMessage380 {
++var SelectedImage_Dimension = class _SelectedImage_Dimension extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.width = 0;
+@@ -18409,7 +17684,7 @@
+     return ["SelectedImage.Dimension|1 width 5|2 height 5"];
+   }
+ };
+-var PromptUploadRef = class _PromptUploadRef extends __protoMessage380 {
++var PromptUploadRef = class _PromptUploadRef extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.uploadId = "";
+@@ -18431,7 +17706,7 @@
+     return ["PromptUploadRef|1 upload_id 9"];
+   }
+ };
+-var SelectedDocument = class _SelectedDocument extends __protoMessage380 {
++var SelectedDocument = class _SelectedDocument extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.dataOrBlobId = { case: void 0 };
+@@ -18457,7 +17732,7 @@
+     return ["SelectedDocument|1 blob_id 12 data_or_blob_id|8 data 12 data_or_blob_id|9 blob_id_with_data #0 data_or_blob_id|10 prompt_upload_ref #1 data_or_blob_id|2 uuid 9|3 filename 9|4 mime_type 9|7 path 9", SelectedDocument_BlobIdWithData, PromptUploadRef];
+   }
+ };
+-var SelectedDocument_BlobIdWithData = class _SelectedDocument_BlobIdWithData extends __protoMessage380 {
++var SelectedDocument_BlobIdWithData = class _SelectedDocument_BlobIdWithData extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.blobId = new Uint8Array(0);
+@@ -18480,7 +17755,7 @@
+     return ["SelectedDocument.BlobIdWithData|1 blob_id 12|2 data 12"];
+   }
+ };
+-var SelectedVideo = class _SelectedVideo extends __protoMessage380 {
++var SelectedVideo = class _SelectedVideo extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.dataOrBlobId = { case: void 0 };
+@@ -18507,7 +17782,7 @@
+     return ["SelectedVideo|1 blob_id 12 data_or_blob_id|8 data 12 data_or_blob_id|9 blob_id_with_data #0 data_or_blob_id|11 signed_url #1 data_or_blob_id|2 uuid 9|3 path 9|4 fps 2?|7 mime_type 9|10 filename 9|12 materialize_to_filesystem 8", SelectedVideo_BlobIdWithData, SelectedVideo_SignedUrl];
+   }
+ };
+-var SelectedVideo_BlobIdWithData = class _SelectedVideo_BlobIdWithData extends __protoMessage380 {
++var SelectedVideo_BlobIdWithData = class _SelectedVideo_BlobIdWithData extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.blobId = new Uint8Array(0);
+@@ -18530,7 +17805,7 @@
+     return ["SelectedVideo.BlobIdWithData|1 blob_id 12|2 data 12"];
+   }
+ };
+-var SelectedVideo_SignedUrl = class _SelectedVideo_SignedUrl extends __protoMessage380 {
++var SelectedVideo_SignedUrl = class _SelectedVideo_SignedUrl extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.url = "";
+@@ -18556,7 +17831,7 @@
+     return ["SelectedVideo.SignedUrl|1 url 9|2 key 9|3 expires_at_unix_ms 3|4 refresh_after_unix_ms 3|5 conversation_id 9"];
+   }
+ };
+-var ExtraContextEntry = class _ExtraContextEntry extends __protoMessage380 {
++var ExtraContextEntry = class _ExtraContextEntry extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.dataOrBlobId = { case: void 0 };
+@@ -18578,7 +17853,7 @@
+     return ["ExtraContextEntry|1 data 9 data_or_blob_id|2 blob_id 12 data_or_blob_id"];
+   }
+ };
+-var SelectedFile = class _SelectedFile extends __protoMessage380 {
++var SelectedFile = class _SelectedFile extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.content = "";
+@@ -18601,7 +17876,7 @@
+     return ["SelectedFile|1 content 9|2 path 9|3 relative_path 9?"];
+   }
+ };
+-var SelectedCodeSelection = class _SelectedCodeSelection extends __protoMessage380 {
++var SelectedCodeSelection = class _SelectedCodeSelection extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.content = "";
+@@ -18624,7 +17899,7 @@
+     return ["SelectedCodeSelection|1 content 9|2 path 9|3 relative_path 9?|4 range #0", Range];
+   }
+ };
+-var SelectedTerminal = class _SelectedTerminal extends __protoMessage380 {
++var SelectedTerminal = class _SelectedTerminal extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.content = "";
+@@ -18646,7 +17921,7 @@
+     return ["SelectedTerminal|1 content 9|2 title 9?|3 path 9?"];
+   }
+ };
+-var SelectedTerminalSelection = class _SelectedTerminalSelection extends __protoMessage380 {
++var SelectedTerminalSelection = class _SelectedTerminalSelection extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.content = "";
+@@ -18668,7 +17943,7 @@
+     return ["SelectedTerminalSelection|1 content 9|2 title 9?|3 path 9?|4 range #0", Range];
+   }
+ };
+-var SelectedFolder = class _SelectedFolder extends __protoMessage380 {
++var SelectedFolder = class _SelectedFolder extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.path = "";
+@@ -18690,7 +17965,7 @@
+     return ["SelectedFolder|1 path 9|2 relative_path 9?|3 directory_tree #0", LsDirectoryTreeNode];
+   }
+ };
+-var SelectedExternalLink = class _SelectedExternalLink extends __protoMessage380 {
++var SelectedExternalLink = class _SelectedExternalLink extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.url = "";
+@@ -18713,7 +17988,7 @@
+     return ["SelectedExternalLink|1 url 9|2 uuid 9|3 pdf_content 9?|4 is_pdf 8?|5 filename 9?|6 blob_id 12?"];
+   }
+ };
+-var SelectedCursorRule = class _SelectedCursorRule extends __protoMessage380 {
++var SelectedCursorRule = class _SelectedCursorRule extends __protoMessage372 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -18734,7 +18009,7 @@
+     return ["SelectedCursorRule|1 rule #0", CursorRule];
+   }
+ };
+-var SelectedGitDiff = class _SelectedGitDiff extends __protoMessage380 {
++var SelectedGitDiff = class _SelectedGitDiff extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.content = "";
+@@ -18757,7 +18032,7 @@
+     return ["SelectedGitDiff|1 content 9|2 full_content_length_char_count 5"];
+   }
+ };
+-var SelectedGitDiffFromBranchToMain = class _SelectedGitDiffFromBranchToMain extends __protoMessage380 {
++var SelectedGitDiffFromBranchToMain = class _SelectedGitDiffFromBranchToMain extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.content = "";
+@@ -18780,7 +18055,7 @@
+     return ["SelectedGitDiffFromBranchToMain|1 content 9|2 full_content_length_char_count 5"];
+   }
+ };
+-var SelectedGitCommit = class _SelectedGitCommit extends __protoMessage380 {
++var SelectedGitCommit = class _SelectedGitCommit extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.sha = "";
+@@ -18804,7 +18079,7 @@
+     return ["SelectedGitCommit|1 sha 9|2 message 9|3 description 9?|4 diff 9"];
+   }
+ };
+-var SelectedPullRequest = class _SelectedPullRequest extends __protoMessage380 {
++var SelectedPullRequest = class _SelectedPullRequest extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.number = 0;
+@@ -18828,7 +18103,7 @@
+     return ["SelectedPullRequest|1 number 5|2 url 9|3 title 9?|4 folder_path 9|5 summary_json 9?|6 description 9?|7 blob_id 12?"];
+   }
+ };
+-var SelectedGitPRDiffSelection = class _SelectedGitPRDiffSelection extends __protoMessage380 {
++var SelectedGitPRDiffSelection = class _SelectedGitPRDiffSelection extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.prUrl = "";
+@@ -18853,7 +18128,7 @@
+     return ["SelectedGitPRDiffSelection|1 pr_url 9|2 file_path 9|3 start_line 5|4 end_line 5|5 diff_content 9?|6 blob_id 12?"];
+   }
+ };
+-var SelectedPluginCapabilityRef = class _SelectedPluginCapabilityRef extends __protoMessage380 {
++var SelectedPluginCapabilityRef = class _SelectedPluginCapabilityRef extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.pluginId = "";
+@@ -18878,7 +18153,7 @@
+     return ["SelectedPluginCapabilityRef|1 plugin_id 9|2 capability_type #0|3 source_path 9|4 snapshot_token 9|5 resolved_commit_sha 9?", SelectedPluginCapabilityType];
+   }
+ };
+-var SelectedCursorCommand = class _SelectedCursorCommand extends __protoMessage380 {
++var SelectedCursorCommand = class _SelectedCursorCommand extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.name = "";
+@@ -18901,7 +18176,7 @@
+     return ["SelectedCursorCommand|1 name 9|2 content 9|3 plugin_capability #0?|4 full_path 9?|5 display_name 9?", SelectedPluginCapabilityRef];
+   }
+ };
+-var SelectedDocumentation = class _SelectedDocumentation extends __protoMessage380 {
++var SelectedDocumentation = class _SelectedDocumentation extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.docId = "";
+@@ -18924,7 +18199,7 @@
+     return ["SelectedDocumentation|1 doc_id 9|2 name 9"];
+   }
+ };
+-var SelectedPastChat = class _SelectedPastChat extends __protoMessage380 {
++var SelectedPastChat = class _SelectedPastChat extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.agentId = "";
+@@ -18947,7 +18222,7 @@
+     return ["SelectedPastChat|1 agent_id 9|2 name 9"];
+   }
+ };
+-var RecentAgent = class _RecentAgent extends __protoMessage380 {
++var RecentAgent = class _RecentAgent extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.name = "";
+@@ -18970,7 +18245,7 @@
+     return ["RecentAgent|1 name 9|2 path 9|3 overview 9?"];
+   }
+ };
+-var RecentAgentsContext = class _RecentAgentsContext extends __protoMessage380 {
++var RecentAgentsContext = class _RecentAgentsContext extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.recentAgents = [];
+@@ -18992,7 +18267,7 @@
+     return ["RecentAgentsContext|1 recent_agents #0*", RecentAgent];
+   }
+ };
+-var CallFrame = class _CallFrame extends __protoMessage380 {
++var CallFrame = class _CallFrame extends __protoMessage372 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -19013,7 +18288,7 @@
+     return ["CallFrame|1 function_name 9?|2 url 9?|3 line_number 5?|4 column_number 5?"];
+   }
+ };
+-var StackTrace = class _StackTrace extends __protoMessage380 {
++var StackTrace = class _StackTrace extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.callFrames = [];
+@@ -19035,7 +18310,7 @@
+     return ["StackTrace|1 call_frames #0*|2 raw_stack_trace 9?", CallFrame];
+   }
+ };
+-var SelectedConsoleLog = class _SelectedConsoleLog extends __protoMessage380 {
++var SelectedConsoleLog = class _SelectedConsoleLog extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.message = "";
+@@ -19061,7 +18336,7 @@
+     return ["SelectedConsoleLog|1 message 9|2 timestamp 1|3 level 9|4 client_name 9|5 session_id 9|6 stack_trace #0?|7 object_data_json 9?", StackTrace];
+   }
+ };
+-var SelectedUIElement = class _SelectedUIElement extends __protoMessage380 {
++var SelectedUIElement = class _SelectedUIElement extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.element = "";
+@@ -19086,7 +18361,7 @@
+     return ["SelectedUIElement|1 element 9|2 xpath 9|3 text_content 9|4 extra 9|5 component 9?|6 component_props_json 9?"];
+   }
+ };
+-var SelectedSubagent = class _SelectedSubagent extends __protoMessage380 {
++var SelectedSubagent = class _SelectedSubagent extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.name = "";
+@@ -19108,7 +18383,7 @@
+     return ["SelectedSubagent|1 name 9"];
+   }
+ };
+-var SelectedBrowser = class _SelectedBrowser extends __protoMessage380 {
++var SelectedBrowser = class _SelectedBrowser extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.browserId = "";
+@@ -19131,7 +18406,7 @@
+     return ["SelectedBrowser|1 browser_id 9|2 url 9|3 page_title 9?"];
+   }
+ };
+-var SelectedAgenticGitActionCommitParams = class _SelectedAgenticGitActionCommitParams extends __protoMessage380 {
++var SelectedAgenticGitActionCommitParams = class _SelectedAgenticGitActionCommitParams extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.filesToCommit = [];
+@@ -19157,7 +18432,7 @@
+     return ["SelectedAgenticGitActionCommitParams|1 files_to_commit 9*|2 files_to_exclude_from_commit 9*|3 should_stage_all_changes 8|4 create_pr_draft 8?|5 files_to_commit_with_status #0*|6 files_to_exclude_from_commit_with_status #0*", SelectedAgenticGitFileWithStatus];
+   }
+ };
+-var SelectedAgenticGitActionCreateBranchParams = class _SelectedAgenticGitActionCreateBranchParams extends __protoMessage380 {
++var SelectedAgenticGitActionCreateBranchParams = class _SelectedAgenticGitActionCreateBranchParams extends __protoMessage372 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -19178,7 +18453,7 @@
+     return ["SelectedAgenticGitActionCreateBranchParams"];
+   }
+ };
+-var SelectedAgenticGitFileWithStatus = class _SelectedAgenticGitFileWithStatus extends __protoMessage380 {
++var SelectedAgenticGitFileWithStatus = class _SelectedAgenticGitFileWithStatus extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.path = "";
+@@ -19200,7 +18475,7 @@
+     return ["SelectedAgenticGitFileWithStatus|1 path 9|2 status 9?"];
+   }
+ };
+-var SelectedAgenticGitActionPushParams = class _SelectedAgenticGitActionPushParams extends __protoMessage380 {
++var SelectedAgenticGitActionPushParams = class _SelectedAgenticGitActionPushParams extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.filesToPush = [];
+@@ -19222,7 +18497,7 @@
+     return ["SelectedAgenticGitActionPushParams|1 files_to_push 9*|2 create_pr_draft 8?"];
+   }
+ };
+-var SelectedAgenticGitActionFixMergeConflictsParams = class _SelectedAgenticGitActionFixMergeConflictsParams extends __protoMessage380 {
++var SelectedAgenticGitActionFixMergeConflictsParams = class _SelectedAgenticGitActionFixMergeConflictsParams extends __protoMessage372 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -19243,7 +18518,7 @@
+     return ["SelectedAgenticGitActionFixMergeConflictsParams|1 base_branch 9?|2 pr_url 9?"];
+   }
+ };
+-var SelectedAgenticGitActionBabysitPrInCloudParams = class _SelectedAgenticGitActionBabysitPrInCloudParams extends __protoMessage380 {
++var SelectedAgenticGitActionBabysitPrInCloudParams = class _SelectedAgenticGitActionBabysitPrInCloudParams extends __protoMessage372 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -19264,7 +18539,7 @@
+     return ["SelectedAgenticGitActionBabysitPrInCloudParams|1 base_branch 9?"];
+   }
+ };
+-var SelectedAgenticGitActionUpdateBranchParams = class _SelectedAgenticGitActionUpdateBranchParams extends __protoMessage380 {
++var SelectedAgenticGitActionUpdateBranchParams = class _SelectedAgenticGitActionUpdateBranchParams extends __protoMessage372 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -19285,7 +18560,7 @@
+     return ["SelectedAgenticGitActionUpdateBranchParams|1 base_branch 9?"];
+   }
+ };
+-var SelectedAgenticGitActionPullLocallyParams = class _SelectedAgenticGitActionPullLocallyParams extends __protoMessage380 {
++var SelectedAgenticGitActionPullLocallyParams = class _SelectedAgenticGitActionPullLocallyParams extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.remoteBranch = "";
+@@ -19307,7 +18582,7 @@
+     return ["SelectedAgenticGitActionPullLocallyParams|1 remote_branch 9"];
+   }
+ };
+-var SelectedAgenticGitAction = class _SelectedAgenticGitAction extends __protoMessage380 {
++var SelectedAgenticGitAction = class _SelectedAgenticGitAction extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.params = { case: void 0 };
+@@ -19329,7 +18604,7 @@
+     return ["SelectedAgenticGitAction|2 commit_params #0 params|6 commit_and_push_params #0 params|3 push_params #1 params|7 create_pr_params #1 params|8 create_pr_with_changes_params #0 params|4 fix_merge_conflicts_params #2 params|11 babysit_pr_in_cloud_params #3 params|14 apply_locally_params #4 params|15 checkout_branch_params #4 params|12 create_branch_and_commit_params #0 params|13 create_branch_commit_and_push_params #0 params|16 update_branch_params #5 params|17 create_branch_params #6 params|5 branch_context #7?|9 path_to_template_file 9?|10 path_to_template_dir 9?", SelectedAgenticGitActionCommitParams, SelectedAgenticGitActionPushParams, SelectedAgenticGitActionFixMergeConflictsParams, SelectedAgenticGitActionBabysitPrInCloudParams, SelectedAgenticGitActionPullLocallyParams, SelectedAgenticGitActionUpdateBranchParams, SelectedAgenticGitActionCreateBranchParams, SelectedGitBranchContext];
+   }
+ };
+-var SelectedGitBranchContext = class _SelectedGitBranchContext extends __protoMessage380 {
++var SelectedGitBranchContext = class _SelectedGitBranchContext extends __protoMessage372 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -19350,7 +18625,7 @@
+     return ["SelectedGitBranchContext|1 current_branch 9?|2 base_branch 9?|3 agent_branch_prefix 9?"];
+   }
+ };
+-var SelectedContext = class _SelectedContext extends __protoMessage380 {
++var SelectedContext = class _SelectedContext extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.selectedImages = [];
+@@ -19394,7 +18669,7 @@
+     return ["SelectedContext|1 selected_images #0*|2 invocation_context #1?|3 extra_context 9*|16 extra_context_entries #2*|4 files #3*|5 code_selections #4*|6 terminals #5*|7 terminal_selections #6*|8 folders #7*|9 external_links #8*|10 cursor_rules #9*|18 git_diff #10?|11 git_diff_from_branch_to_main #11?|12 cursor_commands #12*|13 documentations #13*|14 ui_elements #14*|15 console_logs #15*|17 git_commits #16*|19 past_chats #17*|20 git_pr_diff_selections #18*|21 selected_pull_requests #19*|22 selected_subagents #20*|23 selected_videos #21*|24 selected_browsers #22*|25 selected_documents #23*|26 selected_skills #24*|27 recent_agents_context #25?|34 selected_agentic_git_action #26?", SelectedImage, InvocationContext, ExtraContextEntry, SelectedFile, SelectedCodeSelection, SelectedTerminal, SelectedTerminalSelection, SelectedFolder, SelectedExternalLink, SelectedCursorRule, SelectedGitDiff, SelectedGitDiffFromBranchToMain, SelectedCursorCommand, SelectedDocumentation, SelectedUIElement, SelectedConsoleLog, SelectedGitCommit, SelectedPastChat, SelectedGitPRDiffSelection, SelectedPullRequest, SelectedSubagent, SelectedVideo, SelectedBrowser, SelectedDocument, AgentSkill, RecentAgentsContext, SelectedAgenticGitAction];
+   }
+ };
+-var InvocationContext = class _InvocationContext extends __protoMessage380 {
++var InvocationContext = class _InvocationContext extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.data = { case: void 0 };
+@@ -19416,7 +18691,7 @@
+     return ["InvocationContext|1 slack_thread #0 data|2 github_pr #1 data|3 ide_state #2 data|4 microsoft_teams_thread #3 data|10 blob_id 12 data", InvocationContext_SlackThread, InvocationContext_GithubPR, InvocationContext_IdeState, InvocationContext_MicrosoftTeamsThread];
+   }
+ };
+-var InvocationContext_SlackThread = class _InvocationContext_SlackThread extends __protoMessage380 {
++var InvocationContext_SlackThread = class _InvocationContext_SlackThread extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.thread = "";
+@@ -19438,7 +18713,7 @@
+     return ["InvocationContext.SlackThread|1 thread 9|2 channel_name 9?|3 channel_purpose 9?|4 channel_topic 9?|5 sender_name 9?|6 sender_id 9?|7 sender_type 9?|8 is_directly_addressed 8?|9 message_permalink 9?"];
+   }
+ };
+-var InvocationContext_MicrosoftTeamsThread = class _InvocationContext_MicrosoftTeamsThread extends __protoMessage380 {
++var InvocationContext_MicrosoftTeamsThread = class _InvocationContext_MicrosoftTeamsThread extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.thread = "";
+@@ -19460,7 +18735,7 @@
+     return ["InvocationContext.MicrosoftTeamsThread|1 thread 9|2 channel_name 9?|3 team_name 9?|4 channel_description 9?|5 team_description 9?"];
+   }
+ };
+-var InvocationContext_GithubPR = class _InvocationContext_GithubPR extends __protoMessage380 {
++var InvocationContext_GithubPR = class _InvocationContext_GithubPR extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.title = "";
+@@ -19484,7 +18759,7 @@
+     return ["InvocationContext.GithubPR|1 title 9|2 description 9|3 comments 9|4 ci_failures 9?|5 code_tour_view #0?", InvocationContext_GithubPR_CodeTourView];
+   }
+ };
+-var InvocationContext_GithubPR_CodeTourView = class _InvocationContext_GithubPR_CodeTourView extends __protoMessage380 {
++var InvocationContext_GithubPR_CodeTourView = class _InvocationContext_GithubPR_CodeTourView extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.headSha = "";
+@@ -19506,7 +18781,7 @@
+     return ["InvocationContext.GithubPR.CodeTourView|1 head_sha 9|2 current_revision_id 9?|3 visible_section_id 9?|4 visible_step_id 9?|5 path_scope_prefix 9?"];
+   }
+ };
+-var InvocationContext_IdeState = class _InvocationContext_IdeState extends __protoMessage380 {
++var InvocationContext_IdeState = class _InvocationContext_IdeState extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.visibleFiles = [];
+@@ -19530,7 +18805,7 @@
+     return ["InvocationContext.IdeState|1 visible_files #0*|2 recently_viewed_files #0*|3 currently_viewed_prs #1*", InvocationContext_IdeState_File, InvocationContext_IdeState_ViewedPullRequest];
+   }
+ };
+-var InvocationContext_IdeState_File = class _InvocationContext_IdeState_File extends __protoMessage380 {
++var InvocationContext_IdeState_File = class _InvocationContext_IdeState_File extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.path = "";
+@@ -19553,7 +18828,7 @@
+     return ["InvocationContext.IdeState.File|1 path 9|2 relative_path 9?|3 cursor_position #0?|4 total_lines 5|5 active_command 9?", InvocationContext_IdeState_File_CursorPosition];
+   }
+ };
+-var InvocationContext_IdeState_File_CursorPosition = class _InvocationContext_IdeState_File_CursorPosition extends __protoMessage380 {
++var InvocationContext_IdeState_File_CursorPosition = class _InvocationContext_IdeState_File_CursorPosition extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.line = 0;
+@@ -19576,7 +18851,7 @@
+     return ["InvocationContext.IdeState.File.CursorPosition|1 line 5|2 text 9"];
+   }
+ };
+-var InvocationContext_IdeState_ViewedPullRequest = class _InvocationContext_IdeState_ViewedPullRequest extends __protoMessage380 {
++var InvocationContext_IdeState_ViewedPullRequest = class _InvocationContext_IdeState_ViewedPullRequest extends __protoMessage372 {
+   constructor(data) {
+     super();
+     this.number = 0;
+@@ -19601,23 +18876,23 @@
+ };
+ 
+ // ../packages/proto/dist/generated/agent/v1/agent_pb.js
+-var __protoPackage83 = "agent.v1.";
+-var __protoMessage381 = class extends CompactMessage {
++var __protoPackage75 = "agent.v1.";
++var __protoMessage373 = class extends CompactMessage {
+   static get runtime() {
+     return defineOwn(this, "runtime", proto3);
+   }
+   static $p() {
+-    return __protoPackage83;
++    return __protoPackage75;
+   }
+ };
+-var AgentMode = /* @__PURE__ */ enumType(proto3, __protoPackage83, "AgentMode", [[0, "UNSPECIFIED"], [1, "AGENT"], [2, "ASK"], [3, "PLAN"], [4, "DEBUG"], [5, "TRIAGE"], [7, "MULTITASK"], [8, "CUSTOM"]], 1);
+-var SubagentRunStatus = /* @__PURE__ */ enumType(proto3, __protoPackage83, "SubagentRunStatus", [[0, "UNSPECIFIED"], [1, "RUNNING"], [2, "BACKGROUNDED"], [3, "SUCCESS"], [4, "ERROR"], [5, "ABORTED"]], 1);
+-var SubagentDispatchTool = /* @__PURE__ */ enumType(proto3, __protoPackage83, "SubagentDispatchTool", [[0, "UNSPECIFIED"], [1, "TASK"], [2, "CREATE_AGENT"], [3, "SEND_TO_AGENT"], [4, "CREATE_PROJECT"]], 1);
+-var CustomModeSource = /* @__PURE__ */ enumType(proto3, __protoPackage83, "CustomModeSource", [[0, "UNSPECIFIED"], [1, "AGENT_SKILL"], [2, "PLUGIN_SKILL"], [3, "REPO_SKILL"], [4, "MANAGED_SKILL"]], 1);
+-var SimulatedMsgReason = /* @__PURE__ */ enumType(proto3, __protoPackage83, "SimulatedMsgReason", [[0, "UNSPECIFIED"], [1, "PLAN_EXECUTION"], [2, "COMMIT_REMINDER"], [3, "BACKGROUND_TASK_COMPLETION"], [4, "DIFF_TAB_COMMIT"], [5, "DIFF_TAB_COMMIT_AND_PUSH"], [6, "DIFF_TAB_PUSH"], [7, "DIFF_TAB_CREATE_PR"], [8, "DIFF_TAB_FIX_MERGE_CONFLICTS"], [9, "USER_SENT_TO_SUBAGENT"], [10, "USER_INTERRUPTED_SUBAGENT"], [11, "USER_QUEUED_TO_SUBAGENT"], [12, "BABYSIT_PR_IN_CLOUD"], [13, "CI_PANEL_INVESTIGATE_FAILURE"], [14, "MULTITASK"], [15, "BUILD_IN_PARALLEL"], [16, "MULTITASK_SPLIT_PRS"], [17, "APPLY_LOCALLY"], [18, "CHECKOUT_BRANCH"], [19, "DIFF_TAB_UPDATE_BRANCH"], [20, "PR_TAB_BUGBOT_FIX"], [22, "RUN_BUGBOT_REVIEW"], [23, "RUN_SECURITY_REVIEW"], [24, "FSD_APPLY_FINDING"], [25, "FSD_UNDO_FINDING"], [26, "FSD_START"], [27, "FSD_PR_INTERRUPT"], [28, "SUBSCRIPTION"], [29, "DIFF_TAB_CREATE_BRANCH"], [30, "AGENT_STORE_CONFLICT"], [31, "GOAL_CONTINUATION"], [32, "PROJECT_KICKOFF"], [33, "MARKDOWN_PROMPT_BUTTON"], [34, "USER_QUICK_ACTION"], [35, "INTERACTION_RESPONSE"]], 1);
+-var SubscriptionSource = /* @__PURE__ */ enumType(proto3, __protoPackage83, "SubscriptionSource", [[0, "UNSPECIFIED"], [1, "SLACK"], [2, "GITHUB"], [3, "LINEAR"], [4, "ORIGIN"], [5, "FACTORY"]], 1);
+-var ReplyAudience = /* @__PURE__ */ enumType(proto3, __protoPackage83, "ReplyAudience", [[0, "UNSPECIFIED"], [1, "USER"], [2, "AGENT"]], 1);
+-var TaskArgs = class _TaskArgs extends __protoMessage381 {
++var AgentMode = /* @__PURE__ */ enumType(proto3, __protoPackage75, "AgentMode", [[0, "UNSPECIFIED"], [1, "AGENT"], [2, "ASK"], [3, "PLAN"], [4, "DEBUG"], [5, "TRIAGE"], [7, "MULTITASK"], [8, "CUSTOM"]], 1);
++var SubagentRunStatus = /* @__PURE__ */ enumType(proto3, __protoPackage75, "SubagentRunStatus", [[0, "UNSPECIFIED"], [1, "RUNNING"], [2, "BACKGROUNDED"], [3, "SUCCESS"], [4, "ERROR"], [5, "ABORTED"]], 1);
++var SubagentDispatchTool = /* @__PURE__ */ enumType(proto3, __protoPackage75, "SubagentDispatchTool", [[0, "UNSPECIFIED"], [1, "TASK"], [2, "CREATE_AGENT"], [3, "SEND_TO_AGENT"], [4, "CREATE_PROJECT"]], 1);
++var CustomModeSource = /* @__PURE__ */ enumType(proto3, __protoPackage75, "CustomModeSource", [[0, "UNSPECIFIED"], [1, "AGENT_SKILL"], [2, "PLUGIN_SKILL"], [3, "REPO_SKILL"], [4, "MANAGED_SKILL"]], 1);
++var SimulatedMsgReason = /* @__PURE__ */ enumType(proto3, __protoPackage75, "SimulatedMsgReason", [[0, "UNSPECIFIED"], [1, "PLAN_EXECUTION"], [2, "COMMIT_REMINDER"], [3, "BACKGROUND_TASK_COMPLETION"], [4, "DIFF_TAB_COMMIT"], [5, "DIFF_TAB_COMMIT_AND_PUSH"], [6, "DIFF_TAB_PUSH"], [7, "DIFF_TAB_CREATE_PR"], [8, "DIFF_TAB_FIX_MERGE_CONFLICTS"], [9, "USER_SENT_TO_SUBAGENT"], [10, "USER_INTERRUPTED_SUBAGENT"], [11, "USER_QUEUED_TO_SUBAGENT"], [12, "BABYSIT_PR_IN_CLOUD"], [13, "CI_PANEL_INVESTIGATE_FAILURE"], [14, "MULTITASK"], [15, "BUILD_IN_PARALLEL"], [16, "MULTITASK_SPLIT_PRS"], [17, "APPLY_LOCALLY"], [18, "CHECKOUT_BRANCH"], [19, "DIFF_TAB_UPDATE_BRANCH"], [20, "PR_TAB_BUGBOT_FIX"], [22, "RUN_BUGBOT_REVIEW"], [23, "RUN_SECURITY_REVIEW"], [24, "FSD_APPLY_FINDING"], [25, "FSD_UNDO_FINDING"], [26, "FSD_START"], [27, "FSD_PR_INTERRUPT"], [28, "SUBSCRIPTION"], [29, "DIFF_TAB_CREATE_BRANCH"], [30, "AGENT_STORE_CONFLICT"], [31, "GOAL_CONTINUATION"], [32, "PROJECT_KICKOFF"], [33, "MARKDOWN_PROMPT_BUTTON"], [34, "USER_QUICK_ACTION"], [35, "INTERACTION_RESPONSE"]], 1);
++var SubscriptionSource = /* @__PURE__ */ enumType(proto3, __protoPackage75, "SubscriptionSource", [[0, "UNSPECIFIED"], [1, "SLACK"], [2, "GITHUB"], [3, "LINEAR"], [4, "ORIGIN"], [5, "FACTORY"]], 1);
++var ReplyAudience = /* @__PURE__ */ enumType(proto3, __protoPackage75, "ReplyAudience", [[0, "UNSPECIFIED"], [1, "USER"], [2, "AGENT"]], 1);
++var TaskArgs = class _TaskArgs extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.description = "";
+@@ -19644,7 +18919,7 @@
+     return ["TaskArgs|1 description 9|2 prompt 9|3 subagent_type #0|4 model 9?|5 resume 9?|6 agent_id 9?|7 attachments 9*|8 mode #1|9 responding_to_message_ids 9*|10 environment #2|11 machine #3?", SubagentType, TaskMode, SubagentExecutionEnvironment, TargetMachine];
+   }
+ };
+-var TargetMachine = class _TargetMachine extends __protoMessage381 {
++var TargetMachine = class _TargetMachine extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.machine = { case: void 0 };
+@@ -19666,7 +18941,7 @@
+     return ["TargetMachine|1 same_machine #0 machine|2 new_cloud_vm #1 machine|3 self_hosted_worker #2 machine|4 self_hosted_pool #3 machine", SameMachineTarget, NewCloudVmTarget, SelfHostedWorkerTarget, SelfHostedPoolTarget];
+   }
+ };
+-var SameMachineTarget = class _SameMachineTarget extends __protoMessage381 {
++var SameMachineTarget = class _SameMachineTarget extends __protoMessage373 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -19687,7 +18962,7 @@
+     return ["SameMachineTarget"];
+   }
+ };
+-var NewCloudVmTarget = class _NewCloudVmTarget extends __protoMessage381 {
++var NewCloudVmTarget = class _NewCloudVmTarget extends __protoMessage373 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -19708,7 +18983,7 @@
+     return ["NewCloudVmTarget|1 environment_build_id 9?|2 base_branch 9?"];
+   }
+ };
+-var SelfHostedWorkerTarget = class _SelfHostedWorkerTarget extends __protoMessage381 {
++var SelfHostedWorkerTarget = class _SelfHostedWorkerTarget extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.workerId = "";
+@@ -19730,7 +19005,7 @@
+     return ["SelfHostedWorkerTarget|1 worker_id 9"];
+   }
+ };
+-var SelfHostedPoolTarget = class _SelfHostedPoolTarget extends __protoMessage381 {
++var SelfHostedPoolTarget = class _SelfHostedPoolTarget extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.labels = [];
+@@ -19752,7 +19027,7 @@
+     return ["SelfHostedPoolTarget|1 pool 9?|2 labels #0*", SelfHostedWorkerLabel];
+   }
+ };
+-var SelfHostedWorkerLabel = class _SelfHostedWorkerLabel extends __protoMessage381 {
++var SelfHostedWorkerLabel = class _SelfHostedWorkerLabel extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.key = "";
+@@ -19775,7 +19050,7 @@
+     return ["SelfHostedWorkerLabel|1 key 9|2 value 9"];
+   }
+ };
+-var TaskSuccess = class _TaskSuccess extends __protoMessage381 {
++var TaskSuccess = class _TaskSuccess extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.conversationSteps = [];
+@@ -19799,7 +19074,7 @@
+     return ["TaskSuccess|1 conversation_steps #0*|2 agent_id 9?|3 is_background 8|4 duration_ms 4?|5 result_suffix 9?|6 background_reason #1|7 transcript_path 9?", ConversationStep, SubagentBackgroundReason];
+   }
+ };
+-var TaskError = class _TaskError extends __protoMessage381 {
++var TaskError = class _TaskError extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.error = "";
+@@ -19821,7 +19096,7 @@
+     return ["TaskError|1 error 9"];
+   }
+ };
+-var TaskResult = class _TaskResult extends __protoMessage381 {
++var TaskResult = class _TaskResult extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.result = { case: void 0 };
+@@ -19843,7 +19118,7 @@
+     return ["TaskResult|1 success #0 result|2 error #1 result", TaskSuccess, TaskError];
+   }
+ };
+-var TaskToolCall = class _TaskToolCall extends __protoMessage381 {
++var TaskToolCall = class _TaskToolCall extends __protoMessage373 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -19864,7 +19139,7 @@
+     return ["TaskToolCall|1 args #0|2 result #1|3 cloud_agent_bc_id 9?", TaskArgs, TaskResult];
+   }
+ };
+-var SetActiveBranchArgs = class _SetActiveBranchArgs extends __protoMessage381 {
++var SetActiveBranchArgs = class _SetActiveBranchArgs extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.path = "";
+@@ -19887,7 +19162,7 @@
+     return ["SetActiveBranchArgs|1 path 9|2 branch_name 9"];
+   }
+ };
+-var SetActiveBranchSuccess = class _SetActiveBranchSuccess extends __protoMessage381 {
++var SetActiveBranchSuccess = class _SetActiveBranchSuccess extends __protoMessage373 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -19908,7 +19183,7 @@
+     return ["SetActiveBranchSuccess"];
+   }
+ };
+-var SetActiveBranchError = class _SetActiveBranchError extends __protoMessage381 {
++var SetActiveBranchError = class _SetActiveBranchError extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.error = "";
+@@ -19930,7 +19205,7 @@
+     return ["SetActiveBranchError|1 error 9"];
+   }
+ };
+-var SetActiveBranchResult = class _SetActiveBranchResult extends __protoMessage381 {
++var SetActiveBranchResult = class _SetActiveBranchResult extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.result = { case: void 0 };
+@@ -19952,7 +19227,7 @@
+     return ["SetActiveBranchResult|1 success #0 result|2 error #1 result", SetActiveBranchSuccess, SetActiveBranchError];
+   }
+ };
+-var SetActiveBranchToolCall = class _SetActiveBranchToolCall extends __protoMessage381 {
++var SetActiveBranchToolCall = class _SetActiveBranchToolCall extends __protoMessage373 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -19973,7 +19248,7 @@
+     return ["SetActiveBranchToolCall|1 args #0|2 result #1", SetActiveBranchArgs, SetActiveBranchResult];
+   }
+ };
+-var ToolCall = class _ToolCall extends __protoMessage381 {
++var ToolCall = class _ToolCall extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.tool = { case: void 0 };
+@@ -19993,10 +19268,10 @@
+     return proto3.util.equals(_ToolCall, a, b);
+   }
+   static $() {
+-    return ["ToolCall|1 shell_tool_call #0 tool|3 delete_tool_call #1 tool|4 glob_tool_call #2 tool|5 grep_tool_call #3 tool|8 read_tool_call #4 tool|9 update_todos_tool_call #5 tool|10 read_todos_tool_call #6 tool|12 edit_tool_call #7 tool|13 ls_tool_call #8 tool|14 read_lints_tool_call #9 tool|15 mcp_tool_call #10 tool|16 sem_search_tool_call #11 tool|17 create_plan_tool_call #12 tool|18 web_search_tool_call #13 tool|19 task_tool_call #14 tool|20 list_mcp_resources_tool_call #15 tool|21 read_mcp_resource_tool_call #16 tool|22 apply_agent_diff_tool_call #17 tool|23 ask_question_tool_call #18 tool|24 fetch_tool_call #19 tool|25 switch_mode_tool_call #20 tool|28 generate_image_tool_call #21 tool|29 record_screen_tool_call #22 tool|30 computer_use_tool_call #23 tool|31 write_shell_stdin_tool_call #24 tool|32 reflect_tool_call #25 tool|33 setup_vm_environment_tool_call #26 tool|34 truncated_tool_call #27 tool|35 start_grind_execution_tool_call #28 tool|36 start_grind_planning_tool_call #29 tool|37 web_fetch_tool_call #30 tool|38 report_bugfix_results_tool_call #31 tool|39 ai_attribution_tool_call #32 tool|40 pr_management_tool_call #33 tool|41 mcp_auth_tool_call #34 tool|42 await_tool_call #35 tool|43 blame_by_file_path_tool_call #36 tool|44 get_mcp_tools_tool_call #37 tool|45 report_bug_tool_call #38 tool|46 set_active_branch_tool_call #39 tool|48 communicate_update_tool_call #40 tool|49 send_final_summary_tool_call #41 tool|51 replace_env_tool_call #42 tool|52 edit_pr_labels_tool_call #43 tool|53 record_ci_investigation_findings_tool_call #44 tool|55 send_message_tool_call #45 tool|56 fetch_cloud_agent_data_tool_call #46 tool|58 send_to_user_tool_call #47 tool|61 pi_read_tool_call #48 tool|62 pi_bash_tool_call #49 tool|63 pi_edit_tool_call #50 tool|64 pi_write_tool_call #51 tool|65 pi_grep_tool_call #52 tool|66 pi_find_tool_call #53 tool|67 pi_ls_tool_call #54 tool|68 connect_scm_tool_call #55 tool|69 search_conversations_tool_call #56 tool|70 create_goal_tool_call #57 tool|71 update_goal_tool_call #58 tool|73 get_agent_status_tool_call #59 tool|74 send_to_agent_tool_call #60 tool|75 read_agent_transcript_tool_call #61 tool|76 create_agent_tool_call #62 tool|77 stop_agent_tool_call #63 tool|79 write_canvas_tool_call #64 tool|80 read_canvas_tool_call #65 tool|81 generate_video_tool_call #66 tool|82 x_search_tool_call #67 tool|83 get_origin_pr_code_tour_tool_call #68 tool|84 update_origin_pr_code_tour_tool_call #69 tool|85 list_tracked_tasks_tool_call #70 tool|86 create_tracked_tasks_tool_call #71 tool|87 update_tracked_tasks_tool_call #72 tool|88 delete_tracked_tasks_tool_call #73 tool|89 update_tracked_task_statuses_tool_call #74 tool|90 create_project_tool_call #75 tool|91 update_tracked_task_tags_tool_call #76 tool|54 hook_additional_contexts #77*|57 tool_call_id 9?|59 started_at_ms 4?|60 completed_at_ms 4?", ShellToolCall, DeleteToolCall, GlobToolCall, GrepToolCall, ReadToolCall, UpdateTodosToolCall, ReadTodosToolCall, EditToolCall, LsToolCall, ReadLintsToolCall, McpToolCall, SemSearchToolCall, CreatePlanToolCall, WebSearchToolCall, TaskToolCall, ListMcpResourcesToolCall, ReadMcpResourceToolCall, ApplyAgentDiffToolCall, AskQuestionToolCall, FetchToolCall, SwitchModeToolCall, GenerateImageToolCall, RecordScreenToolCall, ComputerUseToolCall, WriteShellStdinToolCall, ReflectToolCall, SetupVmEnvironmentToolCall, TruncatedToolCall, StartGrindExecutionToolCall, StartGrindPlanningToolCall, WebFetchToolCall, ReportBugfixResultsToolCall, AiAttributionToolCall, PrManagementToolCall, McpAuthToolCall, AwaitToolCall, BlameByFilePathToolCall, GetMcpToolsToolCall, ReportBugToolCall, SetActiveBranchToolCall, CommunicateUpdateToolCall, SendFinalSummaryToolCall, ReplaceEnvToolCall, EditPrLabelsToolCall, RecordCiInvestigationFindingsToolCall, SendMessageToolCall, FetchCloudAgentDataToolCall, SendToUserToolCall, PiReadToolCall, PiBashToolCall, PiEditToolCall, PiWriteToolCall, PiGrepToolCall, PiFindToolCall, PiLsToolCall, ConnectScmToolCall, SearchConversationsToolCall, CreateGoalToolCall, UpdateGoalToolCall, GetAgentStatusToolCall, SendToAgentToolCall, ReadAgentTranscriptToolCall, CreateAgentToolCall, StopAgentToolCall, WriteCanvasToolCall, ReadCanvasToolCall, GenerateVideoToolCall, XSearchToolCall, GetPrCodeTourToolCall, UpdatePrCodeTourToolCall, ListTrackedTasksToolCall, CreateTrackedTasksToolCall, UpdateTrackedTasksToolCall, DeleteTrackedTasksToolCall, UpdateTrackedTaskStatusesToolCall, CreateProjectToolCall, UpdateTrackedTaskTagsToolCall, HookAdditionalContext];
++    return ["ToolCall|1 shell_tool_call #0 tool|3 delete_tool_call #1 tool|4 glob_tool_call #2 tool|5 grep_tool_call #3 tool|8 read_tool_call #4 tool|9 update_todos_tool_call #5 tool|10 read_todos_tool_call #6 tool|12 edit_tool_call #7 tool|13 ls_tool_call #8 tool|14 read_lints_tool_call #9 tool|15 mcp_tool_call #10 tool|16 sem_search_tool_call #11 tool|17 create_plan_tool_call #12 tool|18 web_search_tool_call #13 tool|19 task_tool_call #14 tool|20 list_mcp_resources_tool_call #15 tool|21 read_mcp_resource_tool_call #16 tool|22 apply_agent_diff_tool_call #17 tool|23 ask_question_tool_call #18 tool|24 fetch_tool_call #19 tool|25 switch_mode_tool_call #20 tool|28 generate_image_tool_call #21 tool|29 record_screen_tool_call #22 tool|30 computer_use_tool_call #23 tool|31 write_shell_stdin_tool_call #24 tool|32 reflect_tool_call #25 tool|33 setup_vm_environment_tool_call #26 tool|34 truncated_tool_call #27 tool|35 start_grind_execution_tool_call #28 tool|36 start_grind_planning_tool_call #29 tool|37 web_fetch_tool_call #30 tool|38 report_bugfix_results_tool_call #31 tool|39 ai_attribution_tool_call #32 tool|40 pr_management_tool_call #33 tool|41 mcp_auth_tool_call #34 tool|42 await_tool_call #35 tool|43 blame_by_file_path_tool_call #36 tool|44 get_mcp_tools_tool_call #37 tool|45 report_bug_tool_call #38 tool|46 set_active_branch_tool_call #39 tool|48 communicate_update_tool_call #40 tool|49 send_final_summary_tool_call #41 tool|51 replace_env_tool_call #42 tool|52 edit_pr_labels_tool_call #43 tool|53 record_ci_investigation_findings_tool_call #44 tool|55 send_message_tool_call #45 tool|56 fetch_cloud_agent_data_tool_call #46 tool|58 send_to_user_tool_call #47 tool|68 connect_scm_tool_call #48 tool|69 search_conversations_tool_call #49 tool|70 create_goal_tool_call #50 tool|71 update_goal_tool_call #51 tool|73 get_agent_status_tool_call #52 tool|74 send_to_agent_tool_call #53 tool|75 read_agent_transcript_tool_call #54 tool|76 create_agent_tool_call #55 tool|77 stop_agent_tool_call #56 tool|79 write_canvas_tool_call #57 tool|80 read_canvas_tool_call #58 tool|81 generate_video_tool_call #59 tool|82 x_search_tool_call #60 tool|83 get_origin_pr_code_tour_tool_call #61 tool|84 update_origin_pr_code_tour_tool_call #62 tool|85 list_tracked_tasks_tool_call #63 tool|86 create_tracked_tasks_tool_call #64 tool|87 update_tracked_tasks_tool_call #65 tool|88 delete_tracked_tasks_tool_call #66 tool|89 update_tracked_task_statuses_tool_call #67 tool|90 create_project_tool_call #68 tool|91 update_tracked_task_tags_tool_call #69 tool|93 stop_project_updates_tool_call #70 tool|94 start_project_updates_tool_call #71 tool|54 hook_additional_contexts #72*|57 tool_call_id 9?|59 started_at_ms 4?|60 completed_at_ms 4?", ShellToolCall, DeleteToolCall, GlobToolCall, GrepToolCall, ReadToolCall, UpdateTodosToolCall, ReadTodosToolCall, EditToolCall, LsToolCall, ReadLintsToolCall, McpToolCall, SemSearchToolCall, CreatePlanToolCall, WebSearchToolCall, TaskToolCall, ListMcpResourcesToolCall, ReadMcpResourceToolCall, ApplyAgentDiffToolCall, AskQuestionToolCall, FetchToolCall, SwitchModeToolCall, GenerateImageToolCall, RecordScreenToolCall, ComputerUseToolCall, WriteShellStdinToolCall, ReflectToolCall, SetupVmEnvironmentToolCall, TruncatedToolCall, StartGrindExecutionToolCall, StartGrindPlanningToolCall, WebFetchToolCall, ReportBugfixResultsToolCall, AiAttributionToolCall, PrManagementToolCall, McpAuthToolCall, AwaitToolCall, BlameByFilePathToolCall, GetMcpToolsToolCall, ReportBugToolCall, SetActiveBranchToolCall, CommunicateUpdateToolCall, SendFinalSummaryToolCall, ReplaceEnvToolCall, EditPrLabelsToolCall, RecordCiInvestigationFindingsToolCall, SendMessageToolCall, FetchCloudAgentDataToolCall, SendToUserToolCall, ConnectScmToolCall, SearchConversationsToolCall, CreateGoalToolCall, UpdateGoalToolCall, GetAgentStatusToolCall, SendToAgentToolCall, ReadAgentTranscriptToolCall, CreateAgentToolCall, StopAgentToolCall, WriteCanvasToolCall, ReadCanvasToolCall, GenerateVideoToolCall, XSearchToolCall, GetPrCodeTourToolCall, UpdatePrCodeTourToolCall, ListTrackedTasksToolCall, CreateTrackedTasksToolCall, UpdateTrackedTasksToolCall, DeleteTrackedTasksToolCall, UpdateTrackedTaskStatusesToolCall, CreateProjectToolCall, UpdateTrackedTaskTagsToolCall, StopProjectUpdatesToolCall, StartProjectUpdatesToolCall, HookAdditionalContext];
+   }
+ };
+-var TruncatedToolCallArgs = class _TruncatedToolCallArgs extends __protoMessage381 {
++var TruncatedToolCallArgs = class _TruncatedToolCallArgs extends __protoMessage373 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -20017,7 +19292,7 @@
+     return ["TruncatedToolCallArgs"];
+   }
+ };
+-var TruncatedToolCallSuccess = class _TruncatedToolCallSuccess extends __protoMessage381 {
++var TruncatedToolCallSuccess = class _TruncatedToolCallSuccess extends __protoMessage373 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -20038,7 +19313,7 @@
+     return ["TruncatedToolCallSuccess"];
+   }
+ };
+-var TruncatedToolCallError = class _TruncatedToolCallError extends __protoMessage381 {
++var TruncatedToolCallError = class _TruncatedToolCallError extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.error = "";
+@@ -20060,7 +19335,7 @@
+     return ["TruncatedToolCallError|1 error 9"];
+   }
+ };
+-var TruncatedToolCallResult = class _TruncatedToolCallResult extends __protoMessage381 {
++var TruncatedToolCallResult = class _TruncatedToolCallResult extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.result = { case: void 0 };
+@@ -20082,7 +19357,7 @@
+     return ["TruncatedToolCallResult|1 success #0 result|2 error #1 result", TruncatedToolCallSuccess, TruncatedToolCallError];
+   }
+ };
+-var TruncatedToolCall = class _TruncatedToolCall extends __protoMessage381 {
++var TruncatedToolCall = class _TruncatedToolCall extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.originalStepBlobId = new Uint8Array(0);
+@@ -20105,7 +19380,7 @@
+     return ["TruncatedToolCall|1 original_step_blob_id 12|2 args #0|3 result #1|4 original_step_size_bytes 13|5 preview #2", TruncatedToolCallArgs, TruncatedToolCallResult, ToolCall];
+   }
+ };
+-var ConversationStep = class _ConversationStep extends __protoMessage381 {
++var ConversationStep = class _ConversationStep extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.message = { case: void 0 };
+@@ -20127,7 +19402,7 @@
+     return ["ConversationStep|1 assistant_message #0 message|2 tool_call #1 message|3 thinking_message #2 message", AssistantMessage, ToolCall, ThinkingMessage];
+   }
+ };
+-var TriggeringUserInfo = class _TriggeringUserInfo extends __protoMessage381 {
++var TriggeringUserInfo = class _TriggeringUserInfo extends __protoMessage373 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -20148,7 +19423,7 @@
+     return ["TriggeringUserInfo|1 auth_id 9?|2 user_id 5?"];
+   }
+ };
+-var SubagentRunState = class _SubagentRunState extends __protoMessage381 {
++var SubagentRunState = class _SubagentRunState extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.parentToolCallId = "";
+@@ -20172,7 +19447,7 @@
+     return ["SubagentRunState|1 parent_tool_call_id 9|2 subagent_id 9?|3 environment #0|4 status #1|5 title 9?|6 detail 9?|7 transcript_path 9?|8 output_path 9?|9 completed_timestamp_ms 4?|10 completion_reason #2?", SubagentExecutionEnvironment, SubagentRunStatus, BackgroundTaskCompletionReason];
+   }
+ };
+-var SubagentDispatchStep = class _SubagentDispatchStep extends __protoMessage381 {
++var SubagentDispatchStep = class _SubagentDispatchStep extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.stepIndex = 0;
+@@ -20197,7 +19472,7 @@
+     return ["SubagentDispatchStep|1 step_index 13|2 tool_call_id 9|3 tool #0|4 backgrounded 8", SubagentDispatchTool];
+   }
+ };
+-var SubmittedCustomMode = class _SubmittedCustomMode extends __protoMessage381 {
++var SubmittedCustomMode = class _SubmittedCustomMode extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.id = "";
+@@ -20221,7 +19496,7 @@
+     return ["SubmittedCustomMode|1 id 9|2 label 9|5 source #0|6 source_path 9?|7 source_hash 9?|10 managed_skill_id 9?|11 plugin_id 9?|12 plugin_snapshot_token 9?", CustomModeSource];
+   }
+ };
+-var SubmittedExitedCustomMode = class _SubmittedExitedCustomMode extends __protoMessage381 {
++var SubmittedExitedCustomMode = class _SubmittedExitedCustomMode extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.id = "";
+@@ -20244,7 +19519,7 @@
+     return ["SubmittedExitedCustomMode|1 id 9|2 label 9"];
+   }
+ };
+-var CustomModeExitIntent = class _CustomModeExitIntent extends __protoMessage381 {
++var CustomModeExitIntent = class _CustomModeExitIntent extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.nextMode = AgentMode.UNSPECIFIED;
+@@ -20266,7 +19541,7 @@
+     return ["CustomModeExitIntent|1 next_mode #0|2 exited_mode #1", AgentMode, SubmittedExitedCustomMode];
+   }
+ };
+-var CustomModeIntent = class _CustomModeIntent extends __protoMessage381 {
++var CustomModeIntent = class _CustomModeIntent extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.intent = { case: void 0 };
+@@ -20288,7 +19563,7 @@
+     return ["CustomModeIntent|1 enter #0 intent|2 exit #1 intent", SubmittedCustomMode, CustomModeExitIntent];
+   }
+ };
+-var InteractionResponseMetadata = class _InteractionResponseMetadata extends __protoMessage381 {
++var InteractionResponseMetadata = class _InteractionResponseMetadata extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.interactionId = "";
+@@ -20311,7 +19586,7 @@
+     return ["InteractionResponseMetadata|1 interaction_id 9|2 response #0?|3 skipped_question_ids 9*", InteractionResponse];
+   }
+ };
+-var SubscriptionEventDisplay = class _SubscriptionEventDisplay extends __protoMessage381 {
++var SubscriptionEventDisplay = class _SubscriptionEventDisplay extends __protoMessage373 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -20332,7 +19607,7 @@
+     return ["SubscriptionEventDisplay|1 display_label 9?|2 resource_url 9?|3 subscription_id 9?"];
+   }
+ };
+-var ExecutePlanInfo = class _ExecutePlanInfo extends __protoMessage381 {
++var ExecutePlanInfo = class _ExecutePlanInfo extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.planId = "";
+@@ -20355,7 +19630,7 @@
+     return ["ExecutePlanInfo|1 plan_id 9|2 plan_title 9"];
+   }
+ };
+-var ProjectDetails = class _ProjectDetails extends __protoMessage381 {
++var ProjectDetails = class _ProjectDetails extends __protoMessage373 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -20376,7 +19651,7 @@
+     return ["ProjectDetails|1 name 9?|2 subagent #0?|3 side_chat #1?|4 init_description 9?", ProjectSubagentDetails, ProjectSideChatDetails];
+   }
+ };
+-var ProjectSubagentDetails = class _ProjectSubagentDetails extends __protoMessage381 {
++var ProjectSubagentDetails = class _ProjectSubagentDetails extends __protoMessage373 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -20397,7 +19672,7 @@
+     return ["ProjectSubagentDetails|2 store_dir 9?"];
+   }
+ };
+-var ProjectSideChatDetails = class _ProjectSideChatDetails extends __protoMessage381 {
++var ProjectSideChatDetails = class _ProjectSideChatDetails extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.storeDir = "";
+@@ -20419,7 +19694,7 @@
+     return ["ProjectSideChatDetails|1 store_dir 9"];
+   }
+ };
+-var UserMessage = class _UserMessage extends __protoMessage381 {
++var UserMessage = class _UserMessage extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.text = "";
+@@ -20445,7 +19720,7 @@
+     return ["UserMessage|1 text 9|2 message_id 9|3 selected_context #0?|4 mode #1|5 is_simulated_msg 8?|6 best_of_n_group_id 9?|7 try_use_best_of_n_promotion 8?|8 rich_text 9?|9 simulated_msg_reason #2?|10 conversation_state_blob_id 12|11 subagent_system_reminder 9?|13 triggering_user_info #3?|14 execute_plan_info #4?|15 simulated_message_metadata #5?|16 prompt_reference_id 9?|17 thread_id 9?|18 text_blob_id 12?|19 rich_text_blob_id 12?|21 hook_additional_contexts #6*|22 custom_mode_intent #7?|23 project_details #8?|24 turn_steer 8?|25 started_at_ms 4?|26 completed_at_ms 4?|27 sent_by_agent_id 9?|28 sent_by_voice_call 8?|29 sender #9?|30 forked_context 9?|31 reply_to 9?|32 reply_audience #10?|33 reply_to_tool_call_id 9?|34 during_voice_call 8?|35 inherits_voice_call 8?|36 voice_calls_read_utterances 8?|37 summarized_tool_call_id 9?", SelectedContext, AgentMode, SimulatedMsgReason, TriggeringUserInfo, ExecutePlanInfo, UserMessage_SimulatedMessageMetadata, HookAdditionalContext, CustomModeIntent, ProjectDetails, MessageSender, ReplyAudience];
+   }
+ };
+-var UserMessage_SimulatedMessageMetadata = class _UserMessage_SimulatedMessageMetadata extends __protoMessage381 {
++var UserMessage_SimulatedMessageMetadata = class _UserMessage_SimulatedMessageMetadata extends __protoMessage373 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -20466,7 +19741,7 @@
+     return ["UserMessage.SimulatedMessageMetadata|1 title 9?|2 task_id 9?|3 fsd_finding_action 9?|4 url 9?|5 subscription_source #0?|6 subscription_event_display #1?|7 interaction_response #2?|8 tool_call_id 9?", SubscriptionSource, SubscriptionEventDisplay, InteractionResponseMetadata];
+   }
+ };
+-var MessageSender = class _MessageSender extends __protoMessage381 {
++var MessageSender = class _MessageSender extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.kind = MessageSender_Kind.UNSPECIFIED;
+@@ -20490,8 +19765,8 @@
+     return ["MessageSender|1 kind #0|2 id 9|3 display_name 9", MessageSender_Kind];
+   }
+ };
+-var MessageSender_Kind = /* @__PURE__ */ enumType(proto3, __protoPackage83, "MessageSender.Kind", [[0, "UNSPECIFIED"], [1, "AGENT"], [2, "VOICE_CALL"], [3, "MAIN_BOT"], [4, "PROJECT"]], 1);
+-var AssistantMessage = class _AssistantMessage extends __protoMessage381 {
++var MessageSender_Kind = /* @__PURE__ */ enumType(proto3, __protoPackage75, "MessageSender.Kind", [[0, "UNSPECIFIED"], [1, "AGENT"], [2, "VOICE_CALL"], [3, "MAIN_BOT"], [4, "PROJECT"]], 1);
++var AssistantMessage = class _AssistantMessage extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.text = "";
+@@ -20513,7 +19788,7 @@
+     return ["AssistantMessage|1 text 9|2 started_at_ms 4?|3 completed_at_ms 4?"];
+   }
+ };
+-var ThinkingMessage = class _ThinkingMessage extends __protoMessage381 {
++var ThinkingMessage = class _ThinkingMessage extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.text = "";
+@@ -20536,7 +19811,7 @@
+     return ["ThinkingMessage|1 text 9|2 duration_ms 13|3 started_at_ms 4?|4 completed_at_ms 4?"];
+   }
+ };
+-var ShellCommand = class _ShellCommand extends __protoMessage381 {
++var ShellCommand = class _ShellCommand extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.command = "";
+@@ -20558,7 +19833,7 @@
+     return ["ShellCommand|1 command 9"];
+   }
+ };
+-var ShellOutput = class _ShellOutput extends __protoMessage381 {
++var ShellOutput = class _ShellOutput extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.stdout = "";
+@@ -20582,7 +19857,7 @@
+     return ["ShellOutput|1 stdout 9|2 stderr 9|3 exit_code 5"];
+   }
+ };
+-var ConversationPlan = class _ConversationPlan extends __protoMessage381 {
++var ConversationPlan = class _ConversationPlan extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.plan = "";
+@@ -20604,7 +19879,7 @@
+     return ["ConversationPlan|1 plan 9"];
+   }
+ };
+-var PlanRegistryEntry = class _PlanRegistryEntry extends __protoMessage381 {
++var PlanRegistryEntry = class _PlanRegistryEntry extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.id = "";
+@@ -20627,7 +19902,7 @@
+     return ["PlanRegistryEntry|1 id 9|2 path 9"];
+   }
+ };
+-var GoalState = class _GoalState extends __protoMessage381 {
++var GoalState = class _GoalState extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.conversationId = "";
+@@ -20654,7 +19929,7 @@
+     return ["GoalState|1 conversation_id 9|2 goal_id 9|3 objective 9|4 status #0|5 idle_continuations_without_tool_calls 13|6 active_duration_ms 4?|7 last_accrued_at_ms 4?|8 continuation_count 13|9 agent_session_id 9?|11 context_tokens_added 3?", GoalStatus];
+   }
+ };
+-var ConversationTurnStructure = class _ConversationTurnStructure extends __protoMessage381 {
++var ConversationTurnStructure = class _ConversationTurnStructure extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.turn = { case: void 0 };
+@@ -20676,7 +19951,7 @@
+     return ["ConversationTurnStructure|1 agent_conversation_turn #0 turn|2 shell_conversation_turn #1 turn", AgentConversationTurnStructure, ShellConversationTurnStructure];
+   }
+ };
+-var AgentConversationTurnStructure = class _AgentConversationTurnStructure extends __protoMessage381 {
++var AgentConversationTurnStructure = class _AgentConversationTurnStructure extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.userMessage = new Uint8Array(0);
+@@ -20705,7 +19980,7 @@
+     return ["AgentConversationTurnStructure|1 user_message 12|2 steps 12*|3 request_id 9?|4 encrypted_model 9?|5 dynamic_tool_count 13?|6 send_message_step_indices 13*|7 routed_model_display_name 9?|8 subagent_dispatch_steps #0*|9 dynamic_tool_names 9*|10 user_message_id 9?|11 long_reasoning_reminder #1?|12 long_reasoning_reminder_exposure_logged 8|13 assistant_text_step_indices 13*|14 assistant_text_steps_recorded 8?|15 app_secrets_request_step_indices 13*", SubagentDispatchStep, LongReasoningReminderState];
+   }
+ };
+-var LongReasoningReminderState = class _LongReasoningReminderState extends __protoMessage381 {
++var LongReasoningReminderState = class _LongReasoningReminderState extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.remainingDelayCalls = 0;
+@@ -20727,7 +20002,7 @@
+     return ["LongReasoningReminderState|1 remaining_delay_calls 13"];
+   }
+ };
+-var ShellConversationTurnStructure = class _ShellConversationTurnStructure extends __protoMessage381 {
++var ShellConversationTurnStructure = class _ShellConversationTurnStructure extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.shellCommand = new Uint8Array(0);
+@@ -20750,7 +20025,7 @@
+     return ["ShellConversationTurnStructure|1 shell_command 12|2 shell_output 12"];
+   }
+ };
+-var ConversationSummary = class _ConversationSummary extends __protoMessage381 {
++var ConversationSummary = class _ConversationSummary extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.summary = "";
+@@ -20772,7 +20047,7 @@
+     return ["ConversationSummary|1 summary 9"];
+   }
+ };
+-var ConversationSummaryArchive = class _ConversationSummaryArchive extends __protoMessage381 {
++var ConversationSummaryArchive = class _ConversationSummaryArchive extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.summarizedMessages = [];
+@@ -20797,7 +20072,7 @@
+     return ["ConversationSummaryArchive|1 summarized_messages 12*|2 summary 9|3 window_tail 13|4 summary_message 12"];
+   }
+ };
+-var PromptTokenBreakdownCategory = class _PromptTokenBreakdownCategory extends __protoMessage381 {
++var PromptTokenBreakdownCategory = class _PromptTokenBreakdownCategory extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.id = "";
+@@ -20821,7 +20096,7 @@
+     return ["PromptTokenBreakdownCategory|1 id 9|2 label 9|3 estimated_tokens 13|4 character_count 13?"];
+   }
+ };
+-var PromptTokenBreakdownSnapshot = class _PromptTokenBreakdownSnapshot extends __protoMessage381 {
++var PromptTokenBreakdownSnapshot = class _PromptTokenBreakdownSnapshot extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.totalUsedTokens = 0;
+@@ -20845,7 +20120,7 @@
+     return ["PromptTokenBreakdownSnapshot|1 total_used_tokens 13|2 max_tokens 13|3 categories #0*", PromptTokenBreakdownCategory];
+   }
+ };
+-var PromptContextSourceRef = class _PromptContextSourceRef extends __protoMessage381 {
++var PromptContextSourceRef = class _PromptContextSourceRef extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.sourceType = "";
+@@ -20871,7 +20146,7 @@
+     return ["PromptContextSourceRef|1 source_type 9|3 message_index 13|4 content_path 9|5 start_offset 13|6 end_offset 13"];
+   }
+ };
+-var PromptContextNode = class _PromptContextNode extends __protoMessage381 {
++var PromptContextNode = class _PromptContextNode extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.id = "";
+@@ -20899,7 +20174,7 @@
+     return ["PromptContextNode|1 id 9|2 parent_id 9?|3 kind 9|4 label 9|5 category_id 9|6 estimated_tokens 13|7 character_count 13|9 content_available 8|11 source #0?|12 inline_content 9?", PromptContextSourceRef];
+   }
+ };
+-var PromptContextUsageTree = class _PromptContextUsageTree extends __protoMessage381 {
++var PromptContextUsageTree = class _PromptContextUsageTree extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.schemaVersion = 0;
+@@ -20922,7 +20197,7 @@
+     return ["PromptContextUsageTree|1 schema_version 13|2 nodes #0*", PromptContextNode];
+   }
+ };
+-var ConversationTokenDetails = class _ConversationTokenDetails extends __protoMessage381 {
++var ConversationTokenDetails = class _ConversationTokenDetails extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.usedTokens = 0;
+@@ -20945,7 +20220,7 @@
+     return ["ConversationTokenDetails|1 used_tokens 13|2 max_tokens 13|3 breakdown #0?|4 prompt_context_usage_tree #1?", PromptTokenBreakdownSnapshot, PromptContextUsageTree];
+   }
+ };
+-var FileState = class _FileState extends __protoMessage381 {
++var FileState = class _FileState extends __protoMessage373 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -20966,7 +20241,7 @@
+     return ["FileState|1 content 9?|2 initial_content 9?"];
+   }
+ };
+-var FileStateStructure = class _FileStateStructure extends __protoMessage381 {
++var FileStateStructure = class _FileStateStructure extends __protoMessage373 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
+@@ -20987,7 +20262,7 @@
+     return ["FileStateStructure|1 content 12?|2 initial_content 12?"];
+   }
+ };
+-var StepTiming = class _StepTiming extends __protoMessage381 {
++var StepTiming = class _StepTiming extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.durationMs = protoInt64.zero;
+@@ -21010,7 +20285,7 @@
+     return ["StepTiming|1 duration_ms 4|2 timestamp_ms 4"];
+   }
+ };
+-var TurnTelemetryState = class _TurnTelemetryState extends __protoMessage381 {
++var TurnTelemetryState = class _TurnTelemetryState extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.completedTurnCountCapped = 0;
+@@ -21032,7 +20307,7 @@
+     return ["TurnTelemetryState|1 completed_turn_count_capped 13|2 last_completed_turn_timestamp_ms 4?"];
+   }
+ };
+-var CommunicateUpdateHistoryEntry = class _CommunicateUpdateHistoryEntry extends __protoMessage381 {
++var CommunicateUpdateHistoryEntry = class _CommunicateUpdateHistoryEntry extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.step = "";
+@@ -21055,7 +20330,7 @@
+     return ["CommunicateUpdateHistoryEntry|1 step 9|3 message_index 13"];
+   }
+ };
+-var CommunicateUpdateTurnState = class _CommunicateUpdateTurnState extends __protoMessage381 {
++var CommunicateUpdateTurnState = class _CommunicateUpdateTurnState extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.history = [];
+@@ -21077,7 +20352,7 @@
+     return ["CommunicateUpdateTurnState|1 history #0*|2 final_summary 9?|3 completed_subtitle 9?", CommunicateUpdateHistoryEntry];
+   }
+ };
+-var SubagentPersistedState = class _SubagentPersistedState extends __protoMessage381 {
++var SubagentPersistedState = class _SubagentPersistedState extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.createdTimestampMs = protoInt64.zero;
+@@ -21101,7 +20376,7 @@
+     return ["SubagentPersistedState|1 conversation_state #0|2 created_timestamp_ms 4|3 last_used_timestamp_ms 4|4 subagent_type #1|5 model_id 9?|6 environment #2|7 cloud_subagent #3?|8 first_class_bc_id 9?|9 cloud_requested_environment_build_id 9?|10 machine #4?", ConversationStateStructure, SubagentType, SubagentExecutionEnvironment, CloudSubagentReference, TargetMachine];
+   }
+ };
+-var CloudSubagentReference = class _CloudSubagentReference extends __protoMessage381 {
++var CloudSubagentReference = class _CloudSubagentReference extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.bcId = "";
+@@ -21123,7 +20398,7 @@
+     return ["CloudSubagentReference|1 bc_id 9|2 transcript_path 9?"];
+   }
+ };
+-var TrackedGitRepo = class _TrackedGitRepo extends __protoMessage381 {
++var TrackedGitRepo = class _TrackedGitRepo extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.repoPath = "";
+@@ -21146,7 +20421,7 @@
+     return ["TrackedGitRepo|1 repo_path 9|2 branch_name 9"];
+   }
+ };
+-var ConversationStateStructure = class _ConversationStateStructure extends __protoMessage381 {
++var ConversationStateStructure = class _ConversationStateStructure extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.rootPromptMessagesJson = [];
+@@ -21193,7 +20468,7 @@
+     return ["ConversationStateStructure|1 root_prompt_messages_json 12*|8 turns 12*|3 todos 12*|4 pending_tool_calls 9*|5 token_details #0|6 summary 12?|7 plan 12?|9 previous_workspace_uris 9*|10 mode #1?|11 summary_archive 12?|12 file_states 9,12|15 file_states_v2 9,#2|13 summary_archives 12*|14 turn_timings #3*|16 subagent_states 9,#4|17 self_summary_count 13|18 read_paths 9*|19 active_branch_name 9?|20 plans 9,#5|21 tracked_git_repo_branches #6*|22 agent_type 9?|23 communicate_update_history #7*|24 subagent_threads 9,9|25 communicate_update_final_summary 9?|28 communicate_update_completed_subtitle 9?|29 communicate_update_states_by_parent_tool_call_id 9,#8|30 subagent_runs_by_parent_tool_call_id 9,#9|26 conversation_started_timestamp_ms 4?|27 conversation_started_time_zone 9?|31 subagent_state_refs 9,12|32 goal_state #10?|33 is_root_project_conversation 8?|34 completed_ask_question_tool_call_ids 9*|35 durable_skill_blocks 9*|36 durable_custom_mode_id 9?|37 message_count_at_last_compaction 13?|38 recent_user_message_ids 9*|39 recent_user_message_ids_older_turn_count 13?|40 turn_telemetry #11?|42 mentioned_agent_ids 9*|43 voice_call_utterances #12*|44 voice_call_pending_answer #13?|45 voice_call_time_task_ids 9*|46 writes_voice_call_utterances 8|47 voice_calls_read_utterances 8?", ConversationTokenDetails, AgentMode, FileStateStructure, StepTiming, SubagentPersistedState, PlanRegistryEntry, TrackedGitRepo, CommunicateUpdateHistoryEntry, CommunicateUpdateTurnState, SubagentRunState, GoalState, TurnTelemetryState, VoiceCallUtterance, VoiceCallPendingAnswer];
+   }
+ };
+-var VoiceCallUtterance = class _VoiceCallUtterance extends __protoMessage381 {
++var VoiceCallUtterance = class _VoiceCallUtterance extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.id = "";
+@@ -21218,8 +20493,8 @@
+     return ["VoiceCallUtterance|1 id 9|2 kind #0|3 text 9|4 answers_message_ids 9*", VoiceCallUtterance_Kind];
+   }
+ };
+-var VoiceCallUtterance_Kind = /* @__PURE__ */ enumType(proto3, __protoPackage83, "VoiceCallUtterance.Kind", [[0, "UNSPECIFIED"], [1, "SEND"], [2, "TERMINAL"]], 1);
+-var VoiceCallPendingAnswer = class _VoiceCallPendingAnswer extends __protoMessage381 {
++var VoiceCallUtterance_Kind = /* @__PURE__ */ enumType(proto3, __protoPackage75, "VoiceCallUtterance.Kind", [[0, "UNSPECIFIED"], [1, "SEND"], [2, "TERMINAL"]], 1);
++var VoiceCallPendingAnswer = class _VoiceCallPendingAnswer extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.messageIds = [];
+@@ -21243,7 +20518,7 @@
+     return ["VoiceCallPendingAnswer|1 message_ids 9*|2 reads_utterances 8|3 ended_on_send 8"];
+   }
+ };
+-var InteractionResponse = class _InteractionResponse extends __protoMessage381 {
++var InteractionResponse = class _InteractionResponse extends __protoMessage373 {
+   constructor(data) {
+     super();
+     this.id = 0;
+@@ -21266,7 +20541,7 @@
+     return ["InteractionResponse|1 id 13|2 web_search_request_response #0 result|3 ask_question_interaction_response #1 result|4 switch_mode_request_response #2 result|7 create_plan_request_response #3 result|8 setup_vm_environment_result #4 result|9 web_fetch_request_response #5 result|10 pr_management_result #6 result|11 mcp_auth_request_response #7 result|12 generate_image_request_response #8 result|13 replace_env_result #9 result|14 connect_scm_request_response #10 result", WebSearchRequestResponse, AskQuestionInteractionResponse, SwitchModeRequestResponse, CreatePlanRequestResponse, SetupVmEnvironmentResult, WebFetchRequestResponse, PrManagementResult, McpAuthRequestResponse, GenerateImageRequestResponse, ReplaceEnvResult, ConnectScmRequestResponse];
+   }
+ };
+-var AskQuestionInteractionResponse = class _AskQuestionInteractionResponse extends __protoMessage381 {
++var AskQuestionInteractionResponse = class _AskQuestionInteractionResponse extends __protoMessage373 {
+   constructor(data) {
+     super();
+     proto3.util.initPartial(data, this);
