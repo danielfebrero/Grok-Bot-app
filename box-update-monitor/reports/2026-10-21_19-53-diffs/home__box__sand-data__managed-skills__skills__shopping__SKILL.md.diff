@@ -1,0 +1,82 @@
+--- 2026-10-21_15-52:/home/box/sand-data/managed-skills/skills/shopping/SKILL.md
++++ 2026-10-21_19-53:/home/box/sand-data/managed-skills/skills/shopping/SKILL.md
+@@ -1,12 +1,15 @@
+ ---
+ name: shopping
+ description: >-
+-  When the user asks you to buy, order, reorder, or compare a product on Amazon
+-  or any other retail site, asks which of two or three products to get or
+-  whether one costs less at another store, or sends a product link to purchase,
+-  before you open the store or add anything to a cart, alongside any store's
+-  site playbook. Read it as well as the purchases skill, which covers only how
+-  to pay.
++  When the user asks whether to buy something, whether a price is good, or
++  whether to wait for a drop, read this before you answer, even when you could
++  answer from memory, because the answer needs a price history and reviews
++  opened this turn. Also when the user asks you to buy, order, reorder, or
++  compare a product on Amazon or any other retail site, asks which of two or
++  three products to get or whether one costs less at another store, or sends a
++  product link to purchase, before you open the store or add anything to a cart,
++  alongside any store's site playbook. Read it as well as the purchases skill,
++  which covers only how to pay.
+ ---
+ # Shopping and checkout
+ 
+@@ -21,9 +24,12 @@
+  the deliverable is a shortlist before anything goes in a cart.
+ - "Which of these two should I get?" or "Is it cheaper at Target?", about two or three specific products or one product at several stores, is a comparison;
+  the deliverable is the side-by-side view in Comparing offers, and the user picks.
++- "Should I buy this?" or "Is $600 a good price for it?" asks for advice, not a cart;
++ the deliverable is the verdict in Should I buy it.
+ - A pasted product link goes straight to that product page.
+ - A photo or screenshot of a product ("buy this", "find these shoes") is a search: name what you see (brand, model, color) and search for it, then confirm the match with the user before it goes in a cart.
+ - A list (a packing list, "a phone case, a charger, and a screen protector") is one cart with several items: search each, then review once.
++- A message that buys products from your shopping card by name, store, price, and link, and names a saved card and a saved address by Vault id, comes from the app's Checkout sheet, where the user already chose the variant, the store, the card, and the address. Open each link, choose that variant, and go to checkout, one store at a time, without a new search, a shortlist, or a question about which card, which address, or how to pay. The prices it names are the card's, before shipping and tax.
+ 
+ ## Before you start
+ 
+@@ -80,9 +86,9 @@
+  otherwise take the default and say so. A saved size (see Sizes and preferences) answers the size question only, so still ask about any other open variant. When more than one variant is open, ask about them together in one short message instead of one question at a time.
+ 7. Add to cart. For several items, repeat the search, compare, and add cycle, then review once.
+ 8. Review the cart from a screenshot, then send the user the cart summary: one line per item with the product as a link, its brand, the variant (size, color, pack count), quantity, unit price, and the seller when it is not the store itself, then the subtotal, shipping, tax, and total as far as the page shows them, with the cart screenshot attached at its saved path. When the cart changes, send a fresh summary so the latest one always matches the cart.
+-9. Shipping address. Reuse the account's saved address when memory or the page confirms it is the right one. If the page needs an address typed and the Cursor-managed `vault` skill is in your catalog, follow that skill: use the user's saved contact, and ask in chat for only what it lacks. Without that skill, ask with `RequestUserForm`, with fields targeted at the live checkout page. Confirm the chosen address with the user before you continue.
++9. Shipping address. Reuse the account's saved address when memory or the page confirms it is the right one. If the page needs an address typed and the Cursor-managed `vault` skill is in your catalog, follow that skill: use the user's saved contact, and ask in chat for only what it lacks. Without that skill, ask with `RequestUserForm`, with fields targeted at the live checkout page. Confirm the chosen address with the user before you continue, unless they chose it in the app's Checkout sheet.
+ 10. Ask about a promo code before the final page if the checkout has a field for one and the user has not mentioned one.
+-11. Reach the final review page. Screenshot it. Have the subagent return each line with its amount as the page shows it, then the total, because an order card shows them: each item with its variant, shipping with its arrival date, tax, each discount as a negative amount, and each fee. Check the subtotal, tax, shipping, and total against what you presented.
++11. Reach the final review page. Screenshot it. Have the subagent return each line with its amount as the page shows it, then the total, because an order card shows them: each item with its variant and any quantity above one, shipping with its arrival date, tax, each discount as a negative amount, and each fee. Check the subtotal, tax, shipping, and total against what you presented.
+ 12. Get the yes, pay, and place the order (see Paying and confirming).
+ 13. Screenshot the order confirmation. When you paid through an order card, reply with `purchase` as the purchases skill says, with the delivery estimate in `content`. Otherwise send a shipment card at stage `placed` from the confirmation page, with the total charged in `content` (see Paying and confirming). Without the `shipment` field, report the order number, the total charged, and the delivery estimate. Save any size or preference you learned along the way that is not in memory yet (see Sizes and preferences).
+ 
+@@ -97,7 +103,7 @@
+ 
+ ## Presenting choices
+ 
+-- When `SendToUser` has a `shopping` field, show products in it instead of a text list: every shortlist, and a single product the user asked about or picked. A shortlist entry gets its title, images, one variant with its best offer and that offer's stock state from step 1 as `availability`, its rating, its `specs` with the same labels on every entry, a `keySpec` that is one of those labels and names the spec that sets it apart, and a `badge` or `note`. The product the user asked about or picked gets the full entry: its options with swatches, every variant you found with its offers and their `policies`, its specs, `about`, `reviewSummary`, and `links`, and your `reasons` for and against. Fill the gaps first (step 2), but a photo, rating, or spec you still could not get is only left out of that product's entry, never a reason to send a text list. Link each offer to the product's own page that you or the subagent read, and use a search results page only for a product whose own page nobody opened. In `content`, give your pick and the main tradeoff, and name each store that blocked you or had no match. A comparison fills the field as Comparing offers says.
++- When `SendToUser` has a `shopping` field, show products in it instead of a text list: every shortlist, and a single product the user asked about or picked. A shortlist entry gets its title, images, one variant with its best offer and that offer's stock state from step 1 as `availability`, its rating, its `specs` with the same labels on every entry, a `keySpec` that is one of those labels and names the spec that sets it apart, a short `note` on what sets it apart, and that strength again as one `good` reason, since some apps show the note on the tile and others the first good reason. The product the user asked about or picked gets the full entry: its options with swatches, every variant you found with its offers and their `policies`, its specs, `about`, `reviewSummary`, and `links`, a `note` on why it fits, and your `reasons` for and against. Fill the gaps first (step 2), but a photo, rating, or spec you still could not get is only left out of that product's entry, never a reason to send a text list. Link each offer to the product's own page that you or the subagent read, and use a search results page only for a product whose own page nobody opened. In `content`, give your pick and the main tradeoff, and name each store that blocked you or had no match. A comparison fills the field as Comparing offers says.
+ - Without that field, show three to five candidates that differ on something that matters, one per line as `- [Item name](https://item-page-url), $25.60, short note`. The note carries what sets it apart, such as the rating with review count, the delivery date, the seller, or a spec the user asked about.
+ - Attach a screenshot when the choice is visual or the spec table is dense. A summary alone is enough for a reorder.
+ - Name the tradeoff plainly ("$40 more for the version with a battery indicator"). Do not pad the list with near-duplicates.
+@@ -113,10 +119,22 @@
+ - When `SendToUser` has a `shopping` field, put the comparison there. Give each offer its `delivery`, its shipping and return terms as `policies`, and its perk as `note`. Two or three products get a `compare` with rows for "price", "rating", and the specs every product lists, and the recommendation as its `verdict`. One product at several stores is one product with an offer per store. Without that field, use one column per offer in a compact table, or one line per offer on a channel that shows plain text.
+ - End with a one-line recommendation and the reason ("Target: $12 less delivered and a 90-day return window, arrives a day later"), then ask which one they want, with a `followUps` reply per offer when you sent the `shopping` field.
+ 
++## Should I buy it?
++
++Follow this when the user asks whether to buy something or whether a price is good, or is about to spend a lot on something a cheaper fix might solve. Answer before any talk of checkout, and start the Flow only once they say they want to buy.
++
++- Open a price history page for the item, such as camelcamelcamel or Keepa for Amazon, or the store's own, and say whether today's price is high, normal, or near its low.
++- Read the rating and the most common complaint in the reviews you open.
++- Name one cheaper option, or a fix for the problem behind the purchase, when one exists.
++- Lead with a one-line verdict: Buy, Wait for a drop, Skip, or the cheaper option. Then give the evidence. For Wait for a drop, offer to watch the price as the `orders-and-returns` skill says.
++- Take every price, rating, and count from a page you opened this turn, and link that page. If you could not open a source, say so instead of estimating.
++- When `SendToUser` has a `shopping` field, send the item there instead of a long reply, with the verdict in `content`, the evidence in the product's `reasons`, and the price history page in its `links`.
++
+ ## Paying and confirming
+ 
+ - The user must have asked to buy this specific item. Never spend on your own initiative, and never buy to hold a price.
+-- When the purchases skill has you send an `order` card, as it does to pay with a card saved in the user's vault, that card is the ready-to-buy summary and the confirmation, so send it in place of the summary and widget below. Settle any open choice, such as which saved card, before you send it, and send no question widget after it, because a later widget can close the order card. Place the order after the user taps Pay, as that skill says.
++- When the purchases skill has you send an `order` card, as it does to pay with a card saved in the user's vault, that card is the ready-to-buy summary and the confirmation, so send it in place of the summary and widget below. Settle any open choice, such as which saved card, before you send it, and send no question widget after it, because a later widget can close the order card. A Checkout sheet message has settled the card and the address: its card's Vault id is the order's `payment.card`, and the saved address its Vault id names is where the order ships, written in `shipTo` as the purchases skill says, never as that address's title or id. When an item's price on the review page differs from the price that message named for it, say so in the line before the card;
++ shipping and tax are not a price change. Place the order after the user taps Pay, as that skill says.
+ - Otherwise, before payment, send the ready-to-buy summary: the cart summary from step 8 with each line and the subtotal, shipping, tax, and total read again from the final review page, then the shipping address, the delivery date, and the payment method the page shows, with the review page screenshot attached at its saved path. Then send one question widget whose prompt names the total and the delivery date ("Place the $84.17 order, arriving Tue, Oct 20?"), with options to place it and to edit the order, and allowCustom on so they can name a change. The widget ends your turn. A dismissed widget is a no.
+ - When the site wants payment, a deposit, or a card to hold the booking, work it in this order and stop at the first step that pays. First, a payment method already saved on the account. Have the subagent select it, and when several are saved, ask which one in the confirmation widget. When the account has none and the site charges an exact total now (tax, fees, tip, and shipping included), Stripe Link is the preferred way to pay: with `RequestVirtualCard` among your tools this turn, raise a one-time card with the site as merchant and type it only into the merchant's checkout;
+  a denial is final. Without that tool, offer Stripe Link once as the `purchases` skill says, when that skill is listed. A card kept on file for a hold or a no-show fee is not charged now, so it never gets a one-time card. Next, and right away whenever the user turns Link down, ignores the offer, or asks to use their own card, send the Secure Form (`RequestUserForm`, reason "checkout", the site's domain) for the card inputs the live checkout shows, such as card number, expiry, CVC, name, and billing ZIP;

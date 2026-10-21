@@ -1,0 +1,490 @@
+/**
+ * "Lexura — Luxury Living" investment pitch deck: 10 slides, 13.333 x 7.5 in.
+ *
+ * Rebuilt with pptxgenjs only. The reference deck's photographs are stock
+ * "change image here" grey fields; they are redrawn here as grey placeholder
+ * blocks, and the few small raster glyphs (armchair icon, circular wordmark
+ * badge, rating stars) are redrawn with native shapes.
+ */
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+// ── Palette (theme "Lexura") ───────────────────────────────────────────────
+const BROWN = '4D240D'; // dk2 / accent1 — primary brand brown
+const MID = '703412'; // secondary brown used for cards and dividers
+const RUST = 'A74F1A'; // accent used on stat suffixes
+const CREAM = 'F4F1E9'; // lt2 — default slide background
+const BEIGE = 'E4DCC9'; // warm sand band / hairline outlines
+const WHITE = 'FFFFFF';
+const GREY = '7F7F7F'; // body copy on light backgrounds
+const PALE = 'D8D8D8'; // body copy on dark backgrounds
+const PHOTO = 'CCCCCC'; // stand-in fill for the reference deck's photos
+
+const HEAD = 'Jost'; // display face (titles, statistics)
+const BODY = 'Open Sans'; // everything else
+
+const HAIRLINE = 1.25; // pt — 15875 EMU outlines in the source deck
+const RING = 2.25; // pt — 28575 EMU outlines in the source deck
+
+// ── Generic helpers ────────────────────────────────────────────────────────
+
+/** Text box. `runs` is a string or an array of pptxgenjs text runs. */
+function txt(slide, runs, o) {
+  // Every text frame in the source deck is top-anchored with 0.1" insets.
+  slide.addText(runs, Object.assign({ fontFace: BODY, fontSize: 12, color: GREY, valign: 'top' }, o));
+}
+
+/** Section title: an italic bold lead word followed by the rest of the line. */
+function heading(slide, lead, rest, o) {
+  const { boldRest, ...opts } = o;
+  slide.addText([
+    { text: lead, options: { bold: true, italic: true } },
+    { text: rest, options: { bold: Boolean(boldRest) } },
+  ], Object.assign({ fontFace: HEAD, fontSize: 48, color: BROWN, valign: 'top' }, opts));
+}
+
+/** "Lexura." wordmark, top-left of every slide. */
+function wordmark(slide, color) {
+  txt(slide, 'Lexura.', { x: 0.554, y: 0.273, w: 1.007, h: 0.372, bold: true, color, lineSpacingMultiple: 1.5 });
+}
+
+/** Grey block standing in for a photograph in the reference deck. */
+function photo(slide, x, y, w, h) {
+  slide.addShape('rect', { x, y, w, h, fill: { color: PHOTO } });
+  slide.addText('[image]', {
+    x, y, w, h, align: 'center', valign: 'middle', fontFace: BODY, fontSize: 12, color: WHITE,
+  });
+}
+
+/** 0.588" square tile holding the armchair glyph (drawn with native shapes). */
+function iconTile(slide, x, y, tile, glyph, outline) {
+  slide.addShape('rect', {
+    x, y, w: 0.588, h: 0.588,
+    fill: { color: tile },
+    line: outline ? { color: outline, width: HAIRLINE } : { type: 'none' },
+  });
+  armchair(slide, x + 0.184, y + 0.184, glyph);
+}
+
+/** 0.22" armchair pictogram: rounded back, two arm rests, seat and legs. */
+function armchair(slide, x, y, color) {
+  const flat = { fill: { color }, line: { type: 'none' } };
+  slide.addShape('roundRect', Object.assign({ x: x + 0.019, y: y + 0.008, w: 0.182, h: 0.082, rectRadius: 0.09 }, flat));
+  slide.addShape('roundRect', Object.assign({ x, y: y + 0.086, w: 0.048, h: 0.07, rectRadius: 0.12 }, flat));
+  slide.addShape('roundRect', Object.assign({ x: x + 0.172, y: y + 0.086, w: 0.048, h: 0.07, rectRadius: 0.12 }, flat));
+  slide.addShape('rect', Object.assign({ x: x + 0.036, y: y + 0.086, w: 0.148, h: 0.055 }, flat));
+  slide.addShape('rect', Object.assign({ x: x + 0.002, y: y + 0.158, w: 0.216, h: 0.033 }, flat));
+  slide.addShape('rect', Object.assign({ x: x + 0.024, y: y + 0.191, w: 0.026, h: 0.021 }, flat));
+  slide.addShape('rect', Object.assign({ x: x + 0.17, y: y + 0.191, w: 0.026, h: 0.021 }, flat));
+}
+
+/**
+ * Circular "REAL ESTATE LUXURY" wordmark: each glyph is its own tiny text box
+ * placed on the ring and rotated to stay tangent to it.
+ */
+function badge(slide, x, y, w, h, color) {
+  const ring = 'REAL ESTATE LUXURY  '; // "R" starts low-left and runs clockwise
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  const r = Math.min(w, h) / 2 - 0.1; // radius of the glyph centres
+  const cell = 0.2;
+  ring.split('').forEach((ch, i) => {
+    const deg = 215 + (360 / ring.length) * i;
+    const rad = (deg * Math.PI) / 180;
+    slide.addText(ch, {
+      x: cx + r * Math.sin(rad) - cell / 2,
+      y: cy - r * Math.cos(rad) - cell / 2,
+      w: cell, h: cell, rotate: Math.round(deg) % 360,
+      align: 'center', valign: 'middle', margin: 0,
+      fontFace: BODY, fontSize: Math.round(w * 12), bold: true, color,
+    });
+  });
+}
+
+/** Big Jost statistic: value in one colour, trailing unit in another. */
+function stat(slide, x, y, w, value, unit, valueColor, unitColor, spacing = 1.5) {
+  slide.addText([
+    { text: value, options: { color: valueColor } },
+    { text: unit, options: { color: unitColor } },
+  ], { x, y, w, h: 0.656, fontFace: HEAD, fontSize: 24, bold: true, lineSpacingMultiple: spacing, valign: 'top' });
+}
+
+/** Five-point rating star. */
+function star(slide, x, y, size, color) {
+  slide.addShape('star5', { x, y, w: size, h: size, fill: { color }, line: { type: 'none' } });
+}
+
+/** Roadmap pictograms, drawn inside a 0.36" box centred on (cx, cy). */
+function roadmapIcon(slide, kind, cx, cy, color) {
+  const back = color === WHITE ? BROWN : CREAM; // the disc the glyph sits on
+  const fill = { color };
+  const flat = { fill, line: { type: 'none' } };
+  const ring = { fill: { type: 'none' }, line: { color, width: 1.5 } };
+  if (kind === 'safe') { // domed lid over a drawer carrying two dials
+    slide.addShape('roundRect', Object.assign({ x: cx - 0.165, y: cy - 0.175, w: 0.33, h: 0.15, rectRadius: 0.06 }, flat));
+    slide.addShape('roundRect', Object.assign({ x: cx - 0.19, y: cy - 0.015, w: 0.38, h: 0.17, rectRadius: 0.04 }, flat));
+    slide.addShape('ellipse', { x: cx + 0.03, y: cy + 0.045, w: 0.05, h: 0.05, fill: { color: back } });
+    slide.addShape('ellipse', { x: cx + 0.105, y: cy + 0.045, w: 0.05, h: 0.05, fill: { color: back } });
+  } else if (kind === 'fingerprint') { // nested ridges suggesting a print
+    [0.36, 0.25, 0.14].forEach((d) => {
+      slide.addShape('ellipse', Object.assign({ x: cx - d / 2, y: cy - d / 2, w: d, h: d }, ring));
+    });
+    slide.addShape('ellipse', Object.assign({ x: cx - 0.025, y: cy - 0.025, w: 0.05, h: 0.05 }, flat));
+  } else if (kind === 'payment') { // dollar sign resting on an open palm
+    slide.addText('$', {
+      x: cx - 0.13, y: cy - 0.25, w: 0.3, h: 0.26, margin: 0, align: 'center', valign: 'middle',
+      fontFace: BODY, fontSize: 15, bold: true, color,
+    });
+    slide.addShape('blockArc', {
+      x: cx - 0.22, y: cy - 0.21, w: 0.44, h: 0.52, rotate: 180, fill, line: { type: 'none' },
+    });
+  } else if (kind === 'globe') { // sphere crossed by a meridian and two parallels
+    slide.addShape('ellipse', { x: cx - 0.17, y: cy - 0.17, w: 0.34, h: 0.34, fill: { color } });
+    slide.addShape('ellipse', { x: cx - 0.07, y: cy - 0.17, w: 0.14, h: 0.34, fill: { type: 'none' }, line: { color: back, width: 1.5 } });
+    [-0.075, 0.075].forEach((dy) => {
+      slide.addShape('line', { x: cx - 0.16, y: cy + dy, w: 0.32, h: 0, line: { color: back, width: 1.5 } });
+    });
+  } else if (kind === 'home') { // pitched roof over a body with a doorway
+    slide.addShape('triangle', Object.assign({ x: cx - 0.2, y: cy - 0.18, w: 0.4, h: 0.18 }, flat));
+    slide.addShape('rect', Object.assign({ x: cx - 0.15, y: cy - 0.03, w: 0.3, h: 0.2 }, flat));
+    slide.addShape('rect', { x: cx - 0.05, y: cy + 0.05, w: 0.1, h: 0.12, fill: { color: back } });
+  }
+}
+
+// Repeated copy from the reference deck.
+const LOREM_ABOUT = 'Lorem ipsum dolor sit ametos, Fusce posuere, mag sed.';
+const LOREM_PROBLEM = 'Lorem ipsum dolor sit amet, Fusce pos, mi sedolo pulvi minim';
+const LOREM_SIZE = 'Lorem ipsum dolor sit, consectetur adipisicing minim elitos, sedo dolore minimum am';
+const LOREM_AMENITY = 'Lorem ipsum dolor sit, consectetur adipisicing elito, ';
+const LOREM_SERVICE = 'Lorem ipsum dolor sit ametos di, Fusce pos, mi sedolo pulvina minimum elit sed amet';
+const LOREM_QUOTE = 'Lorem ipsum dolor sit amet, Fus posuere eli, mag sed';
+const LOREM_STEP = 'Lorem ipsum dolor sit amet, elit, sed do eiusmod';
+
+// ── Slide builders ─────────────────────────────────────────────────────────
+
+// 1 — Title: "LUXURY LIVING"
+function slide1(s) {
+  photo(s, 0.667, 2.793, 4.225, 4.707);
+  photo(s, 11.574, 5.741, 1.759, 1.759);
+  wordmark(s, BROWN);
+  heading(s, 'LUXURY', ' LIVING', { x: 0.524, y: 1.0, w: 8.268, h: 1.313, fontSize: 72, boldRest: true });
+  txt(s, '/ Your Trusted Partner /', {
+    x: 8.95, y: 1.482, w: 2.018, h: 0.303, italic: true, align: 'center',
+  });
+  s.addShape('line', { x: 5.663, y: 2.793, w: 1.298, h: 0, line: { color: BROWN, width: HAIRLINE } });
+  txt(s, [
+    { text: 'INVESTMENT' },
+    { text: ' PITCH', options: { italic: true } },
+  ], { x: 7.156, y: 2.564, w: 2.786, h: 0.438, fontSize: 20, color: BROWN });
+  txt(s, '/ 2025', { x: 5.555, y: 3.967, w: 0.726, h: 0.372, italic: true, lineSpacingMultiple: 1.5 });
+  txt(s, 'Lorem ipsum dolor sit amet, Fusce posu eli, mag sed dolore pulvinar cons pur dolore min eius.', {
+    x: 7.156, y: 3.951, w: 3.389, h: 0.978, lineSpacingMultiple: 1.5,
+  });
+  txt(s, 'Estate', { x: 11.47, y: 3.967, w: 0.762, h: 0.372, lineSpacingMultiple: 1.5 });
+  s.addShape('rect', {
+    x: 5.663, y: 6.015, w: 2.129, h: 0.719, fill: { color: CREAM }, line: { color: BROWN, width: HAIRLINE },
+  });
+  txt(s, 'Start Your Journey', {
+    x: 5.819, y: 6.148, w: 1.816, h: 0.372, bold: true, color: BROWN, align: 'center', lineSpacingMultiple: 1.5,
+  });
+  badge(s, 11.032, 5.321, 1.007, 1.022, BROWN);
+}
+
+// 2 — About our company vision
+function slide2(s) {
+  s.background = { color: BROWN };
+  photo(s, 0.667, 1.014, 4.667, 5.986);
+  wordmark(s, WHITE);
+  heading(s, 'ABOUT', ' OUR COMPANY VISION', { x: 5.951, y: 1.014, w: 6.002, h: 1.717, color: WHITE });
+  txt(s, 'Company Vision', {
+    x: 5.951, y: 3.261, w: 2.648, h: 0.42, fontSize: 14, bold: true, color: WHITE, lineSpacingMultiple: 1.5,
+  });
+  txt(s, 'Lorem ipsum dolor sit amet, Fusce posuere, mag sed amet dolore amei pulvinar cons purus dolore min eiusmod minimum elit.', {
+    x: 5.951, y: 3.683, w: 5.721, h: 0.675, color: PALE, lineSpacingMultiple: 1.5,
+  });
+  s.addShape('line', { x: 9.236, y: 5.307, w: 0, h: 1.443, line: { color: MID, width: HAIRLINE } });
+  [
+    { x: 5.951, tile: CREAM, glyph: BROWN, label: 'Our Company Mission 01' },
+    { x: 10.073, tile: MID, glyph: WHITE, label: 'Our Company Mission 02' },
+  ].forEach(({ x, tile, glyph, label }) => {
+    iconTile(s, x + 0.113, 5.32, tile, glyph);
+    txt(s, label, {
+      x: x + 0.846, y: 5.307, w: 1.557, h: 0.572, fontSize: 14, bold: true, color: WHITE,
+    });
+    txt(s, LOREM_ABOUT, { x, y: 6.075, w: 2.604, h: 0.675, color: PALE, lineSpacingMultiple: 1.5 });
+  });
+}
+
+// 3 — Current market pain points
+function slide3(s) {
+  photo(s, 6.667, 1.005, 6.0, 2.745);
+  wordmark(s, BROWN);
+  heading(s, 'CURRENT ', 'MARKET PAIN POINTS', { x: 0.681, y: 1.204, w: 4.525, h: 2.524 });
+  txt(s, 'Lorem ipsum dolor sit amet, Fusce posuere, mag sedolo amet dolore amei pulvinar cons purus dolore min eiusmod minimum elit.', {
+    x: 0.681, y: 4.347, w: 4.63, h: 0.978, lineSpacingMultiple: 1.5,
+  });
+  stat(s, 0.681, 5.823, 1.392, '624K', '+', BROWN, BEIGE);
+  txt(s, 'Lorem ipsum dolor sit amet, Fuscena posuere, mag sed dolore pul', {
+    x: 2.135, y: 5.825, w: 3.133, h: 0.675, lineSpacingMultiple: 1.5,
+  });
+  [
+    { y: 4.339, tile: BROWN, glyph: WHITE, outline: null, label: 'The Best Problem 01' },
+    { y: 5.764, tile: CREAM, glyph: BROWN, outline: BEIGE, label: 'The Best Problem 02' },
+  ].forEach(({ y, tile, glyph, outline, label }) => {
+    iconTile(s, 6.667, y + 0.143, tile, glyph, outline);
+    txt(s, label, {
+      x: 7.514, y, w: 2.648, h: 0.42, fontSize: 14, bold: true, color: BROWN, lineSpacingMultiple: 1.5,
+    });
+    txt(s, LOREM_PROBLEM, { x: 7.514, y: y + 0.423, w: 5.017, h: 0.372, lineSpacingMultiple: 1.5 });
+  });
+}
+
+// 4 — Global luxury market size
+function slide4(s) {
+  s.background = { color: BROWN };
+  s.addShape('rect', { x: 0.667, y: 3.135, w: 5.333, h: 1.571, fill: { color: CREAM } });
+  photo(s, 7.055, 4.052, 5.612, 2.948);
+  wordmark(s, WHITE);
+  heading(s, 'GLOBAL ', 'LUXURY MARKET SIZE', { x: 7.055, y: 1.01, w: 5.304, h: 1.717, color: WHITE });
+  txt(s, 'Lorem ipsum dolor sit amet, Fusce posuere, mag sedolo amet dolore amei pulvinar cons purus dolore min eiusmod', {
+    x: 7.055, y: 2.851, w: 5.091, h: 0.675, color: PALE, lineSpacingMultiple: 1.5,
+  });
+  // Three market-size rows; the middle one sits on the cream band, so it flips colour.
+  [
+    { y: 1.338, tag: 'Aa.', tagColor: MID, label: 'The Market Size 01', ink: WHITE, body: PALE, value: '78', unit: RUST, w: 0.862 },
+    { y: 3.329, tag: 'Bb.', tagColor: BEIGE, label: 'The Market Size 02', ink: BROWN, body: GREY, value: '65', unit: BEIGE, w: 0.946 },
+    { y: 5.46, tag: 'Cc.', tagColor: MID, label: 'The Market Size 03', ink: WHITE, body: PALE, value: '54', unit: RUST, w: 0.946 },
+  ].forEach((r) => {
+    txt(s, r.tag, {
+      x: 1.252, y: r.y + 0.007, w: 0.514, h: 0.425, fontFace: HEAD, fontSize: 14, bold: true,
+      color: r.tagColor, lineSpacingMultiple: 1.5,
+    });
+    txt(s, r.label, {
+      x: 1.924, y: r.y, w: 2.82, h: 0.425, fontSize: 14, bold: true, color: r.ink, lineSpacingMultiple: 1.5,
+    });
+    stat(s, 0.904, r.y + 0.367, r.w, r.value, 'K', r.ink, r.unit);
+    txt(s, LOREM_SIZE, { x: 1.924, y: r.y + 0.381, w: 3.83, h: 0.675, color: r.body, lineSpacingMultiple: 1.5 });
+  });
+}
+
+// 5 — Leadership & expert team
+function slide5(s) {
+  s.addShape('rect', { x: 0, y: 4.438, w: 13.333, h: 3.062, fill: { color: BEIGE } });
+  s.addShape('rect', { x: 0.667, y: 3.438, w: 5.443, h: 3.562, fill: { color: BROWN } });
+  wordmark(s, BROWN);
+  heading(s, 'LEADERSHIP ', '& EXPERT TEAM', { x: 1.708, y: 1.052, w: 9.917, h: 0.909, align: 'center' });
+  txt(s, 'Lorem ipsum dolor sit amet, Fusce posuere, mag sedolo amet dolore amei pulvinar cons purus dolore min eiusmod Fusce posuere, mag sedolo amet dolore amei elitos.', {
+    x: 2.74, y: 2.058, w: 7.854, h: 0.675, align: 'center', lineSpacingMultiple: 1.5,
+  });
+  // Featured member card
+  photo(s, 0.917, 3.687, 2.235, 3.062);
+  txt(s, 'Jonathan Moore', { x: 3.467, y: 3.873, w: 2.124, h: 0.37, fontSize: 16, bold: true, color: WHITE });
+  txt(s, 'Company Co-Founder', {
+    x: 3.459, y: 4.209, w: 2.045, h: 0.372, bold: true, color: PALE, lineSpacingMultiple: 1.5,
+  });
+  txt(s, 'Lorem ipsum dolor sitoi el, pisce ami adipisicing minimum.', {
+    x: 3.459, y: 4.868, w: 2.282, h: 0.978, color: PALE, lineSpacingMultiple: 1.5,
+  });
+  [0, 1, 2, 3, 4].forEach((i) => star(s, 3.566 + i * 0.251, 6.188, 0.144, WHITE));
+  // Two supporting members
+  [
+    { x: 6.622, name: 'Alexis Gerbert', role: 'Finance Manager' },
+    { x: 9.9, name: 'Samuel Collin', role: 'Project Manager' },
+  ].forEach(({ x, name, role }) => {
+    photo(s, x, 3.437, 2.766, 1.938);
+    txt(s, name, {
+      x: x + 0.321, y: 5.845, w: 2.124, h: 0.37, fontSize: 16, bold: true, color: BROWN, align: 'center',
+    });
+    txt(s, role, {
+      x: x + 0.361, y: 6.182, w: 2.045, h: 0.372, bold: true, align: 'center', lineSpacingMultiple: 1.5,
+    });
+  });
+}
+
+// 6 — Premium services and amenities
+function slide6(s) {
+  s.background = { color: BROWN };
+  photo(s, 6.068, 1.0, 3.134, 6.0);
+  s.addShape('rect', { x: 9.449, y: 1.0, w: 3.217, h: 2.873, fill: { color: CREAM } });
+  s.addShape('rect', { x: 9.449, y: 4.127, w: 3.217, h: 2.873, fill: { color: MID } });
+  wordmark(s, WHITE);
+  heading(s, 'PREMIUM ', 'SERVICES AND AMENITIES', { x: 0.688, y: 1.125, w: 4.958, h: 2.524, color: WHITE });
+  txt(s, 'Lorem ipsum dolor sit amet, Fusce posuere, mag sedolo amet dolore amei pulvinar cons purus dolore min', {
+    x: 0.681, y: 3.794, w: 4.63, h: 0.675, color: PALE, lineSpacingMultiple: 1.5,
+  });
+  ['Best Amenities 01', 'Best Amenities 02'].forEach((label, i) => {
+    const y = 4.813 + i * 1.234;
+    s.addShape('ellipse', { x: 0.774, y: y + 0.195, w: 0.111, h: 0.111, fill: { color: RUST } });
+    txt(s, label, {
+      x: 1.108, y, w: 2.789, h: 0.417, fontSize: 14, bold: true, color: WHITE, lineSpacingMultiple: 1.5,
+    });
+    txt(s, LOREM_AMENITY, { x: 1.108, y: y + 0.425, w: 4.203, h: 0.372, color: PALE, lineSpacingMultiple: 1.5 });
+  });
+  // Two stacked service cards on the right
+  [
+    { y: 1.37, tile: BROWN, glyph: WHITE, ink: BROWN, body: GREY, label: 'The Best Services 01' },
+    { y: 4.487, tile: CREAM, glyph: BROWN, ink: WHITE, body: PALE, label: 'The Best Services 02' },
+  ].forEach((c) => {
+    iconTile(s, 10.764, c.y, c.tile, c.glyph);
+    txt(s, c.label, {
+      x: 9.734, y: c.y + 0.741, w: 2.648, h: 0.42, fontSize: 14, bold: true, color: c.ink,
+      align: 'center', lineSpacingMultiple: 1.5,
+    });
+    txt(s, LOREM_SERVICE, {
+      x: 9.653, y: c.y + 1.197, w: 2.81, h: 0.978, color: c.body, align: 'center', lineSpacingMultiple: 1.5,
+    });
+  });
+}
+
+// 7 — Capital allocation and breakdown
+function slide7(s) {
+  photo(s, 0, 2.304, 6.667, 2.22);
+  photo(s, 6.841, 2.304, 3.873, 2.22);
+  wordmark(s, BROWN);
+  [
+    { x: 0.667, tile: BROWN, glyph: WHITE, outline: null, label: 'Best Allocation 01', lw: 2.648, body: 'Lorem ipsum dolor sit amet, Fusce pos, mi sedolo pulvi', bw: 4.478 },
+    { x: 6.841, tile: CREAM, glyph: BROWN, outline: BEIGE, label: 'Best Allocation 02', lw: 2.421, body: 'Lorem ipsum dolor sit amet minimi. ', bw: 3.026 },
+  ].forEach((c) => {
+    iconTile(s, c.x, 1.221, c.tile, c.glyph, c.outline);
+    txt(s, c.label, {
+      x: c.x + 0.847, y: 1.078, w: c.lw, h: 0.42, fontSize: 14, bold: true, color: BROWN, lineSpacingMultiple: 1.5,
+    });
+    txt(s, c.body, { x: c.x + 0.847, y: 1.501, w: c.bw, h: 0.372, lineSpacingMultiple: 1.5 });
+  });
+  heading(s, 'CAPITAL ', 'ALLOCATION AND BREAKDOWN', { x: 5.563, y: 5.061, w: 7.104, h: 1.717 });
+  s.addShape('line', { x: 4.933, y: 5.206, w: 0, h: 1.427, line: { color: BEIGE, width: HAIRLINE } });
+  txt(s, 'The Best Allocation ', {
+    x: 0.667, y: 5.304, w: 2.82, h: 0.425, fontSize: 14, bold: true, color: BROWN, lineSpacingMultiple: 1.5,
+  });
+  stat(s, 0.671, 5.74, 0.934, '78', '%', BROWN, BEIGE);
+  txt(s, 'Lorem ipsum dolor sit, consect adipisicing minim elitos', {
+    x: 1.691, y: 5.754, w: 2.601, h: 0.675, lineSpacingMultiple: 1.5,
+  });
+}
+
+// 8 — Client testimonials & reviews
+function slide8(s) {
+  s.background = { color: BROWN };
+  photo(s, 5.885, 1.095, 3.134, 2.75);
+  wordmark(s, WHITE);
+  heading(s, 'CLIENT ', 'TESTIMONIALS & REVIEWS', { x: 0.695, y: 1.215, w: 4.774, h: 2.524, color: WHITE });
+  stat(s, 9.541, 1.636, 1.665, '98.25', '%', WHITE, RUST, 1.0);
+  txt(s, 'Satisfied Clients With Us', {
+    x: 9.541, y: 2.084, w: 2.909, h: 0.417, fontSize: 14, bold: true, color: WHITE, lineSpacingMultiple: 1.5,
+  });
+  txt(s, 'Lorem ipsum dolor sit amet eli, Fusce el posuere, mag se amet dolores.', {
+    x: 9.541, y: 2.519, w: 3.134, h: 0.675, color: PALE, lineSpacingMultiple: 1.5,
+  });
+  // Three testimonial cards; the middle one is inverted.
+  [
+    { x: 0.667, card: MID, tile: CREAM, glyph: BROWN, ink: WHITE, body: PALE, label: 'Client Testimonial 01' },
+    { x: 4.808, card: CREAM, tile: BROWN, glyph: WHITE, ink: BROWN, body: GREY, label: 'Client Testimonial 02' },
+    { x: 8.95, card: MID, tile: CREAM, glyph: BROWN, ink: WHITE, body: PALE, label: 'Client Testimonial 03' },
+  ].forEach((c) => {
+    s.addShape('rect', { x: c.x, y: 4.352, w: 3.725, h: 1.6, fill: { color: c.card } });
+    iconTile(s, c.x + 0.274, 4.85, c.tile, c.glyph);
+    txt(s, c.label, {
+      x: c.x + 1.089, y: 4.55, w: 2.522, h: 0.42, fontSize: 14, bold: true, color: c.ink, lineSpacingMultiple: 1.5,
+    });
+    txt(s, LOREM_QUOTE, { x: c.x + 1.089, y: 4.973, w: 2.522, h: 0.675, color: c.body, lineSpacingMultiple: 1.5 });
+  });
+  // Progress bar at 83%
+  s.addShape('rect', { x: 0.685, y: 6.577, w: 11.5, h: 0.079, fill: { color: MID } });
+  s.addShape('rect', { x: 0.685, y: 6.577, w: 9.701, h: 0.079, fill: { color: BEIGE } });
+  s.addShape('parallelogram', {
+    x: 10.301, y: 6.532, w: 0.169, h: 0.169, fill: { color: BEIGE }, line: { color: WHITE, width: RING },
+  });
+  txt(s, '83%', { x: 12.245, y: 6.423, w: 0.634, h: 0.349, fontSize: 11, color: WHITE, lineSpacingMultiple: 1.5 });
+}
+
+// 9 — Strategic growth roadmap (five-step chevron timeline)
+function slide9(s) {
+  wordmark(s, BROWN);
+  heading(s, 'STRATEGIC ', 'GROWTH ROADMAP', { x: 1.444, y: 1.084, w: 10.444, h: 0.909, align: 'center' });
+  // Odd steps are solid with the marker riding high; even steps are outlined
+  // with the marker dropped below the arrow.
+  const STEPS = [
+    { year: '2020', label: 'Choice 01', filled: true, icon: 'safe', chevron: 1.381, marker: 1.919, year_x: 1.539, label_x: 0.824 },
+    { year: '2021', label: 'Choice 02', filled: false, icon: 'fingerprint', chevron: 3.527, marker: 4.066, year_x: 3.607, label_x: 2.971 },
+    { year: '2022', label: 'Choice 03', filled: true, icon: 'payment', chevron: 5.674, marker: 6.219, year_x: 5.75, label_x: 5.118 },
+    { year: '2023', label: 'Choice 04', filled: false, icon: 'globe', chevron: 7.821, marker: 8.439, year_x: 7.919, label_x: 7.188 },
+    { year: '2024', label: 'Choice 05', filled: true, icon: 'home', chevron: 9.968, marker: 10.519, year_x: 9.993, label_x: 9.412 },
+  ];
+  STEPS.forEach((step) => {
+    s.addShape('chevron', {
+      x: step.chevron, y: 3.965, w: 1.985, h: 0.856,
+      fill: { color: step.filled ? BROWN : CREAM },
+      line: step.filled ? { type: 'none' } : { color: BEIGE, width: HAIRLINE },
+    });
+    const my = step.filled ? 3.575 : 4.597;
+    s.addShape('ellipse', {
+      x: step.marker, y: my, w: 0.749, h: 0.749,
+      fill: { color: step.filled ? BROWN : CREAM },
+      line: step.filled ? { color: WHITE, width: RING } : { color: BEIGE, width: HAIRLINE },
+    });
+    roadmapIcon(s, step.icon, step.marker + 0.375, my + 0.375, step.filled ? WHITE : BROWN);
+    // The year hugs the marker; the label and copy go on the opposite side.
+    txt(s, step.year, {
+      x: step.year_x, y: step.filled ? 2.944 : 5.598, w: 1.668, h: 0.505,
+      fontFace: HEAD, fontSize: 24, bold: true, color: BROWN, align: 'center',
+    });
+    const labelY = step.filled ? 5.203 : 2.549;
+    txt(s, step.label, {
+      x: step.label_x, y: labelY, w: 2.939, h: 0.337, fontSize: 14, bold: true, color: BROWN, align: 'center',
+    });
+    txt(s, LOREM_STEP, {
+      x: step.label_x + 0.236, y: labelY + 0.353, w: 2.467, h: 0.707, align: 'center', lineSpacingMultiple: 1.5,
+    });
+  });
+}
+
+// 10 — Closing: "GRATEFUL"
+function slide10(s) {
+  s.background = { color: BROWN };
+  photo(s, 0.667, 1.0, 5.194, 6.0);
+  wordmark(s, WHITE);
+  txt(s, 'GRATEFUL', {
+    x: 6.401, y: 1.19, w: 5.639, h: 1.313, fontFace: HEAD, fontSize: 72, bold: true, color: WHITE,
+  });
+  s.addShape('line', { x: 8.859, y: 2.78, w: 0.782, h: 0, line: { color: CREAM, width: HAIRLINE } });
+  // Narrow enough to break as "FOR YOUR / ATTENTION", as the source deck does.
+  txt(s, 'FOR YOUR ATTENTION', {
+    x: 9.811, y: 2.571, w: 2.45, h: 0.438, fontSize: 20, italic: true, color: WHITE,
+  });
+  badge(s, 5.596, 3.548, 0.891, 0.904, WHITE);
+  s.addShape('rect', { x: 7.879, y: 3.847, w: 2.244, h: 0.719, fill: { color: MID } });
+  txt(s, 'End Of Your Journey', {
+    x: 8.015, y: 3.98, w: 1.973, h: 0.372, bold: true, color: WHITE, align: 'center', lineSpacingMultiple: 1.5,
+  });
+  txt(s, [
+    { text: '/', options: { color: RUST } },
+    { text: ' Explore ' },
+    { text: 'More', options: { italic: true } },
+    { text: ' ' },
+  ], {
+    x: 10.584, y: 3.98, w: 1.562, h: 0.372, bold: true, color: WHITE, align: 'center', lineSpacingMultiple: 1.5,
+  });
+  txt(s, '/ Estate', {
+    x: 6.401, y: 5.655, w: 0.792, h: 0.372, italic: true, color: PALE, lineSpacingMultiple: 1.5,
+  });
+  txt(s, 'Lorem ipsum dolor sit amet, Fusce posu eli, mag sed dolore pulvinar cons. Minimum elit.', {
+    x: 7.78, y: 5.638, w: 3.389, h: 0.978, color: PALE, lineSpacingMultiple: 1.5,
+  });
+  txt(s, '2025', { x: 11.783, y: 5.655, w: 0.726, h: 0.372, color: PALE, lineSpacingMultiple: 1.5 });
+}
+
+// ── Build ──────────────────────────────────────────────────────────────────
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'LEXURA', width: 13.333, height: 7.5 });
+pptx.layout = 'LEXURA';
+pptx.author = 'Lexura';
+pptx.title = 'Luxury Living — Investment Pitch';
+
+[slide1, slide2, slide3, slide4, slide5, slide6, slide7, slide8, slide9, slide10].forEach((build) => {
+  const slide = pptx.addSlide();
+  slide.background = { color: CREAM };
+  build(slide);
+});
+
+pptx.writeFile({ fileName: path.join(__dirname, '0063a76d-a3e0-45d0-92c1-9006ff36e640_grok_final.pptx') })
+  .then((f) => console.log('wrote', f));

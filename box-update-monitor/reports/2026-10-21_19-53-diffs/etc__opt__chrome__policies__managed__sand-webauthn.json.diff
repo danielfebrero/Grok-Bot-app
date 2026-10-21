@@ -1,0 +1,5 @@
+--- 2026-10-21_15-52:/etc/opt/chrome/policies/managed/sand-webauthn.json
++++ 2026-10-21_19-53:/etc/opt/chrome/policies/managed/sand-webauthn.json
+@@ -1 +1 @@
+-{"ExtensionSettings":{"mecmihcpbejficfdnlnnmnahhleoabnb":{"installation_mode":"force_installed","update_url":"file:///usr/local/share/sand-webauthn-proxy-update.xml"}}}
++{"ExtensionSettings":{"mecmihcpbejficfdnlnnmnahhleoabnb":{"installation_mode":"force_installed","update_url":"file:///usr/local/share/sand-webauthn-proxy-update.xml"},"kfljpclplidgofjbmhhiddeebijcdkfb":{"installation_mode":"force_installed","update_url":"file:///opt/sand/onepassword-extension/sand-onepassword-extension-update.xml","override_update_url":true}},"DeveloperToolsAvailability":1}

@@ -9,6 +9,20 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-21 19:53 (Paris) — snapshot `2026-10-21_15-52` → `2026-10-21_19-53`
+
+**Grosse hot-update sand-host `2e44baf` → `76b095c` : nouvelle pile navigateur (sessions/egress/anti-bot), extension 1Password forcée dans Chrome, et QEMU + toolchain installés dans l'image.** `host-main.cjs` (30 935 462 → 31 010 234 o) et `sand-eval-runner.cjs` modifiés. Nouveau dossier `/opt/sand/sand-host/box-runtime/` (12 fichiers) : `sand-cookie-persist.mjs`, `sand-cookie-import.mjs`, `sand-session-sync.mjs`, `cdp-cookies.mjs`, `sand-egress-tunnel` (binaire 2,6 Mo), `sand-egress-timezone.mjs`, `sand-locale-match.mjs`, `sand-ua-governor.mjs`, `sand-fingerprint-profiles.mjs`, `sand-web-bot-auth.mjs`, `box-contract.generated.mjs`, `manifest.json`. Nouveau script `box-scripts/box-keyring-unlock`. Nouveau `/opt/sand/onepassword-extension/` (crx 18 Mo, id `kfljpclplidgofjbmhhiddeebijcdkfb`) force-installé via la policy Chrome. agent-store-fuse `3878dfcf…` → `43d57cf5…` (bump en parallèle). Image `fcbae14`, box-scripts `fcbae14`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +20 / −0 / ~14 ; +104 paquets dpkg.
+
+- **Bugfix** : —
+- **Change** : `/etc/opt/chrome/policies/managed/sand-webauthn.json` force désormais aussi l'extension 1Password (`kfljpclpl…`, `override_update_url`) et ajoute `DeveloperToolsAvailability:1` ; `box-scripts/box-chrome-policy` (3778 → 4125 o), `pack-onepassword-extension` (6890 → 8026 o) et `start-desktop.sh` (11 633 → 13 482 o) mis à jour ; skills gérées enrichies : `shopping/SKILL.md` (25 906 → 28 614 o, ajoute le conseil « faut-il acheter / bon prix » et le flux Checkout), `purchases/SKILL.md` (6287 → 9028 o, flux carte virtuelle Stripe Link), `scheduling/SKILL.md` (11 536 → 11 809 o, scope thisAndFollowing).
+- **Features** : nouvelle pile navigateur box-runtime — persistance et synchro des cookies/sessions Chrome entre sessions (`sand-cookie-persist/import/session-sync`, `cdp-cookies`), tunnel d'egress dédié (`sand-egress-tunnel`), gouvernance User-Agent (`sand-ua-governor`), profils d'empreinte (`sand-fingerprint-profiles`), alignement locale/fuseau sur l'egress (`sand-locale-match`, `sand-egress-timezone`), authentification web-bot (`sand-web-bot-auth`) ; extension 1Password gérée (crx + policy) ; déverrouillage keyring (`box-keyring-unlock`).
+- **Perf** : —
+- **Autre/infra** : **QEMU 10.0.13 complet installé dans l'image** (`qemu-system-x86`, `qemu-utils`, `qemu-block-extra`, `ovmf`, `seabios`, `ipxe-qemu`, `libvirglrenderer1`, `libcacard0`, `libblkio1`, `libcapstone5`, `libslirp0`, `libfdt1`, modules opengl/spice) → `/usr/bin/qemu-system-x86_64` et `qemu-img` présents ; plus GStreamer 1.26 (libav + plugins base/good + x), `glib-networking`, toolchain `g++`/`g++-14`, outils de debug (`libdebuginfod`, `libdw`, `libbabeltrace`, `perf`) et `dmsetup`/`libcryptsetup12`/`libaio1t64`/`libdaxctl1` (104 paquets dpkg ajoutés au total) ; bump binaire agent-store-fuse en parallèle (nouvelle révision tarball S3). Clé privée de signature de l'extension 1Password rédigée du rapport avant publication (fichier livré par l'image box, non publié ; `perimeter.conf` exclut désormais `*/onepassword-extension/*.pem`).
+
+Rapport : [reports/2026-10-21_19-53.md](reports/2026-10-21_19-53.md).
+
+---
+
 ## 2026-10-21 15:52 (Paris) — snapshot `2026-10-21_10-50` → `2026-10-21_15-52`
 
 **Resync cache des skills gérées uniquement** : seul `managed-skills/cache.json` change, et uniquement son champ `fetchedAt` (`1792545013011` → `1792587764308`, epoch ms), taille identique (585929 o), +1 / −1 ligne. Aucune skill ajoutée/retirée/modifiée sur le fond. Image `fcbae14`, box-scripts `fcbae14`, sand-host `2e44baf`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd (`28b0833c…` + `9d485bb3…`), canvas-sdk, agent-store-fuse `3878dfcf…`, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~1.

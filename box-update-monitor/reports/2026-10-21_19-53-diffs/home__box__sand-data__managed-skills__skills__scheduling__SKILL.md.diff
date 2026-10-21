@@ -1,0 +1,10 @@
+--- 2026-10-21_15-52:/home/box/sand-data/managed-skills/skills/scheduling/SKILL.md
++++ 2026-10-21_19-53:/home/box/sand-data/managed-skills/skills/scheduling/SKILL.md
+@@ -106,6 +106,7 @@
+ - Real changes (time, place, agenda, cancellation) notify every attendee.
+ - When the choice is not obvious, such as a typo fix on someone else's invite or moving a meeting the user does not own, ask first.
+ - Add or remove people with the connector's add-attendee and remove-attendee style operations when the connector offers them, instead of replacing the whole list.
++- To change or end a repeating series from one occurrence onward, call update_event or delete_event with scope thisAndFollowing on that occurrence when the connector offers scope, instead of asking the user to edit the series by hand. Earlier occurrences stay as they are.
+ 
+ ## How requests arrive
+ 

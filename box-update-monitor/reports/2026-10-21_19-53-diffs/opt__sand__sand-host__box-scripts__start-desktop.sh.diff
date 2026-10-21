@@ -1,0 +1,47 @@
+--- 2026-10-21_15-52:/opt/sand/sand-host/box-scripts/start-desktop.sh
++++ 2026-10-21_19-53:/opt/sand/sand-host/box-scripts/start-desktop.sh
+@@ -98,6 +98,44 @@
+ 
+ rm -f /tmp/xdg-runtime-box/sand-gateway-credential /tmp/xdg-runtime-box-*/sand-gateway-credential || true
+ 
++# Persistent user keyring (sand_box_persistent_keyring gate, stamped as
++# SAND_BOX_PERSISTENT_KEYRING=1 at pod create): unlock the on-disk `login`
++# GNOME keyring on the box session bus. box-keyring-unlock execs
++# gnome-keyring-daemon in the foreground, so it runs as a supervised desktop
++# component like the rest of this session: the supervisor restarts it when it
++# dies (the image removes Secret Service D-Bus activation, so nothing else
++# would), and the script replaces the daemon from any earlier session before
++# it starts, so two daemons never share the keyring files. Only on the primary
++# display: the keyring files are shared on disk, and a second daemon on a
++# forked display's bus would race the first. No-op when the env is absent
++# (today's default) or the image lacks gnome-keyring: host-bundle sync can
++# land this script on an image without the daemon, and registering it there
++# would make the supervisor relaunch its clean no-op exit forever, so the
++# component is not registered at all until the image ships the binary.
++start_persistent_keyring() {
++	[ "${SAND_BOX_PERSISTENT_KEYRING:-}" = "1" ] || return 0
++	[ "${BOX_DISPLAY_NUM:-1}" -lt 2 ] 2>/dev/null || return 0
++	[ -x /usr/local/bin/box-keyring-unlock ] || return 0
++	command -v gnome-keyring-daemon >/dev/null 2>&1 || return 0
++	local bus="${DBUS_SESSION_BUS_ADDRESS:-}" runner=()
++	if [ "$(id -u)" -eq 0 ]; then
++		bus="${BOX_DBUS_ADDRESS:-}"
++		runner=(runuser -u box --)
++	fi
++	[ -n "${bus}" ] || return 0
++	local cmd=(
++		"${runner[@]}" env
++		HOME=/home/box
++		XDG_RUNTIME_DIR="${BOX_USER_XDG_DIR}"
++		DBUS_SESSION_BUS_ADDRESS="${bus}"
++		/usr/local/bin/box-bounded-log --run /tmp/box-keyring.log --
++		/usr/local/bin/box-keyring-unlock
++	)
++	"${cmd[@]}" &
++	sand_desktop_register "${SAND_DESKTOP_GROUP}" keyring 6 /tmp/box-keyring.log "$!" -- "${cmd[@]}"
++}
++start_persistent_keyring
++
+ /usr/local/bin/box-bounded-log --run "/tmp/xvfb${DISPLAY}.log" -- \
+ 	/usr/local/bin/box-xvfb "${DISPLAY}" -screen 0 "${SCREEN_WIDTH}x${SCREEN_HEIGHT}x24" -ac +extension GLX +render -noreset &
+ sand_desktop_register "${SAND_DESKTOP_GROUP}" xvfb 0 "/tmp/xvfb${DISPLAY}.log" "$!" -- \
