@@ -9,6 +9,36 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-22 18:53 (Paris) — snapshot `2026-10-22_17-54` → `2026-10-22_18-53`
+
+**Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `023c11162a46b7dfbe5f7e800bf0c2f4b1063f82` → `ef71388e495e596274f4c3901dc845b80c7c53f0` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`). Binaire `cursor-agent-store-fuse` inchangé (9504880 o, même sha256). Image `fcbae14`, box-scripts `fcbae14`, sand-host `4006392`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~1.
+
+- **Bugfix** : —
+- **Change** : —
+- **Features** : —
+- **Perf** : —
+- **Autre/infra** : bump pointeur tarball S3 agent-store-fuse uniquement (binaire identique).
+
+Rapport : [reports/2026-10-22_18-53.md](reports/2026-10-22_18-53.md).
+
+
+---
+
+## 2026-10-22 17:54 (Paris) — snapshot `2026-10-22_14-51` → `2026-10-22_17-54`
+
+**Hot-update sand-host `fd395ed` → `4006392`** (+ bump agent-store-fuse). Bundle host (`host-main.cjs` 31.3→31.5 Mo, `sand-eval-runner.cjs` 24.7→24.8 Mo), proto agent-store-worker (`CursorRule.body_omitted`), skill `sign-in` (1Password : `ListCredentials` → `GetCredentialProviderStatus`), `managed-skills/cache.json` refetch. Image `fcbae14`, box-scripts `fcbae14`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Meta dpkg : apparition de `rsync` + `libpopt0`. Fichiers : +0 / −0 / ~7.
+
+- **Bugfix** : —
+- **Change** : skill `sign-in` — premier pas 1Password passe par `GetCredentialProviderStatus` (plus `ListCredentials` + URL exacte). Proto `CursorRule` : champ optionnel `body_omitted`. Pages publiées : `ResolvePublishedPageResponse.live_sources` + RPC `RefreshPublishedPageSources`. Catalogue captcha/WAF élargi dans le host (Akamai, Amazon Robot Check / 503 dog, Arkose, AWS WAF, Cloudflare, DataDome, GeeTest, PerimeterX, Turnstile, hCaptcha, reCAPTCHA). Codes d’erreur Messages/iMessage (sidecar, grants, contacts…).
+- **Features** : RPC `ListGrokBotEmailThreads` (GrokBotService) ; `GetUnifyMergeNowBanner` (DashboardService) ; `RefreshPublishedPageSources` (pages live) ; flags host `grok_bot_messaging_multiple_numbers`, `grok_bot_library_external_docs_ui`, `sand_voice_call_transfer`.
+- **Perf** : —
+- **Autre/infra** : hot-update sand-host `4006392` ; agent-store-fuse `0d8cac8a…` → `023c1116…` (pointeur tarball S3) ; paquets dpkg `rsync` + `libpopt0` désormais listés.
+
+Rapport : [reports/2026-10-22_17-54.md](reports/2026-10-22_17-54.md).
+
+
+---
+
 ## 2026-10-22 14:51 (Paris) — snapshot `2026-10-22_13-52` → `2026-10-22_14-51`
 
 **Hot-update sand-host `76b095c` → `fd395ed`** (+ bump agent-store-fuse). Bundle host (`host-main.cjs` 31.0→31.3 Mo, `sand-eval-runner.cjs` 24.5→24.7 Mo), `sand-egress-tunnel` 2.61→2.92 Mo, fingerprint/UA (`sand-ua-governor`, `sand-fingerprint-profiles`), launcher Chrome, policy Chrome, officekit `sharp` 0.35.4→0.35.5 (+ libvips 1.3.3→1.3.4 / so.8.18.6→8.18.7), proto agent-store-worker, search-index-worker. Image `fcbae14`, box-scripts `fcbae14`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +2 / −2 / ~43.

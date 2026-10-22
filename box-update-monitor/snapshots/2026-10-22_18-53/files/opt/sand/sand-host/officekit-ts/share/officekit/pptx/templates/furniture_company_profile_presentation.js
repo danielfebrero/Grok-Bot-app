@@ -1,0 +1,570 @@
+/*
+ * FURNITA — "Crafted Elegance" pitch deck (25 slides, 13.333 x 7.5 in).
+ *
+ * Recreated with pptxgenjs only. The reference deck ships with zero media
+ * parts — every "photo" is an *empty* PowerPoint picture placeholder, which
+ * renders as blank paper. The `photoSlot` / `avatarSlot` helpers below keep
+ * those regions in the code (position, size, shape) so the layout stays
+ * readable, drawn in the paper colour to match the reference output.
+ *
+ * Run:  node 1628ab52-7117-435b-b613-f8d95d83da74_grok_final.js
+ */
+
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ */
+/* Design tokens                                                       */
+/* ------------------------------------------------------------------ */
+
+const INK = '000000';        // theme tx1 — all body/heading text and rules
+const PAPER = 'FFFFFF';      // theme bg1 — slide background, knockout text
+const SLOT = PAPER;          // unfilled picture placeholders (see header note)
+const ARROW_INK = '0C0B10';  // the small ↗ glyph in the nav bar
+
+const FONT = {
+    regular: 'Titillium Web',
+    semi: 'Titillium Web SemiBold',
+    light: 'Titillium Web Light',
+};
+
+// Every text frame in the deck is top-anchored with zero internal inset.
+const TEXT = { margin: 0, valign: 'top', color: INK };
+
+const LABEL_W = 2.478;   // standard width of a card heading
+const LABEL_H = 0.3029;  // standard height of a card heading
+const CARD_GAP = 0.5643; // heading baseline -> paragraph offset used deck-wide
+
+// Body copy is reused verbatim across the deck; keyed by length.
+const COPY = {
+    long: 'Suspendisse interdum consectetur libero id fauus nisl tinu Arcu risus quvars qua quisque id diam vel. Volutpat Suspene interdum.',
+    medium: 'Suspendisse interdum consectetur libero id fauus nisl tinu Arcu risus quvars qua quisque id diam vel. ',
+    short: 'Suspendisse interdum consectetur libero id fauus nisl tinu Arcu risus.',
+    tiny: 'Suspendisse interdum consectetur libero id fauus nisl tinu.',
+    index: 'Suspendisse interdum consectetur libero id fauus nisl tinu Arcu risus quvars qua.',
+    wide: 'Suspendisse interdum consectetur libero id faucibus nisl tinu Arcu risus quvars qua quisque id diam vel. Volutpat Suspene interdum consecter libero id faucis nisl tincidu Arcu consectetur libero.',
+    wideShort: 'Suspendisse interdum consectetur libero id faucibus nisl tinu Arcu risus quvars qua quisque id diam vel. Volutpat Suspene interdum consecter libero id faucis nisl tincidu Arcu.',
+    wideAlt: 'Suspendisse interdum consectetur libero id faucibus nisl tinu Arcu s quvars qua quisque id diam vel. Volutpat Suspene interdum conster libero id faucis nisl tincidu Arcu consectetur libero.',
+};
+
+/* ------------------------------------------------------------------ */
+/* Drawing helpers                                                     */
+/* ------------------------------------------------------------------ */
+
+/** Hairline / rule. */
+function rule(s, x, y, w, width = 0.25, color = INK) {
+    s.addShape('line', { x, y, w, h: 0, line: { color, width } });
+}
+
+/** Oversized page headline (SemiBold, 54–100 pt). */
+function headline(s, x, y, w, h, text, fontSize, align = 'left') {
+    s.addText(text, { ...TEXT, x, y, w, h, fontSize, bold: true, fontFace: FONT.semi, align });
+}
+
+/** Card heading — 18 pt SemiBold (the deck's inherited default size). */
+function label(s, x, y, text, w = LABEL_W) {
+    s.addText(text, { ...TEXT, x, y, w, h: LABEL_H, fontSize: 18, bold: true, fontFace: FONT.semi });
+}
+
+/** Body paragraph — 12 pt Light on 150 % leading. */
+function body(s, x, y, w, h, text) {
+    s.addText(text, { ...TEXT, x, y, w, h, fontSize: 12, fontFace: FONT.light, lineSpacingMultiple: 1.5 });
+}
+
+/** Heading + paragraph pair, the deck's most repeated building block. */
+function card(s, x, y, w, h, heading, text, gap = CARD_GAP, headW = LABEL_W) {
+    label(s, x, y, heading, headW);
+    body(s, x, y + gap, w, h, text);
+}
+
+/** Black disc with a white play triangle. */
+function playButton(s, x, y) {
+    s.addShape('ellipse', { x, y, w: 0.5479, h: 0.5479, fill: { color: INK } });
+    s.addShape('triangle', { x: x + 0.1832, y: y + 0.1956, w: 0.1816, h: 0.1566, fill: { color: PAPER }, rotate: 90 });
+}
+
+/** Black pill button reading "Explore Here". */
+function exploreButton(s, x, y) {
+    s.addShape('roundRect', { x, y, w: 1.4564, h: 0.4456, fill: { color: INK }, rectRadius: 0 });
+    s.addText('Explore Here', {
+        ...TEXT, x: x + 0.1962, y: y + 0.105, w: 1.0641, h: 0.2356,
+        fontSize: 14, fontFace: FONT.regular, color: PAPER, align: 'center',
+    });
+}
+
+/** Big percentage + caption, underlined by a rule. */
+function stat(s, x, y, value, caption, ruleX, ruleW) {
+    s.addText(value, { ...TEXT, x, y, w: LABEL_W, h: 0.6732, fontSize: 40, bold: true, fontFace: FONT.semi, align: 'center' });
+    s.addText(caption, { ...TEXT, x, y: y + 0.7683, w: LABEL_W, h: 0.2356, fontSize: 14, bold: true, fontFace: FONT.semi, align: 'center' });
+    rule(s, ruleX, 7.0691, ruleW);
+}
+
+/** "+654,78" style figure. */
+function figure(s, x, y, text) {
+    s.addText(text, { ...TEXT, x, y, w: LABEL_W, h: 0.3366, fontSize: 20, bold: true, fontFace: FONT.semi });
+}
+
+/** Rectangular image region. */
+function photoSlot(s, x, y, w, h) {
+    s.addShape('rect', { x, y, w, h, fill: { color: SLOT } });
+}
+
+/** Circular image region (avatars / logo chips). */
+function avatarSlot(s, x, y, d = 0.5479) {
+    s.addShape('ellipse', { x, y, w: d, h: d, fill: { color: SLOT } });
+}
+
+/** Row of three overlapping avatar chips starting at x. */
+function avatarRow(s, x, y) {
+    [x, x + 0.3007, x + 0.6455].forEach((cx) => avatarSlot(s, cx, y, 0.4365));
+}
+
+/** Nav bar + rule shared by all 25 slides. */
+function chrome(s) {
+    s.addText('FURNITA', { ...TEXT, x: 0.5817, y: 0.4309, w: 1.9425, h: 0.202, fontSize: 12, fontFace: FONT.regular });
+    const navPad = [7.2, 7.2, 3.6, 3.6]; // l, r, b, t (pt) — matches the source insets
+    s.addText('Login', { ...TEXT, x: 11.2617, y: 0.3972, w: 0.535, h: 0.2693, fontSize: 10, fontFace: FONT.regular, margin: navPad });
+    s.addText('Sign Up', { ...TEXT, x: 11.832, y: 0.3972, w: 0.6725, h: 0.2693, fontSize: 10, fontFace: FONT.regular, margin: navPad });
+    s.addShape('line', {
+        x: 12.5621, y: 0.4764, w: 0.1148, h: 0.1109, flipV: true,
+        line: { color: ARROW_INK, width: 0.75, endArrowType: 'triangle' },
+    });
+    [0.4645, 0.5318, 0.5991].forEach((y) => rule(s, 6.5538, y, 0.2257, 1.25)); // hamburger
+    rule(s, 0.5601, 0.8507, 12.1392);
+}
+
+/* ------------------------------------------------------------------ */
+/* Slides                                                              */
+/* ------------------------------------------------------------------ */
+
+function slide01(s) { // Cover — CRAFTED ELEGANCE
+    photoSlot(s, 0.5501, 3.3451, 2.6365, 2.224);
+    photoSlot(s, 8.3529, 3.3451, 4.378, 4.1549);
+    avatarRow(s, 6.1257, 2.7777);
+    avatarSlot(s, 6.777, 6.4362);
+    headline(s, 0.4968, 1.1369, 12.3397, 1.6829, 'CRAFTED ELEGANCE', 100, 'center');
+    rule(s, 0.5642, 2.9873, 5.3799);
+    rule(s, 7.3522, 2.9873, 5.3799);
+    card(s, 3.6215, 3.5585, 3.158, 0.8835, 'About Company', COPY.long);
+    exploreButton(s, 6.498, 5.6511);
+    s.addText('Furnishing Your Life with Innovation and Craftsmanship', {
+        ...TEXT, x: 0.5858, y: 6.4521, w: 4.8651, h: 0.8078, fontSize: 24, fontFace: FONT.regular,
+    });
+    playButton(s, 7.1565, 6.4362);
+}
+
+function slide02(s) { // CONTENT INDEX
+    photoSlot(s, 0.5501, 4.2896, 2.2892, 2.9138);
+    avatarSlot(s, 8.999, 2.9242);
+    headline(s, 0.5817, 1.4541, 4.5369, 1.2117, 'CONTENT', 72);
+    headline(s, 0.5817, 2.5383, 4.0143, 1.2117, 'INDEX', 72);
+
+    // number | heading | heading x | heading y
+    const entries = [
+        ['01', 'Introduction Company', 4.0035, 4.3335],
+        ['02', 'Company Value', 9.5729, 4.3384],
+        ['03', 'Marketing Strategy', 4.0035, 6.0472],
+        ['04', 'Company Portfolio', 9.5729, 6.0522],
+    ];
+    entries.forEach(([num, heading, x, y]) => {
+        s.addText(num, { ...TEXT, x: x - 0.5773, y: y - 0.0504, w: 0.5773, h: 0.4039, fontSize: 24, bold: true, fontFace: FONT.semi });
+        card(s, x, y, 3.158, 0.5806, heading, COPY.index, 0.5306);
+    });
+
+    rule(s, 3.4262, 5.7679, 9.3047);
+    playButton(s, 9.3751, 2.9242);
+    body(s, 10.2408, 2.8538, 2.5108, 0.5806, COPY.short);
+    label(s, 8.4883, -0.4716, 'About Company'); // sits above the page edge in the source
+}
+
+function slide03(s) { // INTRODUCTION
+    photoSlot(s, 0.5601, 1.6863, 2.9889, 2.5053);
+    photoSlot(s, 3.6778, 1.7466, 3.9889, 2.5053);
+    avatarSlot(s, 0.5872, 5.1384);
+    headline(s, 5.8104, 4.9707, 6.8889, 1.2117, 'INTRODUCTION', 72);
+    card(s, 8.9881, 2.5602, 3.158, 0.8835, 'About Company', COPY.long);
+    playButton(s, 0.9634, 5.1384);
+    body(s, 1.8291, 5.068, 2.5108, 0.5806, COPY.short);
+    rule(s, 0.607, 6.2607, 3.7952);
+    figure(s, 0.5872, 6.8279, '+654,78');
+    exploreButton(s, 2.8834, 6.8086);
+    body(s, 5.7796, 6.5687, 6.8889, 0.5806, COPY.wideShort);
+}
+
+function slide04(s) { // VISION & MISSION
+    photoSlot(s, 0.5817, 1.3929, 3.37, 2.6071);
+    avatarRow(s, 8.3119, 3.9043);
+    headline(s, 0.5817, 4.8686, 4.5369, 1.2117, 'VISION &', 72);
+    headline(s, 0.5817, 5.9528, 4.0143, 1.2117, 'MISSION', 72);
+    card(s, 4.9748, 1.6579, 3.158, 0.8835, 'Vision', COPY.long);
+    card(s, 9.3816, 1.6579, 3.158, 0.8835, 'Mission', COPY.long);
+    rule(s, 4.9748, 4.1225, 3.0252);
+    rule(s, 9.7057, 4.1225, 3.0252);
+    rule(s, 8.3119, 6.2607, 4.4498);
+    figure(s, 8.3119, 6.8279, '+654,78');
+    exploreButton(s, 11.2429, 6.8086);
+    body(s, 8.2548, 5.0672, 4.4445, 0.5806,
+        'Suspendisse interdum consectetur libero id fauus nisl tinu Arcu risus quvars qua quisque id diam vel. Volutpat Suspene.');
+}
+
+function slide05(s) { // COMPANY VALUE
+    photoSlot(s, 0.5817, 1.2857, 2.6771, 5.7834);
+    avatarSlot(s, 10.8779, 6.1548);
+    avatarSlot(s, 11.3516, 6.1548);
+    headline(s, 3.8988, 4.7732, 4.5369, 1.2117, 'COMPANY', 72);
+    headline(s, 3.8988, 5.8574, 4.0143, 1.2117, 'VALUE', 72);
+    card(s, 3.8988, 1.7372, 2.6771, 0.8835, 'Value One', COPY.medium);
+    card(s, 7.0572, 1.7328, 2.6771, 0.8835, 'Value Two', COPY.medium);
+    card(s, 10.2157, 1.7328, 2.6771, 0.8835, 'Value Three', COPY.medium);
+    rule(s, 3.8988, 3.8249, 8.8321);
+    playButton(s, 11.6828, 6.1548);
+    stat(s, 8.553, 5.8165, '89%', 'Best Value', 9.25, 3.4809);
+}
+
+function slide06(s) { // COMPANY SERVICE
+    photoSlot(s, 0.5817, 4.1838, 2.6771, 2.8853);
+    avatarRow(s, 7.7336, 4.4427);
+    headline(s, 0.5817, 1.229, 4.5369, 1.2117, 'COMPANY', 72);
+    headline(s, 0.5817, 2.3132, 4.0143, 1.2117, 'SERVICE', 72);
+    card(s, 3.8183, 5.317, 2.6771, 0.8835, 'Service One ', COPY.medium);
+    card(s, 6.9768, 5.3126, 2.6771, 0.8835, 'Service Two', COPY.medium);
+    card(s, 10.1353, 5.3126, 2.6771, 0.8835, 'Service Three', COPY.medium);
+    body(s, 7.7555, 2.0719, 5.0569, 0.8835, COPY.wide);
+    exploreButton(s, 7.7555, 3.3848);
+    rule(s, 3.8183, 4.6841, 3.7092);
+    rule(s, 9.0217, 4.6609, 3.7092);
+}
+
+function slide07(s) { // MARKET OPPORTUNITY
+    photoSlot(s, 6.916, 4.3542, 5.8149, 2.7486);
+    avatarSlot(s, 0.5872, 4.8941);
+    headline(s, 0.5817, 1.9324, 4.5369, 0.9088, 'MARKET', 54);
+    headline(s, 0.5817, 2.8412, 5.1139, 0.9088, 'OPPORTUNITY', 54);
+    card(s, 6.916, 2.1689, 2.6771, 0.8835, 'Emerging Markets', COPY.medium);
+    card(s, 10.0745, 2.1689, 2.6771, 0.8835, 'Commercial Markets', COPY.medium);
+    playButton(s, 0.9634, 4.8941);
+    body(s, 3.1239, 4.8237, 2.5108, 0.5806, COPY.short);
+    rule(s, 0.607, 6.0164, 5.0886);
+    figure(s, 0.5872, 6.5836, '+654,78');
+    exploreButton(s, 4.2392, 6.5643);
+}
+
+function slide08(s) { // TARGET AUDIENCE
+    photoSlot(s, 0.5817, 4.25, 5.6365, 2.8191);
+    avatarSlot(s, 7.4312, 6.4621);
+    headline(s, 7.4257, 1.8369, 4.5369, 1.1107, 'TARGET', 66);
+    headline(s, 7.4257, 2.7972, 5.1139, 1.1107, 'AUDIENCE', 66);
+    card(s, 0.5817, 2.1689, 2.6771, 0.8835, 'Emerging Markets', COPY.medium);
+    card(s, 3.7402, 2.1689, 2.6771, 0.8835, 'Commercial Markets', COPY.medium);
+    playButton(s, 7.8074, 6.4621);
+    rule(s, 7.4511, 6.0164, 5.0886);
+    exploreButton(s, 11.0832, 6.5643);
+    body(s, 7.4257, 4.5244, 5.3052, 0.8835,
+        'Suspendisse interdum consectetur libero id fauus nisl tinu Arcu risus quvars qua quisque id diam vel. Volutpat Suspene interdum consectetur libero id fauus nisl tinu Arcu risus quvars qua quisque id diam.');
+}
+
+function slide09(s) { // BUSINESS MODEL
+    photoSlot(s, 5.5928, 1.7466, 2.9889, 2.5053);
+    photoSlot(s, 8.7104, 1.7466, 3.9889, 2.5053);
+    avatarSlot(s, 8.8843, 5.1384);
+    headline(s, 0.5817, 4.9707, 7.325, 1.1107, 'BUSINESS MODEL', 66);
+    card(s, 0.5817, 2.5602, 3.158, 0.8835, 'About Company', COPY.long);
+    body(s, 0.5817, 6.5687, 6.8889, 0.5806, COPY.wideShort);
+    playButton(s, 9.2604, 5.1384);
+    body(s, 10.1261, 5.068, 2.5108, 0.5806, COPY.short);
+    rule(s, 8.9041, 6.2607, 3.7952);
+    figure(s, 8.8843, 6.8279, '+654,78');
+    exploreButton(s, 11.1805, 6.8086);
+}
+
+function slide10(s) { // TARGET MARKETING
+    photoSlot(s, 8.4444, 4.4771, 4.2876, 2.6721);
+    avatarRow(s, 6.1257, 3.6984);
+    headline(s, 0.5601, 4.3326, 4.5369, 1.0098, 'TARGET', 60);
+    headline(s, 0.5601, 5.2984, 4.9516, 1.0098, 'MARKETING', 60);
+    card(s, 0.5817, 1.6579, 3.158, 0.8835, 'Digital Advertising', COPY.long);
+    card(s, 4.9817, 1.6579, 3.158, 0.8835, 'Social Media', COPY.long);
+    card(s, 9.3816, 1.6579, 3.158, 0.8835, 'Email Campign', COPY.long);
+    rule(s, 0.5642, 3.908, 5.3799);
+    rule(s, 7.3522, 3.908, 5.3799);
+    body(s, 0.5817, 6.5687, 5.3624, 0.5806,
+        'Suspendisse interdum consectetur libero id faucibus nisl tinu Arcu risus quvars qua quisque id diam vel. Volutpat Suspene interdum consecter.');
+}
+
+function slide11(s) { // SALES STRATEGY
+    photoSlot(s, 2.7556, 1.4444, 4.3556, 3.1447);
+    avatarSlot(s, 0.6141, 1.6005);
+    headline(s, 8.102, 1.4444, 4.5369, 1.0098, 'SALES', 60);
+    headline(s, 8.102, 2.4102, 4.9516, 1.0098, 'STRATEGY', 60);
+    playButton(s, 0.9936, 1.6005);
+    card(s, 0.5817, 5.5455, 3.158, 0.8835, 'Lead Generation', COPY.long);
+    card(s, 4.9817, 5.5455, 3.158, 0.8835, 'Client Referrals', COPY.long);
+    card(s, 9.3816, 5.5455, 3.158, 0.8835, 'Networking Event', COPY.long);
+    exploreButton(s, 0.5601, 4.1435);
+    body(s, 8.102, 3.8068, 5.0569, 0.8835, COPY.wideAlt);
+}
+
+function slide12(s) { // VALUE PROPOSITION
+    photoSlot(s, 0, 4.4194, 4.9297, 2.7778);
+    avatarSlot(s, 11.7718, 2.2269);
+    headline(s, 0.5601, 1.8314, 4.5369, 0.9088, 'VALUE', 54);
+    headline(s, 0.5601, 2.6262, 4.751, 0.9088, 'PROPOSITION', 54);
+    [[6.0623, 3.535], [9.6826, 3.535], [6.072, 5.7429], [9.6924, 5.7429]].forEach(([x, y]) => {
+        card(s, x, y, 3.158, 0.8835, 'Emerging Markets', COPY.long);
+    });
+    playButton(s, 12.1514, 2.2269);
+}
+
+function slide13(s) { // FINANCIAL OVEVIEW
+    photoSlot(s, 10.0094, 1.2857, 2.6771, 5.7834);
+    avatarSlot(s, 7.5586, 6.1548);
+    avatarSlot(s, 8.0323, 6.1548);
+    headline(s, 0.5817, 4.7732, 5.0942, 1.2117, 'FINANCIAL', 72);
+    headline(s, 0.5817, 5.8574, 4.4586, 1.2117, 'OVEVIEW', 72);
+    card(s, 0.5817, 1.7372, 2.6771, 0.8835, 'Revenue Growth', COPY.medium);
+    card(s, 3.7402, 1.7328, 2.6771, 0.8835, 'Profitability', COPY.medium);
+    card(s, 6.8987, 1.7328, 2.6771, 0.8835, 'Cash Flow', COPY.medium);
+    rule(s, 0.5817, 3.8249, 8.8321);
+    playButton(s, 8.3658, 6.1548);
+    stat(s, 5.236, 5.8165, '94%', 'Best Financial', 5.933, 3.4809);
+}
+
+function slide14(s) { // PROMOTION STRATEGY
+    photoSlot(s, 2.9584, 4.4355, 2.5645, 2.6774);
+    photoSlot(s, 5.8347, 3.0806, 3.4946, 4.0323);
+    avatarSlot(s, 9.8625, 6.565);
+    avatarSlot(s, 10.3362, 6.565);
+    headline(s, 0.5817, 1.6755, 5.703, 1.2117, 'PROMOTION', 72);
+    headline(s, 0.5817, 2.7732, 5.9721, 1.2117, 'STRATEGY', 72);
+    card(s, 9.8625, 3.3438, 2.6771, 0.5806, 'Property Management', COPY.tiny);
+    card(s, 9.8625, 4.9949, 2.6771, 0.5806, 'Sales Assistance', COPY.tiny);
+    playButton(s, 10.6697, 6.565);
+    s.addText('Luxury Living', { ...TEXT, x: 0.5858, y: 5.2123, w: 2.0516, h: 0.3366, fontSize: 20, fontFace: FONT.regular });
+    body(s, 0.5817, 5.7657, 2.1174, 0.8835,
+        'Suspendisse interdum consur libero id fauus nisl tinu Arcu risus ars qua quisque.');
+    rule(s, 0.5642, 7.1129, 1.71);
+}
+
+function slide15(s) { // LET'S TAKE A BREAK
+    photoSlot(s, 6.5538, 1.4532, 6.1455, 2.224);
+    photoSlot(s, 0.5642, 4.5273, 5.4721, 2.5419);
+    avatarSlot(s, 11.5584, 6.3098);
+    headline(s, 0.5817, 1.8218, 5.1092, 1.2117, 'LET\u2019S TAKE', 72);
+    headline(s, 3.7934, 2.9195, 5.9721, 1.2117, 'A BREAK', 72);
+    card(s, 6.6267, 5.2715, 3.158, 0.8835, 'Take a Moment, Recharge', COPY.long, 0.7458, 3.1388);
+    exploreButton(s, 11.2794, 5.5247);
+    playButton(s, 11.9379, 6.3098);
+}
+
+function slide16(s) { // AGENCY MILESTONE
+    photoSlot(s, 8.0909, 1.266, 4.6084, 1.8795);
+    avatarSlot(s, 0.5619, 6.139);
+    headline(s, 0.4968, 3.5417, 12.3397, 1.6829, 'AGENCY MILESTONE', 99, 'center');
+    const milestones = [
+        ['2025 Founding', 0.5642, 1.4503],
+        ['2027 Major Client', 4.3854, 1.4503],
+        ['2029 Big Project', 6.201, 5.756],
+        ['2031 Awords', 10.0222, 5.756],
+    ];
+    milestones.forEach(([name, x, y]) => card(s, x, y, 2.6771, 0.5806, name, COPY.tiny));
+    playButton(s, 0.9381, 6.139);
+    body(s, 1.8038, 6.0686, 2.5108, 0.5806, COPY.short);
+}
+
+function slide17(s) { // PROJECT MANAGEMENT
+    photoSlot(s, 6.4182, 1.5892, 2.9636, 5.5237);
+    photoSlot(s, 9.7357, 5.246, 2.9636, 1.8232);
+    avatarSlot(s, 2.9704, 6.1548);
+    avatarSlot(s, 3.4441, 6.1548);
+    headline(s, 0.5817, 1.8355, 3.6807, 0.9088, 'PROJECT', 54);
+    headline(s, 0.5642, 2.7443, 5.2176, 0.9088, 'MANAGEMENT', 54);
+    body(s, 0.575, 4.3624, 5.0569, 0.8835, COPY.wide);
+    card(s, 9.8625, 2.0562, 2.6771, 0.5806, 'Project Initation', COPY.tiny);
+    card(s, 9.8625, 3.7073, 2.6771, 0.5806, 'Planing', COPY.tiny);
+    playButton(s, 3.7776, 6.1548);
+    stat(s, 0.6477, 5.8165, '94%', 'Best Project', 0.575, 4.9159);
+}
+
+function slide18(s) { // THE LARKES FOUNDER
+    photoSlot(s, 7.3455, 1.4364, 5.3854, 3.0);
+    avatarRow(s, 7.3455, 6.4529);
+    headline(s, 0.5817, 1.8355, 4.491, 0.9088, 'THE LARKES', 54);
+    headline(s, 0.5642, 2.7443, 5.2176, 0.9088, 'FOUNDER', 54);
+    body(s, 0.575, 4.1782, 5.0569, 0.8835, COPY.wide);
+
+    // Two skill bars: grey track with a black fill drawn over it.
+    const bars = [
+        ['Leadership On Corporate', 0.5813, 5.9705, 0.596, 6.2923, 4.8311, 4.0612],
+        ['Record Keeping', 0.596, 6.6483, 0.606, 6.9532, 4.8584, 2.9805],
+    ];
+    bars.forEach(([name, tx, ty, bx, by, trackW, fillW]) => {
+        s.addText(name, { ...TEXT, x: tx, y: ty, w: 2.026, h: 0.202, fontSize: 12, fontFace: FONT.regular });
+        rule(s, bx, by, trackW, 7, 'BFBFBF');
+        rule(s, bx, by, fillW, 7, INK);
+    });
+
+    s.addText('Aaron Loeb', { ...TEXT, x: 7.3455, y: 5.0103, w: LABEL_W, h: 0.4712, fontSize: 28, bold: true, fontFace: FONT.semi });
+    s.addText('CEO & Founder', { ...TEXT, x: 7.3455, y: 5.644, w: LABEL_W, h: 0.2356, fontSize: 14, fontFace: FONT.regular });
+    stat(s, 10.218, 5.5047, '94%', 'Reputation', 7.3455, 5.3854);
+}
+
+function slide19(s) { // MEET OUR SUPER TEAM
+    photoSlot(s, 9.3356, 1.1304, 3.3819, 1.9455);
+    photoSlot(s, 5.438, 4.3273, 3.3819, 1.9455);
+    photoSlot(s, 9.3356, 4.3273, 3.3819, 1.9455);
+    avatarSlot(s, 0.5878, 5.0508);
+    headline(s, 0.5817, 1.629, 4.491, 1.1107, 'MEET OUR', 66);
+    headline(s, 0.5642, 2.7108, 5.6358, 1.1107, 'SUPER TEAM', 66);
+
+    // name | role caption y-offset is constant; the three portraits share a grid
+    [['Oakey', 9.7875, 3.4237], ['Allisa', 5.8899, 6.6206], ['Linden ', 9.7875, 6.6206]].forEach(([name, x, y]) => {
+        s.addText(name, { ...TEXT, x, y, w: LABEL_W, h: 0.4039, fontSize: 24, bold: true, fontFace: FONT.semi, align: 'center' });
+        s.addText('CCO', { ...TEXT, x, y: y + 0.4403, w: LABEL_W, h: 0.202, fontSize: 12, bold: true, fontFace: FONT.semi, align: 'center' });
+    });
+
+    playButton(s, 0.9634, 5.0508);
+    body(s, 1.8291, 4.9804, 2.5108, 0.5806, COPY.short);
+    rule(s, 0.607, 6.1732, 3.7952);
+    figure(s, 0.5872, 6.7403, '+654,78');
+    exploreButton(s, 2.8834, 6.7211);
+}
+
+function slide20(s) { // STRATEGIC FRENDSHIP
+    photoSlot(s, 0.5817, 1.3258, 4.891, 2.5822);
+    avatarSlot(s, 11.8298, 1.7506);
+    headline(s, 3.509, 4.843, 4.491, 1.1107, 'STRATEGIC', 66);
+    headline(s, 3.4915, 5.9247, 5.6358, 1.1107, 'FRENDSHIP', 66);
+    rule(s, 0.5817, 6.7818, 2.0728);
+    card(s, 6.2816, 2.1304, 3.158, 0.8835, 'Investor Network', COPY.long);
+    card(s, 9.5729, 5.2015, 3.158, 0.8835, 'Architectural Firms', COPY.long);
+    playButton(s, 12.206, 1.7506);
+}
+
+function slide21(s) { // FUNDING REQUIREMENT
+    photoSlot(s, 6.6667, 4.3107, 2.9346, 2.7921);
+    photoSlot(s, 9.7963, 1.5185, 2.9346, 5.5843);
+    avatarSlot(s, 0.5641, 6.5589);
+    headline(s, 0.5992, 4.1954, 4.491, 0.9088, 'FUNDING', 54);
+    headline(s, 0.5817, 5.1042, 5.2887, 0.9088, 'REQUIREMENT', 54);
+
+    [['Founding Amount', '$ 4500,000', 2.2494], ['Talent Acquisition', '$ 250,000', 6.0909]].forEach(([name, amount, x]) => {
+        label(s, x, 1.9813, name);
+        s.addText(amount, { ...TEXT, x, y: 2.4061, w: LABEL_W, h: 0.2356, fontSize: 14, fontFace: FONT.light });
+        body(s, x, 2.8287, 3.158, 0.8835, COPY.long);
+    });
+
+    rule(s, 0.5601, 2.1327, 0.9954);
+    playButton(s, 0.9403, 6.5589);
+    body(s, 1.806, 6.4885, 2.5108, 0.5806, COPY.short);
+}
+
+function slide22(s) { // NEW UP COMING PROJECT
+    photoSlot(s, 0.5776, 1.3148, 2.478, 2.5932);
+    avatarSlot(s, 8.8584, 5.0508);
+    headline(s, 0.5776, 5.0102, 4.491, 0.9088, 'NEW UP', 54);
+    headline(s, 0.5601, 5.919, 5.9721, 0.9088, 'COMING PROJECT', 54);
+    card(s, 5.6998, 2.0912, 3.158, 0.8835, 'Luxury Apartments', COPY.long);
+    card(s, 9.5413, 2.0912, 3.158, 0.8835, 'Commercial Complex', COPY.long);
+    rule(s, 3.5185, 3.561, 1.5501);
+    playButton(s, 9.2339, 5.0508);
+    body(s, 10.0997, 4.9804, 2.5108, 0.5806, COPY.short);
+    rule(s, 8.8776, 6.1732, 3.7952);
+    figure(s, 8.8578, 6.7403, '+654,78');
+    exploreButton(s, 11.154, 6.7211);
+}
+
+function slide23(s) { // COMPANY PARTNERSHIP
+    photoSlot(s, 4.4259, 1.537, 2.6852, 5.4984);
+    avatarSlot(s, 7.8189, 6.139);
+    headline(s, 7.8189, 1.9232, 4.491, 0.9088, 'COMPANY', 54);
+    headline(s, 7.8189, 2.832, 5.9721, 0.9088, 'PARTNERSHIP', 54);
+    card(s, 0.5601, 2.0912, 3.158, 0.8835, 'Floker .Co', COPY.long);
+    card(s, 0.5817, 4.9613, 3.158, 0.8835, 'Logitech .Co', COPY.long);
+    rule(s, 0.5601, 4.3519, 3.158);
+    playButton(s, 8.195, 6.139);
+    body(s, 9.0607, 6.0686, 2.5108, 0.5806, COPY.short);
+    body(s, 7.8189, 4.429, 5.0569, 0.8835, COPY.wideAlt);
+}
+
+function slide24(s) { // COMPANY PORTFOLIO
+    const tiles = [['Portfolio One', 5.4259, 1.6014, 5.4276, 4.6822],
+                   ['Portfolio Two', 7.921, 2.5323, 7.921, 5.5378],
+                   ['Portfolio Three', 10.4161, 3.5179, 10.4161, 6.6116]];
+    tiles.forEach(([name, px, py, tx, ty]) => {
+        photoSlot(s, px, py, 2.3148, 2.6852);
+        s.addText(name, { ...TEXT, x: tx, y: ty, w: LABEL_W, h: 0.3366, fontSize: 20, bold: true, fontFace: FONT.semi });
+    });
+    avatarSlot(s, 3.5091, 5.9329);
+    headline(s, 0.5817, 1.644, 4.491, 0.9088, 'COMPANY', 54);
+    headline(s, 0.5817, 2.5528, 5.9721, 0.9088, 'PORTFOLIO', 54);
+    body(s, 0.5817, 3.6502, 4.491, 0.8835,
+        'Suspendisse interdum consectetur libero id faucibus nisl tinu Arcu s quvars qua quisque id diam vel. Volutpat Suspene interdum conr libero id faucis nisl tincidu .');
+    playButton(s, 3.8847, 5.9329);
+    body(s, 4.7504, 5.8625, 2.5108, 0.5806, COPY.short);
+    stat(s, 0.3712, 5.6261, '80%', 'Best Portfolio', 3.5283, 3.7952);
+}
+
+function slide25(s) { // THANK YOU FOR ATTENTION
+    photoSlot(s, 0.5817, 1.4819, 4.1807, 3.907);
+    avatarSlot(s, 0.5831, 6.4281);
+    avatarSlot(s, 1.0568, 6.4281);
+    headline(s, 5.6248, 2.0025, 5.1021, 1.1107, 'THANK YOU', 66);
+    headline(s, 5.6248, 3.0984, 6.7848, 1.1107, 'FOR ATTENTION', 66);
+    body(s, 5.6248, 4.4971, 5.7331, 0.5806,
+        'Suspendisse interdum consectetur libero id faucibus nisl tinu Arcu s quvars qua quisque id diam vel. Volutpat Suspene interdum conster libero.');
+
+    // The label boxes are narrower than their padded text, so wrapping is off.
+    const contactLabel = (x, y, w, text) => s.addText(text, {
+        ...TEXT, x, y, w, h: 0.3366, valign: 'middle', wrap: false, fontSize: 20, bold: true, fontFace: FONT.semi,
+    });
+    const contactLine = (x, y, w, text, h = 0.2356, multi = false) => s.addText(text, {
+        ...TEXT, x, y, w, h, valign: 'middle', fontSize: multi ? 12 : 14, fontFace: FONT.regular,
+        ...(multi ? { lineSpacingMultiple: 1.5 } : {}),
+    });
+
+    contactLabel(3.4158, 6.095, 2.1685, 'Location                  :');
+    contactLine(3.4158, 6.6184, 2.6932, '28 Alma Vale Rd, Clifton, Bristol\n BS8 2HY, United Kingdom', 0.5806, true);
+
+    contactLabel(7.0265, 6.0915, 2.1545, 'Telephone              :');
+    contactLine(7.0265, 6.6112, 1.8399, '+4411-7973-4300');
+    contactLine(7.0265, 6.9634, 1.7606, '+4411-8733-4310');
+
+    contactLabel(10.2288, 6.1045, 2.2036, 'Email Address       :');
+    contactLine(10.2288, 6.6502, 2.326, 'furnitainfo@gmail.com');
+    contactLine(10.2288, 6.9504, 2.1807, 'furnita@gmail.com');
+
+    playButton(s, 1.4079, 6.4281);
+}
+
+/* ------------------------------------------------------------------ */
+/* Build                                                               */
+/* ------------------------------------------------------------------ */
+
+const BUILDERS = [
+    slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09,
+    slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18,
+    slide19, slide20, slide21, slide22, slide23, slide24, slide25,
+];
+
+function build() {
+    const pres = new PptxGenJS();
+    pres.defineLayout({ name: 'FURNITA_16x9', width: 13.333, height: 7.5 });
+    pres.layout = 'FURNITA_16x9';
+    pres.author = 'FURNITA';
+    pres.title = 'Crafted Elegance';
+
+    BUILDERS.forEach((builder) => {
+        const slide = pres.addSlide();
+        slide.background = { color: PAPER };
+        builder(slide);
+        chrome(slide);
+    });
+
+    return pres;
+}
+
+build().writeFile({
+    fileName: path.join(__dirname, '1628ab52-7117-435b-b613-f8d95d83da74_grok_final.pptx'),
+}).then((f) => console.log('wrote', f));
