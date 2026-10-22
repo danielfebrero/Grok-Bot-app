@@ -9,6 +9,21 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-22 23:47 (Paris) — snapshot `2026-10-22_18-53` → `2026-10-22_23-47`
+
+**Hot-update sand-host `4006392` → `a92b6f6`** (+ bump agent-store-fuse). Bundle host (`host-main.cjs` 31.5→31.6 Mo, `sand-eval-runner.cjs` 24.8→24.9 Mo), `box-chrome` (launch markers), `sand-cookie-persist.mjs` (`--save-port`), proto agent-store-worker, skills gérées (`purchases`, `routines`, `recent-changes` + note 1Password). Image `fcbae14`, box-scripts `fcbae14`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~13.
+
+- **Bugfix** : —
+- **Change** : `box-chrome` — enregistre les marqueurs stealth actifs au cold launch (`/tmp/sand-box-browser-launch-markers-<port>` : hardware_profile, coherent_fingerprint, spoof_gpu, webrtc_proxy_only, no_local_dns, disable_quic, accept_language, egress_timezone, fail_closed) via `marker_gate_on`. `sand-cookie-persist.mjs` — mode `--save-port` pour rafraîchir le seed depuis le jar live (save-no-seed / save-saved / save-unchanged / save-paused / save-failed). Skill `purchases` : guide X Money embarqué sous `## X Money guide` (sinon Read du catalog). Skill `routines` : une suggestion d'économie d'usage attend le yes de l'utilisateur. Proto `ConversationStateStructure` : champ `project_coordinator_system_section`.
+- **Features** : note managed-skills `recent-changes` — intégration 1Password brokered (approbation dans l'app 1Password, bot ne voit pas les mots de passe ; rollout progressif depuis le 22/10). Nouveaux RPC host : `GetGrokBotAgentCustomMcp` / `UpdateGrokBotAgentCustomMcp`, `GetGrokBotMessagingLinkStatus`, `GetGrokBotVoiceCall` / `RecordGrokBotVoiceCall`, `GetConflictInsights`, `ListOriginCiJobs`, `RecordCliUsage`, `RequestFactoryVulnerabilityPatch` / `RequestFactoryVulnerabilityVerification`, `SetBackgroundComposerVisibility`. Flag host `grok_bot_slack_sharing`.
+- **Perf** : —
+- **Autre/infra** : hot-update sand-host `a92b6f6` (supervisor `upgrade-a92b6f6`) ; agent-store-fuse pointeur tarball S3 `ef71388e…` → `172ca22b…` (binaire identique 9504880 o) ; retrait apparent des flags `sand_enable_pressure_cpu_profiler` et `sand_web_bot_auth_signing` du bundle host.
+
+Rapport : [reports/2026-10-22_23-47.md](reports/2026-10-22_23-47.md).
+
+
+---
+
 ## 2026-10-22 18:53 (Paris) — snapshot `2026-10-22_17-54` → `2026-10-22_18-53`
 
 **Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `023c11162a46b7dfbe5f7e800bf0c2f4b1063f82` → `ef71388e495e596274f4c3901dc845b80c7c53f0` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`). Binaire `cursor-agent-store-fuse` inchangé (9504880 o, même sha256). Image `fcbae14`, box-scripts `fcbae14`, sand-host `4006392`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~1.
