@@ -9,6 +9,21 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-22 14:51 (Paris) — snapshot `2026-10-22_13-52` → `2026-10-22_14-51`
+
+**Hot-update sand-host `76b095c` → `fd395ed`** (+ bump agent-store-fuse). Bundle host (`host-main.cjs` 31.0→31.3 Mo, `sand-eval-runner.cjs` 24.5→24.7 Mo), `sand-egress-tunnel` 2.61→2.92 Mo, fingerprint/UA (`sand-ua-governor`, `sand-fingerprint-profiles`), launcher Chrome, policy Chrome, officekit `sharp` 0.35.4→0.35.5 (+ libvips 1.3.3→1.3.4 / so.8.18.6→8.18.7), proto agent-store-worker, search-index-worker. Image `fcbae14`, box-scripts `fcbae14`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +2 / −2 / ~43.
+
+- **Bugfix** : —
+- **Change** : policy Chrome `sand-webauthn.json` — `3rdparty.extensions` active `AgenticAutofillRemoteBrowser:true` pour 1Password (id box + Nightly `gejiddohjgogedgjnonbofjigllpkmbf`) dès le force-install ; `box-chrome-policy` écrit cette clé en même temps que l'extension. `box-chrome` : mode GPU exposé (`legacy` / `angle-gl` / `swiftshader`) via `/tmp/sand-box-browser-gpu-mode-<port>`, allowlist de flags extra (`/tmp/sand-box-chrome-extra-flags`, pour l'instant `--disable-quic` seul). Fingerprint : mode **coherent** (`SAND_BOX_BROWSER_COHERENT_FINGERPRINT` / marker `/tmp/sand-box-browser-coherent-fingerprint`) — WebGL laissé tel quel (SwiftShader), hardwareConcurrency CDP + vérif WebGL observée ; WebGL spoof legacy inchangé. Proto MCP : `McpDescriptor.account_label` ; TrackedTask : `internal_notes` + `tags`. Content-search : strip des tags inline (math/formatting) avant index.
+- **Features** : autofill agentique 1Password forcé via managed policy ; fingerprint hardware « coherent » (GPU-mode aware) ; flags Chrome extra allowlistés ; champs TrackedTask notes/tags + MCP account_label.
+- **Perf** : —
+- **Autre/infra** : hot-update sand-host `fd395ed` ; bump `sand-egress-tunnel` ; officekit sharp/libvips ; agent-store-fuse `362dc6c6…` → `0d8cac8a…` (pointeur tarball S3) ; `managed-skills/cache.json` refetch timestamp only.
+
+Rapport : [reports/2026-10-22_14-51.md](reports/2026-10-22_14-51.md).
+
+
+---
+
 ## 2026-10-22 13:52 (Paris) — snapshot `2026-10-22_02-50` → `2026-10-22_13-52`
 
 **Mise à jour des skills gérées + bump agent-store-fuse.** 12 skills Cursor-managed réécrites (`grocery-shopping`, `shopping`, `orders-and-returns`, `purchases`, `sign-in`, `box-desktop`, `in-chat-forms`, `no-connector-fallback`, `channels`, `code-changes`, `source-control`, `recent-changes`) + `managed-skills/cache.json` ; en parallèle, agent-store-fuse `d638e166…` → `362dc6c6…` (binaire `cursor-agent-store-fuse` 9494360 → 9504880 o + pointeur tarball S3). Image `fcbae14`, box-scripts `fcbae14`, sand-host `76b095c`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~15.

@@ -1,0 +1,230 @@
+--- 2026-10-22_13-52:/opt/sand/sand-host/box-runtime/sand-ua-governor.mjs
++++ 2026-10-22_14-51:/opt/sand/sand-host/box-runtime/sand-ua-governor.mjs
+@@ -4,9 +4,11 @@
+ import { fileURLToPath, pathToFileURL } from "node:url";
+ 
+ import {
++  BOX_BROWSER_GPU_MODE_PATH_PREFIX,
+   BOX_BROWSER_RUNNING_PATH_PREFIX,
+   BOX_EXPERIMENTS_READY_MARKER_PATH,
+   BROWSER_ACCEPT_LANGUAGE_EN_US_MARKER_PATH,
++  BOX_BROWSER_COHERENT_FINGERPRINT_MARKER_PATH,
+   BROWSER_EGRESS_TIMEZONE_MARKER_PATH,
+   BROWSER_HARDWARE_PROFILE_MARKER_PATH,
+ } from "./box-contract.generated.mjs";
+@@ -21,7 +23,10 @@
+   LINUX_GPU_PATCH_PROFILE,
+   buildHardwareProfileDocumentScript,
+   buildUserAgentOverride,
++  coherentHardwareProfile,
++  normalizeGpuMode,
+   resolveCanvasSeed,
++  verifyCoherentWebgl,
+ } from "./sand-fingerprint-profiles.mjs";
+ import {
+   egressErrorClass,
+@@ -120,6 +125,20 @@
+   });
+ }
+ 
++export function resolveCoherentHardwareProfileEnabled({
++  envValue = process.env.SAND_BOX_BROWSER_COHERENT_FINGERPRINT,
++  markerPath = BOX_BROWSER_COHERENT_FINGERPRINT_MARKER_PATH,
++  readFile = readFileSync,
++} = {}) {
++  return resolveMarkerGate({
++    label: "coherent hardware profile",
++    envValue,
++    markerPath,
++    readFile,
++    honorContents: true,
++  });
++}
++
+ export function resolveEgressTimeZoneGate({
+   envValue = process.env.SAND_BROWSER_EGRESS_TIMEZONE,
+   markerPath = BROWSER_EGRESS_TIMEZONE_MARKER_PATH,
+@@ -145,6 +164,70 @@
+   return browser.hardwareProfileEnabled === true;
+ }
+ 
++export function coherentHardwareProfileEnabledForBrowser(
++  browser,
++  resolve = resolveCoherentHardwareProfileEnabled,
++) {
++  if (!Object.prototype.hasOwnProperty.call(browser, "coherentHardwareProfileEnabled")) {
++    browser.coherentHardwareProfileEnabled = resolve() === true;
++  }
++  return browser.coherentHardwareProfileEnabled === true;
++}
++
++export function hardwareTreatmentForBrowser(browser) {
++  if (coherentHardwareProfileEnabledForBrowser(browser)) return "coherent";
++  return hardwareProfileEnabledForBrowser(browser) ? "legacy" : "off";
++}
++
++export function resolveBoxBrowserGpuMode({
++  port,
++  gpuModePath = `${BOX_BROWSER_GPU_MODE_PATH_PREFIX}-${port}`,
++  readFile = readFileSync,
++} = {}) {
++  try {
++    return normalizeGpuMode(readFile(gpuModePath, "utf8"));
++  } catch (error) {
++    if (error?.code !== "ENOENT") {
++      reportOnce(`box browser gpu mode read failed: ${errorClass(error)}`);
++    }
++    return "unknown";
++  }
++}
++
++export function coherentProfileForBrowser(browser, resolve = resolveBoxBrowserGpuMode) {
++  if (browser.coherentProfile == null) {
++    browser.coherentProfile = coherentHardwareProfile(resolve({ port: browser.port }));
++  }
++  return browser.coherentProfile;
++}
++
++export async function verifyCoherentProfile(browser) {
++  const profile = coherentProfileForBrowser(browser);
++  let gpu;
++  try {
++    gpu = (await browser.send("SystemInfo.getInfo"))?.gpu;
++  } catch (error) {
++    if (isCdpTargetGone(error) || browser.isClosed) return null;
++    console.error(
++      `coherent hardware profile check failed port=${browser.port}: ${errorClass(error)}`,
++    );
++    return null;
++  }
++  const check = verifyCoherentWebgl(profile, gpu);
++  console.error(
++    `coherent hardware profile port=${browser.port} gpu-mode=${profile.gpuMode} webgl=${check.claimed} observed=${check.observed} ${check.verdict}`,
++  );
++  return check;
++}
++
++function applyCoherentHardwareToTarget(browser, sessionId) {
++  return browser.send(
++    "Emulation.setHardwareConcurrencyOverride",
++    { hardwareConcurrency: coherentProfileForBrowser(browser).hardwareConcurrency },
++    sessionId,
++  );
++}
++
+ export function readAcceptLanguageEnUsMarker(
+   markerPath = BROWSER_ACCEPT_LANGUAGE_EN_US_MARKER_PATH,
+ ) {
+@@ -387,10 +470,17 @@
+   { exclude: true },
+ ];
+ 
++function serviceWorkersGoverned(browser) {
++  return (
++    acceptLanguageEnUsEnabledForBrowser(browser) ||
++    egressTimeZoneEnabledForBrowser(browser) ||
++    hardwareTreatmentForBrowser(browser) === "coherent"
++  );
++}
++
+ function attachRelatedTargets(browser, sessionId) {
+   const sessions = relatedTargetSessions(browser);
+-  const serviceWorkers =
+-    acceptLanguageEnUsEnabledForBrowser(browser) || egressTimeZoneEnabledForBrowser(browser);
++  const serviceWorkers = serviceWorkersGoverned(browser);
+   const attached = sessions.get(sessionId);
+   if (attached === true || attached === serviceWorkers) return Promise.resolve();
+   sessions.set(sessionId, serviceWorkers);
+@@ -419,27 +509,30 @@
+ }
+ 
+ export async function applyUaTreatmentToTarget(browser, sessionId, target) {
+-  const hardwareProfile = hardwareProfileEnabledForBrowser(browser);
++  const hardware = hardwareTreatmentForBrowser(browser);
+   const acceptLanguageEnUs = acceptLanguageEnUsEnabledForBrowser(browser);
+   const egressTimeZone = egressTimeZoneEnabledForBrowser(browser);
+-  if (!hardwareProfile && !acceptLanguageEnUs && !egressTimeZone) {
++  if (hardware === "off" && !acceptLanguageEnUs && !egressTimeZone) {
+     await applyDesktopUaToTarget(browser, sessionId);
+     return;
+   }
++  const coherent = hardware === "coherent";
+   if (isWorkerTargetType(target?.type)) {
+     await Promise.all([
+-      acceptLanguageEnUs ? applyDesktopUaToTarget(browser, sessionId) : null,
+-      hardwareProfile
++      acceptLanguageEnUs || coherent ? applyDesktopUaToTarget(browser, sessionId) : null,
++      hardware === "legacy"
+         ? browser.send("Runtime.evaluate", { expression: documentScript(browser) }, sessionId)
+         : null,
++      coherent ? applyCoherentHardwareToTarget(browser, sessionId) : null,
+       egressTimeZone ? applyEgressTimeZoneToTarget(browser, sessionId) : null,
+       target.type === "service_worker" ? null : attachRelatedTargets(browser, sessionId),
+     ]);
+     return;
+   }
+-  if (!hardwareProfile) {
++  if (hardware !== "legacy") {
+     await Promise.all([
+       applyDesktopUaToTarget(browser, sessionId),
++      coherent ? applyCoherentHardwareToTarget(browser, sessionId) : null,
+       egressTimeZone ? applyEgressTimeZoneToTarget(browser, sessionId) : null,
+       attachRelatedTargets(browser, sessionId),
+     ]);
+@@ -458,11 +551,11 @@
+ }
+ 
+ function browserAutoAttachParams(browser) {
+-  const hardwareProfile = hardwareProfileEnabledForBrowser(browser);
++  const hardware = hardwareTreatmentForBrowser(browser);
+   const acceptLanguageEnUs = acceptLanguageEnUsEnabledForBrowser(browser);
+   const egressTimeZone = egressTimeZoneEnabledForBrowser(browser);
+   const filter =
+-    hardwareProfile || acceptLanguageEnUs || egressTimeZone
++    hardware !== "off" || acceptLanguageEnUs || egressTimeZone
+       ? [
+           { type: "page", exclude: false },
+           { type: "worker", exclude: false },
+@@ -470,7 +563,7 @@
+           { exclude: true },
+         ]
+       : [{ type: "page", exclude: false }, { exclude: true }];
+-  if (acceptLanguageEnUs || egressTimeZone) {
++  if (serviceWorkersGoverned(browser)) {
+     filter.unshift({ type: "service_worker", exclude: false });
+   }
+   return { autoAttach: true, waitForDebuggerOnStart: true, flatten: true, filter };
+@@ -483,6 +576,7 @@
+   if (egressTimeZoneEnabledForBrowser(browser) && browser.egressTimeZoneLookup === undefined) {
+     void (browser.startEgressTimeZoneFor ?? startEgressTimeZone)(browser);
+   }
++  if (hardwareTreatmentForBrowser(browser) === "coherent") void verifyCoherentProfile(browser);
+   browser.onEvent((message) => {
+     const sessionId = message.params?.sessionId;
+     if (typeof sessionId !== "string") return;
+@@ -565,11 +659,13 @@
+ 
+ export function resolveBrowserSettings({
+   resolveHardwareProfile = resolveHardwareProfileEnabled,
++  resolveCoherentHardwareProfile = resolveCoherentHardwareProfileEnabled,
+   readAcceptLanguage = readAcceptLanguageEnUsMarker,
+   resolveEgressGate = resolveEgressTimeZoneGate,
+ } = {}) {
+   return {
+     hardwareProfile: resolveHardwareProfile() === true,
++    coherentHardwareProfile: resolveCoherentHardwareProfile() === true,
+     acceptLanguage: readAcceptLanguage(),
+     egressTimeZone: resolveEgressGate(),
+   };
+@@ -587,6 +683,11 @@
+     const after = onOff(settings.hardwareProfile);
+     if (before !== after) changes.push(`hardware-profile ${before}->${after}`);
+   }
++  if (has("coherentHardwareProfileEnabled")) {
++    const before = onOff(browser.coherentHardwareProfileEnabled === true);
++    const after = onOff(settings.coherentHardwareProfile);
++    if (before !== after) changes.push(`coherent-hardware-profile ${before}->${after}`);
++  }
+   if (has("acceptLanguageEnUsEnabled")) {
+     const enabled = browser.acceptLanguageEnUsEnabled === true;
+     const wanted = settings.acceptLanguage != null;

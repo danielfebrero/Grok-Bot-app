@@ -1,0 +1,70 @@
+--- 2026-10-22_13-52:/opt/sand/sand-host/box-launchers/box-chrome
++++ 2026-10-22_14-51:/opt/sand/sand-host/box-launchers/box-chrome
+@@ -137,14 +137,17 @@
+ 		--ignore-gpu-blocklist
+ 		--enable-unsafe-webgpu
+ 	)
++	BOX_CHROME_GPU_MODE=legacy
+ elif [ "${SAND_ENABLE_SPOOF_GPU:-0}" = "1" ] || [ -e "${SAND_ENABLE_SPOOF_GPU_FILE:-/tmp/sand-enable-spoof-gpu}" ]; then
+ 	CHROME_FLAGS+=(
+ 		--use-angle=gl
+ 	)
++	BOX_CHROME_GPU_MODE=angle-gl
+ else
+ 	CHROME_FLAGS+=(
+ 		--enable-unsafe-swiftshader
+ 	)
++	BOX_CHROME_GPU_MODE=swiftshader
+ fi
+ CHROME_FLAGS+=(
+ 	--remote-debugging-port="${CHROME_DEBUG_PORT}"
+@@ -183,6 +186,8 @@
+ fi
+ SAND_BOX_BROWSER_RUNNING=/tmp/sand-box-browser-running
+ BOX_BROWSER_RUNNING_FILE="${SAND_BOX_BROWSER_RUNNING}-${CHROME_DEBUG_PORT}"
++SAND_BOX_BROWSER_GPU_MODE=/tmp/sand-box-browser-gpu-mode
++BOX_BROWSER_GPU_MODE_FILE="${SAND_BOX_BROWSER_GPU_MODE}-${CHROME_DEBUG_PORT}"
+ UNGOOGLED_CHROMIUM=/opt/ungoogled-chromium/chrome
+ box_browser_ungoogled_wanted() {
+ 	[ "${SAND_BOX_BROWSER_UNGOOGLED:-0}" = "1" ] || [ -e "${SAND_BOX_BROWSER_UNGOOGLED_FILE:-/tmp/sand-box-browser-ungoogled}" ]
+@@ -227,6 +232,31 @@
+ if [ "${SAND_CHROME_DISABLE_QUIC}" = "1" ]; then
+ 	CHROME_FLAGS+=(--disable-quic)
+ fi
++sand_box_chrome_extra_flag_allowed() {
++	case "$1" in
++	--disable-quic) return 0 ;;
++	*) return 1 ;;
++	esac
++}
++sand_chrome_flag_present() {
++	local want="$1" flag
++	for flag in "${CHROME_FLAGS[@]}"; do
++		[ "${flag}" = "${want}" ] && return 0
++	done
++	return 1
++}
++BOX_CHROME_EXTRA_FLAGS_FILE="${SAND_BOX_CHROME_EXTRA_FLAGS_FILE:-/tmp/sand-box-chrome-extra-flags}"
++if [ -f "${BOX_CHROME_EXTRA_FLAGS_FILE}" ] && [ ! -L "${BOX_CHROME_EXTRA_FLAGS_FILE}" ]; then
++	while IFS= read -r sand_extra_flag || [ -n "${sand_extra_flag}" ]; do
++		sand_extra_flag="${sand_extra_flag%$'\r'}"
++		sand_extra_flag="${sand_extra_flag#"${sand_extra_flag%%[![:space:]]*}"}"
++		sand_extra_flag="${sand_extra_flag%"${sand_extra_flag##*[![:space:]]}"}"
++		[ -n "${sand_extra_flag}" ] || continue
++		sand_box_chrome_extra_flag_allowed "${sand_extra_flag}" || continue
++		sand_chrome_flag_present "${sand_extra_flag}" && continue
++		CHROME_FLAGS+=("${sand_extra_flag}")
++	done <"${BOX_CHROME_EXTRA_FLAGS_FILE}"
++fi
+ policy_status=0
+ box_chrome_policy=/usr/local/bin/box-chrome-policy
+ case "$0" in
+@@ -370,6 +400,8 @@
+ record_box_browser() {
+ 	printf '%s\n' "${BOX_BROWSER}" >"${BOX_BROWSER_RUNNING_FILE}.$$" &&
+ 		mv -f "${BOX_BROWSER_RUNNING_FILE}.$$" "${BOX_BROWSER_RUNNING_FILE}" 2>/dev/null || true
++	printf '%s\n' "${BOX_CHROME_GPU_MODE}" >"${BOX_BROWSER_GPU_MODE_FILE}.$$" &&
++		mv -f "${BOX_BROWSER_GPU_MODE_FILE}.$$" "${BOX_BROWSER_GPU_MODE_FILE}" 2>/dev/null || true
+ }
+ 
+ # Chromium 139 dies right after it starts serving CDP on a profile whose

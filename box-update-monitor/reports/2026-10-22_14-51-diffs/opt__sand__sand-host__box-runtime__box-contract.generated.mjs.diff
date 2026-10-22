@@ -1,0 +1,23 @@
+--- 2026-10-22_13-52:/opt/sand/sand-host/box-runtime/box-contract.generated.mjs
++++ 2026-10-22_14-51:/opt/sand/sand-host/box-runtime/box-contract.generated.mjs
+@@ -1,15 +1,19 @@
+-// @generated SignedSource<<e75f77dd94e22c7c6f579fdf40a13833c923d06d67e9155e3f245330b602225c>>
++// @generated SignedSource<<5e62378baf01aabe0b99be3b3498673564f79ad8d17f7bd22992a7762f6d9880>>
+ // Emitted by scripts/gen-box-contract.mts from sand/src/shared/box/box-contract.ts;
+ // regenerate with `pnpm --filter sand run gen:box-contract`.
+ export const ENABLE_SPOOF_GPU_MARKER_PATH = "/tmp/sand-enable-spoof-gpu";
+ export const BROWSER_HARDWARE_PROFILE_MARKER_PATH = "/tmp/sand-browser-hardware-profile";
++export const BOX_BROWSER_COHERENT_FINGERPRINT_MARKER_PATH = "/tmp/sand-box-browser-coherent-fingerprint";
+ export const BOX_BROWSER_UNGOOGLED_MARKER_PATH = "/tmp/sand-box-browser-ungoogled";
+ export const BOX_EXPERIMENTS_READY_MARKER_PATH = "/tmp/sand-box-experiments-ready";
+ export const EGRESS_TUNNEL_FAIL_CLOSED_MARKER_PATH = "/tmp/sand-egress-tunnel-fail-closed";
+ export const BOX_BROWSER_WEBRTC_PROXY_ONLY_MARKER_PATH = "/tmp/sand-box-browser-webrtc-proxy-only";
+ export const BOX_BROWSER_NO_LOCAL_DNS_MARKER_PATH = "/tmp/sand-box-browser-no-local-dns";
+ export const BOX_BROWSER_DISABLE_QUIC_MARKER_PATH = "/tmp/sand-chrome-disable-quic";
++export const BOX_CHROME_EXTRA_FLAGS_PATH = "/tmp/sand-box-chrome-extra-flags";
+ export const BOX_BROWSER_RUNNING_PATH_PREFIX = "/tmp/sand-box-browser-running";
++export const BOX_BROWSER_GPU_MODE_PATH_PREFIX = "/tmp/sand-box-browser-gpu-mode";
++export const BOX_BROWSER_GPU_MODES = ["swiftshader","angle-gl","legacy"];
+ export const BROWSER_ACCEPT_LANGUAGE_EN_US_MARKER_PATH = "/tmp/sand-browser-accept-language-en-us";
+ export const BROWSER_EGRESS_TIMEZONE_MARKER_PATH = "/tmp/sand-browser-egress-timezone";
+ export const WEB_BOT_AUTH_SIGNED_CACHE_PATH = "/tmp/sand-web-bot-auth-signed.json";

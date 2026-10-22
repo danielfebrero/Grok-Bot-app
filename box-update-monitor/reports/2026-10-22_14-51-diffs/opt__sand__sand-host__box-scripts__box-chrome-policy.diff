@@ -1,0 +1,43 @@
+--- 2026-10-22_13-52:/opt/sand/sand-host/box-scripts/box-chrome-policy
++++ 2026-10-22_14-51:/opt/sand/sand-host/box-scripts/box-chrome-policy
+@@ -49,13 +49,15 @@
+ 
+ entries=""
+ onepassword_entry=""
++onepassword_id=""
+ if [ -f "${marker}" ] && [ -r "${id_file}" ]; then
+ 	entries="$(printf '"%s":{"installation_mode":"force_installed","update_url":"file://%s"}' \
+ 		"$(cat "${id_file}")" "${update_xml}")"
+ fi
+ if [ -f "${onepassword_marker}" ] && [ -r "${onepassword_id_file}" ]; then
++	onepassword_id="$(cat "${onepassword_id_file}")"
+ 	onepassword_entry="$(printf '"%s":{"installation_mode":"force_installed","update_url":"file://%s","override_update_url":true}' \
+-		"$(cat "${onepassword_id_file}")" "${onepassword_update_xml}")"
++		"${onepassword_id}" "${onepassword_update_xml}")"
+ 	entries="${entries:+${entries},}${onepassword_entry}"
+ fi
+ 
+@@ -70,12 +72,22 @@
+ # deadline. The key is written only while that extension is armed:
+ # https://chromeenterprise.google/policies/#DeveloperToolsAvailability
+ devtools=""
++# The 1Password extension starts with Agentic Autofill and every tab in Agentic
++# Mode, instead of waiting on its remote feature flag, when its managed policy
++# sets AgenticAutofillRemoteBrowser. It reads that policy when it starts, so the
++# key rides in the same write that force-installs it, keyed on the id this box
++# signed it under and on the Nightly store id: https://www.1password.dev
++# Chrome hands an extension the 3rdparty map under its id as chrome.storage.managed:
++# https://chromium.googlesource.com/chromium/src/+/151.0.7922.169/components/policy/core/common/config_dir_policy_loader.cc
++onepassword_policy=""
+ if [ -n "${onepassword_entry}" ]; then
+ 	devtools=',"DeveloperToolsAvailability":1'
++	onepassword_policy="$(printf ',"3rdparty":{"extensions":{"%s":{"AgenticAutofillRemoteBrowser":true},"gejiddohjgogedgjnonbofjigllpkmbf":{"AgenticAutofillRemoteBrowser":true}}}' \
++		"${onepassword_id}")"
+ fi
+ 
+ if [ -n "${entries}" ]; then
+-	printf '{"ExtensionSettings":{%s}%s%s}\n' "${entries}" "${devtools}" "${webrtc:+,${webrtc}}" >"${policy_file}" || exit_unapplied 1
++	printf '{"ExtensionSettings":{%s}%s%s%s}\n' "${entries}" "${devtools}" "${onepassword_policy}" "${webrtc:+,${webrtc}}" >"${policy_file}" || exit_unapplied 1
+ else
+ 	printf '{%s}\n' "${webrtc}" >"${policy_file}" || exit_unapplied 1
+ fi

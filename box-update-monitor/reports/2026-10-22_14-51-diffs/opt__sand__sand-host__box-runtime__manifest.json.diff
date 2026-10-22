@@ -1,0 +1,34 @@
+--- 2026-10-22_13-52:/opt/sand/sand-host/box-runtime/manifest.json
++++ 2026-10-22_14-51:/opt/sand/sand-host/box-runtime/manifest.json
+@@ -2,7 +2,7 @@
+   "files": [
+     {
+       "name": "box-contract.generated.mjs",
+-      "sha256": "e740babfde1bf8044dc9cf990a5986ef05de02cc5787fd12eb6e011e2d3861b3"
++      "sha256": "2d6bde5e62321704fc3d940f18367fb3842a2822d056e3fc827a27038e4ec6f1"
+     },
+     {
+       "name": "cdp-cookies.mjs",
+@@ -22,11 +22,11 @@
+     },
+     {
+       "name": "sand-egress-tunnel",
+-      "sha256": "002bf359f2872e42ca37de28fee66db43b1f5d5b33eecc340a80adb2a5298d2d"
++      "sha256": "aace31b569ca3d9583d186f4391af7ee58cc835e6c751ae4bc89a42191664e89"
+     },
+     {
+       "name": "sand-fingerprint-profiles.mjs",
+-      "sha256": "d659b8887f3eeb8d663ca53fb7173c6de49613d726dd2702f6016080c9b03803"
++      "sha256": "9efed4070f15f84cd4dd7378385ed41fac3fd49f86999904888755433bd2837e"
+     },
+     {
+       "name": "sand-locale-match.mjs",
+@@ -38,7 +38,7 @@
+     },
+     {
+       "name": "sand-ua-governor.mjs",
+-      "sha256": "e0b643719b33b51c47acdc9998fd6ef2a969b00dcb6c642d1c254b41901ef8d6"
++      "sha256": "934da0a3ff2cb9f40994ce7f88eb888746b86afeeadd6c0c3a15e509088d5b45"
+     },
+     {
+       "name": "sand-web-bot-auth.mjs",

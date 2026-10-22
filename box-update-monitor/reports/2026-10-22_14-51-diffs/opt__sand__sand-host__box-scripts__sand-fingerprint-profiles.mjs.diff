@@ -1,0 +1,73 @@
+--- 2026-10-22_13-52:/opt/sand/sand-host/box-scripts/sand-fingerprint-profiles.mjs
++++ 2026-10-22_14-51:/opt/sand/sand-host/box-scripts/sand-fingerprint-profiles.mjs
+@@ -1,6 +1,8 @@
+ import { createHash } from "node:crypto";
+ import { readFileSync } from "node:fs";
+ 
++import { BOX_BROWSER_GPU_MODES } from "./box-contract.generated.mjs";
++
+ export const LINUX_GPU_PATCH_PROFILE = {
+   navigatorPlatform: "Linux x86_64",
+   webglVendor: "Google Inc. (Intel)",
+@@ -8,6 +10,61 @@
+   hardwareConcurrency: 8,
+ };
+ 
++/*
++The coherent profile claims only what the launched browser backs. Stock
++Chrome on the GPU-less box renders WebGL on SwiftShader or not at all, and no
++real GPU's limits, extensions, and rendered pixels can be reproduced from
++outside the browser on SwiftShader, so WebGL is left exactly as box-chrome
++launched it. Every other claim is a CDP override sent to each page, frame,
++and worker target, so no realm runs injected code
++(https://chromedevtools.github.io/devtools-protocol/tot/Emulation/#method-setHardwareConcurrencyOverride).
++*/
++const COHERENT_WEBGL_BY_GPU_MODE = Object.freeze({
++  swiftshader: "swiftshader",
++  "angle-gl": "none",
++  legacy: "unverified",
++  unknown: "unverified",
++});
++
++export function normalizeGpuMode(value) {
++  const mode = String(value ?? "").trim();
++  return BOX_BROWSER_GPU_MODES.includes(mode) ? mode : "unknown";
++}
++
++export function coherentHardwareProfile(gpuMode) {
++  const mode = normalizeGpuMode(gpuMode);
++  return Object.freeze({
++    gpuMode: mode,
++    navigatorPlatform: LINUX_GPU_PATCH_PROFILE.navigatorPlatform,
++    hardwareConcurrency: LINUX_GPU_PATCH_PROFILE.hardwareConcurrency,
++    webgl: COHERENT_WEBGL_BY_GPU_MODE[mode],
++  });
++}
++
++const ANGLE_BACKEND_RE = /\bangle=([a-z0-9-]+)/;
++
++export function observedWebglFromGpuInfo(gpu) {
++  const status = gpu?.featureStatus?.webgl;
++  if (typeof status !== "string") return "unknown";
++  if (status.startsWith("disabled")) return "none";
++  const parts = gpu?.auxAttributes?.glImplementationParts;
++  const backend = typeof parts === "string" ? ANGLE_BACKEND_RE.exec(parts)?.[1] : undefined;
++  if (backend === "swiftshader") return "swiftshader";
++  return backend == null ? "unknown" : `angle-${backend}`;
++}
++
++export function verifyCoherentWebgl(profile, gpu) {
++  const observed = observedWebglFromGpuInfo(gpu);
++  if (profile.webgl === "unverified" || observed === "unknown") {
++    return { claimed: profile.webgl, observed, verdict: "unverified" };
++  }
++  return {
++    claimed: profile.webgl,
++    observed,
++    verdict: observed === profile.webgl ? "match" : "mismatch",
++  };
++}
++
+ // Chromium seeds the GREASE brand, its version, and the brand order with the major version (https://chromium.googlesource.com/chromium/src/+/refs/tags/154.0.8037.57/components/embedder_support/user_agent_utils.cc).
+ const GREASE_CHARS = [" ", "(", ":", "-", ".", "/", ")", ";", "=", "?", "_"];
+ const GREASE_VERSIONS = ["8", "99", "24"];

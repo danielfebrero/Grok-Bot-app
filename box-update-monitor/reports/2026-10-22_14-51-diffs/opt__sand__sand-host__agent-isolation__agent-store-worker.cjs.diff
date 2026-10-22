@@ -1,0 +1,86 @@
+--- 2026-10-22_13-52:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
++++ 2026-10-22_14-51:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
+@@ -7388,7 +7388,7 @@
+     return proto3.util.equals(_McpDescriptor, a, b);
+   }
+   static $() {
+-    return ["McpDescriptor|1 server_name 9|2 server_identifier 9|3 folder_path 9?|4 server_use_instructions 9?|5 tools #0*|7 plugin 9?|8 marketplace 9?|9 plugin_db_id 9?|10 marketplace_id 9?", McpToolDescriptor];
++    return ["McpDescriptor|1 server_name 9|2 server_identifier 9|3 folder_path 9?|4 server_use_instructions 9?|5 tools #0*|7 plugin 9?|8 marketplace 9?|9 plugin_db_id 9?|10 marketplace_id 9?|11 account_label 9?", McpToolDescriptor];
+   }
+ };
+ var McpToolDescriptor = class _McpToolDescriptor extends __protoMessage319 {
+@@ -15557,6 +15557,8 @@
+     this.ownerSessionId = "";
+     this.version = protoInt64.zero;
+     this.tag = "";
++    this.internalNotes = "";
++    this.tags = [];
+     proto3.util.initPartial(data, this);
+   }
+   static fromBinary(bytes, options) {
+@@ -15572,7 +15574,7 @@
+     return proto3.util.equals(_TrackedTaskView, a, b);
+   }
+   static $() {
+-    return ["TrackedTaskView|1 key 9|2 title 9|3 status_id 9|4 status_label 9|5 owner 9|6 parent_key 9|7 links #0*|8 updated_at_ms 4|9 owner_session_id 9|10 version 4|11 tag 9", TrackedTaskLinkView];
++    return ["TrackedTaskView|1 key 9|2 title 9|3 status_id 9|4 status_label 9|5 owner 9|6 parent_key 9|7 links #0*|8 updated_at_ms 4|9 owner_session_id 9|10 version 4|11 tag 9|12 internal_notes 9|13 tags 9*", TrackedTaskLinkView];
+   }
+ };
+ var TrackedTaskStatusView = class _TrackedTaskStatusView extends __protoMessage364 {
+@@ -15772,6 +15774,7 @@
+     super();
+     this.title = "";
+     this.links = [];
++    this.tags = [];
+     proto3.util.initPartial(data, this);
+   }
+   static fromBinary(bytes, options) {
+@@ -15787,7 +15790,7 @@
+     return proto3.util.equals(_NewTrackedTask, a, b);
+   }
+   static $() {
+-    return ["NewTrackedTask|1 client_ref 9?|2 title 9|3 status 9?|4 owner 9?|5 parent 9?|6 links #0*|7 tag 9?", TrackedTaskLinkInput];
++    return ["NewTrackedTask|1 client_ref 9?|2 title 9|3 status 9?|4 owner 9?|5 parent 9?|6 links #0*|7 tag 9?|8 internal_notes 9?|9 tags 9*", TrackedTaskLinkInput];
+   }
+ };
+ var CreateTrackedTasksArgs = class _CreateTrackedTasksArgs extends __protoMessage364 {
+@@ -15969,7 +15972,29 @@
+     return proto3.util.equals(_TrackedTaskUpdate, a, b);
+   }
+   static $() {
+-    return ["TrackedTaskUpdate|1 key 9|2 title 9?|3 status 9?|4 owner 9?|5 parent 9?|6 position #0?|7 add_links #1*|8 remove_links #1*|9 version 4|10 tag 9?", TrackedTaskPosition, TrackedTaskLinkInput];
++    return ["TrackedTaskUpdate|1 key 9|2 title 9?|3 status 9?|4 owner 9?|5 parent 9?|6 position #0?|7 add_links #1*|8 remove_links #1*|9 version 4|10 tag 9?|11 internal_notes 9?|12 tags #2?", TrackedTaskPosition, TrackedTaskLinkInput, TrackedTaskTagIds];
++  }
++};
++var TrackedTaskTagIds = class _TrackedTaskTagIds extends __protoMessage364 {
++  constructor(data) {
++    super();
++    this.ids = [];
++    proto3.util.initPartial(data, this);
++  }
++  static fromBinary(bytes, options) {
++    return new _TrackedTaskTagIds().fromBinary(bytes, options);
++  }
++  static fromJson(jsonValue, options) {
++    return new _TrackedTaskTagIds().fromJson(jsonValue, options);
++  }
++  static fromJsonString(jsonString, options) {
++    return new _TrackedTaskTagIds().fromJsonString(jsonString, options);
++  }
++  static equals(a, b) {
++    return proto3.util.equals(_TrackedTaskTagIds, a, b);
++  }
++  static $() {
++    return ["TrackedTaskTagIds|1 ids 9*"];
+   }
+ };
+ var UpdateTrackedTasksArgs = class _UpdateTrackedTasksArgs extends __protoMessage364 {
+@@ -19765,7 +19790,7 @@
+     return ["MessageSender|1 kind #0|2 id 9|3 display_name 9", MessageSender_Kind];
+   }
+ };
+-var MessageSender_Kind = /* @__PURE__ */ enumType(proto3, __protoPackage75, "MessageSender.Kind", [[0, "UNSPECIFIED"], [1, "AGENT"], [2, "VOICE_CALL"], [3, "MAIN_BOT"], [4, "PROJECT"]], 1);
++var MessageSender_Kind = /* @__PURE__ */ enumType(proto3, __protoPackage75, "MessageSender.Kind", [[0, "UNSPECIFIED"], [1, "AGENT"], [2, "VOICE_CALL"], [3, "MAIN_BOT"], [4, "PROJECT"], [5, "PROJECT_SLACK"]], 1);
+ var AssistantMessage = class _AssistantMessage extends __protoMessage373 {
+   constructor(data) {
+     super();
