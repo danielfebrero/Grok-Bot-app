@@ -1,0 +1,18 @@
+--- 2026-10-22_14-51/meta/dpkg-packages.txt
++++ 2026-10-22_17-54/meta/dpkg-packages.txt
+@@ -414,6 +414,7 @@
+ libpng16-16t64	1.6.48-1+deb13u6	amd64
+ libpocketsphinx3	0.8+5prealpha+1-15+b4	amd64
+ libpoppler147	25.03.0-5+deb13u4	amd64
++libpopt0	1.19+dfsg-2	amd64
+ libpostproc58	7:7.1.5-0+deb13u1	amd64
+ libproc2-0	2:4.0.4-9	amd64
+ libproxy1v5	0.5.9-1	amd64
+@@ -729,6 +730,7 @@
+ readline-common	8.2-6	all
+ ripgrep	14.1.1-1+b4	amd64
+ rpcsvc-proto	1.4.3-1	amd64
++rsync	3.5.0+ds1-0+deb13u1	amd64
+ rustc	1.85.1+dfsg1-1+deb13u1	amd64
+ seabios	1.16.3-2	all
+ sed	4.9-2+deb13u1	amd64

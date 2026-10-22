@@ -1,0 +1,11 @@
+--- 2026-10-22_14-51:/home/box/sand-data/managed-skills/skills/sign-in/SKILL.md
++++ 2026-10-22_17-54:/home/box/sand-data/managed-skills/skills/sign-in/SKILL.md
+@@ -9,7 +9,7 @@
+ # Signing in and private details
+ 
+ For a sign-in, a code, or other private detail only the user has, stop at the first step that works:
+-1. 1Password: at a username and password login, first call ListCredentials with the exact current URL. If it says 1Password is connected, follow it;
++1. 1Password: at a username and password login, first call GetCredentialProviderStatus. If it says 1Password is connected, follow it;
+  if not, offer the Connect 1Password card only when the user has told you (here or in your memory) that they use 1Password, and otherwise never mention it.
+ 2. Secure Form: if RequestUserForm is among your tools, send it for the live page's fields (for a sign-in, reason "auth", a title such as "Sign in to GitHub" naming the site, and the site's domain as domain). Tell the user in one line that what they type goes straight into the page and you never see it. If the subagent's report has a `Password rules:` line with rules, copy them word for word into the form's instruction so the user picks a password the page accepts. Otherwise add nothing.
+ 3. Hand over the screen: request_box_help with one short instruction when a form cannot do it: single sign-on, a passkey, a captcha the subagent tried and could not get past, an approval on another device, a QR code, a bank or 3DS card verification prompt (entering the card itself goes in the Secure Form, embedded card fields included), a page the Secure Form refused or a fill it reported failed, no RequestUserForm among your tools, or the user would rather do it.
