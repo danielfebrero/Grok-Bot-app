@@ -9,6 +9,20 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-22 13:52 (Paris) — snapshot `2026-10-22_02-50` → `2026-10-22_13-52`
+
+**Mise à jour des skills gérées + bump agent-store-fuse.** 12 skills Cursor-managed réécrites (`grocery-shopping`, `shopping`, `orders-and-returns`, `purchases`, `sign-in`, `box-desktop`, `in-chat-forms`, `no-connector-fallback`, `channels`, `code-changes`, `source-control`, `recent-changes`) + `managed-skills/cache.json` ; en parallèle, agent-store-fuse `d638e166…` → `362dc6c6…` (binaire `cursor-agent-store-fuse` 9494360 → 9504880 o + pointeur tarball S3). Image `fcbae14`, box-scripts `fcbae14`, sand-host `76b095c`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~15.
+
+- **Bugfix** : —
+- **Change** : `sign-in` / `box-desktop` / `in-chat-forms` / `no-connector-fallback` — ordre de login : saved logins d'abord, puis password manager connecté, puis Secure Form / handoff ; `grocery-shopping` + `shopping` — mode **Cart only** (« fill my cart, I'll check out ») sans paiement ; `orders-and-returns` — preuve obligatoire (lien source), sweep « what's on its way », deal watch / coupons / price-drop sur achats, reorder ; `purchases` — limite Stripe Link US/CA + USD pour cartes agents, pas de promesse de remboursement ; `shopping` — shortlist / recommend avant search, quote vs checkout plus strict (écarts ligne par ligne) ; `channels` — session Slack (`slack:…`) sans chat in-app ; `code-changes` / `source-control` — merge Origin désormais inline via `cursor-origin-merge_pull_request` (plus forcé cloud agent) ; `recent-changes` — note Pages (2026-10-21).
+- **Features** : mode panier seul (grocery + retail) ; deal watch / coupons / price adjustment dans orders-and-returns ; Pages documentées dans recent-changes.
+- **Perf** : —
+- **Autre/infra** : bump binaire agent-store-fuse (nouvelle révision tarball S3) en parallèle du refresh skills.
+
+Rapport : [reports/2026-10-22_13-52.md](reports/2026-10-22_13-52.md).
+
+---
+
 ## 2026-10-22 02:50 (Paris) — snapshot `2026-10-22_01-51` → `2026-10-22_02-50`
 
 **Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `dad84959e3f17e44068a8bf64150163f12632cef` → `d638e16687c00aa4c6e41aee72623cb0575502bd` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`), binaire `cursor-agent-store-fuse` 9466976 → 9494360 o. Image `fcbae14`, box-scripts `fcbae14`, sand-host `76b095c`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~2.
