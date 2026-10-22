@@ -1,0 +1,137 @@
+--- 2026-10-22_18-53:/opt/sand/sand-host/box-runtime/sand-cookie-persist.mjs
++++ 2026-10-22_23-47:/opt/sand/sand-host/box-runtime/sand-cookie-persist.mjs
+@@ -91,6 +91,12 @@
+   "restore-incomplete": "proceeding to capture with seed cookies still absent from the live jar",
+   "restore-seed-unusable": "seed corrupt or its version is not supported; nothing restored",
+   "restore-port-invalid": "--restore-port needs a TCP port; nothing restored",
++  "save-port-invalid": "--save-port needs a TCP port; nothing saved",
++  "save-no-seed": "no seed to refresh; nothing saved",
++  "save-saved": "seed refreshed from the live jar",
++  "save-unchanged": "seed already holds the live jar",
++  "save-paused": "seed unreadable, corrupt, or of an unsupported version; nothing saved",
++  "save-failed": "saving the live jar failed",
+ });
+ 
+ const PERSIST_COUNT_NAMES = new Set(["refused", "total", "cookies", "seed"]);
+@@ -848,14 +854,69 @@
+   return outcome;
+ }
+ 
+-export function parseRestorePort(argv) {
+-  const at = argv.indexOf("--restore-port");
++function parsePortFlag(argv, flag) {
++  const at = argv.indexOf(flag);
+   if (at === -1) return undefined;
+   const text = argv[at + 1] ?? "";
+   const port = /^\d{1,5}$/.test(text) ? Number.parseInt(text, 10) : 0;
+   return port >= 1 && port <= 65535 ? port : null;
+ }
+ 
++export function parseRestorePort(argv) {
++  return parsePortFlag(argv, "--restore-port");
++}
++
++export function parseSavePort(argv) {
++  return parsePortFlag(argv, "--save-port");
++}
++
++export async function saveSeedFromPort(deps, port) {
++  if (readSeed(deps.fs, deps.seedPath).kind === "absent") {
++    logLine(deps, "save-no-seed");
++    return "no-seed";
++  }
++  try {
++    return await withSeedLock(
++      deps.seedPath,
++      async () => {
++        const browser = await deps.connect(port);
++        let jar;
++        try {
++          jar = await readCookies(browser);
++        } finally {
++          browser.close();
++        }
++        const seed = readSeed(deps.fs, deps.seedPath);
++        if (seed.kind !== "ok") {
++          logLine(deps, "save-paused");
++          return "paused";
++        }
++        const suffixes = tailnetSuffixes(deps);
++        const keptSeed = withoutTailnetCookies(seed.cookies, suffixes);
++        const saved = new Map(keptSeed.map((c) => [cookieKey(c), c]));
++        const cookies = withoutTailnetCookies(
++          mergeJars([{ port, jar }], saved, new Map(), { keepUnseen: true }),
++          suffixes,
++        );
++        if (
++          keptSeed.length === seed.cookies.length &&
++          cookiesDigest(cookies) === cookiesDigest(keptSeed)
++        ) {
++          logLine(deps, "save-unchanged");
++          return "unchanged";
++        }
++        writeSeedFile(deps, serializeSeed(cookies, deps.now?.() ?? Date.now()));
++        logLine(deps, "save-saved", null, { cookies: cookies.length });
++        return "saved";
++      },
++      seedLockOptions(deps),
++    );
++  } catch (error) {
++    logLine(deps, "save-failed", faultCode(error));
++    return "failed";
++  }
++}
++
+ async function isAnyChromeUp(deps) {
+   for (const port of deps.discoverPorts()) {
+     let browser;
+@@ -968,14 +1029,48 @@
+ async function main() {
+   const log = createPersistLog();
+   exitOnUncaught(log);
++  const savePort = parseSavePort(process.argv.slice(2));
++  if (savePort === null) {
++    log("save-port-invalid");
++    process.exitCode = 2;
++    return;
++  }
+   const restorePort = parseRestorePort(process.argv.slice(2));
+   if (restorePort === null) {
+     log("restore-port-invalid");
+     return;
+   }
+-  if (!dropToBoxUser(log)) return;
++  if (!dropToBoxUser(log)) {
++    if (savePort !== undefined) process.exitCode = 1;
++    return;
++  }
+   const report = persistCdpReporters(log);
+   const connect = (port) => connectBrowser(port, report.onDroppedFrame);
++  if (savePort !== undefined) {
++    const outcome = await saveSeedFromPort(
++      {
++        connect,
++        seedPath: SEED_PATH,
++        fs: {
++          copyFileSync,
++          mkdirSync,
++          readdirSync,
++          readFileSync,
++          renameSync,
++          rmdirSync,
++          rmSync,
++          statSync,
++          unlinkSync,
++          writeFileSync,
++        },
++        tailnetSuffixes: () => readTailnetSuffixes(),
++        log,
++      },
++      savePort,
++    );
++    if (outcome === "failed" || outcome === "paused") process.exitCode = 1;
++    return;
++  }
+   if (restorePort !== undefined) {
+     await restoreLaunchedChrome(
+       {

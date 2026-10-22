@@ -1,0 +1,77 @@
+--- 2026-10-22_18-53:/opt/sand/sand-host/box-launchers/box-chrome
++++ 2026-10-22_23-47:/opt/sand/sand-host/box-launchers/box-chrome
+@@ -188,6 +188,8 @@
+ BOX_BROWSER_RUNNING_FILE="${SAND_BOX_BROWSER_RUNNING}-${CHROME_DEBUG_PORT}"
+ SAND_BOX_BROWSER_GPU_MODE=/tmp/sand-box-browser-gpu-mode
+ BOX_BROWSER_GPU_MODE_FILE="${SAND_BOX_BROWSER_GPU_MODE}-${CHROME_DEBUG_PORT}"
++SAND_BOX_BROWSER_LAUNCH_MARKERS=/tmp/sand-box-browser-launch-markers
++BOX_BROWSER_LAUNCH_MARKERS_FILE="${SAND_BOX_BROWSER_LAUNCH_MARKERS}-${CHROME_DEBUG_PORT}"
+ UNGOOGLED_CHROMIUM=/opt/ungoogled-chromium/chrome
+ box_browser_ungoogled_wanted() {
+ 	[ "${SAND_BOX_BROWSER_UNGOOGLED:-0}" = "1" ] || [ -e "${SAND_BOX_BROWSER_UNGOOGLED_FILE:-/tmp/sand-box-browser-ungoogled}" ]
+@@ -397,11 +399,65 @@
+ 		</dev/null >/dev/null 2>&1 9>&-
+ }
+ 
++lowercase_trimmed() {
++	printf '%s' "$1" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]'
++}
++
++# The UA governor's rule: a non-empty env value is on only for 1, on, or true;
++# without one, the marker file is on, unless honor_contents and it says 0,
++# off, or false.
++marker_gate_on() {
++	local env_value="$1" path="$2" honor_contents="$3" contents=""
++	if [ -n "$(lowercase_trimmed "${env_value}")" ]; then
++		case "$(lowercase_trimmed "${env_value}")" in
++		1 | on | true) return 0 ;;
++		*) return 1 ;;
++		esac
++	fi
++	[ -e "${path}" ] || return 1
++	[ "${honor_contents}" = 1 ] || return 0
++	read -r contents 2>/dev/null <"${path}" || true
++	case "$(lowercase_trimmed "${contents}")" in
++	0 | off | false) return 1 ;;
++	esac
++	return 0
++}
++
++# The stealth markers in force for this cold launch, in the vocabulary order of
++# SAND_BROWSER_LAUNCH_MARKERS. The ones this script applies read what it did;
++# the governor's and the tunnel's read their markers as those readers do, at
++# launch. The governor rereads its markers once a browser has no page open.
++box_browser_launch_markers() {
++	local markers=()
++	marker_gate_on "${SAND_BROWSER_HARDWARE_PROFILE:-}" \
++		"${SAND_BROWSER_HARDWARE_PROFILE_FILE:-/tmp/sand-browser-hardware-profile}" 1 &&
++		markers+=(hardware_profile)
++	marker_gate_on "${SAND_BOX_BROWSER_COHERENT_FINGERPRINT:-}" \
++		"${SAND_BOX_BROWSER_COHERENT_FINGERPRINT_FILE:-/tmp/sand-box-browser-coherent-fingerprint}" 1 &&
++		markers+=(coherent_fingerprint)
++	[ "${BOX_CHROME_GPU_MODE}" = angle-gl ] && markers+=(spoof_gpu)
++	[ -e "${SAND_BOX_BROWSER_WEBRTC_PROXY_ONLY_FILE:-/tmp/sand-box-browser-webrtc-proxy-only}" ] &&
++		markers+=(webrtc_proxy_only)
++	[ "${SAND_BOX_BROWSER_NO_LOCAL_DNS}" = "1" ] && [ -n "${SAND_EGRESS_PROXY_BYPASS_FLAG:-}" ] &&
++		markers+=(no_local_dns)
++	[ "${SAND_CHROME_DISABLE_QUIC}" = "1" ] && markers+=(disable_quic)
++	[ -e "${SAND_BROWSER_ACCEPT_LANGUAGE_EN_US_FILE:-/tmp/sand-browser-accept-language-en-us}" ] &&
++		markers+=(accept_language)
++	marker_gate_on "${SAND_BROWSER_EGRESS_TIMEZONE:-}" \
++		"${SAND_BROWSER_EGRESS_TIMEZONE_FILE:-/tmp/sand-browser-egress-timezone}" 0 &&
++		markers+=(egress_timezone)
++	[ -e "${SAND_EGRESS_TUNNEL_FAIL_CLOSED_FILE:-/tmp/sand-egress-tunnel-fail-closed}" ] &&
++		markers+=(fail_closed)
++	printf '%s\n' "${markers[*]}"
++}
++
+ record_box_browser() {
+ 	printf '%s\n' "${BOX_BROWSER}" >"${BOX_BROWSER_RUNNING_FILE}.$$" &&
+ 		mv -f "${BOX_BROWSER_RUNNING_FILE}.$$" "${BOX_BROWSER_RUNNING_FILE}" 2>/dev/null || true
+ 	printf '%s\n' "${BOX_CHROME_GPU_MODE}" >"${BOX_BROWSER_GPU_MODE_FILE}.$$" &&
+ 		mv -f "${BOX_BROWSER_GPU_MODE_FILE}.$$" "${BOX_BROWSER_GPU_MODE_FILE}" 2>/dev/null || true
++	box_browser_launch_markers >"${BOX_BROWSER_LAUNCH_MARKERS_FILE}.$$" &&
++		mv -f "${BOX_BROWSER_LAUNCH_MARKERS_FILE}.$$" "${BOX_BROWSER_LAUNCH_MARKERS_FILE}" 2>/dev/null || true
+ }
+ 
+ # Chromium 139 dies right after it starts serving CDP on a profile whose

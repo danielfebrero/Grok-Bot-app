@@ -1,0 +1,11 @@
+--- 2026-10-22_18-53:/opt/sand/sand-host/box-runtime/manifest.json
++++ 2026-10-22_23-47:/opt/sand/sand-host/box-runtime/manifest.json
+@@ -14,7 +14,7 @@
+     },
+     {
+       "name": "sand-cookie-persist.mjs",
+-      "sha256": "9e4615ab4f6fbf21c869f7efbca36bda1adf9ea5463f5fff432d282fb5d5d823"
++      "sha256": "2ffeadf5b0f702d3fe876f62b241b629fdcf7a8642f698f0e192a09a50b0357e"
+     },
+     {
+       "name": "sand-egress-timezone.mjs",
