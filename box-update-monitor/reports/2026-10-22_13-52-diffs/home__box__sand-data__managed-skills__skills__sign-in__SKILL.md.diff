@@ -1,0 +1,14 @@
+--- 2026-10-22_02-50:/home/box/sand-data/managed-skills/skills/sign-in/SKILL.md
++++ 2026-10-22_13-52:/home/box/sand-data/managed-skills/skills/sign-in/SKILL.md
+@@ -2,8 +2,9 @@
+ name: sign-in
+ description: >-
+   REQUIRED before a login page, a one-time or 2FA code, a captcha, or any page
+-  asking for a password, card, or other private detail, since it holds the one
+-  sign-in order that ends with the Secure Form and then handing over the screen.
++  asking for a password, card, or other private detail;
++ its order: saved logins,
++  a connected password manager, the Secure Form, then handing over the screen.
+ ---
+ # Signing in and private details
+ 

@@ -1,0 +1,109 @@
+--- 2026-10-22_02-50:/home/box/sand-data/managed-skills/skills/orders-and-returns/SKILL.md
++++ 2026-10-22_13-52:/home/box/sand-data/managed-skills/skills/orders-and-returns/SKILL.md
+@@ -1,29 +1,44 @@
+ ---
+ name: orders-and-returns
+ description: >-
+-  When the user asks where an order or package is, wants to return, exchange, or
+-  cancel something they bought, reports a missing, late, or damaged order, or
+-  wants to hear when a product's price drops or it is back in stock, before you
+-  open the store or carrier site.
++  When the user asks where an order or package is or what is on its way, wants
++  to return, exchange, or cancel something they bought, reports a missing, late,
++  or damaged order, asks about a refund or a price adjustment or whether
++  anything they bought dropped in price, wants to reorder what they usually buy,
++  wants to hear when a product's price drops or it is back in stock, wants a
++  list of products or stores watched for deals, or wants their store coupons
++  clipped, read this before you answer or open the store or carrier site, even
++  when you could answer from memory, because every update has to link its
++  source.
+ ---
+ # Orders, tracking, and returns
+ 
+-You handle what happens after a purchase: finding where an order is, returning or exchanging an item, canceling before it ships, sorting out a missing or damaged delivery, and watching a product for a price drop or a restock. The order lives in the user's account on the store. You read it, fill in the forms, and report back, and the user approves anything that changes an order.
++You handle what happens after a purchase: finding where an order is, returning or exchanging an item, canceling before it ships, sorting out a missing or damaged delivery, confirming a refund, watching a product for a price drop or a restock, and running a deal watch over the products and stores the user names. The order lives in the user's account on the store and in the emails the store sent. You read them, fill in the forms, and report back, and the user approves anything that changes an order or goes out in their name.
++
++## Proof
++
++- Every status, refund, claim, or ticket update links the email or page it came from.
++- If you cannot open a source, say so instead of guessing.
++- Never invent a tracking number, a carrier event, a delivery date, a deadline, a refund, or an order number. If no email or page showed it, say so.
+ 
+ ## Entry points
+ 
++- "What's on its way?" or "show me my recent orders" is a sweep of the user's order, shipping, delivery, and refund emails, across every store.
+ - "Where's my Amazon order?" is a status lookup in the store's order history.
+ - A pasted tracking number, or a shipping email, is a carrier lookup and needs no store sign-in.
+ - "Return the jacket, it's too big" is a return, and maybe an exchange for another size.
+ - "Cancel the order I placed this morning" is a cancellation, which only works until the order ships.
+ - "It says delivered but it's not here" or "it arrived broken" is a problem report.
+ - "Tell me when this drops below $200" or "let me know when it's back in stock" is a watch.
++- "Watch these for deals" or "clip my coupons" is a deal watch. "Did anything I bought drop in price?" is one run of its order check.
++- "Reorder the usual" is a new purchase from the list of what the user usually buys.
+ 
+ ## Before you start
+ 
+-- Identify the order: the store, the item, and roughly when it was placed. An order you placed earlier in this conversation already has its store, order number, and confirmation screenshot. Call RecallMemory for an older one the user mentions.
++- Identify the order: the store, the item, and roughly when it was placed. An order you placed earlier in this conversation already has its store, order number, and confirmation screenshot. Call RecallMemory for an older one the user mentions, and for a claim or ticket number you saved.
+ - Run SearchPlugins for the store, and for the user's email when the order came by email. Use a connector when one is installed. Install a missing connector with InstallPlugin without asking;
+  its connect card is the ask. Ask in one widget first only when the user named no service and several plugins fit (Gmail or Outlook, Google or Outlook Calendar), or the plugin has no connector. Say in the user's words why it helps, without saying plugin, MCP, or plugin id, and never paste a connect link. An email connector finds the order and shipping emails, which carry the order number, the carrier, and the tracking number without a store sign-in.
++- For a sweep, read the emails first. When no email connector is installed, offer to connect one before you sign in to each store one by one.
+ - Order history, returns, and cancellations need the user's store account. When the site wants a sign-in, a one-time code, or a verify-you-are-human check, follow the Cursor-managed `sign-in` skill in its order, which ends with the Secure Form (`RequestUserForm`) and then handing over the screen with `request_box_help` and one instruction ("Sign in to your <service> account"). Never send a question widget before these;
+  the tool is the ask. After a receipt or a hand-back, dispatch the subagent again;
+  the session persists across turns.
+@@ -47,6 +62,7 @@
+ 4. Before you submit, send one question widget with the item, the reason, the refund amount, any fee, and how it goes back. A dismissed widget is a no.
+ 5. After you submit, report the return's drop-off deadline and place, and attach the QR code or label: a screenshot of the code, or the downloaded label at its saved path. Offer a reminder routine for the day before the deadline.
+ 6. When the reason was fit, offer to remember the size that would have fit for that brand.
++7. Confirm a refund only from a refund email or the store's order page. Until one shows it, say the refund is pending and when the store says it posts.
+ 
+ ## Cancellations
+ 
+@@ -56,21 +72,43 @@
+ 
+ ## Problems with an order
+ 
+-- For a missing, late, damaged, or wrong item, open the order's help options and report what the store offers (a refund, a replacement, a chat with support), then let the user choose.
+-- Before reporting a "delivered" package as missing, read the carrier's delivery details for a photo or a delivery location and share them, since they often show where it was left. Send a shipment card at stage `delivered` when you can, then the photo.
++1. For a late package, or a "delivered" one that is not there, read the tracking page first. For a delivered package, read the carrier's delivery details for a photo or a delivery location and share them, since they often show where it was left. Send a shipment card at stage `delivered` when you can, then the photo.
++2. Wait out the delivery window the carrier or store states before you file anything, and tell the user when it ends. Many late or misplaced packages turn up inside it.
++3. Then open the order's help options and report what the store offers (a refund, a replacement, a chat with support), or the carrier's claim form, and let the user choose. A damaged or wrong item skips the wait.
++4. Draft the claim or the message and show it to the user. Send or submit nothing in their name until they approve it, and follow the `send-on-behalf` skill for an email or a chat.
++5. Save the claim or ticket number with UpdateMemory, and give it to the user with the email or page it came from.
++
+ - When you chat with the store's support for the user, say who you are acting for, ask for what the user chose, and confirm with the user before you accept a different offer.
+ 
+ ## Price drops and restocks
+ 
+ - A watch is a routine that messages the user only when the condition is met, and then ends. Read the Cursor-managed `routines` skill before you create it, because it says when to sign up for the store's own alert email instead of checking the page every day. Tell the user the product link, the condition, and how the routine finds out.
+ - A watch only notifies. Buying when the price drops is a new purchase the user approves through the `shopping` skill.
+-- When the price drops on something the user already bought, say so if the order is still in its return window, because some stores adjust the price on request and a return and rebuy works at others. Read the store's policy page before you say which applies.
++- When the price drops on something the user already bought, read the store's policy page for a price adjustment window, and say when it has none. Some stores adjust the price on request inside that window, and a return and rebuy works at others. When the user asks, set a routine that rechecks the price until the window closes and messages them, with the page that shows the new price, when a drop makes a claim worth filing.
++
++## Deal watch
++
++- A deal watch is one routine that covers a list of products and the stores the user names. Suggest a weekly run, or a daily one during a short sale window. Ask how big a drop is worth a message, and suggest 15%.
++- A deal watch never buys and never adds to a cart. Buying a watched item is a new purchase the user approves through the `shopping` skill.
++- A single-product watch still ends once its condition is met. A deal watch keeps running until the user stops it, so tell them that when you set it up.
++- Read the Cursor-managed `routines` skill before you create it. Write into its instructions each product with its page link and today's price, the stores, the threshold, and whether to clip coupons.
++- Each run checks:
++  1. Each watched product's price against the price saved with it. Report a drop at or past the threshold, with a link to the page that shows the new price.
++  2. The user's recent orders, from receipt emails when mail is connected, for a drop inside each store's price adjustment window, as Price drops and restocks says. Without connected mail, skip this check, and offer to connect mail when you set up the routine.
++  3. Return deadlines that fall before the next run, from the order page or the email, so none passes between runs.
++- On a store account the user connected or signed in to, clip the digital coupons that match items on their usual list or the watch list. Clipping spends nothing but changes their account, so ask once, when you set up the routine, whether to clip. Never clip or enter a coupon at a store the user did not name.
++- A run messages the user only when it finds something: a drop at or past the threshold, a drop on a recent order that makes a price adjustment claim worth filing, a return deadline before the next run, or a coupon it clipped. List each clipped coupon with its store and the item it matches. Mention each price drop once, not again on every run while the price stays down. A run does not reliably remember what earlier runs sent, so after a run reports a drop, it reads its own routine with action "get" and edits its instructions. A watched product's saved price becomes the price it reported, so the next run measures from there. A drop on a recent order is saved as that order and the price it reported, and later runs skip the order unless its price falls further. With nothing to report, the run stays quiet.
++
++## What the user usually buys
++
++- Build the list from receipt emails: each item, the store, the typical quantity, the last order date, and the typical interval between orders.
++- Save the whole list with UpdateMemory as one fact. When it changes, forget the old fact and write the new one.
++- A reorder is a new purchase at a store whose checkout you can use. It goes through the `shopping` skill, and nothing is ordered without the approval the `purchases` skill requires.
+ 
+ ## Pitfalls
+ 
+ - Use the return deadline the order page shows rather than computing one, because stores count from delivery, from the order date, or from a holiday extension.
+ - Carriers update tracking in batches, so "label created" for a day is common. Say when the last scan was rather than calling the package lost.
+-- Never invent a status, a deadline, a refund amount, or an order number. If the page did not show it, say so.
+ 
+ ## Site playbooks
+ 

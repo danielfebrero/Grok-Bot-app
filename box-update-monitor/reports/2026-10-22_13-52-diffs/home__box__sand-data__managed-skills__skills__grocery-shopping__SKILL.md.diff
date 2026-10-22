@@ -1,0 +1,46 @@
+--- 2026-10-22_02-50:/home/box/sand-data/managed-skills/skills/grocery-shopping/SKILL.md
++++ 2026-10-22_13-52:/home/box/sand-data/managed-skills/skills/grocery-shopping/SKILL.md
+@@ -2,9 +2,10 @@
+ name: grocery-shopping
+ description: >-
+   When the user asks you to buy groceries or household staples, do or repeat a
+-  weekly grocery order, turn a recipe or meal plan into a shopping list, or
+-  order from Instacart, Costco Same-Day, or another grocery delivery site,
+-  before you open the store or add anything to a cart.
++  weekly grocery order, fill a grocery cart they will check out themselves, turn
++  a recipe or meal plan into a shopping list, or order from Instacart, Costco
++  Same-Day, or another grocery delivery site, before you open the store or add
++  anything to a cart.
+ ---
+ # Grocery shopping
+ 
+@@ -17,11 +18,12 @@
+ - A pasted list, or a photo of a handwritten list, is the list itself.
+ - "We're out of milk and paper towels" is a small top-up to the store they usually use.
+ - "Do a Costco run" goes to Costco Same-Day, the grocery storefront, not the costco.com retail site.
++- "Fill my cart, I'll check out" is cart only (see Cart only).
+ 
+ ## Before you start
+ 
+ - Pick the store: the one the user named, then their usual grocer from the Memory section, then ask. On Instacart, also pick the retailer, because prices and stock differ by store.
+-- Read the Memory section for the usual list at that store, brands and sizes they buy, dietary rules and allergies, brands to avoid, organic or other preferences, substitution rules, and household size. The usual list is saved in parts and the Memory section can leave some out, so for a repeat cart always call `RecallMemory` with the store's name before you build the list, and build it from every part that comes back.
++- Read the Memory section for the usual list at that store, brands and sizes they buy, dietary rules and allergies, brands to avoid, organic or other preferences, substitution rules, household size, and whether they always check out themselves (see Cart only). The usual list is saved in parts and the Memory section can leave some out, so for a repeat cart always call `RecallMemory` with the store's name before you build the list, and build it from every part that comes back.
+ - Run SearchPlugins for the grocer. Use a connector when one is installed. Install a missing connector with InstallPlugin without asking;
+  its connect card is the ask. Ask in one widget first only when the user named no service and several plugins fit (Gmail or Outlook, Google or Outlook Calendar), or the plugin has no connector. Say in the user's words why it helps, without saying plugin, MCP, or plugin id, and never paste a connect link.
+ - Confirm the delivery address with the user before checkout, even when the site has one saved.
+@@ -48,6 +50,15 @@
+ 11. Check the total before you place it. Compare the total on the final checkout page with the one in the widget. If it moved (a new fee, tax, a bag or service fee, a changed tip or window), that yes is spent: place nothing, show both numbers, and send a fresh widget with the new total. Its yes is the only one that lets you place the order.
+ 12. Place the order only after a yes to the widget that names the total on the final checkout page, and only the cart that widget read back. When the user already confirmed payment in a `request_box_help` handoff, that confirmation placed the order: dispatch no place click, and only have the helper read the confirmation page. Otherwise, for the place dispatch, resume the helper that read checkout back. Have it compare the checkout lines and total with the ones the widget named and, if the cart is empty or any line or the total differs, stop and report without placing. Only then does it select the payment method from the payment step, click the place-order control, dismiss the post-order prompts (rate, tip more, add items, a membership offer), and read the confirmation page. Once the site confirms the order, report the order number, the delivery window, and the total charged, and attach the confirmation screenshot.
+ 
++## Cart only
++
++Follow this when the user wants a filled cart and will check out themselves, or when memory says they always do.
++
++- A guest cart in your browser does not show on the user's phone or computer. Before step 2, ask once whether they have an account at this store. With one, sign in the way step 3 says (credentials through the Secure Form, or a hand-off so they sign in on the box). When that sign-in hand-off comes back, dispatch step 2 in the signed-in session. With no account, or when they would rather not sign in, dispatch step 2 as a guest.
++- Follow the Flow through step 6, then stop. Never set a delivery window, open checkout, enter payment, or place the order in this mode.
++- Send the step 6 cart summary. For a signed-in cart, add the store's cart page link and one line that the cart is waiting in their account. For a guest cart, say it stays in your browser and send each item as its product link with the size and quantity instead of the cart link.
++- In the same message, offer to hand over the screen with `request_box_help` and one instruction ("Check out your cart on <store>"), so they check out in your browser themselves. When that checkout hand-off comes back, read the page. Report an order as step 12 says only when the page is the store's order confirmation. Otherwise say the cart is still waiting.
++
+ ## Remembering the usual order
+ 
+ - After the first order at a store, offer once to remember it as their usual list there, with each item's brand, size, and usual quantity, along with any substitution rules they stated ("no substitutes for oat milk", "any brand of bananas is fine"). Save with `UpdateMemory` (action "write", type "journal") only after they agree.

@@ -1,0 +1,11 @@
+--- 2026-10-22_02-50:/home/box/sand-data/managed-skills/skills/in-chat-forms/SKILL.md
++++ 2026-10-22_13-52:/home/box/sand-data/managed-skills/skills/in-chat-forms/SKILL.md
+@@ -16,7 +16,7 @@
+ - Never predict a fill failure up front, and never offer the form "as a test". Go straight to `request_box_help` only for steps a form cannot express (a captcha the subagent tried and could not get past, slider and drag-to-verify captchas included, passkey, 3DS, QR code, device approval, a custom widget that is not a captcha) or when the page has no field to target. A host preflight refusal, or a receipt naming a structural reason (closed shadow root, unreachable frame), is final for that page: hand off with `request_box_help`, quote the receipt's reason to the user as written (do not rename it, e.g. as a "protected" or "secure" frame), and do not re-issue the same form. Any other miss follows the receipt: remap a held value or re-ask with a fresh target.
+ - A special-cased site (United, Okta, etc.) does **not** change this. Still snapshot, then send the form, after the page is open.
+ - Tell the user in one line that what they type goes straight into the page and you never see it.
+-- Sign in with the Cursor-managed `sign-in` skill, in its order: the Secure Form, then handing over the screen, after any earlier step the skill names. One-time codes and captchas follow the rules in that skill.
++- Sign in with the Cursor-managed `sign-in` skill, in its order: saved logins first, then any connected password manager, and only then the Secure Form or handing over the screen. One-time codes and captchas follow the rules in that skill.
+ - Note: the in-chat form card may not render on mobile;
+  if the user says they can't see it, say so plainly and offer desktop chat or `request_box_help` as the fallback.
+ - Reach for the form the moment you hit the typed gate. Never pre-ask "want me to hand you the box?" or "should I show you a form?" The form (or the handoff) IS the ask.

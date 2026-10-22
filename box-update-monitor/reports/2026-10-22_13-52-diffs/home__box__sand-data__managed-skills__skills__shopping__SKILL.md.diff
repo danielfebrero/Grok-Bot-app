@@ -1,0 +1,88 @@
+--- 2026-10-22_02-50:/home/box/sand-data/managed-skills/skills/shopping/SKILL.md
++++ 2026-10-22_13-52:/home/box/sand-data/managed-skills/skills/shopping/SKILL.md
+@@ -5,11 +5,15 @@
+   whether to wait for a drop, read this before you answer, even when you could
+   answer from memory, because the answer needs a price history and reviews
+   opened this turn. Also when the user asks you to buy, order, reorder, or
+-  compare a product on Amazon or any other retail site, asks which of two or
+-  three products to get or whether one costs less at another store, or sends a
+-  product link to purchase, before you open the store or add anything to a cart,
+-  alongside any store's site playbook. Read it as well as the purchases skill,
+-  which covers only how to pay.
++  compare a product on Amazon or any other retail site, asks you to fill a
++  retail cart they will check out themselves, asks which of two or three
++  products to get or whether one costs less at another store, or sends a product
++  link to purchase, before you open the store or add anything to a cart,
++  alongside any store's site playbook. Also when the user asks you to find,
++  search for, recommend, or shortlist products, such as the latest model of a
++  phone or accessories for one, before you search or hand the search to a
++  subagent, so its task asks for the facts the product cards need. Read it as
++  well as the purchases skill, which covers only how to pay.
+ ---
+ # Shopping and checkout
+ 
+@@ -29,6 +33,8 @@
+ - A pasted product link goes straight to that product page.
+ - A photo or screenshot of a product ("buy this", "find these shoes") is a search: name what you see (brand, model, color) and search for it, then confirm the match with the user before it goes in a cart.
+ - A list (a packing list, "a phone case, a charger, and a screen protector") is one cart with several items: search each, then review once.
++- "Fill my cart, I'll check out" or "I still press buy" is cart only;
++ the deliverable is a filled cart and a handoff, never a payment (see Cart only).
+ - A message that buys products from your shopping card by name, store, price, and link, and names a saved card and a saved address by Vault id, comes from the app's Checkout sheet, where the user already chose the variant, the store, the card, and the address. Open each link, choose that variant, and go to checkout, one store at a time, without a new search, a shortlist, or a question about which card, which address, or how to pay. The prices it names are the card's, before shipping and tax.
+ 
+ ## Before you start
+@@ -36,7 +42,7 @@
+ - Resolve what, how many, and any hard constraint (budget, brand, delivery-by date, size). Infer harmless defaults and state them. Ask only when the answer changes what to buy.
+ - Run SearchPlugins for the retailer the user named. Use a connector when one is installed. Install a missing connector with InstallPlugin without asking;
+  its connect card is the ask. Ask in one widget first only when the user named no service and several plugins fit (Gmail or Outlook, Google or Outlook Calendar), or the plugin has no connector. Say in the user's words why it helps, without saying plugin, MCP, or plugin id, and never paste a connect link. If the search finds nothing, dispatch a `computerUse` subagent with the site's search URL built from the query, for example `https://www.amazon.com/s?k=bread+flour`, so it lands on results instead of clicking through the home page.
+-- Read the Memory section for the user's preferred retailer, membership status, default shipping address, sizes, brand rules, and anything they have said about upsells or delivery speed. Call RecallMemory for a past order they mention.
++- Read the Memory section for the user's preferred retailer, membership status, default shipping address, sizes, brand rules, whether they always check out themselves (see Cart only), and anything they have said about upsells or delivery speed. Call RecallMemory for a past order they mention.
+ - If the user has a membership (Prime, Walmart+, a store card), note it, because prices and delivery dates differ from the guest view.
+ - A compare across three or more stores, or a hunt through many listings, spends much more of the user's plan than a single search. Before you start one, when `CheckSubscriptionUsage` is among your tools, call it. When it reports that most of this cycle's included usage is used and does not say that on-demand usage is enabled, or that the trial ends within a day, send a question widget whose prompt says so in one line and asks whether to run the quick version (one store, its top three matches) or the full hunt. Otherwise start the full hunt without asking.
+ - When the store's site playbook or an earlier attempt in this conversation shows that it blocks agents or needs a sign-in before it keeps a cart, say so in one line before you start, and name the store you would try next if it does.
+@@ -86,9 +92,9 @@
+  otherwise take the default and say so. A saved size (see Sizes and preferences) answers the size question only, so still ask about any other open variant. When more than one variant is open, ask about them together in one short message instead of one question at a time.
+ 7. Add to cart. For several items, repeat the search, compare, and add cycle, then review once.
+ 8. Review the cart from a screenshot, then send the user the cart summary: one line per item with the product as a link, its brand, the variant (size, color, pack count), quantity, unit price, and the seller when it is not the store itself, then the subtotal, shipping, tax, and total as far as the page shows them, with the cart screenshot attached at its saved path. When the cart changes, send a fresh summary so the latest one always matches the cart.
+-9. Shipping address. Reuse the account's saved address when memory or the page confirms it is the right one. If the page needs an address typed and the Cursor-managed `vault` skill is in your catalog, follow that skill: use the user's saved contact, and ask in chat for only what it lacks. Without that skill, ask with `RequestUserForm`, with fields targeted at the live checkout page. Confirm the chosen address with the user before you continue, unless they chose it in the app's Checkout sheet.
++9. Shipping address. Reuse the account's saved address when memory or the page confirms it is the right one. If the page needs an address typed and the Cursor-managed `vault` skill is in your catalog, follow that skill: use the user's saved contact, and ask in chat for only what it lacks. Without that skill, ask with `RequestUserForm`, with fields targeted at the live checkout page. Confirm the chosen address with the user before you continue, unless they chose it in the app's Checkout sheet or you will pay with an order card, whose Ship to row shows the address beside Pay and lets them pick another saved one.
+ 10. Ask about a promo code before the final page if the checkout has a field for one and the user has not mentioned one.
+-11. Reach the final review page. Screenshot it. Have the subagent return each line with its amount as the page shows it, then the total, because an order card shows them: each item with its variant and any quantity above one, shipping with its arrival date, tax, each discount as a negative amount, and each fee. Check the subtotal, tax, shipping, and total against what you presented.
++11. Reach the final review page. Screenshot it. Have the subagent return each line with its amount as the page shows it, then the total, because an order card shows them: each item with its variant, quantity, line total, and https image URL, shipping with its arrival date, tax, each discount as a negative amount, and each fee. Have it also return the checkout page's https link and the name and address the checkout ships to. Your quote is the step 8 cart summary and the shortlist prices, or the prices a Checkout sheet message named. Compare each item line on this page with the unit price you quoted for it times its quantity, and compare the unit price itself when the page shows one. Remove any line the user did not ask for, such as a protection plan or an add-on, say that you removed it, and read the total again. Before the order card or the ready-to-buy summary, write one line for each item whose price differs from the quote and for each line the quote did not have (a fee, a protection plan, a subscription, a tip, a donation): the line, what you quoted, what the page shows, and the difference. Then give the change in the total. Shipping and tax that show up for the first time are not price changes, but name their amounts. Shipping or tax that your quote already named and that moved gets its own line the same way, with both amounts. When the page's lines do not add up to its total, do not ask for approval. Report each line and the gap, and stop.
+ 12. Get the yes, pay, and place the order (see Paying and confirming).
+ 13. Screenshot the order confirmation. When you paid through an order card, reply with `purchase` as the purchases skill says, with the delivery estimate in `content`. Otherwise send a shipment card at stage `placed` from the confirmation page, with the total charged in `content` (see Paying and confirming). Without the `shipment` field, report the order number, the total charged, and the delivery estimate. Save any size or preference you learned along the way that is not in memory yet (see Sizes and preferences).
+ 
+@@ -130,12 +136,24 @@
+ - Take every price, rating, and count from a page you opened this turn, and link that page. If you could not open a source, say so instead of estimating.
+ - When `SendToUser` has a `shopping` field, send the item there instead of a long reply, with the verdict in `content`, the evidence in the product's `reasons`, and the price history page in its `links`.
+ 
++## Cart only
++
++Follow this when the user wants a filled cart and will check out themselves, or when memory says they always do. The deliverable is the cart and a handoff, never a payment.
++
++- Build the cart in the user's own store account, signed in the way step 3 says, when they have one. A cart in their account shows on their own phone or computer. A guest cart in your browser does not move to their device.
++- Follow the Flow through step 8. Apply a promo code on the cart page when the cart takes one.
++- Then send the handoff: the step 8 cart summary, the store's cart page link, and one line that the cart is waiting in their account. For a guest cart, or a store without an account cart, send the store's own share-cart or list link when the page offers one. Otherwise send each item as its product link with the variant and quantity.
++- In the same message, offer to hand over the screen with `request_box_help` and one instruction ("Check out your cart on <store>"), so they pay in your browser themselves. When that checkout hand-off comes back, read the page. Report an order as step 13 says only when the page is the store's order confirmation. Otherwise say the cart is still waiting.
++- Never open a payment form, raise a virtual card, send an `order` card, or click the place-order control in this mode. A later "go ahead and buy it" is a normal purchase through Paying and confirming.
++- When the user says they always want to check out themselves, save that as one memory fact and name it, the way Sizes and preferences saves a size.
++- When the user hesitates about paying or asks whether it is safe, offer cart only as one plain option in one sentence, without a lecture.
++
+ ## Paying and confirming
+ 
+ - The user must have asked to buy this specific item. Never spend on your own initiative, and never buy to hold a price.
+-- When the purchases skill has you send an `order` card, as it does to pay with a card saved in the user's vault, that card is the ready-to-buy summary and the confirmation, so send it in place of the summary and widget below. Settle any open choice, such as which saved card, before you send it, and send no question widget after it, because a later widget can close the order card. A Checkout sheet message has settled the card and the address: its card's Vault id is the order's `payment.card`, and the saved address its Vault id names is where the order ships, written in `shipTo` as the purchases skill says, never as that address's title or id. When an item's price on the review page differs from the price that message named for it, say so in the line before the card;
+- shipping and tax are not a price change. Place the order after the user taps Pay, as that skill says.
++- When the purchases skill has you send an `order` card, as it does to pay with X Money or a card saved in the user's vault, that card is the ready-to-buy summary and the confirmation, so send it in place of the summary and widget below. Settle any open choice, such as which saved card, before you send it, and send no question widget after it, because a later widget can close the order card. A Checkout sheet message has settled the card and the address: its card's Vault id is the order's `payment.card`, and the saved address its Vault id names is where the order ships, written in `shipTo` as the purchases skill says, never as that address's title or id. Place the order after the user taps Pay, as that skill says.
+ - Otherwise, before payment, send the ready-to-buy summary: the cart summary from step 8 with each line and the subtotal, shipping, tax, and total read again from the final review page, then the shipping address, the delivery date, and the payment method the page shows, with the review page screenshot attached at its saved path. Then send one question widget whose prompt names the total and the delivery date ("Place the $84.17 order, arriving Tue, Oct 20?"), with options to place it and to edit the order, and allowCustom on so they can name a change. The widget ends your turn. A dismissed widget is a no.
++- Give that widget an option for the user to check out themselves. When they pick it, send the handoff in Cart only and place nothing.
+ - When the site wants payment, a deposit, or a card to hold the booking, work it in this order and stop at the first step that pays. First, a payment method already saved on the account. Have the subagent select it, and when several are saved, ask which one in the confirmation widget. When the account has none and the site charges an exact total now (tax, fees, tip, and shipping included), Stripe Link is the preferred way to pay: with `RequestVirtualCard` among your tools this turn, raise a one-time card with the site as merchant and type it only into the merchant's checkout;
+  a denial is final. Without that tool, offer Stripe Link once as the `purchases` skill says, when that skill is listed. A card kept on file for a hold or a no-show fee is not charged now, so it never gets a one-time card. Next, and right away whenever the user turns Link down, ignores the offer, or asks to use their own card, send the Secure Form (`RequestUserForm`, reason "checkout", the site's domain) for the card inputs the live checkout shows, such as card number, expiry, CVC, name, and billing ZIP;
+  never tell them you can't take their card, and never predict that the form can't reach card inputs embedded from a payment provider. Last, when the host refuses the form or its receipt says a card field failed, or the user would rather type on the page, hand the box to the user with `request_box_help` and one instruction ("Add your card and confirm the payment on <service>");
+@@ -153,6 +171,7 @@
+ - Out of stock, "ships in 3 to 5 weeks", or a delivery date after the user's deadline is a flag before checkout, not after.
+ - Bundle suggestions, protection plans, and subscribe-and-save upsells are ignored unless the user asked for them.
+ - Multi-page checkouts hide the real total until the last page. Screenshot the final review page, not the intermediate ones.
++- Never present a total you cannot account for line by line.
+ - A marketplace seller with poor ratings or a long ship time is worth a sentence even when the price is best.
+ - A page saying the site does not allow AI agents (Amazon shows one) ends that store for this request, so never reload or retry it. Do not stop at the block either. Take the product's brand and model number or UPC from what you already have, such as the user's link text, a search result, or the page's structured data, and check two or three other stores the user would buy from for that exact product in parallel subagents. Match on the model number or UPC, not the title, and call out a near match as one. Then send one message: the blocked store and what its page said, in one line, then each store that has the product with its price, delivery date, and seller, presented as a compare (see Presenting choices), and your pick. When you ask for the store with a question widget, its prompt opens with the blocked store and that it does not allow AI agents, because the options alone never tell the user why the store they named is missing.
+ - Never invent a price, a rating, a delivery date, or an order number. If the page did not show it, say so.

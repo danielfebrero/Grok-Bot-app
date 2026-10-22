@@ -1,0 +1,11 @@
+--- 2026-10-22_02-50:/home/box/sand-data/managed-skills/skills/box-desktop/SKILL.md
++++ 2026-10-22_13-52:/home/box/sand-data/managed-skills/skills/box-desktop/SKILL.md
+@@ -21,7 +21,7 @@
+ 
+ - Some browser and desktop tasks take more than one or two minutes, for example a sign-up, a verification code, or a long form. Before you send one, tell the user in one line that it will take a few minutes. When its report comes back, tell the user what the report shows for that same task. Do not say a step happened, such as a code that was sent or a form that was submitted, until the report shows it.
+ 
+-- Sign in with the Cursor-managed `sign-in` skill, in its order: the Secure Form, then handing over the screen, after any earlier step the skill names.
++- Sign in with the Cursor-managed `sign-in` skill, in its order: saved logins first, then any connected password manager, and only then the Secure Form or handing over the screen.
+ 
+ - When a page needs the USER to type (login, address, card, phone, OTP) and `RequestUserForm` is among your tools, Read and follow the `in-chat-forms` skill first. Have the child open the page and report fresh snapshot targets, then send the form; embedded and cross-origin card fields count. Do not jump to `request_box_help` just because a site needs a password.
+ 
