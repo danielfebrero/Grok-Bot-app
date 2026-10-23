@@ -9,6 +9,19 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-23 14:52 (Paris) — snapshot `2026-10-23_09-50` → `2026-10-23_14-52`
+
+**Toolchain C/C++ (clang/LLVM 19 + cppcheck) installé + bump agent-store-fuse.** Côté composants plateforme surveillés, **seul** `agent-store-fuse` a bougé : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `71c0b034eb0f12f3317f29a89191167a4a050f3b` → `011306c935558a4c91141f612d29a8e9bcb6d635` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`), binaire `cursor-agent-store-fuse` inchangé.
+
+En revanche **33 paquets dpkg ajoutés** (0 retiré) — très vraisemblablement un `apt-get install` d'un agent de l'équipe, pas une mise à jour de l'ordinateur : chaîne clang/LLVM 19 (`clang`, `clang-19`, `clang-tidy`, `clang-tools`, `llvm-19` + `-dev`/`-runtime`/`-tools`/`-linker-tools`, `libclang*-19`, `libclang-rt-19-dev`), analyseur statique `cppcheck`, support 32-bit (`lib32gcc-s1`, `lib32stdc++6`, `libc6-i386`), headers de dev (`libffi-dev`, `libncurses-dev`, `libxml2-dev`, `libz3-dev`), `libobjc-14-dev`/`libobjc4`, `binfmt-support`, `libpfm4`, `libpipeline1`, `libtinyxml2-11`, `libyaml-0-2`, `libgc1`, `python3-yaml`, `python3-pygments`. Python dists apparus en conséquence : `PyYAML-6.0.2`, `pygments-2.18.0`.
+
+Composants plateforme **inchangés** : image `fcbae14`, box-scripts `fcbae14`, sand-host `a92b6f6` (supervisor `upgrade-a92b6f6`), exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7. Fichiers texte surveillés : +0 / −0 / ~1 (pointeur fuse).
+
+Rapport : [reports/2026-10-23_14-52.md](reports/2026-10-23_14-52.md).
+
+
+---
+
 ## 2026-10-23 09:50 (Paris) — snapshot `2026-10-23_08-53` → `2026-10-23_09-50`
 
 **Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `d15d9c1024bc977a1c7a1d6ff143847ff52ad361` → `71c0b034eb0f12f3317f29a89191167a4a050f3b` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`). Binaire `cursor-agent-store-fuse` inchangé (9504880 o, même sha256 `5c3513e4…`). Image `fcbae14`, box-scripts `fcbae14`, sand-host `a92b6f6` (supervisor `upgrade-a92b6f6`), exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~1.
