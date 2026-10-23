@@ -1,5 +1,5 @@
 # Version/build courante de l'app Grok Bot sur la box
-# capturée le 2026-10-23 03:52:45 CEST (snapshot 2026-10-23_03-52)
+# capturée le 2026-10-23 05:45:12 CEST (snapshot 2026-10-23_03-52)
 # Box update (Update Computer) = change image_sha ; hot-update host = change sand_host_version
 
 image_sha (/etc/sand-box-image-sha)	fcbae14
