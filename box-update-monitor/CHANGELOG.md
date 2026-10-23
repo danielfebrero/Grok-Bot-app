@@ -9,6 +9,30 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-23 20:51 (Paris) — snapshot `2026-10-23_18-47` → `2026-10-23_20-51`
+
+**Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `48149515a9b2802709207fc5e6ef233b8696ac4e` → `641bc36cdedce93113dbb71675fc413377941f18` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`). Binaire `cursor-agent-store-fuse` inchangé (9504880 o, même sha256 `5c3513e4…`). Image `fcbae14`, box-scripts `fcbae14`, sand-host `ab3b435` (supervisor `upgrade-ab3b435`), exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~1.
+
+Rapport : [reports/2026-10-23_20-51.md](reports/2026-10-23_20-51.md).
+
+
+---
+
+## 2026-10-23 18:47 (Paris) — snapshot `2026-10-23_14-52` → `2026-10-23_18-47`
+
+**Hot-update sand-host `a92b6f6` → `ab3b435`** (+ bump agent-store-fuse + refetch skills gérées). Bundle host (`host-main.cjs` 31.6→31.8 Mo, `sand-eval-runner.cjs` 24.9→25.0 Mo), `sand-egress-tunnel` 2.92→2.93 Mo, session Chrome (`RestoreOnStartup:1`, ledger sign-out cookies, `box-dbus` flock), 14 skills commerce/booking + `channels`/`sign-in`. Image `fcbae14`, box-scripts `fcbae14`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +1 / −0 / ~34.
+
+- **Bugfix** : cookies de session Chrome — `box-chrome-policy` force `RestoreOnStartup:1` (écriture atomique rename) pour que Linux ne purge pas les session cookies à la fermeture de la dernière fenêtre ; `box-chrome` v5 crée `Default/Sessions` et `Sessions_Encrypted` en mode 555 vides (bloque l'écriture Chrome qui sinon restaure des onglets morts). Retrait du mode GPU `spoof_gpu` / `--use-angle=gl` (reste `SAND_CHROME_LEGACY_GPU`).
+- **Change** : `sand-session-sync.mjs` + `cdp-cookies.mjs` + `sand-cookie-persist.mjs` — ledger sign-out (`/home/box/sand-data/chrome-cookie-signouts.json`, digests sha256, max 512 clés) : les cookies signés-out ne sont plus réinjectés depuis le seed ; `deleteCookies` les retire du jar live. Nouveau `box-scripts/box-dbus` (flock sur le socket dbus, kill du holder stale). `start-desktop.sh` / `start-window` : bus session sous `unix:path=$XDG_RUNTIME_DIR/bus` via `box-dbus` (guid stable). Skills commerce : paiement = d'abord méthode **déjà sauvée sur le compte du site** (pas une carte du vault utilisateur) ; règle « montrer dans la langue de l'utilisateur » ; cartes `shipment` aussi après paiement order-card (`food-ordering`, `shopping`) ; `channels` adresse un thread DM `slack:<D>:<ts>` ; `shopping` Pay-now depuis la shopping card sans re-search.
+- **Features** : RPCs host nouveaux — `CreateGrokBotAgentAccessInvite` / `ListGrokBotAgentAccessInvites`, `CreateBonfireInvite` / `GetBonfireStatus`, `RequestOnePasswordLogins`, `SetProactiveMessaging`, `GetCiFailureInsights`, `GetSecurityAgentSuggestedRepos`, `GetCursorInboxPrAction`, `Get/SetPullRequestDraftPreference`, `ListProjectPublishState`, `UpdateTeamTailnetCompanyCa`, `DeleteOriginUserSlackReviewReminder`, `CreateChangeDraftOverride`.
+- **Perf** : —
+- **Autre/infra** : hot-update sand-host `ab3b435` (supervisor `upgrade-ab3b435`) ; agent-store-fuse pointeur tarball S3 `011306c9…` → `48149515…` (binaire identique 9504880 o) ; `managed-skills/cache.json` refetch (`fetchedAt` + 14 SKILL.md : accommodation/flight/food/grocery/job/orders/restaurant×2/rideshare/scheduling/shopping + channels/sign-in/site-playbooks-instacart).
+
+Rapport : [reports/2026-10-23_18-47.md](reports/2026-10-23_18-47.md).
+
+
+---
+
 ## 2026-10-23 14:52 (Paris) — snapshot `2026-10-23_09-50` → `2026-10-23_14-52`
 
 **Toolchain C/C++ (clang/LLVM 19 + cppcheck) installé + bump agent-store-fuse.** Côté composants plateforme surveillés, **seul** `agent-store-fuse` a bougé : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `71c0b034eb0f12f3317f29a89191167a4a050f3b` → `011306c935558a4c91141f612d29a8e9bcb6d635` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`), binaire `cursor-agent-store-fuse` inchangé.
