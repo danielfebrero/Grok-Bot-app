@@ -1,0 +1,33 @@
+{
+  "description": "Cancel a scheduled call",
+  "inputSchema": {
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "notify_invitees": {
+        "description": "Whether invitees get an email about it. Defaults to true.",
+        "type": "boolean"
+      },
+      "occurrence_start_time": {
+        "description": "Start of the occurrence that scope this or this_and_following refers to (RFC 3339).",
+        "type": "string"
+      },
+      "scope": {
+        "description": "Which occurrences: all (the default without occurrence_start_time), this (the default with it), o...",
+        "enum": [
+          "all",
+          "this",
+          "this_and_following"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "cancel_scheduled_call"
+}

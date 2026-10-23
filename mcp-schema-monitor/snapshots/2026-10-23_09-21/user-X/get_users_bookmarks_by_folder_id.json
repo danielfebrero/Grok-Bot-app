@@ -1,0 +1,27 @@
+{
+  "description": "Get Users Bookmarks by Folder ID Each returned post includes a `url` deeplinking to it on x.com.",
+  "inputSchema": {
+    "properties": {
+      "folder_id": {
+        "type": "string"
+      },
+      "id": {
+        "type": "string"
+      },
+      "max_results": {
+        "type": "integer"
+      },
+      "pagination_token": {
+        "description": "A base32hex-encoded pagination token.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "folder_id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_users_bookmarks_by_folder_id"
+}

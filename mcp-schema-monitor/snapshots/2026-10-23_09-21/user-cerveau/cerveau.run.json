@@ -1,0 +1,9 @@
+{
+  "description": "Transmet un gb.run.v1 signé. La signature est l'authentification.",
+  "inputSchema": {
+    "additionalProperties": true,
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "cerveau.run"
+}

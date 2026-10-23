@@ -1,0 +1,13 @@
+{
+  "namespace": "cursor-github",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-22T09:12:04+02:00",
+    "responseKind": "text",
+    "schema": {
+      "contentMediaType": "text/plain",
+      "type": "string"
+    },
+    "source": "inferred"
+  },
+  "tool": "get_job_logs"
+}

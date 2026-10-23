@@ -1,0 +1,28 @@
+{
+  "namespace": "user-AgentMail",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-23T09:21:45+02:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "available": {
+          "type": "boolean"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "enabledAt": {
+          "type": "null"
+        }
+      },
+      "required": [
+        "available",
+        "enabled",
+        "enabledAt"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "get_labs"
+}

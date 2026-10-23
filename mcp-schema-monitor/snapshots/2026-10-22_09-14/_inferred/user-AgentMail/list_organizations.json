@@ -1,0 +1,39 @@
+{
+  "namespace": "user-AgentMail",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-22T09:14:07+02:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "organizations": {
+          "items": {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "selected": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "selected"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "organizations"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "list_organizations"
+}

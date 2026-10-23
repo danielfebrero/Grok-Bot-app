@@ -1,0 +1,16 @@
+{
+  "description": "Get a scheduled broadcast",
+  "inputSchema": {
+    "properties": {
+      "id": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_scheduled_broadcast"
+}

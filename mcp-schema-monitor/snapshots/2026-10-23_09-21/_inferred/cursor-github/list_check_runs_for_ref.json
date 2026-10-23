@@ -1,0 +1,25 @@
+{
+  "namespace": "cursor-github",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-23T09:19:47+02:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "check_runs": {
+          "items": {},
+          "type": "array"
+        },
+        "total_count": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "check_runs",
+        "total_count"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "list_check_runs_for_ref"
+}

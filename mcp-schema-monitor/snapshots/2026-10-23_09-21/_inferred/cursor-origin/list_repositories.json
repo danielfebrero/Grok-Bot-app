@@ -1,0 +1,87 @@
+{
+  "namespace": "cursor-origin",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-23T09:21:02+02:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "repositories": {
+          "items": {
+            "properties": {
+              "allowMergeCommit": {
+                "type": "boolean"
+              },
+              "allowSquashMerge": {
+                "type": "boolean"
+              },
+              "cloneUrl": {
+                "type": "string"
+              },
+              "defaultBranch": {
+                "type": "string"
+              },
+              "deleteBranchOnMerge": {
+                "type": "boolean"
+              },
+              "fullName": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "mirror": {
+                "properties": {
+                  "source": {
+                    "type": "string"
+                  },
+                  "sourceId": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "source",
+                  "sourceId",
+                  "status"
+                ],
+                "type": "object"
+              },
+              "name": {
+                "type": "string"
+              },
+              "owner": {
+                "type": "string"
+              },
+              "visibility": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "allowMergeCommit",
+              "allowSquashMerge",
+              "cloneUrl",
+              "defaultBranch",
+              "deleteBranchOnMerge",
+              "fullName",
+              "id",
+              "mirror",
+              "name",
+              "owner",
+              "visibility"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "repositories"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "list_repositories"
+}

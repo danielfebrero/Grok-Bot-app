@@ -1,0 +1,13 @@
+{
+  "namespace": "cursor-github",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-22T09:12:41+02:00",
+    "responseKind": "json",
+    "schema": {
+      "items": {},
+      "type": "array"
+    },
+    "source": "inferred"
+  },
+  "tool": "list_pull_request_reviews"
+}

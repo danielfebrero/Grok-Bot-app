@@ -1,0 +1,23 @@
+{
+  "description": "Get Users Bookmark Folders",
+  "inputSchema": {
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "max_results": {
+        "type": "integer"
+      },
+      "pagination_token": {
+        "description": "A base32hex-encoded pagination token.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_users_bookmark_folders"
+}

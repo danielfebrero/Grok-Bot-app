@@ -1,0 +1,157 @@
+{
+  "namespace": "cursor-github",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-23T09:20:33+02:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "jobs": {
+          "items": {
+            "properties": {
+              "check_run_url": {
+                "type": "string"
+              },
+              "completed_at": {
+                "type": "string"
+              },
+              "conclusion": {
+                "type": "string"
+              },
+              "created_at": {
+                "type": "string"
+              },
+              "head_branch": {
+                "type": "string"
+              },
+              "head_sha": {
+                "type": "string"
+              },
+              "html_url": {
+                "type": "string"
+              },
+              "id": {
+                "type": "integer"
+              },
+              "labels": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "name": {
+                "type": "string"
+              },
+              "node_id": {
+                "type": "string"
+              },
+              "run_attempt": {
+                "type": "integer"
+              },
+              "run_id": {
+                "type": "integer"
+              },
+              "run_url": {
+                "type": "string"
+              },
+              "runner_group_id": {
+                "type": "integer"
+              },
+              "runner_group_name": {
+                "type": "string"
+              },
+              "runner_id": {
+                "type": "integer"
+              },
+              "runner_name": {
+                "type": "string"
+              },
+              "started_at": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "steps": {
+                "items": {
+                  "properties": {
+                    "completed_at": {
+                      "type": "string"
+                    },
+                    "conclusion": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "number": {
+                      "type": "integer"
+                    },
+                    "started_at": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "completed_at",
+                    "conclusion",
+                    "name",
+                    "number",
+                    "started_at",
+                    "status"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "url": {
+                "type": "string"
+              },
+              "workflow_name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "check_run_url",
+              "completed_at",
+              "conclusion",
+              "created_at",
+              "head_branch",
+              "head_sha",
+              "html_url",
+              "id",
+              "labels",
+              "name",
+              "node_id",
+              "run_attempt",
+              "run_id",
+              "run_url",
+              "runner_group_id",
+              "runner_group_name",
+              "runner_id",
+              "runner_name",
+              "started_at",
+              "status",
+              "steps",
+              "url",
+              "workflow_name"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "total_count": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "jobs",
+        "total_count"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "list_workflow_run_jobs"
+}

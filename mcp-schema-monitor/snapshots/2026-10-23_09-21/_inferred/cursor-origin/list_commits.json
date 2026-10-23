@@ -1,0 +1,90 @@
+{
+  "namespace": "cursor-origin",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-23T09:21:02+02:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "commits": {
+          "items": {
+            "properties": {
+              "author": {
+                "properties": {
+                  "date": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "date",
+                  "email",
+                  "name"
+                ],
+                "type": "object"
+              },
+              "committer": {
+                "properties": {
+                  "date": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "date",
+                  "email",
+                  "name"
+                ],
+                "type": "object"
+              },
+              "message": {
+                "type": "string"
+              },
+              "parents": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "sha": {
+                "type": "string"
+              },
+              "tree": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "author",
+              "committer",
+              "message",
+              "parents",
+              "sha",
+              "tree"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "nextPageToken": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "commits",
+        "nextPageToken"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "list_commits"
+}

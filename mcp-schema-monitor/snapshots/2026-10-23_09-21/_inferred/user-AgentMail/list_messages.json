@@ -1,0 +1,124 @@
+{
+  "namespace": "user-AgentMail",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-23T09:21:45+02:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "count": {
+          "type": "integer"
+        },
+        "limit": {
+          "type": "integer"
+        },
+        "messages": {
+          "items": {
+            "properties": {
+              "attachments": {
+                "items": {
+                  "properties": {
+                    "attachmentId": {
+                      "type": "string"
+                    },
+                    "contentDisposition": {
+                      "type": "string"
+                    },
+                    "contentType": {
+                      "type": "string"
+                    },
+                    "filename": {
+                      "type": "string"
+                    },
+                    "size": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "attachmentId",
+                    "contentDisposition",
+                    "contentType",
+                    "filename",
+                    "size"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "from": {
+                "type": "string"
+              },
+              "inboxId": {
+                "type": "string"
+              },
+              "labels": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "messageId": {
+                "type": "string"
+              },
+              "preview": {
+                "type": "string"
+              },
+              "size": {
+                "type": "integer"
+              },
+              "subject": {
+                "type": "string"
+              },
+              "threadId": {
+                "type": "string"
+              },
+              "timestamp": {
+                "type": "string"
+              },
+              "to": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "updatedAt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "attachments",
+              "createdAt",
+              "from",
+              "inboxId",
+              "labels",
+              "messageId",
+              "preview",
+              "size",
+              "subject",
+              "threadId",
+              "timestamp",
+              "to",
+              "updatedAt"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "nextPageToken": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "count",
+        "limit",
+        "messages",
+        "nextPageToken"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "list_messages"
+}

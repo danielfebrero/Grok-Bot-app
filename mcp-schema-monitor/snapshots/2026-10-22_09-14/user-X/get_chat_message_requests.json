@@ -1,0 +1,30 @@
+{
+  "description": "Get Chat Message Requests",
+  "inputSchema": {
+    "properties": {
+      "chat_message_request.fields": {
+        "description": "A comma separated list of ChatMessageRequest fields to display.",
+        "type": "string"
+      },
+      "inbox_type": {
+        "description": "Which message request inbox to list: `you_may_know` (the apps' Priority tab) or `low_quality` (th...",
+        "enum": [
+          "you_may_know",
+          "low_quality"
+        ],
+        "type": "string"
+      },
+      "max_results": {
+        "description": "The maximum number of message requests to return.",
+        "type": "integer"
+      },
+      "pagination_token": {
+        "description": "The next_token from a previous response, to fetch the next page.",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_chat_message_requests"
+}
