@@ -25,3 +25,5 @@ id_ed25519*
 **/workspace/**
 reports/PUBLISH-BLOCKED.flag
 .publish.conf
+# notifications locales (contiennent URLs github du propriétaire du repo)
+reports/*.NOTIFY*.md

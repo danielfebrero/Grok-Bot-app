@@ -1,0 +1,115 @@
+#!/usr/bin/env bash
+# Unlocks (creating on first use) the on-disk GNOME `login` keyring for the box
+# user, so Secret Service clients (e.g. Okta Verify's device keys) store
+# secrets in /home/box/.local/share/keyrings — a directory the whole-home box
+# store sync persists across recreates — instead of the in-memory `session`
+# keyring that a DBus-activated gnome-keyring-daemon would otherwise serve and
+# a pod recreate would wipe.
+#
+# Runs as the box user with DBUS_SESSION_BUS_ADDRESS pointing at the box
+# session bus, and ends by exec'ing gnome-keyring-daemon in the FOREGROUND, so
+# the caller (start-desktop registers this command with the desktop
+# supervisor) owns a pid that is the daemon and restarts it when it dies —
+# the image removes Secret Service D-Bus activation, so nothing else would.
+# Before exec'ing it replaces the daemon from any earlier run (recorded in a
+# pid file): that one serves a bus that no longer exists, and two daemons must
+# never share the keyring files.
+#
+# The unlock secret sits 0600 beside the keyring files and syncs with them, so
+# the at-rest protection for these secrets is the box store's (encryption and
+# access control on the store), not the keyring password: anyone who can read
+# the synced home can read both the keyring and its password. The password
+# exists only so gnome-keyring serves an unlocked on-disk collection without a
+# prompter.
+set -euo pipefail
+
+command -v gnome-keyring-daemon >/dev/null 2>&1 || exit 0
+[ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ] || exit 0
+
+KEYRINGS_DIR="${HOME}/.local/share/keyrings"
+SECRET_FILE="${KEYRINGS_DIR}/.sand-keyring-unlock"
+# Pod-local (not in the synced home): a pid means nothing after a recreate.
+PID_FILE="${SAND_KEYRING_PID_FILE:-/tmp/box-keyring-daemon.pid}"
+PROC_ROOT="${SAND_KEYRING_PROC_ROOT:-/proc}"
+
+umask 077
+mkdir -p "${KEYRINGS_DIR}"
+chmod 700 "${KEYRINGS_DIR}" || true
+
+# Serialize replacement: concurrent invocations (a desktop restart racing the
+# supervisor's relaunch) must not both read the same predecessor and leave two
+# daemons behind. The lock fd is closed before the exec below, so it never
+# outlives this script into the daemon.
+exec 9>>"${PID_FILE}.lock"
+flock -w 10 9 || exit 0
+
+# Kill the recorded predecessor before touching the keyring files; a live old
+# daemon could rewrite login.keyring under the steps below. The recorded pid
+# only ever names the daemon or this script between its pid-file write and
+# its exec. The script phase runs as an env-shebang bash, so its comm is
+# `bash`; the match therefore reads argv basenames from cmdline, where the
+# daemon is argv[0] and the script phase carries the script path as the
+# interpreter's first argument. A recycled pid belonging to anything else
+# matches neither and stays untouched.
+predecessor_is_keyring() {
+	local field
+	while IFS= read -r field; do
+		case "${field##*/}" in
+		gnome-keyring-daemon | box-keyring-unlock) return 0 ;;
+		esac
+	done < <(tr '\0' '\n' 2>/dev/null <"${PROC_ROOT}/$1/cmdline" | head -n 2)
+	return 1
+}
+
+old_pid="$(tr -dc '0-9' 2>/dev/null <"${PID_FILE}" || true)"
+if [ -n "${old_pid}" ] && [ "${old_pid}" != "$$" ] &&
+	predecessor_is_keyring "${old_pid}"; then
+	kill "${old_pid}" 2>/dev/null || true
+	for _ in $(seq 1 50); do
+		kill -0 "${old_pid}" 2>/dev/null || break
+		sleep 0.1
+	done
+	if kill -0 "${old_pid}" 2>/dev/null; then
+		kill -9 "${old_pid}" 2>/dev/null || true
+	fi
+fi
+
+if [ ! -s "${SECRET_FILE}" ]; then
+	# A login keyring restored without its unlock secret (a partial sync can
+	# save the manifest after the secret upload failed) can never be unlocked
+	# again: a freshly minted secret would leave the daemon prompting on every
+	# access and the collection permanently locked. Move the orphan aside so
+	# the daemon creates a fresh, unlockable keyring; the old bytes stay on
+	# disk for manual recovery. Only login.keyring — it is the one keyring
+	# this script's secret unlocks; other keyrings have their own passwords.
+	if [ -e "${KEYRINGS_DIR}/login.keyring" ]; then
+		mv -f "${KEYRINGS_DIR}/login.keyring" \
+			"${KEYRINGS_DIR}/login.keyring.orphaned.$(date +%s)"
+	fi
+	head -c 32 /dev/urandom | base64 >"${SECRET_FILE}.tmp"
+	chmod 600 "${SECRET_FILE}.tmp"
+	mv -f "${SECRET_FILE}.tmp" "${SECRET_FILE}"
+fi
+
+# Point the `default` collection alias at `login` unless it already names a
+# keyring that exists on disk. A dangling alias (the image ships none, and a
+# session-keyring-only box leaves a `default` file naming nothing durable)
+# would keep clients on the in-memory session collection.
+DEFAULT_FILE="${KEYRINGS_DIR}/default"
+current_default=""
+if [ -f "${DEFAULT_FILE}" ]; then
+	current_default="$(tr -d '[:space:]' <"${DEFAULT_FILE}")"
+fi
+if [ "${current_default}" != "login" ] &&
+	{ [ -z "${current_default}" ] || [ ! -f "${KEYRINGS_DIR}/${current_default}.keyring" ]; }; then
+	printf 'login' >"${DEFAULT_FILE}"
+fi
+
+# --unlock reads the password from stdin and unlocks the `login` keyring,
+# creating it when it does not exist yet (gnome-keyring-daemon(1)). secrets is
+# the only component the box needs; ssh/pkcs11 stay off. exec preserves this
+# pid into the daemon, so the pid recorded here is the one a successor
+# replaces and the one the desktop supervisor watches.
+printf '%s' "$$" >"${PID_FILE}"
+exec 9>&-
+exec gnome-keyring-daemon --foreground --components=secrets --unlock <"${SECRET_FILE}"
