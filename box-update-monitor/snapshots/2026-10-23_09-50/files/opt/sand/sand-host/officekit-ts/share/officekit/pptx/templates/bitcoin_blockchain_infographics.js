@@ -1,0 +1,1132 @@
+/**
+ * Bitcoin Infographic deck — recreated with pptxgenjs.
+ *
+ * Reference: 007ca96f-51b7-4bbc-ad19-59b95a58f55e.pptx
+ *   17 slides, 26.67in x 15.00in (24387175 x 13716000 EMU).
+ *
+ * The original deck's illustrations are large vector clip-art groups
+ * (100-400 freeform paths each). They are re-drawn here as simplified
+ * native pptxgenjs shapes that keep the position, footprint and palette
+ * of the originals.
+ */
+
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ *
+ * Theme
+ * ------------------------------------------------------------------ */
+
+const SLIDE_W = 26.67;
+const SLIDE_H = 15.0;
+
+const C = {
+	white: 'FFFFFF',
+	ink: '000000',
+	tx1: '656D78', // body grey  (theme dk1)
+	tx2: '44546A', // heading slate (theme dk2)
+	a1: '26A69A',
+	a2: '009688',
+	a3: '00897B',
+	a4: '00796B',
+	a5: '00695C',
+	a6: '004D40',
+	ringOuter: 'D1D4D5', // donut gauge - outer track
+	ringInner: 'EDEDED', // donut gauge - inner track
+	pill: 'D8DADD',
+	coinRing: 'DFB87B',
+	coinFace: 'FFD697',
+	coinPale: 'E0CFAC',
+};
+
+// accent1..accent6 plus their 75%-luminance partners (used by icon badges)
+const ACC = [C.a1, C.a2, C.a3, C.a4, C.a5, C.a6];
+const ACC_DARK = ['1C7D74', '007066', '00675C', '005B50', '004F45', '003A30'];
+
+const F = {
+	light: 'Source Sans Pro Light',
+	reg: 'Source Sans Pro',
+	black: 'Source Sans Pro Black',
+	xlight: 'Source Sans Pro ExtraLight',
+	rob: 'Roboto',
+	robBlack: 'Roboto Black',
+};
+
+/* ------------------------------------------------------------------ *
+ * Small helpers
+ * ------------------------------------------------------------------ */
+
+/** Runs sharing one style: ['plain', ['accented', {color}], ...] */
+function runs(parts, base) {
+	return parts.map(p => {
+		const [text, over] = Array.isArray(p) ? p : [p, null];
+		return { text, options: Object.assign({}, base, over) };
+	});
+}
+
+const ART_LINE = 4; // pt — outline weight of the deck's clip art
+
+/** Outlined shape in the flat line-art style used by the deck's clip art. */
+function art(slide, type, x, y, w, h, fill, extra) {
+	slide.addShape(type, Object.assign({
+		x, y, w, h,
+		fill: fill ? { color: fill } : { type: 'none' },
+		line: { color: C.ink, width: ART_LINE },
+	}, extra || {}));
+}
+
+/** Filled shape with no outline. */
+function solid(slide, type, x, y, w, h, fill, extra) {
+	slide.addShape(type, Object.assign({
+		x, y, w, h,
+		fill: typeof fill === 'string' ? { color: fill } : fill,
+		line: { type: 'none' },
+	}, extra || {}));
+}
+
+/** Filled circle centred on (cx, cy). */
+const circ = (slide, cx, cy, d, fill, extra) =>
+	solid(slide, 'ellipse', cx - d / 2, cy - d / 2, d, d, fill, extra);
+
+/* ------------------------------------------------------------------ *
+ * Repeated deck furniture
+ * ------------------------------------------------------------------ */
+
+/** "Bitcoin Infographic Slide" + kicker line, on slides 2-16. */
+function contentHeader(slide) {
+	slide.addText(runs([
+		'Bitcoin ',
+		['Infographic', { color: C.a3 }],
+		' ',
+		'Slide',
+	], { fontFace: F.light, fontSize: 64, color: C.tx2 }),
+	{ x: 5.074, y: 0.893, w: 16.522, h: 1.178, align: 'center', valign: 'top' });
+
+	slide.addText(runs([
+		'Letterpress next level trust fund, ',
+		['before', { color: C.a3 }],
+		' they sold out +1 meh gluten-free locavore tacos PBR&B tofu. ',
+	], { fontFace: F.light, fontSize: 24, color: C.tx2 }),
+	{ x: 6.445, y: 2.054, w: 13.779, h: 0.505, align: 'center', valign: 'top', wrap: false });
+}
+
+/** Big statement paragraph: mixed bold/accent runs, Roboto 48pt. */
+function statement(slide, x, y, w, h, parts) {
+	slide.addText(runs(parts, { fontFace: F.rob, fontSize: 48, color: C.tx1 }),
+		{ x, y, w, h, valign: 'top' });
+}
+
+/** Teal "Bicycle rights ..." sub-headline (Source Sans ExtraLight 28pt). */
+function subHead(slide, x, y, color) {
+	slide.addText('Bicycle rights +1 actually shoreditch, vinyl fixie small batch pop-up',
+		{ x, y, w: 9.436, h: 1.043, fontFace: F.xlight, fontSize: 28, color, valign: 'top' });
+}
+
+const SYNTH = 'Synth chartreuse XOXO, tacos brooklyn VHS plaid.';
+const HASHTAG_LONG = 'Hashtag fashion axe fingerstache, everyday carry shoreditch pinterest umami ' +
+	'authentic brooklyn YOLO heirloom keytar waistcoat kickstarter. Kitsch authentic offal, ' +
+	'narwhal tilde etsy four loko selvage normcore messenger bag put a bird on it heirloom gastropub.';
+const HASHTAG_MED = 'Hashtag fashion axe fingerstache, everyday carry shoreditch pinterest ' +
+	'umami authentic brooklyn YOLO.';
+const HASHTAG_SHORT = 'Hashtag fashion axe fingerstache brooklyn YOLO.';
+
+/** One-line grey caption, 21pt. */
+function synthLine(slide, x, y, size) {
+	slide.addText(SYNTH, {
+		x, y, w: 6.099, h: 0.522, fontFace: F.light, fontSize: size || 21,
+		color: C.tx1, lineSpacingMultiple: 1.3, valign: 'top', wrap: false,
+	});
+}
+
+/** Grey body paragraph, 24pt / 150% leading. */
+function bodyBlock(slide, x, y, w, h, text, size) {
+	slide.addText(text || HASHTAG_LONG, {
+		x, y, w, h, fontFace: F.light, fontSize: size || 24, color: C.tx1,
+		lineSpacingMultiple: 1.5, valign: 'top',
+	});
+}
+
+/* ------------------------------------------------------------------ *
+ * Reusable graphic widgets
+ * ------------------------------------------------------------------ */
+
+/** Bitcoin coin: outlined disc, gold ring, pale face, "B" glyph. */
+function coin(slide, cx, cy, d) {
+	art(slide, 'ellipse', cx - d / 2, cy - d / 2, d, d, C.white);
+	art(slide, 'ellipse', cx - d * 0.43, cy - d * 0.43, d * 0.86, d * 0.86, C.white);
+	art(slide, 'ellipse', cx - d * 0.405, cy - d * 0.405, d * 0.81, d * 0.81, C.coinRing);
+	art(slide, 'ellipse', cx - d * 0.33, cy - d * 0.33, d * 0.66, d * 0.66, C.coinFace);
+	// studs around the rim
+	for (let i = 0; i < 16; i++) {
+		const a = (i / 16) * 2 * Math.PI;
+		const r = d * 0.435;
+		art(slide, 'ellipse', cx + Math.cos(a) * r - d * 0.035, cy + Math.sin(a) * r - d * 0.045,
+			d * 0.07, d * 0.09, C.white, { rotate: (a * 180) / Math.PI + 90 });
+	}
+	// the bitcoin mark: a "B" crossed by two thin vertical strokes
+	slide.addText('B', {
+		x: cx - d * 0.20, y: cy - d * 0.24, w: d * 0.40, h: d * 0.48,
+		align: 'center', valign: 'middle', margin: 0,
+		fontFace: F.rob, fontSize: d * 34, color: C.ink,
+	});
+	[-0.075, 0.028].forEach(off => {
+		solid(slide, 'rect', cx + d * off, cy - d * 0.32, d * 0.024, d * 0.64, C.ink);
+	});
+}
+
+/** Teal bar carrying the deck's white "IOIOIO" data pattern. */
+function bandedBar(slide, x, y, w, h, fill, radius) {
+	art(slide, radius ? 'roundRect' : 'rect', x, y, w, h, fill,
+		radius ? { rectRadius: radius } : {});
+	const pitch = 0.42;
+	const n = Math.max(1, Math.floor((w - 0.5) / pitch));
+	const start = x + (w - (n - 1) * pitch) / 2;
+	for (let i = 0; i < n; i++) {
+		solid(slide, 'rect', start + i * pitch - 0.065, y + h * 0.26, 0.13, h * 0.48, C.white);
+	}
+}
+
+/**
+ * Percentage gauge = grey donut tracks + a native pie chart wedge.
+ * `value` is the reference series value (share of value+130).
+ */
+function gauge(pptx, slide, x, y, size, value, color) {
+	solid(slide, 'donut', x, y, size, size, C.ringInner);
+	solid(slide, 'donut', x + size * 0.037, y + size * 0.037, size * 0.906, size * 0.906, C.ringOuter);
+	slide.addChart(pptx.ChartType.pie,
+		[{ name: 'Region 1', labels: ['Quarter', 'Blank'], values: [value, 130] }],
+		{
+			x: x + size * 0.037, y: y + size * 0.038, w: size * 0.925, h: size * 0.922,
+			chartColors: [color, C.white],
+			showLegend: false, showTitle: false, showValue: false,
+			showPercent: false, showLabel: false, firstSliceAng: 0,
+			chartArea: { roundedCorners: false },
+			layout: { x: 0.005, y: 0.005, w: 0.99, h: 0.9875 },
+		});
+	circ(slide, x + size / 2, y + size / 2, size * 0.547, C.white);
+}
+
+/** Gauge + "19%" / "Type A" caption, laid out left-to-right. */
+function gaugeRow(pptx, slide, x, y, items) {
+	items.forEach((it, i) => {
+		const gx = x + i * 3.0;
+		gauge(pptx, slide, gx, y, 1.693, it.value, ACC[it.accent]);
+		slide.addText(it.pct, {
+			x: gx + 1.795, y: y + 0.349, w: 0.985, h: 0.573, margin: 0,
+			fontFace: F.rob, fontSize: 32, bold: true, color: ACC[it.accent], valign: 'top', wrap: false,
+		});
+		slide.addText(it.label, {
+			x: gx + 1.795, y: y + 0.947, w: 0.985, h: 0.452, margin: 0,
+			fontFace: F.rob, fontSize: 20, bold: true, color: C.tx1, valign: 'top', wrap: false,
+		});
+	});
+}
+
+/** Outlined circle with a check mark (slides 7 & 16 bullet markers). */
+function checkOutline(slide, x, y, d, color) {
+	slide.addShape('ellipse', {
+		x, y, w: d, h: d, fill: { color: C.white }, line: { color, width: 1.4 },
+	});
+	slide.addText('\u2713', {
+		x, y, w: d, h: d, align: 'center', valign: 'middle', margin: 0,
+		fontFace: F.reg, fontSize: d * 34, color,
+	});
+}
+
+/** Filled disc badge with a white check mark (slides 4 & 6). */
+function checkBadge(slide, x, y, d, color, rounded) {
+	solid(slide, rounded ? 'roundRect' : 'ellipse', x, y, d, d, color,
+		rounded ? { rectRadius: d / 2 } : {});
+	slide.addShape('ellipse', {
+		x: x + d * 0.18, y: y + d * 0.18, w: d * 0.64, h: d * 0.64,
+		fill: { type: 'none' }, line: { color: C.white, width: 1.6 },
+	});
+	slide.addText('\u2713', {
+		x: x + d * 0.18, y: y + d * 0.18, w: d * 0.64, h: d * 0.64,
+		align: 'center', valign: 'middle', margin: 0,
+		fontFace: F.reg, fontSize: d * 24, color: C.white,
+	});
+}
+
+/** Concentric ring icon badge used on slides 12 & 13. */
+function ringIcon(slide, x, y, d, accent, glyph) {
+	circ(slide, x + d / 2, y + d / 2, d, ACC[accent]);
+	circ(slide, x + d / 2, y + d / 2, d * 0.852, ACC_DARK[accent]);
+	circ(slide, x + d / 2, y + d / 2, d * 0.759, C.white);
+	circ(slide, x + d / 2, y + d / 2, d * 0.556, ACC[accent]);
+	circ(slide, x + d / 2, y + d / 2, d * 0.466, C.white);
+	slide.addText(glyph, {
+		x: x + d * 0.267, y: y + d * 0.267, w: d * 0.466, h: d * 0.466,
+		align: 'center', valign: 'middle', margin: 0,
+		fontFace: F.reg, fontSize: d * 16, color: ACC_DARK[accent],
+	});
+}
+
+/* ------------------------------------------------------------------ *
+ * Slide 1 & 17 — teal cover / closing
+ * ------------------------------------------------------------------ */
+
+// Radial teal wash: accent3 @ lumMod 89% in the middle, 70% at the corners.
+const COVER_STOPS = [
+	{ t: 0.00, c: '007A6D' },
+	{ t: 0.23, c: '007A6D' },
+	{ t: 0.69, c: '00675C' },
+	{ t: 0.97, c: '006056' },
+	{ t: 1.00, c: '006056' },
+];
+
+// Soft white swaths lying over the wash — gentle arcs sweeping the slide.
+const COVER_BANDS = [
+	{ x: 9.5, y: -16.0, w: 38.0, h: 34.0, t: 96 },
+	{ x: 16.0, y: -17.0, w: 34.0, h: 29.0, t: 95 },
+	{ x: -19.0, y: 6.0, w: 36.0, h: 27.0, t: 96 },
+	{ x: -17.0, y: 10.5, w: 29.0, h: 21.0, t: 96 },
+];
+
+/** Linear blend of two RRGGBB strings. */
+function mix(from, to, k) {
+	let out = '';
+	for (let i = 0; i < 6; i += 2) {
+		const a = parseInt(from.substr(i, 2), 16);
+		const b = parseInt(to.substr(i, 2), 16);
+		out += Math.round(a + (b - a) * k).toString(16).padStart(2, '0');
+	}
+	return out.toUpperCase();
+}
+
+/** Colour of the cover wash at radius `t` (0 = centre, 1 = corner). */
+function coverColor(t) {
+	for (let i = 1; i < COVER_STOPS.length; i++) {
+		const lo = COVER_STOPS[i - 1];
+		const hi = COVER_STOPS[i];
+		if (t <= hi.t) return mix(lo.c, hi.c, (t - lo.t) / (hi.t - lo.t || 1));
+	}
+	return COVER_STOPS[COVER_STOPS.length - 1].c;
+}
+
+function tealBackdrop(slide) {
+	// concentric ellipses stand in for the original radial gradient fill
+	const RINGS = 18;
+	const SPAN = 1.45; // ellipse scale that just reaches the slide corners
+	solid(slide, 'rect', 0, 0, SLIDE_W, SLIDE_H, coverColor(1));
+	for (let i = RINGS - 1; i >= 0; i--) {
+		const k = i / RINGS;
+		const w = SLIDE_W * SPAN * k;
+		const h = SLIDE_H * SPAN * k;
+		solid(slide, 'ellipse', (SLIDE_W - w) / 2, (SLIDE_H - h) / 2, w, h, coverColor(k));
+	}
+	COVER_BANDS.forEach(b => solid(slide, 'ellipse', b.x, b.y, b.w, b.h,
+		{ color: C.white, transparency: b.t }));
+}
+
+function slide01(pptx) {
+	const s = pptx.addSlide();
+	tealBackdrop(s);
+
+	s.addText(runs([
+		'We\u2019ve been ',
+		['crafting', { bold: true }],
+		' beautiful ',
+		['presentation', { italic: true }],
+		' & making ',
+		['clients', { bold: true, italic: true }],
+		' happy for years.',
+	], { fontFace: F.reg, fontSize: 32, color: C.white }),
+	{ x: 5.663, y: 4.973, w: 15.344, h: 0.586, align: 'center', valign: 'top', lineSpacingMultiple: 0.9 });
+
+	s.addText('BITCOIN', {
+		x: 9.477, y: 6.330, w: 7.716, h: 2.339, align: 'center', valign: 'top', wrap: false,
+		fontFace: F.black, fontSize: 133, bold: true, color: C.white,
+	});
+
+	s.addText('Letterpress next level trust fund, before. ', {
+		x: 10.517, y: 10.222, w: 5.636, h: 0.505, align: 'center', valign: 'top', wrap: false,
+		fontFace: F.light, fontSize: 24, color: C.white,
+	});
+
+	// scroll-down affordance
+	s.addShape('ellipse', {
+		x: 12.867, y: 11.393, w: 0.936, h: 0.936,
+		fill: { type: 'none' }, line: { color: C.white, width: 1.2 },
+	});
+	s.addText('\u2193', {
+		x: 12.867, y: 11.393, w: 0.936, h: 0.936, align: 'center', valign: 'middle', margin: 0,
+		fontFace: F.reg, fontSize: 30, color: C.white,
+	});
+}
+
+function slide17(pptx) {
+	const s = pptx.addSlide();
+	tealBackdrop(s);
+
+	s.addText('CLOSING SLIDE', {
+		x: 5.676, y: 4.665, w: 15.344, h: 0.767, align: 'center', valign: 'top',
+		fontFace: F.reg, fontSize: 44, bold: true, color: C.white, lineSpacingMultiple: 0.9,
+	});
+	s.addText('BITCOIN', {
+		x: 9.477, y: 6.330, w: 7.716, h: 2.339, align: 'center', valign: 'top', wrap: false,
+		fontFace: F.black, fontSize: 133, bold: true, color: C.white,
+	});
+	s.addText('Pulsecolor', {
+		x: 12.526, y: 9.628, w: 1.645, h: 0.505, align: 'center', valign: 'top', wrap: false,
+		fontFace: F.light, fontSize: 24, color: C.white,
+	});
+}
+
+/* ------------------------------------------------------------------ *
+ * Slide 2 — bank + four gauges
+ * ------------------------------------------------------------------ */
+
+function slide02(pptx) {
+	const s = pptx.addSlide();
+	contentHeader(s);
+
+	// --- clip art: classical bank building with a coin on the pediment
+	art(s, 'triangle', 1.97, 5.41, 9.65, 2.21, ACC_DARK[0]);
+	bandedBar(s, 1.97, 7.55, 9.65, 0.70, ACC_DARK[0]);
+	for (let i = 0; i < 5; i++) {
+		const px = 3.00 + i * 1.653;
+		art(s, 'rect', px, 8.21, 0.99, 3.82, C.a1);      // shaft
+		art(s, 'rect', px - 0.07, 8.21, 1.13, 0.46, C.white); // capital
+		art(s, 'rect', px - 0.07, 11.57, 1.13, 0.46, C.white); // base
+		art(s, 'ellipse', px + 0.35, 9.30, 0.30, 0.30, C.white);
+		art(s, 'ellipse', px + 0.35, 10.60, 0.30, 0.30, C.white);
+	}
+	art(s, 'rect', 1.97, 12.02, 9.65, 0.60, C.white);
+	bandedBar(s, 1.97, 12.62, 9.65, 1.12, ACC_DARK[0]);
+	coin(s, 6.80, 4.94, 3.41);
+
+	// --- copy block
+	statement(s, 13.399, 3.909, 11.058, 2.524, [
+		['Blockchain', { bold: true, color: C.a1 }],
+		' is the tech. ',
+		['Bitcoin', { bold: true, color: C.a2 }],
+		' is merely the first ',
+		['mainstream', { bold: true, color: C.a3 }],
+		' ',
+		['manifestation', { bold: true, color: C.a4 }],
+		' of its potential.',
+	]);
+	subHead(s, 13.425, 6.506, C.a4);
+	synthLine(s, 13.425, 7.508);
+	bodyBlock(s, 13.425, 7.990, 10.640, 2.461);
+
+	// --- four decorative gauges
+	[[13.425, 25], [16.099, 75], [18.774, 19], [21.448, 350]].forEach(([x, v]) => {
+		solid(s, 'donut', x, 10.837, 2.244, 2.244, C.ringOuter);
+		solid(s, 'donut', x + 0.550, 11.383, 1.147, 1.147, C.ringInner);
+		circ(s, x + 1.122, 11.959, 2.010, C.ringInner);
+		gauge(pptx, s, x + 0.276, 11.113, 1.693, v, C.a1);
+	});
+}
+
+/* ------------------------------------------------------------------ *
+ * Slide 3 — pickaxe & coin, gauges under the copy
+ * ------------------------------------------------------------------ */
+
+function slide03(pptx) {
+	const s = pptx.addSlide();
+	contentHeader(s);
+
+	// --- clip art: coin behind a mining rock, struck by a pickaxe
+	coin(s, 21.92, 7.28, 5.28);
+	art(s, 'rtTriangle', 17.42, 6.57, 7.29, 4.63, C.a2, { flipH: true });
+	art(s, 'rect', 17.42, 11.17, 7.29, 2.32, C.a2);
+	for (let i = 0; i < 7; i++) {
+		const a = -Math.PI / 2 + (i - 3) * 0.30;
+		s.addShape('line', {
+			x: 21.92 + Math.cos(a) * 2.9, y: 7.28 + Math.sin(a) * 2.9,
+			w: Math.cos(a) * 1.1, h: Math.sin(a) * 1.1, line: { color: C.ink, width: ART_LINE },
+		});
+	}
+	art(s, 'rect', 14.35, 7.09, 3.01, 1.31, C.a1, { rotate: 20 });
+	art(s, 'roundRect', 16.74, 7.63, 1.66, 1.87, C.a2, { rectRadius: 0.4, rotate: 20 });
+	art(s, 'rect', 15.10, 9.60, 3.60, 0.55, C.white, { rotate: 40 });
+	art(s, 'triangle', 17.95, 8.47, 2.21, 2.49, C.a1, { rotate: 200 });
+	[[19.95, 11.30], [20.85, 11.85], [21.60, 12.35], [22.35, 11.60]].forEach(([cx, cy]) => {
+		art(s, 'ellipse', cx - 0.18, cy - 0.18, 0.36, 0.36, C.white);
+	});
+
+	// --- copy block
+	statement(s, 2.149, 4.646, 11.224, 2.524, [
+		'In ',
+		['blockchain', { bold: true, color: C.a1 }],
+		', we trust, ',
+		['because', { bold: true, color: C.a2 }],
+		' math doesn\'t lie, code doesn\'t cheat, and the ',
+		['protocol', { bold: true, color: C.a3 }],
+		' remains neutral.',
+	]);
+	subHead(s, 2.149, 7.236, C.a3);
+	synthLine(s, 2.149, 8.244);
+	bodyBlock(s, 2.149, 8.730, 10.640, 2.461);
+	gaugeRow(pptx, s, 2.149, 11.597, [
+		{ value: 30, pct: '19%', label: 'Type A', accent: 0 },
+		{ value: 130, pct: '50%', label: 'Type B', accent: 1 },
+		{ value: 365, pct: '74%', label: 'Type C', accent: 2 },
+	]);
+}
+
+/* ------------------------------------------------------------------ *
+ * Slide 4 — coin in a hand + 2x2 "Analysis" cards
+ * ------------------------------------------------------------------ */
+
+const S4_CARDS = [
+	{ x: 12.138, y: 4.379, w: 6.175, title: 'Analysis 01', accent: 0 },
+	{ x: 19.183, y: 4.379, w: 6.197, title: 'Analysis 02', accent: 1 },
+	{ x: 12.138, y: 9.007, w: 6.175, title: 'Analysis 03', accent: 3 },
+	{ x: 19.183, y: 9.007, w: 6.197, title: 'Analysis 04', accent: 2 },
+];
+
+function slide04(pptx) {
+	const s = pptx.addSlide();
+	contentHeader(s);
+
+	// --- clip art: open palm holding a coin, wired to a chip
+	// open palm: the lower half of a wide ellipse, its top edge masked off
+	art(s, 'ellipse', 2.90, 8.70, 7.30, 3.40, C.white);
+	solid(s, 'rect', 2.70, 8.55, 7.70, 1.70, C.white);
+	s.addShape('line', { x: 2.90, y: 10.25, w: 7.30, h: 0, line: { color: C.ink, width: ART_LINE } });
+	coin(s, 7.09, 7.25, 4.46);
+	art(s, 'roundRect', 3.67, 9.35, 0.61, 2.24, C.a3, { rectRadius: 0.2 });
+	[[2.22, 9.75], [2.10, 10.55], [2.10, 11.35], [2.72, 12.05]].forEach(([cx, cy], i) => {
+		s.addShape('line', { x: cx, y: cy, w: 3.67 - cx, h: 0, line: { color: C.ink, width: ART_LINE } });
+		s.addShape('line', { x: cx, y: cy, w: 0, h: i % 2 ? -0.55 : 0.55, line: { color: C.ink, width: ART_LINE } });
+		art(s, 'ellipse', cx - 0.15, cy - 0.15 + (i % 2 ? -0.55 : 0.55), 0.30, 0.30, C.white);
+	});
+
+	// --- cards
+	S4_CARDS.forEach(cd => {
+		checkBadge(s, cd.x, cd.y, 1.311, ACC[cd.accent], true);
+		s.addText(cd.title, {
+			x: cd.x + 1.641, y: cd.y + 0.353, w: 3.868, h: 0.558, margin: 0, valign: 'middle',
+			fontFace: F.robBlack, fontSize: 28, bold: true, color: C.tx1, lineSpacingMultiple: 1.3,
+		});
+		s.addText([
+			{ text: SYNTH, options: { fontSize: 22, color: ACC[cd.accent], breakLine: true } },
+			{ text: HASHTAG_MED, options: { fontSize: 20, color: C.tx1 } },
+		], {
+			x: cd.x, y: cd.y + 1.709, w: cd.w, h: 1.732, margin: 0, valign: 'top',
+			fontFace: F.light, lineSpacingMultiple: 1.5,
+		});
+	});
+}
+
+/* ------------------------------------------------------------------ *
+ * Slide 5 — icon list, centre column, big coin
+ * ------------------------------------------------------------------ */
+
+const S5_ICONS = [
+	{ y: 4.119, accent: 0, glyph: '\u25C6' },
+	{ y: 5.970, accent: 1, glyph: '\u2756' },
+	{ y: 7.820, accent: 2, glyph: '\u2726' },
+	{ y: 9.670, accent: 3, glyph: '\u27A4' },
+	{ y: 11.520, accent: 4, glyph: '\u2699' },
+];
+
+function slide05(pptx) {
+	const s = pptx.addSlide();
+	contentHeader(s);
+
+	// --- clip art: giant coin over a teal blob with circuit legs
+	solid(s, 'ellipse', 18.62, 5.22, 5.74, 5.36, C.a4);
+	art(s, 'ellipse', 14.36, 3.52, 7.05, 7.05, C.a4);
+	coin(s, 17.89, 7.05, 5.95);
+	[[19.35, 10.60, 0.0], [20.55, 10.60, 0.9], [21.75, 10.60, 1.8]].forEach(([x0, y0, dx]) => {
+		s.addShape('line', { x: x0, y: y0, w: 0, h: 1.5 + dx, line: { color: C.ink, width: ART_LINE } });
+		s.addShape('line', { x: x0, y: y0 + 1.5 + dx, w: -1.2 - dx, h: 0, line: { color: C.ink, width: ART_LINE } });
+		art(s, 'ellipse', x0 - 1.2 - dx - 0.22, y0 + 1.5 + dx - 0.22, 0.44, 0.44, C.white);
+	});
+	[[22.60, 11.40], [23.60, 12.15]].forEach(([cx, cy]) => art(s, 'ellipse', cx, cy, 0.44, 0.44, C.white));
+
+	// --- left icon list
+	S5_ICONS.forEach(ic => {
+		solid(s, 'ellipse', 2.289, ic.y + 0.376, 1.024, 1.024, ACC[ic.accent]);
+		circ(s, 2.801, ic.y + 0.888, 0.858, C.white);
+		s.addText(ic.glyph, {
+			x: 2.371, y: ic.y + 0.459, w: 0.858, h: 0.858, align: 'center', valign: 'middle', margin: 0,
+			fontFace: F.reg, fontSize: 20, color: ACC[ic.accent],
+		});
+		s.addText([
+			{ text: SYNTH, options: { bold: true, fontFace: F.black, breakLine: true } },
+			{ text: HASHTAG_SHORT, options: { fontFace: F.light } },
+		], {
+			x: 3.45, y: ic.y, w: 3.90, h: 1.674, fontSize: 16, color: C.tx1,
+			lineSpacingMultiple: 1.5, valign: 'top',
+		});
+	});
+
+	// --- centre column
+	s.addText('Bitcoin', {
+		x: 7.724, y: 4.124, w: 5.762, h: 0.871, margin: 0, valign: 'top',
+		fontFace: F.robBlack, fontSize: 28, bold: true, color: C.tx1,
+	});
+	s.addText([
+		{ text: 'Process Bitcoin', options: { breakLine: true } },
+		{ text: 'Information Analysis' },
+	], {
+		x: 7.724, y: 4.803, w: 6.001, h: 1.453, margin: 0, valign: 'top',
+		fontFace: F.robBlack, fontSize: 28, bold: true, color: C.a5, lineSpacingMultiple: 1.2,
+	});
+	s.addText([
+		{ text: HASHTAG_LONG, options: { breakLine: true } },
+		{ text: 'Kitsch authentic offal, narwhal tilde etsy four loko selvage normcore messenger.' },
+	], {
+		x: 7.724, y: 6.064, w: 4.919, h: 7.913, fontFace: F.light, fontSize: 24,
+		color: C.tx1, lineSpacingMultiple: 1.5, valign: 'top',
+	});
+}
+
+/* ------------------------------------------------------------------ *
+ * Slide 6 — light-bulb coin, copy, two badge rows
+ * ------------------------------------------------------------------ */
+
+function slide06(pptx) {
+	const s = pptx.addSlide();
+	contentHeader(s);
+
+	// --- clip art: light bulb with a coin inside + radiating nodes
+	art(s, 'ellipse', 4.53, 5.75, 5.04, 5.04, C.a5);
+	art(s, 'rect', 5.65, 10.10, 2.79, 1.30, C.a5);
+	[11.43, 11.96, 12.48].forEach((y, i) => art(s, 'roundRect',
+		i === 2 ? 6.29 : 5.65, y, i === 2 ? 1.51 : 2.79, 0.47, C.a5, { rectRadius: 0.2 }));
+	coin(s, 7.05, 8.27, 4.51);
+	for (let i = 0; i < 14; i++) {
+		const a = Math.PI * (1.12 + i * 0.055);
+		const cx = 7.05 + Math.cos(a) * 3.2, cy = 8.27 + Math.sin(a) * 3.2;
+		s.addShape('line', {
+			x: 7.05 + Math.cos(a) * 2.6, y: 8.27 + Math.sin(a) * 2.6,
+			w: Math.cos(a) * 0.6, h: Math.sin(a) * 0.6, line: { color: C.ink, width: ART_LINE },
+		});
+		art(s, 'ellipse', cx - 0.16, cy - 0.16, 0.32, 0.32, C.white);
+	}
+
+	// --- copy
+	statement(s, 13.283, 3.722, 11.794, 2.524, [
+		['Blockchain', { bold: true, color: C.a1 }],
+		' will do for ',
+		['trusted', { bold: true, color: C.a2 }],
+		' transactions what the internet did for ',
+		['information', { bold: true, color: C.a3 }],
+		'.',
+	]);
+	subHead(s, 13.283, 6.198, C.a3);
+	bodyBlock(s, 13.283, 7.147, 12.232, 1.709, HASHTAG_LONG, 22);
+
+	[[9.347, 9.383, 0], [11.743, 11.779, 1]].forEach(([ty, by, accent]) => {
+		checkBadge(s, 13.426, by, 1.496, ACC[accent]);
+		s.addText(SYNTH, {
+			x: 15.326, y: ty, w: 6.227, h: 0.467, margin: 0, valign: 'top',
+			fontFace: F.light, fontSize: 24, color: ACC[accent], lineSpacingMultiple: 1.3,
+		});
+		s.addText(HASHTAG_MED.replace('pinterest umami authentic ', ''), {
+			x: 15.347, y: ty + 0.491, w: 8.685, h: 1.077, margin: 0, valign: 'top',
+			fontFace: F.light, fontSize: 24, color: C.tx1, lineSpacingMultiple: 1.5,
+		});
+	});
+}
+
+/* ------------------------------------------------------------------ *
+ * Slide 7 — circuit board coin
+ * ------------------------------------------------------------------ */
+
+function slide07(pptx) {
+	const s = pptx.addSlide();
+	contentHeader(s);
+
+	// --- clip art: rounded circuit board with a coin on the corner
+	art(s, 'roundRect', 14.70, 5.71, 9.14, 6.58, C.a6, { rectRadius: 0.6 });
+	art(s, 'roundRect', 21.35, 8.04, 2.97, 1.90, ACC_DARK[5], { rectRadius: 0.4 });
+	art(s, 'ellipse', 22.36, 8.60, 0.78, 0.78, C.white);
+	[[16.20, 9.35], [17.65, 9.20], [19.50, 9.20], [16.55, 11.05], [18.95, 11.55],
+		[20.60, 11.55], [22.90, 10.90], [17.90, 11.90]].forEach(([cx, cy]) => {
+		art(s, 'ellipse', cx - 0.20, cy - 0.20, 0.40, 0.40, C.white);
+		s.addShape('line', { x: cx, y: cy, w: 0, h: -0.9, line: { color: C.ink, width: ART_LINE } });
+	});
+	coin(s, 17.12, 6.18, 5.66);
+
+	// --- copy
+	statement(s, 1.670, 3.242, 10.416, 3.332, [
+		['Blockchain', { bold: true, color: C.a1 }],
+		' represents the ',
+		['second', { bold: true, color: C.a2 }],
+		' era of the internet, a ',
+		['transformation', { bold: true, color: C.a3 }],
+		' from an internet of information to an internet of value',
+	]);
+	subHead(s, 1.698, 6.498, C.a4);
+	synthLine(s, 1.698, 7.541);
+	bodyBlock(s, 1.698, 8.063, 10.640, 2.461);
+	[10.888, 11.885].forEach(y => {
+		checkOutline(s, 1.721, y, 0.604, C.a4);
+		s.addText(SYNTH, {
+			x: 2.471, y: y + 0.011, w: 6.944, h: 0.583, valign: 'top', wrap: false,
+			fontFace: F.light, fontSize: 24, color: C.tx1, lineSpacingMultiple: 1.3,
+		});
+	});
+}
+
+/* ------------------------------------------------------------------ *
+ * Slide 8 — chess-piece coin + gauges
+ * ------------------------------------------------------------------ */
+
+function slide08(pptx) {
+	const s = pptx.addSlide();
+	contentHeader(s);
+
+	// --- clip art: chess pawn made of a coin, circuit branches
+	coin(s, 6.38, 5.50, 4.58);
+	art(s, 'trapezoid', 5.74, 7.69, 1.29, 0.80, C.a1);
+	art(s, 'roundRect', 5.66, 8.56, 1.46, 0.41, C.a1, { rectRadius: 0.18 });
+	art(s, 'trapezoid', 5.23, 9.04, 2.31, 3.51, C.a1);
+	art(s, 'roundRect', 4.95, 12.61, 2.87, 0.54, C.a1, { rectRadius: 0.2 });
+	art(s, 'roundRect', 4.96, 13.22, 2.86, 0.41, ACC_DARK[0], { rectRadius: 0.18 });
+	[-1, 1].forEach(sgn => {
+		[[0.9, 9.60], [1.6, 10.30], [2.1, 11.05], [1.3, 11.75]].forEach(([dx, cy]) => {
+			s.addShape('line', { x: 6.38 + sgn * 0.65, y: cy, w: sgn * dx, h: 0, line: { color: C.ink, width: ART_LINE } });
+			art(s, 'ellipse', 6.38 + sgn * (0.65 + dx) - 0.16, cy - 0.16, 0.32, 0.32, C.white);
+		});
+	});
+
+	// --- copy
+	statement(s, 13.813, 4.546, 11.058, 2.524, [
+		'In ',
+		['blockchain', { bold: true, color: C.a1 }],
+		', we trust, because math doesn\'t lie, code doesn\'t ',
+		['cheat', { bold: true, color: C.a2 }],
+		', and the ',
+		['protocol', { bold: true, color: C.a3 }],
+		' remains neutral.',
+	]);
+	subHead(s, 13.813, 7.083, C.a4);
+	synthLine(s, 13.813, 8.116);
+	bodyBlock(s, 13.813, 8.628, 10.640, 2.461);
+	gaugeRow(pptx, s, 13.877, 11.383, [
+		{ value: 30, pct: '19%', label: 'Type A', accent: 0 },
+		{ value: 130, pct: '50%', label: 'Type B', accent: 1 },
+		{ value: 365, pct: '74%', label: 'Type C', accent: 2 },
+	]);
+}
+
+/* ------------------------------------------------------------------ *
+ * Slide 9 — four "halo dot" steps + phone
+ * ------------------------------------------------------------------ */
+
+const S9_STEPS = [
+	{ x: 1.818, y: 3.901, title: 'Data Entry', accent: 0, tw: 2.617 },
+	{ x: 8.350, y: 3.901, title: 'Verification', accent: 1, tw: 2.966 },
+	{ x: 1.818, y: 8.625, title: 'Block Formation', accent: 2, tw: 4.164 },
+	{ x: 8.350, y: 8.625, title: 'Decentralized Ledger', accent: 3, tw: 5.405 },
+];
+
+function slide09(pptx) {
+	const s = pptx.addSlide();
+	contentHeader(s);
+
+	// --- clip art: smartphone with transfer arrows and a coin
+	art(s, 'roundRect', 19.03, 3.96, 4.91, 9.15, C.a2, { rectRadius: 0.35 });
+	art(s, 'roundRect', 19.36, 4.98, 4.24, 7.11, C.a2, { rectRadius: 0.05 });
+	art(s, 'roundRect', 20.75, 4.20, 1.46, 0.30, C.white, { rectRadius: 0.15 });
+	art(s, 'rect', 20.96, 8.11, 2.64, 0.39, C.a2);
+	art(s, 'rect', 20.96, 8.57, 2.64, 0.39, C.a2);
+	art(s, 'rect', 21.15, 12.35, 0.72, 0.55, C.white);
+	s.addShape('line', { x: 21.30, y: 7.55, w: 2.20, h: 0, line: { color: C.ink, width: ART_LINE } });
+	s.addShape('line', { x: 21.30, y: 7.55, w: 0.55, h: -0.45, line: { color: C.ink, width: ART_LINE } });
+	s.addShape('line', { x: 21.20, y: 9.60, w: 2.20, h: 0, line: { color: C.ink, width: ART_LINE } });
+	s.addShape('line', { x: 22.85, y: 9.60, w: 0.55, h: -0.45, line: { color: C.ink, width: ART_LINE } });
+	coin(s, 18.07, 8.54, 5.95);
+
+	// --- steps
+	S9_STEPS.forEach(st => {
+		circ(s, st.x + 0.591, st.y + 0.592, 1.181, { color: ACC[st.accent], transparency: 71 });
+		circ(s, st.x + 0.591, st.y + 0.592, 0.943, { color: ACC[st.accent], transparency: 71 });
+		circ(s, st.x + 0.591, st.y + 0.592, 0.668, ACC[st.accent]);
+		s.addText(st.title, {
+			x: st.x + 0.576, y: st.y + 0.488, w: st.tw, h: 0.774, margin: [0, 0, 3.6, 3.6], valign: 'top',
+			fontFace: F.robBlack, fontSize: 40, bold: true, color: C.tx2, wrap: false,
+		});
+		s.addText([
+			{ text: 'Synth chartreuse XOXO, tacos VHS plaid.', options: { color: ACC[st.accent], breakLine: true } },
+			{ text: HASHTAG_MED, options: { color: C.tx1 } },
+		], {
+			x: st.x + 0.576, y: st.y + 1.633, w: 4.55, h: 2.067, margin: [0, 0, 3.6, 3.6],
+			fontFace: F.light, fontSize: 20, lineSpacingMultiple: 1.5, valign: 'top',
+		});
+	});
+}
+
+/* ------------------------------------------------------------------ *
+ * Slide 10 — open box + BITCOIN ANALYSIS + four gauges
+ * ------------------------------------------------------------------ */
+
+function slide10(pptx) {
+	const s = pptx.addSlide();
+	contentHeader(s);
+
+	// --- clip art: open box with a coin rising out of it
+	coin(s, 6.73, 6.50, 5.65);
+	// lids folded outward, then the tapering box body
+	art(s, 'rtTriangle', 2.61, 8.50, 4.12, 1.35, C.a3);
+	art(s, 'rtTriangle', 6.73, 8.50, 4.12, 1.35, C.a3, { flipH: true });
+	art(s, 'rect', 2.90, 9.82, 7.66, 3.64, ACC_DARK[2]);
+	s.addShape('line', { x: 6.73, y: 9.82, w: 0, h: 3.64, line: { color: C.ink, width: ART_LINE } });
+	art(s, 'rtTriangle', 2.90, 9.82, 3.83, 0.55, C.a1, { flipV: true });
+	art(s, 'rtTriangle', 6.73, 9.82, 3.83, 0.55, C.a1, { flipH: true, flipV: true });
+	[[4.75, 11.60], [5.45, 12.05], [6.15, 11.75]].forEach(([cx, cy]) => {
+		s.addShape('line', { x: cx, y: cy, w: 0, h: 1.3, line: { color: C.white, width: ART_LINE } });
+		solid(s, 'ellipse', cx - 0.10, cy - 0.10, 0.20, 0.20, C.white);
+	});
+
+	// --- copy
+	s.addText([
+		{ text: 'Bitcoin', options: { fontSize: 28, color: C.tx1, breakLine: true } },
+		{ text: 'Info', options: { fontSize: 28, color: C.a3, breakLine: true } },
+		{ text: ' ', options: { fontSize: 28, breakLine: true } },
+		{ text: 'BITCOIN ANALYSIS', options: { fontSize: 85.34, color: C.a3 } },
+	], {
+		x: 13.315, y: 4.535, w: 12.935, h: 2.614, valign: 'top',
+		fontFace: F.robBlack, bold: true, color: C.tx1,
+	});
+	s.addText('CONTENT TITLE', {
+		x: 13.315, y: 7.190, w: 4.098, h: 0.550, valign: 'top',
+		fontFace: F.robBlack, fontSize: 26.66, bold: true, color: C.tx1,
+	});
+	bodyBlock(s, 13.315, 7.780, 12.232, 1.709, HASHTAG_LONG, 22);
+	gaugeRow(pptx, s, 13.327, 10.139, [
+		{ value: 30, pct: '19%', label: 'Type A', accent: 0 },
+		{ value: 130, pct: '50%', label: 'Type B', accent: 1 },
+		{ value: 365, pct: '74%', label: 'Type C', accent: 2 },
+	]);
+	gauge(pptx, s, 22.553, 10.106, 1.689, 280, C.a4);
+	s.addText('68%', {
+		x: 24.414, y: 10.444, w: 0.985, h: 0.573, margin: 0, valign: 'top', wrap: false,
+		fontFace: F.rob, fontSize: 32, bold: true, color: C.a4,
+	});
+	s.addText('Type D', {
+		x: 24.414, y: 11.043, w: 0.985, h: 0.452, margin: 0, valign: 'top', wrap: false,
+		fontFace: F.rob, fontSize: 20, bold: true, color: C.tx1,
+	});
+}
+
+/* ------------------------------------------------------------------ *
+ * Slide 11 — coin stack, pill quote, user counters
+ * ------------------------------------------------------------------ */
+
+function slide11(pptx) {
+	const s = pptx.addSlide();
+	contentHeader(s);
+
+	// --- clip art: stack of eight "data bar" coins next to a big coin
+	const bars = [
+		[14.37, 4.66, 6.60], [14.00, 5.65, 6.60], [14.00, 6.64, 5.74], [14.37, 7.62, 4.66],
+		[14.00, 8.61, 4.72], [14.37, 9.59, 4.60], [13.99, 10.58, 5.64], [14.00, 11.57, 6.57],
+	];
+	bars.forEach(([x, y, w]) => bandedBar(s, x, y, w, 0.91, C.a4, 0.45));
+	coin(s, 22.12, 9.12, 6.80);
+
+	// --- copy
+	statement(s, 2.181, 3.018, 10.912, 3.332, [
+		['Blockchain', { bold: true, color: C.a1 }],
+		' is the most significant invention since the ',
+		['internet', { bold: true, color: C.a2 }],
+		' itself, and it will ',
+		['revolutionize', { bold: true, color: C.a3 }],
+		' every industry.',
+	]);
+	subHead(s, 2.164, 6.341, C.a4);
+	s.addText('CONTENT TITLE', {
+		x: 2.110, y: 7.335, w: 4.098, h: 0.550, valign: 'top',
+		fontFace: F.robBlack, fontSize: 26.66, bold: true, color: C.tx1,
+	});
+	bodyBlock(s, 2.110, 7.824, 10.640, 2.461);
+	s.addShape('roundRect', {
+		x: 2.115, y: 10.478, w: 8.513, h: 1.570, rectRadius: 0.785,
+		fill: { color: C.pill, transparency: 75 }, line: { type: 'none' },
+	});
+	s.addText(HASHTAG_MED, {
+		x: 2.115, y: 10.478, w: 8.513, h: 1.570, margin: [28.3, 28.3, 3.6, 3.6], valign: 'middle',
+		fontFace: F.light, fontSize: 20, color: C.tx1, lineSpacingMultiple: 1.3,
+	});
+
+	[{ x: 2.110, n: '2.888 K', l: 'Male User', accent: 5, lw: 1.257 },
+	 { x: 6.367, n: '1.074 K', l: 'Female User', accent: 0, lw: 1.560 }].forEach(u => {
+		circ(s, u.x + 0.600, 13.153, 1.200, ACC[u.accent]);
+		s.addText('\u263A', {
+			x: u.x, y: 12.553, w: 1.200, h: 1.200, align: 'center', valign: 'middle', margin: 0,
+			fontFace: F.reg, fontSize: 34, color: C.white,
+		});
+		s.addText(u.n, {
+			x: u.x + 1.473, y: 12.498, w: 2.151, h: 0.774, valign: 'top', wrap: false,
+			fontFace: F.robBlack, fontSize: 40, bold: true, color: C.tx1,
+		});
+		s.addText(u.l, {
+			x: u.x + 1.920, y: 13.325, w: u.lw, h: 0.337, margin: 0, valign: 'top', wrap: false,
+			fontFace: F.rob, fontSize: 20, color: C.tx1,
+		});
+	});
+}
+
+/* ------------------------------------------------------------------ *
+ * Slide 12 — potted coin plant + 2x2 ring icons
+ * ------------------------------------------------------------------ */
+
+const S12_CARDS = [
+	{ x: 13.720, y: 4.989, accent: 3, glyph: '\u2617', tx: 15.272, tw: 3.958 },
+	{ x: 19.357, y: 4.989, accent: 2, glyph: '\u2622', tx: 20.940, tw: 3.791 },
+	{ x: 13.720, y: 7.442, accent: 1, glyph: '\u2318', tx: 15.284, tw: 3.888 },
+	{ x: 19.357, y: 7.442, accent: 0, glyph: '\u26AF', tx: 20.883, tw: 3.791 },
+];
+
+function slide12(pptx) {
+	const s = pptx.addSlide();
+	contentHeader(s);
+
+	// --- clip art: coin growing out of a plant pot
+	coin(s, 6.60, 5.96, 5.18);
+	s.addShape('line', { x: 6.60, y: 8.00, w: 0, h: 1.90, line: { color: C.ink, width: ART_LINE } });
+	[[5.85, 9.05], [7.40, 8.85]].forEach(([cx, cy]) => {
+		s.addShape('line', { x: 6.60, y: 9.50, w: cx - 6.60, h: cy - 9.50, line: { color: C.ink, width: ART_LINE } });
+		art(s, 'ellipse', cx - 0.14, cy - 0.14, 0.28, 0.28, C.white);
+	});
+	bandedBar(s, 3.61, 9.88, 5.98, 0.75, C.a5, 0.2);
+	art(s, 'trapezoid', 4.19, 10.69, 4.82, 2.87, C.a5);
+	art(s, 'rect', 4.35, 13.45, 4.50, 0.28, C.white);
+
+	// --- 2x2 ring-icon cards
+	S12_CARDS.forEach(cd => {
+		ringIcon(s, cd.x, cd.y + 0.100, 1.457, cd.accent, cd.glyph);
+		s.addText([
+			{ text: SYNTH, options: { bold: true, fontFace: F.black, breakLine: true } },
+			{ text: HASHTAG_SHORT, options: { fontFace: F.light } },
+		], {
+			x: cd.tx, y: cd.y, w: cd.tw, h: 1.674, fontSize: 16, color: C.tx2,
+			lineSpacingMultiple: 1.5, valign: 'top',
+		});
+	});
+
+	// --- caption block
+	s.addText('Bitcoin', {
+		x: 14.327, y: 10.237, w: 5.762, h: 0.670, margin: 0, valign: 'top',
+		fontFace: F.robBlack, fontSize: 24, bold: true, color: C.tx1,
+	});
+	s.addText([
+		{ text: 'Bitcoin', options: { breakLine: true } },
+		{ text: 'Information Analysis' },
+	], {
+		x: 14.297, y: 10.758, w: 3.698, h: 2.150, margin: 0, valign: 'top',
+		fontFace: F.robBlack, fontSize: 24, bold: true, color: C.a1,
+	});
+	bodyBlock(s, 18.025, 10.062, 6.706, 1.709,
+		'Hashtag fashion axe fingerstache, everyday carry shoreditch pinterest umami ' +
+		'authentic brooklyn YOLO heirloom keytar waistcoat kickstarter. ', 22);
+}
+
+/* ------------------------------------------------------------------ *
+ * Slide 13 — six ring icons + key-shaped coin
+ * ------------------------------------------------------------------ */
+
+const S13_ITEMS = [
+	{ ix: 1.085, iy: 4.720, tx: 3.438, ty: 4.966, tw: 4.464, accent: 0, glyph: '\u23F1', title: 'Analysis 01', body: SYNTH },
+	{ ix: 7.902, iy: 4.720, tx: 10.289, ty: 4.966, tw: 4.476, accent: 1, glyph: '\u2317', title: 'Analysis 02', body: SYNTH },
+	{ ix: 1.100, iy: 7.275, tx: 3.438, ty: 7.521, tw: 4.464, accent: 2, glyph: '\u263C', title: 'Analysis 03', body: 'Synth chartreuase XOXO, tacos brooklyn VHS plaid.' },
+	{ ix: 7.966, iy: 7.275, tx: 10.289, ty: 7.521, tw: 4.476, accent: 3, glyph: '\u2699', title: 'Analysis 04', body: SYNTH },
+	{ ix: 1.124, iy: 9.956, tx: 3.438, ty: 10.202, tw: 4.464, accent: 4, glyph: '\u2697', title: 'Analysis 05', body: SYNTH },
+	{ ix: 7.910, iy: 9.956, tx: 10.289, ty: 10.202, tw: 4.476, accent: 5, glyph: '\u2726', title: 'Analysis 06', body: SYNTH },
+];
+
+function slide13(pptx) {
+	const s = pptx.addSlide();
+	contentHeader(s);
+
+	// --- clip art: a key whose bow carries the bitcoin mark
+	art(s, 'roundRect', 22.27, 6.67, 2.46, 3.32, C.a6, { rectRadius: 0.6 });
+	art(s, 'roundRect', 22.73, 7.13, 1.41, 2.44, ACC_DARK[5], { rectRadius: 0.35 });
+	s.addText('B', {
+		x: 22.73, y: 7.13, w: 1.41, h: 2.44, align: 'center', valign: 'middle', margin: 0,
+		fontFace: F.rob, fontSize: 60, color: C.white,
+	});
+	art(s, 'roundRect', 15.51, 7.78, 6.90, 1.14, C.coinPale, { rectRadius: 0.25 });
+	for (let i = 0; i < 15; i++) solid(s, 'rect', 15.93 + i * 0.44, 8.02, 0.13, 0.63, C.ink);
+	const nodes = [[17.62, 3.86], [20.55, 4.68], [16.55, 5.62], [21.30, 6.30], [18.90, 5.97],
+		[16.60, 10.40], [18.85, 10.42], [21.20, 10.80], [17.30, 12.00], [20.20, 12.62]];
+	nodes.forEach(([cx, cy]) => {
+		s.addShape('line', {
+			x: cx, y: cy, w: 0, h: (cy < 8 ? 1 : -1) * (Math.abs(8.3 - cy) - 0.4),
+			line: { color: C.ink, width: ART_LINE },
+		});
+		art(s, 'ellipse', cx - 0.24, cy - 0.24, 0.48, 0.48, C.white);
+	});
+
+	// --- six items
+	S13_ITEMS.forEach(it => {
+		ringIcon(s, it.ix, it.iy, 2.086, it.accent, it.glyph);
+		s.addText([
+			{ text: it.title, options: { fontFace: F.robBlack, fontSize: 28, bold: true, breakLine: true } },
+			{ text: it.body, options: { fontFace: F.light, fontSize: 21 } },
+		], {
+			x: it.tx, y: it.ty, w: it.tw, h: 1.594, color: C.tx1,
+			lineSpacingMultiple: 1.3, valign: 'top',
+		});
+	});
+}
+
+/* ------------------------------------------------------------------ *
+ * Slide 14 — coin train + six tagged notes
+ * ------------------------------------------------------------------ */
+
+const S14_NOTES = [
+	{ tag: 'Analysis 01', tagX: 15.401, x: 13.198, w: 5.099, y: 3.773, accent: 0, align: 'right' },
+	{ tag: 'Analysis 02', tagX: 19.848, x: 19.866, w: 5.026, y: 3.773, accent: 1, align: 'left' },
+	{ tag: 'Analysis 03', tagX: 15.460, x: 13.198, w: 5.099, y: 7.443, accent: 2, align: 'right' },
+	{ tag: 'Analysis 04', tagX: 19.848, x: 19.861, w: 5.026, y: 7.443, accent: 3, align: 'left' },
+	{ tag: 'Analysis 05', tagX: 15.417, x: 13.198, w: 5.099, y: 11.066, accent: 4, align: 'right' },
+	{ tag: 'Analysis 06', tagX: 19.848, x: 19.866, w: 5.026, y: 11.066, accent: 5, align: 'left' },
+];
+
+function slide14(pptx) {
+	const s = pptx.addSlide();
+	contentHeader(s);
+
+	// --- clip art: locomotive + wagon carrying stacked coin bars
+	for (let i = 0; i < 4; i++) {
+		const w = 4.60 - i * 0.30;
+		art(s, 'roundRect', 2.14 + i * 0.16, 4.34 + i * 0.62, w, 0.62, C.coinFace, { rectRadius: 0.3 });
+		const n = Math.floor((w - 0.5) / 0.36);
+		const x0 = 2.14 + i * 0.16 + (w - (n - 1) * 0.36) / 2;
+		for (let k = 0; k < n; k++) solid(s, 'rect', x0 + k * 0.36 - 0.055, 4.48 + i * 0.62, 0.11, 0.34, C.ink);
+	}
+	art(s, 'rect', 1.87, 6.82, 5.11, 3.33, C.a4);
+	art(s, 'rect', 7.96, 6.82, 4.19, 3.33, C.a1);
+	art(s, 'rect', 6.98, 9.10, 0.98, 0.28, C.white);
+	for (let i = 0; i < 5; i++) solid(s, 'rect', 11.05, 7.40 + i * 0.24, 1.05, 0.08, C.ink);
+	[3.05, 5.75, 10.80].forEach(cx => {
+		art(s, 'ellipse', cx - 0.72, 9.62, 1.44, 1.44, C.white);
+		art(s, 'ellipse', cx - 0.42, 9.92, 0.84, 0.84, C.white);
+	});
+	art(s, 'rect', 1.62, 11.05, 10.97, 0.30, C.white);
+	[[2.55, 7.55], [3.60, 8.05], [4.35, 7.60], [3.05, 8.75], [4.95, 8.95]].forEach(([cx, cy]) => {
+		s.addShape('line', { x: cx, y: cy, w: 0.7, h: 0.5, line: { color: C.ink, width: ART_LINE } });
+		art(s, 'ellipse', cx - 0.16, cy - 0.16, 0.32, 0.32, C.white);
+	});
+
+	// --- six tagged notes
+	S14_NOTES.forEach(n => {
+		solid(s, 'roundRect', n.tagX, n.y, 2.836, 0.564, ACC[n.accent], { rectRadius: 0.09 });
+		s.addText(n.tag, {
+			x: n.tagX + 0.217, y: n.y + 0.031, w: 2.426, h: 0.628, margin: 0, align: 'center', valign: 'top',
+			fontFace: F.robBlack, fontSize: 20, bold: true, color: C.white, lineSpacingMultiple: 1.3,
+		});
+		s.addText(SYNTH, {
+			x: n.x, y: n.y + 0.760, w: n.w, h: 0.467, margin: 0, align: n.align, valign: 'top',
+			fontFace: F.light, fontSize: 18, color: ACC[n.accent], lineSpacingMultiple: 1.3,
+		});
+		s.addText('Hashtag fashion axe fingerstache, everyday carry shoreditch brooklyn YOLO.', {
+			x: n.x, y: n.y + 1.251, w: n.w, h: 1.482, margin: 0, align: n.align, valign: 'top',
+			fontFace: F.light, fontSize: 20, color: C.tx1, lineSpacingMultiple: 1.5,
+		});
+	});
+}
+
+/* ------------------------------------------------------------------ *
+ * Slide 15 — server blocks
+ * ------------------------------------------------------------------ */
+
+function slide15(pptx) {
+	const s = pptx.addSlide();
+	contentHeader(s);
+
+	// --- clip art: two isometric server blocks + a coin with circuit legs
+	coin(s, 16.86, 5.70, 3.66);
+	// two isometric bars running up-right, each with a fan on the front face
+	[15.19, 18.81].forEach(fx => {
+		art(s, 'rect', fx + 0.62, 9.56, 4.80, 2.36, C.a2, { rotate: -40 });
+		art(s, 'rect', fx, 11.10, 2.36, 2.36, C.a2);
+		art(s, 'ellipse', fx + 0.16, 11.26, 2.04, 2.04, C.white);
+		for (let i = 0; i < 8; i++) {
+			s.addShape('line', {
+				x: fx + 1.18, y: 12.28, w: Math.cos(i * 0.785) * 1.0, h: Math.sin(i * 0.785) * 1.0,
+				line: { color: C.ink, width: 2 },
+			});
+		}
+	});
+	[[19.90, 4.45], [21.55, 4.60], [22.40, 5.35], [20.90, 5.70]].forEach(([cx, cy]) => {
+		s.addShape('line', { x: cx, y: cy, w: 0, h: 8.05 - cy, line: { color: C.ink, width: ART_LINE } });
+		art(s, 'ellipse', cx - 0.20, cy - 0.20, 0.40, 0.40, C.white);
+	});
+
+	// --- copy
+	statement(s, 1.503, 3.619, 11.681, 4.948, [
+		'With ',
+		['blockchain', { bold: true, color: C.a1 }],
+		', we can imagine a world in which contracts are embedded in ',
+		['digital', { bold: true, color: C.a2 }],
+		' code and stored in transparent, shared databases, where they are protected from ' +
+			'deletion, tampering, and ',
+		['revision', { bold: true, color: C.a3 }],
+		'.',
+	]);
+	subHead(s, 1.503, 8.567, C.a1);
+	synthLine(s, 1.503, 9.519);
+	bodyBlock(s, 1.503, 9.951, 10.640, 2.461);
+}
+
+/* ------------------------------------------------------------------ *
+ * Slide 16 — giant coin + quote
+ * ------------------------------------------------------------------ */
+
+function slide16(pptx) {
+	const s = pptx.addSlide();
+	contentHeader(s);
+
+	coin(s, 6.68, 8.66, 9.30);
+
+	statement(s, 13.766, 3.720, 11.909, 3.332, [
+		'In a world where ',
+		['data', { bold: true, color: C.a1 }],
+		' is the new oil, ',
+		['blockchain', { bold: true, color: C.a2 }],
+		' is the new oil tanker." - Richie Etwaru, author of "',
+		['Blockchain', { bold: true, color: C.a3 }],
+		': Trust Companies',
+	]);
+	subHead(s, 13.766, 7.000, C.a1);
+	s.addText(runs([
+		'Hashtag fashion axe fingerstache, everyday carry shoreditch pinterest umami authent',
+		['ic ', { bold: true }],
+		'brooklyn YOLO heirloom keytar waistcoat kickstarter. Kitsch authentic offal, narwhal ' +
+			'tilde etsy four loko selvage normcore messenger bag put a bird on it heirloom gastropub.',
+	], { fontFace: F.light, fontSize: 24, color: C.tx1 }),
+	{ x: 13.766, y: 7.922, w: 10.640, h: 2.461, lineSpacingMultiple: 1.5, valign: 'top' });
+
+	[10.782, 11.774, 12.771].forEach(y => {
+		checkOutline(s, 13.955, y, 0.604, C.a5);
+		s.addText(SYNTH, {
+			x: 14.705, y: y + 0.011, w: 6.944, h: 0.583, valign: 'top', wrap: false,
+			fontFace: F.light, fontSize: 24, color: C.tx1, lineSpacingMultiple: 1.3,
+		});
+	});
+}
+
+/* ------------------------------------------------------------------ *
+ * Build
+ * ------------------------------------------------------------------ */
+
+function build() {
+	const pptx = new PptxGenJS();
+	pptx.defineLayout({ name: 'BITCOIN', width: SLIDE_W, height: SLIDE_H });
+	pptx.layout = 'BITCOIN';
+	pptx.title = 'Bitcoin Infographic Slide';
+	pptx.author = 'Pulsecolor';
+
+	[slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09,
+		slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17]
+		.forEach(fn => fn(pptx));
+
+	return pptx.writeFile({
+		fileName: path.join(__dirname, '007ca96f-51b7-4bbc-ad19-59b95a58f55e_grok_final.pptx'),
+	});
+}
+
+build().then(f => console.log('wrote', f)).catch(e => { console.error(e); process.exit(1); });
