@@ -1,0 +1,86 @@
+--- 2026-10-23_14-52:/opt/sand/sand-host/box-scripts/cdp-cookies.mjs
++++ 2026-10-23_18-47:/opt/sand/sand-host/box-scripts/cdp-cookies.mjs
+@@ -1,3 +1,4 @@
++import { createHash } from "node:crypto";
+ import { readdirSync, readFileSync } from "node:fs";
+ 
+ import { SAND_BOX_CDP_PORT_BASE } from "./box-contract.generated.mjs";
+@@ -306,6 +307,62 @@
+   );
+ }
+ 
++export function cookieDigest(cookie) {
++  return createHash("sha256").update(cookieFingerprint(cookie)).digest("hex").slice(0, 32);
++}
++
++export const SIGNED_OUT_LEDGER_PATH = "/home/box/sand-data/chrome-cookie-signouts.json";
++const SIGNED_OUT_LEDGER_VERSION = 1;
++
++export function parseSignedOutLedger(text) {
++  const ledger = new Map();
++  let parsed;
++  try {
++    parsed = JSON.parse(text);
++  } catch {
++    return null;
++  }
++  if (parsed?.version !== SIGNED_OUT_LEDGER_VERSION || !Array.isArray(parsed.signedOut)) {
++    return null;
++  }
++  for (const entry of parsed.signedOut) {
++    if (typeof entry?.key !== "string" || !Array.isArray(entry.digests)) continue;
++    const digests = entry.digests.filter((d) => typeof d === "string" && /^[0-9a-f]{32}$/.test(d));
++    if (digests.length === 0) continue;
++    ledger.set(entry.key, {
++      digests: new Set(digests),
++      at: Number.isSafeInteger(entry.at) ? entry.at : 0,
++    });
++  }
++  return ledger;
++}
++
++export function serializeSignedOutLedger(ledger) {
++  const signedOut = [...ledger].map(([key, { digests, at }]) => ({
++    key,
++    digests: [...digests],
++    at,
++  }));
++  return `${JSON.stringify({ version: SIGNED_OUT_LEDGER_VERSION, signedOut })}\n`;
++}
++
++export function readSignedOutLedger(path = SIGNED_OUT_LEDGER_PATH, read = readFileSync) {
++  let text;
++  try {
++    text = read(path, "utf8");
++  } catch (error) {
++    if (error?.code === "ENOENT") return new Map();
++    throw error;
++  }
++  const ledger = parseSignedOutLedger(text);
++  if (ledger == null) throw new Error(`${path} is not a sign-out ledger`);
++  return ledger;
++}
++
++export function isSignedOutCopy(ledger, key, cookie) {
++  return ledger.get(key)?.digests.has(cookieDigest(cookie)) === true;
++}
++
+ export const ROTATING_AUTH_COOKIE_NAMES = new Set([
+   "__Secure-1PSIDTS",
+   "__Secure-3PSIDTS",
+@@ -415,6 +472,15 @@
+   }
+ }
+ 
++function toCookieDeleteParam(cookie) {
++  const param = toCookieParam(cookie);
++  return param == null ? null : { ...param, value: "", expires: 1 };
++}
++
++export async function deleteCookies(browser, cookies, onRefused = logRefusedCookies) {
++  await pushCookies(browser, cookies.map(toCookieDeleteParam), onRefused);
++}
++
+ export async function listPageTargets(browser) {
+   const result = await browser.send("Target.getTargets");
+   const targets = [];

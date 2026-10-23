@@ -1,0 +1,67 @@
+--- 2026-10-23_14-52:/home/box/sand-data/managed-skills/skills/site-playbooks-instacart/SKILL.md
++++ 2026-10-23_18-47:/home/box/sand-data/managed-skills/skills/site-playbooks-instacart/SKILL.md
+@@ -12,7 +12,7 @@
+ 
+ The user wants grocery items priced and placed in an Instacart cart, or a real-time basket total from nearby retailers. The parent needs the item list and, if it matters, the retailer slug. The result is the cart contents with name, size, unit price, deals, and subtotal, plus the storefront URL. This skill adds to a cart, so the Task text must list the items. It runs as a guest first. It never logs in on its own, never enters an address or payment, never checks out. When a storefront has no guest cart, the parent arranges a signed-in session (see When blocked) and dispatches the same steps again.
+ 
+-For a lookup with no cart, such as prices or photos to show the user, write a read-only Task text from the Fastest path that asks for each top result's product page URL and the image URL from that page.
++For a lookup with no cart, such as prices or photos to show the user, write a read-only Task text from the Fastest path that asks for each top result's product page URL and image URL from the links page script.
+ 
+ ### Fastest path
+ 
+@@ -46,30 +46,35 @@
+ slug}
+ ?retailerSlug={
+ retailer}
+-`. The snapshot shows the card as a button without that URL. The snippet's links page script reads each card's name and `href` while the results are on screen, and a click on the card opens the page. The HTML that `curl` fetches for a product page carries a JSON-LD `Product` with the name, size, price, stock, and image URL. A search page's HTML carries no results.
++`. The snapshot shows the card as a button without that URL. The snippet's links page script reads each card's name, `href`, and https image while the results are on screen, and a click on the card opens the page. The HTML that `curl` fetches for a product page carries a JSON-LD `Product` with the name, size, price, stock, and image URL. A search page's HTML carries no results.
+ 
+ ### Dispatch snippet
+ 
+ ```
+-On Instacart, add these items to a cart and report the cart: <item list>. Prefer retailer <retailer slug or any>. Do not log in, enter an address or payment, or check out.
+-browser_navigate to https://www.instacart.com/store/<retailer>/s?k=<query> (or https://www.instacart.com/store/s?k=<query> for any retailer), wait 3.5 s, snapshot.
+-Then run the page script async (page) => {
++On Instacart, add these items to a cart: <item list>. Prefer retailer <slug or any>. Never log in, enter an address or payment, or check out.
++For each item, browser_navigate to https://www.instacart.com/store/<retailer>/s?k=<query> (no <retailer>/ for any retailer), wait 3.5 s, snapshot.
++Run the page script async (page) => {
+  const o = {
+ }
+ ;
+- for (const e of (await page.locator('[href*="/products/"]').all()).slice(0, 40)) o[new URL(await e.getAttribute('href'), 'https://www.instacart.com').href] ||= ((await e.getAttribute('aria-label')) || (await e.textContent()) || '').replace(/\s+/g, ' ').trim().slice(0, 99);
++ for (const e of (await page.locator('[href*="/products/"]').all()).slice(0, 40)) {
++ const p = (o[new URL(await e.getAttribute('href'), 'https://www.instacart.com').href] ||= {
++}
++);
++ p.name ||= ((await e.getAttribute('aria-label')) || (await e.textContent())).replace(/\s+/g, ' ').trim().slice(0, 99);
++ for (const i of await e.locator('img[src^=https]').all()) p.image ||= await i.getAttribute('src');
++ }
+  return o;
+  }
+-;
+- keep each added item's URL.
+-First add: browser_click the "Add 1 ct <name>" button, wait 2.5 s. A "$0 delivery fee on your first 3 orders" dialog will appear and cannot be closed, ignore it. If a sign-in dialog opens instead and the button never becomes "Decrement quantity of <name>", stop and report guest_add_blocked with the retailer and the URL.
+-Every later add: run the page script async (page) => page.locator('button[aria-label="Add 1 ct <name>"]').first().dispatchEvent('click'), wait 2 s, confirm the button became "Decrement quantity of <name>".
++ and keep its result.
++First add: browser_click the "Add 1 ct <name>" button, wait 2.5 s. Ignore the "$0 delivery fee" dialog. If a sign-in dialog opens instead and the button never becomes "Decrement quantity of <name>", add nothing, still search each item, then report guest_add_blocked, the URL, and each match's fields from the Report line.
++Later adds: run the page script async (page) => page.locator('button[aria-label="Add 1 ct <name>"]').first().dispatchEvent('click'), wait 2 s, confirm the same change.
+ Open the cart with the page script async (page) => page.locator('header button').filter({
+  hasText: /delivery fee|View Cart/i }
+ ).first().dispatchEvent('click').
+ Read the dialog matching /Personal .* Cart/i for item lines and "Item subtotal", take one screenshot.
+-If a captcha, sign in or password, 2FA, or payment prompt appears, stop and report it with the URL.
+-Report retailer, ZIP, storefront URL, each item with size, price, and product page URL from the links script, subtotal, the $ minimum to checkout, anything you could not add, and the screenshot path.
++On any other captcha, sign-in, password, 2FA, or payment prompt, stop and report it with the URL.
++Report retailer, ZIP, storefront URL, each item's size, price, URL, and image from the links script, subtotal, checkout minimum, anything not added, and the screenshot path.
+ Ground rules for this Task. A Timeout or a net::ERR_* code from browser_navigate means the box cannot reach that host. Do not retry it, even if the tool result says to, and do not run DNS or connectivity checks. Move to the next source this Task names, or report the code and URL. An HTTP block (403, 419, 429, 503) follows this Task's own rule. Work in the tab you start in. Do not open a second tab, and switch tabs only when a tool result names a page you did not intend. In-page tabs are part of the page. A page script is an async (page) => function: run it with browser_run_code if you hold it. Without it, read rendered text from browser_snapshot or browser_find, read a <script> tag from the HTML that curl fetches in the box shell, and report a field neither yields as unreadable, never visible text in its place. Name the read you used. Snapshot a page state once. After a click, a scroll, or a wait this Task calls for, take one new snapshot. Do not snapshot the same state twice. Report as soon as the stop rule above is met, one line per item, only the fields asked for, no page dumps.
+ ```
+ 
+@@ -113,7 +118,7 @@
+ - Tells are an empty search page after 3.5 seconds or repeated XHR 403s.
+ - If the dialog is up and a ref click "succeeds" but the counter does not move, that is the overlay. Use the page-script click.
+ - At storefronts with no guest cart a sign-in modal opens on the first add: the add does not land even after the page-script click, the button never becomes the decrement control, and the dialog stays. That is a sign-in wall, not the fee dialog;
+- the helper stops and reports `guest_add_blocked` with the retailer and the URL. Do not retry the guest snippet or another guest search. The parent tells the user that retailer needs a signed-in session, gets one (credentials through `RequestUserForm`, or a hand-off so the user signs in on the box), and dispatches the same snippet again in that session;
++ the helper adds nothing more, searches the rest of the list, and reports `guest_add_blocked` with the retailer, the URL, and each item's match. Do not retry the guest snippet or another guest search. The parent tells the user that retailer needs a signed-in session, gets one (credentials through `RequestUserForm`, or a hand-off so the user signs in on the box), and dispatches the same snippet again in that session;
+  the helper still never logs in itself.
+ - If the page asks for a password, 2FA code, captcha, or payment, stop. Do not solve or bypass. Report which wall appeared and the URL it was on.
+ 

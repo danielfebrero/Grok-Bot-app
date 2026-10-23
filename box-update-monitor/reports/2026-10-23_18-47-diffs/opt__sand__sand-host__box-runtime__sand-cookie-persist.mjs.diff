@@ -1,0 +1,175 @@
+--- 2026-10-23_14-52:/opt/sand/sand-host/box-runtime/sand-cookie-persist.mjs
++++ 2026-10-23_18-47:/opt/sand/sand-host/box-runtime/sand-cookie-persist.mjs
+@@ -22,11 +22,14 @@
+   cookieFingerprint,
+   cookieKey,
+   cookieRecency,
++  deleteCookies,
+   discoverMonitorPorts,
+   isConnectionRefused,
+   isRotatingAuthCookie,
++  isSignedOutCopy,
+   pushCookies,
+   readCookies,
++  readSignedOutLedger,
+   toCookieParam,
+ } from "./cdp-cookies.mjs";
+ 
+@@ -56,6 +59,7 @@
+   crashed: "crashed; exiting",
+   "telemetry-append-failed": "telemetry append failed",
+   "lock-unreadable": "seed lock dir unreadable, retrying",
++  "ledger-unreadable": "sign-out ledger unreadable; restoring every seed cookie",
+   "lock-owner-kept": "seed lock owner file not removed",
+   "lock-dir-kept": "seed lock dir not removed",
+   "monitor-discovery-failed": "monitor discovery failed",
+@@ -87,6 +91,8 @@
+   "restore-waiting": "seed unreadable; restore waits",
+   "restore-injected": "restored seed cookies into live Chrome",
+   "restore-present": "the live jar already holds the seed cookies",
++  "restore-deleted":
++    "deleted signed-out cookies from the live jar, which holds every other seed cookie",
+   "restore-empty": "no seed cookies to restore",
+   "restore-incomplete": "proceeding to capture with seed cookies still absent from the live jar",
+   "restore-seed-unusable": "seed corrupt or its version is not supported; nothing restored",
+@@ -357,7 +363,9 @@
+     return { kind: "unsupported-version", version };
+   }
+   const cookies = parsed?.cookies;
+-  return Array.isArray(cookies) ? { kind: "ok", cookies } : { kind: "corrupt" };
++  return Array.isArray(cookies)
++    ? { kind: "ok", cookies, savedAt: parsed.savedAt }
++    : { kind: "corrupt" };
+ }
+ 
+ const DNS_NAME = /^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
+@@ -450,7 +458,7 @@
+   return merged;
+ }
+ 
+-function restoreCandidates(target, others, saved, seen) {
++function restoreCandidates(target, others, saved, seen, signedOut) {
+   const missing = [];
+   for (const [key, savedCookie] of saved) {
+     if (target.has(key)) continue;
+@@ -458,12 +466,21 @@
+       seen,
+       key,
+       others.filter(({ jar }) => jar.has(key)),
+-    );
++    ).filter((cookie) => !isSignedOutCopy(signedOut, key, cookie));
+     missing.push(changed.length > 0 ? latestExpiry(changed) : savedCookie);
+   }
+   return missing;
+ }
+ 
++function readSignedOutCopies(deps) {
++  try {
++    return deps.readSignedOut?.() ?? new Map();
++  } catch (error) {
++    logLine(deps, "ledger-unreadable", faultCode(error));
++    return new Map();
++  }
++}
++
+ function dropsMostOfSeed(cookies, saved) {
+   const mergedKeys = new Set(cookies.map(cookieKey));
+   const kept = [...saved.keys()].filter((key) => mergedKeys.has(key)).length;
+@@ -795,11 +812,14 @@
+   if (seed.kind === "corrupt" || seed.kind === "unsupported-version") {
+     return { injected: 0, missingAfter: 0, seedCount: 0, corrupt: true };
+   }
++  const signedOut = readSignedOutCopies(deps);
+   const seedCookies = withoutTailnetCookies(
+     seed.kind === "ok" ? seed.cookies : [],
+     tailnetSuffixes(deps),
+-  );
+-  if (seedCookies.length === 0) return { injected: 0, missingAfter: 0, seedCount: 0 };
++  ).filter((cookie) => !isSignedOutCopy(signedOut, cookieKey(cookie), cookie));
++  if (seedCookies.length === 0 && signedOut.size === 0) {
++    return { injected: 0, missingAfter: 0, seedCount: 0 };
++  }
+ 
+   const saved = new Map(seedCookies.map((c) => [cookieKey(c), c]));
+   const faults = {};
+@@ -811,19 +831,36 @@
+   };
+   const open = await openJars(deps, ports ?? monitorPorts(deps), faults);
+   let injected = 0;
++  let deleted = 0;
+   let missingAfter = seedCookies.length;
+   try {
+     for (const { port, browser, jar } of open) {
+       if (onlyPort !== undefined && port !== onlyPort) continue;
+       const others = open.filter((o) => o.port !== port);
+-      const missing = restoreCandidates(jar, others, saved, seen);
++      const stale = [...jar].filter(([key, cookie]) => isSignedOutCopy(signedOut, key, cookie));
++      const withheld = new Set(
++        stale.map(([key]) => key).filter((key) => !(seed.savedAt > signedOut.get(key).at)),
++      );
++      const held = new Map(jar);
++      for (const [key] of stale) if (!withheld.has(key)) held.delete(key);
++      const missing = restoreCandidates(held, others, saved, seen, signedOut);
+       try {
++        if (stale.length > 0) {
++          await deleteCookies(
++            browser,
++            stale.map(([, cookie]) => cookie),
++            onRefused,
++          );
++          deleted += stale.length;
++        }
+         if (missing.length > 0) {
+           await pushCookies(browser, missing.map(toCookieParam), onRefused);
+           injected += missing.length;
+         }
+         const after = await readCookies(browser);
+-        const stillMissing = [...saved.keys()].filter((key) => !after.has(key)).length;
++        const stillMissing = [...saved.keys()].filter(
++          (key) => !after.has(key) && !withheld.has(key),
++        ).length;
+         missingAfter = Math.min(missingAfter, stillMissing);
+       } catch (error) {
+         faults.code = faultCode(error);
+@@ -833,11 +870,22 @@
+   } finally {
+     for (const { browser } of open) browser.close();
+   }
+-  return { injected, missingAfter, seedCount: seedCookies.length, ...faults };
++  return {
++    injected,
++    missingAfter,
++    seedCount: seedCookies.length,
++    ...(deleted > 0 ? { deleted } : {}),
++    ...faults,
++  };
++}
++
++function okRestoreLine(injected, deleted) {
++  if (injected > 0) return "restore-injected";
++  return deleted > 0 ? "restore-deleted" : "restore-present";
+ }
+ 
+-function logRestoreOutcome(deps, outcome, { injected, seedCount, code, refusal }) {
+-  if (outcome === "ok") logLine(deps, injected > 0 ? "restore-injected" : "restore-present");
++function logRestoreOutcome(deps, outcome, { injected, deleted, seedCount, code, refusal }) {
++  if (outcome === "ok") logLine(deps, okRestoreLine(injected, deleted));
+   else if (outcome === "empty") logLine(deps, "restore-empty");
+   else if (seedCount === 0) logLine(deps, "restore-seed-unusable");
+   else logLine(deps, "restore-incomplete", code ?? null, refusal ?? null);
+@@ -1079,6 +1127,7 @@
+         seedPath: SEED_PATH,
+         fs: { readFileSync },
+         tailnetSuffixes: () => readTailnetSuffixes(),
++        readSignedOut: () => readSignedOutLedger(),
+         log,
+       },
+       restorePort,
+@@ -1107,6 +1156,7 @@
+       writeFileSync,
+     },
+     tailnetSuffixes: () => readTailnetSuffixes(),
++    readSignedOut: () => readSignedOutLedger(),
+     log,
+     emitTelemetry: (event) => appendTelemetry(log, event),
+   };

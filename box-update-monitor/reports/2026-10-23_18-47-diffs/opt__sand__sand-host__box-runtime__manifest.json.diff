@@ -1,0 +1,43 @@
+--- 2026-10-23_14-52:/opt/sand/sand-host/box-runtime/manifest.json
++++ 2026-10-23_18-47:/opt/sand/sand-host/box-runtime/manifest.json
+@@ -2,11 +2,11 @@
+   "files": [
+     {
+       "name": "box-contract.generated.mjs",
+-      "sha256": "2d6bde5e62321704fc3d940f18367fb3842a2822d056e3fc827a27038e4ec6f1"
++      "sha256": "774fbad4282cc4545d47fc5e5e08c26c45dee9ee2a749396eae176bcd5f40972"
+     },
+     {
+       "name": "cdp-cookies.mjs",
+-      "sha256": "f1973da39fad42c634aa88187a8a047b4d5bb0410a5cef3f89ea91a1cd623165"
++      "sha256": "27e1042a977044efb4622ea7742f72459614a1aa0076e1f7d8fe8b547a1b1316"
+     },
+     {
+       "name": "sand-cookie-import.mjs",
+@@ -14,7 +14,7 @@
+     },
+     {
+       "name": "sand-cookie-persist.mjs",
+-      "sha256": "2ffeadf5b0f702d3fe876f62b241b629fdcf7a8642f698f0e192a09a50b0357e"
++      "sha256": "6f82ed6afd730972007150c875fa4f72a09ec067f0c3998ba7836a81609b06eb"
+     },
+     {
+       "name": "sand-egress-timezone.mjs",
+@@ -22,7 +22,7 @@
+     },
+     {
+       "name": "sand-egress-tunnel",
+-      "sha256": "aace31b569ca3d9583d186f4391af7ee58cc835e6c751ae4bc89a42191664e89"
++      "sha256": "42d76a262c610f48815d2c2d592aef9f389a724237d77ed1f82b38d45a892e44"
+     },
+     {
+       "name": "sand-fingerprint-profiles.mjs",
+@@ -34,7 +34,7 @@
+     },
+     {
+       "name": "sand-session-sync.mjs",
+-      "sha256": "0fe7ab96e0b4a507a0955a2104f3d4cfe85911182a4ef7701cbe9c26dc386468"
++      "sha256": "1f6463b4c14af90622bfdfc02f1ad28f085a6b8c2e8c8f29c8e045012791116f"
+     },
+     {
+       "name": "sand-ua-governor.mjs",

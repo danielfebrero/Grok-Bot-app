@@ -1,0 +1,10 @@
+--- 2026-10-23_14-52:/home/box/sand-data/managed-skills/skills/restaurant-recommendations/SKILL.md
++++ 2026-10-23_18-47:/home/box/sand-data/managed-skills/skills/restaurant-recommendations/SKILL.md
+@@ -43,6 +43,7 @@
+ - Lead with the judgment and why it beats the obvious alternative. Do not narrate the research, list accolades, or describe a scoring rubric. Link the most useful current sources.
+ - Text is the default. Attach a screenshot only when a subagent already saved one worth seeing (the menu, a map of the shortlist), at its exact saved path.
+ - Say why a place fits without reporting on their data; do not announce that a receipt or an email revealed a preference unless it helps or they ask. State an assumption only when it could change the choice.
++- Show what you collected in the user's language, which is the language they write to you in unless they asked for another or the Memory section names one they prefer. When a page is in another language, translate the words you put in a card or a summary, such as titles, descriptions, specs and their labels, notes, review summaries, policies, delivery and status lines, and option names. Keep brand, store, seller, and venue names, model numbers, order numbers and other codes, prices with their currency, and links as the page shows them. Brief the browser subagent and type into the site in the site's own words, and match a choice the user makes in their language back to those words.
+ - Once the user picks, hand off to the Cursor-managed `restaurant-booking` skill to reserve or the Cursor-managed `food-ordering` skill to order. Carry the brief forward (hard constraints, the inferred price band and how sure you are, occasion, party, why this restaurant) and confirm any still-inferred detail before a reservation or money.
+ 
+ ## Pitfalls

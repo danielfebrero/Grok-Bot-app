@@ -1,0 +1,82 @@
+--- 2026-10-23_14-52:/opt/sand/sand-host/box-launchers/box-chrome
++++ 2026-10-23_18-47:/opt/sand/sand-host/box-launchers/box-chrome
+@@ -127,22 +127,13 @@
+ )
+ # WebGL on this GPU-less Xvfb box. Default --enable-unsafe-swiftshader keeps a
+ # software context and prints ANGLE(... SwiftShader Device (Subzero) ...).
+-# sand_enable_spoof_gpu writes /tmp/sand-enable-spoof-gpu (or set
+-# SAND_ENABLE_SPOOF_GPU=1) so we launch with --use-angle=gl instead: no WebGL
+-# context, and no SwiftShader renderer string. SAND_CHROME_LEGACY_GPU=1
+-# restores blocklist-ignore + software WebGPU. Chrome must restart to pick up
+-# a marker flip.
++# SAND_CHROME_LEGACY_GPU=1 restores blocklist-ignore + software WebGPU.
+ if [ "${SAND_CHROME_LEGACY_GPU:-0}" = "1" ]; then
+ 	CHROME_FLAGS+=(
+ 		--ignore-gpu-blocklist
+ 		--enable-unsafe-webgpu
+ 	)
+ 	BOX_CHROME_GPU_MODE=legacy
+-elif [ "${SAND_ENABLE_SPOOF_GPU:-0}" = "1" ] || [ -e "${SAND_ENABLE_SPOOF_GPU_FILE:-/tmp/sand-enable-spoof-gpu}" ]; then
+-	CHROME_FLAGS+=(
+-		--use-angle=gl
+-	)
+-	BOX_CHROME_GPU_MODE=angle-gl
+ else
+ 	CHROME_FLAGS+=(
+ 		--enable-unsafe-swiftshader
+@@ -272,7 +263,7 @@
+ SAND_WEBAUTHN_ID_FILE=/usr/local/share/sand-webauthn-proxy.id
+ SAND_WEBAUTHN_MARKER=/home/box/.sand-webauthn-proxy-enabled
+ CHROME_LOG="/tmp/chrome${DISPLAY:-:1}.log"
+-BOX_CHROME_LAUNCHER_VERSION=4
++BOX_CHROME_LAUNCHER_VERSION=5
+ CHROME_FLAGS+=(--sand-box-chrome-launcher="${BOX_CHROME_LAUNCHER_VERSION}")
+ CHROME_LAUNCH_WAIT_S=20
+ CHROME_RELEASE_GRACE_S=10
+@@ -435,7 +426,6 @@
+ 	marker_gate_on "${SAND_BOX_BROWSER_COHERENT_FINGERPRINT:-}" \
+ 		"${SAND_BOX_BROWSER_COHERENT_FINGERPRINT_FILE:-/tmp/sand-box-browser-coherent-fingerprint}" 1 &&
+ 		markers+=(coherent_fingerprint)
+-	[ "${BOX_CHROME_GPU_MODE}" = angle-gl ] && markers+=(spoof_gpu)
+ 	[ -e "${SAND_BOX_BROWSER_WEBRTC_PROXY_ONLY_FILE:-/tmp/sand-box-browser-webrtc-proxy-only}" ] &&
+ 		markers+=(webrtc_proxy_only)
+ 	[ "${SAND_BOX_BROWSER_NO_LOCAL_DNS}" = "1" ] && [ -n "${SAND_EGRESS_PROXY_BYPASS_FLAG:-}" ] &&
+@@ -495,6 +485,30 @@
+ 	[ -z "${out}" ] || printf '%s\n' "${out}" 2>/dev/null >>"${SAND_COOKIE_RESTORE_LOG:-/dev/null}" || true
+ }
+ 
++# box-chrome-policy keeps session cookies past the last window by making each
++# profile restore its last session, and Chrome restores it in the next window
++# from the files it writes under Default/Sessions, or under
++# Default/Sessions_Encrypted once its EncryptSessionStorage field trial is on
++# (https://chromium.googlesource.com/chromium/src/+/refs/tags/155.0.8059.84/chrome/browser/sessions/session_service.cc,
++# https://chromium.googlesource.com/chromium/src/+/refs/tags/155.0.8059.84/components/sessions/core/command_storage_backend.cc,
++# https://chromium.googlesource.com/chromium/src/+/refs/tags/155.0.8059.84/components/sessions/core/command_storage_manager.cc).
++# An empty folder Chrome cannot write leaves no session to restore, so a closed
++# tab never comes back, and a running Chrome loses the file it has open.
++lock_session_restore() {
++	local default="${CHROME_PROFILE}/Default" folder sessions as_box=()
++	[ "$(id -u)" -ne 0 ] || as_box=(runuser -u box --)
++	for folder in Sessions Sessions_Encrypted; do
++		sessions="${default}/${folder}"
++		if [ "$(stat -c %a "${sessions}" 2>/dev/null)" = 555 ] && [ -z "$(ls -A "${sessions}" 2>/dev/null)" ]; then
++			continue
++		fi
++		[ -L "${sessions}" ] || "${as_box[@]}" chmod u+w -- "${sessions}" 2>/dev/null
++		"${as_box[@]}" rm -rf -- "${sessions}" 2>/dev/null || continue
++		{ [ -d "${default}" ] || "${as_box[@]}" mkdir -m 700 -- "${default}"; } 2>/dev/null &&
++			"${as_box[@]}" mkdir -m 555 -- "${sessions}" 2>/dev/null || true
++	done
++}
++
+ # Both profiles share the box-chrome window class on one display, so the wait
+ # matches a visible window owned by this profile's own browser process.
+ chrome_window_up() {
+@@ -573,6 +587,7 @@
+ 
+ exec 9>"${CHROME_PROFILE}/.sand-launch.lock"
+ flock -w 90 9 || exit 1
++lock_session_restore
+ 
+ CHROME_PORT_HELD=0
+ chrome_ready || release_profile_browser || CHROME_PORT_HELD=1

@@ -1,0 +1,29 @@
+// @generated SignedSource<<6fb975d737cc6b6934ab6c10a02d506c89ab6718cca0c11530fa69db638c225d>>
+// Emitted by scripts/gen-box-contract.mts from sand/src/shared/box/box-contract.ts;
+// regenerate with `pnpm --filter sand run gen:box-contract`.
+export const BROWSER_HARDWARE_PROFILE_MARKER_PATH = "/tmp/sand-browser-hardware-profile";
+export const BOX_BROWSER_COHERENT_FINGERPRINT_MARKER_PATH = "/tmp/sand-box-browser-coherent-fingerprint";
+export const BOX_BROWSER_UNGOOGLED_MARKER_PATH = "/tmp/sand-box-browser-ungoogled";
+export const BOX_EXPERIMENTS_READY_MARKER_PATH = "/tmp/sand-box-experiments-ready";
+export const EGRESS_TUNNEL_FAIL_CLOSED_MARKER_PATH = "/tmp/sand-egress-tunnel-fail-closed";
+export const BOX_BROWSER_WEBRTC_PROXY_ONLY_MARKER_PATH = "/tmp/sand-box-browser-webrtc-proxy-only";
+export const BOX_BROWSER_NO_LOCAL_DNS_MARKER_PATH = "/tmp/sand-box-browser-no-local-dns";
+export const BOX_BROWSER_DISABLE_QUIC_MARKER_PATH = "/tmp/sand-chrome-disable-quic";
+export const BOX_CHROME_EXTRA_FLAGS_PATH = "/tmp/sand-box-chrome-extra-flags";
+export const BOX_BROWSER_RUNNING_PATH_PREFIX = "/tmp/sand-box-browser-running";
+export const BOX_BROWSER_GPU_MODE_PATH_PREFIX = "/tmp/sand-box-browser-gpu-mode";
+export const BOX_BROWSER_GPU_MODES = ["swiftshader","angle-gl","legacy"];
+export const BROWSER_ACCEPT_LANGUAGE_EN_US_MARKER_PATH = "/tmp/sand-browser-accept-language-en-us";
+export const BROWSER_EGRESS_TIMEZONE_MARKER_PATH = "/tmp/sand-browser-egress-timezone";
+export const WEB_BOT_AUTH_SIGNED_CACHE_PATH = "/tmp/sand-web-bot-auth-signed.json";
+export const WEB_BOT_AUTH_SIGNED_TTL_MS = 120000;
+export const WEB_BOT_AUTH_SIGNATURE_SOURCES = ["fresh","box_cache","fleet_cache"];
+export const SAND_BOX_PORTS = {"primaryExecDaemon":1337,"primaryPty":1338,"primaryNovncWebsockify":6080,"windowRouter":1339,"forkNovncWebsockify":6081,"hostGateway":1340,"egressTunnelWebSocket":8790,"egressConnectProxy":8791};
+export const SAND_BOX_FORK_PORT_BASES = {"execDaemon":14000,"pty":13600,"vnc":5900};
+export const SAND_BOX_CDP_PORT_BASE = 9222;
+export const SAND_BOX_TAILNET_CHROME_CDP_PORT = 9600;
+export const SAND_BOX_WINDOW_TOKEN_DIR = "/tmp/sand-window-tokens.d";
+export const SAND_BOX_NOVNC_TOKEN_DIR = "/tmp/sand-novnc-tokens.d";
+export const SAND_BOX_DISPLAY_HEADER = "x-sand-display";
+export const SAND_BOX_WINDOW_OWNER_HEADER = "x-sand-window-owner";
+export const TAILNET_HOST_SUFFIXES_PATH = "/var/lib/sand/tailnet/host-suffixes";

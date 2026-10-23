@@ -1,0 +1,49 @@
+--- 2026-10-23_14-52:/opt/sand/sand-host/box-scripts/box-chrome-policy
++++ 2026-10-23_18-47:/opt/sand/sand-host/box-scripts/box-chrome-policy
+@@ -45,8 +45,36 @@
+ 	exit "$1"
+ }
+ 
++# box-chrome keeps Chrome running past its last window, yet on Linux Chrome
++# still clears a profile's session cookies when that window closes unless the
++# profile restores its last session, which also reopens the closed window's
++# tabs in the next window
++# (https://chromium.googlesource.com/chromium/src/+/refs/tags/155.0.8059.84/chrome/browser/sessions/session_data_deleter.cc,
++# https://chromium.googlesource.com/chromium/src/+/refs/tags/155.0.8059.84/chrome/browser/sessions/session_service.cc):
++# https://chromeenterprise.google/policies/#RestoreOnStartup
++restore='"RestoreOnStartup":1'
++
+ { [ -f "${policy_file}" ] && : >>"${policy_file}"; } 2>/dev/null || exit_unapplied 0
+ 
++# A rename swaps the whole file in one step, so a reader never sees it half
++# written (https://man7.org/linux/man-pages/man2/rename.2.html). The image's
++# managed policy folder belongs to root, so a box user cannot create the file to
++# rename and rewrites the policy in place.
++write_policy() {
++	local text="$1" tmp
++	[ "$(cat -- "${policy_file}" 2>/dev/null)" != "${text}" ] || return 0
++	if tmp="$(mktemp -- "$(dirname -- "${policy_file}")/.$(basename -- "${policy_file}").XXXXXX" 2>/dev/null)"; then
++		if printf '%s\n' "${text}" >"${tmp}" &&
++			chmod --reference="${policy_file}" -- "${tmp}" &&
++			chown --reference="${policy_file}" -- "${tmp}" 2>/dev/null &&
++			mv -f -- "${tmp}" "${policy_file}"; then
++			return 0
++		fi
++		rm -f -- "${tmp}"
++	fi
++	printf '%s\n' "${text}" >"${policy_file}"
++}
++
+ entries=""
+ onepassword_entry=""
+ onepassword_id=""
+@@ -87,7 +115,7 @@
+ fi
+ 
+ if [ -n "${entries}" ]; then
+-	printf '{"ExtensionSettings":{%s}%s%s%s}\n' "${entries}" "${devtools}" "${onepassword_policy}" "${webrtc:+,${webrtc}}" >"${policy_file}" || exit_unapplied 1
++	write_policy "$(printf '{"ExtensionSettings":{%s}%s%s,%s%s}' "${entries}" "${devtools}" "${onepassword_policy}" "${restore}" "${webrtc:+,${webrtc}}")" || exit_unapplied 1
+ else
+-	printf '{%s}\n' "${webrtc}" >"${policy_file}" || exit_unapplied 1
++	write_policy "$(printf '{%s%s}' "${restore}" "${webrtc:+,${webrtc}}")" || exit_unapplied 1
+ fi

@@ -1,0 +1,492 @@
+--- 2026-10-23_14-52:/opt/sand/sand-host/box-runtime/sand-session-sync.mjs
++++ 2026-10-23_18-47:/opt/sand/sand-host/box-runtime/sand-session-sync.mjs
+@@ -1,22 +1,30 @@
+-import { statSync } from "node:fs";
++import { mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
++import { dirname } from "node:path";
+ import { pathToFileURL } from "node:url";
+ import {
+   attachToPage,
+   CDP_PORT_BASE,
+   connectBrowser,
++  cookieDigest,
+   cookieFingerprint,
++  cookieKey,
+   cookieRecency,
++  deleteCookies,
+   detachSession,
+   discoverMonitorPorts,
+   hostMatchesCookieDomain,
+   hostOfOrigin,
+   isConnectionRefused,
++  isSignedOutCopy,
+   listPageTargets,
++  parseSignedOutLedger,
+   pushCookies,
+   readCookies,
+   readPageStorage,
+   reloadPage,
++  serializeSignedOutLedger,
+   setPageStorage,
++  SIGNED_OUT_LEDGER_PATH,
+   toCookieParam,
+ } from "./cdp-cookies.mjs";
+ 
+@@ -76,15 +84,159 @@
+ 
+ export function selectCookieSeed(canonical, currentCookies, offered) {
+   const cookies = [];
+-  const offeredKeys = [];
+   for (const [key, cookie] of canonical) {
+     if (currentCookies.has(key)) continue;
+-    const fingerprint = cookieFingerprint(cookie);
+-    if (offered?.get(key) === fingerprint) continue;
++    if (offered?.get(key) === cookieFingerprint(cookie)) continue;
+     cookies.push(cookie);
+-    offeredKeys.push([key, fingerprint]);
+   }
+-  return { cookies, offeredKeys };
++  return cookies;
++}
++
++const SIGNED_OUT_LEDGER_MAX_KEYS = 512;
++const SIGNED_OUT_LEDGER_MAX_DIGESTS = 16;
++const BOX_CHROME_POLICY_PATH = "/etc/opt/chrome/policies/managed/sand-webauthn.json";
++
++function cookieHasExpired(cookie, nowMs) {
++  return (
++    cookie.session !== true &&
++    typeof cookie.expires === "number" &&
++    cookie.expires > 0 &&
++    cookie.expires * 1000 <= nowMs
++  );
++}
++
++function addToSetMap(map, key, value) {
++  let set = map.get(key);
++  if (set == null) {
++    set = new Set();
++    map.set(key, set);
++  }
++  set.add(value);
++}
++
++function addToListMap(map, key, value) {
++  let list = map.get(key);
++  if (list == null) {
++    list = [];
++    map.set(key, list);
++  }
++  list.push(value);
++}
++
++function liveCookies(jar, ledger) {
++  const live = new Map();
++  for (const [key, cookie] of jar) {
++    if (!isSignedOutCopy(ledger, key, cookie)) live.set(key, cookie);
++  }
++  return live;
++}
++
++function planCookieSync({ views, reads, ledger, now, restoresSessions }) {
++  const continuing = [];
++  for (const [port, read] of reads) {
++    const view = views.get(port);
++    if (view?.jar != null && view.browserId === read.browserId) continuing.push([port, view]);
++  }
++
++  const removed = new Map();
++  const written = new Map();
++  const retired = new Map();
++  for (const [port, view] of continuing) {
++    const { jar } = reads.get(port);
++    for (const [key, before] of view.jar) {
++      if (jar.has(key)) continue;
++      view.sent.delete(key);
++      if (cookieHasExpired(before, now)) continue;
++      if (before.session === true && !restoresSessions) continue;
++      addToListMap(removed, key, before);
++    }
++    for (const [key, cookie] of jar) {
++      const fingerprint = cookieFingerprint(cookie);
++      const before = view.jar.get(key);
++      if (before != null && cookieFingerprint(before) === fingerprint) continue;
++      if (view.sent.get(key) === fingerprint) continue;
++      if (before != null && isSignedOutCopy(ledger, key, before)) {
++        addToListMap(retired, key, cookie);
++      } else {
++        addToSetMap(written, key, cookieDigest(cookie));
++      }
++    }
++  }
++
++  let ledgerChanged = false;
++  for (const [key, digests] of written) {
++    const entry = ledger.get(key);
++    if (entry == null) continue;
++    for (const digest of digests) ledgerChanged = entry.digests.delete(digest) || ledgerChanged;
++    if (entry.digests.size === 0) ledger.delete(key);
++  }
++
++  for (const [key, gone] of removed) {
++    for (const copy of gone) addToListMap(retired, key, copy);
++    for (const view of views.values()) {
++      const before = view.jar?.get(key);
++      if (before != null) addToListMap(retired, key, before);
++    }
++    for (const read of reads.values()) {
++      const current = read.jar.get(key);
++      if (current != null) addToListMap(retired, key, current);
++    }
++  }
++  for (const [key, copies] of retired) {
++    const entry = ledger.get(key) ?? { digests: new Set(), at: now };
++    entry.at = now;
++    for (const copy of copies) {
++      const digest = cookieDigest(copy);
++      if (entry.digests.has(digest)) continue;
++      entry.digests.add(digest);
++      ledgerChanged = true;
++    }
++    if (entry.digests.size > 0) ledger.set(key, entry);
++  }
++
++  const canonical = mergeCookies([...reads.values()].map((read) => liveCookies(read.jar, ledger)));
++  const deletes = new Map();
++  const pushes = new Map();
++  for (const [port, read] of reads) {
++    for (const [key, cookie] of read.jar) {
++      if (isSignedOutCopy(ledger, key, cookie)) addToListMap(deletes, port, cookie);
++    }
++    const sent = views.get(port)?.browserId === read.browserId ? views.get(port).sent : null;
++    const cookies = selectCookieSeed(canonical, liveCookies(read.jar, ledger), sent);
++    if (cookies.length > 0) pushes.set(port, cookies);
++  }
++  return { signedOut: [...removed.keys()], ledgerChanged, deletes, pushes };
++}
++
++function capSignedOutLedger(ledger) {
++  for (const entry of ledger.values()) {
++    if (entry.digests.size <= SIGNED_OUT_LEDGER_MAX_DIGESTS) continue;
++    entry.digests = new Set([...entry.digests].slice(-SIGNED_OUT_LEDGER_MAX_DIGESTS));
++  }
++  if (ledger.size <= SIGNED_OUT_LEDGER_MAX_KEYS) return;
++  const oldest = [...ledger].sort((a, b) => a[1].at - b[1].at);
++  for (const [key] of oldest.slice(0, ledger.size - SIGNED_OUT_LEDGER_MAX_KEYS)) ledger.delete(key);
++}
++
++function mergeSignedOutLedger(ledger, file) {
++  for (const [key, { digests, at }] of file) {
++    const entry = ledger.get(key);
++    if (entry == null) {
++      ledger.set(key, { digests: new Set(digests), at });
++    } else {
++      entry.digests = new Set([...digests, ...entry.digests]);
++      entry.at = Math.max(entry.at, at);
++    }
++  }
++  for (const [key, { digests }] of ledger) {
++    const saved = file.get(key)?.digests;
++    if (saved == null || [...digests].some((digest) => !saved.has(digest))) return true;
++  }
++  return false;
++}
++
++function ledgerStamp({ ino, size, mtimeMs }) {
++  return `${ino}:${size}:${mtimeMs}`;
+ }
+ 
+ export const MONITOR_BUSY_TTL_MS = 30_000;
+@@ -202,19 +354,92 @@
+ 
+ // Chrome keeps an in-memory list of all cookies and reads the backing store only until it has fetched them all (https://chromium.googlesource.com/chromium/src/+/refs/tags/151.0.7922.169/net/cookies/cookie_monster.h), and the DevTools IndexedDB domain has no method that writes an entry (https://chromedevtools.github.io/devtools-protocol/tot/IndexedDB/).
+ export class SessionSyncer {
+-  constructor() {
++  constructor({
++    ledgerPath = SIGNED_OUT_LEDGER_PATH,
++    policyPath = BOX_CHROME_POLICY_PATH,
++    fs = { mkdirSync, readFileSync, renameSync, statSync, writeFileSync },
++    now = Date.now,
++  } = {}) {
+     this.browsers = new Map();
+-    this.cookieOffered = new Map();
++    this.cookieViews = new Map();
+     this.storageOffered = new Map();
+     this.browserIdByPort = new Map();
+     this.reloadBreaker = new FreshIdentityReloadBreaker();
+     this.busyWithheldReloads = new Map();
++    this.ledgerPath = ledgerPath;
++    this.policyPath = policyPath;
++    this.fs = fs;
++    this.now = now;
++    this.ledger = new Map();
++    this.ledgerStamp = null;
++    this.ledgerReadFailed = false;
++    this.ledgerSaveFailed = false;
++    this.ledgerUnsaved = false;
++    this.restoresSessions = null;
++    this.policyReadFailed = false;
++    this.loadLedger();
++  }
++
++  loadLedger() {
++    let stamp;
++    let text = null;
++    try {
++      stamp = ledgerStamp(this.fs.statSync(this.ledgerPath));
++      if (stamp === this.ledgerStamp) return true;
++      text = this.fs.readFileSync(this.ledgerPath, "utf8");
++    } catch (error) {
++      if (error?.code !== "ENOENT") {
++        if (!this.ledgerReadFailed) {
++          log(`sign-out ledger unreadable; keeping it and not saving: ${String(error)}`);
++        }
++        this.ledgerReadFailed = true;
++        return false;
++      }
++      stamp = "absent";
++    }
++    this.ledgerReadFailed = false;
++    if (stamp === this.ledgerStamp) return true;
++    let file = text == null ? new Map() : parseSignedOutLedger(text);
++    if (file == null) {
++      log(`${this.ledgerPath} is not a sign-out ledger; replacing it at the next save`);
++      file = new Map();
++    }
++    if (mergeSignedOutLedger(this.ledger, file)) this.ledgerUnsaved = true;
++    this.ledgerStamp = stamp;
++    return true;
++  }
++
++  readRestoresSessions() {
++    let restores = false;
++    let reason = "has no RestoreOnStartup: 1";
++    try {
++      restores = JSON.parse(this.fs.readFileSync(this.policyPath, "utf8"))?.RestoreOnStartup === 1;
++      this.policyReadFailed = false;
++    } catch (error) {
++      if (error?.code !== "ENOENT" && this.restoresSessions != null) {
++        if (!this.policyReadFailed) {
++          log(`Chrome policy is unreadable (${String(error)}); keeping its last value`);
++        }
++        this.policyReadFailed = true;
++        return this.restoresSessions;
++      }
++      reason = `is unreadable (${String(error)})`;
++    }
++    if (restores !== this.restoresSessions) {
++      log(
++        restores
++          ? "Chrome keeps session cookies when a window closes; a lost one is a sign-out"
++          : `Chrome policy ${reason}; a lost session cookie is not read as a sign-out`,
++      );
++    }
++    this.restoresSessions = restores;
++    return restores;
+   }
+ 
+   syncBrowserIdentity(port, browserId) {
+     const prev = this.browserIdByPort.get(port);
+     if (prev != null && browserId !== "" && prev !== browserId) {
+-      this.cookieOffered.delete(port);
++      this.cookieViews.delete(port);
+       this.storageOffered.delete(port);
+       this.reloadBreaker.clearPort(port);
+       this.busyWithheldReloads.delete(port);
+@@ -223,13 +448,121 @@
+     if (browserId !== "") this.browserIdByPort.set(port, browserId);
+   }
+ 
+-  recordCookieOffered(port, cookieKey, fingerprint) {
+-    let perKey = this.cookieOffered.get(port);
+-    if (perKey == null) {
+-      perKey = new Map();
+-      this.cookieOffered.set(port, perKey);
++  saveLedger() {
++    if (!this.loadLedger()) return;
++    capSignedOutLedger(this.ledger);
++    const tmp = `${this.ledgerPath}.tmp`;
++    try {
++      this.fs.mkdirSync(dirname(this.ledgerPath), { recursive: true });
++      this.fs.writeFileSync(tmp, serializeSignedOutLedger(this.ledger));
++      const stamp = ledgerStamp(this.fs.statSync(tmp));
++      this.fs.renameSync(tmp, this.ledgerPath);
++      this.ledgerStamp = stamp;
++      this.ledgerSaveFailed = false;
++      this.ledgerUnsaved = false;
++    } catch (error) {
++      if (!this.ledgerSaveFailed) log(`saving the sign-out ledger failed: ${String(error)}`);
++      this.ledgerSaveFailed = true;
++    }
++  }
++
++  async readJars(live) {
++    const reads = new Map();
++    for (const browser of live) {
++      try {
++        reads.set(browser.port, {
++          browser,
++          browserId: browser.browserId,
++          jar: await readCookies(browser),
++        });
++      } catch {
++        browser.fail(new Error("getCookies failed"));
++      }
++    }
++    return reads;
++  }
++
++  async writeJar(read, view, planned) {
++    const { browser } = read;
++    const current = await readCookies(browser);
++    const stale = [];
++    const fill = [];
++    for (const cookie of planned.pushes) {
++      const held = current.get(cookieKey(cookie));
++      if (held == null || isSignedOutCopy(this.ledger, cookieKey(cookie), held)) fill.push(cookie);
++    }
++    const filled = new Set(fill.map(cookieKey));
++    for (const cookie of planned.deletes) {
++      const key = cookieKey(cookie);
++      const held = current.get(key);
++      if (held != null && !filled.has(key) && isSignedOutCopy(this.ledger, key, held)) {
++        stale.push(held);
++      }
++    }
++    for (const cookie of stale) view.sent.delete(cookieKey(cookie));
++    for (const cookie of fill) view.sent.set(cookieKey(cookie), cookieFingerprint(cookie));
++    if (stale.length > 0) await deleteCookies(browser, stale);
++    if (fill.length > 0) await pushCookies(browser, fill.map(toCookieParam));
++    const after = await readCookies(browser);
++    const jar = new Map(read.jar);
++    for (const key of [...stale, ...fill].map(cookieKey)) {
++      const landed = after.get(key);
++      if (landed == null) jar.delete(key);
++      else jar.set(key, landed);
++    }
++    view.jar = jar;
++    const replaced = fill.filter((cookie) => current.has(cookieKey(cookie))).length;
++    return { deleted: stale.length + replaced, fill };
++  }
++
++  async syncCookies(live) {
++    const reads = await this.readJars(live);
++    for (const [port, read] of reads) {
++      if (this.cookieViews.get(port)?.browserId !== read.browserId) {
++        this.cookieViews.set(port, { browserId: read.browserId, jar: null, sent: new Map() });
++      }
++    }
++    this.loadLedger();
++    const plan = planCookieSync({
++      views: this.cookieViews,
++      reads,
++      ledger: this.ledger,
++      now: this.now(),
++      restoresSessions: this.readRestoresSessions(),
++    });
++    if (plan.signedOut.length > 0) {
++      log(
++        `read a sign-out of ${plan.signedOut.length} cookie(s); removing every copy from the ` +
++          `other monitors`,
++      );
++    }
++    const newCookieDomains = new Map();
++    let pushed = 0;
++    let deleted = 0;
++    for (const [port, read] of reads) {
++      const view = this.cookieViews.get(port);
++      const planned = {
++        deletes: plan.deletes.get(port) ?? [],
++        pushes: plan.pushes.get(port) ?? [],
++      };
++      view.jar = read.jar;
++      if (planned.deletes.length === 0 && planned.pushes.length === 0) continue;
++      try {
++        const done = await this.writeJar(read, view, planned);
++        deleted += done.deleted;
++        pushed += done.fill.length;
++        if (done.fill.length > 0) {
++          newCookieDomains.set(port, new Set(done.fill.map((cookie) => cookie.domain)));
++        }
++      } catch {
++        read.browser.fail(new Error("cookie write failed"));
++      }
+     }
+-    perKey.set(cookieKey, fingerprint);
++    if (plan.ledgerChanged) this.ledgerUnsaved = true;
++    if (this.ledgerUnsaved) this.saveLedger();
++    if (deleted > 0) log(`deleted ${deleted} signed-out cookie cop${deleted === 1 ? "y" : "ies"}`);
++    if (pushed > 0) log(`mirrored ${pushed} cookie write(s) across ${reads.size} monitors`);
++    return newCookieDomains;
+   }
+ 
+   recordStorageOffered(port, storageKey, value) {
+@@ -343,6 +676,7 @@
+   async tick() {
+     await this.ensureConnections();
+     const live = [...this.browsers.values()].filter((b) => !b.isClosed);
++    const newCookieDomains = await this.syncCookies(live);
+     if (live.length === 0) return;
+     const livePorts = live.map((b) => b.port);
+     if (
+@@ -357,7 +691,8 @@
+     const busyPorts = readBusyMonitorPorts(livePorts);
+     try {
+       if (live.length >= 2) {
+-        await this.mirrorSessions(live, pagesByPort, busyPorts);
++        const reloadHosts = await this.syncLocalStorage(pagesByPort);
++        await this.reloadReceivers(pagesByPort, reloadHosts, newCookieDomains, busyPorts);
+       }
+       await this.deliverDeferredReloads(pagesByPort, busyPorts);
+       await this.deliverWithheldReloads(pagesByPort, busyPorts);
+@@ -368,50 +703,6 @@
+     }
+   }
+ 
+-  async mirrorSessions(live, pagesByPort, busyPorts) {
+-    const newCookieDomains = new Map();
+-
+-    const perBrowser = new Map();
+-    for (const browser of live) {
+-      try {
+-        perBrowser.set(browser.port, { browser, cookies: await readCookies(browser) });
+-      } catch {
+-        browser.fail(new Error("getCookies failed"));
+-      }
+-    }
+-    if (perBrowser.size < 2) return;
+-
+-    const canonical = mergeCookies([...perBrowser.values()].map((v) => v.cookies));
+-
+-    let synced = 0;
+-    for (const [port, { browser, cookies }] of perBrowser) {
+-      const { cookies: seed, offeredKeys } = selectCookieSeed(
+-        canonical,
+-        cookies,
+-        this.cookieOffered.get(port),
+-      );
+-      if (seed.length === 0) continue;
+-      await pushCookies(browser, seed.map(toCookieParam));
+-      synced += seed.length;
+-      for (const [key, fingerprint] of offeredKeys) {
+-        this.recordCookieOffered(port, key, fingerprint);
+-      }
+-      let domains = newCookieDomains.get(port);
+-      if (domains == null) {
+-        domains = new Set();
+-        newCookieDomains.set(port, domains);
+-      }
+-      for (const cookie of seed) domains.add(cookie.domain);
+-    }
+-
+-    if (synced > 0) {
+-      log(`mirrored ${synced} cookie write(s) across ${perBrowser.size} monitors`);
+-    }
+-
+-    const reloadHosts = await this.syncLocalStorage(pagesByPort);
+-    await this.reloadReceivers(pagesByPort, reloadHosts, newCookieDomains, busyPorts);
+-  }
+-
+   requestReload(port, host) {
+     const status = this.reloadBreaker.request(port, host);
+     if (status === "trip") {

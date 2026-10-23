@@ -1,0 +1,49 @@
+--- 2026-10-23_14-52:/opt/sand/sand-host/box-scripts/start-desktop.sh
++++ 2026-10-23_18-47:/opt/sand/sand-host/box-scripts/start-desktop.sh
+@@ -68,10 +68,6 @@
+ # <<< box port table <<<
+ NOVNC_HEARTBEAT_S="${SAND_NOVNC_HEARTBEAT_S:-30}"
+ 
+-if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
+-	eval "$(dbus-launch --sh-syntax)"
+-fi
+-
+ BOX_DISPLAY_NUM="${DISPLAY#:}"
+ BOX_DISPLAY_NUM="${BOX_DISPLAY_NUM%%.*}"
+ if [ "${BOX_DISPLAY_NUM:-1}" -ge 2 ] 2>/dev/null; then
+@@ -80,6 +76,9 @@
+ 	BOX_USER_XDG_DIR="/tmp/xdg-runtime-box"
+ fi
+ if [ "$(id -u)" -eq 0 ]; then
++	if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
++		eval "$(dbus-launch --sh-syntax)"
++	fi
+ 	install -d -o box -g box -m 700 "${BOX_USER_XDG_DIR}" 2>/dev/null || true
+ 	rm -f "${BOX_USER_XDG_DIR}/dbus-session-address"
+ 	BOX_DBUS_ADDRESS="$(runuser -u box -- env \
+@@ -93,6 +92,25 @@
+ else
+ 	mkdir -p "${BOX_USER_XDG_DIR}" 2>/dev/null || true
+ 	chmod 700 "${BOX_USER_XDG_DIR}" 2>/dev/null || true
++	if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
++		# Each daemon start listens under a new guid (https://dbus.freedesktop.org/doc/dbus-specification.html#addresses),
++		# so the published address names only the socket, which a relaunched bus reuses.
++		export DBUS_SESSION_BUS_ADDRESS="unix:path=${BOX_USER_XDG_DIR}/bus"
++		BOX_DBUS_ARGV=(/usr/local/bin/box-dbus --session --nofork --address="${DBUS_SESSION_BUS_ADDRESS}")
++		/usr/local/bin/box-bounded-log --run "/tmp/dbus${DISPLAY}.log" -- "${BOX_DBUS_ARGV[@]}" &
++		BOX_DBUS_PID=$!
++		sand_desktop_register "${SAND_DESKTOP_GROUP}" bus -1 "/tmp/dbus${DISPLAY}.log" "${BOX_DBUS_PID}" -- \
++			/usr/local/bin/box-bounded-log --run "/tmp/dbus${DISPLAY}.log" -- "${BOX_DBUS_ARGV[@]}"
++		for _ in $(seq 1 50); do
++			BOX_DBUS_OWNER="$(dbus-send --session --print-reply=literal --dest=org.freedesktop.DBus /org/freedesktop/DBus \
++				org.freedesktop.DBus.GetConnectionUnixProcessID string:org.freedesktop.DBus 2>/dev/null)" || BOX_DBUS_OWNER=""
++			BOX_DBUS_OWNER="${BOX_DBUS_OWNER##* }"
++			if [ -n "${BOX_DBUS_OWNER}" ] && { [ "${BOX_DBUS_OWNER}" = "${BOX_DBUS_PID}" ] || ! kill -0 "${BOX_DBUS_PID}" 2>/dev/null; }; then
++				break
++			fi
++			sleep 0.1
++		done
++	fi
+ 	printf '%s' "${DBUS_SESSION_BUS_ADDRESS:-}" >"${BOX_USER_XDG_DIR}/dbus-session-address" 2>/dev/null || true
+ fi
+ 

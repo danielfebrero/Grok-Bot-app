@@ -1,0 +1,27 @@
+--- 2026-10-23_14-52:/opt/sand/sand-host/box-scripts/start-window
++++ 2026-10-23_18-47:/opt/sand/sand-host/box-scripts/start-window
+@@ -68,6 +68,7 @@
+ 		SAND_CHROME_XDG_DIR="/tmp/xdg-runtime-box-${DISPLAY_NUM}" \
+ 		SAND_XDG_RUNTIME_DIR="/tmp/xdg-runtime-${DISPLAY_NUM}" \
+ 		DISPLAY="${DISP}" \
++		env -u DBUS_SESSION_BUS_ADDRESS \
+ 		setsid nohup /usr/local/bin/box-bounded-log \
+ 		--run "${LOG_DIR}/start-desktop.log" -- \
+ 		/usr/local/bin/start-desktop.sh >/dev/null 2>&1 &
+@@ -87,8 +88,15 @@
+ 
+ if ! daemon_alive; then
+ 	cd /workspace || exit 1
++	DAEMON_BUS_ENV=()
++	if [ "$(id -u)" -ne 0 ]; then
++		DAEMON_BUS_ENV=(
++			XDG_RUNTIME_DIR="/tmp/xdg-runtime-box-${DISPLAY_NUM}"
++			DBUS_SESSION_BUS_ADDRESS="unix:path=/tmp/xdg-runtime-box-${DISPLAY_NUM}/bus"
++		)
++	fi
+ 	DISPLAY="${DISP}" \
+-		env -u SAND_GATEWAY_TOKEN -u SAND_EGRESS_TUNNEL_BEARER -u SAND_DESKTOP_UNIT \
++		env -u SAND_GATEWAY_TOKEN -u SAND_EGRESS_TUNNEL_BEARER -u SAND_DESKTOP_UNIT "${DAEMON_BUS_ENV[@]}" \
+ 		setsid nohup /exec-daemon/exec-daemon serve \
+ 		--port "${EXEC_DAEMON_PORT}" \
+ 		--pty-websocket-port "${PTY_PORT}" \

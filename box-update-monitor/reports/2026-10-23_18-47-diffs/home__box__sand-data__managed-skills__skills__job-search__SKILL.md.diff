@@ -1,0 +1,10 @@
+--- 2026-10-23_14-52:/home/box/sand-data/managed-skills/skills/job-search/SKILL.md
++++ 2026-10-23_18-47:/home/box/sand-data/managed-skills/skills/job-search/SKILL.md
+@@ -42,6 +42,7 @@
+ - Name the fit plainly ("asks for Go, which you have not listed", "senior title but the range tops out at $150k"). Do not pad the list with near-duplicates or reposts of the same role.
+ - For a recency search, lead with the newest posting and give the posted date for each, not "recently".
+ - Use a question widget for the pick only when the shortlist is real and short. Otherwise send the summary and let the user reply.
++- Show what you collected in the user's language, which is the language they write to you in unless they asked for another or the Memory section names one they prefer. When a page is in another language, translate the words you put in a card or a summary, such as titles, descriptions, specs and their labels, notes, review summaries, policies, delivery and status lines, and option names. Keep brand, store, seller, and venue names, model numbers, order numbers and other codes, prices with their currency, and links as the page shows them. Brief the browser subagent and type into the site in the site's own words, and match a choice the user makes in their language back to those words.
+ 
+ ## Applying and confirming
+ 
