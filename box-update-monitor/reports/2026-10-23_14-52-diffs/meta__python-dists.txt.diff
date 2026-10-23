@@ -1,0 +1,16 @@
+--- 2026-10-23_09-50/meta/python-dists.txt
++++ 2026-10-23_14-52/meta/python-dists.txt
+@@ -1,4 +1,5 @@
+ /usr/lib/python3/dist-packages	Deprecated-1.2.18.dist-info
++/usr/lib/python3/dist-packages	PyYAML-6.0.2.dist-info
+ /usr/lib/python3/dist-packages	bcrypt-4.2.0.dist-info
+ /usr/lib/python3/dist-packages	certifi-2025.1.31.egg-info
+ /usr/lib/python3/dist-packages	chardet-5.2.0.dist-info
+@@ -10,6 +11,7 @@
+ /usr/lib/python3/dist-packages	packaging-25.0.dist-info
+ /usr/lib/python3/dist-packages	perf-0.1.egg-info
+ /usr/lib/python3/dist-packages	pip-25.1.1.dist-info
++/usr/lib/python3/dist-packages	pygments-2.18.0.dist-info
+ /usr/lib/python3/dist-packages	redis-6.1.0.dist-info
+ /usr/lib/python3/dist-packages	requests-2.32.3.dist-info
+ /usr/lib/python3/dist-packages	typing_extensions-4.13.2.dist-info
