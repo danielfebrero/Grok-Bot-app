@@ -86,3 +86,30 @@ host_health() {
   local port="${1:-1340}"
   timeout 4 curl -s "http://127.0.0.1:${port}/health" 2>/dev/null | grep -q '"ok":true'
 }
+
+# ============================================================================
+#  Variante "sans restart host-main" (patte agent<->host uniquement)
+#  arm-agent-host.sh / revert-agent-host.sh. Ne touche NI host-main, NI la CA,
+#  NI le 443. Un simple relai loggeur devant le host-main RÉEL (intact) + une
+#  redirection nft en prerouting limitée au SEUL client agent.
+# ----------------------------------------------------------------------------
+AH_AGENT_SADDR="${AH_AGENT_SADDR:-172.30.0.1}"   # client agent (netns distinct)
+AH_HOST_DADDR="${AH_HOST_DADDR:-172.30.0.2}"     # host-main RÉEL (enp0s4), intact
+AH_HOST_PORT="${AH_HOST_PORT:-1340}"             # port host-main réel (plaintext HTTP/1.1)
+AH_RELAY_PORT="${AH_RELAY_PORT:-1342}"           # relai loggeur no-restart
+# NB bind : la cible `redirect` réécrit la daddr vers l'adresse de l'IFACE
+# d'entrée (172.30.0.2), PAS vers 127.0.0.1 (cf. sémantique REDIRECT/nat). Le
+# relai doit donc être joignable sur cette adresse -> bind 0.0.0.0 par défaut.
+# (La valeur "logique" visée reste 127.0.0.1:1342 ; 0.0.0.0 la couvre + l'iface.)
+AH_RELAY_BIND="${AH_RELAY_BIND:-0.0.0.0}"
+AH_IIF="${AH_IIF:-enp0s4}"                        # iface côté agent (scoping défensif)
+AH_RELAY_PIDFILE="$STATE_DIR/relay-agent-host.pid"
+AH_NFT_TABLE="${AH_NFT_TABLE:-sandrpc}"           # table ip dédiée (chain prerouting)
+
+# le relai no-restart écoute-t-il bien ? (0 = oui)
+ah_relay_up() {
+  timeout 3 curl -s -o /dev/null "http://127.0.0.1:${AH_RELAY_PORT}/" 2>/dev/null
+  # 000 (pas de réponse HTTP) => down ; tout code HTTP => up
+  local c; c=$(timeout 3 curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:${AH_RELAY_PORT}/" 2>/dev/null || echo 000)
+  [ "$c" != "000" ]
+}

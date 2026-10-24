@@ -138,13 +138,30 @@ class Relay:
                     pass
 
 
+def _split_hostport(s: str, default_host: str, default_port: int):
+    """Accepte 'HOST:PORT', ':PORT', 'PORT' ou 'HOST'. Renvoie (host, port)."""
+    s = (s or "").strip()
+    if not s:
+        return default_host, default_port
+    if ":" in s:
+        h, _, p = s.rpartition(":")
+        return (h or default_host), (int(p) if p else default_port)
+    if s.isdigit():
+        return default_host, int(s)
+    return s, default_port
+
+
 async def main_async(a):
     proxy._load_env_secrets()
-    r = Relay(a.upstream_host, a.upstream_port)
-    server = await asyncio.start_server(r.handle, a.listen_host, a.listen)
+    lhost, lport = _split_hostport(a.listen, a.listen_host or "127.0.0.1", 1340)
+    if a.upstream:
+        uhost, uport = _split_hostport(a.upstream, a.upstream_host, a.upstream_port)
+    else:
+        uhost, uport = a.upstream_host, a.upstream_port
+    r = Relay(uhost, uport)
+    server = await asyncio.start_server(r.handle, lhost, lport)
     addr = ", ".join(str(s.getsockname()) for s in server.sockets)
-    print(f"relay agent-host en écoute {addr} -> {a.upstream_host}:{a.upstream_port}",
-          flush=True)
+    print(f"relay {LEG} en écoute {addr} -> {uhost}:{uport}", flush=True)
     print(f"logs: {proxy.logfile_path(r.log_dir)}", flush=True)
     async with server:
         await server.serve_forever()
@@ -152,10 +169,13 @@ async def main_async(a):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--listen", type=int, default=1340)
-    ap.add_argument("--listen-host", default="127.0.0.1")
-    ap.add_argument("--upstream-port", dest="upstream_port", type=int, default=1341)
+    # --listen accepte "PORT" ou "HOST:PORT" (rétro-compat : bare port) ;
+    # --upstream accepte "HOST:PORT" (prioritaire sur --upstream-host/-port).
+    ap.add_argument("--listen", default="1340", help="PORT ou HOST:PORT")
+    ap.add_argument("--listen-host", default=None)
+    ap.add_argument("--upstream", default=None, help="HOST:PORT (ex 172.30.0.2:1340)")
     ap.add_argument("--upstream-host", dest="upstream_host", default="127.0.0.1")
+    ap.add_argument("--upstream-port", dest="upstream_port", type=int, default=1341)
     a = ap.parse_args()
     try:
         asyncio.run(main_async(a))

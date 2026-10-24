@@ -131,8 +131,51 @@ capture host↔backend **côté EG** (env maîtrisé) et de n'armer la box que p
 patte **agent↔host** (sans CA, sans redémarrage du core → risque quasi nul).
 
 ## 9. Limites connues
-- `proxy.py` : `PKEY_RE` rédige désormais le bloc PEM COMPLET (en-tête + corps base64 + pied),
-  pas le corps base64 d'une vraie clé. À durcir dans `rpc-traffic-monitor/`
-  (hors scope de ce commit, strictement `live-intercept/`).
+- `proxy.py` : `PKEY_RE` rédige désormais le **BLOC COMPLET**
+  `-----BEGIN … PRIVATE KEY----- … -----END … PRIVATE KEY-----` (`re.DOTALL`),
+  en-tête **et** corps base64 (prouvé par `test/test-agent-host.sh`).
 - La patte host↔backend ne capte que les hôtes redirigés (uid 1000 : host-main) ;
   S3/CDN par IP directe sont redirigés aussi (dport 443) mais étiquetés `autre:`.
+
+## 10. Variante « sans restart host-main » (patte agent↔host) — RECOMMANDÉE
+
+Fichiers : `arm-agent-host.sh`, `revert-agent-host.sh`, relai `relay_agent_host.py`
+(args `--listen HOST:PORT --upstream HOST:PORT`), `watchdog.sh --revert …`.
+
+La patte agent↔host étant du **HTTP/1.1 en clair**, on n'a besoin ni de CA ni de
+redémarrer le core. On intercale juste un relai loggeur devant le **host-main réel
+(intact)** et on redirige, en `nft` PREROUTING, le **seul** trafic du client agent.
+
+```
+agent (172.30.0.1) ──[nft prerouting: saddr 172.30.0.1, daddr 172.30.0.2:1340 → :1342]──▶
+   relai loggeur (0.0.0.0:1342) ──▶ host-main RÉEL (172.30.0.2:1340, NON redémarré)
+```
+
+**Pourquoi aucune boucle (vérifié sur cette box) :**
+- `172.30.0.2` est une adresse **locale** (`enp0s4`, route via `lo`, `src 172.30.0.2`).
+  La connexion sortante du relai vers `172.30.0.2:1340` part donc avec
+  `saddr=172.30.0.2`, **jamais** `172.30.0.1` → la règle (qui ne matche que
+  `saddr 172.30.0.1`) ne la redirige pas.
+- Un paquet localement généré vers une adresse locale passe par **OUTPUT**, pas par
+  **PREROUTING** : la connexion du relai ne traverse même pas la chaîne.
+- `skuid 0` est **inopérant en prerouting** (paquet entrant d'un autre netns = pas de
+  socket propriétaire) : c'est le match `saddr` qui protège. Défense en profondeur :
+  scoping `iifname "enp0s4"` ajouté à la règle.
+
+**Bind du relai :** la cible `redirect` réécrit la daddr vers l'adresse de l'iface
+d'entrée (`172.30.0.2`), **pas** `127.0.0.1`. Le relai écoute donc `0.0.0.0:1342`
+(couvre 127.0.0.1 **et** 172.30.0.2) pour que le paquet redirigé atterrisse bien.
+
+**Armer réellement :**
+```
+LI_ARM_CONFIRM=yes-i-understand-brick-risk sudo -E bash arm-agent-host.sh
+```
+(sans jeton = DRY-RUN, n'écrit rien). Confirmer : `touch /workspace/.sand-live-intercept/DISARM`.
+Annuler : `bash revert-agent-host.sh` (idempotent, `--dry-run` dispo). **host-main
+n'est jamais touché par cette variante** ; risque ≈ nul (pas de CA, pas de 443, pas
+de restart). Watchdog armé AVANT la règle, dead-man `grace` 90 s → revert auto si
+pas de DISARM.
+
+**Test (cibles scratch, n'arme rien) :** `bash test/test-agent-host.sh` prouve
+(a) req+resp capturés, (b) `leg=agent-host`, (c) grep anti-secret VIDE (clé privée
+en bloc complet), (d) `revert-agent-host.sh --dry-run` OK.

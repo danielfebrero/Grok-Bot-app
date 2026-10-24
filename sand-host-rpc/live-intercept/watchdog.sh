@@ -26,11 +26,13 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$HERE/lib.sh"
 
 GRACE=90; INTERVAL=5; PROBES=3
+REVERT="$HERE/revert.sh"   # script de revert (surchargeable: variante agent-host)
 while [ $# -gt 0 ]; do
   case "$1" in
     --grace) GRACE="$2"; shift 2;;
     --interval) INTERVAL="$2"; shift 2;;
     --probes) PROBES="$2"; shift 2;;
+    --revert) REVERT="$2"; shift 2;;
     *) shift;;
   esac
 done
@@ -39,7 +41,7 @@ done
 if [ "${LI_WATCHDOG_DETACHED:-0}" != "1" ]; then
   mkdir -p "$STATE_DIR"
   LI_WATCHDOG_DETACHED=1 setsid bash "$HERE/watchdog.sh" \
-      --grace "$GRACE" --interval "$INTERVAL" --probes "$PROBES" \
+      --grace "$GRACE" --interval "$INTERVAL" --probes "$PROBES" --revert "$REVERT" \
       </dev/null >>"$WATCHDOG_LOG" 2>&1 &
   echo "watchdog détaché (setsid) ; log: $WATCHDOG_LOG"
   exit 0
@@ -54,9 +56,9 @@ START=$(date +%s)
 fail=0
 do_revert() {
   local why="$1" code="$2"
-  wlog "DÉCLENCHEMENT revert ($why) -> exécution de revert.sh"
-  bash "$HERE/revert.sh" >>"$WATCHDOG_LOG" 2>&1
-  wlog "revert.sh terminé (exit $?)"
+  wlog "DÉCLENCHEMENT revert ($why) -> exécution de $REVERT"
+  bash "$REVERT" >>"$WATCHDOG_LOG" 2>&1
+  wlog "revert terminé (exit $?)"
   rm -f "$WATCHDOG_PIDFILE"
   exit "$code"
 }
