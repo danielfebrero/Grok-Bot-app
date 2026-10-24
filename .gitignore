@@ -24,6 +24,12 @@ Thumbs.db
 *.swp
 *~
 
+# live-intercept runtime (TLS keylog, pcaps) — never commit
+.sand-live-intercept/
+*.pcap
+*.pcapng
+*.keylog
+
 # Personal media (belt-and-suspenders)
 *marion*
 *.mp4

@@ -115,43 +115,181 @@ ah_relay_up() {
 }
 
 # ============================================================================
-#  Patte host<->backend — INTERCEPTION SÉLECTIVE (mitmproxy transparent + nft).
-#  Construite SANS rien armer sur le vrai chemin. On/off = pose/retrait de la
-#  SEULE règle nft (pas de restart host-main). Le SEUL moment risqué (restart
-#  host-main avec NODE_EXTRA_CA_CERTS) est isolé dans hb-setup-ca.sh.
+#  Patte host<->backend — déchiffrement PASSIF par keylog TLS (pas de MITM).
 #
-#  TABLE SÉPARÉE (sandrpc_hb) exprès : la patte agent<->host vit dans `ip sandrpc`
-#  (chain prerouting). On ne veut JAMAIS risquer de la toucher -> table distincte,
-#  que hb-off/hb-revert suppriment seule. `nft delete table ip sandrpc` n'est
-#  JAMAIS appelé par les scripts hb-*.
+#  Node 22 de cette box (/exec-daemon/node) N'honore PAS l'env SSLKEYLOGFILE.
+#  Il écrit le format NSS (celui que Wireshark appelle SSLKEYLOGFILE) uniquement
+#  si on le lance avec --tls-keylog=FICHIER. hb-setup-keylog.sh fait ce restart
+#  UNE fois (jeton LI_ARM_CONFIRM) et pose AUSSI SSLKEYLOGFILE= même chemin pour
+#  un build qui, lui, lirait l'env. Aucune CA, aucun NODE_EXTRA_CA_CERTS.
+#
+#  Ensuite hb-on / hb-off ne font que démarrer/arrêter tcpdump + decode_keylog.py
+#  (tshark + tls.keylog_file). Aucune règle nft, aucun redirect :443.
+#
+#  La table agent<->host `ip sandrpc` n'est JAMAIS modifiée ici. Si une vieille
+#  table mitm `ip sandrpc_hb` traîne, hb-off/hb-revert/hb-setup la suppriment.
 # ----------------------------------------------------------------------------
-HB_NFT_TABLE="${HB_NFT_TABLE:-sandrpc_hb}"        # table ip dédiée host<->backend
-HB_MITM_PORT="${HB_MITM_PORT:-8900}"              # mitmproxy transparent (selectif)
+HB_NFT_TABLE="${HB_NFT_TABLE:-sandrpc_hb}"        # reliquat mitm — cleanup seulement
+HB_MITM_PORT="${HB_MITM_PORT:-8900}"              # reliquat mitm — cleanup seulement
 HB_UID="${HB_UID:-1000}"                          # host-main (= uid box)
-HB_TUNNEL_ADDR="${HB_TUNNEL_ADDR:-198.18.0.1}"    # egress tunnel -> EXCLU (passthrough)
+HB_TUNNEL_ADDR="${HB_TUNNEL_ADDR:-198.18.0.1}"    # egress tunnel — exclu du BPF
 
-# Hôtes host<->backend à DÉCHIFFRER (TLS terminé par notre CA). Tout le reste est
-# PASSTHROUGH TLS brut (jamais déchiffré) => les autres clients 443 (tunnel egress
-# 198.18.0.1, S3, cloudflare, ...) continuent de marcher = le "tunnel alternatif".
-# Regex passée à `mitmdump --allow-hosts` (re.search sur SNI puis IP:port). Doit
-# rester alignée avec BACKEND_HOSTS de ../rpc-traffic-monitor/mitmproxy/addon_log.py
-# pour que le classifieur étiquette bien leg="host-backend".
+# SNI / :authority / Host à JOURNALISER. Le pcap peut contenir d'autre TLS (non
+# déchiffrable sans ces clés, ou déchiffrable si host-main y a parlé) : le
+# décodeur ne garde que ce qui matche. Aligné sur BACKEND_HOSTS de addon_log.py.
+# (re.search, ancré en fin : settings.cursor.sh.evil.com est rejeté.)
 HB_ALLOW_HOSTS="${HB_ALLOW_HOSTS:-(^|\\.)(api|api2|api3|api4|repo42)\\.cursor\\.sh(:443)?$|(^|\\.)(www\\.)?cursor\\.com(:443)?$|(^|\\.)cursor\\.sh(:443)?$}"
 
-# markers d'état host<->backend (hors dépôt, dans STATE_DIR) :
-HB_MITM_PIDFILE="$STATE_DIR/hb-mitm.pid"
-HB_MITM_OUT="$STATE_DIR/hb-mitm.out"
-HB_CA_READY_FLAG="$STATE_DIR/hb_ca_ready"          # posé par hb-setup-ca (host-main CA-ready)
-HB_HOSTMAIN_PIDFILE="$STATE_DIR/hb-hostmain.pid"   # pid du host-main relancé CA-ready
-HB_ARM_FLAG="$STATE_DIR/HB_ARM"                     # dead-man dédié (n'interfère PAS avec agent-host)
-HB_DISARM_FLAG="$STATE_DIR/HB_DISARM"
+HB_KEYLOG_DIR="${HB_KEYLOG_DIR:-$STATE_DIR/keylog}"
+HB_KEYLOG_FILE="${HB_KEYLOG_FILE:-$HB_KEYLOG_DIR/sslkeys.log}"
+HB_PCAP="${HB_PCAP:-$STATE_DIR/hb-capture.pcap}"
+HB_PCAP_MAX_BYTES="${HB_PCAP_MAX_BYTES:-67108864}"   # 64 Mio ; au-delà le décodeur coupe tcpdump
+HB_IFACE="${HB_IFACE:-any}"
+HB_CAPTURE_FILTER="${HB_CAPTURE_FILTER:-tcp port 443 and not host ${HB_TUNNEL_ADDR}}"
+HB_TLS_PORTS="${HB_TLS_PORTS:-}"                    # ports != 443 à forcer en TLS (tests)
+HB_DECODE_INTERVAL="${HB_DECODE_INTERVAL:-1}"
+HB_TSHARK="${HB_TSHARK:-$(command -v tshark 2>/dev/null || true)}"
+HB_TCPDUMP="${HB_TCPDUMP:-$(command -v tcpdump 2>/dev/null || true)}"
 
-# mitm transparent host<->backend écoute-t-il bien sur HB_MITM_PORT ? (0 = oui)
-hb_mitm_up() {
-  ss -tlnp 2>/dev/null | grep -q "127.0.0.1:${HB_MITM_PORT} "
+HB_TCPDUMP_PIDFILE="$STATE_DIR/hb-tcpdump.pid"
+HB_DECODE_PIDFILE="$STATE_DIR/hb-decode.pid"
+HB_CAPTURE_OUT="$STATE_DIR/hb-capture.out"
+HB_CAPTURE_READY="$STATE_DIR/hb-capture.ready"
+HB_SEEN_FILE="$STATE_DIR/hb-decode.seen"
+HB_KEYLOG_READY_FLAG="$STATE_DIR/hb_keylog_ready"   # posé par hb-setup-keylog
+HB_HOSTMAIN_PIDFILE="$STATE_DIR/hb-hostmain.pid"
+HB_ARM_FLAG="$STATE_DIR/HB_ARM"                     # dead-man dédié (pas l'état agent-host)
+HB_DISARM_FLAG="$STATE_DIR/HB_DISARM"
+# reliquats mitm (cleanup) :
+HB_MITM_PIDFILE="$STATE_DIR/hb-mitm.pid"
+HB_CA_READY_FLAG="$STATE_DIR/hb_ca_ready"
+
+# gid primaire de l'uid host-main (pour chown du keylog, que node puisse écrire)
+hb_host_gid() {
+  id -g "$HB_UID" 2>/dev/null || echo "$HB_UID"
 }
 
-# la règle de redirection host<->backend est-elle posée ? (0 = oui)
-hb_rule_present() {
-  ${SUDO:-sudo -n} nft list table ip "$HB_NFT_TABLE" 2>/dev/null | grep -q "redirect to :${HB_MITM_PORT}"
+# Le process host-main courant porte-t-il --tls-keylog vers NOTRE fichier ?
+# (cmdline seulement ; on ne lit pas /proc/PID/environ et on ne l'affiche pas.)
+hostmain_has_tls_keylog() {
+  local p
+  for p in $(pgrep -f 'host-main\.cjs' 2>/dev/null || true); do
+    if [ -r "/proc/$p/cmdline" ] && grep -a -F -q -- "--tls-keylog=${HB_KEYLOG_FILE}" "/proc/$p/cmdline" 2>/dev/null; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+hb_capture_up() {
+  local p=""
+  [ -f "$HB_TCPDUMP_PIDFILE" ] || return 1
+  p="$(cat "$HB_TCPDUMP_PIDFILE" 2>/dev/null || true)"
+  [ -n "$p" ] && kill -0 "$p" 2>/dev/null
+}
+
+# Efface un fichier de secrets (pcap ou keylog) sans jamais l'imprimer.
+hb_shred() {
+  local f="$1"
+  [ -n "$f" ] && [ -e "$f" ] || return 0
+  if command -v shred >/dev/null 2>&1; then
+    shred -u -n 1 -- "$f" 2>/dev/null || rm -f -- "$f"
+  else
+    rm -f -- "$f"
+  fi
+}
+
+# Crée le keylog vide, 0600, propriétaire uid host-main (node doit pouvoir append).
+# Le contenu n'est jamais affiché. Hors dépôt, hors dossier de logs partagés.
+hb_prepare_keylog_file() {
+  case "$HB_KEYLOG_FILE" in
+    "$TRAFFIC_LOG_DIR"|"$TRAFFIC_LOG_DIR"/*)
+      echo "ERREUR: le keylog ne doit pas vivre dans les logs de trafic ($TRAFFIC_LOG_DIR)"; return 4;;
+    "$LI_DIR"|"$LI_DIR"/*)
+      echo "ERREUR: le keylog ne doit pas vivre dans le dépôt ($LI_DIR)"; return 4;;
+  esac
+  local gid; gid="$(hb_host_gid)"
+  install -d -m 0750 "$STATE_DIR"
+  install -d -m 0700 -o "$HB_UID" -g "$gid" "$HB_KEYLOG_DIR"
+  if [ ! -e "$HB_KEYLOG_FILE" ]; then
+    install -m 0600 -o "$HB_UID" -g "$gid" /dev/null "$HB_KEYLOG_FILE"
+  else
+    chown "$HB_UID:$gid" "$HB_KEYLOG_FILE" 2>/dev/null || true
+    chmod 0600 "$HB_KEYLOG_FILE" 2>/dev/null || true
+  fi
+}
+
+# Supprime UNIQUEMENT la table reliquat mitm ip sandrpc_hb. Jamais `ip sandrpc`.
+hb_drop_legacy_nft() {
+  command -v nft >/dev/null 2>&1 || return 0
+  local sud="${SUDO:-}"
+  if [ "$(id -u)" != "0" ]; then
+    if [ -z "$sud" ]; then
+      sudo -n true 2>/dev/null || return 0
+      sud="sudo -n"
+    fi
+  fi
+  if $sud nft list table ip "$HB_NFT_TABLE" >/dev/null 2>&1; then
+    slog "hb: suppression reliquat nft table ip $HB_NFT_TABLE (ancien mitm)"
+    $sud nft delete table ip "$HB_NFT_TABLE" || true
+  fi
+  if $sud nft list table ip sandrpc >/dev/null 2>&1; then
+    slog "hb: table ip sandrpc (agent<->host) présente, NON touchée."
+  fi
+}
+
+# Arrête tcpdump puis le décodeur (le décodeur fait une dernière passe sur SIGTERM).
+# Ne supprime le pcap que si $1 = shred (hb-off). hb_stop_capture_keep laisse le pcap
+# au décodeur ; l'appelant shred ensuite.
+hb_stop_pids() {
+  local pf p
+  # tcpdump d'abord pour flush (-U) avant la dernière passe du décodeur.
+  for pf in "$HB_TCPDUMP_PIDFILE" "$HB_DECODE_PIDFILE"; do
+    [ -f "$pf" ] || continue
+    p="$(cat "$pf" 2>/dev/null || true)"
+    if [ -n "${p:-}" ] && kill -0 "$p" 2>/dev/null; then
+      slog "hb: SIGTERM pid $p ($pf)"
+      kill -TERM "$p" 2>/dev/null || true
+    fi
+    if [ "$pf" = "$HB_TCPDUMP_PIDFILE" ]; then
+      # laisser le pcap se fermer avant de signaler le décodeur
+      local i
+      for i in $(seq 1 25); do
+        [ -n "${p:-}" ] && kill -0 "$p" 2>/dev/null || break
+        sleep 0.2
+      done
+    fi
+  done
+  # attendre le décodeur (passe finale)
+  if [ -f "$HB_DECODE_PIDFILE" ]; then
+    p="$(cat "$HB_DECODE_PIDFILE" 2>/dev/null || true)"
+    local i
+    for i in $(seq 1 40); do
+      [ -n "${p:-}" ] && kill -0 "$p" 2>/dev/null || break
+      sleep 0.2
+    done
+    if [ -n "${p:-}" ] && kill -0 "$p" 2>/dev/null; then
+      slog "hb: décodeur $p encore vivant, SIGKILL"
+      kill -KILL "$p" 2>/dev/null || true
+    fi
+  fi
+  rm -f "$HB_TCPDUMP_PIDFILE" "$HB_DECODE_PIDFILE" "$HB_CAPTURE_READY"
+}
+
+hb_kill_legacy_mitm() {
+  if [ -f "$HB_MITM_PIDFILE" ]; then
+    local p
+    p="$(cat "$HB_MITM_PIDFILE" 2>/dev/null || true)"
+    if [ -n "$p" ] && kill -0 "$p" 2>/dev/null; then
+      slog "hb: arrêt mitm reliquat pid $p"
+      kill "$p" 2>/dev/null || true
+    fi
+    rm -f "$HB_MITM_PIDFILE"
+  fi
+  local p
+  for p in $(pgrep -f "mitmdump .*--listen-port ${HB_MITM_PORT}" 2>/dev/null || true); do
+    slog "hb: arrêt mitmdump reliquat pid $p"
+    kill "$p" 2>/dev/null || true
+  done
+  rm -f "$HB_CA_READY_FLAG"
 }
