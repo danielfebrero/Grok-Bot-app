@@ -1,0 +1,18 @@
+--- 2026-10-24_23-50/meta/dpkg-packages.txt
++++ 2026-10-25_01-53/meta/dpkg-packages.txt
+@@ -404,6 +404,7 @@
+ libnuma1	2.0.19-1	amd64
+ libnumbertext-1.0-0	1.0.11-4+b2	amd64
+ libnumbertext-data	1.0.11-4	all
++liboath0t64	2.6.12-1	amd64
+ libobjc-14-dev	14.2.0-19	amd64
+ libobjc4	14.2.0-19	amd64
+ libodfgen-0.1-1	0.1.8-2+b2	amd64
+@@ -724,6 +725,7 @@
+ node-xtend	4.0.2-3	all
+ nodejs	20.19.2+dfsg-1+deb13u3	amd64
+ novnc	1:1.6.0-2	all
++oathtool	2.6.12-1	amd64
+ ocl-icd-libopencl1	2.3.3-1	amd64
+ openssh-client	1:10.0p1-7+deb13u4	amd64
+ openssl	3.5.7-1~deb13u3	amd64
