@@ -1,0 +1,21 @@
+--- 2026-10-24_13-53:/opt/sand/sand-host/extensions/content-search/search-index-worker.cjs
++++ 2026-10-24_17-47:/opt/sand/sand-host/extensions/content-search/search-index-worker.cjs
+@@ -592,6 +592,9 @@
+   return isVoiceCallChannelEntry(entry) || isMeetingChannelEntry(entry) || isMeetingRequestChannelEntry(entry);
+ }
+ 
++// src/shared/transcript/phone-call.ts
++var SAND_PHONE_CALL_QUESTION_ENTRY_PREFIX = "phone-call-question:";
++
+ // src/shared/transcript/silent-wake.ts
+ function isSuppressedEntry(entry) {
+   return entry.kind === "message" && entry.suppressed != null;
+@@ -687,7 +690,7 @@
+   return entry.kind === "send-message" && entry.streaming === true && entry.message.type === "text" && entry.message.content.length === 0;
+ }
+ function isTimelineHiddenEntry(entry) {
+-  return isEmptyStreamingPreviewEntry(entry) || isSuppressedEntry(entry) || entry.kind === "tool-call" || isBackgroundTaskStopNotice(entry) || isExpiredLocalToolPermissionEntry(entry) || isBotShareAutoReviewEntry(entry) || isHiddenOutboundAgentPeerMessageEntry(entry) || isOffChatChannelEntry(entry) || entry.kind === "event" && entry.event.type === "desktop-goal" || entry.kind === "event" && entry.event.type === "team-shared" && isBlankTeamSharedEvent(entry.event);
++  return isEmptyStreamingPreviewEntry(entry) || isSuppressedEntry(entry) || entry.kind === "tool-call" || isBackgroundTaskStopNotice(entry) || isExpiredLocalToolPermissionEntry(entry) || isBotShareAutoReviewEntry(entry) || isHiddenOutboundAgentPeerMessageEntry(entry) || isOffChatChannelEntry(entry) || entry.kind === "send-message" && entry.message.type === "user-form" && entry.id.startsWith(SAND_PHONE_CALL_QUESTION_ENTRY_PREFIX) || entry.kind === "event" && entry.event.type === "desktop-goal" || entry.kind === "event" && entry.event.type === "team-shared" && isBlankTeamSharedEvent(entry.event);
+ }
+ 
+ // src/host/sand-data-files.ts

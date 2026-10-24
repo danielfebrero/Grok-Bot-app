@@ -1,0 +1,38 @@
+--- 2026-10-24_13-53:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
++++ 2026-10-24_17-47:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
+@@ -800,7 +800,7 @@
+     (0, import_node_fs5.renameSync)(dbPath, quarantinePath);
+   } catch (error) {
+     const renameErrorCode = error.code ?? "error";
+-    let copied = false;
++    let copied;
+     try {
+       copySandDataFileSync(dbPath, quarantinePath);
+       copied = true;
+@@ -4773,7 +4773,7 @@
+     return proto3.util.equals(_SandboxPolicy, a, b);
+   }
+   static $() {
+-    return ["SandboxPolicy|1 type #0|2 network_access 8?|3 additional_readwrite_paths 9*|4 additional_readonly_paths 9*|5 debug_output_dir 9?|7 disable_tmp_write 8?|8 allowlist_escalated 8?|9 enable_shared_build_cache 8?|10 network_policy #1?|11 network_policy_strict 8?|12 capture_denies 8?|13 skip_statsig_defaults 8?|14 read_boundary #2|15 additional_read_paths 9*", SandboxPolicy_Type, NetworkPolicy, SandboxPolicy_ReadBoundaryMode];
++    return ["SandboxPolicy|1 type #0|2 network_access 8?|3 additional_readwrite_paths 9*|4 additional_readonly_paths 9*|5 debug_output_dir 9?|7 disable_tmp_write 8?|8 allowlist_escalated 8?|9 enable_shared_build_cache 8?|10 network_policy #1?|11 network_policy_strict 8?|12 capture_denies 8?|13 skip_statsig_defaults 8?|14 read_boundary #2|15 additional_read_paths 9*|16 allow_user_override_read_paths 8?", SandboxPolicy_Type, NetworkPolicy, SandboxPolicy_ReadBoundaryMode];
+   }
+ };
+ var SandboxPolicy_Type = /* @__PURE__ */ enumType(proto3, __protoPackage2, "SandboxPolicy.Type", [[0, "UNSPECIFIED"], [1, "INSECURE_NONE"], [2, "WORKSPACE_READWRITE"], [3, "WORKSPACE_READONLY"]], 1);
+@@ -9970,7 +9970,7 @@
+     return proto3.util.equals(_ComputerUseArgs, a, b);
+   }
+   static $() {
+-    return ["ComputerUseArgs|1 tool_call_id 9|2 actions #0*|3 description 9?|4 bind_unmapped_characters 8?|5 desktop_lease_actor_id 9?|6 screenshot_settle_ms 5?|10 native_x11_driver #1?|11 mark_monitor_busy 8?|9 full_resolution_screenshot 8?", ComputerUseAction, NativeX11Driver];
++    return ["ComputerUseArgs|1 tool_call_id 9|2 actions #0*|3 description 9?|4 bind_unmapped_characters 8?|5 desktop_lease_actor_id 9?|6 screenshot_settle_ms 5?|10 native_x11_driver #1?|11 mark_monitor_busy 8?|9 full_resolution_screenshot 8?|12 capture_name_prefix 9?", ComputerUseAction, NativeX11Driver];
+   }
+ };
+ var NativeX11Driver = class _NativeX11Driver extends __protoMessage336 {
+@@ -16661,7 +16661,7 @@
+     return proto3.util.equals(_WriteCanvasSuccess, a, b);
+   }
+   static $() {
+-    return ["WriteCanvasSuccess|1 canvas_id 9|2 title 9?|3 url 9"];
++    return ["WriteCanvasSuccess|1 canvas_id 9|2 title 9?|3 url 9|4 page_url 9?"];
+   }
+ };
+ var WriteCanvasFailure = class _WriteCanvasFailure extends __protoMessage365 {

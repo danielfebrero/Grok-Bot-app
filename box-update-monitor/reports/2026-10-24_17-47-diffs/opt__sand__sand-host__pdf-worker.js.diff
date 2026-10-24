@@ -1,0 +1,495 @@
+--- 2026-10-24_13-53:/opt/sand/sand-host/pdf-worker.js
++++ 2026-10-24_17-47:/opt/sand/sand-host/pdf-worker.js
+@@ -1,8 +1,10 @@
+ const __import_meta_url=require('node:url').pathToFileURL(__filename).href;
+ "use strict";
++var __create = Object.create;
+ var __defProp = Object.defineProperty;
+ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+ var __getOwnPropNames = Object.getOwnPropertyNames;
++var __getProtoOf = Object.getPrototypeOf;
+ var __hasOwnProp = Object.prototype.hasOwnProperty;
+ var __export = (target, all) => {
+   for (var name in all)
+@@ -16,6 +18,14 @@
+   }
+   return to;
+ };
++var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
++  // If the importer is in node compatibility mode or this is not an ESM
++  // file that has been converted to a CommonJS file using a Babel-
++  // compatible transform (i.e. "__esModule" has not been set), then set
++  // "default" to the CommonJS "module.exports" for node compatibility.
++  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
++  mod
++));
+ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+ 
+ // ../packages/agent/src/tools/core/read/pdf-worker.ts
+@@ -24,6 +34,8 @@
+   default: () => extractPdfTextWorker
+ });
+ module.exports = __toCommonJS(pdf_worker_exports);
++var import_node_module = require("node:module");
++var import_node_path = __toESM(require("node:path"), 1);
+ 
+ // ../node_modules/.pnpm/pdfjs-dist@5.4.296/node_modules/pdfjs-dist/legacy/build/pdf.mjs
+ var pdf_exports = {};
+@@ -11735,11 +11747,11 @@
+     } catch (ex) {
+       warn(`getPathGenerator - ignoring character: "${ex}".`);
+     }
+-    const path = new Path2D(cmds || "");
++    const path2 = new Path2D(cmds || "");
+     if (!this.fontExtraProperties) {
+       objs.delete(objId);
+     }
+-    return this.compiledGlyphs[character] = path;
++    return this.compiledGlyphs[character] = path2;
+   }
+   get black() {
+     return this.#fontData.black;
+@@ -14831,47 +14843,47 @@
+     this._cachedGetSinglePixelWidth = null;
+   }
+   constructPath(opIdx, op, data, minMax) {
+-    let [path] = data;
++    let [path2] = data;
+     if (!minMax) {
+-      path ||= data[0] = new Path2D();
+-      this[op](opIdx, path);
++      path2 ||= data[0] = new Path2D();
++      this[op](opIdx, path2);
+       return;
+     }
+     if (this.dependencyTracker !== null) {
+       const outerExtraSize = op === OPS.stroke ? this.current.lineWidth / 2 : 0;
+       this.dependencyTracker.resetBBox(opIdx).recordBBox(opIdx, this.ctx, minMax[0] - outerExtraSize, minMax[2] + outerExtraSize, minMax[1] - outerExtraSize, minMax[3] + outerExtraSize).recordDependencies(opIdx, ["transform"]);
+     }
+-    if (!(path instanceof Path2D)) {
++    if (!(path2 instanceof Path2D)) {
+       const path2d = data[0] = new Path2D();
+-      for (let i = 0, ii = path.length; i < ii; ) {
+-        switch (path[i++]) {
++      for (let i = 0, ii = path2.length; i < ii; ) {
++        switch (path2[i++]) {
+           case DrawOPS.moveTo:
+-            path2d.moveTo(path[i++], path[i++]);
++            path2d.moveTo(path2[i++], path2[i++]);
+             break;
+           case DrawOPS.lineTo:
+-            path2d.lineTo(path[i++], path[i++]);
++            path2d.lineTo(path2[i++], path2[i++]);
+             break;
+           case DrawOPS.curveTo:
+-            path2d.bezierCurveTo(path[i++], path[i++], path[i++], path[i++], path[i++], path[i++]);
++            path2d.bezierCurveTo(path2[i++], path2[i++], path2[i++], path2[i++], path2[i++], path2[i++]);
+             break;
+           case DrawOPS.closePath:
+             path2d.closePath();
+             break;
+           default:
+-            warn(`Unrecognized drawing path operator: ${path[i - 1]}`);
++            warn(`Unrecognized drawing path operator: ${path2[i - 1]}`);
+             break;
+         }
+       }
+-      path = path2d;
++      path2 = path2d;
+     }
+     Util.axialAlignedBoundingBox(minMax, getCurrentTransform(this.ctx), this.current.minMax);
+-    this[op](opIdx, path);
++    this[op](opIdx, path2);
+     this._pathStartIdx = opIdx;
+   }
+   closePath(opIdx) {
+     this.ctx.closePath();
+   }
+-  stroke(opIdx, path, consumePath = true) {
++  stroke(opIdx, path2, consumePath = true) {
+     const ctx = this.ctx;
+     const strokeColor = this.current.strokeColor;
+     ctx.globalAlpha = this.current.strokeAlpha;
+@@ -14882,25 +14894,25 @@
+         ctx.strokeStyle = strokeColor.getPattern(ctx, this, getCurrentTransformInverse(ctx), PathType.STROKE, opIdx);
+         if (baseTransform) {
+           const newPath = new Path2D();
+-          newPath.addPath(path, ctx.getTransform().invertSelf().multiplySelf(baseTransform));
+-          path = newPath;
++          newPath.addPath(path2, ctx.getTransform().invertSelf().multiplySelf(baseTransform));
++          path2 = newPath;
+         }
+-        this.rescaleAndStroke(path, false);
++        this.rescaleAndStroke(path2, false);
+         ctx.restore();
+       } else {
+-        this.rescaleAndStroke(path, true);
++        this.rescaleAndStroke(path2, true);
+       }
+     }
+     this.dependencyTracker?.recordDependencies(opIdx, Dependencies.stroke);
+     if (consumePath) {
+-      this.consumePath(opIdx, path, this.current.getClippedPathBoundingBox(PathType.STROKE, getCurrentTransform(this.ctx)));
++      this.consumePath(opIdx, path2, this.current.getClippedPathBoundingBox(PathType.STROKE, getCurrentTransform(this.ctx)));
+     }
+     ctx.globalAlpha = this.current.fillAlpha;
+   }
+-  closeStroke(opIdx, path) {
+-    this.stroke(opIdx, path);
++  closeStroke(opIdx, path2) {
++    this.stroke(opIdx, path2);
+   }
+-  fill(opIdx, path, consumePath = true) {
++  fill(opIdx, path2, consumePath = true) {
+     const ctx = this.ctx;
+     const fillColor = this.current.fillColor;
+     const isPatternFill = this.current.patternFill;
+@@ -14912,18 +14924,18 @@
+       ctx.fillStyle = fillColor.getPattern(ctx, this, getCurrentTransformInverse(ctx), PathType.FILL, opIdx);
+       if (baseTransform) {
+         const newPath = new Path2D();
+-        newPath.addPath(path, ctx.getTransform().invertSelf().multiplySelf(baseTransform));
+-        path = newPath;
++        newPath.addPath(path2, ctx.getTransform().invertSelf().multiplySelf(baseTransform));
++        path2 = newPath;
+       }
+       needRestore = true;
+     }
+     const intersect = this.current.getClippedPathBoundingBox();
+     if (this.contentVisible && intersect !== null) {
+       if (this.pendingEOFill) {
+-        ctx.fill(path, "evenodd");
++        ctx.fill(path2, "evenodd");
+         this.pendingEOFill = false;
+       } else {
+-        ctx.fill(path);
++        ctx.fill(path2);
+       }
+     }
+     this.dependencyTracker?.recordDependencies(opIdx, Dependencies.fill);
+@@ -14932,34 +14944,34 @@
+       this.dependencyTracker?.restore(opIdx);
+     }
+     if (consumePath) {
+-      this.consumePath(opIdx, path, intersect);
++      this.consumePath(opIdx, path2, intersect);
+     }
+   }
+-  eoFill(opIdx, path) {
++  eoFill(opIdx, path2) {
+     this.pendingEOFill = true;
+-    this.fill(opIdx, path);
++    this.fill(opIdx, path2);
+   }
+-  fillStroke(opIdx, path) {
+-    this.fill(opIdx, path, false);
+-    this.stroke(opIdx, path, false);
+-    this.consumePath(opIdx, path);
++  fillStroke(opIdx, path2) {
++    this.fill(opIdx, path2, false);
++    this.stroke(opIdx, path2, false);
++    this.consumePath(opIdx, path2);
+   }
+-  eoFillStroke(opIdx, path) {
++  eoFillStroke(opIdx, path2) {
+     this.pendingEOFill = true;
+-    this.fillStroke(opIdx, path);
++    this.fillStroke(opIdx, path2);
+   }
+-  closeFillStroke(opIdx, path) {
+-    this.fillStroke(opIdx, path);
++  closeFillStroke(opIdx, path2) {
++    this.fillStroke(opIdx, path2);
+   }
+-  closeEOFillStroke(opIdx, path) {
++  closeEOFillStroke(opIdx, path2) {
+     this.pendingEOFill = true;
+-    this.fillStroke(opIdx, path);
++    this.fillStroke(opIdx, path2);
+   }
+-  endPath(opIdx, path) {
+-    this.consumePath(opIdx, path);
++  endPath(opIdx, path2) {
++    this.consumePath(opIdx, path2);
+   }
+-  rawFillPath(opIdx, path) {
+-    this.ctx.fill(path);
++  rawFillPath(opIdx, path2) {
++    this.ctx.fill(path2);
+     this.dependencyTracker?.recordDependencies(opIdx, Dependencies.rawFillPath).recordOperation(opIdx);
+   }
+   clip(opIdx) {
+@@ -14997,12 +15009,12 @@
+         x,
+         y,
+         fontSize,
+-        path
++        path: path2
+       } of paths) {
+-        if (!path) {
++        if (!path2) {
+           continue;
+         }
+-        newPath.addPath(path, new DOMMatrix(transform).preMultiplySelf(invTransf).translate(x, y).scale(fontSize, -fontSize));
++        newPath.addPath(path2, new DOMMatrix(transform).preMultiplySelf(invTransf).translate(x, y).scale(fontSize, -fontSize));
+       }
+       ctx.clip(newPath);
+     }
+@@ -15095,9 +15107,9 @@
+     this.moveText(opIdx, 0, this.current.leading);
+     this.dependencyTracker?.recordIncrementalData("moveText", this.dependencyTracker.getSimpleIndex("leading") ?? opIdx);
+   }
+-  #getScaledPath(path, currentTransform, transform) {
++  #getScaledPath(path2, currentTransform, transform) {
+     const newPath = new Path2D();
+-    newPath.addPath(path, new DOMMatrix(transform).invertSelf().multiplySelf(currentTransform));
++    newPath.addPath(path2, new DOMMatrix(transform).invertSelf().multiplySelf(currentTransform));
+     return newPath;
+   }
+   paintChar(opIdx, character, x, y, patternFillTransform, patternStrokeTransform) {
+@@ -15110,11 +15122,11 @@
+     const isAddToPathSet = !!(textRenderingMode & TextRenderingMode.ADD_TO_PATH_FLAG);
+     const patternFill = current.patternFill && !font.missingFile;
+     const patternStroke = current.patternStroke && !font.missingFile;
+-    let path;
++    let path2;
+     if ((font.disableFontFace || isAddToPathSet || patternFill || patternStroke) && !font.missingFile) {
+-      path = font.getPathGenerator(this.commonObjs, character);
++      path2 = font.getPathGenerator(this.commonObjs, character);
+     }
+-    if (path && (font.disableFontFace || patternFill || patternStroke)) {
++    if (path2 && (font.disableFontFace || patternFill || patternStroke)) {
+       ctx.save();
+       ctx.translate(x, y);
+       ctx.scale(fontSize, -fontSize);
+@@ -15124,10 +15136,10 @@
+         if (patternFillTransform) {
+           currentTransform = ctx.getTransform();
+           ctx.setTransform(...patternFillTransform);
+-          const scaledPath = this.#getScaledPath(path, currentTransform, patternFillTransform);
++          const scaledPath = this.#getScaledPath(path2, currentTransform, patternFillTransform);
+           ctx.fill(scaledPath);
+         } else {
+-          ctx.fill(path);
++          ctx.fill(path2);
+         }
+       }
+       if (fillStrokeMode === TextRenderingMode.STROKE || fillStrokeMode === TextRenderingMode.FILL_STROKE) {
+@@ -15144,10 +15156,10 @@
+           const transf = Util.transform([a, b, c, d, 0, 0], invPatternTransform);
+           Util.singularValueDecompose2dScale(transf, XY);
+           ctx.lineWidth *= Math.max(XY[0], XY[1]) / fontSize;
+-          ctx.stroke(this.#getScaledPath(path, currentTransform, patternStrokeTransform));
++          ctx.stroke(this.#getScaledPath(path2, currentTransform, patternStrokeTransform));
+         } else {
+           ctx.lineWidth /= fontSize;
+-          ctx.stroke(path);
++          ctx.stroke(path2);
+         }
+       }
+       ctx.restore();
+@@ -15170,7 +15182,7 @@
+         x,
+         y,
+         fontSize,
+-        path
++        path: path2
+       });
+       this.dependencyTracker?.recordCharacterBBox(opIdx, ctx, font, fontSize, x, y);
+     }
+@@ -15576,9 +15588,9 @@
+     const [x0, y0, x1, y1] = group.bbox;
+     clip.rect(x0, y0, x1 - x0, y1 - y0);
+     if (group.matrix) {
+-      const path = new Path2D();
+-      path.addPath(clip, new DOMMatrix(group.matrix));
+-      clip = path;
++      const path2 = new Path2D();
++      path2.addPath(clip, new DOMMatrix(group.matrix));
++      clip = path2;
+     }
+     groupCtx.clip(clip);
+     if (group.smask) {
+@@ -15922,7 +15934,7 @@
+   }
+   endCompat(opIdx) {
+   }
+-  consumePath(opIdx, path, clipBox) {
++  consumePath(opIdx, path2, clipBox) {
+     const isEmpty = this.current.isEmptyClip();
+     if (this.pendingClip) {
+       this.current.updateClipFromPath();
+@@ -15934,9 +15946,9 @@
+     if (this.pendingClip) {
+       if (!isEmpty) {
+         if (this.pendingClip === EO_CLIP) {
+-          ctx.clip(path, "evenodd");
++          ctx.clip(path2, "evenodd");
+         } else {
+-          ctx.clip(path);
++          ctx.clip(path2);
+         }
+       }
+       this.pendingClip = null;
+@@ -16009,7 +16021,7 @@
+     }
+     return this._cachedScaleForStroking;
+   }
+-  rescaleAndStroke(path, saveRestore) {
++  rescaleAndStroke(path2, saveRestore) {
+     const {
+       ctx,
+       current: {
+@@ -16019,7 +16031,7 @@
+     const [scaleX, scaleY] = this.getScaleForStroking();
+     if (scaleX === scaleY) {
+       ctx.lineWidth = (lineWidth || 1) * scaleX;
+-      ctx.stroke(path);
++      ctx.stroke(path2);
+       return;
+     }
+     const dashes = ctx.getLineDash();
+@@ -16030,7 +16042,7 @@
+     SCALE_MATRIX.a = 1 / scaleX;
+     SCALE_MATRIX.d = 1 / scaleY;
+     const newPath = new Path2D();
+-    newPath.addPath(path, SCALE_MATRIX);
++    newPath.addPath(path2, SCALE_MATRIX);
+     if (dashes.length > 0) {
+       const scale = Math.max(scaleX, scaleY);
+       ctx.setLineDash(dashes.map((x) => x / scale));
+@@ -18530,7 +18542,7 @@
+   let worker = src.worker instanceof PDFWorker ? src.worker : null;
+   const verbosity2 = src.verbosity;
+   const docBaseUrl = typeof src.docBaseUrl === "string" && !isDataScheme(src.docBaseUrl) ? src.docBaseUrl : null;
+-  const cMapUrl = getFactoryUrlProp(src.cMapUrl);
++  const cMapUrl2 = getFactoryUrlProp(src.cMapUrl);
+   const cMapPacked = src.cMapPacked !== false;
+   const CMapReaderFactory = src.CMapReaderFactory || (isNodeJS ? NodeCMapReaderFactory : DOMCMapReaderFactory);
+   const iccUrl = getFactoryUrlProp(src.iccUrl);
+@@ -18558,7 +18570,7 @@
+   const useWasm = src.useWasm !== false;
+   const length = rangeTransport ? rangeTransport.length : src.length ?? NaN;
+   const useSystemFonts = typeof src.useSystemFonts === "boolean" ? src.useSystemFonts : !isNodeJS && !disableFontFace;
+-  const useWorkerFetch = typeof src.useWorkerFetch === "boolean" ? src.useWorkerFetch : !!(CMapReaderFactory === DOMCMapReaderFactory && StandardFontDataFactory === DOMStandardFontDataFactory && WasmFactory === DOMWasmFactory && cMapUrl && standardFontDataUrl && wasmUrl && isValidFetchUrl(cMapUrl, document.baseURI) && isValidFetchUrl(standardFontDataUrl, document.baseURI) && isValidFetchUrl(wasmUrl, document.baseURI));
++  const useWorkerFetch = typeof src.useWorkerFetch === "boolean" ? src.useWorkerFetch : !!(CMapReaderFactory === DOMCMapReaderFactory && StandardFontDataFactory === DOMStandardFontDataFactory && WasmFactory === DOMWasmFactory && cMapUrl2 && standardFontDataUrl && wasmUrl && isValidFetchUrl(cMapUrl2, document.baseURI) && isValidFetchUrl(standardFontDataUrl, document.baseURI) && isValidFetchUrl(wasmUrl, document.baseURI));
+   const styleElement = null;
+   setVerbosityLevel(verbosity2);
+   const transportFactory = {
+@@ -18571,7 +18583,7 @@
+       ownerDocument
+     }),
+     cMapReaderFactory: useWorkerFetch ? null : new CMapReaderFactory({
+-      baseUrl: cMapUrl,
++      baseUrl: cMapUrl2,
+       isCompressed: cMapPacked
+     }),
+     standardFontDataFactory: useWorkerFetch ? null : new StandardFontDataFactory({
+@@ -18610,7 +18622,7 @@
+       useSystemFonts,
+       useWasm,
+       useWorkerFetch,
+-      cMapUrl,
++      cMapUrl: cMapUrl2,
+       iccUrl,
+       standardFontDataUrl,
+       wasmUrl
+@@ -27573,11 +27585,11 @@
+ };
+ var ContourDrawOutline = class extends InkDrawOutline {
+   toSVGPath() {
+-    let path = super.toSVGPath();
+-    if (!path.endsWith("Z")) {
+-      path += "Z";
++    let path2 = super.toSVGPath();
++    if (!path2.endsWith("Z")) {
++      path2 += "Z";
+     }
+-    return path;
++    return path2;
+   }
+ };
+ var BASE_HEADER_LENGTH = 8;
+@@ -30053,13 +30065,13 @@
+     const root = this.#createSVG();
+     const defs = _DrawLayer._svgFactory.createElement("defs");
+     root.append(defs);
+-    const path = _DrawLayer._svgFactory.createElement("path");
+-    defs.append(path);
++    const path2 = _DrawLayer._svgFactory.createElement("path");
++    defs.append(path2);
+     const pathId = `path_p${this.pageIndex}_${id}`;
+-    path.setAttribute("id", pathId);
+-    path.setAttribute("vector-effect", "non-scaling-stroke");
++    path2.setAttribute("id", pathId);
++    path2.setAttribute("vector-effect", "non-scaling-stroke");
+     if (isPathUpdatable) {
+-      this.#toUpdate.set(id, path);
++      this.#toUpdate.set(id, path2);
+     }
+     const clipPathId = hasClip ? this.#createClipPath(defs, pathId) : null;
+     const use = _DrawLayer._svgFactory.createElement("use");
+@@ -30077,11 +30089,11 @@
+     const root = this.#createSVG();
+     const defs = _DrawLayer._svgFactory.createElement("defs");
+     root.append(defs);
+-    const path = _DrawLayer._svgFactory.createElement("path");
+-    defs.append(path);
++    const path2 = _DrawLayer._svgFactory.createElement("path");
++    defs.append(path2);
+     const pathId = `path_p${this.pageIndex}_${id}`;
+-    path.setAttribute("id", pathId);
+-    path.setAttribute("vector-effect", "non-scaling-stroke");
++    path2.setAttribute("id", pathId);
++    path2.setAttribute("vector-effect", "non-scaling-stroke");
+     let maskId;
+     if (mustRemoveSelfIntersections) {
+       const mask = _DrawLayer._svgFactory.createElement("mask");
+@@ -30128,7 +30140,7 @@
+       root,
+       bbox,
+       rootClass,
+-      path
++      path: path2
+     } = properties;
+     const element = typeof elementOrId === "number" ? this.#mapping.get(elementOrId) : elementOrId;
+     if (!element) {
+@@ -30148,10 +30160,10 @@
+         classList.toggle(className, value);
+       }
+     }
+-    if (path) {
++    if (path2) {
+       const defs = element.firstChild;
+       const pathElement = defs.firstChild;
+-      this.#updateProperties(pathElement, path);
++      this.#updateProperties(pathElement, path2);
+     }
+   }
+   updateParent(id, layer) {
+@@ -31994,10 +32006,25 @@
+ };
+ 
+ // ../packages/agent/src/tools/core/read/pdf-worker.ts
++var cMapUrl;
++function pdfjsCMapUrl() {
++  if (cMapUrl === void 0) {
++    try {
++      const pdfParse = (0, import_node_module.createRequire)(__import_meta_url).resolve("pdf-parse");
++      const pdfjs = (0, import_node_module.createRequire)(pdfParse).resolve("pdfjs-dist/package.json");
++      cMapUrl = import_node_path.default.join(import_node_path.default.dirname(pdfjs), "cmaps") + import_node_path.default.sep;
++    } catch {
++      cMapUrl = null;
++    }
++  }
++  return cMapUrl ?? void 0;
++}
+ async function extractPdfTextWorker(params) {
+   const buffer = Buffer.isBuffer(params.bytes) ? params.bytes : Buffer.from(params.bytes);
++  const cMaps = pdfjsCMapUrl();
+   const parser = new PDFParse({
+     data: buffer,
++    ...cMaps === void 0 ? {} : { cMapUrl: cMaps, cMapPacked: true },
+     ...params.disableEval === true ? { isEvalSupported: false } : {}
+   });
+   try {

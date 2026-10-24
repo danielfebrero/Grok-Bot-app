@@ -9,6 +9,30 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-24 17:47 (Paris) — snapshot `2026-10-24_13-53` → `2026-10-24_17-47`
+
+**Hot-update du host bundle (sand-host) `ab3b435` → `ef8271b`** (supervisor `upgrade-ab3b435` → `upgrade-ef8271b`, `pendingUpgradeVersion` = None) : remplacement à chaud du `sand-host` par le sand-supervisor, sans Update de l'ordinateur. Toutes les autres versions plateforme sont inchangées : image `fcbae14`, box-scripts `fcbae14`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, **agent-store-fuse `35aaf402` inchangé**, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7. Fichiers : +0 / −0 / ~8.
+
+### Features
+- **Télémétrie de coût estimé** : nouveau message proto `EstimatedCost` + enum `EstimatedCostSource` (`UNSPECIFIED`/`CATALOG`/`USAGE`), et `TurnEndedUpdate` gagne le champ `7 estimated_cost` (host-main.cjs). La fin de tour peut désormais rapporter un coût estimé, sourcé du catalogue ou de l'usage.
+- **Appels téléphoniques (phone-call)** : `search-index-worker.cjs` reconnaît un préfixe d'entrée `phone-call-question:` et masque dans la timeline les `send-message` de type `user-form` dont l'id commence par ce préfixe (question d'appel téléphonique cachée de l'historique visible).
+- **WriteCanvas** : `WriteCanvasSuccess` gagne un champ `4 page_url` (en plus de `canvas_id`, `title`, `url`) — lien de page retourné à la création d'un canvas.
+- **ComputerUse** : `ComputerUseArgs` gagne un champ `12 capture_name_prefix` (préfixe de nom pour les captures d'écran).
+
+### Change
+- **SandboxPolicy** : nouveau champ `16 allow_user_override_read_paths` (bool) dans la policy de sandbox (host-main.cjs + agent-store-worker.cjs) — permet d'autoriser l'utilisateur à surcharger les chemins de lecture.
+
+### Bugfix
+- **Timers longs** : le `realClock.setTimeout` est réécrit pour découper un délai en segments de `MAX_TIMER_DELAY_MS` (2147483647 ms, ~24,8 j) et se ré-armer, au lieu d'un seul `setTimeout` (qui déborde l'entier 32 bits de Node au-delà de ~24,8 j et tire immédiatement). `MAX_TIMER_DELAY_MS` déplacé dans `init_clock`.
+
+### Autre / infra
+- `agent-store-worker.cjs` : micro-changement (`let copied = false;` → `let copied;` dans le chemin de quarantaine de DB).
+- `pdf-worker.js` : helper de bundling `__toESM` ajouté + imports `node:module` / `node:path` (repackaging esbuild, pas de changement fonctionnel visible).
+- `officekit-ts/.../sports_strategy_playbook.js` : ajout d'un commentaire `// oxlint-disable-next-line no-useless-assignment`.
+- `managed-skills/cache.json` : seul `fetchedAt` change (resync du cache).
+
+Rapport : [reports/2026-10-24_17-47.md](reports/2026-10-24_17-47.md).
+
 ## 2026-10-24 13:53 (Paris) — snapshot `2026-10-24_12-48` → `2026-10-24_13-53`
 
 **Nouveaux paquets réseau/capture installés (image inchangée → install `apt` côté agent, pas un push plateforme)** : la suite **Wireshark/TShark/tcpdump** apparaît dans `dpkg`. Ajouts : `tcpdump 4.99.5-2`, `tshark 4.4.19-0+deb13u1`, `wireshark-common 4.4.19`, `libwireshark18`, `libwiretap15`, `libwsutil16`, `libwireshark-data`, `libpcap0.8t64 1.10.5-2`, `libmaxminddb0 1.12.2-1`, `libnl-genl-3-200`, `libbcg729-0`, `liblua5.4-0`, `libsbc1`, `libsmi2t64`, `libspandsp2t64`, `libspeexdsp1`. Aucune version plateforme ne bouge : image `fcbae14`, box-scripts `fcbae14`, sand-host `ab3b435` (supervisor `upgrade-ab3b435`), exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, agent-store-fuse `35aaf402`, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés.
