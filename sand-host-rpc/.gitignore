@@ -1,0 +1,21 @@
+# ---- Secrets & jetons : JAMAIS committés ----
+*.jwt
+*.token
+*-token.txt
+*.pem
+*.key
+sand-mobile-bearer.*
+*inference*.token
+
+# ---- Logs & corps de trafic : restent LOCAUX ----
+rpc-traffic-monitor/logs/
+rpc-monitor/logs/
+*.jsonl
+*.pid
+proxy.out
+
+# ---- Verrous & artefacts d'exécution ----
+.lock
+.*.partial
+__pycache__/
+*.pyc
