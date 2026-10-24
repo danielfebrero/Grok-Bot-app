@@ -10,7 +10,8 @@
 #   3. restaure le port host (retire le fichier d'état de port)
 #   4. tue le host-main éventuellement lancé par arm (sur 1341) ->
 #      le sand-supervisor le RELANCE automatiquement, propre, sur 1340, avec SON
-#      env d'origine (ni NODE_EXTRA_CA_CERTS ni port modifié). C'est le mécanisme
+#      env d'origine (ni NODE_EXTRA_CA_CERTS, ni SSLKEYLOGFILE, ni --tls-keylog,
+#      ni port modifié). C'est le mécanisme
 #      de restauration : on s'appuie sur l'auto-respawn du superviseur.
 #   5. attend la santé de host-main sur 1340 + joignabilité backend.
 #
@@ -33,8 +34,8 @@ else
   slog "revert: table ip $NFT_TABLE absente (ok)"
 fi
 
-# 2) interceptors : relai + mitm
-for pf in "$RELAY_PIDFILE" "$MITM_PIDFILE"; do
+# 2) interceptors : relai + éventuel mitm résiduel + capture keylog host<->backend
+for pf in "$RELAY_PIDFILE" "$MITM_PIDFILE" "$HB_TCPDUMP_PIDFILE" "$HB_DECODE_PIDFILE"; do
   if [ -f "$pf" ]; then
     p="$(cat "$pf" 2>/dev/null)"
     if [ -n "$p" ] && kill -0 "$p" 2>/dev/null; then
@@ -65,6 +66,15 @@ else
   slog "revert: aucun host-main vivant ; le superviseur va en lancer un"
 fi
 run "rm -f $HOSTMAIN_SPAWN_PIDFILE"
+# secrets de session TLS : seulement après le SIGTERM, sinon le process les réécrit.
+if [ "$DRY" = 1 ]; then
+  echo "DRY: shred $HB_PCAP $HB_KEYLOG_FILE ; rm $HB_KEYLOG_READY_FLAG"
+else
+  sleep 1
+  hb_shred "$HB_PCAP"
+  hb_shred "$HB_KEYLOG_FILE"
+  rm -f "$HB_KEYLOG_READY_FLAG" "$HB_CAPTURE_READY" "$HB_SEEN_FILE" "$HB_CA_READY_FLAG"
+fi
 
 # 5) attente de restauration : health sur 1340 + backend joignable
 if [ "$DRY" = 1 ]; then

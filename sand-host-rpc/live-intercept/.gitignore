@@ -19,3 +19,9 @@ test/_run*/
 HB_ARM
 HB_DISARM
 CA_READY*
+*.pcap
+*.pcapng
+*.keylog
+sslkeys.log
+hb_keylog_ready
+hb_ca_ready
