@@ -53,6 +53,10 @@ import addon_log  # noqa: E402
 import proxy  # noqa: E402
 import ws_frames  # noqa: E402
 
+if _LI not in sys.path:
+    sys.path.insert(0, _LI)
+import inference_effects  # noqa: E402
+
 # Même expression que HB_ALLOW_HOSTS dans lib.sh (re.search, ancrée en fin).
 DEFAULT_ALLOW = (
     r"(^|\.)(api|api2|api3|api4|repo42)\.cursor\.sh(:443)?$"
@@ -1173,11 +1177,14 @@ def decode_once(pcap: str, keylog: str, seen_path: str, tls_ports: list[str],
             asm.note_packet(layers)
     seen = load_seen(seen_path)
     n = 0
+    relevant = False
     log_dir = proxy.resolve_log_dir()
     for rec in asm.records():
         digest = rec.pop("_digest")
         if digest in seen:
             continue
+        if inference_effects.is_correlation_input(rec):
+            relevant = True
         proxy.write_traffic_record(rec, log_dir)
         append_seen(seen_path, digest)
         seen.add(digest)
@@ -1188,6 +1195,13 @@ def decode_once(pcap: str, keylog: str, seen_path: str, tls_ports: list[str],
             + (f" proto={rec['protocol']}" if rec.get("protocol") else ""),
             file=sys.stderr,
         )
+    if relevant:
+        try:
+            added = inference_effects.materialize(log_dir)
+            if added:
+                print(f"inference-effect: {added} tour(s)", file=sys.stderr)
+        except Exception as e:
+            print(f"decode_keylog: inference-effect ignoré ({e})", file=sys.stderr)
     return n
 
 

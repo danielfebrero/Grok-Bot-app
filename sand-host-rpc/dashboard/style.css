@@ -48,6 +48,9 @@ tbody tr:hover{background:var(--panel2)}
 .pill.err{background:rgba(248,81,73,.15);color:var(--err)}
 .pill.leg1{background:rgba(88,166,255,.15);color:var(--leg1)}
 .pill.leg2{background:rgba(188,140,255,.15);color:var(--leg2)}
+.pill.leg3{background:rgba(63,185,80,.18);color:var(--accent2)}
+.note{margin:0 0 12px;color:var(--dim);font-size:12.5px}
+.clip{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:9}
 .modal.hidden{display:none}

@@ -47,6 +47,10 @@ Puis ouvrir http://127.0.0.1:8808 .
   - `error_count`, `error_rate`
   - `rate_now`, `timeline` (échanges/minute, 30 derniers buckets)
   - `last` : derniers échanges avec corps **tronqués** (≤ 2 Ko)
+  - `inference_turns` : tours reconstitués **en lecture seule** depuis les effets
+    (`markAgentRequestStarted` / `Ended`, SSE `transcript`, `ListGrokBotTranscriptEntries`).
+    Pas de corps StreamChat : les jetons de conversation ne passent pas par la box.
+  - `inference_note` : la phrase qui le dit
 
 Le serveur fait un **tail incrémental** (il ne relit que les octets ajoutés
 depuis le dernier passage, suit la rotation de fichier par inode/offset).
@@ -60,6 +64,8 @@ stdlib) :
 - débit par minute en `<canvas>` (aire + ligne) ;
 - donut des pattes (agent→host / host→backend) en `<canvas>` ;
 - barres top méthodes RPC et distribution des status ;
+- tableau des **tours d'inférence** (agent, request id, durée, ids transcript, extrait) ;
 - tableau live des derniers échanges ; clic = modale req/resp (tronqués).
+  Une ligne `leg=inference-effect` est un tour matérialisé dans le JSONL.
 
 Thème sombre, autonome, aucune ressource externe.
