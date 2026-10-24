@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """rpc-traffic-monitor — proxy inverse HTTP/1.1 qui journalise REQUÊTE **et**
-RÉPONSE (corps complets) du trafic RPC Connect/gRPC, en local uniquement.
+RÉPONSE (corps complets) du trafic RPC Connect/gRPC.
 
 Topologie
 ---------
@@ -16,17 +16,86 @@ capture une des deux pattes :
 
 Journalisation
 --------------
-Une ligne JSONL par échange dans logs/traffic-YYYY-MM-DD.jsonl :
+Une ligne JSONL par échange dans <RPC_TRAFFIC_LOG_DIR>/traffic-YYYY-MM-DD.jsonl :
   ts, direction, leg, method (path RPC), status, duree_ms,
-  req_headers (rédigés), req_body (Connect dé-framé + gunzip), 
+  req_headers (rédigés), req_body (Connect dé-framé + gunzip),
   resp_headers (rédigés), resp_body (Connect dé-framé + gunzip).
-Les logs restent LOCAUX (logs/ est gitignoré). Tous les secrets/PII sont rédigés.
+
+Destination des logs (partagée avec l'addon mitmproxy, cf. mitmproxy/addon_log.py) :
+  - défaut : /workspace/shared-eg/box-vers-vps/sand-host-rpc-traffic/
+    (dossier Syncthing partagé EG — écrit uniquement par la box) ;
+  - surchargeable par l'env RPC_TRAFFIC_LOG_DIR.
+ROTATION : un fichier par jour ; purge au-delà de RPC_TRAFFIC_KEEP_DAYS (défaut 14)
+et cap de taille total RPC_TRAFFIC_CAP_MB (défaut 200 Mo) — on retire les plus
+vieux. Tous les secrets/PII sont rédigés AVANT écriture ; rien n'est committé.
 """
 from __future__ import annotations
-import argparse, asyncio, datetime, gzip, json, os, re, ssl, sys, zlib
+import argparse, asyncio, datetime, glob, gzip, json, os, re, ssl, sys, zlib
 
 DIR = os.path.dirname(os.path.abspath(__file__))
-LOG_DIR = os.path.join(DIR, "logs")
+
+# ------------------------- destination des logs (shared-eg) ------------------
+DEFAULT_SHARED_LOG_DIR = "/workspace/shared-eg/box-vers-vps/sand-host-rpc-traffic"
+
+
+def resolve_log_dir() -> str:
+    return os.environ.get("RPC_TRAFFIC_LOG_DIR") or DEFAULT_SHARED_LOG_DIR
+
+
+def logfile_path(log_dir: str) -> str:
+    day = datetime.datetime.now().astimezone().strftime("%Y-%m-%d")
+    return os.path.join(log_dir, f"traffic-{day}.jsonl")
+
+
+def rotate_logs(log_dir: str) -> None:
+    """Purge par ancienneté (RPC_TRAFFIC_KEEP_DAYS, défaut 14 j) puis par taille
+    totale (RPC_TRAFFIC_CAP_MB, défaut 200 Mo) — on supprime les plus anciens."""
+    try:
+        keep_days = int(os.environ.get("RPC_TRAFFIC_KEEP_DAYS", "14"))
+    except ValueError:
+        keep_days = 14
+    try:
+        cap_bytes = int(os.environ.get("RPC_TRAFFIC_CAP_MB", "200")) * 1024 * 1024
+    except ValueError:
+        cap_bytes = 200 * 1024 * 1024
+    files = sorted(glob.glob(os.path.join(log_dir, "traffic-*.jsonl")))
+    today = datetime.date.today()
+    rx = re.compile(r"traffic-(\d{4})-(\d{2})-(\d{2})\.jsonl$")
+    # 1) ancienneté
+    for f in list(files):
+        m = rx.search(os.path.basename(f))
+        if not m:
+            continue
+        try:
+            d = datetime.date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        except ValueError:
+            continue
+        if (today - d).days >= keep_days:
+            try:
+                os.remove(f)
+                files.remove(f)
+            except OSError:
+                pass
+    # 2) cap de taille total (on retire les plus vieux d'abord)
+    def total():
+        return sum(os.path.getsize(f) for f in files if os.path.exists(f))
+    while files and total() > cap_bytes and len(files) > 1:
+        old = files.pop(0)
+        try:
+            os.remove(old)
+        except OSError:
+            break
+
+
+def write_traffic_record(rec: dict, log_dir: str | None = None) -> str:
+    log_dir = log_dir or resolve_log_dir()
+    os.makedirs(log_dir, exist_ok=True)
+    path = logfile_path(log_dir)
+    with open(path, "a") as f:
+        f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    rotate_logs(log_dir)
+    return path
+
 
 # ------------------------- rédaction secrets / PII ---------------------------
 REDACT_HEADERS = {"authorization", "cookie", "set-cookie", "x-cursor-access-token",
@@ -61,7 +130,7 @@ def redact_text(s: str) -> str:
     return s
 
 
-def redact_headers(headers: list[tuple[str, str]]) -> dict:
+def redact_headers(headers) -> dict:
     out = {}
     for k, v in headers:
         out[k] = "[REDACTED]" if k.lower() in REDACT_HEADERS else redact_text(v)
@@ -72,16 +141,31 @@ def redact_headers(headers: list[tuple[str, str]]) -> dict:
 def decompress(body: bytes, enc: str) -> bytes:
     try:
         enc = (enc or "").lower()
-        if "gzip" in enc:
+        if "gzip" in enc or "x-gzip" in enc:
             return gzip.decompress(body)
         if "deflate" in enc:
-            return zlib.decompress(body)
+            try:
+                return zlib.decompress(body)
+            except zlib.error:
+                return zlib.decompress(body, -zlib.MAX_WBITS)
+        if "br" in enc:
+            try:
+                import brotli  # type: ignore
+                return brotli.decompress(body)
+            except Exception:
+                return body
+        if "zstd" in enc:
+            try:
+                import zstandard  # type: ignore
+                return zstandard.ZstdDecompressor().decompress(body)
+            except Exception:
+                return body
     except Exception:
         pass
     return body
 
 
-def deframe_connect(body: bytes) -> object:
+def deframe_connect(body: bytes):
     """Dé-frame un flux Connect/gRPC : suite de [1 octet flag][4 octets BE len][payload].
     Renvoie une liste de messages JSON décodés, ou None si ce n'est pas framé."""
     msgs = []
@@ -100,7 +184,7 @@ def deframe_connect(body: bytes) -> object:
     return msgs if (msgs and i == n) else None
 
 
-def decode_body(body: bytes, ctype: str, cenc: str) -> object:
+def decode_body(body: bytes, ctype: str, cenc: str):
     if not body:
         return None
     raw = decompress(body, cenc)
@@ -146,7 +230,7 @@ async def read_headers(reader: asyncio.StreamReader):
     return start, headers
 
 
-async def read_body(reader: asyncio.StreamReader, headers: list[tuple[str, str]]) -> bytes:
+async def read_body(reader: asyncio.StreamReader, headers) -> bytes:
     hd = {k.lower(): v for k, v in headers}
     if hd.get("transfer-encoding", "").lower() == "chunked":
         buf = b""
@@ -182,15 +266,14 @@ class Proxy:
         self.host = u.hostname
         self.port = u.port or (443 if self.scheme == "https" else 80)
         self.leg = leg
+        self.log_dir = resolve_log_dir()
 
     def logfile(self):
-        os.makedirs(LOG_DIR, exist_ok=True)
-        day = datetime.datetime.now().astimezone().strftime("%Y-%m-%d")
-        return os.path.join(LOG_DIR, f"traffic-{day}.jsonl")
+        os.makedirs(self.log_dir, exist_ok=True)
+        return logfile_path(self.log_dir)
 
     def write_log(self, rec: dict):
-        with open(self.logfile(), "a") as f:
-            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        write_traffic_record(rec, self.log_dir)
 
     async def handle(self, creader, cwriter):
         t0 = asyncio.get_event_loop().time()

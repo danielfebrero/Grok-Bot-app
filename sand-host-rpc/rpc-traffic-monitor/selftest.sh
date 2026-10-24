@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Preuve de capture req+resp : lance le proxy vers api2.cursor.sh, envoie un
-# appel Connect au travers, montre la dernière ligne JSONL (secrets rédigés).
+# Preuve de capture req+resp (proxy.py) : lance le proxy vers api2.cursor.sh,
+# envoie un appel Connect au travers, montre la dernière ligne JSONL (rédactée).
 set -euo pipefail
 DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 PORT="${RTM_PORT:-8799}"
-LOG="$DIR/logs/traffic-$(date +%F).jsonl"
+LOGDIR="${RPC_TRAFFIC_LOG_DIR:-/workspace/shared-eg/box-vers-vps/sand-host-rpc-traffic}"
+LOG="$LOGDIR/traffic-$(date +%F).jsonl"
 python3 "$DIR/proxy.py" --port "$PORT" --upstream "https://api2.cursor.sh" --leg host-backend &
 P=$!; trap 'kill $P 2>/dev/null || true' EXIT
 sleep 1

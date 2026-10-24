@@ -1,14 +1,19 @@
 # rpc-traffic-monitor
 
-Proxy inverse HTTP/1.1 qui **journalise la requête ET la réponse** (corps
-complets) du trafic RPC Connect/gRPC. **Les logs restent 100 % locaux** sous
-`logs/` (gitignoré).
+Journalise la **requête ET la réponse** (corps complets) du trafic RPC
+Connect/gRPC. Deux implémentations complémentaires :
 
-## Principe
+1. **`proxy.py`** — proxy inverse HTTP/1.1 (sans CA, sans MITM de certificat) ;
+2. **`mitmproxy/`** — addon mitmproxy (interception TLS transparente via CA), en
+   **mode proxy explicite / opt-in** (cf. `mitmproxy/README.md`).
+
+Les logs ne sont **pas committés** (`.gitignore` exclut `logs/`, `*.jsonl`) ; par
+défaut ils vont dans le **Syncthing partagé EG** (voir plus bas).
+
+## 1) proxy.py — proxy inverse en clair
 
 `proxy.py` termine le HTTP du client en clair et ré-origine vers un `--upstream`
-(http ou https). Selon la cible qu'on lui donne, il capture l'une des deux
-pattes demandées :
+(http ou https). Selon la cible qu'on lui donne, il capture l'une des deux pattes :
 
 | Patte | `--upstream` | Comment router le trafic dedans |
 |---|---|---|
@@ -18,15 +23,34 @@ pattes demandées :
 Le proxy voit les corps en clair parce que c'est lui qui ouvre la connexion TLS
 vers l'upstream : pas de MITM de certificat, pas de CA à installer.
 
+```bash
+RTM_LEG=host-backend RTM_UPSTREAM=https://api2.cursor.sh ./start.sh   # défaut
+RTM_LEG=agent-host  RTM_UPSTREAM=http://127.0.0.1:1340 RTM_PORT=8788 ./start.sh
+./stop.sh
+./selftest.sh      # preuve de capture req+resp (affiche la dernière ligne, rédactée)
+```
+
+Variables : `RTM_PORT` (défaut `8787`), `RTM_UPSTREAM`
+(défaut `https://api2.cursor.sh`), `RTM_LEG` (`agent-host` | `host-backend`).
+
+## 2) mitmproxy/ — interception TLS, proxy explicite
+
+Pour capturer une connexion TLS existante sans ré-pointer la base URL, cf.
+`mitmproxy/` : `setup-ca.sh` (CA + trust store), `start-mitm.sh` / `stop-mitm.sh`
+(mitmdump + `addon_log.py` sur le port 8899), en **proxy explicite opt-in**
+(`HTTPS_PROXY=http://127.0.0.1:8899`). **On ne détourne pas globalement l'egress
+du host** (risque de flaps egress / cert-pinning) — détails et mode transparent
+AVANCÉ non-activé dans `mitmproxy/README.md`.
+
 ## Ce qui est journalisé
 
-Une ligne **JSONL** par échange dans `logs/traffic-YYYY-MM-DD.jsonl` :
+Une ligne **JSONL** par échange dans `<RPC_TRAFFIC_LOG_DIR>/traffic-YYYY-MM-DD.jsonl` :
 
 ```json
 {
   "ts": "2026-10-24T09:54:45.142+02:00",
   "leg": "host-backend",
-  "direction": "client->api2.cursor.sh:443",
+  "direction": "host->backend",
   "method": "/aiserver.v1.DashboardService/GetTeams",
   "http_method": "POST",
   "status": "400",
@@ -38,48 +62,32 @@ Une ligne **JSONL** par échange dans `logs/traffic-YYYY-MM-DD.jsonl` :
 }
 ```
 
-- **Corps requête + réponse** sont décodés : décompression `gzip`/`deflate`,
-  et **dé-framing Connect/gRPC** (trames `[flag][len BE 32 bits][payload JSON]`)
-  en liste de messages JSON.
-- **Rédaction systématique** avant écriture :
-  - en-têtes sensibles (`authorization`, `cookie`, `set-cookie`,
-    `x-cursor-access-token`, …) → `[REDACTED]` ;
-  - corps : JWT (`eyJ…`), `Bearer …`, tokens GitHub, clés privées PEM, e-mails,
-    et les **valeurs littérales** des variables d'env de type
-    `*TOKEN*/*SECRET*/*CREDENTIAL*/*KEY*/*PASSWORD*` du process courant →
-    `[REDACTED-*]`.
+- **Corps requête + réponse** décodés : décompression `gzip`/`deflate`/`br`/`zstd`,
+  et **dé-framing Connect/gRPC** (trames `[flag][len BE 32 bits][payload JSON]`).
+- **Rédaction systématique** avant écriture : en-têtes sensibles
+  (`authorization`, `cookie`, `set-cookie`, `x-cursor-access-token`, …) →
+  `[REDACTED]` ; corps : JWT (`eyJ…`), `Bearer …`, tokens GitHub, clés privées PEM,
+  e-mails, et les **valeurs littérales** des variables d'env
+  `*TOKEN*/*SECRET*/*CREDENTIAL*/*KEY*/*PASSWORD*` → `[REDACTED-*]`.
 
-Aucun jeton ni secret ni corps brut n'est committé : `logs/` est gitignoré.
+## Où vont les logs (Syncthing partagé EG)
 
-## Usage
+Par défaut : **`/workspace/shared-eg/box-vers-vps/sand-host-rpc-traffic/`** — le
+dossier Syncthing partagé EG (écrit uniquement par la box, comme `github-traffic/`).
+Surchargeable par l'env **`RPC_TRAFFIC_LOG_DIR`**.
 
-```bash
-# Patte host ↔ backend (défaut) :
-RTM_LEG=host-backend RTM_UPSTREAM=https://api2.cursor.sh ./start.sh
-#   puis router la base URL backend sur http://127.0.0.1:8787
+**Rotation / cap** (contrainte shared-eg, 1 Go max indicatif) : un fichier par jour,
+purge au-delà de `RPC_TRAFFIC_KEEP_DAYS` (défaut **14 j**) + cap total
+`RPC_TRAFFIC_CAP_MB` (défaut **200 Mo**) — les plus vieux sont retirés. Aucun nom de
+fichier ne contient « token »/« secret » (sinon `.stignore` EG bloquerait la synchro).
 
-# Patte agent ↔ host :
-RTM_LEG=agent-host RTM_UPSTREAM=http://127.0.0.1:1340 RTM_PORT=8788 ./start.sh
-
-# Arrêt :
-./stop.sh
-
-# Preuve de capture req+resp (lance, appelle, affiche la dernière ligne) :
-./selftest.sh
-```
-
-Variables : `RTM_PORT` (défaut `8787`), `RTM_UPSTREAM`
-(défaut `https://api2.cursor.sh`), `RTM_LEG` (`agent-host` | `host-backend`).
+Les logs restent hors repo : `.gitignore` exclut `logs/`, `*.jsonl`.
 
 ## Limites
 
-- Le proxy capture le trafic **qu'on route explicitement au travers** (via base
-  URL / variable d'env du client). Il n'intercepte pas passivement une
-  connexion déjà établie : pour la patte host↔backend il faut (re)pointer la
-  base URL backend du host sur le proxy.
-- HTTP/1.1 uniquement (pas de h2c en clair) ; connexion fermée après chaque
-  échange (`Connection: close`) — suffisant pour Connect unaire et la plupart
-  des flux ; le streaming long est journalisé à la fermeture.
-- Alternative pour une interception transparente de la patte TLS host↔backend :
-  `mitmproxy` avec une CA installée dans le trust store du host (plus intrusif,
-  non requis ici).
+- `proxy.py` capture le trafic **qu'on route explicitement au travers** (base URL /
+  variable d'env du client) ; il n'intercepte pas passivement une connexion déjà
+  établie. HTTP/1.1 uniquement, `Connection: close` par échange.
+- `mitmproxy/` nécessite la CA dans le trust store ; en **proxy explicite** il ne
+  trace que les clients lancés avec `HTTPS_PROXY`. L'interception **transparente**
+  (iptables) est documentée mais **non activée** (risque egress/pinning).

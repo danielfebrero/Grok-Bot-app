@@ -4,15 +4,24 @@
 *-token.txt
 *.pem
 *.key
+*.crt
+*.p12
 sand-mobile-bearer.*
 *inference*.token
 
-# ---- Logs & corps de trafic : restent LOCAUX ----
+# ---- Logs & corps de trafic : restent LOCAUX / dans shared-eg (hors repo) ----
 rpc-traffic-monitor/logs/
 rpc-monitor/logs/
 *.jsonl
 *.pid
 proxy.out
+mitm.out
+mitm.pid
+
+# ---- CA / artefacts mitmproxy (jamais committés) ----
+rpc-traffic-monitor/mitmproxy/.mitmproxy/
+mitmproxy-ca*.pem
+mitmproxy-ca*.p12
 
 # ---- Verrous & artefacts d'exécution ----
 .lock
