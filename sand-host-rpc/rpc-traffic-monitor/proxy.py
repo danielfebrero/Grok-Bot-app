@@ -18,8 +18,8 @@ Journalisation
 --------------
 Une ligne JSONL par échange dans <RPC_TRAFFIC_LOG_DIR>/traffic-YYYY-MM-DD.jsonl :
   ts, direction, leg, method (path RPC), status, duree_ms,
-  req_headers (rédigés), req_body (Connect dé-framé + gunzip),
-  resp_headers (rédigés), resp_body (Connect dé-framé + gunzip).
+  req_headers (rédigés), req_body (Connect dé-framé + gunzip, protobuf → JSON),
+  resp_headers (rédigés), resp_body (Connect dé-framé + gunzip, protobuf → JSON).
 
 Destination des logs (partagée avec l'addon mitmproxy, cf. mitmproxy/addon_log.py) :
   - défaut : /workspace/shared-eg/box-vers-vps/sand-host-rpc-traffic/
@@ -31,6 +31,8 @@ vieux. Tous les secrets/PII sont rédigés AVANT écriture ; rien n'est committ�
 """
 from __future__ import annotations
 import argparse, asyncio, datetime, glob, gzip, json, os, re, ssl, sys, zlib
+
+import proto_decode
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -184,11 +186,24 @@ def deframe_connect(body: bytes):
     return msgs if (msgs and i == n) else None
 
 
-def decode_body(body: bytes, ctype: str, cenc: str):
+def decode_body(body: bytes, ctype: str, cenc: str, method: str | None = None,
+                side: str | None = None):
+    """side = 'request' | 'response' (choix du message dans le catalogue).
+
+    `application/proto` (Connect unaire) et les trames gRPC/Connect binaires
+    deviennent un objet JSON (noms du catalogue). Le chemin JSON / texte
+    agent↔host ne change pas.
+    """
     if not body:
         return None
     raw = decompress(body, cenc)
     ct = (ctype or "").lower()
+    if proto_decode.is_proto_content_type(ct):
+        try:
+            decoded = proto_decode.decode_protobuf_http_body(raw, ct, method, side)
+        except Exception:
+            decoded = {"_proto_error": "decode"}
+        return redact_json(decoded)
     if "connect" in ct or "grpc" in ct:
         framed = deframe_connect(raw)
         if framed is not None:
@@ -334,9 +349,11 @@ class Proxy:
                 "status": status,
                 "duree_ms": dur,
                 "req_headers": redact_headers(req_headers),
-                "req_body": decode_body(req_body, hd.get("content-type", ""), hd.get("content-encoding", "")),
+                "req_body": decode_body(req_body, hd.get("content-type", ""), hd.get("content-encoding", ""),
+                                        path, "request"),
                 "resp_headers": redact_headers(resp_headers),
-                "resp_body": decode_body(resp_body, rhd.get("content-type", ""), rhd.get("content-encoding", "")),
+                "resp_body": decode_body(resp_body, rhd.get("content-type", ""), rhd.get("content-encoding", ""),
+                                         path, "response"),
             }
             self.write_log(rec)
         except Exception as e:

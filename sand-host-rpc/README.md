@@ -12,7 +12,7 @@ restent **locaux** (voir `.gitignore`).
 | [`token-helper/`](token-helper/) | Helper de jeton du sand-host (copie conforme du helper officiel `get-inference-token.py`). Renouvelle le jeton d'inférence depuis la credential du host et l'imprime seul — **ne logge jamais** la credential ni le jeton. |
 | [`cartographie/`](cartographie/) | **Cartographie annotée exhaustive** des services/méthodes RPC : scan de tout `/opt/sand`, **21 services / 2317 méthodes** (tous packages : `aiserver.v1`, `agent.v1`, `origin.v1`, `orbit.v1`), fusionnée avec le balayage lecture (verdicts d'accès, surface IDOR). Sous-ensemble audité : 460 méthodes. |
 | [`rpc-monitor/`](rpc-monitor/) | **Snapshots + diff + changelog** des déclarations RPC (sur le modèle de `box-update-monitor`/`mcp-schema-monitor`) : empreinte `I\|O\|kind` par méthode, détection ajout/suppression/modif, entrées horodatées commentées, routine locale (`cron.sh`). |
-| [`rpc-traffic-monitor/`](rpc-traffic-monitor/) | Proxy inverse qui **journalise requête ET réponse** (corps complets dé-framés Connect + décompressés) des pattes **agent↔host** et **host↔backend**. Logs **locaux** uniquement, secrets/PII rédigés. |
+| [`rpc-traffic-monitor/`](rpc-traffic-monitor/) | Proxy inverse qui **journalise requête ET réponse** (corps complets dé-framés Connect, protobuf décodé en JSON, décompressés) des pattes **agent↔host** et **host↔backend**. Logs **locaux** uniquement, secrets/PII rédigés. |
 
 ## Démarrage rapide
 

@@ -6,9 +6,17 @@ le format NSS que Wireshark appelle SSLKEYLOGFILE. Sur le Node 22 de cette box
 il est produit par `--tls-keylog` (l'env SSLKEYLOGFILE est ignoré ; cf. README).
 
 Sélection : seul un échange dont le SNI (sinon :authority / Host) matche
-HB_ALLOW_HOSTS est écrit, avec leg=host-backend. Rédaction, décompression et
-dé-framing Connect/gRPC viennent de ../rpc-traffic-monitor/proxy.py ; le
-classifieur de patte vient de addon_log._direction.
+HB_ALLOW_HOSTS est écrit, avec leg=host-backend. Rédaction, décompression,
+dé-framing Connect/gRPC et décodage protobuf viennent de
+../rpc-traffic-monitor/proxy.py ; le classifieur de patte vient de
+addon_log._direction.
+
+Corps HTTP/2 : tshark réassemble les DATA et recolle le corps COMPLET dans
+`http2.data.data` / `http2.body.reassembled.data` de la dernière trame, en plus
+des fragments des trames précédentes. On garde ce corps réassemblé (sinon la
+concaténation le compte deux fois, ou le mode --follow journalise un corps vide
+avant la fin du flux). Un échange unaire n'est écrit qu'une fois la requête et
+la réponse terminées (END_STREAM, ou Content-Length atteint).
 
 Le JSON tshark (corps en clair) reste en mémoire. Seul le JSONL rédigé touche
 le disque, dans RPC_TRAFFIC_LOG_DIR. Rien du keylog n'est recopié.
@@ -258,10 +266,106 @@ def h2_header_pairs(stream: dict):
 def _end_stream(stream: dict) -> bool:
     flags = stream.get("http2.flags_tree") or {}
     if isinstance(flags, list):
-        flags = flags[0] if flags else {}
-    if isinstance(flags, dict) and str(flags.get("http2.flags.end_stream", "")) == "1":
+        flags = flags[-1] if flags else {}
+    if isinstance(flags, dict) and str(flags.get("http2.flags.end_stream", "")) in ("1", "true", "True"):
         return True
+    raw = _first(stream.get("http2.flags"))
+    if isinstance(raw, str) and raw.lower().startswith("0x"):
+        try:
+            # bit 0 = END_STREAM (DATA et HEADERS). SETTINGS ACK est aussi 0x1
+            # mais le flux 0 est ignoré avant cet appel.
+            return bool(int(raw, 16) & 0x1)
+        except ValueError:
+            return False
     return False
+
+
+def _h2_length(stream: dict) -> int:
+    try:
+        return int(str(_first(stream.get("http2.length")) or "0"))
+    except ValueError:
+        return 0
+
+
+def _byte_chunks(val) -> list:
+    if val is None:
+        return []
+    if isinstance(val, list):
+        return [parse_tshark_bytes(v) for v in val]
+    return [parse_tshark_bytes(val)]
+
+
+def _reassembled_bytes(stream: dict) -> bytes:
+    best = b""
+    fr = stream.get("http2.body.fragments")
+    items = fr if isinstance(fr, list) else ([fr] if isinstance(fr, dict) else [])
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        got = parse_tshark_bytes(item.get("http2.body.reassembled.data"))
+        if len(got) > len(best):
+            best = got
+    for got in _byte_chunks(stream.get("http2.body.reassembled.data")):
+        if len(got) > len(best):
+            best = got
+    return best
+
+
+def extract_h2_payload(stream: dict) -> tuple[bytes, str]:
+    """(octets, genre) avec genre = full | fragment | empty.
+
+    `full` est le corps HTTP déjà réassemblé par tshark (à substituer aux
+    fragments). `fragment` est la charge de CETTE trame DATA, à concaténer.
+    """
+    reass = _reassembled_bytes(stream)
+    if reass:
+        return reass, "full"
+    file_data = b""
+    http = stream.get("http")
+    https = http if isinstance(http, list) else ([http] if isinstance(http, dict) else [])
+    for h in https:
+        if isinstance(h, dict):
+            got = parse_tshark_bytes(h.get("http.file_data"))
+            if len(got) > len(file_data):
+                file_data = got
+    parts = [p for p in _byte_chunks(stream.get("http2.data.data")) if p]
+    h2len = _h2_length(stream)
+    if file_data and h2len and len(file_data) > h2len:
+        return file_data, "full"
+    oversized = [p for p in parts if h2len and len(p) > h2len]
+    if oversized:
+        return max(oversized, key=len), "full"
+    if file_data and not parts:
+        if h2len and len(file_data) <= h2len:
+            return file_data, "fragment"
+        return file_data, "full"
+    if parts:
+        return b"".join(parts), "fragment"
+    return b"", "empty"
+
+
+def _content_length(pairs) -> int | None:
+    raw = header_get(pairs, "content-length").strip()
+    if not raw or not raw.isdigit():
+        return None
+    return int(raw)
+
+
+def _side_done(end: bool, headers, body: bytes, full: bool) -> bool:
+    """Vrai quand ce côté de l'échange unaire est complet.
+
+    Un passage --follow qui n'a que les HEADERS (content-length déjà grand,
+    corps encore vide) ne matche pas. Content-Length connu et atteint, ou
+    END_STREAM avec le corps réassemblé, clos le côté.
+    """
+    cl = _content_length(headers)
+    if cl is not None and len(body) == cl:
+        return True
+    if not end:
+        return False
+    if cl is None:
+        return True
+    return bool(full)
 
 
 def _float_or_none(v):
@@ -289,9 +393,35 @@ class Exchange:
         self.epoch = None
         self.ready_req = False
         self.ready_resp = False
+        self.req_end = False
+        self.resp_end = False
+        self.req_full = False
+        self.resp_full = False
 
     def complete(self) -> bool:
         return bool(self.ready_req and self.ready_resp and self.method and self.path is not None)
+
+    def h2_finished(self) -> bool:
+        if not (self.complete() and self.status):
+            return False
+        return (_side_done(self.req_end, self.req_headers, self.req_body, self.req_full)
+                and _side_done(self.resp_end, self.resp_headers, self.resp_body, self.resp_full))
+
+    def store_h2_body(self, is_req: bool, payload: bytes, kind: str) -> None:
+        if kind == "empty" or (not payload and kind != "full"):
+            return
+        if is_req:
+            if kind == "full":
+                self.req_body = payload
+                self.req_full = True
+            elif not self.req_full:
+                self.req_body += payload
+        else:
+            if kind == "full":
+                self.resp_body = payload
+                self.resp_full = True
+            elif not self.resp_full:
+                self.resp_body += payload
 
 
 class Assembler:
@@ -375,54 +505,87 @@ class Assembler:
             typ = str(_first(st.get("http2.type")) or "")
             key = (stream, sid)
             ex = self.h2.get(key)
-            if typ == "1" or (typ == "" and st.get("http2.header")):
+            end = _end_stream(st)
+            has_headers = typ == "1" or bool(st.get("http2.header"))
+            payload, kind = extract_h2_payload(st)
+            has_data = typ == "0" or kind != "empty" or "http2.data.data" in st or bool(_reassembled_bytes(st))
+            if has_headers:
                 pairs = h2_header_pairs(st)
-                if not pairs:
-                    continue
-                names = {k.lower(): v for k, v in pairs}
+                if pairs:
+                    names = {k.lower(): v for k, v in pairs}
+                    if ex is None:
+                        ex = self._new()
+                        self.h2[key] = ex
+                    if ":method" in names:
+                        ex.method = names.get(":method")
+                        ex.path = names.get(":path") or "/"
+                        ex.req_headers = [(k, v) for k, v in pairs if not k.startswith(":")]
+                        # garde :authority pour la rédaction / le repli d'hôte, hors pseudo de transport
+                        if ":authority" in names:
+                            ex.req_headers = [(":authority", names[":authority"])] + ex.req_headers
+                        ex.req_src = f"{src}:{sport}"
+                        ex.server_port = dport
+                        ex.ready_req = True
+                        if end:
+                            ex.req_end = True
+                    elif ":status" in names:
+                        ex.status = names.get(":status")
+                        ex.resp_headers = [(k, v) for k, v in pairs if not k.startswith(":")]
+                        ex.ready_resp = True
+                        if not ex.server_port:
+                            ex.server_port = sport
+                        if end:
+                            ex.resp_end = True
+                    elif end and ex.ready_resp:
+                        # trailers gRPC (HEADERS sans :status, END_STREAM)
+                        ex.resp_end = True
+                        for k, v in pairs:
+                            if not k.startswith(":"):
+                                ex.resp_headers.append((k, v))
+                    elif end and ex.ready_req and not ex.ready_resp:
+                        ex.req_end = True
+                    dur = _float_or_none(first_str(find_all(st, "http2.time")))
+                    if dur is not None:
+                        ex.dur = dur
+            if has_data and not has_headers:
                 if ex is None:
                     ex = self._new()
                     self.h2[key] = ex
-                if ":method" in names:
-                    ex.method = names.get(":method")
-                    ex.path = names.get(":path") or "/"
-                    ex.req_headers = [(k, v) for k, v in pairs if not k.startswith(":")]
-                    # garde :authority pour la rédaction / le repli d'hôte, hors pseudo de transport
-                    if ":authority" in names:
-                        ex.req_headers = [(":authority", names[":authority"])] + ex.req_headers
-                    ex.req_src = f"{src}:{sport}"
-                    ex.server_port = dport
-                    ex.ready_req = True
-                elif ":status" in names:
-                    ex.status = names.get(":status")
-                    ex.resp_headers = [(k, v) for k, v in pairs if not k.startswith(":")]
-                    ex.ready_resp = True
-                    if not ex.server_port:
-                        ex.server_port = sport
-                dur = _float_or_none(first_str(find_all(st, "http2.time")))
-                if dur is not None:
-                    ex.dur = dur
-            elif typ == "0" or "http2.data.data" in st:
-                if ex is None:
-                    ex = self._new()
-                    self.h2[key] = ex
-                data = parse_tshark_bytes(st.get("http2.data.data"))
                 src_id = f"{src}:{sport}"
-                if ex.req_src and src_id == ex.req_src:
-                    ex.req_body += data
-                elif ex.req_src:
-                    ex.resp_body += data
-                else:
-                    # data avant headers : on la range côté requête, corrigée si besoin
-                    # quand les headers arrivent (rare ; tshark ordonne headers puis data).
-                    ex.req_body += data
+                is_req = (not ex.req_src) or src_id == ex.req_src
+                ex.store_h2_body(is_req, payload, kind)
+                if end:
+                    if is_req:
+                        ex.req_end = True
+                    else:
+                        ex.resp_end = True
+            elif has_data and has_headers:
+                # une même trame tshark porte parfois HEADERS et DATA
+                if ex is None:
+                    ex = self._new()
+                    self.h2[key] = ex
+                src_id = f"{src}:{sport}"
+                is_req = (not ex.req_src) or src_id == ex.req_src
+                ex.store_h2_body(is_req, payload, kind)
+                if end:
+                    if is_req:
+                        ex.req_end = True
+                    else:
+                        ex.resp_end = True
 
     def records(self):
         out = []
         seen_local = set()
 
-        def consider(ex: Exchange, stream: str):
-            if not ex.complete():
+        def consider(ex: Exchange, stream: str, h2: bool = False):
+            # HTTP/2 : ne pas écrire tant que les DATA ne sont pas là. Un passage
+            # --follow voyait les HEADERS (content-length déjà grand) et posait
+            # resp_body null, puis le digest changeait ou le passage suivant
+            # échouait — la ligne vide restait.
+            if h2:
+                if not ex.h2_finished():
+                    return
+            elif not ex.complete():
                 return
             if stream in self.exclude:
                 return
@@ -471,18 +634,18 @@ class Assembler:
                 "status": str(ex.status),
                 "duree_ms": dur_ms,
                 "req_headers": proxy.redact_headers(ex.req_headers),
-                "req_body": proxy.decode_body(ex.req_body, req_ct, req_ce),
+                "req_body": proxy.decode_body(ex.req_body, req_ct, req_ce, path, "request"),
                 "resp_headers": proxy.redact_headers(ex.resp_headers),
-                "resp_body": proxy.decode_body(ex.resp_body, resp_ct, resp_ce),
+                "resp_body": proxy.decode_body(ex.resp_body, resp_ct, resp_ce, path, "response"),
                 "_digest": digest,
             }
             out.append(rec)
 
         for stream, conn in self.h1.items():
             for ex in conn["queue"]:
-                consider(ex, stream)
+                consider(ex, stream, False)
         for (stream, _sid), ex in self.h2.items():
-            consider(ex, stream)
+            consider(ex, stream, True)
         return out
 
 
@@ -512,15 +675,36 @@ def tshark_cmd(pcap: str, keylog: str, tls_ports: list[str], tshark: str) -> lis
         "-o", "tcp.desegment_tcp_streams:TRUE",
         "-o", "tls.desegment_ssl_records:TRUE",
         "-o", "tls.desegment_ssl_application_data:TRUE",
-        "-T", "json", "--no-duplicate-keys",
+        "-T", "json",
         "-Y",
         "tls.handshake.extensions_server_name || http.request || http.response "
-        "|| http2.header.name || http2.data.data",
+        "|| http2.header.name || http2.data.data || http2.body.reassembled.data "
+        "|| http.file_data",
     ]
     for port in tls_ports:
         if port and port != "443" and port.isdigit():
             cmd.extend(["-d", f"tcp.port=={int(port)},tls"])
     return cmd
+
+
+class _Merged(list):
+    """Liste née de clés JSON dupliquées (plusieurs trames HTTP/2 dans un paquet)."""
+
+
+def _merge_json_pairs(pairs):
+    """tshark -T json répète `http2.stream` / `http2.data.data`. json.loads n'en
+    garde qu'une ; on les empile pour ne pas perdre de DATA."""
+    out = {}
+    for k, v in pairs:
+        if k not in out:
+            out[k] = v
+            continue
+        cur = out[k]
+        if isinstance(cur, _Merged):
+            cur.append(v)
+        else:
+            out[k] = _Merged([cur, v])
+    return out
 
 
 def run_tshark(pcap: str, keylog: str, tls_ports: list[str], tshark: str):
@@ -531,7 +715,7 @@ def run_tshark(pcap: str, keylog: str, tls_ports: list[str], tshark: str):
     if not raw:
         return []
     try:
-        data = json.loads(raw)
+        data = json.loads(raw, object_pairs_hook=_merge_json_pairs)
     except json.JSONDecodeError:
         return None
     if isinstance(data, dict):

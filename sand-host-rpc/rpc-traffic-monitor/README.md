@@ -63,7 +63,13 @@ Une ligne **JSONL** par échange dans `<RPC_TRAFFIC_LOG_DIR>/traffic-YYYY-MM-DD.
 ```
 
 - **Corps requête + réponse** décodés : décompression `gzip`/`deflate`/`br`/`zstd`,
-  et **dé-framing Connect/gRPC** (trames `[flag][len BE 32 bits][payload JSON]`).
+  **dé-framing Connect/gRPC** (trames `[flag][len BE 32 bits][payload]`), et
+  **protobuf → JSON** quand le `content-type` est `application/proto` (Connect
+  unaire), `application/grpc` ou `application/connect+proto`. Les noms de champs
+  viennent du catalogue `../cartographie/data/rpc_catalog.json` (scalaires
+  protobuf-es, messages imbriqués `ref#Type`). Un tag absent du message est
+  `_unknown_<n>`. Les `int64` hors de l'intervalle sûr JSON sont des chaînes ;
+  les `bytes` sont en base64. La rédaction s'applique au JSON produit.
 - **Rédaction systématique** avant écriture : en-têtes sensibles
   (`authorization`, `cookie`, `set-cookie`, `x-cursor-access-token`, …) →
   `[REDACTED]` ; corps : JWT (`eyJ…`), `Bearer …`, tokens GitHub, clés privées PEM,
@@ -88,6 +94,11 @@ Les logs restent hors repo : `.gitignore` exclut `logs/`, `*.jsonl`.
 - `proxy.py` capture le trafic **qu'on route explicitement au travers** (base URL /
   variable d'env du client) ; il n'intercepte pas passivement une connexion déjà
   établie. HTTP/1.1 uniquement, `Connection: close` par échange.
+- Le décodage protobuf couvre les échanges **unaires**. Un flux
+  `application/connect+proto` / gRPC est dé-tramé si l'enveloppe est complète ;
+  un stream qui ne se termine pas, et le WebSocket, restent hors périmètre.
+  Sans entrée de catalogue pour le path, le corps est quand même parcouru
+  (tags `_unknown_<n>`, pas de noms inventés).
 - `mitmproxy/` nécessite la CA dans le trust store ; en **proxy explicite** il ne
   trace que les clients lancés avec `HTTPS_PROXY`. L'interception **transparente**
   (iptables) est documentée mais **non activée** (risque egress/pinning).

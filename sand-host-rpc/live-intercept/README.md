@@ -100,10 +100,12 @@ backend netfilter vivant est **nftables**.
 | `hb-setup-ca.sh`, `start-mitm-host-backend.sh` | **retirés** (exit 1, message vers les scripts keylog) | non |
 | `lib.sh` | config + helpers communs | non |
 | `test/test-host-backend.sh` | preuve déchiffrement + rédaction sur cibles **scratch** (pas de host-main, pas de nft) | non |
+| `test/test_decode_bodies.py` | réassemblage HTTP/2 (corps proto non null) + décodage catalogue ; pcap scratch si tshark/tcpdump | non |
 
 Rédaction/décodage/rotation : **réutilisés** depuis `../rpc-traffic-monitor/proxy.py`
 + `../rpc-traffic-monitor/mitmproxy/addon_log.py` (headers sensibles, JWT, Bearer,
-e-mails, clés GH/PEM, valeurs d'env secrètes ; dé-framing Connect/gRPC ; gunzip).
+e-mails, clés GH/PEM, valeurs d'env secrètes ; dé-framing Connect/gRPC ; gunzip ;
+protobuf → JSON via `../cartographie/data/rpc_catalog.json`).
 
 ## 7. RUNBOOK
 
@@ -335,3 +337,21 @@ Trois faux serveurs sur `127.0.0.1`, SNI forcé par le client Node
 
 `bash test/run_test.sh` enchaîne le relai agent↔host scratch, ce test, et
 `revert.sh --dry-run`.
+
+## 12. Corps JSONL : protobuf lisible, HTTP/2 complet
+
+`application/proto` (Connect unaire) n'est plus du texte UTF-8. `req_body` /
+`resp_body` sont des objets JSON : noms de champs du catalogue, tags inconnus
+en `_unknown_<n>`. Exemple : `GetManagedSkills` → `skills[].id`, `skills[].content`.
+
+tshark réassemble les DATA HTTP/2 et **recolle le corps entier** dans la
+dernière trame (`http2.body.reassembled.data`, et souvent `http2.data.data`
+plus long que `http2.length`) **en plus** des fragments. Le décodeur garde ce
+corps réassemblé. En `--follow`, une réponse n'est écrite qu'une fois les deux
+côtés terminés (END_STREAM, ou `Content-Length` atteint) — sinon la ligne
+partait avec `resp_body: null` alors que `content-length` était déjà grand.
+
+Limites : un stream qui ne finit pas pendant la capture n'est pas écrit ; le
+WebSocket non plus. Une enveloppe `application/connect+proto` / gRPC complète
+est dé-tramée, chaque payload décodé. La patte agent↔host (HTTP/1.1 clair,
+JSON) ne change pas.

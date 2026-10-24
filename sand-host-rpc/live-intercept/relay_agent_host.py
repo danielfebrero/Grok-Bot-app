@@ -94,10 +94,10 @@ async def pump_one(creader, cwriter, ureader, uwriter, log_dir) -> bool:
         "duree_ms": dur,
         "req_headers": proxy.redact_headers(req_headers),
         "req_body": proxy.decode_body(req_body, hd.get("content-type", ""),
-                                      hd.get("content-encoding", "")),
+                                      hd.get("content-encoding", ""), path, "request"),
         "resp_headers": proxy.redact_headers(resp_headers),
         "resp_body": proxy.decode_body(resp_body, rhd.get("content-type", ""),
-                                       rhd.get("content-encoding", "")),
+                                       rhd.get("content-encoding", ""), path, "response"),
     }
     proxy.write_traffic_record(rec, log_dir)
 

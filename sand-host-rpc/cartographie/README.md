@@ -10,12 +10,14 @@ Cartographie **annotée** des services et méthodes RPC Sand/Cursor exposés par
 | `services-methodes.json` | Version machine : `services.<Service> = [ {method, kind, http, verdict, idor_watch, …} ]`. |
 | `audit-2026-10-24.md` | Rapport d'audit du balayage (copie de `rpc-audit-rapport.md`). |
 | `data/all-rpc-methods.json` | Catalogue brut : 460 triplets `[service, méthode, kind]` (extrait des bundles host). |
+| `data/rpc_catalog.json` | Schéma protobuf pour le décodage des corps (`messages`, `enums`, `methods`). Scalaires protobuf-es, imbriqué `ref#Type`. Régénéré par `extract-rpc-catalog.py` depuis `host-main.cjs`. |
 | `data/rpc-sweep-log.tsv` | Balayage lecture : `service · method · kind · http · outcome`. |
 | `gen-cartographie.py` | Générateur : fusionne `data/` → `services-methodes.{md,json}`. |
 
 ## Régénérer
 ```bash
 python3 gen-cartographie.py
+python3 extract-rpc-catalog.py /opt/sand/sand-host/host-main.cjs   # ou un .cjs.gz
 ```
 
 ## Méthodologie
