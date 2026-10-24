@@ -179,3 +179,87 @@ pas de DISARM.
 **Test (cibles scratch, n'arme rien) :** `bash test/test-agent-host.sh` prouve
 (a) req+resp capturés, (b) `leg=agent-host`, (c) grep anti-secret VIDE (clé privée
 en bloc complet), (d) `revert-agent-host.sh --dry-run` OK.
+
+## 11. Patte host↔backend : interception SÉLECTIVE + ON/OFF par `nft` (propre)
+
+La patte host↔backend est du **TLS direct par IP** vers `api2.cursor.sh` (et le set
+backend), **hors** tunnel egress. Déchiffrer impose (a) un CA accepté par le runtime
+node de host-main et (b) un mitmproxy transparent devant le `:443` **de host-main
+uniquement**. Objectif : **zéro collatéral** sur les autres clients 443 (le tunnel
+egress `198.18.0.1` et donc les Chrome agents, S3, CDN) et un **vrai on/off**.
+
+### 11.1 Interception SÉLECTIVE (le cœur « anti-casse »)
+
+`start-mitm-host-backend.sh` lance `mitmdump --mode transparent` sur `:8900` avec
+**`--allow-hosts "$HB_ALLOW_HOSTS"`** : mitmproxy ne **termine/déchiffre** le TLS que
+pour les hôtes qui **matchent** ; tout le reste est **passthrough TLS brut** (TCP
+relayé, cert d'origine conservé, jamais déchiffré ni loggé). Même moteur de décision
+(`next_layer`) qu'en mode proxy ; en transparent la destination vient de
+`SO_ORIGINAL_DST` posée par la règle `nft`.
+
+| Hôte (SNI puis IP:port) | Décision |
+|---|---|
+| `api2/api3/api4/api/repo42.cursor.sh[:443]`, `cursor.sh`, `*.cursor.com[:443]` | **INTERCEPTÉ** (déchiffré + loggé `leg=host-backend`) |
+| `198.18.0.1:443` (tunnel egress → Chrome agents) | **PASSTHROUGH** |
+| S3, Cloudflare/CDN, tout autre `:443` | **PASSTHROUGH** |
+
+`HB_ALLOW_HOSTS` (ancré, anti-spoof — `settings.cursor.sh.evil.com` **rejeté**) :
+```
+(^|\.)(api|api2|api3|api4|repo42)\.cursor\.sh(:443)?$|(^|\.)(www\.)?cursor\.com(:443)?$|(^|\.)cursor\.sh(:443)?$
+```
+
+### 11.2 Le SEUL moment à risque = `hb-setup-ca.sh` (UN restart host-main)
+
+`api2` **pinne** sa chaîne : rendre host-main CA-ready = l'unique risque de brick.
+`hb-setup-ca.sh` (opérateur) capture l'env du host-main vivant via `/proc/PID/environ`
+(**mémoire seule, jamais sur disque**), ré-lance **le seul host-main** avec son env
+d'origine **+ `NODE_EXTRA_CA_CERTS=<CA mitmproxy>`** (additif, lu au démarrage node),
+sur **le même port 1340** (préserve le relai agent↔host). Le superviseur **adopte**
+ce host-main. Dead-man `watchdog.sh` armé **avant** (flags dédiés `HB_ARM`/`HB_DISARM`
+via `--arm-flag/--disarm-flag`) → revert auto si backend injoignable. **Il ne pose
+AUCUNE règle `nft`.** Une fois fait, host-main est CA-ready en permanence et **le CA
+est inoffensif tant qu'on n'intercepte pas** (aucune règle = trafic direct normal).
+```
+LI_ARM_CONFIRM=yes-i-understand-brick-risk sudo -E bash hb-setup-ca.sh
+```
+(sans jeton = DRY-RUN). C'est **la seule** commande qui touche host-main.
+
+### 11.3 ON / OFF = `nft` add/remove **seul** (aucun restart)
+
+Table **DISTINCTE `ip sandrpc_hb`** (la table agent↔host `ip sandrpc` n'est **jamais**
+touchée). Règle :
+```
+chain output { type nat hook output priority -100 ; policy accept ; }
+rule meta skuid 1000 ip daddr != 198.18.0.1 tcp dport 443 redirect to :8900
+```
+- `skuid 1000` : attrape host-main (uid 1000). mitmproxy tourne en **root (uid 0)** →
+  sa reconnexion au vrai backend n'est **pas** reprise → **pas de boucle** (en `output`
+  le paquet a un socket propriétaire, donc `skuid` opère, contrairement à prerouting).
+- `ip daddr != 198.18.0.1` : exclut le tunnel egress (aussi uid 1000) → **Chrome agents
+  intacts**.
+
+```
+HB_ON_CONFIRM=yes sudo -E bash hb-on.sh   # démarre mitm si besoin + pose la règle — INSTANTANÉ, SANS restart
+bash hb-off.sh                            # delete table ip sandrpc_hb — INSTANTANÉ (mitm laissé idle)
+```
+`hb-on.sh` refuse si host-main n'est pas CA-ready (marqueur absent) sauf `HB_FORCE=1`.
+Sans jeton, `hb-on.sh` = DRY-RUN (n'arme rien).
+
+### 11.4 Revert complet
+```
+bash hb-revert.sh            # delete table sandrpc_hb + kill mitm + SIGTERM host-main (respawn PROPRE sans CA)
+bash hb-revert.sh --dry-run  # plan, n'exécute rien
+```
+Ne touche **jamais** `ip sandrpc` ni le relai agent↔host.
+
+### 11.5 Test (cibles SCRATCH, n'arme RIEN de réel)
+`bash test/test-host-backend.sh` prouve, sur deux faux hôtes mappés `127.0.0.1` le
+temps du test (noms bidon, zéro collatéral, `/etc/hosts` restauré) :
+- (1) hôte ciblé = **déchiffré** (leaf re-signé, `issuer=mitmproxy`) ;
+- (2) hôte hors-liste = **passthrough** (cert d'origine, `issuer≠mitmproxy`) ;
+- (3) seul l'hôte ciblé est loggé, `leg=host-backend`, req+resp body présents ;
+- (4) grep anti-secret **VIDE** (Bearer/`ghp_`/clé privée en bloc complet/email/JWT) ;
+- (5) `HB_ALLOW_HOSTS` de PROD matche le set backend, **rejette** tunnel/S3/CDN/spoof ;
+- (6) `hb-off.sh --dry-run` et `hb-revert.sh --dry-run` OK.
+La syntaxe exacte de la règle `nft` de PROD est validée à part par `nft -c` (non
+appliquée). **Aucune règle `nft` réelle posée, host-main jamais redémarré.**

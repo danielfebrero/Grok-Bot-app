@@ -15,4 +15,7 @@ logs/
 *.jsonl
 __pycache__/
 *.pyc
-test/_run/
+test/_run*/
+HB_ARM
+HB_DISARM
+CA_READY*

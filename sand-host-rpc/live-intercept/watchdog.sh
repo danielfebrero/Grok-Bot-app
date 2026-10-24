@@ -27,12 +27,18 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 GRACE=90; INTERVAL=5; PROBES=3
 REVERT="$HERE/revert.sh"   # script de revert (surchargeable: variante agent-host)
+# flags surchargeables (def = ARM/DISARM partagés) : permet un dead-man DÉDIÉ
+# (ex. host<->backend : --arm-flag HB_ARM --disarm-flag HB_DISARM) qui n'interfère
+# PAS avec l'état de la patte agent<->host.
+ARMF="$ARM_FLAG"; DISARMF="$DISARM_FLAG"
 while [ $# -gt 0 ]; do
   case "$1" in
     --grace) GRACE="$2"; shift 2;;
     --interval) INTERVAL="$2"; shift 2;;
     --probes) PROBES="$2"; shift 2;;
     --revert) REVERT="$2"; shift 2;;
+    --arm-flag) ARMF="$2"; shift 2;;
+    --disarm-flag) DISARMF="$2"; shift 2;;
     *) shift;;
   esac
 done
@@ -42,6 +48,7 @@ if [ "${LI_WATCHDOG_DETACHED:-0}" != "1" ]; then
   mkdir -p "$STATE_DIR"
   LI_WATCHDOG_DETACHED=1 setsid bash "$HERE/watchdog.sh" \
       --grace "$GRACE" --interval "$INTERVAL" --probes "$PROBES" --revert "$REVERT" \
+      --arm-flag "$ARMF" --disarm-flag "$DISARMF" \
       </dev/null >>"$WATCHDOG_LOG" 2>&1 &
   echo "watchdog détaché (setsid) ; log: $WATCHDOG_LOG"
   exit 0
@@ -65,11 +72,11 @@ do_revert() {
 
 while true; do
   # ARM retiré -> plus rien à surveiller
-  if [ ! -f "$ARM_FLAG" ]; then
+  if [ ! -f "$ARMF" ]; then
     wlog "ARM absent ; sortie propre"; rm -f "$WATCHDOG_PIDFILE"; exit 0
   fi
   # DISARM = opérateur confirme ; on arrête de surveiller SANS revert
-  if [ -f "$DISARM_FLAG" ]; then
+  if [ -f "$DISARMF" ]; then
     wlog "DISARM détecté ; le dead-man est annulé (interception conservée) ; sortie"
     rm -f "$WATCHDOG_PIDFILE"; exit 0
   fi
