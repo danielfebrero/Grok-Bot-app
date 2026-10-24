@@ -12,7 +12,7 @@
 #
 # Puis : dry-run de hb-setup-keylog / hb-on / hb-off / hb-revert, et
 # arm-agent-host.sh (toujours dry, la patte agent↔host n'est pas armée).
-set -uo pipefail
+set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LI="$(cd "$HERE/.." && pwd)"
 RUN="$HERE/_run_hb"
@@ -21,12 +21,14 @@ mkdir -p "$RUN/logs" "$RUN/state"
 unset LI_ARM_CONFIRM HB_ON_CONFIRM HB_FORCE || true
 export LI_STATE_DIR="$RUN/state"
 export RPC_TRAFFIC_LOG_DIR="$RUN/logs"
+# AVANT lib.sh : HB_IFACE="${HB_IFACE:-any}" fige la valeur au source.
+# Le scratch est sur lo ; any marche aussi, mais lo évite le cooked LINUX_SLL2.
+export HB_IFACE=lo
 # shellcheck source=../lib.sh
 . "$LI/lib.sh"
 PA=19561; PB=19562; PC=19563
 export HB_PCAP="$RUN/cap.pcap"
 export HB_KEYLOG_FILE="$RUN/keys.log"
-export HB_IFACE="${HB_IFACE:-lo}"
 export HB_CAPTURE_FILTER="tcp port $PA or tcp port $PB or tcp port $PC"
 export HB_TLS_PORTS="$PA $PB $PC"
 export HB_DECODE_INTERVAL=0.5
@@ -208,6 +210,7 @@ echo
 echo "=============== RÉSULTAT ==============="
 [ -n "${LOG:-}" ] && [ -s "$LOG" ] || {
   echo "ÉCHEC: aucun JSONL"; echo "---- capture.out ----"; cat "$RUN/capture.out" || true
+  echo "---- tcpdump ----"; sudo -n cat "$LI_STATE_DIR/hb-capture.out" 2>/dev/null || true
   echo "---- state log ----"; cat "$LI_STATE_DIR/state.log" 2>/dev/null || true
   exit 3
 }

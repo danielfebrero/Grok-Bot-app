@@ -50,9 +50,9 @@ fi
 echo "--- marqueurs de rédaction présents ---"
 grep -oE 'REDACTED[A-Z-]*' "$LOG" | sort | uniq -c
 echo "--- classifieur de patte (addon_log._direction) ---"
-python3 - <<'PYX'
+python3 - "$LI/../rpc-traffic-monitor/mitmproxy" <<'PYX'
 import sys
-sys.path.insert(0,"/workspace/projets/Grok-Bot-app/sand-host-rpc/rpc-traffic-monitor/mitmproxy")
+sys.path.insert(0, sys.argv[1])
 import addon_log
 assert addon_log._direction("api2.cursor.sh",443)=="host->backend"
 assert addon_log._direction("repo42.cursor.sh",443)=="host->backend"

@@ -181,11 +181,24 @@ hostmain_has_tls_keylog() {
   return 1
 }
 
+# 0 si le pid existe encore et n'est pas un zombie. kill -0 reste vrai sur un
+# zombie : hb-off attendrait sinon ~5 s que python (qui n'attend pas tcpdump)
+# récolte un fils déjà mort.
+hb_pid_live() {
+  local p="$1" line state
+  [ -n "${p:-}" ] || return 1
+  [ -r "/proc/$p/stat" ] || return 1
+  line="$(cat "/proc/$p/stat" 2>/dev/null || true)"
+  state="${line##*) }"
+  state="${state%% *}"
+  [ -n "$state" ] && [ "$state" != "Z" ]
+}
+
 hb_capture_up() {
   local p=""
   [ -f "$HB_TCPDUMP_PIDFILE" ] || return 1
   p="$(cat "$HB_TCPDUMP_PIDFILE" 2>/dev/null || true)"
-  [ -n "$p" ] && kill -0 "$p" 2>/dev/null
+  hb_pid_live "$p"
 }
 
 # Efface un fichier de secrets (pcap ou keylog) sans jamais l'imprimer.
@@ -247,7 +260,7 @@ hb_stop_pids() {
   for pf in "$HB_TCPDUMP_PIDFILE" "$HB_DECODE_PIDFILE"; do
     [ -f "$pf" ] || continue
     p="$(cat "$pf" 2>/dev/null || true)"
-    if [ -n "${p:-}" ] && kill -0 "$p" 2>/dev/null; then
+    if hb_pid_live "${p:-}"; then
       slog "hb: SIGTERM pid $p ($pf)"
       kill -TERM "$p" 2>/dev/null || true
     fi
@@ -255,7 +268,7 @@ hb_stop_pids() {
       # laisser le pcap se fermer avant de signaler le décodeur
       local i
       for i in $(seq 1 25); do
-        [ -n "${p:-}" ] && kill -0 "$p" 2>/dev/null || break
+        hb_pid_live "${p:-}" || break
         sleep 0.2
       done
     fi
@@ -265,10 +278,10 @@ hb_stop_pids() {
     p="$(cat "$HB_DECODE_PIDFILE" 2>/dev/null || true)"
     local i
     for i in $(seq 1 40); do
-      [ -n "${p:-}" ] && kill -0 "$p" 2>/dev/null || break
+      hb_pid_live "${p:-}" || break
       sleep 0.2
     done
-    if [ -n "${p:-}" ] && kill -0 "$p" 2>/dev/null; then
+    if hb_pid_live "${p:-}"; then
       slog "hb: décodeur $p encore vivant, SIGKILL"
       kill -KILL "$p" 2>/dev/null || true
     fi

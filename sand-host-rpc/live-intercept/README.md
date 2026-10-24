@@ -4,21 +4,21 @@ Outillage pour capturer **en direct** le trafic RPC de la box sur les deux patte
 et journaliser **requête + réponse (corps complets)** dans les JSONL rédactés
 partagés EG (`/workspace/shared-eg/box-vers-vps/sand-host-rpc-traffic/`).
 
-> ⚠️ **Rien ici n'est armé.** `arm.sh` refuse de tourner sans jeton explicite et
-> la bascule finale (qui peut couper l'egress) est laissée à l'opérateur, protégée
-> par `watchdog.sh`. Ce dossier = scripts testés + runbook.
+> ⚠️ **Rien ici n'est armé.** `arm.sh` et `hb-setup-keylog.sh` refusent de tourner
+> sans jeton explicite. La bascule (un restart de host-main) est laissée à
+> l'opérateur, protégée par `watchdog.sh`. Ce dossier = scripts testés + runbook.
 
 ## 1. Les deux pattes (vérifié sur cette box)
 
 | Patte | Transport | Preuve | Interception |
 |-------|-----------|--------|--------------|
-| **agent ↔ host** | **HTTP/1.1 EN CLAIR** sur `0.0.0.0:1340` (`SAND_HOST_PORT`) | `curl http://127.0.0.1:1340/` → `HTTP/1.1 404` JSON ; `openssl s_client` → *wrong version number* (pas de TLS) ; h2c refusé | **relai TCP plaintext** — aucune CA requise |
-| **host ↔ backend** | **TLS direct par IP** vers `api2.cursor.sh` (52.21.130.202:443), S3, cloudflare — **PAS** via le tunnel `8791` | `ss -tnp` sur pid host-main : connexions `:443` directes, zéro vers `:8791` | **mitmproxy transparent** + host-main doit faire confiance à **notre CA** |
+| **agent ↔ host** | **HTTP/1.1 EN CLAIR** sur `0.0.0.0:1340` (`SAND_HOST_PORT`) | `curl http://127.0.0.1:1340/` → `HTTP/1.1 404` JSON ; `openssl s_client` → *wrong version number* (pas de TLS) ; h2c refusé | **relai TCP plaintext** — aucune CA, aucun keylog |
+| **host ↔ backend** | **TLS direct** vers `api2`/`api3`/…`cursor.sh:443` — **PAS** via le tunnel egress `198.18.0.1` | connexions `:443` directes du pid host-main, zéro vers le tunnel | **capture passive** : `--tls-keylog` + tcpdump/tshark. Pas de mitm, pas de CA, pas de redirect |
 
-Conséquence : seule la patte **host↔backend** exige la CA et un **redémarrage de
-host-main** (donc le risque). La patte **agent↔host** s'intercepte sans CA ni
-redémarrage du core, juste en déplaçant host-main de 1340→1341 et en mettant le
-relai sur 1340.
+La patte **agent↔host** s'intercepte sans redémarrer le core (§10 : relai + nft
+sur le seul client agent). La patte **host↔backend** demande **un** restart de
+host-main, une seule fois, pour ajouter `--tls-keylog` — ensuite on/off =
+démarrer ou arrêter la capture, sans nouveau restart (§11).
 
 ## 2. Topologie de supervision (pourquoi le revert est sûr)
 
@@ -29,57 +29,77 @@ pod-daemon(7) ─ sand-exit-watch(53) ─ supervise-sand-supervisor(21506)
 ```
 
 `sand-supervisor` **relance automatiquement** host-main dès qu'il meurt, avec
-**son propre env d'origine** (port 1340, sans `NODE_EXTRA_CA_CERTS`). De plus il
-**adopte** tout `host-main.cjs` vivant qu'il découvre via `gateway.json`
-(`maybeAdoptOrphanHost`).
+**son propre env d'origine** (port 1340, **sans** `NODE_EXTRA_CA_CERTS`, **sans**
+`SSLKEYLOGFILE`, **sans** `--tls-keylog`). De plus il **adopte** tout
+`host-main.cjs` vivant qu'il découvre via `gateway.json` (`maybeAdoptOrphanHost`).
 
-- **revert** exploite ça : tuer host-main ⇒ le superviseur en relance un **propre**
-  sur 1340. On n'a donc jamais à « reconstruire » host-main nous-mêmes.
-- **arm** exploite l'adoption : on lance NOTRE host-main (nouveau port + CA), il
-  écrit `gateway.json`, puis on SIGTERM l'ancien ⇒ le superviseur adopte le nôtre
-  au lieu d'en pondre un neuf.
+- **hb-revert / revert** exploitent ça : tuer host-main ⇒ le superviseur en relance
+  un **propre** sur 1340. On n'a donc jamais à « reconstruire » host-main nous-mêmes.
+- **hb-setup-keylog** exploite l'adoption : on lance NOTRE host-main (même port
+  1340, argv `--tls-keylog` seulement), il écrit `gateway.json`, puis on SIGTERM
+  l'ancien ⇒ le superviseur adopte le nôtre au lieu d'en pondre un neuf.
 
-## 3. Méthode CA retenue : `NODE_EXTRA_CA_CERTS` additif
+## 3. Déchiffrement host↔backend : `--tls-keylog`, pas une CA
 
-Choisie car **la moins cassante** parmi les trois options :
+Vérifié sur `/exec-daemon/node` **v22.23.4** (OpenSSL 3.5, undici intégré) :
 
-- ✅ **`NODE_EXTRA_CA_CERTS`** (retenu) : **ajoute** notre CA aux racines bundlées
-  de Node sans les remplacer → confiance backend d'origine **préservée**. Lu au
-  démarrage de node → injecté en relançant **uniquement host-main** avec son env
-  d'origine + cette seule variable. Pas de wrapper, pas de mutation du superviseur.
-- ❌ **wrapper `/exec-daemon/node`** : persistant, impacterait **tout** process
-  node de la box — interdit.
-- ❌ **env du superviseur** : impossible à chaud ; remonterait toute la chaîne
-  `pod-daemon` (≈ reboot stack).
+- L'env **`SSLKEYLOGFILE` seul ne crée aucun fichier.** Le binaire ne contient
+  pas cette chaîne ; le callback keylog n'est armé que par l'option.
+- **`--tls-keylog=FICHIER`** écrit le format NSS que Wireshark appelle
+  SSLKEYLOGFILE (`CLIENT_HANDSHAKE_TRAFFIC_SECRET`, `CLIENT_TRAFFIC_SECRET_0`,
+  `SERVER_*`, `EXPORTER_SECRET`). Node avertit que ce fichier contient des
+  secrets de session. Mode **0600** (append).
+- On pose **aussi** `SSLKEYLOGFILE=` vers le même chemin : no-op sur ce build,
+  utile si un Node futur honore l'env. On **retire** `NODE_EXTRA_CA_CERTS` et
+  tout `SSLKEYLOGFILE` précédent.
+- Pas de wrapper sur `/exec-daemon/node` (impacterait tout node de la box).
+  Pas de mutation de l'env du superviseur.
 
-## 4. Anti-boucle d'interception
+Le TLS vers le vrai backend n'est pas terminé par nous : pas de certificat
+maison, pas de pinning à satisfaire. tshark déchiffre **après coup** avec
+`tls.keylog_file`.
 
-host-main tourne en **uid 1000 (box)**, *le même* que l'agent/les interceptors.
-On ne peut donc pas exclure nos propres sondes par uid si elles tournent aussi en
-1000 → **les interceptors (mitm + relai) tournent en ROOT (uid 0)**. La règle nft
-ne redirige que `meta skuid 1000 tcp dport 443` ; le trafic uid-0 du mitm vers le
-vrai backend n'est **pas** repris → pas de boucle.
+## 4. Pas de boucle : la capture est passive
 
-## 5. Netfilter : backend ACTIF = `nft`
+Rien n'est redirigé. tcpdump copie les paquets ; le trafic de host-main continue
+d'aller au vrai `:443`. Le filtre BPF par défaut est
+`tcp port 443 and not host 198.18.0.1` (le tunnel egress, donc les Chrome
+agents, reste dehors). Le décodeur ne **journalise** que les échanges dont le
+SNI (sinon `:authority` / `Host`) matche `HB_ALLOW_HOSTS` et dont
+`addon_log._direction` vaut `host->backend`. Le reste peut rester chiffré dans
+un pcap éphémère mode 0600, détruit par `hb-off`, et n'entre pas dans le JSONL.
 
-La box est dans le **netns racine réel** (`net:[4026531840]`, tailscale + docker
-présents). Le backend netfilter vivant est **nftables** (`table ip nat` avec les
-chaînes tailscale ; `iptables` était absent, installé en `iptables-nft`). On
-utilise donc **`nft`** et une **table dédiée `ip sandrpc`** — créée/hookée
-seulement par `arm`, supprimée en bloc par `revert` (`nft delete table ip sandrpc`).
-La patte agent↔host **n'utilise pas** nft (relai direct sur 1340).
+Les clés n'existent que pour le process Node lancé avec `--tls-keylog`. Un autre
+client TLS de la box n'est pas déchiffrable avec ce fichier.
+
+## 5. Netfilter
+
+La box est dans le **netns racine réel** (tailscale + docker présents). Le
+backend netfilter vivant est **nftables**.
+
+- **host↔backend n'ajoute aucune règle.** L'ancienne table mitm `ip sandrpc_hb`
+  (redirect `:443` → mitm) est **supprimée** si elle traîne encore
+  (`hb-setup-keylog`, `hb-off`, `hb-revert`). Elle n'est plus jamais créée.
+- **agent↔host (§10)** utilise la table `ip sandrpc` (prerouting, un seul
+  client). `hb-*` ne la touche pas. `revert.sh` (chemin combiné historique) la
+  supprime encore : ne pas le lancer pour « éteindre » seulement le keylog —
+  utiliser `hb-revert.sh`.
 
 ## 6. Scripts
 
 | Script | Rôle | Exécute-t-il qqch d'irréversible ? |
 |--------|------|-----------------------------------|
-| `watchdog.sh` | dead-man's switch **détaché (setsid)**, survit à la mort de l'agent | non (sauf s'il déclenche `revert`) |
-| `revert.sh` | restaure TOUT (delete table nft, kill interceptors, bounce host-main→respawn propre 1340) ; idempotent ; `--dry-run` | oui (c'est son rôle) — mais sûr |
-| `arm.sh` | la bascule ; **refuse de tourner** sans `LI_ARM_CONFIRM=yes-i-understand-brick-risk` (sinon dry-run) | oui, seulement avec le jeton |
-| `relay_agent_host.py` | relai HTTP/1.1 keep-alive loggeur, patte agent↔host (`leg=agent-host`) | non |
-| `start-mitm-host-backend.sh` | mitmproxy **transparent** patte host↔backend (`leg=host-backend`), en root | non |
+| `watchdog.sh` | dead-man's switch **détaché (setsid)**, survit à la mort de l'agent | non (sauf s'il déclenche le revert qu'on lui donne) |
+| `hb-setup-keylog.sh` | **un** restart host-main : argv `--tls-keylog` + env `SSLKEYLOGFILE`, capture démarrée **avant** le restart. Jeton `LI_ARM_CONFIRM` | oui, seulement avec le jeton |
+| `hb-on.sh` / `hb-off.sh` | démarre / arrête tcpdump + décodeur. **Aucun** restart, **aucune** nft | non (`hb-off` détruit le pcap, garde le keylog) |
+| `hb-revert.sh` | stop capture, shred pcap **et** keylog, SIGTERM host-main → respawn sans flag | oui (c'est son rôle) — host propre au retour |
+| `start-capture-host-backend.sh` | tcpdump (`--immediate-mode`) + `decode_keylog.py`. Root. Appelé par setup/on | non |
+| `decode_keylog.py` | tshark + keylog NSS → JSONL rédigé `leg=host-backend` | non |
+| `arm-agent-host.sh` / `revert-agent-host.sh` / `relay_agent_host.py` | patte agent↔host, **inchangés** (§10) | `arm-agent-host` oui, avec le jeton |
+| `arm.sh` / `revert.sh` | chemin combiné **historique**. `arm.sh` **n'arme plus** le host↔backend (pas de CA, pas de `--tls-keylog`, pas de nft :443). Ne pas l'enchaîner après `hb-setup-keylog` : il relance host-main **sans** le flag | oui, avec le jeton |
+| `hb-setup-ca.sh`, `start-mitm-host-backend.sh` | **retirés** (exit 1, message vers les scripts keylog) | non |
 | `lib.sh` | config + helpers communs | non |
-| `test/run_test.sh` | PREUVE capture+rédaction+revert sur cibles **scratch** (ne touche pas host-main) | non |
+| `test/test-host-backend.sh` | preuve déchiffrement + rédaction sur cibles **scratch** (pas de host-main, pas de nft) | non |
 
 Rédaction/décodage/rotation : **réutilisés** depuis `../rpc-traffic-monitor/proxy.py`
 + `../rpc-traffic-monitor/mitmproxy/addon_log.py` (headers sensibles, JWT, Bearer,
@@ -93,18 +113,21 @@ cd .../sand-host-rpc/live-intercept
 bash arm.sh                      # DRY : imprime le plan, ne touche à rien
 LI_ARM_CONFIRM=yes-i-understand-brick-risk sudo -E bash arm.sh   # bascule réelle
 ```
-`arm` fait, dans l'ordre : pose `ARM` → lance `watchdog.sh` (grace 90s) → mitm
-transparent (root, :8900) → spawn host-main sur 1341 (+CA) → SIGTERM l'ancien →
-relai sur 1340 → règle nft redirect 443.
+`arm.sh` **ne fait plus** la patte host↔backend (ni mitm, ni CA, ni nft :443, ni
+`--tls-keylog`). Pour cette patte, suivre le §11. Pour l'agent↔host sans
+restart, suivre le §10 (`arm-agent-host.sh`), pas `arm.sh`.
 
 ### Ce qui peut casser
-Si host-main **épingle le certificat** (cert-pinning) du backend, il rejettera
-notre CA ⇒ plus d'egress host↔backend ⇒ **l'agent meurt** (host-main est la bouée).
+`arm.sh` déplace encore host-main de 1340 vers 1341. Ce n'est pas le chemin
+host↔backend. Le risque de la patte backend est décrit au §8 et au §11 : un
+restart / une course d'adoption, pas un pinning de CA.
 
 ### Comment le watchdog sauve
 Détaché (`setsid`), il probe `api2.cursor.sh:443` toutes les 5s. Si injoignable
-3 probes d'affilée **ou** si `grace` (90s) s'écoule **sans `DISARM`**, il lance
-`revert.sh` tout seul → la box se répare même si l'agent est mort.
+3 probes d'affilée **ou** si `grace` (90s) s'écoule sans le flag de désarmement,
+il lance le revert qu'on lui a donné. `arm.sh` utilise `DISARM` + `revert.sh`.
+`hb-setup-keylog.sh` utilise `HB_DISARM` + `hb-revert.sh` (flags dédiés, la
+patte agent↔host n'est pas emportée).
 
 ### Confirmer / désarmer / annuler
 ```bash
@@ -118,24 +141,47 @@ bash revert.sh --dry-run                        # voir ce que revert ferait
 - `revert.sh` : 0 host-main sain sur 1340 + backend joignable · 1 sinon
 - `arm.sh` : 0 dry-run · 2 pas de host-main · 3 host-main KO sur 1341 (revert auto)
 
-## 8. Estimation du risque de pinning
+## 8. Risque résiduel (plus de pinning)
 
-**Modéré-à-élevé, non vérifiable sans armer.** host-main est un bundle Node
-(`application/json` Connect). Les clients Node/undici standards suivent le magasin
-de CA (donc `NODE_EXTRA_CA_CERTS` fonctionnerait) ; le pinning explicite est
-possible côté backend sécurisé mais rare en pur Node sans code dédié. Le test
-scratch prouve que l'addon capture un TLS ré-signé par notre CA quand le client
-l'accepte (`--cacert`). **Le seul vrai test est l'arm**, d'où : watchdog armé
-AVANT la coupure + grace courte + revert auto. Mon conseil reste de privilégier la
-capture host↔backend **côté EG** (env maîtrisé) et de n'armer la box que pour la
-patte **agent↔host** (sans CA, sans redémarrage du core → risque quasi nul).
+Le TLS n'est plus intercepté : host-main parle au certificat **réel** du backend.
+Le pinning ne s'applique plus.
+
+Ce qui reste :
+
+- **Un restart** de host-main pour injecter `--tls-keylog` (et seulement ça).
+  Course d'adoption possible, la même que l'ancien `arm` : le watchdog est armé
+  **avant**, et `hb-revert.sh` SIGTERM host-main pour que le superviseur en
+  relance un sans le flag. Tant que le backend répond, le dead-man ne tire pas.
+- **Le fichier de clés** contient des secrets de session TLS. Il vit dans
+  `STATE_DIR/keylog/sslkeys.log` (défaut `/workspace/.sand-live-intercept/keylog/`),
+  mode **0600**, propriétaire uid host-main (1000), **hors** dépôt et **hors**
+  `TRAFFIC_LOG_DIR`. Jamais recopié dans les JSONL. `hb-revert` le shred.
+  L'environnement de host-main est lu dans `/proc/PID/environ` **en mémoire** et
+  n'est pas écrit sur disque.
+- **hb-off ne retire pas les clés** : host-main continue d'append au fichier
+  0600. C'est voulu (un `hb-on` suivant n'a pas besoin d'un restart). Pour
+  couper l'écriture : `hb-revert.sh`.
 
 ## 9. Limites connues
-- `proxy.py` : `PKEY_RE` rédige désormais le **BLOC COMPLET**
+- `proxy.py` : `PKEY_RE` rédige le **BLOC COMPLET**
   `-----BEGIN … PRIVATE KEY----- … -----END … PRIVATE KEY-----` (`re.DOTALL`),
-  en-tête **et** corps base64 (prouvé par `test/test-agent-host.sh`).
-- La patte host↔backend ne capte que les hôtes redirigés (uid 1000 : host-main) ;
-  S3/CDN par IP directe sont redirigés aussi (dport 443) mais étiquetés `autre:`.
+  en-tête et corps base64.
+- **Wireshark a besoin du ClientHello dans le pcap** pour associer les secrets
+  TLS 1.3. Les pools HTTP/2 ouverts **avant** la capture restent opaques
+  jusqu'à une reconnexion. `hb-setup-keylog` démarre donc tcpdump **avant** le
+  restart, pour prendre les handshakes du nouveau process.
+- **`SSLKEYLOGFILE` seul est ignoré** sur le Node de cette box. Le flag
+  `--tls-keylog` est obligatoire. Les deux sont posés vers le même chemin.
+- tcpdump est lancé avec **`--immediate-mode`**. Sans ça, TPACKET_V3 ne livre
+  les paquets qu'au bout d'environ une seconde : un `hb-off` dans la foulée
+  voyait « N received, 0 captured » et un pcap vide.
+- Dépendances : `tcpdump` et `tshark` (Wireshark). Sans eux, `hb-on` / la
+  capture sortent en erreur ; host-main n'est pas modifié par `hb-on`.
+- HTTP/1.1 et HTTP/2 sont reassemblés. Seuls les SNI de `HB_ALLOW_HOSTS` sont
+  journalisés (`leg=host-backend`). Le pcap est éphémère (plafond
+  `HB_PCAP_MAX_BYTES`, défaut 64 Mio) et **shreddé par hb-off**.
+- Le décodeur ne déchiffre que ce que **ce** Node a mis dans le keylog. Le BPF
+  peut voir d'autre TCP/443 ; il n'est pas écrit dans le JSONL.
 
 ## 10. Variante « sans restart host-main » (patte agent↔host) — RECOMMANDÉE
 
@@ -180,86 +226,112 @@ pas de DISARM.
 (a) req+resp capturés, (b) `leg=agent-host`, (c) grep anti-secret VIDE (clé privée
 en bloc complet), (d) `revert-agent-host.sh --dry-run` OK.
 
-## 11. Patte host↔backend : interception SÉLECTIVE + ON/OFF par `nft` (propre)
+## 11. Patte host↔backend : keylog NSS + capture passive
 
-La patte host↔backend est du **TLS direct par IP** vers `api2.cursor.sh` (et le set
-backend), **hors** tunnel egress. Déchiffrer impose (a) un CA accepté par le runtime
-node de host-main et (b) un mitmproxy transparent devant le `:443` **de host-main
-uniquement**. Objectif : **zéro collatéral** sur les autres clients 443 (le tunnel
-egress `198.18.0.1` et donc les Chrome agents, S3, CDN) et un **vrai on/off**.
+La patte host↔backend est du **TLS direct** vers `api2.cursor.sh` (et le set
+backend), **hors** tunnel egress. On ne termine plus le TLS. Node écrit les
+secrets de session (`--tls-keylog`), tcpdump copie les paquets, tshark déchiffre,
+et le JSONL rédigé part dans le dossier partagé EG avec `leg=host-backend`.
 
-### 11.1 Interception SÉLECTIVE (le cœur « anti-casse »)
+Prérequis : `tcpdump` et `tshark` (`apt-get install tcpdump tshark`).
 
-`start-mitm-host-backend.sh` lance `mitmdump --mode transparent` sur `:8900` avec
-**`--allow-hosts "$HB_ALLOW_HOSTS"`** : mitmproxy ne **termine/déchiffre** le TLS que
-pour les hôtes qui **matchent** ; tout le reste est **passthrough TLS brut** (TCP
-relayé, cert d'origine conservé, jamais déchiffré ni loggé). Même moteur de décision
-(`next_layer`) qu'en mode proxy ; en transparent la destination vient de
-`SO_ORIGINAL_DST` posée par la règle `nft`.
+### 11.1 Qui est journalisé
 
-| Hôte (SNI puis IP:port) | Décision |
+Le BPF par défaut ne prend que `tcp port 443` **sauf** `198.18.0.1`. Le
+décodeur ne garde ensuite que le SNI (sinon `:authority` / `Host`) qui matche
+`HB_ALLOW_HOSTS`, et seulement si la direction est `host->backend`.
+
+| Hôte (SNI, sinon :authority / Host) | Journal |
 |---|---|
-| `api2/api3/api4/api/repo42.cursor.sh[:443]`, `cursor.sh`, `*.cursor.com[:443]` | **INTERCEPTÉ** (déchiffré + loggé `leg=host-backend`) |
-| `198.18.0.1:443` (tunnel egress → Chrome agents) | **PASSTHROUGH** |
-| S3, Cloudflare/CDN, tout autre `:443` | **PASSTHROUGH** |
+| `api` / `api2` / `api3` / `api4` / `repo42.cursor.sh`, `cursor.sh`, `cursor.com`, `www.cursor.com` | **oui**, `leg=host-backend`, req + resp rédigés |
+| `198.18.0.1` (tunnel egress → Chrome agents) | **hors BPF** |
+| S3, Cloudflare/CDN, tout autre nom | **non** (le pcap peut les contenir chiffrés ; il est détruit par `hb-off`) |
 
-`HB_ALLOW_HOSTS` (ancré, anti-spoof — `settings.cursor.sh.evil.com` **rejeté**) :
+`HB_ALLOW_HOSTS` (ancré, anti-spoof — `settings.cursor.sh.evil.com` rejeté) :
 ```
 (^|\.)(api|api2|api3|api4|repo42)\.cursor\.sh(:443)?$|(^|\.)(www\.)?cursor\.com(:443)?$|(^|\.)cursor\.sh(:443)?$
 ```
 
-### 11.2 Le SEUL moment à risque = `hb-setup-ca.sh` (UN restart host-main)
+Iface par défaut : `HB_IFACE=any`. Le test scratch force `lo`.
 
-`api2` **pinne** sa chaîne : rendre host-main CA-ready = l'unique risque de brick.
-`hb-setup-ca.sh` (opérateur) capture l'env du host-main vivant via `/proc/PID/environ`
-(**mémoire seule, jamais sur disque**), ré-lance **le seul host-main** avec son env
-d'origine **+ `NODE_EXTRA_CA_CERTS=<CA mitmproxy>`** (additif, lu au démarrage node),
-sur **le même port 1340** (préserve le relai agent↔host). Le superviseur **adopte**
-ce host-main. Dead-man `watchdog.sh` armé **avant** (flags dédiés `HB_ARM`/`HB_DISARM`
-via `--arm-flag/--disarm-flag`) → revert auto si backend injoignable. **Il ne pose
-AUCUNE règle `nft`.** Une fois fait, host-main est CA-ready en permanence et **le CA
-est inoffensif tant qu'on n'intercepte pas** (aucune règle = trafic direct normal).
-```
-LI_ARM_CONFIRM=yes-i-understand-brick-risk sudo -E bash hb-setup-ca.sh
-```
-(sans jeton = DRY-RUN). C'est **la seule** commande qui touche host-main.
+### 11.2 Le seul moment à risque = `hb-setup-keylog.sh` (un restart)
 
-### 11.3 ON / OFF = `nft` add/remove **seul** (aucun restart)
+C'est **la seule** commande host↔backend qui touche host-main. Sans jeton elle
+imprime le plan et sort.
 
-Table **DISTINCTE `ip sandrpc_hb`** (la table agent↔host `ip sandrpc` n'est **jamais**
-touchée). Règle :
-```
-chain output { type nat hook output priority -100 ; policy accept ; }
-rule meta skuid 1000 ip daddr != 198.18.0.1 tcp dport 443 redirect to :8900
-```
-- `skuid 1000` : attrape host-main (uid 1000). mitmproxy tourne en **root (uid 0)** →
-  sa reconnexion au vrai backend n'est **pas** reprise → **pas de boucle** (en `output`
-  le paquet a un socket propriétaire, donc `skuid` opère, contrairement à prerouting).
-- `ip daddr != 198.18.0.1` : exclut le tunnel egress (aussi uid 1000) → **Chrome agents
-  intacts**.
+Elle lit `/proc/PID/environ` en mémoire (jamais écrit, jamais loggé), retire
+`NODE_EXTRA_CA_CERTS` et un ancien `SSLKEYLOGFILE`, ajoute
+`SSLKEYLOGFILE=<keylog>`, et relance **le seul** host-main sur **le même port
+1340** avec `--tls-keylog=<même fichier>`. Le relai agent↔host, s'il est en
+place, reste sur 1340. Le superviseur adopte ce process.
+
+Ordre : dead-man `watchdog.sh` (flags `HB_ARM` / `HB_DISARM`) → keylog vide
+0600 → suppression d'un reliquat `ip sandrpc_hb` / mitmdump :8900 → **capture
+démarrée** → restart → santé sur :1340 + cmdline contient `--tls-keylog` →
+marqueur `hb_keylog_ready`. Si la capture ne démarre pas, host-main n'est pas
+touché. Si le backend ne répond pas après le restart, le watchdog lance
+`hb-revert.sh`.
 
 ```
-HB_ON_CONFIRM=yes sudo -E bash hb-on.sh   # démarre mitm si besoin + pose la règle — INSTANTANÉ, SANS restart
-bash hb-off.sh                            # delete table ip sandrpc_hb — INSTANTANÉ (mitm laissé idle)
+cd .../sand-host-rpc/live-intercept
+bash hb-setup-keylog.sh          # DRY-RUN
+LI_ARM_CONFIRM=yes-i-understand-brick-risk sudo -E bash hb-setup-keylog.sh
+touch /workspace/.sand-live-intercept/HB_DISARM    # « setup OK, annule le dead-man »
 ```
-`hb-on.sh` refuse si host-main n'est pas CA-ready (marqueur absent) sauf `HB_FORCE=1`.
-Sans jeton, `hb-on.sh` = DRY-RUN (n'arme rien).
+
+Ne pas enchaîner `arm.sh` ensuite : il relance host-main **sans** `--tls-keylog`.
+
+### 11.3 ON / OFF = capture seule (aucun restart, aucune nft)
+
+```
+HB_ON_CONFIRM=yes sudo -E bash hb-on.sh     # tcpdump + décodeur, si pas déjà up
+bash hb-off.sh                              # SIGTERM, passe finale, shred du pcap
+```
+
+`hb-on` exige le marqueur `hb_keylog_ready` **et** `--tls-keylog` dans la
+cmdline du host-main vivant (`HB_FORCE=1` saute le contrôle, déconseillé).
+Sans `HB_ON_CONFIRM=yes` (ou le même `LI_ARM_CONFIRM`), c'est un dry-run.
+`LI_ARM_CONFIRM` déjà posé compte comme confirmation.
+
+`hb-off` garde le keylog et le marqueur. Les handshakes pris pendant que la
+capture tourne sont déchiffrables ; ceux d'avant `hb-on` ne le sont pas
+(ClientHello absent du pcap).
 
 ### 11.4 Revert complet
 ```
-bash hb-revert.sh            # delete table sandrpc_hb + kill mitm + SIGTERM host-main (respawn PROPRE sans CA)
-bash hb-revert.sh --dry-run  # plan, n'exécute rien
+bash hb-revert.sh            # stop capture, shred pcap + keylog, SIGTERM host-main
+bash hb-revert.sh --dry-run  # plan, n'exige pas root, n'exécute rien
 ```
-Ne touche **jamais** `ip sandrpc` ni le relai agent↔host.
+Le superviseur relance host-main **sans** `--tls-keylog` et **sans**
+`SSLKEYLOGFILE`. Ne touche **jamais** `ip sandrpc` ni le relai agent↔host.
+Supprime un reliquat mitm (`ip sandrpc_hb`, mitmdump :8900) s'il existe.
 
-### 11.5 Test (cibles SCRATCH, n'arme RIEN de réel)
-`bash test/test-host-backend.sh` prouve, sur deux faux hôtes mappés `127.0.0.1` le
-temps du test (noms bidon, zéro collatéral, `/etc/hosts` restauré) :
-- (1) hôte ciblé = **déchiffré** (leaf re-signé, `issuer=mitmproxy`) ;
-- (2) hôte hors-liste = **passthrough** (cert d'origine, `issuer≠mitmproxy`) ;
-- (3) seul l'hôte ciblé est loggé, `leg=host-backend`, req+resp body présents ;
-- (4) grep anti-secret **VIDE** (Bearer/`ghp_`/clé privée en bloc complet/email/JWT) ;
-- (5) `HB_ALLOW_HOSTS` de PROD matche le set backend, **rejette** tunnel/S3/CDN/spoof ;
-- (6) `hb-off.sh --dry-run` et `hb-revert.sh --dry-run` OK.
-La syntaxe exacte de la règle `nft` de PROD est validée à part par `nft -c` (non
-appliquée). **Aucune règle `nft` réelle posée, host-main jamais redémarré.**
+### 11.5 Sortir de l'ancien mitm + CA
+
+`hb-setup-ca.sh` et `start-mitm-host-backend.sh` sortent **1** et n'installent
+plus rien. Si un ancien arm mitm tourne encore :
+
+1. `bash hb-off.sh` puis `bash hb-revert.sh` — retire la table `ip sandrpc_hb`,
+   tue mitmdump, et le respawn de host-main **enlève** `NODE_EXTRA_CA_CERTS`.
+2. `apt-get install tcpdump tshark`
+3. Le `hb-setup-keylog.sh` du §11.2 (un restart, capture déjà armée, CA absente).
+4. `touch …/HB_DISARM`, puis `hb-on` / `hb-off` sans autre restart.
+
+### 11.6 Test (cibles scratch, n'arme rien de réel)
+
+`bash test/test-host-backend.sh` ne lance pas host-main et ne pose pas de nft.
+Trois faux serveurs sur `127.0.0.1`, SNI forcé par le client Node
+(`--tls-keylog`), capture via le script de prod :
+
+- `scratchtest.cursor.sh` en HTTP/1.1 → journalisé, rédigé ;
+- `api2.cursor.sh` en HTTP/2 → journalisé, rédigé ;
+- `pass.scratch.test` → déchiffrable mais **absent** du JSONL ;
+- grep anti-secret vide (Bearer, `ghp_`, PEM complet, e-mail, JWT, cookie,
+  labels de keylog) ;
+- `HB_ALLOW_HOSTS` matche le set backend et rejette tunnel / S3 / CDN / spoof ;
+- dry-run de setup / on / off / revert ; les stubs mitm sortent 1 ;
+- `arm-agent-host.sh` reste un dry-run (patte non armée) ;
+- `hb-off` détruit le pcap et **garde** le keylog en 0600.
+
+`bash test/run_test.sh` enchaîne le relai agent↔host scratch, ce test, et
+`revert.sh --dry-run`.

@@ -29,7 +29,9 @@ mkdir -p "$STATE_DIR"
 chmod 0600 "$HB_KEYLOG_FILE" 2>/dev/null || true
 # ne pas laisser un ancien pcap (il peut contenir du chiffré hors-cible)
 rm -f "$HB_PCAP"
-rm -f "$HB_CAPTURE_READY"
+rm -f "$HB_CAPTURE_READY" "$HB_TCPDUMP_PIDFILE"
+: > "$HB_CAPTURE_OUT"
+chmod 0600 "$HB_CAPTURE_OUT" 2>/dev/null || true
 
 read -r -a FILTER <<< "$HB_CAPTURE_FILTER"
 echo "capture passive iface=$HB_IFACE filtre=${FILTER[*]}"
@@ -38,28 +40,65 @@ echo "  pcap=$HB_PCAP"
 echo "  allow=$HB_ALLOW_HOSTS"
 echo "  logs=$TRAFFIC_LOG_DIR"
 
-# -Z root : ne pas dropper vers l'utilisateur tcpdump (le STATE_DIR n'est pas
-# forcément writable par lui). -U : un paquet = un flush, pour que tshark lise
-# un pcap cohérent pendant l'écriture.
-"$HB_TCPDUMP" -i "$HB_IFACE" -n -s 0 -U -Z root -w "$HB_PCAP" "${FILTER[@]}" \
-    >>"$HB_CAPTURE_OUT" 2>&1 &
-td=$!
-echo "$td" > "$HB_TCPDUMP_PIDFILE"
+# tcpdump est double-forké (setsid) : son père est init, pas le décodeur.
+# Sinon, après exec python, un SIGTERM laisse un zombie et kill -0 reste vrai.
+# --immediate-mode : sans ça, libpcap (TPACKET_V3) ne livre les paquets qu'à
+# la fin du délai de tampon (~1 s). Un hb-off dans la seconde les compte
+# « received » mais en écrit 0 — le pcap reste un en-tête vide.
+# -Z root : ne pas dropper vers l'utilisateur tcpdump (STATE_DIR pas writable
+# par lui). -U : un paquet = un flush, pour que tshark lise un pcap cohérent.
+python3 - "$HB_TCPDUMP_PIDFILE" "$HB_TCPDUMP" "$HB_IFACE" "$HB_PCAP" "$HB_CAPTURE_OUT" "${FILTER[@]}" <<'PY'
+import os, sys
+pidfile, tcpdump, iface, pcap, logout, *filt = sys.argv[1:]
+if not filt:
+    sys.stderr.write("ERREUR: filtre BPF vide\n")
+    raise SystemExit(2)
+if os.fork() > 0:
+    os._exit(0)
+os.setsid()
+if os.fork() > 0:
+    os._exit(0)
+with open(pidfile, "w", encoding="utf-8") as fh:
+    fh.write(str(os.getpid()) + "\n")
+fd = os.open(logout, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+os.dup2(fd, 1)
+os.dup2(fd, 2)
+if fd > 2:
+    os.close(fd)
+os.execvp(tcpdump, [
+    tcpdump, "--immediate-mode", "-i", iface, "-n", "-s", "0", "-U", "-Z", "root",
+    "-w", pcap, *filt,
+])
+PY
 
+# Le fichier pcap (en-tête) existe avant que le filtre soit actif. On attend
+# le « listening » de tcpdump, puis un court délai : un client lancé dans la
+# foulée raterait sinon le ClientHello.
 ready=0
+td=""
 for _ in $(seq 1 50); do
-  if ! kill -0 "$td" 2>/dev/null; then
-    echo "ERREUR: tcpdump pid $td est mort au démarrage (voir $HB_CAPTURE_OUT)"
-    exit 6
+  if [ -s "$HB_TCPDUMP_PIDFILE" ]; then
+    td="$(cat "$HB_TCPDUMP_PIDFILE" 2>/dev/null || true)"
+    if [ -n "$td" ] && ! hb_pid_live "$td"; then
+      echo "ERREUR: tcpdump pid $td est mort au démarrage (voir $HB_CAPTURE_OUT)"
+      cat "$HB_CAPTURE_OUT" >&2 || true
+      exit 6
+    fi
   fi
-  if [ -f "$HB_PCAP" ]; then
+  if grep -q "listening on" "$HB_CAPTURE_OUT" 2>/dev/null; then
+    sleep 0.4
     chmod 0600 "$HB_PCAP" 2>/dev/null || true
     ready=1
     break
   fi
   sleep 0.1
 done
-[ "$ready" = 1 ] || { echo "ERREUR: pcap non créé"; kill -TERM "$td" 2>/dev/null || true; exit 6; }
+if [ "$ready" != 1 ]; then
+  echo "ERREUR: tcpdump n'écoute pas (voir $HB_CAPTURE_OUT)"
+  cat "$HB_CAPTURE_OUT" >&2 || true
+  [ -n "$td" ] && kill -TERM "$td" 2>/dev/null || true
+  exit 6
+fi
 touch "$HB_CAPTURE_READY"
 
 # Ce process EST le décodeur après exec : son pid est déjà celui du script.

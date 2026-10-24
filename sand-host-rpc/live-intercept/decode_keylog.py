@@ -495,7 +495,9 @@ def load_seen(path: str) -> set:
 
 def append_seen(path: str, digest: str) -> None:
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-    fd = os.open(path, os.O_APPEND | os.O_CREAT, 0o600)
+    # O_RDONLY vaut 0 : sans O_WRONLY, open() ouvre en lecture et write()
+    # renvoie EBADF. La première ligne JSONL part, les suivantes sont perdues.
+    fd = os.open(path, os.O_APPEND | os.O_CREAT | os.O_WRONLY, 0o600)
     try:
         os.write(fd, (digest + "\n").encode("ascii"))
     finally:
@@ -641,6 +643,13 @@ def main(argv: list[str] | None = None) -> int:
 
     signal.signal(signal.SIGTERM, _on_stop)
     signal.signal(signal.SIGINT, _on_stop)
+
+    def safe_once() -> None:
+        try:
+            once()
+        except Exception as e:
+            print(f"decode_keylog: passe ignorée ({e})", file=sys.stderr)
+
     oversize_stop = False
     while not _stop:
         try:
@@ -655,11 +664,16 @@ def main(argv: list[str] | None = None) -> int:
                 break
         except OSError:
             pass
-        once()
+        safe_once()
         end = time.time() + max(0.2, args.interval)
         while time.time() < end and not _stop:
-            time.sleep(0.2)
-    once()
+            # SIGTERM interrompt sleep et lèverait InterruptedError, ce qui
+            # sauterait la passe finale (pcap déjà fermé par tcpdump).
+            try:
+                time.sleep(0.2)
+            except InterruptedError:
+                break
+    safe_once()
     if oversize_stop:
         return 0
     return 0
