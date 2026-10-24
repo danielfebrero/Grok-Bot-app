@@ -1,0 +1,18 @@
+# runtime / état local — jamais committé
+*.jwt
+*.pem
+*.key
+*.crt
+*.p12
+*.lock
+.lock
+ARM
+DISARM
+*.pid
+*.out
+*.log
+logs/
+*.jsonl
+__pycache__/
+*.pyc
+test/_run/

@@ -1,0 +1,79 @@
+// Extrait REDACTE produit par test/run_test.sh (cibles scratch, secrets factices).
+// Prouve: req_body+resp_body presents, 0 secret/PII en clair.
+// (2e enregistrement re-etiquete host-backend pour illustrer la patte backend.)
+
+{
+  "ts": "2026-10-24T11:35:58.423+02:00",
+  "leg": "agent-host",
+  "direction": "agent->host",
+  "host": "127.0.0.1",
+  "method": "/aiserver.v1.DashboardService/GetTeams",
+  "http_method": "POST",
+  "status": "200",
+  "duree_ms": 0.6,
+  "req_headers": {
+    "Host": "127.0.0.1:19340",
+    "User-Agent": "curl/8.14.1",
+    "Accept": "*/*",
+    "Authorization": "[REDACTED]",
+    "Content-Type": "application/json",
+    "Content-Length": "63"
+  },
+  "req_body": {
+    "user": "[REDACTED-EMAIL]",
+    "note": "corps requete avec secret"
+  },
+  "resp_headers": {
+    "Server": "BaseHTTP/0.6 Python/3.13.5",
+    "Date": "Sat, 24 Oct 2026 09:35:58 GMT",
+    "Authorization": "[REDACTED]",
+    "Set-Cookie": "[REDACTED]",
+    "Content-Type": "application/json",
+    "Content-Length": "218"
+  },
+  "resp_body": {
+    "note": "reponse scratch",
+    "token": "[REDACTED]",
+    "contact": "[REDACTED-EMAIL]",
+    "gh": "[REDACTED-GH]"
+  }
+}
+
+{
+  "ts": "2026-10-24T11:36:03.503+02:00",
+  "leg": "host-backend",
+  "direction": "host->backend",
+  "host": "api2.cursor.sh",
+  "method": "/aiserver.v1.DashboardService/GetServers",
+  "http_method": "POST",
+  "url": "https://127.0.0.1/aiserver.v1.DashboardService/GetServers",
+  "status": "200",
+  "duree_ms": 2.9,
+  "req_headers": {
+    "Host": "127.0.0.1:19443",
+    "User-Agent": "curl/8.14.1",
+    "Accept": "*/*",
+    "Authorization": "[REDACTED]",
+    "Content-Type": "application/json",
+    "Content-Length": "103"
+  },
+  "req_body": {
+    "email": "[REDACTED-EMAIL]",
+    "k": "[REDACTED-PRIVATE-KEY]MIIBVQIBADANfixture-----END PRIVATE KEY-----"
+  },
+  "resp_headers": {
+    "Server": "BaseHTTP/0.6 Python/3.13.5",
+    "Date": "Sat, 24 Oct 2026 09:36:03 GMT",
+    "Authorization": "[REDACTED]",
+    "Set-Cookie": "[REDACTED]",
+    "Content-Type": "application/json",
+    "Content-Length": "218"
+  },
+  "resp_body": {
+    "note": "reponse scratch",
+    "token": "[REDACTED]",
+    "contact": "[REDACTED-EMAIL]",
+    "gh": "[REDACTED-GH]"
+  }
+}
+
