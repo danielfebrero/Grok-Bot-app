@@ -1,0 +1,7 @@
+--- 2026-10-24_20-52/meta/dpkg-packages.txt
++++ 2026-10-24_22-49/meta/dpkg-packages.txt
+@@ -831,3 +831,4 @@
+ xz-utils	5.8.1-1+deb13u2	amd64
+ zlib1g	1:1.3.dfsg+really1.3.1-1+b1	amd64
+ zlib1g-dev	1:1.3.dfsg+really1.3.1-1+b1	amd64
++zstd	1.5.7+dfsg-1	amd64

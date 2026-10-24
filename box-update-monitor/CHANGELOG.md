@@ -9,6 +9,21 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-24 22:49 (Paris) — snapshot `2026-10-24_20-52` → `2026-10-24_22-49`
+
+**Bump agent-store-fuse + install `apt` côté agent (`zstd`)** — aucun push plateforme. Deux changements ce cycle :
+
+1. **Rebuild/bump agent-store-fuse** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `204ac1218bbc24e75c7654a3efda1b51edbe0dd1` → `831fcbe7af021645b440d7e4d728630e01d9cd8a` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`).
+2. **Nouveau paquet `zstd 1.5.7+dfsg-1`** apparu dans `dpkg` — installé par un agent via `apt-get install -y zstd` (`Requested-By: box (1000)`, `2026-10-24 21:45`), pas un push plateforme.
+
+Aucune version plateforme ne bouge : image `fcbae14`, box-scripts `fcbae14`, sand-host `ef8271b` (supervisor `upgrade-ef8271b`), exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~1 (reste du diff capturé dans `meta/dpkg-packages.txt`).
+
+### Autre / infra
+- `zstd` installé côté agent (apt), pas une livraison plateforme.
+
+Rapport : [reports/2026-10-24_22-49.md](reports/2026-10-24_22-49.md).
+
+
 ## 2026-10-24 18:44 (Paris) — snapshot `2026-10-24_17-47` → `2026-10-24_18-44`
 
 **Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `35aaf402a3611d873755a963d906dcca0d685d19` → `24854d212a9e215aba99c6d69c7c80d3114ac660` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`). Binaire `cursor-agent-store-fuse` inchangé (9504880 o, même sha256 `5c3513e4…`). Image `fcbae14`, box-scripts `fcbae14`, sand-host `ef8271b` (supervisor `upgrade-ef8271b`), exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~1.
