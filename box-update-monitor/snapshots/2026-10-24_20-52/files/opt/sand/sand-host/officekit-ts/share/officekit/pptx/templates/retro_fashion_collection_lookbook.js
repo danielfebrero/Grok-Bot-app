@@ -1,0 +1,495 @@
+/**
+ * "Retro Fashion" lookbook — 16 slides, 13.333in x 7.5in.
+ * Rebuilt with pptxgenjs from the reference deck.
+ *
+ * Design system
+ *   background  FAF7F4  warm off-white, set per slide
+ *   accent      AF3E3E  theme accent1 — hairline rules, headings, buttons
+ *   band pink   F1D7D7  accent1 @ 20% luminance — full-bleed colour blocks
+ *   ink         000000  body copy
+ *   sparkle     222A35  theme dk2 — the 4-point star used as a bullet/ornament
+ *   display     Libre Baskerville (theme major font)
+ *   text        Poppins Light     (theme minor font)
+ *
+ * The reference deck's picture placeholders are all empty — they render as bare
+ * background — so no raster art is carried over. The small star icons are
+ * redrawn as native custom-geometry shapes instead of embedded images.
+ */
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+const W = 40 / 3;            // slide width  = 13.3333in (16:9)
+const H = 7.5;               // slide height = 7.5in
+
+const BG = 'FAF7F4';
+const ACCENT = 'AF3E3E';
+const BAND = 'F1D7D7';
+const INK = '000000';
+const STAR = '222A35';
+const WHITE = 'FFFFFF';
+
+const SERIF = 'Libre Baskerville';
+const SANS = 'Poppins Light';
+
+const RULE = { color: ACCENT, width: 0.5 };   // theme line style 1 = 0.5pt
+
+// Doughnut tints on the infographic slide, light -> full accent.
+const DONUT = ['FFEBE0', 'E2AEAE', 'D48686', ACCENT];
+const DONUT_TRACK = 'F2F2F2';
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+let pptx;
+
+/** Hairline accent rule; pass w for a horizontal one, h for a vertical one. */
+function rule(slide, x, y, w, h) {
+  slide.addShape(pptx.ShapeType.line, { x, y, w: w || 0, h: h || 0, line: RULE });
+}
+
+/** Draw a set of rules from a compact [x, y, w, h] table. */
+function rules(slide, list) {
+  list.forEach((r) => rule(slide, r[0], r[1], r[2], r[3]));
+}
+
+/**
+ * The 4-point sparkle ornament (an SVG picture in the reference, redrawn here
+ * as a polygon). Coordinates are fractions of the icon's bounding box; the
+ * inner waist sits at ~0.375 of the box, which gives the concave arms.
+ */
+const SPARKLE_PATH = [
+  [0.500, 0.046], [0.626, 0.374], [0.954, 0.500], [0.626, 0.626],
+  [0.500, 0.954], [0.374, 0.626], [0.046, 0.500], [0.374, 0.374],
+];
+
+function sparkle(slide, x, y, size) {
+  slide.addShape(pptx.ShapeType.custGeom, {
+    x, y, w: size, h: size,
+    points: SPARKLE_PATH.map((p) => ({ x: p[0] * size, y: p[1] * size })).concat([{ close: true }]),
+    fill: { color: STAR },
+    line: { type: 'none' },
+  });
+}
+
+/** Full-bleed colour block inherited from the slide layout. */
+function band(slide, x, y, w, h) {
+  slide.addShape(pptx.ShapeType.rect, { x, y, w, h, fill: { color: BAND }, line: { type: 'none' } });
+}
+
+/** Base text box: top-anchored with PowerPoint's default 0.1in/0.05in insets. */
+function text(slide, content, opts) {
+  slide.addText(content, Object.assign({ valign: 'top', margin: [7.2, 7.2, 3.6, 3.6] }, opts));
+}
+
+/** Big accent display heading (Libre Baskerville). */
+function heading(slide, content, x, y, w, h, fontSize, extra) {
+  text(slide, content, Object.assign({
+    x, y, w, h, fontFace: SERIF, fontSize, color: ACCENT,
+  }, extra));
+}
+
+/** Running body copy: Poppins Light, black, 150% leading. */
+function body(slide, content, x, y, w, h, fontSize, extra) {
+  text(slide, content, Object.assign({
+    x, y, w, h, fontFace: SANS, fontSize, color: INK, lineSpacingMultiple: 1.5,
+  }, extra));
+}
+
+/** Serif label in black: sub-heads, statistic figures, header/footer words. */
+function serifLabel(slide, content, x, y, w, h, fontSize, extra) {
+  text(slide, content, Object.assign({
+    x, y, w, h, fontFace: SERIF, fontSize, color: INK,
+  }, extra));
+}
+
+/** Poppins caption, no extra leading (used under statistics and for links). */
+function caption(slide, content, x, y, w, h, fontSize, extra) {
+  text(slide, content, Object.assign({
+    x, y, w, h, fontFace: SANS, fontSize, color: INK,
+  }, extra));
+}
+
+/**
+ * "Retro / Fashion" running head, also used for the "Lookbook / 2025" footer.
+ * Each side is [label, x, width]; the right-hand label is right-aligned.
+ */
+function runningHead(slide, y, left, right) {
+  serifLabel(slide, left[0], left[1], y, left[2] || 0.9823, 0.3702, 16);
+  serifLabel(slide, right[0], right[1], y, right[2] || 1.2581, 0.3702, 16, { align: 'right' });
+}
+
+/** Statistic block: oversized serif percentage above a Poppins caption. */
+function stat(slide, value, valueX, valueY, label, labelX, labelY, labelSize) {
+  serifLabel(slide, value, valueX, valueY, 2.1722, 0.8415, 44);
+  caption(slide, label, labelX, labelY, 3.5073, labelSize === 24 ? 0.9088 : 0.7068, labelSize);
+}
+
+function newSlide() {
+  const slide = pptx.addSlide();
+  slide.background = { color: BG };
+  return slide;
+}
+
+// ---------------------------------------------------------------------------
+// Copy reused on more than one slide
+// ---------------------------------------------------------------------------
+
+const COVER_BLURB =
+  'PLACEHOLDER' +
+  'nostalgic spirit woven into every garment.';
+const METALLIC_BLURB =
+  'Bold 80s-inspired metallic dress featuring sharp shoulder lines and ' +
+  'sculptural silhouette. This outfit celebrates power, glamour, and ' +
+  'stage-ready confidence.';
+const MIXMATCH_BLURB =
+  'PLACEHOLDER' +
+  'softness and edge.';
+
+// ---------------------------------------------------------------------------
+// Slides
+// ---------------------------------------------------------------------------
+
+// 1 — Cover
+function slide01() {
+  const s = newSlide();
+  rules(s, [
+    [0, 0.7872, W, 0],
+    [12.7059, 0, 0, H],
+    [0.6054, 0, 0, H],
+  ]);
+  heading(s, 'Retro Fashion', 1.0130, 0.7115, 5.8167, 2.3225, 66);
+  body(s, COVER_BLURB, 6.6667, 1.3088, 5.6678, 1.1279, 14);
+  sparkle(s, 5.4134, 1.5982, 0.6259);
+  runningHead(s, 0.2085, ['Retro', 0.7911], ['Fashion', 11.2621]);
+}
+
+// 2 — Introduction
+function slide02() {
+  const s = newSlide();
+  rules(s, [
+    [0, 0.4681, 7.75, 0],
+    [0.5771, 0, 0, H],
+    [0, 5.5496, 7.75, 0],
+  ]);
+  heading(s, 'Introduction', 0.9244, 1.3066, 5.8167, 1.1107, 60);
+  body(s,
+    'PLACEHOLDER' +
+    'of previous decades and reinterpreting them for today\u2019s confident, ' +
+    'expressive generation.',
+    1.9795, 2.7374, 5.4141, 1.1279, 14);
+  sparkle(s, 1.0345, 3.0006, 0.6259);
+
+  // Call-to-action button: accent fill with the theme's darker 15%-shade edge.
+  s.addShape(pptx.ShapeType.rect, {
+    x: 0.9989, y: 4.2665, w: 2.3581, h: 0.6702,
+    fill: { color: ACCENT }, line: { color: '4C1B1B', width: 1 },
+  });
+  caption(s, 'See Details', 0.9989, 4.2665, 2.3581, 0.6702, 18,
+    { color: WHITE, align: 'center', valign: 'middle' });
+
+  body(s, COVER_BLURB, 0.9989, 5.9041, 5.6678, 1.1279, 14);
+}
+
+// 3 — About the brand
+function slide03() {
+  const s = newSlide();
+  rules(s, [
+    [3.4813, 0, 0, H],
+    [0, 7.2518, W, 0],
+    [0, 0.2482, W, 0],
+    [7.1161, 0.0182, 0, H],
+  ]);
+  heading(s, [{ text: 'About', options: { breakLine: true } }, { text: 'The Brand' }],
+    7.4352, 0.7675, 5.8167, 2.1205, 60);
+  body(s,
+    'PLACEHOLDER' +
+    'sophistication, our brand is built upon the belief that fashion should ' +
+    'feel both timeless and deeply personal.',
+    7.5177, 2.9138, 5.4141, 1.4813, 14);
+  sparkle(s, 10.4379, 1.0412, 0.6259);
+  sparkle(s, 7.5177, 5.0396, 0.5870);
+  body(s, 'Timeless Meets Modern', 8.1046, 4.9770, 4.6690, 0.6496, 24, { bold: true });
+  body(s,
+    'PLACEHOLDER' +
+    'contemporary sophistication, creating fashion that transcends trends.',
+    7.6365, 5.8575, 5.4141, 1.1279, 14);
+}
+
+// 4 — Collection overview: three photo frames on a pink band
+function slide04() {
+  const s = newSlide();
+  band(s, 0, 0, W, 2.1145);
+  [1.1221, 5.0284, 8.9346].forEach((x) => {
+    s.addShape(pptx.ShapeType.roundRect, {
+      x, y: 0.9704, w: 3.2766, h: 2.3404, rectRadius: 0.2092,
+      fill: { type: 'none' }, line: { color: ACCENT, width: 1 },
+    });
+  });
+  heading(s, 'COLLECTION OVERVIEW', 0.3925, 4.3919, 5.8167, 1.7166, 48);
+  body(s,
+    'PLACEHOLDER' +
+    'movements, cinematic aesthetics, and artistic eras that shaped global fashion.',
+    7.1240, 3.8579, 5.4141, 1.1279, 14);
+  sparkle(s, 6.0408, 4.9372, 0.6259);
+  body(s,
+    'It is a visual tribute to the expressive spirit of decades past \u2014 ' +
+    'blending the romantic softness of the 70s, the sharp-edged attitude of ' +
+    'the 80s, and the minimalist elegance of the early 90s.',
+    7.1240, 5.2502, 5.4141, 1.4813, 14);
+}
+
+// 5 — Moodboard
+function slide05() {
+  const s = newSlide();
+  rules(s, [
+    [0, 0.2482, W, 0],
+    [4.3395, 0.0182, 0, 4.8648],
+    [7.8466, 0, 0, 4.8830],
+    [4.3395, 4.8830, 8.9939, 0],
+  ]);
+  heading(s, 'Moodboard Collection', 0.1809, 6.3768, 9.1915, 0.9088, 48);
+  body(s,
+    'The moodboard sets the emotional foundation for the collection. Warm ' +
+    'sepia tones, muted olives, dusty rose, and bold primary accents evoke a ' +
+    'classic retro palette.',
+    4.3395, 5.1784, 8.4495, 0.7744, 14);
+  sparkle(s, 11.9279, 2.3879, 0.6259);
+  sparkle(s, 11.3410, 6.6320, 0.3983);
+  sparkle(s, 12.2408, 6.6320, 0.3983);
+}
+
+// 6 — Decade inspiration
+function slide06() {
+  const s = newSlide();
+  rules(s, [
+    [0, 0.1950, W, 0],
+    [4.8820, 0.0182, 0, 7.4818],
+  ]);
+  heading(s, 'DECADE INSPIRATION', 5.2470, 0.9439, 5.9760, 1.7166, 48);
+  body(s,
+    'This season\u2019s lookbook is primarily inspired by the exuberance of ' +
+    'the 1970s and the boldness of the 1980s. From the 70s, the collection ' +
+    'borrows flowing silhouettes, earthy palettes, and bohemian charm',
+    5.3652, 2.9915, 7.4849, 1.1279, 14);
+  sparkle(s, 11.4591, 1.4264, 0.6259);
+}
+
+// 7 — Seasonal inspiration: two decade call-outs
+function slide07() {
+  const s = newSlide();
+  rules(s, [
+    [0, 0.4977, W, 0],
+    [0.5377, 0.0182, 0, 7.4818],
+    [12.7756, 0.0182, 0, 7.4818],
+    [0, 3.8438, W, 0],
+    [5.6192, 3.8438, 0, 3.6562],
+  ]);
+  heading(s, 'SEASONAL INSPIRATION', 0.7133, 4.9482, 4.6587, 1.4473, 40);
+
+  const decades = [
+    ['70s Influence', 4.3191,
+      'Flowing silhouettes, earthy color palettes, and bohemian-inspired ' +
+      'details form the core aesthetic.'],
+    ['80s Influence', 6.0118,
+      'Sharp shoulders, fitted structures, bold metallic accents, and ' +
+      'fearless experimentation bring strength'],
+  ];
+  decades.forEach((d) => {
+    serifLabel(s, d[0], 6.4100, d[1], 4.2897, 0.5722, 28);
+    body(s, d[2], 6.4100, d[1] + 0.5391, 5.5262, 0.6782, 12);
+  });
+}
+
+// 8 — Key looks 1
+function slide08() {
+  const s = newSlide();
+  rules(s, [
+    [0, 0.4977, W, 0],
+    [0.3143, 0.0182, 0, 7.4818],
+    [0, 3.8438, W, 0],
+    [3.2575, 0, 0, 3.8438],
+  ]);
+  serifLabel(s, '\u201CSunset Disco Suit\u201D', 6.6667, 1.7569, 4.2897, 0.5722, 28);
+  body(s, 'A high-waisted, wide-leg trouser set paired with a shimmering satin top.',
+    6.6667, 2.2960, 5.5262, 0.6782, 12);
+  heading(s, 'KEY LOOKS 1', 0.8343, 4.6116, 4.2897, 2.1205, 60);
+  caption(s,
+    'A soft, flowing maxi dress adorned with delicate floral prints. Its ' +
+    'lightweight chiffon fabric creates elegant movement, capturing the ' +
+    'essence of carefree 70s femininity.',
+    6.6667, 5.1372, 5.9542, 1.3127, 18);
+  sparkle(s, 5.3311, 5.3589, 0.6259);
+}
+
+// 9 — Bold 80s metallic dress, with two statistics
+function slide09() {
+  const s = newSlide();
+  rules(s, [
+    [8.7079, 0.0182, 0, 7.4818],
+    [0, 0.6523, W, 0],
+    [0, 3.3189, 8.7079, 0],
+  ]);
+  runningHead(s, 0.1501, ['Retro', 0.1454], ['Fashion', 7.2128]);
+  heading(s, 'BOLD 80S-INSPIRED METALLIC DRESS', 0.4818, 1.1273, 7.8586, 1.5820, 44);
+  body(s, METALLIC_BLURB, 0.4818, 3.5568, 7.8586, 1.2745, 16);
+  stat(s, '82%', 0.6124, 5.2114, 'Retro Influence in Modern Fashion', 0.5938, 6.0529, 18);
+  stat(s, '76%', 4.5417, 5.2114, 'Vintage Color Palette Usage', 4.5231, 6.0529, 18);
+  sparkle(s, 8.3949, 3.0060, 0.6259);
+}
+
+// 10 — Intentional material choices
+function slide10() {
+  const s = newSlide();
+  rules(s, [
+    [0.6562, 0.0182, 0, 7.4818],
+    [0, 0.7604, W, 0],
+    [0, 6.4490, W, 0],
+    [12.6771, 0.0182, 0, 7.4818],
+  ]);
+  runningHead(s, 0.1501, ['Retro', 0.8972], ['Fashion', 11.2730]);
+  runningHead(s, 6.7993, ['Lookbook', 0.8022, 1.6765], ['2025', 11.1781]);
+  heading(s, 'INTENTIONAL MATERIAL CHOICES', 0.8972, 4.2159, 5.5286, 1.6319, 32,
+    { lineSpacingMultiple: 1.5 });
+  body(s,
+    'Corduroy, wool-blend knits, and velvet evoke softness and comfort, while ' +
+    'denim, faux leather, and metallic fabrics add structure and contrast.',
+    7.1241, 1.6222, 5.0955, 1.1279, 14);
+}
+
+// 11 — Sharp and tailored
+function slide11() {
+  const s = newSlide();
+  rules(s, [
+    [8.7520, 0.0182, 0, 7.4818],
+    [0, 0.5521, W, 0],
+    [0, 6.9479, W, 0],
+    [0, 4.5273, 8.7520, 0],
+  ]);
+  runningHead(s, 0.1501, ['Retro', 0.1454], ['Fashion', 7.2128]);
+  heading(s, 'SHARP AND TAILORED', 0.4818, 1.1273, 5.2310, 1.7166, 48);
+  body(s, METALLIC_BLURB, 0.4818, 2.9353, 7.8586, 1.2745, 16);
+  stat(s, '71%', 3.4021, 4.9167, 'Consumer Preference for Nostalgic Design', 3.3834, 5.7581, 18);
+  sparkle(s, 5.8205, 1.6008, 0.6259);
+}
+
+// 12 — Mix & match concepts
+function slide12() {
+  const s = newSlide();
+  rules(s, [
+    [6.6667, 0, 0, H],
+    [0, 0.6904, W, 0],
+    [0, 4.5698, W, 0],
+  ]);
+  runningHead(s, 0.1501, ['Retro', 0.1454], ['Fashion', 11.9298]);
+  heading(s, 'MIX & MATCH CONCEPTS', 0.3351, 5.2074, 5.9415, 1.7166, 48);
+  body(s, 'The pieces within this collection are designed to be versatile and expressive.',
+    7.0567, 4.8905, 5.9415, 0.8706, 16);
+  body(s, MIXMATCH_BLURB, 7.0567, 6.0818, 5.9415, 0.8706, 16);
+  sparkle(s, 6.3537, 4.2569, 0.6259);
+}
+
+// 13 — Infographic: four 60% doughnut rings
+function slide13() {
+  const s = newSlide();
+  rule(s, 0, 0.6904, W, 0);
+  runningHead(s, 0.1501, ['Retro', 0.1454], ['Fashion', 11.9298]);
+  heading(s, 'INFOGRAPHIC', 3.6959, 0.9900, 5.9415, 0.9088, 48, { align: 'center' });
+
+  // Per column: [chart x, "60%" label x, caption-block x]
+  const COLUMNS = [
+    [-0.0876, 1.4269, 0.6300],
+    [2.9921, 4.5066, 3.7097],
+    [6.0692, 7.5811, 6.7855],
+    [9.1490, 10.6608, 9.8652],
+  ];
+
+  COLUMNS.forEach((col, i) => {
+    s.addChart(pptx.ChartType.doughnut,
+      [{ name: 'Sales', labels: ['1st Qtr', '2nd Qtr'], values: [8.2, 3.2] }], {
+        x: col[0], y: 2.1984, w: 3.8276, h: 2.5518,
+        holeSize: 75,
+        chartColors: [DONUT[i], DONUT_TRACK],
+        dataBorder: { pt: 1.5, color: WHITE },
+        showLegend: false, showTitle: false, showValue: false,
+      });
+    serifLabel(s, '60%', col[1], 3.1588, 0.8033, 0.4376, 20, { bold: true, align: 'center' });
+
+    s.addShape(pptx.ShapeType.rect, {
+      x: col[2] + 0.4520, y: 5.2623, w: 1.4905, h: 0.3366,
+      fill: { color: DONUT[i] }, line: { type: 'none' },
+    });
+    caption(s, 'SUBTITLE HERE', col[2] + 0.4520, 5.2623, 1.4905, 0.3366, 14,
+      { bold: true, align: 'center', valign: 'middle' });
+    body(s, MIXMATCH_BLURB, col[2], 5.7896, 2.3637, 1.1362, 10.5, { align: 'center' });
+  });
+}
+
+// 14 — Behind the scenes
+function slide14() {
+  const s = newSlide();
+  rules(s, [
+    [0, 0.6080, W, 0],
+    [0, 6.8677, W, 0],
+    [1.1277, 0, 0, H],
+    [0, 5.1683, 9.0625, 0],
+  ]);
+  runningHead(s, 0.1501, ['Retro', 0.1454], ['Fashion', 11.9298]);
+  heading(s, 'BEHIND THE SCENES', 1.6144, 1.1310, 6.4176, 1.9186, 54);
+  body(s,
+    'Photographs from fittings, set styling sessions, lighting tests, and ' +
+    'editorial planning capture the energy behind the project.',
+    1.7535, 3.3843, 6.6755, 1.4212, 18);
+  stat(s, '74%', 1.8067, 5.5973, 'Monochrome Retro Sets Adoption', 3.3414, 5.5636, 24);
+  sparkle(s, 0.8147, 4.8554, 0.6259);
+}
+
+// 15 — Social media & contact
+function slide15() {
+  const s = newSlide();
+  band(s, 0, 5.3854, W, 2.1146);
+  rule(s, 0, 0.6080, W, 0);
+  runningHead(s, 0.1501, ['Retro', 0.1454], ['Fashion', 11.9298]);
+  heading(s, 'SOCIAL MEDIA & CONTACT INFO', 0.4335, 0.8426, 6.4176, 1.5820, 44);
+  ['www.retroreveriebrand.com', '@retroreverie.official'].forEach((line, i) => {
+    caption(s, line, 8.2553, 1.2644 + i * 0.4569, 4.1676, 0.4039, 18, { align: 'center' });
+  });
+}
+
+// 16 — Thank you
+function slide16() {
+  const s = newSlide();
+  band(s, 0, 0, 3.1042, H);
+  rules(s, [
+    [0, 0.4258, W, 0],
+    [12.4984, 0, 0, H],
+    [0, 7.0742, W, 0],
+  ]);
+  heading(s, 'THANK YOU', 6.2474, 1.3532, 5.8271, 2.7937, 80);
+  body(s,
+    'PLACEHOLDER' +
+    'embrace the beauty of past eras reimagined for the present.',
+    6.3533, 4.5698, 5.4134, 1.2745, 16);
+  sparkle(s, 12.1854, 4.2569, 0.6259);
+}
+
+// ---------------------------------------------------------------------------
+
+function build() {
+  pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'DECK', width: W, height: H });
+  pptx.layout = 'DECK';
+  pptx.title = 'Retro Fashion';
+  pptx.theme = { headFontFace: SERIF, bodyFontFace: SANS };
+
+  [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08,
+   slide09, slide10, slide11, slide12, slide13, slide14, slide15, slide16]
+    .forEach((fn) => fn());
+
+  return pptx.writeFile({
+    fileName: path.join(__dirname, '15c306ab-7398-45a8-bf87-f695c7a5f868_grok_final.pptx'),
+  });
+}
+
+build().then((f) => console.log('wrote', f)).catch((e) => { console.error(e); process.exit(1); });
