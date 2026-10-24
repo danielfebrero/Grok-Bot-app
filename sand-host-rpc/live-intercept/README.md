@@ -131,7 +131,7 @@ capture host↔backend **côté EG** (env maîtrisé) et de n'armer la box que p
 patte **agent↔host** (sans CA, sans redémarrage du core → risque quasi nul).
 
 ## 9. Limites connues
-- `proxy.py` : `PKEY_RE` ne rédige que l'en-tête `-----BEGIN … PRIVATE KEY-----`,
+- `proxy.py` : `PKEY_RE` rédige désormais le bloc PEM COMPLET (en-tête + corps base64 + pied),
   pas le corps base64 d'une vraie clé. À durcir dans `rpc-traffic-monitor/`
   (hors scope de ce commit, strictement `live-intercept/`).
 - La patte host↔backend ne capte que les hôtes redirigés (uid 1000 : host-main) ;

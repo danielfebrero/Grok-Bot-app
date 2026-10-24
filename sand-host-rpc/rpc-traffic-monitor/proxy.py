@@ -104,7 +104,7 @@ JWT_RE = re.compile(r'eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}
 BEARER_RE = re.compile(r'(?i)bearer\s+[A-Za-z0-9._-]{12,}')
 EMAIL_RE = re.compile(r'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}')
 GH_RE = re.compile(r'gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}')
-PKEY_RE = re.compile(r'-----BEGIN [A-Z ]*PRIVATE KEY-----')
+PKEY_RE = re.compile(r'-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----', re.DOTALL)
 # valeurs littérales des secrets d'env du host (rédaction exacte)
 ENV_SECRET_VALUES: list[str] = []
 
