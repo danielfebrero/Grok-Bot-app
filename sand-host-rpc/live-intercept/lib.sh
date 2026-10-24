@@ -143,7 +143,7 @@ HB_ALLOW_HOSTS="${HB_ALLOW_HOSTS:-(^|\\.)(api|api2|api3|api4|repo42)\\.cursor\\.
 HB_KEYLOG_DIR="${HB_KEYLOG_DIR:-$STATE_DIR/keylog}"
 HB_KEYLOG_FILE="${HB_KEYLOG_FILE:-$HB_KEYLOG_DIR/sslkeys.log}"
 HB_PCAP="${HB_PCAP:-$STATE_DIR/hb-capture.pcap}"
-HB_PCAP_MAX_BYTES="${HB_PCAP_MAX_BYTES:-67108864}"   # 64 Mio ; au-delà le décodeur coupe tcpdump
+HB_PCAP_MAX_BYTES="${HB_PCAP_MAX_BYTES:-536870912}"   # 512 Mio ; au-delà le décodeur coupe tcpdump
 HB_IFACE="${HB_IFACE:-any}"
 HB_CAPTURE_FILTER="${HB_CAPTURE_FILTER:-tcp port 443 and not host ${HB_TUNNEL_ADDR}}"
 HB_TLS_PORTS="${HB_TLS_PORTS:-}"                    # ports != 443 à forcer en TLS (tests)

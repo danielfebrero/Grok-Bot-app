@@ -126,10 +126,33 @@ slog "hb-setup-keylog: SIGTERM ancien host-main $OLD_PID puis spawn avec --tls-k
 kill -TERM "$OLD_PID" 2>/dev/null || true
 : > "$STATE_DIR/hb-hostmain.out"
 chmod 0600 "$STATE_DIR/hb-hostmain.out" 2>/dev/null || true
-setsid env -i "${NEWENV[@]}" \
+# CRITICAL: spawn as HB_UID (box=1000), never root. A root host-main cannot
+# take the agent-store lock (uid 1000) and the supervisor then forks a second
+# clean host without --tls-keylog — that opaque host does the real backend work.
+HB_GID="$(id -g "$HB_UID" 2>/dev/null || echo "$HB_UID")"
+if command -v setpriv >/dev/null 2>&1; then
+  DROP=(setpriv --reuid="$HB_UID" --regid="$HB_GID" --clear-groups --)
+elif command -v runuser >/dev/null 2>&1; then
+  DROP=(runuser -u "#$HB_UID" --)
+else
+  slog "hb-setup-keylog: ni setpriv ni runuser — impossible de dropper uid $HB_UID"
+  bash "$REVERT"; exit 3
+fi
+setsid "${DROP[@]}" env -i "${NEWENV[@]}" \
     "$NODE_BIN" "$NODE_FLAG" "--tls-keylog=$HB_KEYLOG_FILE" "$HOST_ENTRY" \
     </dev/null >>"$STATE_DIR/hb-hostmain.out" 2>&1 &
 echo $! > "$HB_HOSTMAIN_PIDFILE"
+# Refuse a root host-main even if something went wrong with setpriv.
+sleep 0.3
+NEW_PID="$(cat "$HB_HOSTMAIN_PIDFILE" 2>/dev/null || true)"
+if [ -n "$NEW_PID" ] && [ -r "/proc/$NEW_PID" ]; then
+  REAL_UID="$(stat -c %u "/proc/$NEW_PID" 2>/dev/null || echo "?")"
+  if [ "$REAL_UID" != "$HB_UID" ]; then
+    slog "hb-setup-keylog: host-main pid=$NEW_PID uid=$REAL_UID ≠ $HB_UID -> REVERT"
+    kill -TERM "$NEW_PID" 2>/dev/null || true
+    bash "$REVERT"; exit 3
+  fi
+fi
 unset OENV NEWENV
 
 for _ in $(seq 1 30); do host_health "$HOST_PORT_ORIG" && break; sleep 1; done
