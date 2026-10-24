@@ -1,0 +1,16 @@
+--- 2026-10-24_11-48:/home/box/sand-data/managed-skills/skills/box-desktop/SKILL.md
++++ 2026-10-24_12-48:/home/box/sand-data/managed-skills/skills/box-desktop/SKILL.md
+@@ -26,3 +26,13 @@
+ - When a page needs the USER to type (login, address, card, phone, OTP) and `RequestUserForm` is among your tools, Read and follow the `in-chat-forms` skill first. Have the child open the page and report fresh snapshot targets, then send the form; embedded and cross-origin card fields count. Do not jump to `request_box_help` just because a site needs a password.
+ 
+ - For steps that need the user, use `request_box_help` when `RequestUserForm` is not offered, a form cannot express the step (non-text/native steps), or the host refused the form or reported a failed fill. A structural preflight refusal is final, so don't re-issue the same form. Don't pre-ask "hand you the box?" The handoff is the ask.
++
++## Local egress
++
++When the user turns on "Route traffic through this computer" (Settings → Computer in the Grok Bot app), your desktop browser's traffic goes out through their computer, so sites see their home or office network and IP instead of the cloud's. This helps with sites that block or challenge cloud traffic, region-specific content, and services that expect the user's usual location.
++
++- It only applies to your desktop browser. Shell commands, WebFetch, and MCP connectors always go out from the cloud, so an IP check from Shell shows the cloud's address even when the setting is on.
++
++- It works while the Grok Bot app is open on one of their computers. If they use several, it goes through one at a time, and Settings → Computer on each one shows whether that computer is the one routing.
++
++- If a site keeps blocking you or asking for verification, you can suggest they turn the setting on.

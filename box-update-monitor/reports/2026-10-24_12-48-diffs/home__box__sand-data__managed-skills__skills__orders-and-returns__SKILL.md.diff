@@ -1,0 +1,61 @@
+--- 2026-10-24_11-48:/home/box/sand-data/managed-skills/skills/orders-and-returns/SKILL.md
++++ 2026-10-24_12-48:/home/box/sand-data/managed-skills/skills/orders-and-returns/SKILL.md
+@@ -2,14 +2,14 @@
+ name: orders-and-returns
+ description: >-
+   When the user asks where an order or package is or what is on its way, wants
+-  to return, exchange, or cancel something they bought, reports a missing, late,
+-  or damaged order, asks about a refund or a price adjustment or whether
+-  anything they bought dropped in price, wants to reorder what they usually buy,
+-  wants to hear when a product's price drops or it is back in stock, wants a
+-  list of products or stores watched for deals, or wants their store coupons
+-  clipped, read this before you answer or open the store or carrier site, even
+-  when you could answer from memory, because every update has to link its
+-  source.
++  to return, exchange, or cancel something they bought or needs its return label
++  or QR code, reports a missing, late, or damaged order, asks about a refund or
++  a price adjustment or whether anything they bought dropped in price, wants to
++  reorder what they usually buy, wants to hear when a product's price drops or
++  it is back in stock, wants a list of products or stores watched for deals, or
++  wants their store coupons clipped, read this before you answer or open the
++  store or carrier site, even when you could answer from memory, because every
++  update has to link its source.
+ ---
+ # Orders, tracking, and returns
+ 
+@@ -28,6 +28,8 @@
+ - "Where's my Amazon order?" is a status lookup in the store's order history.
+ - A pasted tracking number, or a shipping email, is a carrier lookup and needs no store sign-in.
+ - "Return the jacket, it's too big" is a return, and maybe an exchange for another size.
++- "Start a return on what you ordered for me" is a return of an order you placed. Take its store and order number from your confirmation and go straight to that order's return option.
++- "Send me the return label again" or "print my return label" is a return already submitted. Open it on the store's returns page and send the label or code as Returns and exchanges step 5 says.
+ - "Cancel the order I placed this morning" is a cancellation, which only works until the order ships.
+ - "It says delivered but it's not here" or "it arrived broken" is a problem report.
+ - "Tell me when this drops below $200" or "let me know when it's back in stock" is a watch.
+@@ -57,13 +59,21 @@
+ 
+ ## Returns and exchanges
+ 
+-1. Open the order and the store's return option for that item. Read whether it can be returned, the return deadline, the refund amount and where the refund goes, any restocking or return shipping fee, and the ways to send it back (a drop-off location, a pickup, or a mailed label).
++You own a return until the refund posts, or for an exchange until the replacement ships. The user should only have to approve it, print or show the code, and drop the package off.
++
++1. Open the order and the store's return option for that item. Read whether it can be returned, the return deadline, the refund amount and where the refund goes, any restocking or return shipping fee, and each way to send it back (a drop-off with a QR code, a drop-off with a printed label, a pickup, or a mailed label) with what it needs, such as a printer, a box, or a store visit. When the page offers no online return, say so and offer the store's help options as Problems with an order says.
+ 2. Pick the return reason from the site's own list, matched to what the user said. Ask when the match is unclear, because the reason can decide who pays return shipping.
+ 3. For an exchange, check that the new size or color is in stock first. When the store offers no exchange, say so and offer a return plus a new order, which goes through the `shopping` skill.
+-4. Before you submit, send one question widget with the item, the reason, the refund amount, any fee, and how it goes back. A dismissed widget is a no.
+-5. After you submit, report the return's drop-off deadline and place, and attach the QR code or label: a screenshot of the code, or the downloaded label at its saved path. Offer a reminder routine for the day before the deadline.
+-6. When the reason was fit, offer to remember the size that would have fit for that brand.
+-7. Confirm a refund only from a refund email or the store's order page. Until one shows it, say the refund is pending and when the store says it posts.
++4. Before you submit, send one question widget with the item, the reason, the refund amount, and any fee. When the store offers more than one way to send it back, make each way an option with its fee, its drop-off place or pickup, and what it needs. Put first the way that needs no printer and no box, unless it costs more. Leave out a way that needs a printer when memory says the user has none, and save that with UpdateMemory when they say so. With only one way, name it in the prompt. A dismissed widget is a no.
++5. After you submit, read the confirmation page and the store's return email for the return number, the drop-off place and deadline, the label or QR code, the return tracking link, and when the store says the refund posts or the replacement ships. Send them in one message with the email or page each came from.
++   - Have the subagent download a label to `/workspace`, named by store and item, and attach the file with SendToUser so the user can print it at full size. A screenshot of a label prints at the wrong scale, so send one only when the page offers no download, and say so.
++   - Send a QR code as a screenshot cropped to the code, with the return number, since the drop-off counter scans it from the user's phone.
++6. In the same message, offer one routine that follows the return to the refund, or an exchange to the replacement's shipment, and create it on a yes. Read the Cursor-managed `routines` skill before you create it. Write into its instructions the store, the order number, the item, the return number, the way it goes back, the drop-off place and deadline, the label's saved path, the return tracking link, and either the refund amount and the date the store gave for it, or the replacement item and the date the store said it ships. Schedule it daily, since the reminder has to land the day before the deadline. Each run checks:
++   1. Until a carrier scan shows the package on its way, the return tracking link. The day before the drop-off deadline, it reminds the user with the place, the deadline, and the label or QR code again. A return the user takes back to the store in person has no scan, so it gets this one reminder.
++   2. On every run, the order page, or the store's refund or shipping email when mail is connected, since a store can refund or ship a replacement before the return is scanned. It messages the user once when the refund posts, with the amount and the page or email that shows it, or once when the replacement ships, with its tracking link, and then ends.
++   3. When a return that goes back by carrier still shows no scan two days after the drop-off deadline, or the refund or the replacement's shipment is a week past the date the store gave, it messages the user with what the order page says, offers help as Problems with an order says, and ends. A package dropped off on the last day can wait a day for its first scan, so a missing scan on the day after the deadline is not yet a missed drop-off. When the store counts its date from when it gets the item, count from the first scan, or from the drop-off deadline for a return taken back in person.
++7. When the reason was fit, offer to remember the size that would have fit for that brand.
++8. Confirm a refund only from a refund email or the store's order page. Until one shows it, say the refund is pending and when the store says it posts.
+ 
+ ## Cancellations
+ 

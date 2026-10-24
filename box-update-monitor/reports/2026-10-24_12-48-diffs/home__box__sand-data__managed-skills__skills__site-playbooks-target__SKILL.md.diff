@@ -1,0 +1,50 @@
+--- 2026-10-24_11-48:/home/box/sand-data/managed-skills/skills/site-playbooks-target/SKILL.md
++++ 2026-10-24_12-48:/home/box/sand-data/managed-skills/skills/site-playbooks-target/SKILL.md
+@@ -61,17 +61,27 @@
+ ### Dispatch snippet
+ 
+ ```
+-Find "<query>" on Target.com. Read only, do not add to cart or check out.
++Find "<query>" on Target.com. Read only: no cart or checkout.
+ In the box shell run curl -sS -w '\nHTTP %{
+ http_code}
+ ' -H 'Accept: application/json' "https://redsky.target.com/redsky_aggregations/v1/web/plp_search_v2?key=ff457966e64d5e877fdbad070f276d18ecec4a01&channel=WEB&keyword=<url-encoded query>&page=%2Fs%2F<url-encoded query>&visitor_id=skill-runner&pricing_store_id=2885&default_purchasability_filter=true&count=24"
+-Check the HTTP status first;
+- the lines below apply to a 200 only.
+-If data.search.search_response.facet_list is missing or empty, report no results and do not return a product.
+-If data.search.search_response.metadata.auto_corrected_keyword is set, report the correction.
+-From each of the first five data.search.products report tcin, item.product_description.title (decode HTML entities), item.primary_brand.name, price.formatted_current_price, price.formatted_comparison_price, ratings_and_reviews.statistics.rating.average and .count, item.enrichment.buy_url, item.enrichment.image_info.primary_image.url.
+-If the endpoint returns 403 with a captchaAbsoluteURL body, stop and report that URL. On HTTP 435, a body with an appId or blockScript field, or any other 4xx, do not run it again: report api_blocked for the 435 and open https://www.target.com/s?searchTerm=<url-encoded query>, click "Continue shopping" if the Health Data Consent modal shows, wait 2.5 s, read each a[href*="/-/A-"] anchor (TCIN in the href) with the title and price text of its card, and take one screenshot.
+-Stop and report the URL if a captcha, sign in, 2FA, or payment wall appears.
++On HTTP 200, under data.search.search_response report no results and no product if facet_list is missing or empty, and the correction if metadata.auto_corrected_keyword is set.
++From each of the first five data.search.products report tcin, price.formatted_current_price and .formatted_comparison_price, ratings_and_reviews.statistics.rating.average and .count, and under item: product_description.title (decode entities), primary_brand.name, enrichment.buy_url, enrichment.image_info.primary_image.url.
++On a 403 with captchaAbsoluteURL, stop and report it. On 435, an appId or blockScript body, or another 4xx, don't rerun it: report api_blocked for the 435, open https://www.target.com/s?searchTerm=<url-encoded query>, click "Continue shopping" on a consent modal, wait 2.5 s, scroll so five cards render, read their titles, prices and TCINs from the snapshot, and run the page script async (page) => {
++ const o = {
++}
++, w = {
++ timeout: 2e3 }
++;
++ for (const a of await page.locator('a[href*="/-/A-"]:has(img[src^=https])').all()) {
++ const t = (await a.getAttribute('href', w)).match(/A-(\d+)/)?.[1];
++ if (t) o['https://www.target.com/p/-/A-' + t] ??= await a.locator('img[src^=https]').first().getAttribute('src', w);
++ if (Object.keys(o).length > 4) break;
++ }
++ return o;
++ }
++ for URLs and images. Take one screenshot.
++Stop and report the URL on a captcha, sign in, 2FA, or payment wall.
+ Ground rules for this Task. A Timeout or a net::ERR_* code from browser_navigate means the box cannot reach that host. Do not retry it, even if the tool result says to, and do not run DNS or connectivity checks. Move to the next source this Task names, or report the code and URL. An HTTP block (403, 419, 429, 503) follows this Task's own rule. Work in the tab you start in. Do not open a second tab, and switch tabs only when a tool result names a page you did not intend. In-page tabs are part of the page. A page script is an async (page) => function: run it with browser_run_code if you hold it. Without it, read rendered text from browser_snapshot or browser_find, read a <script> tag from the HTML that curl fetches in the box shell, and report a field neither yields as unreadable, never visible text in its place. Name the read you used. Snapshot a page state once. After a click, a scroll, or a wait this Task calls for, take one new snapshot. Do not snapshot the same state twice. Report as soon as the stop rule above is met, one line per item, only the fields asked for, no page dumps.
+ ```
+ 
+@@ -103,7 +113,10 @@
+ | desirability | `.desirability_cues[].display`, for example `"Bestseller"` |
+ 
+ `"See price in cart"` is a real MAP restricted item;
+- read `.price.current_retail` (numeric, sometimes populated) or open `buy_url`. Drop products whose `__typename` is not `ProductSummary` if you want to be defensive about sponsored slots. `https://www.target.com/p/<slug>/-/A-<tcin>` is canonical and `/-/A-<tcin>` alone 301s to it.
++ read `.price.current_retail` (numeric, sometimes populated) or open `buy_url`. Drop products whose `__typename` is not `ProductSummary` if you want to be defensive about sponsored slots. `https://www.target.com/p/<slug>/-/A-<tcin>` is canonical and `https://www.target.com/p/-/A-<tcin>` opens the same page;
++ `/-/A-<tcin>` without `/p/` is a 404.
++
++On the browser fallback, the page script turns each card link's relative href into `https://www.target.com/p/-/A-<tcin>` and reads its https img src (`target.scene7.com`) with locators, since `browser_run_code` refuses in-page JavaScript, so the report carries an https product URL and an image on either path.
+ 
+ ### When blocked
+ 
