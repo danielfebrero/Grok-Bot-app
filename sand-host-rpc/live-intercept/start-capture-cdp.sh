@@ -4,6 +4,9 @@
 # host-main ouvre ws://127.0.0.1:<cdpPort>/devtools/... . Ce n'est ni le relai
 # :1342, ni le tcp/443. tcpdump sur lo + decode_keylog.py --plaintext.
 # Pas de keylog, pas de mitm, pas de nft. Root requis (tcpdump).
+# Même rotation que le 443 : au-delà de CDP_PCAP_MAX_BYTES le décodeur shred
+# et relance tcpdump. Un socket CDP déjà ouvert reste opaque tant que le
+# handshake HTTP (Upgrade) n'est pas dans le nouveau pcap.
 #
 # Variables : CDP_PORTS (obligatoire, liste séparée par espace ou virgule),
 # CDP_IFACE (défaut lo), CDP_PCAP, RPC_TRAFFIC_LOG_DIR. Les ports 6080 et 6081
@@ -46,6 +49,7 @@ filt+=") and not host ${HB_TUNNEL_ADDR}"
 
 mkdir -p "$STATE_DIR"
 rm -f "$CDP_PCAP" "$CDP_CAPTURE_READY" "$CDP_TCPDUMP_PIDFILE"
+hb_shred "${CDP_PCAP}.closed"
 : > "$CDP_CAPTURE_OUT"
 chmod 0600 "$CDP_CAPTURE_OUT" 2>/dev/null || true
 
@@ -54,25 +58,19 @@ echo "  pcap=$CDP_PCAP"
 echo "  filtre=$filt"
 echo "  logs=$TRAFFIC_LOG_DIR leg=host-cdp"
 
-python3 - "$CDP_TCPDUMP_PIDFILE" "$HB_TCPDUMP" "$CDP_IFACE" "$CDP_PCAP" "$CDP_CAPTURE_OUT" "$filt" <<'PY'
-import os, sys
-pidfile, tcpdump, iface, pcap, logout, filt = sys.argv[1:]
-if os.fork() > 0:
-    os._exit(0)
-os.setsid()
-if os.fork() > 0:
-    os._exit(0)
-with open(pidfile, "w", encoding="utf-8") as fh:
-    fh.write(str(os.getpid()) + "\n")
-fd = os.open(logout, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
-os.dup2(fd, 1)
-os.dup2(fd, 2)
-if fd > 2:
-    os.close(fd)
-os.execvp(tcpdump, [
-    tcpdump, "--immediate-mode", "-i", iface, "-n", "-s", "0", "-U", "-Z", "root",
-    "-w", pcap, filt,
-])
+python3 - "$HERE" "$CDP_TCPDUMP_PIDFILE" "$HB_TCPDUMP" "$CDP_IFACE" "$CDP_PCAP" "$CDP_CAPTURE_OUT" "$HB_TCPDUMP_BUFFER_KB" "$filt" <<'PY'
+import sys
+here, pidfile, tcpdump, iface, pcap, logout, buffer, filt = sys.argv[1:]
+sys.path.insert(0, here)
+import decode_keylog as dk
+try:
+    kb = int(buffer)
+except ValueError:
+    kb = dk.DEFAULT_TCPDUMP_BUFFER_KB
+pid = dk.spawn_tcpdump(tcpdump, iface, pcap, logout, filt, pidfile, kb)
+if pid <= 0:
+    sys.stderr.write("ERREUR: tcpdump n'a pas démarré\n")
+    raise SystemExit(2)
 PY
 
 ready=0
@@ -103,7 +101,7 @@ fi
 touch "$CDP_CAPTURE_READY"
 
 echo $$ > "$CDP_DECODE_PIDFILE"
-export HB_TSHARK CDP_PCAP_MAX_BYTES
+export HB_TSHARK CDP_PCAP_MAX_BYTES HB_TCPDUMP_BUFFER_KB
 export HB_TCPDUMP_PIDFILE="$CDP_TCPDUMP_PIDFILE"
 export HB_PCAP_MAX_BYTES="$CDP_PCAP_MAX_BYTES"
 export RPC_TRAFFIC_LOG_DIR="$TRAFFIC_LOG_DIR"
@@ -111,4 +109,7 @@ exec python3 -u "$HERE/decode_keylog.py" \
     --plaintext --follow --interval "$CDP_DECODE_INTERVAL" \
     --pcap "$CDP_PCAP" --seen "$CDP_SEEN_FILE" \
     --cdp-ports "${ports[*]}" --tshark "$HB_TSHARK" \
-    --max-bytes "$CDP_PCAP_MAX_BYTES" --tcpdump-pidfile "$CDP_TCPDUMP_PIDFILE"
+    --max-bytes "$CDP_PCAP_MAX_BYTES" --tcpdump-pidfile "$CDP_TCPDUMP_PIDFILE" \
+    --tcpdump "$HB_TCPDUMP" --iface "$CDP_IFACE" \
+    --capture-filter "$filt" --capture-out "$CDP_CAPTURE_OUT" \
+    --tcpdump-buffer-kb "$HB_TCPDUMP_BUFFER_KB"

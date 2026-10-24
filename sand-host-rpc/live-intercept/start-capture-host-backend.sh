@@ -8,9 +8,13 @@
 # Le filtre BPF par défaut ne prend que le tcp/443 hors tunnel egress. Le
 # décodeur ne JOURNALISE que les SNI qui matchent HB_ALLOW_HOSTS (leg=host-backend).
 # Les autres flux restent chiffrés dans le pcap (0600, détruit par hb-off).
+# Quand le pcap dépasse HB_PCAP_MAX_BYTES, le décodeur rote tout seul
+# (même iface, même filtre). Les TLS déjà ouverts restent opaques jusqu'au
+# ClientHello suivant.
 #
 # Variables (lib.sh) : HB_IFACE, HB_CAPTURE_FILTER, HB_PCAP, HB_KEYLOG_FILE,
-# HB_TLS_PORTS, HB_DECODE_INTERVAL, RPC_TRAFFIC_LOG_DIR, HB_ALLOW_HOSTS.
+# HB_TLS_PORTS, HB_DECODE_INTERVAL, RPC_TRAFFIC_LOG_DIR, HB_ALLOW_HOSTS,
+# HB_PCAP_MAX_BYTES, HB_TCPDUMP_BUFFER_KB.
 # ============================================================================
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -29,6 +33,7 @@ mkdir -p "$STATE_DIR"
 chmod 0600 "$HB_KEYLOG_FILE" 2>/dev/null || true
 # ne pas laisser un ancien pcap (il peut contenir du chiffré hors-cible)
 rm -f "$HB_PCAP"
+hb_shred "${HB_PCAP}.closed"
 rm -f "$HB_CAPTURE_READY" "$HB_TCPDUMP_PIDFILE"
 : > "$HB_CAPTURE_OUT"
 chmod 0600 "$HB_CAPTURE_OUT" 2>/dev/null || true
@@ -40,35 +45,28 @@ echo "  pcap=$HB_PCAP"
 echo "  allow=$HB_ALLOW_HOSTS"
 echo "  logs=$TRAFFIC_LOG_DIR"
 
-# tcpdump est double-forké (setsid) : son père est init, pas le décodeur.
-# Sinon, après exec python, un SIGTERM laisse un zombie et kill -0 reste vrai.
+# tcpdump est double-forké (setsid) par decode_keylog.spawn_tcpdump : son père
+# est init, pas le décodeur. Sinon, après exec python, un SIGTERM laisse un
+# zombie et kill -0 reste vrai.
 # --immediate-mode : sans ça, libpcap (TPACKET_V3) ne livre les paquets qu'à
 # la fin du délai de tampon (~1 s). Un hb-off dans la seconde les compte
 # « received » mais en écrit 0 — le pcap reste un en-tête vide.
 # -Z root : ne pas dropper vers l'utilisateur tcpdump (STATE_DIR pas writable
 # par lui). -U : un paquet = un flush, pour que tshark lise un pcap cohérent.
-python3 - "$HB_TCPDUMP_PIDFILE" "$HB_TCPDUMP" "$HB_IFACE" "$HB_PCAP" "$HB_CAPTURE_OUT" "${FILTER[@]}" <<'PY'
-import os, sys
-pidfile, tcpdump, iface, pcap, logout, *filt = sys.argv[1:]
-if not filt:
-    sys.stderr.write("ERREUR: filtre BPF vide\n")
+# -B : tampon de capture (Kio). La rotation relance exactement cette ligne.
+python3 - "$HERE" "$HB_TCPDUMP_PIDFILE" "$HB_TCPDUMP" "$HB_IFACE" "$HB_PCAP" "$HB_CAPTURE_OUT" "$HB_TCPDUMP_BUFFER_KB" "$HB_CAPTURE_FILTER" <<'PY'
+import sys
+here, pidfile, tcpdump, iface, pcap, logout, buffer, filt = sys.argv[1:]
+sys.path.insert(0, here)
+import decode_keylog as dk
+try:
+    kb = int(buffer)
+except ValueError:
+    kb = dk.DEFAULT_TCPDUMP_BUFFER_KB
+pid = dk.spawn_tcpdump(tcpdump, iface, pcap, logout, filt, pidfile, kb)
+if pid <= 0:
+    sys.stderr.write("ERREUR: tcpdump n'a pas démarré\n")
     raise SystemExit(2)
-if os.fork() > 0:
-    os._exit(0)
-os.setsid()
-if os.fork() > 0:
-    os._exit(0)
-with open(pidfile, "w", encoding="utf-8") as fh:
-    fh.write(str(os.getpid()) + "\n")
-fd = os.open(logout, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
-os.dup2(fd, 1)
-os.dup2(fd, 2)
-if fd > 2:
-    os.close(fd)
-os.execvp(tcpdump, [
-    tcpdump, "--immediate-mode", "-i", iface, "-n", "-s", "0", "-U", "-Z", "root",
-    "-w", pcap, *filt,
-])
 PY
 
 # Le fichier pcap (en-tête) existe avant que le filtre soit actif. On attend
@@ -104,9 +102,13 @@ touch "$HB_CAPTURE_READY"
 # Ce process EST le décodeur après exec : son pid est déjà celui du script.
 echo $$ > "$HB_DECODE_PIDFILE"
 export HB_ALLOW_HOSTS HB_TUNNEL_ADDR HB_TSHARK HB_PCAP_MAX_BYTES HB_TCPDUMP_PIDFILE
+export HB_TCPDUMP_BUFFER_KB
 export RPC_TRAFFIC_LOG_DIR="$TRAFFIC_LOG_DIR"
 exec python3 -u "$HERE/decode_keylog.py" \
     --follow --interval "$HB_DECODE_INTERVAL" \
     --pcap "$HB_PCAP" --keylog "$HB_KEYLOG_FILE" --seen "$HB_SEEN_FILE" \
     --tls-ports "$HB_TLS_PORTS" --tshark "$HB_TSHARK" \
-    --max-bytes "$HB_PCAP_MAX_BYTES" --tcpdump-pidfile "$HB_TCPDUMP_PIDFILE"
+    --max-bytes "$HB_PCAP_MAX_BYTES" --tcpdump-pidfile "$HB_TCPDUMP_PIDFILE" \
+    --tcpdump "$HB_TCPDUMP" --iface "$HB_IFACE" \
+    --capture-filter "$HB_CAPTURE_FILTER" --capture-out "$HB_CAPTURE_OUT" \
+    --tcpdump-buffer-kb "$HB_TCPDUMP_BUFFER_KB"

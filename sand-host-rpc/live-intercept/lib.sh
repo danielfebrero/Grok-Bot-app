@@ -143,7 +143,14 @@ HB_ALLOW_HOSTS="${HB_ALLOW_HOSTS:-(^|\\.)(api|api2|api3|api4|repo42)\\.cursor\\.
 HB_KEYLOG_DIR="${HB_KEYLOG_DIR:-$STATE_DIR/keylog}"
 HB_KEYLOG_FILE="${HB_KEYLOG_FILE:-$HB_KEYLOG_DIR/sslkeys.log}"
 HB_PCAP="${HB_PCAP:-$STATE_DIR/hb-capture.pcap}"
-HB_PCAP_MAX_BYTES="${HB_PCAP_MAX_BYTES:-536870912}"   # 512 Mio ; au-delà le décodeur coupe tcpdump
+# 512 Mio. Au-delà, decode_keylog.py (--follow) rote : shred + nouveau pcap,
+# même iface et même filtre. Les sessions déjà ouvertes restent opaques
+# jusqu'au handshake suivant (ClientHello dans le pcap courant).
+HB_PCAP_MAX_BYTES="${HB_PCAP_MAX_BYTES:-536870912}"
+# -B de tcpdump, en Kio (défaut tcpdump = 2048). 0 = ne pas passer -B.
+# Le noyau peut borner à net.core.rmem_max : les drops « by kernel » ne
+# disparaissent pas forcément. La rotation ne rattrape pas ces paquets.
+HB_TCPDUMP_BUFFER_KB="${HB_TCPDUMP_BUFFER_KB:-8192}"
 HB_IFACE="${HB_IFACE:-any}"
 HB_CAPTURE_FILTER="${HB_CAPTURE_FILTER:-tcp port 443 and not host ${HB_TUNNEL_ADDR}}"
 HB_TLS_PORTS="${HB_TLS_PORTS:-}"                    # ports != 443 à forcer en TLS (tests)
@@ -226,6 +233,16 @@ hb_shred() {
   else
     rm -f -- "$f"
   fi
+}
+
+# Pcap courant + reliquat `.closed` d'une rotation (tcpdump déjà fermé).
+# Le décodeur shred le `.closed` après le nouveau tcpdump ; hb-off / cdp-off
+# rattrapent un arrêt au milieu de la rotation.
+hb_shred_pcap() {
+  local f="$1"
+  [ -n "$f" ] || return 0
+  hb_shred "$f"
+  hb_shred "${f}.closed"
 }
 
 # Crée le keylog vide, 0600, propriétaire uid host-main (node doit pouvoir append).

@@ -25,9 +25,11 @@ plan() {
   cat <<PLAN
 === PLAN cdp-on (DRY=$DRY) — WebSocket CDP loopback, SANS restart, SANS nft ===
  ports : ${PORT_LIST:-<aucun — poser CDP_PORTS ou lancer Chrome DevTools>}
- 1. tcpdump -i $CDP_IFACE  filtre tcp port <ports> (pas 6080/6081, pas ${HB_TUNNEL_ADDR})
+ 1. tcpdump -i $CDP_IFACE -B ${HB_TCPDUMP_BUFFER_KB}  filtre tcp port <ports> (pas 6080/6081, pas ${HB_TUNNEL_ADDR})
  2. decode_keylog.py --plaintext  (tshark -d tcp.port==PORT,http, couche websocket)
     journal : $TRAFFIC_LOG_DIR   leg=host-cdp   protocol=websocket
+    cap pcap : $CDP_PCAP_MAX_BYTES octets, puis rotation auto (socket déjà ouvert :
+    opaque jusqu'au prochain handshake HTTP dans le pcap courant)
  noVNC/websockify 6080/6081 et le tunnel egress restent hors capture.
  OFF : bash $HERE/cdp-off.sh
 PLAN

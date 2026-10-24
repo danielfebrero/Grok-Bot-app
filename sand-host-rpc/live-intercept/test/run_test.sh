@@ -28,6 +28,8 @@ bash "$HERE/test-host-backend.sh"
 
 echo "=============== B2) websocket (relai + CDP loopback) ==============="
 python3 "$HERE/test_ws_frames.py"
+echo "=============== B3) rotation pcap (cap, seen, faux tcpdump) ==============="
+python3 "$HERE/test_pcap_rotate.py"
 bash "$HERE/test-cdp-ws.sh"
 
 echo "=============== C) revert.sh --dry-run (innocuité) ==============="

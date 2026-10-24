@@ -11,7 +11,7 @@ DRY=0; [ "${1:-}" = "--dry-run" ] && DRY=1
 
 if [ "$DRY" = 1 ]; then
   echo "DRY cdp-off: SIGTERM tcpdump ($CDP_TCPDUMP_PIDFILE) puis décodeur ($CDP_DECODE_PIDFILE)"
-  echo "DRY cdp-off: shred pcap $CDP_PCAP"
+  echo "DRY cdp-off: shred pcap $CDP_PCAP (et ${CDP_PCAP}.closed s'il reste d'une rotation)"
   echo "DRY cdp-off: NE PAS toucher host-main, nft, ni le keylog 443"
   exit 0
 fi
@@ -19,6 +19,6 @@ fi
 need_root
 slog "cdp-off: arrêt capture CDP"
 cdp_stop_pids
-hb_shred "$CDP_PCAP"
+hb_shred_pcap "$CDP_PCAP"
 slog "cdp-off: FIN. host-main et la capture 443 non touchés."
 exit 0

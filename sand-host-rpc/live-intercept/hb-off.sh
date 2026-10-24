@@ -19,7 +19,7 @@ DRY=0; [ "${1:-}" = "--dry-run" ] && DRY=1
 
 if [ "$DRY" = 1 ]; then
   echo "DRY hb-off: SIGTERM tcpdump ($HB_TCPDUMP_PIDFILE) puis décodeur ($HB_DECODE_PIDFILE)"
-  echo "DRY hb-off: shred pcap $HB_PCAP ; conserver keylog $HB_KEYLOG_FILE et $HB_KEYLOG_READY_FLAG"
+  echo "DRY hb-off: shred pcap $HB_PCAP (et ${HB_PCAP}.closed s'il reste d'une rotation) ; conserver keylog $HB_KEYLOG_FILE et $HB_KEYLOG_READY_FLAG"
   echo "DRY hb-off: supprimer reliquat nft ip $HB_NFT_TABLE et mitm :$HB_MITM_PORT s'ils existent"
   echo "DRY hb-off: NE PAS toucher la table ip sandrpc ni host-main"
   exit 0
@@ -28,7 +28,7 @@ fi
 need_root
 slog "hb-off: début — arrêt capture passive, host-main NON redémarré"
 hb_stop_pids
-hb_shred "$HB_PCAP"
+hb_shred_pcap "$HB_PCAP"
 hb_drop_legacy_nft
 hb_kill_legacy_mitm
 if command -v nft >/dev/null 2>&1 && nft list table ip sandrpc >/dev/null 2>&1; then
