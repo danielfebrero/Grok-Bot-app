@@ -19,6 +19,24 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 Rapport : [reports/2026-10-24_13-53.md](reports/2026-10-24_13-53.md).
 
+## 2026-10-24 12:48 (Paris) — snapshot `2026-10-24_11-48` → `2026-10-24_12-48`
+
+**Refresh plateforme des skills gérées (managed-skills) Cursor** : 14 `SKILL.md` mis à jour + `cache.json` (contenu de skill, pas seulement `fetchedAt`). Skills touchées : `accommodation-booking`, `box-desktop`, `flight-booking`, `food-ordering`, `grocery-shopping`, `in-chat-forms`, `orders-and-returns`, `purchases`, `recent-changes`, `restaurant-booking`, `scheduling`, `shopping`, `sign-in`, `site-playbooks-target`. Les diffs ajoutent surtout des chemins de paiement (vault `purchases`, cartes enregistrées, Secure Form) et des précisions de flux. Aucune version plateforme ne bouge : image `fcbae14`, sand-host `ab3b435` (supervisor `upgrade-ab3b435`), exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, **agent-store-fuse `35aaf402` inchangé**, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés.
+
+### Change
+- Contenu de 14 skills gérées rafraîchi par la plateforme (push Cursor, hors agent-store-fuse). Fichiers : +0 / −0 / ~15.
+
+Rapport : [reports/2026-10-24_12-48.md](reports/2026-10-24_12-48.md).
+
+## 2026-10-24 11:48 (Paris) — snapshot `2026-10-24_09-53` → `2026-10-24_11-48`
+
+**Suite netfilter/iptables/nftables installée (install `apt` côté agent, pas un push plateforme)** — cohérent avec le travail `.sand-live-intercept` (capture paquets, ARM ~11:59). Ajouts `dpkg` : `iptables 1.8.11-2`, `nftables 1.1.3-1`, `libip4tc2`, `libip6tc2`, `libnetfilter-conntrack3 1.1.0-1`, `libnfnetlink0 1.0.2-3`, `libnftables1 1.1.3-1`, `libnftnl11 1.2.9-1`. **En plus**, rebuild/bump agent-store-fuse : pointeur `cursor_agent_store_fuse_version` `141f384c25dc5b4923687c36bb14a89cfce436f6` → `35aaf402a3611d873755a963d906dcca0d685d19`. Aucune version plateforme ne bouge : image `fcbae14`, sand-host `ab3b435` (supervisor `upgrade-ab3b435`), exec-daemon, orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés.
+
+### Autre / infra
+- Nouveaux paquets réseau (iptables/nftables) installés côté agent + bump agent-store-fuse. Fichiers : +0 / −0 / ~1 (pointeur fuse ; reste capturé dans `meta/dpkg-packages.txt`).
+
+Rapport : [reports/2026-10-24_11-48.md](reports/2026-10-24_11-48.md).
+
 ## 2026-10-24 09:53 (Paris) — snapshot `2026-10-24_06-44` → `2026-10-24_09-53`
 
 **Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `c23654e8c855cf98fa7ee28ab8cd16e1e8cd7410` → `141f384c25dc5b4923687c36bb14a89cfce436f6` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`). Binaire `cursor-agent-store-fuse` inchangé (9504880 o, même sha256 `5c3513e4…`). Image `fcbae14`, box-scripts `fcbae14`, sand-host `ab3b435` (supervisor `upgrade-ab3b435`), exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~1.
