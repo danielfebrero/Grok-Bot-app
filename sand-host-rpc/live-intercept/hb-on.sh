@@ -11,7 +11,8 @@
 # Les connexions TLS ouvertes AVANT ce démarrage ne sont pas déchiffrables :
 # tshark a besoin du ClientHello dans le pcap. Seuls les nouveaux handshakes
 # (après hb-on, ou ceux pris par la capture démarrée dans hb-setup) sortent
-# dans le JSONL.
+# dans le JSONL. Même limite après chaque rotation automatique du pcap
+# (cap HB_PCAP_MAX_BYTES) : pas besoin de relancer hb-on.
 #
 # Dry-run par défaut.
 #   HB_ON_CONFIRM=yes sudo -E bash hb-on.sh
@@ -30,9 +31,11 @@ plan() {
 === PLAN hb-on (DRY=$DRY) — SANS restart host-main, SANS nft ===
  1. exiger le marqueur $HB_KEYLOG_READY_FLAG et --tls-keylog dans la cmdline
     (sauf HB_FORCE=1)
- 2. si pas déjà active : tcpdump -i $HB_IFACE  filtre « $HB_CAPTURE_FILTER »
+ 2. si pas déjà active : tcpdump -i $HB_IFACE -B ${HB_TCPDUMP_BUFFER_KB}  filtre « $HB_CAPTURE_FILTER »
     + decode_keylog.py (tshark, keylog=$HB_KEYLOG_FILE)
     journal : $TRAFFIC_LOG_DIR  leg=host-backend  allow=$HB_ALLOW_HOSTS
+    cap pcap : $HB_PCAP_MAX_BYTES octets, puis rotation auto (sessions TLS déjà
+    ouvertes : opaques jusqu'au ClientHello suivant, sans relancer hb-on)
  OFF sans restart : bash $HERE/hb-off.sh
  Revert (retire le keylog, respawn host propre) : bash $HERE/hb-revert.sh
 PLAN

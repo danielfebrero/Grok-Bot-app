@@ -29,6 +29,13 @@ porte le message recollé. On écrit une ligne JSONL par message
 (`protocol: websocket`), sans attendre la fin du flux — un socket CDP reste
 ouvert. `--plaintext` journalise le CDP loopback (leg=host-cdp), sans keylog.
 Le RSV / permessage-deflate n'est pas gonflé (voir ws_frames).
+
+Rotation (--follow, cap --max-bytes) : arrêt de tcpdump, dernière passe de
+décodage (le fichier seen évite un second JSONL pour un échange déjà écrit),
+shred du pcap, puis tcpdump relancé sur le même chemin / iface / filtre.
+Une session ouverte avant ce nouveau fichier reste opaque jusqu'au handshake
+suivant (ClientHello TLS, ou Upgrade HTTP pour le CDP) : il doit être dans
+le pcap courant. Pas de nft, pas de mitm, pas de restart host-main.
 """
 from __future__ import annotations
 
@@ -38,6 +45,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import signal
 import subprocess
 import sys
@@ -1303,19 +1311,308 @@ def discover_cdp_ports(explicit: list[str] | None = None) -> list[int]:
     return sorted(hits)
 
 
-def _stop_tcpdump(pidfile: str) -> None:
-    if not pidfile or not os.path.isfile(pidfile):
-        return
+# Reliquat renommé le temps du shred. hb-off / cdp-off effacent aussi ce chemin.
+PCAP_CLOSED_SUFFIX = ".closed"
+# -B de tcpdump, en Kio. 0 = ne pas passer -B (défaut historique de tcpdump : 2048).
+DEFAULT_TCPDUMP_BUFFER_KB = 8192
+# Après « listening », laisser le filtre s'armer (même délai que start-capture-*.sh).
+ROTATE_SETTLE_S = 0.4
+
+ROTATE_LOG = (
+    "decode_keylog: pcap au-delà du cap, rotation — nouveau pcap, capture reprise. "
+    "Les sessions déjà ouvertes restent opaques jusqu'au prochain handshake "
+    "(ClientHello / Upgrade doit être dans le pcap courant)."
+)
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None or not str(raw).strip():
+        return default
     try:
-        pid = int(open(pidfile, encoding="utf-8").read().strip() or "0")
+        return int(str(raw).strip())
     except ValueError:
-        return
+        return default
+
+
+def read_pidfile(path: str) -> int:
+    if not path or not os.path.isfile(path):
+        return 0
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return int(fh.read().strip() or "0")
+    except (OSError, ValueError):
+        return 0
+
+
+def pid_alive(pid: int) -> bool:
+    """Vrai si le pid existe et n'est pas un zombie (kill -0 reste vrai sur un zombie)."""
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        pass
+    except OSError:
+        return False
+    try:
+        with open(f"/proc/{pid}/stat", encoding="utf-8", errors="replace") as fh:
+            line = fh.read()
+    except OSError:
+        return True
+    rest = line.rsplit(")", 1)[-1].strip()
+    state = rest.split(" ", 1)[0] if rest else ""
+    return bool(state) and state != "Z"
+
+
+def _signal_pid(pid: int, sig: int) -> None:
     if pid <= 0:
         return
     try:
-        os.kill(pid, signal.SIGTERM)
+        os.kill(pid, sig)
     except OSError:
         pass
+
+
+def wait_pid_dead(pid: int, timeout: float) -> bool:
+    if pid <= 0:
+        return True
+    end = time.monotonic() + max(0.0, timeout)
+    while time.monotonic() < end:
+        if not pid_alive(pid):
+            return True
+        try:
+            time.sleep(0.05)
+        except InterruptedError:
+            break
+    if pid_alive(pid):
+        _signal_pid(pid, signal.SIGKILL)
+        kill_end = time.monotonic() + 1.0
+        while time.monotonic() < kill_end:
+            if not pid_alive(pid):
+                return True
+            try:
+                time.sleep(0.05)
+            except InterruptedError:
+                break
+    return not pid_alive(pid)
+
+
+def _stop_tcpdump(pidfile: str) -> None:
+    pid = read_pidfile(pidfile)
+    if pid <= 0:
+        return
+    _signal_pid(pid, signal.SIGTERM)
+    wait_pid_dead(pid, 5.0)
+
+
+def tcpdump_argv(tcpdump: str, iface: str, pcap: str, capture_filter: str,
+                 buffer_kb: int) -> list[str]:
+    """Ligne tcpdump partagée par le premier lancement et chaque rotation.
+
+    Le filtre est UN argument (les parenthèses CDP ne passent pas par le shell).
+    """
+    filt = (capture_filter or "").strip()
+    if not tcpdump or not iface or not pcap or not filt:
+        raise ValueError("tcpdump, iface, pcap ou filtre BPF vide")
+    cmd = [
+        tcpdump, "--immediate-mode", "-i", iface, "-n", "-s", "0", "-U", "-Z", "root",
+    ]
+    if buffer_kb and int(buffer_kb) > 0:
+        cmd.extend(["-B", str(int(buffer_kb))])
+    cmd.extend(["-w", pcap, filt])
+    return cmd
+
+
+def shred_file(path: str) -> None:
+    """Efface un pcap sans jamais écrire son contenu (shred -n 1, sinon unlink)."""
+    if not path or not os.path.lexists(path):
+        return
+    shred = shutil.which("shred")
+    if shred:
+        subprocess.run(
+            [shred, "-u", "-n", "1", "--", path],
+            check=False, capture_output=True,
+        )
+    if os.path.lexists(path):
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+
+def spawn_tcpdump(tcpdump: str, iface: str, pcap: str, logout: str,
+                  capture_filter: str, pidfile: str, buffer_kb: int = 0) -> int:
+    """Double-fork + setsid, comme start-capture-*.sh. Retourne le pid, ou 0.
+
+    tcpdump est réattaché à init : un SIGTERM du décodeur ne le laisse pas zombie
+    et ne l'emporte pas. Le père de ce fork attend le fils intermédiaire.
+    """
+    try:
+        argv = tcpdump_argv(tcpdump, iface, pcap, capture_filter, buffer_kb)
+    except ValueError as e:
+        print(f"ERREUR: {e}", file=sys.stderr)
+        return 0
+    for directory in (os.path.dirname(pcap), os.path.dirname(pidfile), os.path.dirname(logout)):
+        if directory:
+            try:
+                os.makedirs(directory, exist_ok=True)
+            except OSError:
+                pass
+    try:
+        os.remove(pidfile)
+    except OSError:
+        pass
+    try:
+        first = os.fork()
+    except OSError as e:
+        print(f"ERREUR: fork tcpdump: {e}", file=sys.stderr)
+        return 0
+    if first > 0:
+        while True:
+            try:
+                os.waitpid(first, 0)
+                break
+            except ChildProcessError:
+                break
+            except InterruptedError:
+                continue
+        deadline = time.monotonic() + 5.0
+        while time.monotonic() < deadline:
+            pid = read_pidfile(pidfile)
+            if pid > 0 and pid != os.getpid() and pid_alive(pid):
+                return pid
+            try:
+                time.sleep(0.05)
+            except InterruptedError:
+                break
+        return 0
+    try:
+        os.setsid()
+        if os.fork() > 0:
+            os._exit(0)
+        os.umask(0o077)
+        fd_pid = os.open(pidfile, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        try:
+            os.write(fd_pid, f"{os.getpid()}\n".encode("ascii"))
+        finally:
+            os.close(fd_pid)
+        fd = os.open(logout, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+        os.dup2(fd, 1)
+        os.dup2(fd, 2)
+        if fd > 2:
+            os.close(fd)
+        os.execvp(argv[0], argv)
+    except Exception:
+        os._exit(127)
+    os._exit(127)
+
+
+def wait_tcpdump_listening(logout: str, offset: int, pid: int, timeout: float = 5.0,
+                           settle_s: float = ROTATE_SETTLE_S) -> bool:
+    """Vrai si tcpdump a écrit un nouveau « listening on » après offset."""
+    end = time.monotonic() + max(0.2, timeout)
+    while time.monotonic() < end:
+        if pid and not pid_alive(pid):
+            return False
+        chunk = ""
+        try:
+            with open(logout, "rb") as fh:
+                fh.seek(max(0, offset))
+                chunk = fh.read().decode("utf-8", "replace")
+        except OSError:
+            chunk = ""
+        if "listening on" in chunk:
+            if settle_s > 0 and not _stop:
+                try:
+                    time.sleep(settle_s)
+                except InterruptedError:
+                    pass
+            return bool(pid_alive(pid))
+        try:
+            time.sleep(0.05)
+        except InterruptedError:
+            break
+    return False
+
+
+def rotate_capture(pcap: str, pidfile: str, tcpdump: str, iface: str,
+                   capture_filter: str, logout: str, buffer_kb: int,
+                   decode_fn, settle_s: float = ROTATE_SETTLE_S) -> bool:
+    """Arrête tcpdump, décode le pcap plein, le shred, relance la capture.
+
+    Pas de chevauchement des deux tcpdump : un même échange relu depuis deux
+    pcaps n'a pas le même tcp.stream, donc pas le même digest. On ferme
+    d'abord, on décode (seen inchangé pour ce qui est déjà journalisé), puis
+    seulement on ouvre le fichier neuf.
+    """
+    if _stop:
+        return False
+    if not (tcpdump and iface and (capture_filter or "").strip() and logout and pidfile and pcap):
+        print(
+            "decode_keylog: rotation impossible (tcpdump, iface ou filtre manquant)",
+            file=sys.stderr,
+        )
+        return False
+    old = read_pidfile(pidfile)
+    _signal_pid(old, signal.SIGTERM)
+    wait_pid_dead(old, 5.0)
+    if _stop:
+        return False
+    try:
+        decode_fn()
+    except Exception as e:
+        print(f"decode_keylog: passe finale avant rotation ignorée ({e})", file=sys.stderr)
+    if _stop:
+        return False
+    closed = pcap + PCAP_CLOSED_SUFFIX
+    if os.path.lexists(closed):
+        shred_file(closed)
+        if os.path.lexists(closed):
+            print(
+                "decode_keylog: rotation reportée, reliquat non effacé",
+                file=sys.stderr,
+            )
+            return False
+    try:
+        os.replace(pcap, closed)
+    except OSError as e:
+        print(f"decode_keylog: rotation impossible ({e})", file=sys.stderr)
+        return False
+    if _stop:
+        shred_file(closed)
+        return False
+    offset = 0
+    try:
+        offset = os.path.getsize(logout) if os.path.isfile(logout) else 0
+    except OSError:
+        offset = 0
+    new_pid = spawn_tcpdump(
+        tcpdump, iface, pcap, logout, capture_filter, pidfile, buffer_kb,
+    )
+    listening = bool(new_pid) and wait_tcpdump_listening(
+        logout, offset, new_pid, settle_s=settle_s,
+    )
+    if not listening or _stop:
+        if new_pid:
+            _signal_pid(new_pid, signal.SIGTERM)
+            wait_pid_dead(new_pid, 2.0)
+        shred_file(closed)
+        if not _stop:
+            print(
+                "decode_keylog: nouveau tcpdump n'écoute pas après rotation",
+                file=sys.stderr,
+            )
+        return False
+    try:
+        os.chmod(pcap, 0o600)
+    except OSError:
+        pass
+    shred_file(closed)
+    print(ROTATE_LOG, file=sys.stderr)
+    return True
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -1333,8 +1630,15 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--follow", action="store_true")
     p.add_argument("--interval", type=float, default=1.0)
     p.add_argument("--tshark", default=os.environ.get("HB_TSHARK") or "tshark")
-    p.add_argument("--max-bytes", type=int, default=int(os.environ.get("HB_PCAP_MAX_BYTES", "67108864")))
+    p.add_argument("--max-bytes", type=int, default=_env_int("HB_PCAP_MAX_BYTES", 536870912))
     p.add_argument("--tcpdump-pidfile", default=os.environ.get("HB_TCPDUMP_PIDFILE", ""))
+    # Posés par start-capture-*.sh. Sans eux, le cap arrête tcpdump (ancien
+    # comportement) : on ne devine pas l'iface ni le filtre (443 ≠ CDP).
+    p.add_argument("--tcpdump", default="")
+    p.add_argument("--iface", default="")
+    p.add_argument("--capture-filter", default="")
+    p.add_argument("--capture-out", default="")
+    p.add_argument("--tcpdump-buffer-kb", type=int, default=_env_int("HB_TCPDUMP_BUFFER_KB", DEFAULT_TCPDUMP_BUFFER_KB))
     args = p.parse_args(argv)
 
     if args.discover_cdp:
@@ -1397,20 +1701,43 @@ def main(argv: list[str] | None = None) -> int:
         except Exception as e:
             print(f"decode_keylog: passe ignorée ({e})", file=sys.stderr)
 
-    oversize_stop = False
+    can_rotate = bool(
+        args.tcpdump.strip() and args.iface.strip() and args.capture_filter.strip()
+        and args.capture_out.strip() and args.tcpdump_pidfile.strip()
+    )
+    rotate_failed = False
     while not _stop:
+        too_big = False
         try:
-            if os.path.isfile(args.pcap) and os.path.getsize(args.pcap) > args.max_bytes:
+            too_big = (
+                os.path.isfile(args.pcap)
+                and os.path.getsize(args.pcap) > args.max_bytes
+            )
+        except OSError:
+            too_big = False
+        if too_big and not _stop:
+            if not can_rotate:
                 print(
                     "decode_keylog: pcap au-delà du cap, arrêt de tcpdump "
                     "(relancer hb-on pour continuer)",
                     file=sys.stderr,
                 )
                 _stop_tcpdump(args.tcpdump_pidfile)
-                oversize_stop = True
                 break
-        except OSError:
-            pass
+            ok = rotate_capture(
+                pcap=args.pcap,
+                pidfile=args.tcpdump_pidfile,
+                tcpdump=args.tcpdump,
+                iface=args.iface,
+                capture_filter=args.capture_filter,
+                logout=args.capture_out,
+                buffer_kb=args.tcpdump_buffer_kb,
+                decode_fn=safe_once,
+                settle_s=ROTATE_SETTLE_S,
+            )
+            if not ok:
+                rotate_failed = not _stop
+                break
         safe_once()
         end = time.time() + max(0.2, args.interval)
         while time.time() < end and not _stop:
@@ -1421,8 +1748,13 @@ def main(argv: list[str] | None = None) -> int:
             except InterruptedError:
                 break
     safe_once()
-    if oversize_stop:
-        return 0
+    # hb-off tue le pid lu au début. Une rotation entre-temps a pu en écrire
+    # un autre : on le ferme ici, sinon il continuerait d'écrire un pcap que
+    # hb-off shred. Déjà mort (cas habituel) : no-op.
+    if args.tcpdump_pidfile:
+        _stop_tcpdump(args.tcpdump_pidfile)
+    if rotate_failed:
+        return 4
     return 0
 
 

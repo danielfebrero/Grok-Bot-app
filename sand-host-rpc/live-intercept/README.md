@@ -94,7 +94,7 @@ backend netfilter vivant est **nftables**.
 | `hb-on.sh` / `hb-off.sh` | démarre / arrête tcpdump + décodeur. **Aucun** restart, **aucune** nft | non (`hb-off` détruit le pcap, garde le keylog) |
 | `hb-revert.sh` | stop capture, shred pcap **et** keylog, SIGTERM host-main → respawn sans flag | oui (c'est son rôle) — host propre au retour |
 | `start-capture-host-backend.sh` | tcpdump (`--immediate-mode`) + `decode_keylog.py`. Root. Appelé par setup/on | non |
-| `decode_keylog.py` | tshark + keylog NSS → JSONL rédigé `leg=host-backend`. `--plaintext` : WebSocket CDP loopback | non |
+| `decode_keylog.py` | tshark + keylog NSS → JSONL rédigé `leg=host-backend`. `--plaintext` : WebSocket CDP loopback. En `--follow`, rote le pcap au cap (sans hb-on) | non |
 | `cdp-on.sh` / `cdp-off.sh` / `start-capture-cdp.sh` | tcpdump `lo` sur les ports CDP + décodeur WS. Pas de restart, pas de nft | `cdp-on` oui, avec `CDP_ON_CONFIRM=yes` |
 | `arm-agent-host.sh` / `revert-agent-host.sh` / `relay_agent_host.py` | patte agent↔host, **inchangés** (§10) | `arm-agent-host` oui, avec le jeton |
 | `arm.sh` / `revert.sh` | chemin combiné **historique**. `arm.sh` **n'arme plus** le host↔backend (pas de CA, pas de `--tls-keylog`, pas de nft :443). Ne pas l'enchaîner après `hb-setup-keylog` : il relance host-main **sans** le flag | oui, avec le jeton |
@@ -182,7 +182,24 @@ Ce qui reste :
   capture sortent en erreur ; host-main n'est pas modifié par `hb-on`.
 - HTTP/1.1 et HTTP/2 sont reassemblés. Seuls les SNI de `HB_ALLOW_HOSTS` sont
   journalisés (`leg=host-backend`). Le pcap est éphémère (plafond
-  `HB_PCAP_MAX_BYTES`, défaut 64 Mio) et **shreddé par hb-off**.
+  `HB_PCAP_MAX_BYTES`, défaut **512 Mio**) et **shreddé par hb-off**.
+- **Rotation automatique.** En `--follow`, dépasser le cap ne coupe plus la
+  capture jusqu'au prochain `hb-on` / `cdp-on`. Le décodeur arrête tcpdump,
+  fait une dernière passe (le fichier `seen` empêche un second JSONL pour un
+  échange déjà écrit), shred le pcap, puis relance tcpdump sur **le même**
+  iface et **le même** filtre. Le keylog n'est pas relu dans les logs ; le
+  nouveau pcap est en **0600**. `CDP_PCAP_MAX_BYTES` suit le même chemin.
+- **Après une rotation, une session déjà ouverte reste opaque** jusqu'au
+  handshake suivant. tshark a besoin du **ClientHello dans le pcap courant**
+  (TLS 1.3). Pour le CDP, c'est le **handshake HTTP (Upgrade)** : sans lui les
+  trames websocket suivantes ne sont pas disséquées. Les nouveaux handshakes,
+  eux, sont journalisés. Rien n'est réécrit pour un digest déjà dans `seen`.
+- tcpdump reçoit **`-B`** (`HB_TCPDUMP_BUFFER_KB`, défaut 8192 Kio ; le défaut
+  de tcpdump est 2048). Ça agrandit le tampon de socket pour limiter les
+  « dropped by kernel ». Le noyau peut quand même borner la demande à
+  `net.core.rmem_max`. La rotation **ne rattrape pas** les paquets déjà perdus ;
+  si les drops restent hauts sous charge, c'est ce plafond noyau (ou le débit
+  face au disque), pas le cap du pcap.
 - Le décodeur ne déchiffre que ce que **ce** Node a mis dans le keylog. Le BPF
   peut voir d'autre TCP/443 ; il n'est pas écrit dans le JSONL.
 
@@ -300,6 +317,22 @@ Sans `HB_ON_CONFIRM=yes` (ou le même `LI_ARM_CONFIRM`), c'est un dry-run.
 capture tourne sont déchiffrables ; ceux d'avant `hb-on` ne le sont pas
 (ClientHello absent du pcap).
 
+Le pcap n'arrête plus la capture en atteignant `HB_PCAP_MAX_BYTES` (défaut
+512 Mio, soit 536870912). `decode_keylog.py` rote sur place : la ligne de log
+`pcap au-delà du cap, rotation` apparaît dans `hb-capture.out`, tcpdump
+repart, le décodage continue. **Pas besoin de relancer `hb-on`.** Les flux
+TLS ouverts avant le nouveau fichier restent opaques jusqu'à un nouveau
+ClientHello. Vérifier sur la box avec un cap court et du trafic :
+
+```
+HB_PCAP_MAX_BYTES=1048576 HB_ON_CONFIRM=yes sudo -E bash hb-on.sh
+# puis, dans hb-capture.out : « rotation — nouveau pcap, capture reprise »
+# hb-off shred le pcap courant et un éventuel .closed
+```
+
+`HB_TCPDUMP_BUFFER_KB` (défaut 8192) est le `-B` de tcpdump. Le mettre à `0`
+retire `-B`. Ça ne change pas le filtre BPF.
+
 ### 11.4 Revert complet
 ```
 bash hb-revert.sh            # stop capture, shred pcap + keylog, SIGTERM host-main
@@ -385,7 +418,9 @@ Limites :
   entier sur la trame de continuation, le fragment FIN=0 est vide et ignoré).
   Un fragment coupé par la fin du pcap n'est pas écrit.
 - La capture doit contenir le **handshake HTTP** (comme le ClientHello pour
-  TLS) : sans lui tshark ne dissèque pas les trames suivantes.
+  TLS) : sans lui tshark ne dissèque pas les trames suivantes. Une rotation
+  (`CDP_PCAP_MAX_BYTES`, même mécanisme que le 443) ouvre un pcap neuf : un
+  socket CDP déjà établi reste opaque jusqu'au prochain Upgrade.
 - **noVNC / websockify (6080, 6081)** et **198.18.0.1** sont hors périmètre,
   même si on les met dans `CDP_PORTS`.
 - Un flux unaire HTTP/2 qui ne se termine pas n'est toujours pas journalisé.

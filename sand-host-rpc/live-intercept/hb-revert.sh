@@ -16,7 +16,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DRY=0; [ "${1:-}" = "--dry-run" ] && DRY=1
 
 if [ "$DRY" = 1 ]; then
-  echo "DRY hb-revert: arrêt capture (tcpdump+décodeur) et shred $HB_PCAP"
+  echo "DRY hb-revert: arrêt capture (tcpdump+décodeur) et shred $HB_PCAP (et ${HB_PCAP}.closed)"
   echo "DRY hb-revert: supprimer reliquat nft ip $HB_NFT_TABLE + mitm :$HB_MITM_PORT (jamais ip sandrpc)"
   echo "DRY hb-revert: SIGTERM host-main (respawn superviseur SANS --tls-keylog) puis shred $HB_KEYLOG_FILE"
   echo "DRY hb-revert: rm $HB_KEYLOG_READY_FLAG $HB_ARM_FLAG $HB_DISARM_FLAG $HB_CA_READY_FLAG"
@@ -28,7 +28,7 @@ need_root
 slog "hb-revert: début — teardown keylog. NE touche PAS la patte agent<->host (ip sandrpc)"
 
 hb_stop_pids
-hb_shred "$HB_PCAP"
+hb_shred_pcap "$HB_PCAP"
 hb_drop_legacy_nft
 hb_kill_legacy_mitm
 

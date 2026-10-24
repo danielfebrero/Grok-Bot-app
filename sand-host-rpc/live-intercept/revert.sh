@@ -68,10 +68,10 @@ fi
 run "rm -f $HOSTMAIN_SPAWN_PIDFILE"
 # secrets de session TLS : seulement après le SIGTERM, sinon le process les réécrit.
 if [ "$DRY" = 1 ]; then
-  echo "DRY: shred $HB_PCAP $HB_KEYLOG_FILE ; rm $HB_KEYLOG_READY_FLAG"
+  echo "DRY: shred $HB_PCAP ${HB_PCAP}.closed $HB_KEYLOG_FILE ; rm $HB_KEYLOG_READY_FLAG"
 else
   sleep 1
-  hb_shred "$HB_PCAP"
+  hb_shred_pcap "$HB_PCAP"
   hb_shred "$HB_KEYLOG_FILE"
   rm -f "$HB_KEYLOG_READY_FLAG" "$HB_CAPTURE_READY" "$HB_SEEN_FILE" "$HB_CA_READY_FLAG"
 fi
