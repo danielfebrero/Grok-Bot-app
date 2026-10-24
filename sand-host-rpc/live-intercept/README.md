@@ -94,7 +94,8 @@ backend netfilter vivant est **nftables**.
 | `hb-on.sh` / `hb-off.sh` | démarre / arrête tcpdump + décodeur. **Aucun** restart, **aucune** nft | non (`hb-off` détruit le pcap, garde le keylog) |
 | `hb-revert.sh` | stop capture, shred pcap **et** keylog, SIGTERM host-main → respawn sans flag | oui (c'est son rôle) — host propre au retour |
 | `start-capture-host-backend.sh` | tcpdump (`--immediate-mode`) + `decode_keylog.py`. Root. Appelé par setup/on | non |
-| `decode_keylog.py` | tshark + keylog NSS → JSONL rédigé `leg=host-backend` | non |
+| `decode_keylog.py` | tshark + keylog NSS → JSONL rédigé `leg=host-backend`. `--plaintext` : WebSocket CDP loopback | non |
+| `cdp-on.sh` / `cdp-off.sh` / `start-capture-cdp.sh` | tcpdump `lo` sur les ports CDP + décodeur WS. Pas de restart, pas de nft | `cdp-on` oui, avec `CDP_ON_CONFIRM=yes` |
 | `arm-agent-host.sh` / `revert-agent-host.sh` / `relay_agent_host.py` | patte agent↔host, **inchangés** (§10) | `arm-agent-host` oui, avec le jeton |
 | `arm.sh` / `revert.sh` | chemin combiné **historique**. `arm.sh` **n'arme plus** le host↔backend (pas de CA, pas de `--tls-keylog`, pas de nft :443). Ne pas l'enchaîner après `hb-setup-keylog` : il relance host-main **sans** le flag | oui, avec le jeton |
 | `hb-setup-ca.sh`, `start-mitm-host-backend.sh` | **retirés** (exit 1, message vers les scripts keylog) | non |
@@ -351,7 +352,41 @@ corps réassemblé. En `--follow`, une réponse n'est écrite qu'une fois les de
 côtés terminés (END_STREAM, ou `Content-Length` atteint) — sinon la ligne
 partait avec `resp_body: null` alors que `content-length` était déjà grand.
 
-Limites : un stream qui ne finit pas pendant la capture n'est pas écrit ; le
-WebSocket non plus. Une enveloppe `application/connect+proto` / gRPC complète
-est dé-tramée, chaque payload décodé. La patte agent↔host (HTTP/1.1 clair,
-JSON) ne change pas.
+Limites : un stream HTTP/2 unaire qui ne finit pas pendant la capture n'est
+pas écrit. Une enveloppe `application/connect+proto` / gRPC complète est
+dé-tramée, chaque payload décodé. Le WebSocket est traité à part (§13).
+
+## 13. WebSocket
+
+Trois canaux, pas le même transport. Le JSONL reste le même fichier
+(`protocol: websocket`, `ws_opcode`, `ws_path`, payload dans `req_body` ou
+`resp_body`). Le dashboard lit ces lignes comme les échanges unaires.
+
+| Canal | Où ça passe | Comment les trames sont obtenues |
+|---|---|---|
+| **CDP** (le canal utile) | `ws://127.0.0.1:<port>/devtools/browser/<id>` et `/devtools/page/<targetId>`, en clair. `host-main` fait `new WebSocket(webSocketDebuggerUrl)`. Ports vus : **9229, 9257, 9302**, aussi via `GET /json/version` et `/json/list` | tcpdump sur `lo` + tshark `-d tcp.port==PORT,http`. La couche `websocket` donne le texte déjà démasqué (`websocket.payload.text`) ; un opcode 2 (binaire) est le `data.data` voisin. `cdp-on.sh` / `cdp-off.sh`. leg=`host-cdp` |
+| **agent↔host** | le relai `:1342→:1340` ne voyait pas l'`Upgrade` | si `Upgrade: websocket` et réponse **101**, le relai fait suivre les octets **tels quels** et parse les trames en Python (RFC 6455). leg=`agent-host` |
+| **host↔backend** (best-effort) | TLS tcp/443, filtre inchangé (`not host 198.18.0.1`) | même décodeur, après le keylog. HTTP/1.1 `Upgrade` ou HTTP/2 extended CONNECT (`:protocol=websocket`) si tshark émet la couche `websocket` ou des DATA. Une session voix (`websocket_url` à côté de `client_secret`) peut passer par le **tunnel egress exclu** : elle n'apparaît alors pas |
+
+Sens d'une trame : bit MASK (client→serveur est masqué). Pour le CDP, le client est host-main (`host->cdp` dans `req_body`) et Chrome répond non masqué (`cdp->host` dans `resp_body`). Le JSON CDP (`method` / `params` / `result`) est parsé ; un `method` CDP (ex. `Page.navigate`) remplace le path dans la colonne méthode. Binaire : proto nommé si le path est dans le catalogue, sinon hex. Contrôle (close / ping / pong) : résumé. Rédaction identique aux autres corps.
+
+```
+cd .../sand-host-rpc/live-intercept
+bash cdp-on.sh                         # dry-run, affiche les ports découverts
+CDP_PORTS='9229 9302' CDP_ON_CONFIRM=yes sudo -E bash cdp-on.sh
+bash cdp-off.sh                        # shred du pcap, ne touche pas le 443
+```
+
+Limites :
+
+- **permessage-deflate** (bit RSV) n'est pas décompressé. La trame est notée
+  `_ws: compressed` + hex. CDP ne négocie pas cette extension.
+- Les **fragments** sont recollés (le relai bufferise ; tshark met le message
+  entier sur la trame de continuation, le fragment FIN=0 est vide et ignoré).
+  Un fragment coupé par la fin du pcap n'est pas écrit.
+- La capture doit contenir le **handshake HTTP** (comme le ClientHello pour
+  TLS) : sans lui tshark ne dissèque pas les trames suivantes.
+- **noVNC / websockify (6080, 6081)** et **198.18.0.1** sont hors périmètre,
+  même si on les met dans `CDP_PORTS`.
+- Un flux unaire HTTP/2 qui ne se termine pas n'est toujours pas journalisé.
+  Les trames WS, elles, partent au fil de l'eau (le socket reste ouvert).

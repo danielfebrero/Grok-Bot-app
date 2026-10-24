@@ -20,12 +20,22 @@ la réponse terminées (END_STREAM, ou Content-Length atteint).
 
 Le JSON tshark (corps en clair) reste en mémoire. Seul le JSONL rédigé touche
 le disque, dans RPC_TRAFFIC_LOG_DIR. Rien du keylog n'est recopié.
+
+WebSocket : tshark 4.2 (après déchiffrement TLS, ou en clair avec
+`-d tcp.port==PORT,http`) pose les trames dans la couche `websocket`. Le texte
+est dans `websocket.payload.text` (déjà démasqué) ; le binaire opcode 2 est le
+voisin `data.data` ; un fragment FIN=0 a un payload vide et la continuation
+porte le message recollé. On écrit une ligne JSONL par message
+(`protocol: websocket`), sans attendre la fin du flux — un socket CDP reste
+ouvert. `--plaintext` journalise le CDP loopback (leg=host-cdp), sans keylog.
+Le RSV / permessage-deflate n'est pas gonflé (voir ws_frames).
 """
 from __future__ import annotations
 
 import argparse
 import datetime
 import hashlib
+import json
 import os
 import re
 import signal
@@ -41,6 +51,7 @@ for _p in (_MONITOR, os.path.join(_MONITOR, "mitmproxy")):
 
 import addon_log  # noqa: E402
 import proxy  # noqa: E402
+import ws_frames  # noqa: E402
 
 # Même expression que HB_ALLOW_HOSTS dans lib.sh (re.search, ancrée en fin).
 DEFAULT_ALLOW = (
@@ -344,6 +355,140 @@ def extract_h2_payload(stream: dict) -> tuple[bytes, str]:
     return b"", "empty"
 
 
+def _as_dicts(v):
+    if v is None:
+        return []
+    if isinstance(v, list):
+        return [x for x in v if isinstance(x, dict)]
+    if isinstance(v, dict):
+        return [v]
+    return []
+
+
+def _flag_true(v) -> bool:
+    return str(v).lower() in ("1", "true")
+
+
+def _parse_tshark_ws(fr: dict, data_blobs):
+    """Une trame de la couche websocket de tshark 4.2 (payload déjà démasqué)."""
+    try:
+        opcode = int(str(_first(fr.get("websocket.opcode")) or "0").split()[0])
+    except ValueError:
+        return None
+    fin = _flag_true(fr.get("websocket.fin"))
+    mask = _flag_true(fr.get("websocket.mask"))
+    rsv_raw = str(_first(fr.get("websocket.rsv")) or "0")
+    try:
+        rsv = int(rsv_raw, 16) if rsv_raw.lower().startswith("0x") else int(rsv_raw or "0")
+    except ValueError:
+        rsv = 0
+    payload = fr.get("websocket.payload")
+    text = None
+    ping = b""
+    pong = b""
+    close_code = None
+    close_reason = ""
+    unknown = None
+    if isinstance(payload, dict):
+        text = payload.get("websocket.payload.text")
+        if isinstance(text, list):
+            text = text[-1] if text else None
+        if text is not None:
+            text = str(text)
+        if payload.get("websocket.payload.ping") not in (None, ""):
+            ping = parse_tshark_bytes(payload.get("websocket.payload.ping"))
+        if payload.get("websocket.payload.pong") not in (None, ""):
+            pong = parse_tshark_bytes(payload.get("websocket.payload.pong"))
+        close = payload.get("websocket.payload.close")
+        if isinstance(close, dict):
+            try:
+                close_code = int(str(close.get("websocket.payload.close.status_code") or "0"))
+            except ValueError:
+                close_code = None
+            close_reason = str(close.get("websocket.payload.close.reason") or "")
+        unknown = payload.get("websocket.payload.unknown")
+    binary = b""
+    if opcode == 2:
+        try:
+            binary = next(data_blobs)
+        except StopIteration:
+            binary = parse_tshark_bytes(unknown) if unknown else b""
+    return {
+        "opcode": opcode,
+        "fin": fin,
+        "mask": mask,
+        "rsv": rsv,
+        "text": text,
+        "binary": binary,
+        "ping": ping,
+        "pong": pong,
+        "close_code": close_code,
+        "close_reason": close_reason,
+    }
+
+
+def extract_ws_frames(layers) -> list:
+    """Trames websocket d'un paquet tshark. Les clés dupliquées sont une liste (_Merged)."""
+    blobs = []
+    for d in _as_dicts(layers.get("data")):
+        if "data.data" in d:
+            blobs.append(parse_tshark_bytes(d["data.data"]))
+    if not blobs:
+        for raw in find_all(layers, "data.data"):
+            blobs.append(parse_tshark_bytes(raw))
+    out = []
+    blobs_iter = iter(blobs)
+    for fr in _as_dicts(layers.get("websocket")):
+        parsed = _parse_tshark_ws(fr, blobs_iter)
+        if parsed is not None:
+            out.append(parsed)
+    return out
+
+
+def _tshark_to_logical(fr: dict):
+    """None si ce n'est qu'un fragment FIN=0 sans octets (tshark recolle sur la suite)."""
+    opcode = int(fr.get("opcode") or 0)
+    rsv = int(fr.get("rsv") or 0)
+    fin = bool(fr.get("fin", True))
+    mask = bool(fr.get("mask"))
+    text = fr.get("text")
+    if rsv and not text:
+        data = fr.get("binary") or fr.get("ping") or fr.get("pong") or b""
+        return ws_frames.Logical(opcode if opcode else 2, data, fin, mask, True)
+    if isinstance(text, str) and text != "":
+        # opcode 0 + texte = message recollé par tshark, pas seulement le dernier fragment
+        op = 1 if opcode in (0, 1) else opcode
+        return ws_frames.Logical(op, text.encode("utf-8", "replace"), True, mask, False)
+    if opcode == 2:
+        if not fin and not fr.get("binary"):
+            return None
+        return ws_frames.Logical(2, fr.get("binary") or b"", fin, mask, False)
+    if opcode == 8:
+        reason = (fr.get("close_reason") or "").encode("utf-8", "replace")
+        code = fr.get("close_code")
+        payload = code.to_bytes(2, "big") + reason if isinstance(code, int) else reason
+        return ws_frames.Logical(8, payload, True, mask, False)
+    if opcode == 9:
+        return ws_frames.Logical(9, fr.get("ping") or b"", True, mask, False)
+    if opcode == 10:
+        return ws_frames.Logical(10, fr.get("pong") or b"", True, mask, False)
+    if not fin:
+        return None
+    return None
+
+
+def _payload_fp(obj) -> str:
+    try:
+        raw = json.dumps(obj, ensure_ascii=False, sort_keys=True, default=str)
+    except (TypeError, ValueError):
+        raw = str(obj)
+    return hashlib.sha256(raw.encode("utf-8", "replace")).hexdigest()[:16]
+
+
+def _ws_digest(parts: list) -> str:
+    return hashlib.sha256("|".join(parts).encode("utf-8", "replace")).hexdigest()
+
+
 def _content_length(pairs) -> int | None:
     raw = header_get(pairs, "content-length").strip()
     if not raw or not raw.isdigit():
@@ -397,6 +542,11 @@ class Exchange:
         self.resp_end = False
         self.req_full = False
         self.resp_full = False
+        self.ws = False
+        self.ws_c2s = b""
+        self.ws_s2c = b""
+        self.ws_c2s_full = False
+        self.ws_s2c_full = False
 
     def complete(self) -> bool:
         return bool(self.ready_req and self.ready_resp and self.method and self.path is not None)
@@ -423,16 +573,53 @@ class Exchange:
             elif not self.resp_full:
                 self.resp_body += payload
 
+    def store_ws_bytes(self, is_req: bool, payload: bytes, kind: str) -> None:
+        """Octets HTTP/2 d'un flux :protocol=websocket, si tshark n'a pas de couche websocket."""
+        if kind == "empty" or (not payload and kind != "full"):
+            return
+        if is_req:
+            if kind == "full":
+                self.ws_c2s = payload
+                self.ws_c2s_full = True
+            elif not self.ws_c2s_full:
+                self.ws_c2s += payload
+        else:
+            if kind == "full":
+                self.ws_s2c = payload
+                self.ws_s2c_full = True
+            elif not self.ws_s2c_full:
+                self.ws_s2c += payload
+
+
+class WsFlow:
+    """Un handshake + les trames tshark qui suivent, sur un tcp.stream (et un sid h2)."""
+
+    def __init__(self):
+        self.path = "/"
+        self.host = ""
+        self.server_port = ""
+        self.req_headers = []
+        self.resp_headers = []
+        self.status = ""
+        self.http_method = "GET"
+        self.frames = []
+        self.saw_dissector = False
+        self.h2_exchange: Exchange | None = None
+
 
 class Assembler:
-    def __init__(self, allow_rx: re.Pattern, tunnel: str):
+    def __init__(self, allow_rx: re.Pattern, tunnel: str, mode: str = "tls",
+                 cdp_ports: set | None = None):
         self.allow_rx = allow_rx
         self.tunnel = tunnel
+        self.mode = mode  # "tls" (host↔backend) ou "cdp" (loopback en clair)
+        self.cdp_ports = {str(p) for p in (cdp_ports or set())}
         self.h1 = {}   # tcp.stream -> {queue:[Exchange]}
         self.h2 = {}   # (tcp.stream, sid) -> Exchange
         self.sni = {}  # tcp.stream -> str
         self.exclude = set()
         self._seq = 0
+        self.flows = {}  # ("h1", stream) | ("h2", stream, sid) -> WsFlow
 
     def _new(self) -> Exchange:
         self._seq += 1
@@ -451,10 +638,26 @@ class Assembler:
         sni = find_sni(layers.get("tls"))
         if sni:
             self.sni.setdefault(stream, sni)
+        has_ws = "websocket" in layers
         if "http" in layers:
             self._note_http(layers["http"], src, dst, sport, dport, stream)
         if "http2" in layers:
-            self._note_h2(layers["http2"], src, dst, sport, dport, stream)
+            self._note_h2(layers["http2"], src, dst, sport, dport, stream, parse_ws_data=not has_ws)
+        if has_ws:
+            self._note_ws(layers, src, dst, sport, dport, stream)
+
+    def _flow(self, key) -> WsFlow:
+        flow = self.flows.get(key)
+        if flow is None:
+            flow = WsFlow()
+            self.flows[key] = flow
+        return flow
+
+    def _upgrade_token(self, http_obj, pairs) -> str:
+        up = header_get(pairs, "upgrade")
+        if not up:
+            up = first_str(find_all(http_obj, "http.upgrade")) or ""
+        return up
 
     def _note_http(self, layer, src, dst, sport, dport, stream):
         if stream in self.exclude:
@@ -476,6 +679,14 @@ class Assembler:
                 ex.ready_req = True
                 if dur is not None:
                     ex.dur = dur
+                if "websocket" in self._upgrade_token(http_obj, ex.req_headers).lower():
+                    ex.ws = True
+                    flow = self._flow(("h1", stream))
+                    flow.path = ex.path
+                    flow.http_method = method
+                    flow.req_headers = ex.req_headers
+                    flow.host = bare_host(header_get(ex.req_headers, "host") or dst)
+                    flow.server_port = dport
                 conn["queue"].append(ex)
             elif code:
                 ex = None
@@ -494,8 +705,22 @@ class Assembler:
                 ex.ready_resp = True
                 if dur is not None:
                     ex.dur = dur
+                up = self._upgrade_token(http_obj, ex.resp_headers)
+                if "websocket" in up.lower() or (str(code) == "101" and ex.ws):
+                    ex.ws = True
+                    flow = self._flow(("h1", stream))
+                    flow.status = str(code)
+                    flow.resp_headers = ex.resp_headers
+                    if ex.path:
+                        flow.path = ex.path
+                    if not flow.server_port:
+                        flow.server_port = ex.server_port or sport
+                    if not flow.host:
+                        flow.host = bare_host(header_get(ex.req_headers, "host") or dst)
+                    if ex.method:
+                        flow.http_method = ex.method
 
-    def _note_h2(self, layer, src, dst, sport, dport, stream):
+    def _note_h2(self, layer, src, dst, sport, dport, stream, parse_ws_data: bool = True):
         if stream in self.exclude:
             return
         for st in iter_h2(layer):
@@ -528,6 +753,15 @@ class Assembler:
                         ex.ready_req = True
                         if end:
                             ex.req_end = True
+                        if names.get(":protocol", "").lower() == "websocket":
+                            ex.ws = True
+                            flow = self._flow(("h2", stream, sid))
+                            flow.path = ex.path
+                            flow.http_method = ex.method or "CONNECT"
+                            flow.req_headers = list(ex.req_headers)
+                            flow.host = bare_host(names.get(":authority") or "")
+                            flow.server_port = dport
+                            flow.h2_exchange = ex
                     elif ":status" in names:
                         ex.status = names.get(":status")
                         ex.resp_headers = [(k, v) for k, v in pairs if not k.startswith(":")]
@@ -536,6 +770,13 @@ class Assembler:
                             ex.server_port = sport
                         if end:
                             ex.resp_end = True
+                        if ex.ws:
+                            flow = self._flow(("h2", stream, sid))
+                            flow.status = str(ex.status or "")
+                            flow.resp_headers = list(ex.resp_headers)
+                            flow.h2_exchange = ex
+                            if not flow.server_port:
+                                flow.server_port = ex.server_port
                     elif end and ex.ready_resp:
                         # trailers gRPC (HEADERS sans :status, END_STREAM)
                         ex.resp_end = True
@@ -553,7 +794,10 @@ class Assembler:
                     self.h2[key] = ex
                 src_id = f"{src}:{sport}"
                 is_req = (not ex.req_src) or src_id == ex.req_src
-                ex.store_h2_body(is_req, payload, kind)
+                if ex.ws and parse_ws_data:
+                    ex.store_ws_bytes(is_req, payload, kind)
+                elif not ex.ws:
+                    ex.store_h2_body(is_req, payload, kind)
                 if end:
                     if is_req:
                         ex.req_end = True
@@ -566,18 +810,51 @@ class Assembler:
                     self.h2[key] = ex
                 src_id = f"{src}:{sport}"
                 is_req = (not ex.req_src) or src_id == ex.req_src
-                ex.store_h2_body(is_req, payload, kind)
+                if ex.ws and parse_ws_data:
+                    ex.store_ws_bytes(is_req, payload, kind)
+                elif not ex.ws:
+                    ex.store_h2_body(is_req, payload, kind)
                 if end:
                     if is_req:
                         ex.req_end = True
                     else:
                         ex.resp_end = True
 
+    def _note_ws(self, layers, src, dst, sport, dport, stream):
+        if stream in self.exclude:
+            return
+        flow = self._flow_for_ws(stream, layers, dport)
+        frames = extract_ws_frames(layers)
+        if frames:
+            flow.saw_dissector = True
+            flow.frames.extend(frames)
+        if not flow.server_port:
+            # le port serveur est celui qui n'est pas éphémère quand on le connaît déjà ;
+            # à défaut, le dport de ce paquet (souvent le client). Le handshake l'écrase.
+            flow.server_port = dport
+
+    def _flow_for_ws(self, stream: str, layers, dport: str) -> WsFlow:
+        sids = []
+        for s in find_all(layers, "http2.streamid"):
+            sid = str(s)
+            if sid not in ("", "0"):
+                sids.append(sid)
+        if sids:
+            return self._flow(("h2", stream, sids[0]))
+        h2s = [k for k in self.flows if isinstance(k, tuple) and len(k) == 3 and k[0] == "h2" and k[1] == stream]
+        if len(h2s) == 1 and "http2" in layers:
+            return self._flow(h2s[0])
+        return self._flow(("h1", stream))
+
     def records(self):
         out = []
         seen_local = set()
 
         def consider(ex: Exchange, stream: str, h2: bool = False):
+            # Un Upgrade websocket n'est pas un échange unaire : les trames partent
+            # via _ws_records, y compris tant que le flux reste ouvert.
+            if ex.ws:
+                return
             # HTTP/2 : ne pas écrire tant que les DATA ne sont pas là. Un passage
             # --follow voyait les HEADERS (content-length déjà grand) et posait
             # resp_body null, puis le digest changeait ou le passage suivant
@@ -646,7 +923,144 @@ class Assembler:
                 consider(ex, stream, False)
         for (stream, _sid), ex in self.h2.items():
             consider(ex, stream, True)
+        out.extend(self._ws_records(seen_local))
         return out
+
+    def _ws_records(self, seen_local: set) -> list:
+        out = []
+        for key, flow in self.flows.items():
+            stream = key[1] if isinstance(key, tuple) and len(key) >= 2 else ""
+            sid = key[2] if isinstance(key, tuple) and len(key) == 3 else ""
+            if stream in self.exclude:
+                continue
+            if not flow.saw_dissector and flow.h2_exchange is not None:
+                self._frames_from_h2_bytes(flow)
+            if not flow.status and not flow.frames:
+                continue
+            if not self._ws_allowed(flow, stream):
+                continue
+            host, port, scheme = self._ws_endpoint(flow, stream)
+            path = flow.path or "/"
+            if path and not path.startswith("/"):
+                path = "/" + path
+            url = f"{scheme}://{host}:{port}{path}"
+            leg, hs_direction = self._ws_leg()
+            if flow.status or flow.req_headers:
+                rec = ws_frames.build_handshake_record(
+                    leg=leg, direction=hs_direction, host=host, path=path, url=url,
+                    status=flow.status or "101",
+                    req_headers=flow.req_headers, resp_headers=flow.resp_headers,
+                    http_method=flow.http_method or "GET",
+                )
+                digest = _ws_digest(["hs", stream, sid, path, rec["status"], flow.http_method or ""])
+                if digest not in seen_local:
+                    seen_local.add(digest)
+                    rec["_digest"] = digest
+                    out.append(rec)
+            for i, fr in enumerate(flow.frames):
+                built = self._frame_to_record(fr, leg, host, path, url, flow)
+                if built is None:
+                    continue
+                digest = _ws_digest([
+                    "fr", stream, sid, str(i), built.get("ws_opcode") or "",
+                    built.get("direction") or "",
+                    _payload_fp(built.get("req_body")),
+                    _payload_fp(built.get("resp_body")),
+                ])
+                if digest in seen_local:
+                    continue
+                seen_local.add(digest)
+                built["_digest"] = digest
+                out.append(built)
+        return out
+
+    def _frames_from_h2_bytes(self, flow: WsFlow) -> None:
+        """Repli : DATA HTTP/2 du CONNECT :protocol=websocket, sans couche websocket."""
+        ex = flow.h2_exchange
+        if ex is None or flow.saw_dissector:
+            return
+        for blob, masked in ((ex.ws_c2s, True), (ex.ws_s2c, False)):
+            if not blob:
+                continue
+            frames, _rest = ws_frames.parse_frames(blob)
+            reasm = ws_frames.Reassembler()
+            for fr in frames:
+                for msg in reasm.push(fr):
+                    flow.frames.append({
+                        "logical": msg,
+                        "masked": masked,
+                    })
+
+    def _ws_leg(self) -> tuple[str, str]:
+        if self.mode == "cdp":
+            return "host-cdp", "host->cdp"
+        return "host-backend", "host->backend"
+
+    def _ws_allowed(self, flow: WsFlow, stream: str) -> bool:
+        port = str(flow.server_port or "")
+        if ws_frames.port_excluded(port):
+            return False
+        if self.mode == "cdp":
+            if self.cdp_ports and port not in self.cdp_ports:
+                return False
+            return True
+        sni = self.sni.get(stream) or ""
+        authority = header_get(flow.req_headers, ":authority") or header_get(flow.req_headers, "host")
+        logical = sni or authority or flow.host
+        if not host_allowed(logical, self.allow_rx):
+            return False
+        host = bare_host(logical)
+        try:
+            pnum = int(port or "443")
+        except ValueError:
+            pnum = 443
+        return addon_log._direction(host, pnum) == "host->backend"
+
+    def _ws_endpoint(self, flow: WsFlow, stream: str) -> tuple[str, int, str]:
+        sni = self.sni.get(stream) or ""
+        authority = header_get(flow.req_headers, ":authority") or header_get(flow.req_headers, "host")
+        host = bare_host(sni or authority or flow.host or "127.0.0.1")
+        try:
+            port = int(flow.server_port or ("443" if self.mode == "tls" else "0"))
+        except ValueError:
+            port = 443 if self.mode == "tls" else 0
+        scheme = "ws" if self.mode == "cdp" else "wss"
+        return host, port, scheme
+
+    def _frame_to_record(self, fr: dict, leg: str, host: str, path: str, url: str, flow: WsFlow):
+        if "logical" in fr:
+            msg = fr["logical"]
+            masked = bool(fr.get("masked", msg.masked))
+            side = "request" if masked else "response"
+            name, payload = ws_frames.describe(msg, path, side)
+            client = masked
+            return ws_frames.build_frame_record(
+                leg=leg,
+                direction=self._frame_direction(client),
+                host=host, path=path, url=url, opcode_name=name, payload=payload,
+                client_to_server=client, req_headers=flow.req_headers,
+                resp_headers=flow.resp_headers, status=flow.status or "101",
+                masked=masked, fin=msg.fin, compressed=msg.compressed,
+            )
+        msg = _tshark_to_logical(fr)
+        if msg is None:
+            return None
+        masked = bool(fr.get("mask"))
+        side = "request" if masked else "response"
+        name, payload = ws_frames.describe(msg, path, side)
+        return ws_frames.build_frame_record(
+            leg=leg,
+            direction=self._frame_direction(masked),
+            host=host, path=path, url=url, opcode_name=name, payload=payload,
+            client_to_server=masked, req_headers=flow.req_headers,
+            resp_headers=flow.resp_headers, status=flow.status or "101",
+            masked=masked, fin=msg.fin, compressed=msg.compressed,
+        )
+
+    def _frame_direction(self, client_to_server: bool) -> str:
+        if self.mode == "cdp":
+            return "host->cdp" if client_to_server else "cdp->host"
+        return "host->backend" if client_to_server else "backend->host"
 
 
 def load_seen(path: str) -> set:
@@ -667,19 +1081,30 @@ def append_seen(path: str, digest: str) -> None:
         os.close(fd)
 
 
-def tshark_cmd(pcap: str, keylog: str, tls_ports: list[str], tshark: str) -> list[str]:
-    cmd = [
-        tshark, "-r", pcap, "-n",
+def tshark_cmd(pcap: str, keylog: str, tls_ports: list[str], tshark: str,
+               plaintext: bool = False, cdp_ports: list[str] | None = None) -> list[str]:
+    cmd = [tshark, "-r", pcap, "-n", "-o", "tcp.desegment_tcp_streams:TRUE"]
+    if plaintext:
+        # CDP loopback : HTTP en clair sur un port non standard. Sans -d, tshark
+        # ne voit pas l'Upgrade et ne dissèque pas les trames websocket.
+        cmd += [
+            "-T", "json",
+            "-Y", "http.request || http.response || http.upgrade || websocket",
+        ]
+        for port in cdp_ports or []:
+            if port and port.isdigit():
+                cmd.extend(["-d", f"tcp.port=={int(port)},http"])
+        return cmd
+    cmd += [
         "-o", f"tls.keylog_file:{keylog}",
         "-o", "http.decompress_body:FALSE",
-        "-o", "tcp.desegment_tcp_streams:TRUE",
         "-o", "tls.desegment_ssl_records:TRUE",
         "-o", "tls.desegment_ssl_application_data:TRUE",
         "-T", "json",
         "-Y",
         "tls.handshake.extensions_server_name || http.request || http.response "
         "|| http2.header.name || http2.data.data || http2.body.reassembled.data "
-        "|| http.file_data",
+        "|| http.file_data || websocket",
     ]
     for port in tls_ports:
         if port and port != "443" and port.isdigit():
@@ -707,9 +1132,9 @@ def _merge_json_pairs(pairs):
     return out
 
 
-def run_tshark(pcap: str, keylog: str, tls_ports: list[str], tshark: str):
-    import json
-    cmd = tshark_cmd(pcap, keylog, tls_ports, tshark)
+def run_tshark(pcap: str, keylog: str, tls_ports: list[str], tshark: str,
+               plaintext: bool = False, cdp_ports: list[str] | None = None):
+    cmd = tshark_cmd(pcap, keylog, tls_ports, tshark, plaintext=plaintext, cdp_ports=cdp_ports)
     proc = subprocess.run(cmd, capture_output=True)
     raw = proc.stdout.strip()
     if not raw:
@@ -726,17 +1151,22 @@ def run_tshark(pcap: str, keylog: str, tls_ports: list[str], tshark: str):
 
 
 def decode_once(pcap: str, keylog: str, seen_path: str, tls_ports: list[str],
-                allow_rx: re.Pattern, tunnel: str, tshark: str) -> int:
+                allow_rx: re.Pattern, tunnel: str, tshark: str, *,
+                plaintext: bool = False, cdp_ports: list[str] | None = None) -> int:
     if not os.path.isfile(pcap) or os.path.getsize(pcap) <= 24:
         return 0
-    if not os.path.isfile(keylog) or os.path.getsize(keylog) == 0:
+    if not plaintext and (not keylog or not os.path.isfile(keylog) or os.path.getsize(keylog) == 0):
         return 0
-    frames = run_tshark(pcap, keylog, tls_ports, tshark)
+    frames = run_tshark(pcap, keylog, tls_ports, tshark, plaintext=plaintext, cdp_ports=cdp_ports)
     if frames is None:
         print("decode_keylog: sortie tshark illisible, nouvel essai au passage suivant",
               file=sys.stderr)
         return 0
-    asm = Assembler(allow_rx, tunnel)
+    asm = Assembler(
+        allow_rx, tunnel,
+        mode="cdp" if plaintext else "tls",
+        cdp_ports=set(cdp_ports or []),
+    )
     for fr in frames:
         layers = (fr.get("_source") or {}).get("layers") or {}
         if isinstance(layers, dict):
@@ -754,10 +1184,109 @@ def decode_once(pcap: str, keylog: str, seen_path: str, tls_ports: list[str],
         n += 1
         print(
             f"journalisé leg={rec['leg']} host={rec['host']} "
-            f"http={rec['http_method']} path={rec['method']} status={rec['status']}",
+            f"http={rec['http_method']} path={rec['method']} status={rec['status']}"
+            + (f" proto={rec['protocol']}" if rec.get("protocol") else ""),
             file=sys.stderr,
         )
     return n
+
+
+def _split_ports(raw: str) -> list[str]:
+    return [x for x in re.split(r"[\s,]+", (raw or "").strip()) if x]
+
+
+# Ports vus sur cette box (DevTools). La découverte interroge aussi les
+# listeners loopback : un Chrome qui a bougé de port répond à /json/version.
+KNOWN_CDP_PORTS = (9229, 9257, 9302)
+
+# Adresses locales dans /proc/net/tcp (IPv4) et /proc/net/tcp6.
+_LOCAL_IP_HEX = {
+    "0100007F",  # 127.0.0.1
+    "00000000",  # 0.0.0.0
+    "00000000000000000000000001000000",  # ::1 (forme parfois observée)
+    "00000000000000000000000000000001",  # ::1
+    "00000000000000000000000000000000",  # ::
+}
+
+
+def parse_proc_net_listeners(text: str) -> list[int]:
+    """Ports en écoute (state 0A) sur loopback ou sur toutes les interfaces."""
+    ports = []
+    for line in text.splitlines()[1:]:
+        parts = line.split()
+        if len(parts) < 4:
+            continue
+        local, state = parts[1], parts[3]
+        if state.upper() != "0A":
+            continue
+        ip_hex, _, port_hex = local.partition(":")
+        if ip_hex not in _LOCAL_IP_HEX:
+            continue
+        try:
+            ports.append(int(port_hex, 16))
+        except ValueError:
+            continue
+    return ports
+
+
+def _probe_cdp(port: int) -> bool:
+    """Vrai si http://127.0.0.1:port/json/version expose webSocketDebuggerUrl."""
+    import urllib.request
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/json/version", timeout=0.25) as resp:
+            raw = resp.read(8192)
+        data = json.loads(raw.decode("utf-8", "replace"))
+    except Exception:
+        return False
+    return isinstance(data, dict) and bool(data.get("webSocketDebuggerUrl"))
+
+
+def discover_cdp_ports(explicit: list[str] | None = None) -> list[int]:
+    """Ports à capturer.
+
+    `CDP_PORTS` (explicit) est repris tel quel, moins 6080/6081 (noVNC).
+    Sans liste, on sonde les ports connus et les listeners loopback.
+    """
+    if explicit:
+        out = []
+        for item in explicit:
+            if not str(item).isdigit():
+                continue
+            n = int(item)
+            if n in ws_frames.EXCLUDED_PORTS:
+                continue
+            out.append(n)
+        return out
+    ordered: list[int] = []
+    seen: set[int] = set()
+
+    def add(n: int) -> None:
+        if n in seen or n in ws_frames.EXCLUDED_PORTS or not (0 < n < 65536):
+            return
+        seen.add(n)
+        ordered.append(n)
+
+    for n in KNOWN_CDP_PORTS:
+        add(n)
+    for path in ("/proc/net/tcp", "/proc/net/tcp6"):
+        try:
+            with open(path, encoding="utf-8", errors="replace") as fh:
+                for n in parse_proc_net_listeners(fh.read()):
+                    add(n)
+        except OSError:
+            pass
+    from concurrent.futures import ThreadPoolExecutor
+    hits: list[int] = []
+    sample = ordered[:80]
+    with ThreadPoolExecutor(max_workers=16) as pool:
+        futs = {pool.submit(_probe_cdp, n): n for n in sample}
+        for fut, n in futs.items():
+            try:
+                if fut.result():
+                    hits.append(n)
+            except Exception:
+                pass
+    return sorted(hits)
 
 
 def _stop_tcpdump(pidfile: str) -> None:
@@ -777,9 +1306,15 @@ def _stop_tcpdump(pidfile: str) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="Déchiffre un pcap TLS via keylog NSS et journalise (rédigé).")
-    p.add_argument("--pcap", required=True)
-    p.add_argument("--keylog", required=True)
-    p.add_argument("--seen", required=True)
+    p.add_argument("--pcap", default="")
+    p.add_argument("--keylog", default="", help="keylog NSS (inutile avec --plaintext)")
+    p.add_argument("--seen", default="")
+    p.add_argument("--plaintext", action="store_true",
+                   help="pcap en clair (CDP loopback) : pas de keylog, leg=host-cdp")
+    p.add_argument("--cdp-ports", default=os.environ.get("CDP_PORTS", ""),
+                   help="ports CDP à décoder comme HTTP (découverte : --discover-cdp)")
+    p.add_argument("--discover-cdp", action="store_true",
+                   help="écrit sur stdout les ports loopback qui répondent à /json/version")
     p.add_argument("--tls-ports", default="", help="ports supplémentaires décoder comme TLS (séparés par espace ou virgule)")
     p.add_argument("--follow", action="store_true")
     p.add_argument("--interval", type=float, default=1.0)
@@ -787,6 +1322,16 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--max-bytes", type=int, default=int(os.environ.get("HB_PCAP_MAX_BYTES", "67108864")))
     p.add_argument("--tcpdump-pidfile", default=os.environ.get("HB_TCPDUMP_PIDFILE", ""))
     args = p.parse_args(argv)
+
+    if args.discover_cdp:
+        explicit = _split_ports(os.environ.get("CDP_PORTS", ""))
+        found = discover_cdp_ports(explicit or None)
+        print(" ".join(str(p) for p in found))
+        return 0
+
+    if not args.pcap or not args.seen:
+        print("ERREUR: --pcap et --seen sont requis", file=sys.stderr)
+        return 2
 
     tshark = args.tshark
     if not os.path.isfile(tshark):
@@ -811,14 +1356,18 @@ def main(argv: list[str] | None = None) -> int:
         print(f"ERREUR: HB_ALLOW_HOSTS invalide: {e}", file=sys.stderr)
         return 2
     tunnel = os.environ.get("HB_TUNNEL_ADDR", "198.18.0.1")
-    ports = [x for x in re.split(r"[\s,]+", args.tls_ports.strip()) if x]
+    ports = _split_ports(args.tls_ports)
+    cdp_ports = [p for p in _split_ports(args.cdp_ports) if not ws_frames.port_excluded(p)]
     proxy._load_env_secrets()
 
     def once() -> int:
-        return decode_once(args.pcap, args.keylog, args.seen, ports, allow_rx, tunnel, tshark)
+        return decode_once(
+            args.pcap, args.keylog, args.seen, ports, allow_rx, tunnel, tshark,
+            plaintext=args.plaintext, cdp_ports=cdp_ports,
+        )
 
     if not args.follow:
-        if not os.path.isfile(args.keylog):
+        if not args.plaintext and not os.path.isfile(args.keylog):
             print(f"ERREUR: keylog absent: {args.keylog}", file=sys.stderr)
             return 3
         n = once()
