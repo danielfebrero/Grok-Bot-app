@@ -108,9 +108,9 @@ class RpcTrafficLogger:
             "status": str(resp.status_code),
             "duree_ms": dur,
             "req_headers": proxy.redact_headers(list(req.headers.items())),
-            "req_body": proxy.decode_body(req_body, req_ct, req_ce),
+            "req_body": proxy.decode_body(req_body, req_ct, req_ce, req.path, "request"),
             "resp_headers": proxy.redact_headers(list(resp.headers.items())),
-            "resp_body": proxy.decode_body(resp_body, resp_ct, resp_ce),
+            "resp_body": proxy.decode_body(resp_body, resp_ct, resp_ce, req.path, "response"),
         }
         proxy.write_traffic_record(rec, self.log_dir)
 
