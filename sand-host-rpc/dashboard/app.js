@@ -97,7 +97,10 @@ function drawRows(rows){
 }
 
 function openModal(r){
-  $("mTitle").textContent = `${r.http_method||""} ${r.method||""}  [${r.leg||"?"}] → ${r.status}`;
+  const op = r.ws_opcode ? " "+r.ws_opcode : "";
+  const proto = r.protocol ? " · "+r.protocol : "";
+  const extra = (r.ws_path && r.ws_path !== r.method) ? "  "+r.ws_path : "";
+  $("mTitle").textContent = `${r.http_method||""}${op} ${r.method||""}${extra}  [${r.leg||"?"}]${proto} → ${r.status}`;
   $("mReqH").textContent = JSON.stringify(r.req_headers||{},null,2);
   $("mReqB").textContent = r.req_body==null?"(vide)":(typeof r.req_body==="string"?r.req_body:JSON.stringify(r.req_body,null,2));
   $("mResH").textContent = JSON.stringify(r.resp_headers||{},null,2);

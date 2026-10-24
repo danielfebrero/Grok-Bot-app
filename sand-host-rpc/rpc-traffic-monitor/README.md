@@ -96,9 +96,15 @@ Les logs restent hors repo : `.gitignore` exclut `logs/`, `*.jsonl`.
   établie. HTTP/1.1 uniquement, `Connection: close` par échange.
 - Le décodage protobuf couvre les échanges **unaires**. Un flux
   `application/connect+proto` / gRPC est dé-tramé si l'enveloppe est complète ;
-  un stream qui ne se termine pas, et le WebSocket, restent hors périmètre.
+  un stream qui ne se termine pas reste hors périmètre.
   Sans entrée de catalogue pour le path, le corps est quand même parcouru
   (tags `_unknown_<n>`, pas de noms inventés).
+- **WebSocket** : `ws_frames.py` parse les trames (texte UTF-8/JSON, binaire
+  hex ou proto si le path est au catalogue, contrôle résumé) et réutilise la
+  même rédaction. Le relai agent↔host s'en sert après un `101`. La capture
+  CDP loopback et le tcp/443 passent par `live-intercept` (tshark). RSV /
+  permessage-deflate n'est pas décompressé. noVNC (6080/6081) et le tunnel
+  egress sont hors périmètre — détails dans `live-intercept/README.md` §13.
 - `mitmproxy/` nécessite la CA dans le trust store ; en **proxy explicite** il ne
   trace que les clients lancés avec `HTTPS_PROXY`. L'interception **transparente**
   (iptables) est documentée mais **non activée** (risque egress/pinning).

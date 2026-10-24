@@ -17,6 +17,10 @@ Le relai :
   * journalise CHAQUE échange (req+resp, corps complets) en JSONL via les helpers
     de rédaction/décodage/rotation DÉJÀ écrits dans rpc-traffic-monitor/proxy.py,
     leg="agent-host". Zéro secret/PII en clair.
+  * si la requête est un Upgrade: websocket et que l'upstream répond 101, le
+    relai cesse de parser du HTTP et fait suivre les octets tels quels, en
+    journalisant chaque trame (texte JSON, binaire hex ou proto, contrôle
+    résumé). permessage-deflate (RSV) n'est pas décompressé.
 
 Usage :
     python3 relay_agent_host.py --listen 1340 --upstream-port 1341 [--upstream-host 127.0.0.1]
@@ -30,8 +34,124 @@ _MONITOR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__
 if _MONITOR not in sys.path:
     sys.path.insert(0, _MONITOR)
 import proxy  # noqa: E402  (rpc-traffic-monitor/proxy.py)
+import ws_frames  # noqa: E402
 
 LEG = "agent-host"
+
+
+def _http_bytes(start: str, headers, body: bytes) -> bytes:
+    lines = [start]
+    for k, v in headers:
+        lines.append(f"{k}: {v}")
+    return ("\r\n".join(lines) + "\r\n\r\n").encode("latin1") + (body or b"")
+
+
+def _ws_url(path: str) -> str:
+    if not path.startswith("/"):
+        path = "/" + path
+    return "ws://127.0.0.1" + path
+
+
+async def _log_ws_side(reader, writer, *, client_to_server: bool, path: str,
+                       req_headers, resp_headers, log_dir) -> None:
+    """Fait suivre les octets sans les modifier et journalise les messages réassemblés."""
+    buf = b""
+    reasm = ws_frames.Reassembler()
+    side = "request" if client_to_server else "response"
+    direction = "agent->host" if client_to_server else "host->agent"
+    while True:
+        chunk = await reader.read(65536)
+        if not chunk:
+            return
+        writer.write(chunk)
+        try:
+            await writer.drain()
+        except Exception:
+            return
+        buf += chunk
+        try:
+            frames, buf = ws_frames.parse_frames(buf)
+        except Exception:
+            buf = b""
+            continue
+        if len(buf) > ws_frames.MAX_FRAME_BYTES:
+            buf = b""
+        for fr in frames:
+            for msg in reasm.push(fr):
+                name, payload = ws_frames.describe(msg, path, side)
+                rec = ws_frames.build_frame_record(
+                    leg=LEG, direction=direction, host="127.0.0.1", path=path,
+                    url=_ws_url(path), opcode_name=name, payload=payload,
+                    client_to_server=client_to_server, req_headers=req_headers,
+                    resp_headers=resp_headers, masked=msg.masked, fin=msg.fin,
+                    compressed=msg.compressed,
+                )
+                proxy.write_traffic_record(rec, log_dir)
+
+
+async def pump_websocket(creader, cwriter, ureader, uwriter, log_dir,
+                         method, path, req_headers, req_body) -> bool:
+    """Handshake Upgrade déjà lu. 101 → trames ; sinon on retombe sur un HTTP normal.
+
+    La connexion websocket ne revient pas au keep-alive HTTP : on renvoie False.
+    """
+    uwriter.write(_http_bytes(f"{method} {path} HTTP/1.1", req_headers, req_body))
+    await uwriter.drain()
+    rgot = await proxy.read_headers(ureader)
+    if not rgot:
+        return False
+    status_line, resp_headers = rgot
+    sp = status_line.split(" ")
+    status = sp[1] if len(sp) > 1 else "?"
+    if ws_frames.is_switching(status, resp_headers):
+        cwriter.write(_http_bytes(status_line, resp_headers, b""))
+        await cwriter.drain()
+        rec = ws_frames.build_handshake_record(
+            leg=LEG, direction="agent->host", host="127.0.0.1", path=path,
+            url=_ws_url(path), status=status, req_headers=req_headers,
+            resp_headers=resp_headers, http_method=method or "GET",
+        )
+        proxy.write_traffic_record(rec, log_dir)
+        await asyncio.gather(
+            _log_ws_side(creader, uwriter, client_to_server=True, path=path,
+                         req_headers=req_headers, resp_headers=resp_headers, log_dir=log_dir),
+            _log_ws_side(ureader, cwriter, client_to_server=False, path=path,
+                         req_headers=req_headers, resp_headers=resp_headers, log_dir=log_dir),
+            return_exceptions=True,
+        )
+        return False
+
+    resp_body = await proxy.read_body(ureader, resp_headers)
+    rhd = {k.lower(): v for k, v in resp_headers}
+    rout = [status_line]
+    for k, v in resp_headers:
+        if k.lower() in ("transfer-encoding", "connection"):
+            continue
+        rout.append(f"{k}: {v}")
+    rout.append("Connection: close")
+    if "content-length" not in rhd:
+        rout.append(f"Content-Length: {len(resp_body)}")
+    cwriter.write(("\r\n".join(rout) + "\r\n\r\n").encode("latin1") + resp_body)
+    await cwriter.drain()
+    hd = {k.lower(): v for k, v in req_headers}
+    rec = {
+        "ts": datetime.datetime.now().astimezone().isoformat(timespec="milliseconds"),
+        "leg": LEG,
+        "direction": "agent->host",
+        "host": "127.0.0.1",
+        "method": path,
+        "http_method": method,
+        "status": status,
+        "duree_ms": None,
+        "req_headers": proxy.redact_headers(req_headers),
+        "req_body": proxy.decode_body(req_body, hd.get("content-type", ""),
+                                      hd.get("content-encoding", ""), path, "request"),
+        "resp_headers": proxy.redact_headers(resp_headers),
+        "resp_body": proxy.decode_body(resp_body, rhd.get("content-type", ""),
+                                       rhd.get("content-encoding", ""), path, "response"),
+    }
+    proxy.write_traffic_record(rec, log_dir)
+    return False
 
 
 async def pump_one(creader, cwriter, ureader, uwriter, log_dir) -> bool:
@@ -46,6 +166,11 @@ async def pump_one(creader, cwriter, ureader, uwriter, log_dir) -> bool:
     method = parts[0] if parts else "?"
     path = parts[1] if len(parts) > 1 else "/"
     req_body = await proxy.read_body(creader, req_headers)
+    if ws_frames.is_client_upgrade(req_headers):
+        return await pump_websocket(
+            creader, cwriter, ureader, uwriter, log_dir,
+            method, path, req_headers, req_body,
+        )
     hd = {k.lower(): v for k, v in req_headers}
 
     # ré-émission vers l'upstream (host-main déplacé), en gardant la connexion.

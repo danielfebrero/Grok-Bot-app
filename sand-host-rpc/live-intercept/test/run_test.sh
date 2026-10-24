@@ -26,6 +26,10 @@ sleep 1
 echo "=============== B) patte host-backend (keylog NSS + tshark) ==============="
 bash "$HERE/test-host-backend.sh"
 
+echo "=============== B2) websocket (relai + CDP loopback) ==============="
+python3 "$HERE/test_ws_frames.py"
+bash "$HERE/test-cdp-ws.sh"
+
 echo "=============== C) revert.sh --dry-run (innocuité) ==============="
 bash "$LI/revert.sh" --dry-run 2>&1 | sed 's/^/   /' | head -20
 

@@ -164,6 +164,22 @@ HB_DISARM_FLAG="$STATE_DIR/HB_DISARM"
 HB_MITM_PIDFILE="$STATE_DIR/hb-mitm.pid"
 HB_CA_READY_FLAG="$STATE_DIR/hb_ca_ready"
 
+# ---- CDP loopback (Chrome DevTools, ws:// en clair) -------------------------
+# host-main fait `new WebSocket(webSocketDebuggerUrl)` vers
+# ws://127.0.0.1:<cdpPort>/devtools/browser/<id> et /devtools/page/<targetId>.
+# Ports observés sur cette box : 9229, 9257, 9302. Découverte : GET /json/version
+# (champ webSocketDebuggerUrl) et /json/list. Ce n'est PAS du tcp/443.
+# noVNC / websockify (6080, 6081) et le tunnel egress 198.18.0.1 restent dehors.
+CDP_IFACE="${CDP_IFACE:-lo}"
+CDP_PCAP="${CDP_PCAP:-$STATE_DIR/cdp-capture.pcap}"
+CDP_PCAP_MAX_BYTES="${CDP_PCAP_MAX_BYTES:-$HB_PCAP_MAX_BYTES}"
+CDP_DECODE_INTERVAL="${CDP_DECODE_INTERVAL:-1}"
+CDP_TCPDUMP_PIDFILE="$STATE_DIR/cdp-tcpdump.pid"
+CDP_DECODE_PIDFILE="$STATE_DIR/cdp-decode.pid"
+CDP_CAPTURE_OUT="$STATE_DIR/cdp-capture.out"
+CDP_CAPTURE_READY="$STATE_DIR/cdp-capture.ready"
+CDP_SEEN_FILE="$STATE_DIR/cdp-decode.seen"
+
 # gid primaire de l'uid host-main (pour chown du keylog, que node puisse écrire)
 hb_host_gid() {
   id -g "$HB_UID" 2>/dev/null || echo "$HB_UID"
@@ -287,6 +303,38 @@ hb_stop_pids() {
     fi
   fi
   rm -f "$HB_TCPDUMP_PIDFILE" "$HB_DECODE_PIDFILE" "$HB_CAPTURE_READY"
+}
+
+# Arrête la capture CDP (tcpdump puis décodeur). Ne shred pas le pcap : l'appelant
+# le fait après la passe finale. Ne touche ni host-main, ni nft, ni le keylog 443.
+cdp_stop_pids() {
+  local pf p i
+  for pf in "$CDP_TCPDUMP_PIDFILE" "$CDP_DECODE_PIDFILE"; do
+    [ -f "$pf" ] || continue
+    p="$(cat "$pf" 2>/dev/null || true)"
+    if hb_pid_live "${p:-}"; then
+      slog "cdp: SIGTERM pid $p ($pf)"
+      kill -TERM "$p" 2>/dev/null || true
+    fi
+    if [ "$pf" = "$CDP_TCPDUMP_PIDFILE" ]; then
+      for i in $(seq 1 25); do
+        hb_pid_live "${p:-}" || break
+        sleep 0.2
+      done
+    fi
+  done
+  if [ -f "$CDP_DECODE_PIDFILE" ]; then
+    p="$(cat "$CDP_DECODE_PIDFILE" 2>/dev/null || true)"
+    for i in $(seq 1 40); do
+      hb_pid_live "${p:-}" || break
+      sleep 0.2
+    done
+    if hb_pid_live "${p:-}"; then
+      slog "cdp: décodeur $p encore vivant, SIGKILL"
+      kill -KILL "$p" 2>/dev/null || true
+    fi
+  fi
+  rm -f "$CDP_TCPDUMP_PIDFILE" "$CDP_DECODE_PIDFILE" "$CDP_CAPTURE_READY"
 }
 
 hb_kill_legacy_mitm() {
