@@ -9,6 +9,12 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-24 18:44 (Paris) — snapshot `2026-10-24_17-47` → `2026-10-24_18-44`
+
+**Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `35aaf402a3611d873755a963d906dcca0d685d19` → `24854d212a9e215aba99c6d69c7c80d3114ac660` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`). Binaire `cursor-agent-store-fuse` inchangé (9504880 o, même sha256 `5c3513e4…`). Image `fcbae14`, box-scripts `fcbae14`, sand-host `ef8271b` (supervisor `upgrade-ef8271b`), exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~1.
+
+Rapport : [reports/2026-10-24_18-44.md](reports/2026-10-24_18-44.md).
+
 ## 2026-10-24 17:47 (Paris) — snapshot `2026-10-24_13-53` → `2026-10-24_17-47`
 
 **Hot-update du host bundle (sand-host) `ab3b435` → `ef8271b`** (supervisor `upgrade-ab3b435` → `upgrade-ef8271b`, `pendingUpgradeVersion` = None) : remplacement à chaud du `sand-host` par le sand-supervisor, sans Update de l'ordinateur. Toutes les autres versions plateforme sont inchangées : image `fcbae14`, box-scripts `fcbae14`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, **agent-store-fuse `35aaf402` inchangé**, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7. Fichiers : +0 / −0 / ~8.
