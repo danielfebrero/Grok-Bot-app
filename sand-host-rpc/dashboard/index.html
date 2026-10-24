@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RPC Traffic — Dashboard temps réel</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>Trafic RPC host · <span class="live" id="liveDot">●</span> temps réel</h1>
+  <div class="meta">
+    <label>Fenêtre
+      <select id="days">
+        <option value="1">aujourd'hui</option>
+        <option value="2">2 j</option>
+        <option value="7">7 j</option>
+        <option value="14">14 j</option>
+      </select>
+    </label>
+    <span id="gen"></span>
+    <span id="logdir" class="dim"></span>
+  </div>
+</header>
+
+<section class="cards">
+  <div class="card"><div class="k">Total échanges</div><div class="v" id="cTotal">–</div></div>
+  <div class="card"><div class="k">Échanges / min</div><div class="v" id="cRate">–</div></div>
+  <div class="card"><div class="k">Latence p95</div><div class="v" id="cP95">–</div><div class="sub" id="cLat">p50 · max</div></div>
+  <div class="card"><div class="k">Taux d'erreur</div><div class="v" id="cErr">–</div><div class="sub" id="cErrN"></div></div>
+</section>
+
+<section class="grid2">
+  <div class="panel">
+    <h2>Débit (échanges / minute)</h2>
+    <canvas id="timeline" width="760" height="200"></canvas>
+  </div>
+  <div class="panel">
+    <h2>Pattes (leg)</h2>
+    <canvas id="legs" width="360" height="200"></canvas>
+    <div id="legLegend" class="legend"></div>
+  </div>
+</section>
+
+<section class="grid2">
+  <div class="panel">
+    <h2>Top méthodes / paths RPC</h2>
+    <div id="methods" class="bars"></div>
+  </div>
+  <div class="panel">
+    <h2>Distribution des status HTTP</h2>
+    <div id="statuses" class="bars"></div>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Derniers échanges</h2>
+  <table id="tbl">
+    <thead><tr><th>Heure</th><th>Leg</th><th>Méthode / path</th><th>HTTP</th><th>Status</th><th>Durée</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+</section>
+
+<div id="modal" class="modal hidden">
+  <div class="modal-box">
+    <button id="modalClose" class="close">×</button>
+    <h3 id="mTitle"></h3>
+    <h4>Requête — headers</h4><pre id="mReqH"></pre>
+    <h4>Requête — corps (tronqué)</h4><pre id="mReqB"></pre>
+    <h4>Réponse — headers</h4><pre id="mResH"></pre>
+    <h4>Réponse — corps (tronqué)</h4><pre id="mResB"></pre>
+  </div>
+</div>
+
+<footer>Lecture seule des logs rédactés · rafraîchi toutes les 2 s · 100% stdlib / vanilla</footer>
+<script src="app.js"></script>
+</body>
+</html>
