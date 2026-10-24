@@ -1,0 +1,510 @@
+/**
+ * ElectraVolt - "Powering the Future of Electric Energy" template (20 slides, 16:9).
+ * Rebuilt with pptxgenjs only. Run: node <this file>
+ */
+'use strict';
+
+const pptxgen = require('pptxgenjs');
+const path = require('path');
+
+// ---------------------------------------------------------------- theme ----
+const SLIDE_W = 13.3333333;
+const SLIDE_H = 7.5;
+
+const C = {
+  blue: '0B1FBE',        // accent1 - gradient start (dark)
+  blueLt: '2F47F2',      // accent2 - gradient end (light)
+  yellow: 'FAC736',      // accent3
+  amber: 'F6AF2E',       // accent4
+  white: 'FFFFFF',
+  black: '000000',
+  gray: '404040',        // tx1 lum 75%
+  grayMid: '808080',     // tx1 lum 50%
+  ring: 'D9D9D9'         // bg1 lum 85% - decorative circles
+};
+
+const HEAD = 'Montserrat';   // +mj-lt
+const BODY = 'Open Sans';    // +mn-lt
+
+// Soft drop shadows used by the cards (fresh object per call - pptxgenjs
+// keeps a reference to the options object it is handed).
+function shadow(blur, opacity, offset, angle) {
+  return { type: 'outer', color: '000000', opacity: opacity, blur: blur, offset: offset, angle: angle };
+}
+const cardShadow = function () { return shadow(23, 0.14, 3, 45); };
+const softShadow = function () { return shadow(69, 0.10, 3, 90); };
+const calloutShadow = function () { return shadow(33, 0.10, 16, 45); };
+
+// ------------------------------------------------------------- helpers -----
+function rect(slide, o) {
+  slide.addShape('rect', Object.assign({ line: { type: 'none' } }, o));
+}
+
+function mix(from, to, t) {
+  const hex = (s, i) => parseInt(s.substr(i * 2, 2), 16);
+  let out = '';
+  for (let i = 0; i < 3; i++) {
+    const v = Math.round(hex(from, i) + (hex(to, i) - hex(from, i)) * t);
+    out += v.toString(16).toUpperCase().padStart(2, '0');
+  }
+  return out;
+}
+
+/**
+ * pptxgenjs has no gradient fill, so linear gradients are painted as a grid of
+ * solid tiles. `angle` follows OOXML `lin ang` (degrees clockwise from east);
+ * the pos-0 colour sits at the far end of that direction. Tile counts are
+ * chosen so that neighbouring tiles differ by ~2/255 per channel.
+ */
+function gradRect(slide, o) {
+  const from = o.from || C.blue;
+  const to = o.to || C.blueLt;
+  const rad = ((o.angle === undefined ? 225 : o.angle) * Math.PI) / 180;
+  const ux = Math.cos(rad);
+  const uy = Math.sin(rad);
+  const span = Math.abs(ux) * o.w + Math.abs(uy) * o.h;
+  let range = 0;
+  for (let ch = 0; ch < 3; ch++) {
+    range = Math.max(range, Math.abs(parseInt(from.substr(ch * 2, 2), 16) - parseInt(to.substr(ch * 2, 2), 16)));
+  }
+  const steps = Math.max(2, Math.round(range / 2));
+  const nx = Math.max(1, Math.round((steps * Math.abs(ux) * o.w) / span));
+  const ny = Math.max(1, Math.round((steps * Math.abs(uy) * o.h) / span));
+  const tw = o.w / nx;
+  const th = o.h / ny;
+  if (o.shadow) rect(slide, { x: o.x, y: o.y, w: o.w, h: o.h, fill: { color: mix(from, to, 0.5) }, shadow: o.shadow });
+  for (let ix = 0; ix < nx; ix++) {
+    for (let iy = 0; iy < ny; iy++) {
+      const dx = (ix + 0.5) * tw - o.w / 2;
+      const dy = (iy + 0.5) * th - o.h / 2;
+      const t = (dx * ux + dy * uy + span / 2) / span;
+      rect(slide, {
+        x: o.x + ix * tw, y: o.y + iy * th, w: tw + 0.012, h: th + 0.012,
+        fill: { color: mix(from, to, t) }
+      });
+    }
+  }
+}
+
+function txt(slide, text, o) {
+  slide.addText(text, Object.assign({
+    fontFace: BODY, fontSize: 18, color: C.black,
+    valign: 'top', align: 'left', fit: 'resize'
+  }, o));
+}
+
+// Several boxes hold consecutive paragraphs that share one set of styles.
+function paras(lines) {
+  return lines.map((t, i) => ({ text: t, options: { breakLine: i < lines.length - 1 } }));
+}
+
+// Four concentric outlined circles bleeding off-canvas; (gx, gy) is the group origin.
+const RINGS = [[3.425, 2.375, 7.613], [1.233, 0.266, 10.457], [0, 0, 13.453], [3.984, 3.017, 4.953]];
+function rings(slide, gx, gy) {
+  RINGS.forEach(function (r) {
+    slide.addShape('ellipse', {
+      x: gx + r[0], y: gy + r[1], w: r[2], h: r[2],
+      fill: { type: 'none' },
+      line: { color: C.ring, width: 0.5, transparency: 30 }
+    });
+  });
+}
+
+/**
+ * The source deck draws its pictograms as vector freeforms, so each one is
+ * rebuilt here from native shapes. Parts are [shape, dx, dy, dw, dh, rotate]
+ * in unit-box coordinates, scaled into whatever box the caller asks for.
+ */
+const GLYPHS = {
+  bolt: [['lightningBolt', 0.16, 0.00, 0.68, 1.00]],
+  bulb: [['ellipse', 0.20, 0.02, 0.60, 0.66], ['rect', 0.36, 0.62, 0.28, 0.20], ['rect', 0.40, 0.82, 0.20, 0.16]],
+  hand: [['lightningBolt', 0.42, 0.00, 0.24, 0.52], ['pieWedge', 0.00, 0.54, 1.00, 0.42, 180]],
+  flask: [['triangle', 0.10, 0.24, 0.80, 0.76], ['rect', 0.41, 0.00, 0.18, 0.28]],
+  sun: [['sun', 0.32, 0.00, 0.60, 0.60], ['pieWedge', 0.00, 0.56, 0.80, 0.40, 180]],
+  turbine: [['rect', 0.45, 0.36, 0.10, 0.64], ['triangle', 0.41, 0.00, 0.18, 0.40],
+            ['triangle', 0.00, 0.28, 0.18, 0.40, 120], ['triangle', 0.82, 0.28, 0.18, 0.40, 240]],
+  recycle: [['triangle', 0.31, 0.00, 0.38, 0.42], ['triangle', 0.00, 0.54, 0.38, 0.42, 120],
+            ['triangle', 0.62, 0.54, 0.38, 0.42, 240]]
+};
+
+function icon(slide, x, y, w, h, color, glyph) {
+  GLYPHS[glyph || 'bolt'].forEach(function (g) {
+    slide.addShape(g[0], {
+      x: x + g[1] * w, y: y + g[2] * h, w: g[3] * w, h: g[4] * h,
+      rotate: g[5], fill: { color: color }, line: { type: 'none' }
+    });
+  });
+}
+
+// Yellow square tile with a glyph inside it.
+function iconTile(slide, x, y, size, glyph, tile) {
+  rect(slide, { x: x, y: y, w: size, h: size, fill: { color: tile || C.yellow } });
+  icon(slide, x + size * 0.21, y + size * 0.20, size * 0.58, size * 0.6, C.blue, glyph);
+}
+
+// Repeated "icon + bold heading + grey paragraph" row; (x, y) is the tile corner.
+function featureRow(slide, x, y, glyph, heading, body) {
+  iconTile(slide, x, y, 0.449, glyph);
+  txt(slide, heading, { x: x + 0.722, y: y - 0.078, w: 4.811, h: 0.346, fontSize: 14, bold: true, lineSpacingMultiple: 1.1 });
+  txt(slide, body, { x: x + 0.722, y: y + 0.212, w: 4.851, h: 0.626, fontSize: 12, color: C.gray, lineSpacingMultiple: 1.3, isTextBox: true });
+}
+
+function footer(slide, num, color) {
+  txt(slide, [
+    { text: 'Electra Volt ', options: { bold: true } },
+    { text: '\u2013 presentation template', options: { bold: false } }
+  ], {
+    x: 0.4196, y: 6.9801, w: 3.3652, h: 0.2693,
+    fontFace: HEAD, fontSize: 10, charSpacing: 0, color: color || C.gray, isTextBox: true
+  });
+  txt(slide, String(num), {
+    x: 12.1202, y: 6.9633, w: 0.5627, h: 0.2861,
+    fontFace: HEAD, fontSize: 10.5, align: 'right', color: C.gray, isTextBox: true
+  });
+}
+
+// --------------------------------------------------------------- copy ------
+const LOREM_ROW = 'Lorem ipsum dolor sit consectetur adipiscing elit. Aenean ondimentum justo at noi suscipit quam consectetur..';
+const ROW_HEAD = 'Maecenas suscipit quam in quam lacina';
+const CARD_LOREM = 'Lorem ipsum dolor sit amet, cons adipiscing elit. Sed iaculis mattis augue let. Hendreritai augue semper.';
+const CHALLENGE_LOREM = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam eget augue arcu. Nullam mattis tincidunt turpis. consectetur adipiscing elit. Nam eget augue arcu. Nullam mattis tincidunt.';
+
+// -------------------------------------------------------------- slides -----
+const build = [];
+
+// 1 - title / logo lockup
+build.push(function (s) {
+  rings(s, 0.170, -2.893);
+  rect(s, { x: 0, y: 1.285, w: 0.159, h: 6.215, fill: { color: C.yellow } });
+  rect(s, { x: 5.339, y: 2.543, w: 6.994, h: 2.414, fill: { color: C.white }, shadow: cardShadow() });
+  txt(s, 'ElectraVolt ', { x: 6.492, y: 3.027, w: 5.440, h: 1.111, fontFace: HEAD, fontSize: 60, bold: true });
+  txt(s, 'Powering the Future of Electric Energy', { x: 6.578, y: 4.063, w: 4.669, h: 0.404, color: C.grayMid, wrap: false });
+  gradRect(s, { x: 4.674, y: 3.085, w: 1.331, h: 1.331, angle: 225 });
+  icon(s, 4.845, 3.264, 1.001, 1.001, C.yellow, 'bolt');
+  gradRect(s, { x: 0, y: 0, w: 0.159, h: 1.285, angle: 270 });
+});
+
+// 2 - Introduction
+build.push(function (s) {
+  rings(s, -0.120, -2.893);
+  gradRect(s, { x: 1.296, y: 3.990, w: 12.038, h: 2.667, angle: 225 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque pellentesque lacus risus, lacinia sollicitudin enim ultrices vitae. Fusce hendrerit nibh quis neque consectetur, ac hendrerit ante laoreet. Phasellus eget nisl aliquet, varius ligula ut, interdum erat. Praesent pellentesque mi ut pretium fermentum.',
+    { x: 1.991, y: 5.322, w: 10.195, h: 0.866, fontSize: 12, color: C.white, lineSpacingMultiple: 1.3, isTextBox: true });
+  txt(s, 'Introduction', { x: 1.991, y: 4.333, w: 5.196, h: 1.010, fontFace: HEAD, fontSize: 54, bold: true, color: C.white, wrap: false, isTextBox: true });
+  rect(s, { x: 1.000, y: 3.990, w: 0.296, h: 2.667, fill: { color: C.yellow } });
+  footer(s, 2);
+});
+
+// 3 - Presentation Outline
+build.push(function (s) {
+  rings(s, 0.755, -3.435);
+  gradRect(s, { x: 0, y: 0, w: 3.740, h: 7.5, angle: 225 });
+  rect(s, { x: 1.000, y: 1.000, w: 0.259, h: 5.5, fill: { color: C.yellow } });
+  txt(s, paras([
+    'Lorem ipsum dolor sit amet quisque.',
+    'Consectetur sit dolor adipiscing elit. ',
+    'Quisque pellentesque lacus risus',
+    'Olacinia sollicitudin enim ultrices vitae. '
+  ]), { x: 6.967, y: 3.454, w: 4.073, h: 2.652, fontSize: 14, color: C.gray, lineSpacingMultiple: 1.1, paraSpaceAfter: 36, isTextBox: true });
+  txt(s, 'Presentation Outline', { x: 6.333, y: 1.427, w: 5.342, h: 1.737, fontFace: HEAD, fontSize: 54, bold: true, lineSpacingMultiple: 0.9, isTextBox: true });
+  // timeline: outlined squares joined by short connectors, one of them highlighted
+  [3.480, 4.237, 4.994, 5.752].forEach(function (y, i) {
+    if (i === 1) gradRect(s, { x: 6.511, y: y + 0.048, w: 0.207, h: 0.207, angle: 270 });
+    else rect(s, { x: 6.511, y: y + 0.048, w: 0.207, h: 0.207, fill: { color: C.yellow } });
+    rect(s, { x: 6.463, y: y, w: 0.302, h: 0.302, fill: { type: 'none' }, line: { color: C.ring, width: 1 } });
+    if (i < 3) s.addShape('line', { x: 6.614, y: y + 0.302, w: 0, h: 0.455, line: { color: C.ring, width: 1 } });
+  });
+  footer(s, 3, C.white);
+});
+
+// 4 - The Lifeblood Modern World
+build.push(function (s) {
+  rings(s, -0.328, -2.893);
+  txt(s, 'The Lifeblood Modern World', { x: 0.841, y: 4.304, w: 6.045, h: 1.737, fontFace: HEAD, fontSize: 54, bold: true, lineSpacingMultiple: 0.9 });
+  gradRect(s, { x: 7.395, y: 4.113, w: 4.938, h: 1.930, angle: 225 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipisc elit. Aenondimentum justo at suscipit consectet Cras porta a nibh  lacini vivamus ate. ',
+    { x: 7.787, y: 4.874, w: 4.112, h: 0.889, fontSize: 12, color: C.white, lineSpacingMultiple: 1.3, paraSpaceAfter: 12, isTextBox: true });
+  icon(s, 7.908, 4.453, 0.342, 0.320, C.yellow, 'hand');
+  txt(s, 'Maecenas suscipit quam in quam lacina consectetur facilisis varius.',
+    { x: 0.904, y: 1.955, w: 3.740, h: 0.619, fontSize: 14, bold: true, lineSpacingMultiple: 1.1 });
+  txt(s, 'Lorem ipsum dolor sit consectetur adipiscing elit. Aenean ondimentum justo at noi suscipit quam consectetur. Cras porta a nibh quis lacini justo at ondimentum suscipit vivam.',
+    { x: 0.873, y: 2.612, w: 3.771, h: 1.151, fontSize: 12, color: C.gray, lineSpacingMultiple: 1.3, isTextBox: true });
+  iconTile(s, 1.000, 1.373, 0.449, 'bulb');
+  rect(s, { x: 5.203, y: 1.373, w: 0.151, h: 2.390, fill: { color: C.yellow } });
+  footer(s, 4);
+});
+
+// 5 - The Traditional Powerhouses of Electricity
+build.push(function (s) {
+  rings(s, -4.208, -3.497);
+  txt(s, 'The Traditional Powerhouses of Electricity', { x: 6.151, y: 1.195, w: 6.146, h: 2.555, fontFace: HEAD, fontSize: 54, bold: true, lineSpacingMultiple: 0.9 });
+  txt(s, paras(['Maecenas suscipit quam in quam lacina consectetur facilisis varius porta a nibh quis lacini justo at ondimentum vivam.', '.']),
+    { x: 6.171, y: 4.784, w: 6.126, h: 0.878, fontSize: 14, bold: true, lineSpacingMultiple: 1.1 });
+  txt(s, 'Lorem ipsum dolor sit consectetur adipiscing elit. Aenean ondimentum justo at noi suscipit quam consectetur. Cras porta a nibh quis lacini ondimentum suscipit vivam. Maecenas suscipit quam in quam lacina consectetur facilis.',
+    { x: 6.156, y: 5.441, w: 6.177, h: 0.889, fontSize: 12, color: C.gray, lineSpacingMultiple: 1.3, isTextBox: true });
+  iconTile(s, 6.308, 4.069, 0.449, 'bulb');
+  gradRect(s, { x: 1.080, y: 1.000, w: 0.178, h: 5.450, angle: 225 });
+  footer(s, 5);
+});
+
+// 6 - What is Electric Energy
+build.push(function (s) {
+  rings(s, -0.328, -2.893);
+  txt(s, 'What is Electric Energy', { x: 0.854, y: 3.713, w: 9.521, h: 0.919, fontFace: HEAD, fontSize: 54, bold: true, lineSpacingMultiple: 0.9 });
+  txt(s, paras([
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero.',
+    'Sit amet commodo magna eros quis urna. Nunc viverra imperdiet enim. Fusce vivamus a tellus. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Proin pharetra nonummy pede consectetuer purus adipiscing elit. '
+  ]), { x: 4.901, y: 4.917, w: 7.042, h: 1.582, fontSize: 12, color: C.gray, lineSpacingMultiple: 1.3, paraSpaceAfter: 12, isTextBox: true });
+  gradRect(s, { x: 1.047, y: 4.854, w: 3.427, h: 1.645, angle: 225 });
+  txt(s, '+750M', { x: 1.323, y: 5.138, w: 2.875, h: 0.919, fontFace: HEAD, fontSize: 54, bold: true, color: C.yellow, lineSpacingMultiple: 0.9 });
+  txt(s, 'Add Text Here', { x: 2.026, y: 5.922, w: 1.469, h: 0.371, fontSize: 12, color: C.white, lineSpacingMultiple: 1.3, paraSpaceAfter: 12, isTextBox: true });
+  rect(s, { x: 0, y: 3.079, w: 13.333, h: 0.146, fill: { color: C.yellow } });
+  footer(s, 6);
+});
+
+// 7 - How Electricity Works
+build.push(function (s) {
+  rings(s, -0.599, -2.893);
+  gradRect(s, { x: 2.296, y: 4.974, w: 11.038, h: 1.526, angle: 225 });
+  rect(s, { x: 2.000, y: 4.974, w: 0.296, h: 1.526, fill: { color: C.yellow } });
+  txt(s, 'How Electricity Works', { x: 3.047, y: 5.278, w: 9.000, h: 0.919, fontFace: HEAD, fontSize: 54, bold: true, color: C.white, lineSpacingMultiple: 0.9 });
+  [[1.237, 'bulb'], [3.018, 'hand']].forEach(function (row) {
+    const ty = row[0];
+    iconTile(s, 7.323, ty, 0.449, row[1]);
+    txt(s, ROW_HEAD, { x: 7.227, y: ty + 0.565, w: 4.811, h: 0.346, fontSize: 14, bold: true, lineSpacingMultiple: 1.1 });
+    txt(s, LOREM_ROW, { x: 7.227, y: ty + 0.856, w: 4.851, h: 0.626, fontSize: 12, color: C.gray, lineSpacingMultiple: 1.3, isTextBox: true });
+  });
+  footer(s, 7);
+});
+
+// 8 - Main Types of Electrical Current
+build.push(function (s) {
+  rings(s, -0.599, -2.893);
+  rect(s, { x: 6.658, y: 1.000, w: 0.151, h: 5.5, fill: { color: C.yellow } });
+  txt(s, 'Main Types of Electrical Current', { x: 1.000, y: 1.000, w: 5.367, h: 2.555, fontFace: HEAD, fontSize: 54, bold: true, lineSpacingMultiple: 0.9 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetuer adipisc. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet common.',
+    { x: 1.088, y: 3.649, w: 5.023, h: 0.889, fontSize: 12, color: C.gray, lineSpacingMultiple: 1.3, paraSpaceAfter: 12 });
+  const CARD_TEXT = 'Lorem ipsum dolor sit ol consectetur adipisc elit. Aenondime acini vivamus.';
+  gradRect(s, { x: 1.173, y: 4.842, w: 3.674, h: 1.470, angle: 225, shadow: cardShadow() });
+  txt(s, CARD_TEXT, { x: 1.398, y: 5.512, w: 3.227, h: 0.626, fontSize: 12, color: C.white, lineSpacingMultiple: 1.3, paraSpaceAfter: 12, isTextBox: true });
+  icon(s, 1.519, 5.107, 0.342, 0.320, C.yellow, 'hand');
+  txt(s, 'Add Subtitle', { x: 1.902, y: 5.049, w: 1.479, h: 0.381, fontSize: 14, bold: true, color: C.white, lineSpacingMultiple: 1.3, paraSpaceAfter: 12, isTextBox: true });
+  rect(s, { x: 5.189, y: 4.842, w: 3.674, h: 1.470, fill: { color: C.white }, shadow: cardShadow() });
+  txt(s, CARD_TEXT, { x: 5.413, y: 5.512, w: 3.227, h: 0.626, fontSize: 12, color: C.gray, lineSpacingMultiple: 1.3, paraSpaceAfter: 12, isTextBox: true });
+  icon(s, 5.445, 5.133, 0.260, 0.269, C.blue, 'bulb');
+  txt(s, 'Add Subtitle', { x: 5.747, y: 5.064, w: 1.479, h: 0.381, fontSize: 14, bold: true, color: C.gray, lineSpacingMultiple: 1.3, paraSpaceAfter: 12, isTextBox: true });
+  footer(s, 8);
+});
+
+// 9 - Sources of Electric Energy
+build.push(function (s) {
+  rings(s, -3.620, -1.819);
+  txt(s, 'Sources of Electric Energy', { x: 0.957, y: 0.915, w: 6.505, h: 1.737, fontFace: HEAD, fontSize: 54, bold: true, lineSpacingMultiple: 0.9 });
+  [[3.103, 'hand'], [4.382, 'flask'], [5.661, 'bulb']].forEach(function (r) { featureRow(s, 1.133, r[0], r[1], ROW_HEAD, LOREM_ROW); });
+  gradRect(s, { x: 8.230, y: 0, w: 0.178, h: 7.5, angle: 225 });
+  footer(s, 9);
+});
+
+// 10 - Power from the Breeze
+build.push(function (s) {
+  rings(s, 0, -2.976);
+  txt(s, 'Power from the Breeze', { x: 1.000, y: 4.534, w: 5.354, h: 1.737, fontFace: HEAD, fontSize: 54, bold: true, lineSpacingMultiple: 0.9 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed ultricies, purus lectus malesuada libero. Sit amet commodo magna eros quis urna.',
+    { x: 6.875, y: 5.222, w: 5.458, h: 0.889, fontSize: 12, color: C.gray, lineSpacingMultiple: 1.3, paraSpaceAfter: 12, isTextBox: true });
+  iconTile(s, 6.979, 4.647, 0.449, 'bulb');
+  gradRect(s, { x: 9.182, y: 1.708, w: 3.151, h: 1.645, angle: 225 });
+  txt(s, '+2500', { x: 9.320, y: 1.992, w: 2.875, h: 0.919, fontFace: HEAD, fontSize: 54, bold: true, color: C.yellow, align: 'center', lineSpacingMultiple: 0.9 });
+  txt(s, 'Add Text Here', { x: 10.023, y: 2.776, w: 1.469, h: 0.371, fontSize: 12, color: C.white, lineSpacingMultiple: 1.3, paraSpaceAfter: 12, isTextBox: true });
+  footer(s, 10);
+});
+
+// 11 - The Digital Transformation of Electricity
+build.push(function (s) {
+  rings(s, 0.447, -2.765);
+  txt(s, 'The Digital Transformation of Electricity', { x: 6.186, y: 1.204, w: 6.349, h: 2.555, fontFace: HEAD, fontSize: 54, bold: true, lineSpacingMultiple: 0.9 });
+  gradRect(s, { x: 6.836, y: 3.962, w: 5.698, h: 2.538, angle: 225 });
+  txt(s, '$2500', { x: 0.917, y: 4.838, w: 2.613, h: 0.919, fontFace: HEAD, fontSize: 54, bold: true, color: C.blue, lineSpacingMultiple: 0.9 });
+  txt(s, 'Add Text Here', { x: 0.964, y: 4.390, w: 1.600, h: 0.341, fontSize: 12, bold: true, color: C.gray, lineSpacingMultiple: 1.3, paraSpaceAfter: 12, isTextBox: true });
+  txt(s, 'Lorem ipsum dolor sit amet. ', { x: 0.964, y: 5.714, w: 2.939, h: 0.341, fontSize: 12, color: C.gray, lineSpacingMultiple: 1.3, paraSpaceAfter: 12, isTextBox: true });
+  txt(s, 'Lorem ipsum dolor sit amet, cons adipiscing elit. Phasellus ut nunc urna. Quisque tempus, est placerat vestibulu.',
+    { x: 3.642, y: 4.642, w: 2.078, h: 1.414, fontSize: 12, color: C.gray, lineSpacingMultiple: 1.3, paraSpaceAfter: 12, isTextBox: true });
+  txt(s, ROW_HEAD, { x: 7.365, y: 4.838, w: 4.811, h: 0.346, fontSize: 14, bold: true, color: C.white, lineSpacingMultiple: 1.1 });
+  txt(s, 'Lorem ipsum dolor sit consectetur adipiscing elit. Aenean ondimentum justo at noi suscipit quam consectetur cons adipiscing elit. Phasellus ut nunc urna. Quisque tempus.',
+    { x: 7.365, y: 5.167, w: 4.811, h: 0.889, fontSize: 12, color: C.white, lineSpacingMultiple: 1.3, isTextBox: true });
+  icon(s, 7.454, 4.435, 0.267, 0.249, C.yellow, 'hand');
+  rect(s, { x: 0, y: 1.000, w: 0.159, h: 2.962, fill: { color: C.yellow } });
+  footer(s, 11);
+});
+
+// 12 - Powering the Engine of Progress
+build.push(function (s) {
+  rings(s, 0.447, -2.765);
+  txt(s, 'Powering the Engine of Progress', { x: 1.260, y: 1.120, w: 5.048, h: 2.555, fontFace: HEAD, fontSize: 54, bold: true, lineSpacingMultiple: 0.9, isTextBox: true });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Phasellus ut nunc urna. Quisque tempus, velit est placerat vestibulum sollicitudin, velit ipsum convallis ipsum, nec imperdiet nunc tellus id enim.',
+    { x: 1.284, y: 4.833, w: 5.203, h: 1.151, fontSize: 12, color: C.gray, lineSpacingMultiple: 1.3, paraSpaceAfter: 12, isTextBox: true });
+  txt(s, '95%', { x: 10.486, y: 4.633, w: 2.022, h: 0.919, fontFace: HEAD, fontSize: 54, bold: true, color: C.blue, lineSpacingMultiple: 0.9, isTextBox: true });
+  txt(s, 'Lorem ipsum dolor amet, consectetur adipiscing.', { x: 10.083, y: 5.402, w: 2.335, h: 0.626, fontSize: 12, color: C.gray, align: 'center', lineSpacingMultiple: 1.3, paraSpaceAfter: 12, isTextBox: true });
+  iconTile(s, 1.403, 3.878, 0.449, 'bulb');
+  gradRect(s, { x: 0, y: 0, w: 0.178, h: 7.5, angle: 225 });
+  txt(s, 'Maecenas suscipit quam in lacina consectetur', { x: 1.304, y: 4.482, w: 4.994, h: 0.360, fontSize: 14, bold: true, lineSpacingMultiple: 1.1 });
+  s.addShape('rightArrow', { x: 10.051, y: 4.917, w: 0.521, h: 0.241, rotate: 270, fill: { color: C.yellow }, line: { type: 'none' } });
+  footer(s, 12);
+});
+
+// 13 - break slide
+build.push(function (s) {
+  rings(s, -0.120, -1.566);
+  gradRect(s, { x: 1.409, y: 4.817, w: 10.769, h: 1.683, angle: 225 });
+  txt(s, '20-Minute Power Break!', { x: 1.882, y: 5.160, w: 9.823, h: 1.010, fontFace: HEAD, fontSize: 54, bold: true, color: C.white, wrap: false, isTextBox: true });
+  rect(s, { x: 1.113, y: 4.817, w: 0.296, h: 1.683, fill: { color: C.yellow } });
+  footer(s, 13);
+});
+
+// 14 - Four Key Renewable Electric Energy (4 cards)
+build.push(function (s) {
+  rings(s, 0.287, -2.174);
+  txt(s, 'Four Key Renewable Electric Energy', { x: 1.000, y: 1.000, w: 8.458, h: 1.737, fontFace: HEAD, fontSize: 54, bold: true, lineSpacingMultiple: 0.9 });
+  // [card x, icon-tile x, tile colour, highlighted?]
+  const cards = [
+    [1.087, 1.411, C.amber, false, 'turbine'],
+    [3.928, 4.283, C.amber, false, 'recycle'],
+    [6.769, 7.092, C.yellow, true, 'hand'],
+    [9.611, 9.934, C.amber, false, 'sun']
+  ];
+  cards.forEach(function (card) {
+    const cx = card[0], ix = card[1], tile = card[2], hot = card[3];
+    if (hot) gradRect(s, { x: cx, y: 3.349, w: 2.596, h: 2.929, angle: 225 });
+    else rect(s, { x: cx, y: 3.349, w: 2.596, h: 2.929, fill: { color: C.white }, shadow: softShadow() });
+    rect(s, { x: ix, y: 3.132, w: 0.578, h: 0.578, fill: { color: tile } });
+    icon(s, ix + 0.117, 3.253, 0.337, 0.336, C.blue, card[4]);
+    txt(s, 'Add Subtitle', { x: ix - 0.048, y: 4.104, w: 1.522, h: 0.344, fontSize: 14, bold: true, color: hot ? C.white : C.black, lineSpacingMultiple: 1.1 });
+    txt(s, CARD_LOREM, { x: ix - 0.079, y: 4.552, w: 2.107, h: 1.414, fontSize: 12, color: hot ? C.white : C.gray, lineSpacingMultiple: 1.3, paraSpaceAfter: 12, isTextBox: true });
+  });
+  footer(s, 14);
+});
+
+// 15 - Challenges in Electric Energy (numbered list on a blue panel)
+build.push(function (s) {
+  rings(s, 0.082, -2.347);
+  txt(s, 'Challenges in Electric Energy', { x: 0.717, y: 1.064, w: 11.982, h: 0.919, fontFace: HEAD, fontSize: 54, bold: true, align: 'center', lineSpacingMultiple: 0.9 });
+  gradRect(s, { x: 1.153, y: 2.258, w: 11.111, h: 4.242, angle: 225 });
+  // [row top, number, heading, heading width, rule below?]
+  const rows = [
+    [2.499, '01', 'Grid Infrastructure Limitations', 3.364, true],
+    [3.764, '02', 'Storage and Intermittency Issues', 4.191, true],
+    [5.030, '03', 'Community consultation', 2.991, false]
+  ];
+  rows.forEach(function (r) {
+    const y = r[0];
+    txt(s, r[1], { x: 1.592, y: y, w: 1.627, h: 1.212, fontFace: HEAD, fontSize: 66, bold: true, color: C.yellow, align: 'right', charSpacing: -0.7, isTextBox: true });
+    txt(s, r[2], { x: 3.425, y: y + 0.111, w: r[3], h: 0.384, fontFace: HEAD, fontSize: 14, bold: true, color: C.white, lineSpacingMultiple: 1.2, paraSpaceAfter: 12, isTextBox: true });
+    txt(s, CHALLENGE_LOREM, { x: 3.420, y: y + 0.451, w: 7.647, h: 0.602, fontSize: 12, color: C.white, lineSpacingMultiple: 1.3, paraSpaceAfter: 6, isTextBox: true });
+    if (r[4]) s.addShape('line', { x: 1.793, y: y + 1.268, w: 10.031, h: 0, line: { color: C.blue, width: 0.5 } });
+  });
+  footer(s, 15);
+});
+
+// 16 - What Sets Them Apart?
+build.push(function (s) {
+  rings(s, 0.409, -3.994);
+  txt(s, 'What Sets Them Apart?', { x: 0.953, y: 1.517, w: 5.756, h: 1.737, fontFace: HEAD, fontSize: 54, bold: true, lineSpacingMultiple: 0.9 });
+  [[3.747, 'flask'], [5.026, 'bulb']].forEach(function (r) { featureRow(s, 1.133, r[0], r[1], ROW_HEAD, LOREM_ROW); });
+  rect(s, { x: 6.977, y: 1.000, w: 0.159, h: 5.5, fill: { color: C.yellow } });
+  gradRect(s, { x: 9.903, y: 1.708, w: 2.431, h: 4.056, angle: 225 });
+  const STAT_LOREM = 'Lorem ipsum dolor sit amet consecte adipis elit iaculis.';
+  txt(s, '25%', { x: 10.321, y: 1.965, w: 1.544, h: 0.767, fontFace: HEAD, fontSize: 44, bold: true, color: C.yellow, lineSpacingMultiple: 0.9 });
+  txt(s, STAT_LOREM, { x: 10.318, y: 2.640, w: 1.807, h: 0.865, fontSize: 12, color: C.white, lineSpacingMultiple: 1.3, paraSpaceAfter: 6, isTextBox: true });
+  s.addShape('line', { x: 10.306, y: 3.741, w: 1.819, h: 0, line: { color: C.blue, width: 0.5 } });
+  txt(s, '16%', { x: 10.321, y: 3.934, w: 1.544, h: 0.767, fontFace: HEAD, fontSize: 44, bold: true, color: C.yellow, lineSpacingMultiple: 0.9 });
+  txt(s, STAT_LOREM, { x: 10.318, y: 4.632, w: 1.807, h: 0.889, fontSize: 12, color: C.white, lineSpacingMultiple: 1.3, paraSpaceAfter: 6, isTextBox: true });
+  footer(s, 16);
+});
+
+// 17 - Electric Energy Around the World
+build.push(function (s) {
+  rings(s, -0.743, -2.523);
+  gradRect(s, { x: 4.628, y: 4.203, w: 8.706, h: 2.297, angle: 225 });
+  rect(s, { x: 4.332, y: 4.203, w: 0.296, h: 2.297, fill: { color: C.yellow } });
+  txt(s, 'Electric Energy Around the World', { x: 5.126, y: 4.507, w: 7.891, h: 1.737, fontFace: HEAD, fontSize: 54, bold: true, color: C.white, lineSpacingMultiple: 0.9 });
+  footer(s, 17);
+});
+
+// 18 - Environment Benefits
+build.push(function (s) {
+  rings(s, -0.018, -1.689);
+  txt(s, 'Environment Benefits', { x: 0.864, y: 1.222, w: 5.356, h: 1.737, fontFace: HEAD, fontSize: 54, bold: true, lineSpacingMultiple: 0.9 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed iaculis mattis augue let. Hendreritai augue semper.',
+    { x: 0.929, y: 2.958, w: 5.167, h: 0.626, fontSize: 12, color: C.gray, lineSpacingMultiple: 1.3, paraSpaceAfter: 12, isTextBox: true });
+  gradRect(s, { x: 6.918, y: 1.274, w: 5.178, h: 2.189, angle: 225 });
+  txt(s, '90%', { x: 7.198, y: 1.547, w: 2.258, h: 0.828, fontFace: HEAD, fontSize: 48, bold: true, color: C.yellow, lineSpacingMultiple: 0.9 });
+  txt(s, 'Add data here', { x: 7.196, y: 2.218, w: 1.636, h: 0.381, fontSize: 14, bold: true, color: C.white, lineSpacingMultiple: 1.3, paraSpaceAfter: 6, isTextBox: true });
+  txt(s, 'Lorem ipsum dolor sit at, consectetur adipiscing elit. Sed iaculis mattis augue let sit at, consectet adipisci. ',
+    { x: 7.196, y: 2.599, w: 4.503, h: 0.626, fontSize: 12, color: C.white, lineSpacingMultiple: 1.3, paraSpaceAfter: 6, isTextBox: true });
+  [[4.199, 'hand'], [5.478, 'flask']].forEach(function (r) { featureRow(s, 6.918, r[0], r[1], ROW_HEAD, LOREM_ROW); });
+  rect(s, { x: 1.025, y: 3.943, w: 0.190, h: 2.374, fill: { color: C.yellow } });
+  footer(s, 18);
+});
+
+// 19 - Metrics in Global Electric Energy (6x6 heat-map built from squares)
+build.push(function (s) {
+  rings(s, -1.399, -2.427);
+  const COLS = [6.985, 7.899, 8.812, 9.726, 10.640, 11.554];
+  const ROWS = [1.620, 2.459, 3.297, 4.136, 4.975, 5.814];
+  const HEAT = [
+    ['FAC736', 'FCDD86', 'FDE9AF', 'FDE9AF', 'FEF4D7', 'FEF4D7'],
+    ['F6AF2E', 'FAC736', 'FCDD86', 'FDE9AF', 'FDE9AF', 'FEF4D7'],
+    ['D28B09', 'F6AF2E', 'FAC736', 'FCDD86', 'FDE9AF', 'FDE9AF'],
+    ['D28B09', 'D28B09', 'F6AF2E', 'FAC736', 'FCDD86', 'FDE9AF'],
+    ['8C5C06', 'D28B09', 'D28B09', 'F6AF2E', 'FAC736', 'FCDD86'],
+    ['8C5C06', '8C5C06', 'D28B09', 'D28B09', 'F6AF2E', 'FAC736']
+  ];
+  HEAT.forEach(function (row, r) {
+    row.forEach(function (color, c) {
+      rect(s, { x: COLS[c], y: ROWS[r], w: 0.780, h: 0.716, fill: { color: color } });
+    });
+  });
+  s.addShape('line', { x: 6.685, y: 1.461, w: 5.648, h: 0, line: { color: C.blue, width: 0.5 } });
+  s.addShape('line', { x: 6.879, y: 1.227, w: 0, h: 5.303, line: { color: C.blue, width: 0.5 } });
+  const AXIS = { fontFace: HEAD, fontSize: 16, color: C.gray, align: 'center', wrap: false, h: 0.370, isTextBox: true };
+  [['A', 7.170, 0.363], ['B', 8.079, 0.372], ['C', 8.997, 0.363], ['D', 9.898, 0.388], ['E', 10.798, 0.353], ['F', 11.716, 0.344]]
+    .forEach(function (t) { txt(s, t[0], Object.assign({ x: t[1], y: 0.971, w: t[2] }, AXIS)); });
+  [['10', 6.204, 6.064, 0.432], ['20', 6.180, 5.205, 0.479], ['30', 6.181, 4.346, 0.477],
+   ['40', 6.170, 3.487, 0.500], ['50', 6.181, 2.628, 0.477], ['60', 6.176, 1.769, 0.488]]
+    .forEach(function (t) { txt(s, t[0], Object.assign({ x: t[1], y: t[2], w: t[3] }, AXIS)); });
+  // callout bubble over the grid
+  rect(s, { x: 7.533, y: 3.916, w: 3.116, h: 1.327, fill: { color: C.white }, shadow: calloutShadow() });
+  s.addShape('triangle', { x: 10.750, y: 3.620, w: 0.280, h: 0.860, rotate: 45, fill: { color: C.white }, line: { type: 'none' } });
+  txt(s, '350.000+', { x: 7.786, y: 4.098, w: 1.585, h: 0.404, fontFace: HEAD, fontSize: 18, bold: true, color: C.blue, isTextBox: true });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. ', { x: 7.795, y: 4.460, w: 2.781, h: 0.626, fontSize: 12, color: C.gray, lineSpacingMultiple: 1.3, isTextBox: true });
+  txt(s, 'Metrics in Global Electric Energy', { x: 1.432, y: 2.171, w: 3.896, h: 3.373, fontFace: HEAD, fontSize: 54, bold: true, lineSpacingMultiple: 0.9 });
+  gradRect(s, { x: 0, y: 0, w: 0.178, h: 7.5, angle: 225 });
+  footer(s, 19);
+});
+
+// 20 - Thank you
+build.push(function (s) {
+  rings(s, 1.372, -1.547);
+  rect(s, { x: 4.355, y: 2.488, w: 7.486, h: 2.691, fill: { color: C.white }, shadow: cardShadow() });
+  txt(s, 'Thank You for Your Energy!', { x: 4.825, y: 2.938, w: 6.628, h: 1.919, fontFace: HEAD, fontSize: 60, bold: true, lineSpacingMultiple: 0.9, isTextBox: true });
+  gradRect(s, { x: 11.310, y: 1.987, w: 1.001, h: 1.001, angle: 225 });
+  icon(s, 11.439, 2.122, 0.753, 0.753, C.yellow, 'bolt');
+  rect(s, { x: 0, y: 0, w: 0.178, h: 7.5, fill: { color: C.yellow } });
+  footer(s, 20);
+});
+
+// ---------------------------------------------------------------- write ----
+const pptx = new pptxgen();
+pptx.defineLayout({ name: 'ELECTRAVOLT', width: SLIDE_W, height: SLIDE_H });
+pptx.layout = 'ELECTRAVOLT';
+pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
+pptx.title = 'ElectraVolt';
+pptx.author = 'ElectraVolt';
+
+build.forEach(function (fn) {
+  const slide = pptx.addSlide();
+  slide.background = { color: C.white };
+  fn(slide);
+});
+
+pptx.writeFile({ fileName: path.join(__dirname, '0013fd6d-937e-4de2-acd9-e53a2711d44d_grok_final.pptx') })
+  .then(function (f) { console.log('wrote ' + f); });
