@@ -1,0 +1,762 @@
+/**
+ * "minimal" — Stylish Presentation Template (24 slides, 13.333 x 7.5 in)
+ * Rebuilt from scratch with pptxgenjs. Run: node <thisfile>.js
+ *
+ * The reference deck's vector line-art pictograms are stood in for by simple
+ * outline primitives drawn at the original bounding boxes; its picture regions
+ * are empty placeholders in the original and stay empty here (see `photo`).
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ palette */
+const BLACK = '000000';
+const WHITE = 'FFFFFF';
+const INK = '0C0C0C';       // hairline / rule colour
+const G26 = '262626';
+const G3F = '3F3F3F';
+const G59 = '595959';
+const G7F = '7F7F7F';
+const G88 = '888888';
+const GA5 = 'A5A5A5';
+const GBF = 'BFBFBF';
+const GD8 = 'D8D8D8';
+const GE7 = 'E7E6E6';
+const GF2 = 'F2F2F2';
+
+/* -------------------------------------------------------------------- fonts */
+const REG = 'Montserrat';
+const MED = 'Montserrat Medium';
+const SEMI = 'Montserrat SemiBold';
+
+/* ---------------------------------------------------------- shared copy text */
+const LOREM_A = "Lorem ipsum dolor sit a met, connecter adipescent elite. Mauri's connecter fermentum ague quiz leafed. Sed egret ";
+const LOREM_B = 'Felliniesque dui. Sed various solicitude meatus, neck';
+const LOREM_C = "Mauri's connecter fermentum ague quiz leafed. Sed egret Felliniesque dui. Sed various solicitude meatus, neck impediment connecter";
+const LOREM_WIDE = "Lorem ipsum dolor sit a met, connecter adipescent elite. Mauri's connecter fermentum ague quiz leafed. Sed egret Felliniesque dui. Sed various solicitude meatus, neck Mauri's connecter fermentum ague quiz leafed. various solicitude meatus, neck impediment connecter";
+const SHORT_DESC = 'There are many variations of passages of Lorem Ipsum available, ';
+
+// Run-lists must be rebuilt per use: pptxgenjs writes resolved options back
+// into the objects it is handed, so a shared literal would leak styling.
+const cardBody = () => [
+  { text: 'There are many variations of passages of Lorem Ipsum available, but the have ' },
+  { text: 'use dui. Seed various' }
+];
+const stackBody = () => [
+  { text: 'There are many variations of ', options: { breakLine: true } },
+  { text: 'passages of Lorem Ipsum available, but the have ' },
+  { text: 'use dui. Seed various' }
+];
+const longStackBody = () => [
+  { text: 'There are many variations of ', options: { breakLine: true } },
+  { text: 'passages of Lorem Ipsum available, but the have ' },
+  { text: 'use dui. Seed various dui. Seed various solicitude meatus, neck', options: { breakLine: true } },
+  { text: "Mauri's connecter fermented ague quiz leafed. Seed egret Felliniesque dui. Seed various solicitude meatus, neck impediment connecter" }
+];
+const bioText = () => [
+  { text: 'There are many variations of passages of Lorem Ipsum available, but the have suffered alteration in some form, by injected humor, or randomized words which.' },
+  { text: ' are many variations of passages' }
+];
+const FAR_AWAY = 'Far is away, behind the word muntain, Separated they live in Bookmarks grove right coast of Semantics,';
+
+let SH; // PptxGenJS.ShapeType, assigned in build()
+
+/* ------------------------------------------------------------------ helpers */
+
+/** Text box. Every box in this deck is top-anchored, so bake that in. */
+function txt(s, body, o) {
+  s.addText(body, Object.assign({ valign: 'top', fontFace: REG, color: BLACK }, o));
+}
+
+/** Turn ['a','b','c'] into runs that render as separate paragraphs. */
+function lines(arr) {
+  return arr.map((t, i) => ({ text: t, options: i < arr.length - 1 ? { breakLine: true } : {} }));
+}
+
+function rect(s, x, y, w, h, color, transparency) {
+  s.addShape(SH.rect, { x, y, w, h, fill: transparency ? { color, transparency } : { color } });
+}
+
+function circle(s, x, y, d, color) {
+  s.addShape(SH.ellipse, { x, y, w: d, h: d, fill: { color } });
+}
+
+function ring(s, x, y, d, color, width, dashType) {
+  const line = { color, width: width || 1 };
+  if (dashType) line.dashType = dashType;
+  s.addShape(SH.ellipse, { x, y, w: d, h: d, line });
+}
+
+/** Vertical or horizontal hairline. */
+function rule(s, x, y, w, h, color, width) {
+  s.addShape(SH.line, { x, y, w, h, line: { color: color || INK, width } });
+}
+
+/** The deck's recurring "thin rule with a thick bar over it" motif. */
+function barRule(s, x, y, vertical) {
+  if (vertical) {
+    rule(s, x, y, 0, 2.44, INK, 0.75);
+    rule(s, x, y + 0.829, 0, 0.78, INK, 5.5);
+  } else {
+    rule(s, x, y, 0.594, 0, INK, 0.75);
+    rule(s, x + 0.166, y, 0.261, 0, INK, 3.75);
+  }
+}
+
+/** Short version of the motif used on slides 2, 18 and 19. */
+function shortBarRule(s, x, y) {
+  rule(s, x, y, 0, 1.331, INK, 0.75);
+  rule(s, x, y + 0.453, 0, 0.426, INK, 5.5);
+}
+
+/**
+ * Stand-in for one of the deck's line-art pictograms (people / bulb / eye /
+ * camera / rocket ...). Drawn as light outlines so the ink weight matches the
+ * thin strokes of the originals.
+ */
+function icon(s, x, y, w, h, color) {
+  s.addShape(SH.roundRect, { x, y, w, h, rectRadius: Math.min(w, h) * 0.22, line: { color, width: 1 } });
+  s.addShape(SH.ellipse, { x: x + w * 0.28, y: y + h * 0.28, w: w * 0.44, h: h * 0.44, line: { color, width: 1 } });
+}
+
+/** Stand-in for the tiny social-media marks. */
+function glyph(s, x, y, w, h, color) {
+  s.addShape(SH.ellipse, { x, y, w, h, line: { color, width: 0.75 } });
+  s.addShape(SH.ellipse, { x: x + w * 0.32, y: y + h * 0.32, w: w * 0.36, h: h * 0.36, fill: { color } });
+}
+
+/** Row of four social marks (facebook / instagram / twitter / whatsapp). */
+function socialRow(s, x, y, color) {
+  glyph(s, x, y + 0.005, 0.086, 0.141, color);
+  glyph(s, x + 0.172, y + 0.017, 0.128, 0.129, color);
+  glyph(s, x + 0.390, y + 0.026, 0.145, 0.118, color);
+  glyph(s, x + 0.618, y, 0.128, 0.128, color);
+}
+
+/** Same four marks, but knocked out of coloured discs (title slide). */
+function socialDiscs(s, y, discs) {
+  discs.forEach(([x, color]) => {
+    circle(s, x, y, 0.137, color);
+    s.addShape(SH.ellipse, { x: x + 0.033, y: y + 0.033, w: 0.071, h: 0.071, line: { color: WHITE, width: 0.75 } });
+  });
+}
+
+/** Currency mark used inside the big circles of slide 11. */
+function dollarMark(s, x, y, w, h, color) {
+  txt(s, '$', {
+    x: x - 0.35, y: y - 0.12, w: w + 0.7, h: h + 0.24,
+    fontFace: MED, fontSize: Math.round(h * 74), color, align: 'center', valign: 'middle'
+  });
+}
+
+/**
+ * The reference deck ships no bitmaps at all — every picture region is an
+ * *empty* PowerPoint picture placeholder, which renders as bare slide
+ * background. This keeps those regions reserved (and visible in the source)
+ * without inventing artwork the original never had.
+ */
+function photo(s, x, y, w, h, shape) {
+  s.addShape(shape || SH.rect, { x, y, w, h });
+}
+
+/* --------------------------------------------------- recurring text clusters */
+
+/** 44pt section heading. */
+function heading(s, x, y, w, text, color, align) {
+  txt(s, Array.isArray(text) ? lines(text) : text, {
+    x, y, w, h: Array.isArray(text) ? 1.503 : 0.802,
+    fontSize: 44, bold: true, color: color || BLACK,
+    align: align || 'left', lineSpacingMultiple: 1.13636
+  });
+}
+
+/** The "Good Ideas / Make Everything / Is Batter." tagline. */
+function tagline(s, x, y, w) {
+  txt(s, lines(['Good Ideas', 'Make Everything', 'Is Batter.']), {
+    x, y, w: w || 2.116, h: 0.774, fontFace: MED, fontSize: 14, lineSpacingMultiple: 1.14285
+  });
+}
+
+/** The four-paragraph lorem paragraph block (blank line in the middle). */
+function loremBlock(s, x, y, w, h, o) {
+  o = o || {};
+  const body = o.compact ? [LOREM_A, LOREM_B, LOREM_C] : [LOREM_A, '', LOREM_B, LOREM_C];
+  txt(s, lines(body), {
+    x, y, w, h, fontSize: 7, color: o.color || BLACK,
+    align: o.align || 'left', lineSpacingMultiple: 1.71428
+  });
+}
+
+/** Two square-bulleted lines. */
+function bulletPair(s, x, y, w, h, color, alt) {
+  const bullet = { characterCode: '25AA', indent: 13.5 };
+  const body = alt
+    ? ['There are many variations one passages of', 'Lorem Ipsum available, ']
+    : ['There are many variations of passages of', 'Lorem Ipsum available, '];
+  txt(s, body.map(t => ({ text: t, options: { bullet } })), {
+    x, y, w, h, fontFace: SEMI, fontSize: 9, color: color || BLACK, lineSpacingMultiple: 1.77777
+  });
+}
+
+/** "Your Title Text Here" + body paragraph — the deck's most common card. */
+function card(s, o) {
+  txt(s, 'Your Title Text Here', {
+    x: o.x, y: o.y, w: 1.661, h: 0.494, fontFace: SEMI, fontSize: 11, bold: true,
+    color: o.color || BLACK, align: o.align || 'left', lineSpacingMultiple: 1.27272
+  });
+  txt(s, o.body || cardBody(), {
+    x: o.bx !== undefined ? o.bx : o.x, y: o.by, w: o.bw, h: o.bh || 0.606,
+    fontSize: 7, color: o.color || BLACK, align: o.align || 'left', lineSpacingMultiple: 1.71428
+  });
+}
+
+/** Big number + small "Million" caption (slides 4 and 8). */
+function millionStat(s, x, y, value, color) {
+  txt(s, value, {
+    x, y, w: 1.343, h: 0.619, fontFace: SEMI, fontSize: 28, color, lineSpacingMultiple: 1.42857
+  });
+  txt(s, 'Million', {
+    x: x + 1.065, y: y + 0.227, w: 0.574, h: 0.297, fontSize: 8, color, lineSpacingMultiple: 2
+  });
+}
+
+/** Big $ figure over a small caption (slides 10, 15 and 21). */
+function figureStat(s, x, y, w, value, cx, cy) {
+  txt(s, value, {
+    x, y, w, h: 0.662, fontFace: SEMI, fontSize: 36, align: 'center', lineSpacingMultiple: 1.11111
+  });
+  txt(s, 'passages of Lorem Ipsum available, ', {
+    x: cx, y: cy, w: 1.971, h: 0.272, fontSize: 7, lineSpacingMultiple: 2
+  });
+}
+
+/** Circled step number + card, right column of slides 5 and 17. */
+function stepCard(s, o) {
+  circle(s, o.cx, o.cy, 0.813, o.dot);
+  txt(s, o.num, {
+    x: o.nx, y: o.cy + 0.177, w: o.nw, h: 0.522, fontSize: 28,
+    color: WHITE, align: 'center', lineSpacingMultiple: 1.07142
+  });
+  card(s, { x: o.x, y: o.cy - 0.016, by: o.cy + 0.455, bw: 3.345, bh: 0.42, color: o.color });
+}
+
+/* ------------------------------------------------------------ slide builders */
+
+function slide01(s) {
+  rect(s, 0.99, 4.246, 11.353, 3.254, BLACK, 27);
+  txt(s, 'STYLISH PRESENTATION', { x: 1.823, y: 0.605, w: 1.603, h: 0.236, fontSize: 8 });
+  socialDiscs(s, 0.658, [[1.072, G26], [1.253, G3F], [1.434, G7F], [1.610, GA5]]);
+  barRule(s, 11.124, 1.996, true);
+  barRule(s, 2.235, 1.996, true);
+  txt(s, 'www.example.com', { x: 5.016, y: 2.968, w: 3.3, h: 0.452, fontFace: MED, fontSize: 11, align: 'center', lineSpacingMultiple: 2.27272 });
+  txt(s, '-2027-', { x: 5.912, y: 3.609, w: 1.51, h: 0.461, fontFace: MED, fontSize: 28, align: 'center', lineSpacingMultiple: 0.89285 });
+  txt(s, '_ 25 / 25 / 2037 _', { x: 10.915, y: 0.508, w: 1.51, h: 0.452, fontFace: MED, fontSize: 11, align: 'right', lineSpacingMultiple: 2.27272 });
+  txt(s, 'minimal', { x: 2.936, y: 4.209, w: 7.462, h: 2.064, fontFace: MED, fontSize: 115, color: WHITE, align: 'center', lineSpacingMultiple: 1.21739 });
+  txt(s, 'PRESENTATION TEMPLATE', { x: 4.305, y: 5.876, w: 4.723, h: 0.412, fontFace: MED, fontSize: 14, color: WHITE, align: 'center', lineSpacingMultiple: 1.78571 });
+  // scroll-down cue
+  s.addShape(SH.roundRect, { x: 6.378, y: 6.735, w: 0.648, h: 0.304, rotate: 270, rectRadius: 0.152, line: { color: WHITE, width: 0.75 } });
+  circle(s, 6.623, 6.969, 0.154, WHITE);
+  rule(s, 6.702, 6.628, 0, 0.221, WHITE, 0.75);
+}
+
+function slide02(s) {
+  photo(s, 7.397, 0.841, 5.232, 5.818);
+  rect(s, 0, 2.192, 7.981, 2.184, GF2);
+  loremBlock(s, 1.523, 4.765, 4.182, 1.111, { align: 'center' });
+  shortBarRule(s, 5.647, 0.465);
+  shortBarRule(s, 1.580, 0.453);
+  txt(s, 'CEO/  Management', { x: 2.012, y: 1.301, w: 3.313, h: 0.236, fontSize: 8, align: 'center' });
+  txt(s, 'Aura Jackson', { x: 2.543, y: 0.918, w: 2.25, h: 0.37, fontFace: SEMI, fontSize: 16, align: 'center' });
+  rule(s, 3.475, 1.278, 0.386, 0, G7F, 0.75);
+  socialRow(s, 3.295, 1.570, G3F);
+  txt(s, 'Welcome', { x: 1.959, y: 2.883, w: 3.309, h: 0.802, fontSize: 44, bold: true, align: 'center', lineSpacingMultiple: 1.13636 });
+  txt(s, 'www.example.com', { x: 2.124, y: 6.257, w: 2.979, h: 0.402, fontFace: MED, fontSize: 11, align: 'center', lineSpacingMultiple: 2.27272 });
+}
+
+function slide03(s) {
+  photo(s, 0, 0, 6.745, 7.5);
+  rect(s, 0, -0.011, 6.745, 7.511, BLACK, 37);
+  txt(s, lines(['Table', 'of Minimal', 'Contents']), {
+    x: 1.324, y: 2.648, w: 4.098, h: 2.205, fontSize: 44, bold: true, color: WHITE,
+    align: 'center', lineSpacingMultiple: 1.13636
+  });
+  ['Welcome Massage', 'About Us?', 'Our Service', 'Mission & Vision', 'Creative Slide', 'Our Project']
+    .forEach((label, i) => {
+      const y = 2.214 + i * 0.6065;
+      txt(s, '0' + (i + 1), { x: 7.877, y, w: 0.498, h: 0.381, fontSize: 14, lineSpacingMultiple: 1.42857 });
+      txt(s, label, { x: 8.271, y: y - 0.092, w: i === 0 ? 3.469 : 2.99, h: 0.438, fontFace: SEMI, fontSize: 20 });
+    });
+}
+
+function slide04(s) {
+  photo(s, 5.042, 0.819, 7.417, 3.75);
+  rect(s, 5.042, 0.833, 7.417, 3.736, BLACK, 37);
+  loremBlock(s, 5.479, 2.096, 3.313, 1.279, { color: WHITE });
+  heading(s, 0.976, 1.739, 3.309, 'About Us');
+  tagline(s, 0.976, 2.886);
+  bulletPair(s, 5.46, 1.418, 3.122, 0.55, WHITE);
+  millionStat(s, 5.482, 3.447, '$50K', WHITE);
+  millionStat(s, 7.771, 3.447, '70K', WHITE);
+  millionStat(s, 9.756, 3.447, '40+B', WHITE);
+  // three outlined circles with pictograms
+  ring(s, 1.204, 4.903, 1.888, GBF);
+  icon(s, 1.573, 5.289, 1.119, 1.107, GBF);
+  ring(s, 4.936, 4.903, 1.888, GBF);
+  icon(s, 5.408, 5.375, 0.944, 0.944, GBF);
+  ring(s, 9.032, 4.903, 1.888, GBF);
+  icon(s, 9.504, 5.375, 0.944, 0.944, GBF);
+  circle(s, 1.319, 5.12, 0.254, GA5);
+  circle(s, 6.461, 6.324, 0.254, GA5);
+  circle(s, 9.848, 6.652, 0.254, GA5);
+  [[0.995, 2.173, ['UI/UX ', 'DESIGNERS']], [4.703, 2.336, ['WEB', 'DEVELOPMENTS']], [9.291, 1.461, ['WEB ', 'DESIGNERS']]]
+    .forEach(([x, w, label]) => txt(s, lines(label), {
+      x, y: 5.472, w, h: 0.606, fontFace: MED, fontSize: 14, align: 'center', lineSpacingMultiple: 1.28571
+    }));
+}
+
+function slide05(s) {
+  photo(s, 0, 1.423, 3.538, 4.655);
+  rect(s, 8.229, 0.687, 4.354, 6.127, GF2);
+  heading(s, 3.887, 1.615, 3.309, 'About Us');
+  tagline(s, 3.887, 2.588);
+  bulletPair(s, 3.887, 3.688, 3.122, 0.55, BLACK);
+  loremBlock(s, 3.906, 4.366, 3.313, 1.279);
+  stepCard(s, { cx: 7.813, cy: 1.610, dot: G26, num: '01', nx: 7.905, nw: 0.615, x: 8.82 });
+  stepCard(s, { cx: 7.813, cy: 3.356, dot: G59, num: '02', nx: 7.857, nw: 0.744, x: 8.82 });
+  stepCard(s, { cx: 7.800, cy: 5.196, dot: GBF, num: '03', nx: 7.841, nw: 0.706, x: 8.82 });
+  barRule(s, 8.932, 2.913, false);
+  barRule(s, 8.932, 4.762, false);
+}
+
+function slide06(s) {
+  heading(s, 0.867, 0.823, 4.283, 'Our Service');
+  tagline(s, 0.867, 1.750);
+  photo(s, 0.952, 2.833, 5.459, 3.875);
+  rect(s, 6.417, 0.876, 2.979, 1.957, GBF);
+  rect(s, 9.396, 2.833, 2.979, 1.957, G26);
+  rect(s, 6.417, 4.793, 2.979, 1.957, GF2);
+  // six pictogram cards laid out on a 2 x 3 grid
+  [
+    { ix: 7.683, iy: 1.117, iw: 0.447, ih: 0.447, ic: BLACK, tx: 7.076, ty: 1.643, bx: 6.827, by: 2.113, c: BLACK },
+    { ix: 10.679, iy: 1.046, iw: 0.413, ih: 0.520, ic: BLACK, tx: 10.055, ty: 1.620, bx: 9.806, by: 2.090, c: BLACK },
+    { ix: 7.676, iy: 2.964, iw: 0.461, ih: 0.516, ic: BLACK, tx: 7.076, ty: 3.548, bx: 6.827, by: 4.019, c: BLACK },
+    { ix: 10.669, iy: 3.029, iw: 0.443, ih: 0.439, ic: WHITE, tx: 10.055, ty: 3.525, bx: 9.806, by: 3.995, c: WHITE },
+    { ix: 7.670, iy: 5.044, iw: 0.472, ih: 0.437, ic: BLACK, tx: 7.076, ty: 5.534, bx: 6.827, by: 6.004, c: BLACK },
+    { ix: 10.680, iy: 5.033, iw: 0.412, ih: 0.444, ic: BLACK, tx: 10.055, ty: 5.511, bx: 9.806, by: 5.981, c: BLACK }
+  ].forEach(o => {
+    icon(s, o.ix, o.iy, o.iw, o.ih, o.ic);
+    card(s, { x: o.tx, y: o.ty, bx: o.bx, by: o.by, bw: 2.158, color: o.c, align: 'center' });
+  });
+}
+
+function slide07(s) {
+  heading(s, 4.525, 0.823, 4.283, 'Our Service', BLACK, 'center');
+  photo(s, 1.213, 5.467, 10.907, 2.033);
+  [
+    { v: '74%', vx: 1.118, vy: 2.392, ix: 2.246, iy: 3.686, iw: 0.260, ih: 0.260, tx: 1.546, ty: 4.118, bx: 1.079, by: 4.612 },
+    { v: '+371', vx: 5.408, vy: 2.344, ix: 6.546, iy: 3.629, iw: 0.240, ih: 0.303, tx: 5.836, ty: 4.095, bx: 5.369, by: 4.612 },
+    { v: '2.34k', vx: 9.698, vy: 2.344, ix: 10.828, iy: 3.714, iw: 0.258, ih: 0.256, tx: 10.126, ty: 4.118, bx: 9.659, by: 4.589 }
+  ].forEach(o => {
+    txt(s, o.v, { x: o.vx, y: o.vy, w: 2.518, h: 1.12, fontFace: MED, fontSize: 60, align: 'center', lineSpacingMultiple: 1.16666 });
+    icon(s, o.ix, o.iy, o.iw, o.ih, BLACK);
+    card(s, { x: o.tx, y: o.ty, bx: o.bx, by: o.by, bw: 2.595, align: 'center', body: stackBody() });
+  });
+}
+
+function slide08(s) {
+  heading(s, 0.867, 0.823, 3.577, ['Mission & ', 'Vision']);
+  tagline(s, 0.867, 2.559);
+  bulletPair(s, 0.867, 3.853, 3.122, 0.55, BLACK);
+  loremBlock(s, 0.886, 4.531, 3.313, 1.279);
+  rect(s, 4.864, 3.435, 2.546, 2.184, G26);
+  photo(s, 7.410, 3.435, 2.567, 2.184);
+  rect(s, 9.977, 3.435, 2.546, 2.184, GF2);
+  icon(s, 5.914, 3.677, 0.447, 0.447, WHITE);
+  card(s, { x: 5.306, y: 4.202, bx: 5.058, by: 4.673, bw: 2.158, color: WHITE, align: 'center' });
+  icon(s, 11.014, 3.687, 0.472, 0.437, BLACK);
+  card(s, { x: 10.420, y: 4.177, bx: 10.171, by: 4.647, bw: 2.158, align: 'center' });
+  millionStat(s, 4.736, 5.987, '$50K', BLACK);
+  millionStat(s, 7.359, 5.987, '70K', BLACK);
+  millionStat(s, 9.883, 5.987, '40+B', BLACK);
+  [[5.446, 5.508, '01'], [7.908, 7.951, '02'], [10.495, 10.526, '03']].forEach(([cx, tx, n], i) => {
+    ring(s, cx, 1.471, 1.379, GBF);
+    txt(s, n, { x: tx, y: 1.668 - i * 0.0135, w: 1.265, h: 1.083, fontFace: SEMI, fontSize: 60, color: GD8, align: 'center', lineSpacingMultiple: 1.16666 });
+  });
+  circle(s, 5.560, 1.575, 0.186, GA5);
+  circle(s, 8.361, 2.724, 0.186, GA5);
+  circle(s, 11.657, 2.466, 0.186, GA5);
+}
+
+function slide09(s) {
+  rect(s, 0, -0.01, 5.375, 7.51, GF2);
+  photo(s, 3.937, 0.740, 4.167, 6.021);
+  heading(s, 0.867, 2.428, 2.945, 'Our Project');
+  tagline(s, 0.909, 4.354);
+  // two "N-th YEARS" blocks
+  [{ y: 0, ord: 'st', n: '1', w: 4.059 }, { y: 3.417, ord: 'nd', n: '2', w: 4.780 }].forEach(b => {
+    txt(s, SHORT_DESC, { x: 8.396, y: 0.708 + b.y, w: 2.578, h: 0.438, fontSize: 8, bold: true, lineSpacingMultiple: 1.5 });
+    txt(s, [
+      { text: b.n }, { text: b.ord, options: { superscript: true } }, { text: ' YEARS' }
+    ], { x: 8.374, y: 1.407 + b.y, w: b.w, h: 1.083, fontFace: MED, fontSize: 54, lineSpacingMultiple: 1.29629 });
+    rect(s, 8.493, 2.852 + b.y, 1.395, 0.44, GF2);
+    rect(s, 9.888, 2.848 + b.y, 2.378, 0.44, G26);
+    txt(s, 'suffered', { x: 8.711, y: 2.937 + b.y, w: 0.885, h: 0.283, fontFace: SEMI, fontSize: 9, align: 'center', lineSpacingMultiple: 1.44444 });
+    txt(s, 'many variations of passages', { x: 10.032, y: 2.929 + b.y, w: 2.192, h: 0.269, fontSize: 9, color: WHITE, align: 'center', lineSpacingMultiple: 1.44444 });
+  });
+}
+
+function slide10(s) {
+  photo(s, 1.025, 1.792, 8.324, 3.562);
+  heading(s, 0.867, 0.823, 4.424, 'Our Process');
+  tagline(s, 9.705, 1.681);
+  ring(s, 1.452, 4.932, 0.841, BLACK, 2, 'dot');
+  circle(s, 1.500, 4.980, 0.746, G26);
+  icon(s, 1.664, 5.163, 0.425, 0.421, WHITE);
+  ring(s, 5.611, 4.932, 0.841, GA5, 2, 'dot');
+  circle(s, 5.659, 4.980, 0.746, GA5);
+  icon(s, 5.843, 5.179, 0.359, 0.359, WHITE);
+  card(s, { x: 1.292, y: 5.975, by: 6.446, bw: 3.345, bh: 0.42 });
+  card(s, { x: 5.611, y: 5.975, by: 6.446, bw: 3.345, bh: 0.42 });
+  figureStat(s, 10.583, 2.873, 1.559, '$10K', 10.635, 3.446);
+  figureStat(s, 10.571, 4.372, 1.722, '$50K', 10.678, 4.983);
+  figureStat(s, 10.635, 5.851, 1.662, '$26K', 10.688, 6.461);
+  icon(s, 9.759, 2.999, 0.773, 0.633, BLACK);
+  icon(s, 9.759, 4.502, 0.648, 0.640, G7F);
+  icon(s, 9.764, 6.080, 0.565, 0.560, GD8);
+}
+
+function slide11(s) {
+  heading(s, 4.454, 0.823, 4.424, 'Our Process', BLACK, 'center');
+  const cols = [
+    { ring: 1.585, ry: 2.142, rd: 2.598, rc: GD8, disc: 1.803, dy: 2.361, dd: 2.162, dc: GF2, mark: BLACK,
+      vx: 2.223, vw: 1.322, v: '+71m', vc: BLACK, mx: 2.672, hx: 1.898, hw: 1.966,
+      head: ['Serviceable', 'Obtainable Market'], px: 1.585, tx: 2.426, tw: 0.910, tag: 'Target' },
+    { ring: 5.460, ry: 2.132, rd: 2.621, rc: BLACK, disc: 5.738, dy: 2.410, dd: 2.079, dc: BLACK, mark: WHITE,
+      vx: 6.082, vw: 1.434, v: '34+m', vc: WHITE, mx: 6.587, hx: 5.815, hw: 1.780,
+      head: ['Serviceable', 'Available Market'], px: 5.409, tx: 6.366, tw: 0.679, tag: 'Sam' },
+    { ring: 9.167, ry: 2.132, rd: 2.621, rc: G7F, disc: 9.444, dy: 2.410, dd: 2.079, dc: G7F, mark: WHITE,
+      vx: 9.803, vw: 1.329, v: '237%', vc: WHITE, mx: 10.256, hx: 9.714, hw: 1.631,
+      head: ['Total Available ', 'Service Market'], px: 9.233, tx: 10.190, tw: 0.677, tag: 'Tam' }
+  ];
+  cols.forEach(c => {
+    ring(s, c.ring, c.ry, c.rd, c.rc, 2, 'dot');
+    s.addShape(SH.ellipse, { x: c.disc, y: c.dy, w: c.dd, h: c.dd + 0.008, fill: { color: c.dc } });
+    dollarMark(s, c.mx, 2.700, 0.424, 0.747, c.mark);
+    txt(s, c.v, { x: c.vx, y: 3.518, w: c.vw, h: 0.606, fontSize: 30, bold: true, color: c.vc, align: 'center' });
+    txt(s, lines(c.head), { x: c.hx, y: 4.881, w: c.hw, h: 0.539, fontFace: SEMI, fontSize: 13, align: 'center' });
+    txt(s, FAR_AWAY, { x: c.px, y: 5.371, w: 2.591, h: 0.884, fontSize: 8, align: 'center', lineSpacingMultiple: 2 });
+    txt(s, c.tag, { x: c.tx, y: 6.138, w: c.tw, h: 0.353, fontFace: SEMI, fontSize: 15, align: 'center' });
+  });
+  rule(s, 4.793, 4.951, 0, 1.479, GD8, 1.25);
+  rule(s, 8.617, 4.951, 0, 1.479, GD8, 1.25);
+}
+
+function slide12(s) {
+  // Large rotated hexagonal slab behind the black panel.
+  s.addShape(SH.custGeom, {
+    x: 0, y: 0, w: 13.333, h: 7.5, fill: { color: GD8 },
+    points: [
+      { x: 12.367, y: 6.481 }, { x: 0.889, y: 6.485 }, { x: 0.014, y: 5.140 },
+      { x: 0.012, y: 0 }, { x: 11.722, y: 0 }, { x: 12.365, y: 0.983 }, { close: true }
+    ]
+  });
+  rect(s, 0.888, 0.978, 11.48, 5.502, BLACK);
+  txt(s, lines([
+    'Become a Members and', 'Save up to 47% on All',
+    'Assets Plus Get free Assets', 'Every Month.'
+  ]), {
+    x: 2.752, y: 2.556, w: 7.751, h: 2.345, fontFace: SEMI, fontSize: 36,
+    color: WHITE, align: 'center', lineSpacingMultiple: 1.11111
+  });
+  barRule(s, 11.124, 5.787, true);
+  barRule(s, 2.235, 5.787, true);
+  txt(s, 'www.example.com', { x: 5.016, y: 6.746, w: 3.3, h: 0.452, fontFace: MED, fontSize: 11, align: 'center', lineSpacingMultiple: 2.27272 });
+}
+
+function slide13(s) {
+  photo(s, 8.354, -0.023, 4.979, 7.523);
+  heading(s, 0.867, 0.823, 4.834, 'Team Leaders');
+  tagline(s, 0.867, 2.559);
+  txt(s, 'Skills :', { x: 0.867, y: 4.173, w: 1.343, h: 0.479, fontFace: MED, fontSize: 18, lineSpacingMultiple: 1.66666 });
+  // three skill meters
+  [
+    { y: 5.094, x: 0.983, label: 'UX Design', lx: 0.899, lw: 0.911, ly: 4.819, pct: '63%', px: 2.535, py: 4.991, c: BLACK },
+    { y: 5.529, x: 0.986, label: 'Web Design', lx: 0.915, lw: 1.027, ly: 5.220, pct: '12%', px: 2.543, py: 5.426, c: G7F },
+    { y: 5.980, x: 0.983, label: 'UI Design', lx: 0.899, lw: 0.911, ly: 5.676, pct: '71%', px: 2.551, py: 5.877, c: GBF }
+  ].forEach(m => {
+    s.addShape(SH.roundRect, { x: m.x, y: m.y, w: 1.465, h: 0.12, rectRadius: 0.06, fill: { color: GF2 } });
+    s.addShape(SH.roundRect, { x: m.x, y: m.y, w: 1.102, h: 0.12, rectRadius: 0.06, fill: { color: m.c } });
+    txt(s, m.label, { x: m.lx, y: m.ly, w: m.lw, h: 0.3, fontSize: 9, lineSpacingMultiple: 1.77777 });
+    txt(s, m.pct, { x: m.px, y: m.py, w: 0.703, h: 0.311, fontSize: 12, lineSpacingMultiple: 1.33333 });
+  });
+  icon(s, 4.723, 2.554, 0.672, 0.731, BLACK);
+  txt(s, 'Hello\u2019', { x: 4.509, y: 3.599, w: 1.192, h: 0.438, fontFace: MED, fontSize: 20 });
+  txt(s, 'I\u2019m Web Developer', { x: 4.509, y: 3.991, w: 3.381, h: 0.438, fontFace: MED, fontSize: 20 });
+  txt(s, bioText(), { x: 4.444, y: 4.413, w: 3.687, h: 0.999, fontSize: 8, lineSpacingMultiple: 2 });
+  txt(s, 'Aura Jackson', { x: 4.451, y: 6.123, w: 2.25, h: 0.37, fontFace: SEMI, fontSize: 16 });
+  rule(s, 4.554, 6.482, 0.386, 0, G7F, 0.75);
+  txt(s, 'CEO/  Management Department Minimal Presentation', { x: 4.444, y: 6.505, w: 3.313, h: 0.236, fontSize: 8 });
+  socialRow(s, 4.554, 6.775, G3F);
+}
+
+function slide14(s) {
+  photo(s, 2.917, 0, 3.75, 3.75, SH.diamond);
+  photo(s, 6.667, 0, 3.75, 3.75, SH.diamond);
+  photo(s, 2.917, 3.75, 3.75, 3.75, SH.diamond);
+  photo(s, 6.667, 3.75, 3.75, 3.75, SH.diamond);
+  s.addShape(SH.diamond, { x: 4.792, y: 1.875, w: 3.75, h: 3.75, fill: { color: BLACK } });
+  txt(s, 'Our', { x: 2.396, y: 3.349, w: 1.479, h: 0.802, fontSize: 44, bold: true, lineSpacingMultiple: 1.13636 });
+  txt(s, 'Team', { x: 5.583, y: 3.349, w: 2.167, h: 0.802, fontSize: 44, bold: true, color: WHITE, align: 'center', lineSpacingMultiple: 1.13636 });
+  txt(s, 'Members', { x: 9.197, y: 3.349, w: 3.511, h: 0.802, fontSize: 44, bold: true, lineSpacingMultiple: 1.13636 });
+  // four member blurbs pinned to the corners
+  [
+    { name: 'Robert James', role: 'Manager', align: 'right', nx: 1.190, ny: 1.333, dx: 0.644, dy: 1.535, rx: 2.125, ry: 2.733, cx: 2.319, cy: 2.105, gx: 2.441, gy: 2.200, gw: 0.149, gh: 0.244, c: BLACK },
+    { name: 'Anthony Mike', role: 'Designer', align: 'left', nx: 10.515, ny: 1.291, dx: 10.515, dy: 1.514, rx: 10.515, ry: 2.692, cx: 10.611, cy: 2.084, gx: 10.699, gy: 2.210, gw: 0.224, gh: 0.182, c: G59 },
+    { name: 'Robert James', role: 'Manager', align: 'right', nx: 1.177, ny: 5.037, dx: 0.631, dy: 5.249, rx: 2.112, ry: 6.437, cx: 2.306, cy: 5.809, gx: 2.392, gy: 5.894, gw: 0.221, gh: 0.222, c: G7F },
+    { name: 'Anthony Mike', role: 'Designer', align: 'left', nx: 10.467, ny: 4.995, dx: 10.467, dy: 5.228, rx: 10.467, ry: 6.396, cx: 10.563, cy: 5.794, gx: 10.651, gy: 5.880, gw: 0.223, gh: 0.223, c: GD8 }
+  ].forEach(m => {
+    txt(s, m.name, { x: m.nx, y: m.ny, w: 1.648, h: 0.337, fontFace: MED, fontSize: 14, align: m.align });
+    txt(s, SHORT_DESC, { x: m.dx, y: m.dy, w: 2.194, h: 0.381, fontSize: 7, align: m.align, lineSpacingMultiple: 1.42857 });
+    ring(s, m.cx, m.cy, 0.393, m.c);
+    glyph(s, m.gx, m.gy, m.gw, m.gh, m.c);
+    txt(s, m.role, { x: m.rx, y: m.ry, w: 0.712, h: 0.241, fontSize: 7, align: m.align, lineSpacingMultiple: 1.42857 });
+  });
+}
+
+function slide15(s) {
+  heading(s, 0.867, 0.823, 4.834, 'Our Product');
+  tagline(s, 0.913, 1.838);
+  photo(s, 4.195, 1.605, 2.544, 3.562);
+  photo(s, 4.195, 5.267, 2.544, 1.416);
+  photo(s, 6.843, 1.605, 3.324, 5.078);
+  circle(s, 1.912, 2.861, 0.813, BLACK);
+  icon(s, 2.141, 3.092, 0.353, 0.350, WHITE);
+  txt(s, lines(['Product', 'Developments']), { x: 1.827, y: 3.744, w: 1.537, h: 0.494, fontFace: SEMI, fontSize: 11, bold: true, lineSpacingMultiple: 1.27272 });
+  circle(s, 1.910, 5.478, 0.813, G7F);
+  icon(s, 2.157, 5.662, 0.356, 0.399, WHITE);
+  txt(s, lines(['Product', 'Marketing Analysis']), { x: 1.827, y: 6.359, w: 2.09, h: 0.494, fontFace: SEMI, fontSize: 11, bold: true, lineSpacingMultiple: 1.27272 });
+  figureStat(s, 10.669, 2.325, 1.559, '$10K', 10.721, 2.899);
+  figureStat(s, 10.658, 5.846, 1.722, '$50K', 10.764, 6.456);
+  icon(s, 10.805, 1.489, 0.773, 0.633, BLACK);
+  icon(s, 10.805, 5.012, 0.648, 0.640, G7F);
+}
+
+function slide16(s) {
+  heading(s, 0.784, 0.823, 4.834, 'Our Product');
+  tagline(s, 0.830, 1.838);
+  txt(s, bioText(), { x: 0.860, y: 2.747, w: 3.687, h: 0.999, fontSize: 8, lineSpacingMultiple: 2 });
+  photo(s, 0.944, 3.927, 2.941, 2.777);
+  photo(s, 6.578, 0.823, 2.892, 3.093);
+  photo(s, 9.615, 0.823, 2.917, 5.894);
+  rect(s, 3.998, 3.931, 2.456, 2.773, G26);
+  ring(s, 4.940, 4.168, 0.558, WHITE);
+  circle(s, 4.986, 4.210, 0.075, WHITE);
+  txt(s, '01', { x: 4.968, y: 4.299, w: 0.512, h: 0.381, fontFace: SEMI, fontSize: 20, color: WHITE, align: 'center', lineSpacingMultiple: 1 });
+  icon(s, 5.003, 4.880, 0.447, 0.447, WHITE);
+  card(s, { x: 4.395, y: 5.406, bx: 4.147, by: 5.876, bw: 2.158, color: WHITE, align: 'center' });
+  txt(s, 'Title Here', { x: 6.898, y: 4.152, w: 1.19, h: 0.325, fontFace: MED, fontSize: 14, lineSpacingMultiple: 1.14285 });
+  txt(s, '+43k', { x: 6.889, y: 4.392, w: 2.426, h: 0.802, fontFace: SEMI, fontSize: 44, lineSpacingMultiple: 1.13636 });
+  rule(s, 6.974, 5.388, 1.888, 0, G26, 0.75);
+  rule(s, 6.974, 5.388, 0.456, 0, G26, 6.25);
+  txt(s, 'Title Here', { x: 6.898, y: 5.805, w: 1.19, h: 0.325, fontFace: MED, fontSize: 14, lineSpacingMultiple: 1.14285 });
+  txt(s, '$13+B', { x: 6.889, y: 6.045, w: 2.426, h: 0.802, fontFace: SEMI, fontSize: 44, lineSpacingMultiple: 1.13636 });
+}
+
+function slide17(s) {
+  photo(s, 8.238, 0, 5.095, 7.5);
+  heading(s, 0.898, 0.786, 3.309, 'Revenue');
+  tagline(s, 0.900, 1.990, 2.316);
+  s.addShape(SH.ellipse, { x: 4.158, y: 3.862, w: 3.001, h: 3.001, fill: { color: GA5 }, line: { color: WHITE, width: 5 } });
+  s.addShape(SH.ellipse, { x: 1.660, y: 2.774, w: 2.616, h: 2.616, fill: { color: BLACK }, line: { color: WHITE, width: 5 } });
+  s.addShape(SH.ellipse, { x: 4.025, y: 1.492, w: 2.293, h: 2.293, fill: { color: GF2 }, line: { color: WHITE, width: 5 } });
+  [
+    { cap: 'Review', cx: 4.774, cy: 2.118, cw: 0.796, ch: 0.438, vx: 4.237, vy: 2.461, vw: 1.871, v: '$47M', c: BLACK },
+    { cap: 'Clients', cx: 2.559, cy: 3.564, cw: 0.817, ch: 0.391, vx: 2.008, vy: 3.889, vw: 1.920, v: '40.01K', c: WHITE },
+    { cap: 'Flowers', cx: 5.250, cy: 4.866, cw: 0.817, ch: 0.391, vx: 4.699, vy: 5.219, vw: 1.920, v: '40.01K', c: WHITE }
+  ].forEach(b => {
+    txt(s, b.cap, { x: b.cx, y: b.cy, w: b.cw, h: b.ch, fontSize: 11, color: b.c, align: 'center', lineSpacingMultiple: 2.18181 });
+    txt(s, b.v, { x: b.vx, y: b.vy, w: b.vw, h: 0.662, fontFace: SEMI, fontSize: 36, color: b.c, align: 'center', lineSpacingMultiple: 1.11111 });
+  });
+  rect(s, 8.245, 0.702, 4.354, 6.127, GF2, 61);
+  stepCard(s, { cx: 7.829, cy: 1.625, dot: G26, num: '01', nx: 7.920, nw: 0.615, x: 8.836, color: WHITE });
+  stepCard(s, { cx: 7.829, cy: 3.372, dot: G59, num: '02', nx: 7.873, nw: 0.744, x: 8.836, color: WHITE });
+  stepCard(s, { cx: 7.816, cy: 5.212, dot: GBF, num: '03', nx: 7.857, nw: 0.706, x: 8.836, color: WHITE });
+  [2.929, 4.778].forEach(y => {
+    rule(s, 8.948, y, 0.594, 0, WHITE, 0.75);
+    rule(s, 9.114, y, 0.261, 0, WHITE, 3.75);
+  });
+  txt(s, 'www.example.com', { x: 0.898, y: 6.635, w: 2.979, h: 0.452, fontFace: MED, fontSize: 11, lineSpacingMultiple: 2.27272 });
+}
+
+function slide18(s) {
+  photo(s, 0, 0, 7.024, 7.5);
+  icon(s, 9.212, 1.028, 1.695, 1.653, BLACK);
+  txt(s, 'Break Section', { x: 7.476, y: 3.04, w: 4.794, h: 2.068, fontSize: 72, bold: true, color: GA5, align: 'center', lineSpacingMultiple: 0.97222 });
+  shortBarRule(s, 9.726, 4.912);
+  txt(s, lines(['Assets Plus Get free Assets', 'Every Month.']), {
+    x: 7.253, y: 5.6, w: 4.947, h: 1.223, fontFace: SEMI, fontSize: 24, align: 'center', lineSpacingMultiple: 1.66666
+  });
+}
+
+function slide19(s) {
+  photo(s, 6.899, 0, 6.434, 3.75);
+  photo(s, 6.899, 3.75, 6.434, 3.75);
+  shortBarRule(s, 3.528, 3.084);
+  [
+    { num: '01', ring: 2.862, ry: 0.383, nx: 2.924, ny: 0.580, dot: 2.976, dy: 0.487, ty: 1.822, by: 2.596 },
+    { num: '02', ring: 2.806, ry: 4.164, nx: 2.850, ny: 4.348, dot: 3.259, dy: 5.417, ty: 5.580, by: 6.354 }
+  ].forEach(b => {
+    ring(s, b.ring, b.ry, 1.379, GBF);
+    circle(s, b.dot, b.dy, 0.186, GA5);
+    txt(s, b.num, { x: b.nx, y: b.ny, w: 1.265, h: 1.083, fontFace: SEMI, fontSize: 60, color: GD8, align: 'center', lineSpacingMultiple: 1.16666 });
+    txt(s, lines(['Awesome Slide', 'Text Here']), { x: 1.054, y: b.ty, w: 4.947, h: 0.774, fontFace: SEMI, fontSize: 24, align: 'center', lineSpacingMultiple: 1 });
+    loremBlock(s, 0.609, b.by, 5.837, 0.774, { align: 'center', compact: true });
+  });
+}
+
+function slide20(s) {
+  heading(s, 4.454, 0.823, 4.424, 'Our Clients', BLACK, 'center');
+  txt(s, LOREM_WIDE, { x: 1.347, y: 1.560, w: 10.972, h: 0.5, fontSize: 9, align: 'center', lineSpacingMultiple: 1.66666 });
+  // 3 x 2 grid of client tiles
+  [
+    { x: 3.720, y: 2.389, bg: G26, fg: WHITE, ix: 4.767, iy: 2.713, iw: 0.686, ih: 0.694, tx: 4.279, tw: 1.661, label: 'Old' },
+    { x: 6.623, y: 2.389, bg: G7F, fg: WHITE, ix: 7.683, iy: 2.713, iw: 0.660, ih: 0.694, tx: 7.182, tw: 1.661, label: 'Old' },
+    { x: 9.527, y: 2.389, bg: GD8, fg: BLACK, ix: 10.569, iy: 2.721, iw: 0.694, ih: 0.677, tx: 10.085, tw: 1.661, label: 'Old' },
+    { x: 3.720, y: 4.609, bg: G7F, fg: WHITE, ix: 4.661, iy: 4.839, iw: 0.898, ih: 0.769, tx: 4.156, tw: 1.908, label: 'New' },
+    { x: 6.623, y: 4.609, bg: GD8, fg: BLACK, ix: 7.527, iy: 4.893, iw: 0.972, ih: 0.741, tx: 7.059, tw: 1.908, label: 'New' },
+    { x: 9.527, y: 4.609, bg: G26, fg: WHITE, ix: 10.441, iy: 4.881, iw: 0.950, ih: 0.885, tx: 9.962, tw: 1.908, label: 'New' }
+  ].forEach(t => {
+    rect(s, t.x, t.y, 2.779, 2.111, t.bg);
+    icon(s, t.ix, t.iy, t.iw, t.ih, t.fg);
+    txt(s, lines(['Our ', t.label + ' Clients']), {
+      x: t.tx, y: t.y + 1.211, w: t.tw, h: 0.606, fontFace: SEMI, fontSize: 18, bold: true,
+      color: t.fg, align: 'center', lineSpacingMultiple: 1
+    });
+  });
+  txt(s, '01', { x: 0.844, y: 2.614, w: 0.791, h: 0.522, fontFace: SEMI, fontSize: 32, align: 'center', lineSpacingMultiple: 0.9375 });
+  card(s, { x: 0.946, y: 3.136, by: 3.606, bw: 2.274 });
+  txt(s, '02', { x: 0.796, y: 4.888, w: 0.957, h: 0.522, fontFace: SEMI, fontSize: 32, align: 'center', lineSpacingMultiple: 0.9375 });
+  card(s, { x: 0.946, y: 5.410, by: 5.880, bw: 2.274 });
+}
+
+function slide21(s) {
+  rect(s, 0, 0, 13.333, 3.431, G26);
+  heading(s, 0.898, 0.786, 4.769, 'Creative Slide', WHITE);
+  photo(s, 1.038, 1.861, 5.950, 4.083);
+  rect(s, 6.988, 1.318, 5.706, 5.612, WHITE);
+  tagline(s, 7.151, 1.743, 2.316);
+  [
+    { ix: 7.986, iy: 2.720, iw: 0.641, ih: 0.641, tx: 7.910, ty: 3.533, bx: 7.898, blx: 7.901 },
+    { ix: 10.703, iy: 2.602, iw: 0.592, ih: 0.746, tx: 10.645, ty: 3.510, bx: 10.645, blx: 10.648 }
+  ].forEach(c => {
+    icon(s, c.ix, c.iy, c.iw, c.ih, BLACK);
+    card(s, { x: c.tx, y: c.ty, bx: c.bx, by: 4.019, bw: 2.174, bh: 1.447, body: longStackBody() });
+    bulletPair(s, c.blx, 5.570, 2.171, 0.774, BLACK, true);
+  });
+  figureStat(s, 1.747, 6.075, 1.559, '$10K', 1.799, 6.648);
+  figureStat(s, 5.069, 6.044, 1.722, '$50K', 5.175, 6.654);
+  icon(s, 0.923, 6.201, 0.773, 0.633, BLACK);
+  icon(s, 4.256, 6.174, 0.648, 0.640, G7F);
+}
+
+function slide22(s) {
+  heading(s, 3.569, 0.823, 6.196, 'Smart Data Chart', BLACK, 'center');
+  txt(s, LOREM_WIDE, { x: 1.347, y: 1.751, w: 10.972, h: 0.5, fontSize: 9, align: 'center', lineSpacingMultiple: 1.66666 });
+  // Three ring charts, each built from block-arc segments.
+  const RINGS = [
+    { x: 0.847, y: 2.655, segs: [[217.0, 270.5, 0.2482, GE7], [270.5, 131.4, 0.2590, BLACK], [131.9, 216.9, 0.2561, G88]] },
+    { x: 4.994, y: 2.646, segs: [[168.2, 270.5, 0.2482, GE7], [270.5, 168.7, 0.2719, BLACK]] },
+    { x: 9.141, y: 2.646, segs: [[217.0, 270.5, 0.2482, GE7], [270.5, 131.4, 0.2590, BLACK], [131.9, 216.9, 0.2561, G88]] }
+  ];
+  RINGS.forEach(r => r.segs.forEach(([a1, a2, th, color]) => {
+    s.addShape(SH.blockArc, {
+      x: r.x, y: r.y, w: 3.32, h: 3.32, angleRange: [a1, a2], arcThicknessRatio: th,
+      fill: { color }, line: { color: WHITE, width: 1.5 }
+    });
+  }));
+  [
+    { ix: 2.381, iy: 3.479, iw: 0.260, ih: 0.260, tx: 1.680, ty: 3.912, bx: 1.563, by: 4.406, vx: 1.252, vy: 5.916, v: '74%' },
+    { ix: 6.534, iy: 3.423, iw: 0.240, ih: 0.303, tx: 5.823, ty: 3.888, bx: 5.706, by: 4.406, vx: 5.395, vy: 5.868, v: '+371' },
+    { ix: 10.668, iy: 3.508, iw: 0.258, ih: 0.256, tx: 9.966, ty: 3.912, bx: 9.849, by: 4.382, vx: 9.538, vy: 5.868, v: '2.34k' }
+  ].forEach(c => {
+    icon(s, c.ix, c.iy, c.iw, c.ih, BLACK);
+    card(s, { x: c.tx, y: c.ty, bx: c.bx, by: c.by, bw: 1.896, bh: 0.774, align: 'center', body: stackBody() });
+    txt(s, c.v, { x: c.vx, y: c.vy, w: 2.518, h: 1.12, fontFace: MED, fontSize: 44, align: 'center', lineSpacingMultiple: 1.5909 });
+  });
+}
+
+function slide23(s) {
+  heading(s, 0.784, 0.823, 4.834, 'Smart Device');
+  tagline(s, 0.830, 1.838);
+  [
+    { n: '01', iy: 3.068, ih: 0.541, iw: 0.541, ix: 1.638, ty: 2.957, tw: 1.796, by: 3.289 },
+    { n: '02', iy: 4.458, ih: 0.595, iw: 0.473, ix: 1.672, ty: 4.374, tw: 1.936, by: 4.723 },
+    { n: '03', iy: 5.873, ih: 0.501, iw: 0.541, ix: 1.638, ty: 5.791, tw: 1.936, by: 6.123 }
+  ].forEach(r => {
+    icon(s, r.ix, r.iy, r.iw, r.ih, BLACK);
+    txt(s, 'SUBTITLE TEXT ' + r.n, { x: 2.506, y: r.ty, w: r.tw, h: 0.381, fontSize: 11, bold: true, lineSpacingMultiple: 1.81818 });
+    txt(s, 'There are many variations of passages of Lorem passages of Lorem Ipsum available, ', {
+      x: 2.506, y: r.by, w: 3.065, h: 0.472, fontSize: 8, color: G7F, lineSpacingMultiple: 1.75
+    });
+  });
+  // desktop monitor mock-up
+  s.addShape(SH.roundRect, { x: 6.043, y: 1.564, w: 6.413, h: 3.912, rectRadius: 0.12, fill: { color: G3F } });
+  circle(s, 9.165, 1.691, 0.078, '626263');
+  photo(s, 6.323, 1.810, 5.871, 3.432);
+  s.addShape(SH.roundRect, { x: 6.045, y: 5.476, w: 6.413, h: 0.498, rectRadius: 0.09, fill: { color: 'EBEAED' } });
+  circle(s, 9.106, 5.628, 0.195, 'D5D3D7');
+  s.addShape(SH.custGeom, {
+    x: 8.519, y: 5.937, w: 1.388, h: 0.755, fill: { color: 'D3D0D5' },
+    points: [{ x: 0.10, y: 0 }, { x: 1.288, y: 0 }, { x: 1.388, y: 0.755 }, { x: 0, y: 0.755 }, { close: true }]
+  });
+  s.addShape(SH.roundRect, { x: 8.419, y: 6.676, w: 1.588, h: 0.195, rectRadius: 0.05, fill: { color: GBF } });
+}
+
+function slide24(s) {
+  rect(s, 1.292, -0.008, 1.502, 2.111, G26);
+  rect(s, 0, 2.103, 1.292, 1.839, G7F);
+  rect(s, 1.292, 3.943, 1.502, 2.111, GF2);
+  txt(s, 'THANK YOU', { x: 2.934, y: 2.108, w: 6.717, h: 1.223, fontSize: 72, bold: true, lineSpacingMultiple: 1.11111 });
+  txt(s, 'For Watching With Us?', { x: 2.934, y: 3.315, w: 4.368, h: 0.522, fontFace: SEMI, fontSize: 24, bold: true, lineSpacingMultiple: 1.25 });
+  [
+    { y: 3.862, w: 3.134, dy: 4.004, dot: BLACK, body: ['Phone & Fax:', '+1 028 280 093/+1 203 309 209'] },
+    { y: 4.864, w: 2.735, dy: 5.014, dot: G59, body: ['Emails:', 'myemail@domain.com', '2ndemail@domain.net'] },
+    { y: 6.166, w: 3.010, dy: 6.328, dot: GBF, body: ['Address:', '560 Colins Street, NY 86402'] }
+  ].forEach(b => {
+    s.addShape(SH.roundRect, { x: 8.587, y: b.dy, w: 0.096, h: 0.096, rectRadius: 0.016, fill: { color: b.dot } });
+    txt(s, b.body.map((t, i) => ({
+      text: t, options: Object.assign({ bold: i === 0 }, i < b.body.length - 1 ? { breakLine: true } : {})
+    })), { x: 8.748, y: b.y, w: b.w, h: b.body.length === 3 ? 0.942 : 0.662, fontSize: 12, lineSpacingMultiple: 1.66666 });
+  });
+}
+
+const SLIDES = [
+  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08,
+  slide09, slide10, slide11, slide12, slide13, slide14, slide15, slide16,
+  slide17, slide18, slide19, slide20, slide21, slide22, slide23, slide24
+];
+
+/* --------------------------------------------------------------------- build */
+
+function build() {
+  const pptx = new PptxGenJS();
+  SH = pptx.ShapeType;
+  pptx.defineLayout({ name: 'WIDE_13x75', width: 13.333, height: 7.5 });
+  pptx.layout = 'WIDE_13x75';
+  pptx.author = 'pptxgenjs';
+  pptx.title = 'minimal — Stylish Presentation Template';
+
+  SLIDES.forEach(fn => {
+    const slide = pptx.addSlide();
+    slide.background = { color: WHITE };
+    fn(slide);
+  });
+
+  return pptx.writeFile({
+    fileName: path.join(__dirname, '0b4082bb-e452-4321-aebf-1ad81c0bf044_grok_final.pptx')
+  });
+}
+
+build().then(f => console.log('wrote ' + f)).catch(e => { console.error(e); process.exit(1); });
