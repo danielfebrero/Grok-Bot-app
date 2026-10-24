@@ -1,0 +1,9 @@
+snapshot	2026-10-24_13-53
+created	2026-10-24 13:53:46 CEST
+label	auto: changement détecté (tree:/home/box/sand-data/managed-skills)
+files	15605
+text_copies	3318
+big_text_gz	5
+unreadable	0
+bytes_hashed	1784049982
+duration_s	3.4
