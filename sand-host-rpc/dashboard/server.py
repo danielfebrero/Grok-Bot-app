@@ -21,6 +21,7 @@ Variables d'environnement :
 """
 import json
 import os
+import sys
 import threading
 import datetime
 from collections import deque, Counter, defaultdict
@@ -28,6 +29,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+_LI = os.path.join(os.path.dirname(HERE), "live-intercept")
+if _LI not in sys.path:
+    sys.path.insert(0, _LI)
+import inference_effects  # noqa: E402
 DEFAULT_LOG_DIR = "/workspace/shared-eg/box-vers-vps/sand-host-rpc-traffic"
 LOG_DIR = os.environ.get("RPC_TRAFFIC_LOG_DIR", DEFAULT_LOG_DIR)
 PORT = int(os.environ.get("DASH_PORT", "8808"))
@@ -148,7 +153,12 @@ def compute_stats(days, last_n):
         if r.get("host"):
             hosts[r["host"]] += 1
         d = r.get("duree_ms")
-        if isinstance(d, (int, float)):
+        # Un tour (secondes) ou un flux SSE long ne doit pas écraser la latence RPC.
+        if (
+            isinstance(d, (int, float))
+            and (r.get("leg") or "") != "inference-effect"
+            and r.get("protocol") != "sse"
+        ):
             latencies.append(float(d))
         # taux d'erreur : status >= 400 ou non numérique "error"
         try:
@@ -190,6 +200,9 @@ def compute_stats(days, last_n):
             "req_body": _trunc(r.get("req_body")),
             "resp_headers": r.get("resp_headers"),
             "resp_body": _trunc(r.get("resp_body")),
+            "kind": r.get("kind"),
+            "turn_id": r.get("turn_id"),
+            "note": r.get("note"),
         })
 
     return {
@@ -212,7 +225,19 @@ def compute_stats(days, last_n):
         },
         "timeline": timeline,
         "last": last_out,
+        "inference_turns": _inference_turns(recs),
+        "inference_note": inference_effects.NOTE,
     }
+
+
+def _inference_turns(recs):
+    """Tours reconstruits depuis les effets (marques, SSE, List*). Lecture seule."""
+    try:
+        turns = inference_effects.correlate_turns(recs)
+    except Exception:
+        return []
+    turns.sort(key=lambda t: t.get("ended_at") or t.get("started_at") or "", reverse=True)
+    return turns[:40]
 
 
 # ------------------------------------------------------------------ http

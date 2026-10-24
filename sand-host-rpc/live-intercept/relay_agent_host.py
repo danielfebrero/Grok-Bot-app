@@ -14,13 +14,18 @@ Le relai :
   * lit la réponse, la renvoie au client ;
   * supporte le KEEP-ALIVE : plusieurs échanges par connexion (ce que
     proxy.py en mode `Connection: close` ne faisait pas) ;
+  * pour GET /events (SSE) : transmet au fil de l'eau et journalise CHAQUE
+    événement `data:` (pas seulement le premier chunk, pas un corps tronqué
+    à 20 Ko). Pas de gzip demandé sur ce chemin, pour garder le flux en clair ;
   * journalise CHAQUE échange (req+resp, corps complets) en JSONL via les helpers
     de rédaction/décodage/rotation DÉJÀ écrits dans rpc-traffic-monitor/proxy.py,
     leg="agent-host". Zéro secret/PII en clair.
   * si la requête est un Upgrade: websocket et que l'upstream répond 101, le
     relai cesse de parser du HTTP et fait suivre les octets tels quels, en
     journalisant chaque trame (texte JSON, binaire hex ou proto, contrôle
-    résumé). permessage-deflate (RSV) n'est pas décompressé.
+    résumé). permessage-deflate (RSV) n'est pas décompressé ;
+  * après une marque markAgentRequest* ou la fin d'un flux SSE, matérialise
+    un tour `inference-effect` si le JSONL permet de le clore (effets seulement).
 
 Usage :
     python3 relay_agent_host.py --listen 1340 --upstream-port 1341 [--upstream-host 127.0.0.1]
@@ -35,6 +40,8 @@ if _MONITOR not in sys.path:
     sys.path.insert(0, _MONITOR)
 import proxy  # noqa: E402  (rpc-traffic-monitor/proxy.py)
 import ws_frames  # noqa: E402
+import inference_effects  # noqa: E402
+import sse_stream  # noqa: E402
 
 LEG = "agent-host"
 
@@ -154,6 +161,61 @@ async def pump_websocket(creader, cwriter, ureader, uwriter, log_dir,
     return False
 
 
+def _now_iso() -> str:
+    return datetime.datetime.now().astimezone().isoformat(timespec="milliseconds")
+
+
+async def _log_sse(cwriter, ureader, log_dir, t0, path, method, status,
+                   status_line, req_headers, resp_headers) -> None:
+    """Journalise chaque événement SSE dès qu'il est complet, puis un résumé."""
+    n_events = 0
+
+    def on_event(ev: dict) -> None:
+        nonlocal n_events
+        n_events += 1
+        proxy.write_traffic_record({
+            "ts": _now_iso(),
+            "leg": LEG,
+            "protocol": "sse",
+            "kind": "sse-event",
+            "direction": "agent->host",
+            "host": "127.0.0.1",
+            "method": path,
+            "http_method": method,
+            "status": status,
+            "resp_body": inference_effects.prepare_sse_data(ev.get("data")),
+        }, log_dir)
+
+    stats = {"pings": 0, "events": 0}
+    try:
+        stats = await sse_stream.forward_sse(
+            ureader, cwriter, status_line, resp_headers, on_event,
+        )
+    except Exception as e:
+        stats["error"] = f"{type(e).__name__}: {e}"
+    dur = round((asyncio.get_event_loop().time() - t0) * 1000, 1)
+    summary = {
+        "ts": _now_iso(),
+        "leg": LEG,
+        "protocol": "sse",
+        "kind": "sse-stream",
+        "direction": "agent->host",
+        "host": "127.0.0.1",
+        "method": path,
+        "http_method": method,
+        "status": status,
+        "duree_ms": dur,
+        "sse_events": n_events,
+        "sse_pings": stats.get("pings", 0),
+        "req_headers": proxy.redact_headers(req_headers),
+        "resp_headers": proxy.redact_headers(resp_headers),
+    }
+    if stats.get("error"):
+        summary["erreur"] = stats["error"]
+    proxy.write_traffic_record(summary, log_dir)
+    inference_effects.maybe_materialize(log_dir, summary)
+
+
 async def pump_one(creader, cwriter, ureader, uwriter, log_dir) -> bool:
     """Traite UN échange req/resp. Renvoie True si la connexion peut rester
     ouverte (keep-alive), False si elle doit être fermée."""
@@ -174,12 +236,16 @@ async def pump_one(creader, cwriter, ureader, uwriter, log_dir) -> bool:
     hd = {k.lower(): v for k, v in req_headers}
 
     # ré-émission vers l'upstream (host-main déplacé), en gardant la connexion.
+    # /events : ne pas demander gzip. Le flux SSE gzippé (Z_SYNC_FLUSH) se
+    # décode mal si on n'a qu'un préfixe, et le journal n'en gardait qu'un bout.
+    events_path = sse_stream.is_events_path(path)
     out = [f"{method} {path} HTTP/1.1"]
     for k, v in req_headers:
         if k.lower() in ("connection", "transfer-encoding", "accept-encoding"):
             continue
         out.append(f"{k}: {v}")
-    out.append("Accept-Encoding: gzip")
+    if not events_path:
+        out.append("Accept-Encoding: gzip")
     out.append("Connection: keep-alive")
     if "content-length" not in hd and req_body:
         out.append(f"Content-Length: {len(req_body)}")
@@ -190,10 +256,20 @@ async def pump_one(creader, cwriter, ureader, uwriter, log_dir) -> bool:
     if not rgot:
         return False
     status_line, resp_headers = rgot
-    resp_body = await proxy.read_body(ureader, resp_headers)
     rhd = {k.lower(): v for k, v in resp_headers}
     sp = status_line.split(" ")
     status = sp[1] if len(sp) > 1 else "?"
+
+    # SSE : ne pas attendre la fin du flux (read_body chunked bloque jusqu'au
+    # chunk 0, et decode_body ne gardait que 20 Ko — le « premier bout »).
+    if sse_stream.is_event_stream(path, rhd, status):
+        await _log_sse(
+            cwriter, ureader, log_dir, t0, path, method, status,
+            status_line, req_headers, resp_headers,
+        )
+        return False
+
+    resp_body = await proxy.read_body(ureader, resp_headers)
 
     # renvoi au client
     rout = [status_line]
@@ -225,6 +301,7 @@ async def pump_one(creader, cwriter, ureader, uwriter, log_dir) -> bool:
                                        rhd.get("content-encoding", ""), path, "response"),
     }
     proxy.write_traffic_record(rec, log_dir)
+    inference_effects.maybe_materialize(log_dir, rec)
 
     # keep-alive sauf si l'un des deux a demandé close
     if hd.get("connection", "").lower() == "close":

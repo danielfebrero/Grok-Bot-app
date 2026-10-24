@@ -390,3 +390,57 @@ Limites :
   même si on les met dans `CDP_PORTS`.
 - Un flux unaire HTTP/2 qui ne se termine pas n'est toujours pas journalisé.
   Les trames WS, elles, partent au fil de l'eau (le socket reste ouvert).
+
+## 14. Tours d'inférence — effets seulement
+
+L'inférence LLM du Grok Bot tourne dans le cloud Cursor, **pas sur la box**.
+Les jetons de conversation, `AiService` / `StreamChat`, openai et x.ai
+**n'atteignent pas** le JSONL. Le host↔backend capturé ici est le plan de
+contrôle (`api2` / `api3` / …). Il n'y a pas de corps de modèle à afficher,
+et ce dossier n'en fabrique pas un.
+
+Ce que la box voit, et que les captures journalisent déjà :
+
+| Effet | Où | Forme utile |
+|---|---|---|
+| `POST /api/markAgentRequestStarted` / `Ended` | agent↔host | `{requestId}` — début / fin, durée |
+| `GET /events?channels=transcript,…` | agent↔host, SSE | `{channel:"transcript", payload:{type, agentId, entry\|entries}}` |
+| `ListGrokBotTranscriptEntries` | host↔backend | requête `agentId`, `sessionId`, `limit` ; réponse `entries[]` : `entryId`, `entryKind`, `body` (JSON d'entrée), `bodyOmitted` |
+
+`inference_effects.py` corrèle ces lignes (fenêtre de la marque, +5 s après
+`Ended`) en un tour synthétique écrit **dans le JSONL du jour**, pas dans un
+fichier à part :
+
+```
+leg=inference-effect  protocol=inference-effect  kind=inference-turn
+```
+
+Champs : `request_id`, `agent_id`, `started_at`, `ended_at`, `duree_ms`,
+`transcript_entry_ids`, `snippets` (extrait court, rédigé). `bodyOmitted: true`
+garde l'id et **pas** de texte. La rédaction est celle de `proxy.py`.
+
+Le flux SSE `/events` est transmis au fil de l'eau. Chaque événement `data:`
+est une ligne `protocol=sse`, `kind=sse-event` — y compris quand l'événement
+est coupé entre deux chunks, et y compris au-delà d'un `Content-Length` trop
+court. On ne demande pas gzip sur ce chemin. Un résumé `kind=sse-stream`
+compte événements et `:ping`. Le tour est matérialisé à la marque de fin (et
+à la fin du flux, et quand `decode_keylog.py` voit un `List*`).
+
+Rejouer sur un JSONL déjà capturé (même dossier que les `traffic-*.jsonl`) :
+
+```
+python3 inference_effects.py --materialize "$RPC_TRAFFIC_LOG_DIR"
+```
+
+Le dashboard (`../dashboard/`) recalcule les tours en lecture seule : un tour
+terminé y montre l'agent, la durée et les entrées transcript.
+
+**Hors sujet : l'egress `:8791`.** Aucun script ici ne le redirige, ne le
+déchiffre, ni ne le journalise. Le BPF host↔backend continue d'exclure
+`198.18.0.1`.
+
+Preuve (cibles scratch, rien d'armé) :
+
+```
+python3 test/test_inference_effects.py
+```

@@ -54,6 +54,17 @@
 </section>
 
 <section class="panel">
+  <h2>Tours d'inférence <span class="dim" id="infCount"></span></h2>
+  <p class="note" id="infNote">Effets seulement — les jetons de conversation ne passent pas par la box. Pas de corps StreamChat.</p>
+  <table id="turnsTbl">
+    <thead><tr>
+      <th>Fin</th><th>État</th><th>Agent</th><th>Request</th><th>Durée</th><th>Entrées transcript</th><th>Extrait</th>
+    </tr></thead>
+    <tbody id="turns"></tbody>
+  </table>
+</section>
+
+<section class="panel">
   <h2>Derniers échanges</h2>
   <table id="tbl">
     <thead><tr><th>Heure</th><th>Leg</th><th>Méthode / path</th><th>HTTP</th><th>Status</th><th>Durée</th></tr></thead>
@@ -72,7 +83,7 @@
   </div>
 </div>
 
-<footer>Lecture seule des logs rédactés · rafraîchi toutes les 2 s · 100% stdlib / vanilla</footer>
+<footer>Lecture seule des logs rédactés · tours = effets (mark*, SSE transcript, ListGrokBotTranscriptEntries) · pas de jetons de conversation · rafraîchi toutes les 2 s</footer>
 <script src="app.js"></script>
 </body>
 </html>

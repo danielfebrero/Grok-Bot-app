@@ -1,0 +1,116 @@
+[
+  {
+    "ts": "2026-10-24T09:00:00.000+00:00",
+    "leg": "agent-host",
+    "direction": "agent->host",
+    "host": "127.0.0.1",
+    "method": "/api/markAgentRequestStarted",
+    "http_method": "POST",
+    "status": "200",
+    "duree_ms": 4.2,
+    "req_body": {"requestId": "req-7f3a"},
+    "resp_body": {"outcome": "accepted"}
+  },
+  {
+    "ts": "2026-10-24T09:00:00.500+00:00",
+    "leg": "agent-host",
+    "protocol": "sse",
+    "kind": "sse-event",
+    "direction": "agent->host",
+    "host": "127.0.0.1",
+    "method": "/events?channels=agents",
+    "http_method": "GET",
+    "status": "200",
+    "resp_body": {
+      "channel": "agents",
+      "payload": {
+        "type": "snapshot",
+        "activeAgentId": "agent-other",
+        "entries": [{"id": "ent-noise", "kind": "message", "content": "ne pas attacher"}]
+      }
+    }
+  },
+  {
+    "ts": "2026-10-24T09:00:01.200+00:00",
+    "leg": "agent-host",
+    "protocol": "sse",
+    "kind": "sse-event",
+    "direction": "agent->host",
+    "host": "127.0.0.1",
+    "method": "/events?channels=transcript,agents",
+    "http_method": "GET",
+    "status": "200",
+    "resp_body": {
+      "channel": "transcript",
+      "payload": {
+        "type": "appended",
+        "agentId": "agent-bc-42",
+        "entry": {
+          "id": "ent-9c2",
+          "kind": "message",
+          "role": "assistant",
+          "content": "J'ai regardé le diff. Contact victim@example.com. Jeton eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0LXNlY3JldC1wYXlsb2FkLXh4eCJ9.Zm9vYmFyYmF6cXV4c2VjcmV0c2ln",
+          "timestampMs": 1729770001200
+        },
+        "ordered": {"replicaKey": "transcript:agent-bc-42", "epoch": "ep-1", "sequence": 4}
+      }
+    }
+  },
+  {
+    "ts": "2026-10-24T09:00:02.400+00:00",
+    "leg": "host-backend",
+    "direction": "host->backend",
+    "host": "api2.cursor.sh",
+    "method": "/aiserver.v1.GrokBotService/ListGrokBotTranscriptEntries",
+    "http_method": "POST",
+    "status": "200",
+    "duree_ms": 38.0,
+    "req_body": {"agentId": "agent-bc-42", "limit": 50, "sessionId": "sess-1"},
+    "resp_body": {
+      "entries": [
+        {
+          "seq": "12",
+          "entryKind": "message",
+          "entryId": "ent-9c2",
+          "updatedSeq": "12",
+          "bodyOmitted": false,
+          "body": "eyJpZCI6ICJlbnQtOWMyIiwgImtpbmQiOiAibWVzc2FnZSIsICJyb2xlIjogImFzc2lzdGFudCIsICJhZ2VudElkIjogImFnZW50LWJjLTQyIiwgImNvbnRlbnQiOiAiSidhaSByZWdhcmTDqSBsZSBkaWZmLiBDb250YWN0IHZpY3RpbUBleGFtcGxlLmNvbS4gSmV0b24gZXlKaGJHY2lPaUpJVXpJMU5pSjkuZXlKemRXSWlPaUowWlhOMExYTmxZM0psZEMxd1lYbHNiMkZrTFhoNGVDSjkuWm05dlltRnlZbUY2Y1hWNGMyVmpjbVYwYzJsbiIsICJ0aW1lc3RhbXBNcyI6IDE3Mjk3NzAwMDEyMDB9"
+        },
+        {
+          "seq": "13",
+          "entryKind": "message",
+          "entryId": "ent-omit",
+          "updatedSeq": "13",
+          "bodyOmitted": true,
+          "body": "SECRET-OMITTED-BODY-do-not-surface"
+        }
+      ],
+      "generation": 4,
+      "cloudAgentPeerIds": [],
+      "cloudAgentPeerIdsKnown": false
+    }
+  },
+  {
+    "ts": "2026-10-24T09:00:03.500+00:00",
+    "leg": "agent-host",
+    "direction": "agent->host",
+    "host": "127.0.0.1",
+    "method": "/api/markAgentRequestEnded",
+    "http_method": "POST",
+    "status": "200",
+    "duree_ms": 3.1,
+    "req_body": {"requestId": "req-7f3a"},
+    "resp_body": {"outcome": "accepted"}
+  },
+  {
+    "ts": "2026-10-24T09:10:00.000+00:00",
+    "leg": "agent-host",
+    "direction": "agent->host",
+    "host": "127.0.0.1",
+    "method": "/api/markAgentRequestStarted",
+    "http_method": "POST",
+    "status": "200",
+    "req_body": {"requestId": "req-open"},
+    "resp_body": {"outcome": "accepted"}
+  }
+]

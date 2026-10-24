@@ -15,11 +15,17 @@ function fmtTime(ts){
 function shortMethod(m){ if(!m) return "?"; return m.length>60?("…"+m.slice(-58)):m; }
 
 function statusClass(st){
+  const s = String(st==null?"":st).toLowerCase();
+  if(s==="completed") return "ok";
+  if(s==="open") return "warn";
   const n = parseInt(st,10);
   if(isNaN(n)) return "err";
   if(n>=500) return "err"; if(n>=400) return "warn"; if(n>=200&&n<300) return "ok"; return "warn";
 }
-function legClass(leg){ return (leg&&leg.indexOf("agent")===0)?"leg2":"leg1"; }
+function legClass(leg){
+  if(leg==="inference-effect") return "leg3";
+  return (leg&&leg.indexOf("agent")===0)?"leg2":"leg1";
+}
 
 async function tick(){
   const days = $("days").value;
@@ -49,6 +55,7 @@ function render(d){
   drawLegs(d.by_leg);
   drawBars("methods", d.top_methods, false);
   drawStatusBars("statuses", d.status_dist);
+  drawTurns(d.inference_turns||[], d.inference_note);
   drawRows(d.last);
 }
 
@@ -80,6 +87,45 @@ function drawStatusBars(elId, pairs){
   if(!pairs.length) el.innerHTML='<div class="dim">aucune donnée</div>';
 }
 
+function drawTurns(turns, note){
+  if(note) $("infNote").textContent = note;
+  $("infCount").textContent = turns.length ? "("+turns.length+")" : "";
+  const tb=$("turns"); tb.innerHTML="";
+  turns.forEach((t)=>{
+    const ids=(t.transcript_entry_ids||[]).join(", ");
+    const snip=(t.snippets&&t.snippets[0]&&t.snippets[0].text)||"";
+    const st=t.status==="completed"?"terminé":"ouvert";
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td class="mono">${fmtTime(t.ended_at||t.started_at)}</td>`+
+      `<td><span class="pill ${t.status==="completed"?"ok":"warn"}">${esc(st)}</span></td>`+
+      `<td class="mono" title="${esc(t.agent_id||"")}">${esc(t.agent_id||"–")}</td>`+
+      `<td class="mono">${esc(t.request_id||"")}</td>`+
+      `<td class="mono">${t.duree_ms!=null?t.duree_ms+" ms":"–"}</td>`+
+      `<td class="mono clip" title="${esc(ids)}">${esc(ids||"–")}</td>`+
+      `<td class="clip" title="${esc(snip)}">${esc(snip||"–")}</td>`;
+    tr.onclick=()=>openTurn(t);
+    tb.appendChild(tr);
+  });
+  if(!turns.length){
+    tb.innerHTML='<tr><td colspan="7" class="dim">aucun tour corrélé — markAgentRequestStarted/Ended + transcript (SSE ou ListGrokBotTranscriptEntries)</td></tr>';
+  }
+}
+
+function openTurn(t){
+  $("mTitle").textContent = `Tour d'inférence (effets seulement) ${t.request_id||""} → ${t.status||""}`;
+  $("mReqH").textContent = t.note||"";
+  $("mReqB").textContent = JSON.stringify({
+    requestId: t.request_id, agentId: t.agent_id, agent_ids: t.agent_ids,
+    started_at: t.started_at, ended_at: t.ended_at, duree_ms: t.duree_ms,
+    sse_events: t.sse_events, list_responses: t.list_responses
+  }, null, 2);
+  $("mResH").textContent = "transcript_entry_ids";
+  $("mResB").textContent = JSON.stringify({
+    transcript_entry_ids: t.transcript_entry_ids, snippets: t.snippets
+  }, null, 2);
+  $("modal").classList.remove("hidden");
+}
+
 function drawRows(rows){
   const tb=$("rows"); tb.innerHTML="";
   rows.forEach((r,i)=>{
@@ -97,10 +143,14 @@ function drawRows(rows){
 }
 
 function openModal(r){
-  const op = r.ws_opcode ? " "+r.ws_opcode : "";
-  const proto = r.protocol ? " · "+r.protocol : "";
-  const extra = (r.ws_path && r.ws_path !== r.method) ? "  "+r.ws_path : "";
-  $("mTitle").textContent = `${r.http_method||""}${op} ${r.method||""}${extra}  [${r.leg||"?"}]${proto} → ${r.status}`;
+  if(r.leg==="inference-effect" || r.kind==="inference-turn"){
+    $("mTitle").textContent = `Tour d'inférence (effets seulement) ${r.turn_id||""} [${r.leg}] → ${r.status}`;
+  }else{
+    const op = r.ws_opcode ? " "+r.ws_opcode : "";
+    const proto = r.protocol ? " · "+r.protocol : "";
+    const extra = (r.ws_path && r.ws_path !== r.method) ? "  "+r.ws_path : "";
+    $("mTitle").textContent = `${r.http_method||""}${op} ${r.method||""}${extra}  [${r.leg||"?"}]${proto} → ${r.status}`;
+  }
   $("mReqH").textContent = JSON.stringify(r.req_headers||{},null,2);
   $("mReqB").textContent = r.req_body==null?"(vide)":(typeof r.req_body==="string"?r.req_body:JSON.stringify(r.req_body,null,2));
   $("mResH").textContent = JSON.stringify(r.resp_headers||{},null,2);
