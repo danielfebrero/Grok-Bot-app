@@ -1,0 +1,16 @@
+{
+  "description": "Delete a stream source",
+  "inputSchema": {
+    "properties": {
+      "id": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "delete_source"
+}

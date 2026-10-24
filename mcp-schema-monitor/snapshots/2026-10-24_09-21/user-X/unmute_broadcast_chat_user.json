@@ -1,0 +1,21 @@
+{
+  "description": "Unmute a user in a broadcast chat",
+  "inputSchema": {
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "user_id": {
+        "description": "A 64-bit signed integer.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "user_id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "unmute_broadcast_chat_user"
+}

@@ -1,0 +1,28 @@
+{
+  "namespace": "user-X",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-19T09:19:06+02:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "data": {
+          "properties": {
+            "bookmarked": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "bookmarked"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "data"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "delete_users_bookmark"
+}

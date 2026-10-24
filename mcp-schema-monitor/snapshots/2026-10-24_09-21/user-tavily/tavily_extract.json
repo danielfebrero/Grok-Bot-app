@@ -1,0 +1,54 @@
+{
+  "description": "Extract content from URLs. Returns raw page content in markdown or text format.",
+  "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+      "extract_depth": {
+        "default": "basic",
+        "description": "Use 'advanced' for LinkedIn, protected sites, or tables/embedded content",
+        "enum": [
+          "basic",
+          "advanced"
+        ],
+        "type": "string"
+      },
+      "format": {
+        "default": "markdown",
+        "description": "Output format",
+        "enum": [
+          "markdown",
+          "text"
+        ],
+        "type": "string"
+      },
+      "include_favicon": {
+        "default": false,
+        "description": "Include favicon URLs",
+        "type": "boolean"
+      },
+      "include_images": {
+        "default": false,
+        "description": "Include images from pages",
+        "type": "boolean"
+      },
+      "query": {
+        "default": "",
+        "description": "Query to rerank content chunks by relevance",
+        "type": "string"
+      },
+      "urls": {
+        "description": "List of URLs to extract content from",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "urls"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "tavily_extract"
+}

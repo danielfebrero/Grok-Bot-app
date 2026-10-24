@@ -1,0 +1,55 @@
+{
+  "namespace": "user-X",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-19T09:16:14+02:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "data": {
+          "properties": {
+            "free_balance": {
+              "type": "number"
+            },
+            "free_grants": {
+              "items": {
+                "properties": {
+                  "amount": {
+                    "type": "number"
+                  },
+                  "expires_at": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "amount",
+                  "expires_at"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "prepaid_balance": {
+              "type": "number"
+            },
+            "total_balance": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "free_balance",
+            "free_grants",
+            "prepaid_balance",
+            "total_balance"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "data"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "get_usage_credits"
+}

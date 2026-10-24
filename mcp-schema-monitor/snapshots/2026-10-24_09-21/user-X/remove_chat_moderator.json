@@ -1,0 +1,17 @@
+{
+  "description": "Remove a chat moderator",
+  "inputSchema": {
+    "properties": {
+      "user_id": {
+        "description": "A 64-bit signed integer.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "user_id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "remove_chat_moderator"
+}

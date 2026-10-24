@@ -1,0 +1,79 @@
+{
+  "namespace": "x",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-19T09:19:06+02:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "data": {
+          "properties": {
+            "created_at": {
+              "type": "string"
+            },
+            "edit_history_tweet_ids": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "id": {
+              "type": "string"
+            },
+            "public_metrics": {
+              "properties": {
+                "bookmark_count": {
+                  "type": "integer"
+                },
+                "impression_count": {
+                  "type": "integer"
+                },
+                "like_count": {
+                  "type": "integer"
+                },
+                "quote_count": {
+                  "type": "integer"
+                },
+                "reply_count": {
+                  "type": "integer"
+                },
+                "retweet_count": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "bookmark_count",
+                "impression_count",
+                "like_count",
+                "quote_count",
+                "reply_count",
+                "retweet_count"
+              ],
+              "type": "object"
+            },
+            "text": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "created_at",
+            "edit_history_tweet_ids",
+            "id",
+            "public_metrics",
+            "text",
+            "url"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "data"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "get_posts_by_id"
+}
