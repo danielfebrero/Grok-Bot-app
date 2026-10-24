@@ -84,8 +84,10 @@ Surchargeable par l'env **`RPC_TRAFFIC_LOG_DIR`**.
 
 **Rotation / cap** (contrainte shared-eg, 1 Go max indicatif) : un fichier par jour,
 purge au-delà de `RPC_TRAFFIC_KEEP_DAYS` (défaut **14 j**) + cap total
-`RPC_TRAFFIC_CAP_MB` (défaut **200 Mo**) — les plus vieux sont retirés. Aucun nom de
-fichier ne contient « token »/« secret » (sinon `.stignore` EG bloquerait la synchro).
+`RPC_TRAFFIC_CAP_MB` (défaut **200 Mo**) — les plus vieux sont retirés. Si le
+fichier du jour est seul au-dessus du cap, seule sa fin est gardée (lignes
+entières). Aucun nom de fichier ne contient « token »/« secret » (sinon
+`.stignore` EG bloquerait la synchro).
 
 Les logs restent hors repo : `.gitignore` exclut `logs/`, `*.jsonl`.
 

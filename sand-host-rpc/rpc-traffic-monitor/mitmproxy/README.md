@@ -57,7 +57,8 @@ Dans le **Syncthing partagé EG**, `box-vers-vps/` (écrit uniquement par la box
 
 Surchargeable par `RPC_TRAFFIC_LOG_DIR`. **Rotation** : un fichier par jour, purge
 au-delà de `RPC_TRAFFIC_KEEP_DAYS` (défaut 14 j) + cap total `RPC_TRAFFIC_CAP_MB`
-(défaut 200 Mo). **Aucun secret** n'est écrit (rédaction systématique) et aucun nom
+(défaut 200 Mo). Un fichier unique au-dessus du cap est réduit à sa fin.
+**Aucun secret** n'est écrit (rédaction systématique) et aucun nom
 de fichier ne contient « token »/« secret » (sinon le `.stignore` EG le bloquerait).
 
 ## Mode transparent (AVANCÉ — NON activé)

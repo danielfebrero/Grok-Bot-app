@@ -27,7 +27,9 @@ Destination des logs (partagée avec l'addon mitmproxy, cf. mitmproxy/addon_log.
   - surchargeable par l'env RPC_TRAFFIC_LOG_DIR.
 ROTATION : un fichier par jour ; purge au-delà de RPC_TRAFFIC_KEEP_DAYS (défaut 14)
 et cap de taille total RPC_TRAFFIC_CAP_MB (défaut 200 Mo) — on retire les plus
-vieux. Tous les secrets/PII sont rédigés AVANT écriture ; rien n'est committé.
+vieux. Si le fichier du jour est le seul et dépasse le cap, on n'en garde que
+la fin (lignes JSONL entières). Tous les secrets/PII sont rédigés AVANT
+écriture ; rien n'est committé.
 """
 from __future__ import annotations
 import argparse, asyncio, datetime, glob, gzip, json, os, re, ssl, sys, zlib
@@ -49,44 +51,89 @@ def logfile_path(log_dir: str) -> str:
     return os.path.join(log_dir, f"traffic-{day}.jsonl")
 
 
-def rotate_logs(log_dir: str) -> None:
+def _int_env(name: str, default: int) -> int:
+    try:
+        return int(os.environ.get(name, str(default)))
+    except (TypeError, ValueError):
+        return default
+
+
+def _shrink_file_to_cap(path: str, cap_bytes: int) -> None:
+    """Garde la fin du fichier, alignée sur une ligne JSONL, sous cap_bytes."""
+    size = os.path.getsize(path)
+    if cap_bytes < 0 or size <= cap_bytes:
+        return
+    with open(path, "rb") as src:
+        if cap_bytes == 0:
+            tail = b""
+        else:
+            src.seek(size - cap_bytes)
+            src.readline()
+            tail = src.read()
+        while len(tail) > cap_bytes and tail:
+            nl = tail.find(b"\n")
+            if nl < 0:
+                tail = b""
+                break
+            tail = tail[nl + 1:]
+    tmp = path + ".cap.tmp"
+    try:
+        with open(tmp, "wb") as out:
+            out.write(tail)
+            out.flush()
+            os.fsync(out.fileno())
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+
+
+def rotate_logs(log_dir: str, keep_days: int | None = None, cap_bytes: int | None = None) -> None:
     """Purge par ancienneté (RPC_TRAFFIC_KEEP_DAYS, défaut 14 j) puis par taille
-    totale (RPC_TRAFFIC_CAP_MB, défaut 200 Mo) — on supprime les plus anciens."""
-    try:
-        keep_days = int(os.environ.get("RPC_TRAFFIC_KEEP_DAYS", "14"))
-    except ValueError:
-        keep_days = 14
-    try:
-        cap_bytes = int(os.environ.get("RPC_TRAFFIC_CAP_MB", "200")) * 1024 * 1024
-    except ValueError:
-        cap_bytes = 200 * 1024 * 1024
+    totale (RPC_TRAFFIC_CAP_MB, défaut 200 Mo). Les plus anciens partent d'abord.
+    Un fichier unique au-dessus du cap est réduit à sa fin, pas laissé grossir."""
+    if keep_days is None:
+        keep_days = _int_env("RPC_TRAFFIC_KEEP_DAYS", 14)
+    if cap_bytes is None:
+        cap_mb = _int_env("RPC_TRAFFIC_CAP_MB", 200)
+        cap_bytes = cap_mb * 1024 * 1024 if cap_mb > 0 else 0
     files = sorted(glob.glob(os.path.join(log_dir, "traffic-*.jsonl")))
     today = datetime.date.today()
     rx = re.compile(r"traffic-(\d{4})-(\d{2})-(\d{2})\.jsonl$")
     # 1) ancienneté
-    for f in list(files):
-        m = rx.search(os.path.basename(f))
-        if not m:
-            continue
-        try:
-            d = datetime.date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
-        except ValueError:
-            continue
-        if (today - d).days >= keep_days:
+    if keep_days > 0:
+        for f in list(files):
+            m = rx.search(os.path.basename(f))
+            if not m:
+                continue
             try:
-                os.remove(f)
-                files.remove(f)
-            except OSError:
-                pass
+                d = datetime.date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+            except ValueError:
+                continue
+            if (today - d).days >= keep_days:
+                try:
+                    os.remove(f)
+                    files.remove(f)
+                except OSError:
+                    pass
     # 2) cap de taille total (on retire les plus vieux d'abord)
     def total():
         return sum(os.path.getsize(f) for f in files if os.path.exists(f))
-    while files and total() > cap_bytes and len(files) > 1:
-        old = files.pop(0)
-        try:
-            os.remove(old)
-        except OSError:
-            break
+    if cap_bytes > 0:
+        while files and total() > cap_bytes and len(files) > 1:
+            old = files.pop(0)
+            try:
+                os.remove(old)
+            except OSError:
+                break
+        if len(files) == 1 and os.path.exists(files[0]) and total() > cap_bytes:
+            try:
+                _shrink_file_to_cap(files[0], cap_bytes)
+            except OSError:
+                pass
 
 
 def write_traffic_record(rec: dict, log_dir: str | None = None) -> str:
