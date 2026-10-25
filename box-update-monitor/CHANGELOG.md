@@ -9,6 +9,12 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-25 22:52 (Paris) — snapshot `2026-10-25_16-50` → `2026-10-25_22-52`
+
+**Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `27a19f855e6a132ae1a9db63d4eb61a54fb04e73` → `f457d3385ac3d811f2def9fece9f41ab0fa47db2` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`). Image `fcbae14`, box-scripts `fcbae14`, sand-host `85c241a` (supervisor `upgrade-85c241a`), exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~1.
+
+Rapport : [reports/2026-10-25_22-52.md](reports/2026-10-25_22-52.md).
+
 ## 2026-10-24 22:49 (Paris) — snapshot `2026-10-24_20-52` → `2026-10-24_22-49`
 
 **Bump agent-store-fuse + install `apt` côté agent (`zstd`)** — aucun push plateforme. Deux changements ce cycle :
