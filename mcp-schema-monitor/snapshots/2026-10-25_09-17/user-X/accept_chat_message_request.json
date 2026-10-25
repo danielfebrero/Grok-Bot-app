@@ -1,0 +1,17 @@
+{
+  "description": "Accept a Chat message request",
+  "inputSchema": {
+    "properties": {
+      "id": {
+        "description": "The other user's ID, or both user IDs joined by a hyphen.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "accept_chat_message_request"
+}

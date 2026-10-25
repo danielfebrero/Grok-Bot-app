@@ -1,0 +1,13 @@
+{
+  "namespace": "cursor-github",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-25T09:15:55+01:00",
+    "responseKind": "json",
+    "schema": {
+      "items": {},
+      "type": "array"
+    },
+    "source": "inferred"
+  },
+  "tool": "list_sub_issues"
+}

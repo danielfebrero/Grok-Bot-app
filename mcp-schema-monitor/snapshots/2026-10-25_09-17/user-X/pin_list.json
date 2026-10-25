@@ -1,0 +1,20 @@
+{
+  "description": "Pin List",
+  "inputSchema": {
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "list_id": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "list_id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "pin_list"
+}

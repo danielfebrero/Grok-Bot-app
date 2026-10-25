@@ -1,0 +1,38 @@
+{
+  "description": "Send Chat Message",
+  "inputSchema": {
+    "properties": {
+      "conversation_token": {
+        "description": "Optional conversation token.",
+        "type": "string"
+      },
+      "encoded_message_create_event": {
+        "description": "Base64-encoded Thrift MessageCreateEvent containing encrypted message contents.",
+        "type": "string"
+      },
+      "encoded_message_event_signature": {
+        "description": "Base64-encoded Thrift MessageEventSignature for message verification.",
+        "type": "string"
+      },
+      "id": {
+        "type": "string"
+      },
+      "message_id": {
+        "description": "Unique identifier for this message.",
+        "type": "string"
+      },
+      "xdk_version": {
+        "description": "Version of the Chat XDK that produced the payload.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "message_id",
+      "encoded_message_create_event"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "send_chat_message"
+}

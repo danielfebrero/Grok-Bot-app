@@ -1,0 +1,36 @@
+{
+  "namespace": "x",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-19T09:18:18+02:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "data": {
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "username": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "username"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "data"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "get_users_by_id"
+}

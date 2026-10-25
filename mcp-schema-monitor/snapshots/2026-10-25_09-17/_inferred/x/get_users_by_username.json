@@ -1,0 +1,88 @@
+{
+  "namespace": "x",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-19T09:18:18+02:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "data": {
+          "properties": {
+            "created_at": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            },
+            "location": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "profile_image_url": {
+              "type": "string"
+            },
+            "public_metrics": {
+              "properties": {
+                "followers_count": {
+                  "type": "integer"
+                },
+                "following_count": {
+                  "type": "integer"
+                },
+                "like_count": {
+                  "type": "integer"
+                },
+                "listed_count": {
+                  "type": "integer"
+                },
+                "media_count": {
+                  "type": "integer"
+                },
+                "tweet_count": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "followers_count",
+                "following_count",
+                "like_count",
+                "listed_count",
+                "media_count",
+                "tweet_count"
+              ],
+              "type": "object"
+            },
+            "username": {
+              "type": "string"
+            },
+            "verified": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "created_at",
+            "description",
+            "id",
+            "location",
+            "name",
+            "profile_image_url",
+            "public_metrics",
+            "username",
+            "verified"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "data"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "get_users_by_username"
+}

@@ -1,0 +1,64 @@
+{
+  "description": "Update a scheduled call",
+  "inputSchema": {
+    "properties": {
+      "description": {
+        "description": "What the call is about.",
+        "type": "string"
+      },
+      "duration_minutes": {
+        "description": "How long the call lasts, in minutes.",
+        "type": "integer"
+      },
+      "id": {
+        "type": "string"
+      },
+      "invitee_ids": {
+        "description": "Everyone to invite: replaces the invite list. At most 25 of them may be people not invited yet.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "notify_invitees": {
+        "description": "Whether invitees get an email about the change. Defaults to true.",
+        "type": "boolean"
+      },
+      "occurrence_start_time": {
+        "description": "Start of the occurrence that scope this or this_and_following refers to (RFC 3339).",
+        "type": "string"
+      },
+      "recurrence": {
+        "description": "RFC 5545 RRULE to repeat the call by, such as FREQ=WEEKLY;BYDAY=MO.",
+        "type": "string"
+      },
+      "scope": {
+        "description": "Which occurrences of a recurring call: all (the default without occurrence_start_time), this (the...",
+        "enum": [
+          "all",
+          "this",
+          "this_and_following"
+        ],
+        "type": "string"
+      },
+      "start_time": {
+        "description": "When the call (or the chosen occurrence) starts now (RFC 3339).",
+        "type": "string"
+      },
+      "time_zone": {
+        "description": "IANA time zone the recurrence follows.",
+        "type": "string"
+      },
+      "title": {
+        "description": "Title invitees see.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "update_scheduled_call"
+}
