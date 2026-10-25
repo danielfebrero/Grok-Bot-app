@@ -1,0 +1,52 @@
+--- 2026-10-25_09-49:/opt/sand/sand-host/box-launchers/box-chrome
++++ 2026-10-25_16-50:/opt/sand/sand-host/box-launchers/box-chrome
+@@ -107,6 +107,8 @@
+ 	CHROME_XDG="${BOX_PRIMARY_XDG}"
+ 	CHROME_DEBUG_PORT="${SAND_CHROME_REMOTE_DEBUG_PORT:-$((SAND_BOX_CDP_PORT_BASE + 1))}"
+ fi
++CHROME_TMPDIR=""
++[ -n "${SAND_CHROME_HOME:-}" ] || CHROME_TMPDIR="${CHROME_XDG}/chrome-tmp"
+ CHROME_DBUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-}"
+ if [ "$(id -u)" -eq 0 ]; then
+ 	CHROME_DBUS_ADDRESS=""
+@@ -382,14 +384,30 @@
+ }
+ 
+ launch_chrome() {
+-	local flags=("${CHROME_FLAGS[@]}")
++	local flags=("${CHROME_FLAGS[@]}") env=("${CHROME_ENV[@]}")
+ 	[ "${CHROME_BIN}" != "${UNGOOGLED_CHROMIUM}" ] || flags+=("${UNGOOGLED_CHROMIUM_FLAGS[@]}")
++	[ -z "${CHROME_TMPDIR:-}" ] || [ ! -d "${CHROME_TMPDIR}" ] || env+=(TMPDIR="${CHROME_TMPDIR}")
+ 	setsid -f /usr/local/bin/box-bounded-log --run "${CHROME_LOG}" -- \
+-		"${CHROME_ENV[@]}" \
++		"${env[@]}" \
+ 		nice -n 10 "${CHROME_BIN}" "${flags[@]}" "$@" \
+ 		</dev/null >/dev/null 2>&1 9>&-
+ }
+ 
++# On Linux Chrome copies each CRX it installs into its temp dir and unpacks it
++# there, and an install it drops leaves both copies behind
++# (https://chromium.googlesource.com/chromium/src/+/refs/tags/156.0.8078.47/extensions/browser/sandboxed_unpacker.cc,
++# https://chromium.googlesource.com/chromium/src/+/refs/tags/156.0.8078.47/extensions/browser/updater/extension_downloader.cc).
++# Each profile keeps its own TMPDIR in its display's runtime dir, which
++# stop-window removes, and a cold launch empties it under the profile lock once
++# no browser holds the profile, so nothing in it belongs to a running Chrome.
++reset_chrome_tmpdir() {
++	local as_box=()
++	[ -n "${CHROME_TMPDIR:-}" ] || return 0
++	[ "$(id -u)" -ne 0 ] || as_box=(runuser -u box --)
++	"${as_box[@]}" rm -rf -- "${CHROME_TMPDIR}" 2>/dev/null
++	"${as_box[@]}" mkdir -m 700 -- "${CHROME_TMPDIR}" 2>/dev/null || true
++}
++
+ lowercase_trimmed() {
+ 	printf '%s' "$1" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]'
+ }
+@@ -556,6 +574,7 @@
+ 		fi
+ 		record_box_browser
+ 		drop_sync_store_for_ungoogled
++		reset_chrome_tmpdir
+ 		launch_chrome --no-startup-window
+ 	else
+ 		use_running_browser

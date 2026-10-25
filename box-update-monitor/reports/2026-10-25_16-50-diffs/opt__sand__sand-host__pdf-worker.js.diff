@@ -1,0 +1,65 @@
+--- 2026-10-25_09-49:/opt/sand/sand-host/pdf-worker.js
++++ 2026-10-25_16-50:/opt/sand/sand-host/pdf-worker.js
+@@ -31,7 +31,8 @@
+ // ../packages/agent/src/tools/core/read/pdf-worker.ts
+ var pdf_worker_exports = {};
+ __export(pdf_worker_exports, {
+-  default: () => extractPdfTextWorker
++  default: () => extractPdfTextWorker,
++  renderPdfPages: () => renderPdfPages
+ });
+ module.exports = __toCommonJS(pdf_worker_exports);
+ var import_node_module = require("node:module");
+@@ -32019,14 +32020,17 @@
+   }
+   return cMapUrl ?? void 0;
+ }
+-async function extractPdfTextWorker(params) {
++function parserFor(params) {
+   const buffer = Buffer.isBuffer(params.bytes) ? params.bytes : Buffer.from(params.bytes);
+   const cMaps = pdfjsCMapUrl();
+-  const parser = new PDFParse({
++  return new PDFParse({
+     data: buffer,
+     ...cMaps === void 0 ? {} : { cMapUrl: cMaps, cMapPacked: true },
+     ...params.disableEval === true ? { isEvalSupported: false } : {}
+   });
++}
++async function extractPdfTextWorker(params) {
++  const parser = parserFor(params);
+   try {
+     const result = await parser.getText();
+     return {
+@@ -32036,3 +32040,32 @@
+     await parser.destroy();
+   }
+ }
++async function renderPage(parser, page, maxEdge) {
++  const scale = maxEdge / Math.max(page.width, page.height, 1);
++  const screenshot = await parser.getScreenshot({
++    partial: [page.pageNumber],
++    scale,
++    imageDataUrl: false,
++    imageBuffer: true
++  });
++  const rendered = screenshot.pages[0];
++  return rendered === void 0 ? void 0 : { pageNumber: page.pageNumber, png: rendered.data };
++}
++async function renderPdfPages(params) {
++  const parser = parserFor(params);
++  try {
++    const info2 = await parser.getInfo({ parsePageInfo: true, first: params.maxPages });
++    const pages = [];
++    for (const page of info2.pages.slice(0, params.maxPages)) {
++      const rendered = await renderPage(parser, page, params.maxEdge);
++      if (rendered !== void 0) pages.push(rendered);
++    }
++    return { totalPages: info2.total, pages };
++  } finally {
++    await parser.destroy();
++  }
++}
++// Annotate the CommonJS export names for ESM import in node:
++0 && (module.exports = {
++  renderPdfPages
++});

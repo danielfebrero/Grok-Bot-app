@@ -1,0 +1,12 @@
+--- 2026-10-25_09-49:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/sports_strategy_playbook.js
++++ 2026-10-25_16-50:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/sports_strategy_playbook.js
+@@ -336,8 +336,7 @@
+   s.addShape('roundRect', { x: cd.x, y: cd.y, w: cd.w, h, rectRadius: 0.06,
+     fill: { color: C.white }, shadow: SHADOW_CARD });
+   const pad = 0.247;
+-  // oxlint-disable-next-line no-useless-assignment
+-  let ty = cd.y + 0.278;
++  let ty;
+   if (cd.icon) {
+     iconBadge(s, cd.x + pad, cd.y + 0.172, 0.547, cd.color);
+     text(s, cd.title, { x: cd.x + pad + 0.61, y: cd.y + 0.278, w: cd.titleW || 1.276, h: 0.348,
