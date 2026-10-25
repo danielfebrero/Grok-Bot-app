@@ -1,0 +1,580 @@
+/**
+ * "MEDICALE" medical presentation template - 31 slides, 13.333 x 7.5 in.
+ * Rebuilt with pptxgenjs only. Raster art in the source deck is replaced by
+ * flat placeholder rectangles (see imageBox / the slide 29 + 30 builders).
+ */
+const PptxGenJS = require('pptxgenjs');
+const path = require('path');
+
+/* ------------------------------------------------------------------ theme */
+
+const BLUE = '5478D8';   // brand accent
+const INK = '171717';    // near-black used for the wordmark / captions
+const COAL = '0D0D0D';   // panel + rule black
+const GREY = '404040';   // muted body grey
+const BLACK = '000000';
+const WHITE = 'FFFFFF';
+
+const MONT = 'Montserrat';
+const POP = 'Poppins';
+const SANS = 'Open Sans';
+const INTER = 'Inter';
+
+/* ---------------------------------------------------------------- deck copy */
+
+const L_FULL = "There are many variations of passages of lorem ipsum available, but the majority " +
+  "have suffered alteration in some form, by injected humour, or randomised words which don't " +
+  'look even slightly believable. ';
+const L_MED = 'There are many variations of passages of lorem ipsum available, but the majority ' +
+  'have suffered alteration in some form, by injected humour.';
+const L_SHORT = 'There are many variations of passages of lorem ipsum available, but the majority.';
+const L_ALT = 'There are many variations of passages of lorem ipsum available, but the majority ' +
+  'have suffered alteration.';
+const L_TWICE = L_MED + ' ' + L_MED;
+const L_PLUS_PASSAGES = L_FULL + 'There are many variations of passages.';
+const L_PLUS_MANY = L_FULL + 'There are many variations.';
+const L_PLUS_SOME = L_FULL + 'There are many.';
+const L_DOUBLE = L_FULL + L_FULL.trim();
+const L_MED_ALT = L_MED + ' ' + L_ALT;
+const L_MED_PASSAGES = L_MED + ' There are many variations of passages.';
+const L_MED_AVAIL = L_MED + ' There are many variations of passages of lorem ipsum available.';
+const L_INJECTED = 'There are many variations of passages of lorem ipsum available, but the ' +
+  'majority have suffered alteration in some form, by injected.';
+const L_RANDOMISED = 'There are many variations of passages of lorem ipsum available, but the ' +
+  'majority have suffered alteration in some form, by injected humour, or randomised.';
+const L_WORDS = 'There are many variations of passages of lorem ipsum available, but the ' +
+  'majority have suffered alteration in some form, by injected humour, or randomised words.';
+const L_SUFFERED = 'There are many variations of passages of lorem ipsum available, but the ' +
+  'majority have suffered.';
+const EYEBROW = 'HEALTH MEDICAL DESIGN';
+const CAPS_LEAD = 'THERE ARE MANY VARIATIONS OF PASSAGES OF LOREM IPSUM AVAILABLE.';
+
+// pptxgenjs mutates the run objects it is handed, so hand it a fresh copy each time.
+const companyRuns = () => [
+  { text: 'A COMPANY IS AN ' },
+  { text: 'ASSOCIATION OR COLLECTION', options: { bold: true } },
+  { text: ' OF INDIVIDUALS, WHETHER NATURAL PERSONS. INDIVIDUALS, - ' },
+  { text: 'WHETHER NATURAL A COMPANY IS AN ASSOCIATION OR COLLECTION OF INDIVIDUALS. ', options: { bold: true } },
+];
+
+/* ------------------------------------------------------------- primitives */
+
+/** Text box. Everything in this deck is top-anchored and left-aligned by default. */
+function text(s, body, o) {
+  s.addText(body, Object.assign({ fontFace: SANS, fontSize: 8, color: BLACK, valign: 'top' }, o));
+}
+
+/** Body copy: 8pt Open Sans at 150% leading. */
+function para(s, x, y, w, h, body, o) {
+  text(s, body, Object.assign({ x, y, w, h, lineSpacingMultiple: 1.5, align: 'justify' }, o));
+}
+
+function rect(s, x, y, w, h, fill, o) {
+  s.addShape('rect', Object.assign({ x, y, w, h, fill: { color: fill }, line: { type: 'none' } }, o));
+}
+
+function hline(s, x, y, w, color, width) {
+  s.addShape('line', { x, y, w, h: 0, line: { color, width: width || 1 } });
+}
+
+function vline(s, x, y, h, color) {
+  s.addShape('line', { x, y, w: 0, h, line: { color, width: 1 } });
+}
+
+/** Stand-in for a photograph from the original deck. */
+function imageBox(s, x, y, w, h) {
+  rect(s, x, y, w, h, 'E9E9E9', { line: { color: 'BBBBBB', width: 0.75 } });
+  text(s, '[image]', { x, y: y + h - 0.32, w, h: 0.25, align: 'center', color: '808080', fontSize: 9 });
+}
+
+/* ------------------------------------------------------------- components */
+
+/**
+ * Page furniture shared by every slide: LOGIN pill (top right), MEDICALE.
+ * wordmark (top left), footer rule + label (bottom left), page pill (bottom right).
+ */
+function chrome(s, o) {
+  s.addShape('roundRect', { x: 11.793, y: 0.363, w: 0.979, h: 0.341, fill: { color: o.pill }, line: { type: 'none' }, rectRadius: 0.1705 });
+  text(s, 'LOGIN', { x: 11.807, y: 0.416, w: 0.843, h: 0.236, fontFace: MONT, color: WHITE, align: 'right' });
+  s.addShape('ellipse', { x: 11.88, y: 0.438, w: 0.195, h: 0.195, fill: { color: WHITE }, line: { type: 'none' } });
+
+  text(s, 'MEDICALE.', { x: 0.61, y: 0.382, w: 1.347, h: 0.303, fontFace: MONT, fontSize: 12, bold: true, color: o.logo });
+
+  hline(s, o.footX === undefined ? 0.869 : o.footX, 6.961, 0.667, o.rule);
+  text(s, 'PRESENTATION TEMPLATE', { x: o.footTextX === undefined ? 1.561 : o.footTextX, y: 6.855, w: 2.258, h: 0.236, fontFace: POP, color: o.foot });
+
+  text(s, '01/31 PAGE', { x: 11.804, y: 6.961, w: 0.918, h: 0.236, fontFace: POP, color: o.page });
+  s.addShape('roundRect', { x: 11.648, y: 6.927, w: 1.123, h: 0.294, fill: { type: 'none' }, line: { color: o.ring }, rectRadius: 0.147 });
+}
+
+/** Blue nav strip: DOCTOR/HEALTHY | HOSPITAL/MEDICAL | PRESENTATION + black "M" tile. */
+function tagStrip(s, x, y) {
+  rect(s, x, y, 3.381, 0.721, BLUE);
+  const tag = (label, dx, dy, underline) => text(s, label, {
+    x: x + dx, y: y + dy, w: 1.083, h: 0.236, fontFace: POP, color: WHITE,
+    underline: underline ? { style: 'sng' } : undefined,
+  });
+  tag('DOCTOR', 0.094, 0.125);
+  tag('HEALTHY', 0.094, 0.384);
+  tag('HOSPITAL', 1.058, 0.125, true);
+  tag('MEDICAL', 1.058, 0.382, true);
+  tag('PRESENTATION', 2.156, 0.125);
+  vline(s, x + 2.003, y + 0.125, 0.493, WHITE);
+  rect(s, x + 3.381, y, 0.732, 0.721, BLACK);
+  text(s, 'M', { x: x + 3.403, y: y - 0.002, w: 0.689, h: 0.774, fontFace: POP, fontSize: 40, bold: true, color: WHITE, align: 'center' });
+}
+
+/** 2.23 x 1.8 solid tile with a two-line heading over a short paragraph. */
+function infoCard(s, x, y, o) {
+  const fg = o.color || WHITE;
+  rect(s, x, y, 2.23, 1.8, o.fill);
+  text(s, o.title.map((t, i) => ({ text: t, options: { breakLine: i < o.title.length - 1 } })),
+    { x: x + 0.212, y: y + 0.25, w: 1.654, h: 0.505, fontFace: INTER, fontSize: 12, bold: true, color: fg });
+  text(s, o.body, { x: x + 0.212, y: y + 0.814, w: 1.91, h: 0.774, color: fg });
+}
+
+/** Wide blue tile: label + paragraph on the left, big "90%" on the right. */
+function statCard(s, x, y, w, o) {
+  rect(s, x, y, w, 1.557, BLUE);
+  text(s, o.label, { x: x + 0.282, y: y + 0.218, w: 1.91, h: 0.286, fontFace: POP, fontSize: 11, bold: true, color: WHITE });
+  text(s, o.body, { x: x + 0.282, y: y + 0.547, w: 1.91, h: 0.774, color: WHITE });
+  vline(s, x + 2.172, y + 0.522, 0.706, WHITE);
+  text(s, o.value, { x: x + 2.285, y: y + 0.454, w: 1.429, h: 0.774, fontFace: POP, fontSize: 40, bold: true, color: WHITE, charSpacing: -3 });
+}
+
+/** Small caps label with a hairline rule underneath it. */
+function ruleLabel(s, o) {
+  text(s, o.label, {
+    x: o.x, y: o.y, w: o.w || 2.258, h: 0.236, wrap: o.wrap,
+    fontFace: o.font || INTER, fontSize: o.size || 8, color: o.color,
+  });
+  hline(s, o.x + (o.ruleDx === undefined ? 0.091 : o.ruleDx), o.ruleY, o.ruleW, o.ruleColor || o.color);
+}
+
+/** Paragraph, hairline rule, then a caption beneath the rule. */
+function noteBlock(s, o) {
+  para(s, o.x, o.y, o.w, o.h, o.body, { color: o.color, align: o.align || 'left' });
+  hline(s, o.x + (o.ruleDx === undefined ? 0.091 : o.ruleDx), o.ruleY, o.ruleW, o.ruleColor || o.color);
+  text(s, o.cap, { x: o.x + (o.capDx === undefined ? 0.018 : o.capDx), y: o.capY, w: 2.258, h: 0.236, fontFace: o.capFont || POP, color: o.color });
+}
+
+/** Eyebrow line above one or two 40pt Montserrat headline rows. */
+function headline(s, o) {
+  if (o.eyebrow !== false) {
+    text(s, EYEBROW, { x: o.x + 0.019, y: o.y - 0.236, w: o.eyebrowW || 2.258, h: 0.236, fontFace: o.eyebrowFont || POP, color: o.eyebrowColor || BLACK });
+  }
+  const h = o.h || 0.774;
+  text(s, o.line1, { x: o.x, y: o.y, w: o.w1, h, fontFace: MONT, fontSize: o.size || 40, bold: true, color: o.color1 || BLACK });
+  if (o.line2) {
+    text(s, o.line2, { x: o.x, y: o.y + (o.gap || 0.508), w: o.w2, h, fontFace: MONT, fontSize: o.size || 40, bold: true, color: o.color2 || BLUE });
+  }
+}
+
+/** Single wrapping headline block whose two colour halves flow as one paragraph. */
+function splitHeadline(s, o) {
+  text(s, EYEBROW, { x: o.x + 0.026, y: o.y - 0.291, w: 2.258, h: 0.236, fontFace: INTER, color: BLACK });
+  text(s, [
+    { text: o.lead, options: { color: COAL } },
+    { text: o.tail, options: { color: BLUE } },
+  ], { x: o.x, y: o.y, w: o.w, h: 1.447, fontFace: MONT, fontSize: 40, bold: true });
+}
+
+/* ------------------------------------------------------------ slide builds */
+
+const CHROME = {
+  1: { logo: GREY, pill: BLUE, page: GREY, ring: GREY, rule: GREY, foot: GREY },
+  2: { logo: GREY, pill: COAL, page: WHITE, ring: WHITE, rule: GREY, foot: GREY },
+  3: { logo: WHITE, pill: BLUE, page: GREY, ring: GREY, rule: WHITE, foot: WHITE },
+  4: { logo: GREY, pill: COAL, page: WHITE, ring: WHITE, rule: GREY, foot: GREY },
+  5: { logo: WHITE, pill: BLUE, page: GREY, ring: GREY, rule: WHITE, foot: WHITE },
+  6: { logo: GREY, pill: BLUE, page: GREY, ring: GREY, rule: GREY, foot: GREY },
+  7: { logo: WHITE, pill: COAL, page: WHITE, ring: WHITE, rule: WHITE, foot: WHITE },
+  8: { logo: WHITE, pill: BLUE, page: GREY, ring: GREY, rule: WHITE, foot: WHITE },
+  9: { logo: GREY, pill: BLUE, page: GREY, ring: GREY, rule: GREY, foot: GREY },
+  10: { logo: GREY, pill: BLUE, page: GREY, ring: GREY, rule: GREY, foot: GREY },
+  11: { logo: WHITE, pill: BLUE, page: INK, ring: BLACK, rule: WHITE, foot: WHITE },
+  12: { logo: INK, pill: BLACK, page: WHITE, ring: WHITE, rule: BLACK, foot: BLACK },
+  13: { logo: WHITE, pill: BLUE, page: INK, ring: BLACK, rule: WHITE, foot: WHITE, footX: 0.808, footTextX: 1.5 },
+  14: { logo: WHITE, pill: BLUE, page: INK, ring: BLACK, rule: WHITE, foot: WHITE, footX: 0.808, footTextX: 1.5 },
+  15: { logo: INK, pill: BLACK, page: WHITE, ring: WHITE, rule: BLACK, foot: BLACK },
+  16: { logo: WHITE, pill: BLUE, page: INK, ring: BLACK, rule: WHITE, foot: WHITE },
+  17: { logo: WHITE, pill: BLUE, page: INK, ring: BLACK, rule: WHITE, foot: WHITE },
+  18: { logo: INK, pill: BLACK, page: WHITE, ring: WHITE, rule: BLACK, foot: BLACK },
+  19: { logo: INK, pill: BLUE, page: INK, ring: BLACK, rule: BLACK, foot: BLACK },
+  20: { logo: WHITE, pill: BLACK, page: INK, ring: BLACK, rule: BLACK, foot: BLACK },
+  21: { logo: INK, pill: BLUE, page: INK, ring: BLACK, rule: BLACK, foot: BLACK, footX: 0.832, footTextX: 1.523 },
+  31: { logo: INK, pill: COAL, page: WHITE, ring: WHITE, rule: BLACK, foot: BLACK },
+};
+// Slides 22-30 all use the plain light chrome.
+for (let n = 22; n <= 30; n++) {
+  CHROME[n] = { logo: INK, pill: BLUE, page: INK, ring: BLACK, rule: BLACK, foot: BLACK };
+}
+
+const BUILDERS = [];
+
+/* 1 - cover */
+BUILDERS.push(function (s) {
+  text(s, CAPS_LEAD, { x: 8.006, y: 1.529, w: 2.455, h: 0.484, fontFace: POP, color: GREY, lineSpacingMultiple: 1.5 });
+  text(s, 'MEDICALE', { x: 7.969, y: 2.029, w: 5.115, h: 1.212, fontFace: POP, fontSize: 66, bold: true, color: GREY });
+  tagStrip(s, 8.141, 3.325);
+  para(s, 8.044, 4.36, 4.306, 0.687, L_FULL);
+  ruleLabel(s, { x: 8.063, y: 5.352, label: 'OFFICE COMPANY', color: COAL, ruleY: 5.624, ruleW: 4.09 });
+  ruleLabel(s, { x: 8.063, y: 5.866, label: 'BUSINESS AGENCY', color: COAL, ruleY: 6.114, ruleW: 4.09 });
+  infoCard(s, 5.147, 4.099, { fill: COAL, title: ['OUR', 'HOSPITALS'], body: L_MED });
+});
+
+/* 2 - introduce */
+BUILDERS.push(function (s) {
+  rect(s, 9.838, 0, 3.496, 7.5, BLUE);
+  headline(s, { x: 1.22, y: 1.791, line1: 'INTRODUCE', w1: 4.546, line2: 'DOCTOR US.', w2: 4.402, gap: 0.507 });
+  para(s, 1.266, 3.223, 2.521, 1.091, L_FULL);
+  para(s, 4.003, 3.223, 2.521, 1.09, L_FULL);
+  tagStrip(s, 1.364, 4.848);
+});
+
+/* 3 - welcome */
+BUILDERS.push(function (s) {
+  rect(s, 0, 0, 3.4, 7.5, BLUE);
+  headline(s, { x: 6.082, y: 2.003, line1: 'WELCOME TO', w1: 5.168, line2: 'MEDICALE.', w2: 4.402 });
+  para(s, 6.128, 3.323, 2.521, 1.091, L_FULL);
+  para(s, 8.865, 3.323, 2.521, 1.09, L_FULL);
+  tagStrip(s, 6.226, 4.76);
+});
+
+/* 4 - our doctor */
+BUILDERS.push(function (s) {
+  rect(s, 7.293, 0, 6.04, 7.5, BLUE);
+  splitHeadline(s, { x: 1.099, y: 2.261, w: 5.274, lead: 'OUR DOCTOR ', tail: 'MEDICALE.' });
+  para(s, 1.171, 3.744, 4.208, 0.888, L_TWICE);
+  ruleLabel(s, { x: 1.199, y: 4.898, label: 'HOSPITALS', color: COAL, ruleY: 5.17, ruleW: 4.09 });
+  ruleLabel(s, { x: 1.199, y: 5.412, label: 'DOCTOR', color: COAL, ruleY: 5.66, ruleW: 4.09 });
+  infoCard(s, 10.542, 2.972, { fill: COAL, title: ['OUR', 'HOSPITALS'], body: L_MED });
+});
+
+/* 5 - about us */
+BUILDERS.push(function (s) {
+  rect(s, 0, 0, 3.688, 7.5, BLUE);
+  splitHeadline(s, { x: 6.667, y: 2.205, w: 5.274, lead: 'ABOUT US ', tail: 'MEDICALE.' });
+  para(s, 6.739, 3.687, 4.208, 0.888, L_TWICE);
+  ruleLabel(s, { x: 6.767, y: 4.842, label: 'HOSPITALS', color: COAL, ruleY: 5.113, ruleW: 4.09 });
+  ruleLabel(s, { x: 6.767, y: 5.356, label: 'DOCTOR', color: COAL, ruleY: 5.604, ruleW: 4.09 });
+});
+
+/* 6 - our vision */
+BUILDERS.push(function (s) {
+  headline(s, { x: 0.706, y: 5.151, line1: 'OUR VISION', w1: 4.072, line2: 'MEDICALE.', w2: 4.904 });
+  vline(s, 6.239, 5.296, 1.137, INK);
+  para(s, 9.605, 5.296, 3.086, 0.889, L_FULL);
+});
+
+/* 7 - our doctor (dark panel) */
+BUILDERS.push(function (s) {
+  rect(s, 0, 0, 5.274, 7.5, COAL);
+  text(s, EYEBROW, { x: 0.648, y: 1.647, w: 2.258, h: 0.236, fontFace: INTER, color: WHITE });
+  text(s, 'OUR DOCTOR MEDICALE.', { x: 0.622, y: 1.938, w: 4.652, h: 1.447, fontFace: MONT, fontSize: 40, bold: true, color: WHITE });
+  para(s, 0.673, 3.625, 3.277, 0.889, L_FULL, { color: WHITE });
+  para(s, 0.665, 4.801, 3.277, 0.889, L_FULL, { color: WHITE });
+  para(s, 5.505, 2.379, 3.529, 0.889, L_MED_AVAIL);
+  para(s, 5.508, 3.591, 3.529, 1.091, L_TWICE);
+  ruleLabel(s, { x: 5.523, y: 4.991, label: 'OFFICE COMPANY', color: COAL, ruleY: 5.262, ruleW: 3.31 });
+  ruleLabel(s, { x: 5.523, y: 5.504, label: 'BUSINESS AGENCY', color: COAL, ruleY: 5.753, ruleW: 3.31 });
+});
+
+/* 8 - our hospitals */
+BUILDERS.push(function (s) {
+  rect(s, 0, 0, 3.438, 7.5, BLUE);
+  headline(s, { x: 6.082, y: 2.003, line1: 'OUR HOSPITALS', w1: 5.168, line2: 'MEDICALE.', w2: 4.402 });
+  para(s, 6.128, 3.436, 2.521, 1.091, L_FULL);
+  para(s, 8.865, 3.436, 2.521, 1.09, L_FULL);
+  tagStrip(s, 6.226, 4.873);
+});
+
+/* 9 - the future */
+BUILDERS.push(function (s) {
+  headline(s, { x: 0.605, y: 1.665, line1: 'THE FUTURE', w1: 4.072, line2: 'MEDICALE.', w2: 4.904, gap: 0.507 });
+  infoCard(s, 7.547, 0.983, { fill: BLUE, title: ['OUR', 'HOSPITALS'], body: L_MED });
+  para(s, 7.584, 4.268, 4.208, 0.888, L_TWICE);
+  ruleLabel(s, { x: 7.612, y: 5.422, label: 'HOSPITALS', color: COAL, ruleY: 5.694, ruleW: 4.09 });
+  ruleLabel(s, { x: 7.612, y: 5.936, label: 'DOCTOR', color: COAL, ruleY: 6.184, ruleW: 4.09 });
+  statCard(s, 0.869, 4.607, 4.089, { label: 'HOSPITALS', body: L_MED, value: '90%' });
+});
+
+/* 10 - workspace */
+BUILDERS.push(function (s) {
+  splitHeadline(s, { x: 0.61, y: 2.276, w: 5.274, lead: 'WORKSPACE ', tail: 'MEDICALE.' });
+  para(s, 0.683, 3.758, 4.208, 0.888, L_TWICE);
+  ruleLabel(s, { x: 0.71, y: 4.913, label: 'HOSPITALS', color: COAL, ruleY: 5.184, ruleW: 4.09 });
+  ruleLabel(s, { x: 0.71, y: 5.426, label: 'DOCTOR', color: COAL, ruleY: 5.675, ruleW: 4.09 });
+  para(s, 10.388, 2.725, 2.521, 1.091, L_FULL);
+  para(s, 10.385, 4.202, 2.521, 0.889, L_WORDS);
+  infoCard(s, 7.675, 5.71, { fill: COAL, title: ['OUR', 'HOSPITALS'], body: L_MED });
+});
+
+/* 11 - focus to work */
+BUILDERS.push(function (s) {
+  rect(s, 0, 0, 3.224, 7.5, BLUE);
+  headline(s, { x: 6.01, y: 1.992, line1: 'FOCUS TO WORK', w1: 5.93, line2: 'FROM HEALTH.', w2: 5.051 });
+  para(s, 6.056, 3.303, 2.521, 1.292, L_PLUS_PASSAGES, { align: 'left' });
+  para(s, 9.151, 3.303, 2.521, 1.09, L_FULL, { align: 'left' });
+  tagStrip(s, 6.154, 4.842);
+});
+
+/* 12 - portfolio */
+BUILDERS.push(function (s) {
+  rect(s, 8.534, 0, 4.799, 7.5, BLUE);
+  noteBlock(s, { x: 1.023, y: 3.852, w: 3.928, h: 0.686, body: L_RANDOMISED, color: BLACK, ruleDx: 0.115, ruleY: 4.682, ruleW: 3.661, capY: 4.776, cap: 'MESSAGE HERE' });
+  noteBlock(s, { x: 9.528, y: 1.884, w: 2.157, h: 0.686, body: L_SHORT, color: WHITE, ruleY: 2.69, ruleW: 2.585, capY: 2.783, cap: 'MESSAGE HERE' });
+  headline(s, { x: 0.998, y: 5.251, eyebrow: false, line1: 'PORTFOLIO', w1: 5.191, line2: 'MEDICALE.', w2: 4.402 });
+});
+
+/* 13 - avalaibale (with top nav + blue sidebar of notes) */
+BUILDERS.push(function (s) {
+  rect(s, 0, 0, 3.447, 7.5, BLUE);
+  ['HOME', 'BLOG', 'SERVICES', 'HELP'].forEach((item, i) => {
+    text(s, item, {
+      x: 4.414 + i * 1.053, y: 0.416, w: 1.347, h: 0.236, fontFace: MONT, color: INK, align: 'center',
+      underline: item === 'SERVICES' ? { style: 'sng' } : undefined,
+    });
+  });
+  headline(s, { x: 3.808, y: 1.965, line1: 'AVALAIBALE', w1: 5.191, line2: 'MEDICALE.', w2: 4.402 });
+  para(s, 3.854, 3.398, 2.521, 1.292, L_PLUS_PASSAGES, { align: 'left' });
+  para(s, 6.614, 3.398, 2.521, 1.09, L_FULL, { align: 'left' });
+  tagStrip(s, 3.952, 4.961);
+  [1.701, 3.275, 4.848].forEach((y) => {
+    noteBlock(s, { x: 0.636, y, w: 2.157, h: 0.686, body: L_SHORT, color: WHITE, ruleY: y + 0.806, ruleW: 2.066, capY: y + 0.899, cap: 'MESSAGE HERE' });
+  });
+});
+
+/* 14 - our hospitals (wide blue panel left) */
+BUILDERS.push(function (s) {
+  rect(s, 0, 0, 5.598, 7.5, BLUE);
+  headline(s, { x: 6.364, y: 2.005, line1: 'OUR HOSPITALS', w1: 5.93, line2: 'MEDICALE.', w2: 5.051, gap: 0.507 });
+  para(s, 6.41, 3.315, 2.521, 1.292, L_PLUS_PASSAGES, { align: 'left' });
+  para(s, 9.505, 3.315, 2.521, 1.09, L_FULL, { align: 'left' });
+  tagStrip(s, 6.508, 4.854);
+});
+
+/* 15 - alternation */
+BUILDERS.push(function (s) {
+  rect(s, 8.734, 0, 4.599, 7.5, BLUE);
+  headline(s, { x: 1.339, y: 1.965, line1: 'ALTERNATION', w1: 5.191, line2: 'MEDICALE.', w2: 4.402 });
+  para(s, 1.386, 3.373, 2.521, 1.292, L_PLUS_PASSAGES);
+  para(s, 4.146, 3.373, 2.521, 1.09, L_FULL);
+  tagStrip(s, 1.483, 4.961);
+  infoCard(s, 10.536, 3.31, { fill: WHITE, color: GREY, title: ['OUR', 'HOSPITALS'], body: L_MED });
+});
+
+/* 16 - portfolio hospitals */
+BUILDERS.push(function (s) {
+  rect(s, 0, 0, 6.353, 7.5, BLUE);
+  text(s, EYEBROW, { x: 0.661, y: 1.984, w: 2.258, h: 0.236, fontFace: INTER, color: WHITE });
+  text(s, 'PORTFOLIO HOSPITALS.', { x: 0.635, y: 2.276, w: 5.274, h: 1.447, fontFace: MONT, fontSize: 40, bold: true, color: WHITE });
+  para(s, 0.708, 3.758, 4.208, 0.888, L_TWICE, { color: WHITE });
+  ruleLabel(s, { x: 0.735, y: 4.913, label: 'HOSPITALS', color: WHITE, ruleY: 5.184, ruleW: 4.09 });
+  ruleLabel(s, { x: 0.735, y: 5.426, label: 'DOCTOR', color: WHITE, ruleY: 5.675, ruleW: 4.09 });
+  statCard(s, 8.633, 4.105, 3.993, { label: 'HOSPITALS', body: L_MED, value: '90%' });
+});
+
+/* 17 - portfolio */
+BUILDERS.push(function (s) {
+  rect(s, 0, 0, 4.798, 7.5, BLUE);
+  headline(s, { x: 7.002, y: 1.99, line1: 'PORTFOLIO', w1: 5.191, line2: 'MEDICALE.', w2: 4.402 });
+  para(s, 7.048, 3.423, 2.627, 1.091, L_PLUS_SOME);
+  para(s, 10.143, 3.423, 2.521, 1.09, L_FULL);
+  tagStrip(s, 7.146, 5.047);
+  noteBlock(s, { x: 0.723, y: 4.513, w: 2.165, h: 0.687, body: L_SUFFERED, align: 'justify', color: WHITE, ruleDx: 0.115, ruleY: 5.61, ruleW: 1.949, capY: 5.704, cap: 'MESSAGE HERE' });
+});
+
+/* 18 - research */
+BUILDERS.push(function (s) {
+  rect(s, 9.875, 0, 3.458, 7.5, BLUE);
+  headline(s, { x: 1.339, y: 1.965, line1: 'RESEARCH', w1: 4.258, line2: 'MEDICALE.', w2: 4.402 });
+  para(s, 1.386, 3.373, 2.521, 1.292, L_PLUS_PASSAGES);
+  para(s, 4.146, 3.373, 2.521, 1.09, L_FULL);
+  tagStrip(s, 1.483, 4.961);
+});
+
+/* 19 - use font */
+BUILDERS.push(function (s) {
+  rect(s, 0, 1.984, 13.333, 4.2, BLUE);
+  ['MONTSERRAT.', 'OPEN SANS.', 'POPPINS.'].forEach((name, i) => {
+    text(s, name, { x: 8.601 + i * 0.012, y: 3.343 + i * 0.5265, w: 4.148, h: 0.64, fontFace: MONT, fontSize: 32, bold: true, color: WHITE, align: 'right' });
+  });
+  text(s, EYEBROW, { x: 0.636, y: 2.172, w: 2.258, h: 0.236, fontFace: INTER, color: WHITE });
+  text(s, 'USE FONT  MEDICALE.', { x: 0.61, y: 2.463, w: 5.274, h: 1.447, fontFace: MONT, fontSize: 40, bold: true, color: WHITE });
+  para(s, 0.683, 3.945, 3.864, 0.888, L_MED_ALT, { color: WHITE });
+  ruleLabel(s, { x: 0.71, y: 5.1, label: 'HOSPITALS', color: WHITE, ruleY: 5.372, ruleW: 3.636 });
+  ruleLabel(s, { x: 0.71, y: 5.614, label: 'DOCTOR', color: WHITE, ruleY: 5.862, ruleW: 3.636 });
+});
+
+/* 20 - the team */
+BUILDERS.push(function (s) {
+  rect(s, 0, 0, 13.333, 2.415, BLUE);
+  const team = [
+    { name: 'dr. John doe', nx: 1.187, ny: 4.139, x: 1.21, y: 4.759 },
+    { name: 'dr. Richard', nx: 4.024, ny: 4.137, x: 4.047, y: 4.757 },
+    { name: 'dr. Claudia', nx: 6.885, ny: 4.135, x: 6.908, y: 4.755 },
+    { name: 'dr. Estelle', nx: 9.746, ny: 4.133, x: 9.769, y: 4.752 },
+  ];
+  team.forEach((m) => {
+    text(s, m.name, { x: m.nx, y: m.ny, w: 2.496, h: 0.505, fontFace: MONT, fontSize: 24, bold: true, color: BLACK });
+    noteBlock(s, { x: m.x, y: m.y, w: 2.157, h: 0.686, body: L_SHORT, color: INK, ruleY: m.y + 0.805, ruleW: 2.066, capY: m.y + 0.898, cap: 'TEAM DOCTOR' });
+  });
+});
+
+/* 21 - our portfolio (tinted band + four columns) */
+BUILDERS.push(function (s) {
+  rect(s, 0, 2.833, 13.333, 1.792, BLUE, { fill: { color: BLUE, transparency: 73 } });
+  text(s, EYEBROW, { x: 0.629, y: 3.013, w: 2.258, h: 0.236, fontFace: POP, color: WHITE });
+  text(s, 'OUR PORTFOLIO', { x: 0.61, y: 3.235, w: 5.488, h: 0.774, fontFace: MONT, fontSize: 40, bold: true, color: WHITE });
+  text(s, 'MEDICALE HOSPITAL', { x: 0.61, y: 3.757, w: 6.918, h: 0.774, fontFace: MONT, fontSize: 40, bold: true, color: WHITE });
+  [0.697, 3.781, 6.866, 9.95].forEach((x, i) => para(s, x, 5.094, 2.521, i ? 1.09 : 1.091, L_FULL));
+  [3.5, 6.567, 9.633].forEach((x) => vline(s, x, 5.094, 1.09, GREY));
+});
+
+/* 22 - our style / typography */
+BUILDERS.push(function (s) {
+  rect(s, 0, 4.411, 13.333, 1.61, BLUE);
+  headline(s, { x: 0.64, y: 2.102, size: 36, h: 0.707, line1: 'OUR STYLE', w1: 5.029, line2: 'FONT USE IN DESIGN', w2: 6.203 });
+  const specimens = [
+    { x: 0.746, label: 'BODY TEXT', lw: 2.145, font: 'Open Sans ExtraBold', aw: 2.593, uy: 4.691 },
+    { x: 5.447, label: 'SUB HEADING', lw: 2.423, font: POP, aw: 2.724, uy: 4.691 },
+    { x: 9.93, label: 'HEADING', lw: 1.804, font: MONT, aw: 3.153, uy: 4.687, ax: 9.935 },
+  ];
+  specimens.forEach((c) => {
+    text(s, 'UPPERCASE', { x: c.x, y: c.uy, w: 2.145, h: 0.269, fontFace: MONT, fontSize: 10, color: WHITE });
+    text(s, c.label, { x: c.x, y: 4.888, w: c.lw, h: 0.37, fontFace: MONT, fontSize: 16, bold: true, color: WHITE });
+    text(s, 'ABCDEFGHIJ', { x: c.ax || c.x, y: 5.261, w: c.aw, h: 0.572, fontFace: c.font, fontSize: 28, bold: true, color: WHITE });
+  });
+  text(s, 'HEALTH MEDICAL CARE', { x: 9.366, y: 7.06, w: 1.784, h: 0.269, fontFace: POP, fontSize: 10, color: WHITE });
+  text(s, '24/31 PAGE', { x: 11.808, y: 7.071, w: 0.918, h: 0.236, fontFace: POP, color: WHITE });
+  s.addShape('roundRect', { x: 11.652, y: 7.036, w: 1.123, h: 0.294, fill: { type: 'none' }, line: { color: WHITE }, rectRadius: 0.147 });
+});
+
+/* 23 - single blue caption tile */
+BUILDERS.push(function (s) {
+  rect(s, 6.814, 3.39, 2.425, 2.398, BLUE);
+  para(s, 6.891, 3.622, 2.004, 0.888, L_ALT, { color: WHITE, align: 'left' });
+  ruleLabel(s, { x: 6.908, y: 4.675, w: 1.083, label: 'Medical', font: MONT, color: WHITE, ruleDx: 0.109, ruleY: 4.947, ruleW: 2.019 });
+  ruleLabel(s, { x: 6.908, y: 5.134, w: 1.083, label: 'Healthy', font: MONT, color: WHITE, ruleDx: 0.109, ruleY: 5.406, ruleW: 2.019 });
+});
+
+/* 24 - numbered grid */
+BUILDERS.push(function (s) {
+  const cells = [
+    { num: '01', bx: 0.894, by: 1.364, tx: 3.311, ty: 1.392, lx: 3.329, ly: 2.299 },
+    { num: '02', bx: 0.901, by: 3.652, tx: 3.311, ty: 3.714, lx: 3.329, ly: 4.621 },
+    { num: '03', bx: 6.673, by: 1.364, tx: 9.29, ty: 1.39, lx: 9.307, ly: 2.297 },
+    { num: '04', bx: 6.68, by: 3.652, tx: 9.29, ty: 3.712, lx: 9.307, ly: 4.619 },
+  ];
+  cells.forEach((c) => {
+    para(s, c.tx, c.ty, 2.897, 0.686, L_INJECTED, { align: 'left' });
+    ruleLabel(s, { x: c.lx, y: c.ly, w: 1.083, label: 'Medical', font: MONT, color: INK, ruleDx: 0.109, ruleY: c.ly + 0.272, ruleW: 2.409, ruleColor: BLACK });
+    ruleLabel(s, { x: c.lx, y: c.ly + 0.459, w: 1.083, label: 'Healthy', font: MONT, color: INK, ruleDx: 0.109, ruleY: c.ly + 0.731, ruleW: 2.409, ruleColor: BLACK });
+    rect(s, c.bx, c.by, 0.57, 0.551, BLACK);
+    text(s, c.num, { x: c.bx + 0.037, y: c.by + 0.057, w: 0.57, h: 0.438, fontFace: MONT, fontSize: 20, color: WHITE });
+  });
+});
+
+/* 25 - our portfolio */
+BUILDERS.push(function (s) {
+  para(s, 0.701, 3.756, 3.616, 1.494, L_DOUBLE);
+  text(s, EYEBROW, { x: 5.202, y: 1.295, w: 1.834, h: 0.236, fontFace: POP, color: BLACK });
+  text(s, [
+    { text: 'OUR PORTFOLIO', options: { color: INK, breakLine: true } },
+    { text: 'MEDICALE.', options: { color: BLUE } },
+  ], { x: 5.183, y: 1.53, w: 5.392, h: 1.447, fontFace: MONT, fontSize: 40, bold: true });
+  para(s, 5.202, 3.518, 3.616, 0.888, L_PLUS_MANY);
+  ['Medical', 'Hospitals', 'Consultation'].forEach((label, i) => {
+    ruleLabel(s, { x: 5.202, y: 4.634 + i * 0.3705, w: 1.834, label, font: POP, color: BLACK, ruleDx: 0.099, ruleY: 4.908 + i * 0.37, ruleW: 3.517, ruleColor: INK });
+  });
+});
+
+/* 26 - our healthy */
+BUILDERS.push(function (s) {
+  text(s, EYEBROW, { x: 0.629, y: 1.592, w: 1.834, h: 0.236, fontFace: POP, color: BLACK });
+  text(s, [
+    { text: 'OUR HEALTHY', options: { color: INK, breakLine: true } },
+    { text: 'MEDICALE.', options: { color: BLUE } },
+  ], { x: 0.61, y: 1.828, w: 4.702, h: 1.447, fontFace: MONT, fontSize: 40, bold: true });
+  text(s, 'Aa.', { x: 0.637, y: 3.677, w: 2.16, h: 1.447, fontFace: MONT, fontSize: 80, bold: true, color: INK });
+  para(s, 5.15, 3.006, 2.989, 1.09, L_PLUS_MANY);
+  para(s, 5.15, 4.319, 2.989, 1.09, L_PLUS_MANY);
+  para(s, 9.07, 3.008, 3.616, 0.888, L_PLUS_MANY);
+  ['Medical', 'Hospitals', 'Consultation'].forEach((label, i) => {
+    ruleLabel(s, { x: 9.07, y: 4.123 + i * 0.3705, w: 1.834, label, font: POP, color: BLACK, ruleDx: 0.099, ruleY: 4.398 + i * 0.3695, ruleW: 3.517, ruleColor: INK });
+  });
+});
+
+/* 27 - research medical */
+BUILDERS.push(function (s) {
+  rect(s, 4.692, 0, 5.018, 7.5, BLUE);
+  text(s, EYEBROW, { x: 5.126, y: 1.583, w: 2.258, h: 0.236, fontFace: POP, color: WHITE });
+  text(s, 'RESEARCH MEDICAL.', { x: 5.101, y: 1.837, w: 4.208, h: 1.447, fontFace: 'Montserrat ExtraBold', fontSize: 40, bold: true, color: WHITE });
+  noteBlock(s, { x: 5.123, y: 3.27, w: 4.208, h: 0.888, body: L_TWICE, align: 'justify', color: WHITE, ruleDx: 0.119, ruleY: 5.161, ruleW: 4.062, capDx: 0.028, capY: 5.339, cap: 'TAG YOUR MESSAGE', capFont: INTER });
+  para(s, 5.137, 4.232, 4.208, 0.686, L_MED_PASSAGES, { color: WHITE });
+  noteBlock(s, { x: 10.238, y: 4.193, w: 1.999, h: 0.888, body: L_ALT, color: BLACK, ruleDx: 0.1, ruleY: 5.263, ruleW: 1.625, ruleColor: COAL, capDx: 0.017, capY: 5.379, cap: 'BUSINESS CREATIVE AGENCY', capFont: INTER });
+});
+
+/* 28 - floating blue note */
+BUILDERS.push(function (s) {
+  rect(s, 8.208, 2.076, 5.152, 3.347, BLUE);
+  noteBlock(s, { x: 8.733, y: 2.417, w: 3.78, h: 0.888, body: L_MED_ALT, align: 'justify', color: WHITE, ruleDx: 0.119, ruleY: 4.761, ruleW: 3.676, capDx: 0.028, capY: 4.94, cap: 'TAG YOUR MESSAGE', capFont: INTER });
+  para(s, 8.747, 3.608, 3.78, 0.686, L_MED_PASSAGES, { color: WHITE });
+});
+
+/* 29 - laptop mockup (photo replaced by a placeholder block) */
+BUILDERS.push(function (s) {
+  imageBox(s, 0.925, 1.996, 6.205, 3.396);
+  rect(s, 1.785, 2.15, 4.489, 2.828, '808080');
+  rect(s, 4.638, 5.074, 0.551, 0.095, BLACK);
+  infoCard(s, 5.32, 1.284, { fill: BLUE, title: ['BUSINESS', 'AGENCY'], body: L_MED });
+  text(s, companyRuns(), { x: 8.041, y: 1.735, w: 4.058, h: 1.977, fontFace: INTER, fontSize: 18, color: GREY, lineSpacingMultiple: 1 });
+  ruleLabel(s, { x: 8.078, y: 4.548, w: 0.695, label: 'MEDICAL', wrap: false, font: 'Inter Light', color: GREY, ruleDx: 0.097, ruleY: 4.82, ruleW: 3.829 });
+  ruleLabel(s, { x: 8.078, y: 5.092, w: 0.712, label: 'HEALTHY', wrap: false, font: 'Inter Light', color: GREY, ruleDx: 0.097, ruleY: 5.365, ruleW: 3.829 });
+});
+
+/* 30 - desktop monitor mockup (drawn from flat shapes) */
+BUILDERS.push(function (s) {
+  s.addShape('roundRect', { x: 7.652, y: 1.759, w: 4.959, h: 2.998, fill: { color: BLACK }, line: { type: 'none' }, rectRadius: 0.167 });
+  rect(s, 7.652, 4.757, 4.959, 0.462, 'E9E9E9');
+  s.addShape('trapezoid', { x: 9.265, y: 5.22, w: 1.731, h: 0.525, fill: { color: 'BBBBBB' }, line: { type: 'none' } });
+  rect(s, 7.861, 1.994, 4.534, 2.547, WHITE, { line: { color: BLACK, width: 1 } });
+  text(s, companyRuns(), { x: 0.939, y: 1.773, w: 4.058, h: 1.977, fontFace: INTER, fontSize: 18, color: BLACK, lineSpacingMultiple: 1 });
+  ruleLabel(s, { x: 0.976, y: 4.586, w: 0.695, label: 'MEDICAL', wrap: false, font: 'Inter Light', color: BLACK, ruleDx: 0.097, ruleY: 4.859, ruleW: 3.829 });
+  ruleLabel(s, { x: 0.976, y: 5.131, w: 0.712, label: 'HEALTHY', wrap: false, font: 'Inter Light', color: BLACK, ruleDx: 0.097, ruleY: 5.403, ruleW: 3.829 });
+  rect(s, 6.656, 2.633, 1.741, 1.522, BLUE);
+  text(s, 'A company is an association or collection of individuals, whether natural persons. ',
+    { x: 6.773, y: 2.95, w: 1.588, h: 0.581, fontSize: 10, color: WHITE, lineSpacingMultiple: 1 });
+});
+
+/* 31 - thank you */
+BUILDERS.push(function (s) {
+  text(s, CAPS_LEAD, { x: 1.212, y: 1.456, w: 2.455, h: 0.484, fontFace: POP, color: GREY, lineSpacingMultiple: 1.5 });
+  text(s, 'THANKYOU.', { x: 1.174, y: 1.956, w: 6.013, h: 1.212, fontFace: POP, fontSize: 66, bold: true, color: GREY });
+  tagStrip(s, 1.346, 3.251);
+  para(s, 1.249, 4.286, 4.306, 0.687, L_FULL);
+  ruleLabel(s, { x: 1.268, y: 5.279, label: 'OFFICE COMPANY', color: COAL, ruleY: 5.55, ruleW: 4.09 });
+  ruleLabel(s, { x: 1.268, y: 5.792, label: 'BUSINESS AGENCY', color: COAL, ruleY: 6.041, ruleW: 4.09 });
+});
+
+/* ------------------------------------------------------------------- build */
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'MEDICALE', width: 13.333, height: 7.5 });
+  pptx.layout = 'MEDICALE';
+  pptx.author = 'MEDICALE';
+  pptx.title = 'MEDICALE presentation template';
+
+  BUILDERS.forEach((builder, i) => {
+    const slide = pptx.addSlide();
+    slide.background = { color: WHITE };
+    builder(slide);
+    chrome(slide, CHROME[i + 1]);
+  });
+
+  return pptx.writeFile({ fileName: path.join(__dirname, '16c89fe3-17ee-438e-96b7-7c682d764029_grok_final.pptx') });
+}
+
+build().then((f) => console.log('wrote', f));
