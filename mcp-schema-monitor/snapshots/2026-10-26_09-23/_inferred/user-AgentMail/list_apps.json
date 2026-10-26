@@ -1,0 +1,82 @@
+{
+  "namespace": "user-AgentMail",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-26T09:17:30+01:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "apps": {
+          "items": {
+            "properties": {
+              "appId": {
+                "type": "string"
+              },
+              "categories": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "description": {
+                "type": "string"
+              },
+              "logoUrl": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "ownerSignupLimit": {
+                "type": "integer"
+              },
+              "privacyUrl": {
+                "type": "string"
+              },
+              "slug": {
+                "type": "string"
+              },
+              "termsUrl": {
+                "type": "string"
+              },
+              "updatedAt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "appId",
+              "categories",
+              "description",
+              "logoUrl",
+              "name",
+              "ownerSignupLimit",
+              "privacyUrl",
+              "slug",
+              "termsUrl",
+              "updatedAt"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "count": {
+          "type": "integer"
+        },
+        "limit": {
+          "type": "integer"
+        },
+        "nextPageToken": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "apps",
+        "count",
+        "limit",
+        "nextPageToken"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "list_apps"
+}

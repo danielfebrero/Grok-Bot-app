@@ -1,0 +1,150 @@
+{
+  "namespace": "user-AgentMail",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-26T09:17:42+01:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "count": {
+          "type": "integer"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "inboxId": {
+          "type": "string"
+        },
+        "labels": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "lastMessageId": {
+          "type": "string"
+        },
+        "messageCount": {
+          "type": "integer"
+        },
+        "messages": {
+          "items": {
+            "properties": {
+              "createdAt": {
+                "type": "string"
+              },
+              "extractedHtml": {
+                "type": "string"
+              },
+              "from": {
+                "type": "string"
+              },
+              "html": {
+                "type": "string"
+              },
+              "inboxId": {
+                "type": "string"
+              },
+              "labels": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "messageId": {
+                "type": "string"
+              },
+              "size": {
+                "type": "integer"
+              },
+              "subject": {
+                "type": "string"
+              },
+              "threadId": {
+                "type": "string"
+              },
+              "timestamp": {
+                "type": "string"
+              },
+              "to": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "updatedAt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "createdAt",
+              "extractedHtml",
+              "from",
+              "html",
+              "inboxId",
+              "labels",
+              "messageId",
+              "size",
+              "subject",
+              "threadId",
+              "timestamp",
+              "to",
+              "updatedAt"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "receivedTimestamp": {
+          "type": "string"
+        },
+        "recipients": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "senders": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "size": {
+          "type": "integer"
+        },
+        "subject": {
+          "type": "string"
+        },
+        "threadId": {
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "count",
+        "createdAt",
+        "inboxId",
+        "labels",
+        "lastMessageId",
+        "messageCount",
+        "messages",
+        "receivedTimestamp",
+        "recipients",
+        "senders",
+        "size",
+        "subject",
+        "threadId",
+        "timestamp",
+        "updatedAt"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "get_thread"
+}

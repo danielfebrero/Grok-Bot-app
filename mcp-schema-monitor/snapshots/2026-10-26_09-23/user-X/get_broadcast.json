@@ -1,0 +1,20 @@
+{
+  "description": "Get a broadcast",
+  "inputSchema": {
+    "properties": {
+      "broadcast.fields": {
+        "description": "A comma separated list of Broadcast fields to display.",
+        "type": "string"
+      },
+      "id": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_broadcast"
+}

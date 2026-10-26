@@ -1,0 +1,115 @@
+{
+  "namespace": "cursor-github",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-26T09:16:36+01:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "incomplete_results": {
+          "type": "boolean"
+        },
+        "items": {
+          "items": {
+            "properties": {
+              "avatar_url": {
+                "type": "string"
+              },
+              "events_url": {
+                "type": "string"
+              },
+              "followers_url": {
+                "type": "string"
+              },
+              "following_url": {
+                "type": "string"
+              },
+              "gists_url": {
+                "type": "string"
+              },
+              "gravatar_id": {
+                "type": "string"
+              },
+              "html_url": {
+                "type": "string"
+              },
+              "id": {
+                "type": "integer"
+              },
+              "login": {
+                "type": "string"
+              },
+              "node_id": {
+                "type": "string"
+              },
+              "organizations_url": {
+                "type": "string"
+              },
+              "received_events_url": {
+                "type": "string"
+              },
+              "repos_url": {
+                "type": "string"
+              },
+              "score": {
+                "type": "integer"
+              },
+              "site_admin": {
+                "type": "boolean"
+              },
+              "starred_url": {
+                "type": "string"
+              },
+              "subscriptions_url": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "user_view_type": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "avatar_url",
+              "events_url",
+              "followers_url",
+              "following_url",
+              "gists_url",
+              "gravatar_id",
+              "html_url",
+              "id",
+              "login",
+              "node_id",
+              "organizations_url",
+              "received_events_url",
+              "repos_url",
+              "score",
+              "site_admin",
+              "starred_url",
+              "subscriptions_url",
+              "type",
+              "url",
+              "user_view_type"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "total_count": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "incomplete_results",
+        "items",
+        "total_count"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "search_users"
+}

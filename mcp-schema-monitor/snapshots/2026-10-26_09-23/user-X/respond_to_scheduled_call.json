@@ -1,0 +1,39 @@
+{
+  "description": "Respond to a scheduled call",
+  "inputSchema": {
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "occurrence_start_time": {
+        "description": "Start of the occurrence that scope this or this_and_following refers to (RFC 3339).",
+        "type": "string"
+      },
+      "response": {
+        "description": "The answer to the invitation.",
+        "enum": [
+          "accepted",
+          "declined",
+          "tentative"
+        ],
+        "type": "string"
+      },
+      "scope": {
+        "description": "Which occurrences of a recurring call: all (the default without occurrence_start_time), this (the...",
+        "enum": [
+          "all",
+          "this",
+          "this_and_following"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "response"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "respond_to_scheduled_call"
+}
