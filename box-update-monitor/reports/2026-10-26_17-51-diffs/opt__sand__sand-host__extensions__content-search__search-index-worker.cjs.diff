@@ -1,0 +1,175 @@
+--- 2026-10-26_11-52:/opt/sand/sand-host/extensions/content-search/search-index-worker.cjs
++++ 2026-10-26_17-51:/opt/sand/sand-host/extensions/content-search/search-index-worker.cjs
+@@ -549,6 +549,20 @@
+   };
+ }
+ 
++// src/shared/parse/unknown-record.ts
++function isUnknownRecord(value) {
++  return typeof value === "object" && value !== null && !Array.isArray(value);
++}
++function parseJsonOrUndefined(text) {
++  let value;
++  try {
++    value = JSON.parse(text);
++  } catch {
++    value = void 0;
++  }
++  return value;
++}
++
+ // src/shared/transcript/transcript.ts
+ function isExpiredLocalToolPermissionEntry(entry) {
+   return entry.kind === "send-message" && entry.message.type === "local-tool-permission" && entry.message.ask.status === "expired";
+@@ -592,7 +606,115 @@
+   return isVoiceCallChannelEntry(entry) || isMeetingChannelEntry(entry) || isMeetingRequestChannelEntry(entry);
+ }
+ 
++// src/shared/transcript/flights.ts
++var SAND_FLIGHT_MAX_METRO_AIRPORTS = 4;
++var SAND_FLIGHT_TRAVELER_GENDERS = ["female", "male"];
++var SAND_FLIGHT_MAX_TRAVELERS = 9;
++var IATA_AIRPORT = /^[A-Z]{3}$/;
++var MAX_DURATION_MIN = 7 * 24 * 60;
++function isListOf(value, { min, max }, isItem) {
++  return Array.isArray(value) && value.length >= min && value.length <= max && value.every(isItem);
++}
++function isAirportCode(value) {
++  return typeof value === "string" && IATA_AIRPORT.test(value);
++}
++function isAirportList(value, min) {
++  return isListOf(value, { min, max: SAND_FLIGHT_MAX_METRO_AIRPORTS }, isAirportCode) && new Set(value).size === value.length;
++}
++function isJourneyAirports(min) {
++  return (value) => isUnknownRecord(value) && isAirportList(value.origin, min) && isAirportList(value.destination, min);
++}
++var isSearchedAirports = isJourneyAirports(1);
++var isSkippedAirports = isJourneyAirports(0);
++
++// src/shared/transcript/flight-travelers-reply.ts
++var FLIGHT_TRAVELERS_REPLY_OPEN = "<flight_travelers_reply>";
++var FLIGHT_TRAVELERS_REPLY_CLOSE = "</flight_travelers_reply>";
++var OFFER_ID = /^[A-Za-z0-9_-]{1,120}$/u;
++var TEXT_FIELDS = ["givenName", "familyName", "bornOn", "email", "phone"];
++var TEXT_FIELD_MAX_CHARS = {
++  givenName: 60,
++  familyName: 60,
++  bornOn: 20,
++  email: 200,
++  phone: 30
++};
++var ENTRY_KEYS = /* @__PURE__ */ new Set(["traveler", "gender", ...TEXT_FIELDS]);
++var REPLY_KEYS = /* @__PURE__ */ new Set([
++  "v",
++  "offerId",
++  "travelers",
++  "useGivenContact",
++  "saveToProfile"
++]);
++function hasOnlyKeys(value, keys) {
++  return Object.keys(value).every((key) => keys.has(key));
++}
++function entryOf(value) {
++  if (!isUnknownRecord(value) || !hasOnlyKeys(value, ENTRY_KEYS)) return void 0;
++  const { traveler, gender } = value;
++  if (typeof traveler !== "number" || !Number.isInteger(traveler) || traveler < 0 || traveler >= SAND_FLIGHT_MAX_TRAVELERS) {
++    return void 0;
++  }
++  const entry = { traveler };
++  for (const field of TEXT_FIELDS) {
++    const raw = value[field];
++    if (raw === void 0) continue;
++    if (typeof raw !== "string") return void 0;
++    const text = raw.trim();
++    if (text.length > TEXT_FIELD_MAX_CHARS[field]) return void 0;
++    if (text !== "") entry[field] = text;
++  }
++  if (gender !== void 0) {
++    const known = SAND_FLIGHT_TRAVELER_GENDERS.find((choice) => choice === gender);
++    if (known === void 0) return void 0;
++    entry.gender = known;
++  }
++  return entry;
++}
++function isOptionalFlag(value) {
++  return value === void 0 || typeof value === "boolean";
++}
++function parseFlightTravelersReply(text) {
++  const trimmed = text.trim();
++  if (!trimmed.startsWith(FLIGHT_TRAVELERS_REPLY_OPEN) || !trimmed.endsWith(FLIGHT_TRAVELERS_REPLY_CLOSE)) {
++    return void 0;
++  }
++  const body = trimmed.slice(
++    FLIGHT_TRAVELERS_REPLY_OPEN.length,
++    trimmed.length - FLIGHT_TRAVELERS_REPLY_CLOSE.length
++  );
++  if (/[\n\r]/u.test(body) || body.includes(FLIGHT_TRAVELERS_REPLY_OPEN)) return void 0;
++  const parsed = parseJsonOrUndefined(body);
++  if (!isUnknownRecord(parsed) || !hasOnlyKeys(parsed, REPLY_KEYS) || parsed.v !== 1) {
++    return void 0;
++  }
++  const { offerId, travelers, useGivenContact, saveToProfile } = parsed;
++  if (typeof offerId !== "string" || !OFFER_ID.test(offerId)) return void 0;
++  if (!isOptionalFlag(useGivenContact) || !isOptionalFlag(saveToProfile)) return void 0;
++  if (!Array.isArray(travelers) || travelers.length > SAND_FLIGHT_MAX_TRAVELERS) return void 0;
++  const entries = travelers.map(entryOf);
++  if (entries.some((entry) => entry === void 0)) return void 0;
++  const read = entries.filter((entry) => entry !== void 0);
++  if (new Set(read.map((entry) => entry.traveler)).size !== read.length) return void 0;
++  return {
++    v: 1,
++    offerId,
++    travelers: read,
++    ...useGivenContact === true ? { useGivenContact: true } : {},
++    ...saveToProfile === true ? { saveToProfile: true } : {}
++  };
++}
++
++// src/shared/transcript/card-reply-entries.ts
++function isCardReplyEntry(entry) {
++  return entry.kind === "message" && entry.role === "user" && parseFlightTravelersReply(entry.content) !== void 0;
++}
++
+ // src/shared/transcript/phone-call.ts
++var SAND_PHONE_CALL_RETENTION_MS = 30 * 24 * 60 * 60 * 1e3;
++var SAND_PHONE_CALL_RECORDING_WAIT_MS = 10 * 60 * 1e3;
++var RECORDING_WAIT_GRACE_MS = 2 * 60 * 1e3;
+ var SAND_PHONE_CALL_QUESTION_ENTRY_PREFIX = "phone-call-question:";
+ 
+ // src/shared/transcript/silent-wake.ts
+@@ -690,7 +812,7 @@
+   return entry.kind === "send-message" && entry.streaming === true && entry.message.type === "text" && entry.message.content.length === 0;
+ }
+ function isTimelineHiddenEntry(entry) {
+-  return isEmptyStreamingPreviewEntry(entry) || isSuppressedEntry(entry) || entry.kind === "tool-call" || isBackgroundTaskStopNotice(entry) || isExpiredLocalToolPermissionEntry(entry) || isBotShareAutoReviewEntry(entry) || isHiddenOutboundAgentPeerMessageEntry(entry) || isOffChatChannelEntry(entry) || entry.kind === "send-message" && entry.message.type === "user-form" && entry.id.startsWith(SAND_PHONE_CALL_QUESTION_ENTRY_PREFIX) || entry.kind === "event" && entry.event.type === "desktop-goal" || entry.kind === "event" && entry.event.type === "team-shared" && isBlankTeamSharedEvent(entry.event);
++  return isEmptyStreamingPreviewEntry(entry) || isSuppressedEntry(entry) || entry.kind === "tool-call" || isBackgroundTaskStopNotice(entry) || isExpiredLocalToolPermissionEntry(entry) || isBotShareAutoReviewEntry(entry) || isHiddenOutboundAgentPeerMessageEntry(entry) || isCardReplyEntry(entry) || isOffChatChannelEntry(entry) || entry.kind === "send-message" && entry.message.type === "user-form" && entry.id.startsWith(SAND_PHONE_CALL_QUESTION_ENTRY_PREFIX) || entry.kind === "event" && entry.event.type === "desktop-goal" || entry.kind === "event" && entry.event.type === "team-shared" && isBlankTeamSharedEvent(entry.event);
+ }
+ 
+ // src/host/sand-data-files.ts
+@@ -842,7 +964,7 @@
+ function refuseDatabaseFileLinks(parentFd, path) {
+   const name = (0, import_node_path4.basename)(path);
+   for (const suffix of SQLITE_FILE_SUFFIXES) {
+-    const entry = entryOf(parentFd, `${path}${suffix}`, `${name}${suffix}`);
++    const entry = entryOf2(parentFd, `${path}${suffix}`, `${name}${suffix}`);
+     if ((0, import_node_fs4.lstatSync)(entry, { throwIfNoEntry: false })?.isSymbolicLink() === true) {
+       throw new NoFollowRefusedError("target-link", `${path}${suffix}`);
+     }
+@@ -872,7 +994,7 @@
+   try {
+     for (const name of segmentsBelow(root, (0, import_node_path4.dirname)(path))) {
+       current = (0, import_node_path4.join)(current, name);
+-      const child = openDirectoryRefusingLinks(entryOf(fd, current, name), current);
++      const child = openDirectoryRefusingLinks(entryOf2(fd, current, name), current);
+       (0, import_node_fs4.closeSync)(fd);
+       fd = child;
+     }
+@@ -893,7 +1015,7 @@
+     throw link ? new NoFollowRefusedError("parent-link", shown) : error;
+   }
+ }
+-function entryOf(fd, logicalPath, name) {
++function entryOf2(fd, logicalPath, name) {
+   return process.platform === "linux" ? `/proc/self/fd/${fd}/${name}` : logicalPath;
+ }
+ function descriptorDirOf(fd, logicalPath) {

@@ -1,0 +1,15 @@
+--- 2026-10-26_11-52:/home/box/sand-data/managed-skills/skills/scheduling/SKILL.md
++++ 2026-10-26_17-51:/home/box/sand-data/managed-skills/skills/scheduling/SKILL.md
+@@ -34,9 +34,9 @@
+ Every calendar write goes through the user's calendar connector, Google Calendar or Outlook Calendar.
+ 
+ - Use the calendar connector the user already has. When Google Calendar or Outlook Calendar tools are among your tools, work through that connector without running SearchPlugins, and read its schema before your first write. When both are connected, use the one that owns the event.
+-- Only when neither is connected, run SearchPlugins for the calendar that fits the user: Outlook Calendar when their mail is Outlook or Microsoft 365, Google Calendar when it is Gmail or Google Workspace.
+-- Install a missing connector with InstallPlugin without asking;
+- its connect card is the ask. Ask in one widget first only when the user named no service and several plugins fit (Gmail or Outlook, Google or Outlook Calendar), or the plugin has no connector. Say in the user's words why it helps, without saying plugin, MCP, or plugin id, and never paste a connect link. Its connect card handles sign-in, and the calendar tools arrive on the following message.
++- Only when neither is connected, put up a calendar connect card in this turn, before any question widget. Run SearchPlugins for the calendar that fits the user and install it with InstallPlugin without asking which one: Outlook Calendar when their mail is Outlook or Microsoft 365, otherwise Google Calendar. Not knowing their calendar is not a reason to ask first, and a missing calendar is not a load-bearing gap.
++- Its connect card is the ask and handles sign-in. End the turn on it, and ask anything still open once the calendar tools arrive on the following message. When the user says they use the other calendar, install that one instead.
++- Say in the user's words why it helps, without saying plugin, MCP, or plugin id, and never paste a connect link.
+ - Never write an event any other way, and never edit a calendar in your browser.
+ 
+ Ground the request from:

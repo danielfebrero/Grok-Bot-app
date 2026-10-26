@@ -1,0 +1,100 @@
+--- 2026-10-26_11-52:/opt/sand/sand-host/box-scripts/start-window
++++ 2026-10-26_17-51:/opt/sand/sand-host/box-scripts/start-window
+@@ -16,6 +16,8 @@
+ PTY_PORT=$((13600 + DISPLAY_NUM))         # internal
+ VNC_PORT=$((5900 + DISPLAY_NUM))          # internal; reached via token-websockify
+ WINDOW_UNAVAILABLE_EXIT_CODE=75
++WINDOW_VNC_UNAVAILABLE_EXIT_CODE=74
++WINDOW_VNC_NOT_STARTED_EXIT_CODE=72
+ # <<< box port table <<<
+ # >>> box screen (from sand/src/shared/box/box-contract.ts; regenerate: pnpm --filter sand run gen:box-ports) >>>
+ COMPUTER_USE_API_WIDTH=1280
+@@ -33,6 +35,14 @@
+ CHROME_PROFILE="/home/box/chrome-profile/Fork-${DISPLAY_NUM}"
+ mkdir -p "${LOG_DIR}"
+ 
++if [ -r /usr/local/bin/sand-desktop-supervise.sh ]; then
++	# shellcheck source=/dev/null
++	. /usr/local/bin/sand-desktop-supervise.sh
++fi
++if ! command -v sand_desktop_unregister_group >/dev/null 2>&1; then
++	sand_desktop_unregister_group() { :; }
++fi
++
+ SAND_DESKTOP_UNIT_LIB="${SAND_DESKTOP_UNIT_LIB:-/usr/local/bin/sand-desktop-unit.sh}"
+ if [ -r "${SAND_DESKTOP_UNIT_LIB}" ]; then
+ 	# shellcheck source=/dev/null
+@@ -44,6 +54,18 @@
+ 
+ display_alive() { xdpyinfo -display "${DISP}" >/dev/null 2>&1; }
+ daemon_alive() { (exec 3<>"/dev/tcp/127.0.0.1/${EXEC_DAEMON_PORT}") >/dev/null 2>&1; }
++vnc_token_written() { [ -s "${NOVNC_TOKEN_DIR}/${DISPLAY_NUM}" ]; }
++vnc_alive() {
++	vnc_token_written &&
++		[ -n "$(ss -ltnH "sport = :${VNC_PORT}" 2>/dev/null)" ]
++}
++remove_x_lock() { rm -f "/tmp/.X${DISPLAY_NUM}-lock" "/tmp/.X11-unix/X${DISPLAY_NUM}"; }
++end_desktop() {
++	sand_desktop_unregister_group "d${DISPLAY_NUM}"
++	sand_desktop_unit_kill "${DISP}" "${CHROME_PROFILE}"
++	rm -f "${NOVNC_TOKEN_DIR}/${DISPLAY_NUM}"
++	remove_x_lock
++}
+ 
+ if [ -n "${OWNER_TOKEN}" ] && display_alive; then
+ 	current_binding="$(cat "${WINDOW_TOKEN_DIR}/${DISPLAY_NUM}" 2>/dev/null || true)"
+@@ -53,14 +75,13 @@
+ 	fi
+ fi
+ 
+-if display_alive && daemon_alive; then
++if display_alive && vnc_alive && daemon_alive; then
+ 	echo "sand window ${DISPLAY_NUM} already up (display ${DISP}, daemon :${EXEC_DAEMON_PORT})"
+ 	exit 0
+ fi
+ 
+-if ! display_alive; then
+-	sand_desktop_unit_kill "${DISP}" "${CHROME_PROFILE}"
+-	rm -f "/tmp/.X${DISPLAY_NUM}-lock" "/tmp/.X11-unix/X${DISPLAY_NUM}"
++if ! display_alive || ! vnc_alive; then
++	end_desktop
+ 	SAND_DESKTOP_UNIT="${DISP}" \
+ 		SAND_VNC_PORT="${VNC_PORT}" \
+ 		SAND_NOVNC_TOKEN="${DISPLAY_NUM}" \
+@@ -110,16 +131,29 @@
+ 		--origin-cli-enabled \
+ 		--orbitd-proxy-socket /run/orbitd-proxy/rpc.sock \
+ 		>"${LOG_DIR}/exec-daemon.log" 2>&1 &
++fi
+ 
+-	for _ in $(seq 1 150); do
+-		if daemon_alive; then break; fi
+-		sleep 0.2
+-	done
++for _ in $(seq 1 150); do
++	if daemon_alive && vnc_alive; then break; fi
++	sleep 0.2
++done
+ 
+-	if ! daemon_alive; then
+-		echo "sand window ${DISPLAY_NUM}: exec-daemon on :${EXEC_DAEMON_PORT} did not become ready" >&2
+-		exit 1
++if ! daemon_alive; then
++	echo "sand window ${DISPLAY_NUM}: exec-daemon on :${EXEC_DAEMON_PORT} did not become ready" >&2
++	exit 1
++fi
++
++if ! vnc_alive; then
++	if vnc_token_written; then
++		echo "sand window ${DISPLAY_NUM}: VNC on :${VNC_PORT} is not listening yet; keeping the window for desktop supervision to restart it" >&2
++		exit "${WINDOW_VNC_UNAVAILABLE_EXIT_CODE}"
+ 	fi
++	for pid in $(ss -lptnH "sport = :${EXEC_DAEMON_PORT}" 2>/dev/null | grep -oE 'pid=[0-9]+' | cut -d= -f2 | sort -u); do
++		kill "${pid}" 2>/dev/null || true
++	done
++	end_desktop
++	echo "sand window ${DISPLAY_NUM}: the desktop did not start VNC on :${VNC_PORT}" >&2
++	exit "${WINDOW_VNC_NOT_STARTED_EXIT_CODE}"
+ fi
+ 
+ echo "sand window ${DISPLAY_NUM} ready (display ${DISP}, daemon :${EXEC_DAEMON_PORT}, vnc token ${DISPLAY_NUM})"

@@ -9,6 +9,35 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-26 17:51 (Paris) — snapshot `2026-10-26_11-52` → `2026-10-26_17-51`
+
+**Hot-update du host bundle (sand-host) `85c241a` → `7cb9acc`** (supervisor `upgrade-85c241a` → `upgrade-7cb9acc`, `pendingUpgradeVersion` = None) : remplacement à chaud du `sand-host` par le sand-supervisor, sans Update de l'ordinateur. Bundle host (`host-main.cjs` 32.1→32.3 Mo, `sand-eval-runner.cjs` 25.3→25.4 Mo), `sand-egress-tunnel` 2.93→2.94 Mo, scripts desktop/fenêtre (attente Xvfb 100→150, supervision VNC + codes de sortie 72/74), `search-index-worker.cjs` (parsers flight), `office.mjs`, et refetch skills gérées `purchases` + `scheduling`. Toutes les autres versions plateforme sont inchangées : image `fcbae14`, box-scripts `fcbae14`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, **agent-store-fuse `5d804d35` inchangé**, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7. Fichiers : +0 / −0 / ~12.
+
+### Features
+- **Outils vol Grok Bot** : nouveaux tools `FlightSearch` / `FlightDetails` + carte `flight_travelers` / balises `<flight_travelers_reply>` (host-main + search-index-worker : validation IATA, voyageurs, offres).
+- **Publish state projets** : RPC `ListProjectPublishState` (`project_bc_id` → runs `ProjectRunPublishState` : proposals/apps/secrets_requests/running/error) + message `ProjectRunSecretsRequest`.
+- **Inbox buckets** : `GetInboxBuckets` (buckets + badge + sections), `GetFocusedGroupsOfChanges`, `MarkPullRequestsAsViewed` (par change_ids ou focused_groups).
+- **Connecteur Grok** : `SetGrokConnectorEnabled` (`server_identifier`, `enabled`).
+- **Apps security** : `AppsSettings.security` → `AppsSecuritySettings` (`review_enabled`, `acknowledged_disable_review`, `allow_review_overrides`).
+- **Attribution PR → agent** : `GetPrAgentAttribution` (`pr_url`, `expected_scope` → thread/project/grok_bot_agent_id).
+- **Retry enregistrement appel sortant** : `RetryGrokBotOutboundCallRecording` (`outbound_call_id` → `accepted`).
+- **Repo never-draft** : `UpdateRepoNeverDraftSetting` (`pull_requests_never_draft`).
+- **Watch page** : `GrokBotTranscriptWatchPageTitleChanged` gagne `6 content_changed`.
+- **Paiements (skill purchases)** : section **Bank verification** (3-D Secure / app banque comme étape humaine après submit) ; ordre « How to pay » réécrit (nommé → X Money si outil OK → carte perso) ; X Money n'est plus systématiquement exclu des offres wallet.
+- **Scheduling (skill)** : connecteur calendrier manquant → connect card immédiate (Outlook si mail M365, sinon Google), sans question widget préalable.
+
+### Bugfix / Change
+- **Fenêtre box / VNC** : `start-window` exige display **et** VNC vivant (`vnc_alive` = token + port en écoute) ; nouveaux exit codes `WINDOW_VNC_NOT_STARTED=72` / `WINDOW_VNC_UNAVAILABLE=74` mappés côté host (`box_fork_window_vnc_*`) ; cleanup via `sand_desktop_unregister_group` + `end_desktop`.
+- **Démarrage desktop** : boucle d'attente Xvfb `seq 1 100` → `seq 1 150` dans `start-desktop.sh`.
+- **Local exec** : `classifyLocalExecFailure` (spawn/errno) pour classer les échecs d'exec local.
+
+### Autre / infra
+- `managed-skills/cache.json` : `fetchedAt` + corps `purchases` / `scheduling` (pas seulement timestamp).
+- `officekit-ts/lib/office.mjs` : gros repack (noms minifiés, ~+878 o) — pas de surface fonctionnelle isolée hors host tools.
+- agent-store-fuse inchangé ce cycle.
+
+Rapport : [reports/2026-10-26_17-51.md](reports/2026-10-26_17-51.md).
+
 ## 2026-10-26 11:52 (Paris) — snapshot `2026-10-26_09-53` → `2026-10-26_11-52`
 
 **Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `9baa34c0fd4c8a076b95c76b858a532a2a7156c0` → `5d804d3509e95db6a5edefae929ffb630ee7bb92` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`). Binaire `cursor-agent-store-fuse` inchangé (9501280 o, même sha256 `9a7669a7…`). Image `fcbae14`, box-scripts `fcbae14`, sand-host `85c241a` (supervisor `upgrade-85c241a`), exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~1.

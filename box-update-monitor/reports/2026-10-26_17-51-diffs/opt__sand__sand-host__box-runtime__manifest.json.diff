@@ -1,0 +1,11 @@
+--- 2026-10-26_11-52:/opt/sand/sand-host/box-runtime/manifest.json
++++ 2026-10-26_17-51:/opt/sand/sand-host/box-runtime/manifest.json
+@@ -22,7 +22,7 @@
+     },
+     {
+       "name": "sand-egress-tunnel",
+-      "sha256": "42d76a262c610f48815d2c2d592aef9f389a724237d77ed1f82b38d45a892e44"
++      "sha256": "a619208921a607f5f466ea925e5984b870a67ed6f929370756833bfe0c5df19a"
+     },
+     {
+       "name": "sand-fingerprint-profiles.mjs",
