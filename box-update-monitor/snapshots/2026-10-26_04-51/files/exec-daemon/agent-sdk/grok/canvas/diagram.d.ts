@@ -1,0 +1,33 @@
+import { type JSX } from "react";
+import { type DiagramGeometry } from "./diagram-layout.js";
+import { type DiagramProps } from "./diagram-model.js";
+/**
+ * A diagram of nodes and the lines between them: a relationship or
+ * dependency diagram, a flowchart with a decision and a loop, an org chart
+ * or tree. The ranks, the order within a rank, and the back edges come from
+ * `computeDAGLayout`; this block measures each node, spaces the ranks to
+ * the nodes' real sizes, and draws the cards, lines, arrowheads, and labels
+ * the Grok Bot PD System draws, in a chart card.
+ *
+ * A node is a bordered card on the page's paper. A `box` with a `detail`
+ * (or a `series`) carries a colored accent bar and two lines of text, left
+ * aligned; a `box` with a label alone is a step, its label centered. A
+ * `terminal` is a pill, a `decision` a diamond, a `person` an initials tile
+ * beside a name and a role. Lines are the tertiary ink at 1.5 px with open
+ * chevron heads and an 8 px clearance from each face; a tree of plain,
+ * unlabeled edges draws as an org chart's bus connectors instead, with no
+ * heads. A back edge (one that closes a cycle) leaves the side of its node
+ * and turns into the face of its target, the way a "No" loop does. Edge
+ * labels sit 8 px off the line in the small label type.
+ *
+ * On a block narrower than the drawing, a horizontal diagram turns vertical
+ * when that drawing is the narrower one, and a vertical drawing with a rank
+ * wider than the block stacks its nodes in one column, the lines between
+ * nodes that are not neighbours in it running in lanes beside it, when the
+ * column fits or scrolls far less; past that, the diagram keeps its natural
+ * size and scrolls sideways, as a wide table does, opening on its nodes,
+ * fading at the edge with more beyond it and keeping a lane for the
+ * scrollbar. It is never scaled down.
+ */
+export type { DiagramEdge, DiagramNode, DiagramNodeKind, DiagramProps } from "./diagram-model.js";
+export declare function Diagram(props: DiagramProps): JSX.Element | null;
