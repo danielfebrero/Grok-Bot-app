@@ -9,6 +9,12 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-26 19:48 (Paris) — snapshot `2026-10-26_17-51` → `2026-10-26_19-48`
+
+**Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `5d804d3509e95db6a5edefae929ffb630ee7bb92` → `c76f6fef260691a89fcf718bcbf74b4078b3495f` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`). Binaire `cursor-agent-store-fuse` inchangé (9501280 o, même sha256 `9a7669a7…`). Image `fcbae14`, box-scripts `fcbae14`, sand-host `7cb9acc` (supervisor `upgrade-7cb9acc`), exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~1.
+
+Rapport : [reports/2026-10-26_19-48.md](reports/2026-10-26_19-48.md).
+
 ## 2026-10-26 17:51 (Paris) — snapshot `2026-10-26_11-52` → `2026-10-26_17-51`
 
 **Hot-update du host bundle (sand-host) `85c241a` → `7cb9acc`** (supervisor `upgrade-85c241a` → `upgrade-7cb9acc`, `pendingUpgradeVersion` = None) : remplacement à chaud du `sand-host` par le sand-supervisor, sans Update de l'ordinateur. Bundle host (`host-main.cjs` 32.1→32.3 Mo, `sand-eval-runner.cjs` 25.3→25.4 Mo), `sand-egress-tunnel` 2.93→2.94 Mo, scripts desktop/fenêtre (attente Xvfb 100→150, supervision VNC + codes de sortie 72/74), `search-index-worker.cjs` (parsers flight), `office.mjs`, et refetch skills gérées `purchases` + `scheduling`. Toutes les autres versions plateforme sont inchangées : image `fcbae14`, box-scripts `fcbae14`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, **agent-store-fuse `5d804d35` inchangé**, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7. Fichiers : +0 / −0 / ~12.
