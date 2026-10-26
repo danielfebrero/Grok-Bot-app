@@ -9,6 +9,18 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-26 02:52 (Paris) — snapshot `2026-10-26_00-51` → `2026-10-26_02-52`
+
+**Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `e4c1d27ca28d66e432733238906ebf64340465df` → `e1ba77ac15d9b30e559d74eb74f2f5360ec3250a` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`). Binaire `cursor-agent-store-fuse` inchangé (9501280 o, même sha256 `9a7669a7…`). Image `fcbae14`, box-scripts `fcbae14`, sand-host `85c241a` (supervisor `upgrade-85c241a`), exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~1.
+
+Rapport : [reports/2026-10-26_02-52.md](reports/2026-10-26_02-52.md).
+
+## 2026-10-26 00:51 (Paris) — snapshot `2026-10-25_23-53` → `2026-10-26_00-51`
+
+**Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `db7c8404adfd5f142b8c8d7112ce9ea4e6305632` → `e4c1d27ca28d66e432733238906ebf64340465df` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`). Binaire `cursor-agent-store-fuse` inchangé (9501280 o, même sha256 `9a7669a7…`). Image `fcbae14`, box-scripts `fcbae14`, sand-host `85c241a` (supervisor `upgrade-85c241a`), exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~1.
+
+Rapport : [reports/2026-10-26_00-51.md](reports/2026-10-26_00-51.md).
+
 ## 2026-10-25 23:53 (Paris) — snapshot `2026-10-25_22-52` → `2026-10-25_23-53`
 
 **Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `f457d3385ac3d811f2def9fece9f41ab0fa47db2` → `db7c8404adfd5f142b8c8d7112ce9ea4e6305632` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`). Binaire `cursor-agent-store-fuse` inchangé (9501280 o, même sha256 `9a7669a7…`). Image `fcbae14`, box-scripts `fcbae14`, sand-host `85c241a` (supervisor `upgrade-85c241a`), exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~1.
