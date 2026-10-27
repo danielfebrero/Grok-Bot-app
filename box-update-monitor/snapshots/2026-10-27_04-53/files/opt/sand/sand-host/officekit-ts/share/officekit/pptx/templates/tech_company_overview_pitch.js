@@ -1,0 +1,1130 @@
+/**
+ * "X-Tech" company-profile deck, rebuilt with pptxgenjs.
+ * 30 slides, 13.333in x 7.5in (16:9 widescreen).
+ *
+ * The two photographs in the source deck (a phone on slide 19 and a laptop on
+ * slide 20) are replaced with flat colour placeholders; every other picture
+ * frame in the original is an empty template placeholder and renders blank.
+ */
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+// ---------------------------------------------------------------------------
+// Palette / typography
+// ---------------------------------------------------------------------------
+const BLUE = '3638BF';
+const ORANGE = 'F56C1B';
+const ORANGE_D = 'BF560F';  // accent2 @ 75% lumMod — the darker zigzag arrows
+const WHITE = 'FFFFFF';
+const CREAM = 'FFFFE5';
+const INK = '0D0D0D';       // tx1 @ 95% lumMod — dark headings
+const INK2 = '262626';      // tx1 @ 85% lumMod
+const GREY = '808080';      // tx1 @ 50% — body copy on light backgrounds
+const SILVER = 'D9D9D9';    // bg1 @ 85% — the process arrows on slide 26
+const PHOTO = 'C9CCE8';     // image-placeholder fill
+const PHOTO_TX = '6C71A8';
+
+const HEAD = 'Poppins';
+const BODY = 'Open Sans';
+
+// PowerPoint text insets, expressed the way pptxgenjs wants them:
+// [left, right, bottom, top] in points.
+const INSET = [7.2, 7.2, 3.6, 3.6];        // default text box (0.1in / 0.05in)
+const INSET_TIGHT = [4.8, 4.8, 2.4, 2.4];  // the deck's "Text Box 7" pattern
+
+// ---------------------------------------------------------------------------
+// Generic drawing helpers
+// ---------------------------------------------------------------------------
+
+/** Plain filled rectangle. */
+function rect(s, o) {
+    s.addShape('rect', {
+        x: o.x, y: o.y, w: o.w, h: o.h,
+        fill: { color: o.color, transparency: o.transparency },
+    });
+}
+
+/**
+ * "Rectangle: Single Corner Rounded" — exactly one corner is rounded.
+ * `adj` is the OOXML adjust value (0..50000); pptxgenjs takes the radius in
+ * inches and divides by min(w,h) to rebuild the same adjust value.
+ */
+function corner(s, o) {
+    s.addShape('round1Rect', {
+        x: o.x, y: o.y, w: o.w, h: o.h,
+        fill: { color: o.color, transparency: o.transparency },
+        rectRadius: (o.adj / 100000) * Math.min(o.w, o.h),
+        rotate: o.rotate, flipH: o.flipH, flipV: o.flipV,
+    });
+}
+
+/** Rounded rectangle (all four corners). */
+function pill(s, o) {
+    s.addShape('roundRect', {
+        x: o.x, y: o.y, w: o.w, h: o.h,
+        fill: { color: o.color },
+        rectRadius: ((o.adj === undefined ? 16667 : o.adj) / 100000) * Math.min(o.w, o.h),
+    });
+}
+
+/** Horizontal accent rule. */
+function line(s, x, y, w, color, pt) {
+    s.addShape('line', { x, y, w, h: 0, line: { color, width: pt || 1 } });
+}
+
+/** Vertical rule. */
+function vline(s, x, y, h, color, pt) {
+    s.addShape('line', { x, y, w: 0, h, line: { color, width: pt || 1 } });
+}
+
+/** Text box carrying the deck's default metrics. */
+function tx(s, runs, o) {
+    s.addText(runs, Object.assign({ valign: 'top', margin: INSET, isTextBox: true }, o));
+}
+
+/** Two-tone slide heading: regular word followed by a bold accent word. */
+function heading(s, o) {
+    const runs = [];
+    if (o.light) {
+        runs.push({ text: o.light, options: { color: o.lightColor || WHITE, breakLine: !!o.br } });
+    }
+    if (o.bold) runs.push({ text: o.bold, options: { bold: true, color: o.boldColor || ORANGE } });
+    tx(s, runs, {
+        x: o.x, y: o.y, w: o.w, h: o.h,
+        fontFace: HEAD, fontSize: o.size, align: o.align || 'left',
+    });
+}
+
+/** 12pt body paragraph, justified at 1.5 line spacing by default. */
+function para(s, text, o) {
+    tx(s, text, {
+        x: o.x, y: o.y, w: o.w, h: o.h,
+        fontFace: BODY, fontSize: o.size || 12, color: o.color || GREY,
+        align: o.align || 'justify',
+        lineSpacingMultiple: o.ls === undefined ? 1.5 : o.ls,
+        italic: o.italic, bold: o.bold, charSpacing: o.charSpacing,
+        margin: o.margin || INSET,
+    });
+}
+
+/** Bold sub-heading (the deck's "Text Box 7" pattern). */
+function label(s, text, o) {
+    tx(s, text, {
+        x: o.x, y: o.y, w: o.w, h: o.h || 0.337,
+        fontFace: BODY, fontSize: o.size || 16, bold: true,
+        color: o.color || WHITE, align: o.align || 'left',
+        margin: INSET_TIGHT,
+    });
+}
+
+/** Large numeral ("01".."04") that precedes a feature label. */
+function numeral(s, text, o) {
+    tx(s, text, {
+        x: o.x, y: o.y, w: 0.714, h: 0.471,
+        fontFace: BODY, fontSize: 24, bold: true, color: o.color || WHITE,
+        margin: INSET_TIGHT,
+    });
+}
+
+/** Numeral + bold label + copy — the deck's most repeated composition. */
+function feature(s, o) {
+    numeral(s, o.num, { x: o.x, y: o.y, color: o.color || WHITE });
+    label(s, o.title, { x: o.tx, y: o.y, w: o.titleW || 3.0, color: o.color || WHITE, align: o.align });
+    para(s, o.body, {
+        x: o.tx, y: o.y + 0.372, w: o.bodyW || 2.904, h: 0.944,
+        color: o.color || WHITE, margin: INSET_TIGHT,
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Repeated decorative motifs
+// ---------------------------------------------------------------------------
+
+/** 6x6 grid of small dots; a texture accent on every slide. */
+function dots(s, x, y, color) {
+    const d = 0.0657, stepX = 0.2223, stepY = 0.2263;
+    for (let r = 0; r < 6; r++) {
+        for (let c = 0; c < 6; c++) {
+            s.addShape('ellipse', {
+                x: x + c * stepX, y: y + r * stepY, w: d, h: d,
+                fill: { color: color || ORANGE },
+            });
+        }
+    }
+}
+
+// The logo's two glyph outlines, lifted from the original freeforms and
+// normalised to a 0..1 box.
+const TILE_PATH = [
+    [0.9739, 0.6273], [0.5724, 1.0000], [0.1247, 0.5639], [0.0164, 0.4582],
+    ['c', -0.0055, 0.4368, -0.0055, 0.4023, 0.0164, 0.3809],
+    [0.3947, 0.0160],
+    ['c', 0.4165, -0.0053, 0.4519, -0.0053, 0.4738, 0.0160],
+    [0.9739, 0.5043],
+    ['c', 1.0087, 0.5383, 1.0087, 0.5934, 0.9739, 0.6273],
+];
+const CROSS_PATH = [
+    [0.7344, 0.9890],
+    ['c', 0.7252, 0.9958, 0.7125, 1.0000, 0.6985, 1.0000],
+    [0.3190, 1.0000],
+    ['c', 0.2909, 1.0000, 0.2682, 0.9832, 0.2682, 0.9625],
+    [0.2678, 0.7217], [0.0000, 0.7217], [0.0471, 0.7161],
+    ['c', 0.1392, 0.7002, 0.2157, 0.6602, 0.2591, 0.6073],
+    [0.2672, 0.5928], [0.2664, 0.0372],
+    ['c', 0.2664, 0.0166, 0.2888, 0.0000, 0.3166, 0.0000],
+    [0.6925, 0.0000],
+    ['c', 0.7203, 0.0000, 0.7427, 0.0166, 0.7427, 0.0372],
+    [0.7431, 0.2731], [1.0000, 0.2731], [0.9529, 0.2787],
+    ['c', 0.8915, 0.2893, 0.8370, 0.3106, 0.7947, 0.3393],
+    [0.7483, 0.3808], [0.7492, 0.9625],
+    ['c', 0.7492, 0.9728, 0.7436, 0.9822, 0.7344, 0.9890],
+];
+
+/**
+ * The "X" mark: two rounded tiles on the counter-diagonal with a heavy cross
+ * laid over them. (x, y) is the top-left of the mark's nominal box, `m` its
+ * width; the box is very slightly taller than wide (0.98 : 1).
+ */
+function xmark(s, x, y, m, tile, cross) {
+    const mh = m * 0.980;
+    const tw = 0.6613 * m, th = 0.6924 * mh;
+    glyph(s, { x: x, y: y, w: tw, h: th, path: TILE_PATH, fill: tile });
+    glyph(s, {
+        x: x + 0.3388 * m, y: y + 0.3091 * mh, w: tw, h: th,
+        path: TILE_PATH, fill: tile, flipH: true, flipV: true,
+    });
+    glyph(s, {
+        x: x + 0.1410 * m, y: y - 0.0030 * mh, w: 0.7297 * m, h: 1.0074 * mh,
+        path: CROSS_PATH, fill: cross, rotate: 45, flipH: true, flipV: true,
+    });
+}
+
+/**
+ * Full "X-Tech" lockup. `m` is the X mark's box width — 0.285in in the side
+ * rail, 1.007in on the cover; the wordmark scales from it.
+ */
+function logo(s, x, y, m, crossColor, tileColor, wordColor) {
+    xmark(s, x, y, m, tileColor, crossColor);
+    const pt = 80.8 * m;                        // Poppins size that matches the cap height
+    tx(s, '-Tech', {
+        x: x + 1.1090 * m - 0.0007 * pt, y: y + 0.0379 * m - 0.0038 * pt,
+        w: 3.55 * m, h: 1.2 * m,
+        fontFace: HEAD, fontSize: pt, bold: true, color: wordColor, margin: 0,
+    });
+}
+
+/**
+ * Left rail: vertical hairline at x=0.832, rotated "x-tech.io" caption at the
+ * bottom, and the small logo top-left.
+ */
+function rail(s, o) {
+    o = o || {};
+    vline(s, 0.832, 0.004, 7.496, o.ruleColor || BLUE, 1);
+    tx(s, 'x-tech.io', {
+        x: -0.214, y: 6.521, w: 1.338, h: 0.375, rotate: 90,
+        fontFace: HEAD, fontSize: 12, color: o.captionColor || ORANGE,
+        charSpacing: 3, lineSpacingMultiple: 1.5,
+    });
+    logo(s, 1.376, 0.403, 0.285,
+        o.markColor || BLUE, o.tileColor || ORANGE, o.wordColor || ORANGE);
+}
+
+/** Three outlined social badges (facebook / twitter / instagram). */
+function social(s, x, y, w, color) {
+    const k = w / 1.918, d = 0.306 * k, gap = 0.549 * k;
+    ['f', 't', 'o'].forEach(function (g, i) {
+        s.addShape('ellipse', {
+            x: x + i * gap, y: y, w: d, h: d,
+            fill: { type: 'none' }, line: { color, width: 1 },
+        });
+        tx(s, g, {
+            x: x + i * gap, y: y, w: d, h: d, margin: 0,
+            fontFace: BODY, fontSize: 10 * k, bold: true, color,
+            align: 'center', valign: 'middle',
+        });
+    });
+}
+
+/**
+ * Draw a normalised path (array of [x,y] points and ['c',x1,y1,x2,y2,x,y]
+ * cubic segments, all in 0..1 space) into the given box.
+ */
+function glyph(s, o) {
+    const pts = o.path.map(function (p) {
+        if (p[0] === 'c') {
+            return {
+                x: o.w * p[5], y: o.h * p[6],
+                curve: { type: 'cubic', x1: o.w * p[1], y1: o.h * p[2], x2: o.w * p[3], y2: o.h * p[4] },
+            };
+        }
+        return { x: o.w * p[0], y: o.h * p[1] };
+    });
+    pts.push({ close: true });
+    s.addShape('custGeom', {
+        x: o.x, y: o.y, w: o.w, h: o.h, points: pts,
+        fill: o.fill ? { color: o.fill } : { type: 'none' },
+        line: o.line, rotate: o.rotate, flipH: o.flipH, flipV: o.flipV,
+    });
+}
+
+/** Outlined pictogram standing in for the deck's line-art icons. */
+function icon(s, x, y, size, color) {
+    s.addShape('roundRect', {
+        x, y, w: size, h: size, rectRadius: size * 0.20,
+        fill: { type: 'none' }, line: { color, width: 1.75 },
+    });
+    s.addShape('ellipse', {
+        x: x + size * 0.30, y: y + size * 0.30, w: size * 0.40, h: size * 0.40,
+        fill: { type: 'none' }, line: { color, width: 1.5 },
+    });
+}
+
+/** Flat stand-in for one of the two photographs in the source deck. */
+function photo(s, o) {
+    const opts = {
+        x: o.x, y: o.y, w: o.w, h: o.h,
+        fill: { color: o.color || PHOTO },
+        rotate: o.rotate,
+    };
+    if (o.adj !== undefined) opts.rectRadius = (o.adj / 100000) * Math.min(o.w, o.h);
+    s.addShape(o.adj !== undefined ? 'round1Rect' : 'rect', opts);
+    tx(s, o.caption || '[image]', {
+        x: o.x, y: o.y + o.h / 2 - 0.2, w: o.w, h: 0.4, margin: 0,
+        fontFace: BODY, fontSize: 11, color: PHOTO_TX,
+        align: 'center', valign: 'middle',
+    });
+}
+
+/**
+ * The deck's signature background: a blue panel filling the slide, with the
+ * bottom edge sweeping down to the left corner and curling up at the right.
+ * `band` is where that bottom edge sits (fraction of height).
+ */
+function sweep(s, o) {
+    const band = o.band === undefined ? 0.8445 : o.band;
+    glyph(s, {
+        x: o.x, y: o.y, w: o.w, h: o.h, fill: o.color || BLUE,
+        path: [
+            [0, 0], [1, 0], [1, band - 0.1777],
+            ['c', 1, band - 0.0795, 0.9566, band, 0.9032, band],
+            [0.0869, band],
+            ['c', 0.0446, band + 0.0089, 0.0104, band + 0.0668, 0.0020, band + 0.1420],
+            [0.0008, band + 0.1554], [0, band + 0.1555], [0, 0],
+        ],
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Per-slide builders
+// ---------------------------------------------------------------------------
+
+/** 1 — Cover. */
+function slide01(s) {
+    sweep(s, { x: 0, y: -0.051, w: 13.333, h: 6.27 });
+    social(s, 10.868, 0.553, 1.918, ORANGE);
+    logo(s, 0.771, 1.453, 1.007, ORANGE, CREAM, ORANGE);
+    para(s, 'PLACEHOLDER' +
+        'PLACEHOLDER',
+        { x: 6.09, y: 1.462, w: 5.171, h: 0.978, color: WHITE });
+    dots(s, 11.832, 6.519);
+}
+
+/** 2 — Welcome / Introduction. */
+function slide02(s) {
+    corner(s, { x: 7.571, y: 3.896, w: 5.762, h: 3.604, adj: 22364, color: ORANGE });
+    corner(s, { x: 0, y: -0.022, w: 11.25, h: 3.918, adj: 21234, color: BLUE });
+    dots(s, 11.788, 0.764);
+    heading(s, { x: 1.37, y: 1.433, w: 4.344, h: 1.582, size: 44, light: 'Welcome to ', bold: 'X-Tech' });
+    line(s, 1.476, 3.289, 0.875, ORANGE, 2);
+    label(s, 'Introduction', { x: 1.4, y: 4.449, w: 2.158, h: 0.37, color: ORANGE });
+    para(s, 'PLACEHOLDER' +
+        'PLACEHOLDER' +
+        'PLACEHOLDER' +
+        'sed do eiusmod tempor incididunt aut laborevet ullamco',
+        { x: 1.4, y: 4.985, w: 5.267, h: 1.578 });
+    rail(s, { markColor: ORANGE, tileColor: WHITE, wordColor: WHITE });
+    vline(s, 0.832, -0.048, 3.944, WHITE, 1);
+}
+
+/** 3 — Start Innovating. */
+function slide03(s) {
+    dots(s, 1.017, 1.175);
+    corner(s, { x: 3.3, y: 0.645, w: 10.033, h: 6.855, adj: 16570, color: BLUE });
+    heading(s, { x: 7.317, y: 1.598, w: 5.086, h: 1.447, size: 40, light: 'Start Innovating ', bold: 'With X-Tech' });
+    line(s, 7.424, 3.385, 0.875, ORANGE, 2);
+    const body = 'PLACEHOLDER' +
+        'PLACEHOLDER' +
+        'siabes dolore magna aliqua veniam nostrud';
+    para(s, body, { x: 7.317, y: 3.725, w: 4.862, h: 1.273, color: WHITE });
+    para(s, body, { x: 7.317, y: 5.308, w: 4.862, h: 1.273, color: WHITE });
+    rail(s);
+}
+
+/** 4 — Our Best Value. */
+function slide04(s) {
+    corner(s, { x: 6.359, y: 0, w: 6.975, h: 7.5, adj: 11888, color: BLUE, rotate: 180 });
+    const body = 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula ' +
+        'justo libero vivamus porttitor dolor veniam nostrud consectetur';
+    icon(s, 7.121, 4.45, 0.549, ORANGE);
+    para(s, body, { x: 8.118, y: 4.369, w: 4.082, h: 0.944, color: WHITE, margin: INSET_TIGHT, align: 'left' });
+    icon(s, 7.121, 5.805, 0.593, ORANGE);
+    para(s, body, { x: 8.118, y: 5.805, w: 4.082, h: 0.944, color: WHITE, margin: INSET_TIGHT, align: 'left' });
+    heading(s, { x: 1.37, y: 4.588, w: 4.454, h: 1.717, size: 48, light: 'Our Best ', bold: 'Value', lightColor: INK });
+    line(s, 1.476, 6.551, 0.92, ORANGE, 2);
+    dots(s, 4.329, 6.551);
+    rail(s);
+}
+
+/** 5 — Vision Of X-Tech (three numbered steps). */
+function slide05(s) {
+    corner(s, { x: 5.647, y: 0, w: 7.686, h: 7.5, adj: 11332, color: BLUE, rotate: 180, flipV: true });
+    corner(s, { x: 5.189, y: 2.637, w: 4.184, h: 2.227, adj: 21234, color: ORANGE, flipH: true });
+    heading(s, { x: 1.347, y: 1.822, w: 3.212, h: 1.582, size: 44, light: 'Vision Of ', bold: 'X-Tech', lightColor: INK });
+    line(s, 1.465, 3.664, 0.875, ORANGE, 2);
+    para(s, 'Lorem ipsum dolor sit amet, cons ectetur adip cing elit, sed do eiusmod tempor incidi ' +
+        'dunt ut labore et dolore magna aliqua. sit amet, conse ctetur adipi scing elit. sed do ' +
+        'eiusmod tempor incid. ', { x: 1.347, y: 4.26, w: 3.44, h: 1.578 });
+    const short = 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula';
+    feature(s, { x: 5.877, tx: 6.472, y: 0.995, num: '01', title: 'Technology solutions', titleW: 2.677, body: short, bodyW: 2.528 });
+    feature(s, { x: 5.405, tx: 6.001, y: 3.092, num: '02', title: 'Technology Integrating', titleW: 2.998, body: short + ' dolor sit amet' });
+    feature(s, { x: 5.875, tx: 6.47, y: 5.11, num: '03', title: 'Provide Real', titleW: 2.528, body: short, bodyW: 2.528 });
+    dots(s, 4.816, 1.788);
+    rail(s);
+}
+
+/** 6 — Mission of X-Tech. */
+function slide06(s) {
+    corner(s, { x: 6.245, y: 0, w: 7.089, h: 7.492, adj: 16667, color: BLUE, flipH: true });
+    heading(s, { x: 1.343, y: 1.496, w: 4.041, h: 1.582, size: 44, light: 'Mission of ', bold: 'X-Tech', lightColor: INK });
+    line(s, 1.444, 3.302, 0.875, ORANGE, 2);
+    [
+        { y: 1.083, iy: 1.194, title: 'Innovative Technology ', body: 'PLACEHOLDER' },
+        { y: 3.078, iy: 3.158, title: 'Prioritizing Satisfaction', body: 'Customer satisfaction is our main focus. We listen carefully to our clients\u2019 needs and expectations in order' },
+        { y: 5.072, iy: 5.139, title: 'Become a Trusted Partner', body: 'We strive to be a trusted partner for our clients, collaborating with them in developing optimal solutions' },
+    ].forEach(function (it) {
+        icon(s, 8.47, it.iy, 0.6, ORANGE);
+        label(s, it.title, { x: 9.618, y: it.y, w: 3.176 });
+        para(s, it.body, { x: 9.618, y: it.y + 0.356, w: 3.01, h: 0.938, color: WHITE, margin: INSET_TIGHT });
+    });
+    dots(s, 5.758, 2.824);
+    rail(s);
+}
+
+/** 7 — Experienced In Various Latest Technologies. */
+function slide07(s) {
+    dots(s, 8.093, 0.289);
+    corner(s, { x: -0.015, y: 3.573, w: 10.14, h: 3.927, adj: 23082, color: BLUE });
+    corner(s, { x: 10.125, y: 0, w: 3.208, h: 7.5, adj: 23082, color: ORANGE, flipH: true });
+    heading(s, { x: 1.311, y: 1.256, w: 6.668, h: 1.447, size: 40, light: 'Experienced In Various ', bold: 'Latest Technologies', lightColor: INK });
+    line(s, 1.466, 2.931, 0.875, ORANGE, 2);
+    const body = 'PLACEHOLDER';
+    [{ x: 1.348 }, { x: 4.987 }].forEach(function (c, i) {
+        label(s, ['Mobile Application', 'Artificial Intelligence'][i], { x: c.x, y: 4.157, w: 3.01 });
+        para(s, body, { x: c.x, y: 4.513, w: 2.822, h: 1.247, color: WHITE, margin: INSET_TIGHT });
+    });
+    para(s, 'PLACEHOLDER' +
+        'PLACEHOLDER',
+        { x: 1.279, y: 6.147, w: 6.529, h: 0.675, color: WHITE });
+    rail(s);
+    vline(s, 0.832, 3.556, 3.944, WHITE, 1);
+}
+
+/** 8 — Leader In The Software Development Industry. */
+function slide08(s) {
+    corner(s, { x: 0, y: 0, w: 7.583, h: 7.5, adj: 10304, color: BLUE });
+    heading(s, { x: 1.293, y: 3.773, w: 3.936, h: 2.524, size: 36, light: 'Leader In The Software ', bold: 'Development Industry' });
+    line(s, 1.378, 6.526, 0.875, ORANGE, 2);
+    [
+        { y: 0.942, title: 'Commitment to Quality', body: 'PLACEHOLDER' },
+        { y: 3.193, title: 'Commitment to Security', body: 'PLACEHOLDER' },
+        { y: 5.518, title: 'Collaborative Partnership', body: 'They listen carefully to clients\u2019 needs and involve them in every step of the development process' },
+    ].forEach(function (c) {
+        label(s, c.title, { x: 9.431, y: c.y, w: 3.171, color: ORANGE });
+        para(s, c.body, { x: 9.431, y: c.y + 0.356, w: 3.171, h: 0.938, margin: INSET_TIGHT });
+    });
+    dots(s, 1.431, 1.887);
+    rail(s, { markColor: WHITE, ruleColor: WHITE });
+}
+
+/** 9 — Provide Innovative Technology Solutions. */
+function slide09(s) {
+    corner(s, { x: 0, y: 0, w: 13.333, h: 4.912, adj: 10304, color: BLUE, flipH: true, flipV: true });
+    dots(s, 12.064, 0);
+    heading(s, { x: 1.311, y: 1.256, w: 6.207, h: 1.313, size: 36, light: 'Provide Innovative ', bold: 'Technology Solutions' });
+    line(s, 1.424, 2.831, 0.875, ORANGE, 2);
+    para(s, 'Lorem ipsum dolor sit amet, cons ectetur adip cing elit, sed do eiusmod tempor incidi ' +
+        'dunt ut labore et dolore magna aliqua. sit amet, conse ctetur adipi scing elit. sed do ' +
+        'eiusmod tempor incid. ', { x: 1.35, y: 3.335, w: 5.552, h: 0.978, color: WHITE });
+    label(s, 'Fabrizio Asensio', { x: 1.472, y: 6.328, w: 3.01, color: ORANGE });
+    para(s, 'Founder of X-Tech', { x: 1.472, y: 6.731, w: 3.01, h: 0.269, ls: 1, align: 'left', margin: INSET_TIGHT });
+    rail(s, { markColor: WHITE, ruleColor: WHITE });
+    vline(s, 0.832, 4.912, 2.585, BLUE, 1);
+}
+
+/** 10 — We Are Ready To Help You. */
+function slide10(s) {
+    corner(s, { x: 4.353, y: 0, w: 8.98, h: 7.208, adj: 12905, color: BLUE, flipH: true, flipV: true });
+    [
+        { x: 1.459, lbl: 1.755, rule: 1.859, name: 'Bella Arian' },
+        { x: 5.293, lbl: 5.59, rule: 5.694, name: 'Adrian Luis' },
+    ].forEach(function (c) {
+        corner(s, { x: c.x, y: 5.268, w: 2.951, h: 0.959, adj: 21234, color: ORANGE });
+        tx(s, c.name, {
+            x: c.lbl, y: 5.505, w: 2.467, h: 0.37,
+            fontFace: HEAD, fontSize: 16, bold: true, color: WHITE, charSpacing: 1,
+        });
+        line(s, c.rule, 5.998, 0.875, BLUE, 2);
+    });
+    heading(s, { x: 9.368, y: 1.428, w: 3.208, h: 2.322, size: 44, light: 'We Are Ready To ', bold: 'Help You' });
+    line(s, 9.453, 3.951, 0.875, ORANGE, 2);
+    dots(s, 11.406, 5.462);
+    rail(s);
+}
+
+/** 11 — Experienced And Qualified Experts. */
+function slide11(s) {
+    corner(s, { x: -0.015, y: 1.824, w: 7.628, h: 3.944, adj: 23082, color: BLUE });
+    [
+        { nx: 1.376, ny: 3.174, lx: 1.443, ly: 3.659, name: 'Bandu Gong', c: WHITE },
+        { nx: 4.537, ny: 3.174, lx: 4.634, ly: 3.659, name: 'Dhenso Oris', c: WHITE },
+        { nx: 1.408, ny: 6.297, lx: 1.497, ly: 6.799, name: 'Ghea Anasy', c: ORANGE },
+        { nx: 4.537, ny: 6.274, lx: 4.606, ly: 6.775, name: 'Phete Kholi', c: ORANGE },
+    ].forEach(function (p) {
+        tx(s, p.name, {
+            x: p.nx, y: p.ny, w: 1.984, h: 0.337,
+            fontFace: HEAD, fontSize: 16, bold: true, color: p.c, margin: INSET_TIGHT,
+        });
+        line(s, p.lx, p.ly, 0.875, ORANGE, 2);
+    });
+    heading(s, { x: 8.333, y: 1.127, w: 4.169, h: 2.121, size: 40, light: 'Experienced ', bold: 'And Qualified Experts', lightColor: INK });
+    line(s, 8.451, 3.483, 0.748, ORANGE, 2);
+    para(s, 'Lorem ipsum dolor sit amet, cons ectetur adip cing elit, sed do eiusmod tempor incidi ' +
+        'dunt ut labore et dolore magna aliqua. sit amet, conse ctetur adipi scing elit. sed do ' +
+        'eiusmod tempor incid. ', { x: 8.378, y: 3.821, w: 4.169, h: 1.28 });
+    social(s, 8.589, 5.74, 1.559, ORANGE);
+    dots(s, 6.775, 1.501);
+    rail(s);
+    vline(s, 0.832, 1.824, 3.944, WHITE, 1);
+}
+
+/** 12 — Mobile Application Development (three platform cards). */
+function slide12(s) {
+    corner(s, { x: 6.999, y: -0.023, w: 6.384, h: 7.523, adj: 12639, color: BLUE, flipH: true, flipV: true });
+    const body = 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo libero vivamus';
+    [
+        { y: 0.725, ty: 0.968, num: '01', title: 'Android', flipH: true },
+        { y: 2.935, ty: 3.179, num: '02', title: 'IOS', flipV: true },
+        { y: 5.146, ty: 5.389, num: '03', title: 'Cross-platform', flipH: true, flipV: true },
+    ].forEach(function (c) {
+        corner(s, { x: 7.518, y: c.y, w: 4.285, h: 1.851, adj: 31548, color: ORANGE, flipH: c.flipH, flipV: c.flipV });
+        feature(s, { x: 7.844, tx: 8.559, y: c.ty, num: c.num, title: c.title, titleW: 2.962, body: body, bodyW: 2.962, align: 'justify' });
+    });
+    heading(s, { x: 1.376, y: 4.586, w: 5.399, h: 1.447, size: 40, light: 'Mobile Application ', bold: 'Development', lightColor: INK });
+    line(s, 1.495, 6.427, 0.875, ORANGE, 2);
+    dots(s, 0.33, 3.478);
+    rail(s);
+}
+
+/** 13 — Experienced In Various Latest Technologies (services). */
+function slide13(s) {
+    corner(s, { x: 2.208, y: 3.779, w: 11.125, h: 3.721, adj: 19963, color: ORANGE, flipH: true });
+    corner(s, { x: 6.999, y: -0.023, w: 6.384, h: 6.979, adj: 12639, color: BLUE, flipH: true, flipV: true });
+    heading(s, { x: 1.175, y: 1.023, w: 4.672, h: 2.121, size: 40, light: 'Experienced In ', bold: 'Various Latest Technologies', lightColor: INK });
+    line(s, 1.278, 3.466, 0.875, ORANGE, 2);
+    label(s, 'Introduction', { x: 7.445, y: 0.94, w: 2.158, h: 0.37 });
+    para(s, 'PLACEHOLDER' +
+        'PLACEHOLDER' +
+        'siabes dolore magna aliqua veniam nostrud consectetur',
+        { x: 7.445, y: 1.31, w: 4.889, h: 1.28, color: WHITE });
+    const body = 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo libero vivamus porttitor dolor';
+    feature(s, { x: 7.502, tx: 8.216, y: 3.284, num: '01', title: 'Service One', titleW: 3.239, body: body, bodyW: 4.117 });
+    feature(s, { x: 7.468, tx: 8.182, y: 5.054, num: '02', title: 'Service Two', titleW: 2.962, body: body, bodyW: 3.765 });
+    dots(s, 6.176, 0.096);
+    rail(s);
+}
+
+/** 14 — Why Choose X-Tech? (three orange cards). */
+function slide14(s) {
+    sweep(s, { x: 0, y: -0.051, w: 13.333, h: 6.27 });
+    heading(s, { x: 7.497, y: 1.112, w: 4.323, h: 1.582, size: 44, light: 'Why Choose ', bold: 'X-Tech?' });
+    line(s, 7.652, 2.85, 0.875, ORANGE, 2);
+    para(s, 'Lorem ipsum dolor sit amet, cons ectetur adip cing elit, sed do eiusmod tempor incidi ' +
+        'dunt ut labore et dolore magna aliqua. sit amet, conse ctetur adipi scing',
+        { x: 7.497, y: 3.084, w: 4.604, h: 0.978, color: WHITE });
+    const body = 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula';
+    [
+        { x: 1.378, nx: 1.485, tx: 2.199, num: '01', title: 'Superior Quality' },
+        { x: 5.328, nx: 5.434, tx: 6.148, num: '02', title: 'Latest Innovations' },
+        { x: 9.277, nx: 9.383, tx: 10.098, num: '03', title: 'Security and Privacy' },
+    ].forEach(function (c) {
+        corner(s, { x: c.x, y: 4.768, w: 3.555, h: 1.895, adj: 31548, color: ORANGE, flipV: true });
+        feature(s, { x: c.nx, tx: c.tx, y: 5.011, num: c.num, title: c.title, titleW: 2.734, body: body, bodyW: 2.415, align: 'justify' });
+    });
+    rail(s, { markColor: WHITE, ruleColor: WHITE });
+    vline(s, 0.832, 5.348, 2.152, BLUE, 1);
+    dots(s, 12.513, 6.722);
+}
+
+/** 15 — Focused On Growth (four value tiles). */
+function slide15(s) {
+    corner(s, { x: 0, y: 5.099, w: 12.917, h: 2.401, adj: 50000, color: BLUE });
+    line(s, 1.95, 4.609, 9.137, BLUE, 3);
+    [
+        { x: 1.376, flipV: true, title: 'Continuous Innovation', ty: 4.652 },
+        { x: 4.144, title: 'Team Development', ty: 4.652 },
+        { x: 6.912, flipH: true, flipV: true, title: 'Market Expansion', ty: 4.631 },
+        { x: 9.675, flipH: true, title: 'Strategic Partnership', ty: 4.652 },
+    ].forEach(function (t) {
+        corner(s, { x: t.x, y: 3.55, w: 2.388, h: 3.017, adj: 24568, color: ORANGE, flipH: t.flipH, flipV: t.flipV });
+        icon(s, t.x + 0.97, 3.94, 0.45, WHITE);
+        para(s, t.title, {
+            x: t.x + 0.155, y: t.ty, w: 2.078, h: 0.64,
+            color: WHITE, size: 16, bold: true, align: 'center', ls: 1,
+        });
+        para(s, 'PLACEHOLDER', {
+            x: t.x + 0.109, y: 5.257, w: 2.17, h: 0.978, color: WHITE, align: 'center',
+        });
+    });
+    para(s, 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo ' +
+        'libero vivamus porttitor dolor, conubia mollit. Sapien nam suspendisse, tincidunt eget ante ' +
+        'tncidunt, eros in auctor fringilla praesent at diam. Lorem ipsum dolor sit amet, lacus nulla ' +
+        'ac netus nibh aliquet, Lorem ipsum dolor sitLorem',
+        { x: 1.336, y: 1.278, w: 5.911, h: 1.576 });
+    heading(s, { x: 8.323, y: 1.059, w: 3.806, h: 1.582, size: 44, light: 'Focused ', bold: 'On Growth', lightColor: INK });
+    line(s, 8.424, 2.989, 0.875, ORANGE, 2);
+    dots(s, 11.412, 0.223);
+    rail(s);
+    vline(s, 0.832, 5.099, 2.383, WHITE, 1);
+}
+
+/** 16 — Break slide. */
+function slide16(s) {
+    rect(s, { x: 0, y: 0, w: 13.333, h: 7.5, color: BLUE, transparency: 24 });
+    social(s, 10.868, 0.553, 1.918, WHITE);
+    heading(s, { x: 1.483, y: 2.81, w: 9.173, h: 1.717, size: 96, light: 'BREAK', bold: ' SLIDE', boldColor: WHITE });
+    line(s, 1.678, 4.6, 0.875, WHITE, 2.25);
+    para(s, '5 Minutes For A Short Break', {
+        x: 2.678, y: 4.39, w: 4.148, h: 0.404, color: WHITE, size: 18, ls: 1, align: 'left',
+    });
+    rail(s, { markColor: WHITE, ruleColor: WHITE });
+    dots(s, 8.909, 4.577);
+}
+
+/** 17 — Our Collaborative Partnerships. */
+function slide17(s) {
+    // The sweep motif mirrored: the panel's TOP edge dips to the left corner
+    // and its top-right corner is rounded off.
+    glyph(s, {
+        x: 0, y: 2.287, w: 13.333, h: 5.219, fill: BLUE,
+        path: [
+            [0, 0], [0.0020, 0.0162],
+            ['c', 0.0104, 0.1066, 0.0446, 0.1762, 0.0869, 0.1856],
+            [0.0879, 0.1867], [0.9032, 0.1867],
+            ['c', 0.9566, 0.1867, 1, 0.2823, 1, 0.4003],
+            [1, 1], [0, 1], [0, 0],
+        ],
+    });
+    corner(s, { x: 9.62, y: 0, w: 3.713, h: 7.5, adj: 35041, color: ORANGE, flipH: true });
+    heading(s, { x: 1.319, y: 1.17, w: 5.347, h: 1.447, size: 40, light: 'Our Collaborative ', bold: 'Partnerships', lightColor: INK2 });
+    line(s, 1.475, 2.896, 0.875, ORANGE, 2);
+    const body = 'PLACEHOLDER';
+    feature(s, { x: 1.472, tx: 2.187, y: 3.606, num: '01', title: 'Mobile Application', titleW: 2.787, body: body, bodyW: 2.787 });
+    feature(s, { x: 2.648, tx: 3.436, y: 5.396, num: '02', title: 'Artificial Intelligence', titleW: 2.868, body: body, bodyW: 2.868 });
+    dots(s, -0.505, 0.645);
+    rail(s);
+    vline(s, 0.832, 3.198, 4.285, WHITE, 1);
+}
+
+/** 18 — Why We Are Trusted (three portfolio captions). */
+function slide18(s) {
+    corner(s, { x: 2.243, y: 0.714, w: 11.09, h: 6.017, adj: 24568, color: BLUE, flipH: true });
+    dots(s, 8.329, 1.244);
+    corner(s, { x: 0, y: 5.075, w: 9.241, h: 2.425, adj: 39173, color: ORANGE, flipV: true });
+    [{ x: 1.348, rx: 1.447 }, { x: 4.095, rx: 4.194 }, { x: 6.792, rx: 6.891 }].forEach(function (c) {
+        para(s, 'Third Portfolio ', { x: c.x, y: 5.244, w: 2.451, h: 0.462, color: WHITE, size: 16, bold: true, align: 'left' });
+        line(s, c.rx, 5.864, 0.875, BLUE, 2.25);
+        para(s, 'lorem ipsum dolor ameti basi duisan anusalanin', { x: c.x, y: 6.006, w: 2.25, h: 0.675, color: WHITE });
+    });
+    heading(s, { x: 9.597, y: 1.608, w: 3.132, h: 2.322, size: 44, light: 'Why We ', bold: 'Are Trusted' });
+    line(s, 9.757, 4.171, 0.875, ORANGE, 2);
+    para(s, 'We have worked on successful projects for various industries and business sizes. Quality ' +
+        'and customer satisfaction is our top priority',
+        { x: 9.597, y: 4.476, w: 3.132, h: 1.28, color: WHITE });
+    rail(s, { captionColor: WHITE });
+}
+
+/** 19 — Mobile App Development (phone photo + four features). */
+function slide19(s) {
+    dots(s, 11.484, 5.637);
+    corner(s, { x: 1.122, y: 0, w: 12.211, h: 4.87, adj: 24568, color: BLUE, flipH: true, flipV: true });
+    photo(s, { x: 9.488, y: 1.104, w: 2.877, h: 5.335, color: 'E7E8F0', adj: 9000, caption: '[phone photo]' });
+    const body = 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula dolor sit amet';
+    [
+        { nx: 1.538, tx: 2.133, y: 1.29, num: '01', title: 'Attractive UI/UX Design', tw: 2.998 },
+        { nx: 5.454, tx: 6.05, y: 1.29, num: '02', title: 'Testing and Maintenance', tw: 3.149 },
+        { nx: 1.538, tx: 2.133, y: 3.207, num: '03', title: 'Continuous Updates', tw: 2.998 },
+        { nx: 5.454, tx: 6.05, y: 3.207, num: '04', title: 'Security and Privacy', tw: 2.998 },
+    ].forEach(function (c) {
+        feature(s, { x: c.nx, tx: c.tx, y: c.y, num: c.num, title: c.title, titleW: c.tw, body: body });
+    });
+    heading(s, { x: 1.335, y: 5.319, w: 4.245, h: 1.447, size: 40, light: 'Mobile App ', bold: 'Development', lightColor: INK2 });
+    line(s, 1.49, 7.045, 0.875, ORANGE, 2);
+    para(s, 'PLACEHOLDER' +
+        'es lorem ipsum dolor siabes dolore magna aliqua',
+        { x: 5.758, y: 5.399, w: 3.295, h: 1.28 });
+    rail(s, { markColor: WHITE });
+}
+
+/** 20 — Web Development (laptop photo). */
+function slide20(s) {
+    corner(s, { x: 1.122, y: 0.978, w: 12.211, h: 5.874, adj: 24568, color: BLUE, flipH: true });
+    dots(s, 5.143, 0.632);
+    corner(s, { x: 7.357, y: 4.425, w: 5.404, h: 3.075, adj: 24568, color: ORANGE });
+    photo(s, { x: 0.55, y: 1.55, w: 6.5, h: 4.6, color: 'DDDEE8', adj: 7000, rotate: 345, caption: '[laptop photo]' });
+    heading(s, { x: 7.357, y: 1.542, w: 5.619, h: 0.774, size: 40, light: 'Web ', bold: 'Development' });
+    line(s, 7.496, 2.625, 0.875, ORANGE, 2);
+    para(s, 'PLACEHOLDER' +
+        'PLACEHOLDER',
+        { x: 7.36, y: 2.93, w: 5.074, h: 0.978, color: WHITE });
+    icon(s, 7.779, 5.137, 0.593, BLUE);
+    para(s, 'Description', { x: 8.717, y: 4.955, w: 2.779, h: 0.462, color: WHITE, size: 16, bold: true, align: 'left' });
+    para(s, 'PLACEHOLDER' +
+        'contansani elita sweden aliquie ', { x: 8.717, y: 5.417, w: 3.495, h: 0.97, color: WHITE });
+    rail(s);
+}
+
+/**
+ * Speech bubble: rounded white panel with a wedge tail poking out sideways.
+ * `dir` is -1 for a tail on the left, +1 for one on the right.
+ */
+function bubble(s, o) {
+    const w = 4.143, h = 1.543;
+    pill(s, { x: o.x, y: o.y, w: w, h: h, adj: 16667, color: WHITE });
+    s.addShape('triangle', {
+        x: o.dir < 0 ? o.x - 0.30 : o.x + w - 0.06,
+        y: o.y + (o.dir < 0 ? 0.86 : 0.30),
+        w: 0.36, h: 0.42, rotate: o.dir < 0 ? 270 : 90,
+        fill: { color: WHITE },
+    });
+}
+
+/** 21 — Clients Says (two speech bubbles). */
+function slide21(s) {
+    corner(s, { x: 5.929, y: 0.595, w: 7.061, h: 6.905, adj: 11350, color: BLUE, flipH: true });
+    const quote = '\u201CA wonderful serenity has taken possession of my entire soul, like these sweet ' +
+        'mornings of spring which\u201D';
+    bubble(s, { x: 8.484, y: 0.962, dir: -1 });
+    para(s, quote, { x: 8.817, y: 1.24, w: 3.602, h: 0.866, ls: 1.3, align: 'left' });
+    para(s, 'Antonino ', { x: 6.615, y: 2.565, w: 2.073, h: 0.37, color: WHITE, size: 18, bold: true, align: 'left', ls: 1 });
+    para(s, 'MegaBiz Tech', { x: 6.615, y: 2.868, w: 2.241, h: 0.341, color: WHITE, italic: true, ls: 1.3, align: 'left' });
+    bubble(s, { x: 6.334, y: 4.249, dir: 1 });
+    para(s, quote, { x: 6.667, y: 4.527, w: 3.602, h: 0.866, ls: 1.3, align: 'left' });
+    para(s, 'Martino', { x: 10.142, y: 5.913, w: 2.073, h: 0.37, color: WHITE, size: 18, bold: true, align: 'right', ls: 1 });
+    para(s, 'Mantan Tea', { x: 9.933, y: 6.216, w: 2.282, h: 0.341, color: WHITE, italic: true, ls: 1.3, align: 'right' });
+    heading(s, { x: 1.338, y: 2.667, w: 3.44, h: 1.582, size: 44, light: 'Clients', bold: 'Says', br: true, lightColor: INK });
+    line(s, 1.457, 4.509, 0.875, ORANGE, 2);
+    para(s, 'Lorem ipsum dolor sit amet, cons ectetur adip cing elit, sed do eiusmod tempor incidi ' +
+        'dunt ut labore et dolore magna aliqua. sit amet',
+        { x: 1.373, y: 4.907, w: 4.049, h: 0.978 });
+    dots(s, 4.293, 6.709);
+    rail(s);
+}
+
+/** 22 — Which We Will Provide (target / goal). */
+function slide22(s) {
+    corner(s, { x: 0, y: 0.967, w: 5.635, h: 6.533, adj: 14700, color: BLUE });
+    const bullets = ['Superior Customer Data', 'Users Via Interactive Features', 'Integrate with Experience'];
+    [
+        { bx: 6.878, lx: 6.845, ulx: 6.261, adj: 15422, title: 'Target' },
+        { bx: 10.264, lx: 10.231, ulx: 9.642, adj: 25010, title: 'Goal' },
+    ].forEach(function (c) {
+        pill(s, { x: c.bx, y: 3.741, w: 1.412, h: 0.993, adj: c.adj, color: ORANGE });
+        para(s, c.title, { x: c.lx, y: 3.862, w: 1.478, h: 0.37, color: WHITE, size: 16, bold: true, align: 'center', ls: 1 });
+        para(s, '2021', { x: c.lx, y: 4.276, w: 1.478, h: 0.303, color: WHITE, align: 'center', ls: 1, charSpacing: 3 });
+        bullets.forEach(function (b, i) {
+            para(s, '\u25CB   ' + b, {
+                x: c.ulx, y: 5.013 + i * 0.245, w: 2.9, h: 0.245,
+                align: 'left', ls: 1, margin: 0,
+            });
+        });
+    });
+    heading(s, { x: 1.348, y: 2.168, w: 3.7, h: 1.447, size: 40, light: 'Which We ', bold: 'Will Provide' });
+    line(s, 1.466, 4.01, 0.875, ORANGE, 2);
+    para(s, 'Lorem ipsum dolor sit amet, cons ectetur adip cing elit, sed do eiusmod tempor incidi ' +
+        'dunt ut labore et dolore magna aliqua.',
+        { x: 1.382, y: 4.407, w: 3.666, h: 0.978, color: WHITE });
+    corner(s, { x: 5.635, y: 6.314, w: 7.698, h: 1.186, adj: 37946, color: ORANGE });
+    dots(s, 11.957, 0.268);
+    rail(s);
+    vline(s, 0.832, 0.967, 6.515, WHITE, 1);
+}
+
+/** 23 — Growing All The Time (horizontal bar graphic). */
+function slide23(s) {
+    corner(s, { x: 7.456, y: 1.524, w: 5.877, h: 5.976, adj: 12373, color: BLUE, flipH: true });
+    corner(s, { x: 1.254, y: 2.763, w: 7.37, h: 4.028, adj: 12373, color: ORANGE });
+    // Vertical grid the bars sit on.
+    [2.491, 3.548, 4.578, 5.635, 6.731, 7.804].forEach(function (x) {
+        vline(s, x, 3.069, 2.399, WHITE, 1);
+    });
+    // One bar per month; widths carry the data.
+    [
+        { label: 'May', ly: 3.308, y: 3.408, w: 3.508 },
+        { label: 'june', ly: 3.809, y: 3.908, w: 4.484 },
+        { label: 'July', ly: 4.292, y: 4.391, w: 3.281 },
+    ].forEach(function (b) {
+        s.addShape('round2SameRect', {
+            x: 2.491, y: b.y, w: b.w, h: 0.121, rectRadius: 0.06, fill: { color: BLUE },
+        });
+        para(s, b.label, { x: 1.567, y: b.ly, w: 1.843, h: 0.303, color: WHITE, ls: 1, align: 'left' });
+    });
+    ['0-800', '800-2k', '2k-4k', '4k-6k', '6k-8k'].forEach(function (t, i) {
+        para(s, t, {
+            x: [2.52, 3.574, 4.63, 5.684, 6.78][i], y: 5.071, w: 0.746, h: 0.442,
+            color: WHITE, size: 12, bold: true, italic: true, align: 'center', ls: 1,
+        });
+    });
+    para(s, 'PLACEHOLDER' +
+        'offered by X-Tech in mobile application development',
+        { x: 1.564, y: 5.92, w: 6.423, h: 0.604, color: WHITE, ls: 1, align: 'left' });
+    heading(s, { x: 9.02, y: 3.292, w: 3.7, h: 1.447, size: 40, light: 'Growing All ', bold: 'The Time' });
+    line(s, 9.139, 5.104, 0.875, ORANGE, 2);
+    para(s, 'Lorem ipsum dolor sit amet, cons ectetur adip cing elit, sed do eiusmod tempor incidi ' +
+        'dunt ut labore et dolore magna aliqua.',
+        { x: 9.055, y: 5.502, w: 3.666, h: 0.978, color: WHITE });
+    dots(s, 7.909, 2.141);
+    rail(s);
+}
+
+/** 24 — Reporting Up To 90% (column graphic + KPI rail). */
+function slide24(s) {
+    corner(s, { x: 0, y: 1.894, w: 13.333, h: 5.606, adj: 18786, color: BLUE });
+    corner(s, { x: 9.482, y: 0.488, w: 3.395, h: 6.665, adj: 19133, color: ORANGE });
+    [
+        { y: 1.072, ruleY: 2.945, big: '68%' },
+        { y: 3.072, ruleY: 4.946, big: '800+' },
+        { y: 5.073, ruleY: null, big: '666K+' },
+    ].forEach(function (k) {
+        para(s, k.big, { x: 10.104, y: k.y, w: 1.902, h: 0.832, color: BLUE, size: 32, bold: true, align: 'left' });
+        para(s, 'Sed ut perspiciatis unde omnis iste natus', {
+            x: 10.104, y: k.y + 0.822, w: 2.152, h: 0.675, color: WHITE, align: 'left',
+        });
+        if (k.ruleY) line(s, 10.178, k.ruleY, 0.613, BLUE, 2);
+    });
+    // Growth columns; heights encode the year-on-year climb.
+    [
+        { x: 3.675, y: 6.079, h: 0.518, year: '2015' },
+        { x: 4.607, y: 5.743, h: 0.854, year: '2016' },
+        { x: 5.539, y: 5.407, h: 1.190, year: '2017' },
+        { x: 6.470, y: 5.056, h: 1.542, year: '2018' },
+        { x: 7.402, y: 4.560, h: 2.037, year: '2019' },
+        { x: 8.334, y: 4.161, h: 2.437, year: '2020' },
+    ].forEach(function (b) {
+        s.addShape('round2SameRect', { x: b.x, y: b.y, w: 0.658, h: b.h, fill: { color: ORANGE }, rectRadius: 0 });
+        para(s, '20%', { x: b.x - 0.117, y: b.y + 0.086, w: 0.891, h: 0.337, color: WHITE, size: 14, bold: true, align: 'center', ls: 1 });
+        para(s, b.year, { x: b.x - 0.117, y: 6.7, w: 0.891, h: 0.303, color: WHITE, align: 'center', ls: 1 });
+    });
+    s.addShape('upArrow', { x: 6.312, y: 1.823, w: 0.099, h: 5.713, rotate: 66.8, fill: { color: ORANGE } });
+    heading(s, { x: 1.335, y: 2.379, w: 3.715, h: 2.121, size: 40, light: 'Reporting ', bold: 'Up To 90% In 3 Months' });
+    line(s, 1.49, 4.862, 0.875, ORANGE, 2);
+    dots(s, 1.513, 6.319);
+    rail(s);
+    vline(s, 0.832, 1.894, 5.588, WHITE, 1);
+}
+
+/**
+ * Swoosh arrows for the slide-25 zigzag: a tapered ribbon plus its arrow
+ * head, rising or falling between two diamonds. Paths from the original.
+ */
+const SWOOSH_DOWN = [
+    [0.7470, 0.0000],
+    ['c', 0.7108, 0.0000, 0.6506, 0.0000, 0.5542, 0.1270],
+    ['c', 0.3735, 0.3492, 0.2410, 0.6032, 0.0723, 0.8254],
+    ['c', 0.0000, 0.9206, 0.0482, 1.0000, 0.1205, 1.0000],
+    ['c', 0.2289, 1.0000, 0.5060, 0.5873, 0.6386, 0.3651],
+    ['c', 0.7590, 0.1746, 0.8675, 0.0000, 1.0000, 0.0000],
+    ['c', 0.7470, 0.0000, 0.7470, 0.0000, 0.7470, 0.0000],
+];
+const SWOOSH_UP = [
+    [0.7558, 1.0000],
+    ['c', 0.7209, 1.0000, 0.6512, 1.0000, 0.5581, 0.8852],
+    ['c', 0.3837, 0.6721, 0.2442, 0.3934, 0.0698, 0.1803],
+    ['c', 0.0000, 0.0820, 0.0465, 0.0000, 0.1163, 0.0000],
+    ['c', 0.2209, 0.0000, 0.5000, 0.4098, 0.6279, 0.6230],
+    ['c', 0.7558, 0.8197, 0.8721, 0.9836, 1.0000, 0.9836],
+    ['c', 0.7558, 1.0000, 0.7558, 1.0000, 0.7558, 1.0000],
+];
+const HEAD_DOWN = [
+    [0.4321, 0.8154],
+    ['c', 0.4938, 0.7385, 0.5062, 0.7231, 0.5679, 0.6462],
+    ['c', 0.0988, 0.0000, 0.0988, 0.0000, 0.0000, 0.0000],
+    ['c', 0.2593, 0.0000, 0.2593, 0.0000, 0.2593, 0.0000],
+    ['c', 0.3827, 0.0154, 0.4444, 0.1077, 0.7037, 0.4769],
+    ['c', 0.7778, 0.4154, 0.7901, 0.4000, 0.8642, 0.3231],
+    ['c', 0.8889, 0.6154, 0.9383, 0.8462, 1.0000, 1.0000],
+    ['c', 0.7531, 0.9385, 0.6420, 0.8923, 0.4321, 0.8154],
+];
+const HEAD_UP = [
+    [0.4103, 0.2174],
+    ['c', 0.4744, 0.2754, 0.5000, 0.3043, 0.5641, 0.3623],
+    ['c', 0.0897, 1.0000, 0.0897, 1.0000, 0.0000, 1.0000],
+    ['c', 0.2692, 0.9855, 0.2692, 0.9855, 0.2692, 0.9855],
+    ['c', 0.3846, 0.9710, 0.4615, 0.8696, 0.7179, 0.5072],
+    ['c', 0.7821, 0.5797, 0.8077, 0.5942, 0.8718, 0.6522],
+    ['c', 0.8846, 0.3768, 0.9359, 0.1594, 1.0000, 0.0000],
+    ['c', 0.7436, 0.0870, 0.6282, 0.1304, 0.4103, 0.2174],
+];
+/** Rounded diamond node, inscribed in its box. */
+const DIAMOND = [
+    [0.5000, 0.0000],
+    ['c', 0.5334, 0.0000, 0.5668, 0.0128, 0.5924, 0.0383],
+    [0.9617, 0.4076],
+    ['c', 1.0128, 0.4587, 1.0128, 0.5413, 0.9617, 0.5924],
+    [0.5924, 0.9617],
+    ['c', 0.5413, 1.0128, 0.4587, 1.0128, 0.4076, 0.9617],
+    [0.0383, 0.5924],
+    ['c', -0.0128, 0.5413, -0.0128, 0.4587, 0.0383, 0.4076],
+    [0.4076, 0.0383],
+    ['c', 0.4332, 0.0128, 0.4666, 0.0000, 0.5000, 0.0000],
+];
+
+/** 25 — Evaluations Process (five-step zigzag). */
+function slide25(s) {
+    sweep(s, { x: 0, y: -0.051, w: 13.333, h: 6.417 });
+    // Three copies of the same zigzag unit, offset along the row.
+    [0, 3.965, 7.885].forEach(function (dx) {
+        glyph(s, { x: 1.723 + dx, y: 1.974, w: 1.184, h: 0.908, path: SWOOSH_DOWN, fill: ORANGE_D });
+        glyph(s, { x: 2.608 + dx, y: 1.974, w: 1.155, h: 0.938, path: HEAD_DOWN, fill: ORANGE });
+        if (dx < 7) {
+            glyph(s, { x: 3.649 + dx, y: 2.998, w: 1.226, h: 0.882, path: SWOOSH_UP, fill: ORANGE_D });
+            glyph(s, { x: 4.577 + dx, y: 2.882, w: 1.112, h: 0.997, path: HEAD_UP, fill: ORANGE });
+        }
+    });
+    // Diamond nodes carrying the step pictograms.
+    [
+        { x: 2.149, y: 2.668 }, { x: 4.029, y: 1.907 }, { x: 6.120, y: 2.668 },
+        { x: 8.001, y: 1.907 }, { x: 9.963, y: 2.668 },
+    ].forEach(function (n) {
+        glyph(s, { x: n.x, y: n.y, w: 1.274, h: 1.274, path: DIAMOND, fill: ORANGE });
+        icon(s, n.x + 0.42, n.y + 0.42, 0.44, WHITE);
+    });
+    [
+        { x: 1.774, y: 1.083, w: 1.917, t: 'Identify Evaluation Objectives' },
+        { x: 5.599, y: 1.083, w: 2.134, t: 'Collect Relevant Data And Information' },
+        { x: 9.671, y: 1.083, w: 1.917, t: 'Identify Strengths And Weaknesses' },
+        { x: 3.678, y: 3.973, w: 1.917, t: 'Set Evaluation Criteria' },
+        { x: 7.612, y: 3.973, w: 1.917, t: 'Analyze And Interpret Data' },
+    ].forEach(function (c) {
+        para(s, c.t, { x: c.x, y: c.y, w: c.w, h: 0.675, color: WHITE, bold: true, align: 'center' });
+    });
+    corner(s, { x: 1.19, y: 4.806, w: 5.203, h: 2.694, adj: 12373, color: ORANGE });
+    heading(s, { x: 1.692, y: 5.104, w: 4.248, h: 1.582, size: 44, light: 'Evaluations ', bold: 'Process', boldColor: BLUE });
+    line(s, 1.81, 6.946, 1.081, BLUE, 2);
+    para(s, 'PLACEHOLDER' +
+        'offered by X-Tech in mobile application development, as well as help achieve business goals ' +
+        'and provide meaningful technology solutions to users.',
+        { x: 6.56, y: 5.848, w: 6.345, h: 0.978, align: 'left' });
+    rail(s, { markColor: WHITE, ruleColor: WHITE });
+    dots(s, 11.865, 4.629);
+}
+
+/** 26 — Processes That Take Care Of Us (circular process diagram). */
+function slide26(s) {
+    corner(s, { x: 1.159, y: 1.46, w: 12.174, h: 6.04, adj: 16444, color: BLUE, flipH: true });
+    corner(s, { x: 7.441, y: 0.488, w: 5.339, h: 5.091, adj: 23322, color: ORANGE });
+    // Each node is a square with two opposite corners rounded.
+    const NODE = [
+        [0, 0], [0.8324, 0],
+        ['c', 0.9250, 0, 1, 0.0750, 1, 0.1676],
+        [1, 1], [0.1676, 1],
+        ['c', 0.0750, 1, 0, 0.9250, 0, 0.8324],
+        [0, 0],
+    ];
+    [
+        { x: 9.609, y: 0.930 }, { x: 11.166, y: 2.576 },
+        { x: 9.609, y: 4.137 }, { x: 8.056, y: 2.576 },
+    ].forEach(function (n) {
+        glyph(s, { x: n.x, y: n.y, w: 1.0, h: 1.0, path: NODE, fill: BLUE });
+        icon(s, n.x + 0.26, n.y + 0.26, 0.48, WHITE);
+    });
+    // Quarter-circle arrows joining the four nodes clockwise.
+    [
+        { x: 8.568, y: 1.556, w: 0.750, h: 0.747, path: [[0, 1], ['c', 0.2209, 0.5698, 0.5698, 0.2209, 1, 0]] },
+        { x: 10.916, y: 1.551, w: 0.750, h: 0.747, path: [[0, 0], ['c', 0.4302, 0.2209, 0.7791, 0.5698, 1, 1]] },
+        { x: 10.919, y: 3.892, w: 0.750, h: 0.745, path: [[1, 0], ['c', 0.7791, 0.4302, 0.4302, 0.7791, 0, 1]] },
+        { x: 8.568, y: 3.892, w: 0.752, h: 0.750, path: [[1, 1], ['c', 0.5723, 0.7803, 0.2197, 0.4277, 0, 0]] },
+    ].forEach(function (a) {
+        glyph(s, Object.assign({ line: { color: SILVER, width: 4, endArrowType: 'triangle' } }, a));
+    });
+    para(s, 'Process', { x: 8.679, y: 2.756, w: 2.819, h: 0.505, color: WHITE, size: 24, bold: true, align: 'center', ls: 1 });
+    heading(s, { x: 1.52, y: 2.298, w: 5.352, h: 1.447, size: 40, light: 'Processes That ', bold: 'Take Care Of Us' });
+    line(s, 1.638, 3.886, 0.875, ORANGE, 2);
+    [
+        { x: 1.519, y: 4.322 }, { x: 4.461, y: 4.322 },
+        { x: 1.519, y: 5.814 }, { x: 4.461, y: 5.814 },
+    ].forEach(function (c) {
+        label(s, 'Our Infographics', { x: c.x, y: c.y, w: 2.466 });
+        para(s, 'Lorem ipsum dolor sit amet, lacus nulla ac netus', {
+            x: c.x, y: c.y + 0.373, w: 2.466, h: 0.641, color: WHITE, margin: INSET_TIGHT,
+        });
+    });
+    para(s, 'PLACEHOLDER' +
+        'offered by X-Tech', { x: 7.441, y: 6.214, w: 5.201, h: 0.675, color: WHITE });
+    dots(s, 6.065, 0.886);
+    rail(s);
+}
+
+/**
+ * One quadrant of the SWOT graphic: a rounded square with a stepped tab that
+ * reaches into the centre. Four rotated copies interlock.
+ */
+const SWOT_BLOCK = [
+    [0.0385, 0.2734], [0.4073, 0.0259],
+    ['c', 0.4587, -0.0086, 0.5409, -0.0086, 0.5924, 0.0259],
+    ['c', 0.5924, 0.0259, 0.5924, 0.0259, 0.9614, 0.2736],
+    ['c', 1.0128, 0.3082, 1.0129, 0.3634, 0.9615, 0.3979],
+    ['c', 0.9615, 0.3979, 0.9615, 0.3979, 0.5773, 0.6558],
+    ['c', 0.5349, 0.6842, 0.5349, 0.7308, 0.5774, 0.7593],
+    ['c', 0.5774, 0.7593, 0.5774, 0.7593, 0.6854, 0.8318],
+    ['c', 0.7111, 0.8491, 0.7111, 0.8767, 0.6854, 0.8939],
+    ['c', 0.6854, 0.8939, 0.6854, 0.8939, 0.5467, 0.9871],
+    ['c', 0.5210, 1.0043, 0.4798, 1.0043, 0.4541, 0.9870],
+    ['c', 0.4541, 0.9870, 0.4541, 0.9870, 0.3153, 0.8938],
+    ['c', 0.2895, 0.8766, 0.2895, 0.8490, 0.3152, 0.8317],
+    ['c', 0.3152, 0.8317, 0.3152, 0.8317, 0.4231, 0.7593],
+    ['c', 0.4655, 0.7308, 0.4655, 0.6842, 0.4231, 0.6557],
+    ['c', 0.4231, 0.6557, 0.4231, 0.6557, 0.0386, 0.3976],
+    ['c', -0.0128, 0.3631, -0.0129, 0.3079, 0.0385, 0.2734],
+];
+
+/** 27 — SWOT Analysis. */
+function slide27(s) {
+    sweep(s, { x: 0, y: 0, w: 13.333, h: 6.417 });
+    corner(s, { x: 1.19, y: 1.008, w: 4.749, h: 6.492, adj: 12373, color: ORANGE });
+    // Four copies of one arrow-block glyph, rotated 90 degrees apart, so the
+    // quadrants interlock in the centre.
+    [
+        { x: 1.967, y: 1.303, rot: 315, letter: 'S', lx: 1.873, ly: 1.553 },
+        { x: 3.569, y: 1.303, rot: 45, letter: 'W', lx: 3.507, ly: 1.553 },
+        { x: 3.564, y: 2.881, rot: 135, letter: 'O', lx: 3.507, ly: 3.160 },
+        { x: 1.963, y: 2.881, rot: 225, letter: 'T', lx: 1.873, ly: 3.160 },
+    ].forEach(function (q) {
+        glyph(s, {
+            x: q.x, y: q.y, w: 1.388, h: 2.068,
+            path: SWOT_BLOCK, fill: BLUE, rotate: q.rot,
+        });
+        tx(s, q.letter, {
+            x: q.lx, y: q.ly, w: 1.29, h: 1.29, margin: 0,
+            fontFace: HEAD, fontSize: 44, bold: true, color: WHITE,
+            align: 'center', valign: 'middle',
+        });
+    });
+    const body = 'Lorem ipsum dolor sit amet, lacus nulla ac netus';
+    [
+        { x: 6.677, y: 0.974, t: 'Strengths' },
+        { x: 9.881, y: 0.974, t: 'Weakness' },
+        { x: 6.677, y: 2.466, t: 'Threats' },
+        { x: 9.881, y: 2.466, t: 'Opportunities' },
+    ].forEach(function (c) {
+        label(s, c.t, { x: c.x, y: c.y, w: 2.466 });
+        para(s, body, { x: c.x, y: c.y + 0.372, w: 2.466, h: 0.641, color: WHITE, margin: INSET_TIGHT });
+    });
+    heading(s, { x: 1.692, y: 5.104, w: 3.396, h: 1.582, size: 44, light: 'SWOT ', bold: 'Analysis', boldColor: BLUE });
+    line(s, 1.81, 6.946, 1.081, BLUE, 2);
+    rail(s, { markColor: WHITE, ruleColor: WHITE });
+    dots(s, 11.916, 6.121);
+}
+
+/** 28 — Affordable And High Quality (price table). */
+function slide28(s) {
+    corner(s, { x: 7.825, y: 0, w: 5.508, h: 7.5, adj: 12373, color: BLUE, flipH: true });
+    pill(s, { x: 6.302, y: 1.898, w: 4.992, h: 4.595, adj: 4119, color: ORANGE });
+    line(s, 6.302, 2.796, 4.992, WHITE, 1);
+    [[6.175, 1.750], [8.064, 1.329], [9.739, 1.158]].forEach(function (c) {
+        para(s, 'Colom 1', {
+            x: c[0], y: 2.157, w: c[1], h: 0.337,
+            color: WHITE, size: 14, bold: true, align: 'center', ls: 1,
+        });
+    });
+    // Six data rows; the second one is highlighted with a blue pill.
+    pill(s, { x: 6.485, y: 3.398, w: 4.626, h: 0.605, adj: 16667, color: BLUE });
+    [3.007, 3.579, 4.151, 4.723, 5.311, 5.883].forEach(function (y, i) {
+        const bold = i === 1;
+        [['Descriptions', 6.673, 1.329], ['1000', 8.348, 1.329], ['$6668', 10.023, 1.019]]
+            .forEach(function (c) {
+                para(s, c[0], { x: c[1], y: y, w: c[2], h: 0.303, color: WHITE, bold: bold, align: 'left', ls: 1 });
+            });
+    });
+    heading(s, { x: 1.348, y: 1.629, w: 4.169, h: 2.121, size: 40, light: 'Affordable ', bold: 'And High Quality', lightColor: INK });
+    line(s, 1.466, 3.985, 0.748, ORANGE, 2);
+    para(s, 'PLACEHOLDER' +
+        'your business technology journey.', { x: 1.393, y: 4.485, w: 4.169, h: 0.978 });
+    social(s, 1.605, 6.118, 1.559, ORANGE);
+    dots(s, 5.794, 1.24);
+    rail(s);
+}
+
+/** 29 — Contact Information. */
+function slide29(s) {
+    corner(s, { x: 1.381, y: 3.587, w: 10.714, h: 3.397, adj: 39574, color: BLUE });
+    heading(s, { x: 1.692, y: 3.98, w: 7.086, h: 0.841, size: 44, light: 'Contact ', bold: 'Information' });
+    line(s, 1.8, 4.907, 0.875, ORANGE, 2.25);
+    [
+        { ix: 1.800, iy: 5.557, lx: 2.483, bx: 2.521, bw: 2.010, title: 'Office Hours', l1: 'Monday \u2013 Thursday', l2: '09:00 \u2013 17:00' },
+        { ix: 4.750, iy: 5.644, lx: 5.433, bx: 5.471, bw: 1.869, title: 'Get In Touch', l1: '(+00) 000 000 0000', l2: '(0005) 000 000' },
+        { ix: 7.856, iy: 5.597, lx: 8.522, bx: 8.522, bw: 2.993, title: 'Our Address', l1: 'Fmphith saeatre Parkway', l2: 'Setndo Viaew, United States' },
+    ].forEach(function (c) {
+        icon(s, c.ix, c.iy, 0.47, ORANGE);
+        para(s, c.title, { x: c.lx, y: 5.462, w: 1.949, h: 0.37, color: WHITE, size: 16, bold: true, align: 'left', ls: 1 });
+        tx(s, [{ text: c.l1, options: { breakLine: true } }, { text: c.l2 }], {
+            x: c.bx, y: 5.849, w: c.bw, h: 0.675,
+            fontFace: BODY, fontSize: 12, color: WHITE, lineSpacingMultiple: 1.5,
+        });
+    });
+    dots(s, 10.782, 3.587);
+    rail(s);
+}
+
+/** 30 — Thank You. */
+function slide30(s) {
+    corner(s, { x: 0, y: 2.365, w: 13.333, h: 5.135, adj: 25422, color: BLUE, flipH: true });
+    corner(s, { x: 3.857, y: 3.396, w: 9.476, h: 2.762, adj: 50000, color: ORANGE, flipH: true });
+    heading(s, { x: 5.628, y: 3.865, w: 7.086, h: 1.582, size: 88, light: 'Thank ', bold: 'You', boldColor: BLUE, align: 'right' });
+    line(s, 10.397, 5.573, 2.167, BLUE, 2.25);
+    dots(s, 1.286, 5.527);
+    rail(s);
+    vline(s, 0.832, 2.365, 5.118, WHITE, 1);
+}
+
+// ---------------------------------------------------------------------------
+// Assemble
+// ---------------------------------------------------------------------------
+const BUILDERS = [
+    slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08,
+    slide09, slide10, slide11, slide12, slide13, slide14, slide15, slide16,
+    slide17, slide18, slide19, slide20, slide21, slide22, slide23, slide24,
+    slide25, slide26, slide27, slide28, slide29, slide30,
+];
+
+function build() {
+    const pptx = new PptxGenJS();
+    pptx.defineLayout({ name: 'X_16x9', width: 13.333, height: 7.5 });
+    pptx.layout = 'X_16x9';
+    pptx.author = 'X-Tech';
+    pptx.title = 'X-Tech Company Profile';
+
+    BUILDERS.forEach(function (fn) {
+        const slide = pptx.addSlide();
+        slide.background = { color: WHITE };
+        fn(slide);
+    });
+
+    return pptx.writeFile({
+        fileName: path.join(__dirname, '10ae83ae-1031-4b9e-98ea-5b8180b8cdfe_grok_final.pptx'),
+    });
+}
+
+build().then(function (f) { console.log('wrote', f); }, function (e) {
+    console.error(e);
+    process.exit(1);
+});

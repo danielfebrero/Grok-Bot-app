@@ -1,0 +1,537 @@
+/**
+ * "Pizza Italiana" — 16:9 (20" x 11.25") deck rebuilt with pptxgenjs.
+ *
+ * Run:  node 10f0abfe-4ee9-4b1f-a9f5-ae79063220ca_grok_final.js
+ */
+
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ *
+ * Design tokens
+ * ------------------------------------------------------------------ */
+
+const RED = 'F03A40';
+const CREAM = 'ECECEC'; // page background / "paper"
+const INK = '000000';
+
+const F_TITLE = 'Plus Jakarta Sans Medium';
+const F_TITLE_REG = 'Plus Jakarta Sans';
+const F_BODY = 'Roboto Light';
+const F_NUM = 'Roboto';
+
+const SLIDE_W = 20;
+const SLIDE_H = 11.25;
+
+const BODY_SIZE = 18; // deck default run size
+const BODY_LEAD = 1.5; // 150% line spacing on all body copy
+
+/* Copy used again and again across the deck */
+const COPY = {
+  full: 'Our pizza is more than a meal — it’s a journey to Italy. Every slice is crafted with passion, combining the finest ingredients, slow-fermented dough, and fresh mozzarella. From the wood-fired oven to your table.',
+  woodFired: 'Our pizza is more than a meal — it’s a journey to Italy. Every slice is crafted with passion, combining the finest ingredients, slow-fermented dough, and fresh mozzarella. From the wood-fired.',
+  short: 'Our pizza is more than a meal — it’s a journey to Italy. Every slice is crafted with passion, combining the finest ingredients, slow-fermented dough, and fresh.',
+  mozzarella: 'Our pizza is more than a meal — it’s a journey to Italy. Every slice is crafted with passion, combining the finest ingredients, slow-fermented dough, and fresh mozzarella. ',
+  card: 'Our pizza is more than a meal a journey to Italy. Every slice is crafted with combining',
+  grid: 'Our pizza is more than a meal it’s a journey to Italy. Every slice is crafted with ingredients.',
+  ingredients: 'Our pizza is more than a meal to Italy. Every slice use is crafted with passion, combining the finest ingredients.',
+  discover:
+    'Discover the perfect balance between crispy crust, rich tomato sauce, and creamy cheese. Each pizza we serve is hand-tossed and baked to golden perfection, just like in Naples. Taste the authenticity, feel the love, and enjoy an experience that captures the heart of Italy.',
+  menu: 'Discover the perfect balance between crispy crust, rich tomato sauce, and creamy cheese.',
+};
+
+/* ------------------------------------------------------------------ *
+ * Hand-drawn ("sketch style") frames
+ *
+ * The original deck uses PowerPoint's sketched line style on a plain
+ * rectangle/plaque.  There is no pptxgenjs equivalent, so the wobble is
+ * baked into a custGeom path: anchors sit exactly on the ideal outline and
+ * every segment becomes a cubic whose control points are nudged sideways.
+ * ------------------------------------------------------------------ */
+
+function makeRng(seed) {
+  let s = (seed * 2654435761) >>> 0;
+  return function () {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
+
+/**
+ * Anchor points around a rectangle, spaced at irregular "hand" strides.
+ * `corner` > 0 rounds the corners the way the cover plaque is drawn.
+ */
+function frameOutline(w, h, corner, rnd, stride) {
+  const pts = [{ x: 0, y: corner }];
+  const edge = (x1, y1) => {
+    const p = pts[pts.length - 1];
+    const len = Math.hypot(x1 - p.x, y1 - p.y);
+    if (len < 0.01) return;
+    const cuts = [];
+    for (let t = 0; t < len - stride * 0.5; ) {
+      t = Math.min(len, t + stride * (0.25 + rnd()));
+      cuts.push(t / len);
+    }
+    cuts[cuts.length - 1] = 1;
+    cuts.forEach((f) => pts.push({ x: p.x + (x1 - p.x) * f, y: p.y + (y1 - p.y) * f }));
+  };
+  // quarter turn around (cx, cy), sampled so the later cubics read as a curve
+  const round = (cx, cy, a0) => {
+    for (let i = 1; i <= 3; i++) {
+      const a = a0 + (Math.PI / 2) * (i / 3);
+      pts.push({ x: cx + corner * Math.cos(a), y: cy + corner * Math.sin(a) });
+    }
+  };
+
+  round(corner, corner, Math.PI);
+  edge(w - corner, 0);
+  round(w - corner, corner, -Math.PI / 2);
+  edge(w, h - corner);
+  round(w - corner, h - corner, 0);
+  edge(corner, h);
+  round(corner, h - corner, Math.PI / 2);
+  edge(0, corner);
+  return pts;
+}
+
+/** Turn anchors into a closed custGeom point list with jittered control points. */
+function sketchPoints(anchors, rnd, amp) {
+  const out = [{ x: anchors[0].x, y: anchors[0].y, moveTo: true }];
+  for (let i = 0; i < anchors.length; i++) {
+    const a = anchors[i];
+    const b = anchors[(i + 1) % anchors.length];
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = -dy / len;
+    const ny = dx / len;
+    const o1 = (rnd() - 0.5) * 2 * amp;
+    const o2 = (rnd() - 0.5) * 2 * amp;
+    out.push({
+      x: b.x,
+      y: b.y,
+      curve: {
+        type: 'cubic',
+        x1: a.x + dx / 3 + nx * o1,
+        y1: a.y + dy / 3 + ny * o1,
+        x2: a.x + (dx * 2) / 3 + nx * o2,
+        y2: a.y + (dy * 2) / 3 + ny * o2,
+      },
+    });
+  }
+  out.push({ close: true });
+  return out;
+}
+
+/**
+ * The big sketched "paper" frame that anchors nearly every content slide.
+ *
+ * Two overlapping wobbles are drawn: a stroked one, then a second one filled
+ * with the page colour. Where the two disagree the fill eats the stroke, and
+ * that broken, retraced edge is what the sketched line style looks like.
+ */
+function sketchFrame(slide, x, y, w, h, seed, opts) {
+  const o = opts || {};
+  const corner = o.corner || 0;
+  const amp = o.amp || 0.05;
+  const geom = { x: x, y: y, w: w, h: h };
+
+  slide.addShape('custGeom', Object.assign({
+    line: { color: RED, width: o.width || 1 },
+    points: sketchPoints(frameOutline(w, h, corner, makeRng(seed), 0.6), makeRng(seed + 41), amp),
+  }, geom));
+
+  // The eraser pass: slower, wider wobble, so it drifts outside the stroke in
+  // long stretches instead of nibbling at it evenly.
+  slide.addShape('custGeom', Object.assign({
+    fill: { color: CREAM },
+    points: sketchPoints(frameOutline(w, h, corner, makeRng(seed + 7), 1.4), makeRng(seed + 83), amp * 1.6),
+  }, geom));
+}
+
+/* ------------------------------------------------------------------ *
+ * Small building blocks
+ * ------------------------------------------------------------------ */
+
+const textDefaults = { valign: 'top', margin: [7.2, 7.2, 3.6, 3.6] };
+
+function addText(slide, text, opts) {
+  slide.addText(text, Object.assign({}, textDefaults, opts));
+}
+
+/** Body copy: 18pt Roboto Light, 150% leading. */
+function body(slide, text, x, y, w, h, color) {
+  addText(slide, text, {
+    x: x,
+    y: y,
+    w: w,
+    h: h,
+    fontFace: F_BODY,
+    fontSize: BODY_SIZE,
+    color: color || INK,
+    lineSpacingMultiple: BODY_LEAD,
+  });
+}
+
+/** Headline: Plus Jakarta Sans Medium in the brand red. */
+function title(slide, text, x, y, w, h, size, opts) {
+  addText(
+    slide,
+    text,
+    Object.assign(
+      { x: x, y: y, w: w, h: h, fontFace: F_TITLE, fontSize: size, color: RED },
+      opts || {}
+    )
+  );
+}
+
+/** Master furniture: "Deck Presentation" + the red page pill (top right). */
+function masterChrome(slide, pageNo) {
+  addText(slide, 'Deck Presentation', {
+    x: 5.241, y: 0.26, w: 4.759, h: 0.438, fontFace: F_BODY, fontSize: 20, color: RED,
+  });
+  slide.addShape('roundRect', {
+    x: 17.926, y: 0.171, w: 1.879, h: 0.617,
+    fill: { color: RED }, line: { color: RED, width: 1 }, rectRadius: 0.3085,
+  });
+  addText(slide, 'Page 0' + pageNo, {
+    x: 17.926, y: 0.26, w: 1.879, h: 0.438,
+    fontFace: F_BODY, fontSize: 20, color: CREAM, align: 'center',
+  });
+}
+
+/** The "About Us" eyebrow that sits in the top-left of every content slide. */
+function aboutUs(slide) {
+  addText(slide, 'About Us', {
+    x: 0.61, y: 0.26, w: 1.693, h: 0.438, fontFace: F_BODY, fontSize: 20, color: RED,
+  });
+}
+
+/** Outlined pill button ("Learn More", "$25.00"). */
+function pillButton(slide, x, y, label, textW) {
+  slide.addShape('roundRect', {
+    x: x, y: y, w: 2.122, h: 0.617, line: { color: RED, width: 1 }, rectRadius: 0.3085,
+  });
+  addText(slide, label, {
+    x: x + (2.122 - textW) / 2, y: y + 0.107, w: textW, h: 0.404,
+    fontFace: F_TITLE, fontSize: BODY_SIZE, color: RED, align: 'center', wrap: false,
+  });
+}
+
+/** Solid red "1970" fact card: label pinned to the top, copy near the bottom. */
+function factCard(slide, x, y, w, h, labelX, labelY, copyX, copyY) {
+  slide.addShape('rect', { x: x, y: y, w: w, h: h, fill: { color: RED } });
+  addText(slide, '1970', {
+    x: labelX, y: labelY, w: 1.185, h: 0.438, fontFace: F_NUM, fontSize: 20, color: CREAM,
+  });
+  body(slide, COPY.card, copyX, copyY, 3.593, 1.414, CREAM);
+}
+
+/** Red tile with the little pizza-slice mark (built from native shapes). */
+function pizzaBadge(slide, x, y) {
+  slide.addShape('rect', { x: x, y: y, w: 1.07, h: 1.07, fill: { color: RED } });
+  const ix = x + 0.373;
+  const iy = y + 0.338;
+  slide.addShape('arc', {
+    x: ix + 0.009, y: iy + 0.014, w: 0.306, h: 0.078,
+    angleRange: [180, 360], line: { color: CREAM, width: 1.5 },
+  });
+  slide.addShape('triangle', {
+    x: ix + 0.028, y: iy + 0.076, w: 0.268, h: 0.318, fill: { color: CREAM }, rotate: 180,
+  });
+  [[0.139, 0.278, 0.032], [0.2, 0.153, 0.03], [0.099, 0.108, 0.03]].forEach(function (p) {
+    slide.addShape('ellipse', {
+      x: ix + p[0] - p[2], y: iy + p[1] - p[2], w: p[2] * 2, h: p[2] * 2, fill: { color: RED },
+    });
+  });
+}
+
+/**
+ * Picture placeholder. The source template ships without any media — every
+ * picture frame is empty — so the footprint is kept as an unfilled box.
+ */
+function imageSlot(slide, x, y, w, h) {
+  slide.addShape('rect', { x: x, y: y, w: w, h: h });
+}
+
+/* ------------------------------------------------------------------ *
+ * Slides
+ * ------------------------------------------------------------------ */
+
+/** Slides 1 & 16 share the bordered "plaque" cover treatment. */
+function coverSlide(slide, opts) {
+  imageSlot(slide, 0, 0, SLIDE_W, SLIDE_H);
+  slide.addShape('plaque', {
+    x: 1.36, y: 1.225, w: 17.279, h: 8.801, fill: { color: CREAM }, rectRadius: 0.644,
+  });
+  sketchFrame(slide, 1.64, 1.492, 16.721, 8.265, 101, { corner: 0.605, width: 2.25, amp: 0.05 });
+
+  slide.addShape('roundRect', {
+    x: 8.979, y: opts.badgeY, w: 2.122, h: 0.617, line: { color: RED, width: 1 }, rectRadius: 0.3085,
+  });
+  addText(slide, 'Since 1970', {
+    x: 9.227, y: opts.badgeY + 0.09, w: 1.625, h: 0.438,
+    fontFace: F_NUM, fontSize: 20, color: RED, align: 'center', wrap: false,
+  });
+
+  opts.headlines.forEach(function (hl) {
+    title(slide, hl.text, hl.x, hl.y, hl.w, hl.h, hl.size, { align: 'center', wrap: false });
+  });
+
+  slide.addShape('plaque', {
+    x: 5.908, y: opts.ribbonY, w: 8.184, h: 1.056, fill: { color: RED }, rectRadius: 0.176,
+  });
+  addText(slide, '- Authentic Italian Taste -', {
+    x: 5.908, y: opts.ribbonY + 0.108, w: 8.184, h: 0.841,
+    fontFace: F_NUM, fontSize: 44, color: CREAM, align: 'center',
+  });
+}
+
+function slide01(slide) {
+  coverSlide(slide, {
+    badgeY: 1.953,
+    ribbonY: 7.952,
+    headlines: [
+      { text: 'Pizza', x: 6.623, y: 2.262, w: 6.834, h: 3.45, size: 199 },
+      { text: 'Italiana', x: 5.103, y: 4.523, w: 9.795, h: 3.45, size: 199 },
+    ],
+  });
+}
+
+function slide02(slide) {
+  sketchFrame(slide, 0.61, 1.885, 16.823, 8.583, 2);
+  imageSlot(slide, 10.74, 1.421, 7.935, 8.407);
+  title(slide, 'Authentic Italian Taste', 1.578, 2.576, 8.184, 3.063, 88);
+  body(slide, COPY.full, 1.578, 6.176, 6.447, 1.868);
+  pillButton(slide, 1.578, 8.54, 'Learn More', 1.538);
+  aboutUs(slide);
+}
+
+function slide03(slide) {
+  sketchFrame(slide, 6.027, 1.378, 12.939, 9.134, 3);
+  imageSlot(slide, 0.209, 1.132, 6.907, 9.912);
+  title(slide, 'Crafted by Italian Tradition', 9.205, 2.291, 9.148, 3.063, 88);
+
+  // Two numbered notes down the left edge of the copy block
+  [
+    { n: '01', circleX: 9.17, circleY: 6.221, numX: 9.224, numY: 6.374, textX: 10.555, textY: 6.062 },
+    { n: '02', circleX: 9.224, circleY: 8.211, numX: 9.278, numY: 8.364, textX: 10.609, textY: 8.052 },
+  ].forEach(function (item) {
+    body(slide, COPY.short, item.textX, item.textY, 6.447, 1.414);
+    slide.addShape('ellipse', {
+      x: item.circleX, y: item.circleY, w: 0.744, h: 0.744, line: { color: RED, width: 1 },
+    });
+    addText(slide, item.n, {
+      x: item.numX, y: item.numY, w: 0.636, h: 0.438,
+      fontFace: F_TITLE_REG, fontSize: 20, color: RED, align: 'center',
+    });
+  });
+  aboutUs(slide);
+}
+
+function slide04(slide) {
+  sketchFrame(slide, 0.61, 1.689, 12.939, 9.134, 4);
+  imageSlot(slide, 12.052, 2.122, 7.585, 8.195);
+  body(slide, COPY.full, 1.62, 7.142, 8.635, 1.414);
+  title(slide, 'Taste the Art of Simplicity', 1.62, 2.36, 9.648, 2.794, 80);
+  pillButton(slide, 1.62, 8.978, 'Learn More', 1.538);
+  aboutUs(slide);
+}
+
+function slide05(slide) {
+  sketchFrame(slide, 0.61, 1.036, 12.939, 5.656, 5);
+  imageSlot(slide, 4.14, 4.907, 15.86, 4.512);
+  title(slide, 'Made with Passion, Served with Love', 1.338, 1.583, 10.545, 2.322, 66);
+  body(slide, COPY.full, 6.611, 9.811, 12.545, 0.959);
+  pizzaBadge(slide, 4.628, 9.047);
+  factCard(slide, 14.823, 2.347, 4.333, 4.333, 15.172, 2.621, 15.193, 4.618);
+  aboutUs(slide);
+}
+
+function slide06(slide) {
+  sketchFrame(slide, 0.502, 1.036, 11.474, 8.315, 6);
+  imageSlot(slide, 14.117, 1.653, 5.236, 5.943);
+  imageSlot(slide, 8.58, 4.952, 5.236, 5.943);
+  title(slide, 'The Freshest Ingredients, Always', 1.132, 1.661, 10.843, 2.322, 66);
+  body(slide, COPY.ingredients, 14.527, 8.412, 4.615, 1.414);
+  body(slide, COPY.woodFired, 1.132, 5.146, 5.707, 1.868);
+  pillButton(slide, 1.132, 7.538, 'Learn More', 1.538);
+  pizzaBadge(slide, 14.527, 6.979);
+  aboutUs(slide);
+}
+
+function slide07(slide) {
+  sketchFrame(slide, 0.61, 4.46, 10.101, 6.005, 7);
+  title(slide, 'Welcome to Our Italian Kitchen', 1.303, 7.037, 9.039, 2.524, 72);
+  addText(slide, '50+', {
+    x: 11.762, y: 1.636, w: 3.151, h: 1.212, fontFace: F_NUM, fontSize: 66, color: RED,
+  });
+  body(slide, COPY.mozzarella, 11.762, 3.047, 6.971, 1.414);
+  factCard(slide, 1.267, 1.689, 4.556, 4.129, 1.748, 2.024, 1.748, 3.91);
+  imageSlot(slide, 5.822, 1.689, 4.888, 4.129);
+  imageSlot(slide, 10.711, 5.818, 8.921, 5.05);
+  aboutUs(slide);
+}
+
+function slide08(slide) {
+  sketchFrame(slide, 4.811, 1.49, 14.544, 8.456, 8);
+  imageSlot(slide, 1.474, 5.625, 6.293, 4.861);
+  title(slide, 'Experience the true taste of Naples', 9.665, 2.109, 8.861, 2.322, 66);
+  factCard(slide, 1.712, 2.997, 4.333, 4.333, 2.061, 3.27, 2.082, 5.267);
+  body(slide, COPY.woodFired, 11.58, 6.46, 5.775, 1.868);
+  pillButton(slide, 11.58, 8.824, 'Learn More', 1.538);
+  addText(slide, '50+', {
+    x: 9.362, y: 6.46, w: 2.593, h: 1.111, fontFace: F_NUM, fontSize: 60, color: RED,
+  });
+  aboutUs(slide);
+}
+
+function slide09(slide) {
+  sketchFrame(slide, 0.832, 2.189, 18.168, 8.541, 9);
+  title(slide, 'More Than Food — It’s an Experience', 1.474, 2.804, 6.398, 3.13, 60);
+  ['01', '02', '03'].forEach(function (n, i) {
+    const x = [1.474, 7.323, 13.585][i];
+    addText(slide, n + '. Write Anything Here', {
+      x: x, y: 7.403, w: 4.941, h: 0.438, fontFace: F_TITLE, fontSize: 20, color: RED,
+    });
+    body(slide, COPY.short, x, 8.107, 4.941, 1.868);
+  });
+  imageSlot(slide, 9.146, 1.689, 10.195, 4.169);
+  aboutUs(slide);
+}
+
+function slide10(slide) {
+  sketchFrame(slide, 0.61, 2.166, 10.471, 7.912, 10);
+  imageSlot(slide, 9.805, 1.683, 9.878, 9.244);
+  title(slide, 'We don’t just make pizza', 1.269, 2.865, 7.356, 2.322, 66);
+  body(slide, COPY.discover, 1.269, 5.81, 6.447, 2.322);
+  pillButton(slide, 1.269, 8.755, 'Learn More', 1.538);
+  factCard(slide, 10.0, 6.448, 4.333, 4.333, 10.349, 6.721, 10.37, 8.718);
+  aboutUs(slide);
+}
+
+function slide11(slide) {
+  sketchFrame(slide, 7.027, 1.833, 12.152, 7.816, 11);
+  title(slide, 'Pizza isn’t fast food, it’s an Italian masterpiece', 9.807, 2.456, 8.598, 3.433, 66);
+  body(slide, COPY.full, 9.807, 6.466, 8.808, 1.414);
+  pillButton(slide, 9.807, 8.456, 'Learn More', 1.538);
+  imageSlot(slide, 0.564, 3.367, 7.479, 3.644);
+  imageSlot(slide, 0.564, 7.133, 7.479, 3.644);
+  aboutUs(slide);
+}
+
+function slide12(slide) {
+  sketchFrame(slide, 0.432, 1.207, 10.471, 7.912, 12);
+  body(slide, COPY.discover, 1.234, 2.249, 6.447, 2.322);
+  title(slide, 'Authentic Italian Taste', 1.234, 5.752, 7.344, 2.524, 72);
+  imageSlot(slide, 9.711, 1.776, 4.624, 8.602);
+  imageSlot(slide, 14.522, 1.776, 4.624, 4.202);
+  imageSlot(slide, 14.522, 6.176, 4.624, 4.202);
+  aboutUs(slide);
+}
+
+function slide13(slide) {
+  sketchFrame(slide, 0.53, 1.044, 18.94, 7.867, 13);
+  title(slide, 'More than just pizza — it’s an Italian experience on your table', 1.388, 1.705, 16.612, 2.322, 66);
+  [1.649, 7.297, 12.946].forEach(function (x) {
+    imageSlot(slide, x, 5.405, 5.405, 5.432);
+  });
+  aboutUs(slide);
+}
+
+function slide14(slide) {
+  sketchFrame(slide, 0.378, 5.625, 19.244, 5.365, 14);
+  title(slide, 'Special Menu', 5.927, 1.543, 8.439, 1.212, 66, { align: 'center' });
+  [0.923, 7.005, 13.087].forEach(function (x) {
+    imageSlot(slide, x, 4.207, 5.99, 3.568);
+    pillButton(slide, x, 8.25, '$25.00', 1.117);
+    body(slide, COPY.menu, x, 9.107, 5.99, 0.959);
+  });
+  aboutUs(slide);
+}
+
+function slide15(slide) {
+  // "06" is outlined, "03" is a solid red tile; the rest of the grid is plain.
+  slide.addShape('rect', {
+    x: 5.456, y: 7.422, w: 4.333, h: 3.311, fill: { color: CREAM }, line: { color: RED, width: 1 },
+  });
+  slide.addShape('rect', { x: 10.022, y: 4.111, w: 4.333, h: 3.311, fill: { color: RED } });
+
+  title(slide, 'Simple ingredients, powerful flavors, timeless tradition', 1.266, 1.449, 13.089, 1.919, 54);
+
+  const cols = [1.266, 5.855, 10.444, 15.033];
+  const rows = [{ num: 4.698, text: 5.51 }, { num: 7.862, text: 8.674 }];
+  [
+    ['01', 0, 0, RED, INK], ['02', 1, 0, RED, INK], ['03', 2, 0, CREAM, CREAM], ['04', 3, 0, RED, INK],
+    ['05', 0, 1, RED, INK], ['06', 1, 1, RED, INK], ['07', 2, 1, RED, INK], ['08', 3, 1, RED, INK],
+  ].forEach(function (cell) {
+    const x = cols[cell[1]];
+    const row = rows[cell[2]];
+    addText(slide, cell[0], {
+      x: x, y: row.num, w: 1.967, h: 0.572, fontFace: F_NUM, fontSize: 28, color: cell[3],
+    });
+    body(slide, COPY.grid, x, row.text, 3.701, 1.414, cell[4]);
+  });
+  aboutUs(slide);
+}
+
+function slide16(slide) {
+  coverSlide(slide, {
+    badgeY: 2.482,
+    ribbonY: 7.434,
+    headlines: [{ text: 'Thanks', x: 3.245, y: 2.79, w: 13.59, h: 4.931, size: 287 }],
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Build
+ * ------------------------------------------------------------------ */
+
+const SLIDES = [
+  { build: slide01, chrome: false },
+  { build: slide02, chrome: true },
+  { build: slide03, chrome: true },
+  { build: slide04, chrome: true },
+  { build: slide05, chrome: true },
+  { build: slide06, chrome: true },
+  { build: slide07, chrome: true },
+  { build: slide08, chrome: true },
+  { build: slide09, chrome: true },
+  { build: slide10, chrome: true },
+  { build: slide11, chrome: true },
+  { build: slide12, chrome: true },
+  { build: slide13, chrome: true },
+  { build: slide14, chrome: true },
+  { build: slide15, chrome: true },
+  { build: slide16, chrome: false },
+];
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'DECK_20x11_25', width: SLIDE_W, height: SLIDE_H });
+  pptx.layout = 'DECK_20x11_25';
+  pptx.title = 'Pizza Italiana';
+
+  SLIDES.forEach(function (def, i) {
+    const slide = pptx.addSlide();
+    slide.background = { color: CREAM };
+    def.build(slide);
+    if (def.chrome) masterChrome(slide, i + 1);
+  });
+
+  return pptx.writeFile({
+    fileName: path.join(__dirname, '10f0abfe-4ee9-4b1f-a9f5-ae79063220ca_grok_final.pptx'),
+  });
+}
+
+build().then(
+  function (f) {
+    console.log('wrote ' + f);
+  },
+  function (err) {
+    console.error(err);
+    process.exit(1);
+  }
+);
