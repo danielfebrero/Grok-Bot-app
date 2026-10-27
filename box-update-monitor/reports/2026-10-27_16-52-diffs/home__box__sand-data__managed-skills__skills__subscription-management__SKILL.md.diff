@@ -1,0 +1,83 @@
+--- 2026-10-27_15-51:/home/box/sand-data/managed-skills/skills/subscription-management/SKILL.md
++++ 2026-10-27_16-52:/home/box/sand-data/managed-skills/skills/subscription-management/SKILL.md
+@@ -1,10 +1,13 @@
+ ---
+ name: subscription-management
+ description: >-
+-  When the user asks to cancel a subscription they named, or to read the price
+-  and renewal date on a service they named, read this before you open the
+-  billing page, even when you could answer from memory, because the price, the
+-  date, and proof of cancellation have to come from a page opened this turn.
++  When the user asks to cancel a subscription they named, to read the price and
++  renewal date on a service they named, to start a free trial and leave before
++  it bills, to find paid subscriptions they no longer use, or to watch a
++  subscription price for a change, read this before you open the billing or
++  signup page, or their receipt mail, even when you could answer from memory,
++  because the price, the date, and proof of cancellation have to come from a
++  page or email opened this turn.
+ ---
+ # Subscriptions
+ 
+@@ -33,3 +36,62 @@
+ 3. When they asked to cancel, send the first question widget and end the turn. On a no or a dismissal, stop, and do not open the cancel page. On a yes, open the cancel page and read it. Stop on that page when it shows a retention offer or a final confirm.
+ 4. When it shows a retention offer, follow the retention stop before any other click. If the user takes the offer, stop. If the user declines it or dismisses the widget, go on, and stop again at the final confirm.
+ 5. On the final confirm page, follow the final-confirm stop. Click the confirm control only after that widget's yes, then follow the proof rule. On a no or a dismissal, stop, and leave the subscription in place. The confirm dispatch is not read-only.
++
++## Try it, don't pay for it
++
++You start a free trial the user named and keep the renewal from charging them. Read the trial terms on the service's own page, sign up only after they approve the renewal price and the date it starts, then either cancel while access still lasts or set a reminder before the charge. A stop after that signup that leaves the trial in place still sets the reminder.
++
++### Entry points
++
++- "Start the free trial and make sure I never pay full price" is a signup plus a cancel or a reminder.
++- "Try this for the trial month, then get me out" is the same job for a service they named.
++- "Cancel this trial before it renews" is the cancel half, for a trial that already exists. Skip signup. When access lasts until the trial end, start at Cancel while access lasts. When cancelling now would end access immediately, start at Reminder before the charge. That start reads the terms and stops when a minimum term would still bill them after cancel.
++
++### Read the terms
++
++1. Dispatch a `computerUse` subagent, read-only, to the service's signup or plan page. Have it read the trial length, the date the trial ends, the price charged on that date, whether cancelling now keeps access until that date or ends access immediately, and any minimum term. Screenshot the terms.
++2. Take the renewal price, the end date, and any minimum term from that page. When the price or the end date is missing, stop and tell the user which one the page left out. Leave the signup unsubmitted. When the page shows a minimum term that still bills them after a cancellation during the trial, stop and say that. Leave the signup unsubmitted. That lock-in is not a trial they can leave before it bills.
++
++### Approve, then sign up
++
++- Send one question widget that states the service, the plan, the trial length, the end date, the renewal price, whether cancelling now keeps access until the end date, and the minimum term. When the page shows no minimum term, the widget says that. A dismissed widget is a no. The widget ends the turn. Do not sign up before they answer.
++- On a yes, sign up for that plan only. The signup keeps a card on file for the charge on the end date, so it is not a purchase due today. Use a card already saved on the service's account when it has one. Otherwise follow the `purchases` skill for the user's own card. A one-time card cannot stand in for a card the service will charge later, so leave it out.
++- Read the confirmation page for the account, the plan, and the end date. Screenshot it and send it. When the confirmation disagrees with the widget, say so and stop before any cancel step. A yes on this widget approves the signup only. It does not approve a cancellation.
++
++### Cancel while access lasts
++
++When the terms say access lasts until the trial end after a cancellation, and no minimum term would still bill them, cancel in the same session, before you tell the user the trial is set up. For a trial that already exists, this is the whole job. Read the terms first, including any minimum term. When a minimum term would still bill them after cancel, stop and say that. Do not open the cancel page.
++
++1. Send the first question widget from Shared rules, naming the service, the plan, the renewal price, and the date access ends, and end the turn. On a no or a dismissal, do not open the cancel page. When this cancel follows a signup in this session, fall back to Reminder before the charge. Otherwise stop. A yes on the signup widget is not this yes. An existing trial has had no signup widget, so this is the first ask.
++2. On a yes, open the cancellation page and read the date access ends. Then follow the retention stop and the final-confirm stop in Shared rules before any confirm click. The confirm dispatch is not read-only. Then follow the proof rule in Shared rules.
++3. A finished cancellation, with proof, gets no reminder. When the user takes a retention offer, or says no or dismisses the final confirm, the subscription is still in place. When this cancel follows a signup in this session, fall back to Reminder before the charge. Use the charge date the page shows after that stop, including the end date of an offer they took.
++
++### Reminder before the charge
++
++Use this when cancelling now would end access immediately, when the trial has no cancel control yet, or when a cancel after this session's signup stopped with the subscription still in place.
++
++When the user asked to cancel a trial that already exists, and cancelling now would end access immediately, read the terms first, including any minimum term. When a minimum term would still bill them after cancel, stop and say that. Do not open the cancel page, and do not set the reminder. Otherwise ask before you remind. Send a question widget that names the service, the plan, the renewal price, the end date, the minimum term, and that access ends immediately, and end the turn. When the page shows no minimum term, the widget says that. On a yes, open the cancellation page and follow the retention stop and the final-confirm stop. A yes on an earlier widget is not this yes. On a no or a dismissal, continue to the routine below.
++
++- Offer a routine that messages the user before the renewal, with time to cancel. Read the Cursor-managed `routines` skill before you create it. Write the service, the plan, the renewal price, the end date, and the cancel page link into its instructions. Schedule it two days before the end date, and tell the user that day. When two days before that date has already passed, do not create the routine. Say the charge is too soon for a two-day warning. If this session's signup is what left the subscription in place, send a question widget that names the service, the plan, the renewal price, the end date, and that cancelling now is the only way to stop the charge, and end the turn. On a yes, open the cancellation page and follow the retention stop and the final-confirm stop. On a no or a dismissal, stop.
++- The routine reminds. Cancelling then follows Cancel while access lasts, including the first question widget, the retention stop, and the final-confirm stop. When cancelling would end access immediately, cancelling then follows the question above, including the minimum-term stop.
++
++## Find subscriptions you no longer use
++
++You list paid subscriptions the user may not want, and you cancel one only after they pick it.
++
++- For this job the services come from their mail. Do not ask which service before you read it. Ask only when that mail has no repeating charge.
++- This job is paid subscriptions. A newsletter or other mailing list is a different job. Leave those out of this list.
++- Read receipt and billing mail opened for this task. A charge that repeats, names a service, and shows an amount is a row. A one-time order is not.
++- Show the service, the amount, the date of the latest receipt, and the email it came from. When a row is missing any of those, leave that row out.
++- Ask which rows they no longer use. A dismissed widget is a no. The widget ends the turn. Do not open a billing page before they answer. Quiet mail is not a reason to mark a row unused.
++- For each row they mark unused, dispatch a `computerUse` subagent, read-only, to that service's billing page, the same read as Read or cancel a named subscription. Then follow that section from its cancel step. The plan, the price, and the date access ends come from that page. The receipt is not that page. One row at a time. A yes on the unused-row widget is not the cancel yes.
++
++## Watch a renewal price
++
++You compare the price the user pays with the public price of the same plan, and you can check again before the renewal.
++
++- The service comes from the user, or from a subscription already saved with UpdateMemory for this skill. Ask when they named neither and none is saved.
++- Dispatch a `computerUse` subagent, read-only, to the billing page and the public plan page. Have it read the price they pay, the date of the next charge, and the current public price of the same plan. Screenshot both pages.
++- Tell them those three numbers and which page each came from. When the price they pay is higher than the last price saved for that service, or higher than the public price, say that in the same message.
++- Save the service, the price they pay, the public price, the renewal date, and the links with UpdateMemory.
++- Offer a routine that checks again. Read the Cursor-managed `routines` skill before you create it. Write the service, the last price, the renewal date, and the page links into its instructions. Schedule it two days before the renewal date, and tell the user that day. When two days before that date has already passed, do not create the routine. Say the renewal is too soon for a two-day check. The routine messages only when the price or the date changed. A plan change waits for a question widget under Shared rules.

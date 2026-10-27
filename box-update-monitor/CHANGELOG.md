@@ -9,11 +9,42 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-27 16:52 (Paris) — snapshot `2026-10-27_15-51` → `2026-10-27_16-52`
+
+**Hot-update du host bundle (sand-host) `ab49b45` → `b206477`** (supervisor `upgrade-ab49b45` → `upgrade-b206477`, `pendingUpgradeVersion` = None) : remplacement à chaud du `sand-host` par le sand-supervisor, sans Update de l'ordinateur. Bundle host (`host-main.cjs` 32.8→31.8 Mo, `sand-eval-runner.cjs` 25.9→26.0 Mo), `agent-store-worker` (support `jsonName` protobuf `=…`), skills gérées (`subscription-management`, `purchases`). Image `fcbae14`, box-scripts `fcbae14`, agent-store-fuse `7e69aa33` (inchangé), exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~8.
+
+### Features
+- **Skill `subscription-management` (élargie)** : sections **Try it, don't pay for it** (essai gratuit + cancel / rappel J−2), **Find subscriptions you no longer use** (reçus mail → choix → cancel), **Watch a renewal price** (prix payé vs public + routine J−2).
+- **Pages publiées** : type `PublishedPagePreview` (kind/title/subline/sources/photos) sur `ResolvePublishedPageResponse.preview`.
+- **Plugins** : RPCs `GetInstalledPluginDetail`, `ListStorefrontPlugins` (+ types storefront).
+- **Sand Messages** : `RetrySandMessagesPermission` (agent_id / entry_id / try_again → woken).
+
+### Change
+- **Skill `purchases`** : champ `order.requiresShipping` (false pour vols/tickets/gift cards/téléchargements ; pas de ligne Ship to).
+- **agent-store-worker** : parsing des champs protobuf avec suffixe `=jsonName`.
+
+### Autre-infra
+- `csnaps` (codebase-telemetry) 14.43→14.44 Mo.
+
+Rapport : [reports/2026-10-27_16-52.md](reports/2026-10-27_16-52.md).
+
+## 2026-10-27 15:51 (Paris) — snapshot `2026-10-27_12-53` → `2026-10-27_15-51`
+
+**Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `c1aeda00f43ded2bcc6834775aeb6410194b766f` → `7e69aa3348540cd38a2995d2adb0018c7f74acc5` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`). Toutes les autres versions plateforme inchangées (image `fcbae14`, box-scripts `fcbae14`, sand-host `ab49b45` (supervisor `upgrade-ab49b45`), exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7). Fichiers : +0 / −0 / ~1.
+
+Rapport : [reports/2026-10-27_15-51.md](reports/2026-10-27_15-51.md).
+
 ## 2026-10-27 12:53 (Paris) — snapshot `2026-10-27_11-49` → `2026-10-27_12-53`
 
 **Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `d3f37a3d624cf03ecd92f2b66f74ab5be3b15bfa` → `c1aeda00f43ded2bcc6834775aeb6410194b766f` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`). Toutes les autres versions plateforme inchangées (image `fcbae14`, box-scripts `fcbae14`, sand-host `ab49b45` (supervisor `upgrade-ab49b45`), exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7). Fichiers : +0 / −0 / ~1.
 
 Rapport : [reports/2026-10-27_12-53.md](reports/2026-10-27_12-53.md).
+
+## 2026-10-27 11:49 (Paris) — snapshot `2026-10-27_09-45` → `2026-10-27_11-49`
+
+**Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `37f15904b9c06f3307991ddce09a4541b4af517d` → `d3f37a3d624cf03ecd92f2b66f74ab5be3b15bfa` (tarball S3). Toutes les autres versions plateforme inchangées (image `fcbae14`, box-scripts `fcbae14`, sand-host `ab49b45` (supervisor `upgrade-ab49b45`), exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7). Fichiers : +0 / −0 / ~1.
+
+Rapport : [reports/2026-10-27_11-49.md](reports/2026-10-27_11-49.md).
 
 ## 2026-10-27 09:45 (Paris) — snapshot `2026-10-27_08-52` → `2026-10-27_09-45`
 

@@ -1,0 +1,43 @@
+--- 2026-10-27_15-51:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
++++ 2026-10-27_16-52:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
+@@ -4281,6 +4281,12 @@
+   const fields = [];
+   for (let i = 1; i < entries.length; i++) {
+     const tokens = entries[i].split(" ");
++    let jsonName;
++    const jsonToken = tokens[tokens.length - 1];
++    if (jsonToken !== void 0 && jsonToken.charAt(0) === "=") {
++      jsonName = jsonToken.slice(1);
++      tokens.pop();
++    }
+     const no = Number(tokens[0]);
+     const name = tokens[1];
+     let type = tokens[2];
+@@ -4292,16 +4298,24 @@
+     }
+     const comma = type.indexOf(",");
+     if (comma !== -1) {
+-      fields.push({
++      const field2 = {
+         no,
+         name,
+         kind: "map",
+         K: Number(type.slice(0, comma)),
+         V: fieldType(runtime, refs, type.slice(comma + 1))
+-      });
++      };
++      if (jsonName !== void 0) {
++        field2.jsonName = jsonName;
++      }
++      fields.push(field2);
+       continue;
+     }
+-    fields.push(Object.assign({ no, name }, fieldType(runtime, refs, type), fieldModifier(mod)));
++    const field = Object.assign({ no, name }, fieldType(runtime, refs, type), fieldModifier(mod));
++    if (jsonName !== void 0) {
++      field.jsonName = jsonName;
++    }
++    fields.push(field);
+   }
+   return fields;
+ }

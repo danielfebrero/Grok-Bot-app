@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+# Chrome resolves /etc/opt/chrome/policies/managed per policy key with the
+# lexicographically last file winning the whole key
+# (https://chromium.googlesource.com/chromium/src/+/151.0.7922.169/components/policy/core/common/config_dir_policy_loader.cc),
+# uninstalls a force-installed extension that leaves the effective
+# ExtensionInstallForcelist
+# (https://chromium.googlesource.com/chromium/src/+/151.0.7922.169/components/policy/resources/templates/policy_definitions/Extensions/ExtensionInstallForcelist.yaml),
+# and folds forcelist entries into the same per-extension map as
+# ExtensionSettings
+# (https://chromium.googlesource.com/chromium/src/+/151.0.7922.169/chrome/browser/extensions/extension_management.cc),
+# so this file writes the whole ExtensionSettings map: every Sand extension
+# entry lives in this one file.
+set -u
+
+policy_file="${SAND_WEBAUTHN_POLICY_FILE:-/etc/opt/chrome/policies/managed/sand-webauthn.json}"
+id_file="${SAND_WEBAUTHN_ID_FILE:-/usr/local/share/sand-webauthn-proxy.id}"
+marker="${SAND_WEBAUTHN_MARKER_FILE:-/home/box/.sand-webauthn-proxy-enabled}"
+update_xml="${SAND_WEBAUTHN_UPDATE_XML:-/usr/local/share/sand-webauthn-proxy-update.xml}"
+onepassword_dir="${SAND_ONEPASSWORD_DIR:-/opt/sand/onepassword-extension}"
+if [ ! -r "${onepassword_dir}/sand-onepassword-extension.id" ]; then
+	onepassword_dir=/usr/local/share
+fi
+onepassword_id_file="${SAND_ONEPASSWORD_ID_FILE:-${onepassword_dir}/sand-onepassword-extension.id}"
+onepassword_marker="${SAND_ONEPASSWORD_MARKER_FILE:-/home/box/.sand-onepassword-extension-enabled}"
+onepassword_update_xml="${SAND_ONEPASSWORD_UPDATE_XML:-${onepassword_dir}/sand-onepassword-extension-update.xml}"
+
+case "${SAND_WEBAUTHN_PROXY:-}" in
+	1) : >"${marker}" 2>/dev/null || true ;;
+	0) rm -f "${marker}" 2>/dev/null || true ;;
+esac
+case "${SAND_ONEPASSWORD_EXTENSION:-}" in
+	1) : >"${onepassword_marker}" 2>/dev/null || true ;;
+	0) rm -f "${onepassword_marker}" 2>/dev/null || true ;;
+esac
+
+# https://chromeenterprise.google/policies/#WebRtcIPHandlingUrl (a dangling marker link counts as set)
+webrtc=""
+webrtc_marker="${SAND_BOX_BROWSER_WEBRTC_PROXY_ONLY_FILE:-/tmp/sand-box-browser-webrtc-proxy-only}"
+if [ "${SAND_BOX_BROWSER_WEBRTC_PROXY_ONLY:-0}" = "1" ] || [ -e "${webrtc_marker}" ] ||
+	[ -L "${webrtc_marker}" ]; then
+	webrtc='"WebRtcIPHandlingUrl":[{"url":"*","handling":"disable_non_proxied_udp"}]'
+fi
+exit_unapplied() {
+	[ -z "${webrtc}" ] || exit 3
+	exit "$1"
+}
+
+# box-chrome keeps Chrome running past its last window, yet on Linux Chrome
+# still clears a profile's session cookies when that window closes unless the
+# profile restores its last session, which also reopens the closed window's
+# tabs in the next window
+# (https://chromium.googlesource.com/chromium/src/+/refs/tags/155.0.8059.84/chrome/browser/sessions/session_data_deleter.cc,
+# https://chromium.googlesource.com/chromium/src/+/refs/tags/155.0.8059.84/chrome/browser/sessions/session_service.cc):
+# https://chromeenterprise.google/policies/#RestoreOnStartup
+restore='"RestoreOnStartup":1'
+
+{ [ -f "${policy_file}" ] && : >>"${policy_file}"; } 2>/dev/null || exit_unapplied 0
+
+# A rename swaps the whole file in one step, so a reader never sees it half
+# written (https://man7.org/linux/man-pages/man2/rename.2.html). The image's
+# managed policy folder belongs to root, so a box user cannot create the file to
+# rename and rewrites the policy in place.
+write_policy() {
+	local text="$1" tmp
+	[ "$(cat -- "${policy_file}" 2>/dev/null)" != "${text}" ] || return 0
+	if tmp="$(mktemp -- "$(dirname -- "${policy_file}")/.$(basename -- "${policy_file}").XXXXXX" 2>/dev/null)"; then
+		if printf '%s\n' "${text}" >"${tmp}" &&
+			chmod --reference="${policy_file}" -- "${tmp}" &&
+			chown --reference="${policy_file}" -- "${tmp}" 2>/dev/null &&
+			mv -f -- "${tmp}" "${policy_file}"; then
+			return 0
+		fi
+		rm -f -- "${tmp}"
+	fi
+	printf '%s\n' "${text}" >"${policy_file}"
+}
+
+entries=""
+onepassword_entry=""
+onepassword_id=""
+if [ -f "${marker}" ] && [ -r "${id_file}" ]; then
+	entries="$(printf '"%s":{"installation_mode":"force_installed","update_url":"file://%s"}' \
+		"$(cat "${id_file}")" "${update_xml}")"
+fi
+if [ -f "${onepassword_marker}" ] && [ -r "${onepassword_id_file}" ]; then
+	onepassword_id="$(cat "${onepassword_id_file}")"
+	onepassword_entry="$(printf '"%s":{"installation_mode":"force_installed","update_url":"file://%s","override_update_url":true}' \
+		"${onepassword_id}" "${onepassword_update_xml}")"
+	entries="${entries:+${entries},}${onepassword_entry}"
+fi
+
+# Chrome updates an installed extension from its manifest's update_url unless
+# override_update_url points it at the policy's, and the host's repack strips
+# the store update_url, so without it Chrome never finds a newer 1Password
+# build under the same id:
+# https://chromeenterprise.google/policies/#ExtensionSettings
+# The host drives the 1Password extension's agenticAutofill.v1 over CDP on its
+# background worker, and the default DeveloperToolsAvailability (0) refuses
+# DevTools on policy-installed extensions, so every call would hang until its
+# deadline. The key is written only while that extension is armed:
+# https://chromeenterprise.google/policies/#DeveloperToolsAvailability
+devtools=""
+# The 1Password extension starts with Agentic Autofill and every tab in Agentic
+# Mode, instead of waiting on its remote feature flag, when its managed policy
+# sets AgenticAutofillRemoteBrowser. It reads that policy when it starts, so the
+# key rides in the same write that force-installs it, keyed on the id this box
+# signed it under and on the Nightly store id: https://www.1password.dev
+# Chrome hands an extension the 3rdparty map under its id as chrome.storage.managed:
+# https://chromium.googlesource.com/chromium/src/+/151.0.7922.169/components/policy/core/common/config_dir_policy_loader.cc
+onepassword_policy=""
+if [ -n "${onepassword_entry}" ]; then
+	devtools=',"DeveloperToolsAvailability":1'
+	onepassword_policy="$(printf ',"3rdparty":{"extensions":{"%s":{"AgenticAutofillRemoteBrowser":true},"gejiddohjgogedgjnonbofjigllpkmbf":{"AgenticAutofillRemoteBrowser":true}}}' \
+		"${onepassword_id}")"
+fi
+
+if [ -n "${entries}" ]; then
+	write_policy "$(printf '{"ExtensionSettings":{%s}%s%s,%s%s}' "${entries}" "${devtools}" "${onepassword_policy}" "${restore}" "${webrtc:+,${webrtc}}")" || exit_unapplied 1
+else
+	write_policy "$(printf '{%s%s}' "${restore}" "${webrtc:+,${webrtc}}")" || exit_unapplied 1
+fi

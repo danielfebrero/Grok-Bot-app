@@ -1,12 +1,12 @@
 # Version/build courante de l'app Grok Bot sur la box
-# capturée le 2026-10-27 15:51:19 CET (snapshot 2026-10-27_15-51)
+# capturée le 2026-10-27 16:52:39 CET (snapshot 2026-10-27_16-52)
 # Box update (Update Computer) = change image_sha ; hot-update host = change sand_host_version
 
 image_sha (/etc/sand-box-image-sha)	fcbae14
 box_scripts_version (/usr/local/share/sand-box-scripts/version)	fcbae14
-sand_host_version (/opt/sand/sand-host/version)	ab49b45
-supervisor_status.hostVersion (runtime)	ab49b45
-supervisor_status.lastCommandId (runtime)	upgrade-ab49b45
+sand_host_version (/opt/sand/sand-host/version)	b206477
+supervisor_status.hostVersion (runtime)	b206477
+supervisor_status.lastCommandId (runtime)	upgrade-b206477
 supervisor_status.pendingUpgradeVersion (runtime)	None
 exec_daemon.name	@anysphere/exec-daemon-runtime
 exec_daemon.gitCommit	unknown
