@@ -1,0 +1,28 @@
+{
+ "global": "3d9daf98c45ed44aa2166dce14a1e02fb17317712e624741b590d6a9b52d9457",
+ "services": 21,
+ "methodes": 2346,
+ "par_service": {
+  "AgentService": "1fb954d7487e74bbfcac170d4712f70e48057d441ffa630cc10cae07163bc660",
+  "AgentStoreService": "ec46b6ac434f4038744bd08611357817a15b8d2f5afb55c82f1b72cc474f7581",
+  "AiService": "cb90259ae1c1a96685af1bb045948204eb757c7aeea04f01e850be462b63e952",
+  "AnalyticsService": "1d88b5eef59ad1e5da3f9ada842a093f8dcba3c1303ee3764fa229a933dd021a",
+  "AppPublishService": "f56a0137b14eae3e1999ff123cf58e7fe8f959da039fdeffbe72fe4222a6baf4",
+  "AutomationsService": "98166f277fa2705eb5f901959bbdcf84401ccbfbddfbd88646cd9f5ea8e14926",
+  "BackgroundComposerService": "b9fc08ccf6495fd6edb1d97e77e96c0ad8ac6615592e640ab28c5c99495067d3",
+  "ChatRequestEventService": "2ccd95ad155b115eb29e7684a6a06f09a95b44a3bbefd4f2ed2aa430fd8df298",
+  "ControlService": "965738576cf8ce703a0d5f7688d17e7e1d3ed2ed300dfcbef4b90fc7a9ad60f8",
+  "DaemonService": "3ebf2ed7c51e30291a61c5edc490a3117be9a38f8c171a191651f4f1a930a5f5",
+  "DashboardService": "e2233bb7ef216450eae39c42c220431242a905cb76c00dcb25ae24d45b6e933c",
+  "ExecService": "30b4145f664b91dd106175cb89e36b8307c364cab8c170ececf93cf84072343a",
+  "GrokBotService": "e0daf9e3f647fcaf8151a1ada4575fb8174fc46fd07a7aa7f05acb71b12f2137",
+  "InferenceService": "a9ab32a44a392c8706aad7bab48d7701a5e8bb2e060e5132967718cda27f960b",
+  "MetricsService": "581c3602ad269d1a53f8238a963dc2ffcc2f5ff3329f9a917e5d04ccd4082063",
+  "OriginService": "aa648b704c22a5f0d69ba00b42a745998dd6ba14170582a484cf0d6dbc8f69f3",
+  "PerformanceEventService": "b93b40fce9e9a6066c2629ae6af7c7ad0c86133109f82a6fa3f9c98947f8b2a1",
+  "ProfilingService": "101d13e0742379b327476c29d194daab6bb36c200b8f1bdcb068ff34248d7c8c",
+  "ToolCallEventService": "f1e0fc3de5abd4ec3dc271813b59e7a4d02748efe37fcc4ff49ec933488d82e2",
+  "TraceService": "e90abca474697107664d0940c6e9ae4350b9122ae267b891537b7c00a9937da7",
+  "WebProfilingService": "9418a0fed22dd2f50ef11d637a9ad440f6616617c39a266eefdbadc9790c4ce9"
+ }
+}
