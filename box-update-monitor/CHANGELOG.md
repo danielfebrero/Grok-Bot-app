@@ -9,6 +9,36 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-27 09:45 (Paris) — snapshot `2026-10-27_08-52` → `2026-10-27_09-45`
+
+**Hot-update du host bundle (sand-host) `7cb9acc` → `ab49b45`** (supervisor `upgrade-7cb9acc` → `upgrade-ab49b45`, `pendingUpgradeVersion` = None) : remplacement à chaud du `sand-host` par le sand-supervisor, sans Update de l'ordinateur. Bundle host (`host-main.cjs` 32.3→32.8 Mo, `sand-eval-runner.cjs` 25.4→25.9 Mo), `box-chrome` (Accept-Language via `--accept-lang` + record profil), `sand-ua-governor` / `sand-fingerprint-profiles` (override Accept-Language par session / flag de lancement), `search-index-worker` (normalisation caractères cachés + plafond noms voyageurs vol 59), `agent-store-worker` (`TriggeringUserInfo.followup_id`), et bump concomitant **agent-store-fuse** `62d65171` → `37f15904`. Image `fcbae14`, box-scripts `fcbae14`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +1 / −0 / ~25.
+
+### Features
+- **Skill `subscription-management` (nouveau)** : annuler / lire prix & date de renouvellement d'un abonnement nommé (connectors, stops rétention + confirm final, preuve page/mail, option `place_phone_call`).
+- **Suivi post-commande (skill purchases)** : section **After the order** — routine 3×/jour (9h/13h/18h, 7j) mail → Shop → browser ; shopping crée cette routine après confirmation.
+- **E-mail agent** : `OfferEmailAddress` remplace `ClaimEmailInbox` ; adresse off jusqu'à activation user (`agent-email` + `no-connector-fallback`).
+- **Apps review overrides (Team)** : RPCs `RequestReviewOverride` / `GrantAppReviewOverride` / `RevokeAppReviewOverride` / `CancelReviewOverride` / `ListAppReviewOverrides` + `PublishReviewOverride*` ; règles `Get/List/ActivateTeamAppsReviewRulesVersion`.
+- **Sand Team admin** : egress HTTP rules, trusted CA certs, setup-file upload/list/delete/current-version, `UpdateTeamTailnetBoxAccess`.
+- **Slack org** : `Get/UpdateOrganizationSlackInboundInstallPolicy`, `ListOrganizationSlackConnectedWorkspaces` / `ListSlackConnectedWorkspaces`.
+- **Origin / CI** : `GetOriginCiJobTrace`, `GetMergeQueueTimeline`.
+- **Synced client settings** : `GetSyncedClientSettings` / `UpdateSyncedClientSettings`.
+- **Plugins / bots** : `ListInstalledPlugins`, `SearchTeamBots`, `SendBonfireInvite`, `PresentCallQuestion`, `ReportSignInAttempt`, `ListPlacementRepoCandidates`, `RevokeCollapseSourceProof`, `WatchSessions`, `ShareProject` / `JoinProjectSource`.
+- **Shopping cards** : badges shortlist (Top rated / Lowest price / Best value / …, max 2).
+- **Chrome Accept-Language** : `box-chrome` lit `/tmp/sand-browser-accept-language-*` et pose `--accept-lang` ; governor n'écrase plus le header du contexte déjà flaggé.
+
+### Change
+- **Spendlog** : montant `total CURRENCY` (plus `$total` fixe).
+- **Orders & returns** : ne pas re-proposer une routine de suivi si `<automation_status>` en a déjà une pour la commande.
+- **Sign-in / in-chat-forms** : Secure Form 2FA/OTP sans explication vault.
+- **Vols** : plafond noms voyageurs 60→59 (`search-index-worker`).
+- **recent-changes** : note Action Button (2026-10-19) retirée du feed.
+
+### Autre-infra
+- agent-store-fuse pointeur S3 `…-62d65171…-bk.tar.gz` → `…-37f15904…-bk.tar.gz` (rebuild concomitant au hot-update host).
+- `csnaps` (codebase-telemetry) 14.38→14.43 Mo.
+
+Rapport : [reports/2026-10-27_09-45.md](reports/2026-10-27_09-45.md).
+
 ## 2026-10-27 08:52 (Paris) — snapshot `2026-10-27_05-51` → `2026-10-27_08-52`
 
 **Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `d7000925de3e23cbfe62f00c2bfd7ad2899b5aea` → `62d651713b82c6bea01bac2e91a533e9a6936d9b` (tarball S3). Toutes les autres versions plateforme inchangées (image `fcbae14`, box-scripts `fcbae14`, sand-host `7cb9acc`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7). Fichiers : +0 / −0 / ~1.
