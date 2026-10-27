@@ -1,0 +1,1205 @@
+/*
+ * Teamwork — 32-slide deck rebuilt with pptxgenjs.
+ *
+ * Slide size 10 x 5.625in. Raster artwork in the original (small vector icons)
+ * is replaced by flat placeholder marks, per the conversion brief.
+ *
+ *   node 104a6c65-76d0-40b8-85e4-d8905bffe8cd_grok_final.js
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+// ---------------------------------------------------------------- palette ---
+const C = {
+  bg: 'F7F5F6',   // page background
+  a1: '72B2D6',   // light blue
+  a2: '4489AF',   // mid blue
+  a3: '1F6189',   // dark blue
+  cream: 'E9E8DF',
+  sage: 'C3C5BE',
+  dk: '525455',   // headings
+  gy: '9D9F9D',   // body copy
+  lt: 'F7F5F7',   // text on colour
+  gray: '535353', // 4th accent (charcoal)
+  chip: 'F6F6F7', // icon medallion
+};
+const RAMP = [C.a1, C.a2, C.a3, C.gray];
+
+const F = { bold: 'Barlow', med: 'Barlow Medium', semi: 'Barlow SemiBold' };
+
+// ------------------------------------------------------------- primitives ---
+const HAIR = (color, dash) => ({ color, width: 0.75, dashType: dash || 'solid' });
+
+/** Solid fill with the original's alpha expressed as pptxgenjs transparency. */
+const fill = (color, alphaPct) =>
+  alphaPct === undefined ? { color } : { color, transparency: Math.round(100 - alphaPct) };
+
+/** Text box matching the deck's defaults: top-anchored, 1.5pt inset, 100% leading. */
+function tb(s, x, y, w, h, text, o) {
+  s.addText(text, Object.assign({
+    x, y, w, h, margin: 1.5, valign: 'top', align: 'left', wrap: true,
+    fontSize: 9, fontFace: F.med, color: C.gy, lineSpacingMultiple: 1,
+  }, o));
+}
+
+const rgb = (t, o) => Object.assign({ text: t }, o ? { options: o } : {});
+const bold = (t) => ({ text: t, options: { fontFace: F.bold, bold: true } });
+
+/**
+ * Flatten lines into pptxgenjs runs. A line is a string, a single run or an
+ * array of runs; the bullet rides on the first run of a line, the break on the last.
+ */
+function lines(items, bulletOpt) {
+  const out = [];
+  items.forEach((ln, i) => {
+    const src = Array.isArray(ln) ? ln : [typeof ln === 'string' ? rgb(ln) : ln];
+    const runs = src.map((r) => ({ text: r.text, options: Object.assign({}, r.options) }));
+    if (bulletOpt) runs.forEach((r) => { r.options.bullet = bulletOpt; });
+    if (i < items.length - 1) runs[runs.length - 1].options.breakLine = true;
+    out.push.apply(out, runs);
+  });
+  return out;
+}
+/** En-dash bullet list, as used for every "– item" list in the deck. */
+const DASHES = { characterCode: '2013', indent: 7 };
+const dashList = (items) => lines(items, DASHES);
+/** "1. item" numbered list. */
+const numList = (items) => lines(items, { type: 'number', numberType: 'arabicPeriod', indent: 10 });
+
+/** "Plant (PL) or Idea generator" with the abbreviation set in bold. */
+function role(name, code, tail) {
+  const runs = [rgb(name + ' ('), bold(code), rgb(')')];
+  if (tail) runs.push(rgb(tail));
+  return runs;
+}
+
+/** Convert a normalised [[x,y]] / [[x,y,cx1,cy1,cx2,cy2]] outline into points. */
+function poly(pts, x, y, w, h, closed) {
+  const P = pts.map((p, i) => {
+    const o = { x: x + p[0] * w, y: y + p[1] * h };
+    if (i === 0) { o.moveTo = true; return o; }
+    if (p.length === 6) {
+      o.curve = { type: 'cubic', x1: x + p[2] * w, y1: y + p[3] * h, x2: x + p[4] * w, y2: y + p[5] * h };
+    }
+    return o;
+  });
+  if (closed !== false) P.push({ close: true });
+  return P;
+}
+
+/** addShape('custGeom') for an outline expressed in 0..1 shape space. */
+function shape(s, pts, x, y, w, h, o, closed) {
+  s.addShape('custGeom', Object.assign({ x, y, w, h, points: poly(pts, 0, 0, w, h, closed) }, o));
+}
+/** Stroke-only outline (never closed back to the start point). */
+function stroke(s, pts, x, y, w, h, lineOpt) {
+  shape(s, pts, x, y, w, h, { fill: { type: 'none' }, line: lineOpt || HAIR(C.sage) }, false);
+}
+
+/** Flat stand-in for a vector/raster pictogram from the source deck. */
+function icon(s, x, y, w, h, color, alphaPct) {
+  s.addShape('ellipse', { x, y, w, h, fill: fill(color, alphaPct) });
+}
+
+/** Icon medallion: pale disc + placeholder glyph, used on the cycle diagrams. */
+function medallion(s, x, y, d, discColor, glyphColor) {
+  s.addShape('ellipse', { x, y, w: d, h: d, fill: { color: discColor } });
+  icon(s, x + d * 0.30, y + d * 0.30, d * 0.40, d * 0.40, glyphColor);
+}
+
+const line = (s, x, y, w, h, o) =>
+  s.addShape('line', Object.assign({ x, y, w, h, line: HAIR(C.sage) }, o));
+
+// ------------------------------------------------- reusable outline shapes ---
+// Rounded triangle (slide 5 "gear" frames).
+const TRI = [[.423, .051], [.504, 0], [.579, .051], [.992, .876], [.986, .96], [.913, 1], [.091, 1], [.019, .969], [.008, .878], [.423, .051]];
+
+// Rounded hexagon (slide 6).
+const HEX = [[.036, .226], [.458, .01], [.5, 0], [.543, .01], [.96, .223], [.989, .252], [1, .283], [1, .716], [.99, .75], [.963, .776], [.547, .989], [.502, 1], [.455, .99], [.038, .776], [.011, .752], [0, .716], [0, .286], [.01, .25], [.036, .226]];
+
+// Downward comb / bracket connecting a header to its children (slides 7, 19, 24, 25).
+const COMB = [[0, 1], [0, .449], [0, .288], [.003, .185], [.012, .086], [.025, .022], [.039, .003], [.061, 0], [.939, 0], [.961, .003], [.975, .022], [.988, .086], [.997, .185], [1, .288], [1, .449], [1, 1]];
+
+// Chevron block and its tail/plate variants (slides 22, 28, 30).
+const CHEV = [[.043, 0], [.745, 0], [.773, .01], [.791, .035], [.989, .453], [1, .499], [.993, .541], [.793, .957], [.771, .987], [.739, .999], [.044, 1], [.012, .986], [0, .948], [.001, .053], [.012, .016], [.043, 0]];
+const CHEV_MID = [[.014, .001], [.002, .021], [.002, .065], [.067, .459], [.07, .498], [.067, .535], [.003, .926], [.002, .973], [.013, 1], [.909, 1], [.921, .99], [.927, .966], [.997, .543], [1, .499], [.997, .459], [.928, .039], [.921, .011], [.91, 0]];
+const PLATE = [[.005, .001], [.001, .023, .003, -.03, .001, .006], [.001, .068], [.02, .456], [.021, .501], [.02, .538], [.001, .92], [0, .972], [.004, 1], [.995, .998], [.998, .983], [1, .943], [1, .064], [.999, .026], [.995, .001]];
+
+// Half-disc cap used for the "dimension" circles on slide 19.
+const DOME = [[1, .93], [.993, .976], [.967, 1], [.032, 1], [.009, .973], [0, .92], [.489, 0, .019, .409, .231, .01], [1, .93, .757, -.01, .982, .399]];
+
+// Nonagon ring wedges (slide 3), one entry per segment.
+const RING9 = [
+  { p: [[0, 0], [1, .255], [.813, 1]], x: 2.72, y: .991, w: 1.219, h: 1.719, c: C.a1 },
+  { p: [[1, .574], [.352, 0], [0, 1]], x: 3.589, y: 1.425, w: .985, h: 1.95, c: C.a2 },
+  { p: [[1, 0], [.85, .998], [0, 1]], x: 3.065, y: 2.54, w: 1.511, h: 1.272, c: C.a3 },
+  { p: [[.503, 1], [1, 0], [0, .002]], x: 2.372, y: 3.805, w: 1.98, h: .833, c: C.gray },
+  { p: [[.149, 1], [1, 1], [0, 0]], x: 1.852, y: 3.363, w: 1.517, h: 1.274, c: C.a1 },
+  { p: [[1, 1], [0, .576], [.65, 0]], x: 1.095, y: 2.684, w: .988, h: 1.952, c: C.a2 },
+  { p: [[1, 0], [0, .263], [.19, 1]], x: .867, y: 2.09, w: 1.216, h: 1.725, c: C.a3 },
+  { p: [[1, .393], [.349, 0], [0, 1]], x: .867, y: 1.427, w: 1.854, h: 1.117, c: C.gray },
+  { p: [[0, .396], [.653, 0], [1, 1]], x: 1.513, y: .987, w: 1.856, h: 1.121, c: C.a2 },
+];
+
+// ------------------------------------------------------------ shared copy ---
+const INTRO = 'This is a critical component of dream team building. And the most effective way to ' +
+  'determine team roles is the \u201CBelbin model.\u201D It takes into account not only the competencies ' +
+  'of each team member, but also their human factors. According to it, there are 9 possible Belbin team roles.';
+const DIVERSE = 'Each person on the team can play a different role, one of the nine or several at once. ' +
+  'The more diverse a team is, the more balanced the team is and the better able it is to accomplish its goals.';
+const BUILDING = 'In building a truly effective and flexible team that can get to its goal, it is important ' +
+  'to build communication between the team members and understand each other. To have the right people in the ' +
+  'team who can do the tasks, look at the project critically, or understand that the project is at the finish ' +
+  'line. This is why it is important not only for members to have professional skills, but also to have ' +
+  'personal and communication skills, as well as an ability to work together.';
+const BELBIN = 'Belbin\u2019s Team Roles Model';
+
+const ROLE_LIST_A = [['Plant', 'PL', ' or Idea generator'], ['Monitor-Evaluator', 'ME', ' or analyst'],
+  ['Coordinator', 'CO'], ['Implementer', 'IMP'], ['Completer-Finisher', 'CF']];
+const ROLE_LIST_B = [['Resource Investigator', 'RI'], ['Shaper', 'SH', ' or Motivator'],
+  ['Team Worker', 'TW', ' or Diplomat'], ['Specialist', 'SP']];
+
+/** One dashed-bullet line: "Plant (PL) or Idea generator" (suffix in grey). */
+function roleBullets(items) {
+  return dashList(items.map((it) => {
+    const runs = [rgb(it[0] + ' (' + it[1] + ')', { color: C.dk })];
+    if (it[2]) runs.push(rgb(it[2], { color: C.gy }));
+    return runs;
+  }));
+}
+
+/** Right-hand explainer column shared by slides 3, 4 and 13. */
+function rolesPanel(s, x, y, title) {
+  tb(s, x, y, 3.0, 0.332, title, { fontSize: 17, fontFace: F.bold, bold: true, color: C.dk });
+  tb(s, x + 0.004, y + 0.485, 4.182, 0.667, INTRO);
+  tb(s, x, y + 1.432, 2.982, 0.229, 'Team roles and responsibilities:',
+    { fontSize: 11, fontFace: F.bold, bold: true, color: C.dk });
+  tb(s, x + 0.004, y + 1.728, 2.1, 0.989, roleBullets(ROLE_LIST_A), { margin: 0 });
+  tb(s, x + 2.233, y + 1.728, 1.944, 0.667, roleBullets(ROLE_LIST_B), { margin: 0 });
+  tb(s, x + 0.004, y + 2.693, 4.143, 0.51, DIVERSE);
+}
+
+/** Section heading in the deck's standard top-left position. */
+function heading(s, text, x, y, w) {
+  tb(s, x === undefined ? 0.629 : x, y === undefined ? 0.637 : y, w || 6.4, 0.332, text,
+    { fontSize: 17, fontFace: F.bold, bold: true, color: C.dk });
+}
+
+// ============================================================== slide 01 ====
+function slide01(s) {
+  [C.a1, C.a2, C.a3].forEach((c, i) =>
+    s.addShape('ellipse', { x: 4.668 + i * 0.2595, y: 2.232, w: 0.145, h: 0.145, fill: { color: c } }));
+  tb(s, 3.93, 2.661, 2.14, 0.417, 'Teamwork',
+    { align: 'center', fontSize: 23, fontFace: F.bold, bold: true, color: C.dk });
+  tb(s, 3.447, 3.195, 3.106, 0.198,
+    [bold('30'), rgb(' Unique templates for Business & Marketing')], { align: 'center' });
+}
+
+// ============================================================== slide 02 ====
+// Three cream cards; each holds a coloured header plus three translucent rows.
+const S2_COLS = [
+  { x: 0.955, c: C.a1, head: 'Thinking-Oriented Roles', rows: [role('Plant', 'PL'), role('Monitor-Evaluator', 'ME'), role('Specialist', 'SP')] },
+  { x: 3.755, c: C.a2, head: 'Action-Oriented Roles', rows: [role('Shaper', 'SH'), role('Implementer', 'IMP'), role('Completer-Finisher', 'CF')] },
+  { x: 6.556, c: C.a3, head: 'People-Oriented Roles', rows: [role('Resource Investigator', 'RI'), role('Team Worker', 'TW', ' or Diplomat'), role('Coordinator', 'CO')] },
+];
+function slide02(s) {
+  heading(s, BELBIN, 0.935, 0.72, 3.786);
+  tb(s, 0.939, 1.206, 8.071, 0.515, INTRO);
+  S2_COLS.forEach((col) => {
+    const ix = col.x + 0.073;
+    s.addShape('roundRect', { x: col.x, y: 1.819, w: 2.489, h: 3.004, fill: { color: C.cream }, rectRadius: 0.078 });
+    s.addShape('roundRect', { x: ix, y: 1.89, w: 2.342, h: 1.04, fill: { color: col.c }, rectRadius: 0.034 });
+    icon(s, ix + 1.06, 2.099, 0.24, 0.24, C.bg);
+    tb(s, ix + 0.281, 2.512, 1.781, 0.198, col.head, { align: 'center', color: C.lt });
+    [2.989, 3.599, 4.204].forEach((ry, i) => {
+      s.addShape('roundRect', { x: ix, y: ry, w: 2.342, h: 0.541, fill: fill(col.c, 60), rectRadius: 0.034 });
+      s.addShape('roundRect', { x: ix, y: ry, w: 2.342, h: 0.541, fill: { type: 'none' }, line: HAIR(col.c), rectRadius: 0.034 });
+      tb(s, ix + 0.281, ry + 0.171, 1.781, 0.198, col.rows[i], { align: 'center', color: C.lt });
+    });
+  });
+}
+
+// ============================================================== slide 03 ====
+// Nine-segment ring of role names beside the explainer panel.
+const S3_LABELS = [
+  [3.32, 1.54, 0.44, 0.292, role('Plant', 'PL')],
+  [3.804, 2.261, 0.611, 0.417, role('Monitor-Evaluator', 'ME')],
+  [3.72, 3.342, 0.57, 0.292, role('Specialist', 'SP')],
+  [3.104, 3.973, 0.44, 0.292, role('Shaper', 'SH')],
+  [2.111, 4.177, 0.65, 0.292, role('Implementer', 'IMP')],
+  [1.289, 3.532, 0.57, 0.417, role('Completer-Finisher', 'CF')],
+  [2.156, 1.236, 0.736, 0.417, role('Resource Investigator', 'RI')],
+  [1.37, 1.664, 0.736, 0.417, role('Team Worker', 'TW', ' or Diplomat')],
+  [1.002, 2.577, 0.611, 0.292, role('Coordinator', 'CO')],
+];
+function slide03(s) {
+  RING9.forEach((g) => shape(s, g.p, g.x, g.y, g.w, g.h, { fill: { color: g.c } }));
+  S3_LABELS.forEach((l) => tb(s, l[0], l[1], l[2], l[3], l[4], { align: 'center', fontSize: 8, color: C.lt }));
+  tb(s, 2.057, 2.605, 1.34, 0.479, BELBIN, { align: 'center', fontSize: 13, fontFace: F.semi, color: C.dk });
+  rolesPanel(s, 5.18, 1.211, BELBIN);
+}
+
+// ============================================================== slide 04 ====
+// Donut of nine petals, each capped with a numbered bubble and a pictogram.
+const S4_PETALS = [
+  { p: [[0, .858], [0, 0], [.565, .102, .193, .002, .385, .037], [1, .34, .722, .16, .869, .24], [.414, 1], [.209, .895], [0, .858]], x: 5.022, y: 1.248, w: .965, h: 1.03, c: C.a1 },
+  { p: [[0, .645], [.52, 0], [.841, .403, .65, .113, .758, .25], [1, .856, .918, .544, .972, .697], [.198, 1], [.134, .818], [0, .645]], x: 5.453, y: 1.624, w: 1.087, h: 1.053, c: C.a1 },
+  { p: [[.079, .15], [.981, 0], [.974, .518, 1.009, .172, 1.006, .347], [.793, 1, .942, .687, .881, .85], [0, .56], [.073, .367], [.079, .15]], x: 5.599, y: 2.566, w: .966, h: 1.014, c: C.a1 },
+  { p: [[0, .251], [.182, .142], [.303, 0], [1, .401], [.713, .74, .923, .528, .826, .642], [.275, 1, .584, .852, .435, .94], [0, .251]], x: 5.248, y: 3.17, w: 1.096, h: 1.109, c: C.a2 },
+  { p: [[.299, 0], [.501, .037], [.709, .003], [1, .907], [.504, 1, .841, .969, .673, 1], [0, .902, .333, 1, .162, .967], [.299, 0]], x: 4.481, y: 3.459, w: 1.029, h: .918, c: C.a2 },
+  { p: [[.701, 0], [.819, .14], [1, .249], [.718, 1], [.293, .749, .563, .942, .419, .856], [0, .399, .177, .649, .078, .53], [.701, 0]], x: 3.656, y: 3.171, w: 1.094, h: 1.103, c: C.a2 },
+  { p: [[.019, 0], [.922, .147], [.924, .361], [1, .566], [.205, 1], [.021, .493, .114, .842, .052, .671], [.019, 0, -.006, .33, -.007, .163]], x: 3.436, y: 2.567, w: .966, h: 1.009, c: C.a3 },
+  { p: [[.472, 0], [1, .643], [.868, .818], [.804, 1], [0, .858], [.162, .398, .03, .697, .084, .541], [.472, 0, .243, .248, .348, .114]], x: 3.461, y: 1.629, w: 1.084, h: 1.046, c: C.a3 },
+  { p: [[0, .346], [.454, .098, .136, .24, .289, .157], [1, 0, .628, .036, .813, .003], [1, .859], [.787, .896], [.585, 1], [0, .346]], x: 4.006, y: 1.246, w: .976, h: 1.03, c: C.a3 },
+];
+const S4_BUBBLES = [[5.323, 1.135, C.a1], [6.151, 1.824, C.a1], [6.346, 2.876, C.a1],
+  [5.792, 3.816, C.a2], [4.798, 4.177, C.a2], [3.805, 3.816, C.a2],
+  [3.261, 2.876, C.a3], [3.446, 1.824, C.a3], [4.273, 1.135, C.a3]];
+const S4_LABELS = [
+  [5.18, 1.662, 0.44, 0.292, role('Plant', 'PL')],
+  [5.585, 2.099, 0.65, 0.446, lines(['Monitor-', [rgb('Evaluator ('), bold('ME'), rgb(')')]])],
+  [5.757, 2.828, 0.57, 0.292, role('Specialist', 'SP')],
+  [5.496, 3.471, 0.44, 0.292, role('Shaper', 'SH')],
+  [4.626, 3.825, 0.736, 0.311, role('Implementer', 'IMP')],
+  [4.014, 3.408, 0.57, 0.417, role('Completer-Finisher', 'CF')],
+  [3.603, 2.766, 0.736, 0.417, role('Resource Investigator', 'RI')],
+  [3.831, 2.099, 0.509, 0.417, role('Team Worker', 'TW')],
+  [4.292, 1.661, 0.65, 0.311, role('Coordinator', 'CO')],
+];
+function slide04(s) {
+  // Three faint lobes behind the donut (gradient in the original, flat here).
+  shape(s, [[.001, 0], [0, .665], [.87, 1], [.851, .32, 1.05, .788, 1.043, .528], [.001, 0, .67, .124, .349, .003]],
+    5.024, 0.733, 2.056, 3.105, { fill: fill(C.cream, 55) });
+  shape(s, [[0, .501], [.503, 0], [1, .504], [.492, 1, .894, .816, .7, 1.005], [0, .501, .289, .995, .103, .806]],
+    3.205, 2.835, 3.584, 2.057, { fill: fill(C.cream, 55) });
+  shape(s, [[1, 0], [1, .669], [.129, 1], [.168, .299, -.056, .78, -.041, .509], [1, 0, .353, .113, .665, .001]],
+    2.92, 0.732, 2.063, 3.096, { fill: fill(C.cream, 55) });
+  S4_PETALS.forEach((g) => shape(s, g.p, g.x, g.y, g.w, g.h, { fill: { color: g.c } }));
+  S4_BUBBLES.forEach((b) => {
+    s.addShape('ellipse', { x: b[0], y: b[1], w: 0.402, h: 0.402, fill: { color: b[2] } });
+    icon(s, b[0] + 0.115, b[1] + 0.115, 0.172, 0.172, C.bg);
+  });
+  s.addShape('ellipse', { x: 4.355, y: 2.167, w: 1.289, h: 1.289, fill: { color: C.bg } });
+  tb(s, 4.479, 2.622, 1.045, 0.354, BELBIN, { align: 'center', fontFace: F.semi, color: C.dk });
+  S4_LABELS.forEach((l) => tb(s, l[0], l[1], l[2], l[3], l[4], { align: 'center', fontSize: 8, color: C.lt }));
+  line(s, 5.004, 0.734, 0, 1.435, { line: HAIR(C.sage, 'dash') });
+  line(s, 5.564, 3.135, 1.234, 0.72, { line: HAIR(C.sage, 'dash') });
+  line(s, 3.198, 3.138, 1.243, 0.707, { line: HAIR(C.sage, 'dash'), flipH: true });
+  heading(s, BELBIN, 0.659, 0.638, 1.894);
+  tb(s, 0.663, 1.414, 1.978, 1.448, INTRO);
+  tb(s, 7.445, 3.018, 2.019, 0.417, 'Team roles and responsibilities:',
+    { fontSize: 11, fontFace: F.bold, bold: true, color: C.dk });
+  tb(s, 7.361, 3.48, 2.217, 0.831, roleBullets(ROLE_LIST_A), { margin: 0 });
+  tb(s, 7.361, 4.272, 1.944, 0.667, roleBullets(ROLE_LIST_B), { margin: 0 });
+}
+
+// ============================================================== slide 05 ====
+// Nine triangular "gear" badges zig-zagging across the slide, captions above/below.
+const S5_TRIS = [   // x, y, flipped(pointing down), badge colour
+  [0.684, 2.650, false, C.a1], [1.568, 1.910, true, C.a1], [2.452, 2.650, false, C.a1],
+  [3.336, 1.910, true, C.a2], [4.220, 2.650, false, C.a2], [5.105, 1.910, true, C.a2],
+  [5.989, 2.650, false, C.a3], [6.873, 1.910, true, C.a3], [7.757, 2.650, false, C.a3],
+];
+const S5_NAMES = [
+  [1.023, 3.736, 0.88, 0.167, role('Plant', 'PL')],
+  [1.831, 2.158, 1.033, 0.311, role('Monitor-Evaluator', 'ME')],
+  [2.764, 3.736, 0.937, 0.167, role('Specialist', 'SP')],
+  [3.599, 2.158, 1.033, 0.311, role('Completer-Finisher', 'CF')],
+  [4.532, 3.674, 0.936, 0.311, role('Implementer', 'IMP')],
+  [5.483, 2.221, 0.803, 0.167, role('Shaper', 'SH')],
+  [6.263, 3.674, 1.010, 0.292, role('Resource Investigator', 'RI')],
+  [7.251, 2.158, 0.803, 0.292, role('Team Worker', 'TW')],
+  [8.141, 3.674, 0.803, 0.311, role('Coordinator', 'CO')],
+];
+const S5_NOTES = [  // x, y, w, h, lead sentence, risk sentence
+  [0.780, 4.270, 1.383, 0.850, 'Creative, solves difficult problems. ', 'Strong \u201COwnership" of ideas. Weak cooperation for better results.'],
+  [1.574, 1.404, 1.559, 0.446, 'Sober and discerning, judge accurately. ', 'Cynicism without logic.'],
+  [2.540, 4.270, 1.383, 0.716, 'Self-starting, dedicated, provides rare knowledge. ', 'Ignores factors outside area of his interest.'],
+  [3.428, 1.154, 1.382, 0.667, 'Conscientious, corrects omissions and errors, polishes and perfects. ', 'Obsessive behavior. Doesn\u2019t delegate.'],
+  [4.328, 4.270, 1.344, 0.581, 'Organizes work, put system in place. ', 'Obstructs change, rejects new ideas.'],
+  [5.104, 1.154, 1.559, 0.716, 'Challenging, achieving, overcome obstacle. ', 'Ignores social aspects, can be aggressive, never apologies.'],
+  [6.077, 4.270, 1.383, 0.716, 'Sense new ideas, explores new opportunities. ', 'Forgets to follow-up arrangements, disappoints clients.'],
+  [6.968, 1.154, 1.382, 0.667, 'Has high EL and empathy, listens and averts friction. ', 'Avoid situations that may entail pressure or conflict.'],
+  [7.845, 4.270, 1.383, 0.581, 'Mature, confident, identities talent. ', 'Take credit for the effort of a team. '],
+];
+function slide05(s) {
+  heading(s, BELBIN, 3.509, 0.622, 2.982);
+  S5_TRIS.forEach((t) => {
+    const [x, y, flip, col] = t;
+    const rot = flip ? 180 : 0;
+    stroke(s, TRI, x, y, 1.559, 1.565, HAIR(C.sage, 'dash'));
+    // small cream studs at the triangle's three corners
+    icon(s, x + 0.696, y + 0.048, 0.169, 0.169, C.cream);
+    icon(s, x + 0.026, y + 1.303, 0.237, 0.237, C.cream);
+    icon(s, x + 1.296, y + 1.303, 0.237, 0.237, C.cream);
+    icon(s, x + 0.248, y + 0.27, 0.6, 0.601, col);      // main gear badge
+    icon(s, x + 0.463, y + 0.485, 0.17, 0.17, C.bg);
+  });
+  S5_NAMES.forEach((l) => tb(s, l[0], l[1], l[2], l[3], l[4], { align: 'center', fontSize: 8, color: C.dk }));
+  S5_NOTES.forEach((n) => tb(s, n[0], n[1], n[2], n[3],
+    lines([n[4], [rgb('Risk: ', { fontFace: F.semi, color: C.dk }), rgb(n[5])]]),
+    { align: 'center', fontSize: 8 }));
+}
+
+// ============================================================== slide 06 ====
+// Three hexagon clusters, one per role family.
+const S6_GROUPS = [
+  { x: 0.797, c: C.a1, caption: 'Thinking-Oriented Roles',
+    cells: [[0.630, 0, true, role('Monitor-Evaluator', 'ME')], [0, 1.088, false, role('Plant', 'PL')], [1.260, 1.088, false, role('Specialist', 'SP')]] },
+  { x: 3.767, c: C.a2, caption: 'Action-Oriented Roles',
+    cells: [[0, 0, true, role('Completer-Finisher', 'CF')], [1.261, 0, true, role('Shaper', 'SH')], [0.630, 1.088, true, role('Implementer', 'IMP')]] },
+  { x: 6.738, c: C.a3, caption: 'People-Oriented Roles',
+    cells: [[0.630, 0, true, role('Team Worker', 'TW')], [0, 1.088, false, role('Resource Investigator', 'RI')], [1.260, 1.088, false, role('Coordinator', 'CO')]] },
+];
+function slide06(s) {
+  heading(s, BELBIN, 3.509, 0.622, 2.982);
+  tb(s, 0.939, 1.121, 8.071, 0.515, INTRO, { align: 'center' });
+  S6_GROUPS.forEach((g) => {
+    g.cells.forEach((c) => {
+      const x = g.x + c[0], y = 2.083 + c[1];
+      shape(s, HEX, x, y, 1.205, 1.357, { fill: { color: g.c }, rotate: c[2] ? 180 : 0 });
+      icon(s, x + 0.517, y + 0.384, 0.172, 0.172, C.bg);
+      tb(s, x + 0.13, y + 0.69, 0.945, 0.292, c[3], { align: 'center', fontSize: 8, color: C.lt });
+    });
+    tb(s, g.x + 0.1, 4.746, 2.27, 0.198, g.caption, { align: 'center', color: C.dk });
+  });
+}
+
+// ============================================================== slide 07 ====
+// Org-chart: three family bars, nine role chips, one-line notes, "Balanced Teamwork".
+const S7_FAMILIES = [
+  { x: 0.612, c: C.a1, label: 'Thinking-Oriented Roles' },
+  { x: 3.549, c: C.a2, label: 'Action-Oriented Roles' },
+  { x: 6.487, c: C.a3, label: 'People-Oriented Roles' },
+];
+const S7_CHIPS = [
+  ['Plant', C.a1, 'Innovators and ideas. Prefer to work alone.'],
+  ['Monitor Evaluator', C.a1, 'Separate good ideas from bad.'],
+  ['Specialist', C.a1, 'Skill in a specialist job.'],
+  ['Sharper', C.a2, 'Challenge norms, take lead, push team.'],
+  ['Implementer', C.a2, 'Executors of plans.'],
+  ['Completer Finisher', C.a2, 'Complete the fine details.'],
+  ['Coordinator', C.a3, 'Natural team leader.'],
+  ['Team Worker', C.a3, 'Diplomats, keep team cogs turning.'],
+  ['Resource Investigator', C.a3, 'Find external resources.'],
+];
+function slide07(s) {
+  heading(s, BELBIN, 0.872, 0.637, 3.786);
+  tb(s, 0.877, 1.122, 7.041, 0.979,
+    lines([INTRO, '', DIVERSE]));
+  S7_FAMILIES.forEach((f, i) => {
+    s.addShape('roundRect', { x: f.x, y: 2.414, w: 2.901, h: 0.427, fill: fill(f.c, 80), rectRadius: 0.031 });
+    s.addShape('roundRect', { x: f.x, y: 2.414, w: 2.901, h: 0.427, fill: { type: 'none' }, line: HAIR(f.c), rectRadius: 0.031 });
+    icon(s, f.x + 0.762, 2.512, 0.17, 0.17, C.bg);
+    tb(s, f.x + 0.962, 2.535, 1.4, 0.177, f.label, { fontSize: 8, color: C.lt });
+    line(s, f.x + 1.449, 2.848, 0, 0.645);
+    stroke(s, COMB, f.x + 0.475, 3.222, 1.949, 0.266);
+  });
+  S7_CHIPS.forEach((c, i) => {
+    const x = 0.612 + i * 0.9791;
+    s.addShape('roundRect', { x, y: 3.471, w: 0.943, h: 0.309, fill: { color: c[1] }, rectRadius: 0.03 });
+    tb(s, x + 0.044, 3.485, 0.848, 0.271, c[0], { align: 'center', fontSize: 7, fontFace: F.semi, color: C.lt, valign: 'middle' });
+    tb(s, x + 0.038, 3.845, 0.865, 0.385, c[2], { align: 'center', fontSize: 7 });
+  });
+  // Open bracket underneath, tying every chip into one outcome.
+  s.addShape('custGeom', {
+    x: 0.615, y: 4.381, w: 8.768, h: 0.28, line: HAIR(C.sage, 'dash'), fill: { type: 'none' },
+    points: poly([[0, 0], [0, 1], [1, 1], [1, 0]], 0, 0, 8.768, 0.28, false),
+  });
+  tb(s, 4.077, 4.757, 1.846, 0.198, 'Balanced Teamwork  ', { align: 'center', fontFace: F.semi, color: C.dk });
+}
+
+// ---------------------------------------------------- shared table styling ---
+// Cell padding in points (pptxgenjs reads margin arrays as inches unless top >= 1).
+const PAD = [1, 2, 1, 7];
+const CELL_BORDER = [
+  { type: 'solid', color: C.sage, pt: 0.75 }, { type: 'solid', color: C.sage, pt: 0.75 },
+  { type: 'solid', color: C.sage, pt: 0.75 }, { type: 'solid', color: C.sage, pt: 0.75 },
+];
+const noBorder = (c) => [
+  { type: 'solid', color: C.sage, pt: 0.75 }, { type: 'solid', color: c, pt: 0.75 },
+  { type: 'solid', color: C.sage, pt: 0.75 }, { type: 'solid', color: c, pt: 0.75 },
+];
+/** Table cell with the deck's zero margins and 8pt Barlow. */
+function cell(text, o) {
+  return {
+    text,
+    options: Object.assign({ fontSize: 8, fontFace: F.med, color: C.dk, valign: 'middle',
+      margin: 0, border: CELL_BORDER }, o),
+  };
+}
+/** Turns ['Sober','Strategic'] into dash-prefixed lines inside one cell. */
+const dashLines = (items) => items.map((t) => '\u2013 ' + t).join('\n');
+
+// ============================================================== slide 08 ====
+// Nine-row contribution / weakness matrix with a rounded bracket per family.
+const S8_ROWS = [
+  ['Plant', 'PL', C.a1, 'Creative, imaginative, free-thinking. Generates ideas and solves hard problems.', 'Ignores incidentals. Too preoccupied to fully communicate.'],
+  ['Monitor Evaluator', 'ME', C.a1, 'Sober, strategic and discerning. Sees all options and judges accurately. ', 'Lacks drive and ability to inspire others. Can be overly critical.'],
+  ['Specialist', 'SP', C.a1, 'Single-minded, self-starting, dedicated. Providers rare knowledge and skills.', 'Contributes only on a narrow front. Dwells on technicalities.'],
+  ['Sharper', 'SH', C.a2, 'Challenging, dynamic, thrives pressure. Has drive to overcome obstacles. ', 'Prone to provocation. Offends people\u2019s feelings.'],
+  ['Implementer', 'IM', C.a2, 'Practical, reliable, efficient. Turns ideas action and organizes tasks.', 'Somewhat inflexible. Slow to respond to new possibilities.'],
+  ['Completer Finisher', 'CF', C.a2, 'Painstaking, conscientious, anxious. Finds errors, polishers and prefects.', 'Inclined to worry unduly. Reluctant to delegate. '],
+  ['Coordinator', 'CO', C.a3, 'Mature, confident, identifies talent. Clarifies goals. Delegates effectivity.', 'Can be seen as manipulative. Offloads own share of the work.'],
+  ['Team Worker', 'TW', C.a3, 'Co-operative, perceptive and diplomatic. Listens and averts friction.', 'Indecisive in crunch situation. Avoids confrontation.'],
+  ['Resource Investigator', 'RI', C.a3, 'Outgoing, enthusiastic, communicative. Explores opportunities, develops contacts. ', 'Over-optimistic. Loses interest once initial enthusiasm expires. '],
+];
+function slide08(s) {
+  heading(s, BELBIN, 0.629, 0.637, 3.786);
+  tb(s, 4.212, 1.244, 2.537, 0.167, 'Team Role Contribution', { align: 'center', fontSize: 8, fontFace: F.semi, color: C.dk });
+  tb(s, 6.753, 1.244, 2.537, 0.167, 'Allowable Weakness', { align: 'center', fontSize: 8, fontFace: F.semi, color: C.dk });
+  ['Thinking', 'Action', 'People'].forEach((t, i) => {
+    const y = 1.512 + i * 1.1075;
+    s.addShape('custGeom', { x: 0.92, y, w: 0.241, h: 1.068, fill: { type: 'none' }, line: HAIR('C4C3C0'),
+      points: poly([[1, 0], [.3, .03], [0, .3], [0, .7], [.3, .97], [1, 1]], 0, 0, 0.241, 1.068, false) });
+    tb(s, 0.208, y + 0.451, 1.08, 0.167, t, { align: 'center', fontSize: 8, fontFace: F.semi, color: C.dk, rotate: -90 });
+  });
+  s.addTable(S8_ROWS.map((r) => [
+    cell(r[0], { fill: { color: r[2] }, color: C.lt, align: 'center', border: noBorder(r[2]) }),
+    cell(r[1], { fill: { color: r[2] }, color: C.lt, align: 'center', border: noBorder(r[2]) }),
+    cell('', { fill: { color: r[2] }, border: noBorder(r[2]) }),
+    cell(r[3], { fill: { color: C.bg }, color: C.gy, margin: PAD }),
+    cell(r[4], { fill: { color: C.bg }, color: C.gy, margin: PAD }),
+  ]), { x: 1.193, y: 1.51, colW: [1.737, 0.641, 0.634, 2.56, 2.557], rowH: 0.367 });
+  S8_ROWS.forEach((r, i) => icon(s, 3.733, 1.621 + i * 0.3672, 0.143, 0.143, C.bg, 49));
+}
+
+// ========================================================== slides 09-11 ====
+// Same five-column comparison table, one family per slide.
+const S9_HEAD = ['Roles', 'Characteristics', 'Strengths', 'Allowable Weakness', 'Not-Allowable Weakness'];
+const S9_DATA = {
+  9: ['Belbin\u2019s Team Roles Model: Thinking-Oriented Roles', [
+    ['Plant', C.a1, ['Creative', 'Imaginative', 'Unorthodox'], ['Solve difficult problems'],
+      ['Ignores details', 'Too preoccupied to communicate effectively'], ['PLACEHOLDER']],
+    ['Monitor Evaluator', C.a2, ['Sober', 'Strategic', 'Discerning'], ['Sees all options', 'Judges accurately'],
+      ['Sceptic', 'Lacks drive and ability to inspire others', 'Overly critical'], ['Cynicism without logic']],
+    ['Specialist', C.a3, ['Single-minded', 'Self-starting', 'Dedicated'], ['Provides knowledge and skills in rare supply'],
+      ['Contributes on only a narrow front', 'Dwells on technicalities', 'Overlooks the big picture'], ['Ignores factors outside one area of competence']],
+  ]],
+  10: ['Belbin\u2019s Team Roles Model: People-Oriented Roles', [
+    ['Coordinator', C.a1, ['Mature', 'Confident', 'A good chairperson'], ['Clarifies goals', 'Promote decision making', 'Delegates well'],
+      ['Delegates personal work', 'Inclination to laziness once someone takes over'], ['Taking credits for the effort of a team']],
+    ['Team Worker', C.a2, ['Co-operative', 'Mild', 'Perceptive', 'Diplomatic'], ['Listens', 'Build', 'Averts friction', 'Calm the waters'],
+      ['Indecisive in crush situations', 'Can be easily influenced'], ['Avoiding situations that may entail pressure']],
+    ['Resource Investigator', C.a3, ['Extrovert', 'Enthusiastic', 'Communicative'], ['Explores opportunities', 'Develop contacts'],
+      ['Over-optimistic', 'Loses interest one initial enthusiasm has passed'], ['Letting clients down by neglecting to follow-up arrangements']],
+  ]],
+  11: ['Belbin\u2019s Team Roles Model: Action-Oriented Roles', [
+    ['Sharper', C.a1, ['Challenging', 'Dynamic', 'Thrives on pressure'], ['Has to drive to overcome the pressure'],
+      ['Provokes other', 'Hurts people\u2019s feelings'], ['Inability to recover situation with good humor or apology']],
+    ['Implementer', C.a2, ['Disciplined', 'Reliable', 'Conservative', 'Efficient'], ['Turns ideas into practical solutions'],
+      ['Somewhat inflexible', 'Slow to respond to new possibilities'], ['Obstructing changes']],
+    ['Completer Finisher', C.a3, ['Painstaking', 'Conscientious', 'Anxious'], ['Search out errors and omissions', 'Delivers on time'],
+      ['Inclined to worry unduly', 'Reluctant to delegate', 'A nit-picker'], ['Obsessional behavior']],
+  ]],
+};
+function roleTable(s, n) {
+  const [title, rows] = S9_DATA[n];
+  heading(s, title, 0.629, 0.637, 6.4);
+  const body = [S9_HEAD.map((h) => cell(h, { fill: { color: C.bg }, fontFace: F.semi, align: 'center' }))];
+  rows.forEach((r) => body.push([
+    cell(r[0], { fill: { color: r[1] }, color: C.lt, align: 'center' }),
+    cell(dashLines(r[2]), { fill: { color: C.bg }, color: C.gy, margin: PAD }),
+    cell(dashLines(r[3]), { fill: { color: C.bg }, color: C.gy, margin: PAD }),
+    cell(dashLines(r[4]), { fill: { color: C.bg }, color: C.gy, margin: PAD }),
+    cell(dashLines(r[5]), { fill: { color: C.bg }, color: C.gy, margin: PAD }),
+  ]));
+  s.addTable(body, { x: 0.671, y: 1.223, colW: [1.732, 1.732, 1.732, 1.732, 1.732], rowH: [0.364, 1.108, 1.108, 1.108] });
+}
+
+// ============================================================== slide 12 ====
+// Three cream panels; a family spine, three role spines and three description cards.
+const S12_PANELS = [
+  { x: 0.667, c: C.a1, family: 'Thinking-Oriented Roles',
+    roles: [role('Plant', 'PL'), role('Monitor Evaluator', 'ME'), role('Specialist', 'SP')],
+    notes: ['Comes up with innovative, groundbreaking solutions', 'Assesses team decisions analytically and critically', 'Experts in a particular subject matter'] },
+  { x: 3.574, c: C.a2, family: 'Action-Oriented Roles',
+    roles: [role('Shaper', 'SH'), role('Implementer', 'IMP'), role('Completer-Finisher', 'CF')],
+    notes: ['Extrovert that questions assumptions', 'Brings self-discipline to the team', 'PLACEHOLDER'] },
+  { x: 6.481, c: C.a3, family: 'People-Oriented Roles',
+    roles: [role('Coordinator', 'CO'), role('Team Worker', 'TW'), role('Resource Investigator', 'RI')],
+    notes: ['Brings order into the team', 'Provides support to the team in a diplomatic way', 'Develop outside contacts'] },
+];
+function slide12(s) {
+  heading(s, BELBIN, 0.629, 0.637, 3.073);
+  S12_PANELS.forEach((p) => {
+    s.addShape('roundRect', { x: p.x, y: 1.222, w: 2.85, h: 3.678, fill: { color: C.cream }, rectRadius: 0.078 });
+    s.addShape('roundRect', { x: p.x + 0.056, y: 1.276, w: 0.355, h: 3.57, fill: { color: p.c }, rectRadius: 0.05 });
+    tb(s, p.x - 0.497, 2.973, 1.471, 0.177, p.family,
+      { align: 'center', fontSize: 8, color: C.lt, rotate: -90 });
+    [0, 1, 2].forEach((i) => {
+      const y = 1.276 + i * 1.2025;
+      s.addShape('roundRect', { x: p.x + 0.45, y, w: 0.355, h: 1.166, fill: fill(p.c, 80), rectRadius: 0.05 });
+      s.addShape('roundRect', { x: p.x + 0.845, y, w: 1.954, h: 1.166, fill: { color: C.bg }, rectRadius: 0.05 });
+      tb(s, p.x + 0.035, y + 0.505, 1.176, 0.156, p.roles[i],
+        { align: 'center', fontSize: 7, color: C.lt, rotate: -90 });
+      tb(s, p.x + 1.2, y + 0.24, 1.25, 0.7, p.notes[i], { align: 'center', fontSize: 8, valign: 'middle' });
+    });
+  });
+}
+
+// ============================================================== slide 13 ====
+// Venn of Task / People / Ideas with role pills pinned on the overlaps.
+const S13_CIRCLES = [[0.940, 1.159, C.a1], [2.385, 1.159, C.a2], [1.666, 2.425, C.a3]];
+const S13_PILLS = [
+  [1.108, 1.885, 0.728, 'Task', C.bg, C.a1], [3.538, 1.885, 0.728, 'People', C.bg, C.a2],
+  [2.325, 3.645, 0.728, 'Ideas', C.bg, C.a3], [2.325, 2.514, 0.728, 'Coordinator', C.bg, C.dk],
+  [1.794, 1.643, 0.728, 'Completer', C.a1, C.lt], [2.815, 1.643, 0.728, 'Team Worker', C.a2, C.lt],
+  [1.794, 2.131, 0.728, 'Shaper', C.a1, C.lt], [2.325, 3.920, 0.728, 'Plant', C.a3, C.lt],
+  [3.760, 3.153, 1.057, 'Resource Investigator', C.a2, C.lt],
+  [0.661, 3.153, 0.958, 'Monitor Evaluator', C.a1, C.lt],
+  [2.283, 1.154, 0.811, 'Implementer', C.a1, C.lt],
+];
+function slide13(s) {
+  S13_CIRCLES.forEach((c) => {
+    s.addShape('ellipse', { x: c[0], y: c[1], w: 2.046, h: 2.046, fill: fill(c[2], 49), line: HAIR(c[2]) });
+  });
+  // Double-headed arrows between the three lobes.
+  line(s, 1.848, 1.999, 1.682, 0, { line: Object.assign(HAIR(C.bg), { beginArrowType: 'triangle', endArrowType: 'triangle' }) });
+  line(s, 1.854, 2.042, 0.817, 1.58, { line: Object.assign(HAIR(C.bg), { beginArrowType: 'triangle', endArrowType: 'triangle' }) });
+  line(s, 2.712, 2.028, 0.809, 1.6, { line: Object.assign(HAIR(C.bg), { beginArrowType: 'triangle', endArrowType: 'triangle' }), flipH: true });
+  // Dotted leaders to the outer pills.
+  line(s, 2.687, 1.395, 0, 0.425, { line: Object.assign(HAIR(C.bg, 'dash'), { endArrowType: 'oval' }) });
+  line(s, 3.286, 2.943, 0.456, 0.271, { line: Object.assign(HAIR(C.bg, 'dash'), { endArrowType: 'oval' }) });
+  line(s, 1.636, 2.929, 0.474, 0.285, { line: Object.assign(HAIR(C.bg, 'dash'), { endArrowType: 'oval' }), flipH: true });
+  S13_PILLS.forEach((p) => {
+    s.addShape('roundRect', { x: p[0], y: p[1], w: p[2], h: 0.229, fill: { color: p[4] }, rectRadius: 0.114 });
+    tb(s, p[0], p[1] + 0.026, p[2], 0.156, p[3], { align: 'center', fontSize: 7, fontFace: F.semi, color: p[5] });
+  });
+  rolesPanel(s, 5.256, 1.221, 'Team Roles Triangle');
+}
+
+// ============================================================== slide 14 ====
+// GRPI pyramid: four stacked trapezoids with bullet notes to the right.
+const S14_TIERS = [
+  { x: 2.449, y: 1.012, w: 0.790, h: 0.781, c: C.a1, label: 'Goals', lx: 2.530, lw: 0.627, ly: 1.427,
+    nx: 3.393, ny: 1.078, nw: 1.462, notes: ['Clear direction', 'Shared values', 'Sense of purpose'] },
+  { x: 1.980, y: 1.845, w: 1.726, h: 0.889, c: C.a2, label: 'Roles', lx: 2.261, lw: 1.166, ly: 2.196,
+    nx: 3.897, ny: 1.946, nw: 2.039, notes: ['Defined responsibilities', 'Clear \u201Crules" for working together', 'Understanding of what each other does'] },
+  { x: 1.510, y: 2.787, w: 2.668, h: 0.890, c: C.a3, label: 'Processes', lx: 2.143, lw: 1.401, ly: 3.133,
+    nx: 4.330, ny: 2.946, nw: 1.726, notes: ['Clear communication', 'Decision-making authority', 'Dispute management'] },
+  { x: 1.044, y: 3.726, w: 3.600, h: 0.886, c: C.gray, label: 'Interpersonal Relationships', lx: 2.143, lw: 1.401, ly: 3.988,
+    nx: 4.803, ny: 3.910, nw: 2.039, notes: ['Trust', 'Mutual support', 'Genuine friendliness'] },
+];
+const S14_RULES = [[2.41, 1.817, 3.793], [1.938, 2.76, 4.262], [1.485, 3.701, 4.715], [1.044, 4.693, 5.166]];
+/** Trapezoid whose top edge is inset by `inset` of the width. */
+const trap = (inset) => [[inset, 0], [1 - inset, 0], [1, 1], [0, 1]];
+function slide14(s) {
+  // Two soft vertical guide arrows on the far left.
+  s.addShape('rightArrow', { x: -1.782, y: 1.884, w: 5.249, h: 0.354, rotate: 90, fill: { color: C.cream } });
+  s.addShape('rightArrow', { x: -1.250, y: 3.429, w: 5.062, h: 0.354, rotate: 90, flipH: true, fill: { color: C.cream } });
+  tb(s, 0.131, 2.714, 1.401, 0.198, 'Team Development', { align: 'center', color: C.dk, rotate: -90 });
+  tb(s, 0.570, 2.714, 1.401, 0.198, 'Diagnosis of Issues', { align: 'center', color: C.dk, rotate: -90 });
+  S14_TIERS.forEach((t, i) => {
+    shape(s, trap(i === 0 ? 0.28 : 0.14), t.x, t.y, t.w, t.h, { fill: { color: t.c } });
+    tb(s, t.lx, t.ly, t.lw, i === 3 ? 0.354 : 0.198, t.label, { align: 'center', color: C.lt });
+    tb(s, t.nx, t.ny, t.nw, 0.667, dashList(t.notes),
+      { margin: 0 });
+  });
+  S14_RULES.forEach((r) => line(s, r[0], r[1], r[2], 0, { line: HAIR(C.sage, 'dash') }));
+  heading(s, 'GRPI Model of Team Development', 6.841, 1.528, 2.165);
+  tb(s, 6.841, 2.305, 2.488, 1.917, BUILDING);
+}
+
+// ============================================================== slide 15 ====
+// Four ribbon arms sweeping into a dashed hub.
+const ARM = [[.991, 0], [.998, .011], [1, .035], [1, .131], [.998, .155], [.992, .169], [.847, .408, .938, .193, .887, .277], [.765, .965, .802, .555, .773, .752], [.762, .989], [.756, .999], [0, 1], [0, .831], [.717, .83], [.723, .822], [.725, .808], [.828, .241, .742, .586, .778, .387], [.991, 0, .875, .107, .931, .023]];
+const S15_ARMS = [[-0.009, 1.946, C.a1, 0, false], [5.115, 1.949, C.a2, 0, true],
+  [-0.009, 3.565, C.gray, 180, true], [5.119, 3.568, C.a3, 180, false]];
+const S15_QUADS = [
+  { tx: 2.162, ty: 2.213, tw: 0.627, bx: 2.067, by: 2.412, bw: 1.462, t: 'Goals', n: ['Clear direction', 'Shared values', 'Sense of purpose'] },
+  { tx: 6.653, ty: 2.214, tw: 1.166, bx: 6.550, by: 2.412, bw: 2.836, t: 'Roles', n: ['Defined responsibilities', 'Clear \u201Crules" for working together', 'Understanding of what each other does'] },
+  { tx: 2.171, ty: 3.908, tw: 1.401, bx: 2.059, by: 4.099, bw: 2.275, t: 'Processes', n: ['Clear communication', 'Decision-making authority', 'Dispute management'] },
+  { tx: 6.653, ty: 3.908, tw: 1.870, bx: 6.552, by: 4.096, bw: 2.039, t: 'Interpersonal Relationships', n: ['Trust', 'Mutual support', 'Genuine friendliness'] },
+];
+function slide15(s) {
+  heading(s, 'GRPI Model of Team Development', 0.636, 0.637, 3.786);
+  tb(s, 0.641, 1.122, 8.446, 0.667, BUILDING);
+  S15_ARMS.forEach((a) => shape(s, ARM, a[0], a[1], 4.891, 1.386,
+    { fill: { color: a[2] }, rotate: a[3], flipH: a[4] }));
+  // Curved hub arrows, drawn as quarter block-arcs around the dashed circle.
+  [0, 90, 180, 270].forEach((deg) => s.addShape('blockArc', {
+    x: 3.887, y: 2.266, w: 2.22, h: 2.22, fill: { color: C.sage },
+    angleRange: [deg + 8, deg + 80], arcThicknessRatio: 0.045,
+  }));
+  s.addShape('ellipse', { x: 4.11, y: 2.561, w: 1.774, h: 1.774, fill: { type: 'none' }, line: HAIR(C.sage, 'dash') });
+  tb(s, 4.341, 3.131, 1.318, 0.604, 'GRPI Model of Team Development',
+    { align: 'center', fontSize: 11, fontFace: F.semi, color: C.dk });
+  S15_QUADS.forEach((q) => {
+    tb(s, q.tx, q.ty, q.tw + 0.6, 0.198, q.t, { color: C.dk });
+    tb(s, q.bx, q.by, q.bw, 0.51, dashList(q.n),
+      { margin: 0 });
+  });
+}
+
+// ============================================================== slide 16 ====
+// GRPI checklist: statement rows plus a 1-10 rating strip with one score marked.
+const S16_ROWS = [
+  ['G', 'Purpose and Outcomes. ', 'We understand and agree on our project mission and the desired outcome (vision).', 4],
+  [null, 'Customer and Needs. ', 'We know who the project stakeholders are, what they require, and why this project is really needed. ', 5],
+  [null, 'Goals and Deliverables. ', 'We have identified specific, measurable and prioritized project goals and deliverables linked to our business goals.', 3],
+  [null, 'Project Scope Definition. ', 'We understand or/ and agree on what is in/ out of our project scope and tasks. The project scope is \u201Cset".', 7],
+  ['R', 'Roles and Responsibilities. ', 'We have defined and agreed on our roles, responsibilities, required skills and resources for the project team.', 4],
+  [null, 'Authority and Autonomy. ', 'Our team is clear on the degree of authority or/ and influence we have to meet our project mission.', 8],
+  [null, 'Critical Success Factors. ', 'We know and focusing on the key factors needed to meet the project goals and mission.', 9],
+  ['P', 'Plans and Activities. ', 'We have an effective game plan to follow that includes the right tasks, clearly defined or assigned.', 2],
+  [null, 'Monitoring and Measures. ', 'We have an effective monitoring process and specific metrics linked to progress and goals.', 4],
+  [null, 'Schedule or Milestones. ', 'We have defined our project schedule and know what the key phases and milestones are.', 6],
+  ['I', 'Team Operating Agreement. ', 'We have shared expectations, agreed and followed guidelines for how our team works together.', 5],
+  [null, 'Interpersonal or Team. ', 'We have the necessary relationships, trust, openness, participation and behaviors for a healthy and productive team.', 10],
+];
+const S16_SPANS = { 0: [4, C.a1], 4: [3, C.a2], 7: [3, C.a3], 10: [2, C.gray] };
+function slide16(s) {
+  heading(s, 'GRPI Checklist: Role definition, Building the Team', 0.629, 0.637, 6.4);
+  const body = S16_ROWS.map((r, i) => {
+    const span = S16_SPANS[i];
+    const row = [];
+    if (span) {
+      row.push(cell(r[0], { fill: { color: span[1] }, color: C.lt, align: 'center', fontFace: F.semi, rowspan: span[0] }));
+    }
+    row.push(cell([{ text: r[1], options: { color: C.dk } }, { text: r[2], options: { color: C.gy } }], { margin: PAD }));
+    for (let v = 1; v <= 10; v++) {
+      const hit = v === r[3];
+      row.push(cell(String(v), { fill: { color: hit ? (span ? span[1] : S16_SPANS[Object.keys(S16_SPANS).filter((k) => k <= i).pop()][1]) : C.bg },
+        color: hit ? C.lt : C.dk, align: 'center' }));
+    }
+    return row;
+  });
+  s.addTable(body, { x: 0.672, y: 1.222, rowH: 0.307,
+    colW: [0.311, 5.294, 0.305, 0.305, 0.305, 0.305, 0.305, 0.305, 0.305, 0.305, 0.305, 0.305] });
+}
+
+// ============================================================== slide 17 ====
+// Katzenbach & Smith triangle: three filled wedges inside a dashed outline.
+function slide17(s) {
+  shape(s, [[.468, .022], [.006, .932], [.007, .98], [.039, 1], [.958, 1], [.994, .979], [.995, .933], [.534, .024], [.501, 0], [.468, .022]],
+    5.15, 1.139, 3.841, 3.352, { fill: { type: 'none' }, line: HAIR(C.sage, 'dash') });
+  shape(s, [[.942, .009], [.976, 0], [1, .017], [1, .591], [.995, .604], [.982, .613], [.045, .998], [.012, .996], [.004, .972], [.942, .009]],
+    5.457, 1.438, 1.583, 2.728, { fill: { color: C.a1 } });
+  shape(s, [[.063, .01], [.995, .971], [.988, .996], [.95, .997], [.022, .613], [.006, .603], [0, .589], [.001, .02], [.027, 0], [.063, .01]],
+    7.093, 1.437, 1.59, 2.727, { fill: { color: C.a2 } });
+  shape(s, [[.006, .924], [.487, .012], [.5, 0], [.514, .015], [.993, .923], [.999, .974], [.985, 1], [.016, 1], [.002, .981], [.006, .924]],
+    5.47, 3.144, 3.199, 1.202, { fill: { color: C.a3 } });
+  const wedgeText = (x, y, w, h, items) => tb(s, x, y, w, h, lines(items),
+    { align: 'center', fontSize: 7, color: C.lt });
+  wedgeText(7.155, 2.552, 0.673, 0.5, ['Mutual', 'Small number of people', 'Individual']);
+  wedgeText(6.291, 2.494, 0.673, 0.615, ['Problem Solving', 'Technical and functional', 'Interpersonal']);
+  wedgeText(6.476, 3.647, 1.19, 0.385, ['Specific Goals', 'Common Purpose', 'Meaningful Purpose']);
+  [[7.016, 1.225], [8.795, 4.293], [5.233, 4.293]].forEach((p) =>
+    s.addShape('ellipse', { x: p[0], y: p[1], w: 0.109, h: 0.109, fill: { color: C.sage } }));
+  const cap = (x, y, t, col, rot) => tb(s, x, y, 0.673, 0.271, t,
+    { align: 'center', fontSize: 7, fontFace: F.semi, color: col, rotate: rot });
+  cap(6.734, 0.852, 'Performance Results', C.dk);
+  cap(8.594, 4.502, 'Personal Growth', C.dk);
+  cap(4.841, 4.502, 'Collective Work Products', C.dk);
+  cap(6.734, 4.560, 'Commitment', C.gy);
+  cap(7.822, 2.476, 'Accountability', C.gy, 60);
+  cap(5.660, 2.476, 'Skills', C.gy, -60);
+  tb(s, 0.79, 1.63, 3.565, 0.623,
+    lines(['Focusing on Team Basics Model:', 'Katzenbach and Smith']),
+    { fontSize: 17, fontFace: F.bold, bold: true, color: C.dk });
+  tb(s, 0.79, 2.407, 3.43, 1.304, BUILDING);
+}
+
+// ============================================================== slide 18 ====
+const S18_ROWS = [
+  ['Interpersonal \nRoles', C.a1, [
+    ['Figurehead', 'Symbolic leadership duties involving social legal matters.', 'Attend ceremonies; greet visitors; organize and attend events with clients, customers, bankers, etc.'],
+    ['Leader', 'Motivate, inspire, and guide employees\u2019 action provide opportunities for training; support appropriate staffing.', 'Build trusting relationships with employees; build effective teams; manage conflict.'],
+    ['Liaison', 'Build and maintain relationship between the organization and outside entities.', 'Work on external borders; create and maintain social networks (real and virtual) with key stakeholder.']]],
+  ['Informational\nRoles', C.a2, [
+    ['Monitor', 'Responsible for information relevant to understanding the organization\u2019s internal and external environment', 'Handle correspondence and information such as industry, social and economic news and competitive information.'],
+    ['Disseminator', 'Responsible for the synthesis, integration, and forwarding of information to other member of the organization.', 'Forward informational email; share information in meetings, conference calls, webcasts, etc.'],
+    ['Spokesman', 'Transmit information to outsiders about organizational policy, plans, outcomes, etc.', 'Attend management meetings; maintain networks between the organization and stakeholder.']]],
+  ['Decisional\nRoles', C.a3, [
+    ['Entrepreneur', 'Scan the organizational environment for opportunities; foster creativity and innovation.', 'Participate in strategy and review meeting for new projects or continuous improvement.'],
+    ['Disturbance handler', 'Manage organizational problems and crises.', 'Participate in strategy and review meetings that involve problems and crises; get involved directly which key issues and people.'],
+    ['Resource allocation', 'Take responsibility for allocation all types of organizational resources.', 'Create work schedules; make authorization requests; participate in budgeting activities.'],
+    ['Negotiator', 'Represent the organization during any significant negotiations.', 'Negotiate with vendors and clients; settle disputes about resources allocation.']]],
+];
+function slide18(s) {
+  heading(s, 'Henry Mintzberg\u2019s Managerial Roles', 0.629, 0.637, 3.895);
+  const body = [['Category', 'Role', 'Organizational Function', 'Example Activities']
+    .map((h) => cell(h, { fill: { color: C.bg }, fontFace: F.semi, align: 'center' }))];
+  S18_ROWS.forEach((grp) => grp[2].forEach((r, i) => {
+    const row = [];
+    if (i === 0) row.push(cell(grp[0], { fill: { color: grp[1] }, color: C.lt, align: 'center', rowspan: grp[2].length }));
+    row.push(cell(r[0], { fill: { color: grp[1] }, color: C.lt, margin: PAD }));
+    row.push(cell(r[1], { fill: { color: C.bg }, color: C.gy, margin: PAD }));
+    row.push(cell(r[2], { fill: { color: C.bg }, color: C.gy, margin: PAD }));
+    body.push(row);
+  }));
+  s.addTable(body, { x: 0.671, y: 1.223, colW: [0.931, 0.931, 3.395, 3.395], rowH: 0.335 });
+}
+
+// ============================================================== slide 19 ====
+// Four dimension circles hanging off a header pill.
+const S19_DIMS = [
+  { x: 1.207, c: C.a1, lines: ['Influence'], lx: 1.677, lw: 0.673, ly: 4.008 },
+  { x: 3.198, c: C.a2, lines: ['Interpersonal', 'Facilitation'], lx: 3.222, lw: 1.577, ly: 3.945 },
+  { x: 5.189, c: C.a3, lines: ['Relational ', 'Creativity'], lx: 5.215, lw: 1.577, ly: 3.945 },
+  { x: 7.180, c: C.gray, lines: ['Team', 'Leadership'], lx: 7.207, lw: 1.577, ly: 3.945 },
+];
+function slide19(s) {
+  tb(s, 1.965, 0.913, 6.061, 0.332, 'Four Dimensions of Relational Work Model',
+    { align: 'center', fontSize: 17, fontFace: F.bold, bold: true, color: C.dk });
+  s.addShape('roundRect', { x: 2.908, y: 1.71, w: 4.184, h: 0.418, fill: { color: C.cream }, rectRadius: 0.1 });
+  tb(s, 3.066, 1.81, 3.867, 0.198, 'Butler and Waldroop\u2019s Four Dimensions of Relational Work Model',
+    { align: 'center', fontFace: F.semi, color: C.dk });
+  stroke(s, COMB, 2.01, 2.643, 5.97, 0.308);
+  line(s, 5.0, 2.123, 0, 0.526);
+  line(s, 4.003, 2.647, 0, 0.302, { line: Object.assign(HAIR(C.sage), { beginArrowType: 'triangle' }) });
+  line(s, 6.0, 2.644, 0, 0.302, { line: Object.assign(HAIR(C.sage), { beginArrowType: 'triangle' }) });
+  S19_DIMS.forEach((d) => {
+    s.addShape('ellipse', { x: d.x, y: 2.953, w: 1.613, h: 1.613, fill: fill(d.c, 49), line: HAIR(d.c) });
+    shape(s, DOME, d.x + 0.088, 3.038, 1.44, 0.725, { fill: { color: d.c } });
+    icon(s, d.x + 0.681, 3.311, 0.252, 0.252, C.bg);
+    tb(s, d.lx, d.ly, d.lw, 0.292, lines(d.lines),
+      { align: 'center', fontSize: 8, fontFace: F.semi, color: C.lt });
+  });
+}
+
+// ============================================================== slide 20 ====
+// Same four dimensions as a flower of overlapping circles.
+const S20_PETALS = [
+  { x: 2.003, y: 1.245, rot: 90, c: C.a3, lines: ['Influence'], lx: 2.467, lw: 0.673, ly: 1.788, mx: 2.706, my: 1.551 },
+  { x: 2.765, y: 2.006, rot: 0, c: C.a2, lines: ['Interpersonal', 'Facilitation'], lx: 3.360, lw: 1.009, ly: 2.734, mx: 3.764, my: 2.516 },
+  { x: 2.003, y: 2.767, rot: 90, c: C.gray, lines: ['Relational ', 'Creativity'], lx: 2.152, lw: 1.303, ly: 3.795, mx: 2.706, my: 3.551 },
+  { x: 1.242, y: 2.006, rot: 0, c: C.a1, lines: ['Team', 'Leadership'], lx: 1.250, lw: 1.009, ly: 2.734, mx: 1.654, my: 2.516 },
+];
+const S20_NOTES = [
+  'People in this dimension are professional, great at negotiating, and persuading, and they love having knowledge and ideas that they can share.',
+  'People in this dimension operate usually quietly behind the scenes. They\u2019re good at sensing people\u2019s emotions and motivations. They\u2019re also skilled at helping others cope with emotional issues and conflict.',
+  'People in this dimension are masters at using pictures and words to create emotion, build relationships, or motivate others to act.',
+  'People in this dimension success through their interactions with others. They like managing and working in high-energy team in hectic service environments.',
+];
+function slide20(s) {
+  S20_PETALS.forEach((p) => s.addShape('ellipse',
+    { x: p.x, y: p.y, w: 1.613, h: 1.613, rotate: p.rot, fill: fill(p.c, 49), line: HAIR(p.c) }));
+  s.addShape('ellipse', { x: 2.253, y: 2.256, w: 1.114, h: 1.114, fill: { color: C.bg }, line: { color: C.sage, width: 2 } });
+  s.addShape('ellipse', { x: 2.310, y: 2.313, w: 0.999, h: 0.999, fill: { color: C.cream }, line: HAIR(C.sage, 'dash') });
+  tb(s, 2.412, 2.515, 0.795, 0.581, 'Four Dimensions of Relational Work Model',
+    { align: 'center', fontSize: 8, fontFace: F.semi, color: C.dk });
+  S20_PETALS.forEach((p) => {
+    tb(s, p.lx, p.ly, p.lw, 0.292, lines(p.lines),
+      { align: 'center', fontSize: 8, fontFace: F.semi, color: C.lt });
+    medallion(s, p.mx, p.my, 0.202, C.chip, '545454');
+  });
+  heading(s, 'Four Dimensions of Relational Work Model', 5.276, 1.522, 3.565);
+  tb(s, 5.159, 2.343, 4.102, 1.76, numList(S20_NOTES), { margin: 0 });
+}
+
+// ============================================================== slide 21 ====
+// ACHIEVE: seven petals radiating from a hub, numbered outer bubbles.
+const S21_PETALS = [
+  { p: [[.5, 1], [0, .409], [.001, .04], [.496, 0], [1, .041], [.997, .414]], x: 6.682, y: 1.013, w: 1.026, h: 1.820, c: C.a1 },
+  { p: [[0, 1], [.304, .28], [.62, 0], [.857, .257], [1, .537], [.686, .818]], x: 7.195, y: 1.343, w: 1.674, h: 1.487, c: C.a2 },
+  { p: [[0, .234], [.633, 0], [.998, .139], [.973, .592], [.871, 1], [.505, .87]], x: 7.196, y: 2.559, w: 1.807, h: 1.155, c: C.a3 },
+  { p: [[0, 0], [.757, .414], [1, .753], [.638, .916], [.239, 1], [0, .659]], x: 7.193, y: 2.823, w: 1.214, h: 1.788, c: C.gray },
+  { p: [[0, .754], [.241, .415], [1, 0], [.998, .659], [.758, 1], [.336, .909]], x: 5.979, y: 2.819, w: 1.220, h: 1.793, c: C.a1 },
+  { p: [[.001, .14], [.364, 0], [1, .232], [.491, .874], [.124, 1], [.025, .579]], x: 5.381, y: 2.557, w: 1.818, h: 1.155, c: C.a3 },
+  { p: [[.377, 0], [.693, .28], [1, 1], [.312, .819], [0, .537], [.154, .239]], x: 5.514, y: 1.342, w: 1.688, h: 1.488, c: C.a2 },
+];
+const S21_LABELS = [
+  [6.686, 1.207, ['Assess Current Situation'], 0], [7.837, 1.763, ['Creative Brainstorming '], 51.9],
+  [8.096, 3.005, ['Hone', 'Goals'], 103.4], [7.316, 3.988, ['Initiate Option Generation'], -26.4],
+  [6.056, 4.001, ['Evaluate', 'Options'], 26.0], [5.211, 2.955, ['Valid Action Programme ', 'Design'], -103.7],
+  [5.544, 1.770, ['Encourage Momentum'], -51.8],
+];
+const S21_MEDALS = [[7.093, 1.561], [7.998, 1.985], [8.240, 2.986], [7.609, 3.772], [6.563, 3.772], [5.947, 2.983], [6.189, 1.985]];
+const S21_STEPS = ['Assess the current situation', 'Creative brainstorming', 'Hone goals',
+  'Initiate options generation', 'Evaluate options', 'Valid Action Programme Design', 'Encourage momentum'];
+function slide21(s) {
+  S21_PETALS.forEach((g) => shape(s, g.p, g.x, g.y, g.w, g.h, { fill: { color: g.c } }));
+  s.addShape('ellipse', { x: 6.011, y: 1.644, w: 2.361, h: 2.361, fill: fill(C.bg, 29) });
+  s.addShape('ellipse', { x: 6.479, y: 2.109, w: 1.431, h: 1.431, fill: { color: C.bg } });
+  // Circular flow arrow around the hub.
+  [0, 72, 144, 216, 288].forEach((deg) => s.addShape('blockArc', {
+    x: 6.196, y: 1.827, w: 1.996, h: 1.992, fill: { color: C.bg },
+    angleRange: [deg + 6, deg + 62], arcThicknessRatio: 0.06,
+  }));
+  tb(s, 6.682, 2.635, 1.026, 0.354, 'ACHIEVE Coaching Model',
+    { align: 'center', fontFace: F.semi, color: C.dk });
+  S21_LABELS.forEach((l) => tb(s, l[0], l[1], 1.009, 0.292,
+    lines(l[2]),
+    { align: 'center', fontSize: 8, fontFace: F.semi, color: C.lt, rotate: l[3] }));
+  S21_MEDALS.forEach((m) => medallion(s, m[0], m[1], 0.203, C.chip, '545454'));
+  heading(s, 'ACHIEVE Coaching Model', 1.183, 1.39, 3.565);
+  tb(s, 1.217, 1.924, 3.43, 1.292, BUILDING);
+  tb(s, 1.392, 3.266, 2.156, 1.147, numList(S21_STEPS), { margin: 0 });
+}
+
+// ====================================================== slides 22, 28, 30 ====
+// Shared "chevron row" layout: letter tab, chevron label, description plate.
+function chevronRows(s, rows, opt) {
+  rows.forEach((r, i) => {
+    const y = opt.y0 + i * opt.dy;
+    const c = RAMP[i % 4] === C.gray && opt.ramp4 === false ? RAMP[i % 3] : RAMP[i % 4];
+    shape(s, CHEV_MID, opt.x, y, 0.659, 0.526, { fill: { color: c } });
+    shape(s, CHEV, opt.x + 0.58, y, 1.891, 0.526, { fill: fill(c, 80) });
+    shape(s, PLATE, opt.x + 2.394, y, opt.plateW, 0.526, { fill: { color: C.cream } });
+    tb(s, opt.x + 0.022, y + 0.159, 0.513, 0.198, r[0],
+      { align: 'center', fontFace: F.semi, color: C.lt });
+    tb(s, opt.x + 0.755, y + 0.117, 1.542, 0.292, lines(r[1].split('\n')),
+      { align: 'center', fontSize: 8, fontFace: F.semi, color: C.lt, valign: 'middle', h: 0.292 });
+    tb(s, opt.x + 2.653, y + 0.174, opt.textW, 0.292, r[2], { fontSize: 8, valign: 'middle' });
+  });
+}
+const S22_ROWS = [
+  ['A', 'Align on Coaching\nAgreement', 'Align on the coaching process and relationship, and what the Client wants to focus on and his/ her desired outcomes.'],
+  ['C', 'Clarify motivation', 'Client clarifies what\u2019s important to him/ her about the desired outcomes.'],
+  ['H', 'Hold self-discovery space', 'Client shares what matters most to him/ her including values and the future he/ she wants to create.'],
+  ['I', 'Invite \nself-awareness', 'Client is stretched to fully explore where he/ she is at now until new insight or awareness is gained.'],
+  ['E', 'Explore choices', 'Client creatively identifies and explores a full range of possibilities.'],
+  ['V', 'Validate decision', 'Client decides on the actions he/ she is ready and willing to take, and is feasible.'],
+  ['E', 'Empower ownership', 'Client is empowered to develop and execute an action plan that is relevant and meaningful.'],
+];
+function slide22(s) {
+  heading(s, 'ACHIEVE Coaching Model', 0.629, 0.575, 3.895);
+  chevronRows(s, S22_ROWS, { x: 0.677, y0: 1.062, dy: 0.5667, plateW: 6.248, textW: 5.356 });
+}
+
+// ============================================================== slide 23 ====
+// ACHIEVE as a ring of numbered steps with the narrative on the right.
+const S23_STEPS = [
+  { a: -90, t: 'Align on Coaching Agreement', lx: 2.380, ly: 1.478, lw: 1.009 },
+  { a: -38, t: 'Clarify motivation', lx: 3.596, ly: 1.982, lw: 0.577 },
+  { a: 14, t: 'Validate decision', lx: 3.793, ly: 3.042, lw: 0.577 },
+  { a: 66, t: 'Invite \nself-awareness', lx: 2.959, ly: 3.866, lw: 1.009 },
+  { a: 118, t: 'Explore choices', lx: 1.963, ly: 3.866, lw: 0.666 },
+  { a: 170, t: 'Hold self-discovery space', lx: 1.374, ly: 2.985, lw: 0.590 },
+  { a: 222, t: 'Empower ownership', lx: 1.565, ly: 1.982, lw: 0.608 },
+];
+const S23_BODY = [
+  ['1. ', C.a1, 'Assess the Current Situation. During the first stage of the process, the client or mentee is encouraged to think deeply about their current situation.', 0.904],
+  ['2. ', C.a2, 'Creative Brainstorming. This stages is designed to broaden the mentee\u2019s perspectives and develop the foundation for behavioral change and creative solutions to current challenges.', 1.489],
+  ['3. ', C.a3, 'Hone Goals. In stage 3, the mentee develops specific goals from alternative solutions and suggestions which evolved during stage 2.', 2.077],
+  ['4. ', C.dk, 'Initiate Option Generation. At this stage in the process, the immediate steps in order to achieve the goals must be considered.', 2.663],
+  ['5. ', C.a1, 'Evaluate Options. At step 5, the actions and options generated during the previous stage will be assessed, scrutinized, and prioritized.', 3.250],
+  ['6. ', C.a2, 'Valid Action Program Design. The aim of stage 6 is to put the options into action.', 3.838],
+  ['7. ', C.a3, 'Encourage Momentum. The final stage of ACHIEVE is to encourage momentum - both towards goals - and between coaching sessions.', 4.263],
+];
+function slide23(s) {
+  const cx = 2.875, cy = 2.897, R = 1.83;   // ring centre and radius
+  s.addShape('ellipse', { x: 2.14, y: 2.162, w: 1.47, h: 1.47, fill: { color: C.cream } });
+  S23_STEPS.forEach((st, i) => {
+    const col = RAMP[i % 4];
+    // arc segment of the outer ring
+    s.addShape('blockArc', { x: cx - R, y: cy - R, w: R * 2, h: R * 2, fill: { color: col },
+      angleRange: [st.a + 5, st.a + 47], arcThicknessRatio: 0.04 });
+    const rad = (st.a + 26) * Math.PI / 180;
+    const bx = cx + R * Math.cos(rad) - 0.155, by = cy + R * Math.sin(rad) - 0.155;
+    s.addShape('ellipse', { x: bx, y: by, w: 0.31, h: 0.31, fill: { color: C.bg }, line: { color: col, width: 2.25 } });
+    tb(s, bx, by, 0.31, 0.31, String(i + 1),
+      { align: 'center', valign: 'middle', fontSize: 10, fontFace: F.bold, bold: true, color: col });
+    line(s, cx + 0.6 * Math.cos(rad), cy + 0.6 * Math.sin(rad),
+      Math.abs((R - 0.75) * Math.cos(rad)), Math.abs((R - 0.75) * Math.sin(rad)),
+      { line: HAIR(C.sage, 'dash'), flipH: Math.cos(rad) < 0 });
+    tb(s, st.lx, st.ly, st.lw, 0.396, lines(st.t.split('\n')),
+      { align: 'center', fontSize: 7, fontFace: F.semi, color: C.dk });
+  });
+  [C.a1, C.a2, C.a3].forEach((c, i) =>
+    s.addShape('ellipse', { x: 2.72 + i * 0.1285, y: 3.08, w: 0.071, h: 0.071, fill: { color: c } }));
+  tb(s, 2.332, 2.603, 1.098, 0.354, 'ACHIEVE Coaching Model', { align: 'center', fontFace: F.semi, color: C.dk });
+  S23_BODY.forEach((b) => tb(s, 5.5, b[3], 3.675, 0.51,
+    [{ text: b[0], options: { color: b[1] } }, rgb(b[2])]));
+}
+
+// ============================================================== slide 24 ====
+// Brainstorming tree: root box, four argument columns, stacked sub-point pills.
+const S24_COLS = [
+  { x: 0.679, c: C.a1, title: 'Project Management', px: 1.216, items: ['Alternatives', 'Ideas'], ic: C.a2, tick: 1.692, drop: 1.018 },
+  { x: 2.886, c: C.a2, title: 'Human Capital', px: 3.419, items: ['Decision Making', 'Root Causes', 'Alternative Solutions', 'Issues', 'Impact Analysis'], ic: C.a2, tick: 3.903, drop: 2.305 },
+  { x: 5.094, c: C.a3, title: 'Team Building', px: 5.633, items: ['Share Discussions'], ic: C.a3, tick: 6.112, drop: 0.566 },
+  { x: 7.301, c: C.gray, title: 'Improves', px: 7.826, items: ['Profitability', 'Initiative', 'Innovation', 'Quality', 'Morale', 'Efficiency'], ic: C.gray, tick: 8.310, drop: 2.625 },
+];
+function slide24(s) {
+  s.addShape('roundRect', { x: 3.87, y: 0.81, w: 2.26, h: 0.373, fill: { color: C.a1 }, rectRadius: 0.045 });
+  tb(s, 3.893, 0.886, 2.213, 0.198, 'Brainstorming Process', { align: 'center', color: C.lt });
+  line(s, 5.004, 1.161, 0, 0.185);
+  stroke(s, COMB, 1.692, 1.34, 6.612, 0.331);
+  line(s, 3.901, 1.344, 0, 0.324);
+  line(s, 6.105, 1.339, 0, 0.334);
+  S24_COLS.forEach((col, i) => {
+    const tagX = 1.335 + i * 2.2063;
+    s.addShape('roundRect', { x: tagX + 0.035, y: 1.421, w: 0.641, h: 0.163, fill: { color: C.sage }, rectRadius: 0.08 });
+    tb(s, tagX, 1.425, 0.707, 0.143, 'Argument #' + (i + 1), { align: 'center', fontSize: 6, fontFace: F.semi, color: C.lt });
+    s.addShape('roundRect', { x: col.x, y: 1.671, w: 2.019, h: 0.373, fill: fill(col.c, 80), rectRadius: 0.045 });
+    s.addShape('roundRect', { x: col.x, y: 1.671, w: 2.019, h: 0.373, fill: { type: 'none' }, line: HAIR(col.c), rectRadius: 0.045 });
+    tb(s, col.x + 0.023, 1.748, 1.971, 0.198, col.title, { align: 'center', color: C.lt });
+    s.addShape('roundRect', { x: tagX + 0.044, y: 2.208, w: 0.641, h: 0.163, fill: { color: C.sage }, rectRadius: 0.08 });
+    tb(s, tagX + 0.009, 2.212, 0.707, 0.143, 'Sub-Points', { align: 'center', fontSize: 6, fontFace: F.semi, color: C.lt });
+    line(s, col.tick, 2.04, 0, col.drop);
+    col.items.forEach((t, j) => {
+      const y = 2.542 + j * 0.4095, wide = t.length > 17;
+      const x = wide ? col.px - 0.079 : col.px, w = wide ? 1.116 : 0.958;
+      s.addShape('roundRect', { x, y, w, h: 0.229, fill: { color: col.ic }, rectRadius: 0.114 });
+      tb(s, x + 0.035, y + 0.026, w - 0.07, 0.156, t, { align: 'center', fontSize: 7, fontFace: F.semi, color: C.lt });
+    });
+  });
+}
+
+// ============================================================== slide 25 ====
+// Cascading staircase of seven stages with checkmark annotations.
+const S25_STEPS = [
+  ['Provide Background Information', C.a1, 'Current situation, symptoms, actions', 3.067, 1.264, 1.360],
+  ['Problem Definition', C.a2, 'In the form of a question', 4.119, 1.876, 2.213],
+  ['Idea Generation', C.a3, 'No discussion', 5.175, 2.531, 0.902],
+  ['Idea Selection', C.gray, 'Group -> Name -> Prioritize -> Select ideas', 6.234, 2.964, 2.439],
+  ['Advantages & Disadvantages', C.a1, 'No discussion', 7.290, 3.527, 0.900],
+  ['Critical Concerns ', C.a2, null],
+  ['Action Plan & Implementation', C.a3, null],
+];
+const STAIR = [[1, 1], [.079, 1], [.033, .991], [.004, .926], [0, .82], [0, 0]];
+const RETURN = [[0, 0], [.981, 0], [.994, .006], [1, .042], [1, .958], [.996, .992], [.981, 1], [.863, 1]];
+function slide25(s) {
+  heading(s, 'Generic Brainstorming Process', 0.629, 0.637, 3.628);
+  S25_STEPS.forEach((st, i) => {
+    const x = 0.674 + i * 1.0547, y = 1.223 + i * 0.5502;
+    if (i < 6) stroke(s, STAIR, 0.917 + i * 1.0533, y + 0.376, 0.812, 0.358);
+    s.addShape('roundRect', { x, y, w: 2.313, h: 0.373, fill: fill(st[1], 80), rectRadius: 0.045 });
+    s.addShape('roundRect', { x, y, w: 2.313, h: 0.373, fill: { type: 'none' }, line: HAIR(st[1]), rectRadius: 0.045 });
+    tb(s, x + 0.018, y + 0.077, 2.267, 0.198, st[0], { align: 'center', color: C.lt });
+    if (st[2]) {
+      icon(s, st[3], y + 0.07, 0.11, 0.104, st[1]);
+      tb(s, st[3] + 0.125, y + 0.041, st[5], 0.292, st[2], { fontSize: 8 });
+    }
+  });
+  // Long return connector: right from stage 3, down the side, back to stage 7.
+  stroke(s, RETURN, 5.102, 2.507, 3.663, 1.653);
+}
+
+// ============================================================== slide 26 ====
+// Gibbs' cycle: six pie wedges around a dashed hub.
+// Six wheel wedges, generated as hexagon sectors around the hub.
+const S26_WEDGES = [C.a1, C.a2, C.a3, C.gray, C.a2, C.a3];
+const S26_HUB = { cx: 3.021, cy: 2.771, r: 2.005 };
+/** Wedge i of the hexagonal wheel: hub -> edge midpoint -> corner -> next midpoint. */
+function wheelWedge(s, i, color) {
+  const { cx, cy, r } = S26_HUB, mid = r * Math.cos(Math.PI / 6), gap = 0.02;
+  const rad = (d) => (-90 + i * 60 + d) * Math.PI / 180;
+  const at = (a, dist) => ({ x: cx + dist * Math.cos(a), y: cy + dist * Math.sin(a) });
+  s.addShape('custGeom', { x: 0, y: 0, w: 10, h: 5.625, fill: { color }, points: [
+    Object.assign(at(rad(-30) + gap, mid), { moveTo: true }),
+    at(rad(0), r), at(rad(30) - gap, mid), at(rad(0), 0.09 * r), { close: true }] });
+}
+const S26_TEXT = [
+  ['Description', ['What happened?'], 2.186, 1.262, 1.672, 2.278, 1.442, 1.489],
+  ['Feelings', ['What were you ', 'thinking and ', 'feeling?'], 3.884, 1.913, 0.659, 3.767, 2.093, 0.892],
+  ['Evaluation', ['What was good and bad about the experience?'], 3.939, 3.227, 0.659, 3.872, 3.408, 0.794],
+  ['Analysis', ['What sense can you make of the situation?'], 2.186, 4.027, 1.672, 2.599, 4.208, 0.846],
+  ['Conclusion', ['What could you ', 'have done differently?'], 1.453, 3.223, 0.659, 1.337, 3.404, 0.892],
+  ['Action Plan', ['How will you approach a similar situation in the future?'], 1.453, 1.913, 0.659, 1.337, 2.093, 0.892],
+];
+const S26_MEDALS = [[2.921, 1.018], [4.112, 1.660], [4.167, 2.986], [2.921, 3.794], [1.681, 2.986], [1.681, 1.660]];
+function slide26(s) {
+  S26_WEDGES.forEach((c, i) => wheelWedge(s, i, c));
+  // Rotating arrow ring inside the wheel.
+  [0, 60, 120, 180, 240, 300].forEach((deg) => s.addShape('blockArc', {
+    x: 2.184, y: 1.934, w: 1.678, h: 1.678, fill: { color: C.bg },
+    angleRange: [deg + 32, deg + 74], arcThicknessRatio: 0.035,
+  }));
+  s.addShape('ellipse', { x: 2.239, y: 1.989, w: 1.568, h: 1.568, fill: { type: 'none' }, line: HAIR(C.bg, 'dash') });
+  s.addShape('ellipse', { x: 2.291, y: 2.037, w: 1.470, h: 1.470, fill: fill(C.bg, 92) });
+  S26_TEXT.forEach((t) => {
+    tb(s, t[2], t[3], t[4], 0.167, t[0], { align: 'center', fontSize: 8, fontFace: F.semi, color: C.lt });
+    tb(s, t[5], t[6], t[7], 0.5, lines(t[1]),
+      { align: 'center', fontSize: 7, color: C.lt });
+  });
+  S26_MEDALS.forEach((m) => medallion(s, m[0], m[1], 0.203, C.chip, '545454'));
+  tb(s, 2.477, 2.517, 1.098, 0.51,
+    lines(['Gibbs\u2019 ', 'Reflective', 'Cycle']),
+    { align: 'center', fontFace: F.semi, color: C.dk });
+  heading(s, 'Gibbs\u2019 Reflective Cycle', 5.474, 1.619, 3.565);
+  tb(s, 5.509, 2.153, 3.43, 1.292, BUILDING);
+  const numbered = (x, items) => tb(s, x, 3.495, 1.098, 0.51,
+    numList(items), { margin: 0 });
+  numbered(5.683, ['Description', 'Feelings', 'Evaluation']);
+  numbered(7.250, ['Analysis', 'Conclusion', 'Action Plan']);
+}
+
+// ============================================================== slide 27 ====
+// Six cream cards inside a looping arrow track.
+const S27_CARDS = [
+  ['Description', 'What happened? Keep it relevant, to the point necessary background information.', 2.020, 1.957, 2.102, 1.793, 2.435, C.a1],
+  ['Feelings', 'How did you feel? What were you thinking? (At the time + looking back)', 4.030, 1.957, 4.252, 1.488, 4.432, C.a2],
+  ['Evaluation', 'How did things go? (Good + Bad) Reactions for yourself + other involved.', 6.013, 1.957, 6.249, 1.488, 6.429, C.a3],
+  ['Analysis', 'What sense can you make of the situation? What might have helped? What might have hindered?', 6.013, 3.194, 6.253, 1.488, 6.433, C.gray],
+  ['Conclusion', 'What else could you have done? What you learned? What can you change in future?', 4.030, 3.194, 4.252, 1.488, 4.432, C.a1],
+  ['Action Plan', 'If the situation arose again, what would you do? Anything you need to know, or improve?', 2.020, 3.194, 2.255, 1.488, 2.435, C.a2],
+];
+/**
+ * Thick rounded elbow: an arm along the top joined to a leg down the right side.
+ * Mirror with flipH / flipV to reach the other three corners.
+ */
+function elbow(s, x, y, w, h, t, color, o) {
+  const R = Math.min(w, h);
+  s.addShape('custGeom', Object.assign({ x, y, w, h, fill: { color }, points: [
+    { x: 0, y: 0, moveTo: true }, { x: w - R, y: 0 },
+    { x: w, y: R, curve: { type: 'quadratic', x1: w, y1: 0 } }, { x: w, y: h },
+    { x: w - t, y: h }, { x: w - t, y: R },
+    { x: w - R, y: t, curve: { type: 'quadratic', x1: w - t, y1: t } },
+    { x: 0, y: t }, { close: true }] }, o));
+}
+/** Flat arrow bar: a `t`-thick shaft ending in a wider head, pointing right or left. */
+function arrowBar(s, x, y, w, t, color, left) {
+  const h = t * 1.7;
+  s.addShape('rightArrow', { x, y: y - (h - t) / 2, w, h, fill: { color }, rotate: left ? 180 : 0 });
+}
+function slide27(s) {
+  tb(s, 3.217, 0.704, 3.565, 0.332, 'Gibbs\u2019 Reflective Cycle',
+    { align: 'center', fontSize: 17, fontFace: F.bold, bold: true, color: C.dk });
+  // Loop track: two arrow bars along the top, two along the bottom, elbows at the corners.
+  arrowBar(s, 1.489, 1.383, 2.785, 0.264, C.a3);
+  arrowBar(s, 4.663, 1.383, 1.591, 0.264, C.a1);
+  arrowBar(s, 3.729, 4.694, 1.604, 0.264, C.gray, true);
+  elbow(s, 6.651, 1.436, 1.906, 2.012, 0.264, C.a2);
+  elbow(s, 5.715, 3.837, 2.798, 0.857, 0.264, C.a3, { flipV: true });
+  arrowBar(s, 5.715, 4.826, 1.4, 0.264, C.a3, true);
+  elbow(s, 1.443, 2.902, 1.894, 1.792, 0.264, C.a1, { flipH: true, flipV: true });
+  [[6.378, 1.431, C.a1], [4.388, 1.432, C.a3], [8.347, 3.563, C.a2],
+    [3.447, 4.740, C.gray], [5.437, 4.742, C.a3]].forEach((d) =>
+      s.addShape('ellipse', { x: d[0], y: d[1], w: 0.168, h: 0.168, fill: { color: d[2] } }));
+  S27_CARDS.forEach((c) => {
+    s.addShape('rect', { x: c[2], y: c[3], w: 1.945, h: 1.185, fill: { color: C.cream } });
+    tb(s, c[2] + 0.415, c[3] + 0.41, 1.127, 0.198, c[0], { align: 'center', color: C.dk });
+    tb(s, c[4], c[3] + 0.614, c[5], 0.547, c[1], { align: 'center', fontSize: 8 });
+    medallion(s, c[2] + 0.878, c[3] + 0.19, 0.203, c[7], 'F6F6F6');
+  });
+}
+
+// ============================================================== slide 28 ====
+const S28_ROWS = [
+  ['1', 'Description', 'What happened?'],
+  ['2', 'Feelings', 'What were you thinking and feelings?'],
+  ['3', 'Evaluation', 'What was good and bad about the experience?'],
+  ['4', 'Analysis', 'What sense can you make of the situation?'],
+  ['5', 'Conclusion', 'What else could you have done?'],
+  ['6', 'Action Plan', 'If it arose again, what would you do?'],
+];
+function slide28(s) {
+  heading(s, 'Gibbs\u2019 Reflective Cycle', 1.178, 0.806, 3.895);
+  s.addShape('custGeom', { x: 0.976, y: 1.559, w: 0.245, h: 2.826, fill: { type: 'none' }, line: HAIR(C.sage),
+    points: poly([[1, 0], [.3, .03], [0, .12], [0, .88], [.3, .97], [1, 1]], 0, 0, 0.245, 2.826, false) });
+  chevronRows(s, S28_ROWS, { x: 1.219, y0: 1.293, dy: 0.5668, plateW: 2.654, textW: 2.039 });
+  // Grey arrows pointing right at each row, and one pointing back at the bottom.
+  [1.462, 2.014, 2.578, 3.144, 3.717].forEach((y) =>
+    s.addShape('rightArrow', { x: 5.880, y, w: 0.398, h: 0.220, rotate: 90, fill: { color: C.sage } }));
+  s.addShape('rightArrow', { x: 5.741, y: 4.278, w: 0.398, h: 0.220, rotate: 180, fill: { color: C.sage } });
+  tb(s, 6.829, 2.454, 2.195, 2.229, BUILDING);
+}
+
+// ============================================================== slide 29 ====
+// STEPPPA staircase — same cascade as slide 25, with icon tiles.
+const S29_STEPS = ['Subject', 'Target Identification', 'Emotion', 'Perception', 'Plan', 'Pace', 'Action/ Amend'];
+function slide29(s) {
+  heading(s, 'STEPPPA Coaching Model', 0.629, 0.637, 3.628);
+  S29_STEPS.forEach((t, i) => {
+    const x = 0.674 + i * 1.0547, y = 1.223 + i * 0.5502, c = RAMP[i % 4];
+    if (i < 6) stroke(s, STAIR, 0.917 + i * 1.0533, y + 0.376, 0.812, 0.358);
+    s.addShape('roundRect', { x, y, w: 2.313, h: 0.373, fill: fill(c, 80), rectRadius: 0.045 });
+    s.addShape('roundRect', { x, y, w: 2.313, h: 0.373, fill: { type: 'none' }, line: HAIR(c), rectRadius: 0.045 });
+    s.addShape('roundRect', { x: x + 0.031, y: y + 0.028, w: 0.318, h: 0.318, fill: { color: c }, rectRadius: 0.03 });
+    icon(s, x + 0.111, y + 0.107, 0.158, 0.158, C.bg);
+    tb(s, x + 0.433, y + 0.077, 1.683, 0.198, t, { color: C.lt });
+  });
+}
+
+// ============================================================== slide 30 ====
+const S30_ROWS = [
+  ['S', 'Subject', 'The first stage is to identify the goal or subject of coaching. Why your client needs coaching?'],
+  ['T', 'Target Identification', 'At this stage in the process, the coachee identifies the desired target or outcome, following the SMART ( Specific, Measurable, Accurate, Realistic, and Timely) template for goal-setting. '],
+  ['E', 'Emotion', 'Every decision involves emotions, Therefore, try to understand your emotions and what motivates you.'],
+  ['P', 'Perception', 'Try to see your goal from a broader view. Understand the meaning of your purpose, it is importance, and what specifically it is meaning is for you.'],
+  ['P', 'Plan', 'Once a target and overall path are initially decided upon, it is necessary to develop and systematically organize the first steps along said path. '],
+  ['P', 'Pace', 'It is like setting time limits and boundaries for achieving each goal. Meaning in how much time you should achieve your target.'],
+  ['A', 'Action and Amend', 'Now, it is time to act. Follow your plan step-by-step to achieve your desired outcome. The entire STEPPPA process should be reviewed, including each individual decision that has been made.'],
+];
+function slide30(s) {
+  heading(s, 'STEPPPA Coaching Model', 0.629, 0.575, 3.895);
+  chevronRows(s, S30_ROWS, { x: 0.677, y0: 1.062, dy: 0.5667, plateW: 6.248, textW: 5.356 });
+}
+
+// ============================================================== slide 31 ====
+// Five overlapping "T" circles inside two concentric dashed rings.
+const S31_LOBES = [
+  { x: 2.248, y: 1.249, c: C.a2, lx: 2.505, lw: 1.013, ly: 1.488, t: 'Task', sub: ['Execute Successfully'] },
+  { x: 3.149, y: 1.906, c: C.a3, lx: 3.741, lw: 0.673, ly: 2.381, t: 'Thrust', sub: ['Common Purpose'] },
+  { x: 1.346, y: 1.906, c: C.a1, lx: 1.588, lw: 0.673, ly: 2.381, t: 'Teaming', sub: ['Operate Effectively'] },
+  { x: 1.689, y: 2.975, c: C.a3, lx: 1.952, lw: 0.673, ly: 3.634, t: 'Talent', sub: ['Collective', 'Skills'] },
+  { x: 2.806, y: 2.975, c: C.gray, lx: 3.383, lw: 0.673, ly: 3.634, t: 'Trust', sub: ['In Each ', 'Other'] },
+];
+function slide31(s) {
+  s.addShape('ellipse', { x: 0.555, y: 0.508, w: 4.914, h: 4.914, fill: { type: 'none' }, line: HAIR(C.sage, 'dash') });
+  s.addShape('ellipse', { x: 1.089, y: 1.043, w: 3.845, h: 3.845, fill: { color: C.cream }, line: HAIR(C.sage, 'dash') });
+  S31_LOBES.forEach((l) => s.addShape('ellipse',
+    { x: l.x, y: l.y, w: 1.528, h: 1.528, fill: fill(l.c, 49), line: HAIR(l.c) }));
+  S31_LOBES.forEach((l) => tb(s, l.lx, l.ly, l.lw, 0.463,
+    lines([l.t].concat(l.sub.map((t) => rgb(t, { fontSize: 8 })))),
+    { align: 'center', fontFace: F.semi, color: C.lt }));
+  tb(s, 2.448, 0.669, 1.127, 0.311, 'Team Support From The Organization',
+    { align: 'center', fontSize: 8, fontFace: F.semi, color: C.dk });
+  tb(s, 2.448, 4.551, 1.127, 0.177, 'Team Leader Fit',
+    { align: 'center', fontSize: 8, fontFace: F.semi, color: C.dk });
+  heading(s, 'Team Support from the Organization', 5.925, 1.768, 2.714);
+  tb(s, 5.960, 2.586, 3.430, 1.292, BUILDING);
+}
+
+// ============================================================== slide 32 ====
+// Asset sheet: swatch strips, numbered tiles and two icon grids.
+const S32_SWATCH_A = [C.cream, C.gy, C.a1, C.a2, C.a3, C.dk, '9D9F9D'];
+const S32_SWATCH_B = ['EBE8E0', 'C6C4BF', 'E27C55', '926F95', '495B6F', '545454', '9FA09E'];
+function numberTile(s, x, y, size, n, fs) {
+  // Flat "long shadow" number: grey tag behind, numeral on top.
+  s.addShape('snip2DiagRect', { x: x + size * 0.35, y: y + size * 0.35, w: size * 0.6, h: size * 0.6,
+    fill: { color: C.cream }, rectRadius: 0.02 });
+  tb(s, x, y, size, size, String(n),
+    { align: 'center', valign: 'middle', fontSize: fs, fontFace: F.bold, bold: true, color: C.dk });
+}
+function slide32(s) {
+  [0.719, 4.900].forEach((y) => line(s, -0.003, y, 10.007, 0, { line: HAIR('989898', 'dash') }));
+  [0.672, 9.320].forEach((x) => line(s, x, -0.002, 0, 5.630, { line: HAIR('989898', 'dash'), flipH: true }));
+  S32_SWATCH_A.forEach((c, i) => s.addShape('roundRect',
+    { x: 0.854 + i * 0.508, y: 0.153, w: 0.435, h: 0.435, fill: { color: c }, rectRadius: 0.065 }));
+  S32_SWATCH_B.forEach((c, i) => s.addShape('roundRect',
+    { x: 0.880 + i * 0.3546, y: 3.371, w: 0.304, h: 0.304, fill: { color: c }, rectRadius: 0.046 }));
+  for (let n = 1; n <= 20; n++) {                              // two rows of shadowed numerals
+    const col = (n - 1) % 10, row = Math.floor((n - 1) / 10);
+    numberTile(s, 0.874 + col * 0.839, 0.691 + row * 0.902, 0.702, n, 22);
+  }
+  tb(s, 2.967, 2.592, 4.065, 0.35, '1 2 3 4 5 6 7 8 9 0',
+    { align: 'center', fontSize: 22, fontFace: F.bold, bold: true, color: '545454' });
+  for (let n = 1; n <= 20; n++) {                              // small numeral grid
+    const col = (n - 1) % 10, row = Math.floor((n - 1) / 10);
+    numberTile(s, 3.634 + col * 0.2779, 3.253 + row * 0.299, 0.232, n, 6);
+  }
+  for (let n = 1; n <= 10; n++) {                              // orange numbered discs
+    const x = 0.874 + (n - 1) * 0.839;
+    s.addShape('ellipse', { x, y: 4.201, w: 0.702, h: 0.702, fill: { color: 'E27C55' } });
+    tb(s, x, 4.201, 0.702, 0.702, String(n),
+      { align: 'center', valign: 'middle', fontSize: 20, fontFace: F.bold, bold: true, color: 'F6F6F6' });
+  }
+}
+
+// ------------------------------------------------------------------ build ---
+const BUILDERS = [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08,
+  (s) => roleTable(s, 9), (s) => roleTable(s, 10), (s) => roleTable(s, 11), slide12, slide13,
+  slide14, slide15, slide16, slide17, slide18, slide19, slide20, slide21, slide22, slide23,
+  slide24, slide25, slide26, slide27, slide28, slide29, slide30, slide31, slide32];
+
+const pptx = new PptxGenJS();
+pptx.layout = 'LAYOUT_16x9';
+pptx.defineLayout({ name: 'DECK', width: 10, height: 5.625 });
+pptx.layout = 'DECK';
+pptx.title = 'Teamwork';
+
+BUILDERS.forEach((build) => {
+  const s = pptx.addSlide();
+  s.background = { color: C.bg };
+  build(s);
+});
+
+pptx.writeFile({ fileName: path.join(__dirname, '104a6c65-76d0-40b8-85e4-d8905bffe8cd_grok_final.pptx') })
+  .then((f) => console.log('wrote ' + f));
