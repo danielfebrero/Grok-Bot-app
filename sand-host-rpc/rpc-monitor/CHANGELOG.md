@@ -9,6 +9,15 @@ packages confondus. Entrées les plus récentes en haut. Heures de Paris
 
 <!-- NOUVELLES-ENTREES-ICI -->
 
+## 2026-10-27 20:11 (Paris) — `2026-10-27_18-06` → `2026-10-27_20-11`
+
+Changement de surface RPC détecté : **1 méthode(s) ajoutée(s)**.
+
+Ajoutées : `DashboardService.SyncClientSettings`
+
+Rapport : [reports/2026-10-27_20-11.md](reports/2026-10-27_20-11.md).
+
+
 ## 2026-10-27 18:06 (Paris) — `2026-10-27_10-01` → `2026-10-27_18-06`
 
 Changement de surface RPC détecté : **3 méthode(s) ajoutée(s)**, **330 supprimée(s)**.
