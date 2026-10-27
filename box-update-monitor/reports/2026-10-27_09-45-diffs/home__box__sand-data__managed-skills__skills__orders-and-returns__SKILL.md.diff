@@ -1,0 +1,11 @@
+--- 2026-10-27_08-52:/home/box/sand-data/managed-skills/skills/orders-and-returns/SKILL.md
++++ 2026-10-27_09-45:/home/box/sand-data/managed-skills/skills/orders-and-returns/SKILL.md
+@@ -55,7 +55,7 @@
+ 
+ 1. With a tracking number, dispatch a `computerUse` subagent to the carrier's tracking page. Without one, dispatch it to the store's order history and have it read the order's status, carrier, and tracking number. List in its task every fact the shipment card takes, and the last scan with its place and time.
+ 2. Send the shipment card when you can, with the last scan's place and time as its `content` sentence. Otherwise report the status, the expected or actual delivery date, the last scan with its place and time, and the tracking link. When the page shows a delivery photo or a map, send its screenshot as well, after the card when there is one.
+-3. When the user wants updates until it arrives, offer a routine that checks the tracking page and messages them only when the stage or status changes, with a fresh shipment card when it can send one, and that ends once the package is delivered. Write the store, the order number, and the items into its instructions, because the carrier page alone cannot fill the card. Read the Cursor-managed `routines` skill before you create it.
++3. When the latest `<automation_status>` reminder already lists a routine for that order, such as the one created when you placed it, say it is already being watched instead of offering another. Otherwise, when the user wants updates until it arrives, offer a routine that checks the tracking page and messages them only when the stage or status changes, with a fresh shipment card when it can send one, and that ends once the package is delivered. Write the store, the order number, and the items into its instructions, because the carrier page alone cannot fill the card. Read the Cursor-managed `routines` skill before you create it.
+ 
+ ## Returns and exchanges
+ 

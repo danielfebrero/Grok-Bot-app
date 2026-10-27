@@ -1,0 +1,24 @@
+--- 2026-10-27_08-52:/home/box/sand-data/managed-skills/skills/agent-email/SKILL.md
++++ 2026-10-27_09-45:/home/box/sand-data/managed-skills/skills/agent-email/SKILL.md
+@@ -3,14 +3,16 @@
+ description: >-
+   When you send any email, from your own Grok Bot inbox or the user's Gmail or
+   Outlook, read or search mail in your own inbox, use a name+tag@ form of your
+-  address, or the user wants you to have an email address (you have none until
+-  one is claimed).
++  address, or a sign-up, trial, newsletter or checkout needs an email (you have
++  your own address, off until the user turns it on).
+ ---
+ # Agent email
+ 
+-Grok Bot has native inboxes on the product domain. When the user wants an email address of your own (to send, to receive, or to "create an email for yourself"), call ListEmailInboxes, then ClaimEmailInbox with a local part they chose; if they haven't named one, ask first. A claim is permanent, so never claim to test a name: when they ask you to check one, ask whether one is available, or name several candidates, call CheckEmailInboxAvailability, report every result, and claim only the one address they then pick. Never invent a random username, send them to Settings, or sign up for AgentMail or another third-party inbox.
+-The user gets one address. If ListEmailInboxes shows a live one, use it and don't claim another; the server refuses a second claim.
+-Your own mail goes from your native inbox; a connected Gmail or Outlook is only for sending as the user from an account they already own. When more than one account could send, ask which before sending.
++Your own email address stays off until the user turns it on. ListEmailInboxes says whether it's on.
++When a new account, trial, newsletter or checkout needs an email, call OfferEmailAddress before typing any email. In a run without OfferEmailAddress, such as a routine, don't make one up or ask for one: stop and say in your reply that it needs an email for a sign-up.
++A Not now on the OfferEmailAddress card isn't an answer to save; the server keeps it.
++Never make up an email address, for yourself or in a subagent's instructions: use one the user gave you, yours once it's on, or ask.
++Once your address is on, use it for sign-ups and checkouts without asking when the user's saved answer in memory is yes, except in a routine, where you stop and say in your reply that the sign-up needs an email. Otherwise ask once before typing any email, in one short line like "Want me to use my email, {address}, for this?". Save their answer to that question, yes or no, with UpdateMemory as a shared_profile fact so all their assistants know it. After a yes, use it from then on without asking again. After a no to that question, use or ask for the user's email, and in that message tell them they can always ask you to use yours. If the user tells you to use your email, that always wins; use it and save yes as their new answer.
+ Your inbox also receives mail sent to your address with a + tag before the @ (name+anything@ for name@), so you can give a service a tagged address such as name+shop@ and see in a message's To or Cc which tag it came in on. You can also send from a tagged address, such as replying from the tag a message came in on, and a routine on name+tag@ wakes only for mail sent to that tag.
+ Before sending email or drafting it on a card, consider every account that could send it: each connected Gmail or Outlook account and any inbox of your own. The sender is clear when the user named the account or address, you're replying in a thread that arrived at one account (reply from it), they set a standing preference in this conversation or in memory, or only one account could send. Otherwise ask which address to send from, naming each option, and send nothing until they answer.
+ After a send, name the sender exactly as that send's result reports it (the tool result, or the summary when the user sends a card), never inferred or hedged ("I believe"). If it names no sender, say which tool or account you used without guessing an address.

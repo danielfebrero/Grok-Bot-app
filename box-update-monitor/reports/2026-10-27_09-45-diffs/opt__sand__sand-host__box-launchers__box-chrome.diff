@@ -1,0 +1,105 @@
+--- 2026-10-27_08-52:/opt/sand/sand-host/box-launchers/box-chrome
++++ 2026-10-27_09-45:/opt/sand/sand-host/box-launchers/box-chrome
+@@ -252,6 +252,25 @@
+ 		CHROME_FLAGS+=("${sand_extra_flag}")
+ 	done <"${BOX_CHROME_EXTRA_FLAGS_FILE}"
+ fi
++# The UA governor's configuredAcceptLanguage rule, so it can leave the default context's header to this flag.
++sand_accept_language() {
++	local LC_ALL=C list=""
++	local re='^[A-Za-z]{1,8}(-[A-Za-z0-9]{1,8})*(,[A-Za-z]{1,8}(-[A-Za-z0-9]{1,8})*)*$'
++	if [ -f "$1" ] && [ ! -L "$1" ]; then
++		IFS= read -r -N 129 list 2>/dev/null <"$1" || true
++	fi
++	if [ "${#list}" -le 128 ] && [[ "${list}" =~ ${re} ]]; then
++		printf '%s' "${list}"
++	else
++		printf '%s' "en-US,en-GB,en"
++	fi
++}
++SAND_BROWSER_ACCEPT_LANGUAGE_FILE="${SAND_BROWSER_ACCEPT_LANGUAGE_EN_US_FILE:-/tmp/sand-browser-accept-language-en-us}"
++SAND_ACCEPT_LANGUAGE_FLAGGED=0
++if [ -e "${SAND_BROWSER_ACCEPT_LANGUAGE_FILE}" ]; then
++	SAND_ACCEPT_LANGUAGE_FLAGGED=1
++	CHROME_FLAGS+=(--accept-lang="$(sand_accept_language "${SAND_BROWSER_ACCEPT_LANGUAGE_FILE}")")
++fi
+ policy_status=0
+ box_chrome_policy=/usr/local/bin/box-chrome-policy
+ case "$0" in
+@@ -647,6 +666,76 @@
+ SAND_INCOGNITO_EOF
+ fi
+ 
++SAND_ACCEPT_LANGUAGE_RECORD="${CHROME_PROFILE}/.sand-accept-lang"
++sand_saved_accept_language() {
++	local as_box=() mode=restore
++	[ "$(id -u)" -ne 0 ] || as_box=(runuser -u box --)
++	if [ "${SAND_ACCEPT_LANGUAGE_FLAGGED}" = 1 ]; then
++		[ ! -e "${SAND_ACCEPT_LANGUAGE_RECORD}" ] || return 0
++		mode=save
++	elif [ ! -f "${SAND_ACCEPT_LANGUAGE_RECORD}" ] || profile_browser_pid >/dev/null; then
++		return 0
++	fi
++	command -v python3 >/dev/null 2>&1 || return 0
++	"${as_box[@]}" python3 -I - "${mode}" "${CHROME_PROFILE}/Default/Preferences" "${SAND_ACCEPT_LANGUAGE_RECORD}" <<'SAND_ACCEPT_LANGUAGE_EOF' || return 0
++import json, os, sys
++
++mode, prefs, record = sys.argv[1:4]
++KEYS = ("accept_languages", "selected_languages")
++
++
++def load(path):
++    with open(path, encoding="utf-8") as handle:
++        return json.load(handle)
++
++
++if mode == "save":
++    try:
++        intl = load(prefs).get("intl")
++    except (OSError, ValueError, AttributeError):
++        intl = None
++    saved = {key: intl[key] for key in KEYS if isinstance(intl, dict) and key in intl}
++    with open(f"{record}.tmp", "w", encoding="utf-8") as handle:
++        json.dump(saved, handle)
++    os.replace(f"{record}.tmp", record)
++    sys.exit(0)
++
++try:
++    saved = load(record)
++except (OSError, ValueError):
++    saved = {}
++if not isinstance(saved, dict):
++    saved = {}
++try:
++    settings = load(prefs)
++except FileNotFoundError:
++    settings = None
++except (OSError, ValueError):
++    sys.exit(1)
++if isinstance(settings, dict):
++    intl = settings.get("intl")
++    if intl is None and any(key in saved for key in KEYS):
++        intl = settings["intl"] = {}
++    if isinstance(intl, dict):
++        changed = False
++        for key in KEYS:
++            if key in saved and (key not in intl or intl[key] != saved[key]):
++                intl[key] = saved[key]
++                changed = True
++            elif key not in saved and key in intl:
++                del intl[key]
++                changed = True
++        if changed:
++            with open(f"{prefs}.tmp", "w", encoding="utf-8") as handle:
++                json.dump(settings, handle, separators=(",", ":"))
++            os.replace(f"{prefs}.tmp", prefs)
++os.remove(record)
++SAND_ACCEPT_LANGUAGE_EOF
++}
++if ! chrome_ready; then
++	sand_saved_accept_language
++fi
++
+ if [ "${SAND_CHROME_PREPARE}" -eq 1 ]; then
+ 	if chrome_ready; then
+ 		wait_for_chrome 0

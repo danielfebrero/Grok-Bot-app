@@ -1,0 +1,312 @@
+--- 2026-10-27_08-52:/opt/sand/sand-host/box-scripts/sand-ua-governor.mjs
++++ 2026-10-27_09-45:/opt/sand/sand-host/box-scripts/sand-ua-governor.mjs
+@@ -1,9 +1,19 @@
+ import { createHash } from "node:crypto";
+-import { appendFileSync, readFileSync } from "node:fs";
++import {
++  appendFileSync,
++  closeSync,
++  constants,
++  openSync,
++  readdirSync,
++  readFileSync,
++  renameSync,
++  writeFileSync,
++} from "node:fs";
+ import { dirname, join } from "node:path";
+ import { fileURLToPath, pathToFileURL } from "node:url";
+ 
+ import {
++  BOX_BROWSER_ACCEPT_LANGUAGE_PATH_PREFIX,
+   BOX_BROWSER_GPU_MODE_PATH_PREFIX,
+   BOX_BROWSER_RUNNING_PATH_PREFIX,
+   BOX_EXPERIMENTS_READY_MARKER_PATH,
+@@ -24,6 +34,7 @@
+   buildHardwareProfileDocumentScript,
+   buildUserAgentOverride,
+   coherentHardwareProfile,
++  configuredAcceptLanguage,
+   normalizeGpuMode,
+   resolveCanvasSeed,
+   verifyCoherentWebgl,
+@@ -62,15 +73,16 @@
+   return "Chrome/0.0.0.0";
+ }
+ 
+-export async function applyDesktopUaToTarget(browser, sessionId) {
+-  await browser.send(
+-    "Emulation.setUserAgentOverride",
+-    buildUserAgentOverride(liveChromeProduct(browser), {
+-      acceptLanguageEnUs: acceptLanguageEnUsEnabledForBrowser(browser),
+-      acceptLanguage: browser.acceptLanguage,
+-    }),
+-    sessionId,
+-  );
++export async function applyDesktopUaToTarget(browser, sessionId, browserContextId) {
++  browser.acceptLanguageOverriddenSessions ??= new Set();
++  const override = buildUserAgentOverride(liveChromeProduct(browser), {
++    acceptLanguageEnUs: acceptLanguageEnUsEnabledForBrowser(browser),
++    acceptLanguage: browser.acceptLanguage,
++    acceptLanguageFromLaunchFlag: acceptLanguageFromLaunchFlag(browser, browserContextId),
++    acceptLanguageOverridden: browser.acceptLanguageOverriddenSessions.has(sessionId),
++  });
++  if (override.acceptLanguage) browser.acceptLanguageOverriddenSessions.add(sessionId);
++  await browser.send("Emulation.setUserAgentOverride", override, sessionId);
+ }
+ 
+ export function documentScriptMap(browser) {
+@@ -230,13 +242,18 @@
+ 
+ export function readAcceptLanguageEnUsMarker(
+   markerPath = BROWSER_ACCEPT_LANGUAGE_EN_US_MARKER_PATH,
++  unreadable = "",
+ ) {
++  let fd;
+   try {
+-    return readFileSync(markerPath, "utf8");
++    fd = openSync(markerPath, constants.O_RDONLY | constants.O_NOFOLLOW);
++    return readFileSync(fd, "utf8");
+   } catch (error) {
+     if (error?.code === "ENOENT") return null;
+     reportOnce(`accept-language marker read failed: ${errorClass(error)}`);
+-    return "";
++    return unreadable;
++  } finally {
++    if (fd !== undefined) closeSync(fd);
+   }
+ }
+ 
+@@ -252,6 +269,132 @@
+   return browser.acceptLanguageEnUsEnabled === true;
+ }
+ 
++export const ACCEPT_LANG_FLAG = "--accept-lang=";
++
++function readProcFile(path) {
++  try {
++    return String(readFileSync(path, "utf8"));
++  } catch (error) {
++    if (error?.code !== "ENOENT" && error?.code !== "ESRCH") {
++      reportOnce(`accept-language launch flag read failed: ${errorClass(error)}`);
++    }
++    return null;
++  }
++}
++
++function processStartTicks(procRoot, pid) {
++  const stat = readProcFile(`${procRoot}/${pid}/stat`);
++  const ticks = Number(stat?.slice(stat.lastIndexOf(")") + 2).split(" ")[19]);
++  return Number.isSafeInteger(ticks) ? ticks : Number.POSITIVE_INFINITY;
++}
++
++export function readLaunchAcceptLanguage(port, procRoot = "/proc") {
++  let entries;
++  try {
++    entries = readdirSync(procRoot);
++  } catch (error) {
++    reportOnce(`accept-language launch flag read failed: ${errorClass(error)}`);
++    return null;
++  }
++  const portFlag = `--remote-debugging-port=${port}`;
++  let browser = null;
++  for (const entry of entries) {
++    if (!/^\d+$/.test(entry)) continue;
++    const args = readProcFile(`${procRoot}/${entry}/cmdline`)?.split("\0");
++    if (args === undefined || !args.includes(portFlag)) continue;
++    if (args.some((arg) => arg.startsWith("--type="))) continue;
++    const startTicks = processStartTicks(procRoot, entry);
++    if (browser === null || startTicks < browser.startTicks) browser = { args, startTicks };
++  }
++  const flag = browser?.args.findLast((arg) => arg.startsWith(ACCEPT_LANG_FLAG));
++  return flag === undefined ? null : flag.slice(ACCEPT_LANG_FLAG.length);
++}
++
++function launchFlagMatches(browser) {
++  if (!acceptLanguageEnUsEnabledForBrowser(browser)) return false;
++  if (browser.launchAcceptLanguage === undefined) {
++    browser.launchAcceptLanguage = readLaunchAcceptLanguage(browser.port);
++  }
++  return browser.launchAcceptLanguage === configuredAcceptLanguage(browser.acceptLanguage);
++}
++
++export function acceptLanguageFromLaunchFlag(browser, browserContextId) {
++  return (
++    typeof browserContextId === "string" &&
++    browserContextId === browser.defaultBrowserContextId &&
++    launchFlagMatches(browser)
++  );
++}
++
++async function resolveDefaultBrowserContext(browser) {
++  if (typeof browser.defaultBrowserContextId === "string" || !launchFlagMatches(browser)) return;
++  try {
++    const { defaultBrowserContextId } = (await browser.send("Target.getBrowserContexts")) ?? {};
++    if (typeof defaultBrowserContextId === "string") {
++      browser.defaultBrowserContextId = defaultBrowserContextId;
++    }
++  } catch (error) {
++    if (!browser.isClosed) {
++      console.error(`browser contexts read failed port=${browser.port}: ${errorClass(error)}`);
++    }
++  }
++}
++
++export function recordAcceptLanguage(browser) {
++  if (!acceptLanguageEnUsEnabledForBrowser(browser)) return;
++  const path =
++    browser.acceptLanguageRecordPath ??
++    `${BOX_BROWSER_ACCEPT_LANGUAGE_PATH_PREFIX}-${browser.port}`;
++  const source =
++    typeof browser.defaultBrowserContextId === "string" && launchFlagMatches(browser)
++      ? "flag"
++      : "cdp";
++  try {
++    const scratch = `${path}.${process.pid}`;
++    writeFileSync(scratch, `${source} ${configuredAcceptLanguage(browser.acceptLanguage)}\n`, {
++      mode: 0o644,
++    });
++    renameSync(scratch, path);
++  } catch (error) {
++    reportOnce(`accept-language record failed: ${errorClass(error)}`);
++  }
++}
++
++export async function reapplyChangedAcceptLanguage(
++  browser,
++  read = () => readAcceptLanguageEnUsMarker(undefined, null),
++) {
++  if (browser.isClosed || browser.acceptLanguageEnUsEnabled !== true) return null;
++  const marker = read();
++  if (marker == null || marker === browser.acceptLanguage) return null;
++  const previous = configuredAcceptLanguage(browser.acceptLanguage);
++  const next = configuredAcceptLanguage(marker);
++  browser.acceptLanguage = marker;
++  if (next === previous) return null;
++  const generation = (browser.acceptLanguageGeneration ?? 0) + 1;
++  browser.acceptLanguageGeneration = generation;
++  console.error(
++    `accept-language changed port=${browser.port} (${previous}->${next}); re-applying to attached targets`,
++  );
++  await resolveDefaultBrowserContext(browser);
++  await Promise.all(
++    [...(browser.attachedSessions ?? [])].map((sessionId) =>
++      applyDesktopUaToTarget(
++        browser,
++        sessionId,
++        browser.attachedBrowserContexts?.get(sessionId),
++      ).catch((error) => {
++        if (isCdpTargetGone(error) || !browser.attachedSessions.has(sessionId)) return;
++        console.error(`accept-language re-apply failed port=${browser.port}: ${errorClass(error)}`);
++      }),
++    ),
++  );
++  if (!browser.isClosed && browser.acceptLanguageGeneration === generation) {
++    recordAcceptLanguage(browser);
++  }
++  return `${previous}->${next}`;
++}
++
+ export function egressTimeZoneEnabledForBrowser(
+   browser,
+   { resolveGate = resolveEgressTimeZoneGate, now = Date.now } = {},
+@@ -513,13 +656,15 @@
+   const acceptLanguageEnUs = acceptLanguageEnUsEnabledForBrowser(browser);
+   const egressTimeZone = egressTimeZoneEnabledForBrowser(browser);
+   if (hardware === "off" && !acceptLanguageEnUs && !egressTimeZone) {
+-    await applyDesktopUaToTarget(browser, sessionId);
++    await applyDesktopUaToTarget(browser, sessionId, target?.browserContextId);
+     return;
+   }
+   const coherent = hardware === "coherent";
+   if (isWorkerTargetType(target?.type)) {
+     await Promise.all([
+-      acceptLanguageEnUs || coherent ? applyDesktopUaToTarget(browser, sessionId) : null,
++      acceptLanguageEnUs || coherent
++        ? applyDesktopUaToTarget(browser, sessionId, target?.browserContextId)
++        : null,
+       hardware === "legacy"
+         ? browser.send("Runtime.evaluate", { expression: documentScript(browser) }, sessionId)
+         : null,
+@@ -531,7 +676,7 @@
+   }
+   if (hardware !== "legacy") {
+     await Promise.all([
+-      applyDesktopUaToTarget(browser, sessionId),
++      applyDesktopUaToTarget(browser, sessionId, target?.browserContextId),
+       coherent ? applyCoherentHardwareToTarget(browser, sessionId) : null,
+       egressTimeZone ? applyEgressTimeZoneToTarget(browser, sessionId) : null,
+       attachRelatedTargets(browser, sessionId),
+@@ -540,7 +685,7 @@
+   }
+   const script = documentScript(browser);
+   await Promise.all([
+-    applyDesktopUaToTarget(browser, sessionId),
++    applyDesktopUaToTarget(browser, sessionId, target?.browserContextId),
+     startsBeforeFirstDocument(target)
+       ? null
+       : browser.send("Runtime.evaluate", { expression: script }, sessionId),
+@@ -572,6 +717,7 @@
+ export async function configureUaGovernorBrowser(browser, { startEgressTimeZoneFor } = {}) {
+   browser.attachedSessions = new Set();
+   browser.attachedTargetTypes = new Map();
++  browser.attachedBrowserContexts = new Map();
+   if (startEgressTimeZoneFor != null) browser.startEgressTimeZoneFor = startEgressTimeZoneFor;
+   if (egressTimeZoneEnabledForBrowser(browser) && browser.egressTimeZoneLookup === undefined) {
+     void (browser.startEgressTimeZoneFor ?? startEgressTimeZone)(browser);
+@@ -583,6 +729,8 @@
+     if (message.method === "Target.detachedFromTarget") {
+       browser.attachedSessions.delete(sessionId);
+       browser.attachedTargetTypes.delete(sessionId);
++      browser.attachedBrowserContexts.delete(sessionId);
++      browser.acceptLanguageOverriddenSessions?.delete(sessionId);
+       browser.relatedTargetSessions?.delete(sessionId);
+       if (browser.egressTimeZoneEnabled === true) reassertEgressTimeZone(browser);
+       return;
+@@ -593,6 +741,8 @@
+     if (typeof targetType === "string") {
+       browser.attachedTargetTypes.set(sessionId, targetType);
+     }
++    const browserContextId = message.params?.targetInfo?.browserContextId;
++    browser.attachedBrowserContexts.set(sessionId, browserContextId);
+     const reportUnlessGone = (step) => (error) => {
+       if (isCdpTargetGone(error) || !browser.attachedSessions.has(sessionId)) return;
+       console.error(`${step} failed port=${browser.port}: ${errorClass(error)}`);
+@@ -600,6 +750,7 @@
+     const treatAndResume = () => {
+       void applyUaTreatmentToTarget(browser, sessionId, {
+         type: targetType,
++        browserContextId,
+         waitingForDebugger: message.params?.waitingForDebugger === true,
+       }).catch(reportUnlessGone("ua apply"));
+       void browser
+@@ -610,7 +761,9 @@
+     if (hold == null) treatAndResume();
+     else void hold.then(treatAndResume);
+   });
++  await resolveDefaultBrowserContext(browser);
+   await browser.send("Target.setAutoAttach", browserAutoAttachParams(browser));
++  recordAcceptLanguage(browser);
+ }
+ 
+ export function resolveBoxBrowser({
+@@ -640,7 +793,11 @@
+     if (browser.isClosed) continue;
+     for (const sessionId of browser.attachedSessions ?? []) {
+       const targetType = browser.attachedTargetTypes?.get(sessionId);
+-      await applyUaTreatmentToTarget(browser, sessionId, { type: targetType }).catch((error) => {
++      const browserContextId = browser.attachedBrowserContexts?.get(sessionId);
++      await applyUaTreatmentToTarget(browser, sessionId, {
++        type: targetType,
++        browserContextId,
++      }).catch((error) => {
+         console.error(
+           `ua re-apply failed port=${browser.port}: ${error instanceof Error ? error.name : typeof error}`,
+         );
+@@ -946,6 +1103,7 @@
+         continue;
+       }
+       void tickEgressTimeZone(browser);
++      void reapplyChangedAcceptLanguage(browser);
+       reattachIfSettingsChanged(browser);
+       openPages += openPageCount(browser);
+     }

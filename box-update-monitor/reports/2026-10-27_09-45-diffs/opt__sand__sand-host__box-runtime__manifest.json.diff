@@ -1,0 +1,29 @@
+--- 2026-10-27_08-52:/opt/sand/sand-host/box-runtime/manifest.json
++++ 2026-10-27_09-45:/opt/sand/sand-host/box-runtime/manifest.json
+@@ -2,7 +2,7 @@
+   "files": [
+     {
+       "name": "box-contract.generated.mjs",
+-      "sha256": "774fbad4282cc4545d47fc5e5e08c26c45dee9ee2a749396eae176bcd5f40972"
++      "sha256": "6dccf202b1bbfa5cb67567d19cba056603ec711a1b2d8953b4a2a8ac33411fe6"
+     },
+     {
+       "name": "cdp-cookies.mjs",
+@@ -26,7 +26,7 @@
+     },
+     {
+       "name": "sand-fingerprint-profiles.mjs",
+-      "sha256": "9efed4070f15f84cd4dd7378385ed41fac3fd49f86999904888755433bd2837e"
++      "sha256": "3d7dbbc7ce398ee9465130ffac5178705f37869ac98a68f21a038cfd72135f1f"
+     },
+     {
+       "name": "sand-locale-match.mjs",
+@@ -38,7 +38,7 @@
+     },
+     {
+       "name": "sand-ua-governor.mjs",
+-      "sha256": "934da0a3ff2cb9f40994ce7f88eb888746b86afeeadd6c0c3a15e509088d5b45"
++      "sha256": "e0a662869022ecac2b7093a49ea4650d67f828fd7dd313a755a2c6bdc3623d25"
+     },
+     {
+       "name": "sand-web-bot-auth.mjs",

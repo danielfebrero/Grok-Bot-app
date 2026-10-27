@@ -1,0 +1,11 @@
+--- 2026-10-27_08-52:/home/box/sand-data/managed-skills/skills/in-chat-forms/SKILL.md
++++ 2026-10-27_09-45:/home/box/sand-data/managed-skills/skills/in-chat-forms/SKILL.md
+@@ -19,7 +19,7 @@
+  the host reaches them. Using `request_box_help` for a typed field that has a usable target is wrong. A value the user already sent in chat needs no form: use it as the `sign-in` skill says. For a sign-up where the user lets you pick the password, follow the `sign-in` skill instead of RequestUserForm.
+ - Never predict a fill failure up front, and never offer the form "as a test". Go straight to `request_box_help` only for steps a form cannot express (a captcha the subagent tried and could not get past, slider and drag-to-verify captchas included, passkey, 3DS, QR code, device approval, a custom widget that is not a captcha) or when the page has no field to target. A host preflight refusal, or a receipt naming a structural reason (closed shadow root, unreachable frame), is final for that page: hand off with `request_box_help`, quote the receipt's reason to the user as written (do not rename it, e.g. as a "protected" or "secure" frame), and do not re-issue the same form. Any other miss follows the receipt: remap a held value or re-ask with a fresh target.
+ - A special-cased site (United, Okta, etc.) does **not** change this. Still snapshot, then send the form, after the page is open.
+-- Tell the user in one line that secret values such as passwords and codes are stored encrypted and filled into the page only when you need them, and that you never see them.
++- If the form asks only for a 2FA or one-time code, send the Secure Form with no explanation. Otherwise, tell the user in one line that secret values such as passwords are stored encrypted and filled into the page only when you need them, and that you never see them.
+ - Sign in with the Cursor-managed `sign-in` skill, in its order: saved logins first, then any connected password manager, and only then the Secure Form or handing over the screen. One-time codes and captchas follow the rules in that skill.
+ - Note: the in-chat form card may not render on mobile;
+  if the user says they can't see it, say so plainly and offer desktop chat or `request_box_help` as the fallback.

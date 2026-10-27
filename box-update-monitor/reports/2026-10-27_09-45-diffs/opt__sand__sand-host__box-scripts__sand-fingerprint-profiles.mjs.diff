@@ -1,0 +1,42 @@
+--- 2026-10-27_08-52:/opt/sand/sand-host/box-scripts/sand-fingerprint-profiles.mjs
++++ 2026-10-27_09-45:/opt/sand/sand-host/box-scripts/sand-fingerprint-profiles.mjs
+@@ -134,20 +134,36 @@
+ const ACCEPT_LANGUAGE_LIST_RE =
+   /^[A-Za-z]{1,8}(?:-[A-Za-z0-9]{1,8})*(?:,[A-Za-z]{1,8}(?:-[A-Za-z0-9]{1,8})*)*$/;
+ 
+-function configuredAcceptLanguage(value) {
++export function configuredAcceptLanguage(value) {
+   return typeof value === "string" && value.length <= 128 && ACCEPT_LANGUAGE_LIST_RE.test(value)
+     ? value
+     : "en-US,en-GB,en";
+ }
+ 
++function overrideAcceptLanguage(acceptLanguageEnUs, acceptLanguage, fromLaunchFlag, overridden) {
++  if (!acceptLanguageEnUs) return { acceptLanguage: "en-US,en" };
++  if (fromLaunchFlag) return overridden ? { acceptLanguage: "" } : {};
++  return { acceptLanguage: configuredAcceptLanguage(acceptLanguage) };
++}
++
+ export function buildUserAgentOverride(
+   product,
+-  { acceptLanguageEnUs = false, acceptLanguage = "" } = {},
++  {
++    acceptLanguageEnUs = false,
++    acceptLanguage = "",
++    acceptLanguageFromLaunchFlag = false,
++    acceptLanguageOverridden = false,
++  } = {},
+ ) {
+   const { major } = chromeProductFromUserAgentProduct(product);
+   return {
+     userAgent: `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${major}.0.0.0 Safari/537.36`,
+-    acceptLanguage: acceptLanguageEnUs ? configuredAcceptLanguage(acceptLanguage) : "en-US,en",
++    ...overrideAcceptLanguage(
++      acceptLanguageEnUs,
++      acceptLanguage,
++      acceptLanguageFromLaunchFlag,
++      acceptLanguageOverridden,
++    ),
+     platform: "Linux x86_64",
+     userAgentMetadata: buildUserAgentMetadata(product, acceptLanguageEnUs),
+   };

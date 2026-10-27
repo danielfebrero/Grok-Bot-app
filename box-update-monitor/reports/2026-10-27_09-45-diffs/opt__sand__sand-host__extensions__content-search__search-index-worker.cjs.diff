@@ -1,0 +1,52 @@
+--- 2026-10-27_08-52:/opt/sand/sand-host/extensions/content-search/search-index-worker.cjs
++++ 2026-10-27_09-45:/opt/sand/sand-host/extensions/content-search/search-index-worker.cjs
+@@ -606,12 +606,27 @@
+   return isVoiceCallChannelEntry(entry) || isMeetingChannelEntry(entry) || isMeetingRequestChannelEntry(entry);
+ }
+ 
++// src/shared/transcript/card-text.ts
++var HIDDEN_CHARACTERS = new RegExp("(?![\\r\\n])[\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}\\p{Default_Ignorable_Code_Point}\\u202A-\\u202E\\u2066-\\u2069]|(?! )\\p{Zs}", "gu");
++var HIDDEN_OR_MARK_CHARACTERS = new RegExp("(?![\\r\\n])[\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}\\p{M}\\p{Default_Ignorable_Code_Point}\\u202A-\\u202E\\u2066-\\u2069]|(?! )\\p{Zs}", "gu");
++var SPACES = new RegExp("\\p{Zs}", "gu");
++var DOTS = ".\xB7\u0589\u06D4\u0701\u0702\u1362\u166E\u1803\u1809\u2022\u2024\u2027\u2219\u22C5\u2E31\u2E33\u3002\u30FB\uA4F8\uA60E\uFE52\uFF0E\uFF61\uFF65";
++var SITE_LIKE = new RegExp(
++  [
++    `[\\p{L}\\p{N}+.-]*:\\/\\/\\S*`,
++    `[\\p{L}\\p{N}-]+(?:[${DOTS}][\\p{L}\\p{N}-]+)*[${DOTS}]\\p{L}[\\p{L}\\p{N}]+`,
++    `(?<![\\p{L}\\p{N}])www[${DOTS}]`
++  ].join("|"),
++  "u"
++);
++
+ // src/shared/transcript/flights.ts
+ var SAND_FLIGHT_MAX_METRO_AIRPORTS = 4;
+ var SAND_FLIGHT_TRAVELER_GENDERS = ["female", "male"];
+ var SAND_FLIGHT_MAX_TRAVELERS = 9;
+ var IATA_AIRPORT = /^[A-Z]{3}$/;
+ var MAX_DURATION_MIN = 7 * 24 * 60;
++var FORMAT_CHARACTERS = new RegExp("\\p{Cf}", "gu");
+ function isListOf(value, { min, max }, isItem) {
+   return Array.isArray(value) && value.length >= min && value.length <= max && value.every(isItem);
+ }
+@@ -632,9 +647,10 @@
+ var FLIGHT_TRAVELERS_REPLY_CLOSE = "</flight_travelers_reply>";
+ var OFFER_ID = /^[A-Za-z0-9_-]{1,120}$/u;
+ var TEXT_FIELDS = ["givenName", "familyName", "bornOn", "email", "phone"];
++var SAND_FLIGHT_TRAVELER_NAME_MAX_CHARS = 59;
+ var TEXT_FIELD_MAX_CHARS = {
+-  givenName: 60,
+-  familyName: 60,
++  givenName: SAND_FLIGHT_TRAVELER_NAME_MAX_CHARS,
++  familyName: SAND_FLIGHT_TRAVELER_NAME_MAX_CHARS,
+   bornOn: 20,
+   email: 200,
+   phone: 30
+@@ -812,7 +828,7 @@
+   return entry.kind === "send-message" && entry.streaming === true && entry.message.type === "text" && entry.message.content.length === 0;
+ }
+ function isTimelineHiddenEntry(entry) {
+-  return isEmptyStreamingPreviewEntry(entry) || isSuppressedEntry(entry) || entry.kind === "tool-call" || isBackgroundTaskStopNotice(entry) || isExpiredLocalToolPermissionEntry(entry) || isBotShareAutoReviewEntry(entry) || isHiddenOutboundAgentPeerMessageEntry(entry) || isCardReplyEntry(entry) || isOffChatChannelEntry(entry) || entry.kind === "send-message" && entry.message.type === "user-form" && entry.id.startsWith(SAND_PHONE_CALL_QUESTION_ENTRY_PREFIX) || entry.kind === "event" && entry.event.type === "desktop-goal" || entry.kind === "event" && entry.event.type === "team-shared" && isBlankTeamSharedEvent(entry.event);
++  return isEmptyStreamingPreviewEntry(entry) || isSuppressedEntry(entry) || entry.kind === "tool-call" || isBackgroundTaskStopNotice(entry) || isExpiredLocalToolPermissionEntry(entry) || isBotShareAutoReviewEntry(entry) || isHiddenOutboundAgentPeerMessageEntry(entry) || isCardReplyEntry(entry) || isOffChatChannelEntry(entry) || entry.kind === "send-message" && entry.message.type === "user-form" && entry.message.phoneCallQuestion === void 0 && entry.id.startsWith(SAND_PHONE_CALL_QUESTION_ENTRY_PREFIX) || entry.kind === "event" && entry.event.type === "desktop-goal" || entry.kind === "event" && entry.event.type === "team-shared" && isBlankTeamSharedEvent(entry.event);
+ }
+ 
+ // src/host/sand-data-files.ts
