@@ -9,6 +9,12 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-27 12:53 (Paris) — snapshot `2026-10-27_11-49` → `2026-10-27_12-53`
+
+**Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `d3f37a3d624cf03ecd92f2b66f74ab5be3b15bfa` → `c1aeda00f43ded2bcc6834775aeb6410194b766f` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`). Toutes les autres versions plateforme inchangées (image `fcbae14`, box-scripts `fcbae14`, sand-host `ab49b45` (supervisor `upgrade-ab49b45`), exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7). Fichiers : +0 / −0 / ~1.
+
+Rapport : [reports/2026-10-27_12-53.md](reports/2026-10-27_12-53.md).
+
 ## 2026-10-27 09:45 (Paris) — snapshot `2026-10-27_08-52` → `2026-10-27_09-45`
 
 **Hot-update du host bundle (sand-host) `7cb9acc` → `ab49b45`** (supervisor `upgrade-7cb9acc` → `upgrade-ab49b45`, `pendingUpgradeVersion` = None) : remplacement à chaud du `sand-host` par le sand-supervisor, sans Update de l'ordinateur. Bundle host (`host-main.cjs` 32.3→32.8 Mo, `sand-eval-runner.cjs` 25.4→25.9 Mo), `box-chrome` (Accept-Language via `--accept-lang` + record profil), `sand-ua-governor` / `sand-fingerprint-profiles` (override Accept-Language par session / flag de lancement), `search-index-worker` (normalisation caractères cachés + plafond noms voyageurs vol 59), `agent-store-worker` (`TriggeringUserInfo.followup_id`), et bump concomitant **agent-store-fuse** `62d65171` → `37f15904`. Image `fcbae14`, box-scripts `fcbae14`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +1 / −0 / ~25.
