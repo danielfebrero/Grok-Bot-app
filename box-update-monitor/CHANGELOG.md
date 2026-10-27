@@ -9,6 +9,25 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-27 18:50 (Paris) — snapshot `2026-10-27_17-53` → `2026-10-27_18-50`
+
+**Hot-update du host bundle (sand-host) `b206477` → `95f2586`** (supervisor `upgrade-b206477` → `upgrade-95f2586`, `pendingUpgradeVersion` = None) : remplacement à chaud du `sand-host` par le sand-supervisor, sans Update de l'ordinateur. Gros bundle (`host-main.cjs` 31.8→31.8 Mo, +5368/−3201 lignes après découpe ; `sand-eval-runner.cjs` 26.0→26.0 Mo), `box-chrome`, `agent-store-worker`. Image `fcbae14`, box-scripts `fcbae14`, agent-store-fuse `2e567571` (inchangé), exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~6.
+
+### Features
+- **ComputerUseArgs** : nouveau champ `omit_inline_screenshot` (13, bool) — permet à l'hôte d'omettre la capture inline renvoyée après une action computer-use (host-main + agent-store-worker).
+- **SelectedVideo** : nouvelle source `prompt_upload_ref` (13, `PromptUploadRef`) en plus de `blob_id` / `data` / `signed_url` — une vidéo peut être référencée par un upload de prompt (host-main + agent-store-worker).
+
+### Change
+- **`box-chrome`** : nouvelle fonction `merge_disable_features()` qui fusionne tous les `--disable-features` répétés en une seule valeur (Chrome sur Linux ne garde que le dernier switch répété), et ajout de `--disable-features=TLSTrustAnchorIDs` à la liste des flags extra autorisés.
+- **anyrun `ErrorReason`** : nouvelle valeur `16 TAR_GZIP_URL_SOURCE_EXPIRED` (source tar.gz de snapshot expirée).
+
+### Autre-infra
+- **Paquet image** : ajout de `git-lfs` 3.6.1-1+deb13u1 (dpkg).
+- Forte rotation des blocs protobuf/RPC dans `host-main.cjs` (réordonnancement + définitions) ; le détail exhaustif de la surface RPC est suivi séparément par le moniteur `sand-host-rpc`.
+- `managed-skills/cache.json` : seul `fetchedAt` a changé (pas de changement de contenu de skill) — bruit.
+
+Rapport : [reports/2026-10-27_18-50.md](reports/2026-10-27_18-50.md).
+
 ## 2026-10-27 17:53 (Paris) — snapshot `2026-10-27_16-52` → `2026-10-27_17-53`
 
 **Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `7e69aa3348540cd38a2995d2adb0018c7f74acc5` → `2e567571e043430446db14d64a1270d888f35bec` (tarball S3), binaire `cursor-agent-store-fuse` inchangé. Toutes les autres versions plateforme inchangées (image `fcbae14`, box-scripts `fcbae14`, sand-host `b206477`, exec-daemon, orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7). Fichiers : +0 / −0 / ~1.
