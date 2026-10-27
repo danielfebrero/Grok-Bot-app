@@ -9,6 +9,15 @@ packages confondus. Entrées les plus récentes en haut. Heures de Paris
 
 <!-- NOUVELLES-ENTREES-ICI -->
 
+## 2026-10-27 10:01 (Paris) — `2026-10-26_18-12` → `2026-10-27_10-01`
+
+Changement de surface RPC détecté : **34 méthode(s) ajoutée(s)**.
+
+Ajoutées : `AppPublishService.CancelReviewOverride`, `AppPublishService.RequestReviewOverride`, `BackgroundComposerService.ListPlacementRepoCandidates`, `DashboardService.ActivateTeamAppsReviewRulesVersion`, `DashboardService.DecideAppReviewOverride`, `DashboardService.GetOrganizationSlackInboundInstallPolicy`, `DashboardService.GetSyncedClientSettings`, `DashboardService.GetTeamAppsReviewRules`, `DashboardService.GetTeamAppsReviewRulesVersion`, `DashboardService.GetTeamSandEgressHttpRules`, `DashboardService.GetTeamSandTrustedCaCertificates`, `DashboardService.GrantAppReviewOverride`, `DashboardService.ListAppReviewOverrides`, `DashboardService.ListInstalledPlugins`, `DashboardService.ListOrganizationSlackConnectedWorkspaces`, `DashboardService.ListSlackConnectedWorkspaces`, `DashboardService.ListTeamAppsReviewRulesVersions`, `DashboardService.RevokeAppReviewOverride`, `DashboardService.RevokeCollapseSourceProof`, `DashboardService.SaveTeamAppsReviewRules`, `DashboardService.SendBonfireInvite`, `DashboardService.UpdateOrganizationSlackInboundInstallPolicy`, `DashboardService.UpdateSyncedClientSettings`, `DashboardService.UpdateTeamSandEgressHttpRules`, `DashboardService.UpdateTeamSandTrustedCaCertificates` …
+
+Rapport : [reports/2026-10-27_10-01.md](reports/2026-10-27_10-01.md).
+
+
 ## 2026-10-26 18:12 (Paris) — `2026-10-25_18-01` → `2026-10-26_18-12`
 
 Changement de surface RPC détecté : **8 méthode(s) ajoutée(s)**.
