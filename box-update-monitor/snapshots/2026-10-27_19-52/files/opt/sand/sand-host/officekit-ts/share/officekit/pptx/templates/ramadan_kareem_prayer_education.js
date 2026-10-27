@@ -1,0 +1,980 @@
+/**
+ * "Ramadan Kareem" deck - rebuilt with pptxgenjs.
+ *
+ * Run: node 0f7e2afe-26fc-4046-950b-76a60f6f5ace_grok_final.js
+ * Writes 0f7e2afe-26fc-4046-950b-76a60f6f5ace_grok_final.pptx next to this file.
+ *
+ * All measurements are inches, all font sizes are points, taken from the
+ * original deck. Raster artwork (photos, lantern clip-art, line-art icons) is
+ * replaced by native shape placeholders - see the "placeholders" section.
+ */
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ *
+ * Palette, fonts and slide geometry
+ * ------------------------------------------------------------------ */
+
+const GREEN = '104837'; // brand dark green
+const ORANGE = 'EC9800'; // brand amber
+const ORANGE_DK = 'E37A09'; // lantern cord
+const WHITE = 'FFFFFF';
+const GREY_75 = 'BFBFBF'; // body copy on dark backgrounds
+const GREY_65 = 'A5A5A5';
+const GREY_50 = '7F7F7F'; // body copy on white
+const GREY_35 = '595959';
+const GREY_25 = '3F3F3F';
+const GREY_15 = '262626';
+const NEAR_BLACK = '0C0C0C';
+const HAIRLINE = 'D8D8D8';
+const BAND = 'F2F2F2'; // zebra band behind surah verses
+
+const DISPLAY = 'Berkshire Swash'; // headlines
+const SEMI = 'Poppins SemiBold'; // eyebrows / labels
+const MEDIUM = 'Poppins Medium'; // numbers, contact details
+const BODY_FONT = 'Roboto Medium'; // paragraphs
+const ARABIC = 'Noto Sans Arabic';
+
+const SLIDE_W = 26.667;
+const SLIDE_H = 15;
+const FULL_H = 15.022; // the deck's full-bleed rectangles overshoot slightly
+
+const NOLINE = { type: 'none' };
+
+// Drop shadows are all straight-down black blurs; pptxgenjs mutates the options
+// object it is handed, so every shape gets its own.
+function shadow(blur, opacity, offset) {
+  return { type: 'outer', color: '000000', blur, opacity, offset: offset === undefined ? 4 : offset, angle: 90 };
+}
+
+/* ------------------------------------------------------------------ *
+ * Small helpers
+ * ------------------------------------------------------------------ */
+
+// Text boxes in the source deck are top-anchored and keep PowerPoint's default insets.
+function text(slide, content, opts) {
+  slide.addText(content, Object.assign({ valign: 'top', isTextBox: true }, opts));
+}
+
+function rect(slide, x, y, w, h, color, opts) {
+  slide.addShape('rect', Object.assign({ x, y, w, h, fill: { color }, line: NOLINE }, opts || {}));
+}
+
+// roundRect: the source stores the corner radius as a fraction of the short side
+function roundRect(slide, x, y, w, h, adj, fill, line, opts) {
+  slide.addShape('roundRect', Object.assign({
+    x, y, w, h,
+    rectRadius: adj * Math.min(w, h),
+    fill: fill || { type: 'none' },
+    line: line || NOLINE,
+  }, opts || {}));
+}
+
+function donut(slide, x, y, d, color) {
+  slide.addShape('donut', { x, y, w: d, h: d, fill: { color }, line: NOLINE });
+}
+
+// The recurring ornament: a small ring with a bigger ring up and to the right.
+// The deck uses two spacings for the pair; `rise` picks which one.
+function rings(slide, x, y, smallColor, bigColor, rise) {
+  donut(slide, x, y, 0.397, smallColor);
+  donut(slide, x + 0.379, y - (rise || 0.603), 0.728, bigColor);
+}
+
+function headline(size, color) {
+  return { fontFace: DISPLAY, fontSize: size, color };
+}
+
+function eyebrow(color, spacing) {
+  return { fontFace: SEMI, fontSize: 28, color: color || ORANGE, charSpacing: spacing === undefined ? 3 : spacing };
+}
+
+function paragraph(color, size) {
+  return { fontFace: BODY_FONT, fontSize: size || 24, color, lineSpacingMultiple: 1.5 };
+}
+
+function label(size, color, font) {
+  return { fontFace: font || SEMI, fontSize: size, color };
+}
+
+function link(color) {
+  return { fontFace: SEMI, fontSize: 24, color, underline: { style: 'sng' } };
+}
+
+function hairline(slide, x, y, w, color) {
+  slide.addShape('line', { x, y, w, h: 0, line: { color: color || HAIRLINE, width: 1 } });
+}
+
+/* ------------------------------------------------------------------ *
+ * Placeholders for raster artwork
+ * ------------------------------------------------------------------ */
+
+// Photo slots. The source deck ships these as *empty* picture placeholders, so no
+// artwork is painted - only the frame geometry is reproduced, at the original
+// position, size and outline. Any decorative border the source gave the frame is
+// kept in `opts`.
+function photoFrame(slide, shape, x, y, w, h, opts) {
+  slide.addShape(shape, Object.assign({ x, y, w, h, fill: { type: 'none' }, line: NOLINE }, opts || {}));
+}
+
+// Eight-point "Rub el Hizb" ring - two overlapping squares, hollow inside. Taken
+// from the original artwork: the star spans the middle 75% of its box and the
+// ring wall is 23% of the star's radius. It is drawn as a filled star with a
+// second, smaller star in the backdrop colour punched out of the middle.
+function starOutline(r, c) {
+  const pts = [];
+  for (let i = 0; i < 16; i++) {
+    const radius = i % 2 === 0 ? r : r * 0.7654; // where the two squares cross
+    const angle = (Math.PI / 8) * i;
+    pts.push({ x: c + radius * Math.sin(angle), y: c - radius * Math.cos(angle) });
+  }
+  pts.push({ close: true });
+  return pts;
+}
+
+function star(slide, x, y, size, color, backdrop) {
+  const r = size * 0.375;
+  const c = size / 2;
+  slide.addShape('custGeom', { x, y, w: size, h: size, fill: { color }, line: NOLINE, points: starOutline(r, c) });
+  slide.addShape('custGeom', {
+    x, y, w: size, h: size, fill: { color: backdrop }, line: NOLINE, points: starOutline(r * 0.77, c),
+  });
+}
+
+// Line-art pictogram -> simple rounded outline of the same footprint.
+function icon(slide, x, y, size, color) {
+  slide.addShape('roundRect', {
+    x, y, w: size, h: size,
+    rectRadius: size * 0.22,
+    fill: { type: 'none' },
+    line: { color, width: Math.max(1, size * 2) },
+  });
+}
+
+// Hanging lantern clip-art. `x/y/w/h` is the original group box; inside it the
+// cord runs down the top 57.5% and the lantern hangs from 48.2% to 96.9% of the
+// height, spanning 31%-69% of the width. Slices below are fractions of the
+// lantern body box: [x0, x1, y0, y1, color].
+const LANTERN_PARTS = [
+  [0.42, 0.58, 0.15, 0.21, 'FFAB38'], // knob under the cord
+  [0.27, 0.73, 0.21, 0.28, 'FF890A'], // cap, upper tier
+  [0.17, 0.82, 0.28, 0.34, 'FFAB38'], // cap, middle tier
+  [0.05, 0.95, 0.34, 0.39, 'FF890A'], // cap, lower tier
+  [0.00, 1.00, 0.39, 0.41, 'FCBE00'], // rim above the glass
+  [0.00, 1.00, 0.41, 0.84, 'FF890A'], // body sides
+  [0.26, 0.74, 0.41, 0.84, 'FFAB38'], // body face
+  [0.34, 0.67, 0.44, 0.81, 'FFE261'], // lit glass
+  [0.00, 1.00, 0.84, 0.86, 'FCBE00'], // rim below the glass
+  [0.05, 0.95, 0.86, 0.91, 'FFAB38'], // base, upper tier
+  [0.17, 0.82, 0.91, 0.95, 'FF890A'], // base, lower tier
+  [0.42, 0.58, 0.95, 1.00, 'FFAB38'], // finial
+];
+
+function lantern(slide, x, y, w, h) {
+  rect(slide, x + 0.483 * w, y, 0.036 * w, 0.575 * h, ORANGE_DK);
+  const bodyX = x + 0.31 * w;
+  const bodyW = 0.379 * w;
+  const bodyY = y + 0.482 * h;
+  const bodyH = 0.487 * h;
+  LANTERN_PARTS.forEach(([x0, x1, y0, y1, color]) => {
+    rect(slide, bodyX + x0 * bodyW, bodyY + y0 * bodyH, (x1 - x0) * bodyW, (y1 - y0) * bodyH, color);
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Slides
+ * ------------------------------------------------------------------ */
+
+// 1 - Title / hero
+function slide01(pptx) {
+  const s = pptx.addSlide();
+  rect(s, 0, 0, SLIDE_W, FULL_H, GREEN);
+
+  // Two amber freeform shards on the right half.
+  s.addShape('custGeom', {
+    x: 16.312, y: 0, w: 8.595, h: FULL_H, fill: { color: ORANGE }, line: NOLINE,
+    points: [
+      { x: 8.595, y: 2.384 }, { x: 0.134, y: 0 }, { x: 4.946, y: 15.022 },
+      { x: 0, y: 15.022 }, { x: 8.595, y: 2.384 }, { close: true },
+    ],
+  });
+  s.addShape('custGeom', {
+    x: 12.703, y: -0.01, w: 12.398, h: 15.033, fill: { color: ORANGE }, line: NOLINE,
+    points: [
+      { x: 3.775, y: 0 }, { x: 0, y: 13.402 }, { x: 12.398, y: 9.489 },
+      { x: 8.482, y: 15.033 }, { x: 3.775, y: 0 }, { close: true },
+    ],
+  });
+
+  photoFrame(s, 'heptagon', 13.089, 2.183, 10.396, 10.424);
+
+  text(s, [
+    { text: 'Rama', options: { color: WHITE } },
+    { text: 'd', options: { color: ORANGE } },
+    { text: 'an', options: { color: WHITE } },
+  ], Object.assign({ x: 2.307, y: 2.865, w: 10.107, h: 2.895 }, headline(166, WHITE)));
+  text(s, 'Kareem', Object.assign({ x: 2.307, y: 5.273, w: 7.008, h: 2.423 }, headline(138, ORANGE)));
+  text(s, 'Month Of Muslims & Fasting',
+    Object.assign({ x: 2.307, y: 7.723, w: 8.908, h: 0.572 }, eyebrow(WHITE, 6)));
+  text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliquant.',
+    Object.assign({ x: 2.307, y: 8.55, w: 10.724, h: 1.245 }, paragraph(GREY_75)));
+
+  roundRect(s, 2.307, 10.778, 4.109, 1.084, 0.24064, { color: ORANGE }, NOLINE,
+    { shadow: shadow(28, 0.23, 0) });
+  text(s, 'Visit Now',
+    Object.assign({ x: 2.759, y: 11.035, w: 3.205, h: 0.572, align: 'center' }, eyebrow(WHITE, 0)));
+  text(s, 'More Detail', {
+    x: 6.561, y: 11.035, w: 3.205, h: 0.572, align: 'center',
+    fontFace: MEDIUM, fontSize: 28, color: WHITE, underline: { style: 'sng' },
+  });
+
+  rings(s, 1.928, 2.716, ORANGE, ORANGE);
+  donut(s, 2.801, 12.544, 0.397, ORANGE);
+  donut(s, 9.684, 6.724, 0.397, ORANGE);
+  rings(s, 9.921, 10.835, ORANGE, ORANGE);
+  donut(s, 23.427, 1.584, 0.397, ORANGE);
+
+  lantern(s, 11.253, -0.047, 2.214, 4.033);
+  lantern(s, 10.482, -0.034, 1.513, 2.757);
+
+  text(s, [
+    { text: 'Lo', options: { color: WHITE } },
+    { text: 'go', options: { color: ORANGE } },
+  ], Object.assign({ x: 23.625, y: 12.941, w: 1.72, h: 0.909 }, headline(48, WHITE)));
+}
+
+// 2 - Preparing For Ramadan
+function slide02(pptx) {
+  const s = pptx.addSlide();
+  rect(s, 0, 0, SLIDE_W, FULL_H, WHITE);
+
+  photoFrame(s, 'heptagon', 2.369, 2.453, 6.758, 6.758);
+  photoFrame(s, 'heptagon', 5.738, 5.91, 6.604, 6.604);
+  photoFrame(s, 'heptagon', 7.123, 2.702, 4.377, 4.377);
+  photoFrame(s, 'heptagon', 2.696, 8.155, 4.244, 4.244);
+
+  text(s, 'Welcome In Ramadan', Object.assign({ x: 13.598, y: 3.338, w: 5.532, h: 0.572 }, eyebrow()));
+  text(s, [
+    { text: 'Preparing For ', options: { color: GREEN } },
+    { text: 'Ramadan !', options: { color: ORANGE } },
+  ], Object.assign({ x: 13.598, y: 3.884, w: 10.575, h: 3.063 }, headline(88, GREEN)));
+  text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim venom,',
+    Object.assign({ x: 13.598, y: 7.048, w: 9.237, h: 1.851 }, paragraph(GREY_50)));
+
+  star(s, 13.333, 9.719, 2.268, ORANGE, WHITE);
+  text(s, '01', Object.assign({ x: 14.015, y: 10.336, w: 1.274, h: 0.909 }, headline(48, GREEN)));
+  text(s, 'Why You Choose Us', Object.assign({ x: 15.913, y: 9.791, w: 6.434, h: 0.909 }, headline(48, GREEN)));
+  text(s, 'Wash your both hands up to your wrists three times, make sure that water has reached among,',
+    Object.assign({ x: 15.913, y: 10.925, w: 7.513, h: 1.245 }, paragraph(GREY_50)));
+
+  rings(s, 12.104, 2.939, ORANGE, GREEN);
+  rings(s, 22.091, 9.212, GREEN, ORANGE);
+  donut(s, 1.909, 8.257, 0.397, ORANGE);
+  lantern(s, 22.116, 0, 2.214, 4.033);
+  lantern(s, 21.346, 0.013, 1.513, 2.757);
+}
+
+// 3 - Taraweeh Prayer
+function slide03(pptx) {
+  const s = pptx.addSlide();
+  rect(s, 0, 0, 12.323, FULL_H, WHITE);
+  photoFrame(s, 'rect', 12.323, -0.01, 14.344, 10.94);
+
+  rect(s, 0, 10.93, 14.839, 4.102, GREEN);
+  text(s, '08 Rak \u2019at', Object.assign({ x: 1.747, y: 12.458, w: 3.821, h: 1.01 }, headline(54, ORANGE)));
+  text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit sed do eiusmod tempor incididunt.',
+    Object.assign({ x: 6.108, y: 12.023, w: 7.73, h: 1.245 }, paragraph(GREY_75)));
+  text(s, 'Visit Now', Object.assign({ x: 6.108, y: 13.632, w: 2.093, h: 0.505 }, link(ORANGE)));
+
+  rect(s, 0, 6.543, 17.323, 4.398, ORANGE);
+  text(s, '20 Rak \u2019at', Object.assign({ x: 1.747, y: 8.095, w: 3.821, h: 1.01 }, headline(54, GREEN)));
+  text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
+    Object.assign({ x: 6.098, y: 7.634, w: 10.085, h: 1.245 }, paragraph(GREY_25)));
+  text(s, 'Visit Now', Object.assign({ x: 6.108, y: 9.379, w: 2.093, h: 0.505 }, link(GREEN)));
+
+  text(s, 'Most Beautiful Month', Object.assign({ x: 1.747, y: 1.824, w: 5.532, h: 0.572 }, eyebrow()));
+  text(s, [
+    { text: 'Taraweeh Prayer ', options: { color: GREEN } },
+    { text: 'Together !', options: { color: ORANGE } },
+  ], Object.assign({ x: 1.747, y: 2.397, w: 9.059, h: 2.794 }, headline(80, GREEN)));
+  text(s, [
+    { text: 'Praying Is The most Beautiful ', options: { color: GREEN } },
+    { text: 'Thing In Islam', options: { color: ORANGE } },
+  ], Object.assign({ x: 16.111, y: 11.903, w: 9.672, h: 2.121 }, headline(60, GREEN)));
+
+  rings(s, 8.601, 4.947, ORANGE, ORANGE);
+}
+
+// 4 - Meet Our Organizers
+function slide04(pptx) {
+  const s = pptx.addSlide();
+  rect(s, 0, 0, SLIDE_W, FULL_H, WHITE);
+
+  photoFrame(s, 'rect', 0.001, 0.013, 7.999, 7.496);
+  photoFrame(s, 'rect', -0.003, 7.5, 8, 7.487);
+  photoFrame(s, 'rect', 8.043, -0.004, 7.925, 7.532);
+  photoFrame(s, 'rect', 7.999, 7.53, 7.998, 7.457);
+
+  text(s, 'Our Organizers', Object.assign({ x: 17.402, y: 3.661, w: 5.532, h: 0.572 }, eyebrow()));
+  text(s, 'Meet Our\nOrganizers', Object.assign({ x: 17.402, y: 4.207, w: 6.176, h: 3.063 }, headline(88, GREEN)));
+  text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim venom,',
+    Object.assign({ x: 17.402, y: 7.509, w: 4.286, h: 4.275 }, paragraph(GREY_50)));
+
+  rings(s, 17.023, 2.916, ORANGE, GREEN);
+  rings(s, 22.191, 12.715, GREEN, ORANGE);
+  lantern(s, 22.116, 0, 2.214, 4.033);
+  lantern(s, 21.346, 0.013, 1.513, 2.757);
+}
+
+// 5 - Zakat & Umrah (icon cluster)
+function slide05(pptx) {
+  const s = pptx.addSlide();
+  photoFrame(s, 'rect', 4.423, 6.882, 18.022, 8.149);
+
+  // White page shape with a semicircular "bite" that reveals the photo below.
+  s.addShape('custGeom', {
+    x: 0, y: 0, w: SLIDE_W, h: 15.022, fill: { color: WHITE }, line: NOLINE,
+    points: [
+      { x: 0, y: 0 }, { x: 26.667, y: 0 }, { x: 26.667, y: 15.022 }, { x: 21.691, y: 15.022 },
+      { x: 21.664, y: 14.665 },
+      { x: 13.333, y: 7.147, curve: { type: 'cubic', x1: 21.235, y1: 10.442, x2: 17.669, y2: 7.147 } },
+      { x: 5.003, y: 14.665, curve: { type: 'cubic', x1: 8.998, y1: 7.147, x2: 5.431, y2: 10.442 } },
+      { x: 4.975, y: 15.022 }, { x: 0, y: 15.022 }, { x: 0, y: 0 }, { close: true },
+    ],
+  });
+
+  text(s, 'Muslims Things',
+    Object.assign({ x: 10.567, y: 2.273, w: 5.532, h: 0.572, align: 'center' }, eyebrow()));
+  text(s, [
+    { text: 'Zakat & ', options: { color: GREEN } },
+    { text: 'Umrah', options: { color: ORANGE } },
+  ], Object.assign({ x: 8.046, y: 2.82, w: 10.575, h: 1.582, align: 'center' }, headline(88, GREEN)));
+  text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim venom,',
+    Object.assign({ x: 6.235, y: 4.532, w: 14.196, h: 1.245, align: 'center' }, paragraph(GREY_35)));
+
+  lantern(s, 4.022, 0, 2.214, 4.033);
+  lantern(s, 5.418, -0.022, 1.513, 2.757);
+
+  // Circular icon chips
+  [
+    [4.222, 11.082, 2.71, ORANGE], [6.691, 7.529, 2.71, GREEN], [17.01, 7.529, 2.71, ORANGE],
+    [12.849, 6.097, 2.187, ORANGE], [19.652, 11.082, 2.71, GREEN],
+  ].forEach(([x, y, d, color]) => {
+    s.addShape('flowChartConnector', { x, y, w: d, h: d, fill: { color }, line: NOLINE, shadow: shadow(28, 0.32) });
+  });
+
+  // Star-framed icons and the pictograms sitting inside every chip
+  star(s, 0.959, 11.479, 2.624, ORANGE, WHITE);
+  star(s, 4.94, 5.289, 2.624, ORANGE, WHITE);
+  star(s, 20.579, 7.761, 2.624, ORANGE, WHITE);
+  icon(s, 1.876, 12.396, 0.79, '000000');
+  icon(s, 5.84, 6.206, 0.789, '000000');
+  icon(s, 21.442, 8.624, 0.897, '000000');
+  icon(s, 20.327, 11.716, 1.36, WHITE);
+  icon(s, 17.455, 7.982, 1.817, WHITE);
+  icon(s, 7.341, 8.191, 1.409, WHITE);
+  icon(s, 13.325, 6.607, 1.231, WHITE);
+  icon(s, 4.864, 11.652, 1.424, WHITE);
+
+  rings(s, 4.423, 9.893, ORANGE, GREEN);
+  rings(s, 17.878, 2.357, ORANGE, GREEN);
+  donut(s, 18.224, 6.055, 0.397, ORANGE);
+  donut(s, 8.89, 1.797, 0.397, ORANGE);
+}
+
+// 6 - 5 Time Pray In A Day
+function slide06(pptx) {
+  const s = pptx.addSlide();
+  rect(s, 0, 0, 3.352, FULL_H, GREEN);
+  rect(s, 3.352, 0, 23.315, FULL_H, WHITE);
+
+  text(s, [
+    { text: '5 Time Pray ', options: { color: GREEN } },
+    { text: 'In A Day', options: { color: ORANGE } },
+  ], Object.assign({ x: 4.831, y: 3.187, w: 7.485, h: 3.063 }, headline(88, GREEN)));
+  text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim venom,',
+    Object.assign({ x: 4.831, y: 6.379, w: 8.752, h: 1.851 }, paragraph(GREY_50)));
+
+  // Fajir sits under the intro copy, the other four hang off the timeline.
+  star(s, 4.831, 9.203, 0.918, ORANGE, WHITE);
+  text(s, 'Fajir', Object.assign({ x: 6.2, y: 9.332, w: 5.033, h: 0.707 }, headline(36, GREEN)));
+  text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore,',
+    Object.assign({ x: 4.831, y: 10.246, w: 8.109, h: 1.245 }, paragraph(GREY_50)));
+
+  const prayers = [
+    { name: 'Zohar', num: '02', iconY: 1.82, bodyY: 2.748, dotY: 2.664, numY: 2.4 },
+    { name: 'Asar', num: '03', iconY: 4.733, bodyY: 5.661, dotY: 5.914, numY: 5.616 },
+    { name: 'Mugrib', num: '04', iconY: 7.674, bodyY: 8.601, dotY: 8.751, numY: 8.485 },
+    { name: 'Isha', num: '05', iconY: 10.618, bodyY: 11.67, dotY: 11.549, numY: 11.217, labelW: 1.44 },
+  ];
+  s.addShape('line', { x: 16, y: 2.02, w: 0, h: 10.449, line: { color: HAIRLINE, width: 1 } });
+  prayers.forEach((p) => {
+    star(s, 16.963, p.iconY, 0.918, ORANGE, WHITE);
+    text(s, p.name, Object.assign({ x: 18.038, y: p.iconY + 0.106, w: p.labelW || 1.905, h: 0.707 }, headline(36, GREEN)));
+    text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempo.,',
+      Object.assign({ x: 16.963, y: p.bodyY, w: 7.485, h: 1.245 }, paragraph(GREY_50)));
+    s.addShape('ellipse', { x: 15.875, y: p.dotY, w: 0.242, h: 0.242, fill: { color: GREEN }, line: NOLINE });
+    text(s, p.num, Object.assign({ x: 14.583, y: p.numY, w: 0.892, h: 0.774 }, headline(40, GREEN)));
+  });
+
+  text(s, [
+    { text: 'Month Of Praying ', options: { color: WHITE } },
+    { text: '& Fasting', options: { color: ORANGE } },
+  ], Object.assign({ x: -2.533, y: 7.057, w: 8.631, h: 0.909, rotate: 270, align: 'center' }, headline(48, WHITE)));
+}
+
+// 7 & 14 - full-bleed photo section dividers
+function photoDivider(pptx, eyebrowText, titleText, eyebrowBox) {
+  const s = pptx.addSlide();
+  photoFrame(s, 'rect', 0, 0, SLIDE_W, SLIDE_H);
+  rect(s, 0, 0, SLIDE_W, SLIDE_H, '000000', { fill: { color: '000000', transparency: 32 } });
+  text(s, eyebrowText, Object.assign({
+    x: eyebrowBox[0], y: eyebrowBox[1], w: eyebrowBox[2], h: 0.572, align: 'center',
+  }, eyebrow(ORANGE, eyebrowBox[3])));
+  text(s, titleText,
+    Object.assign({ x: 8.046, y: 6.717, w: 10.575, h: 1.582, align: 'center' }, headline(88, WHITE)));
+  rings(s, 18.005, 8.402, ORANGE, WHITE);
+  rings(s, 8.046, 6.32, ORANGE, WHITE);
+  return s;
+}
+
+// 8 - Umrah Package
+function slide08(pptx) {
+  const s = pptx.addSlide();
+  rect(s, 0, 0, SLIDE_W, FULL_H, WHITE);
+
+  text(s, 'Make Bundle For You',
+    Object.assign({ x: 10.567, y: 1.385, w: 5.532, h: 0.572, align: 'center' }, eyebrow()));
+  text(s, 'Umrah Package',
+    Object.assign({ x: 8.046, y: 1.996, w: 10.575, h: 1.582, align: 'center' }, headline(88, GREEN)));
+  text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod temper incididunt,',
+    Object.assign({ x: 6.235, y: 3.704, w: 14.196, h: 0.64, align: 'center' }, paragraph(GREY_35)));
+
+  const cards = [
+    { photoX: 2.883, photoY: 5, photoW: 6.527, adj: 0.10831, btnX: 2.5, daysX: 3.034, days: 'For 12 Days', cardX: 2.886, textX: 3.554, bookedX: 3.65, amountX: 6.072, bookX: 6.496, price: '$ 35.00', rule: 3.554 },
+    { photoX: 10.113, photoY: 5.031, photoW: 6.524, adj: 0.11362, btnX: 9.731, daysX: 10.265, days: 'For 18 Days', cardX: 10.116, textX: 10.785, bookedX: 10.881, amountX: 13.302, bookX: 13.726, price: '$ 48.00' },
+    { photoX: 17.267, photoY: 5.001, photoW: 6.514, adj: 0.09239, btnX: 16.884, daysX: 17.418, days: 'For 22 Days', cardX: 17.27, textX: 17.938, bookedX: 18.034, amountX: 20.456, bookX: 20.88, price: '$ 75.00' },
+  ];
+
+  cards.forEach((c) => {
+    photoFrame(s, 'roundRect', c.photoX, c.photoY, c.photoW, 5.89, { rectRadius: c.adj * 5.89 });
+  });
+  cards.forEach((c) => {
+    roundRect(s, c.btnX, 5.721, 3.412, 0.945, 0.16667, { color: ORANGE });
+    text(s, c.days, Object.assign({ x: c.daysX, y: 5.907, w: 2.598, h: 0.572 }, eyebrow(WHITE, 0)));
+
+    // White info card: rounded on top, square at the bottom (drawn flipped in the source).
+    s.addShape('custGeom', {
+      x: c.cardX, y: 9.352, w: 6.524, h: 4.366, rotate: 180,
+      fill: { color: WHITE }, line: NOLINE, shadow: shadow(31, 0.36),
+      points: [
+        { x: 0.571, y: 0 }, { x: 5.953, y: 0 },
+        { x: 6.524, y: 0.571, curve: { type: 'cubic', x1: 6.269, y1: 0, x2: 6.524, y2: 0.256 } },
+        { x: 6.524, y: 4.366 }, { x: 0, y: 4.366 }, { x: 0, y: 0.571 },
+        { x: 0.571, y: 0, curve: { type: 'cubic', x1: 0, y1: 0.256, x2: 0.256, y2: 0 } },
+        { close: true },
+      ],
+    });
+    text(s, 'Booked', Object.assign({ x: c.bookedX, y: 9.776, w: 1.657, h: 0.505 }, label(24, ORANGE, MEDIUM)));
+    text(s, '25,2594.00', Object.assign({ x: c.amountX, y: 9.776, w: 2.831, h: 0.505 }, label(24, GREEN, MEDIUM)));
+    text(s, 'Umrah Package', Object.assign({ x: c.textX, y: 10.511, w: 4.156, h: 0.64 }, label(32, GREY_15)));
+    text(s, 'Lorem ipsum dolor sit amet cons,',
+      Object.assign({ x: c.textX, y: 11.071, w: 5.673, h: 0.64 }, paragraph(GREY_35)));
+    if (c.rule) hairline(s, c.rule, 12.194, 5.035);
+    text(s, c.price, Object.assign({ x: c.textX, y: 12.49, w: 2.235, h: 0.64 }, label(32, GREEN, MEDIUM)));
+    text(s, 'Book Now', Object.assign({ x: c.bookX, y: 12.591, w: 2.093, h: 0.505 }, link(ORANGE)));
+  });
+
+  lantern(s, 20.748, 0, 2.214, 4.033);
+  lantern(s, 19.978, 0.013, 1.513, 2.757);
+  donut(s, 24.328, 12.898, 0.397, ORANGE);
+  donut(s, 24.385, 12.038, 0.728, GREEN);
+  donut(s, 2.538, 4.236, 0.397, ORANGE);
+  donut(s, 2.917, 3.569, 0.728, GREEN);
+}
+
+// 9 - Our Services (four cards)
+function slide09(pptx) {
+  const s = pptx.addSlide();
+  rect(s, 0, 0, SLIDE_W, FULL_H, WHITE);
+
+  text(s, 'Muslims Things',
+    Object.assign({ x: 10.237, y: 2.45, w: 6.192, h: 0.572, align: 'center' }, eyebrow()));
+  text(s, 'Our Services',
+    Object.assign({ x: 7.415, y: 2.872, w: 11.837, h: 1.582, align: 'center' }, headline(88, GREEN)));
+  text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore,',
+    Object.assign({ x: 5.388, y: 4.584, w: 15.89, h: 0.64, align: 'center' }, paragraph(GREY_35)));
+
+  const cards = [
+    { x: 2.906, y: 6.144, h: 6.055, title: 'Umrah Services', textX: 3.5, titleY: 8.825, bodyY: 9.335, linkY: 10.9, iconX: 3.5, iconY: 6.936, iconSize: 1.591, iconColor: GREEN, dark: false },
+    { x: 8.25, y: 6.152, h: 6.047, title: 'Guideline', textX: 8.844, titleY: 8.825, bodyY: 9.335, linkY: 10.9, iconX: 8.863, iconY: 7.044, iconSize: 1.375, iconColor: WHITE, dark: true },
+    { x: 13.594, y: 6.145, h: 6.047, title: 'Health Insurance', textX: 14.188, titleY: 8.819, bodyY: 9.328, linkY: 10.893, iconX: 14.188, iconY: 6.926, iconSize: 1.612, iconColor: GREEN, dark: false },
+    { x: 18.937, y: 6.153, h: 6.039, title: 'Managements', textX: 19.531, titleY: 8.819, bodyY: 9.328, linkY: 10.893, iconX: 19.531, iconY: 7.023, iconSize: 1.417, iconColor: GREEN, dark: false },
+  ];
+
+  cards.forEach((c) => {
+    roundRect(s, c.x, c.y, 5.031, c.h, 0.16667,
+      c.dark ? { color: GREEN } : { type: 'none' },
+      c.dark ? NOLINE : { color: HAIRLINE, width: 1 });
+    text(s, c.title, Object.assign({ x: c.textX, y: c.titleY, w: 4.156, h: 0.572 }, label(28, c.dark ? WHITE : GREEN)));
+    text(s, 'Lorem ipsum dolor sit amet cons,',
+      Object.assign({ x: c.textX, y: c.bodyY, w: 3.874, h: 1.245 }, paragraph(c.dark ? GREY_75 : GREY_35)));
+    text(s, 'Visit Now', Object.assign({ x: c.textX, y: c.linkY, w: 2.093, h: 0.505 }, link(ORANGE)));
+    icon(s, c.iconX, c.iconY, c.iconSize, c.iconColor);
+  });
+
+  rings(s, 7.194, 3.287, ORANGE, GREEN, 0.667);
+  rings(s, 18.169, 3.857, ORANGE, GREEN, 0.667);
+}
+
+// 10 & 17 - Surah pages: alternating zebra bands, Arabic right / English left
+function surahSlide(pptx, opts) {
+  const s = pptx.addSlide();
+  rect(s, 0, 0, SLIDE_W, FULL_H, WHITE);
+  opts.bands.forEach(([y, h]) => rect(s, 0, y, SLIDE_W, h, BAND));
+
+  text(s, 'The Beautiful Surah',
+    Object.assign({ x: 10.237, y: opts.eyebrowY, w: 6.192, h: 0.572, align: 'center' }, eyebrow()));
+  text(s, opts.title.map((t) => ({ text: t })),
+    Object.assign({ x: 8.046, y: opts.titleY, w: 10.575, h: 1.582, align: 'center' }, headline(88, GREEN)));
+
+  opts.verses.forEach((v) => {
+    text(s, v.ar, {
+      x: v.arX, y: v.arY, w: v.arW, h: 0.934, align: 'right', valign: 'top', margin: 0,
+      fontFace: ARABIC, fontSize: 36, color: NEAR_BLACK, lineSpacingMultiple: 1.5,
+    });
+    text(s, v.en, Object.assign({ x: 2.292, y: v.enY, w: v.enW || 14.186, h: v.enH || 0.572 }, label(28, GREY_25, MEDIUM)));
+  });
+
+  rings(s, 22.246, opts.eyebrowY + 0.354, ORANGE, GREEN, 0.667);
+  rings(s, 4.607, opts.eyebrowY + 0.515, ORANGE, GREEN, 0.667);
+  return s;
+}
+
+// 11 - 5 Pillar's Of Islam
+function slide11(pptx) {
+  const s = pptx.addSlide();
+  rect(s, 0, 0, SLIDE_W, FULL_H, GREEN);
+
+  const pillars = [
+    { name: 'Shahada', starX: 12.254, starY: 2.514, textX: 12.815, textY: 1.839, iconX: 13.603, iconY: 3.863, iconSize: 1.333, iconColor: 'FFAE2B' },
+    { name: 'Sawm', starX: 19.72, starY: 2.439, textX: 20.281, textY: 1.856, iconX: 21.159, iconY: 3.893, iconSize: 1.123, iconColor: WHITE },
+    { name: 'Salat', starX: 12.245, starY: 8.517, textX: 12.831, textY: 12.22, iconX: 13.697, iconY: 9.969, iconSize: 1.126, iconColor: WHITE },
+    { name: 'Zakat', starX: 19.682, starY: 8.556, textX: 20.2, textY: 12.261, iconX: 21.091, iconY: 9.964, iconSize: 1.214, iconColor: WHITE },
+  ];
+  pillars.forEach((p) => {
+    star(s, p.starX, p.starY, 4.031, ORANGE, GREEN);
+    text(s, p.name, Object.assign({ x: p.textX, y: p.textY, w: 2.91, h: 0.909, align: 'center' }, headline(48, WHITE)));
+  });
+  star(s, 13.032, 2.591, 9.895, ORANGE, GREEN);
+  text(s, 'Hajj', Object.assign({ x: 16.525, y: 8.151, w: 2.91, h: 0.909, align: 'center' }, headline(48, WHITE)));
+  icon(s, 17.158, 6.266, 1.643, WHITE);
+  pillars.forEach((p) => icon(s, p.iconX, p.iconY, p.iconSize, p.iconColor));
+
+  text(s, 'Muslims Are Strong', Object.assign({ x: 2.677, y: 4.285, w: 5.532, h: 0.572 }, eyebrow()));
+  text(s, '5 Pillar\u2019s Of Islam', Object.assign({ x: 2.677, y: 4.831, w: 10.575, h: 1.582 }, headline(88, WHITE)));
+  text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim venom,',
+    Object.assign({ x: 2.777, y: 6.612, w: 9.615, h: 1.851 }, paragraph(GREY_65)));
+
+  [9.085, 10.207].forEach((y) => {
+    star(s, 2.677, y, 0.918, ORANGE, GREEN);
+    text(s, 'Most Beautiful Month In Islam',
+      Object.assign({ x: 3.854, y: y + 0.129, w: 6.509, h: 0.64 }, headline(32, WHITE)));
+  });
+
+  rings(s, 2.034, 3.355, ORANGE, WHITE);
+  rings(s, 10.351, 11.873, ORANGE, WHITE);
+}
+
+// 12 - Why Ramadan Is The Most Sacred Month
+function slide12(pptx) {
+  const s = pptx.addSlide();
+  photoFrame(s, 'rect', 0, 0, SLIDE_W, 10.562);
+  rect(s, 0, 7.062, 13.333, 7.938, GREEN);
+
+  text(s, 'Most Beautiful Month', Object.assign({ x: 1.376, y: 8.978, w: 5.532, h: 0.572 }, eyebrow()));
+  text(s, [
+    { text: 'Why Ramadan Is The Most Sacred ', options: { color: WHITE } },
+    { text: 'Month', options: { color: ORANGE, breakLine: true } },
+    { text: 'In Islam !', options: { color: ORANGE } },
+  ], Object.assign({ x: 1.376, y: 9.55, w: 10.758, h: 3.736 }, headline(72, WHITE)));
+  text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim venom,',
+    Object.assign({ x: 14.583, y: 11.616, w: 9.979, h: 1.851 }, paragraph(GREY_35)));
+
+  rings(s, 24.183, 13.406, ORANGE, GREEN, 0.667);
+  rings(s, 9.523, 8.629, GREEN, WHITE);
+  rect(s, 12.96, 10.562, 0.397, 4.438, ORANGE);
+}
+
+// 13 - News Latest
+function slide13(pptx) {
+  const s = pptx.addSlide();
+  rect(s, 0, 0, SLIDE_W, FULL_H, WHITE);
+
+  [
+    [2.759, 8.602, 7.459, 0.09315], [11.737, 3.678, 7.485, 0.12281],
+    [15.781, 3.664, 7.459, 0.08744], [19.812, 3.685, 7.485, 0.1054],
+  ].forEach(([x, w, h, adj]) => photoFrame(s, 'roundRect', x, 5.304, w, h, { rectRadius: adj * Math.min(w, h) }));
+
+  text(s, 'Ramadan Kareem',
+    Object.assign({ x: 10.501, y: 2.237, w: 5.532, h: 0.572, align: 'center' }, eyebrow()));
+  text(s, 'News Latest',
+    Object.assign({ x: 8.046, y: 2.764, w: 10.575, h: 1.582, align: 'center' }, headline(88, GREEN)));
+
+  lantern(s, 4.022, 0, 2.214, 4.033);
+  lantern(s, 5.418, -0.022, 1.513, 2.757);
+  lantern(s, 20.518, -0.046, 2.214, 4.033);
+  lantern(s, 19.747, -0.033, 1.513, 2.757);
+  rings(s, 7.923, 2.674, ORANGE, GREEN, 0.667);
+}
+
+// 15 - Hajj Package
+function slide15(pptx) {
+  const s = pptx.addSlide();
+  rect(s, 0, 0, SLIDE_W, FULL_H, WHITE);
+
+  const cards = [
+    { photoX: 2.833, photoY: 5.23, photoH: 8.592, adj: 0.07882, overlayX: 2.834, overlayY: 5.23, overlayH: 8.592, textX: 3.554, daysY: 12.501, days: 'For 12 Days', bookX: 6.496, amountX: 6.072, ruleX: 3.554, ovalX: 7.463, priceX: 7.618 },
+    { photoX: 9.719, photoY: 5.23, photoH: 8.592, adj: 0.07394, overlayX: 9.72, overlayY: 5.23, overlayH: 8.625, textX: 10.483, daysY: 12.558, days: 'For 18 Days', bookX: 13.601, amountX: 13.0, ruleX: 10.491, ovalX: 14.355, priceX: 14.51 },
+    { photoX: 16.641, photoY: 5.166, photoH: 8.592, adj: 0.06906, overlayX: 16.607, overlayY: 5.166, overlayH: 8.578, textX: 17.298, daysY: 12.613, days: 'For 22 Days', bookX: 20.24, amountX: 19.815, ruleX: 17.3, ovalX: 21.219, priceX: 21.374 },
+  ];
+
+  cards.forEach((c) => photoFrame(s, 'roundRect', c.photoX, c.photoY, 6.61, c.photoH, { rectRadius: c.adj * 6.61 }));
+  cards.forEach((c) => {
+    // 48% black scrim so the white type stays legible over the photo
+    roundRect(s, c.overlayX, c.overlayY, 6.61, c.overlayH, 0.08157,
+      { color: NEAR_BLACK, transparency: 52 });
+  });
+
+  text(s, 'Make Bundle For You',
+    Object.assign({ x: 10.567, y: 1.385, w: 5.532, h: 0.572, align: 'center' }, eyebrow()));
+  text(s, 'Hajj Package',
+    Object.assign({ x: 8.046, y: 1.996, w: 10.575, h: 1.582, align: 'center' }, headline(88, GREEN)));
+  text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod temper incididunt,',
+    Object.assign({ x: 6.235, y: 3.704, w: 14.196, h: 0.64, align: 'center' }, paragraph(GREY_35)));
+
+  cards.forEach((c) => {
+    text(s, 'Hajj Package', Object.assign({ x: c.textX, y: 9.792, w: 4.156, h: 0.64 }, label(32, WHITE)));
+    text(s, 'Lorem ipsum dolor sit amet cons,',
+      Object.assign({ x: c.textX, y: 10.352, w: 5.673, h: 0.64 }, paragraph(GREY_75)));
+    text(s, 'Booked', Object.assign({ x: c.textX, y: 11.307, w: 1.657, h: 0.505 }, label(24, ORANGE, MEDIUM)));
+    text(s, '25,2594.00', Object.assign({ x: c.amountX, y: 11.307, w: 2.831, h: 0.505 }, label(24, WHITE, MEDIUM)));
+    hairline(s, c.ruleX, 12.202, 5.035, GREY_50);
+    text(s, c.days, Object.assign({ x: c.textX, y: c.daysY, w: 2.598, h: 0.572 }, eyebrow(WHITE, 0)));
+    text(s, 'Book Now', Object.assign({ x: c.bookX, y: 12.591, w: 2.093, h: 0.505 }, link(ORANGE)));
+    s.addShape('ellipse', { x: c.ovalX, y: 5.652, w: 1.44, h: 1.44, fill: { color: ORANGE }, line: NOLINE });
+    text(s, '$35', Object.assign({ x: c.priceX, y: 6.084, w: 1.175, h: 0.64 }, label(32, WHITE, MEDIUM)));
+  });
+
+  lantern(s, 20.748, 0, 2.214, 4.033);
+  lantern(s, 19.978, 0.013, 1.513, 2.757);
+  donut(s, 24.328, 12.898, 0.397, ORANGE);
+  donut(s, 24.385, 12.038, 0.728, GREEN);
+  donut(s, 2.538, 4.236, 0.397, ORANGE);
+  donut(s, 2.917, 3.569, 0.728, GREEN);
+}
+
+// 16 - Our Services (numbered 2x3 grid)
+function slide16(pptx) {
+  const s = pptx.addSlide();
+  rect(s, 0, 0, SLIDE_W, FULL_H, WHITE);
+
+  const tiles = [
+    { num: '01', title: 'Map', x: 2.599, y: 6.033, numX: 3.554, numY: 6.547, numW: 1.007, textX: 4.925, titleY: 6.759, bodyY: 7.268, fill: null, numColor: ORANGE, titleColor: GREEN, bodyColor: GREY_35 },
+    { num: '02', title: 'Praying', x: 9.868, y: 6.046, numX: 10.676, numY: 6.547, numW: 1.175, textX: 12.156, titleY: 6.753, bodyY: 7.262, fill: GREEN, numColor: WHITE, titleColor: WHITE, bodyColor: GREY_65 },
+    { num: '03', title: 'Stay In Hotel', x: 17.137, y: 6.046, numX: 18.068, numY: 6.547, numW: 1.175, textX: 19.594, titleY: 6.753, bodyY: 7.262, fill: null, numColor: ORANGE, titleColor: GREEN, bodyColor: GREY_35 },
+    { num: '04', title: 'Hajj Services', x: 2.599, y: 9.525, numX: 3.554, numY: 10.056, numW: 1.007, textX: 4.925, titleY: 10.251, bodyY: 10.76, fill: ORANGE, numColor: GREEN, titleColor: GREEN, bodyColor: GREY_35 },
+    { num: '05', title: 'Health Insurance', x: 9.868, y: 9.538, numX: 10.676, numY: 10.056, numW: 1.175, textX: 12.156, titleY: 10.245, bodyY: 10.754, fill: null, numColor: GREEN, titleColor: GREEN, bodyColor: GREY_35 },
+    { num: '06', title: 'Managements', x: 17.137, y: 9.538, numX: 18.068, numY: 10.056, numW: 1.175, textX: 19.594, titleY: 10.245, bodyY: 10.754, fill: 'card', numColor: ORANGE, titleColor: GREEN, bodyColor: GREY_35 },
+  ];
+
+  tiles.forEach((t) => {
+    if (t.fill === 'card') {
+      roundRect(s, t.x, t.y, 6.943, 3.124, 0.16667, { color: WHITE }, { color: HAIRLINE, width: 1 },
+        { shadow: shadow(23, 0.29) });
+    } else {
+      roundRect(s, t.x, t.y, 6.943, 3.124, 0.16667,
+        t.fill ? { color: t.fill } : { type: 'none' },
+        t.fill ? NOLINE : { color: HAIRLINE, width: 1 });
+    }
+  });
+
+  text(s, 'Muslims Things',
+    Object.assign({ x: 10.237, y: 2.206, w: 6.192, h: 0.572, align: 'center' }, eyebrow()));
+  text(s, 'Our Services',
+    Object.assign({ x: 7.415, y: 2.628, w: 11.837, h: 1.582, align: 'center' }, headline(88, GREEN)));
+  text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore,',
+    Object.assign({ x: 5.388, y: 4.34, w: 15.89, h: 0.64, align: 'center' }, paragraph(GREY_35)));
+
+  tiles.forEach((t) => {
+    text(s, t.num, Object.assign({ x: t.numX, y: t.numY, w: t.numW, h: 2.121, align: 'center' }, label(60, t.numColor, MEDIUM)));
+    text(s, t.title, Object.assign({ x: t.textX, y: t.titleY, w: 4.156, h: 0.572 }, label(28, t.titleColor)));
+    text(s, 'Lorem ipsum dolor sit amet cons,',
+      Object.assign({ x: t.textX, y: t.bodyY, w: 3.874, h: 1.245 }, paragraph(t.bodyColor)));
+  });
+
+  rings(s, 7.194, 3.287, ORANGE, GREEN, 0.667);
+  donut(s, 17.968, 2.711, 0.397, ORANGE);
+  donut(s, 18.548, 3.19, 0.728, GREEN);
+}
+
+// 18 - Why Ramadan Us The Most Sacred Month In Islamic Culture
+function slide18(pptx) {
+  const s = pptx.addSlide();
+  rect(s, 0, 0, SLIDE_W, FULL_H, GREEN);
+  photoFrame(s, 'ellipse', 2.136, 1.917, 8.09, 8.131);
+  photoFrame(s, 'ellipse', 5.489, 6.618, 6.129, 6.129);
+
+  text(s, 'Beautiful Thing In Islam', Object.assign({ x: 13.919, y: 3.329, w: 6.025, h: 0.572 }, eyebrow()));
+  text(s, [
+    { text: 'Why Ramadan Us The Most ', options: { color: WHITE } },
+    { text: 'Sacred Month In Islamic Culture', options: { color: ORANGE } },
+  ], Object.assign({ x: 13.919, y: 3.875, w: 10.575, h: 6.025 }, headline(88, WHITE)));
+  text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim venom,',
+    Object.assign({ x: 13.919, y: 10.446, w: 9.237, h: 1.851 }, paragraph(GREY_75)));
+
+  [
+    [2.038, 2.236, 2.187, ORANGE], [6.346, 11.058, 2.497, WHITE], [11.052, 4.901, 2.187, ORANGE],
+  ].forEach(([x, y, d, color]) => {
+    s.addShape('flowChartConnector', { x, y, w: d, h: d, fill: { color }, line: NOLINE, shadow: shadow(28, 0.32) });
+  });
+  icon(s, 11.471, 5.27, 1.348, WHITE);
+  icon(s, 6.859, 11.607, 1.47, '000000');
+  icon(s, 2.417, 2.692, 1.183, WHITE);
+
+  rings(s, 13.448, 2.52, ORANGE, WHITE);
+  rings(s, 22.091, 9.286, WHITE, ORANGE);
+  rings(s, 2.265, 12.343, ORANGE, WHITE);
+  lantern(s, 22.116, 0, 2.214, 4.033);
+  lantern(s, 21.346, 0.013, 1.513, 2.757);
+}
+
+// 19 - Benefits Of Fasting
+function slide19(pptx) {
+  const s = pptx.addSlide();
+  rect(s, 14.625, 0, 12.042, FULL_H, GREEN);
+
+  text(s, 'Fasting Make Your Strong',
+    Object.assign({ x: 2.072, y: 8.169, w: 5.532, h: 0.572 }, eyebrow(ORANGE, 0)));
+  text(s, 'Benefits Of Fasting\nIn Ramadan',
+    Object.assign({ x: 2.072, y: 8.85, w: 9.992, h: 2.794 }, headline(80, GREEN)));
+  text(s, [
+    { text: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna ' },
+    { text: 'aliqua' }, { text: '.' },
+  ], Object.assign({ x: 2.072, y: 11.929, w: 10.368, h: 1.245 }, paragraph(GREY_50)));
+
+  text(s, 'Benefits', Object.assign({ x: 15.962, y: 2.783, w: 4.371, h: 1.212 }, headline(66, WHITE)));
+  const benefits = [
+    'Providing Food & Residence', 'Provide Best Room And Services',
+    'Providing Umrah Guiders', 'Providing Transportations',
+  ];
+  [4.263, 5.384, 6.377, 7.369, 8.374, 9.495, 10.487, 11.479].forEach((y, i) => {
+    star(s, 15.962, y, 0.918, ORANGE, GREEN);
+    text(s, benefits[i % 4], Object.assign({ x: 17.199, y: y + 0.129, w: 6.509, h: 0.64 }, headline(32, WHITE)));
+  });
+
+  rect(s, 26.295, 4.263, 0.372, 10.737, ORANGE);
+  photoFrame(s, 'rect', 0, 0, 14.612, 6.781);
+}
+
+// 20 - Price Table
+function slide20(pptx) {
+  const s = pptx.addSlide();
+  rect(s, 0, 0, SLIDE_W, FULL_H, WHITE);
+
+  const plans = [
+    {
+      name: 'BASIC', nameX: 5.142, nameY: 6.764, nameW: 2.182, nameColor: ORANGE,
+      waveX: 3.603, waveY: 4.115, waveW: 6.386, waveH: 9.691, waveColor: GREEN,
+      itemX: 5.142, itemY: 7.633, itemW: 3.712,
+      items: ['50% Discount', 'Online Classes', 'Packages'],
+      priceX: 5.142, priceY: 10.355, priceW: 3.243, price: '400', priceColor: ORANGE,
+    },
+    {
+      name: 'STANDARD', nameX: 11.32, nameY: 6.19, nameW: 3.272, nameColor: WHITE,
+      waveX: 9.989, waveY: 4.035, waveW: 6.211, waveH: 9.804, waveColor: ORANGE,
+      itemX: 11.32, itemY: 7.108, itemW: 3.712,
+      items: ['50% Discount', 'Online Classes', 'Packages'],
+      extra: { text: 'Achievement Success', x: 11.32, y: 9.209, w: 3.023, h: 1.448 },
+      priceX: 11.32, priceY: 10.949, priceW: 4.186, price: '700', priceColor: WHITE,
+    },
+    {
+      name: 'PREMIUM', nameX: 17.835, nameY: 5.803, nameW: 3.272, nameColor: ORANGE,
+      waveX: 16.2, waveY: 4.032, waveW: 6.733, waveH: 9.804, waveColor: GREEN,
+      itemX: 17.835, itemY: 6.787, itemW: 3.712,
+      items: ['50% Discount', 'Online Classes', 'Packages'],
+      extra: { text: 'Achievement Success', x: 17.835, y: 8.889, w: 3.712, h: 1.448 },
+      tail: { text: 'Ramadan', x: 17.835, y: 10.448, w: 3.712, h: 0.741 },
+      priceX: 17.835, priceY: 11.541, priceW: 4.186, price: '900', priceColor: ORANGE,
+    },
+  ];
+
+  // waves are drawn back to front so the amber middle column overlaps
+  [plans[2], plans[0], plans[1]].forEach((p) => {
+    s.addShape('doubleWave', {
+      x: p.waveX, y: p.waveY, w: p.waveW, h: p.waveH, fill: { color: p.waveColor }, line: NOLINE,
+    });
+  });
+
+  const planLine = { fontFace: MEDIUM, fontSize: 28, color: WHITE, lineSpacingMultiple: 1.5 };
+  plans.forEach((p) => {
+    text(s, p.name, Object.assign({ x: p.nameX, y: p.nameY, w: p.nameW, h: 0.774 }, label(40, p.nameColor)));
+    p.items.forEach((item, i) => {
+      text(s, item, Object.assign({
+        x: p.itemX, y: p.itemY + i * (i === 2 ? 0.72 : 0.714), w: p.itemW, h: 0.741,
+      }, planLine));
+    });
+    if (p.extra) {
+      text(s, p.extra.text, Object.assign({ x: p.extra.x, y: p.extra.y, w: p.extra.w, h: p.extra.h }, planLine));
+    }
+    if (p.tail) {
+      text(s, p.tail.text, Object.assign({ x: p.tail.x, y: p.tail.y, w: p.tail.w, h: p.tail.h }, planLine));
+    }
+    text(s, [
+      { text: p.price },
+      { text: ' ', options: { fontSize: null } },
+      { text: '/ Book', options: { fontSize: 28 } },
+    ], { x: p.priceX, y: p.priceY, w: p.priceW, h: 0.909, valign: 'top', isTextBox: true,
+      fontFace: MEDIUM, fontSize: 48, color: p.priceColor });
+  });
+
+  text(s, 'Ramadan Kareem',
+    Object.assign({ x: 10.157, y: 1.481, w: 5.532, h: 0.572, align: 'center' }, eyebrow()));
+  text(s, 'Price Table',
+    Object.assign({ x: 7.635, y: 2.06, w: 10.575, h: 1.717, align: 'center' }, headline(96, GREEN)));
+
+  lantern(s, 3.568, 0.013, 2.214, 4.033);
+  lantern(s, 4.964, 0.024, 1.513, 2.757);
+  lantern(s, 20.064, 0, 1.773, 3.23);
+  lantern(s, 19.294, 0.013, 1.212, 2.208);
+
+  donut(s, 5.86, 4.261, 0.397, GREEN);
+  donut(s, 8.875, 3.897, 0.728, ORANGE);
+  donut(s, 23.723, 12.388, 0.397, GREEN);
+  donut(s, 24.102, 11.721, 0.728, ORANGE);
+  donut(s, 18.247, 3.532, 0.397, GREEN);
+}
+
+// 21 - The Beautiful Mosque Of Saudi
+function slide21(pptx) {
+  const s = pptx.addSlide();
+  rect(s, 0, 0, SLIDE_W, FULL_H, WHITE);
+
+  [[2.163, 6.735], [7.783, 6.773], [13.408, 6.773], [18.947, 6.735]].forEach(([x, y]) => {
+    photoFrame(s, 'ellipse', x, y, 5.233, 5.233);
+  });
+
+  text(s, 'Suggested Places',
+    Object.assign({ x: 10.258, y: 2.191, w: 6.151, h: 0.572, align: 'center' }, eyebrow()));
+  text(s, [
+    { text: 'The Beautiful Mosque ', options: { color: GREEN } },
+    { text: 'Of Saudi', options: { color: ORANGE } },
+  ], Object.assign({ x: 6.747, y: 2.763, w: 13.173, h: 3.063, align: 'center' }, headline(88, GREEN)));
+
+  lantern(s, 20.064, 0, 1.773, 3.23);
+  lantern(s, 19.294, 0.013, 1.212, 2.208);
+  rings(s, 7.396, 6.338, ORANGE, GREEN, 0.667);
+  rings(s, 17.898, 12.286, ORANGE, GREEN, 0.667);
+}
+
+// 22 - Thank you / contact
+function slide22(pptx) {
+  const s = pptx.addSlide();
+  rect(s, 0, -0.007, SLIDE_W, 15.007, GREEN);
+
+  text(s, [
+    { text: 'Rama', options: { color: WHITE } },
+    { text: 'dan', options: { color: ORANGE } },
+  ], Object.assign({ x: 6.394, y: 4.498, w: 13.996, h: 3.45, align: 'center' }, headline(199, WHITE)));
+  text(s, 'Thank You For Visiting', {
+    x: 8.814, y: 8.011, w: 9.156, h: 0.641, align: 'center', valign: 'top', margin: 0, isTextBox: true,
+    fontFace: MEDIUM, fontSize: 32, color: ORANGE, charSpacing: 3,
+  });
+  text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim venom,',
+    Object.assign({ x: 6.217, y: 8.945, w: 14.35, h: 1.245, align: 'center' }, paragraph(GREY_65)));
+
+  rect(s, 2.531, 12.097, 21.605, 0.05, ORANGE);
+  const contacts = [
+    { key: 'Phone:', keyX: 2.452, keyW: 2.175, value: ['+963 254 5994'], valueX: 4.627, valueW: 4.742 },
+    { key: 'Email:', keyX: 9.231, keyW: 2.314, value: ['Yourmail', '@gmail.com'], valueX: 11.405, valueW: 5.046 },
+    { key: 'Website:', keyX: 17.724, keyW: 2.666, value: ['www.yoursite.com'], valueX: 20.39, valueW: 5.157 },
+  ];
+  contacts.forEach((c) => {
+    text(s, c.key, {
+      x: c.keyX, y: 13.161, w: c.keyW, h: 0.64, valign: 'top', isTextBox: true,
+      fontFace: MEDIUM, fontSize: 32, color: ORANGE, charSpacing: 3,
+    });
+    // the domain half of the e-mail carries extra letter-spacing in the original
+    text(s, c.value.map((t, i) => ({ text: t, options: i === 1 ? { charSpacing: 3 } : {} })),
+      Object.assign({ x: c.valueX, y: 13.193, w: c.valueW, h: 0.572 }, label(28, WHITE, MEDIUM)));
+  });
+
+  lantern(s, 20.518, -0.046, 2.214, 4.033);
+  lantern(s, 19.747, -0.033, 1.513, 2.757);
+  rings(s, 5.025, 8.778, ORANGE, WHITE);
+  rings(s, 18.628, 4.617, ORANGE, WHITE);
+}
+
+/* ------------------------------------------------------------------ *
+ * Build
+ * ------------------------------------------------------------------ */
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'RAMADAN', width: SLIDE_W, height: SLIDE_H });
+  pptx.layout = 'RAMADAN';
+  pptx.title = 'Ramadan Kareem';
+
+  slide01(pptx);
+  slide02(pptx);
+  slide03(pptx);
+  slide04(pptx);
+  slide05(pptx);
+  slide06(pptx);
+  photoDivider(pptx, 'We Will Manage', 'Umrah Program', [10.567, 6.107, 5.532, 3]);
+  slide08(pptx);
+  slide09(pptx);
+  surahSlide(pptx, {
+    title: ['Surah Al-', 'Falaq'], eyebrowY: 2.239, titleY: 2.834,
+    bands: [[6.635, 1.5], [10.0, 1.5]],
+    verses: [
+      { ar: '\u0642\u064F\u0644\u0652 \u0623\u064E\u0639\u064F\u0648\u0630\u064F \u0628\u0650\u0631\u064E\u0628\u0651\u0650 \u0671\u0644\u0652\u0641\u064E\u0644\u064E\u0642\u0650 \u0661', arX: 18.239, arY: 5.168, arW: 6.156, en: 'Say, \u02F9O Prophet,\u02FA \u201CI seek refuge in the Lord of the daybreak', enY: 5.442 },
+      { ar: '\u0645\u0650\u0646 \u0634\u064E\u0631\u0651\u0650 \u0645\u064E\u0627 \u062E\u064E\u0644\u064E\u0642\u064E \u0662', arX: 17.301, arY: 6.978, arW: 7.094, en: 'from the evil of whatever He has created,', enY: 7.122 },
+      { ar: '\u0648\u064E\u0645\u0650\u0646 \u0634\u064E\u0631\u0651\u0650 \u063A\u064E\u0627\u0633\u0650\u0642\u064D \u0625\u0650\u0630\u064E\u0627 \u0648\u064E\u0642\u064E\u0628\u064E \u0663', arX: 17.301, arY: 8.506, arW: 7.094, en: 'and from the evil of the night when it grows dark,', enY: 8.747 },
+      { ar: '\u0648\u064E\u0645\u0650\u0646 \u0634\u064E\u0631\u0651\u0650 \u0671\u0644\u0646\u0651\u064E\u0641\u0651\u064E\u0640\u0670\u062B\u064E\u0640\u0670\u062A\u0650 \u0641\u0650\u0649 \u0671\u0644\u0652\u0639\u064F\u0642\u064E\u062F\u0650 \u0664', arX: 16.364, arY: 10.163, arW: 8.031, en: 'and from the evil of those \u02F9witches casting spells by\u02FA blowing onto knots,', enY: 10.403, enW: 14.677 },
+      { ar: '\u0648\u064E\u0645\u0650\u0646 \u0634\u064E\u0631\u0651\u0650 \u062D\u064E\u0627\u0633\u0650\u062F\u064D \u0625\u0650\u0630\u064E\u0627 \u062D\u064E\u0633\u064E\u062F\u064E \u0665', arX: 17.301, arY: 11.931, arW: 7.094, en: 'and from the evil of an envier when they envy.\u201D', enY: 12.247 },
+    ],
+  });
+  slide11(pptx);
+  slide12(pptx);
+  slide13(pptx);
+  photoDivider(pptx, 'We Provide Best Experience', 'Hajj Program', [10.183, 6.043, 6.3, 0]);
+  slide15(pptx);
+  slide16(pptx);
+  surahSlide(pptx, {
+    title: ['Surah Al-', 'Qadr'], eyebrowY: 1.895, titleY: 2.491,
+    bands: [[6.291, 1.5], [9.657, 1.93]],
+    verses: [
+      { ar: '\u0625\u0650\u0646\u0651\u064E\u0627\u0653 \u0623\u064E\u0646\u0632\u064E\u0644\u0652\u0646\u064E\u0640\u0670\u0647\u064F \u0641\u0650\u0649 \u0644\u064E\u064A\u0652\u0644\u064E\u0629\u0650 \u0671\u0644\u0652\u0642\u064E\u062F\u0652\u0631\u0650 \u0661', arX: 18.239, arY: 4.824, arW: 6.156, en: 'Indeed, \u02F9it is\u02FA We \u02F9Who\u02FA sent this \u02F9Quran\u02FA down on the Night of Glory.', enY: 5.098 },
+      { ar: '\u0648\u064E\u0645\u064E\u0627\u0653 \u0623\u064E\u062F\u0652\u0631\u064E\u0649\u0670\u0643\u064E \u0645\u064E\u0627 \u0644\u064E\u064A\u0652\u0644\u064E\u0629\u064F \u0671\u0644\u0652\u0642\u064E\u062F\u0652\u0631\u0650 \u0662', arX: 17.301, arY: 6.634, arW: 7.094, en: 'And what will make you realize what the Night of Glory is?', enY: 6.778 },
+      { ar: '\u0644\u064E\u064A\u0652\u0644\u064E\u0629\u064F \u0671\u0644\u0652\u0642\u064E\u062F\u0652\u0631\u0650 \u062E\u064E\u064A\u0652\u0631\u064C\u06ED \u0645\u0651\u0650\u0646\u0652 \u0623\u064E\u0644\u0652\u0641\u0650 \u0634\u064E\u0647\u0652\u0631\u064D\u06E2 \u0663', arX: 17.301, arY: 8.225, arW: 7.094, en: 'The Night of Glory is better than a thousand months.', enY: 8.465 },
+      { ar: '\u062A\u064E\u0646\u064E\u0632\u0651\u064E\u0644\u064F \u0671\u0644\u0652\u0645\u064E\u0644\u064E\u0640\u0670\u0653\u0626\u0650\u0643\u064E\u0629\u064F \u0648\u064E\u0671\u0644\u0631\u0651\u064F\u0648\u062D\u064F \u0641\u0650\u064A\u0647\u064E\u0627 \u0628\u0650\u0625\u0650\u0630\u0652\u0646\u0650 \u0631\u064E\u0628\u0651\u0650\u0647\u0650\u0645 \u0645\u0651\u0650\u0646 \u0643\u064F\u0644\u0651\u0650 \u0623\u064E\u0645\u0652\u0631\u064D\u06E2 \u0664', arX: 14.875, arY: 10.15, arW: 9.52, en: 'That night the angels and the \u02F9holy\u02FA spirit1 descend, by the permission of their Lord, for every \u02F9decreed\u02FA matter.', enY: 10.095, enW: 12.302, enH: 1.043 },
+      { ar: '\u0633\u064E\u0644\u064E\u0640\u0670\u0645\u064C \u0647\u0650\u0649\u064E \u062D\u064E\u062A\u0651\u064E\u0649\u0670 \u0645\u064E\u0637\u0652\u0644\u064E\u0639\u0650 \u0671\u0644\u0652\u0641\u064E\u062C\u0652\u0631\u0650 \u0665', arX: 17.301, arY: 11.931, arW: 7.094, en: 'It is all peace until the break of dawn.', enY: 12.247 },
+    ],
+  });
+  slide18(pptx);
+  slide19(pptx);
+  slide20(pptx);
+  slide21(pptx);
+  slide22(pptx);
+
+  return pptx.writeFile({
+    fileName: path.join(__dirname, '0f7e2afe-26fc-4046-950b-76a60f6f5ace_grok_final.pptx'),
+  });
+}
+
+build().then((f) => console.log('wrote', f)).catch((e) => {
+  console.error(e);
+  process.exit(1);
+});
