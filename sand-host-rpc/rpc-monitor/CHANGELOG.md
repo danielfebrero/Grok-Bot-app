@@ -9,6 +9,17 @@ packages confondus. Entrées les plus récentes en haut. Heures de Paris
 
 <!-- NOUVELLES-ENTREES-ICI -->
 
+## 2026-10-27 18:06 (Paris) — `2026-10-27_10-01` → `2026-10-27_18-06`
+
+Changement de surface RPC détecté : **3 méthode(s) ajoutée(s)**, **330 supprimée(s)**.
+
+Ajoutées : `DashboardService.GetInstalledPluginDetail`, `DashboardService.ListStorefrontPlugins`, `DashboardService.RetrySandMessagesPermission`
+
+Supprimées : `OriginService.AcceptShareInvite`, `OriginService.AddAppSigningKey`, `OriginService.AddAssignee`, `OriginService.AddCommentToThread`, `OriginService.AddLabelToChange`, `OriginService.AddNamespaceInboundIpAllowlistEntry`, `OriginService.AddNamespaceSshCertificateAuthority`, `OriginService.AddSshPublicKey`, `OriginService.ApplyMergeConflictResolution`, `OriginService.ApplyReviewRequestChanges`, `OriginService.BatchGetChanges`, `OriginService.BatchGetCommitCheckRollups`, `OriginService.BatchGetRepoContentAtSha`, `OriginService.CanMerge`, `OriginService.CancelMergeQueueEntry`, `OriginService.CancelMyAppInstallRequest`, `OriginService.CancelOriginCiJob`, `OriginService.CancelOriginCiRun`, `OriginService.CancelPullRequestBypassRequest`, `OriginService.CheckChangeCreationAccess`, `OriginService.CheckMarketplaceListingSlug`, `OriginService.ClaimCursorInboxPrAction`, `OriginService.CloseReviewRequest`, `OriginService.CommandeerChange`, `OriginService.CompareCommits` …
+
+Rapport : [reports/2026-10-27_18-06.md](reports/2026-10-27_18-06.md).
+
+
 ## 2026-10-27 10:01 (Paris) — `2026-10-26_18-12` → `2026-10-27_10-01`
 
 Changement de surface RPC détecté : **34 méthode(s) ajoutée(s)**.
