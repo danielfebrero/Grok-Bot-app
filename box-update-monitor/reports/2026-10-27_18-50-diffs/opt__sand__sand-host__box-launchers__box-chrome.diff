@@ -1,0 +1,48 @@
+--- 2026-10-27_17-53:/opt/sand/sand-host/box-launchers/box-chrome
++++ 2026-10-27_18-50:/opt/sand/sand-host/box-launchers/box-chrome
+@@ -230,6 +230,7 @@
+ sand_box_chrome_extra_flag_allowed() {
+ 	case "$1" in
+ 	--disable-quic) return 0 ;;
++	--disable-features=TLSTrustAnchorIDs) return 0 ;;
+ 	*) return 1 ;;
+ 	esac
+ }
+@@ -402,9 +403,37 @@
+ 	done
+ }
+ 
++# Chrome on Linux keeps only the last value of a repeated switch
++# (https://chromium.googlesource.com/chromium/src/+/refs/tags/154.0.8037.57/base/command_line.cc),
++# so every --disable-features value is folded into the last such switch.
++merge_disable_features() {
++	local -n merge_flags="$1"
++	local i last=-1 count=0 merged="" feature features=()
++	for i in "${!merge_flags[@]}"; do
++		case "${merge_flags[i]}" in --disable-features=*)
++			last="${i}"
++			count=$((count + 1))
++			;;
++		esac
++	done
++	[ "${count}" -gt 1 ] || return 0
++	for i in "${last}" "${!merge_flags[@]}"; do
++		case "${merge_flags[i]-}" in --disable-features=*) ;; *) continue ;; esac
++		IFS=, read -r -a features <<<"${merge_flags[i]#--disable-features=}"
++		for feature in "${features[@]}"; do
++			[ -n "${feature}" ] || continue
++			case ",${merged}," in *",${feature},"*) ;; *) merged+="${merged:+,}${feature}" ;; esac
++		done
++		[ "${i}" = "${last}" ] || unset 'merge_flags[i]'
++	done
++	merge_flags[last]="--disable-features=${merged}"
++	merge_flags=("${merge_flags[@]}")
++}
++
+ launch_chrome() {
+ 	local flags=("${CHROME_FLAGS[@]}") env=("${CHROME_ENV[@]}")
+ 	[ "${CHROME_BIN}" != "${UNGOOGLED_CHROMIUM}" ] || flags+=("${UNGOOGLED_CHROMIUM_FLAGS[@]}")
++	merge_disable_features flags
+ 	[ -z "${CHROME_TMPDIR:-}" ] || [ ! -d "${CHROME_TMPDIR}" ] || env+=(TMPDIR="${CHROME_TMPDIR}")
+ 	setsid -f /usr/local/bin/box-bounded-log --run "${CHROME_LOG}" -- \
+ 		"${env[@]}" \

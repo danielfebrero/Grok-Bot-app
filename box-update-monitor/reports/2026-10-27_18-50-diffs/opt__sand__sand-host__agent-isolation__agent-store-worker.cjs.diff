@@ -1,0 +1,20 @@
+--- 2026-10-27_17-53:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
++++ 2026-10-27_18-50:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
+@@ -9984,7 +9984,7 @@
+     return proto3.util.equals(_ComputerUseArgs, a, b);
+   }
+   static $() {
+-    return ["ComputerUseArgs|1 tool_call_id 9|2 actions #0*|3 description 9?|4 bind_unmapped_characters 8?|5 desktop_lease_actor_id 9?|6 screenshot_settle_ms 5?|10 native_x11_driver #1?|11 mark_monitor_busy 8?|9 full_resolution_screenshot 8?|12 capture_name_prefix 9?", ComputerUseAction, NativeX11Driver];
++    return ["ComputerUseArgs|1 tool_call_id 9|2 actions #0*|3 description 9?|4 bind_unmapped_characters 8?|5 desktop_lease_actor_id 9?|6 screenshot_settle_ms 5?|10 native_x11_driver #1?|11 mark_monitor_busy 8?|9 full_resolution_screenshot 8?|12 capture_name_prefix 9?|13 omit_inline_screenshot 8?", ComputerUseAction, NativeX11Driver];
+   }
+ };
+ var NativeX11Driver = class _NativeX11Driver extends __protoMessage336 {
+@@ -17818,7 +17818,7 @@
+     return proto3.util.equals(_SelectedVideo, a, b);
+   }
+   static $() {
+-    return ["SelectedVideo|1 blob_id 12 data_or_blob_id|8 data 12 data_or_blob_id|9 blob_id_with_data #0 data_or_blob_id|11 signed_url #1 data_or_blob_id|2 uuid 9|3 path 9|4 fps 2?|7 mime_type 9|10 filename 9|12 materialize_to_filesystem 8", SelectedVideo_BlobIdWithData, SelectedVideo_SignedUrl];
++    return ["SelectedVideo|1 blob_id 12 data_or_blob_id|8 data 12 data_or_blob_id|9 blob_id_with_data #0 data_or_blob_id|11 signed_url #1 data_or_blob_id|13 prompt_upload_ref #2 data_or_blob_id|2 uuid 9|3 path 9|4 fps 2?|7 mime_type 9|10 filename 9|12 materialize_to_filesystem 8", SelectedVideo_BlobIdWithData, SelectedVideo_SignedUrl, PromptUploadRef];
+   }
+ };
+ var SelectedVideo_BlobIdWithData = class _SelectedVideo_BlobIdWithData extends __protoMessage372 {
