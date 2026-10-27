@@ -9,6 +9,35 @@ packages confondus. Entrées les plus récentes en haut. Heures de Paris
 
 <!-- NOUVELLES-ENTREES-ICI -->
 
+## 2026-10-26 18:12 (Paris) — `2026-10-25_18-01` → `2026-10-26_18-12`
+
+Changement de surface RPC détecté : **8 méthode(s) ajoutée(s)**.
+
+Ajoutées : `AppPublishService.ListProjectPublishState`, `BackgroundComposerService.GetPrAgentAttribution`, `DashboardService.SetGrokConnectorEnabled`, `GrokBotService.RetryGrokBotOutboundCallRecording`, `OriginService.GetFocusedGroupsOfChanges`, `OriginService.GetInboxBuckets`, `OriginService.MarkPullRequestsAsViewed`, `OriginService.UpdateRepoNeverDraftSetting`
+
+Rapport : [reports/2026-10-26_18-12.md](reports/2026-10-26_18-12.md).
+
+
+## 2026-10-25 18:01 (Paris) — `2026-10-24_18-01` → `2026-10-25_18-01`
+
+Changement de surface RPC détecté : **4 méthode(s) ajoutée(s)**.
+
+Ajoutées : `GrokBotService.GetGrokBotIMessageDraftSender`, `GrokBotService.ListGrokBotAgentsForOperatorInternal`, `GrokBotService.StartGrokBotSilentSubagentInternal`, `OriginService.GetChangesetOwnerRules`
+
+Rapport : [reports/2026-10-25_18-01.md](reports/2026-10-25_18-01.md).
+
+
+## 2026-10-24 18:01 (Paris) — `2026-10-24_09-52-38` → `2026-10-24_18-01`
+
+Changement de surface RPC détecté : **27 méthode(s) ajoutée(s)**, **2 supprimée(s)**.
+
+Ajoutées : `AppPublishService.CheckPageGrantOwner`, `AppPublishService.ResolvePublishedPageReplyLine`, `AppPublishService.StartPageOwnerCode`, `AutomationsService.GetAgentSdkApplicationIcon`, `BackgroundComposerService.GetBackgroundComposerRepoUrl`, `DashboardService.GetOrganizationGoogleDriveBlockedSharedDrives`, `DashboardService.GetTeamDataRetentionPolicy`, `DashboardService.HandOffMcpOAuthCode`, `DashboardService.SetActiveTailnet`, `DashboardService.UpdateOrganizationGoogleDriveBlockedSharedDrives`, `DashboardService.UpdateTeamDataRetentionPolicy`, `GrokBotService.AdminEnqueueGrokBotServiceAccountMessage`, `GrokBotService.AdminListGrokBotServiceAccountSessions`, `GrokBotService.AdminReadGrokBotServiceAccountConversation`, `GrokBotService.AttachGrokBotAgentDelegatedCredential`, `GrokBotService.CallGrokBotMcpAppTool`, `GrokBotService.ClaimGrokBotSlackConnect`, `GrokBotService.GetGrokBotDefaultPaymentMethod`, `GrokBotService.HangUpGrokBotOutboundCall`, `GrokBotService.NudgeOnePasswordAccessRequest`, `GrokBotService.RemoveGrokBotAgentDelegatedCredential`, `GrokBotService.ResolveGrokBotAddress`, `GrokBotService.SearchGrokBotPlacesArea`, `GrokBotService.SetGrokBotDefaultPaymentMethod`, `GrokBotService.SuggestGrokBotAddresses` …
+
+Supprimées : `GrokBotService.EnsureGrokBotCursorMainBot`, `OriginService.DisableOriginUserSlackReviewReminder`
+
+Rapport : [reports/2026-10-24_18-01.md](reports/2026-10-24_18-01.md).
+
+
 ## 2026-10-24 (Paris) — baseline
 
 Première capture de référence (`snapshot.sh`).
