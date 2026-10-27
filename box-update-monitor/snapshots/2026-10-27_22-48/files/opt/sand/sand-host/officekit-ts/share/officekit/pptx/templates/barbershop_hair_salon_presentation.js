@@ -1,0 +1,724 @@
+/**
+ * Hairshop — Barbershop & Shaving presentation (30 slides, 20 x 11.25 in).
+ * Rebuilt from scratch with pptxgenjs: every position, colour and string below
+ * is a plain literal so the deck's design can be read straight off the source.
+ *
+ *   node 12b8aaae-4412-4a13-9195-91e20fb7fa4b_grok_final.js
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ── palette ─────────────────────────────────────────────────────────────── */
+const BLACK  = '000000';   // slide background
+const CARD   = '0F0F0F';   // panel / card fill
+const ORANGE = 'D1823B';   // brand accent
+const WHITE  = 'FFFFFF';
+const GREY   = 'BFBFBF';   // body copy on black
+const SOFT   = 'F2F2F2';   // body copy on orange
+
+/* ── fonts ───────────────────────────────────────────────────────────────── */
+const HEAD = 'Outfit SemiBold';
+const BODY = 'Outfit';
+const MED  = 'Outfit Medium';
+const TAG  = 'Lexend Deca';
+const SUB  = 'Assistant SemiBold';
+
+/* ── type scale (pt) ─────────────────────────────────────────────────────── */
+const HERO = 199, TITLE = 54, STAT = 48, BIG = 40, LEAD = 28;
+const H2 = 24, H3 = 20, TEXT = 18, TAGSZ = 16, SMALL = 14;
+
+/* Filler copy the template repeats across many cards. */
+const LOREM = {
+  card:    'PLACEHOLDER',
+  tile:    'PLACEHOLDER',
+  row:     'Lorem ipsum dolor sit amet, consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore',
+  short:   'Lorem ipsum dolor sitan amet consectetur the adipiscing elit',
+  service: 'PLACEHOLDER',
+  item:    'Lorem ipsum dolor sit amet heras barber consectetur adipiscing elit seduna shoput eiusmod tempor incididunt here.',
+  tiny:    'Lorem ipsum dolor sitan amet consectetur the adip elit'
+};
+
+/* Double-chevron ">>" bullet used all through the deck (unit path, 0..1). */
+const CHEVRON = [
+  { x: 0.131, y: 1.000 }, { x: 0.000, y: 0.925 }, { x: 0.739, y: 0.500 },
+  { x: 0.000, y: 0.075 }, { x: 0.131, y: 0.000 }, { x: 1.000, y: 0.500 },
+  { x: 0.131, y: 1.000 }, { close: true }
+];
+const CHEV_RATIO = 0.575;  // chevron width / height
+
+/* ── primitives ──────────────────────────────────────────────────────────── */
+
+function box(s, x, y, w, h, o = {}) {
+  s.addShape(o.shape || 'rect', {
+    x, y, w, h,
+    rectRadius: o.radius,
+    fill: o.fill ? { color: o.fill, transparency: o.alpha || 0 } : { type: 'none' },
+    line: o.line ? { color: o.line, width: o.lw || 1, dashType: o.dash || 'solid' } : { type: 'none' },
+    rotate: o.rotate || 0
+  });
+}
+
+function oval(s, x, y, w, h, o = {}) {
+  box(s, x, y, w, h, Object.assign({ shape: 'ellipse' }, o));
+}
+
+/** Horizontal rule / straight connector. */
+function rule(s, x, y, w, o = {}) {
+  s.addShape('line', {
+    x, y, w, h: 0,
+    line: { color: o.line, width: o.lw || 1, dashType: o.dash || 'solid' }
+  });
+}
+
+/** Free polygon from unit coordinates (0..1 of the bounding box). */
+function poly(s, x, y, w, h, pts, color) {
+  s.addShape('custGeom', {
+    x, y, w, h, fill: { color },
+    points: pts.map(p => (p.close ? p : { x: p.x * w, y: p.y * h })).concat([{ close: true }])
+  });
+}
+
+function txt(s, body, x, y, w, h, o = {}) {
+  // a bullet has to ride on each run, so push it down into an array body
+  if (o.bullet && Array.isArray(body)) {
+    body = body.map(run => Object.assign({}, run, {
+      options: Object.assign({ bullet: o.bullet }, run.options)
+    }));
+  }
+  s.addText(body, {
+    x, y, w, h,
+    fontSize: o.size || TEXT,
+    color: o.color || WHITE,
+    fontFace: o.font || BODY,
+    bold: o.bold || false,
+    align: o.align || 'left',
+    valign: 'top',
+    rotate: o.rotate || 0,
+    lineSpacingMultiple: o.lh || null,
+    bullet: o.bullet || false,
+    margin: o.margin
+  });
+}
+
+/** One ">" chevron. `h` drives the size; width follows the glyph ratio. */
+function chev(s, x, y, h, color, o = {}) {
+  s.addShape('custGeom', {
+    x, y, w: o.w || h * CHEV_RATIO, h,
+    fill: { color: color || ORANGE },
+    rotate: o.rotate || 0,
+    flipV: o.flipV || false,
+    points: CHEVRON.map(p => (p.close ? p : { x: p.x * (o.w || h * CHEV_RATIO), y: p.y * h }))
+  });
+}
+
+/** The ">>" pair. `dir` turns the pair to point up ('n') or down ('s'). */
+function marker(s, x, y, h = 0.358, color = ORANGE, dir = 'e') {
+  const step = h * 0.436;
+  if (dir === 'e') {
+    chev(s, x, y, h, color);
+    chev(s, x + step, y, h, color);
+  } else {
+    const rot = dir === 'n' ? 270 : 90;
+    const w = h * CHEV_RATIO, off = (h - w) / 2;   // rotation pivots on the centre
+    chev(s, x + off, y - off + step, h, color, { rotate: rot });
+    chev(s, x + off, y - off, h, color, { rotate: rot });
+  }
+}
+
+/** ">> SECTION LABEL" eyebrow above a headline. */
+function eyebrow(s, x, y, label, w) {
+  marker(s, x, y);
+  txt(s, label, x + 0.490, y - 0.006, w, 0.370, { size: TAGSZ, font: TAG });
+}
+
+/** ">> Service name" list row. */
+function chevRow(s, x, y, label, w) {
+  marker(s, x, y);
+  txt(s, label, x + 0.696, y - 0.073, w, 0.505, { size: H2, font: HEAD });
+}
+
+/** Stand-in for a photo in the original deck (no raster data is embedded). */
+function photo(s, x, y, w, h) {
+  box(s, x, y, w, h, { fill: '262626', line: '3D3D3D' });
+  txt(s, '[image]', x, y + h / 2 - 0.25, w, 0.5, { size: TAGSZ, color: '8A8A8A', align: 'center' });
+}
+
+/* ── icon stand-ins (the original uses vector clip-art) ──────────────────── */
+
+function iconScissors(s, x, y, sz, color) {
+  txt(s, '\u2702', x - sz * 0.5, y - sz * 0.52, sz * 2, sz * 1.8,
+    { size: Math.round(sz * 96), color, font: 'DejaVu Sans', align: 'center' });
+}
+
+function iconPhone(s, x, y, sz, color) {
+  txt(s, '\u260E', x, y - sz * 0.32, sz, sz * 1.3, { size: Math.round(sz * 52), color, font: 'DejaVu Sans', align: 'center' });
+}
+
+function iconShare(s, x, y, sz, color) {
+  txt(s, '\u2197', x, y - sz * 0.28, sz, sz * 1.3, { size: Math.round(sz * 62), color, font: 'DejaVu Sans', align: 'center' });
+}
+
+function iconSearch(s, x, y, sz, color) {
+  oval(s, x, y, sz * 0.72, sz * 0.72, { line: color, lw: 2 });
+  s.addShape('line', {
+    x: x + sz * 0.60, y: y + sz * 0.60, w: sz * 0.34, h: sz * 0.34,
+    line: { color, width: 2.5 }
+  });
+}
+
+function iconClock(s, x, y, sz, color) {
+  oval(s, x + sz * 0.08, y + sz * 0.16, sz * 0.84, sz * 0.84, { line: color, lw: 2 });
+  oval(s, x + sz * 0.04, y, sz * 0.26, sz * 0.26, { fill: color });
+  oval(s, x + sz * 0.70, y, sz * 0.26, sz * 0.26, { fill: color });
+  s.addShape('line', { x: x + sz * 0.50, y: y + sz * 0.34, w: 0, h: sz * 0.24, line: { color, width: 1.5 } });
+  s.addShape('line', { x: x + sz * 0.50, y: y + sz * 0.58, w: sz * 0.18, h: 0, line: { color, width: 1.5 } });
+}
+
+function iconPin(s, x, y, sz, color, hole) {
+  s.addShape('teardrop', { x, y, w: sz, h: sz, fill: { color }, rotate: 135 });
+  oval(s, x + sz * 0.31, y + sz * 0.28, sz * 0.30, sz * 0.30, { fill: hole });
+}
+
+function iconGlobe(s, x, y, sz, color) {
+  oval(s, x, y, sz, sz, { line: color, lw: 1.5 });
+  oval(s, x + sz * 0.30, y, sz * 0.40, sz, { line: color, lw: 1 });
+  s.addShape('line', { x, y: y + sz / 2, w: sz, h: 0, line: { color, width: 1 } });
+}
+
+/** Circled social badge: 'facebook', 'twitter', 'instagram'. */
+function social(s, x, y, sz, kind) {
+  oval(s, x, y, sz, sz, { line: WHITE, lw: 1.5 });
+  if (kind === 'instagram') {
+    box(s, x + sz * 0.27, y + sz * 0.27, sz * 0.46, sz * 0.46, { shape: 'roundRect', radius: sz * 0.14, line: WHITE, lw: 1 });
+    oval(s, x + sz * 0.41, y + sz * 0.41, sz * 0.18, sz * 0.18, { fill: WHITE });
+  } else {
+    txt(s, kind === 'facebook' ? 'f' : 't', x, y + sz * 0.08, sz, sz * 0.84,
+      { size: Math.round(sz * 44), color: WHITE, font: HEAD, align: 'center' });
+  }
+}
+
+
+/* ── slides ──────────────────────────────────────────────────────────────── */
+
+/* 01 — cover */
+function slide01(s) {
+  box(s, 0, 0, 20, 11.25, { fill: BLACK, alpha: 16 });
+  txt(s, 'Hairshop', 3.507, 3.757, 12.985, 3.45, { size: HERO, font: HEAD, align: 'center' });
+  txt(s, 'Barbershop & Shaving Presentation Template', 5.105, 6.921, 9.79, 0.572, { size: LEAD, color: ORANGE, font: SUB, align: 'center' });
+  txt(s, 'Since 2008', 13.042, 4.155, 2.477, 0.572, { size: LEAD, font: SUB, align: 'right' });
+}
+
+/* 02 — about + portrait */
+function slide02(s) {
+  box(s, 11.527, -0.227, 7.087, 8.894, { line: ORANGE, lw: 2.25 });
+  txt(s, 'The best hairstyles for your every appearance', 1.576, 2.706, 8.834, 1.919, { size: TITLE, font: HEAD });
+  eyebrow(s, 1.638, 2.108, 'ABOUT US', 1.55);
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ultricies integer quis auctor elit sed vulputate. Molestie a iaculis at erat pellentesque adipiscing commodo. Vitae ultricies leo integer malesuada nunc vel. Ultricies lacus sed turpis tincidunt id aliquet risus. Vel facilisis volutpat est velit egestas dui id ornare. Pharetra et ultrices neque ornare aenean euismod. Massa eget egestas purus viverra accumsan. Fringilla phasellus faucibus scelerisque eleifend donec pretium vulputate sapien lorem sed risus ultricies.', 1.638, 5.008, 7.998, 4.139, { color: GREY, lh: 1.5 });
+}
+
+/* 03 — about, framed photo left */
+function slide03(s) {
+  box(s, 1.318, 1.289, 10.091, 8.672, { line: ORANGE, lw: 2.25 });
+  box(s, 9.023, 2.091, 10.977, 7.068, { fill: CARD });
+  txt(s, 'Barbershop makes style even cooler', 10.698, 3.69, 7.757, 1.919, { size: TITLE, font: HEAD });
+  eyebrow(s, 10.828, 3.092, 'ABOUT US', 1.55);
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed eiusmod tempor incididunt ut labore et dolore magna aliqua. Ultricies integer quis auctor elit sed vulputate. Molestie a iaculis at erat pellentesque adipiscing commodo. Vitae ultricies leo integer malesuada nunc vel. Ultricies lacus sed turpis tincidun baerbershop.', 10.76, 5.842, 8.081, 2.322, { color: GREY, lh: 1.5 });
+}
+
+/* 04 — about + three numbered cards */
+function slide04(s) {
+  box(s, 6.705, 1.812, 6.165, 7.626, { line: ORANGE, lw: 2.25 });
+  box(s, 13.62, 0.549, 5.545, 3.245, { fill: CARD });
+  box(s, 13.62, 4.003, 5.545, 3.245, { fill: CARD });
+  box(s, 13.62, 7.456, 5.545, 3.245, { fill: CARD });
+  txt(s, '01. Your Text Here', 14.422, 1.218, 3.803, 0.438, { size: H3, font: HEAD });
+  txt(s, LOREM.card, 14.422, 1.712, 4.163, 1.413, { color: GREY, lh: 1.5 });
+  txt(s, '02. Your Text Here', 14.422, 4.671, 3.803, 0.438, { size: H3, font: HEAD });
+  txt(s, LOREM.card, 14.422, 5.166, 4.163, 1.413, { color: GREY, lh: 1.5 });
+  txt(s, '03. Your Text Here', 14.422, 8.125, 3.803, 0.438, { size: H3, font: HEAD });
+  txt(s, LOREM.card, 14.422, 8.619, 4.163, 1.413, { color: GREY, lh: 1.5 });
+  txt(s, [{ text: 'Barbershop is your best', options: { breakLine: true } }, { text: 'style' }], 1.22, 3.002, 4.748, 2.827, { size: TITLE, font: HEAD });
+  eyebrow(s, 1.328, 2.404, 'ABOUT US', 1.55);
+  txt(s, 'Lorem ipsum dolor sit amet, consecte adipiscing elit, sed eiusmod tempor is incididunt ut labore et dolore magna aliqua. Ultricies integer quis auctor sed vulputate. Molestie a iaculis at erat pellentesque adipiscing.', 1.22, 6.076, 4.612, 2.776, { color: GREY, lh: 1.5 });
+}
+
+/* 05 — about, orange pill, stats */
+function slide05(s) {
+  txt(s, [{ text: 'We will change your' }, { text: ' out looks' }], 1.955, 2.417, 7.757, 1.919, { size: TITLE, font: HEAD });
+  eyebrow(s, 2.017, 1.819, 'ABOUT US', 1.55);
+  box(s, 2.959, 2.666, 3.644, 9.563, { shape: 'round2SameRect', radius: 1.822, fill: ORANGE, rotate: 90 });
+  txt(s, '01. Your Text Here', 1.955, 6.493, 3.803, 0.438, { size: H3, font: HEAD });
+  txt(s, LOREM.card, 1.955, 6.988, 4.163, 1.413, { color: SOFT, lh: 1.5 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed eiusmod tempor incididunt ut labore et dolore magna aliqua. Ultricies integer quis auctor elit sed vulputate. Molestie iacus at erat pellentesque adipiscing commodo. Vitae ultricies leo integer malesuada nunc vel ultricies lacus sed.', 11.556, 2.417, 7.045, 2.322, { color: GREY, lh: 1.5 });
+  txt(s, 'Haircut Styles', 11.556, 5.187, 2.861, 0.505, { size: H2, font: HEAD });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed eiusmod tempor incididunt ut labore et dolore magna aliqua. Ultricies integer quis auctor elit sed vulputate. ', 11.556, 5.766, 7.045, 1.413, { color: GREY, lh: 1.5 });
+  txt(s, '30', 11.556, 7.604, 1.677, 0.909, { size: STAT, color: ORANGE, font: BODY, bold: true });
+  txt(s, 'Outlet Branch', 11.556, 8.464, 2.229, 0.438, { size: H3, font: HEAD });
+  txt(s, '1000+', 14.264, 7.604, 2.646, 0.909, { size: STAT, color: ORANGE, font: BODY, bold: true });
+  txt(s, 'Satisfied Customer', 14.264, 8.464, 3.125, 0.438, { size: H3, font: HEAD });
+}
+
+/* 06 — about + six services */
+function slide06(s) {
+  box(s, -0.276, 1.709, 6.151, 7.832, { line: ORANGE, lw: 2.25 });
+  txt(s, 'We always provide the best haircuts, with models that are always up to date', 7.824, 2.204, 10.153, 2.827, { size: TITLE, font: HEAD });
+  eyebrow(s, 7.886, 1.606, 'ABOUT US', 1.55);
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed eiusmod tempor incididunt ut labore et dolore magna aliqua. Ultricies integer quis auctor elit sed vulputate. Molestie a iaculis at erat pellentesque adipiscing commodo vitae ultricies leo integer.', 7.824, 5.265, 10.153, 1.413, { color: GREY, lh: 1.5 });
+  chevRow(s, 7.964, 7.283, 'Haircut Styles', 2.861);
+  chevRow(s, 7.964, 8.067, 'Smooth Shave', 2.861);
+  chevRow(s, 7.964, 8.85, 'Hair Straight', 3.195);
+  chevRow(s, 12.61, 7.283, 'Pomade Service', 2.989);
+  chevRow(s, 12.61, 8.067, 'Hair Coloring', 3.201);
+  chevRow(s, 12.61, 8.85, 'Beard Triming', 3.195);
+}
+
+/* 07 — about, hero photo, two read-mores */
+function slide07(s) {
+  box(s, 1.247, 1.042, 10.017, 5.686, { line: ORANGE, lw: 2.25 });
+  txt(s, 'Style your hair and beard', 12.923, 2.177, 5.717, 1.919, { size: TITLE, font: HEAD });
+  eyebrow(s, 13.031, 1.579, 'ABOUT US', 1.55);
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipis elit, sed eiusmod tempor incididunt ut labore et dolore magna aliqua. Ultricies integer quis auc elit sed vulputate molestie iacus at', 12.923, 4.329, 5.571, 1.867, { color: GREY, lh: 1.5 });
+  txt(s, '01. Your Text Here', 5.596, 7.679, 3.803, 0.438, { size: H3, font: HEAD });
+  txt(s, LOREM.card, 5.596, 8.173, 4.163, 1.413, { color: GREY, lh: 1.5 });
+  marker(s, 5.705, 9.916, 0.306);
+  txt(s, 'READMORE', 6.087, 9.884, 1.594, 0.37, { size: TAGSZ, font: TAG });
+  txt(s, '02. Your Text Here', 14.477, 7.679, 3.803, 0.438, { size: H3, font: HEAD });
+  txt(s, LOREM.card, 14.477, 8.173, 4.163, 1.413, { color: GREY, lh: 1.5 });
+  marker(s, 14.587, 9.916, 0.306);
+  txt(s, 'READMORE', 14.969, 9.884, 1.604, 0.37, { size: TAGSZ, font: TAG });
+}
+
+/* 08 — about, two cards over portrait */
+function slide08(s) {
+  txt(s, [{ text: 'We will change your' }, { text: ' out looks' }], 1.773, 2.076, 8.081, 1.919, { size: TITLE, font: HEAD });
+  eyebrow(s, 1.835, 1.478, 'ABOUT US', 1.55);
+  box(s, 7.562, 4.526, 5.545, 3.245, { fill: ORANGE });
+  txt(s, '02. Your Text Here', 8.364, 5.195, 3.803, 0.438, { size: H3, font: HEAD });
+  txt(s, LOREM.card, 8.364, 5.689, 4.163, 1.413, { color: SOFT, lh: 1.5 });
+  box(s, 1.773, 4.526, 5.545, 3.245, { fill: CARD });
+  txt(s, '01. Your Text Here', 2.575, 5.195, 3.803, 0.438, { size: H3, font: HEAD });
+  txt(s, LOREM.card, 2.575, 5.689, 4.163, 1.413, { color: GREY, lh: 1.5 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed eiusmod tempor incididunt ut labore et dolore magna aliqua. Ultricies integer quis auctor elit sed vulputate. Molestie a iaculis at erat pellentesque adipiscing commodo vitae ultricies leo integer malesu', 1.773, 8.303, 8.081, 1.867, { color: GREY, lh: 1.5 });
+}
+
+/* 09 — about, tall portrait left */
+function slide09(s) {
+  txt(s, 'Barbershop is your best style', 11.198, 2.256, 7.352, 1.919, { size: TITLE, font: HEAD });
+  eyebrow(s, 11.26, 1.658, 'ABOUT US', 1.55);
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ultricies integer quis auctor elit sed vulputate. ', 11.26, 4.408, 6.876, 1.413, { color: GREY, lh: 1.5 });
+  chevRow(s, 11.363, 6.24, 'Haircut Styles', 2.861);
+  txt(s, LOREM.row, 11.26, 6.671, 6.876, 0.959, { color: GREY, lh: 1.5 });
+  chevRow(s, 11.363, 8.208, 'Smooth Shave', 2.861);
+  txt(s, LOREM.row, 11.26, 8.64, 6.876, 0.959, { color: GREY, lh: 1.5 });
+}
+
+/* 10 — team, three portraits */
+function slide10(s) {
+  box(s, 1.464, 3.41, 5.008, 5.425, { line: ORANGE, lw: 2.25 });
+  box(s, 7.496, 3.41, 5.008, 5.425, { line: ORANGE, lw: 2.25 });
+  box(s, 13.528, 3.41, 5.008, 5.425, { line: ORANGE, lw: 2.25 });
+  txt(s, 'Our Professional Barbershop', 4.37, 1.518, 11.26, 1.01, { size: TITLE, font: HEAD, align: 'center' });
+  eyebrow(s, 9.292, 0.92, 'TEAM', 0.926);
+  txt(s, 'Your Name Here', 2.066, 9.28, 3.803, 0.505, { size: H2, font: HEAD, align: 'center' });
+  txt(s, 'Job Position', 2.91, 9.732, 2.116, 0.504, { color: GREY, align: 'center', lh: 1.5 });
+  txt(s, 'Your Name Here', 8.098, 9.28, 3.803, 0.505, { size: H2, font: HEAD, align: 'center' });
+  txt(s, 'Job Position', 8.943, 9.732, 2.116, 0.504, { color: GREY, align: 'center', lh: 1.5 });
+  txt(s, 'Your Name Here', 14.131, 9.28, 3.803, 0.505, { size: H2, font: HEAD, align: 'center' });
+  txt(s, 'Job Position', 14.976, 9.732, 2.116, 0.504, { color: GREY, align: 'center', lh: 1.5 });
+}
+
+/* 11 — team, two profiles with skill bars */
+function slide11(s) {
+  box(s, 10.054, 3.71, 5.008, 6.448, { line: ORANGE, lw: 2.25 });
+  box(s, 1.261, 3.71, 5.008, 6.448, { line: ORANGE, lw: 2.25 });
+  txt(s, 'Our Professional Barbershop', 4.37, 1.518, 11.26, 1.01, { size: TITLE, font: HEAD, align: 'center' });
+  eyebrow(s, 9.292, 0.92, 'TEAM', 0.926);
+  box(s, 4.81, 4.753, 4.972, 4.362, { fill: CARD });
+  box(s, 13.604, 4.753, 4.972, 4.362, { fill: CARD });
+  txt(s, 'Your Name Here', 5.395, 5.523, 3.803, 0.505, { size: H2, font: HEAD, align: 'center' });
+  txt(s, 'Job Position', 6.239, 5.975, 2.116, 0.504, { color: GREY, align: 'center', lh: 1.5 });
+  rule(s, 5.574, 7.479, 3.469, { line: BLACK, lw: 3 });
+  rule(s, 5.574, 7.479, 2.99, { line: ORANGE, lw: 6 });
+  txt(s, 'Your Skill Here', 5.464, 6.947, 2.116, 0.337, { size: SMALL, font: HEAD });
+  txt(s, '90%', 8.274, 6.947, 0.814, 0.337, { size: SMALL, font: HEAD, align: 'right' });
+  rule(s, 5.574, 8.346, 3.469, { line: BLACK, lw: 3 });
+  rule(s, 5.574, 8.346, 2.99, { line: ORANGE, lw: 6 });
+  txt(s, 'Your Skill Here', 5.464, 7.814, 2.116, 0.337, { size: SMALL, font: HEAD });
+  txt(s, '90%', 8.274, 7.814, 0.814, 0.337, { size: SMALL, font: HEAD, align: 'right' });
+  txt(s, 'Your Name Here', 14.188, 5.523, 3.803, 0.505, { size: H2, font: HEAD, align: 'center' });
+  txt(s, 'Job Position', 15.033, 5.975, 2.116, 0.504, { color: GREY, align: 'center', lh: 1.5 });
+  rule(s, 14.367, 7.479, 3.469, { line: BLACK, lw: 3 });
+  rule(s, 14.367, 7.479, 2.99, { line: ORANGE, lw: 6 });
+  txt(s, 'Your Skill Here', 14.258, 6.947, 2.116, 0.337, { size: SMALL, font: HEAD });
+  txt(s, '90%', 17.068, 6.947, 0.814, 0.337, { size: SMALL, font: HEAD, align: 'right' });
+  rule(s, 14.367, 8.346, 3.469, { line: BLACK, lw: 3 });
+  rule(s, 14.367, 8.346, 2.99, { line: ORANGE, lw: 6 });
+  txt(s, 'Your Skill Here', 14.258, 7.814, 2.116, 0.337, { size: SMALL, font: HEAD });
+  txt(s, '90%', 17.068, 7.814, 0.814, 0.337, { size: SMALL, font: HEAD, align: 'right' });
+}
+
+/* 12 — featured barber, skills */
+function slide12(s) {
+  poly(s, 0, 6.217, 9.988, 5.033, [{ x: 0.886, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }, { x: 0, y: 0.397 }], ORANGE);
+  txt(s, [{ text: 'Richard Sanchez ' }, { text: '– Expert Barber', options: { color: ORANGE } }], 11.198, 2.139, 7.211, 1.919, { size: TITLE, font: HEAD });
+  eyebrow(s, 11.26, 1.541, 'Our Team', 1.55);
+  box(s, 11.198, 4.532, 2.427, 2.427, { shape: 'diamond', fill: CARD });
+  txt(s, '30+', 11.607, 5.358, 1.607, 0.774, { size: BIG, font: HEAD, align: 'center' });
+  txt(s, 'Barber Awards And Certificates', 14.034, 5.291, 3.487, 0.909, { size: H2, font: HEAD });
+  rule(s, 11.363, 8.337, 6.085, { line: CARD, lw: 8 });
+  rule(s, 11.363, 8.337, 5.472, { line: ORANGE, lw: 10 });
+  txt(s, 'Your Skill Here', 11.26, 7.591, 2.116, 0.438, { size: H3, font: HEAD });
+  txt(s, '90%', 16.634, 7.591, 0.814, 0.438, { size: H3, font: HEAD, align: 'right' });
+  rule(s, 11.363, 9.715, 6.085, { line: CARD, lw: 8 });
+  rule(s, 11.363, 9.715, 4.804, { line: ORANGE, lw: 10 });
+  txt(s, 'Your Skill Here', 11.26, 8.969, 2.116, 0.438, { size: H3, font: HEAD });
+  txt(s, '80%', 16.634, 8.969, 0.814, 0.438, { size: H3, font: HEAD, align: 'right' });
+  marker(s, 1.083, 1.776, 0.505, ORANGE, 'n');
+  txt(s, 'Swipe Up', 0.388, 3.149, 1.679, 0.505, { size: H2, font: HEAD, rotate: 270 });
+}
+
+/* 13 — services grid */
+function slide13(s) {
+  box(s, 14.236, 2.055, 3.864, 3.864, { fill: CARD });
+  txt(s, 'The advantages of our barbershop you will get', 1.983, 2.359, 6.562, 2.827, { size: TITLE, font: HEAD });
+  eyebrow(s, 1.983, 1.761, 'SERVICES', 1.663);
+  box(s, 2.086, 6.064, 3.864, 3.864, { fill: CARD });
+  box(s, 6.136, 6.064, 3.864, 3.864, { fill: CARD });
+  box(s, 10.186, 6.064, 3.864, 3.864, { fill: CARD });
+  box(s, 14.236, 6.064, 3.864, 3.864, { fill: CARD });
+  box(s, 10.002, 1.875, 4.403, 4.403, { fill: ORANGE });
+  txt(s, 'Smooth Shave', 10.773, 3.431, 2.861, 0.505, { size: H2, font: HEAD, align: 'center' });
+  txt(s, LOREM.row, 10.446, 3.939, 3.516, 1.671, { size: TAGSZ, align: 'center', lh: 1.5 });
+  iconScissors(s, 11.876, 2.607, 0.657, WHITE);
+  txt(s, 'Haircut Styles', 2.588, 6.843, 2.861, 0.505, { size: H2, font: HEAD, align: 'center' });
+  txt(s, LOREM.short, 2.407, 7.396, 3.221, 1.413, { color: GREY, align: 'center', lh: 1.5 });
+  marker(s, 3.906, 9.097, 0.222);
+  txt(s, 'Pomade Service', 6.638, 6.843, 2.861, 0.505, { size: H2, font: HEAD, align: 'center' });
+  txt(s, LOREM.short, 6.525, 7.396, 3.087, 1.413, { color: GREY, align: 'center', lh: 1.5 });
+  marker(s, 7.956, 9.097, 0.222);
+  txt(s, 'Hair Coloring', 10.695, 6.843, 2.861, 0.505, { size: H2, font: HEAD, align: 'center' });
+  txt(s, LOREM.short, 10.535, 7.396, 3.166, 1.413, { color: GREY, align: 'center', lh: 1.5 });
+  marker(s, 12.006, 9.097, 0.222);
+  txt(s, 'Beard Triming', 14.749, 6.843, 2.861, 0.505, { size: H2, font: HEAD, align: 'center' });
+  txt(s, LOREM.short, 14.555, 7.396, 3.226, 1.413, { color: GREY, align: 'center', lh: 1.5 });
+  marker(s, 16.056, 9.097, 0.222);
+  txt(s, 'Hair Straight', 14.741, 2.835, 2.861, 0.505, { size: H2, font: HEAD, align: 'center' });
+  txt(s, LOREM.short, 14.618, 3.387, 3.101, 1.413, { color: GREY, align: 'center', lh: 1.5 });
+  marker(s, 16.049, 5.088, 0.222);
+}
+
+/* 14 — services, three photo cards */
+function slide14(s) {
+  box(s, 1.364, 3.415, 5.318, 6.502, { line: ORANGE, lw: 2.25 });
+  txt(s, 'Our Best Services', 4.37, 1.518, 11.26, 1.01, { size: TITLE, font: HEAD, align: 'center' });
+  eyebrow(s, 9.292, 0.92, 'SERVICES', 1.559);
+  box(s, 1.526, 7.47, 4.994, 2.262, { fill: CARD });
+  txt(s, 'Beard Triming', 2.592, 7.872, 2.861, 0.505, { size: H2, font: HEAD, align: 'center' });
+  txt(s, LOREM.tiny, 1.876, 8.372, 4.293, 0.959, { color: GREY, align: 'center', lh: 1.5 });
+  box(s, 7.341, 3.415, 5.318, 6.502, { line: ORANGE, lw: 2.25 });
+  box(s, 7.503, 7.47, 4.994, 2.262, { fill: CARD });
+  txt(s, 'Smooth Shave', 8.569, 7.872, 2.861, 0.505, { size: H2, font: HEAD, align: 'center' });
+  txt(s, LOREM.tiny, 7.854, 8.372, 4.293, 0.959, { color: GREY, align: 'center', lh: 1.5 });
+  box(s, 13.318, 3.415, 5.318, 6.502, { line: ORANGE, lw: 2.25 });
+  box(s, 13.48, 7.47, 4.994, 2.262, { fill: CARD });
+  txt(s, 'Haircut Styles', 14.547, 7.872, 2.861, 0.505, { size: H2, font: HEAD, align: 'center' });
+  txt(s, LOREM.tiny, 13.831, 8.372, 4.293, 0.959, { color: GREY, align: 'center', lh: 1.5 });
+}
+
+/* 15 — services accordion */
+function slide15(s) {
+  box(s, 0, 0, 20, 11.25, { fill: BLACK, alpha: 10 });
+  box(s, 1.624, 3.771, 7.781, 2.818, { line: ORANGE });
+  txt(s, '01. Haircut Style', 2.449, 4.453, 3.803, 0.438, { size: H3, font: HEAD });
+  txt(s, 'Lorem ipsum dolor sit amet heras consectetur barber adipiscing elit seduna eiusmod tempor ancidun.', 2.449, 4.947, 6.131, 0.959, { color: GREY, lh: 1.5 });
+  chev(s, 8.856, 4.091, 0.237, ORANGE, { rotate: 270, flipV: true });
+  box(s, 10.595, 3.771, 7.781, 1.254, { line: ORANGE });
+  txt(s, '04. Hair Straight', 11.42, 4.179, 3.288, 0.438, { size: H3, font: HEAD });
+  chev(s, 17.827, 4.091, 0.237, ORANGE, { rotate: 90 });
+  box(s, 10.595, 5.335, 7.781, 1.254, { line: ORANGE });
+  txt(s, '05. Pomade Service', 11.42, 5.743, 3.288, 0.438, { size: H3, font: HEAD });
+  chev(s, 17.827, 5.656, 0.237, ORANGE, { rotate: 90 });
+  box(s, 1.624, 6.96, 7.781, 1.254, { line: ORANGE });
+  txt(s, '02. Bread Trimming', 2.449, 7.368, 3.288, 0.438, { size: H3, font: HEAD });
+  chev(s, 8.856, 7.281, 0.237, ORANGE, { rotate: 90 });
+  box(s, 1.624, 8.524, 7.781, 1.254, { line: ORANGE });
+  txt(s, '03. Smooth Shave', 2.449, 8.933, 3.288, 0.438, { size: H3, font: HEAD });
+  chev(s, 8.856, 8.845, 0.237, ORANGE, { rotate: 90 });
+  box(s, 10.595, 6.96, 7.781, 1.254, { line: ORANGE });
+  txt(s, '06. Hair Coloring', 11.42, 7.368, 3.288, 0.438, { size: H3, font: HEAD });
+  chev(s, 17.827, 7.281, 0.237, ORANGE, { rotate: 90 });
+  box(s, 10.595, 8.524, 7.781, 1.254, { line: ORANGE });
+  txt(s, '07. Creambat Hair', 11.42, 8.933, 3.288, 0.438, { size: H3, font: HEAD });
+  chev(s, 17.827, 8.845, 0.237, ORANGE, { rotate: 90 });
+  txt(s, 'Barbershop with the latest hairstyles', 1.624, 1.856, 13.853, 1.01, { size: TITLE, font: HEAD });
+  eyebrow(s, 1.669, 1.259, 'SERVICES', 1.663);
+}
+
+/* 16 — services, four cards */
+function slide16(s) {
+  txt(s, [{ text: 'Barbershop Amazing', options: { breakLine: true } }, { text: 'Services' }], 1.401, 1.856, 8.172, 1.919, { size: TITLE, font: HEAD });
+  eyebrow(s, 1.447, 1.259, 'SERVICES', 1.663);
+  box(s, 1.333, 4.378, 4.21, 3.864, { fill: CARD, line: ORANGE });
+  txt(s, '01. Bread Trimming', 1.828, 5.075, 3.3, 0.438, { size: H3, font: HEAD });
+  txt(s, LOREM.service, 1.828, 5.512, 3.303, 1.413, { color: GREY, lh: 1.5 });
+  marker(s, 4.864, 7.582, 0.222);
+  txt(s, 'NEXT', 4.025, 7.525, 0.771, 0.337, { size: SMALL, font: TAG, align: 'right' });
+  box(s, 5.708, 4.378, 4.21, 3.864, { fill: CARD, line: ORANGE });
+  txt(s, '02. Hair Coloring', 6.203, 5.075, 3.3, 0.438, { size: H3, font: HEAD });
+  txt(s, LOREM.service, 6.203, 5.512, 3.303, 1.413, { color: GREY, lh: 1.5 });
+  marker(s, 9.239, 7.582, 0.222);
+  txt(s, 'NEXT', 8.4, 7.525, 0.771, 0.337, { size: SMALL, font: TAG, align: 'right' });
+  box(s, 10.083, 4.396, 4.21, 5.967, { fill: CARD, line: ORANGE });
+  txt(s, '03. Haircut Styles', 10.578, 5.093, 3.3, 0.438, { size: H3, font: HEAD });
+  txt(s, LOREM.service, 10.578, 5.53, 3.303, 1.413, { color: GREY, lh: 1.5 });
+  marker(s, 13.614, 9.775, 0.222);
+  txt(s, 'NEXT', 12.775, 9.717, 0.771, 0.337, { size: SMALL, font: TAG, align: 'right' });
+  box(s, 14.458, 4.414, 4.21, 3.864, { fill: CARD, line: ORANGE });
+  txt(s, '04. Smooth Shave', 14.953, 5.111, 3.3, 0.438, { size: H3, font: HEAD });
+  txt(s, LOREM.service, 14.953, 5.548, 3.303, 1.413, { color: GREY, lh: 1.5 });
+  marker(s, 17.989, 7.618, 0.222);
+  txt(s, 'NEXT', 17.15, 7.561, 0.771, 0.337, { size: SMALL, font: TAG, align: 'right' });
+  txt(s, [{ text: 'Ipsum dolor sit amet', options: { breakLine: true } }, { text: 'Consectetur adipiscing', options: { breakLine: true } }, { text: 'Elit sed do eiusmod', options: { breakLine: true } }, { text: 'Tempor incididunt utas' }], 10.574, 7.06, 3.164, 1.867, { color: GREY, lh: 1.5, bullet: { characterCode: '2713', indent: 22.5 } });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ultricies integer quis auctor elit sed vulputate. ', 12.065, 1.972, 6.876, 1.413, { color: GREY, lh: 1.5 });
+}
+
+/* 17 — break slide */
+function slide17(s) {
+  txt(s, 'Breakslide', 2.413, 3.9, 15.174, 3.45, { size: HERO, font: HEAD, align: 'center' });
+  txt(s, 'Barbershop & Shaving Presentation Template', 4.142, 7.064, 8.101, 0.572, { size: LEAD, color: ORANGE, font: SUB });
+  marker(s, 3.614, 7.171);
+}
+
+/* 18 — portfolio, four photo rows */
+function slide18(s) {
+  box(s, 1.471, 6.835, 8.331, 3.366, { fill: CARD, line: ORANGE });
+  box(s, 1.471, 3.069, 8.331, 3.366, { fill: CARD, line: ORANGE });
+  box(s, 10.198, 6.835, 8.331, 3.366, { fill: CARD, line: ORANGE });
+  box(s, 10.198, 3.069, 8.331, 3.366, { fill: CARD, line: ORANGE });
+  txt(s, 'Our Portfolio Hairshop', 1.471, 1.652, 8.77, 1.01, { size: TITLE, font: HEAD });
+  eyebrow(s, 1.585, 1.055, 'PORTFOLIO', 1.663);
+  txt(s, 'Haircut Styles', 5.371, 3.793, 2.861, 0.505, { size: H2, font: HEAD });
+  txt(s, LOREM.tile, 5.371, 4.298, 4.019, 1.413, { color: GREY, lh: 1.5 });
+  txt(s, 'Smooth Shave', 5.371, 7.559, 2.861, 0.505, { size: H2, font: HEAD });
+  txt(s, LOREM.tile, 5.371, 8.064, 4.019, 1.413, { color: GREY, lh: 1.5 });
+  txt(s, 'Hair Coloring', 14.104, 3.793, 2.861, 0.505, { size: H2, font: HEAD });
+  txt(s, LOREM.tile, 14.104, 4.298, 4.019, 1.413, { color: GREY, lh: 1.5 });
+  txt(s, 'Bread Trimming', 14.104, 7.559, 2.861, 0.505, { size: H2, font: HEAD });
+  txt(s, LOREM.tile, 14.104, 8.064, 4.019, 1.413, { color: GREY, lh: 1.5 });
+  oval(s, 17.938, 1.843, 0.591, 0.591, { fill: ORANGE });
+  txt(s, 'NEXT', 16.575, 1.975, 1.104, 0.37, { size: TAGSZ, font: TAG, align: 'right' });
+  chev(s, 18.173, 2.033, 0.211, WHITE);
+}
+
+/* 19 — portfolio, price tag */
+function slide19(s) {
+  box(s, 17.75, 7.946, 2.25, 3.304, { fill: ORANGE });
+  box(s, 10.659, 5.604, 5.715, 4.902, { fill: BLACK });
+  txt(s, 'Our Portfolio Hairshop', 1.283, 2.942, 3.779, 2.827, { size: TITLE, font: HEAD });
+  eyebrow(s, 1.394, 2.345, 'PORTFOLIO', 1.663);
+  txt(s, LOREM.service, 1.283, 5.89, 3.303, 1.413, { color: GREY, lh: 1.5 });
+  box(s, 1.394, 7.685, 3.022, 0.926, { fill: CARD });
+  txt(s, 'Starting Price $20', 1.503, 7.946, 2.804, 0.404, { font: HEAD, align: 'center' });
+  box(s, 4.47, 7.685, 0.954, 0.926, { fill: ORANGE });
+  iconShare(s, 4.755, 7.972, 0.384, BLACK);
+}
+
+/* 20 — portfolio, two photos + tabs */
+function slide20(s) {
+  txt(s, 'Our Portfolio Hairshop', 1.471, 1.652, 8.77, 1.01, { size: TITLE, font: HEAD });
+  eyebrow(s, 1.471, 1.055, 'PORTFOLIO', 1.663);
+  box(s, 1.471, 8.957, 3.133, 1.081, { fill: CARD });
+  txt(s, '01. Haircut Style', 1.47, 9.296, 3.134, 0.404, { font: HEAD, align: 'center' });
+  box(s, 4.952, 9.23, 3.133, 1.081, { fill: ORANGE });
+  txt(s, '02. Bread Trimming', 4.952, 9.569, 3.133, 0.404, { font: HEAD, align: 'center' });
+  box(s, 8.433, 8.957, 3.133, 1.081, { fill: CARD });
+  txt(s, '03. Hair Coloring', 8.433, 9.296, 3.133, 0.404, { font: HEAD, align: 'center' });
+  box(s, 11.915, 8.957, 3.133, 1.081, { fill: CARD });
+  txt(s, '04. Smooth Shave', 11.915, 9.296, 3.133, 0.404, { font: HEAD, align: 'center' });
+  box(s, 15.396, 8.957, 3.133, 1.081, { fill: CARD });
+  txt(s, '05. Pomade Service', 15.396, 9.296, 3.133, 0.404, { font: HEAD, align: 'center' });
+  oval(s, 17.938, 1.843, 0.591, 0.591, { fill: ORANGE });
+  txt(s, 'NEXT', 16.575, 1.975, 1.104, 0.37, { size: TAGSZ, font: TAG, align: 'right' });
+  chev(s, 18.173, 2.033, 0.211, WHITE);
+}
+
+/* 21 — portfolio, centre panel with prices */
+function slide21(s) {
+  box(s, 6.75, 0.193, 6.5, 10.864, { line: ORANGE, lw: 2.25 });
+  txt(s, 'Change your out looks!', 7.355, 1.468, 5.291, 1.919, { size: TITLE, font: HEAD, align: 'center' });
+  chev(s, 8.924, 0.871, 0.358, ORANGE);
+  chev(s, 9.08, 0.871, 0.358, ORANGE);
+  txt(s, 'PORTFOLIO', 9.414, 0.865, 1.663, 0.37, { size: TAGSZ, font: TAG });
+  oval(s, 9.473, 3.795, 1.054, 1.054, { fill: ORANGE });
+  txt(s, '$20', 9.41, 4.104, 1.18, 0.438, { size: H3, font: HEAD, align: 'center' });
+  txt(s, 'Your Text Here', 8.457, 5.039, 3.086, 0.438, { size: H3, font: HEAD, align: 'center' });
+  txt(s, LOREM.tile, 7.99, 5.43, 4.019, 1.413, { color: GREY, align: 'center', lh: 1.5 });
+  oval(s, 9.455, 7.337, 1.054, 1.054, { fill: ORANGE });
+  txt(s, '$35', 9.392, 7.646, 1.18, 0.438, { size: H3, font: HEAD, align: 'center' });
+  txt(s, 'Your Text Here', 8.439, 8.581, 3.086, 0.438, { size: H3, font: HEAD, align: 'center' });
+  txt(s, LOREM.tile, 7.972, 8.972, 4.019, 1.413, { color: GREY, align: 'center', lh: 1.5 });
+}
+
+/* 22 — portfolio, six numbered items */
+function slide22(s) {
+  txt(s, 'Change your out looks!', 8.062, 1.131, 8.824, 1.01, { size: TITLE, font: HEAD });
+  txt(s, '01. Your Text Here', 8.133, 2.969, 3.803, 0.438, { size: H3, font: HEAD });
+  txt(s, LOREM.item, 8.133, 3.463, 4.981, 1.413, { color: GREY, lh: 1.5 });
+  txt(s, '04. Your Text Here', 13.459, 2.969, 3.803, 0.438, { size: H3, font: HEAD });
+  txt(s, LOREM.item, 13.459, 3.463, 4.981, 1.413, { color: GREY, lh: 1.5 });
+  txt(s, '05. Your Text Here', 13.387, 5.59, 3.803, 0.438, { size: H3, font: HEAD });
+  txt(s, LOREM.item, 13.387, 6.085, 4.981, 1.413, { color: GREY, lh: 1.5 });
+  txt(s, '03. Your Text Here', 7.989, 8.211, 3.803, 0.438, { size: H3, font: HEAD });
+  txt(s, LOREM.item, 7.989, 8.706, 4.981, 1.413, { color: GREY, lh: 1.5 });
+  txt(s, '06. Your Text Here', 13.315, 8.211, 3.803, 0.438, { size: H3, font: HEAD });
+  txt(s, LOREM.item, 13.315, 8.706, 4.981, 1.413, { color: GREY, lh: 1.5 });
+  rule(s, 8.133, 2.21, 8.384, { line: ORANGE, lw: 4.5 });
+  box(s, 6.364, 5.333, 6.227, 2.48, { fill: ORANGE });
+  txt(s, '02. Your Text Here', 7.273, 5.875, 3.803, 0.438, { size: H3, font: HEAD });
+  txt(s, 'PLACEHOLDER', 7.273, 6.313, 4.519, 0.959, { color: SOFT, lh: 1.5 });
+}
+
+/* 23 — portfolio, staggered cards */
+function slide23(s) {
+  box(s, 16.318, 0, 3.682, 4.422, { fill: CARD });
+  box(s, 0, 0, 6.545, 4.909, { fill: ORANGE });
+  box(s, 1.076, 0.947, 8.422, 2.944, { fill: CARD });
+  txt(s, '01. Your Text Here', 1.878, 1.478, 3.803, 0.438, { size: H3, font: HEAD });
+  txt(s, LOREM.card, 1.878, 1.947, 4.163, 1.413, { color: GREY, lh: 1.5 });
+  box(s, 2.334, 4.153, 8.422, 2.944, { fill: CARD });
+  txt(s, '02. Your Text Here', 3.136, 4.684, 3.803, 0.438, { size: H3, font: HEAD });
+  txt(s, LOREM.card, 3.136, 5.153, 4.163, 1.413, { color: GREY, lh: 1.5 });
+  box(s, 3.857, 7.359, 8.422, 2.944, { fill: CARD });
+  txt(s, '03. Your Text Here', 4.659, 7.89, 3.803, 0.438, { size: H3, font: HEAD });
+  txt(s, LOREM.card, 4.659, 8.359, 4.163, 1.413, { color: GREY, lh: 1.5 });
+  txt(s, 'Barbershop makes style even cooler', 11.923, 2.166, 7.314, 1.919, { size: TITLE, font: HEAD });
+  eyebrow(s, 11.985, 1.568, 'PORTFOLIO', 2.203);
+}
+
+/* 24 — mockup, desktop */
+function slide24(s) {
+  photo(s, 1.691, 2.448, 7.65, 6.353);
+  box(s, 10.273, 7.463, 8.072, 2.589, { fill: CARD, line: ORANGE, lw: 2.25 });
+  txt(s, 'Barbershop is your best style', 11.406, 2.976, 7.352, 1.919, { size: TITLE, font: HEAD });
+  eyebrow(s, 11.469, 2.378, 'MOCKUP', 1.55);
+  chevRow(s, 11.571, 5.292, 'Haircut Styles', 2.861);
+  txt(s, LOREM.row, 11.469, 5.724, 6.876, 0.959, { color: GREY, lh: 1.5 });
+  chevRow(s, 11.142, 8.1, 'Smooth Shave', 2.861);
+  txt(s, LOREM.row, 11.04, 8.531, 6.876, 0.959, { color: GREY, lh: 1.5 });
+}
+
+/* 25 — mockup, phone */
+function slide25(s) {
+  photo(s, 10.227, 2.435, 11.316, 6.38);
+  txt(s, [{ text: 'We will change your' }, { text: ' out looks' }], 1.603, 2.848, 7.757, 1.919, { size: TITLE, font: HEAD });
+  eyebrow(s, 1.665, 2.25, 'MOCKUP', 1.55);
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed eiusmod tempor incididunt ut labore et dolore magna aliqua. Ultricies integer quis auctor elit sed vulputate. Molestie iacus at erat pellentesque adipiscing commodo. Vitae ultricies leo integer malesuada nunc vel ultricies lacus sed.', 1.603, 5, 7.045, 2.322, { color: GREY, lh: 1.5 });
+  txt(s, '30', 1.603, 7.709, 1.677, 0.909, { size: STAT, color: ORANGE, font: BODY, bold: true });
+  txt(s, 'Outlet Branch', 1.603, 8.569, 2.229, 0.438, { size: H3, font: HEAD });
+  txt(s, '1000+', 4.311, 7.709, 2.646, 0.909, { size: STAT, color: ORANGE, font: BODY, bold: true });
+  txt(s, 'Satisfied Customer', 4.311, 8.569, 3.125, 0.438, { size: H3, font: HEAD });
+}
+
+/* 26 — mockup, laptop + search bar */
+function slide26(s) {
+  photo(s, -2.273, 2.378, 11.219, 6.494);
+  txt(s, 'The advantages of our barbershop you will get', 10.827, 2.477, 6.562, 2.827, { size: TITLE, font: HEAD });
+  eyebrow(s, 10.827, 1.88, 'MOCKUP', 1.663);
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed eiusmod tempor incididunt ut labore et dolore magna aliqua. Ultricies integer quis auctor elit sed vulputate. Molestie iacus at erat pellentesque adipiscing commodo. Vitae ultricies leo integer malesuada nunc vel ultricies lacus sed.', 10.929, 5.543, 7.045, 2.322, { color: GREY, lh: 1.5 });
+  box(s, 10.983, 8.399, 3.792, 0.977, { fill: CARD });
+  txt(s, 'www.hairshop.com', 11.264, 8.669, 3.23, 0.438, { size: H3, font: HEAD, align: 'center' });
+  box(s, 14.864, 8.399, 1.105, 0.977, { fill: ORANGE });
+  iconSearch(s, 15.206, 8.678, 0.421, WHITE);
+}
+
+/* 27 — price list + opening hours */
+function slide27(s) {
+  txt(s, 'Price List Barbershop', 2.461, 1.381, 4.909, 1.919, { size: TITLE, font: HEAD });
+  box(s, 1.636, 4.164, 8.932, 5.797, { fill: CARD });
+  txt(s, 'Haircut Styles', 2.738, 5.057, 2.861, 0.505, { size: H2, font: HEAD });
+  rule(s, 2.838, 5.76, 6.627, { line: ORANGE, dash: 'lgDash' });
+  txt(s, '$15.00', 7.73, 5.056, 1.736, 0.505, { size: H2, font: HEAD, align: 'right' });
+  txt(s, 'Beard Triming', 2.738, 6.16, 2.861, 0.505, { size: H2, font: HEAD });
+  rule(s, 2.838, 6.863, 6.627, { line: ORANGE, dash: 'lgDash' });
+  txt(s, '$20.00', 7.611, 6.159, 1.855, 0.505, { size: H2, font: HEAD, align: 'right' });
+  txt(s, 'Hair Coloring', 2.738, 7.263, 2.861, 0.505, { size: H2, font: HEAD });
+  rule(s, 2.838, 7.966, 6.627, { line: ORANGE, dash: 'lgDash' });
+  txt(s, '$25.00', 7.73, 7.262, 1.736, 0.505, { size: H2, font: HEAD, align: 'right' });
+  txt(s, 'Pomade Service', 2.738, 8.366, 2.861, 0.505, { size: H2, font: HEAD });
+  rule(s, 2.838, 9.069, 6.627, { line: ORANGE, dash: 'lgDash' });
+  txt(s, '$35.00', 7.611, 8.365, 1.855, 0.505, { size: H2, font: HEAD, align: 'right' });
+  box(s, 14.455, 2.482, 5.545, 3.427, { fill: ORANGE });
+  txt(s, 'OPEN HOURS', 15.187, 3.882, 3.483, 0.438, { size: H3, font: HEAD });
+  txt(s, 'Weekday\t07.00 PM - 10.00 AM', 15.187, 4.376, 4.171, 0.504, { color: SOFT, font: TAG, lh: 1.5 });
+  txt(s, 'Weekend\t09.00 PM - 08.00 AM', 15.187, 4.836, 4.171, 0.504, { color: SOFT, font: TAG, lh: 1.5 });
+  marker(s, 1.636, 1.626, 0.562);
+  iconClock(s, 15.295, 3.159, 0.498, WHITE);
+}
+
+/* 28 — testimonial */
+function slide28(s) {
+  box(s, 7.444, -0.231, 12.806, 5.022, { line: ORANGE, lw: 2.25 });
+  txt(s, 'I always feel good after I change my hair. You get a haircut and feel positive and ready to take on the day.', 2.098, 6.018, 13.971, 2.827, { size: TITLE, font: HEAD });
+  marker(s, 2.247, 9.283, 0.477);
+  txt(s, 'Kristin Maldonado', 2.939, 9.32, 2.721, 0.404, { font: TAG });
+  rule(s, 7.229, 7.909, 8.384, { line: ORANGE, lw: 4.5 });
+}
+
+/* 29 — contact */
+function slide29(s) {
+  txt(s, 'Get in infomation', 1.993, 2.165, 7.098, 1.01, { size: TITLE, font: HEAD });
+  eyebrow(s, 2.056, 1.567, 'CONTACT', 1.55);
+  box(s, 2.056, 3.945, 1.01, 1.01, { fill: CARD, line: ORANGE, lw: 2.25 });
+  iconPin(s, 2.363, 4.231, 0.416, WHITE, CARD);
+  txt(s, '181 Mercer Street, New York, NY 10012, United States', 3.533, 4.063, 4.551, 0.774, { size: H3, font: MED });
+  box(s, 2.056, 5.383, 1.01, 1.01, { fill: CARD, line: ORANGE, lw: 2.25 });
+  txt(s, [{ text: '+09 7864 8903 6373', options: { breakLine: true } }, { text: '+09 1234 5678 9000' }], 3.533, 5.5, 3.176, 0.774, { size: H3, font: MED });
+  box(s, 2.056, 6.82, 1.01, 1.01, { fill: CARD, line: ORANGE, lw: 2.25 });
+  txt(s, [{ text: 'contact@hairshop.com', options: { breakLine: true } }, { text: 'www.hairshop.com' }], 3.533, 6.938, 3.495, 0.774, { size: H3, font: MED });
+  iconPhone(s, 2.344, 5.726, 0.434, WHITE);
+  iconGlobe(s, 2.345, 7.109, 0.431, WHITE);
+  social(s, 2.697, 9.211, 0.479, 'twitter');
+  social(s, 3.338, 9.211, 0.479, 'instagram');
+  social(s, 2.056, 9.211, 0.479, 'facebook');
+  txt(s, 'Follow Us Social Media', 1.993, 8.595, 3.478, 0.438, { size: H3, font: MED });
+}
+
+/* 30 — closing */
+function slide30(s) {
+  box(s, 0, 0, 20, 11.25, { fill: BLACK, alpha: 50 });
+  txt(s, 'Thanks!', 3.507, 3.9, 12.985, 3.45, { size: HERO, font: HEAD, align: 'center' });
+  txt(s, 'For Watching My Presentation', 6.882, 6.957, 6.236, 0.572, { size: LEAD, color: ORANGE, font: SUB, align: 'center' });
+  marker(s, 9.897, 7.545, 0.358, ORANGE, 's');
+}
+
+/* ── build ───────────────────────────────────────────────────────────────── */
+
+/* The two title slides sit on a white master; every other slide is black. */
+const BACKGROUNDS = {
+  1: WHITE,
+  30: WHITE,
+};
+
+const BUILDERS = [
+  slide01, slide02, slide03, slide04, slide05, slide06,
+  slide07, slide08, slide09, slide10, slide11, slide12,
+  slide13, slide14, slide15, slide16, slide17, slide18,
+  slide19, slide20, slide21, slide22, slide23, slide24,
+  slide25, slide26, slide27, slide28, slide29, slide30,
+];
+
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'HAIRSHOP', width: 20, height: 11.25 });
+pptx.layout = 'HAIRSHOP';
+pptx.title = 'Hairshop — Barbershop & Shaving Presentation Template';
+
+BUILDERS.forEach((build, i) => {
+  const slide = pptx.addSlide();
+  slide.background = { color: BACKGROUNDS[i + 1] || BLACK };
+  build(slide);
+});
+
+pptx.writeFile({ fileName: path.join(__dirname, '12b8aaae-4412-4a13-9195-91e20fb7fa4b_grok_final.pptx') })
+  .then(f => console.log('wrote ' + f));

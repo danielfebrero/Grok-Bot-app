@@ -1,0 +1,761 @@
+/**
+ * "MUSSE / MUSSEE" presentation template — rebuilt with pptxgenjs.
+ *
+ * Widescreen 13.333 x 7.5in, 20 slides.
+ * Photographs in the source deck are replaced by flat grey "[image]" plates.
+ *
+ *   node 0caa6862-cf02-4751-8c3d-ac3abb356626_grok_final.js
+ */
+
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ *
+ * Palette / typography
+ * ------------------------------------------------------------------ */
+
+const RED = 'C00000';
+const BLACK = '000000';
+const WHITE = 'FFFFFF';
+const NIGHT = '262626'; // dark slide background
+const INK = '1A1A1A';
+const INK_SOFT = '181717';
+const GREY_35 = '595959';
+const GREY_40 = '404040';
+const GREY_50 = '808080';
+const GREY_55 = '767171';
+const GREY_65 = 'A6A6A6';
+const TRACK = 'C5C3C3'; // empty part of a progress bar
+const PLATE = 'D4D4D4'; // photo placeholder plate
+const PLATE_TXT = 'A6A6A6';
+
+const HEAD = 'Poppins'; // display face
+const BODY = 'Lato'; // text face
+
+/* ------------------------------------------------------------------ *
+ * Boilerplate copy of the template
+ * ------------------------------------------------------------------ */
+
+const T = {
+  brand: 'MUSSEE',
+  ribbon: 'MUSSEE PRESENTATION',
+  tagline:
+    'NO VIM MODO IMPERDIET DIGNISSIM. EX PERICULIS TEMPORIBUS IUS, TRACTATOS QUALISQUE CU MEL. ',
+  mauris1:
+    'Mauris quam dolor, cursus at porta et, luctus eget purus. Nunc tempor luctus interdum. ' +
+    'Duis libero leo, consequat ut accumsan eu, viverra et erat. ',
+  mauris2: 'Mauris quam dolor, cursus at porta et, luctus eget purus.',
+  mauris3:
+    'Mauris quam dolor, cursus at porta et, luctus eget purus. Nunc tempor luctus interdum. ' +
+    'Duis libero leo, consequat ut accumsan eu, viverra et erat. Nunc rhoncus tellus in ipsum ' +
+    'molestie et gravida tortor.',
+  lorem:
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonummy nibh euismod ' +
+    'tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis ' +
+    'nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. ' +
+    ' Ut wisi enim ad minim veniam, quis nostrud exerci tation.',
+  dummy1:
+    'Lorem Ipsum\u00A0is simply dummy text of the printing and typesetting industry. Lorem Ipsum ' +
+    "has been the industry's standard dummy text ever since the 1500s, when an unknown printer " +
+    'took a galley of type and scrambled it to make a type specimen book. It has survived not ' +
+    'only five centuries, but also the leap into electronic typesetting, remaining essentially ' +
+    'unchanged. ',
+  dummy2:
+    'Lorem Ipsum\u00A0is simply dummy text of the printing and typesetting industry. Lorem Ipsum ' +
+    "has been the industry's standard dummy text ever since the 1500s, when an unknown printer " +
+    'took a galley of type',
+  sed1:
+    'PLACEHOLDER' +
+    'laudantium, totam rem aperiam, ',
+  sed2: 'Sed ut perspiciatis unde omnis iste natus error sit .',
+  sedBoth:
+    'PLACEHOLDER' +
+    'laudantium, totam rem aperiam,  Sed ut perspiciatis unde omnis iste natus error sit .',
+  aliquam:
+    'Aliquam varius adipiscing tempor. Vivamus id ipsum sit amet massa consectetur porta. ',
+  farAway:
+    'Far far away, behind the word mountains, far from the countries. there live the blind',
+  farAway2:
+    'Far far away, behind the word mountains, far from the countries Vokalia and Consonantia, ' +
+    'there live the blind texts. Separated',
+  farAway3:
+    'Far far away, behind the word mountains, far from the countries Vokalia and Consonantia, ' +
+    'there live the blind texts. Separated they live in Bookmarksgrove right at the coast of the ' +
+    'Semantics, a large language ocean. ',
+  greatTitle: 'PUT YOU GREATE TITLE GOES HERE',
+  feature:
+    'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo ' +
+    'libero vivamus porttitor dolor, ',
+  mockup:
+    'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo ' +
+    'libero vivamus porttitor dolor, conubia mollit. Sapien nam suspendisse, tincidunt eget ante ' +
+    'tincidunt, eros in auctor fringilla praesent at diam. In et quam est eget mi. Pellentesque ' +
+    'nunc orci eu enim, eget in fringilla vitae, et eros praesent dolor porttitor. Lacinia ' +
+    'lectus nonummy, ',
+  vivamus: 'Vivamus quam dolor, tempor ac gravida sit amet, porta fermentum magna. ',
+  nullam:
+    'Nullam eu tempor purus. Nunc a leo magna, sit amet consequat risus. Etiam faucibus tortor.',
+};
+
+/* ------------------------------------------------------------------ *
+ * Small helpers
+ * ------------------------------------------------------------------ */
+
+/** Flatten paragraphs (arrays of runs) into a pptxgenjs text-run array. */
+function paras(groups) {
+  const runs = [];
+  groups.forEach(group => {
+    group.forEach((run, i) => {
+      runs.push({
+        text: run.text,
+        options: Object.assign({}, run.options, { breakLine: i === group.length - 1 }),
+      });
+    });
+  });
+  return runs;
+}
+
+/** A "photo" slot: one flat plate shape captioned "[image]". */
+function plate(slide, box, opts) {
+  const o = opts || {};
+  slide.addText('[image]', {
+    shape: o.shape || 'rect',
+    points: o.points,
+    x: box[0],
+    y: box[1],
+    w: box[2],
+    h: box[3],
+    fill: { color: o.color || PLATE },
+    line: { type: 'none' },
+    align: 'center',
+    valign: 'middle',
+    fontFace: BODY,
+    fontSize: Math.min(11, Math.max(7, box[2] * 2.2)),
+    color: PLATE_TXT,
+  });
+}
+
+/** Full-bleed photo plate darkened by a translucent black scrim. */
+function scrimmedPhoto(slide, transparency) {
+  plate(slide, [0, 0, 13.333, 7.5]);
+  slide.addShape('rect', {
+    x: 0,
+    y: 0,
+    w: 13.333,
+    h: 7.5,
+    fill: { color: BLACK, transparency: transparency },
+    line: { type: 'none' },
+  });
+}
+
+/** "MUSSEE" eyebrow label above a headline. */
+function eyebrow(slide, x, y, opts) {
+  const o = opts || {};
+  slide.addText(T.brand, {
+    x: x,
+    y: y,
+    w: 1.759,
+    h: o.h || 0.337,
+    fontFace: BODY,
+    fontSize: o.fontSize || 14,
+    bold: true,
+    charSpacing: 5,
+    color: o.color || GREY_40,
+    valign: 'top',
+  });
+}
+
+/** Two/three-line "Musse | Simple | Slides." headline block. */
+function headline(slide, box, lines, opts) {
+  const o = opts || {};
+  slide.addText(
+    paras(
+      lines.map((line, i) => [
+        {
+          text: line,
+          options: { color: i === 0 ? RED : o.color || BLACK },
+        },
+      ])
+    ),
+    {
+      x: box[0],
+      y: box[1],
+      w: box[2],
+      h: box[3],
+      fontFace: HEAD,
+      fontSize: o.fontSize,
+      bold: true,
+      charSpacing: o.charSpacing,
+      align: o.align || 'left',
+      lineSpacingMultiple: o.lineSpacingMultiple === undefined ? 0.8 : o.lineSpacingMultiple,
+      valign: 'top',
+      rotate: o.rotate,
+      wrap: o.wrap,
+    }
+  );
+}
+
+/** Vertical "MUSSEE PRESENTATION" side rail. */
+function sideRail(slide, x, y, rotate) {
+  slide.addText(T.ribbon, {
+    x: x,
+    y: y,
+    w: 5.189,
+    h: 0.337,
+    rotate: rotate,
+    fontFace: BODY,
+    fontSize: 14,
+    bold: true,
+    charSpacing: 5,
+    color: WHITE,
+    align: 'center',
+    valign: 'top',
+  });
+}
+
+/** The two-paragraph "Lorem Ipsum is simply dummy text..." block (slides 8 & 12). */
+function dummyPair(slide, box) {
+  slide.addText(paras([[{ text: T.dummy1 }], [{ text: T.dummy2 }]]), {
+    x: box[0], y: box[1], w: box[2], h: box[3],
+    fontFace: BODY, fontSize: 9, align: 'justify',
+    lineSpacingMultiple: 1.5, paraSpaceBefore: 10, valign: 'top',
+  });
+}
+
+/** Body copy in Lato with 1.5 line spacing. */
+function copy(slide, box, text, opts) {
+  const o = opts || {};
+  slide.addText(text, {
+    x: box[0],
+    y: box[1],
+    w: box[2],
+    h: box[3],
+    fontFace: BODY,
+    fontSize: o.fontSize || 12,
+    color: o.color || BLACK,
+    align: o.align || 'left',
+    italic: o.italic,
+    lineSpacingMultiple: o.lineSpacingMultiple === undefined ? 1.5 : o.lineSpacingMultiple,
+    valign: o.valign || 'top',
+    margin: o.margin,
+    rotate: o.rotate,
+    wrap: o.wrap,
+    charSpacing: o.charSpacing,
+    bold: o.bold,
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Vector glyphs (freeform icons traced from the template), normalised
+ * to a 0..1000 box.  M/L/C/Z mirror the DrawingML path commands.
+ * ------------------------------------------------------------------ */
+
+const ICONS = {
+  bulb: [['M',499,153],['C',315,153,163,286,163,448],['C',163,553,211,616,245,662],['C',267,691,279,707,279,724],['C',279,762,301,798,342,825],['C',342,848,346,903,346,903],['L',346,903],['C',347,920,356,952,416,969],['C',423,979,432,986,443,994],['C',450,998,458,1000,466,1000],['L',532,1000],['C',540,1000,549,998,555,994],['C',568,986,576,979,584,969],['C',644,950,653,918,653,903],['C',653,903,657,848,658,825],['C',698,798,721,762,721,724],['C',721,708,733,691,754,662],['C',789,616,836,553,836,448],['C',836,286,685,153,499,153],['Z'],['M',696,144],['C',700,146,703,146,707,146],['C',714,146,721,142,725,137],['L',758,87],['C',763,78,759,66,750,61],['C',740,56,726,58,721,68],['L',688,118],['C',683,126,687,139,696,144],['Z'],['M',859,283],['C',863,283,866,283,870,281],['L',925,252],['C',936,248,938,235,933,226],['C',927,217,914,214,904,219],['L',848,248],['C',839,254,834,265,841,274],['C',844,280,852,283,859,283],['Z'],['M',978,433],['L',915,433],['C',903,433,893,442,893,452],['C',893,463,903,472,915,472],['L',978,472],['C',990,472,1000,463,1000,452],['C',1000,442,990,433,978,433],['Z'],['M',925,652],['L',870,624],['C',859,618,847,621,841,630],['C',834,640,839,651,848,657],['L',904,686],['C',907,687,911,688,914,688],['C',922,688,929,684,933,678],['C',938,670,936,657,925,652],['Z'],['M',130,624],['L',74,652],['C',64,657,60,670,67,678],['C',71,684,78,688,85,688],['C',89,688,93,687,96,686],['L',150,657],['C',161,651,164,640,159,630],['C',153,621,140,618,130,624],['Z'],['M',105,452],['C',105,442,97,433,85,433],['L',21,433],['C',10,433,0,442,0,452],['C',0,463,10,472,21,472],['L',85,472],['C',97,472,105,463,105,452],['Z'],['M',150,248],['L',96,219],['C',86,214,73,217,67,226],['C',60,235,64,248,74,252],['L',130,281],['C',133,283,137,283,141,283],['C',148,283,155,281,159,274],['C',164,265,161,254,150,248],['Z'],['M',274,137],['C',278,142,285,146,293,146],['C',295,146,300,146,302,144],['C',313,139,316,126,311,118],['L',279,68],['C',272,58,260,56,249,61],['C',239,66,237,78,242,87],['L',274,137],['Z'],['M',499,97],['C',512,97,521,88,521,77],['L',521,19],['C',521,9,512,0,499,0],['C',488,0,479,9,479,19],['L',479,77],['C',479,88,488,97,499,97],['Z'],['M',684,619],['C',659,652,636,683,636,724],['C',636,743,617,757,603,766],['L',395,766],['C',382,757,364,743,364,724],['C',364,683,341,652,316,619],['C',285,577,249,530,249,448],['C',249,328,361,230,499,230],['C',639,230,751,328,751,448],['C',751,530,715,577,684,619],['Z']],
+  bars: [['M',72,666],['C',33,666,0,703,0,750],['L',0,917],['C',0,963,33,1000,72,1000],['C',113,1000,146,963,146,917],['L',146,750],['C',146,703,113,666,72,666],['Z'],['M',926,0],['C',885,0,852,37,852,83],['L',852,917],['C',852,963,885,1000,926,1000],['C',967,1000,1000,963,1000,917],['L',1000,83],['C',1000,37,967,0,926,0],['Z'],['M',714,167],['C',674,167,642,204,642,250],['L',642,917],['C',642,963,674,1000,714,1000],['C',755,1000,787,963,787,917],['L',787,250],['C',787,204,755,167,714,167],['Z'],['M',499,334],['C',460,334,425,371,425,416],['L',425,917],['C',425,963,460,1000,499,1000],['C',540,1000,573,963,573,917],['L',573,416],['C',573,371,540,334,499,334],['Z'],['M',280,499],['C',238,499,206,538,206,583],['L',206,917],['C',206,963,238,1000,280,1000],['C',319,1000,353,963,353,917],['L',353,583],['C',353,538,319,499,280,499],['Z']],
+  layers: [['M',721,379],['L',1000,379],['L',797,0],['L',496,0],['L',194,0],['L',0,379],['L',274,379],['L',721,379],['Z'],['M',95,805],['L',0,1000],['L',274,1000],['L',721,1000],['L',1000,1000],['L',893,805],['L',95,805],['Z'],['M',95,493],['L',0,677],['L',274,677],['L',721,677],['L',1000,677],['L',893,493],['L',95,493],['Z']],
+  phone: [['M',841,0],['L',841,0],['C',155,0,155,0,155,0],['C',60,0,0,37,0,90],['C',0,888,0,888,0,888],['C',0,941,60,998,155,998],['C',841,998,841,998,841,998],['C',936,998,996,941,996,888],['C',996,90,996,90,996,90],['C',996,37,936,0,841,0],['Z'],['M',498,941],['L',498,941],['C',435,941,375,922,375,906],['C',375,869,435,851,498,851],['C',562,851,622,869,622,906],['C',622,922,562,941,498,941],['Z'],['M',873,798],['L',873,798],['C',124,798,124,798,124,798],['C',124,127,124,127,124,127],['C',873,127,873,127,873,127],['L',873,798],['Z']],
+  envelope: [['M',39,95],['L',39,95],['C',76,123,440,439,440,439],['C',460,467,479,467,501,467],['C',518,467,538,467,538,439],['C',555,439,922,123,941,95],['C',980,63,998,0,961,0],['C',39,0,39,0,39,0],['C',0,0,20,63,39,95],['Z'],['M',961,281],['L',961,281],['C',941,281,555,593,538,625],['C',538,625,518,625,501,625],['C',479,625,460,625,440,625],['C',421,593,59,281,39,281],['C',20,253,20,281,20,281],['C',20,309,20,933,20,933],['C',20,965,39,996,76,996],['C',922,996,922,996,922,996],['C',961,996,980,965,980,933],['C',980,933,980,309,980,281],['C',980,281,980,253,961,281],['Z']],
+  pencil: [['M',905,90],['L',905,90],['C',816,0,747,0,747,0],['C',432,340,432,340,432,340],['C',66,703,66,703,66,703],['C',0,997,0,997,0,997],['C',297,928,297,928,297,928],['C',680,568,680,568,680,568],['C',997,248,997,248,997,248],['C',997,248,997,182,905,90],['Z'],['M',297,905],['L',297,905],['C',182,928,182,928,182,928],['C',182,905,161,885,138,862],['C',113,839,90,839,90,816],['C',113,726,113,726,113,726],['C',138,680,138,680,138,680],['C',138,680,182,680,251,747],['C',317,816,317,862,317,862],['L',297,905],['Z']],
+  bulbCircle: [['M',291,962],['L',291,962],['C',338,980,412,998,484,998],['C',558,998,629,980,681,962],['C',681,855,681,855,681,855],['C',291,855,291,855,291,855],['L',291,962],['Z'],['M',681,803],['L',681,803],['C',681,588,997,518,973,303],['C',948,161,827,0,484,0],['C',146,0,25,161,0,303],['C',0,518,291,588,291,803],['L',681,803],['Z'],['M',146,303],['L',146,303],['C',170,179,291,106,484,106],['C',681,106,802,179,827,303],['C',827,376,777,428,706,500],['C',629,552,585,624,533,713],['C',437,713,437,713,437,713],['C',387,624,338,552,266,500],['C',192,428,146,376,146,303],['Z']],
+  folder: [['M',855,333],['L',855,333],['C',748,38,748,38,748,38],['C',748,19,712,0,696,19],['C',18,279,18,279,18,279],['C',0,279,0,298,0,333],['C',107,629,107,629,107,629],['C',107,462,107,462,107,462],['C',107,390,161,333,231,333],['C',408,333,408,333,408,333],['C',622,185,622,185,622,185],['C',748,333,748,333,748,333],['L',855,333],['Z'],['M',962,425],['L',962,425],['C',231,425,231,425,231,425],['C',213,425,195,444,195,462],['C',195,962,195,962,195,962],['C',195,979,213,998,231,998],['C',962,998,962,998,962,998],['C',980,998,998,979,998,962],['C',998,462,998,462,998,462],['C',998,444,980,425,962,425],['Z'],['M',909,888],['L',909,888],['C',302,888,302,888,302,888],['C',302,815,302,815,302,815],['C',392,573,392,573,392,573],['C',533,758,533,758,533,758],['C',660,629,660,629,660,629],['C',837,554,837,554,837,554],['C',909,723,909,723,909,723],['L',909,888],['Z']],
+  wifi: [['M',498,752],['L',498,752],['C',444,752,388,814,388,876],['C',388,938,444,998,498,998],['C',554,998,608,938,608,876],['C',608,814,554,752,498,752],['Z'],['M',277,631],['L',277,631],['C',350,713,350,713,350,713],['C',425,631,554,631,646,713],['C',719,631,719,631,719,631],['C',590,509,406,509,277,631],['Z'],['M',129,468],['L',129,468],['C',204,550,204,550,204,550],['C',369,388,627,388,794,550],['C',869,468,869,468,869,468],['C',665,245,333,245,129,468],['Z'],['M',0,307],['L',0,307],['C',54,388,54,388,54,388],['C',296,124,683,124,923,388],['C',998,307,998,307,998,307],['C',719,0,277,0,0,307],['Z']],
+  megaphone: [['M',899,344],['L',899,344],['C',818,154,679,0,598,17],['C',479,78,679,307,81,537],['C',20,556,0,632,20,690],['C',40,729,119,786,182,768],['L',220,749],['C',261,805,301,768,301,805],['C',321,844,360,920,360,939],['C',380,959,400,998,420,978],['C',440,978,519,959,539,939],['C',578,939,578,920,560,900],['C',560,883,519,864,519,844],['C',499,825,479,749,458,729],['C',440,710,479,671,519,671],['C',798,654,838,805,937,768],['C',998,749,998,537,899,344],['Z'],['M',876,671],['L',876,671],['C',856,671,737,595,679,442],['C',618,288,618,134,638,134],['C',658,134,757,229,818,383],['C',899,537,876,654,876,671],['Z']],
+  handset: [['M',579,580],['L',579,580],['C',500,659,399,738,360,700],['C',300,639,259,598,140,700],['C',0,799,99,878,160,919],['C',218,998,459,939,698,700],['C',937,460,998,219,937,138],['C',878,79,818,0,718,120],['C',619,239,660,278,718,341],['C',759,377,680,479,579,580]],
+};
+
+/** Draw one of the traced glyphs as a custGeom shape. */
+function icon(slide, name, box, color) {
+  const sx = v => Math.round((v / 1000) * box[2] * 10000) / 10000;
+  const sy = v => Math.round((v / 1000) * box[3] * 10000) / 10000;
+  const points = ICONS[name].map(cmd => {
+    if (cmd[0] === 'Z') return { close: true };
+    if (cmd[0] === 'M') return { x: sx(cmd[1]), y: sy(cmd[2]), moveTo: true };
+    if (cmd[0] === 'L') return { x: sx(cmd[1]), y: sy(cmd[2]) };
+    return {
+      x: sx(cmd[5]),
+      y: sy(cmd[6]),
+      curve: { type: 'cubic', x1: sx(cmd[1]), y1: sy(cmd[2]), x2: sx(cmd[3]), y2: sy(cmd[4]) },
+    };
+  });
+  slide.addShape('custGeom', {
+    x: box[0],
+    y: box[1],
+    w: box[2],
+    h: box[3],
+    points: points,
+    fill: { color: color || BLACK },
+    line: { type: 'none' },
+  });
+}
+
+/* Torn-edge banners used behind the two "FEATURES" slides. */
+const BANNER_TOP = [
+  { x: 0, y: 0, moveTo: true },
+  { x: 13.4171, y: 0 },
+  { x: 13.4302, y: 3.8229, curve: { type: 'cubic', x1: 13.4216, y1: 1.2737, x2: 13.4302, y2: 2.537 } },
+  { x: 9.9104, y: 3.0602 },
+  { x: 9.9104, y: 3.8229 },
+  { x: 6.6807, y: 3.1237 },
+  { x: 6.6807, y: 3.8229 },
+  { x: 3.2732, y: 3.0852 },
+  { x: 3.2732, y: 3.8229 },
+  { x: 0, y: 3.1142 },
+  { close: true },
+];
+const BANNER_TOP_ALT = [
+  { x: 0.0131, y: 0, moveTo: true },
+  { x: 13.4302, y: 0 },
+  { x: 13.4302, y: 3.1142 },
+  { x: 10.1585, y: 3.8229 },
+  { x: 10.1585, y: 3.0852 },
+  { x: 6.7503, y: 3.8229 },
+  { x: 6.7503, y: 3.1237 },
+  { x: 3.5219, y: 3.8229 },
+  { x: 3.5219, y: 3.0602 },
+  { x: 0, y: 3.8229 },
+  { x: 0.0131, y: 0, curve: { type: 'cubic', x1: 0, y1: 2.537, x2: 0.0086, y2: 1.2737 } },
+  { close: true },
+];
+
+/* ------------------------------------------------------------------ *
+ * Slide builders
+ * ------------------------------------------------------------------ */
+
+/** 1 — Cover. */
+function slide01(s) {
+  scrimmedPhoto(s, 50);
+  s.addText('MUSSE', {
+    x: 3.904, y: 2.449, w: 5.526, h: 1.245,
+    fontFace: HEAD, fontSize: 80, bold: true, charSpacing: 3,
+    color: WHITE, align: 'center', lineSpacingMultiple: 0.8, valign: 'top',
+  });
+  s.addText(T.ribbon, {
+    x: 3.39, y: 4.247, w: 6.553, h: 0.337,
+    fill: { color: RED },
+    fontFace: BODY, fontSize: 14, bold: true, charSpacing: 5,
+    color: WHITE, align: 'center', valign: 'top',
+  });
+  copy(s, [3.333, 4.617, 6.667, 0.673], T.tagline, {
+    color: WHITE, bold: true, align: 'center',
+  });
+}
+
+/** 2 — Intro card on a photo. */
+function slide02(s) {
+  scrimmedPhoto(s, 50);
+  s.addShape('rect', {
+    x: 1.943, y: 1.087, w: 9.471, h: 5.364,
+    fill: { color: WHITE }, line: { type: 'none' },
+  });
+  s.addText(
+    paras([
+      [{ text: T.mauris1 }],
+      [{ text: T.mauris2 }],
+    ]),
+    {
+      x: 6.526, y: 4.015, w: 4.533, h: 1.239,
+      fontFace: BODY, fontSize: 12, color: GREY_35,
+      lineSpacingMultiple: 1.5, valign: 'top', margin: [4.8, 4.8, 2.4, 2.4],
+    }
+  );
+  headline(s, [6.526, 2.087, 3.593, 1.548], ['MUSEE', 'CREATIVE '], {
+    fontSize: 44, charSpacing: 3, wrap: false, lineSpacingMultiple: null,
+  });
+  sideRail(s, -1.498, 3.467, 270);
+  sideRail(s, 9.867, 3.582, 90);
+  plate(s, [2.991, 2.163, 2.967, 3.147]);
+}
+
+/** 3 — Same card, dark variant with a red column. */
+function slide03(s) {
+  s.background = { color: NIGHT };
+  s.addShape('rect', {
+    x: 4.99, y: 0.559, w: 2.363, h: 6.382,
+    fill: { color: RED }, line: { type: 'none' },
+  });
+  s.addText(
+    paras([
+      [{ text: T.mauris1 }],
+      [{ text: T.mauris2 }],
+    ]),
+    {
+      x: 8.191, y: 4.13, w: 4.533, h: 1.239,
+      fontFace: BODY, fontSize: 12, color: WHITE,
+      lineSpacingMultiple: 1.5, valign: 'top', margin: [4.8, 4.8, 2.4, 2.4],
+    }
+  );
+  headline(s, [8.191, 2.202, 3.593, 1.548], ['MUSEE', 'CREATIVE '], {
+    fontSize: 44, charSpacing: 3, color: WHITE, wrap: false, lineSpacingMultiple: null,
+  });
+  sideRail(s, 3.577, 3.582, 90);
+  plate(s, [0.559, 0.559, 4.431, 6.382]);
+}
+
+/** 4 / 6 — Big headline beside a full-height photo (mirrored pair). */
+function bigHeadlineSlide(s, opts) {
+  headline(s, opts.headBox, ['Musse', 'Simple', 'Slides.'], { fontSize: 75 });
+  copy(s, opts.copyBox, T.lorem, { fontSize: 10, color: GREY_65, align: 'justify' });
+  eyebrow(s, opts.eyebrow[0], opts.eyebrow[1]);
+  plate(s, opts.photo);
+}
+
+function slide04(s) {
+  bigHeadlineSlide(s, {
+    headBox: [1.075, 1.703, 5.552, 3.193],
+    copyBox: [1.115, 5.244, 4.725, 1.262],
+    eyebrow: [1.115, 1.296],
+    photo: [6.836, 0, 6.498, 7.5],
+  });
+}
+
+function slide06(s) {
+  bigHeadlineSlide(s, {
+    headBox: [7.454, 1.744, 5.552, 3.193],
+    copyBox: [7.454, 5.244, 4.725, 1.262],
+    eyebrow: [7.494, 1.338],
+    photo: [0, 0, 6.667, 7.5],
+  });
+}
+
+/** 5 — "FASHION SLIDES" with a square photo. */
+function slide05(s) {
+  headline(s, [1.036, 1.956, 5.173, 2.184], ['FASHION', 'SLIDES'], {
+    fontSize: 75, charSpacing: 1.5,
+  });
+  copy(s, [1.036, 4.484, 4.725, 1.262], T.lorem, {
+    fontSize: 10, color: GREY_65, align: 'justify',
+  });
+  eyebrow(s, 1.119, 1.544);
+  plate(s, [6.667, 0.797, 5.906, 5.906]);
+}
+
+/** 7 — Two text columns over a large photo. */
+function slide07(s) {
+  copy(s, [0.86, 1.413, 2.638, 2.667], T.lorem, { fontSize: 10, align: 'justify' });
+  headline(s, [4.869, 5.039, 5.173, 2.184], ['FASHION', 'SLIDES'], {
+    fontSize: 75, charSpacing: 1.5, color: WHITE,
+  });
+  eyebrow(s, 4.953, 4.628, { color: WHITE });
+  copy(s, [0.86, 4.761, 2.638, 1.582], T.sedBoth, { fontSize: 10, color: INK });
+  plate(s, [4.147, 0, 9.187, 7.5]);
+}
+
+/** 8 — Banner photo on top, headline + two paragraphs below. */
+function slide08(s) {
+  dummyPair(s, [5.007, 4.791, 7.678, 1.606]);
+  headline(s, [0.649, 4.791, 3.796, 1.934], ['Musse', 'Simple'], { fontSize: 66 });
+  eyebrow(s, 0.688, 4.385);
+  plate(s, [0, 0, 13.333, 3.62]);
+}
+
+/** 9 — Skill bars. */
+function slide09(s) {
+  s.addText(
+    paras([[{ text: T.sed1 }], [{ text: T.sed2 }]]),
+    {
+      x: 1.217, y: 3.319, w: 4.435, h: 1.616,
+      fontFace: BODY, fontSize: 12, color: INK,
+      lineSpacingMultiple: 1.5, valign: 'top',
+    }
+  );
+
+  const bars = [
+    { label: 'Photography', pct: '70%', y: 5.299, barY: 5.689, filled: 2.761 },
+    { label: 'Graphic Design', pct: '90%', y: 5.981, barY: 6.362, filled: 3.409 },
+  ];
+  bars.forEach(bar => {
+    s.addShape('roundRect', {
+      x: 1.293, y: bar.barY, w: 3.559, h: 0.05, rectRadius: 0.016,
+      fill: { color: TRACK }, line: { type: 'none' },
+    });
+    s.addShape('roundRect', {
+      x: 1.293, y: bar.barY, w: bar.filled, h: 0.05, rectRadius: 0.016,
+      fill: { color: BLACK }, line: { type: 'none' },
+    });
+    copy(s, [1.185, bar.y, 1.475, 0.404], bar.label, { color: INK });
+    copy(s, [4.163, bar.y, 0.74, 0.404], bar.pct, { color: INK, align: 'right' });
+  });
+
+  headline(s, [1.177, 1.249, 3.796, 1.934], ['Musse', 'Simple'], { fontSize: 66 });
+  eyebrow(s, 1.217, 0.843);
+  plate(s, [6.604, 0, 6.729, 7.5]);
+}
+
+/** 10 / 11 — Three features under a torn-edge banner photo. */
+const FEATURE_COLUMNS = [
+  { copyBox: [0.714, 5.759, 3.56, 0.633], label: [1.599, 5.371], title: [1.666, 4.483] },
+  { copyBox: [4.898, 6.019, 3.56, 0.673], label: [5.784, 5.631], title: [5.851, 4.698] },
+  { copyBox: [9.038, 5.759, 3.56, 0.633], label: [9.924, 5.371], title: [9.991, 4.483] },
+];
+
+function featureColumns(s) {
+  FEATURE_COLUMNS.forEach(col => {
+    copy(s, col.copyBox, T.aliquam, { color: GREY_35, align: 'center', margin: [4.8, 4.8, 2.4, 2.4] });
+    s.addText('FEATURES', {
+      x: col.label[0], y: col.label[1], w: 1.788, h: 0.404,
+      fontFace: BODY, fontSize: 18, bold: true, charSpacing: 3,
+      align: 'center', valign: 'top', wrap: false,
+    });
+  });
+}
+
+function slide10(s) {
+  featureColumns(s);
+  icon(s, 'bars', [6.409, 4.896, 0.538, 0.475]);
+  icon(s, 'bulb', [2.183, 4.531, 0.622, 0.684]);
+  icon(s, 'layers', [10.501, 4.674, 0.635, 0.398]);
+  plate(s, [0, 0, 13.432, 3.823], { shape: 'custGeom', points: BANNER_TOP });
+}
+
+function slide11(s) {
+  featureColumns(s);
+  FEATURE_COLUMNS.forEach(col => {
+    s.addText('TITLE', {
+      x: col.title[0], y: col.title[1], w: 1.655, h: 0.808,
+      fontFace: HEAD, fontSize: 44, bold: true,
+      align: 'center', valign: 'top', wrap: false, margin: [4.8, 4.8, 2.4, 2.4],
+    });
+  });
+  plate(s, [0, 0, 13.432, 3.823], { shape: 'custGeom', points: BANNER_TOP_ALT });
+}
+
+/** 12 — Headline + copy over a strip of four photos. */
+function slide12(s) {
+  dummyPair(s, [4.737, 1.396, 7.678, 1.606]);
+  headline(s, [0.866, 1.325, 3.796, 1.434], ['Musse', 'Simple'], { fontSize: 48 });
+  eyebrow(s, 0.944, 1.009, { fontSize: 12, h: 0.303 });
+  [
+    [-0.819, 3.583],
+    [2.986, 3.583],
+    [6.792, 3.597],
+    [10.611, 3.597],
+  ].forEach(col => plate(s, [col[0], 3.486, col[1], 2.583]));
+}
+
+/** 13 — Four portrait cards with numbered captions. */
+function slide13(s) {
+  ['01', '02', '03', '04'].forEach((num, i) => {
+    const x = [0.902, 3.876, 6.85, 9.824][i];
+    s.addText(
+      paras([
+        [{ text: num + '. PUT YOU TITLE  HERE', options: { fontSize: 9.33, bold: true, color: INK_SOFT } }],
+        [{ text: T.farAway, options: { fontSize: 10.67, color: GREY_55 } }],
+      ]),
+      {
+        x: x, y: 5.586, w: 2.608, h: 1.145,
+        fontFace: BODY, align: 'center', lineSpacingMultiple: 1.5, valign: 'top',
+      }
+    );
+    plate(s, [[0.901, 3.875, 6.85, 9.825][i], 1.17, 2.608, 4.186]);
+  });
+}
+
+/** 14 — Photo mosaic, headline bottom-left, caption bottom-right. */
+function slide14(s) {
+  plate(s, [0.881, 1.452, 3.405, 3.214]);
+  s.addText(
+    paras([
+      [{ text: T.greatTitle, options: { bold: true, color: INK_SOFT } }],
+      [{ text: T.farAway2, options: { color: GREY_55 } }],
+    ]),
+    {
+      x: 8.458, y: 5.274, w: 3.944, h: 0.753,
+      fontFace: BODY, fontSize: 9, lineSpacingMultiple: 1.5, valign: 'top',
+    }
+  );
+  headline(s, [0.881, 5.274, 2.6, 1.212], ['Musse', 'Simple'], { fontSize: 40 });
+  plate(s, [3.714, 3.297, 3.024, 3.214]);
+  plate(s, [7.167, 1.452, 6.167, 3.428]);
+}
+
+/** 15 — Rotated headline beside three photos. */
+function slide15(s) {
+  s.addText(
+    paras([
+      [{ text: T.greatTitle, options: { bold: true, color: INK_SOFT } }],
+      [{ text: T.farAway3, options: { color: GREY_55 } }],
+    ]),
+    {
+      x: 6.02, y: 4.897, w: 5.777, h: 0.98,
+      fontFace: BODY, fontSize: 9, lineSpacingMultiple: 1.5, valign: 'top',
+    }
+  );
+  headline(s, [0.142, 1.693, 3.006, 1.434], ['Musse', 'Simple'], {
+    fontSize: 48, rotate: 270,
+  });
+  plate(s, [3.095, 1.31, 5.738, 2.856]);
+  plate(s, [0.905, 4.452, 3.762, 2.142]);
+  plate(s, [9.119, 1.31, 3.286, 2.856]);
+}
+
+/** 16 — Diamond photo cluster with three icon rows. */
+function slide16(s) {
+  const rows = [
+    { y: 2.58, iconName: 'phone', iconBox: [11.989, 2.701, 0.29, 0.501] },
+    { y: 4.109, iconName: 'envelope', iconBox: [11.931, 4.254, 0.407, 0.252] },
+    { y: 5.686, iconName: 'pencil', iconBox: [12.001, 5.764, 0.337, 0.334] },
+  ];
+  rows.forEach(row => icon(s, row.iconName, row.iconBox, '111111'));
+  rows.forEach(row => {
+    s.addText(
+      paras([[{ text: T.feature }, { text: 'Lorem ipsum' }]]),
+      {
+        x: 7.942, y: row.y, w: 3.816, h: 0.825,
+        fontFace: BODY, fontSize: 10, align: 'right',
+        lineSpacingMultiple: 1.5, valign: 'top',
+      }
+    );
+  });
+  headline(s, [8.135, 0.62, 3.796, 1.434], ['Musse', 'Simple'], {
+    fontSize: 48, align: 'right',
+  });
+  plate(s, [1.952, 3.699, 3.064, 2.889], { shape: 'diamond' });
+  plate(s, [3.563, 1.786, 3.77, 3.555], { shape: 'diamond' });
+  plate(s, [1.952, 1.317, 2.508, 2.365], { shape: 'diamond' });
+}
+
+/** 17 — Section break: white card on a lightly dimmed photo. */
+function slide17(s) {
+  scrimmedPhoto(s, 75);
+  s.addShape('rect', {
+    x: 4.436, y: 1.13, w: 4.461, h: 5.364,
+    fill: { color: WHITE }, line: { type: 'none' },
+  });
+  copy(s, [4.914, 3.726, 3.506, 1.582], T.mauris3, {
+    color: NIGHT, align: 'center', margin: [4.8, 4.8, 2.4, 2.4],
+  });
+  headline(s, [5.074, 1.992, 3.185, 1.548], ['MUSE', 'PROJECT'], {
+    fontSize: 44, charSpacing: 3, align: 'center', wrap: false, lineSpacingMultiple: null,
+  });
+}
+
+/** 18 — Team grid. */
+function slide18(s) {
+  for (let i = 0; i < 4; i++) {
+    s.addText('Your Name', {
+      x: 1.403 + i * 2.931, y: 4.913, w: 1.715, h: 0.37,
+      fontFace: BODY, fontSize: 16, bold: true, charSpacing: 3,
+      align: 'center', valign: 'top', wrap: false,
+    });
+    copy(s, [0.943 + i * 2.931, 5.302, 2.636, 0.828], T.vivamus, {
+      fontSize: 10.5, color: GREY_50, align: 'center', margin: [4.8, 4.8, 2.4, 2.4],
+    });
+  }
+  copy(s, [0.802, 1.102, 11.73, 0.269], T.nullam, {
+    italic: true, align: 'center', valign: 'middle',
+    lineSpacingMultiple: 0, margin: [4.8, 4.8, 2.4, 2.4],
+  });
+  s.addText(
+    [
+      { text: 'GREAT', options: { color: RED } },
+      { text: ' TEAM', options: { color: BLACK } },
+    ],
+    {
+      x: 4.612, y: 0.483, w: 4.109, h: 0.673,
+      fontFace: HEAD, fontSize: 36, bold: true, charSpacing: 6,
+      align: 'center', valign: 'top', wrap: false, margin: [4.8, 4.8, 2.4, 2.4],
+    }
+  );
+  [1.459, 4.213, 6.968, 9.722].forEach(x =>
+    plate(s, [x, 2.047, 2.152, 2.154], { shape: 'ellipse' })
+  );
+}
+
+/** 19 — Phone mockup with a 3x2 icon grid. */
+function slide19(s) {
+  // Handset artwork of the source deck -> chassis, bezel and screen plate.
+  s.addShape('roundRect', {
+    x: 1.015, y: 1.08, w: 5.144, h: 10.88, rectRadius: 0.55,
+    fill: { color: '4A4A4A' }, line: { type: 'none' },
+  });
+  s.addShape('roundRect', {
+    x: 1.075, y: 1.14, w: 5.024, h: 10.76, rectRadius: 0.5,
+    fill: { color: '141414' }, line: { type: 'none' },
+  });
+  s.addShape('roundRect', {
+    x: 2.32, y: 1.53, w: 1.53, h: 0.09, rectRadius: 0.045,
+    fill: { color: '3A3A3A' }, line: { type: 'none' },
+  }); // earpiece
+  s.addShape('ellipse', {
+    x: 3.5, y: 1.24, w: 0.11, h: 0.11,
+    fill: { color: '3A3A3A' }, line: { type: 'none' },
+  }); // camera
+  plate(s, [1.38, 2.587, 4.413, 5.54]);
+
+  s.addText(
+    [
+      { text: 'OUR ', options: { color: BLACK } },
+      { text: 'MOCKUP', options: { color: RED } },
+    ],
+    {
+      x: 7.025, y: 1.055, w: 5.046, h: 0.774,
+      fontFace: HEAD, fontSize: 40, bold: true, align: 'justify', valign: 'top',
+    }
+  );
+  copy(s, [6.804, 2.02, 5.375, 1.363], T.mockup, { fontSize: 10, align: 'justify' });
+
+  const grid = [
+    { icon: 'bulbCircle', box: [7.512, 4.371, 0.338, 0.46] },
+    { icon: 'folder', box: [9.239, 4.351, 0.485, 0.464] },
+    { icon: 'envelope', box: [11.031, 4.435, 0.515, 0.332] },
+    { icon: 'wifi', box: [7.464, 5.98, 0.486, 0.44] },
+    { icon: 'megaphone', box: [9.276, 5.987, 0.432, 0.446] },
+    { icon: 'handset', box: [11.079, 6.015, 0.392, 0.389] },
+  ];
+  [4.049, 5.673].forEach(y =>
+    [7.155, 8.959, 10.763].forEach(x =>
+      s.addShape('ellipse', {
+        x: x, y: y, w: 1.052, h: 1.052,
+        fill: { type: 'none' }, line: { color: BLACK, width: 3 },
+      })
+    )
+  );
+  grid.forEach(g => icon(s, g.icon, g.box));
+}
+
+/** 20 — Closing slide. */
+function slide20(s) {
+  s.background = { color: NIGHT };
+  s.addText('THANKS', {
+    x: 3.904, y: 2.642, w: 5.526, h: 1.174,
+    fontFace: HEAD, fontSize: 72, bold: true, charSpacing: 3,
+    color: RED, align: 'center', lineSpacingMultiple: 0.8, valign: 'top',
+  });
+  s.addText(T.ribbon, {
+    x: 3.39, y: 4.247, w: 6.553, h: 0.337,
+    fontFace: BODY, fontSize: 14, charSpacing: 5,
+    color: WHITE, align: 'center', valign: 'top',
+  });
+  copy(s, [3.333, 4.617, 6.667, 0.673], T.tagline, { color: WHITE, align: 'center' });
+  sideRail(s, -0.512, 3.648, 270);
+}
+
+/* ------------------------------------------------------------------ *
+ * Assemble & write
+ * ------------------------------------------------------------------ */
+
+const BUILDERS = [
+  slide01, slide02, slide03, slide04, slide05,
+  slide06, slide07, slide08, slide09, slide10,
+  slide11, slide12, slide13, slide14, slide15,
+  slide16, slide17, slide18, slide19, slide20,
+];
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'WIDE', width: 13 + 1 / 3, height: 7.5 }); // 12192000 x 6858000 EMU
+  pptx.layout = 'WIDE';
+  pptx.author = 'MUSSEE';
+  pptx.title = 'MUSSEE PRESENTATION';
+
+  BUILDERS.forEach(builder => builder(pptx.addSlide()));
+
+  return pptx.writeFile({
+    fileName: path.join(__dirname, '0caa6862-cf02-4751-8c3d-ac3abb356626_grok_final.pptx'),
+  });
+}
+
+build().then(file => console.log('wrote', file));

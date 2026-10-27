@@ -1,0 +1,853 @@
+/*
+ * "Sepats - Creative Powerpoint Templates"  -  35 slides, 20 x 11.25 in (16:9)
+ * Rebuilt from scratch with pptxgenjs.  Photographs and raster logos of the
+ * original deck are replaced by programmatic placeholders (native shapes only).
+ *
+ *   node 0e0e3a37-e431-41da-8cb4-7fea4b951b7c_grok_final.js
+ */
+'use strict';
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ palette */
+const YELLOW = 'FBBC14';   // accent 1
+const DEEP   = 'F3AA10';   // darker accent, used in every gradient
+const MID    = 'F5AE11';
+const ORANGE = 'F17400';   // decorative crosses
+const WHITE  = 'FFFFFF';
+const BLACK  = '000000';
+const INK    = '0D0D0D';   // tx1 lumMod 95%
+const DARK   = '404040';   // tx1 lumMod 75%  (arrows, timeline, charts)
+const GREY   = 'BFBFBF';   // bg1 lumMod 75%  (placeholder input text)
+const SCREEN = 'FDFDFD';   // device mock-up screen
+const CAPT   = '9A9A9A';   // "[image]" caption
+
+/* recurring gradient stop tables (fraction of the sweep -> colour) */
+const COVER_GRAD = [{ pos: 0, color: YELLOW, alpha: 0.09 }, { pos: 0.60, color: YELLOW },
+                    { pos: 1, color: YELLOW }];
+const BREAK_GRAD = [{ pos: 0, color: YELLOW, alpha: 0.62 }, { pos: 0.35, color: YELLOW, alpha: 0.91 },
+                    { pos: 1, color: YELLOW, alpha: 0.91 }];
+const ICONS_GRAD = [{ pos: 0, color: YELLOW, alpha: 0.91 }, { pos: 0.60, color: YELLOW, alpha: 0.91 },
+                    { pos: 1, color: YELLOW, alpha: 0.60 }];
+
+/* -------------------------------------------------------------------- fonts */
+const BLK   = 'Nunito Black';
+const XBOLD = 'Nunito ExtraBold';
+const SEMI  = 'Nunito SemiBold';
+const LIGHT = 'Nunito Light';
+
+/* ------------------------------------------------------------- boiler text */
+const L_FULL  = "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, ";
+const L_MED   = "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown ";
+const L_WHEN  = "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when";
+const L_STD   = "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text";
+const L_SHORT = "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the";
+const L_IND   = "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's";
+const L_ANJAY = "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry\u2019s testing anjayy";
+const L_EVER  = "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever ";
+const L_PLUS  = L_STD + " dummy text of the printing and ";
+const L_SVC   = "Lorem Ipsum is simply dummy text of the printing and typestting industry. Lorem Ipsum of";
+const L_STAN  = "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's stan";
+const TAGLINE = 'Creative Powerpoint Templates';
+const NAV     = [['Home', 1.426, 0], ['About', 1.426, 1.527], ['Portfolio', 2.174, 3.156],
+                 ['Services', 2.174, 5.187]];
+
+/* headline fragments: [dark part, accent part] */
+const H_KEEP  = ['Keep your head, heels ', 'and standards high'];
+const H_KEEP2 = ['Keep your head, ', 'heels and standards high'];
+const H_FEET  = ['I still have my feet on the ground, ', 'I just wear better shoes.'];
+
+/* ------------------------------------------------------------- colour maths */
+const hex = n => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0').toUpperCase();
+function mix(a, b, t) {                       // t = 0 -> a, 1 -> b
+  const A = [0, 2, 4].map(i => parseInt(a.substr(i, 2), 16));
+  const B = [0, 2, 4].map(i => parseInt(b.substr(i, 2), 16));
+  return A.map((v, i) => hex(v + (B[i] - v) * t)).join('');
+}
+const onWhite = (c, alpha) => mix(WHITE, c, alpha === undefined ? 1 : alpha);
+
+/* ------------------------------------------------------------ tiny wrappers */
+function box(s, x, y, w, h, color, extra) {
+  s.addShape('rect', Object.assign({ x, y, w, h, fill: { color } }, extra || {}));
+}
+function poly(s, x, y, w, h, pts, color, extra) {   // polygon from 0..1 coords
+  s.addShape('custGeom', Object.assign({
+    x, y, w, h, fill: { color },
+    points: pts.map(p => ({ x: +(p[0] * w).toFixed(3), y: +(p[1] * h).toFixed(3) }))
+      .concat([{ close: true }])
+  }, extra || {}));
+}
+/* polygon from absolute slide coordinates (bounding box computed here) */
+function polyAbs(s, pts, color, extra) {
+  const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+  const x = Math.min.apply(null, xs), y = Math.min.apply(null, ys);
+  const w = Math.max.apply(null, xs) - x, h = Math.max.apply(null, ys) - y;
+  poly(s, x, y, w, h, pts.map(p => [(p[0] - x) / w, (p[1] - y) / h]), color, extra);
+}
+
+/* soft drop shadow used by the "cards" */
+const CARD_SHADOW = { type: 'outer', angle: 90, blur: 25, offset: 0, color: BLACK, opacity: 0.2 };
+
+/* text with the deck's defaults: top anchored, Nunito Light 18pt, black */
+function T(s, txt, o) {
+  s.addText(txt, Object.assign({ fontFace: LIGHT, fontSize: 18, color: BLACK, valign: 'top' }, o));
+}
+function headline(s, runs, o) {                     // 54pt ExtraBold section title
+  const t = Array.isArray(runs)
+    ? [{ text: runs[0], options: { color: (o && o.color) || BLACK } },
+       { text: runs[1], options: { color: YELLOW } }]
+    : runs;
+  T(s, t, Object.assign({ fontFace: XBOLD, fontSize: 54 }, o));
+}
+function body(s, txt, o) {
+  T(s, txt, Object.assign({ align: 'justify', lineSpacingMultiple: 1.5 }, o));
+}
+function label(s, txt, o) {                         // small 20pt "Lorem Ipsum"
+  T(s, txt, Object.assign({ fontFace: XBOLD, fontSize: 20 }, o));
+}
+function caption(s, txt, o) {                       // 24pt ExtraBold sub-caption
+  T(s, txt, Object.assign({ fontFace: XBOLD, fontSize: 24 }, o));
+}
+function bigNum(s, txt, o) {                        // 44pt counter
+  T(s, txt, Object.assign({ fontFace: XBOLD, fontSize: 44 }, o));
+}
+
+/* Linear gradient approximated with a stack of thin solid bands.
+   stops: [{pos:0..1, color, alpha}] ; angle: 0 ->, 45 diagonal, 90 v, 180 <-, 270 ^ */
+function gradientColor(stops, t) {
+  if (t <= stops[0].pos) return onWhite(stops[0].color, stops[0].alpha);
+  const last = stops[stops.length - 1];
+  if (t >= last.pos) return onWhite(last.color, last.alpha);
+  for (let i = 0; i < stops.length - 1; i++) {
+    const a = stops[i], b = stops[i + 1];
+    if (t >= a.pos && t <= b.pos) {
+      return mix(onWhite(a.color, a.alpha), onWhite(b.color, b.alpha), (t - a.pos) / (b.pos - a.pos));
+    }
+  }
+  return onWhite(last.color, last.alpha);
+}
+function gradient(s, x, y, w, h, stops, angle) {
+  const vertical = angle === 90 || angle === 270;
+  const reverse  = angle === 180 || angle === 270;
+  const span = vertical ? h : w;
+  const steps = Math.max(24, Math.min(150, Math.round(span / 0.07)));
+  for (let i = 0; i < steps; i++) {
+    const color = gradientColor(stops, reverse ? 1 - (i + 0.5) / steps : (i + 0.5) / steps);
+    if (vertical) box(s, x, y + h * i / steps, w, h / steps + 0.014, color);
+    else          box(s, x + w * i / steps, y, w / steps + 0.014, h, color);
+  }
+}
+/* 45-degree gradient: parallelogram bands sweeping from top-left to bottom-right */
+function gradientDiag(s, w, h, stops) {
+  const steps = 90, total = w + h;
+  for (let i = 0; i < steps; i++) {
+    const a = total * i / steps, b = total * (i + 1) / steps + 0.03;
+    const edge = u => [[Math.min(u, w), Math.max(0, u - w)], [Math.max(0, u - h), Math.min(u, h)]];
+    const [p1, p2] = edge(a), [p3, p4] = edge(b);
+    polyAbs(s, [p1, p3, p4, p2], gradientColor(stops, (i + 0.5) / steps));
+  }
+}
+
+/* ------------------------------------------------------------------ glyphs */
+const GLYPH = {
+  refresh(s, x, y, w, h, c, bg) {                   // two circular arrows
+    s.addShape('donut', { x, y, w, h, fill: { color: c } });
+    box(s, x,            y + h * 0.38, w * 0.26, h * 0.24, bg);
+    box(s, x + w * 0.74, y + h * 0.38, w * 0.26, h * 0.24, bg);
+    poly(s, x, y, w, h, [[0.00, 0.42], [0.38, 0.42], [0.19, 0.06]], c);
+    poly(s, x, y, w, h, [[0.62, 0.58], [1.00, 0.58], [0.81, 0.94]], c);
+  },
+  doc(s, x, y, w, h, c, bg) {                       // page with bookmark
+    poly(s, x, y, w, h, [[0.10, 0], [0.72, 0], [0.92, 0.18], [0.92, 1], [0.10, 1]], c);
+    poly(s, x, y, w, h, [[0.34, 0.30], [0.66, 0.30], [0.66, 0.78], [0.50, 0.62], [0.34, 0.78]], bg);
+  },
+  list(s, x, y, w, h, c, bg) {                      // stacked text lines
+    box(s, x, y, w, h, c);
+    [[0.16, 0.52], [0.40, 0.76], [0.58, 0.76], [0.74, 0.52]].forEach(l =>
+      box(s, x + w * 0.12, y + h * l[0], w * l[1], h * 0.11, bg));
+  },
+  search(s, x, y, w, h, c) {
+    s.addShape('donut', { x, y, w: w * 0.78, h: h * 0.78, fill: { color: c } });
+    s.addShape('roundRect', { x: x + w * 0.62, y: y + h * 0.62, w: w * 0.36, h: h * 0.18,
+      fill: { color: c }, rectRadius: 0.4, rotate: 45 });
+  },
+  envelope(s, x, y, w, h, c, bg) {
+    s.addShape('roundRect', { x, y: y + h * 0.1, w, h: h * 0.8, fill: { color: c }, rectRadius: 0.1 });
+    poly(s, x, y, w, h, [[0.06, 0.16], [0.94, 0.16], [0.50, 0.62]], bg);
+  },
+  phone(s, x, y, w, h, c) {
+    poly(s, x, y, w, h, [[0.06, 0.02], [0.34, 0.00], [0.48, 0.30], [0.32, 0.42],
+      [0.60, 0.70], [0.72, 0.54], [1.00, 0.68], [0.98, 0.96], [0.74, 1.00],
+      [0.40, 0.86], [0.14, 0.60], [0.00, 0.26]], c);
+  },
+  home(s, x, y, w, h, c, bg) {
+    poly(s, x, y, w, h, [[0.50, 0], [1, 0.46], [0.86, 0.46], [0.86, 1], [0.14, 1], [0.14, 0.46], [0, 0.46]], c);
+    box(s, x + w * 0.40, y + h * 0.62, w * 0.20, h * 0.38, bg);
+  },
+  twitter(s, x, y, w, h, c) {
+    poly(s, x, y, w, h, [[1.00, 0.10], [0.80, 0.20], [0.88, 0.02], [0.63, 0.13], [0.42, 0.05],
+      [0.24, 0.18], [0.24, 0.40], [0.06, 0.30], [0.10, 0.50], [0.26, 0.60], [0.10, 0.62],
+      [0.22, 0.80], [0.00, 0.92], [0.36, 1.00], [0.70, 0.86], [0.86, 0.52], [0.86, 0.32]], c);
+  },
+  facebook(s, x, y, w, h, c) {
+    T(s, 'f', { x: x - w * 0.6, y: y - h * 0.22, w: w * 2.2, h: h * 1.5,
+      fontFace: BLK, fontSize: 34, color: c, align: 'center', valign: 'middle' });
+  },
+  linkedin(s, x, y, w, h, c) {
+    T(s, 'in', { x: x - w * 0.4, y: y - h * 0.18, w: w * 1.8, h: h * 1.4,
+      fontFace: BLK, fontSize: 26, color: c, align: 'center', valign: 'middle' });
+  },
+  flame(s, x, y, w, h, c) {
+    poly(s, x, y, w, h, [[0.52, 0.00], [0.80, 0.34], [0.86, 0.24], [0.96, 0.56], [0.86, 0.86],
+      [0.56, 1.00], [0.24, 0.92], [0.12, 0.66], [0.24, 0.40], [0.34, 0.52], [0.36, 0.24]], c);
+  },
+  bulb(s, x, y, w, h, c) {
+    s.addShape('ellipse', { x: x + w * 0.16, y, w: w * 0.68, h: h * 0.68, fill: { color: c } });
+    box(s, x + w * 0.36, y + h * 0.66, w * 0.28, h * 0.16, c);
+    box(s, x + w * 0.39, y + h * 0.86, w * 0.22, h * 0.12, c);
+  },
+  puzzle(s, x, y, w, h, c, bg) {
+    box(s, x + w * 0.14, y + h * 0.24, w * 0.66, h * 0.66, c);
+    s.addShape('ellipse', { x: x + w * 0.31, y: y + h * 0.06, w: w * 0.32, h: h * 0.32, fill: { color: c } });
+    s.addShape('ellipse', { x: x + w * 0.64, y: y + h * 0.40, w: w * 0.32, h: h * 0.32, fill: { color: c } });
+    s.addShape('ellipse', { x: x, y: y + h * 0.42, w: w * 0.28, h: h * 0.28, fill: { color: bg } });
+  },
+  people(s, x, y, w, h, c) {
+    [[0.02, 0.26, 0.30], [0.34, 0.14, 0.34], [0.70, 0.26, 0.30]].forEach(p => {
+      s.addShape('ellipse', { x: x + w * p[0], y: y + h * p[1], w: w * p[2], h: h * p[2], fill: { color: c } });
+      s.addShape('roundRect', { x: x + w * (p[0] - 0.04), y: y + h * (p[1] + p[2] + 0.04),
+        w: w * (p[2] + 0.08), h: h * 0.30, fill: { color: c }, rectRadius: 0.4 });
+    });
+  },
+  picture(s, x, y, w, h, c, bg) {                   // tiny "photo" pictogram
+    s.addShape('rect', { x, y, w, h, fill: { color: bg }, line: { color: c, width: 1 } });
+    poly(s, x, y, w, h, [[0.08, 0.92], [0.42, 0.36], [0.70, 0.92]], c);
+    poly(s, x, y, w, h, [[0.55, 0.92], [0.78, 0.55], [0.95, 0.92]], c);
+    s.addShape('ellipse', { x: x + w * 0.62, y: y + h * 0.12, w: w * 0.18, h: h * 0.24, fill: { color: c } });
+  }
+};
+
+/* recurring 1.161" yellow tile carrying a white pictogram */
+const TILE_GLYPH = { refresh: [0.285, 0.283, 0.591, 0.594],
+                     doc:     [0.285, 0.240, 0.591, 0.681],
+                     list:    [0.235, 0.309, 0.690, 0.542] };
+const TILE_KINDS = ['refresh', 'doc', 'list'];
+function tile(s, kind, x, y, opts) {
+  opts = opts || {};
+  const size = opts.size || 1.161, k = size / 1.161;
+  s.addShape('rect', Object.assign({ x, y, w: size, h: size, fill: { color: YELLOW } },
+    opts.border ? { line: { color: WHITE, width: 7 } } : {}));
+  const g = TILE_GLYPH[kind];
+  GLYPH[kind](s, x + g[0] * k, y + g[1] * k, g[2] * k, g[3] * k, WHITE, YELLOW);
+}
+
+/* footprint-pair logo (stands in for the original raster/svg logo) */
+function logo(s, x, y, color, size) {
+  size = size || 1.313;
+  [[0.06, 0.02, 0.30, 0.50], [0.13, 0.58, 0.17, 0.19],
+   [0.52, 0.20, 0.28, 0.47], [0.58, 0.72, 0.16, 0.18]].forEach(p =>
+    s.addShape('ellipse', { x: x + size * p[0], y: y + size * p[1],
+      w: size * p[2], h: size * p[3], fill: { color } }));
+}
+
+/* top navigation, search / url pills, socials, footer tagline */
+function navbar(s, x, y, color) {
+  NAV.forEach(n => T(s, n[0], { x: x + n[2], y, w: n[1], h: 0.572, fontFace: SEMI, fontSize: 28, color }));
+}
+function pill(s, x, y, w, text, btnColor) {
+  s.addShape('roundRect', { x, y, w, h: 0.679, fill: { color: WHITE }, rectRadius: 0.34,
+    shadow: { type: 'outer', angle: 90, blur: 18, offset: 0, color: BLACK, opacity: 0.18 } });
+  T(s, text, { x: x + 0.3, y, w: w - 1.4, h: 0.679, fontFace: SEMI, fontSize: 20,
+    color: GREY, valign: 'middle' });
+  s.addShape('roundRect', { x: x + w - 1.007, y, w: 1.007, h: 0.679, fill: { color: btnColor }, rectRadius: 0.34 });
+  GLYPH.search(s, x + w - 0.706, y + 0.14, 0.404, 0.399, WHITE);
+}
+const searchPill = (s, x, y) => pill(s, x, y, 2.921, 'Search', DEEP);
+const storePill  = (s, x, y) => pill(s, x, y, 4.798, 'sepats.store', YELLOW);
+
+function socialV(s, x, y, color) {
+  GLYPH.twitter (s, x,         y,         0.518, 0.421, color);
+  GLYPH.facebook(s, x + 0.122, y + 1.317, 0.274, 0.531, color);
+  GLYPH.linkedin(s, x + 0.014, y + 2.744, 0.490, 0.466, color);
+}
+function socialH(s, x, y, color) {
+  GLYPH.twitter (s, x,         y + 0.055, 0.518, 0.421, color);
+  GLYPH.facebook(s, x + 1.351, y,         0.274, 0.531, color);
+  GLYPH.linkedin(s, x + 2.459, y + 0.032, 0.490, 0.466, color);
+}
+const tagline = (s, x, y, color) => T(s, TAGLINE,
+  { x, y, w: 3.413, h: 0.909, fontSize: 24, color: color || WHITE, align: 'right' });
+
+/* decorative thin "+" ornaments */
+function crosses(s, pts, color) {
+  const a = 0.223, t = 0.042;
+  pts.forEach(p => {
+    box(s, p[0], p[1] + (a - t) / 2, a, t, color);
+    box(s, p[0] + (a - t) / 2, p[1], t, a, color);
+  });
+}
+const CROSS_BAND  = [[2.614, 1.606], [5.491, 4.483], [8.371, 1.606], [11.265, 4.483], [14.126, 1.606],
+                     [17.004, 4.483], [19.876, 1.599], [-0.112, 4.483], [2.614, 7.361], [8.371, 7.361],
+                     [14.126, 7.361], [19.876, 7.354]];
+const CROSS_PANEL = [[1.94, 0.963], [4.817, 3.84], [7.697, 0.963], [1.94, 6.718], [7.697, 6.718], [4.817, 9.29]];
+
+/* Stand-ins for the photographs of the original deck: a plain screen area
+   plus a dark device bezel drawn on top (so anything behind shows through). */
+function screen(s, x, y, w, h, clear) {
+  if (!clear) box(s, x, y, w, h, SCREEN);
+  T(s, '[image]', { x, y: y + h / 2 - 0.3, w, h: 0.6, fontFace: SEMI,
+    fontSize: 18, color: CAPT, align: 'center', valign: 'middle' });
+}
+function bezel(s, x, y, w, h, t, radius) {
+  s.addShape('roundRect', { x: x + t / 2, y: y + t / 2, w: w - t, h: h - t,
+    fill: { type: 'none' }, line: { color: DARK, width: t * 72 },
+    rectRadius: radius === undefined ? 0.04 : radius });
+}
+
+/* ---------------------------------------------------------------- slides */
+const BUILD = [];
+
+/* 1 - cover on a soft yellow gradient */
+BUILD.push(s => {
+  gradient(s, 0, 0, 20, 11.25, COVER_GRAD, 0);
+  T(s, 'Sepats', { x: 11.281, y: 2.469, w: 7.922, h: 2.895, fontFace: BLK, fontSize: 166, color: WHITE, wrap: false });
+  T(s, TAGLINE, { x: 11.506, y: 5.288, w: 4.9, h: 0.505, fontSize: 24, color: WHITE, wrap: false });
+  navbar(s, 6.32, 0.896, WHITE);
+  logo(s, 0.636, 0.526, WHITE);
+  searchPill(s, 16.444, 0.843);
+  tagline(s, 15.951, 9.72);
+  socialV(s, 1.033, 7.198, WHITE);
+});
+
+/* 2 - cover, flat yellow, centred */
+BUILD.push(s => {
+  box(s, 0, 0, 20, 11.25, onWhite(YELLOW, 0.95));
+  T(s, 'Sepats', { x: 6.039, y: 3.873, w: 7.922, h: 2.895, fontFace: BLK, fontSize: 166,
+    color: WHITE, align: 'center' });
+  T(s, TAGLINE, { x: 7.55, y: 6.693, w: 4.9, h: 0.505, fontSize: 24, color: WHITE, align: 'center' });
+  navbar(s, 12.45, 0.896, WHITE);
+  logo(s, 0.636, 0.526, WHITE);
+  tagline(s, 15.93, 9.72);
+  socialV(s, 1.033, 7.198, WHITE);
+});
+
+/* 3 - split cover, wordmark straddling the panel edge */
+BUILD.push(s => {
+  box(s, 0, 0, 10, 11.25, YELLOW);
+  T(s, [{ text: 'Sep', options: { color: WHITE } }, { text: 'ats', options: { color: YELLOW } }],
+    { x: 3.793, y: 3.563, w: 11.316, h: 4.123, fontFace: BLK, fontSize: 239, align: 'center', valign: 'top' });
+  logo(s, 0.636, 0.526, WHITE);
+  navbar(s, 12.353, 0.896, WHITE);
+  tagline(s, 15.976, 9.709);
+  socialH(s, 0.91, 10.142, WHITE);
+});
+
+/* 4 - intro copy + url pill */
+BUILD.push(s => {
+  logo(s, 0.636, 0.526, YELLOW);
+  headline(s, H_KEEP, { x: 1.598, y: 2.626, w: 10.148, h: 1.919 });
+  body(s, L_FULL, { x: 1.598, y: 4.847, w: 9.567, h: 1.881 });
+  body(s, L_EVER, { x: 1.598, y: 6.857, w: 9.567, h: 0.972 });
+  storePill(s, 1.709, 8.281);
+});
+
+/* 5 - yellow image panel left, copy + three tiles right */
+BUILD.push(s => {
+  box(s, 0, 0, 8.122, 11.25, YELLOW);
+  crosses(s, CROSS_PANEL, mix(YELLOW, ORANGE, 0.5));
+  T(s, 'IMG PNG FILE', { x: 0.757, y: 1.03, w: 6.608, h: 0.4, fontFace: XBOLD, fontSize: 14,
+    color: WHITE, align: 'center' });
+  GLYPH.picture(s, 3.64, 5.31, 0.84, 0.62, '5B6B7B', WHITE);
+  logo(s, 0.636, 0.526, WHITE);
+  headline(s, H_FEET, { x: 9.095, y: 2.463, w: 10.148, h: 2.827 });
+  body(s, L_FULL, { x: 9.095, y: 5.374, w: 9.28, h: 1.881 });
+  [10.386, 13.3, 16.214].forEach((x, i) => tile(s, TILE_KINDS[i], x, 7.913));
+  [10.0, 12.914, 15.828].forEach(x => label(s, 'Lorem Ipsum', { x, y: 9.224, w: 1.934, h: 0.438 }));
+});
+
+/* 6 - yellow banner + three rounded cards */
+BUILD.push(s => {
+  const band = onWhite(YELLOW, 0.81);
+  box(s, 0, 0, 19.987, 7.079, band);
+  crosses(s, CROSS_BAND, mix(band, ORANGE, 0.26));
+  headline(s, 'Keep your head, heels and standards high',
+    { x: 3.549, y: 1.365, w: 12.902, h: 1.919, align: 'center', color: WHITE });
+  body(s, L_FULL, { x: 2.805, y: 3.587, w: 14.389, h: 1.426, align: 'center', color: WHITE });
+  [[0.764, WHITE, BLACK], [7.257, YELLOW, WHITE], [13.749, WHITE, BLACK]].forEach(c => {
+    s.addShape('roundRect', { x: c[0], y: 6.312, w: 5.381, h: 3.764, fill: { color: c[1] },
+      rectRadius: 3.764 * 0.16667, shadow: CARD_SHADOW });
+    T(s, 'Lorem Ipsum', { x: c[0] + 1.205, y: 6.973, w: 2.972, h: 0.64,
+      fontFace: XBOLD, fontSize: 32, color: c[2] });
+    body(s, L_IND, { x: c[0] + 0.523, y: 7.731, w: 4.337, h: 1.426, color: c[2] });
+  });
+  logo(s, 0.636, 0.526, WHITE);
+  logo(s, 17.925, 0.526, WHITE);
+});
+
+/* 7 - narrow yellow rail with a vertical wordmark */
+BUILD.push(s => {
+  box(s, 0, 0, 1.806, 11.25, YELLOW);
+  T(s, 'Sepats', { x: -0.592, y: 5.07, w: 2.991, h: 1.111, fontFace: BLK, fontSize: 60,
+    color: WHITE, align: 'center', rotate: 270 });
+  headline(s, H_KEEP2, { x: 10.966, y: 2.589, w: 9.275, h: 1.919 });
+  body(s, L_MED, { x: 10.976, y: 4.863, w: 8.035, h: 1.426 });
+  [11.529, 14.443, 17.357].forEach((x, i) => tile(s, TILE_KINDS[i], x, 6.912));
+  [11.143, 14.057, 16.971].forEach(x => label(s, 'Lorem Ipsum', { x, y: 8.223, w: 1.934, h: 0.438 }));
+  logo(s, 17.925, 0.526, YELLOW);
+});
+
+/* 8 - copy left, gradient panel right, two counters */
+BUILD.push(s => {
+  box(s, 11.348, 0, 8.048, 4.365, YELLOW);
+  gradient(s, 11.348, 4.365, 8.048, 6.885,
+    [{ pos: 0, color: YELLOW, alpha: 0.45 }, { pos: 1, color: DEEP }], 90);
+  headline(s, H_FEET, { x: 1.086, y: 2.519, w: 10.148, h: 2.827 });
+  body(s, L_FULL, { x: 1.086, y: 5.429, w: 9.289, h: 1.881 });
+  tile(s, 'refresh', 1.782, 7.893);
+  tile(s, 'doc', 6.69, 7.893);
+  bigNum(s, '239+', { x: 3.135, y: 8.053, w: 1.682, h: 0.841, color: INK });
+  bigNum(s, '457+', { x: 8.043, y: 8.053, w: 1.682, h: 0.841, color: INK });
+  logo(s, 0.636, 0.526, YELLOW);
+});
+
+/* 9 - yellow stat block + two bullet rows */
+BUILD.push(s => {
+  box(s, 5.189, 7.021, 4.381, 4.229, YELLOW);
+  body(s, L_MED, { x: 10.735, y: 4.557, w: 8.035, h: 1.426 });
+  headline(s, H_KEEP2, { x: 10.725, y: 2.283, w: 9.275, h: 1.919 });
+  logo(s, 17.925, 0.526, YELLOW);
+  [[6.598, 'refresh'], [8.465, 'doc']].forEach((r, i) => {
+    tile(s, r[1], 10.823, r[0]);
+    caption(s, 'Lorem Ipsum', { x: 12.269, y: 6.463 + i * 1.825, w: 2.278, h: 0.505, color: INK });
+    body(s, L_SHORT, { x: 12.269, y: 6.88 + i * 1.825, w: 6.501, h: 0.972 });
+  });
+  T(s, '4895 +', { x: 6.13, y: 8.611, w: 2.684, h: 1.01, fontFace: XBOLD, fontSize: 54,
+    color: WHITE, align: 'center' });
+  caption(s, 'Lorem Ipsum', { x: 6.334, y: 9.645, w: 2.278, h: 0.505, color: WHITE, align: 'center' });
+});
+
+/* 10 - two flat cards + gradient panel right */
+BUILD.push(s => {
+  gradient(s, 11.381, 0, 8.619, 11.25,
+    [{ pos: 0, color: YELLOW, alpha: 0.26 }, { pos: 0.89, color: DEEP }], 270);
+  headline(s, H_FEET, { x: 1.086, y: 2.357, w: 10.148, h: 2.827 });
+  body(s, L_STD, { x: 1.086, y: 5.268, w: 9.289, h: 0.972 });
+  logo(s, 0.636, 0.526, YELLOW);
+  [[1.166, YELLOW, WHITE], [7.069, WHITE, BLACK]].forEach(c => {
+    s.addShape('rect', { x: c[0], y: 6.812, w: 5.381, h: 3.026, fill: { color: c[1] }, shadow: CARD_SHADOW });
+    T(s, 'Lorem Ipsum', { x: c[0] + 1.204, y: 7.261, w: 2.972, h: 0.64,
+      fontFace: XBOLD, fontSize: 32, color: c[2] });
+    body(s, L_IND, { x: c[0] + 0.522, y: 8.019, w: 4.337, h: 1.426, color: c[2] });
+  });
+  T(s, '4895 +', { x: 14.348, y: 0.819, w: 2.684, h: 1.01, fontFace: XBOLD, fontSize: 54,
+    color: WHITE, align: 'center' });
+  body(s, L_STD, { x: 12.404, y: 2.064, w: 6.573, h: 1.426, align: 'center', color: WHITE });
+});
+
+/* 11 - "Break Slides" divider (first word runs off the right edge) */
+BUILD.push(s => {
+  gradient(s, 0, 0, 20, 11.25, BREAK_GRAD, 0);
+  T(s, 'Break ', { x: 15.65, y: 1.183, w: 4.3, h: 2.9, fontFace: BLK, fontSize: 166, color: WHITE, wrap: false });
+  T(s, 'Slides', { x: 5.269, y: 3.95, w: 14.039, h: 2.9, fontFace: BLK, fontSize: 166,
+    color: WHITE, align: 'center' });
+  logo(s, 0.636, 0.526, WHITE);
+  tagline(s, 15.93, 9.72);
+  socialV(s, 1.033, 7.198, WHITE);
+});
+
+/* 12 - portfolio: yellow lower band + white stat strip */
+BUILD.push(s => {
+  const band = onWhite(YELLOW, 0.81);
+  box(s, 0, 5.625, 19.987, 5.625, band);
+  const rule = mix(band, WHITE, 0.08);
+  [2.725, 5.603, 8.48, 11.358, 14.235, 17.113, 19.99].forEach(x =>
+    s.addShape('line', { x, y: 5.625, w: 0, h: 5.625, line: { color: rule, width: 0.25 } }));
+  [7.339, 10.217].forEach(y =>
+    s.addShape('line', { x: 0, y, w: 20, h: 0, line: { color: rule, width: 0.25 } }));
+  headline(s, 'Our Portfolio Design Sepats', { x: 4.176, y: 1.679, w: 11.597, h: 1.01, align: 'center' });
+  body(s, L_MED, { x: 2.276, y: 3.072, w: 15.436, h: 0.972, align: 'center' });
+  box(s, 4.03, 7.006, 11.89, 2.863, WHITE);
+  [['3874 +', 5.385, 5.358], ['8273 +', 8.943, 8.916], ['9182 +', 12.34, 12.313]].forEach(g => {
+    bigNum(s, g[0], { x: g[1], y: 7.749, w: 2.223, h: 0.841, align: 'center' });
+    caption(s, 'Lorem Ipsum', { x: g[2], y: 8.62, w: 2.278, h: 0.505, align: 'center' });
+  });
+  logo(s, 0.636, 0.526, YELLOW);
+  logo(s, 17.925, 0.526, YELLOW);
+  [5.721, 9.419, 13.117].forEach((x, i) => tile(s, TILE_KINDS[i], x, 4.909, { border: true }));
+});
+
+/* 13 - portfolio detail list + right tile rail */
+BUILD.push(s => {
+  box(s, 10.0, 0, 6.667, 1.162, YELLOW);
+  [[1.428, 'refresh', 2.739], [4.751, 'doc', 6.062], [8.073, 'list', 9.384]].forEach(r => {
+    tile(s, r[1], 17.7, r[0]);
+    label(s, 'Lorem Ipsum', { x: 17.313, y: r[2], w: 1.934, h: 0.438 });
+  });
+  headline(s, 'Our Portfolio Design Sepats', { x: 1.395, y: 2.598, w: 8.631, h: 1.919 });
+  body(s, L_PLUS, { x: 1.395, y: 4.658, w: 7.543, h: 1.426 });
+  label(s, 'Lorem Ipsum', { x: 1.395, y: 6.511, w: 1.934, h: 0.438 });
+  body(s, L_SHORT, { x: 1.395, y: 6.97, w: 7.543, h: 0.972 });
+  label(s, 'Lorem Ipsum', { x: 1.395, y: 8.256, w: 1.934, h: 0.438 });
+  body(s, L_SHORT, { x: 1.395, y: 8.715, w: 7.543, h: 0.972 });
+  logo(s, 0.636, 0.526, YELLOW);
+});
+
+/* 14 - portfolio grid with one gradient hero tile */
+BUILD.push(s => {
+  gradient(s, 7.328, 4.402, 5.344, 6.367,
+    [{ pos: 0, color: YELLOW, alpha: 0.26 }, { pos: 1, color: DEEP }], 270);
+  bigNum(s, '3874 +', { x: 8.897, y: 4.945, w: 2.223, h: 0.841, color: WHITE, align: 'center' });
+  caption(s, 'Lorem Ipsum', { x: 8.87, y: 5.816, w: 2.278, h: 0.505, color: WHITE, align: 'center' });
+  headline(s, 'Our Portfolio Design Sepats', { x: 4.176, y: 1.679, w: 11.597, h: 1.01, align: 'center' });
+  body(s, L_MED, { x: 2.276, y: 3.072, w: 15.436, h: 0.972, align: 'center' });
+  logo(s, 0.636, 0.526, YELLOW);
+  logo(s, 17.925, 0.526, YELLOW);
+});
+
+/* 15 - offset yellow blocks with counters */
+BUILD.push(s => {
+  box(s, 2.532, 6.113, 5.063, 2.653, YELLOW);
+  box(s, 7.595, 2.484, 8.856, 2.653, YELLOW);
+  [[9.015, 3.073, 8.988, 3.944], [3.952, 6.748, 3.925, 7.619], [13.091, 3.073, 13.063, 3.944]].forEach(g => {
+    bigNum(s, '3874 +', { x: g[0], y: g[1], w: 2.223, h: 0.841, color: WHITE, align: 'center' });
+    caption(s, 'Lorem Ipsum', { x: g[2], y: g[3], w: 2.278, h: 0.505, color: WHITE, align: 'center' });
+  });
+  headline(s, 'Our Portfolio Design Sepats', { x: 5.468, y: 0.884, w: 11.668, h: 1.01 });
+  T(s, L_PLUS, { x: 11.554, y: 8.821, w: 7.543, h: 1.426, align: 'right', lineSpacingMultiple: 1.5 });
+  [11.944, 14.706, 17.468].forEach((x, i) => tile(s, TILE_KINDS[i], x, 6.428));
+  [11.558, 14.32, 17.082].forEach(x => label(s, 'Lorem Ipsum', { x, y: 7.739, w: 1.934, h: 0.438 }));
+  logo(s, 17.925, 0.526, YELLOW);
+});
+
+/* 16 - three service cards */
+BUILD.push(s => {
+  [0.371, 6.978, 13.585].forEach(x => box(s, x, 4.519, 6.044, 6.143, YELLOW));
+  headline(s, 'Our Services Design Sepats', { x: 4.166, y: 1.53, w: 11.668, h: 1.01, align: 'center' });
+  ['Services 01', 'Services 02', 'Services 03'].forEach((t, i) =>
+    bigNum(s, t, { x: 1.626 + i * 6.608, y: 9.427, w: 3.533, h: 0.841, color: WHITE, align: 'center' }));
+  [[2.812, 3.213], [9.419, 3.209], [16.027, 3.209]].forEach((p, i) =>
+    tile(s, TILE_KINDS[i], p[0], p[1], { border: true }));
+  logo(s, 0.636, 0.526, YELLOW);
+  logo(s, 17.925, 0.526, YELLOW);
+});
+
+/* 17 - three full-height gradient columns */
+BUILD.push(s => {
+  const down = [{ pos: 0, color: YELLOW, alpha: 0.26 }, { pos: 0.76, color: DEEP, alpha: 0.98 }];
+  const up   = [{ pos: 0, color: YELLOW, alpha: 0.26 }, { pos: 1, color: DEEP, alpha: 0.86 }];
+  gradient(s, -0.032, 0, 6.699, 11.25, down, 90);
+  gradient(s, 13.333, 0, 6.699, 11.25, down, 90);
+  gradient(s, 6.667, 0, 6.699, 11.25, up, 270);
+  [['Services 01', 1.567, 8.749, 0.525, 9.591], ['Services 03', 14.916, 8.749, 13.876, 9.536],
+   ['Services 02', 8.234, 0.975, 7.192, 1.819]].forEach(c => {
+    bigNum(s, c[0], { x: c[1], y: c[2], w: 3.533, h: 0.841, color: WHITE, align: 'center' });
+    body(s, L_SVC, { x: c[3], y: c[4], w: 5.616, h: 0.972, color: WHITE });
+  });
+});
+
+/* 18 - gallery: yellow rail left, copy + card */
+BUILD.push(s => {
+  box(s, 0, 0, 4.479, 11.25, YELLOW);
+  s.addShape('rect', { x: 12.117, y: 6.328, w: 6.749, h: 3.026, fill: { color: YELLOW }, shadow: CARD_SHADOW });
+  T(s, 'Lorem Ipsum', { x: 13.916, y: 6.777, w: 2.972, h: 0.64, fontFace: XBOLD, fontSize: 32, color: WHITE });
+  body(s, L_ANJAY, { x: 12.909, y: 7.416, w: 5.166, h: 1.426, color: WHITE });
+  headline(s, 'Our Galery Design Sepats', { x: 6.917, y: 1.897, w: 9.971, h: 1.01 });
+  body(s, L_STD + 'PLACEHOLDER',
+    { x: 6.917, y: 2.946, w: 9.446, h: 1.426 });
+  logo(s, 17.925, 0.526, YELLOW);
+});
+
+/* 19 - four curved up arrows: a vertical shaft that leans out towards the
+   bottom edge.  [shaftCentre, tip, bendY, footCentre, thickness, colour]      */
+BUILD.push(s => {
+  const ARROWS = [[4.43, 2.34, 9.30, 1.16, 0.58, YELLOW],
+                  [5.66, 3.17, 9.30, 4.57, 0.56, DARK],
+                  [6.88, 4.53, 9.30, 7.97, 0.58, YELLOW],
+                  [8.08, 1.00, 9.30, 11.36, 0.56, DARK]];
+  const BOTTOM = 11.25;
+  ARROWS.forEach(a => {
+    const [cx, top, bend, foot, tw, color] = a;
+    const head = tw * 1.55, neck = top + head * 1.45;
+    polyAbs(s, [[cx, top], [cx + head, neck], [cx + tw / 2, neck], [cx + tw / 2, bend],
+      [foot + tw / 2, BOTTOM], [foot - tw / 2, BOTTOM], [cx - tw / 2, bend],
+      [cx - tw / 2, neck], [cx - head, neck]], color);
+  });
+  headline(s, 'Four curved up arrows infographic', { x: 8.405, y: 1.881, w: 9.971, h: 1.919, align: 'right' });
+  [[4.805, 4.619, 5.036, 'refresh'], [6.671, 6.444, 6.861, 'doc'], [8.423, 8.269, 8.686, 'list']].forEach(r => {
+    tile(s, r[3], 17.176, r[0]);
+    caption(s, 'Lorem Ipsum', { x: 14.464, y: r[1], w: 2.278, h: 0.505, color: INK, align: 'right' });
+    T(s, L_SHORT, { x: 10.06, y: r[2], w: 6.681, h: 0.972, align: 'right', lineSpacingMultiple: 1.5 });
+  });
+  logo(s, 0.636, 0.526, YELLOW);
+});
+
+/* 20 - "mountain" statistics diagram */
+BUILD.push(s => {
+  const BARS = [[2.464, 3.955, 3.393, YELLOW, '82%'], [4.836, 5.580, 1.768, DARK, '46%'],
+                [7.208, 4.923, 2.425, YELLOW, '70%'], [9.580, 6.191, 1.157, DARK, '31%'],
+                [11.952, 4.278, 3.070, YELLOW, '75%'], [14.324, 4.647, 2.701, DARK, '72%']];
+  const YEARS = [['2017', 3.464, 7.717], ['2018', 5.848, 7.722], ['2019', 8.208, 7.717],
+                 ['2020', 10.592, 7.722], ['2021', 12.983, 7.717], ['2022', 15.367, 7.722]];
+  BARS.forEach(b => {
+    const [x, y, h, c] = b;
+    poly(s, x, y, 3.212, h, [[0.5, 0], [1, 1], [0, 1]], c);                         // peak
+    poly(s, x + 1.618, y, 1.594, h, [[0, 0], [1, 1], [0, 1]], mix(c, BLACK, 0.2));  // shaded half
+    box(s, x + 0.871, y - 1.048, 1.469, 0.741, c);                                  // % flag
+    T(s, b[4], { x: x + 0.871, y: y - 1.048, w: 1.469, h: 0.741, fontFace: XBOLD, fontSize: 24,
+      color: WHITE, align: 'center', valign: 'middle' });
+    poly(s, x + 1.320, y - 0.313, 0.571, 0.247, [[0, 0], [1, 0], [0.5, 1]], c);     // flag tail
+  });
+  YEARS.forEach(y => T(s, y[0], { x: y[1], y: y[2], w: 1.212, h: 0.606, fontFace: XBOLD,
+    fontSize: 30, color: INK, align: 'center' }));
+  headline(s, 'Stastitics diagram', { x: 5.014, y: 1.246, w: 9.971, h: 1.01, align: 'center' });
+  body(s, L_PLUS, { x: 2.915, y: 8.926, w: 14.169, h: 0.972, align: 'center' });
+  logo(s, 0.636, 0.526, YELLOW);
+  logo(s, 17.925, 0.526, YELLOW);
+});
+
+/* 21 - horizontal process timeline */
+BUILD.push(s => {
+  s.addShape('line', { x: 0.918, y: 6.58, w: 18.164, h: 0, line: { color: DARK, width: 6 } });
+  [[3.34, 3.358, YELLOW, '01', 'down'], [10.605, 3.358, YELLOW, '03', 'down'],
+   [6.973, 8.036, DARK, '02', 'up'], [14.238, 8.036, DARK, '04', 'up']].forEach(t => {
+    const down = t[4] === 'down';
+    poly(s, t[0], t[1], 2.422, 1.766,
+      down ? [[0, 0], [1, 0], [1, 0.56], [0.5, 1], [0, 0.56]]
+           : [[0, 1], [0, 0.44], [0.5, 0], [1, 0.44], [1, 1]], t[2]);
+    T(s, t[3], { x: t[0], y: t[1] + (down ? 0.45 : 0.62), w: 2.422, h: 0.6,
+      fontFace: XBOLD, fontSize: 32, color: WHITE, align: 'center' });
+  });
+  [[4.551, 5.124], [11.816, 5.124], [8.184, 6.906], [15.449, 6.906]].forEach(l =>
+    s.addShape('line', { x: l[0], y: l[1], w: 0, h: 1.13, line: { color: DARK, width: 2.25 } }));
+  [[0.593, DARK], [4.225, YELLOW], [7.858, DARK], [11.491, YELLOW], [15.124, DARK], [18.757, YELLOW]]
+    .forEach(d => {
+      s.addShape('ellipse', { x: d[0], y: 6.255, w: 0.651, h: 0.651,
+        fill: { color: WHITE }, line: { color: DARK, width: 2.25 } });
+      s.addShape('ellipse', { x: d[0] + 0.0845, y: 6.339, w: 0.482, h: 0.482, fill: { color: d[1] } });
+    });
+  [[3.494, 7.917, 2.392, 8.376], [10.877, 7.917, 9.774, 8.376],
+   [7.217, 3.292, 6.114, 3.75], [14.515, 3.292, 13.413, 3.75]].forEach(c => {
+    label(s, 'Lorem Ipsum', { x: c[0], y: c[1], w: 1.934, h: 0.438 });
+    body(s, L_SHORT, { x: c[2], y: c[3], w: 4.138, h: 1.426 });
+  });
+  headline(s, 'Horizontal process diagram ', { x: 4.551, y: 1.277, w: 10.898, h: 1.01, align: 'center' });
+  logo(s, 0.636, 0.526, YELLOW);
+  logo(s, 17.925, 0.526, YELLOW);
+});
+
+/* 22 - process with half frames (chevron bands) */
+BUILD.push(s => {
+  const band = (x, y, w, h, color, up) => poly(s, x, y, w, h,
+    up ? [[0, 1], [0.5, 0], [1, 1], [0.84, 1], [0.5, 0.29], [0.16, 1]]
+       : [[0, 0], [0.5, 1], [1, 0], [0.84, 0], [0.5, 0.71], [0.16, 0]], color);
+  band(1.398, 4.851, 4.618, 2.309, DARK, true);
+  band(9.789, 4.851, 4.618, 2.309, DARK, true);
+  band(5.593, 7.376, 4.618, 2.309, YELLOW, false);
+  band(13.985, 7.376, 4.618, 2.309, YELLOW, false);
+  GLYPH.flame (s, 2.957, 6.15, 1.5, 1.5, YELLOW);
+  GLYPH.bulb  (s, 7.152, 7.035, 1.5, 1.5, DARK);
+  GLYPH.puzzle(s, 11.348, 6.15, 1.5, 1.5, YELLOW, WHITE);
+  GLYPH.people(s, 15.551, 7.035, 1.5, 1.5, DARK);
+  headline(s, 'Process with half frames', { x: 5.435, y: 1.277, w: 9.131, h: 1.01, align: 'center' });
+  body(s, L_WHEN, { x: 2.542, y: 2.457, w: 14.764, h: 0.972, align: 'center' });
+  [[2.611, 7.939, 1.509, 8.398], [11.102, 7.939, 10.0, 8.398],
+   [7.015, 4.721, 5.913, 5.179], [15.315, 4.721, 14.213, 5.179]].forEach(c => {
+    label(s, 'Lorem Ipsum', { x: c[0], y: c[1], w: 1.934, h: 0.438 });
+    body(s, L_SHORT, { x: c[2], y: c[3], w: 4.138, h: 1.426 });
+  });
+  logo(s, 0.636, 0.526, YELLOW);
+  logo(s, 17.925, 0.526, YELLOW);
+});
+
+/* 23 - infographic cycle diagram: four quadrants of a ring, each one bleeding
+   45 degrees into its neighbour with a darker shade for a layered 3-D look. */
+BUILD.push(s => {
+  const cx = 14.87, cy = 5.29, r = 4.45;
+  const wedge = (from, to, color) => {
+    const pts = [[0.5, 0.5]];
+    for (let a = from; a <= to; a += 4) {
+      pts.push([0.5 + 0.5 * Math.cos(a * Math.PI / 180), 0.5 + 0.5 * Math.sin(a * Math.PI / 180)]);
+    }
+    poly(s, cx - r, cy - r, 2 * r, 2 * r, pts, color);
+  };
+  /* screen angles: 270 = up, 0 = right, 90 = down, 180 = left.
+     A darker sliver trails each quadrant so the ring looks layered. */
+  const QUADS = [[270, YELLOW], [0, DARK], [90, YELLOW], [180, DARK]];
+  QUADS.forEach(q => wedge(q[0] - 2, q[0] + 92, q[1]));
+  QUADS.forEach(q => wedge(q[0] - 42, q[0] + 1, mix(q[1], BLACK, 0.28)));
+  /* white four-petal cut-out: elongated ellipses pointing along the diagonals */
+  [[-1, -1, 45], [1, -1, 135], [1, 1, 45], [-1, 1, 135]].forEach(d => {
+    const px = cx + d[0] * 0.78, py = cy + d[1] * 0.78;
+    s.addShape('ellipse', { x: px - 1.42, y: py - 1.05, w: 2.84, h: 2.10,
+      fill: { color: WHITE }, rotate: d[2] });
+  });
+  headline(s, 'Infographic cycle diagram ', { x: 2.125, y: 2.928, w: 9.131, h: 1.919 });
+  body(s, L_WHEN, { x: 2.093, y: 5.08, w: 7.691, h: 1.426 });
+  tile(s, 'refresh', 2.093, 7.183);
+  tile(s, 'doc', 6.607, 7.183);
+  bigNum(s, '239+', { x: 3.446, y: 7.343, w: 1.682, h: 0.841, color: INK });
+  bigNum(s, '457+', { x: 7.96, y: 7.343, w: 1.682, h: 0.841, color: INK });
+  logo(s, 0.636, 0.526, YELLOW);
+});
+
+/* 24 - phone mock-ups */
+BUILD.push(s => {
+  box(s, 0, 3.392, 7.476, 5.725, YELLOW);
+  /* the lower phone's screen is left clear so the yellow block shows through */
+  [[5.79, -1.20, 5.28, 7.63, false], [0.75, 3.71, 4.92, 7.64, true]].forEach(ph => {
+    screen(s, ph[0], ph[1], ph[2], ph[3], ph[4]);
+    bezel(s, ph[0], ph[1], ph[2], ph[3], 0.11, 0.10);
+  });
+  box(s, 2.32, 3.71, 1.78, 0.22, DARK);                          // notch
+  headline(s, 'Easy Access call & message', { x: 11.047, y: 3.535, w: 7.609, h: 1.919 });
+  body(s, L_WHEN, { x: 11.128, y: 5.454, w: 7.691, h: 1.426 });
+  storePill(s, 11.224, 7.193);
+  logo(s, 0.636, 0.526, YELLOW);
+  logo(s, 17.925, 0.526, YELLOW);
+});
+
+/* 25 - desktop preview */
+BUILD.push(s => {
+  screen(s, 1.56, 1.56, 8.56, 6.76);
+  box(s, 0, 2.581, 7.152, 4.21, YELLOW);                          // block behind the screen
+  crosses(s, CROSS_PANEL.map(p => [p[0] - 0.1, p[1] + 0.372]), mix(WHITE, ORANGE, 0.5));
+  bezel(s, 1.56, 1.56, 8.56, 6.76, 0.13, 0.01);                   // monitor
+  box(s, 1.56, 8.32, 8.56, 0.30, 'C4C4C4');
+  poly(s, 4.35, 8.62, 3.20, 1.10, [[0.34, 0], [0.66, 0], [1, 1], [0, 1]], 'B5B5B5');
+  headline(s, 'Preview With Desktop', { x: 10.758, y: 2.398, w: 8.405, h: 1.01 });
+  body(s, L_WHEN, { x: 10.79, y: 3.524, w: 8.151, h: 1.426 });
+  [[5.374, 'refresh', 5.239, 5.656], [7.241, 'doc', 7.064, 7.481]].forEach(r => {
+    tile(s, r[1], 10.855, r[0]);
+    caption(s, 'Lorem Ipsum', { x: 12.301, y: r[2], w: 2.278, h: 0.505, color: INK });
+    body(s, L_SHORT, { x: 12.301, y: r[3], w: 6.64, h: 0.972 });
+  });
+  logo(s, 17.925, 0.526, YELLOW);
+});
+
+/* 26 - laptop mock-up + two yellow cards */
+BUILD.push(s => {
+  screen(s, 11.28, 1.02, 7.60, 5.16);                             // laptop
+  bezel(s, 11.28, 1.02, 7.60, 5.16, 0.14, 0.05);
+  poly(s, 10.49, 6.18, 9.17, 0.26, [[0.06, 0], [0.94, 0], [1, 1], [0, 1]], 'C9C9C9');
+  storePill(s, 12.679, 1.831);
+  headline(s, 'Mockup Slides Sepats', { x: 1.43, y: 3.29, w: 8.639, h: 1.01 });
+  body(s, L_MED, { x: 1.43, y: 4.584, w: 7.967, h: 1.426 });
+  [[3.251, 7.241, 5.049, 7.69, 4.042, 8.329], [10.396, 7.184, 12.194, 7.633, 11.187, 8.272]].forEach(c => {
+    s.addShape('rect', { x: c[0], y: c[1], w: 6.749, h: 3.026, fill: { color: YELLOW }, shadow: CARD_SHADOW });
+    T(s, 'Lorem Ipsum', { x: c[2], y: c[3], w: 2.972, h: 0.64, fontFace: XBOLD, fontSize: 32, color: WHITE });
+    body(s, L_ANJAY, { x: c[4], y: c[5], w: 5.166, h: 1.426, color: WHITE });
+  });
+  logo(s, 0.636, 0.526, YELLOW);
+});
+
+/* 27 - contact */
+BUILD.push(s => {
+  [[4.56, 'envelope', 4.872, 0.688, 0.536, 'creative.sepats@sepats.store', 4.926, 4.869],
+   [6.101, 'phone', 6.334, 0.69, 0.69, '+123 456 789 00', 6.426, 2.905],
+   [7.643, 'home', 7.92, 0.765, 0.608, 'Asia, Indonesia, Lampung', 8.037, 4.281]].forEach(r => {
+    box(s, 1.96, r[0], 1.161, 1.161, YELLOW);
+    GLYPH[r[1]](s, 1.96 + (1.161 - r[3]) / 2, r[2], r[3], r[4], WHITE, YELLOW);
+    caption(s, r[5], { x: 3.438, y: r[6], w: r[7], h: 0.505, color: INK });
+  });
+  headline(s, 'Get In Touch Sepats', { x: 1.831, y: 2.116, w: 8.169, h: 1.01 });
+  body(s, L_STAN, { x: 1.831, y: 3.274, w: 7.314, h: 0.972 });
+  logo(s, 0.636, 0.526, YELLOW);
+  s.addShape('roundRect', { x: 2.904, y: 9.378, w: 4.686, h: 0.915, fill: { color: YELLOW }, rectRadius: 0.46 });
+  T(s, 'Contact Us', { x: 2.904, y: 9.378, w: 4.686, h: 0.915, fontFace: XBOLD, fontSize: 20,
+    color: WHITE, align: 'center', valign: 'middle' });
+});
+
+/* 28 - "Icons Slides" divider */
+BUILD.push(s => {
+  gradientDiag(s, 20, 11.25, ICONS_GRAD);
+  T(s, 'Icons ', { x: -1.094, y: 0.88, w: 12.121, h: 2.9, fontFace: BLK, fontSize: 166,
+    color: WHITE, align: 'center' });
+  T(s, 'Slides', { x: 7.1, y: 3.65, w: 6.5, h: 2.9, fontFace: BLK, fontSize: 166, color: WHITE, wrap: false });
+  logo(s, 18.051, 0.526, WHITE);
+  socialV(s, 18.449, 7.198, WHITE);
+  T(s, TAGLINE, { x: 1.047, y: 9.72, w: 3.413, h: 0.909, fontSize: 24, color: WHITE, align: 'right' });
+});
+
+/* 29-32 - icon sheets: dense grids of small pictograms.  Sheets 29/30 of the
+   original are line drawings, 31/32 are solid, so the outline flag flips.     */
+const SHEET_SHAPES = [
+  'ellipse', 'star5', 'heart', 'moon', 'triangle', 'plus', 'donut', 'pie', 'diamond', 'hexagon',
+  'pentagon', 'sun', 'cloud', 'teardrop', 'rightArrow', 'lightningBolt', 'smileyFace', 'star6',
+  'flowChartDocument', 'trapezoid', 'octagon', 'star4', 'blockArc', 'arc', 'chevron', 'can',
+  'cube', 'frame', 'gear6', 'halfFrame', 'homePlate', 'leftRightArrow', 'parallelogram', 'plaque',
+  'star7', 'upArrow', 'wave', 'flowChartMagneticDisk', 'flowChartManualInput', 'irregularSeal1',
+  'noSmoking', 'pieWedge', 'rtTriangle', 'star10', 'star12', 'swooshArrow', 'verticalScroll',
+  'funnel', 'flowChartConnector', 'flowChartInternalStorage', 'bevel', 'diagStripe', 'corner',
+  'flowChartTerminator', 'moon', 'chord', 'heptagon', 'decagon', 'star8', 'flowChartDelay'
+];
+function iconSheet(cols, rows, size, outline) {
+  return s => rows.forEach((cy, r) => cols.forEach((cx, c) => {
+    const shape = SHEET_SHAPES[(r * 7 + c * 5 + r * c) % SHEET_SHAPES.length];
+    s.addShape(shape, Object.assign({ x: cx - size / 2, y: cy - size / 2, w: size, h: size },
+      outline ? { fill: { type: 'none' }, line: { color: BLACK, width: 3 } }
+              : { fill: { color: BLACK } }));
+  }));
+}
+BUILD.push(iconSheet([1.12, 2.59, 4.16, 5.79, 7.42, 9.10, 10.74, 12.44, 14.05, 15.52, 17.14, 18.84],
+                     [0.92, 2.26, 3.63, 5.04, 6.45, 7.85, 9.11, 10.26], 0.62, true));
+BUILD.push(iconSheet([0.87, 2.41, 4.06, 5.82, 7.55, 9.22, 10.89, 12.64, 14.37, 15.96, 17.55, 19.08],
+                     [0.94, 2.32, 3.59, 4.92, 6.26, 7.50, 8.89, 10.17], 0.64, true));
+BUILD.push(iconSheet([1.53, 3.30, 4.97, 6.66, 8.43, 10.14, 11.66, 13.21, 14.80, 16.47, 18.30],
+                     [1.20, 2.74, 4.43, 6.16, 7.87, 9.48], 0.55, false));
+BUILD.push(iconSheet([1.71, 3.64, 5.36, 6.95, 8.56, 10.33, 11.98, 13.61, 15.09, 16.66, 18.28],
+                     [1.48, 3.06, 4.74, 6.43, 8.01, 9.51], 0.57, false));
+
+/* 33 - thanks (gradient) */
+BUILD.push(s => {
+  gradient(s, 0, 0, 20, 11.25, COVER_GRAD, 0);
+  T(s, 'Thanks You', { x: 7.955, y: 2.949, w: 11.108, h: 2.423, fontFace: BLK, fontSize: 138,
+    color: WHITE, align: 'center' });
+  T(s, TAGLINE, { x: 7.955, y: 5.12, w: 4.9, h: 0.505, fontSize: 24, color: WHITE });
+  navbar(s, 6.32, 0.896, WHITE);
+  logo(s, 0.636, 0.526, WHITE);
+  searchPill(s, 16.444, 0.843);
+  tagline(s, 15.951, 9.72);
+  socialV(s, 1.033, 7.198, WHITE);
+});
+
+/* 34 - thanks (flat) */
+BUILD.push(s => {
+  box(s, 0, 0, 20, 11.25, onWhite(YELLOW, 0.95));
+  T(s, 'Thanks You', { x: 3.341, y: 3.873, w: 13.318, h: 2.895, fontFace: BLK, fontSize: 166,
+    color: WHITE, align: 'center' });
+  T(s, TAGLINE, { x: 7.55, y: 6.693, w: 4.9, h: 0.505, fontSize: 24, color: WHITE, align: 'center' });
+  navbar(s, 12.45, 0.896, WHITE);
+  logo(s, 0.636, 0.526, WHITE);
+  tagline(s, 15.93, 9.72);
+  socialV(s, 1.033, 7.198, WHITE);
+});
+
+/* 35 - thanks (split) */
+BUILD.push(s => {
+  box(s, 0, 0, 10, 11.25, onWhite(YELLOW, 0.81));
+  T(s, 'Thanks\nYou', { x: 10.856, y: 2.781, w: 8.35, h: 5.688, fontFace: BLK, fontSize: 166,
+    color: YELLOW, wrap: false });
+  logo(s, 0.636, 0.526, WHITE);
+  navbar(s, 12.353, 0.896, YELLOW);
+  tagline(s, 15.976, 9.709, YELLOW);
+  socialH(s, 0.91, 10.142, WHITE);
+});
+
+/* --------------------------------------------------------------------- main */
+function main() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'SEPATS', width: 20, height: 11.25 });
+  pptx.layout = 'SEPATS';
+  pptx.author = 'Sepats';
+  pptx.title = 'Sepats - Creative Powerpoint Templates';
+
+  BUILD.forEach(build => {
+    const slide = pptx.addSlide();
+    slide.background = { color: WHITE };
+    build(slide);
+  });
+
+  const out = path.join(__dirname, '0e0e3a37-e431-41da-8cb4-7fea4b951b7c_grok_final.pptx');
+  return pptx.writeFile({ fileName: out }).then(() => console.log('wrote', out));
+}
+main();
