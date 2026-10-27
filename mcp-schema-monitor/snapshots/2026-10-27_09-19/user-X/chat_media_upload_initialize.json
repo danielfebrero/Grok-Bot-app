@@ -1,0 +1,22 @@
+{
+  "description": "Initialize Chat Media Upload. Needs the OAuth2 scope `media.write`.",
+  "inputSchema": {
+    "properties": {
+      "conversation_id": {
+        "description": "The XChat conversation the upload belongs to.",
+        "type": "string"
+      },
+      "total_bytes": {
+        "description": "Total size of the media upload in bytes.",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "conversation_id",
+      "total_bytes"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "chat_media_upload_initialize"
+}

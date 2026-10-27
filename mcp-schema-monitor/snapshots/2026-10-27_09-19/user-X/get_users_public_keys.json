@@ -1,0 +1,21 @@
+{
+  "description": "Get public keys",
+  "inputSchema": {
+    "properties": {
+      "ids": {
+        "description": "(comma-separated)",
+        "type": "string"
+      },
+      "public_key.fields": {
+        "description": "A comma separated list of PublicKey fields to display.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "ids"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_users_public_keys"
+}

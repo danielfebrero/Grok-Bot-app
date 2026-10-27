@@ -1,0 +1,16 @@
+{
+  "description": "Go live on a scheduled broadcast",
+  "inputSchema": {
+    "properties": {
+      "id": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "go_live_scheduled_broadcast"
+}

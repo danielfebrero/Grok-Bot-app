@@ -1,0 +1,28 @@
+{
+  "description": "Messages que la box n'a pas écrits, après le curseur. peer * reçoit tout ce qui n'est pas sorti de la box. peer gb:<id> filtre. wait en secondes, 25 au plus.",
+  "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+      "after": {
+        "description": "Horodatage RFC3339 du curseur.",
+        "type": "string"
+      },
+      "after_id": {
+        "description": "Id du curseur, avec after.",
+        "type": "string"
+      },
+      "peer": {
+        "description": "* ou gb:<id>. Défaut *.",
+        "type": "string"
+      },
+      "wait": {
+        "description": "Secondes d'attente si la page est vide. 0 à 25.",
+        "type": "integer"
+      }
+    },
+    "required": [],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "pull"
+}

@@ -1,0 +1,23 @@
+{
+  "description": "Get Trends by Woeid Each returned trend includes a `url` deeplinking to its x.com search.",
+  "inputSchema": {
+    "properties": {
+      "max_trends": {
+        "type": "integer"
+      },
+      "trend.fields": {
+        "description": "A comma separated list of Trend fields to display.",
+        "type": "string"
+      },
+      "woeid": {
+        "type": "integer"
+      }
+    },
+    "required": [
+      "woeid"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_trends_by_woeid"
+}
