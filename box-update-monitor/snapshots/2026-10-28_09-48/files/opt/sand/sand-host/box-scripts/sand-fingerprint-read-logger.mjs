@@ -1,0 +1,1950 @@
+import { randomBytes } from "node:crypto";
+import { appendFileSync, closeSync, constants, fstatSync, openSync, readFileSync } from "node:fs";
+
+export const FINGERPRINT_LOG_CONFIG_VERSION = 1;
+export const FINGERPRINT_SAMPLE_BPS = 10_000;
+export const FINGERPRINT_DOCUMENT_UNIQUE_CAP = 128;
+export const FINGERPRINT_BROWSER_MINUTE_CAP = 240;
+export const FINGERPRINT_DRAIN_INTERVAL_MS = 2_000;
+
+const MAX_CONFIG_BYTES = 8 * 1024;
+const MAX_HOSTS = 64;
+const MAX_HOST_LENGTH = 253;
+const MAX_SCRIPT_URL_LENGTH = 512;
+const MAX_ARGS_SUMMARY_LENGTH = 96;
+const MAX_BATCH_RECORDS = 256;
+const MAX_BATCH_BYTES = 48 * 1024;
+const MAX_READS = 1_000_000;
+const TOKEN_PATH_SEGMENT = /^(?:\d{5,}|[0-9a-f]{12,}|[A-Za-z0-9_-]{20,})$/;
+const HOST_LABEL = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)$/;
+const SCRIPT_URL_SENTINELS = new Set([
+  "<inline>",
+  "<eval>",
+  "<blob>",
+  "<data>",
+  "<extension>",
+  "<unknown>",
+]);
+const ARGS_SUMMARIES = new Set([
+  "present",
+  "context:2d",
+  "context:webgl",
+  "context:webgl2",
+  "context:bitmaprenderer",
+  "context:webgpu",
+  "context:other",
+  "mime:default",
+  "mime:image/png",
+  "mime:image/jpeg",
+  "mime:image/webp",
+  "mime:other",
+  "size:small",
+  "size:medium",
+  "size:large",
+  "parameter:debug_renderer",
+  "parameter:limits",
+  "parameter:shader",
+  "parameter:other",
+  "extension:debug_renderer",
+  "extension:anisotropic",
+  "extension:context",
+  "extension:other",
+  "hints:none",
+  "permission:accelerometer",
+  "permission:camera",
+  "permission:clipboard-read",
+  "permission:clipboard-write",
+  "permission:geolocation",
+  "permission:gyroscope",
+  "permission:magnetometer",
+  "permission:microphone",
+  "permission:midi",
+  "permission:notifications",
+  "permission:persistent-storage",
+  "permission:other",
+  "entry:element",
+  "entry:event",
+  "entry:first-input",
+  "entry:largest-contentful-paint",
+  "entry:longtask",
+  "entry:mark",
+  "entry:measure",
+  "entry:navigation",
+  "entry:paint",
+  "entry:resource",
+  "entry:other",
+  "global",
+  "other",
+  "error_stack",
+]);
+
+const SURFACES = new Set([
+  "navigator",
+  "screen",
+  "window",
+  "webgl",
+  "canvas",
+  "audio",
+  "fonts",
+  "permissions",
+  "media",
+  "webrtc",
+  "timing",
+  "automation",
+  "challenge_asset",
+]);
+const VENDORS = new Set([
+  "cloudflare",
+  "datadome",
+  "human",
+  "akamai",
+  "imperva",
+  "kasada",
+  "arkose",
+  "recaptcha",
+  "hcaptcha",
+  "fingerprintjs",
+  "first_party",
+  "other",
+]);
+const DROP_REASONS = new Set(["document_cap", "browser_rate_cap"]);
+const VALUE_SUMMARIES = new Set([
+  "undefined",
+  "null",
+  "boolean:true",
+  "boolean:false",
+  "number:negative",
+  "number:zero",
+  "number:one",
+  "number:2-7",
+  "number:8-31",
+  "number:32-127",
+  "number:128-511",
+  "number:512-2047",
+  "number:2048-plus",
+  "string:empty",
+  "string:nonempty",
+  "object:present",
+]);
+
+function safeClose(fd) {
+  if (fd !== undefined) closeSync(fd);
+}
+
+function secureBoundedRead(path, maxBytes, deps = {}, requiredMode = null) {
+  const open = deps.open ?? openSync;
+  const stat = deps.stat ?? fstatSync;
+  const read = deps.read ?? readFileSync;
+  let fd;
+  try {
+    fd = open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+    const metadata = stat(fd);
+    if (!metadata.isFile() || metadata.size <= 0 || metadata.size > maxBytes) return null;
+    const mode = metadata.mode & 0o777;
+    if (requiredMode === null ? (mode & 0o077) !== 0 : mode !== requiredMode) return null;
+    return String(read(fd, "utf8"));
+  } catch {
+    return null;
+  } finally {
+    safeClose(fd);
+  }
+}
+
+function canonicalHost(raw) {
+  if (typeof raw !== "string" || raw.length === 0 || raw.length > MAX_HOST_LENGTH) return null;
+  if (raw !== raw.trim() || raw.includes("*") || raw.includes("/") || raw.includes("@"))
+    return null;
+  let parsed;
+  try {
+    parsed = new URL(`https://${raw}`);
+  } catch {
+    return null;
+  }
+  if (
+    parsed.username !== "" ||
+    parsed.password !== "" ||
+    parsed.pathname !== "/" ||
+    parsed.search !== "" ||
+    parsed.hash !== "" ||
+    (parsed.port !== "" && parsed.port !== "443")
+  ) {
+    return null;
+  }
+  const host = parsed.hostname.toLowerCase().replace(/\.$/, "");
+  if (host === "" || host.includes(":")) return null;
+  const labels = host.split(".");
+  if (labels.length < 2 || labels.some((label) => !HOST_LABEL.test(label))) return null;
+  return host;
+}
+
+export function parseFingerprintLogConfig(raw) {
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (parsed == null || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  if (
+    Object.keys(parsed).some((key) => key !== "version" && key !== "hosts") ||
+    parsed.version !== FINGERPRINT_LOG_CONFIG_VERSION ||
+    !Array.isArray(parsed.hosts) ||
+    parsed.hosts.length === 0 ||
+    parsed.hosts.length > MAX_HOSTS
+  ) {
+    return null;
+  }
+  const hosts = [];
+  const seen = new Set();
+  for (const rawHost of parsed.hosts) {
+    const host = canonicalHost(rawHost);
+    if (host == null || host !== rawHost || seen.has(host)) return null;
+    seen.add(host);
+    hosts.push(host);
+  }
+  if (hosts.some((host, index) => index > 0 && hosts[index - 1] > host)) return null;
+  return Object.freeze({
+    version: FINGERPRINT_LOG_CONFIG_VERSION,
+    hosts: Object.freeze(hosts),
+  });
+}
+
+export function readFingerprintLogConfig({ markerPath, open, stat, read } = {}) {
+  if (typeof markerPath !== "string" || markerPath.length === 0) return null;
+  const raw = secureBoundedRead(markerPath, MAX_CONFIG_BYTES, { open, stat, read }, 0o600);
+  return raw == null ? null : parseFingerprintLogConfig(raw);
+}
+
+export function windowIndexFromCdpPort(port, cdpPortBase) {
+  const index = port - cdpPortBase;
+  return Number.isInteger(index) && index >= 1 && index <= 256 ? index : null;
+}
+
+export function sanitizeScriptUrl(raw) {
+  if (typeof raw !== "string" || raw.length === 0) return "<unknown>";
+  if (SCRIPT_URL_SENTINELS.has(raw)) return raw;
+  if (raw.startsWith("blob:")) return "<blob>";
+  if (raw.startsWith("data:")) return "<data>";
+  if (/^(?:chrome|moz|safari-web)-extension:/.test(raw)) return "<extension>";
+  let parsed;
+  try {
+    parsed = new URL(raw.replace(/:\d+:\d+$/, ""));
+  } catch {
+    return raw.includes("eval at ") ? "<eval>" : "<unknown>";
+  }
+  if (parsed.protocol !== "https:") return "<unknown>";
+  const segments = parsed.pathname
+    .split("/")
+    .map((segment) => (TOKEN_PATH_SEGMENT.test(segment) ? ":id" : segment.slice(0, 64)));
+  const sanitized = `${parsed.protocol}//${parsed.hostname.toLowerCase()}${segments.join("/")}`;
+  return sanitized.slice(0, MAX_SCRIPT_URL_LENGTH);
+}
+
+function isSafeScriptUrl(value) {
+  if (typeof value !== "string" || value.length === 0 || value.length > MAX_SCRIPT_URL_LENGTH) {
+    return false;
+  }
+  if (SCRIPT_URL_SENTINELS.has(value)) return true;
+  try {
+    const parsed = new URL(value);
+    return (
+      parsed.protocol === "https:" &&
+      parsed.username === "" &&
+      parsed.password === "" &&
+      parsed.port === "" &&
+      value === parsed.href &&
+      value === `${parsed.origin}${parsed.pathname}`
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isSafeArgsSummary(value) {
+  return (
+    typeof value === "string" && (ARGS_SUMMARIES.has(value) || /^hints:[0-9a-f]{1,2}$/.test(value))
+  );
+}
+
+export function classifyFingerprintVendor(scriptUrl, site = "") {
+  if (scriptUrl === "<inline>" || scriptUrl === "<eval>") return "first_party";
+  if (scriptUrl.startsWith("<")) return "other";
+  let parsed;
+  try {
+    parsed = new URL(scriptUrl);
+  } catch {
+    return "other";
+  }
+  const haystack = `${parsed.hostname}${parsed.pathname}`.toLowerCase();
+  const rules = [
+    ["cloudflare", /cloudflare|challenges\.cloudflare/],
+    ["datadome", /datadome/],
+    ["human", /perimeterx|px-cdn|humansecurity/],
+    ["akamai", /akamai|akamaihd|akam\.net/],
+    ["imperva", /imperva|incapsula/],
+    ["kasada", /kasada|kpsdk/],
+    ["arkose", /arkoselabs|funcaptcha/],
+    ["recaptcha", /recaptcha|google\.com\/recaptcha|gstatic\.com\/recaptcha/],
+    ["hcaptcha", /hcaptcha/],
+    ["fingerprintjs", /fingerprintjs|fpjs/],
+  ];
+  for (const [vendor, pattern] of rules) {
+    if (pattern.test(haystack)) return vendor;
+  }
+  return parsed.hostname === site || parsed.hostname.endsWith(`.${site}`) ? "first_party" : "other";
+}
+
+function isolatedDocumentInstaller(options) {
+  const eventTarget = EventTarget.prototype;
+  const addEventListener = eventTarget.addEventListener;
+  const dispatchEvent = eventTarget.dispatchEvent;
+  const removeEventListener = eventTarget.removeEventListener;
+  const CustomEventCtor = CustomEvent;
+  const records = new Map();
+  let dropped = 0;
+  let generation = "";
+  let channel = "";
+
+  const validString = (value, limit) => typeof value === "string" && value.length <= limit;
+  const validScriptUrl = (value) => {
+    if (["<inline>", "<eval>", "<blob>", "<data>", "<extension>", "<unknown>"].includes(value)) {
+      return true;
+    }
+    if (!validString(value, 512) || value.length === 0) return false;
+    try {
+      const parsed = new URL(value);
+      return (
+        parsed.protocol === "https:" &&
+        parsed.username === "" &&
+        parsed.password === "" &&
+        parsed.port === "" &&
+        value === parsed.href &&
+        value === `${parsed.origin}${parsed.pathname}`
+      );
+    } catch {
+      return false;
+    }
+  };
+  const validArgsSummary = (value) =>
+    validString(value, 96) &&
+    /^(?:present|context:(?:2d|webgl2?|bitmaprenderer|webgpu|other)|mime:(?:default|image\/(?:png|jpeg|webp)|other)|size:(?:small|medium|large)|parameter:(?:debug_renderer|limits|shader|other)|extension:(?:debug_renderer|anisotropic|context|other)|hints:(?:none|[0-9a-f]{1,2})|permission:(?:accelerometer|camera|clipboard-read|clipboard-write|geolocation|gyroscope|magnetometer|microphone|midi|notifications|persistent-storage|other)|entry:(?:element|event|first-input|largest-contentful-paint|longtask|mark|measure|navigation|paint|resource|other)|global|other|error_stack)$/.test(
+      value,
+    );
+  const valueSummaries = new Set([
+    "undefined",
+    "null",
+    "boolean:true",
+    "boolean:false",
+    "number:negative",
+    "number:zero",
+    "number:one",
+    "number:2-7",
+    "number:8-31",
+    "number:32-127",
+    "number:128-511",
+    "number:512-2047",
+    "number:2048-plus",
+    "string:empty",
+    "string:nonempty",
+    "object:present",
+  ]);
+  const validValueSummary = (value) => value === undefined || valueSummaries.has(value);
+  const onData = (event) => {
+    const detail = event && event.detail;
+    if (
+      detail != null &&
+      typeof detail === "object" &&
+      detail.kind === "ack" &&
+      detail.generation === generation
+    ) {
+      return;
+    }
+    if (
+      detail != null &&
+      typeof detail === "object" &&
+      detail.kind === "dropped" &&
+      detail.generation === generation &&
+      Number.isInteger(detail.count) &&
+      detail.count > 0
+    ) {
+      dropped = Math.max(dropped, Math.min(1000000, detail.count));
+      return;
+    }
+    if (
+      detail == null ||
+      typeof detail !== "object" ||
+      detail.kind !== "read" ||
+      detail.generation !== generation ||
+      !validString(detail.site, 253) ||
+      !validScriptUrl(detail.scriptUrl) ||
+      !validString(detail.vendor, 32) ||
+      !validString(detail.surface, 32) ||
+      !validString(detail.api, 96) ||
+      !validArgsSummary(detail.argsSummary) ||
+      !validValueSummary(detail.valueSummary)
+    ) {
+      dropped += 1;
+      return;
+    }
+    const key = `${detail.scriptUrl}\u0000${detail.api}\u0000${detail.argsSummary}`;
+    const found = records.get(key);
+    if (found) {
+      found.reads = Math.min(1000000, found.reads + 1);
+      return;
+    }
+    if (records.size >= 128) {
+      dropped += 1;
+      return;
+    }
+    const record = {
+      site: detail.site,
+      scriptUrl: detail.scriptUrl,
+      vendor: detail.vendor,
+      surface: detail.surface,
+      api: detail.api,
+      argsSummary: detail.argsSummary,
+      reads: 1,
+    };
+    if (detail.valueSummary !== undefined) record.valueSummary = detail.valueSummary;
+    records.set(key, record);
+  };
+  const onBootstrap = (event) => {
+    const detail = event && event.detail;
+    if (
+      detail == null ||
+      typeof detail !== "object" ||
+      detail.kind !== "hello" ||
+      !validString(detail.channel, 128) ||
+      !validString(detail.generation, 128)
+    ) {
+      return;
+    }
+    if (channel !== "") {
+      Reflect.apply(removeEventListener, globalThis, [channel, onData, true]);
+    }
+    channel = detail.channel;
+    generation = detail.generation;
+    Reflect.apply(addEventListener, globalThis, [channel, onData, true]);
+    Reflect.apply(dispatchEvent, globalThis, [
+      new CustomEventCtor(channel, { detail: { kind: "ack", generation } }),
+    ]);
+  };
+  Reflect.apply(addEventListener, globalThis, [options.bootstrapEvent, onBootstrap, true]);
+
+  const controller = {
+    drain() {
+      const reads = [...records.values()];
+      records.clear();
+      const saturated = dropped;
+      dropped = 0;
+      return { generation, reads, dropped: saturated };
+    },
+    stop() {
+      Reflect.apply(dispatchEvent, globalThis, [
+        new CustomEventCtor(options.stopEvent, { detail: null }),
+      ]);
+      Reflect.apply(removeEventListener, globalThis, [options.bootstrapEvent, onBootstrap, true]);
+      if (channel !== "") {
+        Reflect.apply(removeEventListener, globalThis, [channel, onData, true]);
+      }
+      records.clear();
+      dropped = 0;
+      generation = "";
+      channel = "";
+      if (globalThis[options.controllerKey] === controller) {
+        delete globalThis[options.controllerKey];
+      }
+    },
+  };
+  Object.defineProperty(globalThis, options.controllerKey, {
+    configurable: true,
+    enumerable: false,
+    value: controller,
+    writable: false,
+  });
+  return controller;
+}
+
+function mainDocumentInstaller(options) {
+  if (globalThis.top !== globalThis) return;
+  const listedSite = (host) =>
+    options.hosts.find((wanted) => host === wanted || host.endsWith(`.${wanted}`)) ?? "";
+  const documentHost = String(globalThis.location && globalThis.location.hostname).toLowerCase();
+  const site = listedSite(documentHost);
+  if (site === "") return;
+
+  const cryptoObject = globalThis.crypto;
+  const sample = new Uint32Array(1);
+  if (cryptoObject && typeof cryptoObject.getRandomValues === "function") {
+    cryptoObject.getRandomValues(sample);
+  } else {
+    sample[0] = Math.floor(Math.random() * 0x1_0000_0000);
+  }
+  if (sample[0] % 10000 >= options.sampledBps) return;
+
+  const nativeFunctionToString = Function.prototype.toString;
+  const nativeReflectApply = Reflect.apply;
+  const nativeReflectConstruct = Reflect.construct;
+  const nativeDefineProperty = Object.defineProperty;
+  const nativeGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+  const nativeGetPrototypeOf = Object.getPrototypeOf;
+  const nativeSetPrototypeOf = Object.setPrototypeOf;
+  const nativeReflectOwnKeys = Reflect.ownKeys;
+  const nativeNumberIsFinite = Number.isFinite;
+  const nativeError = Error;
+  const nativeURL = URL;
+  const nativeStringSplit = String.prototype.split;
+  const nativeStringSlice = String.prototype.slice;
+  const nativeStringIncludes = String.prototype.includes;
+  const nativeStringStartsWith = String.prototype.startsWith;
+  const nativeStringEndsWith = String.prototype.endsWith;
+  const nativeStringReplace = String.prototype.replace;
+  const nativeStringToLowerCase = String.prototype.toLowerCase;
+  const nativeRegExpExec = RegExp.prototype.exec;
+  const nativeRegExpTest = RegExp.prototype.test;
+  const nativeArrayJoin = Array.prototype.join;
+  const nativeArrayPush = Array.prototype.push;
+  const nativeArrayShift = Array.prototype.shift;
+  const nativeSetHas = Set.prototype.has;
+  const nativeSetAdd = Set.prototype.add;
+  const nativeMapGet = Map.prototype.get;
+  const nativeMapSet = Map.prototype.set;
+  const nativeCustomEvent = CustomEvent;
+  const nativeDispatchEvent = EventTarget.prototype.dispatchEvent;
+  const nativeAddEventListener = EventTarget.prototype.addEventListener;
+  const nativeRemoveEventListener = EventTarget.prototype.removeEventListener;
+  const nativePerformanceObserver = globalThis.PerformanceObserver;
+  const nativePerformanceObserverObserve = nativePerformanceObserver?.prototype?.observe;
+  const nativePerformanceObserverDisconnect = nativePerformanceObserver?.prototype?.disconnect;
+  const nativeSources = new WeakMap();
+  const constructorWrappers = new WeakMap();
+  const wrapped = [];
+  const seen = new Set();
+  const attribution = new Map();
+  const pending = [];
+  let dropped = 0;
+  let acknowledged = false;
+  let active = true;
+  let resourceObserver = null;
+
+  function stop() {
+    if (!active) return;
+    active = false;
+    pending.length = 0;
+    seen.clear();
+    attribution.clear();
+    dropped = 0;
+    acknowledged = false;
+    nativeReflectApply(nativeRemoveEventListener, globalThis, [channel, onAck, true]);
+    nativeReflectApply(nativeRemoveEventListener, globalThis, [options.stopEvent, onStop, true]);
+    if (resourceObserver != null && typeof nativePerformanceObserverDisconnect === "function") {
+      nativeReflectApply(nativePerformanceObserverDisconnect, resourceObserver, []);
+    }
+    for (let index = wrapped.length - 1; index >= 0; index -= 1) {
+      const entry = wrapped[index];
+      const current = nativeGetOwnPropertyDescriptor(entry.owner, entry.key);
+      const stillInstalled =
+        entry.kind === "get"
+          ? current?.get === entry.replacement
+          : current?.value === entry.replacement;
+      if (stillInstalled) nativeDefineProperty(entry.owner, entry.key, entry.descriptor);
+    }
+    wrapped.length = 0;
+  }
+
+  const randomHex = () => {
+    const bytes = new Uint8Array(16);
+    if (cryptoObject && typeof cryptoObject.getRandomValues === "function") {
+      cryptoObject.getRandomValues(bytes);
+    } else {
+      for (let index = 0; index < bytes.length; index += 1) {
+        bytes[index] = Math.floor(Math.random() * 256);
+      }
+    }
+    let output = "";
+    for (const byte of bytes) output += byte.toString(16).padStart(2, "0");
+    return output;
+  };
+  const generation = randomHex();
+  const channel = `__sand_fp_${randomHex()}`;
+
+  const sanitizedUrl = (raw) => {
+    if (typeof raw !== "string" || raw.length === 0) return "<unknown>";
+    if (nativeReflectApply(nativeStringStartsWith, raw, ["blob:"])) return "<blob>";
+    if (nativeReflectApply(nativeStringStartsWith, raw, ["data:"])) return "<data>";
+    if (nativeReflectApply(nativeRegExpTest, /^(?:chrome|moz|safari-web)-extension:/, [raw])) {
+      return "<extension>";
+    }
+    let parsed;
+    try {
+      parsed = new nativeURL(raw);
+    } catch {
+      return nativeReflectApply(nativeStringIncludes, raw, ["eval at "]) ? "<eval>" : "<unknown>";
+    }
+    if (parsed.protocol !== "https:") return "<unknown>";
+    const parts = nativeReflectApply(nativeStringSplit, parsed.pathname, ["/"]);
+    for (let index = 0; index < parts.length; index += 1) {
+      const part = parts[index];
+      parts[index] = nativeReflectApply(
+        nativeRegExpTest,
+        /^(?:\d{5,}|[0-9a-f]{12,}|[A-Za-z0-9_-]{20,})$/,
+        [part],
+      )
+        ? ":id"
+        : nativeReflectApply(nativeStringSlice, part, [0, 64]);
+    }
+    const host = nativeReflectApply(nativeStringToLowerCase, parsed.hostname, []);
+    const joined = nativeReflectApply(nativeArrayJoin, parts, ["/"]);
+    return nativeReflectApply(nativeStringSlice, `${parsed.protocol}//${host}${joined}`, [0, 512]);
+  };
+  const scriptUrl = () => {
+    let stack;
+    try {
+      const rawStack = new nativeError().stack;
+      stack = typeof rawStack === "string" ? rawStack : "";
+    } catch {
+      return "<unknown>";
+    }
+    const lines = nativeReflectApply(nativeStringSplit, stack, ["\n"]);
+    for (let index = 1; index < lines.length; index += 1) {
+      const line = lines[index];
+      const match = nativeReflectApply(
+        nativeRegExpExec,
+        /(https?:\/\/[^\s)]+|blob:[^\s)]+|data:[^\s)]+)/,
+        [line],
+      );
+      if (match) {
+        return sanitizedUrl(nativeReflectApply(nativeStringReplace, match[1], [/:\d+:\d+$/, ""]));
+      }
+      if (nativeReflectApply(nativeStringIncludes, line, ["eval at "])) return "<eval>";
+    }
+    return "<inline>";
+  };
+  const vendorRules = [
+    ["cloudflare", /cloudflare|challenges\.cloudflare/],
+    ["datadome", /datadome/],
+    ["human", /perimeterx|px-cdn|humansecurity/],
+    ["akamai", /akamai|akamaihd|akam\.net/],
+    ["imperva", /imperva|incapsula/],
+    ["kasada", /kasada|kpsdk/],
+    ["arkose", /arkoselabs|funcaptcha/],
+    ["recaptcha", /recaptcha|google\.com\/recaptcha|gstatic\.com\/recaptcha/],
+    ["hcaptcha", /hcaptcha/],
+    ["fingerprintjs", /fingerprintjs|fpjs/],
+  ];
+  const vendorFor = (url) => {
+    if (url === "<inline>" || url === "<eval>") return "first_party";
+    if (nativeReflectApply(nativeStringStartsWith, url, ["<"])) return "other";
+    let parsed;
+    try {
+      parsed = new nativeURL(url);
+    } catch {
+      return "other";
+    }
+    const host = nativeReflectApply(nativeStringToLowerCase, parsed.hostname, []);
+    const text = nativeReflectApply(
+      nativeStringToLowerCase,
+      `${parsed.hostname}${parsed.pathname}`,
+      [],
+    );
+    for (let index = 0; index < vendorRules.length; index += 1) {
+      if (nativeReflectApply(nativeRegExpTest, vendorRules[index][1], [text])) {
+        return vendorRules[index][0];
+      }
+    }
+    return host === site || nativeReflectApply(nativeStringEndsWith, host, [`.${site}`])
+      ? "first_party"
+      : "other";
+  };
+  const dispatch = (detail) =>
+    nativeReflectApply(nativeDispatchEvent, globalThis, [
+      new nativeCustomEvent(channel, { __proto__: null, detail }),
+    ]);
+  const flush = () => {
+    if (!acknowledged) return;
+    while (pending.length > 0) dispatch(nativeReflectApply(nativeArrayShift, pending, []));
+  };
+  const hello = () =>
+    nativeReflectApply(nativeDispatchEvent, globalThis, [
+      new nativeCustomEvent(options.bootstrapEvent, {
+        __proto__: null,
+        detail: { kind: "hello", channel, generation },
+      }),
+    ]);
+  const onAck = (event) => {
+    const detail = event && event.detail;
+    if (detail && detail.kind === "ack" && detail.generation === generation) {
+      acknowledged = true;
+      flush();
+    }
+  };
+  const onStop = () => stop();
+  nativeReflectApply(nativeAddEventListener, globalThis, [channel, onAck, true]);
+  nativeReflectApply(nativeAddEventListener, globalThis, [options.stopEvent, onStop, true]);
+  hello();
+
+  const signalDropped = () => {
+    dropped = Math.min(1000000, dropped + 1);
+    if ((dropped & (dropped - 1)) !== 0) return;
+    hello();
+    dispatch({ kind: "dropped", generation, count: dropped });
+  };
+  const valueSummary = (surface, api, value) => {
+    const boxLevel =
+      surface === "navigator" ||
+      surface === "screen" ||
+      surface === "window" ||
+      surface === "webgl" ||
+      surface === "automation" ||
+      api === "audio.sampleRate" ||
+      api === "audio.baseLatency" ||
+      api === "audio.outputLatency";
+    if (!boxLevel) return undefined;
+    if (value === undefined) return "undefined";
+    if (value === null) return "null";
+    if (typeof value === "boolean") return value ? "boolean:true" : "boolean:false";
+    if (typeof value === "string") return value.length === 0 ? "string:empty" : "string:nonempty";
+    if (typeof value === "number") {
+      if (!nativeNumberIsFinite(value)) return undefined;
+      if (value < 0) return "number:negative";
+      if (value === 0) return "number:zero";
+      if (value === 1) return "number:one";
+      if (value < 8) return "number:2-7";
+      if (value < 32) return "number:8-31";
+      if (value < 128) return "number:32-127";
+      if (value < 512) return "number:128-511";
+      if (value < 2048) return "number:512-2047";
+      return "number:2048-plus";
+    }
+    return typeof value === "object" || typeof value === "function" ? "object:present" : undefined;
+  };
+  const recordAttributed = (url, vendor, surface, api, argsSummary, result) => {
+    if (!active) return;
+    const key = `${url}\u0000${api}\u0000${argsSummary}`;
+    if (!nativeReflectApply(nativeSetHas, seen, [key])) {
+      if (seen.size >= options.documentCap) {
+        signalDropped();
+        return;
+      }
+      nativeReflectApply(nativeSetAdd, seen, [key]);
+    }
+    const detail = {
+      kind: "read",
+      generation,
+      site,
+      scriptUrl: url,
+      vendor,
+      surface,
+      api,
+      argsSummary,
+    };
+    const summary = valueSummary(surface, api, result);
+    if (summary !== undefined) detail.valueSummary = summary;
+    if (acknowledged) dispatch(detail);
+    else if (pending.length < options.documentCap) {
+      nativeReflectApply(nativeArrayPush, pending, [detail]);
+      hello();
+    } else {
+      signalDropped();
+    }
+  };
+  const record = (surface, api, argsSummary, result) => {
+    try {
+      if (!active) return;
+      const attrKey = `${api}\u0000${argsSummary}`;
+      let attributed = nativeReflectApply(nativeMapGet, attribution, [attrKey]);
+      if (attributed === undefined) {
+        const url = scriptUrl();
+        attributed = { url, vendor: vendorFor(url) };
+        if (attribution.size < options.documentCap) {
+          nativeReflectApply(nativeMapSet, attribution, [attrKey, attributed]);
+        }
+      }
+      recordAttributed(attributed.url, attributed.vendor, surface, api, argsSummary, result);
+    } catch {
+      signalDropped();
+    }
+  };
+
+  const nativeSource = (callable) => {
+    try {
+      return nativeReflectApply(nativeFunctionToString, callable, []);
+    } catch {
+      return `function ${callable.name || ""}() { [native code] }`;
+    }
+  };
+  const preserveCallable = (replacement, native) => {
+    nativeDefineProperty(replacement, "name", {
+      configurable: true,
+      value: native.name,
+    });
+    nativeDefineProperty(replacement, "length", {
+      configurable: true,
+      value: native.length,
+    });
+    nativeSources.set(replacement, nativeSource(native));
+    return replacement;
+  };
+  const findDescriptor = (target, key) => {
+    let owner = target;
+    while (owner != null) {
+      const descriptor = nativeGetOwnPropertyDescriptor(owner, key);
+      if (descriptor) return { owner, descriptor };
+      owner = nativeGetPrototypeOf(owner);
+    }
+    return null;
+  };
+  const wrapAccessor = (target, key, surface, api) => {
+    if (target == null) return;
+    const found = findDescriptor(target, key);
+    if (!found || !found.descriptor.configurable || typeof found.descriptor.get !== "function") {
+      return;
+    }
+    const native = found.descriptor.get;
+    const replacement = preserveCallable(
+      {
+        [key]() {
+          const result = nativeReflectApply(native, this, []);
+          record(surface, api, "present", result);
+          return result;
+        },
+      }[key],
+      native,
+    );
+    nativeDefineProperty(found.owner, key, { ...found.descriptor, get: replacement });
+    wrapped.push({
+      owner: found.owner,
+      key,
+      descriptor: found.descriptor,
+      replacement,
+      kind: "get",
+    });
+  };
+  const wrapMethod = (target, key, surface, api, summarize = () => "present") => {
+    if (target == null) return;
+    const found = findDescriptor(target, key);
+    if (!found || !found.descriptor.configurable || typeof found.descriptor.value !== "function") {
+      return;
+    }
+    const native = found.descriptor.value;
+    const replacement = preserveCallable(
+      {
+        [key](...args) {
+          const result = nativeReflectApply(native, this, args);
+          try {
+            const summary = summarize(args);
+            if (summary !== null) {
+              const routed =
+                typeof summary === "object" ? summary : { surface, api, argsSummary: summary };
+              record(routed.surface ?? surface, routed.api ?? api, routed.argsSummary, result);
+            }
+          } catch {
+            signalDropped();
+          }
+          return result;
+        },
+      }[key],
+      native,
+    );
+    nativeDefineProperty(found.owner, key, { ...found.descriptor, value: replacement });
+    wrapped.push({
+      owner: found.owner,
+      key,
+      descriptor: found.descriptor,
+      replacement,
+      kind: "value",
+    });
+  };
+  const wrapConstructor = (target, key, surface, api) => {
+    const descriptor = target && nativeGetOwnPropertyDescriptor(target, key);
+    if (!descriptor || !descriptor.configurable || typeof descriptor.value !== "function") return;
+    const native = descriptor.value;
+    let replacement = constructorWrappers.get(native);
+    if (replacement === undefined) {
+      replacement = preserveCallable(function (...args) {
+        const result =
+          new.target === undefined
+            ? nativeReflectApply(native, this, args)
+            : nativeReflectConstruct(
+                native,
+                args,
+                new.target === replacement ? native : new.target,
+              );
+        record(surface, api, "present");
+        return result;
+      }, native);
+      constructorWrappers.set(native, replacement);
+      nativeSetPrototypeOf(replacement, nativeGetPrototypeOf(native));
+      for (const staticKey of nativeReflectOwnKeys(native)) {
+        if (
+          staticKey === "name" ||
+          staticKey === "length" ||
+          staticKey === "prototype" ||
+          staticKey === "arguments" ||
+          staticKey === "caller"
+        ) {
+          continue;
+        }
+        const staticDescriptor = nativeGetOwnPropertyDescriptor(native, staticKey);
+        if (staticDescriptor) nativeDefineProperty(replacement, staticKey, staticDescriptor);
+      }
+      const prototypeDescriptor = nativeGetOwnPropertyDescriptor(native, "prototype");
+      if (prototypeDescriptor) nativeDefineProperty(replacement, "prototype", prototypeDescriptor);
+      const constructorDescriptor =
+        native.prototype && nativeGetOwnPropertyDescriptor(native.prototype, "constructor");
+      if (constructorDescriptor?.configurable) {
+        nativeDefineProperty(native.prototype, "constructor", {
+          ...constructorDescriptor,
+          value: replacement,
+        });
+        wrapped.push({
+          owner: native.prototype,
+          key: "constructor",
+          descriptor: constructorDescriptor,
+          replacement,
+          kind: "value",
+        });
+      }
+    }
+    nativeDefineProperty(target, key, { ...descriptor, value: replacement });
+    wrapped.push({ owner: target, key, descriptor, replacement, kind: "value" });
+  };
+  const ownDataString = (value, key) => {
+    if (value == null || (typeof value !== "object" && typeof value !== "function")) return null;
+    let descriptor;
+    try {
+      descriptor = nativeGetOwnPropertyDescriptor(value, key);
+    } catch {
+      return null;
+    }
+    return descriptor && "value" in descriptor && typeof descriptor.value === "string"
+      ? descriptor.value
+      : null;
+  };
+  const primitive = (value) =>
+    typeof value === "string" || typeof value === "number" || typeof value === "boolean"
+      ? value
+      : null;
+  const canvasContext = (args) => {
+    const value = primitive(args[0]);
+    return typeof value === "string" && /^(?:2d|webgl2?|bitmaprenderer|webgpu)$/.test(value)
+      ? `context:${value}`
+      : "context:other";
+  };
+  const mimeValue = (value) => {
+    if (typeof value !== "string") return "mime:default";
+    if (/png/i.test(value)) return "mime:image/png";
+    if (/jpe?g/i.test(value)) return "mime:image/jpeg";
+    if (/webp/i.test(value)) return "mime:image/webp";
+    return "mime:other";
+  };
+  const mime = (args) => mimeValue(primitive(args[0]));
+  const blobMime = (args) => mimeValue(primitive(args[1]));
+  const convertMime = (args) => mimeValue(ownDataString(args[0], "type"));
+  const sizeBucket = (args) => {
+    const numbers = args.filter((value) => typeof value === "number" && Number.isFinite(value));
+    const size = numbers.reduce((product, value) => product * Math.max(1, Math.abs(value)), 1);
+    if (size <= 4096) return "size:small";
+    if (size <= 262144) return "size:medium";
+    return "size:large";
+  };
+  const webglParameter = (args) => {
+    const value = primitive(args[0]);
+    if (value === 0x9245 || value === 0x9246) return "parameter:debug_renderer";
+    if (typeof value !== "number") return "parameter:other";
+    if (value >= 0x0d00 && value <= 0x0dff) return "parameter:limits";
+    if (value >= 0x8b00 && value <= 0x8dff) return "parameter:shader";
+    return "parameter:other";
+  };
+  const extension = (args) => {
+    const value = primitive(args[0]);
+    if (typeof value !== "string") return "extension:other";
+    const lower = value.toLowerCase();
+    if (lower.includes("debug_renderer")) return "extension:debug_renderer";
+    if (lower.includes("anisotropic")) return "extension:anisotropic";
+    if (lower.includes("lose_context")) return "extension:context";
+    return "extension:other";
+  };
+  const uaHints = (args) => {
+    const hints = args[0];
+    if (!Array.isArray(hints)) return "hints:none";
+    const known = [
+      "architecture",
+      "bitness",
+      "formFactors",
+      "fullVersionList",
+      "model",
+      "platformVersion",
+      "uaFullVersion",
+      "wow64",
+    ];
+    let bits = 0;
+    for (let index = 0; index < Math.min(hints.length, 32); index += 1) {
+      const descriptor = nativeGetOwnPropertyDescriptor(hints, String(index));
+      const value = descriptor && "value" in descriptor ? descriptor.value : null;
+      const knownIndex = known.indexOf(value);
+      if (knownIndex >= 0) bits |= 1 << knownIndex;
+    }
+    return `hints:${bits.toString(16)}`;
+  };
+  const permission = (args) => {
+    const name = ownDataString(args[0], "name");
+    return [
+      "accelerometer",
+      "camera",
+      "clipboard-read",
+      "clipboard-write",
+      "geolocation",
+      "gyroscope",
+      "magnetometer",
+      "microphone",
+      "midi",
+      "notifications",
+      "persistent-storage",
+    ].includes(name)
+      ? `permission:${name}`
+      : "permission:other";
+  };
+  const entryType = (args) => {
+    const value = primitive(args[0]);
+    return typeof value === "string" &&
+      [
+        "element",
+        "event",
+        "first-input",
+        "largest-contentful-paint",
+        "longtask",
+        "mark",
+        "measure",
+        "navigation",
+        "paint",
+        "resource",
+      ].includes(value)
+      ? `entry:${value}`
+      : "entry:other";
+  };
+
+  const toStringDescriptor = nativeGetOwnPropertyDescriptor(Function.prototype, "toString");
+  if (toStringDescriptor && toStringDescriptor.configurable) {
+    const replacement = preserveCallable(
+      {
+        toString() {
+          const source = nativeSources.get(this);
+          return source === undefined
+            ? nativeReflectApply(nativeFunctionToString, this, [])
+            : source;
+        },
+      }.toString,
+      nativeFunctionToString,
+    );
+    nativeSources.set(replacement, nativeSource(nativeFunctionToString));
+    nativeDefineProperty(Function.prototype, "toString", {
+      ...toStringDescriptor,
+      value: replacement,
+    });
+    wrapped.push({
+      owner: Function.prototype,
+      key: "toString",
+      descriptor: toStringDescriptor,
+      replacement,
+      kind: "value",
+    });
+  }
+
+  const navigatorPrototype = globalThis.Navigator && Navigator.prototype;
+  for (const key of [
+    "webdriver",
+    "userAgent",
+    "userAgentData",
+    "platform",
+    "vendor",
+    "languages",
+    "hardwareConcurrency",
+    "deviceMemory",
+    "maxTouchPoints",
+    "plugins",
+    "mimeTypes",
+    "pdfViewerEnabled",
+    "cookieEnabled",
+    "doNotTrack",
+    "globalPrivacyControl",
+    "connection",
+  ]) {
+    wrapAccessor(
+      navigatorPrototype,
+      key,
+      key === "connection" ? "media" : "navigator",
+      key === "connection" ? "network.connection" : `navigator.${key}`,
+    );
+  }
+  const uaDataPrototype = globalThis.NavigatorUAData && NavigatorUAData.prototype;
+  for (const key of ["brands", "mobile", "platform"]) {
+    wrapAccessor(uaDataPrototype, key, "navigator", "navigator.userAgentData");
+  }
+  wrapMethod(
+    uaDataPrototype,
+    "getHighEntropyValues",
+    "navigator",
+    "navigator.userAgentData.getHighEntropyValues",
+    uaHints,
+  );
+
+  const screenPrototype = globalThis.Screen && Screen.prototype;
+  for (const key of [
+    "width",
+    "height",
+    "availWidth",
+    "availHeight",
+    "colorDepth",
+    "pixelDepth",
+    "orientation",
+  ]) {
+    wrapAccessor(screenPrototype, key, "screen", `screen.${key}`);
+  }
+  const orientationPrototype = globalThis.ScreenOrientation && ScreenOrientation.prototype;
+  for (const key of ["type", "angle"]) {
+    wrapAccessor(orientationPrototype, key, "screen", "screen.orientation");
+  }
+  for (const key of [
+    "innerWidth",
+    "innerHeight",
+    "outerWidth",
+    "outerHeight",
+    "devicePixelRatio",
+  ]) {
+    wrapAccessor(globalThis, key, "window", `window.${key}`);
+  }
+
+  const canvasPrototype = globalThis.HTMLCanvasElement && HTMLCanvasElement.prototype;
+  wrapMethod(canvasPrototype, "getContext", "canvas", "canvas.getContext", (args) => {
+    const argsSummary = canvasContext(args);
+    return argsSummary === "context:webgl" || argsSummary === "context:webgl2"
+      ? { surface: "webgl", api: "webgl.getContext", argsSummary }
+      : { surface: "canvas", api: "canvas.getContext", argsSummary };
+  });
+  wrapMethod(canvasPrototype, "toDataURL", "canvas", "canvas.toDataURL", mime);
+  wrapMethod(canvasPrototype, "toBlob", "canvas", "canvas.toBlob", blobMime);
+  const offscreenPrototype = globalThis.OffscreenCanvas && OffscreenCanvas.prototype;
+  wrapMethod(
+    offscreenPrototype,
+    "getContext",
+    "canvas",
+    "offscreenCanvas.getContext",
+    canvasContext,
+  );
+  wrapMethod(
+    offscreenPrototype,
+    "convertToBlob",
+    "canvas",
+    "offscreenCanvas.convertToBlob",
+    convertMime,
+  );
+  wrapMethod(
+    offscreenPrototype,
+    "transferToImageBitmap",
+    "canvas",
+    "offscreenCanvas.transferToImageBitmap",
+  );
+  const context2d = globalThis.CanvasRenderingContext2D && CanvasRenderingContext2D.prototype;
+  wrapMethod(context2d, "getImageData", "canvas", "canvas.getImageData", sizeBucket);
+  wrapMethod(context2d, "measureText", "fonts", "canvas.measureText");
+
+  for (const ctorName of ["WebGLRenderingContext", "WebGL2RenderingContext"]) {
+    const prototype = globalThis[ctorName] && globalThis[ctorName].prototype;
+    wrapMethod(prototype, "getParameter", "webgl", "webgl.getParameter", webglParameter);
+    wrapMethod(prototype, "getExtension", "webgl", "webgl.getExtension", extension);
+    wrapMethod(prototype, "getSupportedExtensions", "webgl", "webgl.getSupportedExtensions");
+    wrapMethod(prototype, "getShaderPrecisionFormat", "webgl", "webgl.getShaderPrecisionFormat");
+    wrapMethod(prototype, "readPixels", "webgl", "webgl.readPixels", sizeBucket);
+  }
+
+  const audioBuffer = globalThis.AudioBuffer && AudioBuffer.prototype;
+  for (const key of ["getChannelData", "copyFromChannel", "copyToChannel"]) {
+    wrapMethod(audioBuffer, key, "audio", `audio.${key}`);
+  }
+  const analyser = globalThis.AnalyserNode && AnalyserNode.prototype;
+  for (const key of [
+    "getByteFrequencyData",
+    "getFloatFrequencyData",
+    "getByteTimeDomainData",
+    "getFloatTimeDomainData",
+  ]) {
+    wrapMethod(analyser, key, "audio", `audio.${key}`);
+  }
+  const baseAudio = globalThis.BaseAudioContext && BaseAudioContext.prototype;
+  for (const key of ["sampleRate", "currentTime"]) {
+    wrapAccessor(baseAudio, key, "audio", `audio.${key}`);
+  }
+  const audioContext = globalThis.AudioContext && AudioContext.prototype;
+  for (const key of ["baseLatency", "outputLatency"]) {
+    wrapAccessor(audioContext, key, "audio", `audio.${key}`);
+  }
+  wrapMethod(
+    globalThis.OfflineAudioContext && OfflineAudioContext.prototype,
+    "startRendering",
+    "audio",
+    "audio.startRendering",
+  );
+
+  wrapAccessor(globalThis.Document && Document.prototype, "fonts", "fonts", "fonts.document");
+  const fontSet = globalThis.FontFaceSet && FontFaceSet.prototype;
+  wrapAccessor(fontSet, "status", "fonts", "fonts.status");
+  wrapAccessor(fontSet, "ready", "fonts", "fonts.ready");
+  wrapMethod(fontSet, "check", "fonts", "fonts.check");
+  wrapMethod(fontSet, "load", "fonts", "fonts.load");
+  wrapMethod(globalThis, "queryLocalFonts", "fonts", "fonts.queryLocalFonts");
+
+  wrapMethod(
+    globalThis.Permissions && Permissions.prototype,
+    "query",
+    "permissions",
+    "permissions.query",
+    permission,
+  );
+  wrapAccessor(globalThis.Notification, "permission", "permissions", "notifications.permission");
+  wrapMethod(
+    globalThis.MediaDevices && MediaDevices.prototype,
+    "enumerateDevices",
+    "media",
+    "media.enumerateDevices",
+  );
+  const connection = globalThis.NetworkInformation && NetworkInformation.prototype;
+  for (const key of ["effectiveType", "rtt", "downlink", "saveData"]) {
+    wrapAccessor(connection, key, "media", "network.connection");
+  }
+  wrapConstructor(globalThis, "RTCPeerConnection", "webrtc", "webrtc.RTCPeerConnection");
+  wrapConstructor(globalThis, "webkitRTCPeerConnection", "webrtc", "webrtc.RTCPeerConnection");
+  wrapConstructor(globalThis, "RTCDataChannel", "webrtc", "webrtc.RTCDataChannel");
+  wrapConstructor(globalThis, "RTCSessionDescription", "webrtc", "webrtc.RTCSessionDescription");
+  wrapConstructor(globalThis, "RTCIceCandidate", "webrtc", "webrtc.RTCIceCandidate");
+  wrapMethod(
+    globalThis.RTCRtpSender,
+    "getCapabilities",
+    "webrtc",
+    "webrtc.RTCRtpSender.getCapabilities",
+  );
+  wrapMethod(
+    globalThis.RTCRtpReceiver,
+    "getCapabilities",
+    "webrtc",
+    "webrtc.RTCRtpReceiver.getCapabilities",
+  );
+
+  wrapAccessor(
+    globalThis.Performance && Performance.prototype,
+    "timeOrigin",
+    "timing",
+    "timing.performance.timeOrigin",
+  );
+  wrapMethod(
+    globalThis.Performance && Performance.prototype,
+    "getEntries",
+    "timing",
+    "timing.performance.getEntries",
+  );
+  wrapMethod(
+    globalThis.Performance && Performance.prototype,
+    "getEntriesByType",
+    "timing",
+    "timing.performance.getEntriesByType",
+    entryType,
+  );
+  wrapMethod(
+    globalThis.Performance && Performance.prototype,
+    "getEntriesByName",
+    "timing",
+    "timing.performance.getEntriesByName",
+  );
+  wrapMethod(Date.prototype, "getTimezoneOffset", "timing", "timing.Date.getTimezoneOffset");
+  wrapMethod(globalThis, "requestAnimationFrame", "timing", "timing.requestAnimationFrame");
+  wrapConstructor(globalThis, "PerformanceObserver", "timing", "timing.PerformanceObserver");
+  wrapMethod(
+    globalThis.PerformanceObserver && PerformanceObserver.prototype,
+    "observe",
+    "timing",
+    "timing.PerformanceObserver",
+  );
+
+  const summarizeAutomation = (args) => (args[0] === globalThis ? "global" : null);
+  wrapMethod(
+    globalThis.Object,
+    "getOwnPropertyNames",
+    "automation",
+    "automation.globalOwnKeys",
+    summarizeAutomation,
+  );
+  wrapMethod(
+    globalThis.Object,
+    "getOwnPropertySymbols",
+    "automation",
+    "automation.globalOwnKeys",
+    summarizeAutomation,
+  );
+  wrapMethod(
+    globalThis.Object,
+    "getOwnPropertyDescriptors",
+    "automation",
+    "automation.globalOwnKeys",
+    summarizeAutomation,
+  );
+  wrapMethod(
+    globalThis.Reflect,
+    "ownKeys",
+    "automation",
+    "automation.globalOwnKeys",
+    summarizeAutomation,
+  );
+  wrapMethod(
+    globalThis.Object,
+    "getOwnPropertyDescriptor",
+    "automation",
+    "automation.globalOwnKeys",
+    (args) => {
+      if (args[0] === globalThis) return "global";
+      if (args[1] === "stack") {
+        return {
+          surface: "automation",
+          api: "automation.errorStack",
+          argsSummary: "error_stack",
+        };
+      }
+      return null;
+    },
+  );
+  for (const key of [
+    "_phantom",
+    "callPhantom",
+    "__nightmare",
+    "domAutomation",
+    "domAutomationController",
+  ]) {
+    wrapAccessor(globalThis, key, "automation", "automation.global");
+  }
+  if (typeof nativePerformanceObserver === "function") {
+    try {
+      resourceObserver = new nativePerformanceObserver((list) => {
+        try {
+          const entries = list.getEntries();
+          for (let index = 0; index < Math.min(entries.length, 64); index += 1) {
+            const entry = entries[index];
+            if (entry?.initiatorType !== "script") continue;
+            const url = sanitizedUrl(entry.name);
+            const vendor = vendorFor(url);
+            if (vendor === "first_party" || vendor === "other") continue;
+            recordAttributed(url, vendor, "challenge_asset", "challenge.scriptResource", "present");
+          }
+        } catch {
+          signalDropped();
+        }
+      });
+      nativeReflectApply(nativePerformanceObserverObserve, resourceObserver, [
+        { type: "resource", buffered: true },
+      ]);
+    } catch (error) {
+      if (!(error instanceof nativeError)) throw error;
+    }
+  }
+}
+
+function workerInstaller(options) {
+  const records = new Map();
+  let dropped = 0;
+  let active = true;
+  const wrapped = [];
+  const transport = {
+    push(record) {
+      const key = `${record.scriptUrl}\u0000${record.api}\u0000${record.argsSummary}`;
+      const found = records.get(key);
+      if (found) found.reads = Math.min(1000000, found.reads + 1);
+      else if (records.size < options.documentCap) records.set(key, { ...record, reads: 1 });
+      else dropped += 1;
+    },
+  };
+  const scope = globalThis;
+  const nativeToString = Function.prototype.toString;
+  const nativeApply = Reflect.apply;
+  const nativeDescriptor = Object.getOwnPropertyDescriptor;
+  const nativeDefine = Object.defineProperty;
+  const nativeError = Error;
+  const nativeURL = URL;
+  const nativeStringSlice = String.prototype.slice;
+  const nativeStringStartsWith = String.prototype.startsWith;
+  const nativeStringEndsWith = String.prototype.endsWith;
+  const nativeStringReplace = String.prototype.replace;
+  const nativeStringToLowerCase = String.prototype.toLowerCase;
+  const nativeRegExpExec = RegExp.prototype.exec;
+  const nativeRegExpTest = RegExp.prototype.test;
+  const sources = new WeakMap();
+  const vendorRules = [
+    ["cloudflare", /cloudflare|challenges\.cloudflare/],
+    ["datadome", /datadome/],
+    ["human", /perimeterx|px-cdn|humansecurity/],
+    ["akamai", /akamai|akamaihd|akam\.net/],
+    ["imperva", /imperva|incapsula/],
+    ["kasada", /kasada|kpsdk/],
+    ["arkose", /arkoselabs|funcaptcha/],
+    ["recaptcha", /recaptcha|google\.com\/recaptcha|gstatic\.com\/recaptcha/],
+    ["hcaptcha", /hcaptcha/],
+    ["fingerprintjs", /fingerprintjs|fpjs/],
+  ];
+  const vendorFor = (scriptUrl) => {
+    if (nativeApply(nativeStringStartsWith, scriptUrl, ["<"])) return "other";
+    let parsed;
+    try {
+      parsed = new nativeURL(scriptUrl);
+    } catch {
+      return "other";
+    }
+    const text = nativeApply(nativeStringToLowerCase, `${parsed.hostname}${parsed.pathname}`, []);
+    for (let index = 0; index < vendorRules.length; index += 1) {
+      if (nativeApply(nativeRegExpTest, vendorRules[index][1], [text]))
+        return vendorRules[index][0];
+    }
+    return parsed.hostname === options.site ||
+      nativeApply(nativeStringEndsWith, parsed.hostname, [`.${options.site}`])
+      ? "first_party"
+      : "other";
+  };
+  const record = (surface, api, argsSummary = "present") => {
+    try {
+      if (!active) return;
+      let scriptUrl = "<unknown>";
+      try {
+        const rawStack = new nativeError().stack;
+        const stack = typeof rawStack === "string" ? rawStack : "";
+        const match = nativeApply(nativeRegExpExec, /(https?:\/\/[^\s)]+)/, [stack]);
+        if (match) {
+          const parsed = new nativeURL(
+            nativeApply(nativeStringReplace, match[1], [/:\d+:\d+$/, ""]),
+          );
+          if (parsed.protocol === "https:") {
+            scriptUrl = nativeApply(
+              nativeStringSlice,
+              `${parsed.protocol}//${parsed.hostname}${parsed.pathname}`,
+              [0, 512],
+            );
+          }
+        }
+      } catch {
+        scriptUrl = "<unknown>";
+      }
+      transport.push({
+        site: options.site,
+        scriptUrl,
+        vendor: vendorFor(scriptUrl),
+        surface,
+        api,
+        argsSummary,
+      });
+    } catch {
+      dropped += 1;
+    }
+  };
+  const wrap = (target, key, surface, api) => {
+    const descriptor = target && nativeDescriptor(target, key);
+    if (!descriptor || !descriptor.configurable || typeof descriptor.value !== "function") return;
+    const native = descriptor.value;
+    const replacement = {
+      [key](...args) {
+        const result = nativeApply(native, this, args);
+        record(surface, api);
+        return result;
+      },
+    }[key];
+    nativeDefine(replacement, "name", { configurable: true, value: native.name });
+    nativeDefine(replacement, "length", { configurable: true, value: native.length });
+    sources.set(replacement, nativeApply(nativeToString, native, []));
+    nativeDefine(target, key, { ...descriptor, value: replacement });
+    wrapped.push({ target, key, descriptor, replacement });
+  };
+  const toStringDescriptor = nativeDescriptor(Function.prototype, "toString");
+  if (toStringDescriptor && toStringDescriptor.configurable) {
+    const replacement = {
+      toString() {
+        return sources.get(this) ?? nativeApply(nativeToString, this, []);
+      },
+    }.toString;
+    nativeDefine(replacement, "name", { configurable: true, value: nativeToString.name });
+    nativeDefine(replacement, "length", { configurable: true, value: nativeToString.length });
+    sources.set(replacement, nativeApply(nativeToString, nativeToString, []));
+    nativeDefine(Function.prototype, "toString", { ...toStringDescriptor, value: replacement });
+    wrapped.push({
+      target: Function.prototype,
+      key: "toString",
+      descriptor: toStringDescriptor,
+      replacement,
+    });
+  }
+  wrap(
+    scope.Performance && Performance.prototype,
+    "getEntries",
+    "timing",
+    "timing.performance.getEntries",
+  );
+  wrap(
+    scope.Performance && Performance.prototype,
+    "getEntriesByType",
+    "timing",
+    "timing.performance.getEntriesByType",
+  );
+  wrap(
+    scope.OffscreenCanvas && OffscreenCanvas.prototype,
+    "getContext",
+    "canvas",
+    "offscreenCanvas.getContext",
+  );
+  wrap(
+    scope.OffscreenCanvas && OffscreenCanvas.prototype,
+    "convertToBlob",
+    "canvas",
+    "offscreenCanvas.convertToBlob",
+  );
+  wrap(scope.RTCRtpSender, "getCapabilities", "webrtc", "webrtc.RTCRtpSender.getCapabilities");
+  wrap(scope.RTCRtpReceiver, "getCapabilities", "webrtc", "webrtc.RTCRtpReceiver.getCapabilities");
+  const controller = function drain() {
+    const reads = [...records.values()];
+    records.clear();
+    const saturated = dropped;
+    dropped = 0;
+    return { generation: options.generation, reads, dropped: saturated };
+  };
+  controller.stop = () => {
+    if (!active) return;
+    active = false;
+    records.clear();
+    dropped = 0;
+    for (let index = wrapped.length - 1; index >= 0; index -= 1) {
+      const entry = wrapped[index];
+      const current = nativeDescriptor(entry.target, entry.key);
+      if (current?.value === entry.replacement) {
+        nativeDefine(entry.target, entry.key, entry.descriptor);
+      }
+    }
+    wrapped.length = 0;
+  };
+  return controller;
+}
+
+export function buildIsolatedFingerprintScript({
+  bootstrapEvent,
+  controllerKey,
+  stopEvent = "__sand_fp_stop",
+}) {
+  return `(${isolatedDocumentInstaller.toString()})(${JSON.stringify({
+    bootstrapEvent,
+    controllerKey,
+    stopEvent,
+  })})`;
+}
+
+export function buildMainFingerprintScript({
+  hosts,
+  bootstrapEvent,
+  stopEvent = "__sand_fp_stop",
+  sampledBps = FINGERPRINT_SAMPLE_BPS,
+  documentCap = FINGERPRINT_DOCUMENT_UNIQUE_CAP,
+}) {
+  return `(${mainDocumentInstaller.toString()})(${JSON.stringify({
+    hosts,
+    bootstrapEvent,
+    stopEvent,
+    sampledBps,
+    documentCap,
+  })})`;
+}
+
+export function buildWorkerFingerprintScript({
+  site,
+  generation,
+  documentCap = FINGERPRINT_DOCUMENT_UNIQUE_CAP,
+}) {
+  return `(${workerInstaller.toString()})(${JSON.stringify({ site, generation, documentCap })})`;
+}
+
+function randomToken(bytes = 16) {
+  return randomBytes(bytes).toString("hex");
+}
+
+function hostFromUrl(raw) {
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol === "https:" || parsed.protocol === "http:") {
+      return parsed.hostname.toLowerCase();
+    }
+    if (parsed.protocol === "blob:") return hostFromUrl(parsed.pathname);
+    return "";
+  } catch {
+    return "";
+  }
+}
+
+function listedSite(host, hosts) {
+  return hosts.find((wanted) => host === wanted || host.endsWith(`.${wanted}`)) ?? "";
+}
+
+function validReadRecord(record) {
+  return (
+    record != null &&
+    typeof record === "object" &&
+    typeof record.site === "string" &&
+    record.site.length > 0 &&
+    record.site.length <= MAX_HOST_LENGTH &&
+    isSafeScriptUrl(record.scriptUrl) &&
+    VENDORS.has(record.vendor) &&
+    SURFACES.has(record.surface) &&
+    typeof record.api === "string" &&
+    record.api.length > 0 &&
+    record.api.length <= 96 &&
+    isSafeArgsSummary(record.argsSummary) &&
+    (record.valueSummary === undefined || VALUE_SUMMARIES.has(record.valueSummary)) &&
+    Number.isInteger(record.reads) &&
+    record.reads >= 1 &&
+    record.reads <= MAX_READS
+  );
+}
+
+function boundedBatch(value) {
+  if (value == null || typeof value !== "object" || !Array.isArray(value.reads)) return null;
+  if (value.reads.length > MAX_BATCH_RECORDS) return null;
+  const encoded = JSON.stringify(value);
+  if (Buffer.byteLength(encoded, "utf8") > MAX_BATCH_BYTES) return null;
+  const reads = value.reads.filter(validReadRecord);
+  const dropped =
+    Number.isInteger(value.dropped) && value.dropped > 0 ? Math.min(value.dropped, MAX_READS) : 0;
+  return { reads, dropped };
+}
+
+export function fingerprintReadLine({ read, windowIndex, sampledBps = FINGERPRINT_SAMPLE_BPS }) {
+  const event = {
+    kind: "fingerprint_read",
+    record: "read",
+    site: read.site,
+    vendor: VENDORS.has(read.vendor)
+      ? read.vendor
+      : classifyFingerprintVendor(read.scriptUrl, read.site),
+    surface: read.surface,
+    api: read.api,
+    argsSummary: read.argsSummary,
+    windowIndex,
+    reads: read.reads,
+    sampledBps,
+  };
+  if (VALUE_SUMMARIES.has(read.valueSummary)) event.valueSummary = read.valueSummary;
+  return event;
+}
+
+export function fingerprintDroppedLine({
+  site,
+  windowIndex,
+  reason,
+  dropped,
+  sampledBps = FINGERPRINT_SAMPLE_BPS,
+}) {
+  if (!DROP_REASONS.has(reason)) throw new TypeError(`unknown fingerprint drop reason ${reason}`);
+  return {
+    kind: "fingerprint_read",
+    record: "dropped",
+    site,
+    windowIndex,
+    reason,
+    dropped: Math.max(1, Math.min(MAX_READS, dropped)),
+    sampledBps,
+  };
+}
+
+export function appendFingerprintTelemetry(
+  event,
+  {
+    telemetryPath = process.env.SAND_BOX_TELEMETRY_LOG ?? "/tmp/sand-box-telemetry.log",
+    append = appendFileSync,
+  } = {},
+) {
+  const line = `${JSON.stringify(event)}\n`;
+  if (Buffer.byteLength(line, "utf8") > 4 * 1024) {
+    throw new RangeError("fingerprint telemetry line exceeded its byte bound");
+  }
+  append(telemetryPath, line, "utf8");
+}
+
+async function installDocumentTarget(browser, state, config) {
+  const isolated = buildIsolatedFingerprintScript(state);
+  const main = buildMainFingerprintScript({
+    hosts: config.hosts,
+    bootstrapEvent: state.bootstrapEvent,
+    stopEvent: state.stopEvent,
+  });
+  await browser.send("Page.enable", {}, state.sessionId);
+  const isolatedScript = await browser.send(
+    "Page.addScriptToEvaluateOnNewDocument",
+    { source: isolated, worldName: state.worldName },
+    state.sessionId,
+  );
+  const mainScript = await browser.send(
+    "Page.addScriptToEvaluateOnNewDocument",
+    { source: main },
+    state.sessionId,
+  );
+  state.documentScriptIdentifiers = [isolatedScript?.identifier, mainScript?.identifier].filter(
+    (identifier) => typeof identifier === "string",
+  );
+  const tree = await browser.send("Page.getFrameTree", {}, state.sessionId);
+  const frameId = tree?.frameTree?.frame?.id;
+  if (typeof frameId !== "string") return;
+  const world = await browser.send(
+    "Page.createIsolatedWorld",
+    { frameId, worldName: state.worldName, grantUniveralAccess: false },
+    state.sessionId,
+  );
+  if (Number.isInteger(world?.executionContextId)) {
+    await browser.send(
+      "Runtime.evaluate",
+      { expression: isolated, contextId: world.executionContextId },
+      state.sessionId,
+    );
+  }
+  await browser.send("Runtime.evaluate", { expression: main }, state.sessionId);
+}
+
+async function installWorkerTarget(browser, state) {
+  const installed = await browser.send(
+    "Runtime.evaluate",
+    {
+      expression: buildWorkerFingerprintScript({
+        site: state.site,
+        generation: state.generation,
+      }),
+    },
+    state.sessionId,
+  );
+  const objectId = installed?.result?.objectId;
+  if (typeof objectId === "string") state.controllerObjectId = objectId;
+}
+
+async function currentTargetHost(browser, sessionId) {
+  const result = await browser.send(
+    "Runtime.evaluate",
+    {
+      expression: "String(globalThis.location?.hostname ?? '').toLowerCase()",
+      returnByValue: true,
+    },
+    sessionId,
+  );
+  return typeof result?.result?.value === "string" ? result.result.value : "";
+}
+
+async function documentControllerObjectId(browser, state) {
+  const tree = await browser.send("Page.getFrameTree", {}, state.sessionId);
+  const frameId = tree?.frameTree?.frame?.id;
+  if (typeof frameId !== "string") return null;
+  const world = await browser.send(
+    "Page.createIsolatedWorld",
+    { frameId, worldName: state.worldName, grantUniveralAccess: false },
+    state.sessionId,
+  );
+  if (!Number.isInteger(world?.executionContextId)) return null;
+  const controller = await browser.send(
+    "Runtime.evaluate",
+    {
+      expression: `globalThis[${JSON.stringify(state.controllerKey)}]`,
+      contextId: world.executionContextId,
+    },
+    state.sessionId,
+  );
+  return typeof controller?.result?.objectId === "string" ? controller.result.objectId : null;
+}
+
+async function drainObject(browser, state, objectId) {
+  const result = await browser.send(
+    "Runtime.callFunctionOn",
+    {
+      objectId,
+      functionDeclaration:
+        state.type === "worker" ? "function(){return this();}" : "function(){return this.drain();}",
+      returnByValue: true,
+    },
+    state.sessionId,
+  );
+  return result?.result?.value;
+}
+
+async function stopTarget(browser, state) {
+  const removals =
+    state.type === "page"
+      ? state.documentScriptIdentifiers.map((identifier) =>
+          browser.send("Page.removeScriptToEvaluateOnNewDocument", { identifier }, state.sessionId),
+        )
+      : [];
+  let objectId = state.type === "worker" ? state.controllerObjectId : null;
+  if (state.type === "page") {
+    const [controller] = await Promise.allSettled([documentControllerObjectId(browser, state)]);
+    if (controller.status === "fulfilled") objectId = controller.value;
+  }
+  const stop =
+    typeof objectId === "string"
+      ? browser.send(
+          "Runtime.callFunctionOn",
+          {
+            objectId,
+            functionDeclaration: "function(){return this.stop();}",
+            returnByValue: true,
+          },
+          state.sessionId,
+        )
+      : null;
+  await Promise.allSettled([...removals, stop]);
+}
+
+export function createFingerprintReadLogger({
+  browser,
+  config,
+  cdpPortBase,
+  append = appendFingerprintTelemetry,
+  now = Date.now,
+  token = randomToken,
+} = {}) {
+  const windowIndex = windowIndexFromCdpPort(browser?.port, cdpPortBase);
+  if (windowIndex == null || config == null || config.hosts.length === 0) return null;
+  const targets = new Map();
+  const targetsById = new Map();
+  const rate = { startedAt: now(), emitted: 0 };
+  let active = true;
+  let ticking = false;
+  let nextDrainAt = now() + FINGERPRINT_DRAIN_INTERVAL_MS;
+
+  const emit = (event) => {
+    if (active) append(event);
+  };
+  const resetRate = () => {
+    if (now() - rate.startedAt >= 60_000) {
+      rate.startedAt = now();
+      rate.emitted = 0;
+    }
+  };
+  const emitRows = (state, rows, batchDropped) => {
+    resetRate();
+    const acceptedRows = rows.filter(
+      (row) => config.hosts.includes(row.site) && (state.site === "" || row.site === state.site),
+    );
+    const site = state.site || acceptedRows[0]?.site;
+    if (site == null) return;
+    const remaining = FINGERPRINT_BROWSER_MINUTE_CAP - rate.emitted;
+    if (remaining <= 0) return;
+    const overflow = Math.max(0, acceptedRows.length + (batchDropped > 0 ? 1 : 0) - remaining);
+    const reserveDrop =
+      batchDropped > 0 || overflow > 0 || (remaining === 1 && acceptedRows.length > 0);
+    const readSlots = Math.max(0, remaining - (reserveDrop ? 1 : 0));
+    for (const read of acceptedRows.slice(0, readSlots)) {
+      emit(fingerprintReadLine({ read, windowIndex }));
+      rate.emitted += 1;
+    }
+    const omitted = batchDropped + Math.max(0, acceptedRows.length - readSlots);
+    if (omitted > 0 && rate.emitted < FINGERPRINT_BROWSER_MINUTE_CAP) {
+      emit(
+        fingerprintDroppedLine({
+          site,
+          windowIndex,
+          reason: batchDropped > 0 && overflow === 0 ? "document_cap" : "browser_rate_cap",
+          dropped: omitted,
+        }),
+      );
+      rate.emitted += 1;
+    }
+  };
+
+  const drain = async (state) => {
+    if (!active || state.draining || !targets.has(state.sessionId)) return;
+    state.draining = true;
+    try {
+      const objectId =
+        state.type === "worker"
+          ? state.controllerObjectId
+          : await documentControllerObjectId(browser, state);
+      if (typeof objectId !== "string") return;
+      const batch = boundedBatch(await drainObject(browser, state, objectId));
+      if (batch != null) emitRows(state, batch.reads, batch.dropped);
+    } finally {
+      state.draining = false;
+    }
+  };
+
+  return {
+    config,
+    windowIndex,
+    targets,
+    async prepare({ sessionId, parentSessionId, target }) {
+      if (!active) return false;
+      if (targets.has(sessionId)) return true;
+      const type = target?.type;
+      if (!["page", "worker"].includes(type)) return false;
+      const parent = typeof parentSessionId === "string" ? targets.get(parentSessionId) : null;
+      const ownHost = hostFromUrl(target?.url);
+      let site = "";
+      if (type === "worker") {
+        let workerHost = ownHost;
+        if (workerHost === "" && parent != null) {
+          workerHost = await currentTargetHost(browser, parent.sessionId);
+        }
+        site = listedSite(workerHost, config.hosts);
+      }
+      if (type === "worker" && site === "") return false;
+      const state = {
+        sessionId,
+        targetId: target?.targetId,
+        type,
+        site,
+        bootstrapEvent: `__sand_fp_boot_${token()}`,
+        controllerKey: `__sand_fp_buffer_${token()}`,
+        worldName: `__sand_fp_world_${token()}`,
+        generation: token(),
+        stopEvent: `__sand_fp_stop_${token()}`,
+        controllerObjectId: null,
+        documentScriptIdentifiers: [],
+        draining: false,
+      };
+      targets.set(sessionId, state);
+      if (typeof state.targetId === "string") targetsById.set(state.targetId, state);
+      try {
+        if (type === "worker") await installWorkerTarget(browser, state);
+        else await installDocumentTarget(browser, state, config);
+        if (!active) {
+          await stopTarget(browser, state);
+          return false;
+        }
+      } catch (error) {
+        targets.delete(sessionId);
+        if (typeof state.targetId === "string") targetsById.delete(state.targetId);
+        throw error;
+      }
+      return true;
+    },
+    detach(sessionId) {
+      const state = targets.get(sessionId);
+      if (state == null) return;
+      targets.delete(sessionId);
+      if (typeof state.targetId === "string") targetsById.delete(state.targetId);
+    },
+    async targetDestroyed(targetId) {
+      if (!active) return;
+      const state = targetsById.get(targetId);
+      if (state != null) await drain(state);
+    },
+    async tick() {
+      if (!active || ticking || now() < nextDrainAt) return;
+      ticking = true;
+      nextDrainAt = now() + FINGERPRINT_DRAIN_INTERVAL_MS;
+      try {
+        for (const state of targets.values()) await drain(state);
+      } finally {
+        ticking = false;
+      }
+    },
+    async stop() {
+      if (!active) return;
+      active = false;
+      const stopping = [...targets.values()].map((state) => stopTarget(browser, state));
+      targets.clear();
+      targetsById.clear();
+      await Promise.allSettled(stopping);
+    },
+  };
+}
