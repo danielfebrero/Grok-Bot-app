@@ -1,0 +1,1001 @@
+/**
+ * Standalone pptxgenjs rebuild of "Business Report - From Insight to Impact".
+ * 31 slides, 13.333 x 7.5 in.  Run with:  node <this file>
+ * Photographs in the original deck are drawn here as flat placeholder blocks.
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+// ---------------------------------------------------------------- palette --
+const DARK = '0F2B26';   // accent1 - deep forest green
+const GREEN = '22804D';  // accent2
+const BLUE = '293B87';   // accent3
+const SAND = 'CCB785';   // accent4
+const GOLD = 'B49B57';   // accent5
+const PALE = 'D5D2BC';   // accent6
+const W = 'FFFFFF';
+const K = '000000';
+const INK = '262626';
+const INK2 = '363432';
+const GRAY = '404040';
+const GRAY2 = '595959';
+const GRAY3 = '808080';
+const GRAY4 = 'BFBFBF';
+const LINE = 'D9D9D9';
+const LT2 = 'E7E6E6';
+const OFFW = 'F2F2F2';
+const CREAM = 'F0EBDD';
+const MINT = '5AD391';
+const TEAL = '3EB19C';
+const GREEN2 = '1A603A';
+const BLUE2 = '657AD0';
+const SAND2 = 'E0D4B6';
+const SAND3 = 'D2C39A';
+const PHOTO = 'DFE1E0';  // stand-in tone for the deck's photographs
+
+const MJ = 'Outfit Bold';   // theme major font
+const MN = 'Outfit';        // theme minor font
+const RECT = 'rect';
+const SHD = { type: 'outer', color: K, opacity: 0.12, blur: 24, offset: 6, angle: 45 };
+
+const QTRS = ['1st Qtr', '2nd Qtr', '3rd Qtr', '4th Qtr'];
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'];
+
+// --------------------------------------------------------------- helpers ---
+/** Map the compact run/paragraph keys used in the slide builders to pptxgenjs options. */
+function runOpts(o) {
+  if (!o) return {};
+  const r = {};
+  if (o.sz !== undefined) r.fontSize = o.sz;
+  if (o.col !== undefined) r.color = o.col;
+  if (o.ff !== undefined) r.fontFace = o.ff;
+  if (o.b) r.bold = true;
+  if (o.i) r.italic = true;
+  if (o.u) r.underline = { style: 'sng' };
+  if (o.cs !== undefined) r.charSpacing = o.cs;
+  if (o.al !== undefined) r.align = o.al;
+  if (o.ls !== undefined) r.lineSpacingMultiple = o.ls;
+  if (o.sb !== undefined) r.paraSpaceBefore = o.sb;
+  if (o.sa !== undefined) r.paraSpaceAfter = o.sa;
+  if (o.bu !== undefined) r.bullet = { characterCode: o.bu.codePointAt(0).toString(16).padStart(4, '0') };
+  if (o.p) r.breakLine = true;
+  if (o.br) { r.breakLine = true; }
+  return r;
+}
+
+/** Shape-level options shared by tx() and sh(). */
+function boxOpts(x, y, w, h, o) {
+  const r = { x, y, w, h };
+  if (!o) return r;
+  if (o.fill !== undefined) r.fill = typeof o.fill === 'string' ? { color: o.fill } : o.fill;
+  if (o.line !== undefined) r.line = o.line;
+  if (o.rotate !== undefined) r.rotate = o.rotate;
+  if (o.flipH) r.flipH = true;
+  if (o.flipV) r.flipV = true;
+  if (o.shadow !== undefined) r.shadow = o.shadow;
+  if (o.rectRadius !== undefined) r.rectRadius = o.rectRadius;
+  if (o.angleRange !== undefined) r.angleRange = o.angleRange;
+  return r;
+}
+
+/** Plain shape. */
+function sh(slide, shape, x, y, w, h, o) {
+  slide.addShape(shape, boxOpts(x, y, w, h, o));
+}
+
+/** Text box; o.shape swaps the rectangular frame for a preset geometry. */
+function tx(slide, body, x, y, w, h, o) {
+  o = o || {};
+  const opts = boxOpts(x, y, w, h, o);
+  opts.fontSize = o.sz !== undefined ? o.sz : 18;
+  opts.fontFace = o.ff !== undefined ? o.ff : MN;
+  opts.color = o.col !== undefined ? o.col : K;
+  if (o.b) opts.bold = true;
+  if (o.i) opts.italic = true;
+  if (o.u) opts.underline = { style: 'sng' };
+  if (o.cs !== undefined) opts.charSpacing = o.cs;
+  if (o.al !== undefined) opts.align = o.al;
+  opts.valign = o.va !== undefined ? o.va : 'top';
+  if (o.ls !== undefined) opts.lineSpacingMultiple = o.ls;
+  if (o.sb !== undefined) opts.paraSpaceBefore = o.sb;
+  if (o.sa !== undefined) opts.paraSpaceAfter = o.sa;
+  if (o.bu !== undefined) opts.bullet = { characterCode: o.bu.codePointAt(0).toString(16).padStart(4, '0') };
+  else opts.bullet = false;
+  opts.margin = o.m !== undefined ? o.m : [0.1, 0.1, 0.05, 0.05];
+  if (o.wrap === false) opts.wrap = false;
+  if (o.shape) opts.shape = o.shape;
+  const runs = typeof body === 'string'
+    ? body
+    : body.map(r => (r.br ? { text: '', options: { breakLine: true } }
+                          : { text: r[0], options: runOpts(r[1]) }));
+  slide.addText(runs, opts);
+}
+
+/** Stand-in for a photograph: a flat block, captioned when it is large enough. */
+function img(slide, x, y, w, h, o) {
+  o = o || {};
+  const opts = { x, y, w, h, fill: { color: PHOTO }, line: { type: 'none' } };
+  if (o.rotate !== undefined) opts.rotate = o.rotate;
+  if (o.r !== undefined) opts.rectRadius = o.r;
+  slide.addShape(o.r !== undefined ? 'roundRect' : RECT, opts);
+  if (!o.tiny) {
+    tx(slide, '[image]', x, y + h / 2 - 0.18, w, 0.36,
+      { sz: 11, col: GRAY3, ff: MN, al: 'center', va: 'middle' });
+  }
+}
+
+/** Every slide but the title carries the same page furniture. */
+function footer(slide, n) {
+  tx(slide, 'Detailed Business Report', 0.583, 7.012, 3.858, 0.263, { sz: 9.6, col: GRAY4, ff: MN });
+  tx(slide, String(n), 12.055, 7.012, 0.766, 0.303, { sz: 12, col: GRAY4, ff: MN, al: 'right' });
+  sh(slide, 'line', 11.724, 7.167, 0.804, 0, { line: { color: GRAY4, width: 0.75 } });
+}
+
+/**
+ * Freeform outline. `pts` holds unit-square coordinates: [x, y] for a corner,
+ * ['c', x1, y1, x2, y2, x, y] for a cubic segment. Scaled into the given box.
+ */
+function poly(slide, x, y, w, h, pts, opt) {
+  opt = opt || {};
+  const pt = (a, b) => ({ x: a * w, y: b * h });
+  const points = pts.map((p, i) => (p[0] === 'c'
+    ? { curve: { type: 'cubic', x1: p[1] * w, y1: p[2] * h, x2: p[3] * w, y2: p[4] * h }, x: p[5] * w, y: p[6] * h }
+    : Object.assign(pt(p[0], p[1]), i === 0 ? { moveTo: true } : {})));
+  points.push({ close: true });
+  slide.addShape('custGeom', {
+    x, y, w, h, points,
+    fill: opt.fill ? { color: opt.fill } : { type: 'none' },
+    line: opt.line || { type: 'none' },
+    rotate: opt.rotate, flipH: opt.flipH,
+  });
+}
+
+// Reusable outlines, lifted from the original artwork (unit square).
+const SWOOSH = [[1, 0], [1, 1], [0, 1], ['c', .061, .271, .75, .753, 1, 0]];
+const BLOB = [[1, 1], [.878, 1], [.721, 1], [.598, 1], [.589, .991],
+  ['c', .569, .97, .55, .946, .533, .919], ['c', .439, .69, .573, .518, .45, .347],
+  ['c', .327, .176, -.018, .403, .001, 0], [.123, 0], [.878, 0], [1, 0]];
+const BUBBLE = [[0, .135], ['c', 0, .06, .03, 0, .068, 0], [.932, 0],
+  ['c', .97, 0, 1, .06, 1, .135], [1, .673], ['c', 1, .747, .97, .807, .932, .807],
+  [.309, .819], [.14, 1], ['c', .14, .937, .139, .874, .139, .81],
+  ['c', .106, .807, .101, .807, .068, .807], ['c', .03, .807, 0, .747, 0, .673]];
+const CONE_WIDE = [[.167, .923], ['c', .387, 1.026, .613, 1.026, .833, .923],
+  [1, 0], ['c', .62, .118, .38, .118, .144, .045], [0, 0]];
+const CONE_MID = [[.25, .925], ['c', .41, 1.025, .59, 1.025, .75, .925],
+  [1, 0], ['c', .67, .103, .33, .103, 0, 0], [0, 0]];
+const CONE_TIP = [[0, 0], [.5, 1], [1, 0], ['c', .983, .005, 1.04, .002, .873, .002], [0, 0]];
+// Isometric plate: the diamond top face and the slab of its side wall.
+const PLATE_TOP = [[.463, .985], [.039, .607], ['c', -.013, .56, -.013, .44, .039, .393],
+  [.463, .015], ['c', .486, -.005, .514, -.005, .537, .015], [.961, .393],
+  ['c', 1.013, .44, 1.013, .56, .961, .607], [.537, .985], ['c', .514, 1.005, .486, 1.005, .463, .985]];
+const PLATE_SIDE = [[.961, .06], [.537, .721], ['c', .514, .756, .486, .756, .463, .721],
+  [.039, .06], ['c', .029, .044, .021, .024, .015, 0], ['c', -.011, .098, -.003, .247, .039, .312],
+  [.463, .973], ['c', .486, 1.009, .514, 1.009, .537, .973], [.961, .312],
+  ['c', 1.003, .247, 1.011, .098, .985, 0], ['c', .979, .024, .971, .044, .961, .06]];
+
+/** Rounded speech balloon with a tail in one of the bottom corners. */
+function balloon(slide, x, y, w, h, flip) {
+  poly(slide, x, y, w, h, BUBBLE, { fill: W, line: { color: LINE, width: 0.75 }, flipH: flip });
+}
+
+/** One tier of the slide-31 funnel: elliptical cap over a tapering body. */
+function cone(slide, x, y, w, h, shape, body, cap, capH) {
+  sh(slide, 'ellipse', x, y, w, capH, { fill: cap });
+  poly(slide, x, y + capH / 2, w, h, shape, { fill: body });
+}
+
+/** Shared styling for the two stacked line charts on slide 5. */
+function lineChartOpts(chartColors) {
+  return {
+    chartColors, lineSize: 2.25, lineSmooth: false, lineDataSymbol: 'none',
+    showLegend: true, legendPos: 'b', legendFontSize: 8, legendFontFace: MN,
+    showValue: false, catAxisLabelFontSize: 8, catAxisLabelFontFace: MN,
+    valAxisLabelFontSize: 8, valAxisLabelFontFace: MN,
+    valGridLine: { color: LINE, size: 0.5 }, catGridLine: { style: 'none' },
+    valAxisLineShow: false, catAxisLineShow: true,
+  };
+}
+
+
+// ---------------------------------------------------------------- slide 1 --
+/** Slide 1 - BUSINESS */
+function slide01(s) {
+  poly(s, 11.333, 0, 2, 1.317, SWOOSH, { fill: DARK, rotate: 180 });
+  tx(s,'BUSINESS ',.508,2.289,12.317,2.423,{sz:138,col:W,b:1,ff:MJ,cs:-3,va:'middle',al:'center'});
+  tx(s,'FROM INSIGHT TO IMPACT',1.635,1.969,10.063,.64,{sz:32,col:W,ff:MN,al:'center'});
+  tx(s,'PRESENTATION TEMPLATE',3.508,5.535,6.317,.404,{col:W,ff:MN,al:'center'});
+  sh(s,'roundRect',6.983,4.522,4.092,.739,{fill:GOLD,rectRadius:.369});
+  tx(s,'REPORT',7.367,4.608,3.324,.646,{sz:36,col:W,b:1,ff:MJ,cs:.3,al:'center',ls:.9,sb:10});
+  sh(s,'line',1.89,4.892,5.093,0,{line:{color:GRAY4,width:2.1}});
+}
+
+// ---------------------------------------------------------------- slide 2 --
+/** Slide 2 - Objectives */
+function slide02(s) {
+  sh(s,'round2SameRect',6.918,0,6.416,6.827,{rotate:180,fill:DARK,angleRange:[.088,0]});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit Aenean',7.738,3.031,4.088,.522,{sz:12.5,col:OFFW,ff:MJ});
+  sh(s,'ellipse',7.437,3.045,.299,.299,{fill:{color:CREAM,transparency:70}});
+  sh(s,'ellipse',7.478,3.086,.216,.216,{fill:CREAM});
+  sh(s,RECT,7.528,3.154,.116,.08,{fill:K});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit Aenean',7.738,4.387,3.895,.522,{sz:12.5,col:OFFW,ff:MJ});
+  sh(s,'ellipse',7.437,4.387,.299,.299,{fill:{color:CREAM,transparency:70}});
+  sh(s,'ellipse',7.478,4.429,.216,.216,{fill:CREAM});
+  sh(s,RECT,7.528,4.497,.116,.08,{fill:K});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit Aenean',7.738,5.532,4.316,.522,{sz:12.5,col:OFFW,ff:MJ});
+  sh(s,'ellipse',7.437,5.547,.299,.299,{fill:{color:CREAM,transparency:70}});
+  sh(s,'ellipse',7.478,5.589,.216,.216,{fill:CREAM});
+  sh(s,RECT,7.528,5.657,.116,.08,{fill:K});
+  sh(s,'line',1.443,2.806,0,3.429,{line:{color:LINE,dashType:'lgDash'}});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit Aenean',2.048,2.184,3.986,.64,{sz:16,col:GRAY2,ff:MN});
+  sh(s,'roundRect',1.141,2.201,.605,.605,{shadow:SHD,fill:DARK,rectRadius:.101});
+  tx(s,'01',1.052,2.3,.783,.407,{sz:20,col:W,b:1,ff:MJ,al:'center',ls:.9,sb:10});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit Aenean',2.048,3.356,3.986,.64,{sz:16,col:GRAY2,ff:MN});
+  sh(s,'roundRect',1.141,3.356,.605,.605,{shadow:SHD,fill:DARK,rectRadius:.101});
+  tx(s,'02',1.052,3.455,.783,.407,{sz:20,col:W,b:1,ff:MJ,al:'center',ls:.9,sb:10});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit Aenean',2.048,4.493,3.986,.64,{sz:16,col:GRAY2,ff:MN});
+  sh(s,'roundRect',1.141,4.493,.605,.605,{shadow:SHD,fill:DARK,rectRadius:.101});
+  tx(s,'03',1.052,4.592,.783,.407,{sz:20,col:W,b:1,ff:MJ,al:'center',ls:.9,sb:10});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit Aenean',2.048,5.63,3.986,.64,{sz:16,col:GRAY2,ff:MN});
+  sh(s,'roundRect',1.141,5.63,.605,.605,{shadow:SHD,fill:DARK,rectRadius:.101});
+  tx(s,'04',1.052,5.729,.783,.407,{sz:20,col:W,b:1,ff:MJ,al:'center',ls:.9,sb:10});
+  sh(s,'roundRect',6.386,1.681,2.912,.739,{fill:GOLD,rectRadius:.369});
+  tx(s,'Objectives',6.659,1.816,2.366,.468,{sz:24,col:W,b:1,ff:MJ,cs:.3,al:'center',ls:.9,sb:10});
+  sh(s,'line',7.538,4.075,4.41,0,{flipH:true,line:{color:'B6D9FF',width:.25}});
+  sh(s,'line',7.538,5.22,4.41,0,{flipH:true,line:{color:'B6D9FF',width:.25}});
+}
+
+// ---------------------------------------------------------------- slide 3 --
+/** Slide 3 - Detailed Reporting for Growth */
+function slide03(s) {
+  poly(s, 7.065, 0, 6.268, 4.126, SWOOSH, { fill: DARK, rotate: 180 });
+  tx(s,'Detailed Reporting for Growth',1.125,.88,4.525,2.282,{sz:48,col:INK,b:1,ff:MJ,ls:.9,sb:10});
+  tx(s,[['Detailed Report',{col:DARK,b:1,i:1,ff:MJ}],['  ',{col:GRAY2,i:1,ff:MN}],['Lorem ipsum dolor sit amet, consectetuer adipiscing elit Aenean ElitLorem ipsum dolor sit amet, consectetuer adipiscing ',{col:GRAY2,ff:MN}]],1.125,4.946,3.986,1.469,{sz:16,ls:1.3,sa:6});
+  sh(s,'roundRect',1.188,4.168,.605,.605,{shadow:SHD,fill:DARK,rectRadius:.101});
+  img(s,1.301,4.281,.379,.379,{tiny:1});
+  img(s, 6.181, 1.118, 5.263, 5.263);
+  balloon(s, 5.883, 0.722, 3.073, 1.554, true);
+  tx(s, [['It\'s delivered through ', { col: '3F3F3F' }], ['actions, decisions, and the ability', { col: DARK }], [' to rally others.', { col: '3F3F3F' }]],
+    6.143, 0.88, 2.553, 0.878, { sz: 14, ff: MN, va: 'middle', al: 'center', ls: 1.1 });
+  balloon(s, 9.554, 5.004, 3.073, 1.554, false);
+  tx(s, [['It\'s about making a ', { col: '3F3F3F' }], ['difference, regardless ', { col: DARK }], ['of your role. ', { col: '3F3F3F' }]],
+    9.814, 5.477, 2.553, 0.878, { sz: 14, ff: MN, va: 'middle', al: 'center', ls: 1.1 });
+}
+
+// ---------------------------------------------------------------- slide 4 --
+/** Slide 4 - Breaking Down the Numbers. Uncovering the Trends. */
+function slide04(s) {
+  tx(s,'Breaking Down the Numbers. Uncovering the Trends.',1.002,.965,10.565,1.555,{sz:48,col:INK,ff:MJ,ls:.9});
+  sh(s,'ellipse',1.337,3.38,1.456,1.456,{line:{color:LT2,width:9}});
+  sh(s,'arc',1.337,3.38,1.456,1.456,{line:{color:DARK,width:9},angleRange:[270,56.016]});
+  tx(s,'+60',1.59,3.735,.901,.662,{sz:28,col:DARK,b:1,ff:MN,va:'middle',al:'center',ls:1.3});
+  sh(s,'ellipse',3.531,3.38,1.456,1.456,{line:{color:LT2,width:9}});
+  sh(s,'arc',3.531,3.38,1.456,1.456,{line:{color:SAND,width:9},angleRange:[270,151.942]});
+  tx(s,'189',3.766,3.735,.901,.662,{sz:28,col:SAND,b:1,ff:MN,va:'middle',al:'center',ls:1.3});
+  sh(s,'ellipse',5.711,3.38,1.456,1.456,{line:{color:LT2,width:9}});
+  sh(s,'arc',5.711,3.38,1.456,1.456,{line:{color:'AEA97E',width:9},angleRange:[270,105.429]});
+  tx(s,'550',5.963,3.735,.901,.662,{sz:28,col:'7B764D',b:1,ff:MN,va:'middle',al:'center',ls:1.3});
+  tx(s,'Lorem ipsum dolor sit amet,',1.178,5.191,1.724,.602,{sz:12,col:GRAY,ff:MN,al:'center',ls:1.3});
+  tx(s,'Lorem ipsum dolor sit amet,',3.396,5.191,1.724,.602,{sz:12,col:GRAY,ff:MN,al:'center',ls:1.3});
+  tx(s,'Lorem ipsum dolor sit amet,',5.577,5.191,1.724,.602,{sz:12,col:GRAY,ff:MN,al:'center',ls:1.3});
+  tx(s,'c',8.143,3.078,3.88,1.372,{col:K,ff:MN,va:'middle',al:'center',shadow:SHD,fill:W});
+  tx(s,'Lorem ipsum dolor sit',8.709,3.382,2.348,.368,{sz:14,col:GRAY,ff:MN,al:'right',ls:1.2});
+  sh(s,RECT,8.525,3.493,.15,.15,{fill:DARK});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer',8.457,3.768,3.88,.34,{sz:12,col:GRAY,ff:MN,ls:1.3});
+  tx(s,'c',8.143,4.836,3.88,1.372,{col:K,ff:MN,va:'middle',al:'center',shadow:SHD,fill:W});
+  tx(s,'Lorem ipsum dolor sit',8.709,5.14,2.348,.368,{sz:14,col:GRAY,ff:MN,al:'right',ls:1.2});
+  sh(s,RECT,8.525,5.251,.15,.15,{fill:'7B764D'});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer',8.457,5.527,3.88,.34,{sz:12,col:GRAY,ff:MN,ls:1.3});
+}
+
+// ---------------------------------------------------------------- slide 5 --
+/** Slide 5 - Breaking Down the Numbers */
+function slide05(s) {
+  tx(s,[['Breaking Down '],{br:1},['the Numbers']],.97,1.569,6.796,1.555,{sz:48,col:INK,ff:MJ,ls:.9});
+  sh(s,'roundRect',-.3,3.633,6.967,2.298,{shadow:SHD,fill:DARK,rectRadius:.383});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum',1.296,4.819,5.032,.602,{sz:12,col:W,ff:MN,ls:1.3});
+  tx(s,'Comprehensive Insights',2.857,4.207,3.47,.502,{sz:20,col:W,ff:MN,ls:1.3});
+  tx(s,'48.00+',1.296,4.172,1.561,.572,{sz:28,col:W,b:1,ff:MN});
+  const cats = ['Category 1', 'Category 2', 'Category 3', 'Category 4'];
+  const rows = [[4.3, 2.5, 3.5, 4.5], [2.4, 4.4, 1.8, 2.8], [2, 2, 3, 5]];
+  const series = rows.map((values, i) => ({ name: 'Series ' + (i + 1), labels: cats, values }));
+  [[GREEN, SAND, PALE], [DARK, BLUE, GOLD]].forEach((colors, i) =>
+    s.addChart('line', series, Object.assign(lineChartOpts(colors), { x: 7.063, y: 0.955 + i * 2.831, w: 5.412, h: 2.795 })));
+}
+
+// ---------------------------------------------------------------- slide 6 --
+/** Slide 6 - Business Data */
+function slide06(s) {
+  sh(s,'line',7.085,6.193,5.157,0,{flipH:true,line:{color:BLUE}});
+  sh(s,'line',7.085,2.378,0,3.815,{flipH:true,line:{color:BLUE}});
+  tx(s,'Business Data',8.386,6.241,2.136,.379,{sz:16,col:GRAY2,ff:MJ,al:'center',ls:1.1,flipH:true});
+  tx(s,'Business Data',5.792,4.135,2.136,.379,{sz:16,col:GRAY2,ff:MJ,al:'center',ls:1.1,rotate:90,flipH:true});
+  tx(s,'High',9.907,2.322,1.896,.379,{sz:16,col:GRAY2,ff:MJ,al:'center',ls:1.1,flipH:true});
+  tx(s,'Medium',7.496,2.322,1.896,.379,{sz:16,col:GRAY2,ff:MJ,al:'center',ls:1.1,flipH:true});
+  tx(s,'High',11.439,3.351,1.302,.379,{sz:16,col:GRAY2,ff:MJ,al:'center',ls:1.1,rotate:90,flipH:true});
+  tx(s,'Medium',11.439,4.983,1.302,.379,{sz:16,col:GRAY2,ff:MJ,al:'center',ls:1.1,rotate:90,flipH:true});
+  sh(s,RECT,9.667,2.777,2.106,1.527,{flipH:true,fill:BLUE});
+  sh(s,RECT,7.436,2.777,2.106,1.527,{fill:GREEN});
+  sh(s,RECT,9.667,4.409,2.106,1.527,{fill:GREEN});
+  sh(s,RECT,7.436,4.409,2.106,1.527,{flipH:true,fill:BLUE});
+  tx(s,'Business Basics',9.928,3.186,1.582,.774,{sz:20,col:W,ff:MJ,al:'center',flipH:true});
+  tx(s,'Business Basics',7.698,3.186,1.582,.774,{sz:20,col:W,ff:MJ,al:'center',flipH:true});
+  tx(s,'Business Basics',9.928,4.817,1.582,.774,{sz:20,col:W,ff:MJ,al:'center',flipH:true});
+  tx(s,'Business Basics',7.698,4.817,1.582,.774,{sz:20,col:W,ff:MJ,al:'center',flipH:true});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus et magnis dis parturient montes,',1.049,5.025,4.835,.865,{sz:12,col:GRAY,ff:MN,ls:1.3});
+  tx(s,'Beauty Your Pitch With Bright Color',1.049,4.569,5.457,.422,{sz:16,col:BLUE,b:1,ff:MN,ls:1.3});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus et magnis dis parturient montes,',1.054,3.123,4.835,.865,{sz:12,col:GRAY,ff:MN,ls:1.3});
+  tx(s,'Beauty Your Pitch With Bright Color',1.054,2.701,5.457,.422,{sz:16,col:GREEN,b:1,ff:MN,ls:1.3});
+  tx(s,'Detailed Reporting for Growth',1.125,.88,11.083,.828,{sz:48,col:INK,b:1,ff:MJ,ls:.9,sb:10});
+}
+
+// ---------------------------------------------------------------- slide 7 --
+/** Slide 7 - Presonal Values */
+function slide07(s) {
+  sh(s,'line',2.487,6.296,8.359,0,{shadow:SHD,line:{color:GRAY,width:.75,dashType:'dash',transparency:70}});
+  tx(s,'01',1.848,5.977,.639,.639,{sz:14,col:W,ff:MJ,va:'middle',m:0,al:'center',shadow:SHD,fill:DARK,line:{color:W,width:1.5},shape:'ellipse'});
+  sh(s,'roundRect',.888,2.854,2.559,2.76,{shadow:SHD,fill:W,rectRadius:.079});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa',1.138,3.976,2.026,1.203,{sz:12,col:GRAY2,ff:MN,al:'center',ls:1.1,sa:6,flipH:true});
+  tx(s,'Presonal Values',1.307,3.324,1.722,.61,{sz:14,col:INK,ff:MJ,al:'center',ls:1.1,sa:6,flipH:true});
+  sh(s,'round2SameRect',.888,5.284,2.559,.329,{fill:DARK,angleRange:[0,.431]});
+  sh(s,'triangle',2.061,5.614,.213,.184,{rotate:180,fill:DARK});
+  tx(s,'02',4.847,5.977,.639,.639,{sz:14,col:W,ff:MJ,va:'middle',m:0,al:'center',shadow:SHD,fill:GREEN,line:{color:W,width:1.5},shape:'ellipse'});
+  sh(s,'roundRect',3.887,2.854,2.559,2.76,{shadow:SHD,fill:W,rectRadius:.079});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa',4.138,3.976,2.026,1.203,{sz:12,col:GRAY2,ff:MN,al:'center',ls:1.1,sa:6,flipH:true});
+  tx(s,'Communication Skill',4.138,3.324,2.058,.61,{sz:14,col:INK,ff:MJ,al:'center',ls:1.1,sa:6,flipH:true});
+  sh(s,'round2SameRect',3.887,5.284,2.559,.329,{fill:GREEN,angleRange:[0,.431]});
+  sh(s,'triangle',5.06,5.614,.213,.184,{rotate:180,fill:GREEN});
+  tx(s,'03',7.847,5.977,.639,.639,{sz:14,col:W,ff:MJ,va:'middle',al:'center',shadow:SHD,fill:GOLD,shape:'ellipse'});
+  sh(s,'roundRect',6.887,2.854,2.559,2.76,{shadow:SHD,fill:W,rectRadius:.079});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa',7.137,3.976,2.026,1.203,{sz:12,col:GRAY2,ff:MN,al:'center',ls:1.1,sa:6,flipH:true});
+  tx(s,'Decision Making ',7.306,3.324,1.722,.61,{sz:14,col:INK,ff:MJ,al:'center',ls:1.1,sa:6,flipH:true});
+  sh(s,'round2SameRect',6.887,5.284,2.559,.329,{shadow:SHD,fill:GOLD,angleRange:[0,.431]});
+  sh(s,'triangle',8.06,5.614,.213,.184,{rotate:180,shadow:SHD,fill:GOLD});
+  tx(s,'04',10.846,5.977,.639,.639,{sz:14,col:W,ff:MJ,va:'middle',m:0,al:'center',shadow:SHD,fill:SAND,line:{color:W,width:1.5},shape:'ellipse'});
+  sh(s,'roundRect',9.886,2.854,2.559,2.76,{shadow:SHD,fill:W,rectRadius:.079});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa',10.137,3.976,2.026,1.203,{sz:12,col:GRAY2,ff:MN,al:'center',ls:1.1,sa:6,flipH:true});
+  tx(s,'Problem Solving',10.305,3.324,1.722,.61,{sz:14,col:INK,ff:MJ,al:'center',ls:1.1,sa:6,flipH:true});
+  sh(s,'round2SameRect',9.886,5.284,2.559,.329,{fill:SAND,angleRange:[0,.431]});
+  sh(s,'triangle',11.059,5.614,.213,.184,{rotate:180,fill:SAND});
+  tx(s,'Detailed Reporting for Growth',1.138,.884,11.056,.828,{sz:48,col:INK,b:1,ff:MJ,va:'middle',al:'center',ls:.9,sb:10});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus et magnis dis parturient montes,',2.274,1.773,8.785,.686,{sz:14,col:GRAY,ff:MN,al:'center',ls:1.3});
+}
+
+// ---------------------------------------------------------------- slide 8 --
+/** Slide 8 - Powering New Beginnings */
+function slide08(s) {
+  sh(s,RECT,4.078,.837,2.953,2.953,{fill:DARK});
+  tx(s,'02',4.42,1.425,1.671,.715,{sz:44,col:OFFW,b:1,ff:MJ,ls:.8});
+  tx(s,'Lorem ipsum dolor sit amet, adipiscing elit porttitor congue.',4.42,2.212,2.269,.934,{sz:13,col:OFFW,ff:MN,ls:1.3});
+  sh(s,RECT,1.125,3.79,2.953,2.953,{fill:GREEN});
+  tx(s,'01',1.467,4.371,1.671,.715,{sz:44,col:OFFW,b:1,ff:MJ,ls:.8});
+  tx(s,'Lorem ipsum dolor sit amet, adipiscing elit porttitor congue.',1.467,5.159,2.269,.934,{sz:13,col:OFFW,ff:MN,ls:1.3});
+  tx(s,'Powering New Beginnings',7.615,4.365,5.135,.352,{col:DARK,b:1,ff:MJ,ls:.8});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus.',7.615,4.84,4.645,.934,{sz:13,col:GRAY,ff:MN,ls:1.3});
+  tx(s,'Detailed Reporting for Growth',7.55,1.725,4.525,2.282,{sz:48,col:INK,b:1,ff:MJ,ls:.9,sb:10});
+  img(s,1.125,.837,2.953,2.953);
+  img(s,4.078,3.79,2.953,2.953);
+}
+
+// ---------------------------------------------------------------- slide 9 --
+/** Slide 9 - Mission */
+function slide09(s) {
+  sh(s,RECT,0,3.596,4.886,3.271,{fill:GREEN});
+  sh(s,RECT,9.867,.633,3.467,3.271,{fill:GREEN});
+  tx(s,'Mission',7.158,4.636,2.153,.372,{sz:20,col:DARK,b:1,ff:MJ,ls:.8});
+  tx(s,'Pellentesque morbi tristique senectus et netus et malesuada fames turpis pede egestas pharetra.',7.158,5.111,2.153,1.503,{sz:13,col:GRAY,ff:MN,ls:1.3});
+  tx(s,'Vision',10.32,4.636,2.153,.372,{sz:20,col:GREEN,b:1,ff:MJ,ls:.8});
+  tx(s,'Pellentesque morbi tristique senectus et netus et malesuada fames turpis pede egestas pharetra.',10.32,5.111,2.153,1.503,{sz:13,col:GRAY,ff:MN,ls:1.3});
+  sh(s,'line',9.583,4.636,0,1.979,{line:{color:DARK}});
+  tx(s,'Our Vision & Mission for Succes',1.138,1.249,6.778,1.555,{sz:48,col:INK,ff:MJ,va:'middle',ls:.9,sb:10});
+  img(s,3.125,3.596,3.271,3.271);
+  img(s,8.352,.633,3.271,3.271);
+}
+
+// ---------------------------------------------------------------- slide 10 --
+/** Slide 10 - Business in Motion */
+function slide10(s) {
+  tx(s,[['Business in '],{br:1},['Motion']],.97,1.352,6.796,1.919,{sz:60,col:INK,ff:MJ,ls:.9});
+  sh(s,'roundRect',-.3,3.633,6.967,2.298,{shadow:SHD,fill:DARK,rectRadius:.383});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum',1.296,4.787,5.032,.602,{sz:12,col:W,ff:MN,ls:1.3});
+  tx(s,'Comprehensive Insights',1.296,4.175,3.47,.502,{sz:20,col:W,ff:MN,ls:1.3});
+  img(s,7.993,.352,5.924,4.595,{rotate:20.1});
+}
+
+// ---------------------------------------------------------------- slide 11 --
+/** Slide 11 - Detailed Business Report */
+function slide11(s) {
+  tx(s,[['28',{sz:166}],['%',{sz:138}]],.604,.793,5.025,2.895,{col:DARK,ff:MJ,cs:-1.5,al:'center'});
+  tx(s,'Lorem ipsum dolor sit amet',1.38,3.263,3.404,.425,{sz:16,col:GRAY3,ff:MN,ls:1.3});
+  sh(s,RECT,5.169,-.664,2.995,13.333,{rotate:90,flipH:true,fill:GREEN});
+  tx(s,[['Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus.',{ls:1.3,sb:12,p:1}],['Donec quam felis, ultricies nec, pellentesque eu, pretium quis, sem. Nulla consequat',{ls:1.3,sb:12}]],6.982,1.905,5.316,2.084,{sz:14,col:GRAY3,ff:MN,va:'middle'});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo',6.98,.982,5.316,.775,{sz:16,col:DARK,ff:MJ,va:'middle',ls:1.3});
+  sh(s,'line',0,6.957,13.333,0,{line:{color:PALE,transparency:85}});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo',1.45,5.727,2.584,.869,{sz:12,col:W,ff:MN,ls:1.3,sb:12});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo',5.247,5.727,2.584,.869,{sz:12,col:W,ff:MN,ls:1.3,sb:12});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula',9.299,5.727,2.584,.869,{sz:12,col:W,ff:MN,ls:1.3,sb:12});
+  tx(s,'01',1.45,4.968,2.584,.737,{sz:32,col:W,b:1,ff:MN,ls:1.3,sb:12});
+  tx(s,'02',5.247,4.968,2.584,.737,{sz:32,col:W,b:1,ff:MN,ls:1.3,sb:12});
+  tx(s,'03',9.299,4.968,2.584,.737,{sz:32,col:W,b:1,ff:MN,ls:1.3,sb:12});
+}
+
+// ---------------------------------------------------------------- slide 12 --
+/** Slide 12 - Value Here */
+function slide12(s) {
+  tx(s,'Lorem ipsum dolor enim sit veniam amet.',9.712,4.118,2.517,.648,{sz:14,col:GRAY,ff:MN,ls:1.2});
+  tx(s,'Value Here',9.712,3.755,2.922,.358,{sz:14,col:BLUE,ff:MJ,va:'bottom',ls:1.2});
+  tx(s,'Lorem ipsum dolor enim sit veniam amet.',6.038,4.118,2.517,.648,{sz:14,col:GRAY,ff:MN,ls:1.2});
+  tx(s,'Value Here',6.038,3.748,2.222,.372,{sz:14,col:DARK,ff:MJ,va:'bottom',al:'justify',ls:1.2});
+  sh(s,'line',8.835,3.711,0,.976,{line:{color:LINE,transparency:25}});
+  sh(s,'roundRect',5.587,3.815,.303,.303,{shadow:SHD,fill:DARK,rectRadius:.09});
+  sh(s,RECT,5.672,3.919,.133,.095,{fill:W});
+  sh(s,'roundRect',9.284,3.815,.303,.303,{shadow:SHD,fill:BLUE,rectRadius:.09});
+  sh(s,RECT,9.368,3.919,.133,.095,{fill:W});
+  tx(s,'Lorem ipsum dolor enim sit veniam amet.',9.712,5.614,2.517,.648,{sz:14,col:GRAY,ff:MN,ls:1.2});
+  tx(s,'Value Here',9.712,5.248,2.222,.372,{sz:14,col:SAND,ff:MJ,va:'bottom',al:'justify',ls:1.2});
+  tx(s,'Lorem ipsum dolor enim sit veniam amet.',6.038,5.614,2.517,.648,{sz:14,col:GRAY,ff:MN,ls:1.2});
+  tx(s,'Value Here',6.038,5.255,2.222,.358,{sz:14,col:GREEN,ff:MJ,va:'bottom',ls:1.2});
+  sh(s,'line',8.835,5.155,0,.995,{line:{color:LINE,transparency:25}});
+  sh(s,'roundRect',5.587,5.312,.303,.303,{shadow:SHD,fill:GREEN,rectRadius:.09});
+  sh(s,RECT,5.672,5.416,.133,.095,{fill:W});
+  sh(s,'roundRect',9.284,5.312,.303,.303,{shadow:SHD,fill:SAND,rectRadius:.09});
+  sh(s,RECT,9.368,5.416,.133,.095,{fill:W});
+  tx(s,'Detailed Reporting for Growth',1.138,.884,11.056,.828,{sz:48,col:INK,b:1,ff:MJ,va:'middle',al:'center',ls:.9,sb:10});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus et magnis dis parturient montes,',2.274,2.157,8.785,.686,{sz:14,col:GRAY,ff:MN,al:'center',ls:1.3});
+  s.addChart('pie', [{ name: 'Sales', labels: ['Data 1', 'Data 2', 'Data 3', 'Data 4'], values: [40, 30, 20, 10] }], {
+    x: 0.999, y: 3.269, w: 4.101, h: 3.246,
+    chartColors: [DARK, GREEN, BLUE, SAND], showLegend: true, legendPos: 'b', legendFontSize: 8, legendFontFace: MN,
+    showValue: true, dataLabelFormatCode: '0"%"', dataLabelColor: W, dataLabelFontSize: 12, dataLabelFontFace: MN,
+    showPercent: false, dataBorder: { pt: 1, color: W },
+  });
+}
+
+// ---------------------------------------------------------------- slide 13 --
+/** Slide 13 - Focus Fuels */
+function slide13(s) {
+  tx(s,'01',.798,1.352,2.243,1.217,{sz:80,col:DARK,b:1,ff:MJ,ls:.8});
+  tx(s,[['Lorem ipsum dolor sit amet, consectetuer adipiscing elit porttitor congue massa. ',{ls:1.3,sa:24,p:1}],['Fusce posuere magna sed pulvinar ultricie purus lectus sit. ',{ls:1.3,sa:24}]],.798,3.739,2.243,2.408,{sz:13,col:GRAY,ff:MN});
+  tx(s,'Focus Fuels',.798,3.248,2.243,.352,{col:DARK,b:1,ff:MJ,ls:.8});
+  tx(s,'02',3.963,1.352,2.243,1.217,{sz:80,col:GREEN,b:1,ff:MJ,ls:.8});
+  tx(s,'Big Dream',3.963,3.248,2.243,.352,{col:GREEN,b:1,ff:MJ,ls:.8});
+  tx(s,[['Lorem ipsum dolor sit amet, consectetuer adipiscing elit porttitor congue massa. ',{ls:1.3,sa:24,p:1}],['Fusce posuere magna sed pulvinar ultricie purus lectus sit. ',{ls:1.3,sa:24}]],3.963,3.739,2.243,2.408,{sz:13,col:GRAY,ff:MN});
+  tx(s,'03',7.128,1.352,2.243,1.217,{sz:80,col:DARK,b:1,ff:MJ,ls:.8});
+  tx(s,'The Future',7.128,3.248,2.243,.352,{col:DARK,b:1,ff:MJ,ls:.8});
+  tx(s,[['Lorem ipsum dolor sit amet, consectetuer adipiscing elit porttitor congue massa. ',{ls:1.3,sa:24,p:1}],['Fusce posuere magna sed pulvinar ultricie purus lectus sit. ',{ls:1.3,sa:24}]],7.128,3.739,2.243,2.408,{sz:13,col:GRAY,ff:MN});
+  tx(s,'04',10.293,1.352,2.243,1.217,{sz:80,col:GREEN,b:1,ff:MJ,ls:.8});
+  tx(s,'Empowering',10.293,3.248,2.243,.352,{col:GREEN,b:1,ff:MJ,ls:.8});
+  tx(s,[['Lorem ipsum dolor sit amet, consectetuer adipiscing elit porttitor congue massa. ',{ls:1.3,sa:24,p:1}],['Fusce posuere magna sed pulvinar ultricie purus lectus sit. ',{ls:1.3,sa:24}]],10.293,3.739,2.243,2.408,{sz:13,col:GRAY,ff:MN});
+}
+
+// ---------------------------------------------------------------- slide 14 --
+/** Slide 14 - Detailed Progress Bar */
+function slide14(s) {
+  poly(s, 0, 0, 7.226, 7.5, BLOB, { fill: DARK, rotate: 180 });
+  sh(s,'roundRect',.997,1.338,7.763,5.066,{shadow:SHD,fill:W,rectRadius:.255});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer adipiscing',1.299,5.205,2.339,.605,{sz:12,col:GRAY,ff:MN,al:'right',ls:1.3});
+  tx(s,'150%',1.656,4.436,1.982,.841,{sz:44,col:GREEN,ff:MJ,cs:-2.4,va:'middle',al:'right'});
+  tx(s,[['Detailed'],{br:1},['Progress'],{br:1},['Bar']],9.336,1.718,3.206,2.121,{sz:40,col:'0D0D0D',ff:MJ});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. ',9.336,4.603,2.615,.995,{sz:14,col:GRAY,ff:MN,ls:1.3});
+  // Waterfall chart rebuilt from primitives (pptxgenjs has no waterfall type).
+  const WF = [90, 130, -60, 70, 200, 30, 111, 140];
+  const TOTALS = [0, 4, 7];          // bars that restart from the baseline
+  const BASE_Y = 6.03, UNIT = 0.0105, BAR_W = 0.35, STEP = 0.553;
+  let run = 0, prevTop = null;
+  WF.forEach((v, i) => {
+    const from = TOTALS.includes(i) ? 0 : run;
+    const to = TOTALS.includes(i) ? v : run + v;
+    run = to;
+    const x = 3.98 + i * STEP;
+    const yTop = BASE_Y - Math.max(from, to) * UNIT;
+    const hgt = Math.abs(to - from) * UNIT;
+    if (prevTop !== null) sh(s, 'line', x - (STEP - BAR_W), prevTop, STEP - BAR_W, 0, { line: { color: LINE, width: 0.5 } });
+    sh(s, RECT, x, yTop, BAR_W, hgt, { fill: GREEN });
+    tx(s, String(v), x, yTop + hgt / 2 - 0.13, BAR_W, 0.26, { sz: 8, col: W, ff: MN, al: 'center', va: 'middle', m: 0 });
+    prevTop = BASE_Y - to * UNIT;
+  });
+}
+
+// ---------------------------------------------------------------- slide 15 --
+/** Slide 15 - 2025 Office data */
+function slide15(s) {
+  sh(s,'roundRect',1.069,.459,3.092,.663,{shadow:SHD,fill:W,rectRadius:.332});
+  tx(s,'2025 Office data',1.187,.588,2.856,.404,{col:DARK,ff:MJ,al:'center'});
+  tx(s,'Competitor Landscape',7.16,1.837,4.993,1.717,{sz:48,col:INK,ff:MJ});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus et magnis dis parturient',7.16,3.718,4.993,.806,{sz:11,col:INK,ff:MN,ls:1.3});
+  sh(s,'line',8.686,5.461,0,.732,{line:{color:GRAY,width:1.5}});
+  tx(s,'89%',7.16,5.374,1.254,.707,{sz:36,col:DARK,ff:MJ});
+  tx(s,'Your Title',7.16,5.955,1.254,.303,{sz:12,col:DARK,ff:MJ});
+  tx(s,'21+',8.958,5.374,1.254,.707,{sz:36,col:DARK,ff:MJ});
+  tx(s,'Your Title',8.958,5.955,1.254,.303,{sz:12,col:DARK,ff:MJ});
+  tx(s,'82$',10.756,5.374,1.254,.707,{sz:36,col:DARK,ff:MJ});
+  tx(s,'Your Title',10.756,5.955,1.254,.303,{sz:12,col:DARK,ff:MJ});
+  sh(s,'line',10.484,5.461,0,.732,{line:{color:GRAY,width:1.5}});
+  s.addChart('bar', [{
+    name: 'Series 1', labels: MONTHS,
+    values: [0.4, 0.5, 0.25, 0.45, 0.6, 0.3, 0.5, 0.75, 0.5, 0.65, 0.45, 0.7],
+  }], {
+    x: 1.069, y: 1.083, w: 5.627, h: 6.183,
+    barDir: 'col', barGapWidthPct: 76, barOverlapPct: -27, chartColors: [GREEN],
+    showLegend: false, showValue: true, dataLabelPosition: 'outEnd', dataLabelFontSize: 8,
+    dataLabelFontFace: MN, dataLabelColor: INK, dataLabelFormatCode: '0%',
+    catAxisLabelFontSize: 8, catAxisLabelFontFace: MN, catAxisLabelRotate: -45, catAxisLineShow: true,
+    valAxisLabelFontSize: 8, valAxisLabelFontFace: MN, valAxisLabelFormatCode: '0%',
+    valAxisMaxVal: 1, valAxisMajorUnit: 0.2, valAxisLineShow: false,
+    valGridLine: { color: LINE, size: 0.5 }, catGridLine: { style: 'none' },
+  });
+}
+
+// ---------------------------------------------------------------- slide 16 --
+/** Slide 16 - Powering New Beginnings */
+function slide16(s) {
+  // World map: continent outlines simplified from the original artwork.
+  const MAP = [
+    [[9.4,4.26],[9.43,4.2],[9.52,4.19],[9.56,4.08],[9.48,4.08],[9.41,4.17],[9.32,4.18],[9.23,4.09],[9.23,3.93],[9.13,3.82],[9.01,3.8],[8.94,3.72],[8.79,3.74],[8.6,3.7],[8.83,4.03],[8.68,3.77],[8.67,3.73],[8.73,3.74],[8.99,4.15],[9.22,4.26],[9.38,4.29],[9.4,4.26]],
+    [[10.63,5.88],[10.79,5.59],[11.02,5.47],[11.21,4.95],[10.7,4.8],[10.69,4.64],[10.43,4.72],[10.41,4.61],[10.27,4.64],[10.24,4.74],[10.1,4.72],[10.09,4.91],[9.97,5.01],[10.08,5.12],[10.24,5.09],[10.47,5.31],[10.61,5.65],[10.49,5.77],[10.63,5.88]],
+    [[10.61,5.6],[10.46,5.66],[10.49,5.6],[10.32,5.48],[10.18,5.51],[10.08,5.8],[10.1,5.89],[10.03,6.15],[10.05,6.3],[9.99,6.54],[10.14,6.61],[10.12,6.53],[10.23,6.4],[10.17,6.34],[10.29,6.2],[10.25,6.15],[10.52,6],[10.46,5.91],[10.48,5.78],[10.61,5.6]],
+    [[10.04,6.6],[9.98,6.49],[10.05,6.3],[10.03,6.14],[10.1,5.89],[10.08,5.83],[10.09,5.74],[10.18,5.51],[10.12,5.35],[10.09,5.36],[10.08,5.58],[10.04,5.71],[10.05,5.75],[10.04,5.86],[9.98,6.01],[9.98,6.1],[9.95,6.22],[10,6.19],[9.99,6.32],[9.91,6.38],[9.97,6.42],[9.91,6.45],[9.96,6.48],[9.93,6.57],[10.05,6.63],[9.98,6.68],[10.09,6.62],[10.1,6.65],[10.09,6.69],[10.03,6.7],[10.19,6.73],[10.13,6.73],[10.13,6.62],[10.04,6.6]],
+    [[9.87,4.76],[9.94,4.78],[9.99,4.84],[10.07,4.84],[10.09,4.9],[10.11,4.82],[10.1,4.72],[10.18,4.7],[10.17,4.58],[10.04,4.55],[9.99,4.48],[10.05,4.37],[9.95,4.41],[9.84,4.54],[9.86,4.64],[9.81,4.72],[9.87,4.76]],
+    [[10.49,5.34],[10.41,5.28],[10.39,5.21],[10.25,5.15],[10.24,5.09],[10.11,5.12],[10.13,5.17],[10.11,5.33],[10.16,5.51],[10.21,5.49],[10.33,5.48],[10.36,5.41],[10.47,5.41],[10.49,5.34]],
+    [[10.11,5.34],[10.13,5.17],[10.07,5.08],[9.99,5.06],[9.97,5.01],[10,4.94],[10.09,4.91],[10.07,4.89],[10.09,4.86],[9.99,4.84],[9.91,4.78],[9.9,4.83],[9.81,4.92],[9.77,4.91],[9.76,4.88],[9.73,4.91],[9.74,4.96],[9.8,5.03],[9.9,5.24],[10.08,5.37],[10.11,5.34]],
+    [[10.03,4.41],[9.99,4.48],[10.04,4.55],[10.17,4.58],[10.18,4.71],[10.24,4.74],[10.3,4.69],[10.27,4.64],[10.33,4.65],[10.39,4.62],[10.38,4.57],[10.42,4.5],[10.38,4.5],[10.38,4.47],[10.34,4.45],[10.34,4.44],[10.25,4.45],[10.15,4.43],[10.1,4.38],[10.05,4.43],[10.06,4.47],[10.03,4.46],[10.03,4.41]],
+    [[11.84,1.28],[11.56,1.38],[11.6,1.27],[11.28,1.29],[11.64,1.23],[11.5,1.17],[10.85,1.19],[10.9,1.28],[10.37,1.29],[10.18,1.41],[10.23,1.48],[10.01,1.54],[10.22,1.61],[10.05,1.63],[10.15,1.69],[10.51,1.78],[10.69,2.02],[10.6,2.03],[10.71,2.1],[10.62,2.27],[10.81,2.54],[10.94,2.59],[11.04,2.33],[11.61,2.07],[11.5,2.05],[11.64,2],[11.54,1.88],[11.71,1.81],[11.62,1.65],[11.75,1.64],[11.63,1.58],[11.68,1.43],[11.94,1.31],[11.84,1.28]],
+    [[9.07,2.07],[8.99,1.84],[8.89,1.97],[8.56,1.92],[8.78,2.15],[9.07,2.07]],
+    [[9.43,1.3],[9.8,1.34],[9.58,1.4],[9.7,1.52],[9.47,1.66],[9.74,1.68],[10.36,1.24],[9.43,1.3]],
+    [[10.22,2.28],[10.37,2.25],[10.05,1.98],[9.49,1.87],[9.48,2.01],[9.81,2.03],[10.11,2.25],[9.84,2.36],[10.22,2.49],[10.22,2.28]],
+    [[10.41,3.18],[10.27,3.07],[10.07,3.15],[10.55,2.94],[10.27,2.57],[10.17,2.67],[9.85,2.46],[9.79,2.98],[9.31,2.63],[9.34,2.39],[9.73,2.22],[9.66,2.08],[9.55,2.22],[9.45,2.16],[9.41,1.83],[9.28,1.84],[9.28,2.22],[9.23,2.08],[8.9,2.24],[8.27,2.04],[7.84,2.09],[7.84,2.57],[8.42,3.07],[9.51,3.07],[9.76,3.2],[9.7,3.34],[10.12,3.13],[10.23,3.28],[10.41,3.18]],
+    [[8.19,2.79],[7.84,2.57],[7.84,2.09],[7.17,2.05],[7.03,2.15],[7.22,2.27],[6.99,2.31],[7.2,2.35],[7.04,2.51],[7.32,2.64],[7.14,2.82],[7.53,2.53],[7.51,2.63],[7.89,2.59],[8.19,2.79]],
+    [[10.17,3.15],[9.73,3.36],[9.61,3.22],[9.55,3.35],[9.65,3.18],[9.31,3.06],[8.42,3.07],[8.39,3.47],[8.6,3.7],[8.94,3.72],[9.23,3.93],[9.52,3.77],[9.76,3.95],[10.17,3.15]]
+  ];
+  MAP.forEach(ring => {
+    const xs = ring.map(p => p[0]), ys = ring.map(p => p[1]);
+    const x0 = Math.min(...xs), y0 = Math.min(...ys);
+    const w = Math.max(...xs) - x0, h = Math.max(...ys) - y0;
+    poly(s, x0, y0, w, h, ring.map(p => [(p[0] - x0) / w, (p[1] - y0) / h]), { fill: LINE });
+  });
+  img(s,7.963,1.706,.905,1.186);
+  tx(s,'01',8.131,1.83,.569,.569,{sz:14,col:W,ff:MJ,va:'middle',al:'center',fill:DARK,line:{color:W,width:.75},shape:'ellipse'});
+  img(s,8.621,2.69,.905,1.186);
+  tx(s,'02',8.789,2.814,.569,.569,{sz:14,col:W,ff:MJ,va:'middle',al:'center',fill:GREEN,line:{color:W,width:.75},shape:'ellipse'});
+  img(s,10.309,4.459,.905,1.186);
+  tx(s,'03',10.477,4.583,.569,.569,{sz:14,col:W,ff:MJ,va:'middle',al:'center',fill:DARK,line:{color:W,width:.75},shape:'ellipse'});
+  tx(s,'Powering New Beginnings',1.354,4.494,5.135,.352,{col:DARK,b:1,ff:MJ,ls:.8});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus.',1.354,4.97,5.135,.934,{sz:13,col:GRAY,ff:MN,ls:1.3});
+  tx(s,'Detailed Reporting Maps Spread',1.289,1.751,4.525,2.282,{sz:48,col:INK,b:1,ff:MJ,ls:.9,sb:10});
+}
+
+// ---------------------------------------------------------------- slide 17 --
+/** Slide 17 - Effortless and Effective */
+function slide17(s) {
+  sh(s,RECT,0,3.903,6.667,2.847,{fill:DARK});
+  sh(s,RECT,6.667,3.903,6.667,2.847,{fill:GREEN});
+  tx(s,'Effortless and Effective',.63,4.455,5.406,.352,{col:OFFW,b:1,ff:MJ,al:'right',ls:.8});
+  tx(s,'Lorem ipsum dolor sit amet adipiscing elit. porttitor congue massa. Fusce, magna sed pulvinar ultricies, purus lectus libero, sit amet magna eros quis urna. ',.63,5.084,5.406,.934,{sz:13,col:OFFW,ff:MN,al:'right',ls:1.3,sa:24});
+  tx(s,'Experience the Advantage',7.297,4.455,5.406,.352,{col:OFFW,b:1,ff:MJ,ls:.8});
+  tx(s,'Breaking Down the Numbers. Uncovering the Trends.',1.384,1.482,10.565,1.555,{sz:48,col:INK,ff:MJ,al:'center',ls:.9});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer.',8.084,5.23,1.737,.862,{sz:14,col:OFFW,ff:MN,ls:1.1,sb:12});
+  sh(s,'ellipse',7.297,5.275,.779,.779,{shadow:SHD,fill:GREEN2});
+  tx(s,'01',7.297,5.446,.779,.438,{sz:20,col:W,ff:MJ,al:'center'});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer.',10.472,5.23,1.737,.862,{sz:14,col:OFFW,ff:MN,ls:1.1,sb:12});
+  sh(s,'ellipse',9.685,5.275,.779,.779,{shadow:SHD,fill:GREEN2});
+  tx(s,'02',9.685,5.446,.779,.438,{sz:20,col:W,ff:MJ,al:'center'});
+}
+
+// ---------------------------------------------------------------- slide 18 --
+/** Slide 18 - Project Meetup London Day 2 */
+function slide18(s) {
+  poly(s, 0, 0, 7.226, 7.5, BLOB, { fill: DARK, rotate: 180 });
+  sh(s,RECT,7.74,4.933,3.794,1.056,{fill:W,line:{color:LT2}});
+  tx(s,'Project Meetup London Day 2',7.973,5.062,3.414,.411,{sz:14,col:DARK,ff:MJ,ls:1.5});
+  tx(s,'TUE, 10 AM – Royal Hall',7.973,5.412,2.929,.372,{sz:12,col:GRAY3,ff:MN,ls:1.5});
+  sh(s,RECT,7.74,3.72,4.301,1.056,{shadow:SHD,fill:W});
+  tx(s,'Project Meetup London Day 1',7.973,3.849,3.414,.411,{sz:14,col:DARK,ff:MJ,ls:1.5});
+  tx(s,'TUE, 10 AM – Royal Hall',7.973,4.199,2.929,.372,{sz:12,col:GRAY3,ff:MN,ls:1.5});
+  tx(s,[['Business'],{br:1},['Agenda']],7.088,1.431,5.025,1.555,{sz:48,col:INK,ff:MJ,ls:.9});
+  sh(s,'roundRect',1.272,1.503,5.122,4.766,{shadow:SHD,fill:W,rectRadius:.15});
+  tx(s,[['July ',{col:INK}],['2026',{col:DARK}]],1.953,1.715,3.758,.572,{sz:28,ff:MJ,al:'center'});
+  sh(s,'triangle',5.723,1.934,.159,.137,{rotate:90,fill:{color:'A0A1A3',transparency:70}});
+  sh(s,'triangle',1.783,1.934,.159,.137,{rotate:270,flipH:true,fill:{color:'A0A1A3',transparency:70}});
+  tx(s,'S',5.512,2.513,.672,.498,{sz:12,col:W,ff:MN,va:'middle',al:'center',fill:DARK});
+  tx(s,'M',1.481,2.513,.672,.498,{sz:12,col:W,ff:MN,va:'middle',al:'center',flipH:true,fill:DARK});
+  tx(s,'T',2.153,2.513,.672,.498,{sz:12,col:W,ff:MN,va:'middle',al:'center',fill:DARK});
+  tx(s,'W',2.825,2.513,.672,.498,{sz:12,col:W,ff:MN,va:'middle',al:'center',fill:DARK});
+  tx(s,'T',3.497,2.513,.672,.498,{sz:12,col:W,ff:MN,va:'middle',al:'center',fill:DARK});
+  tx(s,'F',4.169,2.513,.672,.498,{sz:12,col:W,ff:MN,va:'middle',al:'center',fill:DARK});
+  tx(s,'S',4.84,2.513,.672,.498,{sz:12,col:W,ff:MN,va:'middle',al:'center',fill:DARK});
+  tx(s,'27',1.481,3.011,.672,.498,{sz:12,col:LINE,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'28',2.153,3.011,.672,.498,{sz:12,col:LINE,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'29',2.825,3.011,.672,.498,{sz:12,col:LINE,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'30',3.497,3.011,.672,.498,{sz:12,col:LINE,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'1',4.169,3.011,.672,.498,{sz:12,col:GRAY3,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'2',4.84,3.011,.672,.498,{sz:12,col:GRAY3,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'3',5.512,3.011,.672,.498,{sz:12,col:GRAY3,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'4',1.481,3.509,.672,.498,{sz:12,col:GRAY3,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'5',2.153,3.509,.672,.498,{sz:12,col:GRAY3,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'6',2.825,3.509,.672,.498,{sz:12,col:GRAY3,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'7',3.497,3.509,.672,.498,{sz:12,col:GRAY3,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'8',4.169,3.509,.672,.498,{sz:12,col:GRAY3,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'9',4.84,3.509,.672,.498,{sz:12,col:GRAY3,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'10',5.512,3.509,.672,.498,{sz:12,col:GRAY3,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'11',1.481,4.006,.672,.498,{sz:12,col:GRAY3,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'12',2.153,4.006,.672,.498,{sz:12,col:GRAY3,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'13',2.825,4.006,.672,.498,{sz:12,col:GRAY3,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'14',3.497,4.006,.672,.498,{sz:12,col:GRAY3,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'15',4.169,4.006,.672,.498,{sz:12,col:GRAY3,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'16',4.84,4.006,.672,.498,{sz:12,col:GRAY3,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'17',5.512,4.006,.672,.498,{sz:12,col:GRAY3,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'18',1.481,4.504,.672,.498,{sz:12,col:GRAY3,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'19',2.153,4.504,.672,.498,{sz:12,col:GRAY3,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'20',2.825,4.504,.672,.498,{sz:12,col:GRAY3,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'21',3.497,4.504,.672,.498,{sz:12,col:GRAY3,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'22',4.169,4.504,.672,.498,{sz:12,col:GRAY3,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'23',4.84,4.504,.672,.498,{sz:12,col:GRAY3,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'24',5.512,4.504,.672,.498,{sz:12,col:GRAY3,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'25',1.481,5.002,.672,.498,{sz:12,col:GRAY3,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'26',2.153,5.002,.672,.498,{sz:12,col:GRAY3,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'27',2.825,5.002,.672,.498,{sz:12,col:GRAY3,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'28',3.497,5.002,.672,.498,{sz:12,col:GRAY3,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'29',4.169,5.002,.672,.498,{sz:12,col:GRAY3,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'30',4.84,5.002,.672,.498,{sz:12,col:GRAY3,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'31',5.512,5.002,.672,.498,{sz:12,col:GRAY3,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'1',1.481,5.499,.672,.498,{sz:12,col:LINE,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'2',2.153,5.499,.672,.498,{sz:12,col:LINE,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'3',2.825,5.499,.672,.498,{sz:12,col:LINE,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'4',3.497,5.499,.672,.498,{sz:12,col:LINE,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'5',4.169,5.499,.672,.498,{sz:12,col:LINE,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'7',4.84,5.499,.672,.498,{sz:12,col:LINE,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  tx(s,'8',5.512,5.499,.672,.498,{sz:12,col:LINE,ff:MN,va:'middle',al:'center',fill:{color:W,transparency:100}});
+  sh(s,'ellipse',3.791,4.919,.083,.083,{fill:DARK});
+  sh(s,'line',7.305,3.584,0,2.541,{flipV:true,line:{color:CREAM}});
+  sh(s,'ellipse',7.2,5.355,.21,.21,{fill:W,line:{color:GRAY3,transparency:85}});
+  sh(s,'triangle',7.278,4.225,.07,.06,{rotate:90,fill:LINE});
+  sh(s,'ellipse',7.15,4.042,.341,.341,{shadow:SHD,fill:W,line:{color:DARK,width:1.5}});
+  img(s,7.232,4.124,.176,.176,{tiny:1});
+  img(s,7.253,5.409,.103,.103,{tiny:1});
+}
+
+// ---------------------------------------------------------------- slide 19 --
+/** Slide 19 - Uncovering the Trends. */
+function slide19(s) {
+  sh(s,'roundRect',5.47,4.061,6.641,.909,{fill:W,rectRadius:.455});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo.',6.472,4.211,5.152,.61,{sz:14,col:GRAY2,ff:MN,ls:1.1,sb:12});
+  sh(s,'ellipse',5.535,4.126,.779,.779,{shadow:SHD,fill:GREEN});
+  tx(s,'02',5.535,4.297,.779,.438,{sz:20,col:W,ff:MJ,al:'center'});
+  sh(s,'roundRect',5.082,2.493,6.641,.909,{fill:W,rectRadius:.455});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo.',6.084,2.642,5.152,.61,{sz:14,col:GRAY2,ff:MN,ls:1.1,sb:12});
+  sh(s,'ellipse',5.147,2.558,.779,.779,{shadow:SHD,fill:DARK});
+  tx(s,'01',5.147,2.728,.779,.438,{sz:20,col:W,ff:MJ,al:'center'});
+  sh(s,'roundRect',4.934,5.629,6.641,.909,{fill:W,rectRadius:.455});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo.',5.937,5.779,5.152,.61,{sz:14,col:GRAY2,ff:MN,ls:1.1,sb:12});
+  sh(s,'ellipse',4.999,5.694,.779,.779,{shadow:SHD,fill:DARK});
+  tx(s,'03',4.999,5.865,.779,.438,{sz:20,col:W,ff:MJ,al:'center'});
+  tx(s,'Uncovering the Trends.',1.384,.959,10.565,.828,{sz:48,col:OFFW,ff:MJ,al:'center',ls:.9});
+  img(s,1.375,2.117,4.63,4.63);
+}
+
+// ---------------------------------------------------------------- slide 20 --
+/** Slide 20 - Organically grow the holistic world view of disruptive innovatio */
+function slide20(s) {
+  tx(s,'Organically grow the holistic world view of disruptive innovation via workplace.',1.063,4.565,3.937,.688,{sz:14,col:GRAY3,ff:MN,ls:1.3,sb:12});
+  tx(s,[['Grow up your ',{col:INK2}],['business',{col:DARK}],[' in minutes',{col:INK2}]],1.03,2.048,4.651,2.282,{sz:48,ff:MJ,ls:.9});
+  sh(s,'roundRect',5.889,1.014,4.913,5.578,{shadow:SHD,fill:DARK,rectRadius:0});
+  tx(s,[['Company profit',{ls:1.3,bu:'ü',ml:.312,p:1}],['Features',{ls:1.3,bu:'ü',ml:.312,p:1}],['Business growth',{ls:1.3,bu:'ü',ml:.312,p:1}],['Schedule plan',{ls:1.3,bu:'ü',ml:.312,p:1}],['Financial freedom',{ls:1.3,bu:'ü',ml:.312,p:1}],['Take action',{ls:1.3,bu:'ü',ml:.312}]],6.667,2.625,2.347,1.913,{sz:14,col:W,ff:MN});
+  tx(s,'Most Effective',6.667,5.656,1.403,.375,{sz:12,col:W,ff:MN,va:'middle',al:'center',line:{color:W,width:1.25},rectRadius:.188,shape:'roundRect'});
+  img(s,9.453,.743,.229,.229,{rotate:180,tiny:1});
+  sh(s,'roundRect',9.06,.561,4.913,6.378,{shadow:SHD,fill:W,rectRadius:0});
+  tx(s,'Most Valuable',9.778,5.792,2.039,.545,{sz:16,col:W,ff:MN,va:'middle',al:'center',fill:DARK,rectRadius:.273,shape:'roundRect'});
+  tx(s,[['Concept',{ls:1.3,bu:'ü',ml:.312,p:1}],['Brain storming',{ls:1.3,bu:'ü',ml:.312,p:1}],['Business growth',{ls:1.3,bu:'ü',ml:.312,p:1}],['Schedule plan',{ls:1.3,bu:'ü',ml:.312,p:1}],['Financial freedom',{ls:1.3,bu:'ü',ml:.312,p:1}],['Take action',{ls:1.3,bu:'ü',ml:.312,p:1}],['Main point',{ls:1.3,bu:'ü',ml:.312,p:1}],['Mission & vision',{ls:1.3,bu:'ü',ml:.312,p:1}],['Digital app',{ls:1.3,bu:'ü',ml:.312}]],9.778,2.625,2.347,2.832,{sz:14,col:GRAY3,ff:MN});
+  sh(s,'roundRect',5.772,1.352,2.682,.63,{fill:W,rectRadius:.315});
+  tx(s,'Your Strategy',6.336,1.46,1.935,.413,{col:GRAY2,ff:MN,ls:1.1,sb:12});
+  sh(s,'ellipse',5.399,1.278,.779,.779,{fill:LINE});
+  tx(s,'01',5.399,1.448,.779,.438,{sz:20,col:W,ff:MJ,al:'center'});
+  sh(s,'roundRect',9.769,1.677,2.682,.63,{fill:GREEN,rectRadius:.315});
+  tx(s,'Your Strategy',10.334,1.785,1.935,.413,{col:OFFW,ff:MN,ls:1.1,sb:12});
+  sh(s,'ellipse',9.397,1.603,.779,.779,{fill:DARK});
+  tx(s,'02',9.397,1.773,.779,.438,{sz:20,col:W,ff:MJ,al:'center'});
+}
+
+// ---------------------------------------------------------------- slide 21 --
+/** Slide 21 - Empowering Visions To Grow */
+function slide21(s) {
+  sh(s,RECT,6.667,.837,6.667,5.906,{fill:DARK});
+  sh(s,RECT,0,.837,6.667,2.122,{fill:GREEN});
+  tx(s,'Empowering Visions To Grow',7.33,3.78,5.243,.352,{col:W,b:1,ff:MJ,ls:.8});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue magna sed. ',7.33,4.255,5.243,.65,{sz:13,col:W,ff:MN,ls:1.3,sa:24});
+  tx(s,'85%',3.927,1.345,2.545,1.106,{sz:72,col:OFFW,b:1,ff:MJ,ls:.8});
+  tx(s,'Lorem ipsum dolor sit amet elit porttitor massa. ',1.125,1.749,2.545,.65,{sz:13,col:OFFW,ff:MN,ls:1.3});
+  tx(s,'Goal Project',1.125,1.397,1.828,.352,{col:OFFW,b:1,ff:MJ,ls:.8});
+  sh(s,'roundRect',5.701,5.38,6.641,.909,{fill:W,rectRadius:.455});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo.',6.703,5.53,5.152,.61,{sz:14,col:GRAY2,ff:MN,ls:1.1,sb:12});
+  sh(s,'ellipse',5.766,5.445,.779,.779,{shadow:SHD,fill:DARK});
+  tx(s,'01',5.766,5.615,.779,.438,{sz:20,col:W,ff:MJ,al:'center'});
+  tx(s,'Strategic Insight',7.322,1.639,4.525,1.555,{sz:48,col:OFFW,b:1,ff:MJ,ls:.9,sb:10});
+  img(s,0,2.959,6.667,3.784);
+}
+
+// ---------------------------------------------------------------- slide 22 --
+/** Slide 22 - Timeline Infographic */
+function slide22(s) {
+  sh(s,RECT,0,2.508,13.333,4.992,{fill:{color:DARK,transparency:55}});
+  sh(s,RECT,6.667,2.508,3.481,4.992,{fill:{color:DARK,transparency:55}});
+  sh(s,'line',3.199,2.508,0,4.992,{line:{color:W,width:1.5,transparency:80}});
+  sh(s,'line',4.933,2.508,0,4.992,{line:{color:W,width:1.5,transparency:80}});
+  sh(s,'line',8.401,2.508,0,4.992,{line:{color:W,width:1.5,transparency:80}});
+  sh(s,'line',11.868,2.508,0,4.992,{line:{color:W,width:1.5,transparency:80}});
+  tx(s,'2026',2.698,2.161,1.003,.379,{sz:14,col:DARK,ff:MJ,al:'center',ls:1.3,sb:7.5});
+  tx(s,'2027',4.431,2.161,1.003,.379,{sz:14,col:DARK,ff:MJ,al:'center',ls:1.3,sb:7.5});
+  tx(s,'2029',6.165,2.161,1.003,.379,{sz:14,col:DARK,ff:MJ,al:'center',ls:1.3,sb:7.5});
+  tx(s,'2036',7.899,2.161,1.003,.379,{sz:14,col:DARK,ff:MJ,al:'center',ls:1.3,sb:7.5});
+  tx(s,'2040',9.633,2.161,1.003,.379,{sz:14,col:DARK,ff:MJ,al:'center',ls:1.3,sb:7.5});
+  tx(s,'2058',11.367,2.161,1.003,.379,{sz:14,col:DARK,ff:MJ,al:'center',ls:1.3,sb:7.5});
+  sh(s,'ellipse',.982,1.963,.965,.976,{fill:DARK});
+  tx(s,'2025',1.193,2.161,.544,.588,{col:W,ff:MJ,al:'center',ls:.8,sb:7.5});
+  sh(s,'line',1.465,2.748,0,4.755,{flipH:true,line:{color:DARK,width:2}});
+  sh(s,'roundRect',1.259,3.367,2.916,.539,{shadow:SHD,fill:W,rectRadius:.27});
+  tx(s,'Lorem ipsum dolor sit amet. ',1.316,3.45,2.916,.381,{sz:14,col:GRAY3,ff:MN,ls:1.3});
+  sh(s,'roundRect',4.707,4.959,5.684,.539,{shadow:SHD,fill:W,rectRadius:.27});
+  tx(s,[['Lorem ipsum dolor sit amet. ',{col:GRAY3}],['Qui sint neque a numquam. ',{col:DARK}]],4.858,5.043,5.38,.381,{sz:14,ff:MN,ls:1.3});
+  sh(s,'roundRect',9.839,4.163,3.022,.539,{shadow:SHD,fill:W,rectRadius:.27});
+  tx(s,'Lorem ipsum dolor sit amet. ',9.97,4.246,2.761,.381,{sz:14,col:GRAY3,ff:MN,ls:1.3});
+  sh(s,'roundRect',8.407,5.755,2.315,.539,{shadow:SHD,fill:W,rectRadius:.27});
+  tx(s,'Lorem ipsum dolor. ',8.545,5.839,2.177,.381,{sz:14,col:GRAY3,ff:MN,ls:1.3});
+  tx(s,'Timeline Infographic',2.894,.635,7.545,.828,{sz:48,col:INK,ff:MJ,al:'center',ls:.9});
+}
+
+// ---------------------------------------------------------------- slide 23 --
+/** Slide 23 - Value A */
+function slide23(s) {
+  tx(s,'85%',2.008,2.964,2.222,.771,{sz:36,col:GREEN,ff:MJ,va:'bottom',al:'justify',ls:1.2});
+  tx(s,'Value A',2.008,3.666,2.222,.395,{sz:16,col:GREEN,ff:MJ,va:'bottom',al:'justify',ls:1.2});
+  sh(s,'roundRect',1.392,3.177,.461,.461,{shadow:SHD,fill:GREEN,rectRadius:.145});
+  sh(s,RECT,1.521,3.335,.203,.144,{fill:W});
+  tx(s,'90%',2.008,4.25,2.222,.771,{sz:36,col:SAND,ff:MJ,va:'bottom',al:'justify',ls:1.2});
+  tx(s,'Value B',2.008,4.952,2.222,.395,{sz:16,col:SAND,ff:MJ,va:'bottom',al:'justify',ls:1.2});
+  sh(s,'roundRect',1.392,4.463,.461,.461,{shadow:SHD,fill:SAND,rectRadius:.145});
+  sh(s,RECT,1.521,4.621,.203,.144,{fill:W});
+  sh(s,'roundRect',1.392,5.776,.461,.461,{shadow:SHD,fill:BLUE,rectRadius:.154});
+  sh(s,RECT,1.521,5.935,.203,.144,{fill:W});
+  tx(s,'45%',2.008,5.536,2.222,.771,{sz:36,col:BLUE,ff:MJ,va:'bottom',al:'justify',ls:1.2});
+  tx(s,'Value C',2.008,6.238,2.222,.395,{sz:16,col:BLUE,ff:MJ,va:'bottom',al:'justify',ls:1.2});
+  tx(s,'99%',10.423,3.323,2.222,.771,{sz:36,col:DARK,ff:MJ,va:'bottom',al:'justify',ls:1.2});
+  tx(s,'Lorem ipsum dolor enim sit veniam',10.423,4.404,2.005,.648,{sz:14,col:GRAY,ff:MN,ls:1.2});
+  tx(s,'Practice Room',10.423,4.025,2.222,.395,{sz:16,col:DARK,ff:MJ,va:'bottom',al:'justify',ls:1.2});
+  tx(s,[['Grow up ',{col:INK2}],{br:1},['your ',{col:INK2}],['Business',{col:DARK}]],1.173,.867,8.733,1.555,{sz:48,ff:MJ,ls:.9});
+  img(s,5.807,2.657,3.274,3.274);
+  s.addChart('doughnut', [{ name: 'Sales', labels: ['1st Qtr', '2nd Qtr', '3rd Qtr', '4th Qtr'], values: [6.2, 2.2, 2.4, 1.2] }], {
+    x: 4.796, y: 1.748, w: 5.296, h: 5.04,
+    holeSize: 75, chartColors: [DARK, BLUE, SAND, GREEN], showLegend: false, showValue: false,
+    dataBorder: { pt: 1, color: W },
+  });
+  // Leader line from the doughnut out to the 99% callout.
+  sh(s, 'line', 8.625, 2.307, 2.25, 0, { line: { color: DARK, width: 0.75, dashType: 'dash' } });
+  sh(s, 'line', 8.625, 2.307, 0.8, 0.875, { line: { color: DARK, width: 0.75, dashType: 'dash' }, flipH: true });
+}
+
+// ---------------------------------------------------------------- slide 24 --
+/** Slide 24 - Person */
+function slide24(s) {
+  sh(s,'ellipse',5.097,1.742,3.572,3.572,{line:{color:'A6A6A6',width:2,dashType:'dash',transparency:60}});
+  sh(s,'arc',5.097,1.742,3.572,3.572,{line:{color:DARK,width:5},angleRange:[270,0]});
+  sh(s,'arc',9.081,2.908,1.106,1.106,{line:{color:GREEN,width:5},angleRange:[120.511,251.175]});
+  sh(s,'ellipse',9.162,2.985,.954,.954,{shadow:SHD,fill:W});
+  tx(s,'22',9.128,3.22,1.015,.387,{sz:20,col:GREEN,ff:MJ,al:'center',ls:.8});
+  tx(s,'Person',9.125,3.525,1.015,.249,{sz:10.5,col:GRAY,ff:MJ,al:'center',ls:.8});
+  sh(s,'arc',8.297,4.87,1.106,1.106,{line:{color:BLUE,width:5},angleRange:[22.522,251.175]});
+  sh(s,'ellipse',8.378,4.946,.954,.954,{shadow:SHD,fill:W});
+  tx(s,'478',8.344,5.181,1.015,.387,{sz:20,col:BLUE,ff:MJ,al:'center',ls:.8});
+  tx(s,'Person',8.342,5.486,1.015,.249,{sz:10.5,col:GRAY,ff:MJ,al:'center',ls:.8});
+  sh(s,'arc',8.055,.911,1.106,1.106,{line:{color:DARK,width:5},angleRange:[50.22,308.011]});
+  sh(s,'ellipse',8.136,.988,.954,.954,{shadow:SHD,fill:W});
+  tx(s,'16',8.102,1.223,1.015,.387,{sz:20,col:DARK,ff:MJ,al:'center',ls:.8});
+  tx(s,'Person',8.099,1.528,1.015,.249,{sz:10.5,col:GRAY,ff:MJ,al:'center',ls:.8});
+  sh(s,'arc',4.391,4.87,1.106,1.106,{line:{color:SAND,width:5},angleRange:[88.755,251.175]});
+  sh(s,'ellipse',4.472,4.946,.954,.954,{shadow:SHD,fill:W});
+  tx(s,'84',4.438,5.181,1.015,.387,{sz:20,col:SAND,ff:MJ,al:'center',ls:.8});
+  tx(s,'Person',4.435,5.486,1.015,.249,{sz:10.5,col:GRAY,ff:MJ,al:'center',ls:.8});
+  tx(s,'Your Text Here',9.404,.985,3.093,.404,{col:DARK,ff:MJ});
+  tx(s,'Lorem ipsum dolor sit amet',9.404,1.409,3.135,.382,{sz:14,col:GRAY,ff:MN,ls:1.3});
+  tx(s,'Your Text Here',10.297,2.903,2.364,.404,{col:GREEN,ff:MJ});
+  tx(s,'Lorem ipsum dolor sit amet',10.297,3.326,2.066,.689,{sz:14,col:GRAY,ff:MN,ls:1.3});
+  tx(s,'Your Text Here',9.65,4.801,3.011,.404,{col:BLUE,ff:MJ});
+  tx(s,'Lorem ipsum dolor sit amet',9.65,5.224,2.04,.689,{sz:14,col:GRAY,ff:MN,ls:1.3});
+  tx(s,'Your Text Here',1.151,5.128,3.093,.404,{col:SAND,ff:MJ,al:'right'});
+  tx(s,'Lorem ipsum dolor sit amet',1.109,5.551,3.135,.382,{sz:14,col:GRAY,ff:MN,al:'right',ls:1.3});
+  tx(s,[['Grow up your ',{col:INK2}],['business',{col:DARK}],[' in minutes',{col:INK2}]],1.03,.867,4.651,2.282,{sz:48,ff:MJ,ls:.9});
+  s.addChart('doughnut', [{ name: 'Sales', labels: ['1st Qtr', '2nd Qtr', '3rd Qtr', '4th Qtr'], values: [0.25, 0.5, 0.75, 0.25] }], {
+    x: 4.991, y: 1.705, w: 3.784, h: 3.645,
+    holeSize: 64, chartColors: [DARK, GREEN, BLUE, SAND], showLegend: false,
+    showValue: true, showPercent: false, dataLabelFormatCode: '0%', dataLabelColor: W,
+    dataLabelFontSize: 12, dataLabelFontFace: MN, dataBorder: { pt: 1, color: W },
+  });
+}
+
+// ---------------------------------------------------------------- slide 25 --
+/** Slide 25 - A wonderful serenity has taken possession of my entire soul, lik */
+function slide25(s) {
+  // Isometric stack: five plates, alternating wide bases and narrower tops.
+  // [x, y, w, h, faceColour, sideColour]
+  const PLATES = [
+    [5.220, 4.857, 2.893, 1.794, SAND3, GOLD],
+    [4.868, 3.455, 3.598, 2.232, SAND2, SAND],
+    [5.220, 3.381, 2.893, 1.794, BLUE2, BLUE],
+    [4.868, 1.979, 3.598, 2.232, MINT, GREEN],
+    [5.220, 1.905, 2.893, 1.794, TEAL, DARK],
+  ];
+  PLATES.forEach(([x, y, w, h, faceCol, sideCol]) => {
+    poly(s, x, y + h * 0.428, w, h * 0.572, PLATE_SIDE, { fill: sideCol });
+    poly(s, x, y, w, h, PLATE_TOP, { fill: faceCol });
+  });
+  tx(s,'A wonderful serenity has taken possession of my entire soul, like these sweet',1.656,2.787,2.403,.865,{sz:12,col:GRAY,ff:MN,al:'right',ls:1.3,sa:8,flipH:true});
+  sh(s,'roundRect',1.656,2.073,2.682,.63,{flipH:true,fill:GREEN,rectRadius:.315});
+  tx(s,'Your Strategy',1.839,2.181,1.935,.413,{col:OFFW,ff:MN,al:'right',ls:1.1,sb:12,flipH:true});
+  sh(s,'ellipse',3.933,1.999,.779,.779,{flipH:true,fill:DARK});
+  tx(s,'01',3.933,2.169,.779,.438,{sz:20,col:W,ff:MJ,al:'center',flipH:true});
+  tx(s,'A wonderful serenity has taken possession of my entire soul, like these sweet',9.117,4.155,2.215,.865,{sz:12,col:GRAY,ff:MN,ls:1.3,sa:8});
+  sh(s,'roundRect',8.838,3.441,2.682,.63,{fill:BLUE,rectRadius:.315});
+  tx(s,'Your Strategy',9.403,3.549,1.935,.413,{col:OFFW,ff:MN,ls:1.1,sb:12});
+  sh(s,'ellipse',8.466,3.367,.779,.779,{fill:DARK});
+  tx(s,'02',8.466,3.537,.779,.438,{sz:20,col:W,ff:MJ,al:'center'});
+  tx(s,'A wonderful serenity has taken possession of my entire soul, like these sweet',1.656,5.808,2.403,.865,{sz:12,col:GRAY,ff:MN,al:'right',ls:1.3,sa:8,flipH:true});
+  sh(s,'roundRect',1.656,5.094,2.682,.63,{flipH:true,fill:SAND,rectRadius:.315});
+  tx(s,'Your Strategy',1.839,5.202,1.935,.413,{col:OFFW,ff:MN,al:'right',ls:1.1,sb:12,flipH:true});
+  sh(s,'ellipse',3.933,5.02,.779,.779,{flipH:true,fill:DARK});
+  tx(s,'03',3.933,5.19,.779,.438,{sz:20,col:W,ff:MJ,al:'center',flipH:true});
+  tx(s,[['Grow up your ',{col:INK2}],['Business',{col:DARK}]],2.3,.867,8.733,.828,{sz:48,ff:MJ,al:'center',ls:.9});
+}
+
+// ---------------------------------------------------------------- slide 26 --
+/** Slide 26 - Option One */
+function slide26(s) {
+  sh(s,'roundRect',5.267,3.075,2.799,1.597,{fill:W,rectRadius:.208});
+  tx(s,'Option One',5.541,3.413,1.803,.37,{sz:16,col:K,ff:MJ});
+  tx(s,'A wonderful serenity',5.541,3.713,2.25,.337,{sz:14,col:GRAY3,ff:MN});
+  sh(s,'star5',6.469,4.149,.185,.185);
+  sh(s,'star5',6.261,4.149,.185,.185);
+  sh(s,'star5',6.052,4.149,.185,.185);
+  sh(s,'star5',5.844,4.149,.185,.185);
+  sh(s,'star5',5.636,4.149,.185,.185);
+  sh(s,'roundRect',5.267,5.015,2.799,1.597,{fill:GREEN,rectRadius:.208});
+  tx(s,'Option Two',5.541,5.353,1.803,.37,{sz:16,col:SAND,ff:MJ});
+  tx(s,'A wonderful serenity',5.541,5.653,2.25,.337,{sz:14,col:W,ff:MN});
+  sh(s,'star5',6.469,6.089,.185,.185);
+  sh(s,'star5',6.261,6.089,.185,.185);
+  sh(s,'star5',6.052,6.089,.185,.185);
+  sh(s,'star5',5.844,6.089,.185,.185);
+  sh(s,'star5',5.636,6.089,.185,.185);
+  tx(s,'Challenges Businesses Face',1.133,.979,4.503,2.827,{sz:54,col:W,ff:MJ,cs:-1.5});
+  tx(s,'45%',2.122,5.122,2.347,1.212,{sz:66,col:SAND,ff:MJ,cs:-3});
+  sh(s,'rightArrow',1.064,5.339,.897,.776,{rotate:270,fill:W});
+  img(s,6.667,.601,5.417,6.299,{r:.25});
+}
+
+// ---------------------------------------------------------------- slide 27 --
+/** Slide 27 - Subtitle Text Here */
+function slide27(s) {
+  sh(s,'roundRect',.933,1.905,11.468,3.071,{shadow:SHD,fill:W,rectRadius:.307});
+  tx(s,'Subtitle Text Here',.919,5.354,3.415,.314,{sz:14,col:INK,b:1,ff:MJ,va:'bottom',ls:.9});
+  tx(s,'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring.',.919,5.687,3.415,.865,{sz:12,col:GRAY,ff:MN,ls:1.3,sa:8});
+  tx(s,'Subtitle Text Here',4.959,5.354,3.415,.314,{sz:14,col:INK,b:1,ff:MJ,va:'bottom',ls:.9});
+  tx(s,'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring.',4.959,5.687,3.415,.865,{sz:12,col:GRAY,ff:MN,ls:1.3,sa:8});
+  sh(s,'roundRect',8.986,5.294,3.429,1.108,{fill:DARK,line:{color:'081613'},rectRadius:.185});
+  tx(s,'23.500+',9.211,5.487,2.964,.466,{sz:24,col:W,b:1,ff:MJ,va:'bottom',ls:.9});
+  tx(s,'A wonderful serenity taken now',9.211,5.868,2.964,.34,{sz:12,col:W,ff:MN,ls:1.3,sa:8});
+  tx(s,[['Grow up your ',{col:INK2}],['Business',{col:DARK}]],2.3,.867,8.733,.828,{sz:48,ff:MJ,al:'center',ls:.9});
+  s.addChart('bar', [
+    { name: 'Data 1', labels: QTRS, values: [5.2, 8.7, 1.4, 1.2] },
+    { name: 'Data 2', labels: QTRS, values: [5.4, 8.4, 1.2, 1.4] },
+  ], {
+    x: 1.226, y: 2.169, w: 10.881, h: 2.542,
+    barDir: 'col', barGrouping: 'clustered', barGapWidthPct: 100, barOverlapPct: -100,
+    chartColors: [DARK, GREEN], showLegend: false, showValue: false,
+    catAxisLabelFontSize: 8, catAxisLabelFontFace: MN, valAxisLabelFontSize: 8, valAxisLabelFontFace: MN,
+    valAxisLineShow: false, valGridLine: { color: LINE, size: 0.5 }, catGridLine: { style: 'none' },
+  });
+}
+
+// ---------------------------------------------------------------- slide 28 --
+/** Slide 28 - Option 01 */
+function slide28(s) {
+  poly(s, -0.325, -0.115, 6.776, 7.635, BLOB, { fill: DARK, rotate: 180 });
+  sh(s,'roundRect',7.987,.97,3.458,1.615,{shadow:SHD,fill:W,rectRadius:.194});
+  tx(s,'Option 01',8.277,1.078,2.116,.447,{sz:16,col:DARK,b:1,ff:MJ,ls:1.4,sb:12,sa:8});
+  tx(s,'Project Innovation',8.766,1.575,2.441,.337,{sz:14,col:GRAY2,ff:MN,sb:12});
+  sh(s,'roundRect',8.335,1.567,.354,.354,{shadow:SHD,fill:'2D3847',rectRadius:.103});
+  img(s,8.412,1.643,.201,.201,{tiny:1});
+  tx(s,'Explore the Possibility',8.766,2.051,2.441,.337,{sz:14,col:GRAY2,ff:MN,sb:12});
+  sh(s,'roundRect',8.335,2.042,.354,.354,{shadow:SHD,fill:DARK,rectRadius:.103});
+  img(s,8.412,2.119,.201,.201,{tiny:1});
+  sh(s,'roundRect',7.987,2.923,3.458,1.615,{shadow:SHD,fill:W,rectRadius:.194});
+  tx(s,'Option 02',8.277,3.031,2.116,.447,{sz:16,col:DARK,b:1,ff:MJ,ls:1.4,sb:12,sa:8});
+  tx(s,'Project Innovation',8.766,3.528,2.441,.337,{sz:14,col:GRAY2,ff:MN,sb:12});
+  sh(s,'roundRect',8.335,3.519,.354,.354,{shadow:SHD,fill:'2D3847',rectRadius:.103});
+  img(s,8.412,3.595,.201,.201,{tiny:1});
+  tx(s,'Explore the Possibility',8.766,4.004,2.441,.337,{sz:14,col:GRAY2,ff:MN,sb:12});
+  sh(s,'roundRect',8.335,3.995,.354,.354,{shadow:SHD,fill:DARK,rectRadius:.103});
+  img(s,8.412,4.071,.201,.201,{tiny:1});
+  sh(s,'roundRect',7.987,4.875,3.458,1.615,{shadow:SHD,fill:W,rectRadius:.194});
+  tx(s,'Option 03',8.277,4.984,2.116,.447,{sz:16,col:DARK,b:1,ff:MJ,ls:1.4,sb:12,sa:8});
+  tx(s,'Project Innovation',8.766,5.48,2.441,.337,{sz:14,col:GRAY2,ff:MN,sb:12});
+  sh(s,'roundRect',8.335,5.472,.354,.354,{shadow:SHD,fill:'2D3847',rectRadius:.103});
+  img(s,8.412,5.548,.201,.201,{tiny:1});
+  tx(s,'Explore the Possibility',8.766,5.956,2.441,.337,{sz:14,col:GRAY2,ff:MN,sb:12});
+  sh(s,'roundRect',8.335,5.947,.354,.354,{shadow:SHD,fill:DARK,rectRadius:.103});
+  img(s,8.412,6.024,.201,.201,{tiny:1});
+  tx(s,[['Lets',{ls:.9,sb:10,p:1}],['Grow!',{ls:.9,sb:10}]],1.125,4.795,2.303,1.695,{sz:48,col:OFFW,b:1,ff:MJ});
+  img(s,3.433,.583,4.183,6.917);
+}
+
+// ---------------------------------------------------------------- slide 29 --
+/** Slide 29 - Become an Expert */
+function slide29(s) {
+  sh(s,'roundRect',7.042,.893,4.847,2.318,{shadow:SHD,fill:BLUE,rectRadius:.187});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis',7.327,4.669,4.562,.995,{sz:14,col:GRAY,ff:MN,ls:1.3});
+  tx(s,'Become an Expert',7.327,4.146,4.131,.438,{sz:20,col:DARK,ff:MJ});
+  tx(s,'Potential Client',7.453,1.888,3.175,.37,{sz:20,col:W,ff:MJ,ls:.8,sb:12});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit',7.453,2.289,4.006,.683,{sz:14,col:W,ff:MN,ls:1.3,sb:12});
+  tx(s,'13.765+',7.453,1.049,2.851,.774,{sz:40,col:W,ff:MJ});
+  sh(s,'roundRect',1.155,4.101,4.851,2.467,{shadow:SHD,fill:GREEN,rectRadius:.224});
+  tx(s,'Sucecss Story',1.638,5.183,3.729,.37,{sz:20,col:W,ff:MJ,ls:.8,sb:12});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit',1.638,5.583,3.966,.683,{sz:14,col:W,ff:MN,ls:1.3,sb:12});
+  tx(s,'12.765+',1.638,4.344,3.165,.774,{sz:40,col:W,ff:MJ});
+  tx(s,[['Grow up your ',{col:INK2}],['business',{col:DARK}],[' in minutes',{col:INK2}]],1.03,.932,4.651,2.282,{sz:48,ff:MJ,ls:.9});
+}
+
+// ---------------------------------------------------------------- slide 30 --
+/** Slide 30 - Wonderful serenity taken now */
+function slide30(s) {
+  sh(s,'roundRect',1.125,.817,1.775,3.449,{flipH:true,shadow:SHD,fill:GREEN,rectRadius:.269});
+  tx(s,'87%',1.296,1.121,1.433,.586,{sz:32,col:W,b:1,ff:MJ,ls:.9});
+  tx(s,'Wonderful serenity taken now',1.296,2.852,1.433,1.119,{sz:16,col:W,ff:MN,ls:1.3,sa:8});
+  tx(s,'Powering New Beginnings',8.013,4.368,3.839,.345,{col:DARK,b:1,ff:MJ,ls:.8});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar',8.013,4.843,4.068,.928,{sz:13,col:GRAY,ff:MN,ls:1.3});
+  tx(s,[['Detailed Reporting '],{br:1},['for Growth']],7.948,1.728,4.133,2.282,{sz:48,col:INK,b:1,ff:MJ,ls:.9,sb:10});
+  img(s,1.943,2.541,5.345,3.361);
+}
+
+// ---------------------------------------------------------------- slide 31 --
+/** Slide 31 - Bigger Value */
+function slide31(s) {
+  // Funnel: three tapering cones, each with a darker elliptical rim.
+  cone(s, 6.106, 0.897, 4.133, 1.804, CONE_WIDE, DARK, '071613', 0.524);
+  cone(s, 6.796, 3.049, 2.756, 1.8, CONE_MID, GREEN, '114027', 0.35);
+  cone(s, 7.481, 5.159, 1.378, 1.665, CONE_TIP, TEAL, '141D44', 0.175);
+  tx(s,'Bigger Value',6.801,1.813,2.75,.508,{col:W,ff:MJ,al:'center',ls:1.2});
+  tx(s,'Values',7.097,3.888,2.16,.508,{col:W,ff:MJ,al:'center',ls:1.2});
+  tx(s,'Values',7.093,5.505,2.16,.461,{sz:14,col:W,ff:MJ,al:'center',ls:1.2});
+  sh(s,'roundRect',8.531,5.514,2.751,1.273,{fill:W,rectRadius:.636});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer.',9.274,5.716,1.737,.862,{sz:14,col:GRAY2,ff:MN,ls:1.1,sb:12});
+  sh(s,'ellipse',8.234,5.761,.779,.779,{shadow:SHD,fill:GREEN});
+  tx(s,'03',8.234,5.932,.779,.438,{sz:20,col:W,ff:MJ,al:'center'});
+  sh(s,'roundRect',4.299,3.563,2.751,1.273,{flipH:true,fill:W,rectRadius:.636});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer.',4.57,3.765,1.737,.862,{sz:14,col:GRAY2,ff:MN,al:'right',ls:1.1,sb:12,flipH:true});
+  sh(s,'ellipse',6.568,3.81,.779,.779,{flipH:true,shadow:SHD,fill:MINT});
+  tx(s,'02',6.568,3.98,.779,.438,{sz:20,col:W,ff:MJ,al:'center',flipH:true});
+  sh(s,'roundRect',9.847,1.467,2.751,1.273,{fill:W,rectRadius:.636});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer.',10.591,1.669,1.737,.862,{sz:14,col:GRAY2,ff:MN,ls:1.1,sb:12});
+  sh(s,'ellipse',9.551,1.714,.779,.779,{shadow:SHD,fill:GREEN2});
+  tx(s,'01',9.551,1.884,.779,.438,{sz:20,col:W,ff:MJ,al:'center'});
+  tx(s,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus et magnis dis parturient montes,',1.054,5.658,4.835,.865,{sz:12,col:GRAY,ff:MN,ls:1.3});
+  tx(s,'Beauty Your Pitch With Bright Color',1.054,5.236,5.457,.422,{sz:16,col:GREEN,b:1,ff:MN,ls:1.3});
+  tx(s,[['Detailed '],{br:1},['Reporting for '],{br:1},['Growth']],1.125,.88,4.63,2.282,{sz:48,col:INK,b:1,ff:MJ,ls:.9,sb:10});
+}
+
+// ------------------------------------------------------------------ build --
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'WIDE', width: 13.333, height: 7.5 });
+pptx.layout = 'WIDE';
+pptx.theme = { headFontFace: MJ, bodyFontFace: MN };
+pptx.title = 'Business Report';
+
+const BUILDERS = [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20, slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29, slide30, slide31];
+
+BUILDERS.forEach((build, i) => {
+  const s = pptx.addSlide();
+  s.background = { color: [DARK, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, DARK, W, W, W, W, W, W, DARK, W, W, W, W, W][i] };
+  build(s);
+  if (i > 0) footer(s, i + 1);
+});
+
+pptx.writeFile({ fileName: path.join(__dirname, '07c6dadb-bd48-4fae-8ed0-f3f59a75e13b_grok_final.pptx') })
+  .then(f => console.log('wrote ' + f));

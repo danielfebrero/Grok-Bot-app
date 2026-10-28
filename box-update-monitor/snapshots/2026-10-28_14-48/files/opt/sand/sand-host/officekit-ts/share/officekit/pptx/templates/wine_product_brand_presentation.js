@@ -1,0 +1,1060 @@
+/**
+ * Wineyta — wine-themed 30-slide deck, rebuilt with pptxgenjs.
+ *
+ * Layout: 16:9 (13.333in x 7.5in).  Headings use Prata, body copy Montserrat Light.
+ * Photographs in the original deck are replaced by flat colour placeholders.
+ *
+ * Run:  node this-file.js   ->  writes the .pptx next to the script.
+ */
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ theme */
+
+const C = {
+  A1: '5E192E', // deep wine    (accent1)
+  A2: 'CB7695', // rose         (accent2)
+  A3: 'E0AEC0', // blush        (accent3)
+  A4: 'FFD653', // light gold   (accent4)
+  A5: 'FFC000', // gold         (accent5)
+  A6: 'DAA600', // dark gold    (accent6)
+  A1_D25: '461322',
+  A1_D50: '2F0C17',
+  A2_D25: 'AF426A',
+  A2_D50: '742C46',
+  A2_D75: '3A1623',
+  A4_D50: 'A98100',
+  A4_L40: 'FFE698',
+  WHITE: 'FFFFFF',
+  GREY_TEXT: '595959', // tx1 65% lum
+  GREY_LINE: 'D9D9D9', // bg2 85% lum
+  GREY_BAND: 'F2F2F2', // bg1 95% lum
+  GREY_LAND: 'E5E5E5',
+  PAPER: 'F4F1F2',      // photo-placeholder tint
+  PAPER_EDGE: 'E7E2E4',
+  PAPER_TEXT: 'C9C0C4',
+  GREY_MID: '808080',
+  GREY_LT: 'BFBFBF',
+  INK: '404040',
+  SLATE: '394251',
+  CREAM: 'E6E0CA',
+  IVORY: 'F7F3E7',
+  PORCELAIN: 'EAEEEF',
+  TRAY: '61545B',
+};
+
+const HEAD = 'Prata';
+const BODY = 'Montserrat Light';
+// pptxgenjs margin order is [left, right, bottom, top], in points.
+// The template uses 0.1in side insets and 0.05in top/bottom.
+const TEXT_INSET = [7.2, 7.2, 3.6, 3.6];
+
+/* --------------------------------------------------------------- lorem text */
+
+const L_FULL =
+  'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
+  'incididunt ut labore et dolore magna aliqua. Eget arcu dictum varius duis at ' +
+  'consectetur. Eget mauris pharetra et ultrices neque. Enim lobortis scelerisque ' +
+  'fermentum dui faucibus in ornare quam. ';
+const L_MED =
+  'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
+  'incididunt ut labore et dolore magna aliqua. Eget arcu dictum varius duis at consectetur.';
+const L_SHORT =
+  'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
+  'incididunt ut labore.';
+const L_TINY = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit';
+const L_CARD =
+  'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
+  'incididunt ut labore et dolore magna aliqua. ';
+const BULLETS = [
+  'Lorem ipsum dolor sit amet, consectetur adip',
+  'elit, sed do eiusmod tempor incididunt',
+  'Eget arcu dictum varius duis ',
+  'Enim lobortis scelerisque fermentum dui ',
+  'fermentum dui faucibus in ornare quam. ',
+];
+
+/* ------------------------------------------------------------- primitives */
+
+const merge = (base, extra) => Object.assign({}, base, extra || {});
+
+/** Prata heading / label. */
+function head(sl, text, o) {
+  sl.addText(text, merge(
+    { fontFace: HEAD, fontSize: 40, color: C.A1, valign: 'top', margin: TEXT_INSET }, o));
+}
+
+/** Montserrat body copy. */
+function body(sl, text, o) {
+  sl.addText(text, merge(
+    { fontFace: BODY, fontSize: 12, color: C.GREY_TEXT, valign: 'top',
+      lineSpacingMultiple: 1.5, margin: TEXT_INSET }, o));
+}
+
+/** Four-point sparkle. */
+function star(sl, x, y, s, color, rotate) {
+  sl.addShape('star4', { x, y, w: s, h: s, fill: { color }, rotate: rotate || 0 });
+}
+
+function hline(sl, x, y, w, color, o) {
+  sl.addShape('line', { x, y, w, h: 0, line: merge({ color, width: 1 }, o) });
+}
+
+/**
+ * The signature hand-drawn loop that circles every section title.
+ * `w`/`h` size the ellipse, `sweep` is the arc's end angle (degrees).
+ */
+function swirl(sl, x, y, w, h, startAng, endAng, rotate) {
+  sl.addShape('arc', {
+    x, y, w, h, rotate: rotate === undefined ? 11.46 : rotate,
+    angleRange: [Math.round(startAng), Math.round(endAng)],
+    line: { color: C.A4, width: 0.5 },
+  });
+}
+
+/** Title + swirl + sparkle, the deck's recurring headline unit. */
+function titleBlock(sl, text, t, arc) {
+  head(sl, text, { x: t.x, y: t.y, w: t.w, h: t.h || 1.447, fontSize: t.size || 40,
+    align: t.align, color: t.color || C.A1 });
+  if (arc) {
+    swirl(sl, arc.x, arc.y, arc.w, arc.h, arc.a1, arc.a2, arc.rot);
+    star(sl, arc.sx, arc.sy, 0.188, arc.sc || C.A2, 344.61);
+  }
+}
+
+/** Outlined pill button ("MORE", "Checkout"). */
+function button(sl, x, y, w, h, label) {
+  sl.addShape('rect', { x, y, w, h, fill: { color: C.WHITE }, line: { color: C.A1, width: 0.5 } });
+  sl.addText(label, { x, y, w, h, align: 'center', valign: 'middle',
+    fontFace: HEAD, fontSize: 12, color: C.A1, charSpacing: 3 });
+}
+
+/** "✦ More Product ⟶" call-to-action row. */
+function ctaLink(sl, x, y, label, size, arrow) {
+  star(sl, x, y + 0.058, 0.188, C.A2);
+  head(sl, label, { x: x + 0.188, y, w: 1.6, h: 0.34, fontSize: size || 14 });
+  if (arrow) {
+    sl.addShape('line', { x: arrow, y: y + 0.158, w: 0.357, h: 0,
+      line: { color: C.A5, width: 0.25, endArrowType: 'triangle' } });
+  }
+}
+
+/** "Subtitle Here ✦ ————" divider. */
+function subtitleRow(sl, x, y, starX, ruleX, ruleW) {
+  head(sl, 'Subtitle Here', { x, y, w: 3.672, h: 0.37, fontSize: 16 });
+  star(sl, starX, y + 0.077, 0.188, C.A2);
+  hline(sl, ruleX, y + 0.173, ruleW, C.A5);
+}
+
+/** "Insert Title Here" + micro-copy, used by the four-up infographics. */
+function labelBlock(sl, x, y, align, w) {
+  const width = w || 2.975;
+  head(sl, 'Insert Title Here', { x, y, w: width, h: 0.337, fontSize: 14, align });
+  body(sl, L_TINY, { x, y: y + 0.291, w: width, h: 0.673, align });
+}
+
+/** The 2x2 label ring around a centred infographic. */
+function quadLabels(sl, leftX, rightX) {
+  [2.759, 5.49].forEach(function (y) {
+    labelBlock(sl, leftX, y, 'right');
+    labelBlock(sl, rightX, y, 'left');
+  });
+}
+
+/** Bulleted list row: sparkle + text + dashed rule underneath. */
+function bulletRow(sl, x, y, text, w, ruleX, ruleW, color, hasRule) {
+  star(sl, x, y + 0.021, 0.26, C.A5);
+  sl.addText(text, { x: x + 0.391, y, w, h: 0.303, fontFace: BODY, fontSize: 12,
+    color: color || C.GREY_TEXT, valign: 'middle', margin: TEXT_INSET });
+  if (hasRule) {
+    hline(sl, ruleX, y + 0.618, ruleW, C.GREY_LINE, { width: 1, dashType: 'dash' });
+  }
+}
+
+/** Blend a hex colour towards white; `t` is the transparency percentage. */
+function fade(hex, t) {
+  const k = t / 100;
+  let out = '';
+  for (let i = 0; i < 6; i += 2) {
+    const v = parseInt(hex.substr(i, 2), 16);
+    out += ('0' + Math.round(v + (255 - v) * k).toString(16)).slice(-2).toUpperCase();
+  }
+  return out;
+}
+
+/**
+ * White->colour ramp built from opaque bands (pptxgenjs has no gradient fill,
+ * and stacking translucent rects seams badly when rendered).
+ * `dir` is 'v' (top to bottom) or 'h' (left to right).
+ */
+function gradBands(sl, x, y, w, h, color, tFrom, tTo, n, dir) {
+  const vertical = dir !== 'h';
+  const band = (vertical ? h : w) / n;
+  for (let i = 0; i < n; i++) {
+    const t = tFrom + (tTo - tFrom) * (i + 0.5) / n;
+    sl.addShape('rect', {
+      x: vertical ? x : x + band * i,
+      y: vertical ? y + band * i : y,
+      w: vertical ? w : band * 1.15,
+      h: vertical ? band * 1.15 : h,
+      fill: { color: fade(color, t) },
+    });
+  }
+}
+
+/**
+ * Stand-in for one of the template's photo frames: a soft tinted rectangle at
+ * the original position, captioned when the frame is big enough to read it.
+ */
+function photo(sl, x, y, w, h) {
+  sl.addShape('rect', { x, y, w, h, fill: { color: C.PAPER },
+    line: { color: C.PAPER_EDGE, width: 0.5 } });
+  if (w >= 2.4 && h >= 1.2) {
+    sl.addText('[image]', { x, y: y + h / 2 - 0.18, w, h: 0.36, align: 'center',
+      fontFace: BODY, fontSize: 11, color: C.PAPER_TEXT });
+  }
+}
+
+/* ------------------------------------------------ flat-vector illustrations */
+
+/** Wine bottle: cap, neck, shouldered body, label band. */
+function bottle(sl, x, y, w, h, c) {
+  const nw = w * 0.34, nx = x + (w - nw) / 2;
+  const capH = h * 0.07, neckH = h * 0.30;
+  const by = y + capH + neckH * 0.8, bh = y + h - by;
+  sl.addShape('rect', { x: nx, y: y + capH, w: nw, h: neckH, fill: { color: c.glass } });
+  sl.addShape('roundRect', { x, y: by, w, h: bh, fill: { color: c.glass }, rectRadius: 0.12 });
+  sl.addShape('rect', { x, y: by + bh * 0.32, w, h: bh * 0.60, fill: { color: c.wine } });
+  sl.addShape('rect', { x, y: by + bh * 0.26, w, h: bh * 0.34, fill: { color: c.label } });
+  sl.addShape('rect', { x, y: by + bh * 0.26, w, h: bh * 0.05, fill: { color: c.trim } });
+  sl.addShape('rect', { x, y: by + bh * 0.57, w, h: bh * 0.03, fill: { color: c.trim } });
+  sl.addShape('rect', { x: nx - w * 0.02, y: y + capH * 0.85, w: nw + w * 0.04, h: h * 0.05,
+    fill: { color: c.cap } });
+  sl.addShape('rect', { x: nx, y, w: nw, h: capH, fill: { color: c.cap } });
+}
+
+/** Stemmed glass with wine in the bowl. */
+function wineGlass(sl, x, y, w, h, glass, wine) {
+  sl.addShape('ellipse', { x, y, w, h: h * 0.62, fill: { color: glass } });
+  sl.addShape('ellipse', { x: x + w * 0.07, y: y + h * 0.14, w: w * 0.86, h: h * 0.44,
+    fill: { color: wine } });
+  sl.addShape('rect', { x: x + w * 0.44, y: y + h * 0.5, w: w * 0.12, h: h * 0.42,
+    fill: { color: glass } });
+  sl.addShape('roundRect', { x: x + w * 0.2, y: y + h * 0.9, w: w * 0.6, h: h * 0.09,
+    fill: { color: glass }, rectRadius: 0.6 });
+}
+
+/** Champagne flute — narrow cone bowl on a stem. */
+function flute(sl, x, y, w, h, glass, wine) {
+  sl.addShape('triangle', { x, y, w, h: h * 0.6, fill: { color: glass }, flipV: true });
+  sl.addShape('triangle', { x: x + w * 0.1, y: y + h * 0.16, w: w * 0.8, h: h * 0.42,
+    fill: { color: wine }, flipV: true });
+  sl.addShape('rect', { x: x + w * 0.44, y: y + h * 0.58, w: w * 0.12, h: h * 0.34,
+    fill: { color: glass } });
+  sl.addShape('roundRect', { x: x + w * 0.22, y: y + h * 0.9, w: w * 0.56, h: h * 0.08,
+    fill: { color: glass }, rectRadius: 0.6 });
+}
+
+/** Line-art cocktail/wine icon used on the timeline slides. */
+function glassIcon(sl, x, y, w, h, color) {
+  const ln = { color, width: 1 };
+  sl.addShape('triangle', { x, y, w, h: h * 0.5, fill: { type: 'none' }, line: ln, flipV: true });
+  sl.addShape('line', { x: x + w / 2, y: y + h * 0.5, w: 0, h: h * 0.36, line: ln });
+  sl.addShape('line', { x: x + w * 0.22, y: y + h * 0.87, w: w * 0.56, h: 0, line: ln });
+  sl.addShape('ellipse', { x: x + w * 0.62, y: y + h * 0.02, w: w * 0.22, h: h * 0.16,
+    fill: { type: 'none' }, line: ln });
+}
+
+/** Line-art bottle icon (optionally paired with a small goblet). */
+function bottleIcon(sl, x, y, w, h, color, withGlass) {
+  const ln = { color, width: 1 };
+  const bw = withGlass ? w * 0.42 : w * 0.6;
+  const bx = x + (withGlass ? 0 : (w - bw) / 2);
+  const nw = bw * 0.34;
+  sl.addShape('rect', { x: bx + (bw - nw) / 2, y, w: nw, h: h * 0.3,
+    fill: { type: 'none' }, line: ln });
+  sl.addShape('roundRect', { x: bx, y: y + h * 0.26, w: bw, h: h * 0.74,
+    fill: { type: 'none' }, line: ln, rectRadius: 0.2 });
+  if (withGlass) {
+    const gx = x + w * 0.55, gw = w * 0.45;
+    sl.addShape('roundRect', { x: gx, y: y + h * 0.28, w: gw, h: h * 0.4,
+      fill: { type: 'none' }, line: ln, rectRadius: 0.6 });
+    sl.addShape('line', { x: gx + gw / 2, y: y + h * 0.66, w: 0, h: h * 0.24, line: ln });
+    sl.addShape('line', { x: gx + gw * 0.2, y: y + h * 0.9, w: gw * 0.6, h: 0, line: ln });
+  }
+}
+
+/** Line-art beer stein icon. */
+function mugIcon(sl, x, y, w, h, color) {
+  const ln = { color, width: 1 };
+  const bw = w * 0.7;
+  sl.addShape('rect', { x, y: y + h * 0.22, w: bw, h: h * 0.7, fill: { type: 'none' }, line: ln });
+  sl.addShape('roundRect', { x: x + bw * 0.94, y: y + h * 0.38, w: w * 0.3, h: h * 0.34,
+    fill: { type: 'none' }, line: ln, rectRadius: 0.6 });
+  sl.addShape('ellipse', { x, y, w: bw * 0.5, h: h * 0.26, fill: { type: 'none' }, line: ln });
+  sl.addShape('ellipse', { x: x + bw * 0.42, y: y + h * 0.02, w: bw * 0.58, h: h * 0.24,
+    fill: { type: 'none' }, line: ln });
+}
+
+/** Cylinder for the 3-D looking bar charts. */
+function cylinder(sl, x, y, w, h, side, top, hole) {
+  const cap = w * 0.34;
+  sl.addShape('rect', { x, y: y + cap / 2, w, h: h - cap / 2, fill: { color: side } });
+  sl.addShape('ellipse', { x, y: y + h - cap / 2, w, h: cap, fill: { color: side } });
+  sl.addShape('ellipse', { x, y, w, h: cap, fill: { color: top } });
+  sl.addShape('ellipse', { x: x + w * 0.17, y: y + cap * 0.22, w: w * 0.66, h: cap * 0.56,
+    fill: { color: hole } });
+}
+
+/** Marker line with a small ring at each end (slide 24 value callouts). */
+function lollipop(sl, x, yTop, yBot, color) {
+  sl.addShape('line', { x, y: yTop, w: 0, h: yBot - yTop, line: { color, width: 1.5 } });
+  [yTop, yBot].forEach(function (y) {
+    sl.addShape('ellipse', { x: x - 0.044, y: y - 0.044, w: 0.088, h: 0.088,
+      fill: { color: C.WHITE }, line: { color, width: 1 } });
+  });
+}
+
+/** Two-tone triangle pair — one blade of the pinwheel infographics. */
+function blade(sl, a, b, c, colA, d, colB) {
+  sl.addShape('custGeom', { x: 0, y: 0, w: 13.333, h: 7.5, fill: { color: colA },
+    points: [{ x: a[0], y: a[1] }, { x: b[0], y: b[1] }, { x: c[0], y: c[1] }, { close: true }] });
+  sl.addShape('custGeom', { x: 0, y: 0, w: 13.333, h: 7.5, fill: { color: colB },
+    points: [{ x: c[0], y: c[1] }, { x: b[0], y: b[1] }, { x: d[0], y: d[1] }, { close: true }] });
+}
+
+/* ------------------------------------------------------------------- maps */
+/* Coarse raster tracings of the original vector maps: '#' land, 'M'/'Y'/'P'
+   are the highlighted regions. Each glyph becomes one small rectangle.      */
+
+const WORLD = [
+  '..................###....####...........................................',
+  '................####.##########.........................................',
+  '.................##.##########..........................................',
+  '......................########......................YYYY................',
+  '................###....######.....................YYYYYYYYYY..Y.........',
+  '.#####.###.....#####....#####.........##Y.....YYYYYYYYYYYYYYYYYYYYY.YY..',
+  '.################..##...###..........###YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY.',
+  '.###############...##...##..........####YYYYYYYYYYYYYYYYYYYYYYYYYYYYYY..',
+  '.###.##########...##...............###.YYYYYYYYYYYYYYYYYYYYYYYYYY.YY....',
+  '.......##########.####...........P....##YYYYYYYYYYYYYYYYYYYYYY...YY.....',
+  '........###############..........P.#####YYYYYY####YYYYYYYY#YYY...Y......',
+  '.........MMMMMMM#####.#...........########YY################YY..........',
+  '.........MMMMMMMM#MM.............#######..YY################Y...........',
+  '.........MMMMMMMMMM.............##....######.#############.#............',
+  '..........MMMMMMMM..............####.....#################...#..........',
+  '...........##MMM.M..............##########################..............',
+  '............###................###############.###########..............',
+  '.............###...............##############...###.###.................',
+  '................#..............#############.....#...###................',
+  '..................####.........#############............................',
+  '..................######............#######..........##.##..............',
+  '..................########..........######............#.#....#..........',
+  '..................#########.........######....................#.........',
+  '..................########..........######..................#...........',
+  '....................######..........#####..#..............#####.........',
+  '....................#####............####...............########........',
+  '....................####.............###.................########.......',
+  '...................####...............#..................##..###........',
+  '...................###........................................##........',
+  '...................##...................................................',
+  '...................##...................................................',
+  '...................#....................................................',
+];
+
+const AUS = [
+  '..............................................',
+  '..............................................',
+  '....................#........#................',
+  '.................#######.....#................',
+  '.................######.....###...............',
+  '............###.#######.....####..............',
+  '............############....####..............',
+  '...........###############..#####.............',
+  '.........########################.............',
+  '.........########################.............',
+  '.......############################...........',
+  '...#################################..........',
+  '..##################################..........',
+  '.#####################################........',
+  '.#####################################........',
+  '.######################################.......',
+  '.###############MMMMMMMMMMMM############......',
+  '.###############MMMMMMMMMMMM############......',
+  '.###############MMMMMMMMMMMM############......',
+  '..##############MMMMMMMMMMMMYYYYYYYYYYYYY.....',
+  '..##############MMMMMMMMMMMMYYYYYYYYYYYY......',
+  '..##############MMMMMMMMMMMMYYYYYYYYYYYY......',
+  '...#############...MMMMMMMMMYYYYYYYYYYYY......',
+  '...#########.........MMMMMMMYYYYYYYYYYY.......',
+  '..#########...........MMMMMMYYYYYYYYYY........',
+  '...##....................MMM##YYYYYYYY........',
+  '..........................MM###YYYYYY.........',
+  '...........................M#######YY.........',
+  '............................#######...........',
+  '..............................................',
+  '..............................................',
+  '................................#.#...........',
+  '................................###...........',
+  '.................................#............',
+];
+
+const ASIA = [
+  '...........##.......................................',
+  '........########....................................',
+  '.......##########......................MMM..........',
+  '.###################.......##.........MMMM..........',
+  '#####################.###############MMMMMMM........',
+  '#####################MM##############MMMMMMMMM......',
+  '...################MMMM##############MMMMMMMMM......',
+  '..################MMMMMMM#########MMMMMMMMMMM.....#.',
+  '...###############MMMMMMMMM######MMMMMMMMMMM.....###',
+  '....############MMMMMMMMMMMMMMMMMMMMMMMMMM##........',
+  '....##########MMMMMMMMMMMMMMMMMMMMMMMM...##......#..',
+  '....#.#########MMMMMMMMMMMMMMMMMMMMMMM....#.....##..',
+  '........#....###MMMMMMMMMMMMMMMMMMMMMMM...##...##...',
+  '.............####MMMMMMMMMMMMMMMMMMMMMM......##.....',
+  '............#####MMMMMMMMMMMMMMMMMMMMMM.....#.......',
+  '..........########MMMMMMMMMMMMMMMMMMMMM.............',
+  '........############MMMMM##MMMMMMMMMMMM.............',
+  '........###################MMMMMMMMMMM..............',
+  '...........################MMMMMMMMMM..#............',
+  '............###########.####M###MMM.................',
+  '..............#######....######..#..................',
+  '..............#####......#######.......#............',
+  '..............####.........######......#............',
+  '...............###.........######...................',
+  '...............###............###...................',
+  '................#..........#.............#..........',
+  '............................#............#..........',
+  '..........................####.....##...............',
+  '...........................###...#####..............',
+  '............................##...####........#......',
+  '.............................##...###.##.....####...',
+  '..............................#.................##..',
+  '................................###.............##..',
+  '....................................................',
+];
+
+const MAP_COLORS = { '#': C.GREY_LAND, M: C.A1, Y: C.A5, P: C.A2 };
+
+function drawMap(sl, rows, x, y, w, h) {
+  const cw = w / rows[0].length, ch = h / rows.length;
+  rows.forEach(function (row, r) {
+    for (let c = 0; c < row.length; c++) {
+      const color = MAP_COLORS[row[c]];
+      if (!color) continue;
+      let c2 = c;
+      while (c2 + 1 < row.length && row[c2 + 1] === row[c]) c2++;
+      sl.addShape('rect', { x: x + c * cw, y: y + r * ch, w: cw * (c2 - c + 1), h: ch * 1.08,
+        fill: { color } });
+      c = c2;
+    }
+  });
+}
+
+/* --------------------------------------------------------------- the deck */
+
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'WIDE_13x75', width: 13.333, height: 7.5 });
+pptx.layout = 'WIDE_13x75';
+pptx.author = 'Wineyta';
+pptx.title = 'Wineyta Presentation';
+
+/** Slides 1 & 30 — full-bleed wine background with the wordmark. */
+function coverSlide(bigText, smallText) {
+  const sl = pptx.addSlide();
+  gradBands(sl, 0, 0, 13.333, 7.5, C.A1, 8, 15, 24, 'h');
+  sl.addText(bigText, { x: 1.092, y: 4.839, w: 5.0, h: 1.111,
+    fontFace: HEAD, fontSize: 60, color: C.A5, valign: 'top', margin: TEXT_INSET });
+  sl.addText(smallText, { x: 1.162, y: 5.804, w: 3.0, h: 0.438,
+    fontFace: BODY, fontSize: 20, color: C.A5, valign: 'top', margin: TEXT_INSET });
+  hline(sl, 0, 6.772, 2.035, C.A6);
+}
+
+function slide01() { coverSlide('Wineyta', 'Presentation'); }
+
+function slide02() {
+  const sl = pptx.addSlide();
+  photo(sl, 0, 0, 5.667, 7.5);
+  titleBlock(sl, [{ text: 'Made In ', options: { breakLine: true } }, { text: 'Many Varieties' }],
+    { x: 7.168, y: 1.783, w: 4.208 },
+    { x: 8.802, y: 2.522, w: 2.563, h: 0.525, a1: 354, a2: 342, sx: 10.687, sy: 3.049 });
+  body(sl, L_FULL, { x: 7.168, y: 3.23, w: 4.495, h: 1.884, align: 'justify' });
+  button(sl, 7.283, 5.289, 1.503, 0.428, 'MORE');
+}
+
+function slide03() {
+  const sl = pptx.addSlide();
+  photo(sl, 6.667, 1.226, 6.667, 5.048);
+  titleBlock(sl, 'Having An Alcoholic Content', { x: 0.856, y: 1.499, w: 5.112 },
+    { x: 3.501, y: 2.28, w: 2.394, h: 0.565, a1: 350, a2: 330, sx: 5.163, sy: 2.835 });
+  body(sl, L_FULL, { x: 0.856, y: 2.946, w: 4.495, h: 1.884, align: 'justify' });
+  subtitleRow(sl, 0.856, 4.959, 2.477, 2.837, 2.458);
+  body(sl, L_SHORT, { x: 0.856, y: 5.329, w: 4.495, h: 0.673, align: 'justify' });
+}
+
+function slide04() {
+  const sl = pptx.addSlide();
+  photo(sl, 0.683, 0.619, 11.968, 4.365);
+  titleBlock(sl, 'Variety Of Such Fermented', { x: 0.945, y: 5.43, w: 4.495 },
+    { x: 0.814, y: 6.238, w: 3.437, h: 0.479, a1: 356, a2: 328, rot: 11.02, sx: 3.196, sy: 6.711 });
+  subtitleRow(sl, 5.954, 5.431, 7.575, 7.935, 4.327);
+  body(sl, L_MED, { x: 5.954, y: 5.801, w: 6.434, h: 0.976, align: 'justify' });
+}
+
+function slide05() {
+  const sl = pptx.addSlide();
+  photo(sl, 0.938, 1.031, 4.854, 5.438);
+  titleBlock(sl, '"Wine" comes from the Old English', { x: 6.63, y: 1.519, w: 5.62 },
+    { x: 8.751, y: 2.252, w: 2.312, h: 0.579, a1: 350, a2: 335, sx: 10.39, sy: 2.816 });
+  body(sl, L_FULL, { x: 6.63, y: 4.427, w: 5.62, h: 1.581, align: 'justify' });
+  ctaLink(sl, 6.74, 6.132, 'More Product', 14, 8.471);
+}
+
+function slide06() {
+  const sl = pptx.addSlide();
+  titleBlock(sl, 'Content Of Wine Is About 12%', { x: 4.014, y: 0.641, w: 5.306, align: 'center' },
+    { x: 5.457, y: 1.477, w: 3.004, h: 0.446, a1: 356, a2: 331, sx: 7.45, sy: 1.937 });
+  [1.302, 4.952, 8.603].forEach(function (x) {
+    photo(sl, x, 2.46, 3.429, 3.429);
+    gradBands(sl, x, 4.19, 3.429, 1.698, C.A1, 100, 0, 40);
+    head(sl, 'Lorem ipsum dolor sit amet consec  ',
+      { x: x + 0.49, y: 5.108, w: 2.448, h: 0.64, fontSize: 16, color: C.A5, align: 'center' });
+    body(sl, 'Lorem ipsum dolor sit amet, consec tetur adipiscing elit, sed.',
+      { x, y: 6.019, w: 3.429, h: 0.673, align: 'center' });
+  });
+}
+
+function slide07() {
+  const sl = pptx.addSlide();
+  photo(sl, 7.229, 0.917, 5.271, 2.645);
+  photo(sl, 7.229, 3.938, 5.271, 2.645);
+  titleBlock(sl, 'Wine Symbolized Life And Vitality', { x: 0.963, y: 1.66, w: 5.393 },
+    { x: 3.377, y: 2.37, w: 2.1, h: 0.584, a1: 349, a2: 282, sx: 4.663, sy: 2.907 });
+  body(sl, L_FULL + 'Lorem ipsum dolor sit amet, consec tetur adipiscing elit, sed.',
+    { x: 0.963, y: 3.107, w: 5.176, h: 2.187, align: 'justify' });
+  body(sl, 'Lorem ipsum dolor sit amet', { x: 0.963, y: 5.396, w: 3.672, h: 0.303,
+    lineSpacingMultiple: 1 });
+  star(sl, 4.962, 5.473, 0.188, C.A2);
+  head(sl, 'Submit', { x: 5.076, y: 5.396, w: 1.062, h: 0.37, fontSize: 16, align: 'right' });
+  hline(sl, 1.047, 5.84, 5.028, C.A5);
+}
+
+function slide08() {
+  const sl = pptx.addSlide();
+  photo(sl, 5.859, 1.429, 4.404, 4.404);
+  photo(sl, 10.732, 3.056, 2.602, 2.776);
+  sl.addShape('line', { x: 10.732, y: 2.401, w: 1.216, h: 0,
+    line: { color: C.A5, width: 0.5, endArrowType: 'triangle' } });
+  titleBlock(sl, 'Expertise In Wine Theory', { x: 0.894, y: 2.306, w: 4.495 },
+    { x: 2.35, y: 3.081, w: 2.429, h: 0.528, a1: 348, a2: 329, sx: 3.827, sy: 3.574 });
+  body(sl, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
+    'incididunt ut labore et dolore magna aliqua. Eget arcu dictum varius duis.',
+    { x: 0.894, y: 3.916, w: 4.208, h: 1.279, align: 'justify' });
+  head(sl, 'Insert Product Here', { x: 5.754, y: 6.053, w: 3.214, h: 0.337, fontSize: 14 });
+  body(sl, '2018 Lorem ipsum dolor, 450ml', { x: 5.754, y: 6.358, w: 3.214, h: 0.303,
+    lineSpacingMultiple: 1 });
+  sl.addText([
+    { text: '$', options: { fontSize: 14, fontFace: BODY, color: C.A5 } },
+    { text: '45', options: { fontSize: 28, fontFace: HEAD, color: C.A1 } },
+  ], { x: 9.467, y: 6.071, w: 0.893, h: 0.572, align: 'right', valign: 'top',
+    margin: TEXT_INSET });
+}
+
+function slide09() {
+  const sl = pptx.addSlide();
+  titleBlock(sl, 'Drinking A Daily Glass Of Wine', { x: 0.901, y: 1.624, w: 4.787 },
+    { x: 2.446, y: 2.427, w: 2.575, h: 0.509, a1: 353, a2: 206, sx: 4.051, sy: 2.926 });
+  hline(sl, 0, 3.979, 2.792, C.A5);
+  body(sl, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
+    'incididunt ut labore et dolore magna aliqua. Eget arcu dictum varius duis at consectetur. ' +
+    'Eget mauris pharetra et ultrices neque. ',
+    { x: 8.29, y: 2.812, w: 4.148, h: 1.581, align: 'justify', color: C.INK });
+  [['What\u2019s Your Name?', 4.654], ['Email:', 5.289]].forEach(function (f) {
+    sl.addShape('rect', { x: 8.385, y: f[1], w: 4.042, h: 0.51,
+      fill: { type: 'none' }, line: { color: C.A5, width: 0.75 } });
+    head(sl, f[0], { x: 8.479, y: f[1] + 0.104, w: 3.417, h: 0.303, fontSize: 12 });
+  });
+  star(sl, 11.251, 6.175, 0.188, C.A2);
+  head(sl, 'Submit', { x: 11.365, y: 6.098, w: 1.062, h: 0.37, fontSize: 16, align: 'right' });
+  sl.addShape('line', { x: 11.211, y: 6.559, w: 1.216, h: 0,
+    line: { color: C.A5, width: 0.5, endArrowType: 'triangle' } });
+}
+
+function slide10() {
+  const sl = pptx.addSlide();
+  sl.addShape('rect', { x: 0, y: 5.952, w: 13.333, h: 1.566, fill: { color: C.GREY_BAND } });
+  titleBlock(sl, [{ text: 'Moderate ', options: { breakLine: true } },
+    { text: 'Amounts Of Red Wine' }], { x: 0.894, y: 0.83, w: 6.793 },
+    { x: 4.27, y: 1.612, w: 3.004, h: 0.509, a1: 353, a2: 227, sx: 6.55, sy: 2.154 });
+  body(sl, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
+    'incididunt ut labore et dolore magna aliqua. Eget arcu dictum varius duis.',
+    { x: 0.894, y: 2.44, w: 7.814, h: 0.673 });
+  const cols = [0.987, 4.813, 8.638], rows = [3.366, 5.104];
+  rows.forEach(function (cy, ri) {
+    cols.forEach(function (cx, ci) {
+      const active = ri === 1 && ci === 0;
+      sl.addShape('rect', { x: cx, y: cy, w: 3.647, h: 1.566, fill: { color: C.WHITE },
+        line: { color: active ? C.A5 : C.GREY_LINE, width: 0.75 } });
+      head(sl, 'Insert Title Here', { x: cx + 0.229, y: cy + 0.301, w: 2.975, h: 0.337, fontSize: 14 });
+      body(sl, L_TINY, { x: cx + 0.229, y: cy + 0.592, w: 2.975, h: 0.673 });
+      const bx = cx + 3.27, by = cy + 1.189;
+      sl.addShape('ellipse', { x: bx, y: by, w: 0.284, h: 0.284,
+        fill: { color: active ? C.A5 : C.WHITE }, line: { color: C.A5, width: 0.5 } });
+      star(sl, bx + 0.063, by + 0.063, 0.158, C.A1);
+    });
+  });
+}
+
+function slide11() {
+  const sl = pptx.addSlide();
+  titleBlock(sl, 'Effects On Our Health.', { x: 1.295, y: 1.767, w: 4.132 },
+    { x: 2.478, y: 2.495, w: 2.178, h: 0.518, a1: 349, a2: 284, sx: 4.158, sy: 2.99 });
+  body(sl, L_FULL, { x: 1.295, y: 3.215, w: 4.495, h: 1.884, align: 'justify' });
+  button(sl, 1.41, 5.305, 1.503, 0.428, 'MORE');
+  hline(sl, 0, 6.63, 2.792, C.A5);
+  BULLETS.forEach(function (t, i) {
+    const y = 1.732 + i * 0.9334;
+    bulletRow(sl, 7.245, y, t, 4.73, 7.714, 4.386, C.GREY_TEXT, i < 4);
+  });
+}
+
+function slide12() {
+  const sl = pptx.addSlide();
+  // Smartphone mock-up (the only bitmap in the source deck).
+  sl.addShape('roundRect', { x: 2.293, y: 1.042, w: 3.11, h: 5.833, fill: { color: C.INK },
+    line: { color: C.GREY_MID, width: 1 }, rectRadius: 0.12 });
+  sl.addShape('roundRect', { x: 2.4, y: 1.15, w: 2.896, h: 5.617, fill: { color: C.WHITE },
+    rectRadius: 0.1 });
+  sl.addShape('roundRect', { x: 3.35, y: 1.155, w: 1.0, h: 0.16, fill: { color: C.INK },
+    rectRadius: 0.5 });
+  titleBlock(sl, 'Blood Alcohol Content (BAC)', { x: 6.339, y: 1.402, w: 5.239 },
+    { x: 8.556, y: 2.101, w: 2.111, h: 0.523, a1: 346, a2: 302, sx: 10.394, sy: 2.57 });
+  body(sl, L_FULL, { x: 6.339, y: 2.849, w: 5.382, h: 1.581, align: 'justify' });
+  subtitleRow(sl, 6.339, 4.592, 7.959, 8.32, 3.258);
+  body(sl, L_SHORT, { x: 6.339, y: 4.962, w: 5.382, h: 0.673, align: 'justify' });
+  button(sl, 6.437, 5.846, 1.651, 0.428, 'Checkout');
+}
+
+function slide13() {
+  const sl = pptx.addSlide();
+  titleBlock(sl, 'Can Wine Get You Drunk?', { x: 0.787, y: 0.69, w: 4.495 },
+    { x: 1.886, y: 1.436, w: 2.23, h: 0.509, a1: 353, a2: 332, sx: 3.677, sy: 1.929 });
+  hline(sl, 0, 2.815, 2.792, C.A5);
+  body(sl, L_FULL, { x: 5.016, y: 2.661, w: 6.584, h: 1.279, align: 'justify' });
+  ctaLink(sl, 5.14, 4.201, 'More Product', 14, 6.871);
+  [5.115, 7.283, 9.452].forEach(function (x) { photo(sl, x, 4.791, 1.961, 1.961); });
+  photo(sl, 11.622, 4.791, 1.711, 1.961);
+}
+
+function slide14() {
+  const sl = pptx.addSlide();
+  photo(sl, 8.175, 0, 5.159, 7.5);
+  gradBands(sl, 0, 0, 8.175, 7.5, C.A1, 5, 6, 12, 'h');
+  titleBlock(sl, 'Calculated Based On Your Weight', { x: 1.187, y: 1.66, w: 5.112, color: C.WHITE },
+    { x: 3.559, y: 2.407, w: 2.1, h: 0.586, a1: 352, a2: 317, sx: 5.206, sy: 2.95, sc: C.A3 });
+  body(sl, L_FULL + 'Lorem ipsum dolor sit amet, consec tetur adipiscing elit, sed.',
+    { x: 1.187, y: 3.107, w: 5.176, h: 2.187, align: 'justify', color: C.WHITE });
+  body(sl, 'Lorem ipsum dolor sit amet', { x: 1.187, y: 5.396, w: 3.672, h: 0.303,
+    color: C.WHITE, lineSpacingMultiple: 1 });
+  star(sl, 5.186, 5.473, 0.188, C.A2);
+  head(sl, 'Submit', { x: 5.3, y: 5.396, w: 1.062, h: 0.37, fontSize: 16, align: 'right',
+    color: C.WHITE });
+  hline(sl, 1.27, 5.84, 5.028, C.A5);
+}
+
+function slide15() {
+  const sl = pptx.addSlide();
+  titleBlock(sl, 'Meet Our Customers', { x: 4.419, y: 0.641, w: 4.495, align: 'center' },
+    { x: 5.001, y: 1.375, w: 3.287, h: 0.61, a1: 355, a2: 342, rot: 7.22, sx: 7.598, sy: 1.946 });
+  const cards = [
+    { x: 1.063, pic: 2.129, stars: [C.A2, C.A2], sx: 2.487 },
+    { x: 4.866, pic: 5.931, stars: [C.A5, C.A5, C.A5], sx: 6.087 },
+    { x: 8.668, pic: 9.733, stars: [C.A2, C.A2], sx: 10.091 },
+  ];
+  cards.forEach(function (cd) {
+    sl.addShape('rect', { x: cd.x, y: 3.292, w: 3.602, h: 3.248, fill: { color: C.WHITE },
+      line: { color: C.GREY_LINE, width: 0.75 } });
+    photo(sl, cd.pic, 2.556, 1.471, 1.471);
+    sl.addText([
+      { text: 'Insert Title Here', options: { fontSize: 14, color: C.A1, breakLine: true } },
+      { text: 'Customer', options: { fontSize: 12, color: C.GREY_TEXT } },
+    ], { x: cd.x + 0.314, y: 3.973 + 0.372, w: 2.975, h: 0.577, align: 'center', valign: 'top',
+      fontFace: HEAD, lineSpacingMultiple: 1.1, margin: TEXT_INSET });
+    body(sl, L_CARD, { x: cd.x + 0.308, y: 4.923, w: 3.048, h: 1.279, align: 'center' });
+    cd.stars.forEach(function (c, i) { star(sl, cd.sx + i * 0.403, 6.363, 0.353, c); });
+  });
+}
+
+function slide16() {
+  const sl = pptx.addSlide();
+  titleBlock(sl, 'When Should I Drink Wine?', { x: 0.945, y: 0.907, w: 4.643 },
+    { x: 2.566, y: 1.653, w: 2.041, h: 0.546, a1: 349, a2: 336, sx: 4.024, sy: 2.164 });
+  subtitleRow(sl, 5.954, 0.907, 7.575, 7.935, 4.327);
+  body(sl, L_MED, { x: 5.954, y: 1.278, w: 6.434, h: 0.976, align: 'justify' });
+  // Three "browser window" bars, each above an (empty) screenshot frame.
+  const bars = [
+    { x: 1.495, w: 4.473, y: 3.902, h: 0.255, bar: C.A1, dots: [C.A2, C.A3, C.A1],
+      pic: [1.504, 4.183, 4.464, 2.541] },
+    { x: 7.472, w: 4.473, y: 3.902, h: 0.255, bar: C.A1, dots: [C.A2, C.A3, C.A1],
+      pic: [7.481, 4.183, 4.464, 2.541] },
+    { x: 4.077, w: 5.231, y: 2.933, h: 0.299, bar: C.A5, dots: [C.A5, C.A3, C.A1],
+      pic: [4.077, 3.25, 5.231, 2.924] },
+  ];
+  bars.forEach(function (b) {
+    const s = b.w / 4.473;
+    photo(sl, b.pic[0], b.pic[1], b.pic[2], b.pic[3]);
+    sl.addShape('roundRect', { x: b.x, y: b.y, w: b.w, h: b.h, fill: { color: C.WHITE },
+      line: { color: C.GREY_LINE, width: 0.4 }, rectRadius: 0.3 });
+    sl.addShape('rect', { x: b.x, y: b.y + b.h * 0.87, w: b.w, h: 0.033 * s,
+      fill: { color: b.bar } });
+    b.dots.forEach(function (c, i) {
+      sl.addShape('ellipse', { x: b.x + (0.096 + i * 0.105) * s, y: b.y + 0.073 * s,
+        w: 0.075 * s, h: 0.075 * s, fill: { color: c } });
+    });
+    for (let i = 0; i < 3; i++) {
+      sl.addShape('rect', { x: b.x + b.w - 0.169 * s, y: b.y + (0.061 + i * 0.037) * s,
+        w: 0.105 * s, h: 0.025 * s, fill: { color: C.A1 } });
+    }
+  });
+}
+
+function slide17() {
+  const sl = pptx.addSlide();
+  titleBlock(sl, 'The Color Of The Wine', { x: 1.047, y: 1.499, w: 3.672 },
+    { x: 2.189, y: 2.248, w: 1.719, h: 0.475, a1: 350, a2: 334, rot: 14.12, sx: 3.734, sy: 2.654 });
+  body(sl, L_FULL, { x: 1.047, y: 2.946, w: 4.495, h: 1.884, align: 'justify' });
+  subtitleRow(sl, 1.047, 4.959, 2.667, 3.028, 2.458);
+  body(sl, L_SHORT, { x: 1.047, y: 5.329, w: 4.495, h: 0.673, align: 'justify' });
+  sl.addShape('rect', { x: 6.413, y: 1.239, w: 6.078, h: 5.023, fill: { color: C.WHITE },
+    line: { color: C.A5, width: 0.75 } });
+  sl.addChart(pptx.ChartType.bar, [
+    { name: 'Series 1', labels: ['Categori 1', 'Categori 2', 'Categori 3', 'Categori 3'],
+      values: [14.3, 9.5, 14.2, 17.8] },
+    { name: 'Series 2', labels: ['Categori 1', 'Categori 2', 'Categori 3', 'Categori 3'],
+      values: [6.4, 13.1, 7, 10.3] },
+  ], {
+    x: 6.6, y: 1.4, w: 5.7, h: 4.6,
+    barDir: 'col', barGapWidthPct: 130, barGrouping: 'clustered',
+    chartColors: [C.A1, C.A5],
+    valAxisMinVal: 0, valAxisMaxVal: 20, valAxisMajorUnit: 5,
+    valAxisLineShow: false, catAxisLineShow: true, catAxisLineColor: C.GREY_LT,
+    valGridLine: { style: 'solid', color: C.GREY_LT, size: 0.5 },
+    catGridLine: { style: 'none' },
+    catAxisLabelColor: C.INK, valAxisLabelColor: C.INK,
+    catAxisLabelFontFace: BODY, valAxisLabelFontFace: BODY,
+    catAxisLabelFontSize: 10, valAxisLabelFontSize: 10,
+    showLegend: true, legendPos: 'b', legendColor: C.INK,
+    legendFontFace: BODY, legendFontSize: 10,
+  });
+}
+
+function slide18() {
+  const sl = pptx.addSlide();
+  gradBands(sl, 0, 0, 13.333, 7.5, C.A1, 3, 14, 24, 'h');
+  // Two bottles flanked by two filled glasses, standing on a tray.
+  sl.addShape('ellipse', { x: 0.872, y: 6.05, w: 6.0, h: 0.469, fill: { color: C.A1_D25 } });
+  wineGlass(sl, 1.477, 3.613, 1.287, 2.404, 'FFFFFF', C.A2);
+  bottle(sl, 2.847, 1.61, 1.179, 4.4, { glass: '7E7590', wine: C.A2, label: C.A3,
+    trim: C.SLATE, cap: C.A5 });
+  bottle(sl, 4.121, 1.606, 1.246, 4.41, { glass: C.A4, wine: C.A5, label: C.A6,
+    trim: C.SLATE, cap: C.A2 });
+  wineGlass(sl, 5.028, 3.613, 1.285, 2.404, 'FFFFFF', C.A4);
+  sl.addShape('roundRect', { x: 1.16, y: 6.02, w: 5.363, h: 0.226, fill: { color: C.TRAY },
+    rectRadius: 0.5 });
+  titleBlock(sl, [{ text: 'Just Called ', options: { breakLine: true } },
+    { text: '\u201CWine Collectors\u201D' }], { x: 7.451, y: 1.664, w: 4.946, color: C.WHITE },
+    { x: 9.218, y: 2.489, w: 3.004, h: 0.451, a1: 356, a2: 311, sx: 11.392, sy: 2.974, sc: C.A3 });
+  body(sl, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
+    'incididunt ut labore et dolore magna aliqua. Eget arcu dictum varius duis at consectetur. ' +
+    'Eget mauris pharetra.',
+    { x: 7.451, y: 3.24, w: 4.599, h: 1.279, align: 'justify', color: C.WHITE });
+  bulletRow(sl, 7.451, 4.836, BULLETS[0], 4.208, 7.92, 3.797, C.WHITE, true);
+  bulletRow(sl, 7.451, 5.533, BULLETS[1], 4.104, 0, 0, C.WHITE, false);
+}
+
+function slide19() {
+  const sl = pptx.addSlide();
+  titleBlock(sl, 'Terms For Wine Lovers', { x: 4.375, y: 0.668, w: 4.495, align: 'center' },
+    { x: 6.356, y: 1.429, w: 2.045, h: 0.506, a1: 354, a2: 332, sx: 8.019, sy: 1.903 });
+  // Four two-tone blades pinwheeling around the centre, with grey echoes behind.
+  const G = 'EFEFEF';
+  blade(sl, [5.959, 5.322], [6.34, 4.661], [5.04, 4.625], G, [5.942, 3.969], G);
+  blade(sl, [7.316, 3.948], [6.935, 4.609], [8.236, 4.645], G, [7.333, 5.301], G);
+  blade(sl, [5.961, 3.975], [6.622, 4.355], [6.659, 3.055], G, [7.315, 3.958], G);
+  blade(sl, [5.961, 5.309], [6.622, 4.928], [6.659, 6.229], G, [7.315, 5.326], G);
+  blade(sl, [5.542, 4.641], [6.404, 4.408], [5.359, 3.302], C.A1, [6.648, 3.506], C.A1_D25);
+  blade(sl, [6.659, 3.526], [6.891, 4.389], [7.997, 3.343], C.A2_D25, [7.793, 4.633], C.A2);
+  blade(sl, [7.803, 4.626], [6.94, 4.858], [7.986, 5.964], C.A4, [6.696, 5.76], C.A5);
+  blade(sl, [5.554, 4.631], [6.417, 4.863], [5.371, 5.969], C.A6, [6.66, 5.765], C.A5);
+  const pents = [
+    { x: 4.976, y: 2.858, c: C.A1, flip: false, ic: C.A3 },
+    { x: 7.551, y: 2.858, c: C.A2, flip: false, ic: C.WHITE },
+    { x: 4.976, y: 5.65, c: C.A5, flip: true, ic: C.A1 },
+    { x: 7.523, y: 5.65, c: C.A4, flip: true, ic: C.A1 },
+  ];
+  pents.forEach(function (p) {
+    sl.addShape('pentagon', { x: p.x, y: p.y, w: 0.824, h: 0.785, fill: { color: p.c },
+      line: { color: C.WHITE, width: 5.5 }, flipV: p.flip });
+    glassIcon(sl, p.x + 0.27, p.y + 0.22, 0.29, 0.34, p.ic);
+  });
+  quadLabels(sl, 1.33, 9.029);
+}
+
+function slide20() {
+  const sl = pptx.addSlide();
+  titleBlock(sl, 'The Act Of Collecting Wine', { x: 1.161, y: 1.539, w: 4.495 },
+    { x: 2.344, y: 2.313, w: 3.004, h: 0.509, a1: 357, a2: 304, sx: 4.227, sy: 2.811 });
+  body(sl, L_FULL, { x: 1.161, y: 3.16, w: 4.033, h: 2.187, align: 'justify' });
+  ctaLink(sl, 1.271, 5.624, 'More Product', 14, 3.002);
+  // Bar-cart still life.
+  sl.addShape('ellipse', { x: 5.729, y: 5.604, w: 6.938, h: 0.522, fill: { color: C.GREY_BAND } });
+  wineGlass(sl, 6.098, 4.233, 1.136, 1.34, C.PORCELAIN, C.A1);
+  bottle(sl, 7.089, 1.618, 1.759, 3.95, { glass: C.CREAM, wine: C.A1, label: C.IVORY,
+    trim: C.A1, cap: C.SLATE });
+  flute(sl, 8.906, 2.891, 0.909, 2.66, C.PORCELAIN, C.A5);
+  sl.addShape('roundRect', { x: 9.439, y: 4.214, w: 1.251, h: 1.367, fill: { color: C.PORCELAIN },
+    rectRadius: 0.08 });
+  sl.addShape('rect', { x: 9.528, y: 4.751, w: 1.079, h: 0.648, fill: { color: C.A1 } });
+  sl.addShape('roundRect', { x: 9.563, y: 4.623, w: 0.558, h: 0.558, fill: { color: C.A1_D25 },
+    rectRadius: 0.15 });
+  bottle(sl, 10.75, 2.277, 1.243, 3.281, { glass: C.PORCELAIN, wine: C.A5, label: C.A5,
+    trim: C.A1, cap: C.A1 });
+  sl.addShape('roundRect', { x: 6.056, y: 5.571, w: 6.275, h: 0.311, fill: { color: C.TRAY },
+    rectRadius: 0.5 });
+}
+
+function slide21() {
+  const sl = pptx.addSlide();
+  titleBlock(sl, 'As Wine Aficionados ', { x: 4.419, y: 0.641, w: 4.495, align: 'center' },
+    { x: 4.925, y: 1.423, w: 3.5, h: 0.444, a1: 357, a2: 344, rot: 7.23, sx: 7.66, sy: 1.876 });
+  sl.addShape('ellipse', { x: 4.625, y: 2.646, w: 4.083, h: 4.083, fill: { color: C.GREY_BAND } });
+  sl.addShape('ellipse', { x: 5.104, y: 3.124, w: 3.126, h: 3.126, fill: { color: C.WHITE } });
+  // Four kite-shaped facets forming a diamond star.
+  const cx = 6.676, cy = 4.687;
+  const facets = [
+    { tip: [cx, 2.916], l: [5.984, 4.097], r: [7.369, 4.097], cl: C.A1_D25, cr: C.A1 },
+    { tip: [8.407, cy], l: [7.369, 4.216], r: [7.369, 5.279], cl: C.A2_D25, cr: C.A2 },
+    { tip: [cx, 6.46], l: [5.984, 5.397], r: [7.369, 5.397], cl: C.A4, cr: C.A5 },
+    { tip: [4.946, cy], l: [6.099, 4.216], r: [6.099, 5.279], cl: C.A5, cr: C.A6 },
+  ];
+  facets.forEach(function (f) {
+    sl.addShape('custGeom', { x: 0, y: 0, w: 13.333, h: 7.5, fill: { color: f.cl },
+      points: [{ x: f.tip[0], y: f.tip[1] }, { x: f.l[0], y: f.l[1] }, { x: cx, y: cy },
+        { close: true }] });
+    sl.addShape('custGeom', { x: 0, y: 0, w: 13.333, h: 7.5, fill: { color: f.cr },
+      points: [{ x: f.tip[0], y: f.tip[1] }, { x: f.r[0], y: f.r[1] }, { x: cx, y: cy },
+        { close: true }] });
+  });
+  const badges = [
+    { x: 5.261, y: 3.347, c: C.A5, ic: C.WHITE },
+    { x: 7.4, y: 3.363, c: C.A1, ic: C.WHITE },
+    { x: 5.29, y: 5.424, c: C.A4, ic: C.A1 },
+    { x: 7.4, y: 5.44, c: C.A2, ic: C.WHITE },
+  ];
+  badges.forEach(function (b) {
+    sl.addShape('ellipse', { x: b.x, y: b.y, w: 0.779, h: 0.779, fill: { color: C.GREY_BAND } });
+    sl.addShape('ellipse', { x: b.x + 0.111, y: b.y + 0.111, w: 0.556, h: 0.556,
+      fill: { color: b.c } });
+    glassIcon(sl, b.x + 0.26, b.y + 0.22, 0.26, 0.33, b.ic);
+  });
+  quadLabels(sl, 1.33, 9.029);
+}
+
+function slide22() {
+  const sl = pptx.addSlide();
+  titleBlock(sl, 'Particularly Grape Wines', { x: 4.419, y: 0.641, w: 4.495, align: 'center' },
+    { x: 6.662, y: 1.375, w: 1.807, h: 0.597, a1: 354, a2: 338, sx: 7.735, sy: 1.912 });
+  hline(sl, 2.032, 4.312, 9.27, C.A1);
+  const stops = [
+    { x: 0.985, star: 1.848, c: C.A2, ix: 1.667, iw: 0.73, icon: 'pair' },
+    { x: 3.303, star: 4.165, c: C.A5, ix: 4.012, iw: 0.675, icon: 'glass' },
+    { x: 5.62, star: 6.483, c: C.A2, ix: 6.367, iw: 0.6, icon: 'bottle' },
+    { x: 7.937, star: 8.8, c: C.A5, ix: 8.574, iw: 0.821, icon: 'mug' },
+    { x: 10.255, star: 11.118, c: C.A2, ix: 10.982, iw: 0.639, icon: 'bottle' },
+  ];
+  stops.forEach(function (s) {
+    if (s.icon === 'glass') glassIcon(sl, s.ix, 3.0, s.iw, 0.85, s.c);
+    else if (s.icon === 'mug') mugIcon(sl, s.ix, 3.0, s.iw, 0.85, s.c);
+    else if (s.icon === 'pair') {
+      glassIcon(sl, s.ix, 3.0, s.iw * 0.6, 0.85, s.c);
+      sl.addShape('ellipse', { x: s.ix + s.iw * 0.6, y: 3.06, w: s.iw * 0.4, h: 0.4,
+        fill: { type: 'none' }, line: { color: s.c, width: 1 } });
+    } else bottleIcon(sl, s.ix, 3.0, s.iw, 0.85, s.c, true);
+    star(sl, s.star, 4.128, 0.367, s.c);
+    head(sl, 'Insert Title Here', { x: s.x, y: 4.966, w: 2.093, h: 0.337, fontSize: 14,
+      align: 'center' });
+    body(sl, L_TINY, { x: s.x, y: 5.256, w: 2.093, h: 0.976, align: 'center' });
+  });
+}
+
+function slide23() {
+  const sl = pptx.addSlide();
+  titleBlock(sl, 'Learn How To Drink Win', { x: 4.419, y: 0.641, w: 4.495, align: 'center' },
+    { x: 6.861, y: 1.555, w: 1.238, h: 0.372, a1: 350, a2: 192, sx: 7.71, sy: 1.867 });
+  sl.addShape('ellipse', { x: 4.492, y: 6.379, w: 4.307, h: 0.311, fill: { color: C.GREY_BAND } });
+  bottle(sl, 5.315, 2.398, 1.062, 3.936, { glass: C.A4, wine: C.A2, label: C.A4,
+    trim: C.A5, cap: C.A5 });
+  flute(sl, 6.645, 4.09, 0.761, 2.226, C.PORCELAIN, C.A2);
+  flute(sl, 7.552, 4.09, 0.761, 2.226, C.PORCELAIN, C.A2);
+  sl.addShape('roundRect', { x: 4.729, y: 6.328, w: 3.875, h: 0.191, fill: { color: C.TRAY },
+    rectRadius: 0.5 });
+  quadLabels(sl, 0.893, 9.466);
+}
+
+function slide24() {
+  const sl = pptx.addSlide();
+  titleBlock(sl, 'You Need To Taste Wine', { x: 0.869, y: 1.255, w: 4.495 },
+    { x: 2.436, y: 2.003, w: 1.721, h: 0.5, a1: 348, a2: 333, rot: 15, sx: 3.914, sy: 2.462 });
+  const rowColors = [C.A1, C.A2, C.A4, C.A5];
+  BULLETS.slice(0, 4).forEach(function (t, i) {
+    const y = 3.142 + i * 0.9334;
+    star(sl, 1.033, y + 0.021, 0.26, rowColors[i]);
+    sl.addText(t, { x: 1.424, y, w: 4.27, h: 0.303, fontFace: BODY, fontSize: 12,
+      color: C.GREY_TEXT, valign: 'middle', margin: TEXT_INSET });
+    if (i < 3) hline(sl, 1.502, y + 0.618, 4.033, C.GREY_LINE, { width: 1, dashType: 'dash' });
+  });
+  const bars = [
+    { x: 6.714, y: 3.059, side: C.A1, top: C.A1_D25, hole: C.A1_D50, v: '40', c: C.A1, lx: 7.194, ly: 2.795 },
+    { x: 8.235, y: 3.586, side: C.A2, top: C.A2_D50, hole: C.A2_D75, v: '32', c: C.A2, lx: 8.715, ly: 3.301 },
+    { x: 9.756, y: 4.299, side: C.A4, top: C.A5, hole: C.A6, v: '24', c: C.A4, lx: 10.236, ly: 3.993 },
+    { x: 11.276, y: 5.075, side: C.A5, top: C.A6, hole: C.A4_D50, v: '15', c: C.A5, lx: 11.757, ly: 4.828 },
+  ];
+  bars.forEach(function (b, i) {
+    cylinder(sl, b.x, b.y, 0.96, 6.665 - b.y, b.side, b.top, b.hole);
+    lollipop(sl, b.lx, 1.974, b.ly, b.c);
+    head(sl, b.v, { x: 6.852 + i * 1.521, y: 1.423, w: 0.684, h: 0.404, fontSize: 18,
+      align: 'center', color: b.c });
+  });
+}
+
+function slide25() {
+  const sl = pptx.addSlide();
+  titleBlock(sl, 'Wines Can Often Outlive', { x: 4.552, y: 0.641, w: 4.229, align: 'center' },
+    { x: 6.477, y: 1.379, w: 2.057, h: 0.58, a1: 354, a2: 264, sx: 8.059, sy: 1.914 });
+  // Nested 3-D "onion" rings, drawn back to front.
+  sl.addShape('ellipse', { x: 5.123, y: 5.301, w: 3.088, h: 0.859, fill: { color: C.WHITE } });
+  sl.addShape('rect', { x: 5.588, y: 2.766, w: 1.078, h: 2.632, fill: { color: C.A1_D50 } });
+  sl.addShape('rect', { x: 5.329, y: 2.865, w: 0.478, h: 2.57, fill: { color: C.A1 } });
+  sl.addShape('ellipse', { x: 5.329, y: 2.681, w: 1.337, h: 0.296, fill: { color: C.A1_D25 } });
+  sl.addShape('rect', { x: 6.667, y: 3.305, w: 1.101, h: 2.538, fill: { color: C.A2_D75 } });
+  sl.addShape('rect', { x: 7.527, y: 3.767, w: 0.477, h: 2.267, fill: { color: C.A2 } });
+  sl.addShape('rect', { x: 7.865, y: 3.691, w: 0.346, h: 2.281, fill: { color: C.A2_D25 } });
+  sl.addShape('ellipse', { x: 6.667, y: 3.255, w: 1.544, h: 0.655, fill: { color: C.A2_D50 } });
+  sl.addShape('rect', { x: 5.123, y: 3.96, w: 0.336, h: 2.549, fill: { color: C.A5 } });
+  sl.addShape('rect', { x: 5.456, y: 3.826, w: 0.351, h: 2.08, fill: { color: C.A6 } });
+  sl.addShape('rect', { x: 5.175, y: 3.945, w: 0.533, h: 1.899, fill: { color: C.A4 } });
+  sl.addShape('ellipse', { x: 5.123, y: 3.748, w: 0.684, h: 0.331, fill: { color: C.A5 } });
+  sl.addShape('rect', { x: 5.912, y: 4.536, w: 1.51, h: 1.578, fill: { color: C.GREY_MID } });
+  sl.addShape('ellipse', { x: 5.912, y: 5.85, w: 1.51, h: 0.42, fill: { color: C.GREY_MID } });
+  sl.addShape('ellipse', { x: 5.912, y: 4.326, w: 1.51, h: 0.42, fill: { color: C.GREY_LT } });
+  sl.addShape('rect', { x: 5.177, y: 5.495, w: 2.828, h: 1.176, fill: { color: C.A4 } });
+  sl.addShape('ellipse', { x: 5.175, y: 6.13, w: 2.829, h: 0.54, fill: { color: C.A4 } });
+  sl.addShape('ellipse', { x: 5.175, y: 5.271, w: 2.829, h: 0.54, fill: { color: C.A4_L40 } });
+  const icons = [
+    { x: 3.828, y: 2.878, w: 0.725, h: 0.726, c: C.A6 },
+    { x: 8.904, y: 2.869, w: 0.596, h: 0.743, c: C.A1 },
+    { x: 3.856, y: 5.604, w: 0.671, h: 0.733, c: C.A5 },
+    { x: 8.843, y: 5.612, w: 0.719, h: 0.719, c: C.A2 },
+  ];
+  icons.forEach(function (ic, i) {
+    if (i === 0) glassIcon(sl, ic.x, ic.y, ic.w, ic.h, ic.c);
+    else if (i === 1) bottleIcon(sl, ic.x, ic.y, ic.w, ic.h, ic.c, true);
+    else if (i === 2) glassIcon(sl, ic.x, ic.y, ic.w, ic.h, ic.c);
+    else mugIcon(sl, ic.x, ic.y, ic.w, ic.h, ic.c);
+  });
+  quadLabels(sl, 0.551, 9.808);
+}
+
+function slide26() {
+  const sl = pptx.addSlide();
+  drawMap(sl, WORLD, 2.48, 0.564, 9.025, 4.403);
+  titleBlock(sl, 'Cooking Wines By 3-5 Years.', { x: 0.945, y: 5.43, w: 4.495 },
+    { x: 1.745, y: 6.157, w: 2.909, h: 0.593, a1: 352, a2: 337, sx: 3.97, sy: 6.764 });
+  subtitleRow(sl, 5.954, 5.431, 7.575, 7.935, 4.327);
+  body(sl, L_MED, { x: 5.954, y: 5.801, w: 6.434, h: 0.976, align: 'justify' });
+}
+
+function slide27() {
+  const sl = pptx.addSlide();
+  drawMap(sl, AUS, 6.399, 0.854, 6.93, 5.475);
+  titleBlock(sl, 'High quality and longevity', { x: 1.03, y: 1.438, w: 4.183 },
+    { x: 2.129, y: 2.274, w: 2.732, h: 0.486, a1: 354, a2: 307, sx: 3.969, sy: 2.769 });
+  body(sl, L_FULL, { x: 1.03, y: 2.885, w: 4.495, h: 1.884, align: 'justify' });
+  head(sl, 'People', { x: 1.052, y: 4.995, w: 2.417, h: 0.337, fontSize: 14, color: C.GREY_TEXT });
+  sl.addShape('line', { x: 1.194, y: 5.431, w: 4.233, h: 0,
+    line: { color: C.GREY_LINE, width: 6 } });
+  sl.addShape('line', { x: 1.135, y: 5.431, w: 2.446, h: 0, line: { color: C.A5, width: 5.5 } });
+  star(sl, 3.437, 5.302, 0.26, C.A1, 45);
+  head(sl, '60%', { x: 3.212, y: 5.669, w: 0.723, h: 0.303, fontSize: 12, align: 'center',
+    color: C.GREY_TEXT });
+}
+
+function slide28() {
+  const sl = pptx.addSlide();
+  drawMap(sl, ASIA, 0.641, 1.402, 6.016, 4.697);
+  titleBlock(sl, 'Term Used By Wine Tasters', { x: 7.746, y: 1.402, w: 4.076 },
+    { x: 9.25, y: 2.171, w: 2.277, h: 0.565, a1: 353, a2: 328, sx: 10.641, sy: 2.694 });
+  body(sl, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
+    'incididunt ut labore et dolore magna aliqua. Eget arcu dictum varius duis at consectetur. ' +
+    'Eget mauris pharetra et ultrices neque. Enim lobortis scelerisque fermentum.',
+    { x: 7.746, y: 2.849, w: 4.551, h: 1.581, align: 'justify' });
+  subtitleRow(sl, 7.746, 4.592, 9.366, 9.727, 2.544);
+  body(sl, L_SHORT, { x: 7.746, y: 4.962, w: 4.545, h: 0.673, align: 'justify' });
+  button(sl, 7.844, 5.846, 1.651, 0.428, 'Checkout');
+}
+
+function slide29() {
+  const sl = pptx.addSlide();
+  photo(sl, 7.393, 0, 5.0, 7.5);
+  titleBlock(sl, 'Our Contact', { x: 1.585, y: 1.444, w: 3.03 },
+    { x: 1.583, y: 2.19, w: 2.1, h: 0.565, a1: 360, a2: 334, sx: 3.265, sy: 2.721 });
+  const rows = [
+    ['www.wineytabro.com', 3.214, 'globe'],
+    ['wineytabro@gmail.com', 4.06, 'mail'],
+    ['+144 3532 123', 4.907, 'phone'],
+    ['23 South Street, East Pasar, Copenhagen', 5.753, 'pin'],
+  ];
+  rows.forEach(function (r, i) {
+    const y = r[1], kind = r[2];
+    if (kind === 'globe') {
+      sl.addShape('ellipse', { x: 1.751, y: y + 0.026, w: 0.25, h: 0.25,
+        fill: { type: 'none' }, line: { color: C.A5, width: 1 } });
+      sl.addShape('ellipse', { x: 1.826, y: y + 0.026, w: 0.1, h: 0.25,
+        fill: { type: 'none' }, line: { color: C.A5, width: 0.75 } });
+      hline(sl, 1.751, y + 0.151, 0.25, C.A5);
+    } else if (kind === 'mail') {
+      sl.addShape('rect', { x: 1.752, y: y + 0.067, w: 0.248, h: 0.17,
+        fill: { type: 'none' }, line: { color: C.A5, width: 1 } });
+      sl.addShape('line', { x: 1.752, y: y + 0.067, w: 0.124, h: 0.085,
+        line: { color: C.A5, width: 1 } });
+      sl.addShape('line', { x: 1.876, y: y + 0.152, w: 0.124, h: -0.085,
+        line: { color: C.A5, width: 1 } });
+    } else if (kind === 'phone') {
+      sl.addShape('roundRect', { x: 1.797, y: y + 0.026, w: 0.157, h: 0.25,
+        fill: { type: 'none' }, line: { color: C.A5, width: 1 }, rectRadius: 0.3 });
+      hline(sl, 1.83, y + 0.079, 0.09, C.A5, { width: 0.5 });
+    } else {
+      sl.addShape('ellipse', { x: 1.791, y: y + 0.022, w: 0.171, h: 0.171,
+        fill: { type: 'none' }, line: { color: C.A5, width: 1 } });
+      sl.addShape('triangle', { x: 1.809, y: y + 0.13, w: 0.135, h: 0.152,
+        fill: { color: C.A5 }, flipV: true });
+    }
+    body(sl, r[0], { x: 2.172, y, w: 3.802, h: 0.303, valign: 'middle', lineSpacingMultiple: 1 });
+    if (i < 3) {
+      hline(sl, 2.25, y + 0.575, 3.442, C.GREY_LINE, { width: 1, dashType: 'dash' });
+    }
+  });
+}
+
+function slide30() { coverSlide('Thank You!', 'Any Question?'); }
+
+[slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
+ slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
+ slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29, slide30]
+  .forEach(function (fn) { fn(); });
+
+pptx.writeFile({ fileName: path.join(__dirname, '0f955302-5be8-4753-8aff-8ee78596f885_grok_final.pptx') })
+  .then(function (f) { console.log('wrote ' + f); });
