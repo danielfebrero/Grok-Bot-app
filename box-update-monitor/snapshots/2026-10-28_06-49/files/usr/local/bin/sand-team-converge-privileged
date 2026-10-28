@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# The one command the in-box host's sudo grant covers (see start-sand-box.sh).
+# In a uid-split box the host runs as sand-host, which cannot change uid, so
+# every managed-setup converge goes through here: as root when the team turned
+# the agent's sudo off, so the team's own setup scripts still get root while
+# nothing the agent runs does; dropped to box (--as-box) when it did not, which
+# is exactly how the converge always ran. sudo resets the environment, so this
+# script sets everything the converge needs; only the Team Secrets envelope
+# arrives, on stdin, from the host.
+set -euo pipefail
+
+NODE=/exec-daemon/node
+CONVERGE=/usr/local/bin/sand-team-converge.mjs
+MANAGED_ROOT=/opt/sand-managed
+ROOT_STATE_DIR=/var/lib/sand/managed-setup
+
+as_box=0
+force=0
+for arg in "$@"; do
+	case "${arg}" in
+	--as-box) as_box=1 ;;
+	--force) force=1 ;;
+	*)
+		echo "usage: sand-team-converge-privileged [--as-box] [--force]" >&2
+		exit 2
+		;;
+	esac
+done
+
+if [ "$(id -u)" -ne 0 ]; then
+	echo "sand-team-converge-privileged: needs root (the host reaches it through its sudo grant)" >&2
+	exit 1
+fi
+
+# The host runs at -1000 and sudo inherits that; setup workloads must stay
+# OOM-killable.
+printf '%s\n' 0 >/proc/self/oom_score_adj 2>/dev/null || true
+
+if [ "${force}" = "1" ]; then
+	export SAND_MANAGED_SETUP_FORCE=1
+fi
+
+if [ "${as_box}" = "1" ]; then
+	# The host publishes the assignment and manifests 0600 into a tree it owns.
+	# The unprivileged converge has to read them, and the receipts it writes
+	# are its own.
+	install -d -m 700 -o box -g box "${MANAGED_ROOT}/receipts"
+	chgrp -hR box "${MANAGED_ROOT}"
+	chmod -R g+rX "${MANAGED_ROOT}"
+	chown -hR box:box "${MANAGED_ROOT}/receipts"
+	exec setpriv --reuid=box --regid=box --init-groups \
+		env HOME=/home/box USER=box LOGNAME=box \
+		NPM_CONFIG_PREFIX=/home/box/.local \
+		"PATH=/home/box/.local/bin:${PATH}" \
+		"${NODE}" "${CONVERGE}"
+fi
+
+# Root keeps its receipts, status, and lock in a tree of its own: the box-owned
+# /run/sand would let the agent point a root write somewhere else.
+install -d -m 700 -o root -g root "${ROOT_STATE_DIR}"
+exec env HOME=/root USER=root LOGNAME=root \
+	SAND_SETUP_RECEIPTS_ROOT="${ROOT_STATE_DIR}/receipts" \
+	SAND_SETUP_STATUS_PATH="${ROOT_STATE_DIR}/status.json" \
+	SAND_SETUP_LOCK_PATH="${ROOT_STATE_DIR}/converge.lock" \
+	"${NODE}" "${CONVERGE}"

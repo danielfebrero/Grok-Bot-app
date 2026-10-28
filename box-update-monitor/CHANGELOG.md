@@ -9,6 +9,12 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-28 06:49 (Paris) — snapshot `2026-10-28_04-51` → `2026-10-28_06-49`
+
+**Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `7b30e3f2698a9e98d79693a0a4329c970526d29f` → `fc6dee62657e80f1d0fb13cf34be9ae58534baaf` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`), binaire `cursor-agent-store-fuse` inchangé (même hash). Toutes les autres versions plateforme inchangées (image `fcbae14`, box-scripts `fcbae14`, sand-host `04f60e5` (supervisor `upgrade-04f60e5`), exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7). Fichiers : +0 / −0 / ~1.
+
+Rapport : [reports/2026-10-28_06-49.md](reports/2026-10-28_06-49.md).
+
 ## 2026-10-28 04:51 (Paris) — snapshot `2026-10-28_03-50` → `2026-10-28_04-51`
 
 **Hot-update du host bundle (sand-host) `95f2586` → `04f60e5`** (supervisor `upgrade-95f2586` → `upgrade-04f60e5`, `pendingUpgradeVersion` = None) : remplacement à chaud du `sand-host` par le sand-supervisor, sans Update de l'ordinateur. Bundle host (`host-main.cjs` 31.8→32.1 Mo, `sand-eval-runner.cjs` 26.0→26.3 Mo), `agent-store-worker`, `box-chrome`, `box-chrome-policy`, runtime navigateur (`sand-ua-governor.mjs` 39.8→66.0 Ko, `sand-fingerprint-profiles.mjs`, `box-contract.generated.mjs`), `start-desktop.sh`, et un **nouveau** script `box-scripts/sand-fingerprint-read-logger.mjs` (1950 lignes). Le pointeur **agent-store-fuse** a aussi bougé dans la foulée (`/usr/local/bin/cursor_agent_store_fuse_version` `51beac1d…` → `7b30e3f2…`). Image `fcbae14`, box-scripts `fcbae14`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +1 / −0 / ~21.
