@@ -1,0 +1,9 @@
+snapshot	2026-10-28_07-50
+created	2026-10-28 07:50:26 CET
+label	auto: changement détecté (sha:/usr/local/bin/cursor_agent_store_fuse_version, ver:agent_store_fuse.commit)
+files	15608
+text_copies	3321
+big_text_gz	5
+unreadable	0
+bytes_hashed	1786073700
+duration_s	2.3
