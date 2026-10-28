@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+socket=""
+for arg in "$@"; do
+	case "${arg}" in
+	--address=unix:path=*) socket="${arg#--address=unix:path=}" ;;
+	esac
+done
+[ -n "${socket}" ] || exec dbus-daemon "$@"
+lock="${socket}.lock"
+
+bus_for_socket() {
+	local pid="$1"
+	[ -n "${pid}" ] && [ "${pid}" != "$$" ] || return 1
+	[ "$( (cat "/proc/${pid}/comm") 2>/dev/null)" = dbus-daemon ] || return 1
+	(tr '\0' '\n' <"/proc/${pid}/cmdline") 2>/dev/null | grep -qxF -- "--address=unix:path=${socket}"
+}
+
+# A flock(2) lock belongs to the open file description, so the daemon exec'd below holds it until it exits (https://man7.org/linux/man-pages/man2/flock.2.html).
+exec 9>>"${lock}"
+for signal in TERM TERM KILL KILL; do
+	flock -n 9 && break
+	holder="$( (tr -dc '0-9' <"${lock}") 2>/dev/null || true)"
+	if bus_for_socket "${holder}"; then
+		kill "-${signal}" "${holder}" 2>/dev/null || true
+	fi
+	flock -w 1 9 && break
+done
+flock -n 9 || exit 1
+printf '%s\n' "$$" >"${lock}"
+exec dbus-daemon "$@"
