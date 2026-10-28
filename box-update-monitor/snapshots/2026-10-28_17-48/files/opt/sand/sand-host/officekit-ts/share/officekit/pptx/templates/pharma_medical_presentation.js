@@ -1,0 +1,828 @@
+/**
+ * PHARMEDIS - Medical & Pharmaceutical Presentation Template
+ * Recreated with pptxgenjs (31 slides, 20" x 11.25" widescreen).
+ *
+ * Raster artwork from the source deck (icon pictograms, stock photos and the
+ * device mock-ups) is redrawn with native shapes / "[image]" placeholder boxes.
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ theme */
+
+const W = 20;                 // slide width  (inches)
+const H = 11.25;              // slide height (inches)
+
+const INK    = '000000';      // default body/heading text
+const DARK   = '202D2F';      // brand charcoal
+const CYAN   = '01F5EF';      // brand cyan
+const CYAN_L = '5DF9F5';      // light cyan (pricing highlight)
+const ORANGE = 'FEA900';      // brand orange
+const LAV    = 'F3F2FC';      // lavender panel
+const WHITE  = 'FFFFFF';
+const GRAY   = '808080';      // body copy
+const GRAY_D = '595959';      // darker body copy
+const GRAY_M = '404040';      // caption copy
+const GRAY_L = 'F2F2F2';      // copy on dark panels
+const NAVY   = '202131';      // stat numbers
+const TRACK  = 'F5F5F5';      // progress-bar track
+
+const HEAD = 'Sarabun SemiBold';
+const BODY = 'Assistant';
+const BODYM = 'Assistant Medium';
+
+const M = [7.2, 7.2, 3.6, 3.6];   // text insets l/r/b/t in points (0.1" / 0.05")
+const BULLET = { characterCode: '2022', indent: 13.5 };
+const NOLINE = { type: 'none' };
+
+// pptxgenjs mutates the shadow object it is handed, so hand out fresh copies
+const shadow = (o = {}) => ({ type: 'outer', blur: 20, offset: 7, angle: 45, color: GRAY, opacity: 0.2, ...o });
+const softShadow = () => shadow({ blur: 39, offset: 0, angle: 90, color: 'BFBFBF', opacity: 0.3 });
+
+/* ---------------------------------------------------------------- helpers */
+
+// pptxgenjs emits prstGeom <a:gd> adj values as `angleRange` scaled by 60000
+const gd = (adj1, adj2 = 0) => ({ angleRange: [adj1 / 60000, adj2 / 60000] });
+
+/** plain rectangle */
+function rect(s, o) {
+    s.addShape('rect', { line: NOLINE, ...o });
+}
+
+/** rounded rectangle; `adj` is the OOXML corner-radius adjust value (default 16667) */
+function rrect(s, o) {
+    const { adj = 16667, ...rest } = o;
+    // pptxgenjs skips a zero rectRadius (and then falls back to its own default),
+    // so a zero-radius "rounded" rectangle has to be drawn as a plain rect
+    if (!adj) return rect(s, rest);
+    s.addShape('roundRect', { line: NOLINE, ...rest, rectRadius: (adj / 100000) * Math.min(o.w, o.h) });
+}
+
+/** "top corners rounded" tab (round2SameRect) */
+function tab(s, o) {
+    const { adj1 = 50000, adj2 = 0, ...rest } = o;
+    s.addShape('round2SameRect', { line: NOLINE, ...gd(adj1, adj2), ...rest });
+}
+
+function txt(s, str, o) {
+    s.addText(str, { valign: 'top', margin: M, fontFace: BODY, fontSize: 20, color: GRAY, ...o });
+}
+const title = (s, str, o) => txt(s, str, { fontFace: HEAD, fontSize: 48, color: INK, ...o });
+const head  = (s, str, o) => txt(s, str, { fontFace: HEAD, fontSize: 20, color: INK, ...o });
+const body  = (s, str, o) => txt(s, str, { lineSpacingMultiple: 1.5, ...o });
+const note  = (s, str, o) => txt(s, str, { fontFace: BODYM, ...o });
+const stat  = (s, str, o) => txt(s, str, { fontFace: BODYM, fontSize: 24, bold: true, color: NAVY, ...o });
+
+/**
+ * Pictogram stand-in for the deck's icon artwork: a medical cross whose ink
+ * coverage matches the original glyphs.
+ */
+function icon(s, x, y, size, color) {
+    s.addShape('plus', { x: x + size * 0.19, y: y + size * 0.19, w: size * 0.62, h: size * 0.62,
+        rectRadius: 0.3333 * size * 0.62, fill: { color }, line: NOLINE });
+}
+
+/** the "cross in a ring" medical mark (proportions taken from the logo art) */
+function crossMark(s, x, y, size, color) {
+    s.addShape('ellipse', { x: x + size * 0.135, y: y + size * 0.135, w: size * 0.73, h: size * 0.73,
+        fill: { type: 'none' }, line: { color, width: size * 4.5 } });
+    s.addShape('plus', { x: x + size * 0.25, y: y + size * 0.25, w: size * 0.5, h: size * 0.5,
+        rectRadius: 0.3333 * size * 0.5, fill: { color }, line: NOLINE });
+}
+
+/**
+ * PHARMEDIS logo mark: a big half-donut, a small counter half-donut and the
+ * cross. All three keep fixed proportions of the mark's bounding box.
+ */
+function mark(s, x, y, size, o) {
+    const opt = { outer: CYAN, inner: WHITE, cross: ORANGE, flipV: false, transparency: 0, ...o };
+    const t = opt.transparency;
+    const arc = (d, k, color) => s.addShape('blockArc', {
+        x: x + size * d, y: y + size * d, w: size * k, h: size * k,
+        fill: { color, transparency: t }, line: NOLINE, flipV: opt.flipV,
+    });
+    arc(0, 1, opt.outer);
+    arc(0.3423, 0.3153, opt.inner);
+    if (opt.cross) crossMark(s, x + size * 0.4392, y + size * 0.4392, size * 0.1211, opt.cross);
+}
+
+/** rounded "pill" button with a centred caption */
+function pill(s, b, t) {
+    rrect(s, { adj: 18056, ...b });
+    txt(s, t.text, { x: t.x, y: t.y, w: t.w, h: t.h || 0.438, align: 'center', fontFace: HEAD, fontSize: t.size || 20, color: t.color || INK });
+}
+
+/** the four service buttons used on the "medical service" slides */
+const SERVICES = [
+    { col: 0, row: 0, dx: 0.405, tw: 2.678, text: 'EMERGENCY CALL', primary: true },
+    { col: 1, row: 0, dx: 0.190, tw: 3.110, text: 'CONSULTATION' },
+    { col: 0, row: 1, dx: 0.495, tw: 2.498, text: 'NUTRITION ' },
+    { col: 1, row: 1, dx: 0.405, tw: 2.678, text: 'LAB TESTS' },
+];
+function serviceGrid(s, x0, y0) {
+    SERVICES.forEach(b => {
+        const x = x0 + b.col * 4.558;
+        const y = y0 + b.row * 1.564;
+        pill(s,
+            b.primary
+                ? { x, y, w: 3.488, h: 1.093, fill: { color: ORANGE }, shadow: shadow() }
+                : { x, y, w: 3.488, h: 1.093, fill: { type: 'none' }, line: { color: LAV } },
+            { x: x + b.dx, y: y + 0.31, w: b.tw, text: b.text, color: b.primary ? WHITE : INK });
+    });
+}
+
+/**
+ * Marks a picture region. Every picture placeholder in the source deck is
+ * *empty* — it carries a white tile pattern and no photograph, and renders as
+ * nothing. So this reserves the exact rectangle with an unfilled shape, which
+ * keeps the region visible/selectable in PowerPoint without painting anything
+ * the reference does not paint.
+ */
+function photo(s, x, y, w, h) {
+    rect(s, { x, y, w, h, fill: { type: 'none' } });
+}
+
+/**
+ * Vertical gradient, approximated with a stack of banded rectangles because
+ * pptxgenjs has no gradient fill. `stops` are [position 0..1, hex colour].
+ */
+function scrim(s, x, y, w, h, stops, bands = 24) {
+    const mix = (c1, c2, t) => [0, 2, 4]
+        .map(i => {
+            const a = parseInt(c1.substr(i, 2), 16);
+            const b = parseInt(c2.substr(i, 2), 16);
+            return Math.round(a + (b - a) * t).toString(16).padStart(2, '0');
+        })
+        .join('').toUpperCase();
+    for (let i = 0; i < bands; i++) {
+        const t = (i + 0.5) / bands;
+        let k = 1;
+        while (k < stops.length - 1 && stops[k][0] < t) k++;
+        const [p0, c0] = stops[k - 1];
+        const [p1, c1] = stops[k];
+        rect(s, { x, y: y + (h * i) / bands, w, h: h / bands + 0.01, fill: { color: mix(c0, c1, (t - p0) / (p1 - p0)) } });
+    }
+}
+
+/**
+ * Device mock-ups (monitor / laptop / phone) drawn with native shapes.
+ * The fractions come from measuring the source deck's mock-up artwork.
+ */
+function device(s, x, y, w, h, kind) {
+    const SCREEN = 'F3F2FC';
+    const SHELL = '0B0C0E';
+    if (kind === 'monitor') {
+        rect(s, { x: x + w * 0.018, y: y + h * 0.022, w: w * 0.966, h: h * 0.681, fill: { color: SHELL } });
+        rect(s, { x: x + w * 0.056, y: y + h * 0.068, w: w * 0.891, h: h * 0.583, fill: { color: SCREEN } });
+        rect(s, { x: x + w * 0.018, y: y + h * 0.703, w: w * 0.966, h: h * 0.106, fill: { color: 'D2D2D2' } });
+        rect(s, { x: x + w * 0.399, y: y + h * 0.809, w: w * 0.203, h: h * 0.126, fill: { color: 'BEBEBE' } });
+        rrect(s, { x: x + w * 0.100, y: y + h * 0.930, w: w * 0.800, h: h * 0.058, adj: 50000, fill: { color: 'CDCDCD' } });
+    } else if (kind === 'laptop') {
+        rect(s, { x: x + w * 0.097, y: y + h * 0.020, w: w * 0.811, h: h * 0.915, fill: { color: SHELL } });
+        rect(s, { x: x + w * 0.121, y: y + h * 0.055, w: w * 0.763, h: h * 0.825, fill: { color: SCREEN } });
+        rect(s, { x, y: y + h * 0.935, w, h: h * 0.032, fill: { color: 'DBDCDE' } });
+        rrect(s, { x, y: y + h * 0.960, w, h: h * 0.036, adj: 50000, fill: { color: 'A9ACB0' } });
+    } else {
+        rrect(s, { x: x + w * 0.009, y, w: w * 0.987, h, adj: 12000, fill: { color: 'A8A8AC' } });
+        rrect(s, { x: x + w * 0.040, y: y + h * 0.008, w: w * 0.920, h: h * 0.984, adj: 11500, fill: { color: SHELL } });
+        rrect(s, { x: x + w * 0.066, y: y + h * 0.032, w: w * 0.872, h: h * 0.928, adj: 9500, fill: { color: WHITE } });
+        rrect(s, { x: x + w * 0.260, y: y + h * 0.032, w: w * 0.484, h: h * 0.030, adj: 45000, fill: { color: SHELL } });
+    }
+}
+
+/** the small "PHARMEDIS" wordmark used in slide corners */
+function wordmark(s, x, y, w, size, color) {
+    txt(s, 'PHARMEDIS', { x, y, w, h: size / 40, align: 'center', fontFace: HEAD, fontSize: size, color });
+}
+
+/* --------------------------------------------------------- shared layouts */
+
+/** lavender rail with two cyan blocks, mirrored left (x=0) or right (x=17.419) */
+function verticalRail(s, x) {
+    rect(s, { x, y: 0, w: 2.581, h: H, fill: { color: LAV } });
+    rect(s, { x: x + 0.765, y: 0, w: 1.050, h: 1.256, fill: { color: CYAN } });
+    rect(s, { x: x + 0.765, y: 10.003, w: 1.050, h: 1.256, fill: { color: CYAN } });
+}
+
+/** faint half-donut watermarks used on the title / section slides */
+function watermarks(s, color) {
+    [2.395, 12.077].forEach(x => mark(s, x, 2.944, 5.529,
+        { outer: color, inner: color, cross: null, flipV: true, transparency: 97 }));
+}
+
+/* ---------------------------------------------------------- slide builders */
+
+const LOREM_LONG = 'Fusce ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod thes tempor ut labore et dolore magna aliqua. Aliquam etiam eratulan velit. Orci eu volutpat odio mauris sit amet. furce lorem ipsum dolor sit amet nulla facilisi nullam vehicula ipsum placerat in egestas erat imperdiet sed sagittis commodo incididunt nibh tortor facilisis.';
+const LOREM_CARD = 'Fusce ipsum dolor sit amet,  elit sed do eiusmod thes';
+const LOREM_TITLE = 'Fusce ipsum dolor sit amet, consectetur elit, sed do eiusmod thes tempor incididunt ut.';
+const SUBTITLE = 'Medical & Pharmaceutical Presentation Template';
+
+const slides = [];
+
+// 1 - title slide -----------------------------------------------------------
+slides.push(s => {
+    s.background = { color: DARK };
+    watermarks(s, WHITE);
+    txt(s, 'PHARMEDIS', { x: 5.159, y: 6.211, w: 9.682, h: 1.952, align: 'center', fontFace: HEAD, fontSize: 110, color: WHITE });
+    txt(s, SUBTITLE, { x: 5.871, y: 8.372, w: 8.258, h: 0.505, align: 'center', fontFace: BODYM, fontSize: 24, bold: true, color: ORANGE });
+    mark(s, 5.871, 1.496, 8.258);
+});
+
+// 2 - hero with icon strip --------------------------------------------------
+slides.push(s => {
+    rect(s, { x: 0, y: 0, w: W, h: 2.555, fill: { color: LAV } });
+    photo(s, 13.691, 3.475, 5.175, 7.775);
+    rect(s, { x: 18.866, y: 9.504, w: 1.134, h: 1.746, fill: { color: CYAN } });
+    icon(s, 18.933, 9.877, 1.0, WHITE);
+
+    [[13.691, DARK], [15.118, DARK], [16.545, DARK], [17.972, DARK]].forEach(([x, c], i) => {
+        rrect(s, { x, y: i === 3 ? 0.896 : 0.920, w: 0.894, h: 0.894, fill: { color: WHITE }, shadow: i === 3 ? shadow() : undefined });
+        icon(s, x + 0.220, 1.139, 0.455, c);
+    });
+
+    title(s, 'With Pharmedis, Change The Way You Receive The Best Healthcare', { x: 1.529, y: 4.039, w: 10.633, h: 1.717 });
+    body(s, LOREM_LONG, { x: 1.529, y: 5.985, w: 10.633, h: 2.068 });
+    pill(s, { x: 1.529, y: 8.656, w: 3.084, h: 1.093, fill: { color: ORANGE } },
+        { x: 1.871, y: 8.950, w: 2.400, h: 0.505, text: 'Readmore', size: 24, color: WHITE });
+
+    mark(s, 1.134, 0.541, 1.979);
+    wordmark(s, 0.695, 1.652, 2.805, 25, DARK);
+    note(s, SUBTITLE, { x: 4.029, y: 0.857, w: 3.984, h: 0.841, fontSize: 22, color: GRAY_M });
+});
+
+// 3 - "We Take Care About Your Health" --------------------------------------
+slides.push(s => {
+    photo(s, 0, 0, 8.395, H);
+    rrect(s, { x: 10.349, y: 5.018, w: 7.860, h: 5.093, adj: 9509, fill: { color: WHITE }, shadow: shadow() });
+    title(s, 'We Take Care About Your Health', { x: 10.349, y: 1.138, w: 7.860, h: 1.717 });
+    body(s, 'Fusce ipsum dolor sit amet, consectetur adipiscing elit, sed do this tempor incididunt ut labore et dolore magna aliqua rutrum.', { x: 10.349, y: 3.034, w: 8.047, h: 1.058 });
+
+    const rows = [
+        { y: 5.686, ty: 5.627, cy: 6.201, title: 'FIND DOCTORS NEAR YOU', tw: 3.932, badge: ORANGE, ico: WHITE },
+        { y: 7.118, ty: 7.059, cy: 7.633, title: 'MEDICINES', tw: 2.678, badge: null, ico: DARK },
+        { y: 8.550, ty: 8.491, cy: 9.065, title: 'LAB TESTS', tw: 2.678, badge: null, ico: DARK },
+    ];
+    rows.forEach(r => {
+        rrect(s, { x: 11.413, y: r.y, w: 0.894, h: 0.894, ...(r.badge
+            ? { fill: { color: r.badge } }
+            : { fill: { type: 'none' }, line: { color: LAV, width: 3 } }) });
+        icon(s, 11.592, r.y + 0.179, 0.536, r.ico);
+        head(s, r.title, { x: 13.161, y: r.ty, w: r.tw, h: 0.443 });
+        note(s, 'Lorem ipsum dolor sit amet', { x: 13.161, y: r.cy, w: 3.984, h: 0.438, color: GRAY_D });
+    });
+});
+
+// 4 - "Your Health Is Our Top Priorty" --------------------------------------
+slides.push(s => {
+    photo(s, 11.581, 1.209, 6.977, 4.088);
+    photo(s, 11.581, 5.953, 6.977, 4.088);
+    body(s, 'Fusce ipsum dolor sit amet, consectetur adipiscing elit, sed do ut labore et dolore magna aliqua. Aliquam etiam eratulan velit scelerisque. Orci sagittis eu volutpat odio facilisis mauris sit amet. furce lorem ipsum dolor sit amet consectetur adipiscing elit pellentesque monolin habitant. Tristique magna sit amet purus.', { x: 1.442, y: 3.444, w: 8.047, h: 2.573 });
+    title(s, 'Your Health Is Our Top Priorty', { x: 1.442, y: 1.346, w: 8.047, h: 1.717 });
+
+    rrect(s, { x: 1.442, y: 7.003, w: 1.535, h: 2.901, adj: 18056, fill: { color: DARK } });
+    rrect(s, { x: 1.762, y: 7.369, w: 0.894, h: 0.894, fill: { color: ORANGE } });
+    rrect(s, { x: 1.762, y: 8.645, w: 0.894, h: 0.894, fill: { color: WHITE } });
+    icon(s, 1.980, 7.587, 0.458, WHITE);
+    icon(s, 1.980, 8.863, 0.458, DARK);
+    stat(s, '275K', { x: 3.634, y: 7.314, w: 1.535, h: 0.505 });
+    txt(s, 'Happy Costumer', { x: 3.634, y: 7.880, w: 2.864, h: 0.438, color: GRAY_M });
+    stat(s, '1260+', { x: 3.641, y: 8.591, w: 1.535, h: 0.505 });
+    txt(s, 'Best Doctor', { x: 3.641, y: 9.157, w: 2.864, h: 0.438, color: GRAY_M });
+});
+
+// 5 - "Healthy Habits For A Happy Heart" ------------------------------------
+slides.push(s => {
+    rect(s, { x: 0, y: 8.023, w: W, h: 3.227, fill: { color: LAV } });
+    [1.949, 7.604, 13.259].forEach(x => photo(s, x, 4.440, 4.793, 2.767));
+
+    body(s, 'Fusce ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod thes tempor incididunt ut labore et dolore magna aliqua. Aliquam eratulan velit. Orci eu volutpat odio facilisis mauris sit amet. furce lorem ipsum dolor sit amet nulla facilisi nullam vehicula ipsum placerat in egestas erat imperdiet sed sagittis commodo. lacus vestibulum sed arcu non odio euismod. Massa tincidunt nunc pulvinar sapien.',
+        { x: 1.625, y: 2.056, w: 16.749, h: 1.563, align: 'center' });
+    title(s, 'Healthy Habits For A Happy Heart', { x: 4.546, y: 0.886, w: 10.907, h: 0.909, align: 'center' });
+
+    rrect(s, { x: 1.949, y: 9.308, w: 0.894, h: 0.894, fill: { color: WHITE } });
+    icon(s, 2.156, 9.516, 0.479, DARK);
+    stat(s, '100+', { x: 3.504, y: 9.242, w: 1.535, h: 0.505 });
+    txt(s, 'Ambulance transport', { x: 3.504, y: 9.808, w: 2.864, h: 0.438, color: GRAY_M });
+
+    rrect(s, { x: 16.938, y: 9.249, w: 0.894, h: 0.894, fill: { color: WHITE } });
+    icon(s, 17.145, 9.457, 0.479, DARK);
+    stat(s, '25+', { x: 14.742, y: 9.194, w: 1.535, h: 0.505, align: 'right' });
+    txt(s, 'Years Of Experience', { x: 13.413, y: 9.760, w: 2.864, h: 0.438, align: 'right', color: GRAY_M });
+
+    mark(s, 8.598, 8.521, 2.805);
+    wordmark(s, 8.329, 10.191, 3.343, 35, DARK);
+});
+
+// 6 - "The Highest Quality Healthcare" --------------------------------------
+slides.push(s => {
+    rect(s, { x: 0, y: 0, w: 2.581, h: H, fill: { color: LAV } });
+    photo(s, 2.581, 0, 5.767, H);
+    rect(s, { x: 0.766, y: 0, w: 1.050, h: 1.256, fill: { color: CYAN } });
+    rect(s, { x: 0.766, y: 10.003, w: 1.050, h: 1.256, fill: { color: CYAN } });
+
+    txt(s, 'PHARMEDIS', { x: 0.382, y: 0.776, w: 1.818, h: 9.697, vert: 'vert', align: 'center', fontFace: HEAD, fontSize: 96, color: DARK });
+    body(s, 'Fusce ipsum dolor sit amet, consectetur adipiscing elit, sed do ut labore et dolore magna aliqua. Aliquam etiam eratulan velit. Orci sagittis eu volutpat odio facilisis mauris sit amet. furce lorem ipsum dolor sit amet consectetur adipiscing elit pellentesque monolin habitant. Tristique magna sit amet purus gravida. Quisque sagittis purus situ amet volutpat. Augue eget arcu dictum varius duis at consectetur eiusmod thes tempor incididunt .', { x: 10.605, y: 3.128, w: 8.047, h: 3.583 });
+    title(s, 'The Highest Quality Healthcare', { x: 10.605, y: 1.260, w: 8.047, h: 1.717 });
+    serviceGrid(s, 10.605, 7.327);
+
+    // the photo's bottom scrim: transparent -> 45% black -> solid charcoal
+    scrim(s, 2.581, 6.283, 5.767, 4.967, [[0, 'FFFFFF'], [0.45, 'E5E6E6'], [1, '8F9090']]);
+    rrect(s, { x: 3.465, y: 7.386, w: 0.894, h: 0.894, fill: { color: ORANGE } });
+    icon(s, 3.685, 7.605, 0.454, WHITE);
+    txt(s, 'Your Title Here 96%', { x: 3.465, y: 8.543, w: 3.263, h: 0.505, fontFace: HEAD, fontSize: 24, color: WHITE });
+    body(s, 'Fusce ipsum dolor sit amet elit, sed do this tempor incididunt', { x: 3.465, y: 9.125, w: 3.874, h: 1.058, color: GRAY_L });
+});
+
+// 7 - "We Are Always Ready For Your Health" ---------------------------------
+slides.push(s => {
+    photo(s, 10.851, 1.717, 7.637, 7.817);
+    crossMark(s, 14.169, 5.125, 1.0, ORANGE);
+    body(s, 'Fusce ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod thes tempor incididunt ut labore et dolore velit. Orci eu volutpat odio facilisis mauris sit amet. furce lorem', { x: 1.512, y: 3.031, w: 7.164, h: 1.563 });
+    title(s, 'We Are Always Ready For Your Health', { x: 1.467, y: 1.095, w: 7.164, h: 1.717 });
+    rrect(s, { x: 1.467, y: 5.601, w: 7.164, h: 4.554, adj: 11782, fill: { color: WHITE }, shadow: shadow() });
+    head(s, 'HEALTHCARE', { x: 2.057, y: 7.350, w: 2.678, h: 0.438 });
+    body(s, 'Fusce ipsum dolor sit amet, consectetur elit, sed do eiusmod thes tempor incididunt ut labore et dolore velit. Orci eu volutpat odio facilisis.', { x: 2.057, y: 7.849, w: 5.985, h: 1.563, color: GRAY_D });
+    rrect(s, { x: 2.191, y: 6.198, w: 0.894, h: 0.894, fill: { color: ORANGE } });
+    icon(s, 2.410, 6.418, 0.455, WHITE);
+});
+
+// 8 - Vision / Mission ------------------------------------------------------
+slides.push(s => {
+    photo(s, 10.434, 0, 9.566, H);
+    const VM = 'Lorem ipsum dolor sit amet elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Nibh tortor id aliquet lectus. Amet nisl purus in mollis nunc sed id. Posuere morbi leo urna molestie at elementum eu facilisis sed. Condimentum mattis pellentesque id nibh tortor id aliquet lectus. consectetur adipiscing. ';
+    rrect(s, { x: 1.116, y: 1.016, w: 5.837, h: 9.218, adj: 7015, fill: { color: DARK }, shadow: shadow() });
+    rrect(s, { x: 7.516, y: 1.016, w: 5.837, h: 9.218, adj: 7015, fill: { color: LAV }, line: { color: WHITE, width: 3 } });
+    title(s, 'Vision', { x: 3.398, y: 2.101, w: 2.743, h: 0.909, color: WHITE });
+    body(s, VM, { x: 1.912, y: 4.052, w: 4.246, h: 5.097, color: GRAY_L });
+    title(s, 'Mission', { x: 9.718, y: 2.101, w: 2.743, h: 0.909 });
+    body(s, VM, { x: 8.311, y: 4.063, w: 4.246, h: 5.097, color: GRAY_M });
+    tab(s, { x: 1.122, y: 1.823, w: 1.453, h: 1.465, rotate: 90, flipH: true, fill: { color: CYAN } });
+    tab(s, { x: 7.521, y: 1.823, w: 1.453, h: 1.465, rotate: 90, flipH: true, fill: { color: DARK } });
+    icon(s, 1.534, 2.217, 0.660, WHITE);
+    icon(s, 7.907, 2.214, 0.682, WHITE);
+});
+
+// 9 - "We Are With The Best Doctor" -----------------------------------------
+slides.push(s => {
+    photo(s, 0, 0, 7.409, H);
+    rect(s, { x: 0, y: 0, w: 0.605, h: H, fill: { color: DARK } });
+    tab(s, { x: -3.905, y: 5.160, w: 8.739, h: 0.930, rotate: 90, flipH: true, fill: { color: ORANGE } });
+    title(s, 'We Are With The Best Doctor', { x: 9.721, y: 1.255, w: 9.140, h: 0.909 });
+    body(s, 'Fusce ipsum dolor sit amet, consectetur adipiscing elit, sed do this tempor incididunt ut labore et dolore magna aliqua rutrum nibh tortor.', { x: 9.721, y: 2.309, w: 9.140, h: 1.058 });
+
+    tab(s, { x: 13.591, y: 0.275, w: 2.538, h: 10.279, adj1: 21928, rotate: 270, fill: { color: DARK }, shadow: shadow() });
+    s.addShape('line', { x: 19.953, y: 4.146, w: 0, h: 2.538, line: { color: ORANGE, width: 6 } });
+    head(s, 'GENERAL PRACTITIONER, DENTIST, NUTRITIONIST, RADIOLOGIST', { x: 10.831, y: 4.697, w: 8.029, h: 0.774, color: WHITE });
+    body(s, 'Fusce ipsum dolor sit amet, consectetur elit, sed do eiusmod', { x: 10.831, y: 5.579, w: 7.355, h: 0.553, color: GRAY_L });
+
+    tab(s, { x: 13.591, y: 3.586, w: 2.538, h: 10.279, adj1: 21928, rotate: 270, fill: { color: WHITE }, line: { color: LAV, width: 3 } });
+    head(s, 'MEDICINE LABORATORY', { x: 10.831, y: 7.929, w: 4.494, h: 0.438 });
+    body(s, 'Fusce ipsum dolor sit amet, consectetur elit, sed do eiusmod thes tempor incididunt ut labore et dolore velit. Orci eu', { x: 10.831, y: 8.464, w: 7.355, h: 1.058 });
+});
+
+// 10 - doctor profile with donut charts -------------------------------------
+slides.push(s => {
+    rect(s, { x: 1.097, y: 1.028, w: 12.399, h: 9.194, fill: { color: WHITE }, line: { color: LAV, width: 3 } });
+    photo(s, 13.276, 0, 6.724, H);
+    rect(s, { x: 1.097, y: 1.646, w: 0.745, h: 3.238, fill: { color: CYAN } });
+
+    tab(s, { x: 15.038, y: 6.864, w: 1.619, h: 5.143, rotate: 90, flipH: true, fill: { color: ORANGE } });
+    [14.290, 15.401, 16.512].forEach(x => {
+        rrect(s, { x, y: 8.989, w: 0.894, h: 0.894, fill: { color: WHITE } });
+        icon(s, x + 0.24, 9.229, 0.42, DARK);
+    });
+
+    title(s, 'Dr. Mikha Sheerena', { x: 3.106, y: 1.646, w: 7.164, h: 0.909 });
+    body(s, 'General Practitioner ', { x: 3.106, y: 2.641, w: 3.560, h: 0.553, italic: true, color: GRAY_D });
+    body(s, 'Fusce ipsum dolor sit amet, consectetur adipiscing elit, sed do thes tempor incididunt ut labore et dolore magna aliqua. Aliquam etiam eratulan velit scelerisque. Orci sagittis eu volutpat odio facilisis.', { x: 3.106, y: 3.394, w: 8.047, h: 1.563 });
+
+    const donuts = [
+        { x: 3.106, topDark: true, pct: '95%', label: 'Consultation', lx: 3.106, lw: 2.310 },
+        { x: 5.975, topDark: false, pct: '87%', label: 'Laboratory Expertt', lx: 5.871, lw: 2.517 },
+        { x: 8.843, topDark: true, pct: '97%', label: 'Nutritionist', lx: 8.843, lw: 2.310 },
+    ];
+    donuts.forEach((d, i) => {
+        const yTop = d.topDark ? 5.583 - i * 0.006 : 5.577;
+        s.addShape('blockArc', { x: d.x, y: d.topDark ? yTop : 5.662, w: 2.310, h: 2.310, fill: { color: d.topDark ? DARK : DARK }, line: NOLINE, flipV: !d.topDark });
+        s.addShape('blockArc', { x: d.x, y: d.topDark ? yTop + 0.086 : 5.577, w: 2.310, h: 2.310, fill: { color: LAV }, line: NOLINE, flipV: d.topDark });
+        icon(s, d.x + 0.857, 6.476, 0.596, d.topDark ? DARK : WHITE);
+        stat(s, d.pct, { x: d.x + 0.388, y: 8.501, w: 1.535, h: 0.505, align: 'center' });
+        txt(s, d.label, { x: d.lx, y: 9.167, w: d.lw, h: 0.438, align: 'center', color: GRAY_M });
+    });
+});
+
+// 11 - "Our Specialized Doctor" ---------------------------------------------
+slides.push(s => {
+    rect(s, { x: 1.174, y: 4.209, w: 17.651, h: 6.154, fill: { color: WHITE }, line: { color: DARK, width: 3 } });
+    rect(s, { x: 2.233, y: 3.181, w: 14.372, h: 2.062, fill: { color: WHITE } });
+    photo(s, 1.509, 2.664, 3.096, 3.096);
+    photo(s, 15.395, 2.664, 3.096, 3.096);
+    mark(s, 5.871, 1.496, 8.258, { outer: ORANGE, inner: ORANGE, cross: null, transparency: 92 });
+    crossMark(s, 9.500, 5.125, 1.0, 'FEF0D5');
+    tab(s, { x: 18.529, y: 0.507, w: 1.432, h: 1.509, rotate: 270, flipH: true, fill: { color: CYAN } });
+    crossMark(s, 0.974, 2.198, 0.838, ORANGE);
+
+    title(s, 'Our Specialized Doctor', { x: 5.505, y: 0.886, w: 8.990, h: 0.909, align: 'center' });
+    head(s, 'Dr. CLARA MARION', { x: 5.742, y: 3.181, w: 2.678, h: 0.438 });
+    body(s, LOREM_CARD, { x: 5.742, y: 3.679, w: 3.560, h: 1.058 });
+    body(s, 'Radiologist ', { x: 5.742, y: 4.833, w: 3.560, h: 0.553, italic: true, color: GRAY_D });
+    head(s, 'Dr. STEFFANNY ZOE', { x: 11.162, y: 3.181, w: 3.096, h: 0.438, align: 'right' });
+    body(s, LOREM_CARD, { x: 10.697, y: 3.679, w: 3.560, h: 1.058, align: 'right' });
+    body(s, 'Anesthetic', { x: 10.697, y: 4.833, w: 3.560, h: 0.553, align: 'right', italic: true, color: GRAY_D });
+
+    head(s, 'YOUR TITLE HERE', { x: 8.629, y: 6.206, w: 2.742, h: 0.438, align: 'center' });
+    body(s, 'Fusce ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod thes tempor incididunt ut labore et dolore magna aliqua. Aliquam eratulan velit. Orci eu volutpat odio facilisis mauris sit amet. furce lorem ipsum dolor sit amet nulla facilisi nullam vehicula ipsum placerat in egestas erat imperdiet sed sagittis commodo. lacus vestibulum sed arcu non odio.', { x: 2.919, y: 6.913, w: 14.163, h: 1.563, align: 'center' });
+    [8.701, 9.627, 10.554].forEach(x => {
+        rrect(s, { x, y: 8.931, w: 0.746, h: 0.746, fill: { color: LAV } });
+        icon(s, x + 0.20, 9.131, 0.35, DARK);
+    });
+});
+
+// 12 - four doctor cards ----------------------------------------------------
+slides.push(s => {
+    const DOCTORS = [
+        { x: 1.366, name: 'Dr. DEVAN CARLOS', role: 'Dentist' },
+        { x: 5.975, name: 'Dr. LUCAS BRYAN ', role: 'Nutritionist', accent: true },
+        { x: 10.583, name: 'Dr. SONIA ALSA', role: 'ENT Specialist' },
+        { x: 15.192, name: 'Dr. MELODY LIAN', role: 'Internist' },
+    ];
+    DOCTORS.forEach(d => {
+        rrect(s, { x: d.x, y: 1.365, w: 3.442, h: 5.429, adj: 7015, fill: { color: LAV, transparency: 15 } });
+        if (!d.accent) tab(s, { x: d.x + 0.004, y: 2.036, w: 0.985, h: 0.993, rotate: 90, flipH: true, fill: { color: CYAN } });
+        photo(s, d.x + 0.171, 1.634, 3.100, 4.890);
+    });
+    tab(s, { x: 6.028, y: 5.075, w: 0.985, h: 1.099, rotate: 90, flipH: true, fill: { color: ORANGE }, shadow: shadow() });
+    icon(s, 6.243, 5.348, 0.553, WHITE);
+
+    DOCTORS.forEach(d => {
+        head(s, d.name, { x: d.x + 0.382, y: 7.473, w: 2.678, h: 0.438, align: 'center' });
+        body(s, LOREM_CARD, { x: d.x - 0.059, y: 8.039, w: 3.560, h: 1.058, align: 'center' });
+        body(s, d.role, { x: d.x - 0.059, y: 9.331, w: 3.560, h: 0.553, align: 'center', italic: true, color: GRAY_D });
+    });
+});
+
+// 13 - doctor with skill bars -----------------------------------------------
+slides.push(s => {
+    verticalRail(s, 17.419);
+    rrect(s, { x: 6.023, y: 5.326, w: 11.394, h: 5.924, adj: 0, fill: { color: DARK } });
+    photo(s, 0, 0, 6.023, H);
+    txt(s, 'PHARMEDIS', { x: 17.801, y: 0.776, w: 1.818, h: 9.697, vert: 'vert270', align: 'center', fontFace: HEAD, fontSize: 96, color: DARK });
+
+    title(s, 'Dr. Zafreno Ganzello', { x: 7.957, y: 1.044, w: 7.164, h: 0.909 });
+    body(s, 'General Practitioner ', { x: 7.957, y: 2.038, w: 3.560, h: 0.553, italic: true, color: GRAY_D });
+    body(s, 'Fusce ipsum dolor sit amet, consectetur adipiscing elit, sed do ut labore et dolore magna aliqua. Aliquam etiam eratulan velit eget arcu dictum varius duis at consectetur eiusmod thes', { x: 7.957, y: 2.869, w: 7.523, h: 1.563 });
+
+    const SKILLS = [
+        { y: 6.199, label: 'Anamnesis Expertise', pct: '85%', bar: 5.407 },
+        { y: 7.861, label: 'Lung Diseases', pct: '95%', bar: 5.770 },
+        { y: 9.528, label: 'Digestive Problems', pct: '80%', bar: 5.151 },
+    ];
+    SKILLS.forEach((k, i) => {
+        const ty = [6.154, 7.770, 9.385][i];
+        rrect(s, { x: 7.351, y: k.y, w: 0.894, h: 0.894, fill: { color: WHITE } });
+        icon(s, 7.556, k.y + 0.20, 0.49, DARK);
+        txt(s, k.label, { x: 9.035, y: ty, w: 4.540, h: 0.505, fontFace: HEAD, fontSize: 24, bold: true, color: WHITE });
+        txt(s, k.pct, { x: 14.241, y: ty, w: 1.297, h: 0.505, align: 'right', fontFace: HEAD, fontSize: 24, bold: true, color: WHITE });
+        rrect(s, { x: 9.035, y: ty + 0.782, w: 6.446, h: 0.203, adj: 50000, fill: { color: TRACK } });
+        rrect(s, { x: 9.035, y: ty + 0.782, w: k.bar, h: 0.203, adj: 50000, fill: { color: ORANGE } });
+    });
+});
+
+// 14 - "Top Medical Service" ------------------------------------------------
+slides.push(s => {
+    rrect(s, { x: 1.116, y: 1.016, w: 10.891, h: 9.218, adj: 0, fill: { color: WHITE }, line: { color: DARK, width: 3 } });
+    rrect(s, { x: 13.574, y: 1.016, w: 5.310, h: 9.218, adj: 0, fill: { color: LAV }, line: { color: WHITE, width: 3 } });
+    tab(s, { x: 2.601, y: 1.016, w: 1.562, h: 1.416, rotate: 180, flipH: true, fill: { color: DARK } });
+    photo(s, 13.969, 2.721, 4.519, 7.047);
+    rect(s, { x: 13.969, y: 1.343, w: 4.519, h: 1.212, fill: { color: DARK } });
+
+    title(s, 'Top Medical Service', { x: 2.601, y: 3.097, w: 7.164, h: 0.909 });
+    body(s, 'Lorem ipsum dolor sit amet elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Nibh tortor id aliquet lectus. Amet nisl purus in mollis nunc sed id. Posuere morbi leo urna molestie', { x: 2.601, y: 4.313, w: 8.060, h: 1.563, color: GRAY_M });
+    serviceGrid(s, 2.601, 6.612);
+    crossMark(s, 3.001, 1.343, 0.761, ORANGE);
+    head(s, 'YOUR TITLE HERE', { x: 14.890, y: 1.730, w: 2.678, h: 0.438, align: 'center', color: WHITE });
+});
+
+// 15 - "The Best Medical Service" -------------------------------------------
+slides.push(s => {
+    tab(s, { x: 1.442, y: 4.209, w: 6.576, h: 7.041, adj1: 11096, fill: { color: DARK } });
+    photo(s, 2.203, 1.577, 5.052, 5.172);
+
+    title(s, 'The Best Medical Service', { x: 10.395, y: 1.371, w: 7.873, h: 0.909 });
+    const BLURB = 'Eiusmod thes tempor incididunt ut labore et dolore magna aliqua. Aliquam eratulan velit. Orci eu volutpat odio facilisis mauris sit';
+    body(s, BLURB, { x: 10.395, y: 2.574, w: 7.873, h: 1.058 });
+    pill(s, { x: 10.395, y: 4.306, w: 3.488, h: 1.093, fill: { color: ORANGE }, shadow: shadow() },
+        { x: 10.801, y: 4.600, w: 2.678, text: 'YOUR TITLE HERE', color: WHITE });
+    body(s, BLURB, { x: 10.395, y: 5.697, w: 7.873, h: 1.058 });
+    pill(s, { x: 10.395, y: 7.429, w: 3.488, h: 1.093, fill: { color: WHITE }, line: { color: LAV, width: 2.25 } },
+        { x: 10.801, y: 7.723, w: 2.678, text: 'YOUR TITLE HERE', color: GRAY });
+    body(s, BLURB, { x: 10.395, y: 8.821, w: 7.873, h: 1.058 });
+
+    head(s, '21.980+', { x: 2.203, y: 8.600, w: 2.678, h: 0.438, color: WHITE });
+    body(s, 'Fusce ipsum dolor sit amet, consectetur elit, sed do eiusmod thes tempor.', { x: 2.203, y: 9.099, w: 5.021, h: 1.058, color: WHITE });
+    rrect(s, { x: 2.338, y: 7.448, w: 0.894, h: 0.894, fill: { color: ORANGE } });
+    icon(s, 2.518, 7.628, 0.534, WHITE);
+});
+
+// 16 - "Our Facilities" -----------------------------------------------------
+slides.push(s => {
+    body(s, 'Fusce ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod thes tempor incididunt ut labore et dolore magna aliqua. Aliquam etiam eratulan velit. Orci eu volutpat odio facilisis mauris sit amet. furce lorem ipsum dolor sit amet nulla facilisi nullam vehicula ipsum placerat in egestas erat imperdiet sed sagittis commodo. Fermentum odio eu feugiat pretium nibh ipsum.', { x: 10.348, y: 3.765, w: 8.028, h: 3.078 });
+    title(s, 'Our Facilities', { x: 10.348, y: 2.595, w: 7.164, h: 0.909 });
+    pill(s, { x: 10.348, y: 7.562, w: 3.084, h: 1.093, fill: { color: ORANGE } },
+        { x: 10.690, y: 7.856, w: 2.400, h: 0.505, text: 'Readmore', size: 24, color: WHITE });
+
+    rrect(s, { x: 0, y: 1.141, w: 8.724, h: 8.968, adj: 0, fill: { color: WHITE }, shadow: shadow() });
+    rect(s, { x: 0, y: 1.141, w: 0.442, h: 8.968, fill: { color: CYAN } });
+    txt(s, 'Our Best Facilities', { x: 1.949, y: 1.892, w: 5.711, h: 0.707, fontFace: HEAD, fontSize: 36, color: INK });
+    [{ y: 3.275, ty: 4.427, by: 4.925 }, { y: 6.649, ty: 7.801, by: 8.300 }].forEach((r, i) => {
+        rrect(s, { x: 2.083, y: r.y, w: 0.894, h: 0.894, fill: i === 0 ? { color: WHITE } : { type: 'none' }, line: { color: LAV, width: 3 } });
+        icon(s, 2.290, r.y + 0.208, 0.479, DARK);
+        head(s, 'YOUR TITLE HERE', { x: 1.949, y: r.ty, w: 2.678, h: 0.438 });
+        body(s, LOREM_TITLE, { x: 1.949, y: r.by, w: 5.711, h: 1.058, color: GRAY_D });
+    });
+});
+
+// 17 - "Our Best Facilities" (three columns) --------------------------------
+slides.push(s => {
+    watermarks(s, DARK);
+    mark(s, 5.871, 1.496, 8.258, { outer: ORANGE, inner: ORANGE, cross: null, transparency: 92 });
+    crossMark(s, 9.500, 5.125, 1.0, 'FEF0D5');
+    [2.280, 8.332, 14.386].forEach(x => photo(s, x, 4.404, 3.336, 3.415));
+
+    title(s, 'Our Best Facilities', { x: 5.301, y: 1.207, w: 9.398, h: 0.909, align: 'center' });
+    body(s, 'Fusce ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod thes tempor incididunt ut labore et dolore magna aliqua. Aliquam egestas erat imperdiet sed sagittis commodo. lacus vestibulum sed arcu non odio euismod. Massa tincidunt nunc pulvinar sapien.', { x: 1.625, y: 2.376, w: 16.749, h: 1.058, align: 'center' });
+    [2.053, 8.220, 14.386].forEach(x => {
+        head(s, 'YOUR TITLE HERE', { x: x + 0.441, y: 8.419, w: 2.678, h: 0.438, align: 'center' });
+        body(s, LOREM_CARD, { x, y: 8.985, w: 3.560, h: 1.058, align: 'center' });
+    });
+});
+
+// 18 - break slide ----------------------------------------------------------
+slides.push(s => {
+    photo(s, 0, 0, W, H);
+    rect(s, { x: 0.638, y: 0, w: 19.362, h: H, fill: { color: DARK, transparency: 25 } });
+    mark(s, 18.017, 0.463, 1.346);
+    wordmark(s, 17.480, 1.256, 2.419, 18, WHITE);
+    txt(s, 'BREAK SLIDES', { x: 4.348, y: 4.292, w: 11.941, h: 1.952, align: 'center', fontFace: HEAD, fontSize: 110, color: WHITE });
+    txt(s, SUBTITLE, { x: 6.190, y: 6.453, w: 8.258, h: 0.505, align: 'center', fontFace: BODYM, fontSize: 24, bold: true, color: ORANGE });
+    rect(s, { x: 0, y: 0, w: 0.638, h: H, fill: { color: LAV } });
+    tab(s, { x: 0.647, y: 4.420, w: 2.390, h: 2.410, rotate: 90, flipH: true, fill: { color: LAV } });
+    crossMark(s, 1.033, 4.816, 1.618, ORANGE);
+});
+
+// 19 - "Our Best Portfolio" -------------------------------------------------
+slides.push(s => {
+    rect(s, { x: 0, y: 1.386, w: 0.623, h: 4.220, fill: { color: ORANGE } });
+    photo(s, 12.124, 0, 7.876, 5.605);
+    photo(s, 12.124, 5.645, 7.876, 5.605);
+    s.addShape('ellipse', { x: 11.591, y: 0, w: 2.678, h: H, fill: { color: WHITE }, line: NOLINE });
+
+    title(s, 'Our Best Portfolio', { x: 1.730, y: 1.419, w: 7.164, h: 0.909 });
+    body(s, 'Fusce ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod thes tempor incididunt ut labore et dolore magna aliqua. Aliquam etiam eratulan velit scelerisque. Orci sagittis eu volutpat odio facilisis mauris sit amet. furce lorem ipsum dolor sit amet consectetur adipiscing elit pellentesque monolin habitant. Tristique magna sit amet purus gravida. Quisque sagittis purus situ amet volutpat. Augue eget arcu dictum varius duis at consectetur. ', { x: 1.730, y: 2.589, w: 9.184, h: 3.078 });
+    [{ ty: 6.279, by: 6.778 }, { ty: 8.274, by: 8.772 }].forEach(r => {
+        head(s, 'YOUR TITLE HERE', { x: 1.730, y: r.ty, w: 2.678, h: 0.438 });
+        body(s, LOREM_TITLE, { x: 1.730, y: r.by, w: 5.711, h: 1.058, color: GRAY_D });
+    });
+});
+
+// 20 - "Our Portfolio" (two paragraphs) -------------------------------------
+slides.push(s => {
+    rect(s, { x: 0, y: 0, w: 10, h: H, fill: { color: LAV } });
+    rect(s, { x: 0, y: 0, w: 4.600, h: 9.086, fill: { color: DARK } });
+    rect(s, { x: 0, y: 9.086, w: 4.600, h: 2.164, fill: { color: CYAN } });
+    photo(s, 0.880, 0.920, 3.720, 9.411);
+    photo(s, 5.180, 0.920, 3.720, 4.416);
+    photo(s, 5.180, 5.914, 3.720, 4.416);
+
+    title(s, 'Our Portfolio', { x: 11.914, y: 1.686, w: 5.743, h: 0.909 });
+    txt(s, [
+        { text: 'Fusce ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod thes tempor incididunt ut labore et dolore magna aliqua. Aliquam etiam eratulan velit. Orci eu volutpat odio facilisis mauris sit amet. furce lorem ipsum dolor sit amet nulla facilisi nullam vehicula in egestas erat imperdiet sed sagittis commodo odio eu', options: { breakLine: true } },
+        { text: '', options: { breakLine: true } },
+        { text: 'Ullamcorper a lacus vestibulum sed arcu non odio et ligula. Amet cursus sit amet dictum sit amet justo in egestas erat imperdiet sed. Ultrices tincidunt arcu non sodales neque sodales ut. Tellus integer feugiat scelerisque varius euismod. Massa tincidunt nunc pulvinar sapien donec. Est placerat .' },
+    ], { x: 11.914, y: 2.952, w: 6.563, h: 6.612, lineSpacingMultiple: 1.5 });
+});
+
+// 21 - "Our Portfolio" (cyan band) ------------------------------------------
+slides.push(s => {
+    rect(s, { x: 12.351, y: 3.992, w: 7.649, h: 3.266, fill: { color: CYAN } });
+    photo(s, 12.351, 0, 7.649, 3.533);
+    photo(s, 12.351, 7.717, 7.649, 3.533);
+
+    rrect(s, { x: 11.047, y: 4.343, w: 7.326, h: 2.564, adj: 9509, fill: { color: WHITE }, shadow: shadow() });
+    rrect(s, { x: 11.776, y: 5.171, w: 0.894, h: 0.894, fill: { color: ORANGE } });
+    icon(s, 11.996, 5.391, 0.454, WHITE);
+    note(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.', { x: 13.384, y: 5.171, w: 4.258, h: 0.909, fontSize: 24, color: GRAY_D });
+
+    title(s, 'Our Portfolio', { x: 1.730, y: 1.638, w: 7.164, h: 0.909 });
+    body(s, 'Fusce ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod thes tempor incididunt ut labore et dolore magna aliqua. Aliquam etiam eratulan velit scelerisque. Orci sagittis eu volutpat odio facilisis mauris sit amet. furce lorem ipsum dolor sit amet consectetur adipiscing elit pellentesque monolin habitant. Tristique magna sit amet purus gravida. ', { x: 1.730, y: 2.807, w: 7.326, h: 3.078 });
+    head(s, 'YOUR TITLE HERE', { x: 1.730, y: 6.498, w: 2.678, h: 0.438 });
+    body(s, 'Fusce ipsum dolor sit amet, consectetur elit, sed do eiusmod thes tempor incididunt ut aenean pharetra magna.', { x: 1.730, y: 6.996, w: 7.326, h: 1.058, color: GRAY_D });
+
+    [{ x: 1.730, on: true }, { x: 3.157 }, { x: 4.584 }, { x: 6.011 }].forEach(b => {
+        rrect(s, { x: b.x, y: 8.718, w: 0.894, h: 0.894, ...(b.on
+            ? { fill: { color: ORANGE }, shadow: shadow() }
+            : { fill: { type: 'none' }, line: { color: LAV } }) });
+        icon(s, b.x + 0.220, 8.938, 0.455, b.on ? WHITE : DARK);
+    });
+});
+
+// 22 - "Gallery Portfolio" (dark left panel) --------------------------------
+slides.push(s => {
+    rect(s, { x: 0, y: 0, w: 7.419, h: H, fill: { color: DARK } });
+    photo(s, 0.766, 0.776, 5.893, 4.188);
+    photo(s, 0.766, 6.208, 5.893, 4.188);
+    verticalRail(s, 17.419);
+    txt(s, 'PHARMEDIS', { x: 17.801, y: 0.776, w: 1.818, h: 9.697, vert: 'vert270', align: 'center', fontFace: HEAD, fontSize: 96, color: DARK });
+
+    const GALLERY = 'Fusce ipsum dolor sit amet, consectetur elit, sed do eiusmod thes tempor incididunt ut commodo quis imperdiet massa risus ultricies tristique nulla';
+    [{ box: 0.855, ty: 2.057, by: 2.555 }, { box: 7.133, ty: 8.334, by: 8.833 }].forEach(r => {
+        rrect(s, { x: 9.292, y: r.box, w: 0.894, h: 0.894, fill: { type: 'none' }, line: { color: LAV, width: 2.25 } });
+        icon(s, 9.511, r.box + 0.220, 0.455, DARK);
+        head(s, 'YOUR TITLE HERE', { x: 9.226, y: r.ty, w: 2.678, h: 0.438 });
+        body(s, GALLERY, { x: 9.226, y: r.by, w: 7.005, h: 1.563, color: GRAY_D });
+    });
+    title(s, 'Gallery Portfolio', { x: 9.163, y: 5.171, w: 6.024, h: 0.909 });
+
+    rrect(s, { x: 1.230, y: 7.217, w: 0.894, h: 0.894, fill: { color: ORANGE } });
+    icon(s, 1.449, 7.437, 0.455, WHITE);
+    rrect(s, { x: 1.230, y: 8.493, w: 0.894, h: 0.894, fill: { color: WHITE } });
+    icon(s, 1.449, 8.713, 0.455, DARK);
+});
+
+// 23 - "Gallery Portfolio" (date card) --------------------------------------
+slides.push(s => {
+    rect(s, { x: 13.047, y: 0, w: 6.953, h: H, fill: { color: DARK } });
+    rect(s, { x: 0, y: 0.813, w: 16.605, h: 9.623, fill: { type: 'none' }, line: { color: LAV, width: 3 } });
+    rect(s, { x: -0.078, y: 2.814, w: 0.590, h: 5.621, fill: { color: CYAN } });
+    photo(s, 14.110, 2.765, 4.826, 4.826);
+
+    title(s, 'Gallery Portfolio', { x: 2.078, y: 2.258, w: 7.164, h: 0.909 });
+    rrect(s, { x: 2.078, y: 3.813, w: 7.326, h: 2.861, adj: 9509, fill: { color: WHITE }, shadow: shadow() });
+    rrect(s, { x: 2.807, y: 4.797, w: 0.894, h: 0.894, fill: { color: ORANGE } });
+    icon(s, 3.027, 5.016, 0.454, WHITE);
+    txt(s, '28/05/2024', { x: 4.431, y: 4.366, w: 3.290, h: 0.640, fontFace: BODYM, fontSize: 32, bold: true, color: NAVY });
+    note(s, SUBTITLE, { x: 4.415, y: 5.212, w: 4.258, h: 0.909, fontSize: 24, color: GRAY_D });
+    body(s, 'Fusce ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod thes tempor incididunt ut labore et dolore magna aliqua. Aliquam etiam eratulan velit scelerisque. Orci sagittis eu volutpat odio facilisis mauris sit amet. furce habitant. Tristique magna sit amet purus gravida. auris commodo quis.', { x: 2.078, y: 7.320, w: 9.404, h: 2.068 });
+});
+
+// 24 - "Gallery Portfolio" (list card) --------------------------------------
+slides.push(s => {
+    [0, 3.926, 7.853].forEach(x => photo(s, x, 0, 3.651, 7.209));
+    body(s, 'Fusce ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod thes tempor incididunt ut labore et dolore velit. ', { x: 1.255, y: 9.123, w: 7.836, h: 1.058 });
+    title(s, 'Gallery Portfolio', { x: 1.210, y: 8.139, w: 7.164, h: 0.909 });
+
+    rrect(s, { x: 4.365, y: 4.866, w: 2.774, h: 1.997, adj: 9509, fill: { color: CYAN, transparency: 70 }, shadow: shadow() });
+    stat(s, '275K', { x: 4.688, y: 5.194, w: 1.535, h: 0.505, color: WHITE });
+    txt(s, 'Patient Consultation', { x: 4.688, y: 5.760, w: 2.128, h: 0.774, color: WHITE });
+
+    rrect(s, { x: 10.651, y: 1.017, w: 8.349, h: 9.215, adj: 0, fill: { color: WHITE }, shadow: shadow() });
+    photo(s, 11.473, 2.061, 6.705, 2.634);
+    [{ y: 5.713, on: true }, { y: 7.004, ty: 6.996 }, { y: 8.295, ty: 8.280 }].forEach(r => {
+        rrect(s, { x: 11.473, y: r.y, w: 0.894, h: 0.894, ...(r.on
+            ? { fill: { color: ORANGE } }
+            : { fill: { color: WHITE }, line: { color: LAV, width: 3 } }) });
+        icon(s, 11.652, r.y + 0.179, 0.536, r.on ? WHITE : DARK);
+        note(s, 'Lorem ipsum dolor sit amet elit, sed do eiusmod tempor labore', { x: 13.081, y: r.ty || r.y, w: 5.098, h: 0.909, fontSize: 24, color: GRAY_D });
+    });
+});
+
+// 25 - desktop mock-up ------------------------------------------------------
+slides.push(s => {
+    tab(s, { x: 5.799, y: -3.759, w: 9.313, h: 19.089, adj1: 6550, rotate: 270, fill: { color: DARK } });
+    tab(s, { x: 5.890, y: -3.828, w: 9.313, h: 18.907, adj1: 6550, rotate: 270, fill: { color: LAV } });
+    device(s, 12.826, 3.100, 6.081, 5.050, 'monitor');
+    title(s, 'Visit Our Website For Get Solutions', { x: 2.657, y: 2.736, w: 8.605, h: 1.717 });
+    body(s, 'Fusce ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod thes tempor incididunt ut labore et dolore magna aliqua. Aliquam etiam eratulan velit scelerisque. Orci sagittis eu volutpat odio facilisis mauris sit amet. furce lorem ipsum dolor sit amet consectetur adipiscing elit', { x: 2.657, y: 4.747, w: 8.605, h: 2.068, color: GRAY_D });
+    pill(s, { x: 2.657, y: 7.421, w: 3.084, h: 1.093, fill: { color: ORANGE } },
+        { x: 2.999, y: 7.715, w: 2.400, h: 0.505, text: 'Readmore', size: 24, color: WHITE });
+});
+
+// 26 - laptop mock-up -------------------------------------------------------
+slides.push(s => {
+    rect(s, { x: 0, y: 2.645, w: 8.302, h: 4.006, fill: { color: LAV } });
+    device(s, 1.563, 2.533, 7.609, 4.404, 'laptop');
+    stat(s, '155K', { x: 2.248, y: 7.713, w: 1.535, h: 0.505 });
+    txt(s, 'Patients Consul', { x: 2.248, y: 8.279, w: 2.247, h: 0.438, color: GRAY_M });
+    note(s, 'Lorem ipsum dolor sit amet elit, sed do eiusmod tempor labore', { x: 4.903, y: 7.831, w: 4.269, h: 0.774 });
+
+    title(s, 'Get The Latest Information From Us', { x: 11.914, y: 2.223, w: 6.563, h: 1.717 });
+    body(s, 'Fusce ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod thes tempor incididunt ut labore et dolore magna aliqua. Aliquam etiam eratulan velit. Orci eu volutpat odio facilisis mauris sit amet. furce lorem ipsum dolor sit amet nulla facilisi nullam vehicula in egestas erat imperdiet sed sagittis commodo odio eu', { x: 11.914, y: 4.323, w: 6.563, h: 3.078 });
+    pill(s, { x: 11.914, y: 7.934, w: 3.084, h: 1.093, fill: { color: ORANGE } },
+        { x: 12.256, y: 8.228, w: 2.400, h: 0.505, text: 'Readmore', size: 24, color: WHITE });
+
+    mark(s, 18.017, 0.393, 1.346, { inner: DARK });
+    wordmark(s, 17.480, 1.186, 2.419, 18, INK);
+    rrect(s, { x: 5.249, y: 4.076, w: 2.774, h: 1.549, adj: 9509, fill: { color: CYAN, transparency: 60 }, shadow: shadow() });
+    stat(s, '1260+', { x: 5.745, y: 4.296, w: 1.535, h: 0.505, color: WHITE });
+    txt(s, 'Best Doctor', { x: 5.745, y: 4.862, w: 2.128, h: 0.438, color: WHITE });
+});
+
+// 27 - phone mock-up --------------------------------------------------------
+slides.push(s => {
+    rect(s, { x: 17.419, y: 0, w: 2.581, h: H, fill: { color: LAV } });
+    rect(s, { x: 18.184, y: 0, w: 1.050, h: 1.256, fill: { color: CYAN } });
+    device(s, 13.804, 1.824, 4.552, 8.073, 'phone');
+
+    title(s, 'Download Our App', { x: 1.648, y: 1.824, w: 7.164, h: 0.909 });
+    body(s, 'Fusce ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod thes tempor incididunt ut labore et dolore magna aliqua. Aliquam etiam eratulan velit scelerisque. Orci sagittis eu volutpat odio facilisis mauris sit amet. ', { x: 1.648, y: 3.146, w: 9.404, h: 1.563 });
+    txt(s, 'DOWNLOAD', { x: 1.644, y: 5.118, w: 3.290, h: 0.505, fontFace: BODYM, fontSize: 24, bold: true, color: DARK });
+    rrect(s, { x: 1.648, y: 6.541, w: 9.724, h: 2.885, adj: 9509, fill: { color: WHITE }, shadow: shadow() });
+    rrect(s, { x: 2.338, y: 7.536, w: 0.894, h: 0.894, fill: { color: ORANGE } });
+    icon(s, 2.558, 7.756, 0.454, WHITE);
+    body(s, 'Fusce ipsum dolor sit amet, consectetur elit, sed do eiusmod thes tempor incididunt ut ', { x: 3.946, y: 7.358, w: 6.736, h: 1.250, fontSize: 24 });
+});
+
+// 28 - pricing tables -------------------------------------------------------
+slides.push(s => {
+    title(s, 'Our Pricing Tables', { x: 6.418, y: 0.673, w: 7.164, h: 0.909, align: 'center' });
+
+    const PLANS = [
+        { x: 1.958, name: 'Basic Plan', price: '$37 /', accent: DARK, ring: DARK, dot: DARK, arcAdj: 13235741 },
+        { x: 7.836, name: 'Standard Plan', price: '$65 /', accent: CYAN, ring: CYAN, dot: CYAN_L, arcAdj: 12696384 },
+        { x: 13.714, name: 'Premium Plan', price: '$89 /', accent: DARK, ring: '000000', dot: '000000', arcAdj: 13235741 },
+    ];
+    PLANS.forEach(p => {
+        const cx = p.x + 2.164;                           // card centre
+        s.addShape('arc', { x: cx - 0.985, y: 2.249, w: 1.970, h: 1.970, fill: { type: 'none' }, line: { color: p.ring, width: 2.25 }, ...gd(p.arcAdj, 10722266) });
+        s.addShape('ellipse', { x: cx - 0.638, y: 2.596, w: 1.276, h: 1.276, fill: { color: p.dot }, line: { color: 'F7F8FA', width: 20 } });
+        s.addShape('line', { x: cx, y: 4.218, w: 0, h: 0.466, line: { color: p.dot === CYAN_L ? CYAN_L : DARK, width: 2.25 } });
+        icon(s, cx - 0.194, 3.040, 0.388, WHITE);
+        rrect(s, { x: p.x, y: 4.516, w: 4.328, h: 6.060, adj: 9011, fill: { color: WHITE }, shadow: shadow() });
+        txt(s, p.name, { x: p.x + 0.625, y: 4.959, w: 2.024, h: 0.540, fontFace: HEAD, color: p.accent, lineSpacingMultiple: 1.5 });
+        txt(s, [
+            { text: p.price, options: { fontSize: 32 } },
+            { text: 'Month', options: { fontSize: 16 } },
+        ], { x: p.x + 0.625, y: 5.470, w: 2.024, h: 0.803, fontFace: HEAD, color: DARK, lineSpacingMultiple: 1.5 });
+        txt(s, Array.from({ length: 4 }, () => ({ text: 'Mauris commodo quis', options: { breakLine: true, bullet: BULLET } })),
+            { x: p.x + 0.625, y: 6.557, w: 3.540, h: 2.068, lineSpacingMultiple: 1.5 });
+        pill(s, { x: p.x + 0.979, y: 9.243, w: 2.369, h: 0.804, adj: 24501, fill: { color: p.dot === CYAN_L ? CYAN_L : DARK } },
+            { x: p.x + 1.222, y: 9.426, w: 1.884, text: 'Select Now', color: WHITE });
+    });
+});
+
+// 29 - testimonials ---------------------------------------------------------
+slides.push(s => {
+    photo(s, 3.677, 4.085, 1.276, 1.276);
+    [1.969, 5.096, 8.223].forEach(y => photo(s, 11.267, y, 1.058, 1.058));
+    s.addShape('line', { x: 0, y: 0.221, w: W, h: 0, line: { color: DARK, width: 3 } });
+    rect(s, { x: 1.349, y: 0, w: 7.186, h: 0.442, fill: { color: CYAN } });
+
+    s.addShape('arc', { x: 3.330, y: 3.737, w: 1.970, h: 1.970, fill: { type: 'none' }, line: { color: DARK, width: 2.25 }, ...gd(13235741, 10722266) });
+    s.addShape('line', { x: 4.338, y: 5.730, w: 0, h: 0.466, line: { color: DARK, width: 2.25 } });
+    rrect(s, { x: 1.349, y: 6.005, w: 5.932, h: 3.205, adj: 9011, fill: { color: WHITE }, shadow: shadow() });
+    title(s, 'What Our Patients Says', { x: 1.349, y: 2.040, w: 7.535, h: 0.909 });
+
+    const QUOTE = 'Fusce ipsum dolor sit amet elit, sed do eiusmod thes tempor incididunt ut ';
+    head(s, 'YOUR NAME HERE', { x: 2.999, y: 6.808, w: 2.678, h: 0.438 });
+    body(s, QUOTE, { x: 1.907, y: 7.381, w: 5.023, h: 1.058, align: 'center' });
+    [1.203, 4.330, 7.457].forEach(y => {
+        rrect(s, { x: 10.628, y, w: 8.023, h: 2.590, adj: 9509, fill: { color: WHITE }, shadow: softShadow() });
+        head(s, 'YOUR NAME HERE', { x: 13.047, y: y + 0.497, w: 2.678, h: 0.438 });
+        body(s, QUOTE, { x: 13.047, y: y + 1.034, w: 5.023, h: 1.058 });
+    });
+});
+
+// 30 - contact --------------------------------------------------------------
+slides.push(s => {
+    photo(s, 0, 0, 7.876, H);
+    s.addShape('ellipse', { x: 5.750, y: 0, w: 2.678, h: H, fill: { color: WHITE }, line: NOLINE });
+    rect(s, { x: 0.923, y: 0.813, w: 18.154, h: 9.623, fill: { type: 'none' }, line: { color: LAV, width: 3 } });
+    rect(s, { x: 18.116, y: 2.814, w: 1.884, h: 5.621, fill: { color: CYAN } });
+
+    title(s, 'Contact Us', { x: 10.563, y: 1.704, w: 5.041, h: 0.909 });
+    const CONTACT = [
+        { y: 3.504, head: 'Office Address', lines: ['5 East 79th Street, Los Angeles, CA 90010, United States'], w: 4.045, hw: 3.254 },
+        { y: 5.684, head: 'Email & Website', lines: ['Info@pharmedis.com', 'www.pharmedis.com'], w: 3.256, hw: 3.606 },
+        { y: 7.866, head: 'Our Phone', lines: ['+1213 8768 6059 188', '+1213 8768 6059 189'], w: 3.606, hw: 3.254 },
+    ];
+    CONTACT.forEach(c => {
+        icon(s, 10.570, c.y, 0.591, DARK);
+        txt(s, c.head, { x: 11.561, y: c.y + 0.043, w: c.hw, h: 0.505, fontFace: HEAD, fontSize: 24, color: INK });
+        body(s, c.lines.map((t, i) => ({ text: t, options: { breakLine: i < c.lines.length - 1 } })),
+            { x: 11.559, y: c.y + 0.639, w: c.w, h: 1.058 });
+    });
+});
+
+// 31 - thank you ------------------------------------------------------------
+slides.push(s => {
+    s.background = { color: DARK };
+    rect(s, { x: 0, y: 2.814, w: 0.638, h: 5.621, fill: { color: CYAN } });
+    photo(s, 14.302, 0, 5.698, H);
+    txt(s, 'THANK YOU', { x: 1.181, y: 4.292, w: 11.941, h: 1.952, align: 'center', fontFace: HEAD, fontSize: 110, color: WHITE });
+    txt(s, SUBTITLE, { x: 3.022, y: 6.453, w: 8.258, h: 0.505, align: 'center', fontFace: BODYM, fontSize: 24, bold: true, color: ORANGE });
+});
+
+/* ------------------------------------------------------------------- build */
+
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'PHARMEDIS', width: W, height: H });
+pptx.layout = 'PHARMEDIS';
+pptx.author = 'PHARMEDIS';
+pptx.title = 'PHARMEDIS - Medical & Pharmaceutical Presentation Template';
+
+slides.forEach(build => build(pptx.addSlide()));
+
+pptx.writeFile({ fileName: path.join(__dirname, '0afd44de-4325-40a4-b37f-3ebecdd4c356_grok_final.pptx') })
+    .then(f => console.log('wrote', f));
