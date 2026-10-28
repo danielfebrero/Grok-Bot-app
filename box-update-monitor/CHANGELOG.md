@@ -9,6 +9,18 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-28 19:48 (Paris) — snapshot `2026-10-28_17-48` → `2026-10-28_19-48`
+
+**Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `1925f3f267039e9863fe35e79d414451ae560e62` → `7fc2a4c450a39a9c4b790f3f9f085650e21d5821` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`), binaire `cursor-agent-store-fuse` inchangé (même hash). Toutes les autres versions plateforme inchangées (image `fcbae14`, box-scripts `fcbae14`, sand-host `ce1748b` (supervisor `upgrade-ce1748b`), exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7). Fichiers : +0 / −0 / ~1.
+
+Rapport : [reports/2026-10-28_19-48.md](reports/2026-10-28_19-48.md).
+
+## 2026-10-28 17:48 (Paris) — snapshot `2026-10-28_16-49` → `2026-10-28_17-48`
+
+**Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `63415b60e9787cfabb016bb9ac326698a9b95414` → `1925f3f267039e9863fe35e79d414451ae560e62` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`), binaire `cursor-agent-store-fuse` inchangé (même hash). Toutes les autres versions plateforme inchangées (image `fcbae14`, box-scripts `fcbae14`, sand-host `ce1748b` (supervisor `upgrade-ce1748b`), exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7). Fichiers : +0 / −0 / ~1.
+
+Rapport : [reports/2026-10-28_17-48.md](reports/2026-10-28_17-48.md).
+
 ## 2026-10-28 16:49 (Paris) — snapshot `2026-10-28_14-48` → `2026-10-28_16-49`
 
 **Hot-update du host bundle (sand-host) `04f60e5` → `ce1748b`** (supervisor `upgrade-04f60e5` → `upgrade-ce1748b`, `pendingUpgradeVersion` = None) : remplacement à chaud du `sand-host` par le sand-supervisor, sans Update de l'ordinateur. Bundle host (`host-main.cjs` 32.1→32.0 Mo, `sand-eval-runner.cjs` 26.3→26.2 Mo), `agent-store-worker`, `box-chrome-policy`, binaire `sand-egress-tunnel` (hash changé). Le pointeur **agent-store-fuse** a aussi bougé (`/usr/local/bin/cursor_agent_store_fuse_version` `9fc17c1a…` → `63415b60…`). Image `fcbae14`, box-scripts `fcbae14`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~15.
