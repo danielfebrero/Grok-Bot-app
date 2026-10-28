@@ -1,0 +1,800 @@
+#!/usr/bin/env node
+/**
+ * "Zoologic" zoo presentation — 24 slides, 13.333 x 7.5 in.
+ * Recreated with pptxgenjs only. Run: node <this file>
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ *
+ * Design tokens
+ * ------------------------------------------------------------------ */
+const GREEN = '86BC42'; // theme accent1
+const MINT = 'E7F2D9'; // accent1 lum 20% / off 80%
+const WHITE = 'FFFFFF';
+const INK = '404040'; // tx1 lum 90%
+const GREY = '959595'; // tx1 lum 50%
+
+const HEAD = 'Poppins SemiBold'; // theme major latin
+const BODY = 'Open Sans'; // theme minor latin
+
+const NO_LINE = { type: 'none' };
+
+/** Wide, very soft drop shadow used by every white card (fresh object per call:
+ *  pptxgenjs rewrites shadow values in place while generating XML). */
+function softShadow() {
+  return {
+    type: 'outer', blur: 15, offset: 0, angle: 0,
+    color: '000000', opacity: 0.1, rotateWithShape: false,
+  };
+}
+
+/* ------------------------------------------------------------------ *
+ * Small helpers
+ * ------------------------------------------------------------------ */
+
+/** Solid shape with no outline. */
+function shape(slide, kind, opts) {
+  slide.addShape(kind, Object.assign({ line: NO_LINE }, opts));
+}
+
+/**
+ * Shape whose bounding box is given AFTER rotation. pptxgenjs (like OOXML)
+ * rotates around the box centre, so pre-rotated w/h are swapped for 90/270.
+ */
+function rotatedShape(slide, kind, o) {
+  const quarter = o.rotate === 90 || o.rotate === 270;
+  const w = quarter ? o.h : o.w;
+  const h = quarter ? o.w : o.h;
+  const rest = Object.assign({}, o);
+  delete rest.x; delete rest.y; delete rest.w; delete rest.h;
+  shape(slide, kind, Object.assign({
+    x: o.x + o.w / 2 - w / 2,
+    y: o.y + o.h / 2 - h / 2,
+    w: w, h: h,
+  }, rest));
+}
+
+/** round2SameRect adjustments live in the same avLst slot as `angleRange`. */
+function cornerAdj(adj1, adj2) {
+  return [adj1 / 60000, (adj2 || 0) / 60000];
+}
+
+/**
+ * Big white/mint "sheet": a rectangle rounded on one side (`side`), optionally
+ * also rounded on the opposite side (`adjFar`).
+ */
+function sheet(slide, o) {
+  const rotBySide = { top: 0, right: 90, bottom: 180, left: 270 };
+  rotatedShape(slide, 'round2SameRect', {
+    x: o.x, y: o.y, w: o.w, h: o.h,
+    rotate: rotBySide[o.side],
+    angleRange: cornerAdj(o.adj, o.adjFar),
+    fill: { color: o.fill || WHITE },
+    shadow: o.shadow === false ? undefined : softShadow(),
+  });
+}
+
+/** Text run list for the two-tone headings ("Our " + "Service"). */
+function twoTone(dark, green, size) {
+  const common = { fontFace: HEAD, fontSize: size };
+  return [
+    { text: dark, options: Object.assign({ color: INK }, common) },
+    { text: green, options: Object.assign({ color: GREEN }, common) },
+  ];
+}
+
+/** Heading textbox — the deck's two-tone titles. */
+function heading(slide, x, y, w, h, dark, green, size, align) {
+  slide.addText(twoTone(dark, green, size), {
+    x: x, y: y, w: w, h: h,
+    align: align || 'left', valign: 'top', wrap: align !== 'center',
+  });
+}
+
+/** Grey Lorem paragraph (11pt, 1.5 line spacing). */
+function paragraph(slide, x, y, w, h, text, opts) {
+  const o = opts || {};
+  slide.addText(text, {
+    x: x, y: y, w: w, h: h,
+    fontFace: BODY, fontSize: 11, color: o.color || GREY,
+    align: o.align || 'left', valign: 'top',
+    lineSpacingMultiple: 1.5,
+  });
+}
+
+/** Bold 14pt Poppins mini-title. */
+function subTitle(slide, x, y, w, text, color) {
+  slide.addText(text, {
+    x: x, y: y, w: w, h: 0.337,
+    fontFace: HEAD, fontSize: 14, bold: true, color: color || INK,
+    valign: 'top', wrap: false,
+  });
+}
+
+/** Big green/white "12+" style number. */
+function bigNumber(slide, x, y, w, text, color) {
+  slide.addText(text, {
+    x: x, y: y, w: w, h: 0.505,
+    fontFace: HEAD, fontSize: 24, bold: true, color: color || GREEN,
+    valign: 'top', wrap: false,
+  });
+}
+
+/** subTitle + paragraph stacked, as used in every feature block. */
+function featureBlock(slide, x, y, w, title, body, opts) {
+  const o = opts || {};
+  subTitle(slide, x, y, o.titleW || w, title, o.titleColor);
+  paragraph(slide, x, y + 0.335, w, o.bodyH || 0.934, body, { color: o.bodyColor });
+}
+
+/** Row of four 0.1" green dots that sits above most headings. */
+function dots(slide, x, y) {
+  for (let i = 0; i < 4; i++) {
+    shape(slide, 'ellipse', {
+      x: x + i * 0.2423, y: y, w: 0.1, h: 0.1, fill: { color: GREEN },
+    });
+  }
+}
+
+/** Pill-shaped "Learn More" button with a circular play badge on its left. */
+function learnMore(slide, x, y) {
+  rotatedShape(slide, 'round2SameRect', {
+    x: x + 0.351, y: y + 0.044, w: 1.708, h: 0.44, rotate: 90,
+    angleRange: cornerAdj(19629), fill: { color: GREEN },
+  });
+  shape(slide, 'ellipse', {
+    x: x, y: y, w: 0.528, h: 0.528, fill: { color: WHITE }, shadow: softShadow(),
+  });
+  shape(slide, 'ellipse', {
+    x: x + 0.14, y: y + 0.136, w: 0.256, h: 0.256, fill: { color: GREEN },
+  });
+  rotatedShape(slide, 'triangle', {
+    x: x + 0.23, y: y + 0.208, w: 0.089, h: 0.103, rotate: 90, fill: { color: WHITE },
+  });
+  slide.addText('Learn More', {
+    x: x + 0.637, y: y + 0.121, w: 1.313, h: 0.286,
+    fontFace: BODY, fontSize: 11, color: WHITE, charSpacing: 2,
+    valign: 'top', wrap: false,
+  });
+}
+
+/** Small circular chevron badge (the two navigation dots on the side rails). */
+function navBadge(slide, x, y, flip) {
+  shape(slide, 'ellipse', { x: x, y: y, w: 0.378, h: 0.378, fill: { color: GREEN } });
+  shape(slide, 'ellipse', { x: x + 0.097, y: y + 0.095, w: 0.183, h: 0.183, fill: { color: WHITE } });
+  rotatedShape(slide, 'triangle', {
+    x: x + 0.148, y: y + 0.15, w: 0.074, h: 0.064,
+    rotate: flip ? 180 : 0, fill: { color: GREEN },
+  });
+}
+
+// Sweep angles are OOXML style: 0 = east, growing clockwise.
+const HALF_SWEEP = { right: [270, 90], bottom: [0, 180], left: [90, 270], top: [180, 360] };
+const QUAD_SWEEP = { tr: [270, 360], br: [0, 90], bl: [90, 180], tl: [180, 270] };
+const OPPOSITE = { left: 'right', right: 'left', top: 'bottom', bottom: 'top' };
+const HALF_QUADS = { right: ['tr', 'br'], left: ['tl', 'bl'], top: ['tl', 'tr'], bottom: ['bl', 'br'] };
+
+/** Solid half disc. */
+function halfDisc(slide, x, y, size, half, fill) {
+  shape(slide, 'pie', {
+    x: x, y: y, w: size, h: size,
+    angleRange: HALF_SWEEP[half], fill: { color: fill || GREEN },
+  });
+}
+
+/** Quarter wedge, optionally filled; always keeps the hairline outline. */
+function quadWedge(slide, x, y, size, quad, fill) {
+  shape(slide, 'arc', {
+    x: x, y: y, w: size, h: size, angleRange: QUAD_SWEEP[quad],
+    fill: fill ? { color: fill } : { type: 'none' },
+    line: { color: GREEN, width: 0.5 },
+  });
+}
+
+/** Hairline circle arcs over the listed quadrants (default: whole ring). */
+function circleOutline(slide, x, y, size, quads) {
+  (quads || ['tr', 'br', 'bl', 'tl']).forEach(function (q) {
+    quadWedge(slide, x, y, size, q, null);
+  });
+}
+
+/**
+ * The deck's signature motif: a circle with one half filled green and the
+ * opposite half left as a hairline outline (optionally filled white).
+ */
+function splitCircle(slide, x, y, size, greenHalf, otherFill) {
+  HALF_QUADS[OPPOSITE[greenHalf]].forEach(function (q) {
+    quadWedge(slide, x, y, size, q, otherFill);
+  });
+  halfDisc(slide, x, y, size, greenHalf);
+}
+
+/* ------------------------------------------------------------------ *
+ * Page chrome: logo, top nav, footer, corner tabs, side badges
+ * ------------------------------------------------------------------ */
+const NAV_ITEMS = [
+  { label: 'About', x: 8.392, w: 0.637 },
+  { label: 'Service', x: 9.661, w: 0.71 },
+  { label: 'Team', x: 11.003, w: 0.603 },
+  { label: 'Portfolio', x: 12.239, w: 0.821 },
+];
+
+function chrome(slide, opts) {
+  const o = opts || {};
+  const logoColor = o.logoColor || INK;
+  const footColor = o.footColor || GREY;
+
+  // top-left and bottom-right rounded tabs
+  rotatedShape(slide, 'round2SameRect', {
+    x: 0, y: 0.249, w: 0.411, h: 0.141, rotate: 90,
+    angleRange: cornerAdj(50000), fill: { color: GREEN },
+  });
+  rotatedShape(slide, 'round2SameRect', {
+    x: 12.922, y: 7.109, w: 0.411, h: 0.141, rotate: 270,
+    angleRange: cornerAdj(50000), fill: { color: GREEN },
+  });
+
+  // wordmark
+  slide.addText(
+    logoColor === WHITE
+      ? [{ text: 'Zoologic', options: { color: WHITE, fontFace: HEAD, fontSize: 11 } }]
+      : twoTone('Zoolo', 'gic', 11),
+    { x: 0.554, y: 0.177, w: 0.866, h: 0.286, valign: 'top', wrap: false }
+  );
+
+  // top navigation
+  NAV_ITEMS.forEach(function (item) {
+    const white = (o.whiteNav || []).indexOf(item.label) >= 0;
+    slide.addText(item.label, {
+      x: item.x, y: 0.177, w: item.w, h: 0.286,
+      fontFace: BODY, fontSize: 11, color: white ? WHITE : GREY,
+      align: 'right', valign: 'top', wrap: false,
+    });
+  });
+
+  // footer
+  slide.addText('Your Website Here', {
+    x: 0.274, y: 7.035, w: 2.02, h: 0.286,
+    fontFace: BODY, fontSize: 11, color: footColor, charSpacing: 2,
+    valign: 'top', wrap: false,
+  });
+  slide.addText(o.page, {
+    x: 12.019, y: 7.035, w: 0.83, h: 0.286,
+    fontFace: HEAD, fontSize: 11, color: o.pageColor || INK,
+    align: 'right', valign: 'top', wrap: false,
+  });
+
+  // the pair of chevron badges on the left or right rail
+  const bx = o.badgeX || (o.badges === 'left' ? 0.485 : 12.471);
+  navBadge(slide, bx, 3.223, false);
+  navBadge(slide, bx, 3.9, true);
+}
+
+/* ------------------------------------------------------------------ *
+ * Reusable body copy
+ * ------------------------------------------------------------------ */
+const LOREM = {
+  hero: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
+    'incididunt ut labore et dolore magna aliqua. Ut enim minim veniam, quis nostrud ' +
+    'PLACEHOLDER' +
+    'cillum dolore nulla pariatur.',
+  wide: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
+    'incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud ' +
+    'exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure ' +
+    'dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. ' +
+    'Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt ' +
+    'mollit anim id est laborum.',
+  centered: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
+    'incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud ' +
+    'exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure ' +
+    'PLACEHOLDER' +
+    'deserunt mollit anim id est laborum.',
+  medium: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
+    'incididunt ut labore dolore magna aliqua. Ut enim minim veniam, quis nostrud ullamco ' +
+    'laboris aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in ' +
+    'voluptate velit esse cillum dolore eu',
+  short: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
+    'incididunt ut labore dolore magna aliqua. Ut enim minim veniam, quis nostrud ullamco ' +
+    'laboris aliquip ex ea commodo aute irure dolor in reprehenderit',
+  banner: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
+    'incididunt ut labore et dolore magna aliqua. Ut enim minim veniam, quis nostrud ' +
+    'PLACEHOLDER' +
+    'in voluptate velit esse',
+  block: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, do eiusmod tempor ' +
+    'incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud ' +
+    'exercitation ullamco laboris nisi aliquip ex ea commodo consequat. ',
+  card: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed doeiusmod',
+  cardAlt: 'Lorem ipsum dolor sit, consectetur adipiscing elit, sed doeiusmod',
+  cardTight: 'Lorem ipsum dolor sit consectetur adipiscing elit, doeiusmod',
+  line: 'Lorem ipsum dolor sit amet, consectetur',
+  tiny: 'Lorem ipsum dolor sit amet',
+  animal: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit sed do eiusmod ' +
+    'incididunt ut labore dolore magna aliqua.',
+  animalShort: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit sed do eiusmod',
+};
+
+/* ------------------------------------------------------------------ *
+ * Custom freeform outlines (rounded cut-outs behind content blocks)
+ * ------------------------------------------------------------------ */
+
+/** Mint panel with a step cut out of its lower left (slide 2). */
+function notchedPanel(slide, x, y) {
+  shape(slide, 'custGeom', {
+    x: x, y: y, w: 4.081, h: 2.596, fill: { color: MINT },
+    points: [
+      { x: 0, y: 0 }, { x: 4.081, y: 0 }, { x: 4.081, y: 2.596 },
+      { x: 2.778, y: 2.596 }, { x: 2.778, y: 0.945 }, { x: 0, y: 0.945 },
+      { close: true },
+    ],
+  });
+}
+
+/** Mint panel whose left edge is bitten by a half circle (slide 3). */
+function roundBittenPanel(slide, x, y) {
+  shape(slide, 'custGeom', {
+    x: x, y: y, w: 5.133, h: 2.386, fill: { color: MINT },
+    points: [
+      { x: 0, y: 0 }, { x: 5.133, y: 0 }, { x: 5.133, y: 2.386 },
+      { x: 0.008, y: 2.386 }, { x: 0.020, y: 2.377 },
+      { curve: { type: 'cubic', x1: 0.360, y1: 2.096, x2: 0.577, y2: 1.671 }, x: 0.577, y: 1.196 },
+      { curve: { type: 'cubic', x1: 0.577, y1: 0.721, x2: 0.360, y2: 0.296 }, x: 0.020, y: 0.015 },
+      { close: true },
+    ],
+  });
+}
+
+/** Mint panel whose left edge is bitten by a tall stadium shape (slide 10). */
+function stadiumBittenPanel(slide, x, y) {
+  shape(slide, 'custGeom', {
+    x: x, y: y, w: 5.134, h: 5.714, fill: { color: MINT },
+    points: [
+      { x: 0, y: 0 }, { x: 5.134, y: 0 }, { x: 5.134, y: 5.714 },
+      { x: 0.057, y: 5.714 }, { x: 0.153, y: 5.710 },
+      { curve: { type: 'cubic', x1: 1.069, y1: 5.616, x2: 1.784, y2: 4.843 }, x: 1.784, y: 3.901 },
+      { x: 1.784, y: 1.822 },
+      { curve: { type: 'cubic', x1: 1.784, y1: 0.881, x2: 1.069, y2: 0.107 }, x: 0.153, y: 0.014 },
+      { x: 0, y: 0.006 },
+      { close: true },
+    ],
+  });
+}
+
+/** Thick green semicircular band hugging the bitten panel (slide 3). */
+function crescent(slide, cx, cy, radius) {
+  shape(slide, 'blockArc', {
+    x: cx - radius, y: cy - radius, w: radius * 2, h: radius * 2,
+    angleRange: HALF_SWEEP.right, arcThicknessRatio: 0.082, fill: { color: GREEN },
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Slides
+ * ------------------------------------------------------------------ */
+const builders = [];
+
+// 1 — Cover
+builders.push(function (s) {
+  shape(s, 'rect', { x: 8.571, y: 1.194, w: 4.762, h: 5.113, fill: { color: MINT } });
+  sheet(s, { x: 0, y: 1.194, w: 9.556, h: 5.113, side: 'right', adj: 6682 });
+  splitCircle(s, 7.465, 1.66, 4.18, 'left');
+  s.addText(twoTone('Zoolo', 'gic', 60), {
+    x: 1.038, y: 1.852, w: 3.838, h: 1.111, valign: 'top', wrap: false,
+  });
+  s.addText('Zoo Presentation', {
+    x: 1.038, y: 2.795, w: 2.448, h: 0.337,
+    fontFace: BODY, fontSize: 14, color: GREY, charSpacing: 3,
+    valign: 'top', wrap: false,
+  });
+  paragraph(s, 1.038, 3.289, 5.662, 1.212, LOREM.hero);
+  learnMore(s, 1.145, 4.834);
+  chrome(s, { page: 'Page 01', badges: 'right', badgeX: 12.31 });
+});
+
+// 2 — Table of content
+builders.push(function (s) {
+  notchedPanel(s, 9.252, 0);
+  shape(s, 'rect', { x: 0, y: 1.335, w: 6.896, h: 2.664, fill: { color: GREEN } });
+  [
+    { t: 'About', x: 0.627, y: 1.814, bx: 0.624 },
+    { t: 'Service', x: 3.63, y: 1.814, bx: 3.634 },
+    { t: 'Team', x: 0.624, y: 2.799, bx: 0.624 },
+    { t: 'Portfolio', x: 3.63, y: 2.799, bx: 3.634 },
+  ].forEach(function (it) {
+    subTitle(s, it.x, it.y, 1.1, it.t, WHITE);
+    paragraph(s, it.bx, it.y + 0.336, 2.667, 0.379, 'Lorem ipsum dolor sit consectetur', { color: WHITE });
+  });
+  s.addShape('line', { x: 6.198, y: 4.255, w: 0, h: 0.862, line: { color: GREEN, width: 0.5 } });
+  s.addShape('line', { x: 6.198, y: 5.117, w: 1.269, h: 0, line: { color: GREEN, width: 0.5 } });
+  heading(s, 1.189, 4.875, 4.031, 0.64, 'Table Of ', 'Content', 32);
+  paragraph(s, 1.189, 5.689, 10.955, 0.934, LOREM.wide);
+  chrome(s, { page: 'Page 02', badges: 'right' });
+});
+
+// 3 — Welcome message
+builders.push(function (s) {
+  roundBittenPanel(s, 8.201, 3.75);
+  crescent(s, 7.373, 4.946, 1.53);
+  circleOutline(s, 5.513, 3.185, 3.516, ['tr', 'br']);
+  dots(s, 6.253, 0.66);
+  heading(s, 4.407, 0.843, 4.52, 0.64, 'Welcome ', 'Message', 32, 'center');
+  paragraph(s, 1.175, 1.635, 10.984, 0.934, LOREM.centered, { align: 'center' });
+  bigNumber(s, 9.499, 4.192, 0.695, '12+');
+  subTitle(s, 9.499, 4.697, 1.992, 'Year Of Exestence');
+  paragraph(s, 9.499, 5.031, 3.12, 0.656, LOREM.card);
+  chrome(s, { page: 'Page 03', badges: 'right' });
+});
+
+// 4 — About our zoo
+builders.push(function (s) {
+  shape(s, 'rect', { x: 3.317, y: 3.954, w: 7.617, h: 2.561, fill: { color: MINT } });
+  shape(s, 'rect', { x: 0, y: 0, w: 2.743, h: 7.5, fill: { color: GREEN } });
+  dots(s, 5.709, 0.979);
+  heading(s, 5.527, 1.163, 3.303, 0.572, 'About Our ', 'Zoo', 28);
+  paragraph(s, 5.527, 1.87, 6.667, 1.212,
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
+    'incididunt ut labore dolore magna aliqua. Ut enim ad minim veniam, quis nostrud ' +
+    'ullamco laboris aliquip ex ea commodo consequat. Duis aute irure dolor in ' +
+    'reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. ');
+  splitCircle(s, 9.471, 3.75, 2.927, 'right');
+  [
+    { n: '12+', nw: 0.695, t: 'Year Of Exestence', tw: 1.992, y: 4.4 },
+    { n: '99+', nw: 0.8, t: 'Animal Species', tw: 1.731, y: 5.358 },
+  ].forEach(function (r) {
+    bigNumber(s, 4.929, r.y + 0.104, r.nw, r.n);
+    subTitle(s, 5.925, r.y, r.tw, r.t);
+    paragraph(s, 5.925, r.y + 0.334, 3.12, 0.379, LOREM.line);
+  });
+  chrome(s, { page: 'Page 04', badges: 'right', logoColor: WHITE, footColor: WHITE });
+});
+
+// 5 — History of our zoo
+builders.push(function (s) {
+  sheet(s, { x: 0, y: 0.792, w: 7.206, h: 5.914, side: 'right', adj: 6682, fill: MINT, shadow: false });
+  // the huge circle's quadrants sandwich the two timeline cards
+  function timelineCard(y, title, titleW) {
+    sheet(s, { x: 6.305, y: y, w: 4.698, h: 1.795, side: 'left', adj: 16407 });
+    subTitle(s, 6.832, y + 0.403, titleW, title);
+    paragraph(s, 6.832, y + 0.737, 3.12, 0.656, LOREM.card);
+  }
+  timelineCard(3.963, '2019 - 2024', 1.282);
+  quadWedge(s, 10.221, 0.643, 6.214, 'bl', WHITE);
+  timelineCard(1.735, '2015 - 2018', 1.238);
+  quadWedge(s, 10.221, 0.643, 6.214, 'tl', GREEN);
+  dots(s, 1.386, 1.559);
+  heading(s, 1.284, 1.742, 3.303, 1.043, 'History Of Our ', 'Zoo', 28);
+  paragraph(s, 1.284, 3.152, 3.874, 1.767, LOREM.medium);
+  learnMore(s, 1.386, 5.41);
+  chrome(s, { page: 'Page 05', badges: 'left' });
+});
+
+// 6 — The best zoo in town
+builders.push(function (s) {
+  shape(s, 'rect', { x: 0, y: 0, w: 13.333, h: 2.656, fill: { color: MINT } });
+  dots(s, 1.298, 5.281);
+  heading(s, 1.196, 5.464, 2.753, 1.043, 'The Best Zoo ', 'In Town', 28);
+  paragraph(s, 4.319, 5.376, 5.389, 1.212, LOREM.banner);
+  learnMore(s, 10.079, 5.722);
+  chrome(s, { page: 'Page 06', badges: 'left' });
+});
+
+// 7 — Vision and mission
+builders.push(function (s) {
+  sheet(s, { x: 0, y: 0.73, w: 5.349, h: 2.108, side: 'right', adj: 17975 });
+  dots(s, 1.169, 1.079);
+  heading(s, 0.987, 1.263, 3.621, 1.043, 'About Zoo Vision ', 'And Mission', 28);
+  paragraph(s, 1.358, 3.28, 3.704, 0.934,
+    'Lorem ipsum dolor amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
+    'incididunt ut labore et dolore magna aliqua. ');
+  featureBlock(s, 4.608, 5.321, 2.274, 'Our Vision', LOREM.card, { titleW: 1.215 });
+  featureBlock(s, 7.291, 5.321, 2.274, 'Our Mission', LOREM.card, { titleW: 1.359 });
+  learnMore(s, 10.079, 5.696);
+  chrome(s, { page: 'Page 07', badges: 'left' });
+});
+
+// 8 — More about us
+builders.push(function (s) {
+  shape(s, 'rect', { x: 0, y: 0, w: 3.792, h: 2.638, fill: { color: MINT } });
+  sheet(s, { x: 1.386, y: 1.288, w: 5.349, h: 2.69, side: 'left', adj: 17975 });
+  quadWedge(s, 5.544, 0.696, 3.866, 'bl', GREEN);
+  quadWedge(s, 5.544, 0.696, 3.866, 'tl', WHITE);
+  [1.635, 2.697].forEach(function (y) {
+    subTitle(s, 1.816, y + 0.298, 1.089, 'About Us');
+    paragraph(s, 3.03, y, 2.264, 0.934, LOREM.card);
+  });
+  paragraph(s, 4.788, 5.364, 7.321, 1.212,
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
+    'incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud ' +
+    'exercitation ullamco laboris nisi aliquip ex ea commodo consequat. Duis aute irure ' +
+    'dolor in reprehenderit voluptate velit esse cillum dolore eu fugiat nulla pariatur. ');
+  dots(s, 1.386, 5.82);
+  heading(s, 1.284, 6.003, 3.163, 0.572, 'More About ', 'Us', 28);
+  chrome(s, { page: 'Page 08', badges: 'left' });
+});
+
+// 9 — What we do
+builders.push(function (s) {
+  shape(s, 'rect', { x: 6.383, y: 1.06, w: 6.951, h: 1.782, fill: { color: MINT } });
+  sheet(s, { x: 0, y: 1.06, w: 7.238, h: 5.378, side: 'right', adj: 11700 });
+  dots(s, 1.282, 1.8);
+  heading(s, 1.179, 1.984, 3.163, 0.572, 'What We ', 'Do?', 28);
+  paragraph(s, 1.179, 2.842, 5.064, 1.212, LOREM.block);
+  featureBlock(s, 1.179, 4.431, 2.274, 'Animal Breeding', LOREM.card, { titleW: 1.859 });
+  featureBlock(s, 3.969, 4.431, 2.274, 'Rare Animal', LOREM.card, { titleW: 1.413 });
+  learnMore(s, 6.209, 1.687);
+  subTitle(s, 8.64, 1.778, 1.278, 'Cozy Place');
+  paragraph(s, 10.07, 1.479, 2.948, 0.934,
+    'Lorem ipsum dolor amet, consectetur adipiscing elit, do eiusmod tempor incididunt ' +
+    'ut labore et dolore magna.');
+  chrome(s, { page: 'Page 09', badges: 'right' });
+});
+
+// 10 — Our excellent service
+builders.push(function (s) {
+  shape(s, 'roundRect', {
+    x: 6.143, y: 0.681, w: 3.954, h: 6.139, rectRadius: 1.977,
+    fill: { type: 'none' }, line: { color: GREEN, width: 0.5 },
+  });
+  stadiumBittenPanel(s, 8.2, 0.888);
+  sheet(s, { x: 9.134, y: 1.776, w: 3.526, h: 3.94, side: 'left', adj: 10753 });
+  dots(s, 1.386, 1.559);
+  heading(s, 1.284, 1.742, 3.163, 1.043, 'Our Excellent ', 'Service', 28);
+  paragraph(s, 1.284, 3.152, 3.874, 1.767, LOREM.medium);
+  learnMore(s, 1.386, 5.41);
+  featureBlock(s, 9.79, 2.324, 2.274, 'Animal Breeding', LOREM.card, { titleW: 1.859 });
+  featureBlock(s, 9.79, 3.907, 2.274, 'Rare Animal', LOREM.card, { titleW: 1.413 });
+  chrome(s, { page: 'Page 10', badges: 'right' });
+});
+
+// 11 — Our service
+builders.push(function (s) {
+  shape(s, 'rect', { x: 10.847, y: 5.23, w: 2.486, h: 2.27, fill: { color: MINT } });
+  shape(s, 'rect', { x: 3.159, y: 4.353, w: 6.951, h: 1.782, fill: { color: GREEN } });
+  sheet(s, { x: 3.601, y: 1.076, w: 9.732, h: 2.353, side: 'left', adj: 18447 });
+  dots(s, 4.577, 1.875);
+  heading(s, 4.474, 2.058, 2.716, 0.572, 'Our ', 'Service', 28);
+  paragraph(s, 7.578, 1.646, 5.064, 1.212, LOREM.block);
+  featureBlock(s, 3.695, 4.746, 3.179, 'Animal Breeding', LOREM.cardAlt,
+    { titleW: 1.859, titleColor: WHITE, bodyColor: WHITE, bodyH: 0.627 });
+  featureBlock(s, 6.61, 4.748, 3.179, 'Rare Animal', LOREM.cardAlt,
+    { titleW: 1.413, titleColor: WHITE, bodyColor: WHITE, bodyH: 0.627 });
+  chrome(s, { page: 'Page 11', badges: 'right' });
+});
+
+// 12 — Service we provide
+builders.push(function (s) {
+  shape(s, 'rect', { x: 0, y: 5.719, w: 4.312, h: 1.781, fill: { color: MINT } });
+  sheet(s, { x: 0.823, y: 4.808, w: 6.796, h: 1.833, side: 'left', adj: 10753 });
+  dots(s, 8.988, 1.559);
+  heading(s, 8.886, 1.742, 2.494, 1.043, 'Service We ', 'Provide', 28);
+  paragraph(s, 8.886, 3.152, 3.192, 1.767, LOREM.short);
+  featureBlock(s, 1.42, 5.226, 2.7, 'Animal Breeding', LOREM.cardTight,
+    { titleW: 1.859, titleColor: GREEN, bodyH: 0.656 });
+  featureBlock(s, 4.445, 5.226, 2.7, 'Rare Animal', LOREM.cardTight,
+    { titleW: 1.413, titleColor: GREEN, bodyH: 0.656 });
+  learnMore(s, 8.988, 5.41);
+  chrome(s, { page: 'Page 12', badges: 'right' });
+});
+
+// 13 — Break slide
+builders.push(function (s) {
+  dots(s, 1.386, 1.401);
+  heading(s, 1.284, 1.585, 2.86, 0.64, 'Break ', 'Slide', 32);
+  paragraph(s, 4.319, 1.01, 5.389, 1.212, LOREM.banner);
+  learnMore(s, 10.079, 1.357);
+  splitCircle(s, 1.386, 3.225, 3.392, 'right');
+  chrome(s, { page: 'Page 13', badges: 'left' });
+});
+
+// 14 — Our best animal species
+builders.push(function (s) {
+  shape(s, 'rect', { x: 0, y: 4.802, w: 13.333, h: 2.698, fill: { color: MINT } });
+  dots(s, 6.253, 0.66);
+  heading(s, 3.813, 0.843, 5.708, 0.64, 'Our Best Animal ', 'Species', 32, 'center');
+  paragraph(s, 1.175, 1.635, 10.984, 0.934, LOREM.centered, { align: 'center' });
+  [
+    { x: 1.386, half: 'bottom', other: null },
+    { x: 4.971, half: 'top', other: WHITE },
+    { x: 8.556, half: 'bottom', other: null },
+  ].forEach(function (c) {
+    splitCircle(s, c.x, 3.106, 3.392, c.half, c.other);
+  });
+  chrome(s, { page: 'Page 14', badges: 'left' });
+});
+
+// 15 — Rare animal species
+builders.push(function (s) {
+  [
+    { y: 1.201, title: 'Elephant', tw: 1.084 },
+    { y: 4.064, title: 'Lion', tw: 0.602 },
+  ].forEach(function (row) {
+    sheet(s, { x: 6.667, y: row.y, w: 5.401, h: 2.227, side: 'right', adj: 18745, fill: MINT, shadow: false });
+    subTitle(s, 8.438, row.y + 0.479, row.tw, row.title);
+    paragraph(s, 8.438, row.y + 0.814, 3.138, 0.934, LOREM.animal);
+    splitCircle(s, 5.387, row.y - 0.16, 2.56, 'left', WHITE);
+  });
+  dots(s, 1.322, 1.559);
+  heading(s, 1.219, 1.742, 2.844, 1.043, 'Rare Animal ', 'Species', 28);
+  paragraph(s, 1.219, 3.152, 3.192, 1.767, LOREM.short);
+  learnMore(s, 1.322, 5.41);
+  chrome(s, { page: 'Page 15', badges: 'left' });
+});
+
+// 16 — Our great service
+builders.push(function (s) {
+  shape(s, 'rect', { x: 0, y: 1.06, w: 2.532, h: 5.378, fill: { color: MINT } });
+  sheet(s, { x: 6.095, y: 1.06, w: 7.238, h: 5.378, side: 'left', adj: 11700 });
+  dots(s, 7.277, 1.721);
+  heading(s, 7.175, 1.904, 4.432, 0.64, 'Our Great ', 'Service', 32);
+  paragraph(s, 7.175, 2.846, 5.064, 1.212, LOREM.block);
+  featureBlock(s, 7.175, 4.405, 2.274, 'Cozy Place', LOREM.card, { titleW: 1.278 });
+  featureBlock(s, 9.964, 4.405, 2.274, 'Animal Breeding', LOREM.card, { titleW: 1.825 });
+  chrome(s, { page: 'Page 16', badges: 'left' });
+});
+
+// 17 — Our best species
+builders.push(function (s) {
+  sheet(s, { x: 9.134, y: 1.776, w: 3.526, h: 3.94, side: 'left', adj: 10753 });
+  featureBlock(s, 9.79, 2.324, 2.274, 'Snake', LOREM.card, { titleW: 0.814 });
+  featureBlock(s, 9.79, 3.907, 2.274, 'Tiger', LOREM.card, { titleW: 0.7 });
+  dots(s, 5.134, 1.507);
+  heading(s, 5.031, 1.69, 2.473, 1.178, 'Our Best ', 'Species', 32);
+  paragraph(s, 5.029, 3.204, 3.192, 1.767, LOREM.short);
+  learnMore(s, 5.131, 5.462);
+  chrome(s, { page: 'Page 17', badges: 'right' });
+});
+
+// 18 — Our best zoo photograph
+builders.push(function (s) {
+  shape(s, 'rect', { x: 7.377, y: 1.26, w: 5.956, h: 2.49, fill: { color: MINT } });
+  subTitle(s, 8.019, 1.918, 0.884, 'Reptile');
+  paragraph(s, 9.584, 1.764, 3.138, 0.656, LOREM.animalShort);
+  subTitle(s, 8.019, 2.739, 1.213, 'Mammals');
+  paragraph(s, 9.584, 2.585, 3.138, 0.656, LOREM.animalShort);
+  dots(s, 1.322, 5.229);
+  heading(s, 1.219, 5.412, 2.844, 1.043, 'Our Best Zoo ', 'Photograph', 28);
+  paragraph(s, 4.319, 5.328, 5.389, 1.212, LOREM.banner);
+  learnMore(s, 10.079, 5.674);
+  chrome(s, { page: 'Page 18', badges: 'right' });
+});
+
+// 19 — Our animals photography
+builders.push(function (s) {
+  shape(s, 'rect', { x: 10.857, y: 5.037, w: 2.476, h: 2.463, fill: { color: MINT } });
+  sheet(s, { x: 3.03, y: 4.032, w: 3.508, h: 2.12, side: 'left', adj: 0 });
+  dots(s, 4.033, 1.188);
+  heading(s, 3.93, 1.371, 2.844, 1.043, 'Our Animals ', 'Photography', 28);
+  paragraph(s, 7.116, 1.287, 5.389, 1.212, LOREM.banner);
+  bigNumber(s, 3.457, 4.483, 0.695, '12+');
+  subTitle(s, 3.455, 4.988, 1.992, 'Year Of Exestence');
+  paragraph(s, 3.455, 5.322, 2.68, 0.379, 'Lorem ipsum dolor sit consectetur');
+  chrome(s, { page: 'Page 19', badges: 'right' });
+});
+
+// 20 — Our portfolio
+builders.push(function (s) {
+  sheet(s, { x: 0, y: 0.742, w: 7.635, h: 3.535, side: 'right', adj: 10753 });
+  dots(s, 1.239, 1.444);
+  heading(s, 1.137, 1.628, 2.844, 0.572, 'Our ', 'Portfolio', 28);
+  paragraph(s, 1.137, 2.363, 5.389, 1.212, LOREM.banner);
+  [
+    { x: 5.787, n: '12+', nw: 0.695, t: 'Year Of Exestence', tw: 1.992 },
+    { x: 9.247, n: '99+', nw: 0.8, t: 'Animal Species', tw: 1.731 },
+  ].forEach(function (col) {
+    bigNumber(s, col.x, 5.151, col.nw, col.n);
+    subTitle(s, col.x, 5.655, col.tw, col.t);
+    paragraph(s, col.x, 5.99, 3.12, 0.656, LOREM.card);
+  });
+  chrome(s, { page: 'Page 20', badges: 'right' });
+});
+
+// 21 — Our excellent portfolio
+builders.push(function (s) {
+  shape(s, 'rect', { x: 0, y: 5.12, w: 3.27, h: 2.38, fill: { color: MINT } });
+  shape(s, 'rect', { x: 1.42, y: 3.999, w: 3.993, h: 2.305, fill: { color: GREEN } });
+  [
+    { y: 4.41, n: '12+', nw: 0.744, t: 'Year Of Exestence', tw: 1.992 },
+    { y: 5.21, n: '99+', nw: 0.849, t: 'Animal Species', tw: 1.731 },
+  ].forEach(function (row) {
+    bigNumber(s, 1.84, row.y + 0.104, row.nw, row.n, WHITE);
+    subTitle(s, 2.765, row.y, row.tw, row.t, WHITE);
+    paragraph(s, 2.765, row.y + 0.334, 2.204, 0.379, LOREM.tiny, { color: WHITE });
+  });
+  dots(s, 9.354, 1.559);
+  heading(s, 9.251, 1.742, 2.844, 1.043, 'Our Excellent ', 'Portfolio', 28);
+  paragraph(s, 9.251, 3.152, 3.192, 1.767, LOREM.short);
+  learnMore(s, 9.354, 5.41);
+  chrome(s, { page: 'Page 21', badges: 'left' });
+});
+
+// 22 — Pricing table
+builders.push(function (s) {
+  [
+    { y: 1.297, price: '$15', pw: 0.681, title: 'Package One', tw: 1.526 },
+    { y: 3.002, price: '$25', pw: 0.728, title: 'Package Two', tw: 1.526 },
+    { y: 4.707, price: '$35', pw: 0.735, title: 'Package Three', tw: 1.685 },
+  ].forEach(function (row) {
+    sheet(s, { x: 5.505, y: row.y, w: 5.167, h: 1.497, side: 'left', adj: 18447 });
+    shape(s, 'roundRect', {
+      x: 6.011, y: row.y + 0.445, w: 0.866, h: 0.607, rectRadius: 0.1, fill: { color: GREEN },
+    });
+    s.addText(row.price, {
+      x: 6.077, y: row.y + 0.529, w: row.pw, h: 0.438,
+      fontFace: HEAD, fontSize: 20, bold: true, color: WHITE,
+      align: 'center', valign: 'top', wrap: false,
+    });
+    subTitle(s, 7.186, row.y + 0.253, row.tw, row.title);
+    paragraph(s, 7.186, row.y + 0.587, 3.12, 0.656, LOREM.card);
+  });
+  dots(s, 1.339, 1.559);
+  heading(s, 1.236, 1.742, 2.844, 1.043, 'Our Excellent ', 'Pricing Table', 28);
+  paragraph(s, 1.236, 3.152, 3.192, 1.767, LOREM.short);
+  learnMore(s, 1.339, 5.41);
+  chrome(s, { page: 'Page 22', badges: 'left', whiteNav: ['Team', 'Portfolio'], pageColor: WHITE });
+});
+
+// 23 — Contact us
+builders.push(function (s) {
+  shape(s, 'rect', { x: 0, y: 0, w: 3.27, h: 1.836, fill: { color: MINT } });
+  [
+    { y: 1.047, title: 'Phone Number', tw: 1.685 },
+    { y: 2.874, title: 'Our Address', tw: 1.433 },
+  ].forEach(function (card) {
+    sheet(s, { x: 1.339, y: card.y, w: 3.88, h: 1.592, side: 'left', adj: 18447 });
+    subTitle(s, 1.754, card.y + 0.301, card.tw, card.title);
+    paragraph(s, 1.754, card.y + 0.635, 3.12, 0.656, LOREM.card);
+  });
+  dots(s, 1.339, 5.768);
+  heading(s, 1.236, 5.951, 2.844, 0.572, 'Contact ', 'Us', 28);
+  paragraph(s, 4.223, 5.311, 8.016, 1.212,
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
+    'incididunt ut labore et dolore magna aliqua. Ut enim minim veniam, quis nostrud ' +
+    'exercitation ullamco laboris nisi ut aliquip commodo consequat. Duis aute irure dolor ' +
+    'in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. ' +
+    'PLACEHOLDER' +
+    'laborum.');
+  chrome(s, { page: 'Page 23', badges: 'left' });
+});
+
+// 24 — Thank you (mirror of the cover)
+builders.push(function (s) {
+  sheet(s, { x: 3.778, y: 1.194, w: 9.556, h: 5.113, side: 'left', adj: 6682 });
+  splitCircle(s, 1.687, 1.66, 4.18, 'right');
+  s.addText(twoTone('Thank ', 'You', 60), {
+    x: 6.941, y: 1.852, w: 4.686, h: 1.111, valign: 'top', wrap: false,
+  });
+  s.addText('For Watching This Presentation', {
+    x: 6.941, y: 2.795, w: 4.313, h: 0.337,
+    fontFace: BODY, fontSize: 14, color: GREY, charSpacing: 3,
+    valign: 'top', wrap: false,
+  });
+  paragraph(s, 6.941, 3.289, 5.662, 1.212, LOREM.hero);
+  learnMore(s, 7.048, 4.834);
+  chrome(s, { page: 'Page 24', badges: 'left' });
+});
+
+/* ------------------------------------------------------------------ *
+ * Build + save
+ * ------------------------------------------------------------------ */
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'ZOO_16x9', width: 13.3333333, height: 7.5 });
+  pptx.layout = 'ZOO_16x9';
+  pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
+  pptx.title = 'Zoologic - Zoo Presentation';
+
+  builders.forEach(function (fn) {
+    const slide = pptx.addSlide();
+    slide.background = { color: WHITE };
+    fn(slide);
+  });
+
+  return pptx.writeFile({
+    fileName: path.join(__dirname, '1583e056-9836-49f7-b1aa-e39f8bca6e2e_grok_final.pptx'),
+  });
+}
+
+build().then(function (f) { console.log('wrote ' + f); },
+  function (e) { console.error(e); process.exit(1); });

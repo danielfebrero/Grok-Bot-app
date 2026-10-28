@@ -1,0 +1,175 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# >>> table-reservation-goat port table (from sand/src/shared/box/box-contract.ts; regenerate: pnpm --filter sand run gen:box-ports) >>>
+SAND_BOX_CDP_PORT_BASE=9222
+sand_box_cdp_port() {
+	if [ "${1:-1}" -ge 2 ] 2>/dev/null; then echo $((SAND_BOX_CDP_PORT_BASE + $1)); else echo $((SAND_BOX_CDP_PORT_BASE + 1)); fi
+}
+# <<< table-reservation-goat port table <<<
+
+self="$(readlink -f "$0")"
+real="${self%/bin/*}/libexec/printing-press/${self##*/}"
+
+passthrough() {
+	exec env -u TABLE_RESERVATION_GOAT_OT_CHROME_DEBUG_URL "$real" "$@"
+}
+
+seen_avail_check=0
+has_foreign=0
+has_ot=0
+prev=""
+for arg in "$@"; do
+	if [ "$prev" = "availability" ] && [ "$arg" = "check" ]; then
+		seen_avail_check=1
+	fi
+	case "$arg" in
+	resy:* | tock:*) has_foreign=1 ;;
+	opentable:*) has_ot=1 ;;
+	esac
+	if [[ "$arg" =~ ^[0-9]{3,}$ ]]; then
+		has_ot=1
+	fi
+	prev="$arg"
+done
+
+if [ "$seen_avail_check" -eq 0 ] || [ "$has_foreign" -eq 1 ] || [ "$has_ot" -eq 0 ]; then
+	passthrough "$@"
+fi
+
+exec_daemon_display() {
+	local pid=$$
+	local found="" cmdline exe environ disp ppid match
+	while [ -n "$pid" ] && [ "$pid" -ge 1 ] 2>/dev/null; do
+		match=0
+		exe="$(readlink -f "/proc/${pid}/exe" 2>/dev/null || true)"
+		case "$exe" in
+		/exec-daemon/exec-daemon | /exec-daemon/node) match=1 ;;
+		esac
+		cmdline="$(tr '\0' ' ' <"/proc/${pid}/cmdline" 2>/dev/null || true)"
+		case "$cmdline" in
+		*supervise-exec-daemon*) match=0 ;;
+		*/exec-daemon/exec-daemon* | */exec-daemon/index.js*) match=1 ;;
+		esac
+		if [ "$match" -eq 1 ]; then
+			environ="$(tr '\0' '\n' <"/proc/${pid}/environ" 2>/dev/null || true)"
+			disp=""
+			while IFS= read -r line; do
+				case "$line" in
+				DISPLAY=*)
+					disp="${line#DISPLAY=}"
+					break
+					;;
+				esac
+			done <<<"$environ"
+			if [ -n "$disp" ]; then
+				found="$disp"
+			fi
+		fi
+		if [ "$pid" -eq 1 ]; then
+			break
+		fi
+		ppid="$(awk '/^PPid:/{print $2; exit}' "/proc/${pid}/status" 2>/dev/null || true)"
+		if [ -z "$ppid" ] || [ "$ppid" = "$pid" ]; then
+			break
+		fi
+		pid="$ppid"
+	done
+	[ -n "$found" ] || return 1
+	printf '%s\n' "$found"
+}
+
+display=""
+display="$(exec_daemon_display || true)"
+export DISPLAY="${display}"
+display="${display#:}"
+display="${display%%.*}"
+port=""
+if [[ "$display" =~ ^[0-9]+$ ]]; then
+	port="$(sand_box_cdp_port "$display")"
+fi
+
+root="${TMPDIR:-/tmp}/sand-table-reservation-goat"
+mkdir -p -m 700 "$root"
+for dir in "$root"/*/; do
+	[ -d "$dir" ] || continue
+	pid="${dir%/}"
+	pid="${pid##*/}"
+	[ -d "/proc/$pid" ] || rm -rf "$dir"
+done
+cache="$root/$$"
+rm -rf "$cache"
+mkdir -m 700 "$cache"
+
+if [ -z "$port" ]; then
+	exec env \
+		-u TABLE_RESERVATION_GOAT_OT_CHROME_DEBUG_URL \
+		-u XDG_CONFIG_HOME \
+		-u XDG_DATA_HOME \
+		-u XDG_STATE_HOME \
+		XDG_CACHE_HOME="$cache" \
+		"$real" "$@"
+fi
+curl --max-time 0.2 -fsS "http://127.0.0.1:${port}/json/version" >/dev/null 2>&1 ||
+	env -u SAND_CHROME_REMOTE_DEBUG_PORT -u CHROME_USER_DATA_DIR box-chrome --sand-prepare ||
+	true
+
+proxy="${self%/bin/*}/libexec/printing-press/ot-cdp-proxy.mjs"
+node_bin="${SAND_OT_CDP_PROXY_NODE:-}"
+if [ -z "$node_bin" ]; then
+	if [ -x /exec-daemon/node ]; then
+		node_bin=/exec-daemon/node
+	else
+		node_bin=node
+	fi
+fi
+proxy_url=""
+proxy_pid=""
+stop_proxy() {
+	if [ -n "${proxy_pid:-}" ]; then
+		kill "$proxy_pid" 2>/dev/null || true
+		wait "$proxy_pid" 2>/dev/null || true
+		proxy_pid=""
+	fi
+}
+if [ -f "$proxy" ]; then
+	url_file="$cache/proxy-url"
+	rm -f "$url_file"
+	"$node_bin" "$proxy" --upstream "http://127.0.0.1:${port}" --url-file "$url_file" &
+	proxy_pid=$!
+	trap stop_proxy EXIT
+	trap 'exit 129' HUP
+	trap 'exit 130' INT
+	trap 'exit 143' TERM
+	for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+		if [ -s "$url_file" ]; then
+			proxy_url="$(cat "$url_file")"
+			break
+		fi
+		if ! kill -0 "$proxy_pid" 2>/dev/null; then
+			break
+		fi
+		sleep 0.05
+	done
+fi
+if [ -z "$proxy_url" ]; then
+	stop_proxy
+	exec env \
+		-u TABLE_RESERVATION_GOAT_OT_CHROME_DEBUG_URL \
+		-u XDG_CONFIG_HOME \
+		-u XDG_DATA_HOME \
+		-u XDG_STATE_HOME \
+		XDG_CACHE_HOME="$cache" \
+		"$real" "$@"
+fi
+set +e
+env \
+	-u XDG_CONFIG_HOME \
+	-u XDG_DATA_HOME \
+	-u XDG_STATE_HOME \
+	XDG_CACHE_HOME="$cache" \
+	TABLE_RESERVATION_GOAT_OT_CHROME_DEBUG_URL="$proxy_url" \
+	"$real" "$@"
+status=$?
+set -e
+exit "$status"
