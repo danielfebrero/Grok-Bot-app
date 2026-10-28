@@ -1,0 +1,6 @@
+name	2026-10-28_06-05
+label	auto: changement de surface RPC détecté
+date	2026-10-28 06:05:16 CET
+services	20
+methodes	2077
+fingerprint	1fffc66bf93c29fff0072c3509be5fc6d0e1b5b9c0cf2e56d85c29bdf7d8cb09

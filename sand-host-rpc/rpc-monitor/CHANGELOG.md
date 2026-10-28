@@ -9,6 +9,15 @@ packages confondus. Entrées les plus récentes en haut. Heures de Paris
 
 <!-- NOUVELLES-ENTREES-ICI -->
 
+## 2026-10-28 06:05 (Paris) — `2026-10-27_20-11` → `2026-10-28_06-05`
+
+Changement de surface RPC détecté : **15 méthode(s) ajoutée(s)**.
+
+Ajoutées : `DashboardService.GetMcpBackendAccessToken`, `DashboardService.GetTeamGrokBotPublishedWorkerImage`, `DashboardService.GetTeamGrokBotSlackWorkspaceAccess`, `DashboardService.ListTeamGrokBotCustomerHostedWorkers`, `DashboardService.RefreshCanvasSources`, `DashboardService.SetTeamGrokBotSlackWorkspaceAccess`, `DashboardService.UpdateTeamPersonalApiKeyCreationSetting`, `GrokBotService.CreateGrokBotOnboardingDripInternal`, `GrokBotService.CreateGrokBotOnboardingDripStepInternal`, `GrokBotService.GetGrokBotOnboardingDripInternal`, `GrokBotService.ListGrokBotOnboardingDripsInternal`, `GrokBotService.ReorderGrokBotOnboardingDripStepsInternal`, `GrokBotService.SetGrokBotOnboardingDripStatusInternal`, `GrokBotService.UpdateGrokBotOnboardingDripInternal`, `GrokBotService.UpdateGrokBotOnboardingDripStepInternal`
+
+Rapport : [reports/2026-10-28_06-05.md](reports/2026-10-28_06-05.md).
+
+
 ## 2026-10-27 20:11 (Paris) — `2026-10-27_18-06` → `2026-10-27_20-11`
 
 Changement de surface RPC détecté : **1 méthode(s) ajoutée(s)**.
