@@ -9,6 +9,15 @@ packages confondus. Entrées les plus récentes en haut. Heures de Paris
 
 <!-- NOUVELLES-ENTREES-ICI -->
 
+## 2026-10-28 18:13 (Paris) — `2026-10-28_06-05` → `2026-10-28_18-13`
+
+Changement de surface RPC détecté : **8 méthode(s) ajoutée(s)**.
+
+Ajoutées : `AppPublishService.ArmMergeRepublish`, `AppPublishService.DisarmMergeRepublish`, `AppPublishService.PrepareDefaultBranchPublish`, `GrokBotService.AdminGetSandBoxActiveVm`, `GrokBotService.ResolveGrokBotFlightBookingLink`, `GrokBotService.SearchGrokBotSimilarProducts`, `GrokBotService.SearchGrokBotTranscripts`, `GrokBotService.UpdateGrokBotMeetingSettings`
+
+Rapport : [reports/2026-10-28_18-13.md](reports/2026-10-28_18-13.md).
+
+
 ## 2026-10-28 06:05 (Paris) — `2026-10-27_20-11` → `2026-10-28_06-05`
 
 Changement de surface RPC détecté : **15 méthode(s) ajoutée(s)**.
