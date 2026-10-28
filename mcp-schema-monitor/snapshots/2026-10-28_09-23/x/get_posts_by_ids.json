@@ -1,0 +1,41 @@
+{
+  "description": "Get Posts by IDs Each returned post includes a `url` deeplinking to it on x.com.",
+  "inputSchema": {
+    "properties": {
+      "expansions": {
+        "description": "A comma separated list of fields to expand.",
+        "type": "string"
+      },
+      "ids": {
+        "description": "(comma-separated)",
+        "type": "string"
+      },
+      "media.fields": {
+        "description": "A comma separated list of Media fields to display.",
+        "type": "string"
+      },
+      "place.fields": {
+        "description": "A comma separated list of Place fields to display.",
+        "type": "string"
+      },
+      "poll.fields": {
+        "description": "A comma separated list of Poll fields to display.",
+        "type": "string"
+      },
+      "post.fields": {
+        "description": "A comma separated list of Post fields to display.",
+        "type": "string"
+      },
+      "user.fields": {
+        "description": "A comma separated list of User fields to display.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "ids"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_posts_by_ids"
+}

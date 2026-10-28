@@ -1,0 +1,20 @@
+{
+  "namespace": "user-AgentMail",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-28T09:21:55+01:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "success": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "success"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "delete_list_entry"
+}

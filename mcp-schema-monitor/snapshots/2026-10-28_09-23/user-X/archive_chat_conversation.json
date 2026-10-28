@@ -1,0 +1,76 @@
+{
+  "description": "Archive a Chat conversation",
+  "inputSchema": {
+    "properties": {
+      "action_signatures": {
+        "description": "Signatures for this action, forwarded in the order they are sent.",
+        "items": {
+          "properties": {
+            "encoded_message_event_detail": {
+              "description": "Base64-encoded Thrift MessageEventDetail for the signed action.",
+              "type": "string"
+            },
+            "message_event_signature": {
+              "properties": {
+                "message_signing_key_info_list": {
+                  "description": "List of signing key information for message verification.",
+                  "items": {
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "public_key_version": {
+                  "description": "The version of the public key used for signing.",
+                  "type": "string"
+                },
+                "signature": {
+                  "description": "The signature of the message event.",
+                  "type": "string"
+                },
+                "signature_version": {
+                  "description": "The version of the signature algorithm.",
+                  "type": "string"
+                },
+                "signing_public_key": {
+                  "description": "The public key used for signing.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "signature",
+                "public_key_version",
+                "signature_version"
+              ],
+              "type": "object"
+            },
+            "message_id": {
+              "description": "Client-generated ID of the message being signed.",
+              "type": "string"
+            },
+            "signature_payload": {
+              "description": "Payload string the client signed; used only in server-side failure logs.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "message_id",
+            "encoded_message_event_detail",
+            "message_event_signature"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "id": {
+        "description": "The ID of the conversation: a group ID starting with `g`, the other user's ID for a 1:1 conversat...",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "archive_chat_conversation"
+}

@@ -1,0 +1,26 @@
+{
+  "description": "Chronologie des faits entre cet acteur et la salle, du plus ancien au plus récent de la fenêtre. peer est eg:<slug> ou gb:<id>. before est next_before. Les lignes du fil topic ne sortent pas par ici.",
+  "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+      "before": {
+        "description": "Curseur next_before, forme at|ref_id.",
+        "type": "string"
+      },
+      "limit": {
+        "description": "1 à 50. Défaut 20.",
+        "type": "integer"
+      },
+      "peer": {
+        "description": "eg:<slug> ou gb:<id>.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "peer"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "liaison"
+}

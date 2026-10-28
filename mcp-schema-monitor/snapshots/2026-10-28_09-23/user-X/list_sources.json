@@ -1,0 +1,9 @@
+{
+  "description": "List stream sources",
+  "inputSchema": {
+    "properties": {},
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "list_sources"
+}

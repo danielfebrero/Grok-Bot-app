@@ -1,0 +1,50 @@
+{
+  "namespace": "cursor-origin",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-28T09:22:19+01:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "entries": {
+          "items": {
+            "properties": {
+              "mode": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              },
+              "sha": {
+                "type": "string"
+              },
+              "size": {
+                "type": "integer"
+              },
+              "type": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "mode",
+              "path",
+              "sha",
+              "type"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "sha": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "entries",
+        "sha"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "get_git_tree"
+}

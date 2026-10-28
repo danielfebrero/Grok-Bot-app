@@ -1,0 +1,66 @@
+{
+  "description": "Get Chat Conversations, newest first. All filters must match (AND). A page can hold fewer than max_results while meta.next_token is set: keep paging. Read state: chat_conversation.fields=unread,last_read_event_id,newest_event_id",
+  "inputSchema": {
+    "properties": {
+      "chat_conversation.fields": {
+        "description": "A comma separated list of ChatConversation fields to display.",
+        "type": "string"
+      },
+      "end_time": {
+        "description": "ISO 8601, e.g. 2026-10-17T00:00:00Z. Chats whose latest message is before this time.",
+        "type": "string"
+      },
+      "expansions": {
+        "description": "A comma separated list of fields to expand.",
+        "type": "string"
+      },
+      "is_archived": {
+        "description": "true: only archived; false: only not archived. Omit for both.",
+        "type": "boolean"
+      },
+      "is_muted": {
+        "description": "true: only muted; false: only not muted. Omit for both.",
+        "type": "boolean"
+      },
+      "max_results": {
+        "description": "Conversations covered per page (1-1000, default 200). Filtered pages can return fewer.",
+        "type": "integer"
+      },
+      "pagination_token": {
+        "description": "meta.next_token from the previous page. Send the same filters with it, or the request fails.",
+        "type": "string"
+      },
+      "participant_ids": {
+        "description": "Comma-separated numeric user IDs (1-10), all in the chat. Names or @handles: use participant_query.",
+        "type": "string"
+      },
+      "participant_query": {
+        "description": "Name or @username prefix (1-50 chars); keeps chats where any other participant matches it.",
+        "type": "string"
+      },
+      "start_time": {
+        "description": "ISO 8601, e.g. 2026-10-16T00:00:00Z. Chats whose latest message is at or after this time.",
+        "type": "string"
+      },
+      "type": {
+        "description": "Only direct (1:1) or only group conversations. Omit for both.",
+        "enum": [
+          "direct",
+          "group"
+        ],
+        "type": "string"
+      },
+      "unread_only": {
+        "description": "Return only unread conversations. A page can be short; keep paging while has_more.",
+        "type": "boolean"
+      },
+      "user.fields": {
+        "description": "A comma separated list of User fields to display.",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_chat_conversations"
+}

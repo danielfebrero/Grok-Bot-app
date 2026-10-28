@@ -1,0 +1,20 @@
+{
+  "description": "Get Communities by ID",
+  "inputSchema": {
+    "properties": {
+      "community.fields": {
+        "description": "A comma separated list of Community fields to display.",
+        "type": "string"
+      },
+      "id": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_communities_by_id"
+}

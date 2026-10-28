@@ -1,0 +1,20 @@
+{
+  "description": "Block User",
+  "inputSchema": {
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "target_user_id": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "target_user_id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "users_id_block"
+}
