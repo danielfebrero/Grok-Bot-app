@@ -1,0 +1,1110 @@
+--- 2026-10-28_03-50:/opt/sand/sand-host/box-scripts/sand-ua-governor.mjs
++++ 2026-10-28_04-51:/opt/sand/sand-host/box-scripts/sand-ua-governor.mjs
+@@ -3,10 +3,13 @@
+   appendFileSync,
+   closeSync,
+   constants,
++  fstatSync,
++  mkdtempSync,
+   openSync,
+   readdirSync,
+   readFileSync,
+   renameSync,
++  rmSync,
+   writeFileSync,
+ } from "node:fs";
+ import { dirname, join } from "node:path";
+@@ -19,10 +22,13 @@
+   BOX_EXPERIMENTS_READY_MARKER_PATH,
+   BROWSER_ACCEPT_LANGUAGE_EN_US_MARKER_PATH,
+   BOX_BROWSER_COHERENT_FINGERPRINT_MARKER_PATH,
++  BOX_BROWSER_FINGERPRINT_LOG_SITES_PATH,
++  SAND_BOX_CDP_PORT_BASE,
+   BROWSER_EGRESS_TIMEZONE_MARKER_PATH,
+   BROWSER_HARDWARE_PROFILE_MARKER_PATH,
+ } from "./box-contract.generated.mjs";
+ import {
++  CDP_ERROR_CODES,
+   connectBrowser,
+   discoverMonitorPorts,
+   getBrowserVersion,
+@@ -30,7 +36,9 @@
+   isConnectionRefused,
+ } from "./cdp-cookies.mjs";
+ import {
++  ACCEPT_LANGUAGE_EXTENSION_NAME,
+   LINUX_GPU_PATCH_PROFILE,
++  buildAcceptLanguageExtension,
+   buildHardwareProfileDocumentScript,
+   buildUserAgentOverride,
+   coherentHardwareProfile,
+@@ -47,6 +55,10 @@
+ } from "./sand-egress-timezone.mjs";
+ 
+ const POLL_INTERVAL_MS = 100;
++const FINGERPRINT_MARKER_MAX_BYTES = 8 * 1024;
++const FINGERPRINT_MARKER_MAX_HOSTS = 64;
++const FINGERPRINT_MARKER_MAX_HOST_LENGTH = 253;
++const FINGERPRINT_MARKER_HOST_LABEL = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)$/;
+ export const EGRESS_TIME_ZONE_ATTACH_WAIT_MS = 3_000;
+ export const EGRESS_TIME_ZONE_RETRY_MS = Object.freeze([5_000, 30_000, 120_000, 300_000]);
+ export const EGRESS_TIME_ZONE_GATE_WAIT_MS = 120_000;
+@@ -67,6 +79,166 @@
+   console.error(message);
+ }
+ 
++export function readFingerprintMarkerCandidate({
++  markerPath = BOX_BROWSER_FINGERPRINT_LOG_SITES_PATH,
++  open = openSync,
++  stat = fstatSync,
++  readFile = readFileSync,
++  effectiveUid = process.geteuid?.(),
++  effectiveGroups = [process.getegid?.(), ...(process.getgroups?.() ?? [])].filter(
++    Number.isInteger,
++  ),
++  uidSplitActive = process.env.SAND_HOST_UID_SPLIT_ACTIVE === "1",
++} = {}) {
++  let fd;
++  try {
++    fd = open(markerPath, constants.O_RDONLY | constants.O_NOFOLLOW);
++    const metadata = stat(fd);
++    const mode = metadata.mode & 0o777;
++    const ownerPrivate =
++      mode === 0o600 && (effectiveUid === undefined || metadata.uid === effectiveUid);
++    const ownerShared =
++      mode === 0o640 &&
++      effectiveUid !== undefined &&
++      metadata.uid !== effectiveUid &&
++      effectiveGroups.includes(metadata.gid);
++    if (
++      !metadata.isFile() ||
++      metadata.nlink !== 1 ||
++      metadata.size <= 0 ||
++      metadata.size > FINGERPRINT_MARKER_MAX_BYTES ||
++      (uidSplitActive ? !ownerShared : !ownerPrivate)
++    ) {
++      return null;
++    }
++    return String(readFile(fd, "utf8"));
++  } catch (error) {
++    if (error?.code !== "ENOENT") {
++      reportOnce(`fingerprint log marker read failed: ${errorClass(error)}`);
++    }
++    return null;
++  } finally {
++    if (fd !== undefined) closeSync(fd);
++  }
++}
++
++function fingerprintMarkerHost(raw) {
++  if (
++    typeof raw !== "string" ||
++    raw.length === 0 ||
++    raw.length > FINGERPRINT_MARKER_MAX_HOST_LENGTH ||
++    raw !== raw.trim() ||
++    raw.includes("*") ||
++    raw.includes("/") ||
++    raw.includes("@")
++  ) {
++    return null;
++  }
++  let parsed;
++  try {
++    parsed = new URL(`https://${raw}`);
++  } catch {
++    return null;
++  }
++  if (
++    parsed.username !== "" ||
++    parsed.password !== "" ||
++    parsed.pathname !== "/" ||
++    parsed.search !== "" ||
++    parsed.hash !== "" ||
++    (parsed.port !== "" && parsed.port !== "443")
++  ) {
++    return null;
++  }
++  const host = parsed.hostname.toLowerCase().replace(/\.$/, "");
++  const labels = host.split(".");
++  if (
++    host === "" ||
++    host.includes(":") ||
++    labels.length < 2 ||
++    labels.some((label) => !FINGERPRINT_MARKER_HOST_LABEL.test(label))
++  ) {
++    return null;
++  }
++  return host;
++}
++
++export function parseFingerprintMarker(raw) {
++  let parsed;
++  try {
++    parsed = JSON.parse(raw);
++  } catch {
++    return null;
++  }
++  if (
++    parsed == null ||
++    typeof parsed !== "object" ||
++    Array.isArray(parsed) ||
++    Object.keys(parsed).some((key) => key !== "version" && key !== "hosts") ||
++    parsed.version !== 1 ||
++    !Array.isArray(parsed.hosts) ||
++    parsed.hosts.length === 0 ||
++    parsed.hosts.length > FINGERPRINT_MARKER_MAX_HOSTS
++  ) {
++    return null;
++  }
++  const hosts = [];
++  const seen = new Set();
++  for (const rawHost of parsed.hosts) {
++    const host = fingerprintMarkerHost(rawHost);
++    if (host == null || host !== rawHost || seen.has(host)) return null;
++    seen.add(host);
++    hosts.push(host);
++  }
++  if (hosts.some((host, index) => index > 0 && hosts[index - 1] > host)) return null;
++  return Object.freeze({ version: 1, hosts: Object.freeze(hosts) });
++}
++
++export function fingerprintMarkerDigest(raw) {
++  return createHash("sha256").update(raw).digest("hex");
++}
++
++const FINGERPRINT_LOGGER_MODULE = "./sand-fingerprint-read-logger.mjs";
++
++async function importFingerprintLogger() {
++  return await import(FINGERPRINT_LOGGER_MODULE);
++}
++
++export async function configureFingerprintLogger(
++  browser,
++  {
++    markerPath = BOX_BROWSER_FINGERPRINT_LOG_SITES_PATH,
++    open = openSync,
++    stat = fstatSync,
++    readFile = readFileSync,
++    load = importFingerprintLogger,
++  } = {},
++) {
++  const raw = readFingerprintMarkerCandidate({
++    markerPath,
++    open,
++    stat,
++    readFile,
++  });
++  const config = raw == null ? null : parseFingerprintMarker(raw);
++  browser.fingerprintLogConfigDigest = config == null ? null : fingerprintMarkerDigest(raw);
++  if (config == null) return null;
++  let loggerModule;
++  try {
++    loggerModule = await load();
++  } catch (error) {
++    if (error?.code !== "ERR_MODULE_NOT_FOUND") throw error;
++    reportOnce(`fingerprint logger unavailable: ${errorClass(error)}`);
++    return null;
++  }
++  browser.fingerprintReadLogger = loggerModule.createFingerprintReadLogger({
++    browser,
++    config,
++    cdpPortBase: SAND_BOX_CDP_PORT_BASE,
++  });
++  return browser.fingerprintReadLogger;
++}
++
+ function liveChromeProduct(browser) {
+   const version = typeof browser?.chromeVersion === "string" ? browser.chromeVersion : "";
+   if (/^\d+\.\d+\.\d+\.\d+$/.test(version)) return `Chrome/${version}`;
+@@ -78,11 +250,59 @@
+   const override = buildUserAgentOverride(liveChromeProduct(browser), {
+     acceptLanguageEnUs: acceptLanguageEnUsEnabledForBrowser(browser),
+     acceptLanguage: browser.acceptLanguage,
+-    acceptLanguageFromLaunchFlag: acceptLanguageFromLaunchFlag(browser, browserContextId),
++    acceptLanguageFromChrome: acceptLanguageFromLaunchFlag(browser, browserContextId),
+     acceptLanguageOverridden: browser.acceptLanguageOverriddenSessions.has(sessionId),
+   });
+-  if (override.acceptLanguage) browser.acceptLanguageOverriddenSessions.add(sessionId);
+-  await browser.send("Emulation.setUserAgentOverride", override, sessionId);
++  if (override.acceptLanguage) {
++    browser.acceptLanguageOverriddenSessions.add(sessionId);
++    if (
++      isOffTheRecordContext(browser, browserContextId) &&
++      !acceptLanguageFromExtension(browser, browserContextId)
++    ) {
++      reportAcceptLanguageFallback(browser);
++    }
++  }
++  try {
++    await sendUserAgentOverride(browser, override, sessionId);
++  } catch (error) {
++    if (override.acceptLanguage && !isCdpTargetGone(error) && !browser.isClosed) {
++      browser.acceptLanguageUnappliedSessions ??= new Set();
++      browser.acceptLanguageUnappliedSessions.add(sessionId);
++    }
++    throw error;
++  }
++}
++
++export const UA_OVERRIDE_RETRY_MS = Object.freeze([250, 1_000]);
++const RETRIED_UA_OVERRIDE_ERRORS = new Set([
++  CDP_ERROR_CODES.sendTimeout,
++  CDP_ERROR_CODES.protocolServer,
++]);
++
++async function sendUserAgentOverride(browser, override, sessionId) {
++  for (let attempt = 0; ; attempt += 1) {
++    try {
++      return await browser.send("Emulation.setUserAgentOverride", override, sessionId);
++    } catch (error) {
++      const code = errorClass(error);
++      const retryMs = UA_OVERRIDE_RETRY_MS[attempt];
++      const live = !browser.isClosed && browser.attachedSessions?.has(sessionId) !== false;
++      if (
++        !acceptLanguageEnUsEnabledForBrowser(browser) ||
++        !RETRIED_UA_OVERRIDE_ERRORS.has(code) ||
++        !live
++      ) {
++        throw error;
++      }
++      if (retryMs === undefined) {
++        console.error(
++          `ua override failed port=${browser.port} after ${attempt + 1} attempts: ${code}; this target keeps Chrome's own User-Agent and Accept-Language`,
++        );
++        throw error;
++      }
++      await delay(retryMs);
++    }
++  }
+ }
+ 
+ export function documentScriptMap(browser) {
+@@ -265,6 +485,12 @@
+     const marker = resolve();
+     browser.acceptLanguageEnUsEnabled = marker != null;
+     browser.acceptLanguage = marker ?? "";
++    if (marker != null) {
++      if (browser.launchAcceptLanguage === undefined) {
++        browser.launchAcceptLanguage = readLaunchAcceptLanguage(browser.port);
++      }
++      if (browser.launchAcceptLanguage) browser.acceptLanguage = browser.launchAcceptLanguage;
++    }
+   }
+   return browser.acceptLanguageEnUsEnabled === true;
+ }
+@@ -327,7 +553,12 @@
+ }
+ 
+ async function resolveDefaultBrowserContext(browser) {
+-  if (typeof browser.defaultBrowserContextId === "string" || !launchFlagMatches(browser)) return;
++  if (
++    typeof browser.defaultBrowserContextId === "string" ||
++    !acceptLanguageEnUsEnabledForBrowser(browser)
++  ) {
++    return;
++  }
+   try {
+     const { defaultBrowserContextId } = (await browser.send("Target.getBrowserContexts")) ?? {};
+     if (typeof defaultBrowserContextId === "string") {
+@@ -340,6 +571,403 @@
+   }
+ }
+ 
++export const ACCEPT_LANGUAGE_EXTENSION_ROOT = "/tmp";
++const ACCEPT_LANGUAGE_EXTENSION_DIR_PREFIX = "sand-ua-governor-accept-language-";
++export const ACCEPT_LANGUAGE_EXTENSION_HOLD_MS = 3_000;
++export const ACCEPT_LANGUAGE_EXTENSION_LOAD_TIMEOUT_MS = 20_000;
++export const ACCEPT_LANGUAGE_EXTENSION_RETRY_MS = Object.freeze([5_000, 30_000, 120_000, 300_000]);
++
++export function isOffTheRecordContext(browser, browserContextId) {
++  return (
++    acceptLanguageEnUsEnabledForBrowser(browser) &&
++    typeof browser.defaultBrowserContextId === "string" &&
++    typeof browserContextId === "string" &&
++    browserContextId !== browser.defaultBrowserContextId
++  );
++}
++
++function extensionCoversList(browser) {
++  const extension = browser.acceptLanguageExtension;
++  return (
++    extension?.phase === "ready" &&
++    extension.list === configuredAcceptLanguage(browser.acceptLanguage)
++  );
++}
++
++function extensionCoversOffTheRecord(browser) {
++  const extension = browser.acceptLanguageExtension;
++  return (
++    extensionCoversList(browser) || (extension?.phase === "loading" && extension.installed != null)
++  );
++}
++
++export function acceptLanguageFromExtension(browser, browserContextId) {
++  return isOffTheRecordContext(browser, browserContextId) && extensionCoversOffTheRecord(browser);
++}
++
++function reportAcceptLanguageFallback(browser) {
++  const extension = browser.acceptLanguageExtension;
++  const reason =
++    extension?.phase === "loading"
++      ? `extension still loading after ${ACCEPT_LANGUAGE_EXTENSION_HOLD_MS}ms`
++      : (extension?.reason ?? `extension loaded for ${extension?.list}`);
++  reportOnce(
++    `accept-language fallback port=${browser.port} context=off-the-record: the CDP override sends ${configuredAcceptLanguage(browser.acceptLanguage)} right after User-Agent (${reason})`,
++  );
++}
++
++export async function readExtensionsCommands(port, signal) {
++  const res = await fetch(`http://127.0.0.1:${port}/json/protocol`, { signal });
++  if (!res.ok) throw new Error(`/json/protocol HTTP ${res.status}`);
++  const domain = (await res.json())?.domains?.find((entry) => entry?.domain === "Extensions");
++  return new Map(
++    (domain?.commands ?? []).map((command) => [
++      command?.name,
++      (command?.parameters ?? []).map((parameter) => parameter?.name),
++    ]),
++  );
++}
++
++export function extensionsUnsupported(commands) {
++  if (!commands.get("loadUnpacked")?.includes("enableInIncognito")) {
++    return "Chrome lacks Extensions.loadUnpacked enableInIncognito";
++  }
++  const missing = ["getExtensions", "uninstall"].find((name) => !commands.has(name));
++  return missing === undefined ? null : `Chrome lacks Extensions.${missing}`;
++}
++
++function acceptLanguageExtensionRoot(browser) {
++  return browser.acceptLanguageExtensionRoot ?? ACCEPT_LANGUAGE_EXTENSION_ROOT;
++}
++
++function acceptLanguageExtensionDirPrefix(browser) {
++  return join(
++    acceptLanguageExtensionRoot(browser),
++    `${ACCEPT_LANGUAGE_EXTENSION_DIR_PREFIX}${browser.port}-`,
++  );
++}
++
++async function uninstallAcceptLanguageExtension(browser, id) {
++  try {
++    await browser.send("Extensions.uninstall", { id });
++    return true;
++  } catch (error) {
++    if (!browser.isClosed) {
++      console.error(
++        `accept-language extension uninstall failed port=${browser.port} id=${id}: ${errorClass(error)}`,
++      );
++    }
++    return false;
++  }
++}
++
++const acceptLanguageExtensionPortsListed = new Set();
++const acceptLanguageExtensionPortsLoaded = new Set();
++
++function acceptLanguageExtensionDirInUse(browser, path) {
++  const extension = browser.acceptLanguageExtension;
++  return (
++    path === extension?.installed?.dir ||
++    path === extension?.attempt?.dir ||
++    extension?.loadingDirs?.has(path) === true
++  );
++}
++
++async function removeStaleAcceptLanguageExtensions(browser) {
++  const prefix = acceptLanguageExtensionDirPrefix(browser);
++  const kept = new Set();
++  try {
++    const { extensions } = (await browser.send("Extensions.getExtensions")) ?? {};
++    for (const extension of Array.isArray(extensions) ? extensions : []) {
++      if (
++        extension?.name !== ACCEPT_LANGUAGE_EXTENSION_NAME ||
++        typeof extension.path !== "string" ||
++        !extension.path.startsWith(prefix)
++      ) {
++        continue;
++      }
++      if (
++        extension.id === browser.acceptLanguageExtension?.installed?.id ||
++        acceptLanguageExtensionDirInUse(browser, extension.path) ||
++        !(await uninstallAcceptLanguageExtension(browser, extension.id))
++      ) {
++        kept.add(extension.path);
++      }
++    }
++    for (const name of readdirSync(dirname(prefix))) {
++      const path = join(dirname(prefix), name);
++      if (
++        path.startsWith(prefix) &&
++        !kept.has(path) &&
++        !acceptLanguageExtensionDirInUse(browser, path)
++      ) {
++        rmSync(path, { recursive: true, force: true });
++      }
++    }
++    return kept.size === 0;
++  } catch (error) {
++    if (!browser.isClosed) {
++      console.error(
++        `accept-language extension cleanup failed port=${browser.port}: ${errorClass(error)}`,
++      );
++    }
++    return false;
++  }
++}
++
++async function installAcceptLanguageExtension(browser, extension, attempt) {
++  const read = browser.readExtensionsCommands ?? readExtensionsCommands;
++  const unsupported = extensionsUnsupported(await read(browser.port, attempt.abort.signal));
++  if (unsupported !== null) return { unsupported };
++  const dir = mkdtempSync(acceptLanguageExtensionDirPrefix(browser));
++  attempt.dir = dir;
++  extension.loadingDirs ??= new Set();
++  extension.loadingDirs.add(dir);
++  let loaded;
++  try {
++    for (const [name, contents] of Object.entries(buildAcceptLanguageExtension(attempt.list))) {
++      writeFileSync(join(dir, name), contents, { mode: 0o644 });
++    }
++    loaded = await browser.send("Extensions.loadUnpacked", { path: dir, enableInIncognito: true });
++    if (typeof loaded?.id !== "string") throw new Error("Extensions.loadUnpacked returned no id");
++  } catch (error) {
++    rmSync(dir, { recursive: true, force: true });
++    throw error;
++  } finally {
++    extension.loadingDirs.delete(dir);
++  }
++  if (extension.attempt !== attempt) {
++    if (await uninstallAcceptLanguageExtension(browser, loaded.id)) {
++      rmSync(dir, { recursive: true, force: true });
++    }
++    return null;
++  }
++  return { installed: { id: loaded.id, dir } };
++}
++
++function settleAcceptLanguageExtension(browser, extension, attempt, outcome, now) {
++  if (extension.attempt !== attempt || browser.isClosed) return;
++  if (outcome.installed !== undefined) {
++    extension.phase = "ready";
++    extension.installed = outcome.installed;
++    acceptLanguageExtensionPortsLoaded.add(browser.port);
++    extension.reason = null;
++    extension.attempts = 0;
++    console.error(
++      `accept-language extension loaded port=${browser.port} id=${outcome.installed.id}: ${attempt.list} in stock position for off-the-record contexts`,
++    );
++    extension.cleanup = removeStaleAcceptLanguageExtensions(browser);
++    return;
++  }
++  extension.attempt = null;
++  extension.installed = null;
++  if (outcome.unsupported !== undefined) {
++    extension.phase = "unsupported";
++    extension.reason = outcome.unsupported;
++    console.error(
++      `accept-language extension unavailable port=${browser.port}: ${outcome.unsupported}`,
++    );
++    return;
++  }
++  const retryMs =
++    ACCEPT_LANGUAGE_EXTENSION_RETRY_MS[
++      Math.min(extension.attempts, ACCEPT_LANGUAGE_EXTENSION_RETRY_MS.length - 1)
++    ];
++  extension.phase = "failed";
++  extension.reason = `extension load failed ${errorClass(outcome.error)}`;
++  extension.attempts += 1;
++  extension.nextAttemptAt = now() + retryMs;
++  console.error(
++    `accept-language extension load failed port=${browser.port}: ${errorClass(outcome.error)}; retrying in ${retryMs}ms`,
++  );
++  extension.cleanup = removeStaleAcceptLanguageExtensions(browser);
++}
++
++function reapplyOffTheRecordAcceptLanguage(browser) {
++  return Promise.all(
++    [...(browser.attachedSessions ?? [])].map((sessionId) => {
++      const browserContextId = browser.attachedBrowserContexts?.get(sessionId);
++      if (!isOffTheRecordContext(browser, browserContextId)) return null;
++      return applyDesktopUaToTarget(browser, sessionId, browserContextId).catch((error) => {
++        if (isCdpTargetGone(error) || !browser.attachedSessions.has(sessionId)) return;
++        console.error(`accept-language re-apply failed port=${browser.port}: ${errorClass(error)}`);
++      });
++    }),
++  );
++}
++
++function finishAcceptLanguageExtension(browser, extension, attempt, outcome, now) {
++  if (extension.attempt !== attempt) return null;
++  const covered = extensionCoversOffTheRecord(browser);
++  settleAcceptLanguageExtension(browser, extension, attempt, outcome, now);
++  extension.inFlight = null;
++  attempt.releaseHold();
++  if (browser.isClosed) return null;
++  if (extension.phase === "ready" && !extensionCoversList(browser)) {
++    void ensureAcceptLanguageExtension(browser, { now });
++    if (extensionCoversOffTheRecord(browser) !== covered) {
++      void reapplyOffTheRecordAcceptLanguage(browser);
++    }
++    return extension.inFlight;
++  }
++  if (extensionCoversOffTheRecord(browser) === covered) return null;
++  return reapplyOffTheRecordAcceptLanguage(browser);
++}
++
++export function ensureAcceptLanguageExtension(browser, { now = Date.now } = {}) {
++  browser.acceptLanguageExtension ??= { phase: "idle", attempts: 0, nextAttemptAt: 0 };
++  const extension = browser.acceptLanguageExtension;
++  if (extension.inFlight != null) return extension.hold;
++  if (browser.isClosed || extension.phase === "unsupported") return null;
++  if (extensionCoversList(browser)) return verifyAcceptLanguageExtension(browser, extension, now);
++  if (extension.phase === "failed" && now() < extension.nextAttemptAt) return null;
++  const attempt = {
++    list: configuredAcceptLanguage(browser.acceptLanguage),
++    abort: new AbortController(),
++    holdUntil: now() + ACCEPT_LANGUAGE_EXTENSION_HOLD_MS,
++    deadline: now() + ACCEPT_LANGUAGE_EXTENSION_LOAD_TIMEOUT_MS,
++  };
++  extension.attempt = attempt;
++  extension.phase = "loading";
++  extension.list = attempt.list;
++  extension.hold = new Promise((resolve) => {
++    attempt.releaseHold = resolve;
++  });
++  extension.inFlight = installAcceptLanguageExtension(browser, extension, attempt)
++    .then(
++      (outcome) => outcome ?? { error: new Error("superseded") },
++      (error) => ({ error }),
++    )
++    .then((outcome) => finishAcceptLanguageExtension(browser, extension, attempt, outcome, now));
++  return extension.hold;
++}
++
++async function acceptLanguageExtensionDropped(browser, installed) {
++  try {
++    const { extensions } = (await browser.send("Extensions.getExtensions")) ?? {};
++    return !(Array.isArray(extensions) ? extensions : []).some(
++      (entry) => entry?.id === installed.id && entry.enabled !== false,
++    );
++  } catch (error) {
++    if (!browser.isClosed) {
++      reportOnce(
++        `accept-language extension check failed port=${browser.port}: ${errorClass(error)}`,
++      );
++    }
++    return false;
++  }
++}
++
++async function confirmAcceptLanguageExtension(browser, extension, verify, now) {
++  const { installed } = extension;
++  const dropped = await acceptLanguageExtensionDropped(browser, installed);
++  if (extension.verify === verify) extension.verify = null;
++  if (!dropped || extension.installed !== installed || browser.isClosed) return verify.release();
++  console.error(
++    `accept-language extension ${installed.id} is no longer loaded in Chrome port=${browser.port}; loading it again`,
++  );
++  extension.phase = "failed";
++  extension.reason = "extension no longer loaded in Chrome";
++  extension.installed = null;
++  extension.nextAttemptAt = 0;
++  verify.release(ensureAcceptLanguageExtension(browser, { now }));
++  return reapplyOffTheRecordAcceptLanguage(browser);
++}
++
++function verifyAcceptLanguageExtension(browser, extension, now) {
++  if (extension.verify != null) return extension.verify.hold;
++  const verify = { holdUntil: now() + ACCEPT_LANGUAGE_EXTENSION_HOLD_MS };
++  verify.hold = new Promise((resolve) => {
++    verify.release = resolve;
++  });
++  extension.verify = verify;
++  void confirmAcceptLanguageExtension(browser, extension, verify, now);
++  return verify.hold;
++}
++
++function acceptLanguageExtensionWanted(browser) {
++  return (
++    acceptLanguageEnUsEnabledForBrowser(browser) &&
++    typeof browser.defaultBrowserContextId === "string"
++  );
++}
++
++function prepareAcceptLanguageExtension(browser) {
++  if (!acceptLanguageExtensionWanted(browser)) return null;
++  const hold = ensureAcceptLanguageExtension(browser);
++  if (browser.acceptLanguageExtension?.verify != null) return hold;
++  return extensionCoversOffTheRecord(browser) ? null : hold;
++}
++
++function hasLeftoverAcceptLanguageExtensions(browser) {
++  const prefix = acceptLanguageExtensionDirPrefix(browser);
++  try {
++    return readdirSync(dirname(prefix)).some((name) =>
++      join(dirname(prefix), name).startsWith(prefix),
++    );
++  } catch (error) {
++    reportOnce(
++      `accept-language extension cleanup failed port=${browser.port}: ${errorClass(error)}`,
++    );
++    return null;
++  }
++}
++
++export function settleAcceptLanguageExtensionOnAttach(browser) {
++  if (acceptLanguageExtensionWanted(browser)) return ensureAcceptLanguageExtension(browser);
++  const { port } = browser;
++  const settled = () => {
++    acceptLanguageExtensionPortsListed.add(port);
++    acceptLanguageExtensionPortsLoaded.delete(port);
++  };
++  if (
++    !acceptLanguageEnUsEnabledForBrowser(browser) &&
++    acceptLanguageExtensionPortsListed.has(port) &&
++    !acceptLanguageExtensionPortsLoaded.has(port)
++  ) {
++    return null;
++  }
++  const leftover = hasLeftoverAcceptLanguageExtensions(browser);
++  if (leftover === false) settled();
++  if (leftover !== true) return null;
++  browser.acceptLanguageExtensionCleanup = removeStaleAcceptLanguageExtensions(browser).then(
++    (removed) => {
++      if (removed) settled();
++    },
++  );
++  return browser.acceptLanguageExtensionCleanup;
++}
++
++export function acceptLanguageExtensionHold(browser, browserContextId) {
++  return isOffTheRecordContext(browser, browserContextId)
++    ? prepareAcceptLanguageExtension(browser)
++    : null;
++}
++
++export function tickAcceptLanguageExtension(browser, { now = Date.now } = {}) {
++  const extension = browser.acceptLanguageExtension;
++  if (extension == null || browser.isClosed) return null;
++  const { attempt } = extension;
++  if (extension.inFlight != null && attempt != null) {
++    if (now() >= attempt.holdUntil) attempt.releaseHold();
++    if (now() < attempt.deadline) return null;
++    const timeout = Object.assign(new Error("extension load timed out"), { name: "TimeoutError" });
++    attempt.abort.abort(timeout);
++    return finishAcceptLanguageExtension(browser, extension, attempt, { error: timeout }, now);
++  }
++  if (extension.verify != null && now() >= extension.verify.holdUntil) {
++    extension.verify.release();
++    extension.verify = null;
++  }
++  if (
++    extension.phase === "failed" ||
++    (extension.phase === "ready" && !extensionCoversList(browser))
++  ) {
++    return ensureAcceptLanguageExtension(browser, { now });
++  }
++  return null;
++}
++
+ export function recordAcceptLanguage(browser) {
+   if (!acceptLanguageEnUsEnabledForBrowser(browser)) return;
+   const path =
+@@ -360,39 +988,20 @@
+   }
+ }
+ 
+-export async function reapplyChangedAcceptLanguage(
++export function reapplyChangedAcceptLanguage(
+   browser,
+   read = () => readAcceptLanguageEnUsMarker(undefined, null),
+ ) {
+   if (browser.isClosed || browser.acceptLanguageEnUsEnabled !== true) return null;
+   const marker = read();
+-  if (marker == null || marker === browser.acceptLanguage) return null;
+-  const previous = configuredAcceptLanguage(browser.acceptLanguage);
++  if (marker == null) return null;
++  const current = configuredAcceptLanguage(browser.acceptLanguage);
+   const next = configuredAcceptLanguage(marker);
+-  browser.acceptLanguage = marker;
+-  if (next === previous) return null;
+-  const generation = (browser.acceptLanguageGeneration ?? 0) + 1;
+-  browser.acceptLanguageGeneration = generation;
+-  console.error(
+-    `accept-language changed port=${browser.port} (${previous}->${next}); re-applying to attached targets`,
+-  );
+-  await resolveDefaultBrowserContext(browser);
+-  await Promise.all(
+-    [...(browser.attachedSessions ?? [])].map((sessionId) =>
+-      applyDesktopUaToTarget(
+-        browser,
+-        sessionId,
+-        browser.attachedBrowserContexts?.get(sessionId),
+-      ).catch((error) => {
+-        if (isCdpTargetGone(error) || !browser.attachedSessions.has(sessionId)) return;
+-        console.error(`accept-language re-apply failed port=${browser.port}: ${errorClass(error)}`);
+-      }),
+-    ),
++  if (next === current) return null;
++  reportOnce(
++    `accept-language changed port=${browser.port} (${current}->${next}); keeping ${current} until Chrome's next cold launch`,
+   );
+-  if (!browser.isClosed && browser.acceptLanguageGeneration === generation) {
+-    recordAcceptLanguage(browser);
+-  }
+-  return `${previous}->${next}`;
++  return null;
+ }
+ 
+ export function egressTimeZoneEnabledForBrowser(
+@@ -621,12 +1230,24 @@
+   );
+ }
+ 
++function fingerprintLoggerEnabled(browser) {
++  return browser.fingerprintReadLogger != null;
++}
++
++async function applyFingerprintLoggerToTarget(browser, sessionId, target) {
++  const logger = browser.fingerprintReadLogger;
++  if (logger == null) return null;
++  return logger.prepare({
++    sessionId,
++    parentSessionId: target?.parentSessionId,
++    target,
++  });
++}
++
+ function attachRelatedTargets(browser, sessionId) {
+   const sessions = relatedTargetSessions(browser);
+-  const serviceWorkers = serviceWorkersGoverned(browser);
+-  const attached = sessions.get(sessionId);
+-  if (attached === true || attached === serviceWorkers) return Promise.resolve();
+-  sessions.set(sessionId, serviceWorkers);
++  if (sessions.has(sessionId)) return Promise.resolve();
++  sessions.set(sessionId, true);
+   return browser
+     .send(
+       "Target.setAutoAttach",
+@@ -634,15 +1255,12 @@
+         autoAttach: true,
+         waitForDebuggerOnStart: true,
+         flatten: true,
+-        filter: serviceWorkers
+-          ? [{ type: "service_worker", exclude: false }, ...RELATED_TARGET_FILTER]
+-          : RELATED_TARGET_FILTER,
++        filter: RELATED_TARGET_FILTER,
+       },
+       sessionId,
+     )
+     .catch((error) => {
+-      if (attached === undefined) sessions.delete(sessionId);
+-      else sessions.set(sessionId, attached);
++      sessions.delete(sessionId);
+       throw error;
+     });
+ }
+@@ -651,17 +1269,28 @@
+   return target?.type === "iframe" && target.waitingForDebugger === true;
+ }
+ 
++async function settleAll(steps) {
++  const failed = (await Promise.allSettled(steps)).find((step) => step.status === "rejected");
++  if (failed != null) throw failed.reason;
++}
++
+ export async function applyUaTreatmentToTarget(browser, sessionId, target) {
+   const hardware = hardwareTreatmentForBrowser(browser);
+   const acceptLanguageEnUs = acceptLanguageEnUsEnabledForBrowser(browser);
+   const egressTimeZone = egressTimeZoneEnabledForBrowser(browser);
+   if (hardware === "off" && !acceptLanguageEnUs && !egressTimeZone) {
+-    await applyDesktopUaToTarget(browser, sessionId, target?.browserContextId);
++    await settleAll([
++      applyDesktopUaToTarget(browser, sessionId, target?.browserContextId),
++      fingerprintLoggerEnabled(browser) && ["page", "worker"].includes(target?.type)
++        ? attachRelatedTargets(browser, sessionId)
++        : null,
++      applyFingerprintLoggerToTarget(browser, sessionId, target),
++    ]);
+     return;
+   }
+   const coherent = hardware === "coherent";
+   if (isWorkerTargetType(target?.type)) {
+-    await Promise.all([
++    await settleAll([
+       acceptLanguageEnUs || coherent
+         ? applyDesktopUaToTarget(browser, sessionId, target?.browserContextId)
+         : null,
+@@ -671,20 +1300,22 @@
+       coherent ? applyCoherentHardwareToTarget(browser, sessionId) : null,
+       egressTimeZone ? applyEgressTimeZoneToTarget(browser, sessionId) : null,
+       target.type === "service_worker" ? null : attachRelatedTargets(browser, sessionId),
++      applyFingerprintLoggerToTarget(browser, sessionId, target),
+     ]);
+     return;
+   }
+   if (hardware !== "legacy") {
+-    await Promise.all([
++    await settleAll([
+       applyDesktopUaToTarget(browser, sessionId, target?.browserContextId),
+       coherent ? applyCoherentHardwareToTarget(browser, sessionId) : null,
+       egressTimeZone ? applyEgressTimeZoneToTarget(browser, sessionId) : null,
+       attachRelatedTargets(browser, sessionId),
++      applyFingerprintLoggerToTarget(browser, sessionId, target),
+     ]);
+     return;
+   }
+   const script = documentScript(browser);
+-  await Promise.all([
++  await settleAll([
+     applyDesktopUaToTarget(browser, sessionId, target?.browserContextId),
+     startsBeforeFirstDocument(target)
+       ? null
+@@ -692,6 +1323,7 @@
+     installDocumentScript(browser, sessionId, script),
+     egressTimeZone ? applyEgressTimeZoneToTarget(browser, sessionId) : null,
+     attachRelatedTargets(browser, sessionId),
++    applyFingerprintLoggerToTarget(browser, sessionId, target),
+   ]);
+ }
+ 
+@@ -700,7 +1332,7 @@
+   const acceptLanguageEnUs = acceptLanguageEnUsEnabledForBrowser(browser);
+   const egressTimeZone = egressTimeZoneEnabledForBrowser(browser);
+   const filter =
+-    hardware !== "off" || acceptLanguageEnUs || egressTimeZone
++    hardware !== "off" || acceptLanguageEnUs || egressTimeZone || fingerprintLoggerEnabled(browser)
+       ? [
+           { type: "page", exclude: false },
+           { type: "worker", exclude: false },
+@@ -714,23 +1346,42 @@
+   return { autoAttach: true, waitForDebuggerOnStart: true, flatten: true, filter };
+ }
+ 
+-export async function configureUaGovernorBrowser(browser, { startEgressTimeZoneFor } = {}) {
++export async function configureUaGovernorBrowser(
++  browser,
++  { startEgressTimeZoneFor, configureFingerprintLoggerFor = configureFingerprintLogger } = {},
++) {
+   browser.attachedSessions = new Set();
+   browser.attachedTargetTypes = new Map();
+   browser.attachedBrowserContexts = new Map();
++  browser.attachedTargetIds = new Map();
+   if (startEgressTimeZoneFor != null) browser.startEgressTimeZoneFor = startEgressTimeZoneFor;
++  await configureFingerprintLoggerFor(browser);
+   if (egressTimeZoneEnabledForBrowser(browser) && browser.egressTimeZoneLookup === undefined) {
+     void (browser.startEgressTimeZoneFor ?? startEgressTimeZone)(browser);
+   }
+   if (hardwareTreatmentForBrowser(browser) === "coherent") void verifyCoherentProfile(browser);
+   browser.onEvent((message) => {
++    if (message.method === "Target.targetDestroyed") {
++      const targetId = message.params?.targetId;
++      if (typeof targetId === "string") {
++        void browser.fingerprintReadLogger?.targetDestroyed(targetId).catch((error) => {
++          if (!isCdpTargetGone(error) && !browser.isClosed) {
++            console.error(`fingerprint drain failed port=${browser.port}: ${errorClass(error)}`);
++          }
++        });
++      }
++      return;
++    }
+     const sessionId = message.params?.sessionId;
+     if (typeof sessionId !== "string") return;
+     if (message.method === "Target.detachedFromTarget") {
+       browser.attachedSessions.delete(sessionId);
+       browser.attachedTargetTypes.delete(sessionId);
+       browser.attachedBrowserContexts.delete(sessionId);
++      browser.attachedTargetIds.delete(sessionId);
++      browser.fingerprintReadLogger?.detach(sessionId);
+       browser.acceptLanguageOverriddenSessions?.delete(sessionId);
++      browser.acceptLanguageUnappliedSessions?.delete(sessionId);
+       browser.relatedTargetSessions?.delete(sessionId);
+       if (browser.egressTimeZoneEnabled === true) reassertEgressTimeZone(browser);
+       return;
+@@ -743,25 +1394,70 @@
+     }
+     const browserContextId = message.params?.targetInfo?.browserContextId;
+     browser.attachedBrowserContexts.set(sessionId, browserContextId);
++    const targetId = message.params?.targetInfo?.targetId;
++    if (typeof targetId === "string") browser.attachedTargetIds.set(sessionId, targetId);
+     const reportUnlessGone = (step) => (error) => {
+       if (isCdpTargetGone(error) || !browser.attachedSessions.has(sessionId)) return;
+       console.error(`${step} failed port=${browser.port}: ${errorClass(error)}`);
+     };
+     const treatAndResume = () => {
+-      void applyUaTreatmentToTarget(browser, sessionId, {
++      const waitingForDebugger = message.params?.waitingForDebugger === true;
++      const applying = applyUaTreatmentToTarget(browser, sessionId, {
++        ...message.params?.targetInfo,
+         type: targetType,
+         browserContextId,
+-        waitingForDebugger: message.params?.waitingForDebugger === true,
+-      }).catch(reportUnlessGone("ua apply"));
+-      void browser
+-        .send("Runtime.runIfWaitingForDebugger", {}, sessionId)
+-        .catch(reportUnlessGone("resume"));
++        parentSessionId: message.sessionId,
++        waitingForDebugger,
++      });
++      const resume = () =>
++        void browser
++          .send("Runtime.runIfWaitingForDebugger", {}, sessionId)
++          .catch(reportUnlessGone("resume"));
++      const acceptLanguageMustApply =
++        acceptLanguageEnUsEnabledForBrowser(browser) &&
++        browser.acceptLanguageOverriddenSessions?.has(sessionId);
++      if (!acceptLanguageMustApply) {
++        void applying.catch(reportUnlessGone("ua apply"));
++        resume();
++        return;
++      }
++      void applying.then(resume, (error) => {
++        reportUnlessGone("ua apply")(error);
++        if (!acceptLanguageMustApply) {
++          resume();
++        } else if (!browser.acceptLanguageUnappliedSessions?.has(sessionId)) {
++          resume();
++        } else if (!browser.attachedSessions.has(sessionId)) {
++          return;
++        } else if (acceptLanguageFromExtension(browser, browserContextId)) {
++          console.error(
++            `accept-language override failed port=${browser.port} ${targetType ?? "target"}; resuming it, since the extension already sets its Accept-Language`,
++          );
++          resume();
++        } else if (targetType === "page" && typeof targetId === "string") {
++          console.error(
++            `accept-language override failed port=${browser.port} page; closing it so it does not keep running without the list in its Accept-Language and navigator.languages`,
++          );
++          void browser.send("Target.closeTarget", { targetId }).catch(reportUnlessGone("close"));
++        } else if (waitingForDebugger) {
++          console.error(
++            `accept-language override failed port=${browser.port} ${targetType ?? "target"}; holding it paused so it never runs without the list in its Accept-Language and navigator.languages`,
++          );
++        }
++      });
+     };
+-    const hold = egressTimeZoneHold(browser);
+-    if (hold == null) treatAndResume();
+-    else void hold.then(treatAndResume);
++    const holds = [
++      egressTimeZoneHold(browser),
++      acceptLanguageExtensionHold(browser, browserContextId),
++    ].filter((hold) => hold != null);
++    if (holds.length === 0) treatAndResume();
++    else void (holds.length === 1 ? holds[0] : Promise.all(holds)).then(treatAndResume);
+   });
+   await resolveDefaultBrowserContext(browser);
++  const settling = settleAcceptLanguageExtensionOnAttach(browser);
++  if (settling != null && settling === browser.acceptLanguageExtensionCleanup) {
++    await Promise.race([settling, delay(ACCEPT_LANGUAGE_EXTENSION_HOLD_MS)]);
++  }
+   await browser.send("Target.setAutoAttach", browserAutoAttachParams(browser));
+   recordAcceptLanguage(browser);
+ }
+@@ -819,12 +1515,17 @@
+   resolveCoherentHardwareProfile = resolveCoherentHardwareProfileEnabled,
+   readAcceptLanguage = readAcceptLanguageEnUsMarker,
+   resolveEgressGate = resolveEgressTimeZoneGate,
++  readFingerprintMarker = readFingerprintMarkerCandidate,
+ } = {}) {
++  const fingerprintRaw = readFingerprintMarker();
++  const fingerprintConfig = fingerprintRaw == null ? null : parseFingerprintMarker(fingerprintRaw);
+   return {
+     hardwareProfile: resolveHardwareProfile() === true,
+     coherentHardwareProfile: resolveCoherentHardwareProfile() === true,
+     acceptLanguage: readAcceptLanguage(),
+     egressTimeZone: resolveEgressGate(),
++    fingerprintLogConfigDigest:
++      fingerprintConfig == null ? null : fingerprintMarkerDigest(fingerprintRaw),
+   };
+ }
+ 
+@@ -850,7 +1551,11 @@
+     const wanted = settings.acceptLanguage != null;
+     if (enabled !== wanted) {
+       changes.push(`accept-language ${onOff(enabled)}->${onOff(wanted)}`);
+-    } else if (wanted && (browser.acceptLanguage ?? "") !== settings.acceptLanguage) {
++    } else if (
++      wanted &&
++      !browser.launchAcceptLanguage &&
++      (browser.acceptLanguage ?? "") !== settings.acceptLanguage
++    ) {
+       changes.push("accept-language value");
+     }
+   }
+@@ -859,13 +1564,33 @@
+     const after = onOff(settings.egressTimeZone === "on");
+     if (before !== after) changes.push(`egress-time-zone ${before}->${after}`);
+   }
++  if (has("fingerprintLogConfigDigest")) {
++    const before = browser.fingerprintLogConfigDigest;
++    const after = settings.fingerprintLogConfigDigest ?? null;
++    if (before !== after) {
++      changes.push(
++        before == null || after == null
++          ? `fingerprint-logging ${before == null ? "off" : "on"}->${after == null ? "off" : "on"}`
++          : "fingerprint-logging value",
++      );
++    }
++  }
+   return changes;
+ }
+ 
+ export function reattachIfSettingsChanged(browser, resolve = resolveBrowserSettings) {
+   if (browser.isClosed || !(browser.attachedTargetTypes instanceof Map)) return [];
+-  if (openPageCount(browser) > 0) return [];
+   const changes = changedBrowserSettings(browser, resolve());
++  if (changes.some((change) => change.startsWith("fingerprint-logging "))) {
++    void Promise.resolve(browser.fingerprintReadLogger?.stop()).catch((error) => {
++      if (!isCdpTargetGone(error) && !browser.isClosed) {
++        console.error(`fingerprint cleanup failed port=${browser.port}: ${errorClass(error)}`);
++      }
++    });
++    browser.fingerprintReadLogger = null;
++    browser.fingerprintLogConfigDigest = null;
++  }
++  if (openPageCount(browser) > 0) return [];
+   if (changes.length === 0) return [];
+   console.error(
+     `browser settings changed port=${browser.port} (${changes.join(", ")}); reattaching while no page is open`,
+@@ -877,14 +1602,21 @@
+ const GOVERNOR_DIR = dirname(fileURLToPath(import.meta.url));
+ export const UA_GOVERNOR_ENTRY = "sand-ua-governor.mjs";
+ const LOCAL_MODULE_SPECIFIER = /\b(?:from|import)\s*\(?\s*["']\.\/([\w.-]+\.mjs)["']/g;
++const OPTIONAL_GOVERNOR_MODULES = [FINGERPRINT_LOGGER_MODULE.slice(2)];
+ 
+ export function governorCodeFingerprint(dir = GOVERNOR_DIR, readFile = readFileSync) {
+   const sources = new Map();
+-  const pending = [UA_GOVERNOR_ENTRY];
++  const pending = [UA_GOVERNOR_ENTRY, ...OPTIONAL_GOVERNOR_MODULES];
+   while (pending.length > 0) {
+     const name = pending.pop();
+     if (sources.has(name)) continue;
+-    const source = String(readFile(join(dir, name), "utf8"));
++    let source;
++    try {
++      source = String(readFile(join(dir, name), "utf8"));
++    } catch (error) {
++      if (OPTIONAL_GOVERNOR_MODULES.includes(name) && error?.code === "ENOENT") continue;
++      throw error;
++    }
+     sources.set(name, source);
+     for (const match of source.matchAll(LOCAL_MODULE_SPECIFIER)) pending.push(match[1]);
+   }
+@@ -1103,8 +1835,15 @@
+         continue;
+       }
+       void tickEgressTimeZone(browser);
+-      void reapplyChangedAcceptLanguage(browser);
++      void tickAcceptLanguageExtension(browser);
++      reapplyChangedAcceptLanguage(browser);
+       reattachIfSettingsChanged(browser);
++      if (browser.isClosed) continue;
++      void browser.fingerprintReadLogger?.tick().catch((error) => {
++        if (!isCdpTargetGone(error) && !browser.isClosed) {
++          console.error(`fingerprint drain failed port=${browser.port}: ${errorClass(error)}`);
++        }
++      });
+       openPages += openPageCount(browser);
+     }
+     if (openPages > 0) lastActivityAtMs = Date.now();

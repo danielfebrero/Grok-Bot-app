@@ -1,0 +1,104 @@
+--- 2026-10-28_03-50:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
++++ 2026-10-28_04-51:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
+@@ -377,7 +377,6 @@
+ var SAND_PRODUCTION_DATA_DIRNAME = ".grokbot";
+ var SAND_USER_DATA_DIR_ENV = "SAND_USER_DATA_DIR";
+ var SAND_DATA_DIRNAME = "sand-data";
+-var USER_DATA_DIR_FLAG = "--user-data-dir";
+ var SAND_BOX_HOME_DIR = "/home/box";
+ var SAND_BOX_DATA_ROOT = `${SAND_BOX_HOME_DIR}/${SAND_DATA_DIRNAME}`;
+ var SAND_BOX_MODEL_VISIBLE_DATA_ROOT = `${SAND_BOX_HOME_DIR}/agent-data`;
+@@ -389,21 +388,8 @@
+ var SAND_BOX_DEBUGGING_REFERENCE_PATH = `${SAND_BOX_REFERENCE_DIR}/${DEBUGGING_THE_BOX_FILE}`;
+ var SAND_APP_UI_REFERENCE_PATH = `${SAND_BOX_REFERENCE_DIR}/${SAND_APP_UI_FILE}`;
+ var SAND_APP_ACTIONS_REFERENCE_PATH = `${SAND_BOX_REFERENCE_DIR}/${SAND_APP_ACTIONS_FILE}`;
+-function readUserDataDirArg(argv) {
+-  for (let i = 0; i < argv.length; i++) {
+-    const arg = argv[i];
+-    if (arg === USER_DATA_DIR_FLAG) {
+-      const next = argv[i + 1];
+-      return next != null && !next.startsWith("--") ? next : null;
+-    }
+-    const prefix = `${USER_DATA_DIR_FLAG}=`;
+-    if (arg.startsWith(prefix)) return arg.slice(prefix.length);
+-  }
+-  return null;
+-}
+-function resolveSandUserDataDir(argv = [], env = process.env, cwd = process.cwd()) {
+-  const raw = readUserDataDirArg(argv) ?? env[SAND_USER_DATA_DIR_ENV];
+-  const trimmed = raw?.trim();
++function resolveSandUserDataDir(env = process.env, cwd = process.cwd()) {
++  const trimmed = env[SAND_USER_DATA_DIR_ENV]?.trim();
+   if (trimmed == null || trimmed.length === 0) return null;
+   return (0, import_node_path3.isAbsolute)(trimmed) ? trimmed : (0, import_node_path3.resolve)(cwd, trimmed);
+ }
+@@ -417,7 +403,7 @@
+ function getSandRootDir(homeDir = (0, import_node_os.homedir)()) {
+   const override = resolveSandDataRootOverride();
+   if (override != null) return override;
+-  const userDataDir = resolveSandUserDataDir([], process.env);
++  const userDataDir = resolveSandUserDataDir(process.env);
+   if (userDataDir != null) {
+     return (0, import_node_path3.join)(userDataDir, SAND_DATA_DIRNAME);
+   }
+@@ -13436,7 +13422,7 @@
+     return proto3.util.equals(_SendMessageArgs, a, b);
+   }
+   static $() {
+-    return ["SendMessageArgs|1 text #0 message|2 attachment #1 message|3 reply_to 9?", SendMessageText, SendMessageAttachment];
++    return ["SendMessageArgs|1 text #0 message|2 attachment #1 message|3 reply_to 9?|4 replace_previous_message 8?", SendMessageText, SendMessageAttachment];
+   }
+ };
+ var SendMessageSuccess = class _SendMessageSuccess extends __protoMessage357 {
+@@ -15686,7 +15672,7 @@
+     return proto3.util.equals(_ListTrackedTasksArgs, a, b);
+   }
+   static $() {
+-    return ["ListTrackedTasksArgs|1 tool_call_id 9|2 keys 9*|3 status_categories 9*|4 owner 9?|5 linked_agent_id 9?"];
++    return ["ListTrackedTasksArgs|1 tool_call_id 9|2 keys 9*|3 status_categories 9*|4 owner 9?|5 linked_agent_id 9?|6 cursor 9?"];
+   }
+ };
+ var ListTrackedTasksSuccess = class _ListTrackedTasksSuccess extends __protoMessage364 {
+@@ -15700,6 +15686,7 @@
+     this.matchingCount = 0;
+     this.message = "";
+     this.tags = [];
++    this.nextCursor = "";
+     proto3.util.initPartial(data, this);
+   }
+   static fromBinary(bytes, options) {
+@@ -15715,7 +15702,7 @@
+     return proto3.util.equals(_ListTrackedTasksSuccess, a, b);
+   }
+   static $() {
+-    return ["ListTrackedTasksSuccess|1 tasks #0*|2 statuses #1*|3 members #2*|4 older_closed_count 13|5 truncated 8|6 matching_count 13|7 message 9|8 tags #3*", TrackedTaskView, TrackedTaskStatusView, TrackedTaskMemberView, TrackedTaskTagView];
++    return ["ListTrackedTasksSuccess|1 tasks #0*|2 statuses #1*|3 members #2*|4 older_closed_count 13|5 truncated 8|6 matching_count 13|7 message 9|8 tags #3*|9 next_cursor 9", TrackedTaskView, TrackedTaskStatusView, TrackedTaskMemberView, TrackedTaskTagView];
+   }
+ };
+ var ListTrackedTasksError = class _ListTrackedTasksError extends __protoMessage364 {
+@@ -16675,7 +16662,7 @@
+     return proto3.util.equals(_WriteCanvasSuccess, a, b);
+   }
+   static $() {
+-    return ["WriteCanvasSuccess|1 canvas_id 9|2 title 9?|3 url 9|4 page_url 9?"];
++    return ["WriteCanvasSuccess|1 canvas_id 9|2 title 9?|3 url 9|4 page_url 9?|5 audience_notice 9?"];
+   }
+ };
+ var WriteCanvasFailure = class _WriteCanvasFailure extends __protoMessage365 {
+@@ -20001,6 +19988,7 @@
+     this.longReasoningReminderExposureLogged = false;
+     this.assistantTextStepIndices = [];
+     this.appSecretsRequestStepIndices = [];
++    this.preferenceChangeStepIndices = [];
+     proto3.util.initPartial(data, this);
+   }
+   static fromBinary(bytes, options) {
+@@ -20016,7 +20004,7 @@
+     return proto3.util.equals(_AgentConversationTurnStructure, a, b);
+   }
+   static $() {
+-    return ["AgentConversationTurnStructure|1 user_message 12|2 steps 12*|3 request_id 9?|4 encrypted_model 9?|5 dynamic_tool_count 13?|6 send_message_step_indices 13*|7 routed_model_display_name 9?|8 subagent_dispatch_steps #0*|9 dynamic_tool_names 9*|10 user_message_id 9?|11 long_reasoning_reminder #1?|12 long_reasoning_reminder_exposure_logged 8|13 assistant_text_step_indices 13*|14 assistant_text_steps_recorded 8?|15 app_secrets_request_step_indices 13*", SubagentDispatchStep, LongReasoningReminderState];
++    return ["AgentConversationTurnStructure|1 user_message 12|2 steps 12*|3 request_id 9?|4 encrypted_model 9?|5 dynamic_tool_count 13?|6 send_message_step_indices 13*|7 routed_model_display_name 9?|8 subagent_dispatch_steps #0*|9 dynamic_tool_names 9*|10 user_message_id 9?|11 long_reasoning_reminder #1?|12 long_reasoning_reminder_exposure_logged 8|13 assistant_text_step_indices 13*|14 assistant_text_steps_recorded 8?|15 app_secrets_request_step_indices 13*|16 preference_change_step_indices 13*", SubagentDispatchStep, LongReasoningReminderState];
+   }
+ };
+ var LongReasoningReminderState = class _LongReasoningReminderState extends __protoMessage373 {

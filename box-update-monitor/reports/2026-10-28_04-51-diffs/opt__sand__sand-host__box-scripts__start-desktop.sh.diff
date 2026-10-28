@@ -1,0 +1,168 @@
+--- 2026-10-28_03-50:/opt/sand/sand-host/box-scripts/start-desktop.sh
++++ 2026-10-28_04-51:/opt/sand/sand-host/box-scripts/start-desktop.sh
+@@ -116,6 +116,13 @@
+ 
+ rm -f /tmp/xdg-runtime-box/sand-gateway-credential /tmp/xdg-runtime-box-*/sand-gateway-credential || true
+ 
++SAND_DESKTOP_PANEL_MARKER="${BOX_USER_XDG_DIR}/sand-desktop-panel"
++if [ "${SAND_BOX_DESKTOP_PANEL:-}" = "1" ] && command -v xfce4-panel >/dev/null 2>&1; then
++	: >"${SAND_DESKTOP_PANEL_MARKER}" || true
++else
++	rm -f "${SAND_DESKTOP_PANEL_MARKER}" || true
++fi
++
+ # Persistent user keyring (sand_box_persistent_keyring gate, stamped as
+ # SAND_BOX_PERSISTENT_KEYRING=1 at pod create): unlock the on-disk `login`
+ # GNOME keyring on the box session bus. box-keyring-unlock execs
+@@ -154,6 +161,37 @@
+ }
+ start_persistent_keyring
+ 
++# Audio devices (sand_box_audio_devices gate, stamped as SAND_BOX_AUDIO_DEVICES=1
++# at pod create): a PulseAudio daemon per display in the box runtime dir that
++# box-chrome hands this display's Chrome. It starts before Xvfb so its socket is
++# up before any Chrome on the display can start, because Chrome picks its audio
++# backend once at startup
++# (https://chromium.googlesource.com/chromium/src/+/refs/tags/156.0.8078.47/media/audio/linux/audio_manager_linux.cc).
++# Registers nothing on an image without pulseaudio, like the keyring above.
++start_box_audio() {
++	[ "${SAND_BOX_AUDIO_DEVICES:-}" = "1" ] || return 0
++	[ -x /usr/local/bin/box-audio.sh ] || return 0
++	command -v pulseaudio >/dev/null 2>&1 || return 0
++	local log="/tmp/pulseaudio${DISPLAY}.log"
++	local cmd=(/usr/local/bin/box-bounded-log --run "${log}" -- /usr/local/bin/box-audio.sh "${BOX_USER_XDG_DIR}")
++	if [ "$(id -u)" -eq 0 ]; then
++		cmd=(runuser -u box -- env HOME=/home/box "${cmd[@]}")
++	fi
++	"${cmd[@]}" &
++	sand_desktop_register "${SAND_DESKTOP_GROUP}" audio 7 "${log}" "$!" -- "${cmd[@]}"
++	# box-audio never replaces a live daemon, so a socket that accepts a
++	# connection is served by the daemon that keeps serving it, and a socket
++	# file a dead daemon left in a kept /tmp refuses connections
++	# (https://man7.org/linux/man-pages/man7/unix.7.html).
++	for _ in $(seq 1 50); do
++		python3 -I -c 'import socket, sys; socket.socket(socket.AF_UNIX).connect(sys.argv[1])' \
++			"${BOX_USER_XDG_DIR}/pulse/native" 2>/dev/null && return 0
++		sleep 0.1
++	done
++	echo "start-desktop: PulseAudio for ${DISPLAY} did not accept connections within 5 s; Chrome started on this display now gets no audio devices (see ${log})" >&2
++}
++start_box_audio
++
+ /usr/local/bin/box-bounded-log --run "/tmp/xvfb${DISPLAY}.log" -- \
+ 	/usr/local/bin/box-xvfb "${DISPLAY}" -screen 0 "${SCREEN_WIDTH}x${SCREEN_HEIGHT}x24" -ac +extension GLX +render -noreset &
+ sand_desktop_register "${SAND_DESKTOP_GROUP}" xvfb 0 "/tmp/xvfb${DISPLAY}.log" "$!" -- \
+@@ -348,15 +386,105 @@
+ 	) 9>"${lock_file}"
+ }
+ 
+-configure_plank_dock dock1
++# xfce4-panel reads its layout from the xfce4-panel xfconf channel, and a panel
++# that is never hidden reserves its size along its edge as a strut, which the
++# window manager subtracts from the work area it maximizes windows into
++# (https://docs.xfce.org/xfce/xfce4-panel/preferences,
++# https://specifications.freedesktop.org/wm-spec/1.5/ar01s05.html#id-1.6.10).
++# Each launcher plugin starts the .desktop items kept in its own launcher-<id>
++# folder (https://docs.xfce.org/xfce/xfce4-panel/launcher).
++configure_desktop_panel() {
++	local channel_dir="${HOME}/.config/xfce4/xfconf/xfce-perchannel-xml"
++	local launchers="${HOME}/.config/xfce4/panel" id=2 item
++	mkdir -p "${channel_dir}" || return 1
++	for item in \
++		"${HOME}/.local/share/applications/box-chrome.desktop" \
++		/usr/share/applications/thunar.desktop \
++		/usr/share/applications/xfce4-terminal.desktop; do
++		mkdir -p "${launchers}/launcher-${id}" &&
++			cp -f "${item}" "${launchers}/launcher-${id}/" 2>/dev/null || true
++		id=$((id + 1))
++	done
++	cat >"${channel_dir}/.xfce4-panel.xml.$$" <<'EOF' || return 1
++<?xml version="1.0" encoding="UTF-8"?>
++<channel name="xfce4-panel" version="1.0">
++  <property name="configver" type="int" value="2"/>
++  <property name="panels" type="array">
++    <value type="int" value="1"/>
++    <property name="panel-1" type="empty">
++      <property name="position" type="string" value="p=10;x=0;y=0"/>
++      <property name="position-locked" type="bool" value="true"/>
++      <property name="length" type="double" value="100"/>
++      <property name="size" type="uint" value="40"/>
++      <property name="icon-size" type="uint" value="24"/>
++      <property name="autohide-behavior" type="uint" value="0"/>
++      <property name="enable-struts" type="bool" value="true"/>
++      <property name="plugin-ids" type="array">
++        <value type="int" value="1"/>
++        <value type="int" value="2"/>
++        <value type="int" value="3"/>
++        <value type="int" value="4"/>
++        <value type="int" value="5"/>
++        <value type="int" value="6"/>
++        <value type="int" value="7"/>
++        <value type="int" value="8"/>
++      </property>
++    </property>
++  </property>
++  <property name="plugins" type="empty">
++    <property name="plugin-1" type="string" value="applicationsmenu"/>
++    <property name="plugin-2" type="string" value="launcher">
++      <property name="items" type="array">
++        <value type="string" value="box-chrome.desktop"/>
++      </property>
++    </property>
++    <property name="plugin-3" type="string" value="launcher">
++      <property name="items" type="array">
++        <value type="string" value="thunar.desktop"/>
++      </property>
++    </property>
++    <property name="plugin-4" type="string" value="launcher">
++      <property name="items" type="array">
++        <value type="string" value="xfce4-terminal.desktop"/>
++      </property>
++    </property>
++    <property name="plugin-5" type="string" value="separator"/>
++    <property name="plugin-6" type="string" value="tasklist"/>
++    <property name="plugin-7" type="string" value="separator">
++      <property name="expand" type="bool" value="true"/>
++      <property name="style" type="uint" value="0"/>
++    </property>
++    <property name="plugin-8" type="string" value="clock"/>
++  </property>
++</channel>
++EOF
++	mv -f "${channel_dir}/.xfce4-panel.xml.$$" "${channel_dir}/xfce4-panel.xml"
++}
+ 
+-start_dock_once "/tmp/plank${DISPLAY}-dock1.pid" "/tmp/plank${DISPLAY}-dock1.log" \
+-	/usr/local/bin/box-plank --name dock1
+-sand_desktop_register "${SAND_DESKTOP_GROUP}" dock 5 "/tmp/plank${DISPLAY}-dock1.log" \
+-	"$(tr -dc '0-9' <"/tmp/plank${DISPLAY}-dock1.pid" 2>/dev/null || true)" \
+-	"/tmp/plank${DISPLAY}-dock1.pid" -- \
+-	/usr/local/bin/box-bounded-log --run "/tmp/plank${DISPLAY}-dock1.log" -- \
+-	/usr/local/bin/box-plank --name dock1
++start_desktop_panel() {
++	[ -e "${SAND_DESKTOP_PANEL_MARKER:-}" ] || return 1
++	if ! configure_desktop_panel; then
++		rm -f "${SAND_DESKTOP_PANEL_MARKER}"
++		return 1
++	fi
++	start_dock_once "/tmp/xfce4-panel${DISPLAY}.pid" "/tmp/xfce4-panel${DISPLAY}.log" xfce4-panel
++	sand_desktop_register "${SAND_DESKTOP_GROUP}" dock 5 "/tmp/xfce4-panel${DISPLAY}.log" \
++		"$(tr -dc '0-9' <"/tmp/xfce4-panel${DISPLAY}.pid" 2>/dev/null || true)" \
++		"/tmp/xfce4-panel${DISPLAY}.pid" -- \
++		/usr/local/bin/box-bounded-log --run "/tmp/xfce4-panel${DISPLAY}.log" -- xfce4-panel
++}
++
++if ! start_desktop_panel; then
++	configure_plank_dock dock1
++
++	start_dock_once "/tmp/plank${DISPLAY}-dock1.pid" "/tmp/plank${DISPLAY}-dock1.log" \
++		/usr/local/bin/box-plank --name dock1
++	sand_desktop_register "${SAND_DESKTOP_GROUP}" dock 5 "/tmp/plank${DISPLAY}-dock1.log" \
++		"$(tr -dc '0-9' <"/tmp/plank${DISPLAY}-dock1.pid" 2>/dev/null || true)" \
++		"/tmp/plank${DISPLAY}-dock1.pid" -- \
++		/usr/local/bin/box-bounded-log --run "/tmp/plank${DISPLAY}-dock1.log" -- \
++		/usr/local/bin/box-plank --name dock1
++fi
+ 
+ mkdir -p /workspace
+ cd /workspace

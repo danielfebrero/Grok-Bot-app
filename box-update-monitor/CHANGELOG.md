@@ -9,6 +9,35 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-28 04:51 (Paris) — snapshot `2026-10-28_03-50` → `2026-10-28_04-51`
+
+**Hot-update du host bundle (sand-host) `95f2586` → `04f60e5`** (supervisor `upgrade-95f2586` → `upgrade-04f60e5`, `pendingUpgradeVersion` = None) : remplacement à chaud du `sand-host` par le sand-supervisor, sans Update de l'ordinateur. Bundle host (`host-main.cjs` 31.8→32.1 Mo, `sand-eval-runner.cjs` 26.0→26.3 Mo), `agent-store-worker`, `box-chrome`, `box-chrome-policy`, runtime navigateur (`sand-ua-governor.mjs` 39.8→66.0 Ko, `sand-fingerprint-profiles.mjs`, `box-contract.generated.mjs`), `start-desktop.sh`, et un **nouveau** script `box-scripts/sand-fingerprint-read-logger.mjs` (1950 lignes). Le pointeur **agent-store-fuse** a aussi bougé dans la foulée (`/usr/local/bin/cursor_agent_store_fuse_version` `51beac1d…` → `7b30e3f2…`). Image `fcbae14`, box-scripts `fcbae14`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +1 / −0 / ~21.
+
+### Features
+- **Panneau de bureau (xfce4-panel)** : nouveau mode de bureau sous gate `sand_box_desktop_panel` (`SAND_BOX_DESKTOP_PANEL=1`) qui remplace le dock plank par un vrai panneau xfce4 (menu Applications, lanceurs box-chrome/Thunar/xfce4-terminal, liste des fenêtres, horloge). Le panneau réserve un *strut* le long de son bord ; quand le marqueur `sand-desktop-panel` est présent, `box-chrome` laisse le window manager maximiser la fenêtre dans la zone de travail restante au lieu d'utiliser `--start-maximized`.
+- **Périphériques audio dans la box** : nouveau gate `sand_box_audio_devices` (`SAND_BOX_AUDIO_DEVICES=1`) — un démon PulseAudio par display (via `/usr/local/bin/box-audio.sh`), lancé avant Xvfb pour que la socket soit prête avant tout Chrome, qui expose enfin des périphériques audio à Chrome. Ne s'enregistre pas sur une image sans pulseaudio.
+- **Extension Accept-Language (MV3)** : nouvelle extension `Sand Accept-Language` (declarativeNetRequest) qui pose un en-tête `accept-language` en forme native Chrome avec q-values (`buildAcceptLanguageExtension` / `nativeAcceptLanguageHeader`), appliquée aux onglets réguliers (hors incognito).
+- **Journalisation d'empreinte (opt-in par site)** : nouveau `sand-fingerprint-read-logger.mjs` qui échantillonne (1/10000) et plafonne les lectures de surfaces de fingerprint (canvas, WebGL, permissions, polices, timezone…) d'un site, uniquement pour les hôtes listés dans le marqueur `/tmp/sand-browser-fingerprint-log-sites` (nouveau `BOX_BROWSER_FINGERPRINT_LOG_SITES_PATH`, lu avec contrôles de propriété/permissions stricts 0600/0640).
+- **Nouveaux modes GPU navigateur** : `BOX_BROWSER_GPU_MODES` passe de `swiftshader, angle-gl, legacy` à `+ stock, llvmpipe`. Mapping WebGL cohérent : `llvmpipe → angle-opengl`, `stock → none`. Nouveaux marqueurs `no-swiftshader`, `stock-fonts`, `stock-notifications`.
+- **Notifications « stock »** : sous le marqueur `stock-notifications`, `box-chrome-policy` retire `DefaultNotificationsSetting` des managed defaults pour que Chrome retombe sur « demander » (comportement d'usine), et restaure le fichier à la sortie.
+
+### Change
+- **Protobuf/RPC** (host-main + agent-store-worker) :
+  - `SendMessageArgs` : nouveau champ `replace_previous_message` (4, bool) — permet de remplacer le message précédent.
+  - `ListTrackedTasksArgs` : nouveau `cursor` (6) + `ListTrackedTasksSuccess.next_cursor` (9) — pagination des tâches suivies.
+  - `WriteCanvasSuccess` : nouveau `audience_notice` (5, string).
+  - `AgentConversationTurnStructure` : nouveau `preference_change_step_indices` (16).
+- **agent-store-worker** : `resolveSandUserDataDir` ne lit plus le flag CLI `--user-data-dir` (fonction `readUserDataDirArg` supprimée) ; seul l'env `SAND_USER_DATA_DIR` est pris en compte.
+- Renommage interne `acceptLanguageFromLaunchFlag` → `acceptLanguageFromChrome` dans `sand-fingerprint-profiles.mjs`.
+
+### Autre-infra (skills gérées)
+- **`purchases`** : **Shop Pay retiré** partout — les wallets agents sont désormais Stripe Link + X Money uniquement (plus de `complete_checkout`/`shop_pay` dans le flux). Ajout d'une note : un ordre qu'un connecteur de shopping place dans ses propres outils (ex. Gopuff) se paie via la skill `shopping-connectors`, pas par ce flux.
+- **`shopping-connectors`** : nouvelle règle — certains connecteurs encaissent dans leurs propres outils (Gopuff `get_quote`/`place_order`) ; payer uniquement avec un moyen listé par le devis du connecteur, jamais une carte `RequestVirtualCard`/Shop/X Money/Secure Form (ces cartes se saisissent dans un checkout web, qu'un ordre connecteur n'a pas).
+- **`no-connector-fallback`** : nouvelle ligne « Tailscale isn't available on this account yet » — enjoint l'agent à ne jamais installer/exécuter Tailscale ou un autre client VPN sur l'ordinateur, à prévenir l'utilisateur et à s'arrêter si on lui demande d'atteindre son tailnet.
+
+Rapport : [reports/2026-10-28_04-51.md](reports/2026-10-28_04-51.md).
+
+
 ## 2026-10-28 03:50 (Paris) — snapshot `2026-10-28_01-46` → `2026-10-28_03-50`
 
 **Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `4ed306f58e3bf1935a1ee8cffcb4ce8b3d39b60f` → `51beac1d5fb75cbe1fd3bec6178ac81e017a38a7` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`), binaire `cursor-agent-store-fuse` inchangé (même hash). Toutes les autres versions plateforme inchangées (image `fcbae14`, box-scripts `fcbae14`, sand-host `95f2586` (supervisor `upgrade-95f2586`), exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7). Fichiers : +0 / −0 / ~1.

@@ -1,0 +1,86 @@
+--- 2026-10-28_03-50:/opt/sand/sand-host/box-scripts/box-chrome-policy
++++ 2026-10-28_04-51:/opt/sand/sand-host/box-scripts/box-chrome-policy
+@@ -45,6 +45,83 @@
+ 	exit "$1"
+ }
+ 
++# While sand_box_browser_stock_notifications is on, a box-owned managed defaults
++# file loses DefaultNotificationsSetting, so Chrome falls back to asking
++# (https://chromeenterprise.google/policies/#DefaultNotificationsSetting).
++# Like the host's rewrite of sand.json, it starts only before this boot's first
++# browser launch, and the file's own bytes come back once the marker goes away
++# unless something else rewrote the file since. It runs on exit, after every
++# other write to the file in this run.
++stock_notifications_defaults() {
++	local defaults_file="${SAND_BROWSER_DEFAULTS_POLICY_FILE:-/etc/opt/chrome/policies/managed/sand-browser-defaults.json}"
++	[ -f "${defaults_file}" ] && command -v python3 >/dev/null 2>&1 || return 0
++	python3 -I - "${defaults_file}" \
++		"${SAND_BROWSER_DEFAULTS_IMAGE_FILE:-/home/box/.sand-browser-defaults.image.json}" \
++		"${SAND_BOX_BROWSER_STOCK_NOTIFICATIONS_FILE:-/tmp/sand-box-browser-stock-notifications}" \
++		"${SAND_BOX_BROWSER_RUNNING_PREFIX:-/tmp/sand-box-browser-running}" <<'SAND_STOCK_NOTIFICATIONS_EOF' || true
++import glob, json, os, sys
++
++path, saved_path, marker, running = sys.argv[1:5]
++KEY = "DefaultNotificationsSetting"
++
++
++def read(file):
++    try:
++        with open(file, encoding="utf-8") as handle:
++            return handle.read()
++    except FileNotFoundError:
++        return None
++
++
++def write(file, text):
++    with open(file, "w", encoding="utf-8") as handle:
++        handle.write(text)
++
++
++def policy_of(text):
++    try:
++        policy = json.loads(text)
++    except (TypeError, ValueError):
++        return None
++    return policy if isinstance(policy, dict) else None
++
++
++def without_key(policy):
++    return json.dumps({k: v for k, v in policy.items() if k != KEY}, separators=(",", ":")) + "\n"
++
++
++def put_back(saved, current):
++    saved_policy = policy_of(saved)
++    if saved_policy is not None and current == without_key(saved_policy):
++        write(path, saved)
++    try:
++        os.remove(saved_path)
++    except OSError:
++        pass
++
++
++current, saved = read(path), read(saved_path)
++if not os.path.lexists(marker):
++    if saved is not None:
++        put_back(saved, current)
++    sys.exit(0)
++policy = policy_of(current)
++if policy is None or KEY not in policy:
++    sys.exit(0)
++starting = saved is None
++if starting:
++    if glob.glob(f"{running}-*"):
++        sys.exit(0)
++    write(saved_path, current)
++    saved = current
++stock = without_key(policy)
++write(path, stock)
++if starting and glob.glob(f"{running}-*"):
++    put_back(saved, stock)
++SAND_STOCK_NOTIFICATIONS_EOF
++}
++trap stock_notifications_defaults EXIT
++
+ # box-chrome keeps Chrome running past its last window, yet on Linux Chrome
+ # still clears a profile's session cookies when that window closes unless the
+ # profile restores its last session, which also reopens the closed window's

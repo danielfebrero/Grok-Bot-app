@@ -1,0 +1,43 @@
+--- 2026-10-28_03-50:/opt/sand/sand-host/extensions/content-search/search-index-worker.cjs
++++ 2026-10-28_04-51:/opt/sand/sand-host/extensions/content-search/search-index-worker.cjs
+@@ -888,7 +888,6 @@
+ var SAND_PRODUCTION_DATA_DIRNAME = ".grokbot";
+ var SAND_USER_DATA_DIR_ENV = "SAND_USER_DATA_DIR";
+ var SAND_DATA_DIRNAME = "sand-data";
+-var USER_DATA_DIR_FLAG = "--user-data-dir";
+ var SAND_BOX_HOME_DIR = "/home/box";
+ var SAND_BOX_DATA_ROOT = `${SAND_BOX_HOME_DIR}/${SAND_DATA_DIRNAME}`;
+ var SAND_BOX_MODEL_VISIBLE_DATA_ROOT = `${SAND_BOX_HOME_DIR}/agent-data`;
+@@ -900,21 +899,8 @@
+ var SAND_BOX_DEBUGGING_REFERENCE_PATH = `${SAND_BOX_REFERENCE_DIR}/${DEBUGGING_THE_BOX_FILE}`;
+ var SAND_APP_UI_REFERENCE_PATH = `${SAND_BOX_REFERENCE_DIR}/${SAND_APP_UI_FILE}`;
+ var SAND_APP_ACTIONS_REFERENCE_PATH = `${SAND_BOX_REFERENCE_DIR}/${SAND_APP_ACTIONS_FILE}`;
+-function readUserDataDirArg(argv) {
+-  for (let i = 0; i < argv.length; i++) {
+-    const arg = argv[i];
+-    if (arg === USER_DATA_DIR_FLAG) {
+-      const next = argv[i + 1];
+-      return next != null && !next.startsWith("--") ? next : null;
+-    }
+-    const prefix = `${USER_DATA_DIR_FLAG}=`;
+-    if (arg.startsWith(prefix)) return arg.slice(prefix.length);
+-  }
+-  return null;
+-}
+-function resolveSandUserDataDir(argv = [], env = process.env, cwd = process.cwd()) {
+-  const raw = readUserDataDirArg(argv) ?? env[SAND_USER_DATA_DIR_ENV];
+-  const trimmed = raw?.trim();
++function resolveSandUserDataDir(env = process.env, cwd = process.cwd()) {
++  const trimmed = env[SAND_USER_DATA_DIR_ENV]?.trim();
+   if (trimmed == null || trimmed.length === 0) return null;
+   return (0, import_node_path2.isAbsolute)(trimmed) ? trimmed : (0, import_node_path2.resolve)(cwd, trimmed);
+ }
+@@ -928,7 +914,7 @@
+ function getSandRootDir(homeDir = (0, import_node_os.homedir)()) {
+   const override = resolveSandDataRootOverride();
+   if (override != null) return override;
+-  const userDataDir = resolveSandUserDataDir([], process.env);
++  const userDataDir = resolveSandUserDataDir(process.env);
+   if (userDataDir != null) {
+     return (0, import_node_path2.join)(userDataDir, SAND_DATA_DIRNAME);
+   }
