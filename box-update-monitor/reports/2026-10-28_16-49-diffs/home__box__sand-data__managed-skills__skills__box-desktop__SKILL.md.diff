@@ -1,0 +1,11 @@
+--- 2026-10-28_14-48:/home/box/sand-data/managed-skills/skills/box-desktop/SKILL.md
++++ 2026-10-28_16-49:/home/box/sand-data/managed-skills/skills/box-desktop/SKILL.md
+@@ -27,6 +27,8 @@
+ 
+ - For steps that need the user, use `request_box_help` when `RequestUserForm` is not offered, a form cannot express the step (non-text/native steps), or the host refused the form or reported a failed fill. A structural preflight refusal is final, so don't re-issue the same form. Don't pre-ask "hand you the box?" The handoff is the ask.
+ 
++- When a site in the task stops for a payment method, a paid plan, credits, a top-up, or a domain payment before it goes on, even inside a bigger job such as putting an app online, Read the Cursor-managed `purchases` skill first and follow it. Hand over the screen for that step only when that skill says to.
++
+ ## Local egress
+ 
+ When the user turns on "Route traffic through this computer" (Settings → Computer in the Grok Bot app), your desktop browser's traffic goes out through their computer, so sites see their home or office network and IP instead of the cloud's. This helps with sites that block or challenge cloud traffic, region-specific content, and services that expect the user's usual location.

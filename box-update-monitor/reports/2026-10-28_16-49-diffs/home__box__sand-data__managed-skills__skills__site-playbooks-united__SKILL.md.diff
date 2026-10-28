@@ -1,0 +1,42 @@
+--- 2026-10-28_14-48:/home/box/sand-data/managed-skills/skills/site-playbooks-united/SKILL.md
++++ 2026-10-28_16-49:/home/box/sand-data/managed-skills/skills/site-playbooks-united/SKILL.md
+@@ -37,8 +37,8 @@
+ RETURN_YYYY-MM-DD}
+           # omit for one-way
+   &tt={
+-1|0|2}
+-                      # 1=round-trip, 0=one-way, 2=multi-city
++0|1|2}
++                      # 0=round-trip (needs r), 1=one-way (omit r), 2=multi-city
+   &sc=7                            # search-class, keep 7 for cash fares
+   &px={
+ PASSENGER_COUNT}
+@@ -49,21 +49,24 @@
+   &newDateOverride=true            # use new date logic, safer on cross-month dates
+ ```
+ 
+-Examples, both returned 200 in earlier testing.
++Examples, a round trip and then a one-way search.
+ 
+ ```
+-https://www.united.com/en/us/fsr/choose-flights?f=SFO&t=JFK&d=2026-07-15&r=2026-07-22&tt=1&sc=7&px=1&taxng=1&clm=7&st=bestmatches
+-https://www.united.com/en/us/fsr/choose-flights?f=SFO&t=JFK&d=2026-07-15&tt=0&sc=7&px=1&taxng=1&clm=7&st=bestmatches
++https://www.united.com/en/us/fsr/choose-flights?f=SFO&t=JFK&d=2026-07-15&r=2026-07-22&tt=0&sc=7&px=1&taxng=1&clm=7&st=bestmatches
++https://www.united.com/en/us/fsr/choose-flights?f=SFO&t=JFK&d=2026-07-15&tt=1&sc=7&px=1&taxng=1&clm=7&st=bestmatches
+ ```
+ 
++`tt=1` runs a one-way search even when `r` is set, and the results then say the fares are for a one-way trip. `tt=0` without `r` stays a round-trip search with an empty return date, so a one-way search needs `tt=1`.
++
+ Airports are IATA codes only. City names get coerced to a "no flights" state, so resolve them from a static IATA table first;
+  `/api/airports/lookup/search` returns 404. Dates must be `YYYY-MM-DD`, not in the past, and within United's 11 month window. Optional `noflex=true` disables the flexible date calendar above the grid. `tt=2` needs a different `f1`/`t1`/`d1` layout and is out of scope.
+ 
+ ### Dispatch snippet
+ 
+ ```
+-Open https://www.united.com/en/us/fsr/choose-flights?f=<ORIGIN>&t=<DEST>&d=<YYYY-MM-DD>&r=<RETURN or omit>&tt=<1 round trip|0 one way>&sc=7&px=<ADULTS>&taxng=1&clm=<7 economy|6 premium|4 business|3 first>&st=priceasc
++Open https://www.united.com/en/us/fsr/choose-flights?f=<ORIGIN>&t=<DEST>&d=<YYYY-MM-DD>&r=<RETURN or omit>&tt=<0 round trip|1 one way>&sc=7&px=<ADULTS>&taxng=1&clm=<7 economy|6 premium|4 business|3 first>&st=priceasc
+ Wait 4 s after load, then snapshot. If no flight cards, wait 2 s and snapshot once more.
++If you asked for a round trip and the page says the fares are for a one-way trip, the trip type did not apply: report trip_type_mismatch with the URL and stop.
+ For each outbound card read depart time, arrive time (+1d = next day), duration, stops, flight numbers (UA nnn), fare brand, and the all-in USD price (strip a trailing * and note saver).
+ If you see "No flights available for the dates you selected", report an empty result. If the date picker reopens, the date was rejected. If the header city is wrong, the IATA code was not recognized. If an error banner renders where the flight cards should be, report site_error_banner with the URL and stop.
+ Return a table sorted by price plus the results URL and one screenshot path.

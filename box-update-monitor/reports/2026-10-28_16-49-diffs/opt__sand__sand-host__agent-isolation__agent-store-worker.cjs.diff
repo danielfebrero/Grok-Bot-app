@@ -1,0 +1,19 @@
+--- 2026-10-28_14-48:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
++++ 2026-10-28_16-49:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
+@@ -5135,6 +5135,7 @@
+     this.timeoutBehavior = TimeoutBehavior.UNSPECIFIED;
+     this.closeStdin = false;
+     this.adminCommandDenylist = [];
++    this.smartModeClassifierAllowed = false;
+     proto3.util.initPartial(data, this);
+   }
+   static fromBinary(bytes, options) {
+@@ -5150,7 +5151,7 @@
+     return proto3.util.equals(_ShellArgs, a, b);
+   }
+   static $() {
+-    return ["ShellArgs|1 command 9|2 working_directory 9|3 timeout 5|4 tool_call_id 9|5 simple_commands 9*|6 has_input_redirect 8|7 has_output_redirect 8|8 parsing_result #0|9 requested_sandbox_policy #1?|10 file_output_threshold_bytes 4?|11 is_background 8|12 skip_approval 8|13 timeout_behavior #2|14 hard_timeout 5?|15 description 9?|16 classifier_result #3?|17 close_stdin 8|18 output_notification #4?|19 smart_mode_approval #5?|20 hook_approval_requirement #6?|21 conversation_id 9?|22 admin_command_denylist 9*|23 request_id 9?|24 secret_scope_id 9?", ShellCommandParsingResult, SandboxPolicy, TimeoutBehavior, CommandClassifierResult, ShellOutputNotificationConfig, SmartModeApproval, ShellHookApprovalRequirement];
++    return ["ShellArgs|1 command 9|2 working_directory 9|3 timeout 5|4 tool_call_id 9|5 simple_commands 9*|6 has_input_redirect 8|7 has_output_redirect 8|8 parsing_result #0|9 requested_sandbox_policy #1?|10 file_output_threshold_bytes 4?|11 is_background 8|12 skip_approval 8|13 timeout_behavior #2|14 hard_timeout 5?|15 description 9?|16 classifier_result #3?|17 close_stdin 8|18 output_notification #4?|19 smart_mode_approval #5?|20 hook_approval_requirement #6?|21 conversation_id 9?|22 admin_command_denylist 9*|23 request_id 9?|24 secret_scope_id 9?|25 smart_mode_classifier_allowed 8", ShellCommandParsingResult, SandboxPolicy, TimeoutBehavior, CommandClassifierResult, ShellOutputNotificationConfig, SmartModeApproval, ShellHookApprovalRequirement];
+   }
+ };
+ var ShellResult = class _ShellResult extends __protoMessage35 {

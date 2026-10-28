@@ -9,6 +9,30 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-28 16:49 (Paris) — snapshot `2026-10-28_14-48` → `2026-10-28_16-49`
+
+**Hot-update du host bundle (sand-host) `04f60e5` → `ce1748b`** (supervisor `upgrade-04f60e5` → `upgrade-ce1748b`, `pendingUpgradeVersion` = None) : remplacement à chaud du `sand-host` par le sand-supervisor, sans Update de l'ordinateur. Bundle host (`host-main.cjs` 32.1→32.0 Mo, `sand-eval-runner.cjs` 26.3→26.2 Mo), `agent-store-worker`, `box-chrome-policy`, binaire `sand-egress-tunnel` (hash changé). Le pointeur **agent-store-fuse** a aussi bougé (`/usr/local/bin/cursor_agent_store_fuse_version` `9fc17c1a…` → `63415b60…`). Image `fcbae14`, box-scripts `fcbae14`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~15.
+
+### Features
+- **Clic final booking/vol par l'agent** (`accommodation-booking`, `flight-booking`) : après choix du moyen de paiement, l'agent clique lui-même confirm/pay/book/request-to-book (sauf si le paiement a déjà été fini dans un handoff). Garde-fou « material change » : total >1 % ou +5 unités monétaires, autre devise, autre vol/dates/cabine/passagers, autre hôtel/listing/nuits/invités → pas de clic, nouveau widget. Un total plus bas, un layout différent ou des offres upsell refusées n'arrêtent pas.
+- **Site billing steps** (`purchases`) : une page qui bloque pour un plan payant, des crédits, un top-up ou un paiement de domaine est un checkout — l'agent paie via la skill (pas de handoff systématique). Carte « on file » sans charge du jour → `RequestUserForm` checkout, pas d'order card.
+- **Promos ProductSearch** (`shopping`) : mention des codes/prix deal à côté du prix magasin (jamais en lead), saisie des codes avant la page finale, le total approuvé = celui de la page (pas le deal price).
+- **Protobuf / RPC** (host-main) : nouveaux types visibles `ModelCallCompletedUpdate` (tokens in/out/cache), `PrepareDefaultBranchPublish*`, `ArmMergeRepublish*` / `DisarmMergeRepublish*` / `MergeRepublish`, `InferenceHookKind` (`HTTPS_ENDPOINT`, `MICROSOFT_PURVIEW`) + config team, `SearchGrokBotTranscripts*`, `SearchGrokBotSimilarProducts*`, `ResolveGrokBotFlightBookingLink*`, `CloudAgentVoiceCall`, `UpdateGrokBotMeetingSettings*`, `AppAccessListRole`.
+- **ShellArgs** (agent-store-worker) : nouveau champ `smart_mode_classifier_allowed` (25, bool).
+
+### Change
+- **`box-chrome-policy` / stock notifications** : plus de réécriture du fichier managed defaults pour retirer `DefaultNotificationsSetting` ; fichier dédié `sand-notifications.json` vidé (`{}`) sous le marqueur `sand-box-browser-stock-notifications`, sinon remis à `{"DefaultNotificationsSetting":2}`. `write_policy` prend désormais `(file, text)`.
+- **`purchases`** : avertissement X Money sans plafond de montant sur la carte émise ; re-check shipping + total juste avant place-order ; si le total de confirmation diverge → prévenir avec les deux montants (sans spéculer sur un refuse banque) ; `requiresShipping: false` couvre aussi le pickup in-store (et exclut toute ligne shipping).
+- **`box-desktop`** : si un site s'arrête pour un paiement/plan/crédits, lire d'abord `purchases` avant tout handoff écran.
+- **`site-playbooks-united`** : inversion `tt` — `0` = aller-retour, `1` = one-way (exemples + snippet + stop `trip_type_mismatch` si la page annonce one-way alors qu'on voulait un A/R).
+- **`SetActiveTailnetRequest`** : champ `magic_dns_suffix` (4) ajouté.
+
+### Autre-infra
+- Binaire `sand-egress-tunnel` rebuild (sha256 `a6192089…` → `c38782ab…`, taille 2943808 → 2943272).
+- Rebuild/bump agent-store-fuse (pointeur seulement).
+
+Rapport : [reports/2026-10-28_16-49.md](reports/2026-10-28_16-49.md).
+
 ## 2026-10-28 14:48 (Paris) — snapshot `2026-10-28_09-48` → `2026-10-28_14-48`
 
 **Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `772aea7767999e284a815a1f5f16cf9b26876bcd` → `9fc17c1abef521abc16ca46b6cf54b06575a8b93` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`), binaire `cursor-agent-store-fuse` inchangé (même hash). Toutes les autres versions plateforme inchangées (image `fcbae14`, box-scripts `fcbae14`, sand-host `04f60e5` (supervisor `upgrade-04f60e5`), exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7). Fichiers : +0 / −0 / ~1.

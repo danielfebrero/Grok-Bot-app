@@ -1,0 +1,154 @@
+--- 2026-10-28_14-48:/opt/sand/sand-host/box-scripts/box-chrome-policy
++++ 2026-10-28_16-49:/opt/sand/sand-host/box-scripts/box-chrome-policy
+@@ -45,83 +45,6 @@
+ 	exit "$1"
+ }
+ 
+-# While sand_box_browser_stock_notifications is on, a box-owned managed defaults
+-# file loses DefaultNotificationsSetting, so Chrome falls back to asking
+-# (https://chromeenterprise.google/policies/#DefaultNotificationsSetting).
+-# Like the host's rewrite of sand.json, it starts only before this boot's first
+-# browser launch, and the file's own bytes come back once the marker goes away
+-# unless something else rewrote the file since. It runs on exit, after every
+-# other write to the file in this run.
+-stock_notifications_defaults() {
+-	local defaults_file="${SAND_BROWSER_DEFAULTS_POLICY_FILE:-/etc/opt/chrome/policies/managed/sand-browser-defaults.json}"
+-	[ -f "${defaults_file}" ] && command -v python3 >/dev/null 2>&1 || return 0
+-	python3 -I - "${defaults_file}" \
+-		"${SAND_BROWSER_DEFAULTS_IMAGE_FILE:-/home/box/.sand-browser-defaults.image.json}" \
+-		"${SAND_BOX_BROWSER_STOCK_NOTIFICATIONS_FILE:-/tmp/sand-box-browser-stock-notifications}" \
+-		"${SAND_BOX_BROWSER_RUNNING_PREFIX:-/tmp/sand-box-browser-running}" <<'SAND_STOCK_NOTIFICATIONS_EOF' || true
+-import glob, json, os, sys
+-
+-path, saved_path, marker, running = sys.argv[1:5]
+-KEY = "DefaultNotificationsSetting"
+-
+-
+-def read(file):
+-    try:
+-        with open(file, encoding="utf-8") as handle:
+-            return handle.read()
+-    except FileNotFoundError:
+-        return None
+-
+-
+-def write(file, text):
+-    with open(file, "w", encoding="utf-8") as handle:
+-        handle.write(text)
+-
+-
+-def policy_of(text):
+-    try:
+-        policy = json.loads(text)
+-    except (TypeError, ValueError):
+-        return None
+-    return policy if isinstance(policy, dict) else None
+-
+-
+-def without_key(policy):
+-    return json.dumps({k: v for k, v in policy.items() if k != KEY}, separators=(",", ":")) + "\n"
+-
+-
+-def put_back(saved, current):
+-    saved_policy = policy_of(saved)
+-    if saved_policy is not None and current == without_key(saved_policy):
+-        write(path, saved)
+-    try:
+-        os.remove(saved_path)
+-    except OSError:
+-        pass
+-
+-
+-current, saved = read(path), read(saved_path)
+-if not os.path.lexists(marker):
+-    if saved is not None:
+-        put_back(saved, current)
+-    sys.exit(0)
+-policy = policy_of(current)
+-if policy is None or KEY not in policy:
+-    sys.exit(0)
+-starting = saved is None
+-if starting:
+-    if glob.glob(f"{running}-*"):
+-        sys.exit(0)
+-    write(saved_path, current)
+-    saved = current
+-stock = without_key(policy)
+-write(path, stock)
+-if starting and glob.glob(f"{running}-*"):
+-    put_back(saved, stock)
+-SAND_STOCK_NOTIFICATIONS_EOF
+-}
+-trap stock_notifications_defaults EXIT
+-
+ # box-chrome keeps Chrome running past its last window, yet on Linux Chrome
+ # still clears a profile's session cookies when that window closes unless the
+ # profile restores its last session, which also reopens the closed window's
+@@ -131,26 +54,48 @@
+ # https://chromeenterprise.google/policies/#RestoreOnStartup
+ restore='"RestoreOnStartup":1'
+ 
+-{ [ -f "${policy_file}" ] && : >>"${policy_file}"; } 2>/dev/null || exit_unapplied 0
+-
+ # A rename swaps the whole file in one step, so a reader never sees it half
+ # written (https://man7.org/linux/man-pages/man2/rename.2.html). The image's
+ # managed policy folder belongs to root, so a box user cannot create the file to
+ # rename and rewrites the policy in place.
+ write_policy() {
+-	local text="$1" tmp
+-	[ "$(cat -- "${policy_file}" 2>/dev/null)" != "${text}" ] || return 0
+-	if tmp="$(mktemp -- "$(dirname -- "${policy_file}")/.$(basename -- "${policy_file}").XXXXXX" 2>/dev/null)"; then
++	local file="$1" text="$2" tmp
++	[ "$(cat -- "${file}" 2>/dev/null)" != "${text}" ] || return 0
++	if tmp="$(mktemp -- "$(dirname -- "${file}")/.$(basename -- "${file}").XXXXXX" 2>/dev/null)"; then
+ 		if printf '%s\n' "${text}" >"${tmp}" &&
+-			chmod --reference="${policy_file}" -- "${tmp}" &&
+-			chown --reference="${policy_file}" -- "${tmp}" 2>/dev/null &&
+-			mv -f -- "${tmp}" "${policy_file}"; then
++			chmod --reference="${file}" -- "${tmp}" &&
++			chown --reference="${file}" -- "${tmp}" 2>/dev/null &&
++			mv -f -- "${tmp}" "${file}"; then
+ 			return 0
+ 		fi
+ 		rm -f -- "${tmp}"
+ 	fi
+-	printf '%s\n' "${text}" >"${policy_file}"
++	printf '%s\n' "${text}" >"${file}"
++}
++
++# While sand_box_browser_stock_notifications is on, the image's box-owned
++# notifications file holds no policy, so Chrome falls back to asking
++# (https://chromeenterprise.google/policies/#DefaultNotificationsSetting). It
++# empties only before this boot's first box browser launch, and gets the image's
++# value back once the marker goes away. A dangling marker link counts as set.
++notifications_file="${SAND_NOTIFICATIONS_POLICY_FILE:-/etc/opt/chrome/policies/managed/sand-notifications.json}"
++notifications_image='{"DefaultNotificationsSetting":2}'
++notifications_marker="${SAND_BOX_BROWSER_STOCK_NOTIFICATIONS_FILE:-/tmp/sand-box-browser-stock-notifications}"
++box_browser_launched() {
++	compgen -G "${SAND_BOX_BROWSER_RUNNING_PREFIX:-/tmp/sand-box-browser-running}-*" >/dev/null
+ }
++if { [ -f "${notifications_file}" ] && : >>"${notifications_file}"; } 2>/dev/null; then
++	if [ ! -e "${notifications_marker}" ] && [ ! -L "${notifications_marker}" ]; then
++		write_policy "${notifications_file}" "${notifications_image}" || true
++	elif [ "$(cat -- "${notifications_file}")" != "{}" ] && ! box_browser_launched; then
++		write_policy "${notifications_file}" "{}" || true
++		if box_browser_launched; then
++			write_policy "${notifications_file}" "${notifications_image}" || true
++		fi
++	fi
++fi
++
++{ [ -f "${policy_file}" ] && : >>"${policy_file}"; } 2>/dev/null || exit_unapplied 0
+ 
+ entries=""
+ onepassword_entry=""
+@@ -192,7 +137,7 @@
+ fi
+ 
+ if [ -n "${entries}" ]; then
+-	write_policy "$(printf '{"ExtensionSettings":{%s}%s%s,%s%s}' "${entries}" "${devtools}" "${onepassword_policy}" "${restore}" "${webrtc:+,${webrtc}}")" || exit_unapplied 1
++	write_policy "${policy_file}" "$(printf '{"ExtensionSettings":{%s}%s%s,%s%s}' "${entries}" "${devtools}" "${onepassword_policy}" "${restore}" "${webrtc:+,${webrtc}}")" || exit_unapplied 1
+ else
+-	write_policy "$(printf '{%s%s}' "${restore}" "${webrtc:+,${webrtc}}")" || exit_unapplied 1
++	write_policy "${policy_file}" "$(printf '{%s%s}' "${restore}" "${webrtc:+,${webrtc}}")" || exit_unapplied 1
+ fi
