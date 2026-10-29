@@ -1,0 +1,43 @@
+{
+  "namespace": "cursor-origin",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-28T09:22:19+01:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "files": {
+          "items": {
+            "properties": {
+              "content": {
+                "type": "string"
+              },
+              "encoding": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              },
+              "sha": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "content",
+              "encoding",
+              "path",
+              "sha"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "files"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "get_file_contents"
+}

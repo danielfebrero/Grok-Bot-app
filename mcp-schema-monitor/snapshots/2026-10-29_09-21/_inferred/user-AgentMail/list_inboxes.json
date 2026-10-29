@@ -1,0 +1,55 @@
+{
+  "namespace": "user-AgentMail",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-29T09:21:33+01:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "count": {
+          "type": "integer"
+        },
+        "inboxes": {
+          "items": {
+            "properties": {
+              "createdAt": {
+                "type": "string"
+              },
+              "displayName": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              },
+              "inboxId": {
+                "type": "string"
+              },
+              "updatedAt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "createdAt",
+              "displayName",
+              "email",
+              "inboxId",
+              "updatedAt"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "limit": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "count",
+        "inboxes",
+        "limit"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "list_inboxes"
+}

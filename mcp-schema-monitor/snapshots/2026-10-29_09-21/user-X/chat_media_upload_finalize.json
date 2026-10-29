@@ -1,0 +1,39 @@
+{
+  "description": "Finalize Chat Media Upload. Needs the OAuth2 scope `media.write`.",
+  "inputSchema": {
+    "properties": {
+      "conversation_id": {
+        "description": "The XChat conversation the upload belongs to.",
+        "type": "string"
+      },
+      "id": {
+        "type": "string"
+      },
+      "media_hash_key": {
+        "description": "The media hash key returned by the initialize step.",
+        "type": "string"
+      },
+      "message_id": {
+        "description": "Optional message identifier associated with the upload.",
+        "type": "string"
+      },
+      "num_parts": {
+        "description": "Total number of uploaded parts, as a numeric string.",
+        "type": "string"
+      },
+      "ttl_msec": {
+        "description": "Optional TTL for the media in milliseconds, as a numeric string.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "conversation_id",
+      "media_hash_key",
+      "num_parts"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "chat_media_upload_finalize"
+}

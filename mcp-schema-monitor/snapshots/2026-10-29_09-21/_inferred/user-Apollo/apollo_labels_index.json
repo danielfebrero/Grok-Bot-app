@@ -1,0 +1,25 @@
+{
+  "namespace": "user-Apollo",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-19T09:18:18+02:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "data": {
+          "items": {},
+          "type": "array"
+        },
+        "success": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "data",
+        "success"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "apollo_labels_index"
+}

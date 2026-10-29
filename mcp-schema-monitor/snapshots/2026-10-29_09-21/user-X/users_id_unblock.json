@@ -1,0 +1,20 @@
+{
+  "description": "Unblock User",
+  "inputSchema": {
+    "properties": {
+      "source_user_id": {
+        "type": "string"
+      },
+      "target_user_id": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "source_user_id",
+      "target_user_id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "users_id_unblock"
+}

@@ -1,0 +1,25 @@
+{
+  "namespace": "cursor-github",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-29T09:20:20+01:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "total_count": {
+          "type": "integer"
+        },
+        "workflows": {
+          "items": {},
+          "type": "array"
+        }
+      },
+      "required": [
+        "total_count",
+        "workflows"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "list_workflows"
+}

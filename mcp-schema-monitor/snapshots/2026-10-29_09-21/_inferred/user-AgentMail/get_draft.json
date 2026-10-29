@@ -1,0 +1,51 @@
+{
+  "namespace": "user-AgentMail",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-29T09:21:33+01:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "createdAt": {
+          "type": "string"
+        },
+        "draftId": {
+          "type": "string"
+        },
+        "inboxId": {
+          "type": "string"
+        },
+        "labels": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "preview": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "createdAt",
+        "draftId",
+        "inboxId",
+        "labels",
+        "preview",
+        "subject",
+        "text",
+        "updatedAt"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "get_draft"
+}
