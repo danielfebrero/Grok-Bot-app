@@ -1,0 +1,21 @@
+{
+  "description": "Retrieves the message request state of a 1:1 Chat conversation and its newest message events. Like opening the request in an X app, reading it marks the returned messages as delivered and updates the unread badge.",
+  "inputSchema": {
+    "properties": {
+      "chat_message_request_detail.fields": {
+        "description": "A comma separated list of ChatMessageRequestDetail fields to display.",
+        "type": "string"
+      },
+      "id": {
+        "description": "The other user's ID, or both user IDs joined by a hyphen.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_chat_message_request"
+}

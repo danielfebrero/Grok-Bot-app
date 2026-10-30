@@ -1,0 +1,16 @@
+{
+  "description": "Returns one of the authenticated user's stream sources.",
+  "inputSchema": {
+    "properties": {
+      "id": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_source"
+}

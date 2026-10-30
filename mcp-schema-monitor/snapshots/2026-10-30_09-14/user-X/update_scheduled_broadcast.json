@@ -1,0 +1,71 @@
+{
+  "description": "Updates a scheduled broadcast. Path `:id` is the broadcast id; the body must include `scheduled_broadcast_id`. Re-send every field that should be kept.",
+  "inputSchema": {
+    "properties": {
+      "available_for_replay": {
+        "description": "Enable replay.",
+        "type": "boolean"
+      },
+      "chat_option": {
+        "description": "Who can chat (numeric string): `0` default, `1` chat off, `2` everyone, `3` verified accounts, `4...",
+        "type": "string"
+      },
+      "description": {
+        "description": "Description.",
+        "type": "string"
+      },
+      "id": {
+        "type": "string"
+      },
+      "is_locked": {
+        "description": "Lock the broadcast.",
+        "type": "boolean"
+      },
+      "locale": {
+        "description": "Locale.",
+        "type": "string"
+      },
+      "manual_publish": {
+        "description": "If true, do not auto-publish at start; call POST .../live when ready.",
+        "type": "boolean"
+      },
+      "roll_forward": {
+        "description": "Deprecated: recurring schedules are being retired and `true` will be rejected.",
+        "type": "boolean"
+      },
+      "scheduled_broadcast_id": {
+        "description": "Numeric scheduler id from create/list/get.",
+        "type": "string"
+      },
+      "scheduled_end_ms": {
+        "description": "End time, ms since Unix epoch (decimal string).",
+        "type": "string"
+      },
+      "scheduled_start_ms": {
+        "description": "Start time, ms since Unix epoch (decimal string).",
+        "type": "string"
+      },
+      "source_id": {
+        "description": "Ingest / source id.",
+        "type": "string"
+      },
+      "thumbnail_media_id": {
+        "description": "Pre-live slate media id (numeric string).",
+        "type": "string"
+      },
+      "title": {
+        "description": "Title / status text.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "scheduled_broadcast_id",
+      "scheduled_start_ms",
+      "scheduled_end_ms"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "update_scheduled_broadcast"
+}

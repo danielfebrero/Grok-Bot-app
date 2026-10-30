@@ -1,0 +1,21 @@
+{
+  "description": "Allows a muted user to post messages in a running broadcast chat again. The authenticated user must be the broadcast host or a moderator.",
+  "inputSchema": {
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "user_id": {
+        "description": "A 64-bit signed integer.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "user_id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "unmute_broadcast_chat_user"
+}

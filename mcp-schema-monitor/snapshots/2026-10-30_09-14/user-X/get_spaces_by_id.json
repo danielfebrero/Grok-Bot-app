@@ -1,0 +1,32 @@
+{
+  "description": "Retrieves details of a specific Space by its ID.",
+  "inputSchema": {
+    "properties": {
+      "expansions": {
+        "description": "A comma separated list of fields to expand.",
+        "type": "string"
+      },
+      "id": {
+        "type": "string"
+      },
+      "space.fields": {
+        "description": "A comma separated list of Space fields to display.",
+        "type": "string"
+      },
+      "topic.fields": {
+        "description": "A comma separated list of Topic fields to display.",
+        "type": "string"
+      },
+      "user.fields": {
+        "description": "A comma separated list of User fields to display.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_spaces_by_id"
+}

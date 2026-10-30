@@ -1,0 +1,20 @@
+{
+  "description": "Returns a user's registered public keys for X Chat encryption.",
+  "inputSchema": {
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "public_key.fields": {
+        "description": "A comma separated list of PublicKey fields to display.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_users_public_key"
+}

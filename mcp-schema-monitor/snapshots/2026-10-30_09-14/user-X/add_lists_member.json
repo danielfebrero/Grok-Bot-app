@@ -1,0 +1,20 @@
+{
+  "description": "Adds a User to a specific List by its ID.",
+  "inputSchema": {
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "user_id": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "user_id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "add_lists_member"
+}

@@ -1,0 +1,36 @@
+{
+  "description": "Appends media data to an XChat upload session. Needs the OAuth2 scope `media.write`.",
+  "inputSchema": {
+    "properties": {
+      "conversation_id": {
+        "description": "The XChat conversation the upload belongs to.",
+        "type": "string"
+      },
+      "id": {
+        "type": "string"
+      },
+      "media": {
+        "description": "The media segment bytes: base64-encoded in JSON bodies, raw bytes in multipart bodies.",
+        "type": "string"
+      },
+      "media_hash_key": {
+        "description": "The media hash key returned by the initialize step.",
+        "type": "string"
+      },
+      "segment_index": {
+        "description": "The index of this segment in the upload sequence.",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "id",
+      "media",
+      "segment_index",
+      "conversation_id",
+      "media_hash_key"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "chat_media_upload_append"
+}
