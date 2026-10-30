@@ -1,0 +1,258 @@
+--- 2026-10-29_02-44:/opt/sand/sand-host/box-scripts/sand-team-converge.mjs
++++ 2026-10-30_18-53:/opt/sand/sand-host/box-scripts/sand-team-converge.mjs
+@@ -1,6 +1,17 @@
+ import { spawnSync } from "node:child_process";
+ import { createHash } from "node:crypto";
+-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
++import {
++  closeSync,
++  constants as fsConstants,
++  existsSync,
++  fstatSync,
++  mkdirSync,
++  openSync,
++  readFileSync,
++  renameSync,
++  rmSync,
++  writeFileSync,
++} from "node:fs";
+ import { dirname, join } from "node:path";
+ 
+ const ROOT_CONVERGE_UMASK_AGENT_READABLE = 0o022;
+@@ -18,6 +29,7 @@
+ const LOCK_PATH =
+   process.env.SAND_SETUP_LOCK_PATH || join(dirname(STATUS_PATH), "managed-setup-converge.lock");
+ const IMAGE_SHA_PATH = process.env.SAND_BOX_IMAGE_SHA_PATH || "/etc/sand-box-image-sha";
++const DEADLINE_PATH = process.env.SAND_SETUP_DEADLINE_PATH || "/run/grok-bot/setup-deadline";
+ const SCHEMA_VERSION = 1;
+ const SECRET_ENVELOPE_VERSION = 1;
+ const EXECUTOR_VERSION = "3.0.0";
+@@ -45,6 +57,10 @@
+     ? configuredScriptTimeoutMs
+     : DEFAULT_SCRIPT_TIMEOUT_MS;
+ const FORCE_SETUP = process.env.SAND_MANAGED_SETUP_FORCE === "1";
++const NOT_RUN_TOTAL_TIMEOUT = "not run: total setup timeout";
++const DEADLINE_FILE_MAX_BYTES = 64;
++const DEADLINE_MIN_EPOCH_MS = 1_000_000_000_000;
++const GROUP_OR_OTHER_WRITABLE = 0o022;
+ 
+ function log(message) {
+   console.log(`[sand-managed-converge] ${new Date().toISOString()} ${message}`);
+@@ -273,25 +289,124 @@
+   return redacted;
+ }
+ 
+-function runScript(entryId, kind, script, secrets, secretValues) {
++function ignoredDeadline(reason) {
++  log(`setup deadline at ${DEADLINE_PATH} ${reason}; no total setup timeout`);
++  return null;
++}
++
++function readDeadlineFile() {
++  let fd;
++  try {
++    fd = openSync(
++      DEADLINE_PATH,
++      fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW | fsConstants.O_NONBLOCK,
++    );
++  } catch (error) {
++    if (error?.code === "ENOENT") return null;
++    return ignoredDeadline(`unreadable (${error})`);
++  }
++  try {
++    const info = fstatSync(fd);
++    if (!info.isFile()) return ignoredDeadline("is not a regular file");
++    if ((info.mode & GROUP_OR_OTHER_WRITABLE) !== 0) {
++      return ignoredDeadline("is writable by group or others");
++    }
++    if (info.size > DEADLINE_FILE_MAX_BYTES) {
++      return ignoredDeadline(`is longer than ${DEADLINE_FILE_MAX_BYTES} bytes`);
++    }
++    return readFileSync(fd, "utf8");
++  } catch (error) {
++    return ignoredDeadline(`unreadable (${error})`);
++  } finally {
++    closeSync(fd);
++  }
++}
++
++function readDeadline() {
++  const raw = readDeadlineFile();
++  if (raw === null) return null;
++  const atMs = /^[0-9]+\n?$/.test(raw) ? Number(raw) : Number.NaN;
++  if (!Number.isSafeInteger(atMs)) return ignoredDeadline("is not one epoch-ms line");
++  if (atMs < DEADLINE_MIN_EPOCH_MS) {
++    return ignoredDeadline(`holds ${atMs}, which is not an epoch time in milliseconds`);
++  }
++  if (atMs <= Date.now()) {
++    return ignoredDeadline(
++      `${new Date(atMs).toISOString()} has already passed, so the file is left over from an earlier run`,
++    );
++  }
++  return { atMs, skippedEntries: 0, stoppedEntryId: null };
++}
++
++function remainingMs(deadline) {
++  return deadline === null ? Number.POSITIVE_INFINITY : deadline.atMs - Date.now();
++}
++
++function deadlineStatus(deadline) {
++  if (deadline === null || (deadline.skippedEntries === 0 && deadline.stoppedEntryId === null)) {
++    return {};
++  }
++  const { atMs, skippedEntries, stoppedEntryId } = deadline;
++  return {
++    totalTimeout: { deadlineAt: new Date(atMs).toISOString(), skippedEntries, stoppedEntryId },
++  };
++}
++
++function scriptFailure(message) {
++  return { message, atDeadline: false };
++}
++
++function deadlineStop(deadline, entryId, message) {
++  deadline.stoppedEntryId = entryId;
++  return { message, atDeadline: true };
++}
++
++function deadlineRefusal(deadline, kind) {
++  deadline.skippedEntries += 1;
++  return { message: `${kind} ${NOT_RUN_TOTAL_TIMEOUT}`, atDeadline: true };
++}
++
++function killScriptGroup(entryId, pid) {
++  if (!(pid > 0)) return;
++  try {
++    process.kill(-pid, "SIGKILL");
++  } catch (error) {
++    if (error?.code !== "ESRCH") log(`entry ${entryId}: leftover processes not ended (${error})`);
++  }
++}
++
++function runScript(entryId, kind, script, secrets, secretValues, deadline) {
++  const remaining = remainingMs(deadline);
++  if (remaining <= 0) return deadlineRefusal(deadline, kind);
++  const timeout = Math.min(SCRIPT_TIMEOUT_MS, remaining);
++  const ownGroup = deadline !== null;
+   log(`entry ${entryId}: running ${kind}`);
+   const result = spawnSync("bash", ["-c", script], {
+     encoding: "utf8",
+     env: { ...process.env, ...secrets },
+     maxBuffer: 10 * 1024 * 1024,
+-    timeout: SCRIPT_TIMEOUT_MS,
++    timeout,
+     killSignal: "SIGKILL",
++    detached: ownGroup,
+   });
++  if (ownGroup && result.error != null) killScriptGroup(entryId, result.pid);
+   if (result.stdout) process.stdout.write(redactSecrets(result.stdout, secretValues));
+   if (result.stderr) process.stderr.write(redactSecrets(result.stderr, secretValues));
+   if (result.error != null) {
+     if (result.error.code === "ETIMEDOUT") {
+-      return `${kind} timed out after ${SCRIPT_TIMEOUT_MS}ms`;
++      if (timeout < SCRIPT_TIMEOUT_MS) {
++        return deadlineStop(
++          deadline,
++          entryId,
++          `${kind} stopped at the total setup timeout after ${timeout}ms`,
++        );
++      }
++      return scriptFailure(`${kind} timed out after ${SCRIPT_TIMEOUT_MS}ms`);
+     }
+-    return `${kind} could not run: ${result.error}`;
++    return scriptFailure(`${kind} could not run: ${result.error}`);
+   }
+   if (result.status !== 0) {
+-    return `${kind} exited ${result.status}`;
++    return scriptFailure(`${kind} exited ${result.status}`);
+   }
+   return null;
+ }
+@@ -335,7 +450,7 @@
+   });
+ }
+ 
+-function reconcileEntry(ref, manifestHash, entry, imageSha, secrets, secretValues) {
++function reconcileEntry(ref, manifestHash, entry, imageSha, secrets, secretValues, deadline) {
+   const path = receiptPath(ref, entry.id);
+   const hadReceipt = existsSync(path);
+   const entryReceipt = readEntryReceipt(ref, entry);
+@@ -347,14 +462,15 @@
+     hadReceipt && receipt === null && (entryReceipt === null || imageSha.length !== 0);
+ 
+   if (!FORCE_SETUP && entry.check !== undefined && !receiptInvalidated) {
+-    const checkError = runScript(entry.id, "check", entry.check, secrets, secretValues);
+-    if (checkError === null) {
++    const check = runScript(entry.id, "check", entry.check, secrets, secretValues, deadline);
++    if (check === null) {
+       log(`entry ${entry.id}: already compliant`);
+       if (receipt === null || !receiptMatchesCurrentManifest(receipt, ref, manifestHash)) {
+         writeReceipt(ref, manifestHash, entry, imageSha);
+       }
+       return null;
+     }
++    if (check.atDeadline) return check.message;
+     rmSync(path, { force: true });
+   } else if (!FORCE_SETUP && receipt !== null) {
+     log(`entry ${entry.id}: receipt matches; no-op`);
+@@ -364,12 +480,13 @@
+     return null;
+   }
+ 
++  if (remainingMs(deadline) <= 0) return deadlineRefusal(deadline, "setup").message;
+   rmSync(path, { force: true });
+-  const setupError = runScript(entry.id, "setup", entry.setup, secrets, secretValues);
+-  if (setupError !== null) return setupError;
++  const setup = runScript(entry.id, "setup", entry.setup, secrets, secretValues, deadline);
++  if (setup !== null) return setup.message;
+   if (entry.check !== undefined) {
+-    const checkError = runScript(entry.id, "check", entry.check, secrets, secretValues);
+-    if (checkError !== null) return checkError;
++    const check = runScript(entry.id, "check", entry.check, secrets, secretValues, deadline);
++    if (check !== null) return check.message;
+   }
+   writeReceipt(ref, manifestHash, entry, imageSha);
+   return null;
+@@ -385,6 +502,7 @@
+ }
+ 
+ function main(secretsByTeam, secretValues) {
++  const deadline = readDeadline();
+   let assignmentRaw;
+   try {
+     assignmentRaw = readFileSync(ASSIGNMENT_PATH, "utf8");
+@@ -496,7 +614,15 @@
+       publishApplying(assignmentHash, manifestStatuses);
+       let error;
+       try {
+-        error = reconcileEntry(ref, currentManifestHash, entry, imageSha, secrets, secretValues);
++        error = reconcileEntry(
++          ref,
++          currentManifestHash,
++          entry,
++          imageSha,
++          secrets,
++          secretValues,
++          deadline,
++        );
+       } catch (reconcileError) {
+         error = `reconciliation failed: ${reconcileError}`;
+         try {
+@@ -543,14 +669,16 @@
+     phase = hasSuccess ? "degraded" : "failed";
+     failureClass = hasSuccess ? "team-setup-degraded" : "team-setup-failed";
+   }
++  const cut = deadlineStatus(deadline);
+   writeStatus({
+     phase,
+     failureClass,
+     message: hasFailure
+-      ? `${failedEntries} setup item(s) failed.`
++      ? `${failedEntries} setup item(s) failed${cut.totalTimeout === undefined ? "" : "; the total setup timeout stopped the run"}.`
+       : "Assigned setup manifests are compliant.",
+     assignmentHash,
+     manifests: manifestStatuses,
++    ...cut,
+   });
+   log(
+     `converged ${assignment.manifests.length} manifest(s): ${succeededEntries} entries ok, ${failedEntries} failed`,

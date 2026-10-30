@@ -1,0 +1,11 @@
+--- 2026-10-29_02-44:/home/box/sand-data/managed-skills/skills/box-desktop/SKILL.md
++++ 2026-10-30_18-53:/home/box/sand-data/managed-skills/skills/box-desktop/SKILL.md
+@@ -11,6 +11,8 @@
+ 
+ - Delegate the outcome, constraints, required values, and success criteria, not browser or desktop steps. Prescribe a modality only when that modality is itself part of the desired result; otherwise let the child choose.
+ 
++- Before the first browser subagent for a service, confirm that the service has no connector: no GetMcpServerStatus row, and no SearchPlugins result that can do the task. A connector that only needs installing or a sign-in still comes first; AuthenticateMcpServer shows the user its connect card.
++
+ - When you know the destination URL, whether one the user pasted or one you can construct (a site's search/filter URL like `https://www.amazon.com/s?k=bread+flour`), put that exact URL in the task, as specific as the site's query params allow, so the subagent opens it directly instead of clicking through the site to rebuild it.
+ 
+ - Before dispatching to a website, check your skill catalog for that site's `site-playbooks-<site>` skill. If its description covers the job, Read it first and paste the matching section's Dispatch snippet into the task. That snippet's deep link and stop rules are the one case where you hand the subagent steps rather than only the outcome. Skip the Read when the job is not what the description names, or when that snippet is already in your instructions or earlier in this conversation.

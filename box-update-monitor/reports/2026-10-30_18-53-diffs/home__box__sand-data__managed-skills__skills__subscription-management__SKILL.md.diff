@@ -1,0 +1,54 @@
+--- 2026-10-29_02-44:/home/box/sand-data/managed-skills/skills/subscription-management/SKILL.md
++++ 2026-10-30_18-53:/home/box/sand-data/managed-skills/skills/subscription-management/SKILL.md
+@@ -3,11 +3,12 @@
+ description: >-
+   When the user asks to cancel a subscription they named, to read the price and
+   renewal date on a service they named, to start a free trial and leave before
+-  it bills, to find paid subscriptions they no longer use, or to watch a
+-  subscription price for a change, read this before you open the billing or
+-  signup page, or their receipt mail, even when you could answer from memory,
+-  because the price, the date, and proof of cancellation have to come from a
+-  page or email opened this turn.
++  it bills, to find paid subscriptions they no longer use or pay for twice, to
++  watch a subscription price for a change, or to ask a service to refund a
++  subscription charge, read this before you open the billing or signup page, or
++  their receipt mail, even when you could answer from memory, because the price,
++  the date, and proof of cancellation have to come from a page or email opened
++  this turn.
+ ---
+ # Subscriptions
+ 
+@@ -79,11 +80,13 @@
+ 
+ You list paid subscriptions the user may not want, and you cancel one only after they pick it.
+ 
+-- For this job the services come from their mail. Do not ask which service before you read it. Ask only when that mail has no repeating charge.
++- For this job the services come from their mail and card activity. Do not ask which service before you read them. Ask only when neither has a repeating charge.
+ - This job is paid subscriptions. A newsletter or other mailing list is a different job. Leave those out of this list.
+-- Read receipt and billing mail opened for this task. A charge that repeats, names a service, and shows an amount is a row. A one-time order is not.
+-- Show the service, the amount, the date of the latest receipt, and the email it came from. When a row is missing any of those, leave that row out.
+-- Ask which rows they no longer use. A dismissed widget is a no. The widget ends the turn. Do not open a billing page before they answer. Quiet mail is not a reason to mark a row unused.
++- Read receipt and billing mail opened for this task. When the Finance connector is connected, also read its card and bank transactions for the same months. The user linked those accounts, so reading them needs no other ask, and nothing there is changed. Without it, read mail only. Each charge is one row: the merchant as the receipt or the statement names it, the amount with its currency, the date, and where it came from, the email's sender and subject or the account and its last four digits. A receipt and the card transaction for it are one row with both sources. Two transactions, or two receipts with different order or invoice numbers, are two rows, even for the same amount on the same day. Leave out a row that its source does not show whole, and never fill in a merchant, an amount, or a date yourself. A charge that repeats, names a service, and shows an amount is a subscription row. A one-time order is not.
++- Show the service, the amount, the date of the latest charge, and where it came from. When a row is missing any of those, leave that row out.
++- Mark a row duplicate when the same service bills twice for the same period, such as on two accounts, two emails, or two cards. Mark two rows overlapping only when a plan page, opened read-only for this task, shows that one plan already includes the other, such as a family plan that covers the user beside their own plan. Similar names are not an overlap. Put duplicate and overlapping rows first, each with the reason and the page or charges that show it.
++- Ask which rows they no longer use. A dismissed widget is a no. The widget ends the turn. Do not open a billing page before they answer. Quiet mail is not a reason to mark a row unused, and a duplicate or overlap flag is not their answer.
++- For a duplicate charge they want back, follow Ask for a refund for the extra charge.
+ - For each row they mark unused, dispatch a `computerUse` subagent, read-only, to that service's billing page, the same read as Read or cancel a named subscription. Then follow that section from its cancel step. The plan, the price, and the date access ends come from that page. The receipt is not that page. One row at a time. A yes on the unused-row widget is not the cancel yes.
+ 
+ ## Watch a renewal price
+@@ -95,3 +98,15 @@
+ - Tell them those three numbers and which page each came from. When the price they pay is higher than the last price saved for that service, or higher than the public price, say that in the same message.
+ - Save the service, the price they pay, the public price, the renewal date, and the links with UpdateMemory.
+ - Offer a routine that checks again. Read the Cursor-managed `routines` skill before you create it. Write the service, the last price, the renewal date, and the page links into its instructions. Schedule it two days before the renewal date, and tell the user that day. When two days before that date has already passed, do not create the routine. Say the renewal is too soon for a two-day check. The routine messages only when the price or the date changed. A plan change waits for a question widget under Shared rules.
++
++## Ask for a refund
++
++You ask a service to refund a subscription charge the user did not want, such as a renewal they forgot to cancel or the same plan billed twice. A refund does not cancel the plan.
++
++- The charge comes from the user, or from a row they picked in Find subscriptions you no longer use. Take the service, the amount, the date, and the account it billed from a receipt or a billing page opened for this task.
++- Dispatch a `computerUse` subagent, read-only, to the service's billing or help page. Have it read whether the service refunds that charge, any refund window, and each way to ask: a refund form or button, a support email address, or a phone number with its hours. Screenshot the page. When the page says that charge is not refunded, tell the user, and go on only when they still want to ask.
++- Send one question widget that names the service, the charge with its amount and date, and each way to ask as its own option. A dismissed widget is a no. The widget ends the turn.
++- A refund request goes out only after the user approves it. Draft an email with DraftExternalMessage, as the `send-on-behalf` skill says, to the support address the page shows. Never send it with a connector's send tool before the user has seen that card, even when they asked you to send it. When place_phone_call is among your tools, place a call only after their yes on the question that offered it; its approval card shows the script, and they can edit it. Fill a refund form on the service's or store's own page, screenshot it, and send a question widget that shows what it says and the amount. Submit it only after that widget's yes. The submit is not read-only.
++- The request names the service, the account, the charge with its amount and date, and the reason the user gave. It says they did not use the plan only when they said so.
++- Report a refund only when a page, an email, or the call's result states it with the amount. When it says the refund is requested, pending, or processing, use those words. Save the service, the amount, the date, and the link or the call's result with UpdateMemory.
++- When the user also wants the plan cancelled, follow Read or cancel a named subscription. A yes on the refund question is not the cancel yes.

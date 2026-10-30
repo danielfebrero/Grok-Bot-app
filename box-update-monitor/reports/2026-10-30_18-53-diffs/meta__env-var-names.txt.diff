@@ -1,0 +1,10 @@
+--- 2026-10-29_02-44/meta/env-var-names.txt
++++ 2026-10-30_18-53/meta/env-var-names.txt
+@@ -1,6 +1,7 @@
+ # noms seulement (valeurs non capturées : peuvent contenir des secrets)
+ CURSOR_AGENT
+ CURSOR_AGENT_SOCKET
++CURSOR_AUTH_TOKEN
+ CURSOR_CONVERSATION_ID
+ CURSOR_REQUEST_ID
+ CURSOR_RIPGREP_PATH

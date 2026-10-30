@@ -1,0 +1,58 @@
+--- 2026-10-29_02-44:/opt/sand/sand-host/box-scripts/sand-fingerprint-read-logger.mjs
++++ 2026-10-30_18-53:/opt/sand/sand-host/box-scripts/sand-fingerprint-read-logger.mjs
+@@ -507,8 +507,7 @@
+   const nativeArrayShift = Array.prototype.shift;
+   const nativeSetHas = Set.prototype.has;
+   const nativeSetAdd = Set.prototype.add;
+-  const nativeMapGet = Map.prototype.get;
+-  const nativeMapSet = Map.prototype.set;
++  const nativeSetClear = Set.prototype.clear;
+   const nativeCustomEvent = CustomEvent;
+   const nativeDispatchEvent = EventTarget.prototype.dispatchEvent;
+   const nativeAddEventListener = EventTarget.prototype.addEventListener;
+@@ -520,7 +519,6 @@
+   const constructorWrappers = new WeakMap();
+   const wrapped = [];
+   const seen = new Set();
+-  const attribution = new Map();
+   const pending = [];
+   let dropped = 0;
+   let acknowledged = false;
+@@ -531,8 +529,7 @@
+     if (!active) return;
+     active = false;
+     pending.length = 0;
+-    seen.clear();
+-    attribution.clear();
++    nativeReflectApply(nativeSetClear, seen, []);
+     dropped = 0;
+     acknowledged = false;
+     nativeReflectApply(nativeRemoveEventListener, globalThis, [channel, onAck, true]);
+@@ -684,7 +681,7 @@
+   hello();
+ 
+   const signalDropped = () => {
+-    dropped = Math.min(1000000, dropped + 1);
++    if (dropped < 1000000) dropped += 1;
+     if ((dropped & (dropped - 1)) !== 0) return;
+     hello();
+     dispatch({ kind: "dropped", generation, count: dropped });
+@@ -751,16 +748,8 @@
+   const record = (surface, api, argsSummary, result) => {
+     try {
+       if (!active) return;
+-      const attrKey = `${api}\u0000${argsSummary}`;
+-      let attributed = nativeReflectApply(nativeMapGet, attribution, [attrKey]);
+-      if (attributed === undefined) {
+-        const url = scriptUrl();
+-        attributed = { url, vendor: vendorFor(url) };
+-        if (attribution.size < options.documentCap) {
+-          nativeReflectApply(nativeMapSet, attribution, [attrKey, attributed]);
+-        }
+-      }
+-      recordAttributed(attributed.url, attributed.vendor, surface, api, argsSummary, result);
++      const url = scriptUrl();
++      recordAttributed(url, vendorFor(url), surface, api, argsSummary, result);
+     } catch {
+       signalDropped();
+     }
