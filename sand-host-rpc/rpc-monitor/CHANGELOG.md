@@ -9,6 +9,15 @@ packages confondus. Entrées les plus récentes en haut. Heures de Paris
 
 <!-- NOUVELLES-ENTREES-ICI -->
 
+## 2026-10-30 18:06 (Paris) — `2026-10-28_18-13` → `2026-10-30_18-06`
+
+Changement de surface RPC détecté : **15 méthode(s) ajoutée(s)**.
+
+Ajoutées : `AutomationsService.GetDebugBotTeamSettings`, `BackgroundComposerService.CheckCustomerTunnelOwnership`, `BackgroundComposerService.EnsureProjectGroupChat`, `DashboardService.GetCanvasPageBrand`, `DashboardService.GetProfileOriginContributions`, `DashboardService.GetSlackLinkPreview`, `DashboardService.ListSlackLinkedWorkspaces`, `DashboardService.RequestSandSeatTierUpgrade`, `DashboardService.RunCanvasConnectorAction`, `GrokBotService.AdminStartGrokBotDream`, `GrokBotService.AnswerGrokBotMessagingCard`, `GrokBotService.GetGrokBotInviteByEmailAccess`, `GrokBotService.GetGrokBotMessagingCard`, `GrokBotService.ReportGrokBotMessagingCapabilities`, `GrokBotService.SummarizeGrokBotTeamReviewItems`
+
+Rapport : [reports/2026-10-30_18-06.md](reports/2026-10-30_18-06.md).
+
+
 ## 2026-10-28 18:13 (Paris) — `2026-10-28_06-05` → `2026-10-28_18-13`
 
 Changement de surface RPC détecté : **8 méthode(s) ajoutée(s)**.
