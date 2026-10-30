@@ -9,6 +9,16 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-30 18:53 (Paris) — snapshot `2026-10-29_02-44` → `2026-10-30_18-53`
+
+**Hot-update sand-host** `ce1748b` → `b3a26a9` (supervisor `upgrade-b3a26a9`). Image `fcbae14`, box-scripts `fcbae14`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, agent-store-fuse `18d8bc1`, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +1 / −0 / ~12.
+
+- **Features** : nouvelle skill gérée `usage-review` (usage, limites, plan, facturation, réduire la conso des bots/routines). Skill `subscription-management` : nouvelle section « Ask for a refund » (demande de remboursement via brouillon validé par l'utilisateur), détection des abonnements en double, lecture des transactions carte/banque via le connecteur Finance s'il est connecté.
+- **Change** : `box-desktop` impose de vérifier qu'aucun connecteur n'existe (GetMcpServerStatus / SearchPlugins) avant le premier sous-agent navigateur ; retouches de `grocery-shopping`, `purchases`, `sign-in` ; `cache.json` des skills mis à jour.
+- **Autre-infra** : `sand-team-converge.mjs` (+143/−15) ajoute un délai total de setup lu dans `/run/grok-bot/setup-deadline` (fichier ignoré s'il est inscriptible par groupe/autres ou mal formé) ; `sand-fingerprint-read-logger.mjs` simplifie l'attribution des scripts (suppression du cache Map) ; `host-main.cjs` (+11 311/−4 624) et `sand-eval-runner.cjs` (+9 680/−3 695) rebuildés ; binaire `codebase-telemetry/csnaps` modifié ; nouvelle variable d'environnement (nom seul) `CURSOR_AUTH_TOKEN` visible dans l'environnement des commandes.
+
+Rapport : [reports/2026-10-30_18-53.md](reports/2026-10-30_18-53.md).
+
 ## 2026-10-29 02:44 (Paris) — snapshot `2026-10-28_22-47` → `2026-10-29_02-44`
 
 **Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `24ade2e48a537b7717d845988afd1ee24565fb84` → `18d8bc13f8b0a14fe15358a760ab71ad14bd6f7d` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`). Toutes les autres versions plateforme inchangées (image `fcbae14`, box-scripts `fcbae14`, sand-host `ce1748b` (supervisor `upgrade-ce1748b`), exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7). Fichiers : +0 / −0 / ~1.
