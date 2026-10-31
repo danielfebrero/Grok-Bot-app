@@ -1,0 +1,130 @@
+--- 2026-10-30_18-53:/opt/sand/sand-host/sand-eval-runner.cjs
++++ 2026-10-31_16-45:/opt/sand/sand-host/sand-eval-runner.cjs
+@@ -1007823,6 +1007823,8 @@
+ 
+ var PRODUCT_SEARCH_MAX_RESULTS = 20;
+ 
++var PRODUCT_SEARCH_MAX_SITES = 20;
++
+ var SAND_PRODUCT_AVAILABILITIES = ["unknown", "in_stock", "out_of_stock"];
+ 
+ var SAND_PRODUCT_CONDITIONS = ["unknown", "new", "used", "refurbished"];
+@@ -1007841,6 +1007843,11 @@
+ , max ${
+ PRODUCT_SEARCH_MAX_RESULTS}
+ ).`
++  ),
++  sites: array(string2().trim().min(1)).max(PRODUCT_SEARCH_MAX_SITES).optional().describe(
++    `Only when the user limits shopping to certain stores: their domains, e.g. ["walmart.com"] for "on Walmart", ["amazon.com", "target.com"] for "from Amazon or Target" (max ${
++PRODUCT_SEARCH_MAX_SITES}
++). Returns only those stores' offers.`
+   )
+ }
+ );
+@@ -1008197,18 +1008204,30 @@
+ 
+ }
+ 
+-function renderProductSearchResult(query2, result, nowMs = Date.now(), options2 = {
++function noProductsLine(search) {
++
++  const found = search.sites === void 0 || search.sites.length === 0 ? "No products found" : `No offers from ${
++search.sites.join(", ")}
++`;
++
++  return `${
++found}
++ for "${
++search.query}
++". Try broader words, or fall back to ${
++GROK_BOT_TOOL_NAMES.WebSearch}
++.`;
++
++}
++
++function renderProductSearchResult(search, result, nowMs = Date.now(), options2 = {
+ }
+ ) {
+ 
+   const modelContent = options2.modelContent === true;
+ 
+   const sections = [
+-    result.products.length === 0 ? `No products found for "${
+-query2}
+-". Try broader words, or fall back to ${
+-GROK_BOT_TOOL_NAMES.WebSearch}
+-.` : result.products.map((product, index) => renderProduct(product, index, nowMs, modelContent)).join("\n")
++    result.products.length === 0 ? noProductsLine(search) : result.products.map((product, index) => renderProduct(product, index, nowMs, modelContent)).join("\n")
+   ];
+ 
+   const promoted = result.products.some(
+@@ -1008313,33 +1008332,37 @@
+ 
+         }
+ 
+-        let result;
+-
+-        try {
+-
+-          result = await port.search(
+-            {
++        const request3 = {
+ 
+-              query: args.query,
+-              ...args.country === void 0 ? {
++          query: args.query,
++          ...args.country === void 0 ? {
+ }
+  : {
+  country: args.country }
+ ,
+-              ...args.numResults === void 0 ? {
++          ...args.numResults === void 0 ? {
+ }
+  : {
+  numResults: args.numResults }
+-
+-            }
+ ,
+-            ctx.signal
+-          );
++          ...args.sites === void 0 || args.sites.length === 0 ? {
++}
++ : {
++ sites: args.sites }
++
++        }
++;
++
++        let result;
++
++        try {
++
++          result = await port.search(request3, ctx.signal);
+ 
+         }
+  catch (error63) {
+ 
+-          if (ctx.signal.aborted) throw error63;
++          if (ctx.signal.aborted || error63 instanceof SandModelVisibleError) throw error63;
+ 
+           throw new SandModelVisibleError(
+             `Product search is unavailable right now. Use ${
+@@ -1008356,7 +1008379,7 @@
+ 
+         const modelContent = options2.modelContent?.() === true;
+ 
+-        const rendered = renderProductSearchResult(args.query, result, Date.now(), {
++        const rendered = renderProductSearchResult(request3, result, Date.now(), {
+ 
+           modelContent
+         }
+@@ -1060130,7 +1060153,7 @@
+ 
+ 
+ // ../packages/grok-bot-harness/src/frozen-prompts/frozen-prompt.ts
+-var import_yaml3 = __toESM(require_dist2());
++var import_yaml3 = __toESM(require_dist2(), 1);
+ 
+ init_v4();
+ 

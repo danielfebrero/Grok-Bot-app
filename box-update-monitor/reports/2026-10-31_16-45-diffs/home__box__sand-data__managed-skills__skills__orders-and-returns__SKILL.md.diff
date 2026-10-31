@@ -1,0 +1,44 @@
+--- 2026-10-30_18-53:/home/box/sand-data/managed-skills/skills/orders-and-returns/SKILL.md
++++ 2026-10-31_16-45:/home/box/sand-data/managed-skills/skills/orders-and-returns/SKILL.md
+@@ -5,11 +5,12 @@
+   to return, exchange, or cancel something they bought or needs its return label
+   or QR code, reports a missing, late, or damaged order, asks about a refund or
+   a price adjustment or whether anything they bought dropped in price, wants to
+-  reorder what they usually buy, wants to hear when a product's price drops or
+-  it is back in stock, wants a list of products or stores watched for deals, or
+-  wants their store coupons clipped, read this before you answer or open the
+-  store or carrier site, even when you could answer from memory, because every
+-  update has to link its source.
++  reorder, save, or change what they usually buy at a store or asks what they
++  bought from one, wants to hear when a product's price drops or it is back in
++  stock, wants a list of products or stores watched for deals, or wants their
++  store coupons clipped, read this before you answer, save a usual list to
++  memory, or open the store or carrier site, even when you could answer from
++  memory, because every update has to link its source.
+ ---
+ # Orders, tracking, and returns
+ 
+@@ -34,7 +35,7 @@
+ - "It says delivered but it's not here" or "it arrived broken" is a problem report.
+ - "Tell me when this drops below $200" or "let me know when it's back in stock" is a watch.
+ - "Watch these for deals" or "clip my coupons" is a deal watch. "Did anything I bought drop in price?" is one run of its order check.
+-- "Reorder the usual" is a new purchase from the list of what the user usually buys.
++- "Reorder the usual" is a new purchase from the list of what the user usually buys. "What did I buy from Amazon last month?" reads that store's past orders, and "rebuy the coffee" reorders one item from them (see What the user usually buys).
+ 
+ ## Before you start
+ 
+@@ -112,8 +113,12 @@
+ 
+ ## What the user usually buys
+ 
+-- Build the list from receipt emails: each item, the store, the typical quantity, the last order date, and the typical interval between orders.
+-- Save the whole list with UpdateMemory as one fact. When it changes, forget the old fact and write the new one.
++- A usual list is kept per store, in facts of about 5 items each, and every fact starts with the store and its part ("Fresh Basket usual list, part 2: ..."). Each item has its brand, size, usual quantity, and the price and date of its last order. Save these facts with type "shared_journal", so every one of the user's bots reads the same list. Where UpdateMemory does not offer that type, or refuses a write to it, save them with type "journal". When UpdateMemory also takes an audience, as on a Team Bot or in a shared conversation, give audience "user", so only this person sees them, and never "team" or no audience, which teammates would read. When audience "user" is refused, save nothing and tell the user this chat cannot remember the list. When two facts hold the same part, use the newer one. Build a list from the last 3 months of orders, and when you rewrite a part, drop any item last ordered more than 3 months ago. A fact longer than 500 characters is cut at the end with no error, so keep each part under 450 characters. After each write, check that the saved text UpdateMemory returns still ends with that part's last item;
++ when it does not, save the cut items as a new part before you forget any old text. For a reorder, call RecallMemory with the store's name and build from every part that comes back.
++- With no list saved for that store, build one from receipt emails, the store's order history, or its buy-again page: each item with those facts and the typical interval between orders. Show it, and save it with UpdateMemory (action "write") only after the user agrees. When an item, a quantity, or a price changes, rewrite only the part that holds it: write the new text first, then forget the old text.
++- When you rebuild a usual order, compare each line with the saved list: an item out of stock or not found, a price at least 10% above or below the saved one in the same currency, or another size or pack. Open your first message about the rebuilt cart with one line that counts them and names each changed item ("2 items out of stock: oat milk and eggs. Coffee up 12%"), or that says nothing changed since the last order. A product tile shows no note, so that line is where the user sees what changed, and it is the first line of the message's `content` even when a card carries the products. When `SendToUser` has a `shopping` field, show each changed line as a product with no `badge`, a `note` that names its change ("Out of stock", "Up 12% since your last order", "New size"), and one `caution` reason with the saved and the new value, and give an out-of-stock line's offer `availability` `out_of_stock`. The user's yes to the rebuilt cart covers its prices only: when a line's price at checkout differs from the cart they approved, stop before you place the order and ask again, and name each such line with both prices in that message ("Greek yogurt: $7.49 in the cart, $7.99 at checkout"), since a new total alone does not say which line moved. Propose a replacement for each item that is out of stock or not found, and ask about them all in that message.
++- "What did I buy from Amazon last month?" is a history lookup. Read the Spendlog lines for that month as the `purchases` skill says, which cover the orders you placed, then the store's receipt emails for that month when mail is connected, then its order history. List each order with its date, items, and total, link the email or page it came from, and name any source you could not read.
++- "Rebuy the coffee" reorders that one item: take its product page and variant from the order you found.
+ - A reorder is a new purchase at a store whose checkout you can use. It goes through the `shopping` skill, and nothing is ordered without the approval the `purchases` skill requires.
+ 
+ ## Pitfalls

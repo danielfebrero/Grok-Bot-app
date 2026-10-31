@@ -1,0 +1,192 @@
+--- 2026-10-30_18-53:/opt/sand/sand-host/host-main.cjs
++++ 2026-10-31_16-45:/opt/sand/sand-host/host-main.cjs
+@@ -866570,6 +866570,19 @@
+     client: true,
+     default: false
+   }
++,
++  // Grok Bot onboarding answers the data-sharing question instead of showing
++  // it, and the walk continues to whatever step followed it. Cursor onboarding
++  // still asks. An account still owed a choice is written training-on, or no
++  // training when its country is in `onboarding_data_sharing_opt_out_countries`
++  // or unknown;
++ an account that already chose keeps its mode. Unit: userID.
++  // Default OFF.
++  onboarding_skip_data_sharing: {
++
++    client: true,
++    default: false
++  }
+ 
+ }
+ ;
+@@ -870878,7 +870891,14 @@
+     enableUI: boolean2(),
+     orgs: array(string2()).min(1)
+   }
+-)
++),
++  // ISO 3166-1 alpha-2 codes that `onboarding_skip_data_sharing` answers with
++  // no training instead of training-on.
++  onboarding_data_sharing_opt_out_countries: object({
++
++    countryCodes: array(string2())
++  }
++).strict()
+ }
+ ;
+ 
+@@ -873407,6 +873427,16 @@
+     }
+ 
+   }
++,
++  onboarding_data_sharing_opt_out_countries: {
++
++    client: true,
++    fallbackValues: {
++
++      countryCodes: []
++    }
++
++  }
+ 
+   /* END_DYNAMIC_CONFIGS */
+ }
+@@ -875966,7 +875996,7 @@
+ // src/host/extensions/telemetry/structured-log-telemetry.ts
+ function getHostBuiltAtMs() {
+ 
+-  return true ? "1793370965000" : void 0;
++  return true ? "1793456690000" : void 0;
+ 
+ }
+ 
+@@ -1460067,6 +1460097,8 @@
+ 
+ var PRODUCT_SEARCH_MAX_RESULTS = 20;
+ 
++var PRODUCT_SEARCH_MAX_SITES = 20;
++
+ var productSearchParameters = object({
+ 
+   query: string2().trim().min(1).describe(
+@@ -1460081,6 +1460113,11 @@
+ , max ${
+ PRODUCT_SEARCH_MAX_RESULTS}
+ ).`
++  ),
++  sites: array(string2().trim().min(1)).max(PRODUCT_SEARCH_MAX_SITES).optional().describe(
++    `Only when the user limits shopping to certain stores: their domains, e.g. ["walmart.com"] for "on Walmart", ["amazon.com", "target.com"] for "from Amazon or Target" (max ${
++PRODUCT_SEARCH_MAX_SITES}
++). Returns only those stores' offers.`
+   )
+ }
+ );
+@@ -1460437,18 +1460474,30 @@
+ 
+ }
+ 
+-function renderProductSearchResult(query2, result, nowMs2 = Date.now(), options2 = {
++function noProductsLine(search) {
++
++  const found = search.sites === void 0 || search.sites.length === 0 ? "No products found" : `No offers from ${
++search.sites.join(", ")}
++`;
++
++  return `${
++found}
++ for "${
++search.query}
++". Try broader words, or fall back to ${
++GROK_BOT_TOOL_NAMES.WebSearch}
++.`;
++
++}
++
++function renderProductSearchResult(search, result, nowMs2 = Date.now(), options2 = {
+ }
+ ) {
+ 
+   const modelContent = options2.modelContent === true;
+ 
+   const sections = [
+-    result.products.length === 0 ? `No products found for "${
+-query2}
+-". Try broader words, or fall back to ${
+-GROK_BOT_TOOL_NAMES.WebSearch}
+-.` : result.products.map((product, index) => renderProduct(product, index, nowMs2, modelContent)).join("\n")
++    result.products.length === 0 ? noProductsLine(search) : result.products.map((product, index) => renderProduct(product, index, nowMs2, modelContent)).join("\n")
+   ];
+ 
+   const promoted = result.products.some(
+@@ -1460553,33 +1460602,37 @@
+ 
+         }
+ 
+-        let result;
+-
+-        try {
++        const request5 = {
+ 
+-          result = await port.search(
+-            {
+-
+-              query: args.query,
+-              ...args.country === void 0 ? {
++          query: args.query,
++          ...args.country === void 0 ? {
+ }
+  : {
+  country: args.country }
+ ,
+-              ...args.numResults === void 0 ? {
++          ...args.numResults === void 0 ? {
+ }
+  : {
+  numResults: args.numResults }
+-
+-            }
+ ,
+-            ctx.signal
+-          );
++          ...args.sites === void 0 || args.sites.length === 0 ? {
++}
++ : {
++ sites: args.sites }
++
++        }
++;
++
++        let result;
++
++        try {
++
++          result = await port.search(request5, ctx.signal);
+ 
+         }
+  catch (error64) {
+ 
+-          if (ctx.signal.aborted) throw error64;
++          if (ctx.signal.aborted || error64 instanceof SandModelVisibleError) throw error64;
+ 
+           throw new SandModelVisibleError(
+             `Product search is unavailable right now. Use ${
+@@ -1460596,7 +1460649,7 @@
+ 
+         const modelContent = options2.modelContent?.() === true;
+ 
+-        const rendered = renderProductSearchResult(args.query, result, Date.now(), {
++        const rendered = renderProductSearchResult(request5, result, Date.now(), {
+ 
+           modelContent
+         }
+@@ -1535885,7 +1535938,7 @@
+     const hostUpgrade = this.hostUpgrade;
+ 
+     const hostBundleVersion = await hostUpgrade.resolveHostBundleIdentityVersion(
+-      (true ? "b3a26a9" : null) ?? "unknown"
++      (true ? "540e5a5" : null) ?? "unknown"
+     );
+ 
+     let resolvedBoxStoreId;

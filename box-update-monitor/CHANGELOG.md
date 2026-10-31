@@ -9,6 +9,16 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-31 16:45 (Paris) — snapshot `2026-10-30_18-53` → `2026-10-31_16-45`
+
+**Hot-update sand-host** `b3a26a9` → `540e5a5` (supervisor `upgrade-540e5a5`, `pendingUpgradeVersion` = None). Image `fcbae14`, box-scripts `fcbae14`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, agent-store-fuse `18d8bc1`, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~10.
+
+- **Features** : `ProductSearch` accepte un paramètre `sites` (jusqu'à 20 domaines) pour limiter la recherche à certains magasins, avec message « No offers from … » dédié. Skill `food-ordering` : nouvelle section « Comparing channels » (comparer l'app de livraison et la page de commande directe du restaurant, souvent moins chère). Skill `shopping` : nouvelle section « Price check before paying ». Skills `grocery-shopping` / `orders-and-returns` : sauvegarde et modification de la « liste habituelle » en mémoire (plusieurs faits de 500 caractères max), comparaison ligne à ligne lors d'une recommande (rupture, prix ±10 %, autre format).
+- **Change** : `shopping-connectors` décrit le paiement via `RequestVirtualCard` (réseau Stripe, approbation Link) ; `food-ordering` envoie le récapitulatif via `SendToUser` ; `recent-changes` retire la note du 2026-10-22 sur Grok Bot Vault ; `cache.json` des skills mis à jour.
+- **Autre-infra** : nouveaux feature flags côté host `onboarding_skip_data_sharing` (défaut OFF : l'onboarding Grok Bot répond à la question de partage de données au lieu de l'afficher, training-on sauf pays listés) et `onboarding_data_sharing_opt_out_countries` ; `host-main.cjs` (+77/−24 après découpage) et `sand-eval-runner.cjs` rebuildés.
+
+Rapport : [reports/2026-10-31_16-45.md](reports/2026-10-31_16-45.md).
+
 ## 2026-10-30 18:53 (Paris) — snapshot `2026-10-29_02-44` → `2026-10-30_18-53`
 
 **Hot-update sand-host** `ce1748b` → `b3a26a9` (supervisor `upgrade-b3a26a9`). Image `fcbae14`, box-scripts `fcbae14`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, agent-store-fuse `18d8bc1`, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +1 / −0 / ~12.

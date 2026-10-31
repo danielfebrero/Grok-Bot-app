@@ -1,0 +1,61 @@
+--- 2026-10-30_18-53:/home/box/sand-data/managed-skills/skills/grocery-shopping/SKILL.md
++++ 2026-10-31_16-45:/home/box/sand-data/managed-skills/skills/grocery-shopping/SKILL.md
+@@ -2,10 +2,11 @@
+ name: grocery-shopping
+ description: >-
+   When the user asks you to buy groceries or household staples, do or repeat a
+-  weekly grocery order, fill a grocery cart they will check out themselves, turn
+-  a recipe or meal plan into a shopping list, or order from Instacart, Costco
+-  Same-Day, or another grocery delivery site, before you open the store or add
+-  anything to a cart.
++  weekly grocery order, save or change their usual grocery list, fill a grocery
++  cart they will check out themselves, turn a recipe or meal plan into a
++  shopping list, or order from Instacart, Costco Same-Day, or another grocery
++  delivery site, before you open the store, add anything to a cart, or save a
++  usual list to memory.
+ ---
+ # Grocery shopping
+ 
+@@ -33,12 +34,12 @@
+ Every message in this flow, from the questions about close matches to the cart summary, substitutions, delivery windows, and confirmation, follows one rule. Show what you collected in the user's language, which is the language they write to you in unless they asked for another or the Memory section names one they prefer. When a page is in another language, translate the words you put in a card or a summary, such as titles, descriptions, specs and their labels, notes, review summaries, policies, delivery and status lines, and option names. Keep brand, store, seller, and venue names, model numbers, order numbers and other codes, prices with their currency, and links as the page shows them. Brief the browser subagent and type into the site in the site's own words, and match a choice the user makes in their language back to those words.
+ 
+ 1. Build the list before you open the store: each item with its quantity, and the brand and size from memory when one is saved. For a recipe, name the pantry staples you left off (salt, oil, spices) so the user can add them back.
+-2. Dispatch the browser subagent once with the whole list, using the site playbook's cart job. That job stops at the cart, and its "never check out" line holds for this dispatch only. Ask it to report, for each list item, the product it chose (name, brand, size), its product page URL and image URL, the unit price, any deal, whether it came from past purchases, and which items it could not find. Only the list goes in the cart;
++2. Dispatch the browser subagent once with the whole list, using the site playbook's cart job. That job stops at the cart, and its "never check out" line holds for this dispatch only. Ask it to report, for each list item, the product it chose (name, brand, size), its product page URL and image URL, the unit price, any deal, whether it came from past purchases, and which items it could not find or found out of stock. Only the list goes in the cart;
+  have it dismiss suggested items, membership or delivery subscription trials, and round-up prompts.
+ 3. When the site wants a sign-in, a one-time code, or a verify-you-are-human check, follow the Cursor-managed `sign-in` skill in its order, which ends with the Secure Form (`RequestUserForm`) and then handing over the screen with `request_box_help` and one instruction ("Sign in to your <service> account"). Never send a question widget before these;
+  the tool is the ask. After a receipt or a hand-back, dispatch the subagent again;
+  the session persists across turns.
+-4. Sort the results. A line is a usual product when it matches memory or past purchases, a close match when the brand or size differs, or not found.
++4. Sort the results. A line is a usual product when it matches memory or past purchases, a close match when the brand or size differs, out of stock, or not found. For a repeat cart, When you rebuild a usual order, compare each line with the saved list: an item out of stock or not found, a price at least 10% above or below the saved one in the same currency, or another size or pack. Open your first message about the rebuilt cart with one line that counts them and names each changed item ("2 items out of stock: oat milk and eggs. Coffee up 12%"), or that says nothing changed since the last order. A product tile shows no note, so that line is where the user sees what changed, and it is the first line of the message's `content` even when a card carries the products. When `SendToUser` has a `shopping` field, show each changed line as a product with no `badge`, a `note` that names its change ("Out of stock", "Up 12% since your last order", "New size"), and one `caution` reason with the saved and the new value, and give an out-of-stock line's offer `availability` `out_of_stock`. The user's yes to the rebuilt cart covers its prices only: when a line's price at checkout differs from the cart they approved, stop before you place the order and ask again, and name each such line with both prices in that message ("Greek yogurt: $7.49 in the cart, $7.99 at checkout"), since a new total alone does not say which line moved.
+ 5. Ask once about everything uncertain. Send one message that lists every close match and missing item with your proposed pick, so the user can approve them all or correct a few, instead of one question per item. An item the store sells in several sizes or pack counts is one line with the size you picked and the other sizes with their prices, not one line per size.
+ 6. Send the cart summary: one line per item with product, size, quantity, and price, then the subtotal, delivery and service fees, the preselected tip, and the estimated total as far as the site shows them, with the cart screenshot attached at its saved path. When the subtotal is under a free delivery threshold or an order minimum, say how far under, and add nothing to close the gap unless the user picks it. Unless Cart only applies, this summary leads on to step 9's widget, never to an offer to hand over the screen so they check out themselves.
+ 7. Set substitutions. When the site asks what to do if an item is out of stock, apply the user's saved rule for that item. With no rule, choose no replacement for anything tied to an allergy or dietary rule and the site's closest match for the rest, and tell the user which you chose.
+@@ -69,21 +70,22 @@
+ 
+ ## Product cards
+ 
+-- When `SendToUser` has a `shopping` field, show the products you name in it instead of a text list: the matches the helper reported when it could not add to the cart, the close matches and proposed picks in step 5, and a guest cart's items. Write each product from the helper's report: its name and size as `title`, its image URL as the one entry in `images`, and one variant with `options` `{
++- When `SendToUser` has a `shopping` field, show the products you name in it instead of a text list: the matches the helper reported when it could not add to the cart, the close matches and proposed picks in step 5, the changed lines of a repeat cart, and a guest cart's items. Write each product from the helper's report: its name and size as `title`, its image URL as the one entry in `images`, and one variant with `options` `{
+ }
+ ` and one offer whose `seller` is the store, `url` is its product page, and `price` is the unit price as `{
+  amount, currency }
+ `, such as `{
+  "amount": 12.99, "currency": "USD" }
+-`.
++`. A changed line of a repeat cart also gets the `note`, the `caution` reason, and, when it is out of stock, the offer `availability` that step 4 names.
+ - Keep quantities, the subtotal, fees, and what you need from the user in `content`, and send any question widget as its own message after the card.
+ - A product the helper reported with no image URL or no product page stays a text line.
+ 
+ ## Remembering the usual order
+ 
+-- After the first order at a store, offer once to remember it as their usual list there, with each item's brand, size, and usual quantity, along with any substitution rules they stated ("no substitutes for oat milk", "any brand of bananas is fine"). Save with `UpdateMemory` (action "write", type "journal") only after they agree.
+-- One memory fact holds at most 500 characters, so a usual list takes several facts. Save the store's substitution rules as one fact, then the items in facts of about eight items each, and start every fact with the store and its part ("Fresh Basket usual list, part 2: ...").
+-- Keep one usual list per store. When they add, drop, or swap an item, or change a quantity, rewrite only the part of that list that holds it instead of saving a second list for the same store: write the new text first, and forget the old text only after that write is saved, so a failed write never loses the part. When a part grows past about eight items, move the extra items into a new part. Name the change in one short line. An item that was out of stock this time stays on the list.
++- After the first order at a store, offer once to remember it as their usual list there, along with any substitution rules they stated ("no substitutes for oat milk", "any brand of bananas is fine"). Save with `UpdateMemory` (action "write") only after they agree.
++- A usual list is kept per store, in facts of about 5 items each, and every fact starts with the store and its part ("Fresh Basket usual list, part 2: ..."). Each item has its brand, size, usual quantity, and the price and date of its last order. Save these facts with type "shared_journal", so every one of the user's bots reads the same list. Where UpdateMemory does not offer that type, or refuses a write to it, save them with type "journal". When UpdateMemory also takes an audience, as on a Team Bot or in a shared conversation, give audience "user", so only this person sees them, and never "team" or no audience, which teammates would read. When audience "user" is refused, save nothing and tell the user this chat cannot remember the list. When two facts hold the same part, use the newer one. Build a list from the last 3 months of orders, and when you rewrite a part, drop any item last ordered more than 3 months ago. A fact longer than 500 characters is cut at the end with no error, so keep each part under 450 characters. After each write, check that the saved text UpdateMemory returns still ends with that part's last item;
++ when it does not, save the cut items as a new part before you forget any old text. One memory fact holds at most 500 characters, which is why a list takes several, and the store's substitution rules get one fact of their own.
++- Keep one usual list per store. When they add, drop, or swap an item, change a quantity, or an order charges a new price for an item, rewrite only the part of that list that holds it instead of saving a second list for the same store: write the new text first, and forget the old text only after that write is saved, so a failed write never loses the part. When a part grows past about 5 items, move the extra items into a new part. Name the change in one short line. An item that was out of stock this time stays on the list.
+ - For a weekly habit, offer a routine that builds the cart on their usual day and sends the cart summary for approval. The routine stops at the cart, and the user approves checkout each time. Read the Cursor-managed `routines` skill before you create it.
+ 
+ ## Pitfalls

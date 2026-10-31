@@ -1,0 +1,61 @@
+--- 2026-10-30_18-53:/home/box/sand-data/managed-skills/skills/shopping/SKILL.md
++++ 2026-10-31_16-45:/home/box/sand-data/managed-skills/skills/shopping/SKILL.md
+@@ -4,14 +4,16 @@
+   When the user asks whether to buy something, whether a price is good, or
+   whether to wait for a drop, read this before you answer, even when you could
+   answer from memory, because the answer needs a price history and reviews
+-  opened this turn. Also when the user asks you to buy, order, reorder, or
+-  compare a product on Amazon or any other retail site, asks you to fill a
+-  retail cart they will check out themselves, asks which of two or three
+-  products to get or whether one costs less at another store, or sends a product
+-  link to purchase, before you open the store or add anything to a cart,
+-  alongside any store's site playbook. Also when the user asks you to find,
+-  search for, recommend, or shortlist products, such as the latest model of a
+-  phone or accessories for one, before you search or hand the search to a
++  opened this turn. When the user names a product they are about to buy and asks
++  whether it costs less anywhere, read this before you search, because it sets
++  which stores to check and how to report them. Also when the user asks you to
++  buy, order, reorder, or compare a product on Amazon or any other retail site,
++  asks you to fill a retail cart they will check out themselves, asks which of
++  two or three products to get or whether one costs less at another store, or
++  sends a product link to purchase, before you open the store or add anything to
++  a cart, alongside any store's site playbook. Also when the user asks you to
++  find, search for, recommend, or shortlist products, such as the latest model
++  of a phone or accessories for one, before you search or hand the search to a
+   subagent, so its task asks for the facts the product cards need. Read it as
+   well as the purchases skill, which covers only how to pay.
+ ---
+@@ -22,12 +24,13 @@
+ ## Entry points
+ 
+ - "Order more of the coffee filters I usually get" is a reorder;
+- start from order history, not a fresh search.
++ start from the usual list in memory and the store's order history, as the `orders-and-returns` skill's What the user usually buys says, not a fresh search.
+ - "Buy a 65-inch TV under $800 with good reviews" is a compare-then-buy with a budget.
+ - "Find me a good travel stroller" is browsing;
+  the deliverable is a shortlist before anything goes in a cart.
+ - "Which of these two should I get?" or "Is it cheaper at Target?", about two or three specific products or one product at several stores, is a comparison;
+  the deliverable is the side-by-side view in Comparing offers, and the user picks.
++- "I'm about to buy these headphones at Best Buy for $249, is it cheaper anywhere?", or a product link sent with a check before paying, is a price check: a comparison of that product at other stores, with the store and price the user named as the one to beat (see Price check before paying).
+ - "Should I buy this?" or "Is $600 a good price for it?" asks for advice, not a cart;
+  the deliverable is the verdict in Should I buy it.
+ - A pasted product link goes straight to that product page.
+@@ -137,8 +140,18 @@
+ - Read the return window from the product page or the store's return policy page. When neither shows it, write "not shown" rather than a typical value.
+ - For the same product at several stores, confirm the model number or pack size matches before comparing prices, and say when it does not.
+ - When `SendToUser` has a `shopping` field, put the comparison there. Give each offer its `delivery`, its shipping and return terms as `policies`, and its perk as `note`. Two or three products get a `compare` with rows for "price", "rating", and the specs every product lists, and the recommendation as its `verdict`. One product at several stores is one product with an offer per store. Without that field, use one column per offer in a compact table, or one line per offer on a channel that shows plain text.
++- Name every store you checked and how many there were, including each one that blocked you or had no match, so the user sees what the best price was measured against ("Checked 4 stores: Target, Walmart (out of stock), Best Buy, Amazon (blocked)").
+ - End with a one-line recommendation and the reason ("Target: $12 less delivered and a 90-day return window, arrives a day later"), then ask which one they want, with a `followUps` reply per offer when you sent the `shopping` field.
+ 
++### Price check before paying
++
++- Check three to five stores that sell the same product, starting with the brand's own store and the retailers the user would buy from, plus the sellers a `ProductSearch` result lists for it. The store the user named is one of them, at the price you read on its page this turn;
++ when that differs from the price they gave, say so.
++- The message text carries the result, also beside a `shopping` card, because the card shows one price and neither the stores you checked nor the differences. Its first sentence is the count line from Comparing offers, marking each store that blocked you, had no match, or had the product out of stock. Its second gives each in-stock offer's difference from the store the user named, cheapest delivered price first: "Checked 4 stores: Target, Walmart (out of stock), Best Buy, Amazon (blocked). Against Target's $89.00 delivered, Best Buy is $6.51 less." When the store they named is already the cheapest, the second sentence says that plainly.
++- Work each difference from the two delivered prices, the item plus shipping, exact to the cent: $89.00 against $82.49 is $6.51 less. Never round a difference or write "about".
++- A promo code's deal price holds only once a cart shows it, so rank that offer by its price without the code, and give the deal price and its exact difference beside it.
++- Offer to put the cheapest offer in a cart and take it to the approval. That is a purchase through the Flow from step 6, and nothing is bought without the user's yes.
++
+ ## Should I buy it?
+ 
+ Follow this when the user asks whether to buy something or whether a price is good, or is about to spend a lot on something a cheaper fix might solve. Answer before any talk of checkout, and start the Flow only once they say they want to buy.
