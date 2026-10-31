@@ -1,0 +1,179 @@
+{
+  "namespace": "cursor-github",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-31T09:17:39+01:00",
+    "responseKind": "json",
+    "schema": {
+      "items": {
+        "properties": {
+          "_links": {
+            "properties": {
+              "html": {
+                "properties": {
+                  "href": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "href"
+                ],
+                "type": "object"
+              },
+              "pull_request": {
+                "properties": {
+                  "href": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "href"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "html",
+              "pull_request"
+            ],
+            "type": "object"
+          },
+          "author_association": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "commit_id": {
+            "type": "string"
+          },
+          "copilot_code_review_effort": {
+            "type": "null"
+          },
+          "html_url": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "is_copilot_code_review": {
+            "type": "boolean"
+          },
+          "node_id": {
+            "type": "string"
+          },
+          "pull_request_url": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "submitted_at": {
+            "type": "string"
+          },
+          "user": {
+            "properties": {
+              "avatar_url": {
+                "type": "string"
+              },
+              "events_url": {
+                "type": "string"
+              },
+              "followers_url": {
+                "type": "string"
+              },
+              "following_url": {
+                "type": "string"
+              },
+              "gists_url": {
+                "type": "string"
+              },
+              "gravatar_id": {
+                "type": "string"
+              },
+              "html_url": {
+                "type": "string"
+              },
+              "id": {
+                "type": "integer"
+              },
+              "login": {
+                "type": "string"
+              },
+              "node_id": {
+                "type": "string"
+              },
+              "organizations_url": {
+                "type": "string"
+              },
+              "received_events_url": {
+                "type": "string"
+              },
+              "repos_url": {
+                "type": "string"
+              },
+              "site_admin": {
+                "type": "boolean"
+              },
+              "starred_url": {
+                "type": "string"
+              },
+              "subscriptions_url": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "user_view_type": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "avatar_url",
+              "events_url",
+              "followers_url",
+              "following_url",
+              "gists_url",
+              "gravatar_id",
+              "html_url",
+              "id",
+              "login",
+              "node_id",
+              "organizations_url",
+              "received_events_url",
+              "repos_url",
+              "site_admin",
+              "starred_url",
+              "subscriptions_url",
+              "type",
+              "url",
+              "user_view_type"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "_links",
+          "author_association",
+          "body",
+          "commit_id",
+          "copilot_code_review_effort",
+          "html_url",
+          "id",
+          "is_copilot_code_review",
+          "node_id",
+          "pull_request_url",
+          "state",
+          "submitted_at",
+          "user"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "source": "inferred"
+  },
+  "tool": "list_pull_request_reviews"
+}

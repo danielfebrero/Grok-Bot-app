@@ -1,0 +1,66 @@
+{
+  "description": "Retrieves a list of Chat conversations for the authenticated user's inbox, newest first: the most recently active conversation comes first. The unread, last_read_event_id and newest_event_id fields give your read state, computed from your latest read receipt and each conversation's latest notifying message. Request them with chat_conversation.fields=unread,last_read_event_id,newest_event_id. The filters unread_only, type, is_archived, is_muted, participant_ids, participant_query, start_time and end_time are optional, and all filters must match (AND). participant_query keeps conversations where another participant's username, or a word of their display name, starts with the query, ignoring case and accents; with a leading @ it matches usernames only. It considers the 100 people who best match the query, uses only public profile information, and never matches group names, nicknames or messages. start_time and end_time apply to the time of each conversation's latest message. Each page covers max_results conversations and returns those that match, so a page can hold fewer than max_results, or none, while meta.next_token is set and has_more is true: keep paging, passing meta.next_token as pagination_token. Once a page reaches a conversation whose latest message is older than start_time, has_more is false. A pagination_token only works with the same filters as the request that returned it; with other filters, the request fails with a 400. When both are provided, `start_time` must be earlier than `end_time`.",
+  "inputSchema": {
+    "properties": {
+      "chat_conversation.fields": {
+        "description": "A comma separated list of ChatConversation fields to display.",
+        "type": "string"
+      },
+      "end_time": {
+        "description": "ISO 8601, e.g. 2026-10-17T00:00:00Z. Chats whose latest message is before this time.",
+        "type": "string"
+      },
+      "expansions": {
+        "description": "A comma separated list of fields to expand.",
+        "type": "string"
+      },
+      "is_archived": {
+        "description": "true: only archived; false: only not archived. Omit for both.",
+        "type": "boolean"
+      },
+      "is_muted": {
+        "description": "true: only muted; false: only not muted. Omit for both.",
+        "type": "boolean"
+      },
+      "max_results": {
+        "description": "Conversations covered per page (1-1000, default 200). Filtered pages can return fewer.",
+        "type": "integer"
+      },
+      "pagination_token": {
+        "description": "meta.next_token from the previous page. Send the same filters with it, or the request fails.",
+        "type": "string"
+      },
+      "participant_ids": {
+        "description": "Comma-separated numeric user IDs (1-10), all in the chat. Names or @handles: use participant_query.",
+        "type": "string"
+      },
+      "participant_query": {
+        "description": "Name or @username prefix (1-50 chars); keeps chats where any other participant matches it.",
+        "type": "string"
+      },
+      "start_time": {
+        "description": "ISO 8601, e.g. 2026-10-16T00:00:00Z. Chats whose latest message is at or after this time.",
+        "type": "string"
+      },
+      "type": {
+        "description": "Only direct (1:1) or only group conversations. Omit for both.",
+        "enum": [
+          "direct",
+          "group"
+        ],
+        "type": "string"
+      },
+      "unread_only": {
+        "description": "Return only unread conversations. A page can be short; keep paging while has_more.",
+        "type": "boolean"
+      },
+      "user.fields": {
+        "description": "A comma separated list of User fields to display.",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_chat_conversations"
+}

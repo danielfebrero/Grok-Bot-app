@@ -1,0 +1,38 @@
+{
+  "description": "Returns the X calls on the authenticated user's calendar, earliest first: events on their X Calls calendar, and events on the Microsoft Outlook calendars they linked to X whose conference is an X call. Calls still running at start_time are included. The window defaults to the next 24 hours and may span at most 7 days. Use scheduled_call.fields to select which fields are returned. When both are provided, `start_time` must be earlier than `end_time`.",
+  "inputSchema": {
+    "properties": {
+      "call.fields": {
+        "description": "A comma separated list of Call fields to display.",
+        "type": "string"
+      },
+      "end_time": {
+        "description": "Calls starting before this time (RFC 3339). Defaults to 24 hours after start_time.",
+        "type": "string"
+      },
+      "expansions": {
+        "description": "A comma separated list of fields to expand.",
+        "type": "string"
+      },
+      "max_results": {
+        "description": "The most calls to return. Defaults to 20.",
+        "type": "integer"
+      },
+      "scheduled_call.fields": {
+        "description": "A comma separated list of ScheduledCall fields to display.",
+        "type": "string"
+      },
+      "start_time": {
+        "description": "Calls still running at this time or starting after it (RFC 3339). Defaults to now.",
+        "type": "string"
+      },
+      "user.fields": {
+        "description": "A comma separated list of User fields to display.",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "list_scheduled_calls"
+}

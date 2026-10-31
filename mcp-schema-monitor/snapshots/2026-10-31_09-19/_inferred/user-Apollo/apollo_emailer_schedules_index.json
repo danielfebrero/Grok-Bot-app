@@ -1,0 +1,113 @@
+{
+  "namespace": "user-Apollo",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-19T09:18:18+02:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "emailer_schedules": {
+          "items": {
+            "properties": {
+              "created_at": {
+                "type": "string"
+              },
+              "default": {
+                "type": "boolean"
+              },
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "schedule_hash": {
+                "properties": {
+                  "friday": {
+                    "items": {
+                      "items": {
+                        "type": "integer"
+                      },
+                      "type": "array"
+                    },
+                    "type": "array"
+                  },
+                  "monday": {
+                    "items": {
+                      "items": {
+                        "type": "integer"
+                      },
+                      "type": "array"
+                    },
+                    "type": "array"
+                  },
+                  "thursday": {
+                    "items": {
+                      "items": {
+                        "type": "integer"
+                      },
+                      "type": "array"
+                    },
+                    "type": "array"
+                  },
+                  "tuesday": {
+                    "items": {
+                      "items": {
+                        "type": "integer"
+                      },
+                      "type": "array"
+                    },
+                    "type": "array"
+                  },
+                  "wednesday": {
+                    "items": {
+                      "items": {
+                        "type": "integer"
+                      },
+                      "type": "array"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "friday",
+                  "monday",
+                  "thursday",
+                  "tuesday",
+                  "wednesday"
+                ],
+                "type": "object"
+              },
+              "skip_holidays": {
+                "type": "boolean"
+              },
+              "time_zone": {
+                "type": "string"
+              },
+              "use_contacts_time_zone": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "created_at",
+              "default",
+              "id",
+              "name",
+              "schedule_hash",
+              "skip_holidays",
+              "time_zone",
+              "use_contacts_time_zone"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "emailer_schedules"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "apollo_emailer_schedules_index"
+}

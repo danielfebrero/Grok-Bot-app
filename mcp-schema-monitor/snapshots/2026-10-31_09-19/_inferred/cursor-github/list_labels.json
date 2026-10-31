@@ -1,0 +1,55 @@
+{
+  "namespace": "cursor-github",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-31T09:18:19+01:00",
+    "responseKind": "json",
+    "schema": {
+      "items": {
+        "properties": {
+          "archived_at": {
+            "type": "null"
+          },
+          "archived_by": {
+            "type": "null"
+          },
+          "color": {
+            "type": "string"
+          },
+          "default": {
+            "type": "boolean"
+          },
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "node_id": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "archived_at",
+          "archived_by",
+          "color",
+          "default",
+          "description",
+          "id",
+          "name",
+          "node_id",
+          "url"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "source": "inferred"
+  },
+  "tool": "list_labels"
+}

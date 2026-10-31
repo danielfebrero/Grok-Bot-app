@@ -1,0 +1,48 @@
+{
+  "description": "Puts an X call on the authenticated user's X Calls calendar, with them as its organizer, and invites people to it. The call exists right away: share its join_url, or put an agent in it at start time with POST /2/calls/:id/join. A recurrence (an RFC 5545 RRULE) repeats it. Invitees get an email unless notify_invitees is false.",
+  "inputSchema": {
+    "properties": {
+      "description": {
+        "description": "What the call is about.",
+        "type": "string"
+      },
+      "duration_minutes": {
+        "description": "How long the call lasts, in minutes. Defaults to 30; at most 31 days.",
+        "type": "integer"
+      },
+      "invitee_ids": {
+        "description": "X user ids of the people to invite.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "notify_invitees": {
+        "description": "Whether invitees get an email about the call. Defaults to true.",
+        "type": "boolean"
+      },
+      "recurrence": {
+        "description": "RFC 5545 RRULE to repeat the call by, such as FREQ=WEEKLY;BYDAY=MO; the RRULE: prefix is optional.",
+        "type": "string"
+      },
+      "start_time": {
+        "description": "When the call starts (RFC 3339); not in the past.",
+        "type": "string"
+      },
+      "time_zone": {
+        "description": "IANA time zone the recurrence follows, such as America/Los_Angeles.",
+        "type": "string"
+      },
+      "title": {
+        "description": "Title invitees see.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "start_time"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "schedule_call"
+}

@@ -1,0 +1,106 @@
+{
+  "namespace": "user-AgentMail",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-31T09:19:30+01:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "authenticationResults": {
+          "properties": {
+            "dkim": {
+              "type": "string"
+            },
+            "dkimDomain": {
+              "type": "string"
+            },
+            "dmarc": {
+              "type": "string"
+            },
+            "dmarcDomain": {
+              "type": "string"
+            },
+            "spf": {
+              "type": "string"
+            },
+            "spfDomain": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "dkim",
+            "dkimDomain",
+            "dmarc",
+            "dmarcDomain",
+            "spf",
+            "spfDomain"
+          ],
+          "type": "object"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "extractedHtml": {
+          "type": "string"
+        },
+        "from": {
+          "type": "string"
+        },
+        "html": {
+          "type": "string"
+        },
+        "inboxId": {
+          "type": "string"
+        },
+        "labels": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "messageId": {
+          "type": "string"
+        },
+        "size": {
+          "type": "integer"
+        },
+        "subject": {
+          "type": "string"
+        },
+        "threadId": {
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "string"
+        },
+        "to": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "updatedAt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "authenticationResults",
+        "createdAt",
+        "extractedHtml",
+        "from",
+        "html",
+        "inboxId",
+        "labels",
+        "messageId",
+        "size",
+        "subject",
+        "threadId",
+        "timestamp",
+        "to",
+        "updatedAt"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "get_message"
+}

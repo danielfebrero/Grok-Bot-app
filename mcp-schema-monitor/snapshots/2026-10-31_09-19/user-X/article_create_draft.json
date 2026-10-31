@@ -1,0 +1,166 @@
+{
+  "description": "Creates a new Article draft that can later be published.",
+  "inputSchema": {
+    "properties": {
+      "content_state": {
+        "properties": {
+          "blocks": {
+            "description": "The text blocks that make up the article body.",
+            "items": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "cashtags": {
+                      "description": "Cashtag spans in this block.",
+                      "type": "array"
+                    },
+                    "hashtags": {
+                      "description": "Hashtag spans in this block.",
+                      "type": "array"
+                    },
+                    "mentions": {
+                      "description": "Mention spans in this block.",
+                      "type": "array"
+                    },
+                    "urls": {
+                      "description": "URL spans in this block.",
+                      "type": "array"
+                    }
+                  },
+                  "type": "object"
+                },
+                "entity_ranges": {
+                  "description": "References to entries in entities.",
+                  "items": {
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "inline_style_ranges": {
+                  "description": "Inline formatting ranges.",
+                  "items": {
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "key": {
+                  "description": "Optional block key.",
+                  "type": "string"
+                },
+                "text": {
+                  "description": "The text content of this block. For latex entities, this holds the LaTeX source;          for div...",
+                  "type": "string"
+                },
+                "type": {
+                  "description": "The block type. Use atomic for non-text embeds (image, post, markdown, divider, latex).",
+                  "enum": [
+                    "unstyled",
+                    "header-one",
+                    "header-two",
+                    "header-three",
+                    "unordered-list-item",
+                    "ordered-list-item",
+                    "blockquote",
+                    "atomic"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "text",
+                "type"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "entities": {
+            "description": "Non-text entities referenced by blocks (links, embedded posts, images, emoji,          markdown/c...",
+            "items": {
+              "properties": {
+                "key": {
+                  "description": "The entity key referenced by entity_ranges.",
+                  "type": "string"
+                },
+                "value": {
+                  "properties": {
+                    "data": {
+                      "type": "object"
+                    },
+                    "mutability": {
+                      "description": "Whether the entity can be edited. Recommended: immutable for post, image, divider, latex; mutable...",
+                      "enum": [
+                        "immutable",
+                        "mutable",
+                        "segmented"
+                      ],
+                      "type": "string"
+                    },
+                    "type": {
+                      "description": "The entity type. markdown carries code blocks, GFM tables, and other Markdown;          emoji map...",
+                      "enum": [
+                        "post",
+                        "link",
+                        "image",
+                        "emoji",
+                        "markdown",
+                        "divider",
+                        "latex"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "mutability",
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              },
+              "required": [
+                "key",
+                "value"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "blocks",
+          "entities"
+        ],
+        "type": "object"
+      },
+      "cover_media": {
+        "properties": {
+          "media_category": {
+            "description": "The media category (e.g. tweet_image).",
+            "type": "string"
+          },
+          "media_id": {
+            "description": "The media ID from the media upload endpoint.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "media_category",
+          "media_id"
+        ],
+        "type": "object"
+      },
+      "title": {
+        "description": "The title of the Article.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "title",
+      "content_state"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "article_create_draft"
+}

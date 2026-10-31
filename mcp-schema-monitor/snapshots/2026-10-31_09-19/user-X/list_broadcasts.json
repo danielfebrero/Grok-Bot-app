@@ -1,0 +1,24 @@
+{
+  "description": "Returns the authenticated user's live-video broadcasts, or selected owned broadcasts when ids are provided. At most one of `ids`, `max_results` may be provided. At most one of `ids`, `pagination_token` may be provided.",
+  "inputSchema": {
+    "properties": {
+      "broadcast.fields": {
+        "description": "A comma separated list of Broadcast fields to display.",
+        "type": "string"
+      },
+      "ids": {
+        "description": "Comma-separated broadcast IDs to retrieve instead of listing broadcasts.",
+        "type": "string"
+      },
+      "max_results": {
+        "type": "integer"
+      },
+      "pagination_token": {
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "list_broadcasts"
+}

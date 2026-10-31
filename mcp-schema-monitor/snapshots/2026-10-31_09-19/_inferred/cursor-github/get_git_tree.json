@@ -1,0 +1,62 @@
+{
+  "namespace": "cursor-github",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-31T09:17:20+01:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "sha": {
+          "type": "string"
+        },
+        "tree": {
+          "items": {
+            "properties": {
+              "mode": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              },
+              "sha": {
+                "type": "string"
+              },
+              "size": {
+                "type": "integer"
+              },
+              "type": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "mode",
+              "path",
+              "sha",
+              "type",
+              "url"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "truncated": {
+          "type": "boolean"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "sha",
+        "tree",
+        "truncated",
+        "url"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "get_git_tree"
+}

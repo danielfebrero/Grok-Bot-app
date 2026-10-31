@@ -1,0 +1,35 @@
+{
+  "namespace": "cursor-origin",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-31T09:18:19+01:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "branches": {
+          "items": {
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "sha": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "sha"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "branches"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "list_branches"
+}

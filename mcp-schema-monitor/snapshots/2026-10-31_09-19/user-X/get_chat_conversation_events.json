@@ -1,0 +1,28 @@
+{
+  "description": "Retrieves the events of a specific Chat conversation, newest first, with pagination support: messages, key changes, group changes, and read receipts. Events with an id above the conversation's last_read_event_id are unread: they come after the point you read up to. To collect them, page until an event's id is at or below it. Only `id` and `encoded_event` are always present. Events are either end-to-end encrypted or unencrypted, such as messages sent before the conversation was encrypted. Encrypted events carry `conversation_key_version`, and usually `conversation_token` and `message_event_signature`; treat an encrypted event without `message_event_signature` as unverified. An event without `conversation_key_version` is unencrypted. Decode each `encoded_event` client-side, and decrypt it with the conversation key named by `conversation_key_version` when that is present. A page holds up to `max_results` events and can hold fewer while `has_more` is true. For 1:1 conversations, provide the recipient's user ID; the server constructs the canonical conversation ID from the authenticated user and recipient.",
+  "inputSchema": {
+    "properties": {
+      "chat_message_event.fields": {
+        "description": "A comma separated list of ChatMessageEvent fields to display.",
+        "type": "string"
+      },
+      "id": {
+        "type": "string"
+      },
+      "max_results": {
+        "description": "The maximum number of events to return.",
+        "type": "integer"
+      },
+      "pagination_token": {
+        "description": "The next_token from a previous response, to fetch the next page.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_chat_conversation_events"
+}
