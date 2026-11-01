@@ -9,6 +9,17 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-11-01 16:54 (Paris) — snapshot `2026-11-01_09-45` → `2026-11-01_16-54`
+
+**Hot-update sand-host** `540e5a5` → `95b8cfb` (supervisor `upgrade-95b8cfb`, `pendingUpgradeVersion` = None). Image `fcbae14`, box-scripts `fcbae14`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, agent-store-fuse `0782755`, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~7.
+
+- **Features** : essayage virtuel shopping derrière un flag host (« Sand shopping try-on ») : `SendToUser` peut marquer `canTryOn` sur les produits portables (vêtements, chaussures, sacs, accessoires) pour afficher un bouton « Try on ». Nouvelles RPC `DashboardService.Get/UpdateTeamCloudAgentMcpAllowlist` + flag `cloud_agent_mcp_allowlist` (allowlist MCP des Cloud Agents au niveau équipe). Nouvelles RPC admin `GrokBotService.Admin*GrokBotAccountMigration*` (migration de tous les bots et réglages d'un ancien compte Grok Bot vers un nouveau : résoudre, soumettre, lister, appliquer, annuler, réessayer ; états COMPUTING → REVIEWING → MIGRATING → DONE) et notes de migration de compte dans l'inbox (`account-migration:`). Nouveaux noms d'outils docs/sheets/slides reconnus (`docs_read_document`, `docs_insert_text`, `sheets_read_range`, `sheets_write_range`, `slides_replace_text`…).
+- **Change** : section Purchases — option de re-vérification du total juste avant « place order » (option de livraison et total approuvés, recontrôle sur la page de confirmation, consigne explicite au sous-agent) ; X Money garde la carte déjà émise si le total change ; `RequestVirtualCard` transmet des `quoteTerms` par réseau. Le flag `critical_tier_opt_out_enabled` s'applique aux « internal dev teams » (plus seulement la team 1). Skill `recent-changes` : retrait des notes du 2026-10-21 (Pages) et du 2026-10-18 (Grok Bot dans The X Subscription) ; `cache.json` des skills mis à jour.
+- **Bugfix** : sérialisation des erreurs — reconnaissance de tous les types d'erreur natifs (`TypeError`, `RangeError`…, `AggregateError`) et de leurs nom/message par défaut ; adresses de messages des fils de tâche (`task-…-t…s…`) acceptées par les cartes.
+- **Autre-infra** : `host-main.cjs` (+2 222/−82 après découpage) et `sand-eval-runner.cjs` (+716/−83) rebuildés ; binaire `box-runtime/sand-egress-tunnel` reconstruit (2 943 272 → 2 942 744 octets) avec `manifest.json` mis à jour.
+
+Rapport : [reports/2026-11-01_16-54.md](reports/2026-11-01_16-54.md).
+
 ## 2026-11-01 09:45 (Paris) — snapshot `2026-11-01_06-44` → `2026-11-01_09-45`
 
 **Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `9b8ca3e81e6eaa30683327cd50c03e0a0905df0f` → `07827555fc0518668254cd5125bb9e9a21ad2505` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`). Toutes les autres versions plateforme inchangées (image `fcbae14`, sand-host `540e5a5`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5). Fichiers : +0 / −0 / ~1.

@@ -1,0 +1,1252 @@
+--- 2026-11-01_09-45:/opt/sand/sand-host/sand-eval-runner.cjs
++++ 2026-11-01_16-54:/opt/sand/sand-host/sand-eval-runner.cjs
+@@ -550421,6 +550421,182 @@
+ }
+ ;
+ 
++var GetTeamCloudAgentMcpAllowlistRequest = class _GetTeamCloudAgentMcpAllowlistRequest extends __protoMessage3128 {
++
++  constructor(data2) {
++
++    super();
++
++    this.teamId = 0;
++
++    proto3.util.initPartial(data2, this);
++
++  }
++
++  static fromBinary(bytes, options2) {
++
++    return new _GetTeamCloudAgentMcpAllowlistRequest().fromBinary(bytes, options2);
++
++  }
++
++  static fromJson(jsonValue2, options2) {
++
++    return new _GetTeamCloudAgentMcpAllowlistRequest().fromJson(jsonValue2, options2);
++
++  }
++
++  static fromJsonString(jsonString, options2) {
++
++    return new _GetTeamCloudAgentMcpAllowlistRequest().fromJsonString(jsonString, options2);
++
++  }
++
++  static equals(a, b2) {
++
++    return proto3.util.equals(_GetTeamCloudAgentMcpAllowlistRequest, a, b2);
++
++  }
++
++  static $() {
++
++    return ["GetTeamCloudAgentMcpAllowlistRequest|1 team_id 5"];
++
++  }
++
++}
++;
++
++var GetTeamCloudAgentMcpAllowlistResponse = class _GetTeamCloudAgentMcpAllowlistResponse extends __protoMessage3128 {
++
++  constructor(data2) {
++
++    super();
++
++    proto3.util.initPartial(data2, this);
++
++  }
++
++  static fromBinary(bytes, options2) {
++
++    return new _GetTeamCloudAgentMcpAllowlistResponse().fromBinary(bytes, options2);
++
++  }
++
++  static fromJson(jsonValue2, options2) {
++
++    return new _GetTeamCloudAgentMcpAllowlistResponse().fromJson(jsonValue2, options2);
++
++  }
++
++  static fromJsonString(jsonString, options2) {
++
++    return new _GetTeamCloudAgentMcpAllowlistResponse().fromJsonString(jsonString, options2);
++
++  }
++
++  static equals(a, b2) {
++
++    return proto3.util.equals(_GetTeamCloudAgentMcpAllowlistResponse, a, b2);
++
++  }
++
++  static $() {
++
++    return ["GetTeamCloudAgentMcpAllowlistResponse|1 mcp_allowlist_cloud_mirrors_local 8?|2 cloud_allowed_mcp_configuration #0?", AllowedMCPConfiguration];
++
++  }
++
++}
++;
++
++var UpdateTeamCloudAgentMcpAllowlistRequest = class _UpdateTeamCloudAgentMcpAllowlistRequest extends __protoMessage3128 {
++
++  constructor(data2) {
++
++    super();
++
++    this.teamId = 0;
++
++    proto3.util.initPartial(data2, this);
++
++  }
++
++  static fromBinary(bytes, options2) {
++
++    return new _UpdateTeamCloudAgentMcpAllowlistRequest().fromBinary(bytes, options2);
++
++  }
++
++  static fromJson(jsonValue2, options2) {
++
++    return new _UpdateTeamCloudAgentMcpAllowlistRequest().fromJson(jsonValue2, options2);
++
++  }
++
++  static fromJsonString(jsonString, options2) {
++
++    return new _UpdateTeamCloudAgentMcpAllowlistRequest().fromJsonString(jsonString, options2);
++
++  }
++
++  static equals(a, b2) {
++
++    return proto3.util.equals(_UpdateTeamCloudAgentMcpAllowlistRequest, a, b2);
++
++  }
++
++  static $() {
++
++    return ["UpdateTeamCloudAgentMcpAllowlistRequest|1 team_id 5|2 mcp_allowlist_cloud_mirrors_local 8?|3 cloud_allowed_mcp_configuration #0?", AllowedMCPConfiguration];
++
++  }
++
++}
++;
++
++var UpdateTeamCloudAgentMcpAllowlistResponse = class _UpdateTeamCloudAgentMcpAllowlistResponse extends __protoMessage3128 {
++
++  constructor(data2) {
++
++    super();
++
++    proto3.util.initPartial(data2, this);
++
++  }
++
++  static fromBinary(bytes, options2) {
++
++    return new _UpdateTeamCloudAgentMcpAllowlistResponse().fromBinary(bytes, options2);
++
++  }
++
++  static fromJson(jsonValue2, options2) {
++
++    return new _UpdateTeamCloudAgentMcpAllowlistResponse().fromJson(jsonValue2, options2);
++
++  }
++
++  static fromJsonString(jsonString, options2) {
++
++    return new _UpdateTeamCloudAgentMcpAllowlistResponse().fromJsonString(jsonString, options2);
++
++  }
++
++  static equals(a, b2) {
++
++    return proto3.util.equals(_UpdateTeamCloudAgentMcpAllowlistResponse, a, b2);
++
++  }
++
++  static $() {
++
++    return ["UpdateTeamCloudAgentMcpAllowlistResponse|1 mcp_allowlist_cloud_mirrors_local 8?|2 cloud_allowed_mcp_configuration #0?", AllowedMCPConfiguration];
++
++  }
++
++}
++;
++
+ var ResetOrganizationGroupAgentRunModeToAutoReviewRequest = class _ResetOrganizationGroupAgentRunModeToAutoReviewRequest extends __protoMessage3128 {
+ 
+   constructor(data2) {
+@@ -695178,6 +695354,28 @@
+     }
+ ,
+     /**
++     * @generated from rpc aiserver.v1.DashboardService.GetTeamCloudAgentMcpAllowlist
++     */
++    getTeamCloudAgentMcpAllowlist: {
++
++      name: "GetTeamCloudAgentMcpAllowlist",
++      I: GetTeamCloudAgentMcpAllowlistRequest,
++      O: GetTeamCloudAgentMcpAllowlistResponse,
++      kind: MethodKind.Unary
++    }
++,
++    /**
++     * @generated from rpc aiserver.v1.DashboardService.UpdateTeamCloudAgentMcpAllowlist
++     */
++    updateTeamCloudAgentMcpAllowlist: {
++
++      name: "UpdateTeamCloudAgentMcpAllowlist",
++      I: UpdateTeamCloudAgentMcpAllowlistRequest,
++      O: UpdateTeamCloudAgentMcpAllowlistResponse,
++      kind: MethodKind.Unary
++    }
++,
++    /**
+      * @generated from rpc aiserver.v1.DashboardService.ResetOrganizationGroupAgentRunModeToAutoReview
+      */
+     resetOrganizationGroupAgentRunModeToAutoReview: {
+@@ -801889,6 +802087,7 @@
+   voice: "voice",
+   purchases: "purchases",
+   shoppingConnectors: "shopping-connectors",
++  virtualTryOn: "virtual-try-on",
+   sendOnBehalf: "send-on-behalf",
+   skillAuthoring: "skill-authoring",
+   sourceControl: "source-control",
+@@ -989980,6 +990179,16 @@
+ 
+ }
+ 
++var SAND_TASK_THREAD_SEND_ID = /^task-([0-9a-f]{
++10}
++)-t(?:\d+|b)s\d+$/;
++
++function sandTaskIdOfThreadSendId(entryId) {
++
++  return SAND_TASK_THREAD_SEND_ID.exec(entryId)?.[1];
++
++}
++
+ 
+ // ../packages/grok-bot-harness/src/tasks/task-document.ts
+ var import_yaml2 = __toESM(require_dist2(), 1);
+@@ -1007025,6 +1007234,11 @@
+ }
+  : {
+  alternatives }
++,
++      ...raw.canTryOn === true ? {
++ canTryOn: true }
++ : {
++}
+ 
+     }
+ ;
+@@ -1010342,6 +1010556,7 @@
+   "reply_in_thread",
+   "stepped_widgets",
+   "similar_products",
++  "shopping_try_on",
+   "tighter_question_widgets",
+   "link_verification",
+   "generate_image_real_subjects",
+@@ -1010634,6 +1010849,7 @@
+   reply_in_thread: "Threaded replies",
+   stepped_widgets: "Stepped widgets",
+   similar_products: "Similar products",
++  shopping_try_on: "Shopping try on",
+   tighter_question_widgets: "Asking for decisions",
+   link_verification: "Link verification",
+   generate_image_real_subjects: "GenerateImage real subjects",
+@@ -1011009,6 +1011225,7 @@
+   yelpDining: false,
+   shoppingCards: false,
+   similarProducts: false,
++  shoppingTryOn: false,
+   shoppingModelContent: false,
+   weatherCard: false,
+   xCards: false,
+@@ -1011302,6 +1011519,7 @@
+   yelpDining: "default",
+   shoppingCards: "default",
+   similarProducts: "default",
++  shoppingTryOn: "default",
+   shoppingModelContent: "default",
+   weatherCard: "default",
+   xCards: "default",
+@@ -1011659,6 +1011877,8 @@
+     () => gates.similarProducts() ? "on" : "off"
+   );
+ 
++  const pinnedShoppingTryOn = pin("shopping_try_on", () => gates.shoppingTryOn() ? "on" : "off");
++
+   const pinnedTighterQuestionWidgets = pin(
+     "tighter_question_widgets",
+     () => gates.tighterQuestionWidgets() ? "on" : "off"
+@@ -1011810,6 +1012030,7 @@
+     replyInThread: () => pinnedReplyInThread() === "on",
+     steppedWidgets: () => pinnedSteppedWidgets() === "on",
+     similarProducts: () => pinnedSimilarProducts() === "on",
++    shoppingTryOn: () => pinnedShoppingTryOn() === "on",
+     tighterQuestionWidgets: () => pinnedTighterQuestionWidgets() === "on",
+     linkVerification: () => pinnedLinkVerification() === "on",
+     generateImageRealSubjects: () => pinnedGenerateImageRealSubjects() === "on",
+@@ -1040595,6 +1040816,11 @@
+   "copy_file",
+   "create_file",
+   "create_folder",
++  "docs_delete_content",
++  "docs_find_text",
++  "docs_insert_text",
++  "docs_read_document",
++  "docs_replace_text",
+   "download_file",
+   "export_file",
+   "get_file_metadata",
+@@ -1040607,6 +1040833,13 @@
+   "reply_to_comment",
+   "search",
+   "share_file",
++  "sheets_append_rows",
++  "sheets_get_spreadsheet",
++  "sheets_read_range",
++  "sheets_write_range",
++  "slides_read_presentation",
++  "slides_replace_text",
++  "slides_set_shape_text",
+   "trash_file",
+   "update_file",
+   "update_file_content"
+@@ -1065906,6 +1066139,33 @@
+ 
+ }
+ 
++async function quoteTermsOf(ctx, args, deps) {
++
++  if (args.networkId === void 0) return void 0;
++
++  return await deps.quoteTermsForNetwork?.(ctx, args.networkId);
++
++}
++
++function tokenRequestFields(request3) {
++
++  return {
++
++    ...request3.networkId === void 0 ? {
++}
++ : {
++ networkId: request3.networkId }
++,
++    ...request3.quoteTerms === void 0 ? {
++}
++ : {
++ quoteTerms: request3.quoteTerms }
++
++  }
++;
++
++}
++
+ async function runRequestVirtualCard(args, deps) {
+ 
+   const agentId = deps.getAgentId();
+@@ -1065920,11 +1066180,9 @@
+ 
+     agentId,
+     card,
+-    ...args.networkId === void 0 ? {
+-}
+- : {
+- networkId: args.networkId }
+-
++    ...tokenRequestFields({
++ networkId: args.networkId, quoteTerms: deps.quoteTerms }
++)
+   }
+ );
+ 
+@@ -1066013,7 +1066271,11 @@
+ 
+       await refuseUnquotedNetwork(ctx, args, d);
+ 
+-      return runRequestVirtualCard(args, d);
++      const quoteTerms = await quoteTermsOf(ctx, args, d);
++
++      return runRequestVirtualCard(args, quoteTerms === void 0 ? d : {
++ ...d, quoteTerms }
++);
+ 
+     }
+ 
+@@ -1066042,11 +1066304,26 @@
+ 
+ var PURCHASES_CHARGED_TOTAL_LINE = "- After the order is placed, compare the confirmation page's grand total with the total the user approved. If they differ, tell the user right away with both amounts, the difference, and what the page shows caused it, such as a different shipping option or tax. Say the card was charged the confirmation page's total. Never say the charge might fail, be declined, or not clear at the new amount, and don't set a check on whether it settles. Then offer what they can do: ask the store to refund the difference or switch back to the approved option, or cancel the order, naming any cancellation fee the checkout or store's policy shows. They can also dispute the charge through their card issuer or wallet.";
+ 
+-var PURCHASES_CHECKOUT_RESULT_LINES = [
+-  PURCHASES_PLACE_ORDER_CHECK_LINE,
+-  PURCHASES_CHARGED_TOTAL_LINE,
+-  PURCHASES_FAILED_CHECKOUT_LINE
+-];
++var PURCHASES_PLACE_ORDER_RECHECK_LINE = "- Whichever card or wallet pays, right before the store's place-order button is pressed, the final review page must still show the shipping option and other choices the user approved and the grand total they approved. Read them once the page stops updating. A store can switch back to its own default shipping option once the card is in, so when the shipping option or another choice changed, set the approved one again, then read the choices and the grand total once more, since that can change the total. Press the button only when they all match. Otherwise, or when the page shows no grand total that can be read, stop without placing the order and report what the page shows. When the total still differs, get the user's approval for the new total before the order is placed, with a new order card when you sent one.";
++
++var PURCHASES_PLACE_ORDER_SUBAGENT_LINE = "- When a subagent places the order, write the approved shipping option, other choices, and grand total into its instructions, have it make that check, and have it report the confirmation page's order number, shipping option, grand total, and what the page says about payment.";
++
++var PURCHASES_CHARGED_TOTAL_AS_SHOWN_LINE = "- After the order is placed, compare the confirmation page's grand total, from the subagent's report when a subagent placed it, with the total the user approved. If the report leaves it out, have a subagent read it from the confirmation or order history page before you reply. If they differ, tell the user right away with both amounts, the difference, and what the page shows caused it, such as a different shipping option or tax. Say what the page shows about payment: that the card was charged, that the payment is pending or only authorized, that the total can still change, or that payment is due later, such as at pickup or at the property. When it shows only a total, say the order was placed for that total. Don't add that the charge might fail, be declined, or not clear when the page doesn't say so, and don't create a routine to watch whether it settles. Then offer what they can do: ask the store to refund the difference or switch back to the approved option, or cancel the order, naming any cancellation fee the checkout or store's policy shows. They can also dispute the charge through their card issuer or wallet.";
++
++function purchasesCheckoutResultLines(totalRecheck) {
++
++  return totalRecheck ? [
++    PURCHASES_PLACE_ORDER_RECHECK_LINE,
++    PURCHASES_PLACE_ORDER_SUBAGENT_LINE,
++    PURCHASES_CHARGED_TOTAL_AS_SHOWN_LINE,
++    PURCHASES_FAILED_CHECKOUT_LINE
++  ] : [
++    PURCHASES_PLACE_ORDER_CHECK_LINE,
++    PURCHASES_CHARGED_TOTAL_LINE,
++    PURCHASES_FAILED_CHECKOUT_LINE
++  ];
++
++}
+ 
+ var SPEND_LOG_WORD = "Spendlog";
+ 
+@@ -1066404,19 +1066681,33 @@
+   PURCHASES_WARRANTY_LINE
+ ].join("\n");
+ 
+-var PURCHASES_CREDIT_CARD_SECTION = [
+-  "## Credit cards",
+-  `Follow this whenever the user's own credit card comes up, before or at checkout, whatever an earlier message in the conversation said. A card is saved securely only at a live checkout page, when you collect it with ${
++function purchasesCreditCardSection({
++
++  totalRecheck
++}
++) {
++
++  return [
++    "## Credit cards",
++    `Follow this whenever the user's own credit card comes up, before or at checkout, whatever an earlier message in the conversation said. A card is saved securely only at a live checkout page, when you collect it with ${
+ GROK_BOT_TOOL_NAMES.RequestUserForm}
+ . Card details or photos the user sends in chat are fine to accept and use for the purchase, but they are not saved, so never say a card is already saved or ready to use.`,
+-  "- If, before a checkout, the user asks you to take, save, or remember a card, asks whether you'll remember it later, or asks whether it's safe to give it to you, say yes, you'll save it securely once you're at a checkout, ask what they'd like to buy, and don't open a form yet.",
+-  "- If they send card details or photos, asked for or not, thank them and say that if you need anything more you'll ask once, at checkout. Don't read any of the details back or ask for anything missing yet.",
+-  `- Keep these replies about what you will do at checkout, for example "Thanks! I'll save it securely when we check out. What would you like to buy?" Leave out anything you won't do or haven't done yet, where they shouldn't send it, and any warning about sharing it. Never refuse a card or say a wallet is the only way.`,
+-  `- At checkout, enter what they already sent. Collect anything still missing with ${
++    "- If, before a checkout, the user asks you to take, save, or remember a card, asks whether you'll remember it later, or asks whether it's safe to give it to you, say yes, you'll save it securely once you're at a checkout, ask what they'd like to buy, and don't open a form yet.",
++    "- If they send card details or photos, asked for or not, thank them and say that if you need anything more you'll ask once, at checkout. Don't read any of the details back or ask for anything missing yet.",
++    `- Keep these replies about what you will do at checkout, for example "Thanks! I'll save it securely when we check out. What would you like to buy?" Leave out anything you won't do or haven't done yet, where they shouldn't send it, and any warning about sharing it. Never refuse a card or say a wallet is the only way.`,
++    `- At checkout, enter what they already sent. Collect anything still missing with ${
+ GROK_BOT_TOOL_NAMES.RequestUserForm}
+  rather than in chat, and use that form for any verification code the bank or checkout asks for, even when the card itself needed no form.`,
+-  ...PURCHASES_CHECKOUT_RESULT_LINES
+-].join("\n");
++    ...purchasesCheckoutResultLines(totalRecheck)
++  ].join("\n");
++
++}
++
++var PURCHASES_CREDIT_CARD_SECTION = purchasesCreditCardSection({
++
++  totalRecheck: false
++}
++);
+ 
+ var PURCHASES_VAULT_CARD_DIRECT_SAVE_LINE = `- When they asked you to save, keep, or remember a card and sent its number, expiry, and security code, call ${
+ GROK_BOT_TOOL_NAMES.RequestUserForm}
+@@ -1066475,7 +1066766,12 @@
+ 
+ var checkoutCardFormClause = (directSave) => directSave ? "with no choice so they can save one in the form" : "so they save one";
+ 
+-function purchasesVaultCardSection(directSave) {
++function purchasesVaultCardSection({
++
++  directSave,
++  totalRecheck
++}
++) {
+ 
+   return [
+     ...purchasesVaultCardLines(directSave),
+@@ -1066491,14 +1066787,37 @@
+  once its receipt says it's saved, fill it the same way. ${
+ PURCHASES_SAVED_CARD_FALLBACK}
+ `,
+-    ...PURCHASES_CHECKOUT_RESULT_LINES
++    ...purchasesCheckoutResultLines(totalRecheck)
+   ].join("\n");
+ 
+ }
+ 
+-var PURCHASES_VAULT_CARD_SECTION = purchasesVaultCardSection(false);
++var PURCHASES_VAULT_CARD_SECTION = purchasesVaultCardSection({
++
++  directSave: false,
++  totalRecheck: false
++}
++);
+ 
+-function purchasesVaultCardOrderSection(directSave) {
++var PURCHASES_ORDER_CARD_X_MONEY_KEEPS_CARD_CLAUSE = ", except that a Pay naming X Money on a new order card for a changed total keeps using the card X Money already issued for this purchase, as the X Money line says";
++
++var PURCHASES_SAVED_CARD_TOTAL_MATCH_CLAUSE = " and its total still matches the order;
++ if the total changed, send a new order";
++
++var PURCHASES_ORDER_RESULT_REPLY_LINE = `- Once the order goes through or fails after a Pay tap, whichever card or wallet that Pay named, reply with purchase: placed with the order number, or failed with the reason. After a placed one, when ${
++GROK_BOT_TOOL_NAMES.SendToUser}
++ has a shipment field, send a shipment card at stage "placed" in its own ${
++GROK_BOT_TOOL_NAMES.SendToUser}
++, with the store, the order number, and the items from the confirmation page.`;
++
++function purchasesVaultCardOrderSection({
++
++  directSave,
++  totalRecheck
++}
++) {
++
++  const checkoutResultLines = purchasesCheckoutResultLines(totalRecheck);
+ 
+   return [
+     ...purchasesVaultCardLines(directSave),
+@@ -1066526,8 +1066845,9 @@
+ GROK_BOT_TOOL_NAMES.SendToUser}
+  type "widget" with order, filled as the next lines say, and stop. Fill the saved card as the \`${
+ GROK_BOT_BUILTIN_SKILL_IDS.vault}
+-\` skill says and place the order only after the user taps Pay on the newest order card, with the card and address that Pay names, and only once the page ships to that address and its total still matches the order;
+- if the total changed, send a new order.`,
++\` skill says and place the order only after the user taps Pay on the newest order card, with the card and address that Pay names, and only once the page ships to that address${
++totalRecheck ? "" : PURCHASES_SAVED_CARD_TOTAL_MATCH_CLAUSE}
++.`,
+     "- Take every order fact from the checkout's final review page. When a subagent runs the checkout, ask it to report from that page the store's name and the checkout's https link;
+  each cart line's title, variant, quantity, line total, and https image URL;
+  each shipping, tax, fee, and discount line with its label and amount, and the shipping arrival date;
+@@ -1066550,24 +1066870,28 @@
+  Write every label in plain words without markdown.`,
+     "- A yes in chat does not pay an order card, and writing in chat can close the open card. When the user has not tapped Pay on the newest order card and still wants to buy after writing in chat, whether they approved there or asked something first, send the order again and ask in one line to tap Pay on the new card. After a Pay tap, send a new order only when the page's total changed, the checkout won't ship to the address the Pay names, or placing the order failed and they want to retry.",
+     `- An order card holds any number of product lines, each at any quantity, in whatever currency the checkout charges. Link pays only orders in US dollars, so send an order in another currency with a saved card or "x_money" as the order.payment line allows, never "stripe_link". For any refusal, fix what it names and send the order again.`,
+-    `- When a connected wallet pays, the order card is that purchase's approval: send it the same way with payment.method "stripe_link", or "x_money" as the order.payment line allows, and no payment.card, in place of the wallet's Approve / Cancel widget, and spend only after the user taps Pay on the newest order card, with the wallet that Pay names: X Money calls its purchase tool, and Link calls \`${
++    `- When a connected wallet pays, the order card is that purchase's approval: send it the same way with payment.method "stripe_link", or "x_money" as the order.payment line allows, and no payment.card, in place of the wallet's Approve / Cancel widget, and spend only after the user taps Pay on the newest order card, with the wallet that Pay names: X Money calls its purchase tool${
++totalRecheck ? PURCHASES_ORDER_CARD_X_MONEY_KEEPS_CARD_CLAUSE : ""}
++, and Link calls \`${
+ GROK_BOT_TOOL_NAMES.RequestVirtualCard}
+ \` with that card's total and lines, whose card is Link's own authorization of the same purchase. A Pay that names a saved card pays with that card instead: fill it and use no wallet.`,
+     `- The order card answers in chat with a message that ends with its order id, like "(order ord_\u2026)". "Pay $\u2026 to \u2026 with Visa ending 4242, shipping to <name>, <address>" is the Pay tap, and "with X Money" or "with Link" names a wallet. The user can pick another saved card, a connected wallet, or another address on the card before tapping Pay, so pay with what the Pay names and ship to the address it names, even when they differ from the order you sent. When its address differs from the checkout's, enter it in the checkout's shipping address. When its card differs from the order's, or the order had no payment, call ${
+ GROK_BOT_TOOL_NAMES.Vault}
+  list with kind "card" and fill the card with that brand and those last four digits, even when the order paid with a wallet. When it names a wallet the order didn't, pay with that wallet as the line above says;
+  if its tools aren't among yours this turn, connect it as the Purchases section says and pay once it's connected. "Cancel the \u2026 order" is a no: place nothing, say in one line that nothing was charged, and send no new order card unless they ask for one.`,
+-    `- Once the order goes through or fails after a Pay tap, whichever card or wallet that Pay named, reply with purchase: placed with the order number, or failed with the reason. After a placed one, when ${
+-GROK_BOT_TOOL_NAMES.SendToUser}
+- has a shipment field, send a shipment card at stage "placed" in its own ${
+-GROK_BOT_TOOL_NAMES.SendToUser}
+-, with the store, the order number, and the items from the confirmation page.`,
+-    ...PURCHASES_CHECKOUT_RESULT_LINES
++    ...totalRecheck ? checkoutResultLines : [],
++    PURCHASES_ORDER_RESULT_REPLY_LINE,
++    ...totalRecheck ? [] : checkoutResultLines
+   ].join("\n");
+ 
+ }
+ 
+-var PURCHASES_VAULT_CARD_ORDER_SECTION = purchasesVaultCardOrderSection(false);
++var PURCHASES_VAULT_CARD_ORDER_SECTION = purchasesVaultCardOrderSection({
++
++  directSave: false,
++  totalRecheck: false
++}
++);
+ 
+ var PURCHASES_VAULT_CONTACT_SECTION = [
+   "## Checkout contact info",
+@@ -1080335,13 +1080659,13 @@
+  each shows as a card after content, in list order. For text after a card, or between cards, make separate sends."
+ );
+ 
+-var SHOPPING_DESCRIPTION = `type:text. Product cards after content. For a ${
+-GROK_BOT_TOOL_NAMES.ProductSearch}
+- product, give its id, a 1-3 word badge and a one-line note, not price or rating;
++var SHOPPING_DESCRIPTION_RULES = `, not price or rating;
+  the card fills in the rest. Else, or to fix one, write fields from a tool or subagent result: a variant per option combination, an offer per seller, at least one image, only its prices, https links and images. Content: a sentence or two;
+  don't list or link products. Example: {
+ "products":[{
+-"id":"prd_ggl_1","badge":"Top pick"}
++"id":"prd_ggl_1","badge":"Top pick"`;
++
++var SHOPPING_DESCRIPTION_EXAMPLE_END = `}
+ ,{
+ "title":"Mug","images":["https://nw.example/mug.jpg"],"variants":[{
+ "options":{
+@@ -1080355,6 +1080679,22 @@
+ ]}
+ `;
+ 
++var SHOPPING_DESCRIPTION = `type:text. Product cards after content. For a ${
++GROK_BOT_TOOL_NAMES.ProductSearch}
++ product, give its id, a 1-3 word badge and a one-line note${
++SHOPPING_DESCRIPTION_RULES}
++${
++SHOPPING_DESCRIPTION_EXAMPLE_END}
++`;
++
++var SHOPPING_TRY_ON_DESCRIPTION = `type:text. Product cards after content. For a ${
++GROK_BOT_TOOL_NAMES.ProductSearch}
++ product, give its id, a 1-3 word badge, a one-line note and canTryOn if the user could wear it${
++SHOPPING_DESCRIPTION_RULES}
++,"canTryOn":true${
++SHOPPING_DESCRIPTION_EXAMPLE_END}
++`;
++
+ var shoppingUrl = () => string2();
+ 
+ var shoppingText = (max) => max === void 0 ? string2() : string2().max(max);
+@@ -1080529,6 +1080869,26 @@
+ }
+ ).optional().describe(SHOPPING_DESCRIPTION);
+ 
++var tryOnShape = {
++
++  canTryOn: boolean2().optional().describe(
++    "true on every product the user could wear: clothing, shoes, a bag or an accessory. Adds Try on"
++  )
++}
++;
++
++var shoppingFieldWithTryOn = shoppingField.unwrap().extend({
++
++  products: array(shoppingProduct.extend(tryOnShape)).max(limit.products).describe("Best first")
++}
++).optional().describe(SHOPPING_TRY_ON_DESCRIPTION);
++
++var shoppingFieldWithSimilarAndTryOn = shoppingFieldWithSimilar.unwrap().extend({
++
++  products: array(shoppingFieldWithSimilar.unwrap().shape.products.element.extend(tryOnShape)).max(limit.products).describe("Best first")
++}
++).optional().describe(SHOPPING_TRY_ON_DESCRIPTION);
++
+ var SHIPMENT_DESCRIPTION = "type:text. An order's shipping status as a card after content. Take values from the store's or carrier's page or email: names in plain words (Amazon, UPS), not domains;
+  one line each;
+  https links. stage sets the progress bar;
+@@ -1080642,7 +1081002,7 @@
+   open: string2().trim().optional().describe(SEND_MESSAGE_OPEN_DESCRIPTION),
+   act: sendMessageActField,
+   cards: cardsField,
+-  shopping: shoppingFieldWithSimilar,
++  shopping: shoppingFieldWithSimilarAndTryOn,
+   shipment: shipmentField,
+   order: orderField,
+   purchase: purchaseField,
+@@ -1081942,6 +1082302,18 @@
+ }
+ ;
+ 
++function advertisedShoppingField(args) {
++
++  if (args.shoppingTryOn) {
++
++    return args.similarProducts ? shoppingFieldWithSimilarAndTryOn : shoppingFieldWithTryOn;
++
++  }
++
++  return args.similarProducts ? shoppingFieldWithSimilar : shoppingField;
++
++}
++
+ function conciseAdvertisedSendMessageParameters(args) {
+ 
+   const table = conciseVariantTables(args)[args.credentialRequest][inAppVariantKey(args)];
+@@ -1081951,7 +1082323,7 @@
+ ) : table;
+ 
+   const shopping = args.shoppingCards ? variant.extend({
+- shopping: args.similarProducts ? shoppingFieldWithSimilar : shoppingField }
++ shopping: advertisedShoppingField(args) }
+ ) : variant;
+ 
+   const shipment = args.shipmentCards ? shopping.extend({
+@@ -1083038,9 +1083410,7 @@
+  never split one answer into fragments.`,
+     "- Put identifiers, paths, commands, and code in code spans, one script per span. Text renders as Markdown: use distinct link labels, `\\( ... \\)` for inline math and `$$ ... $$` on their own lines for display math (a single `$` is not a delimiter), and a fenced `mermaid` block when a diagram beats prose. Never substitute an image of a formula.",
+     ITEM_LINES_LINE,
+-    `- Warm means attentive to the user, not emotional about yourself: never narrate your feelings or claim to be human. Use dashes and emoji rarely. Use a person's stated pronouns or those already in context;
+- never infer gender or pronouns from a name, and default to "they". Call people by the name a source gave you;
+- if all you have is an email address or handle, use the handle as written rather than turning it into a first name.`
++    "- Warm means attentive to the user, not emotional about yourself: never narrate your feelings or claim to be human. Use dashes and emoji rarely."
+   ]
+ }
+ ;
+@@ -1113205,6 +1113575,12 @@
+ 
+ }
+ 
++function isMessageRefAddress(value) {
++
++  return isMessageAddress(value) || sandTaskIdOfThreadSendId(value) !== void 0;
++
++}
++
+ 
+ // ../packages/grok-bot-harness/src/reactions.ts
+ var REACTION_WAKE_PROMPT_PREFIX = "[The user reacted ";
+@@ -1119977,7 +1120353,7 @@
+ 
+ function cardLocation(deliverTo, draftId, taskId, outsideChannel = false) {
+ 
+-  const id = draftId != null && draftId.length > 0 ? ` (id: ${
++  const id = draftId != null && draftId.length > 0 ? ` (message id: ${
+ draftId}
+ )` : "";
+ 
+@@ -1120000,7 +1120376,7 @@
+ 
+ function channelDraftCardResult(where, draftId, card) {
+ 
+-  const id = draftId != null && draftId.length > 0 ? ` (id: ${
++  const id = draftId != null && draftId.length > 0 ? ` (message id: ${
+ draftId}
+ )` : "";
+ 
+@@ -1142061,6 +1142437,33 @@
+ 
+ }
+ 
++function withOfferedProductFields(shopping, offered) {
++
++  return {
++
++    ...shopping,
++    products: shopping.products.map(({
++ similar, canTryOn, ...product }
++) => ({
++
++      ...product,
++      ...offered.similar && similar !== void 0 ? {
++ similar }
++ : {
++}
++,
++      ...offered.tryOn && canTryOn !== void 0 ? {
++ canTryOn }
++ : {
++}
++
++    }
++))
++  }
++;
++
++}
++
+ function readFilledShoppingCard(shopping, searched, options2 = {
+ }
+ ) {
+@@ -1145170,6 +1145573,10 @@
+  name: "render_card_id_leniency" }
+ );
+ 
++var renderCardMessageAddress = defineShim({
++ name: "render_card_message_address" }
++);
++
+ async function resolveRenderCards(ctx, rawArgs, renderCards) {
+ 
+   const ids = rawArgs.type === "text" ? rawArgs.cards ?? [] : [];
+@@ -1145188,6 +1145595,18 @@
+ 
+     const entry = await renderCards.registry.lookup(ctx, id);
+ 
++    if (entry === void 0 && isMessageRefAddress(id)) {
++
++      logShimFiring(ctx, renderCardMessageAddress.applied(void 0, {
++ log: {
++ field: "cards" }
++ }
++));
++
++      continue;
++
++    }
++
+     if (entry === void 0) throw new SandToolInputError(unknownRenderCardError(id));
+ 
+     if (renderCards.registry.isShown(id)) throw new SandToolInputError(renderCardShownError(id));
+@@ -1145223,19 +1145642,6 @@
+ 
+ }
+ 
+-function withoutSimilarQueries(shopping) {
+-
+-  return {
+-
+-    ...shopping,
+-    products: shopping.products.map(({
+- similar: _similar, ...product }
+-) => product)
+-  }
+-;
+-
+-}
+-
+ function shoppingCardOfArgs(rawArgs, deps) {
+ 
+   const raw = rawArgs.type === "text" ? rawArgs.shopping : void 0;
+@@ -1145257,7 +1145663,12 @@
+   }
+ 
+   const read2 = readFilledShoppingCard(
+-    deps.renderCards.similarProductsOffered?.() === true ? raw : withoutSimilarQueries(raw),
++    withOfferedProductFields(raw, {
++
++      similar: deps.renderCards.similarProductsOffered?.() === true,
++      tryOn: deps.renderCards.shoppingTryOnOffered?.() === true
++    }
++),
+     deps.renderCards.products,
+     {
+  modelContent: deps.renderCards.shoppingModelContent?.() === true }
+@@ -1146631,6 +1147042,7 @@
+     renderCards: concise && deps.renderCards?.offered() === true,
+     shoppingCards: concise && deps.renderCards?.shoppingOffered?.() === true,
+     similarProducts: concise && deps.renderCards?.similarProductsOffered?.() === true,
++    shoppingTryOn: concise && deps.renderCards?.shoppingTryOnOffered?.() === true,
+     shipmentCards: concise && deps.renderCards?.shipmentOffered?.() === true,
+     orderCards: concise && orderOffered(deps),
+     replyInThread: deps.replyInThread?.() === true,
+@@ -1195481,6 +1195893,7 @@
+             offered: () => offersRenderCards(host),
+             shoppingOffered: () => offersRenderCardKind(host, "shopping"),
+             similarProductsOffered: () => offersRenderCardKind(host, "shopping") && host.gates.similarProducts(),
++            shoppingTryOnOffered: () => offersRenderCardKind(host, "shopping") && host.gates.shoppingTryOn(),
+             similarProductsSearch: () => offeredProductSearchPort(host),
+             shoppingModelContent: host.gates.shoppingModelContent,
+             ...host.shoppingRefusal === void 0 ? {
+@@ -1217528,7 +1217941,14 @@
+         "set_slide_background",
+         "set_table_cell_fill",
+         "set_text_style",
+-        "update_element_position"
++        "update_element_position",
++        "docs_insert_text",
++        "docs_replace_text",
++        "docs_delete_content",
++        "sheets_write_range",
++        "sheets_append_rows",
++        "slides_replace_text",
++        "slides_set_shape_text"
+       ]),
+       ...actions("edited", ["copy_sheet_to_another_spreadsheet"])
+     }
+@@ -1220190,7 +1220610,8 @@
+ }
+  : {
+ 
+-          quoteNamesNetwork: (ctx, networkId) => tokens.quoteNamesNetwork(ctx, networkId)
++          quoteNamesNetwork: (ctx, networkId) => tokens.quoteNamesNetwork(ctx, networkId),
++          quoteTermsForNetwork: (ctx, networkId) => tokens.quoteTermsForNetwork(ctx, networkId)
+         }
+ ,
+         requestCard: (request3) => virtualCard.requestCard(request3),
+@@ -1232153,7 +1232574,7 @@
+     plugin: "google-drive",
+     tag: "googledrive",
+     name: "Google Drive",
+-    summary: "Search, read, create, copy, move, share and comment on Drive files and folders. It can't edit a Doc, Sheet or Slide deck's content in place."
++    summary: "Search, read, create, copy, move, share and comment on Drive files and folders. It edits a Doc, Sheet or Slide deck's content in place only with its docs_, sheets_ and slides_ tools, when it lists them."
+   }
+ ,
+   {
+@@ -1233556,6 +1233977,42 @@
+ ],
+         ["reply_to_comment", {
+  rows: HOSTED, inherits: ["update_file"] }
++],
++        ["docs_read_document", {
++ rows: HOSTED, inherits: ["read_file_content"] }
++],
++        ["docs_find_text", {
++ rows: HOSTED, inherits: ["read_file_content"] }
++],
++        ["docs_insert_text", {
++ rows: HOSTED, inherits: ["update_file"] }
++],
++        ["docs_replace_text", {
++ rows: HOSTED, inherits: ["update_file"] }
++],
++        ["docs_delete_content", {
++ rows: HOSTED, inherits: ["update_file"] }
++],
++        ["sheets_get_spreadsheet", {
++ rows: HOSTED, inherits: ["read_file_content"] }
++],
++        ["sheets_read_range", {
++ rows: HOSTED, inherits: ["read_file_content"] }
++],
++        ["sheets_write_range", {
++ rows: HOSTED, inherits: ["update_file"] }
++],
++        ["sheets_append_rows", {
++ rows: HOSTED, inherits: ["update_file"] }
++],
++        ["slides_read_presentation", {
++ rows: HOSTED, inherits: ["read_file_content"] }
++],
++        ["slides_replace_text", {
++ rows: HOSTED, inherits: ["update_file"] }
++],
++        ["slides_set_shape_text", {
++ rows: HOSTED, inherits: ["update_file"] }
+ ]
+       ])
+     }
+@@ -1250030,6 +1250487,103 @@
+ }
+ 
+ 
++// ../packages/grok-bot-harness/src/mcp/link-shared-payment-token/quote-terms.ts
++var IDEMPOTENCY_KEY = /idempotency_?key$/i;
++
++var EXPIRES_AT_KEY = /expires_?at$/i;
++
++var MAX_IDEMPOTENCY_KEY_LENGTH = 255;
++
++var PRINTABLE_ASCII = /^[\x21-\x7e]+$/;
++
++var MIN_EXPIRES_AT_SECONDS = 1e9;
++
++var MAX_EXPIRES_AT_SECONDS = 99999999999;
++
++function idempotencyKeyOf(value) {
++
++  if (typeof value !== "string") return void 0;
++
++  const key = value.trim();
++
++  return key.length <= MAX_IDEMPOTENCY_KEY_LENGTH && PRINTABLE_ASCII.test(key) ? key : void 0;
++
++}
++
++function expiresAtSecondsOf(value) {
++
++  const seconds = typeof value === "string" && value.trim().length > 0 ? Number(value) : value;
++
++  if (typeof seconds !== "number" || !Number.isInteger(seconds)) return void 0;
++
++  return seconds >= MIN_EXPIRES_AT_SECONDS && seconds <= MAX_EXPIRES_AT_SECONDS ? seconds : void 0;
++
++}
++
++function firstMatching(record6, key, read2) {
++
++  const entries = Object.entries(record6);
++
++  for (const [name18, value] of entries) {
++
++    const found = key.test(name18) ? read2(value) : void 0;
++
++    if (found !== void 0) return found;
++
++  }
++
++  return void 0;
++
++}
++
++function linkQuoteTermsBeside(record6) {
++
++  return linkQuoteTerms({
++
++    idempotencyKey: firstMatching(record6, IDEMPOTENCY_KEY, idempotencyKeyOf),
++    expiresAtSeconds: firstMatching(record6, EXPIRES_AT_KEY, expiresAtSecondsOf)
++  }
++);
++
++}
++
++function linkQuoteTerms(parts) {
++
++  return {
++
++    ...parts.idempotencyKey === void 0 ? {
++}
++ : {
++ idempotencyKey: parts.idempotencyKey }
++,
++    ...parts.expiresAtSeconds === void 0 ? {
++}
++ : {
++ expiresAtSeconds: parts.expiresAtSeconds }
++
++  }
++;
++
++}
++
++function encodedLinkQuoteTerms(terms2) {
++
++  return [terms2.idempotencyKey ?? "", terms2.expiresAtSeconds?.toString() ?? ""];
++
++}
++
++function decodedLinkQuoteTerms(encoded) {
++
++  return linkQuoteTerms({
++
++    idempotencyKey: idempotencyKeyOf(encoded.idempotencyKey),
++    expiresAtSeconds: expiresAtSecondsOf(encoded.expiresAt)
++  }
++);
++
++}
++
++
+ // ../packages/grok-bot-harness/src/mcp/link-shared-payment-token-custody.ts
+ var SPEND_REQUEST_READ_TOOL = "get_spend_request";
+ 
+@@ -1250084,18 +1250638,30 @@
+ 
+ }
+ 
+-function connectorQuoteKey(server, toolName, networkId) {
++function quotedNetworkKey(quote3) {
+ 
+-  return [server, toolName, networkId].join(QUOTE_KEY_SEPARATOR);
++  return [
++    quote3.server,
++    quote3.toolName,
++    quote3.networkId,
++    ...encodedLinkQuoteTerms(quote3.terms)
++  ].join(QUOTE_KEY_SEPARATOR);
+ 
+ }
+ 
+ function quoteKeyParts(key) {
+ 
+-  const [server = "", toolName = "", networkId = ""] = key.split(QUOTE_KEY_SEPARATOR);
++  const [server = "", toolName = "", networkId = "", idempotencyKey = "", expiresAt = ""] = key.split(QUOTE_KEY_SEPARATOR);
+ 
+   return {
+- server, toolName, networkId }
++
++    server,
++    toolName,
++    networkId,
++    terms: decodedLinkQuoteTerms({
++ idempotencyKey, expiresAt }
++)
++  }
+ ;
+ 
+ }
+@@ -1250122,7 +1250688,7 @@
+ 
+     if (NETWORK_ID_KEY.test(key) && typeof child === "string" && child.trim().length > 0) {
+ 
+-      into.add(child.trim());
++      into.set(child.trim(), linkQuoteTermsBeside(value));
+ 
+     }
+  else {
+@@ -1250135,11 +1250701,11 @@
+ 
+ }
+ 
+-function networkIdsOfSuccess(success2) {
++function quotedNetworksOfSuccess(success2) {
+ 
+-  if (success2.isError) return [];
++  const ids = /* @__PURE__ */ new Map();
+ 
+-  const ids = /* @__PURE__ */ new Set();
++  if (success2.isError) return ids;
+ 
+   for (const item of success2.content) {
+ 
+@@ -1250157,7 +1250723,23 @@
+ 
+   }
+ 
+-  return [...ids];
++  return ids;
++
++}
++
++function networkIdsOfSuccess(success2) {
++
++  return [...quotedNetworksOfSuccess(success2).keys()];
++
++}
++
++function quoteKeysOf(args, success2) {
++
++  return [...quotedNetworksOfSuccess(success2)].map(
++    ([networkId, terms2]) => quotedNetworkKey({
++ server: serverOf2(args), toolName: args.toolName, networkId, terms: terms2 }
++)
++  );
+ 
+ }
+ 
+@@ -1250171,9 +1250753,7 @@
+ 
+   if (result?.case !== "success") return [];
+ 
+-  return networkIdsOfSuccess(result.value).map(
+-    (id) => connectorQuoteKey(serverOf2(args), args.toolName, id)
+-  );
++  return quoteKeysOf(args, result.value);
+ 
+ }
+ 
+@@ -1250291,7 +1250871,32 @@
+ 
+ var BUILT_IN_STACK = Object.getOwnPropertyDescriptor(new Error(), "stack");
+ 
+-var BUILT_IN_PROTOTYPES = /* @__PURE__ */ new Set([
++var ERROR_KINDS = [
++  Error,
++  TypeError,
++  RangeError,
++  ReferenceError,
++  SyntaxError,
++  EvalError,
++  URIError,
++  AggregateError
++];
++
++var BUILT_IN_ERROR_TEXT = new Map(
++  ERROR_KINDS.map((kind) => [
++    kind.prototype,
++    {
++ name: kind.prototype.name, message: kind.prototype.message }
++
++  ])
++);
++
++var ERROR_TO_STRING = Object.getOwnPropertyDescriptor(
++  Error.prototype,
++  "toString"
++)?.value;
++
++var CLASS_GETTER_BOUNDARIES = /* @__PURE__ */ new Set([
+   Object.prototype,
+   Array.prototype,
+   Map.prototype,
+@@ -1250299,6 +1250904,11 @@
+   Error.prototype
+ ]);
+ 
++var BUILT_IN_PROTOTYPES = /* @__PURE__ */ new Set([
++  ...CLASS_GETTER_BOUNDARIES,
++  ...BUILT_IN_ERROR_TEXT.keys()
++]);
++
+ function scrubThrownValue(value) {
+ 
+   const {
+@@ -1250730,13 +1251340,28 @@
+ 
+     if (Object.getOwnPropertyDescriptor(holder, Symbol.toPrimitive) !== void 0) return false;
+ 
++    const builtIn = BUILT_IN_ERROR_TEXT.get(holder);
++
++    if (holder === thrown && (builtIn !== void 0 || Object.hasOwn(holder, "constructor"))) {
++
++      return false;
++
++    }
++
+     const ownName = Object.getOwnPropertyDescriptor(holder, "name");
+ 
+     const ownMessage = Object.getOwnPropertyDescriptor(holder, "message");
+ 
+-    const unwalked = holder !== thrown && holder !== Error.prototype;
++    if (builtIn === void 0) {
++
++      if (holder !== thrown && (ownName !== void 0 || ownMessage !== void 0)) return false;
++
++    }
++ else if (ownName !== void 0 && dataValue(ownName) !== builtIn.name || ownMessage !== void 0 && dataValue(ownMessage) !== builtIn.message) {
++
++      return false;
+ 
+-    if (unwalked && (ownName !== void 0 || ownMessage !== void 0)) return false;
++    }
+ 
+     toString3 ??= Object.getOwnPropertyDescriptor(holder, "toString");
+ 
+@@ -1250746,7 +1251371,7 @@
+ 
+     if (holder === Error.prototype) {
+ 
+-      return holder !== thrown && dataValue(toString3) === Error.prototype.toString && typeof dataValue(name18) === "string" && typeof dataValue(message) === "string";
++      return dataValue(toString3) === ERROR_TO_STRING && typeof dataValue(name18) === "string" && typeof dataValue(message) === "string";
+ 
+     }
+ 
+@@ -1250788,7 +1251413,7 @@
+ 
+   if (scope.seen.has(value)) return scope.seen.get(value);
+ 
+-  const inPlace = scope.complete && !node2.keys.some(namesToken) && node2.fields.every(([, field]) => field.writable === true) && node2.inherited.every(([, field]) => !reachesToken2(field, scope.reaching)) && (!(value instanceof Error) || scrubbedStack2(value, node2));
++  const inPlace = scope.complete && !BUILT_IN_PROTOTYPES.has(value) && !node2.keys.some(namesToken) && node2.fields.every(([, field]) => field.writable === true) && node2.inherited.every(([, field]) => !reachesToken2(field, scope.reaching)) && (!(value instanceof Error) || scrubbedStack2(value, node2));
+ 
+   const target = inPlace ? value : shellOf2(value, node2);
+ 
+@@ -1250926,7 +1251551,7 @@
+ 
+   let proto = Object.getPrototypeOf(value);
+ 
+-  while (typeof proto === "object" && proto !== null && !BUILT_IN_PROTOTYPES.has(proto)) {
++  while (typeof proto === "object" && proto !== null && !CLASS_GETTER_BOUNDARIES.has(proto)) {
+ 
+     for (const key of Reflect.ownKeys(proto)) {
+ 
+@@ -1251105,6 +1251730,9 @@
+   return {
+ 
+     quoteNamesNetwork: async () => false,
++    quoteTermsForNetwork: async () => ({
++}
++),
+     guardSpiller: guardSpillerAgainstTokens,
+     wrap: (executor) => ({
+ 
+@@ -1251171,7 +1251799,7 @@
+   }
+ ;
+ 
+-  const quotes = async (ctx) => [...quotesThisTurn, ...await readEarlier(ctx)].filter((key) => {
++  const quotes = async (ctx) => [...await readEarlier(ctx), ...quotesThisTurn].filter((key) => {
+ 
+     const {
+  server, toolName }
+@@ -1251221,9 +1251849,11 @@
+ 
+     if (outcome.case === "success" && connectorOf2(serverOf2(args))?.quoteTools.has(args.toolName)) {
+ 
+-      for (const id of networkIdsOfSuccess(outcome.value)) {
++      for (const key of quoteKeysOf(args, outcome.value)) {
+ 
+-        quotesThisTurn.add(connectorQuoteKey(serverOf2(args), args.toolName, id));
++        quotesThisTurn.delete(key);
++
++        quotesThisTurn.add(key);
+ 
+       }
+ 
+@@ -1251364,6 +1251994,9 @@
+   return {
+ 
+     quoteNamesNetwork: async (ctx, networkId) => (await quotes(ctx)).some((key) => quoteKeyParts(key).networkId === networkId),
++    quoteTermsForNetwork: async (ctx, networkId) => (await quotes(ctx)).map(quoteKeyParts).filter((quote3) => quote3.networkId === networkId).at(-1)?.terms ?? {
++}
++,
+     guardSpiller: guardSpillerAgainstTokens,
+     wrap: (executor) => ({
+ 
