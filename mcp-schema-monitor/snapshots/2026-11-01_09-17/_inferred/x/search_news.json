@@ -1,0 +1,86 @@
+{
+  "namespace": "x",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-26T09:18:24+01:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "data": {
+          "items": {
+            "properties": {
+              "category": {
+                "type": "string"
+              },
+              "contexts": {
+                "properties": {
+                  "topics": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "topics"
+                ],
+                "type": "object"
+              },
+              "disclaimer": {
+                "type": "string"
+              },
+              "hook": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "summary": {
+                "type": "string"
+              },
+              "updated_at": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "category",
+              "contexts",
+              "disclaimer",
+              "hook",
+              "id",
+              "name",
+              "summary",
+              "updated_at",
+              "url"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "meta": {
+          "properties": {
+            "result_count": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "result_count"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "search_news"
+}

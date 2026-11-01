@@ -1,0 +1,21 @@
+{
+  "description": "Renames one of the authenticated user's stream sources.",
+  "inputSchema": {
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "name": {
+        "description": "New label for the source.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "name"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "update_source"
+}
