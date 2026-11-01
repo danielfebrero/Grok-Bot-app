@@ -1,0 +1,765 @@
+/**
+ * "Saudi Arabia — Presentation Template" — rebuilt with pptxgenjs.
+ *
+ * Run:  node 17bca852-cfdd-4009-a218-4a3df9bfe947_grok_final.js
+ * Out:  17bca852-cfdd-4009-a218-4a3df9bfe947_grok_final.pptx  (next to this file)
+ *
+ * Slide size 13.333 x 7.5 in, 20 slides. All geometry is in inches, taken from
+ * the source deck's <a:xfrm> offsets with group transforms already flattened.
+ */
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ theme */
+
+const C = {
+  ink: '0D0D0D',        // near-black headline colour
+  body: '595959',       // tx1 @ lum 65/35 — standard body copy
+  body75: '404040',
+  grey50: '808080',     // slide-number grey inherited from the master
+  track: 'D9D9D9',      // progress-bar trough
+  hair: 'BFBFBF',
+  white: 'FFFFFF',
+  pink: 'F6C1D5',       // accent1
+  pinkDk: 'E86194',     // accent1 @ lum 75%
+  pinkPale: 'FDF3F7',
+  stone: 'B2B0A8',      // accent2
+  stoneDk: '86847E',
+  green: '6ABE87',      // accent3
+  greenDk: '439B62',
+  teal: '00B5BF',       // accent4
+  tealDk: '00888F',
+  sand: 'DBAE7B',       // accent5
+  ochre: 'C98538',      // accent5 @ lum 75% — the deck's signature orange
+  tableRowA: 'FBE8EF',
+  tableRowB: 'FDF4F7',
+};
+
+const FONT = 'Open Sans';          // theme major + minor face
+const FONT_SEMI = 'Poppins SemiBold';
+const TIGHT = 0.9;                 // 90% leading inherited by the deck's Title placeholders
+
+/**
+ * Recurring drop shadows, transcribed from the source <a:outerShdw> elements.
+ * Returned fresh each call: pptxgenjs rewrites the object it is handed.
+ */
+const shadow = {
+  card:  () => ({ type: 'outer', color: '000000', opacity: 0.2,  blur: 28, offset: 12, angle: 90 }),
+  soft:  () => ({ type: 'outer', color: '000000', opacity: 0.15, blur: 40, offset: 13, angle: 90 }),
+  disc:  () => ({ type: 'outer', color: '000000', opacity: 0.15, blur: 66, offset: 10, angle: 90 }),
+  panel: () => ({ type: 'outer', color: '0D0D0D', opacity: 0.14, blur: 45, offset: 31, angle: 45 }),
+  chip:  () => ({ type: 'outer', color: '000000', opacity: 0.12, blur: 40, offset: 10, angle: 90 }),
+};
+
+/* --------------------------------------------------------------- helpers */
+
+const rect = (s, x, y, w, h, opts = {}) => s.addShape('rect', { x, y, w, h, ...opts });
+const oval = (s, x, y, w, h, opts = {}) => s.addShape('ellipse', { x, y, w, h, ...opts });
+
+/** Text box. PowerPoint anchors at the top by default; pptxgenjs centres, so pin it. */
+function text(s, str, x, y, w, h, opts = {}) {
+  s.addText(str, {
+    x, y, w, h,
+    fontFace: FONT, valign: 'top', margin: [7.2, 7.2, 3.6, 3.6],
+    ...opts,
+  });
+}
+
+/**
+ * The source deck's picture placeholders were left empty, so they contribute
+ * nothing to the render. Recorded here so the code still shows where they sit.
+ */
+const photoFrame = (/* x, y, w, h */) => {};
+
+/**
+ * Eyebrow + big headline block used on most content slides:
+ * two paragraphs at 18pt then 40pt bold, 107% leading, 8pt after.
+ */
+function headline(s, eyebrow, title, x, y, w, color = C.ink, align = 'left') {
+  if (!eyebrow) {                       // slide 6: plain single-paragraph title
+    text(s, title, x, y, w, 1.447, { fontSize: 40, bold: true, color, align });
+    return;
+  }
+  text(s, [{ text: eyebrow, options: { fontSize: 18, breakLine: true } },
+           { text: title, options: { fontSize: 40, bold: true } }],
+    x, y, w, 1.943, { color, align, lineSpacingMultiple: 1.07, paraSpaceAfter: 8 });
+}
+
+/** 40pt bold centred slide title (infographic / chart / table slides). */
+function bigTitle(s, str, x, y, w, h, opts = {}) {
+  text(s, str, x, y, w, h, { fontSize: 40, bold: true, color: C.ink, align: 'center', ...opts });
+}
+
+/** The centred lorem paragraph that sits under those titles. */
+function deckLede(s, y = 1.532) {
+  text(s,
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus luctus urna sed urna ' +
+    'sit amet, consectetur adipiscing elit. Vivamus lorem ipsum dolor sit amet, consectetur adipiscing elit. ',
+    1.98, y, 9.374, 0.675,
+    { fontSize: 12, color: C.body, align: 'center', lineSpacingMultiple: 1.5 });
+}
+
+/** Small bold card heading (Poppins SemiBold, bottom-anchored in the source). */
+function cardTitle(s, str, x, y, w, h, color = C.ink) {
+  text(s, str, x, y, w, h,
+    { fontSize: 16, color, fontFace: FONT_SEMI, valign: 'bottom', lineSpacingMultiple: 1.0 });
+}
+
+/** 12pt body copy with the deck's 150% leading. */
+function body(s, str, x, y, w, h, opts = {}) {
+  text(s, str, x, y, w, h, { fontSize: 12, color: C.body, lineSpacingMultiple: 1.5, ...opts });
+}
+
+/**
+ * Page number, bottom right. The master paints a grey field on every slide;
+ * most slides additionally stamp a white one on top of their colour block.
+ */
+function pageNumber(s, n, overlayWhite) {
+  s.slideNumber = { x: 11.807, y: 6.899, w: 0.766, h: 0.337,
+    align: 'right', fontFace: FONT, fontSize: 14, color: C.grey50 };
+  if (overlayWhite) {
+    text(s, String(n), 11.807, 6.899, 0.766, 0.337,
+      { fontSize: 14, color: C.white, align: 'right' });
+  }
+}
+
+/** Linear blend of two hex colours; `t` = 0 gives `a`, 1 gives `b`. */
+function mix(a, b, t) {
+  const ch = i => Math.round(parseInt(a.substr(i, 2), 16) * (1 - t) +
+                             parseInt(b.substr(i, 2), 16) * t);
+  return [ch(0), ch(2), ch(4)].map(v => v.toString(16).padStart(2, '0').toUpperCase()).join('');
+}
+
+/**
+ * pptxgenjs cannot emit gradient fills, so the source's white->transparent
+ * column gradients are approximated with a stack of solid bands. The bars sit
+ * on a flat panel, so the alpha ramp is pre-blended against `base`.
+ */
+function fadeBarUp(s, x, y, w, h, base, steps = 26) {
+  const seg = h / steps;
+  for (let i = 0; i < steps; i++) {
+    // Source gradient: opaque white at the foot, fully clear by 89% of the height.
+    const alpha = Math.min(1, ((i + 0.5) / steps) / 0.89);
+    rect(s, x, y + i * seg, w, seg + 0.02, { fill: { color: mix(base, C.white, alpha) } });
+  }
+}
+
+/** Freeform polygon; `pts` are fractions of the bounding box. */
+function poly(s, pts, x, y, w, h, color) {
+  s.addShape('custGeom', {
+    x, y, w, h, fill: { color },
+    points: [...pts.map(p => ({ x: p[0] * w, y: p[1] * h })), { close: true }],
+  });
+}
+
+/* ================================================================ slides */
+
+function slide01(pres) {                       // Title — "Saudi Arabia"
+  const s = pres.addSlide();
+  pageNumber(s, 1, false);
+  photoFrame(0, 0, 13.333, 7.5);
+  rect(s, 0, 1.867, 13.333, 3.847, { fill: { color: C.ochre, transparency: 16 } });
+
+  const nav = [['Home', 4.446, 0.812, 'left'], ['About', 5.509, 0.786, 'center'],
+               ['Services', 6.590, 1.022, 'center'], ['Contact', 7.865, 1.022, 'center']];
+  nav.forEach(([label, x, w, align]) =>
+    text(s, label, x, 2.272, w, 0.25, { fontSize: 14, color: C.white, align, lineSpacingMultiple: TIGHT }));
+
+  text(s, 'Saudi Arabia', 3.018, 3.024, 7.298, 1.135,
+    { fontSize: 75, bold: true, color: C.white, lineSpacingMultiple: TIGHT });
+  s.addShape('line', { x: 5.421, y: 4.399, w: 2.492, h: 0, line: { color: C.white, width: 2 } });
+  text(s, 'Presentation Template', 4.465, 4.779, 4.403, 0.333,
+    { fontSize: 18, color: C.white, align: 'center', valign: 'bottom', lineSpacingMultiple: TIGHT });
+}
+
+function slide02(pres) {                       // Discovering Saudi Arabia
+  const s = pres.addSlide();
+  pageNumber(s, 2, true);
+  s.addShape('roundRect', { x: 4.568, y: 6.033, w: 1.877, h: 0.5,
+    rectRadius: 0.25, fill: { color: C.pink }, shadow: shadow.card() });
+  text(s, 'Learn More', 4.67, 6.033, 1.673, 0.53,
+    { fontSize: 16, color: C.white, align: 'center', lineSpacingMultiple: 1.3 });
+
+  rect(s, 9.862, 0, 3.471, 7.5, { fill: { color: C.ochre } });
+  body(s, 'Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor ' +
+          'incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ',
+    0.994, 3.775, 4.596, 1.11, { valign: 'bottom' });
+  headline(s, 'Discovering Saudi Arabia: ', 'A Journey Through Culture And Heritage', 0.955, 1.107, 6.665);
+  photoFrame(7.152, 0.601, 5.421, 6.299);
+}
+
+function slide03(pres) {                       // A Nation Of Rich History
+  const s = pres.addSlide();
+  pageNumber(s, 3, true);
+  [[1.11, 4.838, C.ochre, 1.26, 5.095, 1.27, 5.399],
+   [4.404, 4.845, C.stone, 4.554, 5.103, 4.564, 5.406]].forEach(
+    ([rx, ry, fill, tx, ty, bx, by]) => {
+      rect(s, rx, ry, 2.861, 1.51, { fill: { color: fill }, shadow: shadow.card() });
+      text(s, 'Your text here', tx, ty, 2.174, 0.333,
+        { fontSize: 14, color: C.white, fontFace: FONT_SEMI, valign: 'bottom',
+          lineSpacingMultiple: TIGHT });
+      text(s, 'Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod',
+        bx, by, 2.562, 0.74,
+        { fontSize: 10, color: C.white, lineSpacingMultiple: 1.2, valign: 'bottom' });
+    });
+
+  body(s, 'Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor ' +
+          'incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ',
+    1.11, 3.533, 5.486, 0.958, { valign: 'bottom' });
+  headline(s, 'Saudi Arabia: ', 'A Nation Of Rich History And Modern Innovation', 1.11, 0.786, 6.671);
+  photoFrame(7.924, 0, 5.396, 7.5);
+}
+
+function slide04(pres) {                       // The Future Leaders Of Tomorrow
+  const s = pres.addSlide();
+  pageNumber(s, 4, true);
+  photoFrame(0, 3.75, 13.333, 3.753);
+  rect(s, 0, -0.029, 13.333, 3.813, { fill: { color: C.ochre } });
+
+  [[0.790, 1.285, 3.324, 2.603, 0.408, 1.217, 3.991, '01. Your text here'],
+   [4.844, 5.363, 3.393, 2.346, 0.334, 5.235, 4.045, '02. Your text here'],
+   [8.898, 9.415, 3.244, 2.634, 0.483, 9.369, 3.970, '03. Your text here']].forEach(
+    ([cx, tx, ty, tw, th, bx, by, label]) => {
+      rect(s, cx, 2.987, 3.645, 2.949, { fill: { color: C.white }, shadow: shadow.card() });
+      cardTitle(s, label, tx, ty, tw, th);
+      body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus luctus urna sed ' +
+              'urna ultricies ac tempor dui sagittis. In condimentum facilisis porta. ',
+        bx, by, 2.864, 1.587, { color: C.body75 });
+    });
+
+  headline(s, "Saudi Arabia's Youth ", 'The Future Leaders Of Tomorrow',
+    2.737, 0.706, 7.87, C.white, 'center');
+}
+
+function slide05(pres) {                       // Geography, Climate, Natural Wonders
+  const s = pres.addSlide();
+  pageNumber(s, 5, true);
+  rect(s, 0, 5.29, 13.333, 2.21, { fill: { color: C.ochre } });
+
+  [[5.107, 2.310, 5.526, 4.333, 1.766, 0.408, 5.533, 4.999, 'Geography'],
+   [9.161, 2.335, 9.527, 4.401, 1.992, 0.342, 9.551, 5.053, 'Climate']].forEach(
+    ([cx, ch, tx, ty, tw, th, bx, by, label]) => {
+      rect(s, cx, 4.105, 3.645, ch, { fill: { color: C.white }, shadow: shadow.card() });
+      cardTitle(s, label, tx, ty, tw, th);
+      body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus luctus urna sed urna',
+        bx, by, 2.864, 0.981, { align: 'justify' });
+    });
+
+  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus luctus urna sed urna ' +
+          'sit amet, consectetur adipiscing elit. Vivamus lorem ipsum dolor sit amet, consectetur adipiscing elit. ',
+    6.519, 2.689, 5.896, 0.981);
+  headline(s, 'Saudi Arabia: ', 'Geography, Climate, And Natural Wonders', 6.53, 0.703, 6.665);
+  photoFrame(0.786, 0.729, 5.384, 5.544);
+}
+
+function slide06(pres) {                       // Technological Advancements
+  const s = pres.addSlide();
+  pageNumber(s, 6, true);
+  [[0.791, 4.376, 2.310, 1.197, 4.604, 2.106, 0.408, 1.218, 5.271],
+   [4.841, 4.407, 2.335, 5.224, 4.673, 1.992, 0.342, 5.236, 5.325]].forEach(
+    ([cx, cy, ch, tx, ty, tw, th, bx, by]) => {
+      rect(s, cx, cy, 3.489, ch, { fill: { color: C.white }, shadow: shadow.card() });
+      cardTitle(s, 'Your text here', tx, ty, tw, th);
+      body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus luctus urna sed urna',
+        bx, by, 2.864, 0.981, { color: C.body75 });
+    });
+
+  body(s, 'Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor ' +
+          'incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud ' +
+          'exercitation Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus luctus',
+    0.667, 2.627, 7.865, 0.889, { valign: 'bottom' });
+  headline(s, null, 'Technological Advancements In Saudi Arabia', 0.667, 1.048, 8.574);
+  photoFrame(8.889, 0, 4.444, 7.5);
+}
+
+function slide07(pres) {                       // Vision 2030
+  const s = pres.addSlide();
+  pageNumber(s, 7, true);
+  rect(s, 0, 4.097, 13.333, 3.403, { fill: { color: C.ochre } });
+
+  /* Three icon tiles: a cog, a shield and a padlock, drawn from primitives. */
+  const glyphs = {
+    cog: (x, y) => s.addShape('gear6', { x: x + 0.11, y: y + 0.11, w: 0.37, h: 0.37,
+      fill: { color: C.white } }),
+    shield: (x, y) => s.addShape('pentagon', { x: x + 0.14, y: y + 0.12, w: 0.31, h: 0.35,
+      rotate: 180, fill: { color: C.white } }),
+    lock: (x, y) => {
+      s.addShape('blockArc', { x: x + 0.19, y: y + 0.12, w: 0.21, h: 0.21,
+        angleRange: [180, 180], arcThicknessRatio: 0.18, fill: { color: C.white } });
+      s.addShape('roundRect', { x: x + 0.15, y: y + 0.23, w: 0.29, h: 0.23,
+        rectRadius: 0.05, fill: { color: C.white } });
+    },
+  };
+  [['Vision 1', 2.818, 3.255, C.ink,   C.body,  2.959, C.pink,  'cog'],
+   ['Vision 2', 4.324, 4.760, C.white, C.white, 4.478, C.stone, 'shield'],
+   ['Vision 3', 5.779, 6.215, C.white, C.white, 5.934, C.green, 'lock']].forEach(
+    ([label, ty, by, tCol, bCol, iy, iCol, glyph]) => {
+      cardTitle(s, label, 8.362, ty, 1.766, 0.408, tCol);
+      body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus luctus urna sed urna',
+        8.362, by, 4.228, 0.678, { color: bCol, align: 'justify' });
+      rect(s, 7.623, iy, 0.589, 0.589, { fill: { color: iCol } });
+      glyphs[glyph](7.623, iy);
+    });
+
+  headline(s, "Saudi Arabia's Vision 2030: ", 'Transforming The Future', 7.502, 0.698, 6.728);
+  photoFrame(0, 0, 5.125, 7.5);
+}
+
+function slide08(pres) {                       // Economic Impact And Global Influence
+  const s = pres.addSlide();
+  pageNumber(s, 8, true);
+  photoFrame(8.208, 0, 5.125, 7.5);
+  rect(s, 1.324, 3.137, 1.584, 1.353, { fill: { color: C.white }, shadow: shadow.card() });
+  rect(s, 1.329, 4.739, 3.025, 2.164, { fill: { color: C.white }, shadow: shadow.card() });
+  rect(s, 5.274, 4.739, 3.426, 2.164, { fill: { color: C.white }, shadow: shadow.card() });
+
+  cardTitle(s, 'Subtitle 1', 3.309, 3.143, 1.766, 0.408);
+  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus luctus urna sed urna',
+    3.309, 3.579, 4.228, 0.678, { align: 'justify' });
+
+  text(s, '63k', 1.481, 3.289, 1.208, 0.682,
+    { fontSize: 32, color: C.ink, valign: 'middle', lineSpacingMultiple: 1.2 });
+  text(s, 'Active User.', 1.481, 3.885, 1.474, 0.368,
+    { fontSize: 14, color: C.body, lineSpacingMultiple: 1.2 });
+  text(s, '23,613', 1.657, 5.299, 2.369, 0.682,
+    { fontSize: 36, color: C.ink, valign: 'middle', lineSpacingMultiple: 1.2 });
+  text(s, 'Positive Feedback.', 1.657, 5.981, 2.369, 0.406,
+    { fontSize: 16, color: C.body, lineSpacingMultiple: 1.2 });
+
+  text(s, 'Economic Impact', 5.641, 4.887, 2.423, 0.37, { fontSize: 16, bold: true, color: C.ink });
+  text(s, 'Lorem ipsum dolor sit amet, consectetur', 5.641, 5.267, 2.423, 0.604,
+    { fontSize: 12, color: C.body, lineSpacingMultiple: 1.3 });
+  rect(s, 6.073, 6.491, 2.171, 0.157, { fill: { color: C.track } });
+  rect(s, 5.724, 6.491, 2.126, 0.157, { fill: { color: C.pinkDk } });
+  text(s, 'Progress', 5.635, 6.077, 1.351, 0.303, { fontSize: 12, color: C.body });
+  text(s, '85%', 7.587, 6.077, 0.657, 0.303, { fontSize: 12, color: C.body, align: 'right' });
+
+  headline(s, 'The Oil Kingdom: ', 'Economic Impact And Global Influence', 1.232, 0.904, 6.683);
+}
+
+function slide09(pres) {                       // Meet Our Team
+  const s = pres.addSlide();
+  pageNumber(s, 9, false);
+  bigTitle(s, 'Meet Our Team', 4.302, 0.829, 4.729, 0.812,
+    { valign: 'middle', lineSpacingMultiple: TIGHT });
+  deckLede(s, 1.659);
+
+  [['Anton Rodrigo', C.pink,  0.638, 0.759, 4.874, 2.060, 0.772, 5.010],
+   ['Maria Jolly',   C.stone, 3.715, 3.785, 4.909, 2.060, 3.815, 5.041],
+   ['Anne Jeremiah', C.green, 6.742, 6.854, 4.894, 2.060, 6.820, 5.041],
+   ['Jim Miller',    C.teal,  9.769, 9.883, 4.874, 1.917, 9.880, 5.018]].forEach(
+    ([name, color, bodyX, barX, barY, barW, nameX, nameY]) => {
+      photoFrame(bodyX + 0.12, 2.841, 2.724, 2.667);
+      body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.', bodyX, 5.631, 2.18, 0.978);
+      rect(s, barX, barY, barW, 0.625, { fill: { color }, shadow: shadow.soft() });
+      text(s, name, nameX, nameY, 2.724, 0.404, { fontSize: 18, bold: true, color: C.white });
+    });
+}
+
+function slide10(pres) {                       // The Heart Of The Arab World
+  const s = pres.addSlide();
+  pageNumber(s, 10, false);
+  photoFrame(9.794, 2.349, 2.779, 4.301);
+
+  [['Your text here 1', '85%', 4.430, 4.831, 1.328, 4.127, C.pinkDk, 2.006, 4.214],
+   ['Your text here 2', '55%', 5.088, 5.489, 1.328, 2.624, C.stone,  2.006, 4.214],
+   ['Your text here 3', '75%', 5.746, 6.147, 1.338, 3.303, C.green,  2.014, 4.206]].forEach(
+    ([label, pct, labelY, barY, fillX, fillW, fillC, trackX, trackW]) => {
+      rect(s, trackX, barY, trackW, 0.157, { fill: { color: C.track } });
+      rect(s, fillX, barY, fillW, 0.157, { fill: { color: fillC } });
+      text(s, label, fillX - 0.089, labelY, 1.71, 0.303, { fontSize: 12, color: C.ink });
+      text(s, pct, 5.493, labelY, 0.657, 0.303, { fontSize: 12, color: C.body, align: 'right' });
+    });
+
+  text(s, '90%', 1.201, 2.251, 1.503, 0.679,
+    { fontSize: 28, color: C.ink, valign: 'middle', lineSpacingMultiple: 1.2 });
+  text(s, 'Visitor', 1.201, 2.760, 1.344, 0.679,
+    { fontSize: 18, color: C.ink, valign: 'middle', lineSpacingMultiple: 1.2 });
+  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus luctus urna sed urna ' +
+          'sit amet, consectetur adipiscing elit.', 1.217, 3.411, 5.704, 0.678);
+
+  rect(s, 8.953, 3.900, 1.386, 1.108, { fill: { color: C.ochre }, shadow: shadow.card() });
+  text(s, 'Viewers', 9.018, 3.867, 1.246, 0.679,
+    { fontSize: 18, color: C.white, valign: 'middle', lineSpacingMultiple: 1.2 });
+  text(s, '176M', 9.018, 4.292, 1.246, 0.679,
+    { fontSize: 28, color: C.white, valign: 'middle', lineSpacingMultiple: 1.2 });
+
+  headline(s, 'Saudi Arabia', 'The Heart Of The Arab World', 2.133, 0.78, 9.067, C.ink, 'center');
+}
+
+function slide11(pres) {                       // Celebrating Culture And Community
+  const s = pres.addSlide();
+  pageNumber(s, 11, true);
+  rect(s, 0, 3.75, 13.333, 3.75, { fill: { color: C.ochre } });
+
+  // Magnifier tile.
+  rect(s, 8.17, 5.51, 0.669, 0.669, { fill: { color: C.stone }, shadow: shadow.chip() });
+  oval(s, 8.335, 5.655, 0.25, 0.25, { fill: { type: 'none' }, line: { color: C.white, width: 1.5 } });
+  s.addShape('line', { x: 8.555, y: 5.875, w: 0.11, h: 0.11, line: { color: C.white, width: 2 } });
+
+  text(s, 'Your text here', 9.036, 5.325, 3.233, 0.37, { fontSize: 16, bold: true, color: C.white });
+  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do',
+    9.036, 5.704, 3.233, 0.678, { color: C.white });
+  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
+          'incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam consectetur ' +
+          'adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ' +
+          'Ut enim ad minim veniam',
+    0.973, 4.035, 4.952, 1.583, { color: C.white });
+
+  headline(s, 'Saudi Arabian Festivals: ', 'Celebrating Culture And Community', 0.934, 1.141, 6.677);
+  photoFrame(6.667, 0, 6.667, 4.658);
+}
+
+function slide12(pres) {                       // Image Gallery
+  const s = pres.addSlide();
+  pageNumber(s, 12, false);
+  rect(s, 2.43, 0, 8.595, 5.013, { fill: { color: C.ochre } });
+  text(s, 'Image Gallery', 4.319, 0.981, 4.729, 0.878,
+    { fontSize: 40, bold: true, color: C.white, align: 'center', valign: 'middle',
+      lineSpacingMultiple: TIGHT });
+  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus luctus urna sed urna ' +
+          'sit amet, consectetur adipiscing elit. Vivamus',
+    4.088, 2.111, 5.162, 0.981, { color: C.white, align: 'center' });
+  text(s, 'Podcast Presentation Template', 0.769, 0.819, 3.763, 0.279,
+    { fontSize: 14, color: C.pink, valign: 'bottom', lineSpacingMultiple: TIGHT });
+
+  [[0.760, 3.750, 4.385, 3.149], [0.760, 0.689, 3.260, 2.614], [5.599, 3.750, 3.260, 3.149],
+   [9.312, 0.601, 3.260, 3.475], [9.312, 4.468, 3.260, 2.431]].forEach(g => photoFrame(...g));
+}
+
+function slide13(pres) {                       // Diversification Beyond Oil
+  const s = pres.addSlide();
+  pageNumber(s, 13, true);
+  photoFrame(7.021, 0, 6.312, 7.5);
+  rect(s, 7.019, 0, 6.314, 7.5, { fill: { color: C.ochre, transparency: 17 } });
+  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
+          'incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud ' +
+          'exercitation ullamco laboris nisi',
+    7.681, 4.07, 4.717, 1.129, { color: C.white, lineSpacingMultiple: 1.3 });
+
+  // Vertical stepper: three ringed dots joined by hairlines.
+  [1.614, 3.315, 4.994].forEach(y => {
+    oval(s, 6.049, y, 0.218, 0.218,
+      { fill: { type: 'none' }, line: { color: C.pinkPale, width: 1.25 } });
+    oval(s, 6.088, y + 0.039, 0.14, 0.14, { fill: { color: C.pink } });
+  });
+  [1.832, 3.533].forEach(y =>
+    s.addShape('line', { x: 6.155, y, w: 0, h: 1.472, line: { color: C.pinkPale, width: 1.25 } }));
+
+  [['Start Project', 1.536, 1.917], ['Concept and Idea', 3.237, 3.613],
+   ['Further Steps', 4.917, 5.309]].forEach(([label, ty, by]) => {
+    text(s, label, 2.213, ty, 3.475, 0.37,
+      { fontSize: 16, bold: true, color: C.ink, align: 'right' });
+    body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
+            'incididunt ut labore et dolore magna aliqua. ',
+      1.418, by, 4.318, 0.981, { align: 'right' });
+  });
+
+  headline(s, 'The Saudi Vision: ', 'Diversification Beyond Oil', 7.57, 1.614, 5.66, C.white);
+}
+
+function slide14(pres) {                       // Bar Chart Comparison
+  const s = pres.addSlide();
+  pageNumber(s, 14, false);
+
+  /* Two "chart" panels drawn as shapes, exactly as the source deck does. */
+  const BAR_W = 0.345;
+  const panels = [
+    { x: 1.149, fill: C.ochre, title: '2023 Data ', titleX: 1.284, titleY: 2.746, titleH: 0.424,
+      bars: [ // barX, barY, barH, pct, pctX, pctY, month, monthX, monthW
+        [1.543, 3.732, 2.112, '90%', 1.303, 3.389, 'Jan',   1.420, 0.589],
+        [2.229, 4.272, 1.572, '72%', 2.024, 3.912, 'Feb',   2.093, 0.630],
+        [2.898, 4.037, 1.874, '85%', 2.693, 3.688, 'March', 2.647, 0.838],
+        [3.514, 4.795, 1.116, '60%', 3.322, 4.442, 'Apr',   3.365, 0.630]] },
+    { x: 9.080, fill: C.stone, title: '2024 Data ', titleX: 9.220, titleY: 2.751, titleH: 0.462,
+      bars: [
+        [ 9.521, 4.464, 1.386, '60%',  9.322, 4.090, 'Jan',    9.385, 0.589],
+        [10.152, 4.919, 0.931, '40%',  9.956, 4.536, 'Feb',   10.058, 0.630],
+        [10.835, 3.804, 2.112, '95%', 10.623, 3.443, 'March', 10.611, 0.838],
+        [11.451, 4.166, 1.751, '85%', 11.222, 3.776, 'Apr',   11.329, 0.630]] },
+  ];
+
+  s.addShape('line', { x: 11.049, y: 2.506, w: 0, h: 3.819, line: { color: 'C7D5E0', width: 1 } });
+  panels.forEach(p => {
+    rect(s, p.x, 2.577, 3.116, 4.037, { fill: { color: p.fill }, shadow: shadow.panel() });
+    text(s, p.title, p.titleX, p.titleY, 2.846, p.titleH,
+      { fontSize: 18, bold: true, color: C.white, align: 'center', lineSpacingMultiple: 1.3 });
+    p.bars.forEach(([bx, by, bh, pct, px, py, month, mx, mw]) => {
+      fadeBarUp(s, bx, by, BAR_W, bh, p.fill);
+      text(s, pct, px, py, 0.766, 0.303,
+        { fontSize: 12, bold: true, color: C.white, align: 'center' });
+      text(s, month, mx, 5.995, mw, 0.291,
+        { fontSize: 12, bold: true, color: C.white, align: 'center' });
+    });
+  });
+
+  bigTitle(s, 'Bar Chart Comparison', 3.076, 1.123, 7.205, 0.707, { lineSpacingMultiple: 0.9 });
+  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
+          'incididunt ut labore et', 4.685, 2.042, 3.998, 0.978, { align: 'center' });
+
+  text(s, 'Your Data 01', 4.517, 4.385, 1.984, 0.37, { fontSize: 16, bold: true, color: C.ink });
+  body(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo',
+    4.545, 4.779, 2.029, 1.284);
+  text(s, 'Your Data 02', 6.573, 4.415, 2.216, 0.37,
+    { fontSize: 16, bold: true, color: C.ink, align: 'right' });
+  body(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo',
+    6.813, 4.810, 2.029, 1.284, { align: 'right' });
+}
+
+function slide15(pres) {                       // Table Slide
+  const s = pres.addSlide();
+  pageNumber(s, 15, false);
+  bigTitle(s, 'Table Slide', 4.127, 0.73, 5.08, 0.707, { lineSpacingMultiple: 0.9 });
+  deckLede(s);
+
+  const head = ['2024', 'Mon', 'Tues', 'Wed', 'Thurs', 'Fri', 'Sat'];
+  const projects = ['Project One', 'Project Two', 'Project Three', 'Project Four', 'Project Five'];
+  const rule = { pt: 1, color: C.pinkDk, type: 'solid' };
+  const gap = { pt: 1, color: C.white, type: 'solid' };   // header dividers are white
+  // Border order is [top, right, bottom, left].
+  const headBorder = c => [rule, c === 6 ? rule : gap, rule, c === 0 ? rule : gap];
+  const bodyBorder = [rule, rule, rule, rule];
+
+  const rows = [head.map((label, c) => ({
+    text: label,
+    options: { fill: { color: C.ochre }, color: C.white, bold: true, align: 'center',
+               border: headBorder(c) },
+  }))];
+  projects.forEach((name, r) => {
+    const band = r % 2 === 0 ? C.tableRowA : C.tableRowB;
+    rows.push(head.map((_, c) => ({
+      text: c === 0 ? name : '',
+      options: { fill: { color: band }, color: C.ink, bold: c === 0,
+                 align: c === 0 ? 'left' : 'center', border: bodyBorder,
+                 margin: c === 0 ? [2.7, 5.4, 2.7, 11.3] : [2.7, 5.4, 2.7, 5.4] },
+    })));
+  });
+
+  s.addTable(rows, {
+    x: 1.157, y: 2.498, w: 11.008, colW: [2.011, 1.499, 1.499, 1.499, 1.499, 1.499, 1.499],
+    rowH: 0.71, fontFace: FONT, fontSize: 14, valign: 'middle', margin: [2.7, 5.4, 2.7, 5.4],
+  });
+
+  // Gantt-style bars laid over the grid.
+  [[3.187, 3.412, 3.142, C.pink], [4.410, 4.098, 2.780, C.stone],
+   [6.456, 4.839, 3.269, C.green], [4.577, 5.530, 4.528, C.teal],
+   [8.283, 6.252, 3.545, C.sand]].forEach(([x, y, w, color]) => {
+    rect(s, x, y, w, 0.315, { fill: { color } });
+    text(s, 'Your Text', x, y, w, 0.315,
+      { fontSize: 12, color: C.white, align: 'center', valign: 'middle' });
+  });
+}
+
+function slide16(pres) {                       // Pie Chart Slide (donut gauges)
+  const s = pres.addSlide();
+  pageNumber(s, 16, false);
+  bigTitle(s, 'Pie Chart Slide', 1.453, 0.743, 10.428, 0.774);
+  deckLede(s);
+
+  /* startAngle values come straight from the source blockArc adj1 handles. */
+  const gauges = [
+    { discX: 1.700, ringX: 1.927, color: C.pink,  startAngle: 333.198, dot: [3.768, 4.766],
+      pct: '80%', labelX: 2.083, statX: 1.392, bodyX: 1.316, stat: '765.200' },
+    { discX: 5.421, ringX: 5.649, color: C.stone, startAngle: 45.980,  dot: [7.255, 5.927],
+      pct: '65%', labelX: 5.805, statX: 5.108, bodyX: 5.033, stat: '615.247' },
+    { discX: 9.133, ringX: 9.393, color: C.green, startAngle: 128.468, dot: [9.709, 5.986],
+      pct: '40%', labelX: 9.549, statX: 8.825, bodyX: 8.750, stat: '415.842' },
+  ];
+
+  gauges.forEach(g => {
+    oval(s, g.discX, 4.043, 2.5, 2.5, { fill: { color: C.white }, shadow: shadow.disc() });
+    // Faint track ring — an outlined ellipse stands in for the source's thin DONUT.
+    oval(s, g.ringX + 0.028, 4.299, 1.988, 1.988,
+      { fill: { type: 'none' }, line: { color: '000000', width: 4, transparency: 90 } });
+    s.addShape('blockArc', { x: g.ringX, y: 4.271, w: 2.044, h: 2.044,
+      angleRange: [g.startAngle, 268.875], arcThicknessRatio: 0.057, fill: { color: g.color } });
+    oval(s, g.dot[0], g.dot[1], 0.19, 0.19, { fill: { color: g.color } });
+
+    text(s, g.pct, g.labelX, 4.809, 1.732, 0.707,
+      { fontSize: 36, bold: true, color: C.ink, align: 'center' });
+    text(s, 'Income', g.labelX, 5.410, 1.732, 0.337,
+      { fontSize: 14, color: C.body, align: 'center' });
+    text(s, g.stat, g.statX, 2.476, 3.117, 0.572,
+      { fontSize: 28, bold: true, color: g.color, align: 'center' });
+    body(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas',
+      g.bodyX, 3.041, 3.267, 0.981, { align: 'center' });
+  });
+}
+
+function slide17(pres) {                       // Creative Infographic (pyramid)
+  const s = pres.addSlide();
+  pageNumber(s, 17, false);
+  bigTitle(s, 'Creative Infographic', 2.34, 0.954, 8.653, 0.774);
+
+  /* Four stacked isometric slabs, each a rhombus top face plus two shaded sides.
+     The sides carry a vertical gradient in the source; a mid-tone blend stands in. */
+  const TOP   = [[0, 0.446], [0.5, 0], [1, 0.446], [0.5, 1]];
+  const LEFT  = [[1, 0.665], [1, 1], [0, 0.288], [0, 0]];
+  const RIGHT = [[0, 0.665], [0, 1], [1, 0.288], [1, 0]];
+  [{ top: [4.617, 4.385, 4.211, 1.726], left: [4.614, 5.155, 2.108, 1.438],
+     right: [6.721, 5.155, 2.108, 1.438], face: C.teal,  dark: C.tealDk,  shade: 0.39 },
+   { top: [4.940, 3.633, 3.566, 1.470], left: [4.940, 4.290, 1.791, 1.294],
+     right: [6.729, 4.295, 1.777, 1.289], face: C.green, dark: C.greenDk, shade: 0.37 },
+   { top: [5.300, 2.961, 2.842, 1.168], left: [5.300, 3.475, 1.438, 1.132],
+     right: [6.736, 3.491, 1.406, 1.117], face: C.stone, dark: C.stoneDk, shade: 0.43 },
+   { top: [5.700, 2.318, 2.096, 0.852], left: [5.700, 2.694, 1.047, 0.958],
+     right: [6.745, 2.694, 1.051, 0.958], face: C.pink,  dark: C.pinkDk,  shade: 0.11 }]
+    .forEach(sl => {
+      const side = mix(sl.face, sl.dark, sl.shade);
+      poly(s, TOP, ...sl.top, sl.face);
+      poly(s, LEFT, ...sl.left, side);
+      poly(s, RIGHT, ...sl.right, side);
+    });
+
+  // White-outlined diamond badges running down the pyramid's spine.
+  [[6.349, 5.909, mix(C.teal, C.tealDk, 0.39)], [6.351, 4.933, mix(C.green, C.white, 0.30)],
+   [6.349, 3.910, mix(C.stone, C.stoneDk, 0.43)], [6.349, 2.890, mix(C.pink, C.pinkDk, 0.11)]]
+    .forEach(([x, y, color]) =>
+      s.addShape('rect', { x, y, w: 0.687, h: 0.687, rotate: 45,
+        fill: { color }, line: { color: C.white, width: 3 } }));
+
+  /* Callout cards with arrows pointing back at the pyramid. */
+  const cards = [
+    { card: [1.494, 2.419], titleX: 1.750, titleY: 2.555, titleW: 1.869, bodyY: 2.913,
+      color: C.pink,    bold: false, arrow: [4.367, 2.926, true,  C.pink] },
+    { card: [1.000, 4.086], titleX: 1.256, titleY: 4.223, titleW: 1.869, bodyY: 4.581,
+      color: '0C0C48',  bold: true,  arrow: [3.800, 4.521, true,  C.green] },
+    { card: [9.465, 3.069], titleX: 9.721, titleY: 3.206, titleW: 2.184, bodyY: 3.564,
+      color: C.stoneDk, bold: true,  arrow: [8.040, 3.750, false, C.stone] },
+    { card: [9.775, 4.787], titleX: 10.031, titleY: 4.924, titleW: 2.175, bodyY: 5.282,
+      color: '3E94C6',  bold: true,  arrow: [8.371, 5.409, false, C.teal] },
+  ];
+  cards.forEach(c =>
+    rect(s, c.card[0], c.card[1], 2.667, 1.402, { fill: { color: C.white }, shadow: shadow.card() }));
+  cards.forEach(c => {
+    text(s, 'Your text here', c.titleX, c.titleY, c.titleW, 0.37,
+      { fontSize: 16, bold: c.bold, color: c.color });
+    body(s, 'Lorem ipsum dolor sit amet, consectetur.', c.titleX, c.bodyY, 2.259, 0.678);
+    const [ax, ay, flipH, color] = c.arrow;
+    s.addShape('line', { x: ax, y: ay, w: 1.333, h: 0, flipH,
+      line: { color, width: 1, endArrowType: 'triangle' } });
+  });
+}
+
+function slide18(pres) {                       // Timeline Infographic
+  const s = pres.addSlide();
+  pageNumber(s, 18, false);
+  bigTitle(s, 'Timeline Infographic', 3.071, 0.777, 7.191, 0.707, { lineSpacingMultiple: 0.9 });
+  deckLede(s);
+
+  const stops = [
+    { year: '2021', color: C.pink,  barX: 1.837, yearX: 2.032, yearY: 4.758,
+      titleX: 2.032, titleY: 2.846, bodyX: 2.032, bodyY: 3.225, bodyW: 1.569 },
+    { year: '2022', color: C.stone, barX: 3.776, yearX: 3.982, yearY: 3.837,
+      titleX: 3.979, titleY: 4.855, bodyX: 3.979, bodyY: 5.238, bodyW: 1.442 },
+    { year: '2023', color: C.green, barX: 5.714, yearX: 5.851, yearY: 4.758,
+      titleX: 5.854, titleY: 2.843, bodyX: 5.853, bodyY: 3.231, bodyW: 1.518 },
+    { year: '2024', color: C.teal,  barX: 7.653, yearX: 7.884, yearY: 3.837,
+      titleX: 7.881, titleY: 4.855, bodyX: 7.881, bodyY: 5.236, bodyW: 1.575 },
+    { year: '2025', color: C.sand,  barX: 9.592, yearX: 9.728, yearY: 4.758,
+      titleX: 9.731, titleY: 2.850, bodyX: 9.731, bodyY: 3.231, bodyW: 1.636 },
+  ];
+  stops.forEach(st =>
+    rect(s, st.barX, 4.473, 1.903, 0.276, { fill: { color: st.color }, shadow: shadow.soft() }));
+
+  // Leader lines with a dot at the far end, alternating above/below the axis.
+  [[3.758, 2.369, 3.711, 5.313], [5.696, 3.905, 5.649, 3.821],
+   [7.634, 2.369, 7.588, 5.313], [9.574, 3.905, 9.528, 3.821]].forEach(([lx, ly, dx, dy]) => {
+    s.addShape('line', { x: lx, y: ly, w: 0, h: 2.948, line: { color: C.hair, width: 1.25 } });
+    oval(s, dx, dy, 0.093, 0.087, { fill: { color: C.hair } });
+  });
+
+  stops.forEach((st, i) => {
+    text(s, st.year, st.yearX, st.yearY, 1.299, 0.64,
+      { fontSize: 32, bold: true, color: st.color });
+    text(s, `Project ${i + 1}`, st.titleX, st.titleY, 1.575, 0.37,
+      { fontSize: 16, bold: true, color: st.color });
+    text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, ',
+      st.bodyX, st.bodyY, st.bodyW, 1.133,
+      { fontSize: 12, color: C.body, lineSpacingMultiple: 1.3 });
+  });
+}
+
+function slide19(pres) {                       // Contact Us
+  const s = pres.addSlide();
+  pageNumber(s, 19, false);
+  photoFrame(0, 0, 6.667, 3.75);
+  photoFrame(6.667, 3.75, 6.667, 3.75);
+
+  /* Four round icon badges. The last two are tiny PNG glyphs in the source and
+     are redrawn here from primitives. */
+  const marks = {
+    pin: (cx, cy, tint) => {
+      s.addShape('teardrop', { x: cx - 0.10, y: cy - 0.115, w: 0.20, h: 0.20,
+        rotate: 225, fill: { color: C.white } });
+      oval(s, cx - 0.032, cy - 0.085, 0.064, 0.064, { fill: { color: tint } });
+    },
+    phone: (cx, cy) => s.addShape('moon', { x: cx - 0.085, y: cy - 0.095, w: 0.17, h: 0.19,
+      rotate: 315, fill: { color: C.white } }),
+    mail: (cx, cy, tint) => {
+      rect(s, cx - 0.11, cy - 0.075, 0.22, 0.15, { fill: { color: C.white } });
+      s.addShape('triangle', { x: cx - 0.10, y: cy - 0.070, w: 0.20, h: 0.10,
+        rotate: 180, fill: { color: tint } });
+    },
+    globe: (cx, cy, tint) => {
+      oval(s, cx - 0.105, cy - 0.105, 0.21, 0.21, { fill: { color: C.white } });
+      oval(s, cx - 0.045, cy - 0.105, 0.09, 0.21,
+        { fill: { type: 'none' }, line: { color: tint, width: 0.75 } });
+      rect(s, cx - 0.105, cy - 0.012, 0.21, 0.024, { fill: { color: tint } });
+    },
+  };
+  [{ color: C.stone, y: 4.324, mark: 'pin',   textY: 4.238, textW: 2.606, textH: 0.608,
+     label: '253 Mutton Town Road, South Dakota, 57553' },
+   { color: C.green, y: 4.932, mark: 'phone', textY: 4.984, textW: 2.464, textH: 0.332,
+     label: '+123-456-7890' },
+   { color: C.pink,  y: 5.540, mark: 'mail',  textY: 5.617, textW: 2.464, textH: 0.332,
+     label: 'hello@youremail.com' },
+   { color: C.teal,  y: 6.164, mark: 'globe', textY: 6.216, textW: 2.464, textH: 0.332,
+     label: 'www.yourwebsite.com' }].forEach(c => {
+    oval(s, 1.237, c.y, 0.438, 0.438, { fill: { color: c.color } });
+    marks[c.mark](1.456, c.y + 0.219, c.color);
+    text(s, c.label, 1.890, c.textY, c.textW, c.textH,
+      { fontSize: 14, color: C.ink, fontFace: FONT_SEMI, valign: 'bottom',
+        lineSpacingMultiple: 1.0 });
+  });
+
+  text(s, 'Contact Us', 7.064, 1.231, 4.394, 0.707,
+    { fontSize: 40, bold: true, color: C.ink, lineSpacingMultiple: 0.9 });
+  body(s, 'Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor ' +
+          'incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ',
+    7.064, 2.007, 4.982, 1.11, { valign: 'bottom' });
+}
+
+function slide20(pres) {                       // Thank You
+  const s = pres.addSlide();
+  pageNumber(s, 20, false);
+  photoFrame(0, 0, 13.333, 7.5);
+  rect(s, 0, 2.063, 13.333, 3.342, { fill: { color: C.ochre, transparency: 11 } });
+  text(s, 'Thank You', 3.533, 2.531, 6.267, 1.135,
+    { fontSize: 80, bold: true, color: C.white, align: 'center', lineSpacingMultiple: TIGHT });
+  s.addShape('line', { x: 5.421, y: 3.906, w: 2.492, h: 0, line: { color: C.white, width: 2 } });
+  text(s, 'For Your Watching', 4.465, 4.285, 4.403, 0.333,
+    { fontSize: 18, color: C.white, align: 'center', valign: 'bottom',
+      lineSpacingMultiple: TIGHT });
+}
+
+/* ------------------------------------------------------------------ build */
+
+function build() {
+  const pres = new PptxGenJS();
+  pres.defineLayout({ name: 'W16x9', width: 13.3333333, height: 7.5 });   // 12192000 EMU
+  pres.layout = 'W16x9';
+  pres.theme = { headFontFace: FONT, bodyFontFace: FONT };
+  pres.title = 'Saudi Arabia';
+
+  [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
+   slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20]
+    .forEach(fn => fn(pres));
+
+  return pres.writeFile({
+    fileName: path.join(__dirname, '17bca852-cfdd-4009-a218-4a3df9bfe947_grok_final.pptx'),
+  });
+}
+
+build().then(f => console.log('wrote', f)).catch(err => { console.error(err); process.exit(1); });
