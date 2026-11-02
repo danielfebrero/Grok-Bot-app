@@ -1,0 +1,593 @@
+/**
+ * "GYMPRESS" gym presentation template - 24 slides, 13.333 x 7.5 in (16:9).
+ *
+ * Rebuilt from scratch with pptxgenjs. Every shape, colour, font and string
+ * below is a plain literal so the deck design can be read straight off the code.
+ *
+ * Note: the reference deck's picture placeholders are all empty (the .pptx ships
+ * with no media parts at all), so there is nothing to stand in for - they are
+ * simply not emitted.
+ */
+
+const PptxGenJS = require('pptxgenjs');
+const path = require('path');
+
+/* ------------------------------------------------------------------ palette */
+
+const ORANGE = 'FE4905';
+const WHITE = 'FFFFFF';
+const DARK = '262626'; // slide background (tx1 @ 85% lum)
+
+const HEAD = 'Montserrat';
+const BODY = 'Open Sans';
+
+/* --------------------------------------------------------- shared lorem text */
+
+const LOREM_LONG =
+  'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore ' +
+  'et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut ' +
+  'aliquip ex commodo consequat. Duis aute irure dolor reprehenderit in voluptate velit esse cillum ' +
+  'dolore eu fugiat nulla pariatur. ';
+const LOREM_HERO =
+  'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore ' +
+  'et dolore magna aliqua. Ut enim minim venam quis nostrud exercitation ullamco laboris nisi ut ' +
+  'commodo consequat. ';
+const LOREM_BREAK =
+  'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt labore ' +
+  'et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut ' +
+  'commodo consequat. ';
+const LOREM_CENTER =
+  'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore ' +
+  'et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut ' +
+  'aliquip ex ea commodo consequat. ';
+const LOREM_SERVICES =
+  'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore ' +
+  'dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisiut ' +
+  'aliquip commodo aute irure dolor in reprehenderit';
+const LOREM_SERVICES2 =
+  'Lorem ipsum dolor sit amet, consectetur adipiscing elit, aute irure dolor in reprehenderit';
+const LOREM_PROVIDE =
+  'Lorem ipsum dolor sit amet, consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore ' +
+  'et dolore magna enim ad minim veniam quis nostrud';
+const LOREM_ITEM =
+  'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed eiusmod tempor incididunt';
+const LOREM_CARD = 'Lorem ipsum dolor sit consectetur adipiscing elit, sed do';
+const LOREM_AMET = 'Lorem ipsum dolor amet consectetur adipiscing elit, sed do';
+
+/* ---------------------------------------------- freeform outlines (fractions) */
+
+// ">" chevron used for the nav arrows and as a bullet glyph
+const CHEVRON_R = [[0.6313, 0], [0, 0], [0.3687, 0.5], [0, 1], [0.6313, 1], [1, 0.5]];
+const CHEVRON_L = CHEVRON_R.map(([x, y]) => [1 - x, y]);
+
+const BANNER_NOTCH_R = [[0, 0], [1, 0], [0.9239, 0.5], [1, 1], [0, 1]];          // s2
+const BANNER_NOTCH_R2 = [[0, 0], [1, 0], [0.9272, 0.5], [1, 1], [0, 1]];         // s23
+const BANNER_NOTCH_L = [[0, 0], [1, 0], [1, 1], [0, 1], [0.0606, 0.5]];          // s8
+const BANNER_NOTCH_L2 = [[0, 0], [1, 0], [1, 1], [0, 1], [0.0838, 0.5]];         // s16
+const ARROW_HOLLOW_R = [[0, 0], [0.1273, 0], [1, 0.5], [0.1273, 1], [0, 1], [0.8727, 0.5]];   // s3
+const ARROW_HOLLOW_R2 = [[0, 0], [0.2098, 0], [1, 0.5], [0.2098, 1], [0, 1], [0.7902, 0.5]];  // s11
+const ARROW_HOLLOW_R3 = [[0, 0], [0.1965, 0], [1, 0.5], [0.1965, 1], [0, 1], [0.8035, 0.5]];  // s17
+const ARROW_HOLLOW_L = [[0.8816, 0], [1, 0], [0.1184, 0.5], [1, 1], [0.8816, 1], [0, 0.5]];   // s9
+const SLASH = [[0.5209, 0], [1, 0], [0.4791, 1], [0, 1]];                        // s6
+const SPEECH_BLOCK = [[0.0664, 0], [1, 0], [0.9562, 0.1439], [0.9562, 0.8609],
+  [0.9985, 1], [0, 1], [0.0664, 0.7817]];                                        // s12
+const SNIP_LEFT = [[0, 0.8486], [0, 0.1514], [0.1626, 0], [1, 0], [1, 1], [0.1626, 1]]; // s5
+const PODIUM = [                                                                  // s15
+  [0.2707, 0], [0.2828, 0], [0.2828, 0.3641], [0.3884, 0.6399], [0.4939, 0.3641],
+  [0.4939, 0], [0.5061, 0], [0.5061, 0.3641], [0.6116, 0.6399], [0.7172, 0.3641],
+  [0.7172, 0], [0.7293, 0], [0.7293, 0.3641], [0.8349, 0.6399], [0.9404, 0.3641],
+  [0.9404, 0.0171], [1, 1], [0, 1], [0.0596, 0.0171], [0.0596, 0.3641],
+  [0.1651, 0.6399], [0.2707, 0.3641]];
+
+/* ----------------------------------------------------------------- helpers */
+
+/** Filled polygon from fractional (0..1) outline coordinates. */
+function poly(slide, outline, x, y, w, h, color) {
+  slide.addShape('custGeom', {
+    x, y, w, h,
+    fill: { color },
+    points: outline
+      .map(([fx, fy]) => ({ x: +(fx * w).toFixed(4), y: +(fy * h).toFixed(4) }))
+      .concat([{ close: true }]),
+  });
+}
+
+function rect(slide, x, y, w, h, color) {
+  slide.addShape('rect', { x, y, w, h, fill: { color } });
+}
+
+function hexagon(slide, x, y, w, h, color) {
+  slide.addShape('hexagon', { x, y, w, h, fill: { color } });
+}
+
+/**
+ * Every text box in the deck uses PowerPoint's default insets (0.1" left/right,
+ * 0.05" top/bottom), top vertical alignment and "resize shape to fit text".
+ */
+const INSET = [7.2, 7.2, 3.6, 3.6]; // left, right, bottom, top - in points
+
+function text(slide, content, opt) {
+  slide.addText(content, Object.assign({
+    margin: INSET, valign: 'top', fit: 'resize',
+  }, opt));
+}
+
+/** 11pt Open Sans body copy at 1.5 line spacing. */
+function body(slide, x, y, w, h, str, opt) {
+  text(slide, str, Object.assign({
+    x, y, w, h, fontFace: BODY, fontSize: 11, color: WHITE, lineSpacingMultiple: 1.5,
+  }, opt));
+}
+
+/** 14pt bold Montserrat sub-heading. */
+function label(slide, x, y, w, str, color, align) {
+  text(slide, str, {
+    x, y, w, h: 0.337, fontFace: HEAD, fontSize: 14, bold: true,
+    color: color || WHITE, align: align || 'left', wrap: false,
+  });
+}
+
+/** Row of small hexagon "dots" that sits above every section heading. */
+function dots(slide, x, y, count, w, h, pitch) {
+  for (let i = 0; i < count; i++) hexagon(slide, +(x + i * pitch).toFixed(3), y, w, h, WHITE);
+}
+
+/**
+ * Section heading: four white dots plus a 28pt two-tone Montserrat title.
+ * `x,y` is the title box origin; the dots sit at (+0.084, -0.084).
+ */
+function heading(slide, x, y, w, h, orangePart, whitePart, align) {
+  const dotsW = 3 * 0.1183 + 0.097;
+  const dotsX = align === 'center' ? x + (w - dotsW) / 2 : x + 0.084;
+  dots(slide, +dotsX.toFixed(3), +(y - 0.084).toFixed(3), 4, 0.097, 0.083, 0.1183);
+  text(slide, [
+    { text: orangePart, options: { color: ORANGE } },
+    { text: whitePart, options: { color: WHITE } },
+  ], {
+    x, y, w, h, fontFace: HEAD, fontSize: 28, bold: true,
+    align: align || 'left',
+  });
+}
+
+/** Big two-tone 60pt title used on the cover and the closing slide. */
+function heroTitle(slide, x, y, w, runs) {
+  dots(slide, +(x + 0.090).toFixed(3), +(y - 0.075).toFixed(3), 3, 0.173, 0.149, 0.2124);
+  text(slide, runs, {
+    x, y, w, h: 1.111, fontFace: HEAD, fontSize: 60, bold: true, wrap: false,
+  });
+}
+
+/** Orange hexagon "Learn More" button. */
+function learnMore(slide, x, y) {
+  hexagon(slide, x, y, 1.934, 0.487, ORANGE);
+  text(slide, 'Learn More', {
+    x: x + 0.240, y: y + 0.100, w: 1.454, h: 0.286,
+    fontFace: BODY, fontSize: 11, color: WHITE, charSpacing: 3,
+    align: 'center', wrap: false,
+  });
+}
+
+/** Labelled percentage bar (white track + coloured fill + right-aligned value). */
+function progressBar(slide, x, y, fillW, pct, title, titleW, fillColor) {
+  rect(slide, x, y, 2.910, 0.303, WHITE);
+  rect(slide, x, y, fillW, 0.303, fillColor);
+  text(slide, title, {
+    x: x - 0.007, y: y + 0.017, w: titleW, h: 0.269,
+    fontFace: BODY, fontSize: 10, color: WHITE,
+  });
+  text(slide, pct, {
+    x: x + 2.410, y: y + 0.017, w: 0.507, h: 0.269,
+    fontFace: BODY, fontSize: 10, color: DARK, align: 'right',
+  });
+}
+
+/** Small right-pointing chevron used as a list bullet. */
+function bullet(slide, x, y, color) {
+  poly(slide, CHEVRON_R, x, y, 0.194, 0.286, color);
+}
+
+/** Orange top bar with wordmark, nav links, chevrons and rule + page footer. */
+function chrome(slide, pageNo) {
+  rect(slide, 0, 0, 13.333, 0.814, ORANGE);
+  text(slide, 'GYM Presentation', {
+    x: 0.379, y: 0.264, w: 1.662, h: 0.286,
+    fontFace: HEAD, fontSize: 11, bold: true, color: WHITE, wrap: false,
+  });
+  [['About', 8.513, 0.637], ['Service', 9.708, 0.710],
+   ['Team', 10.976, 0.600], ['Portfolio', 12.134, 0.821]].forEach(([txt, x, w]) => {
+    text(slide, txt, {
+      x, y: 0.264, w, h: 0.286, fontFace: BODY, fontSize: 11, color: WHITE,
+      align: 'right', wrap: false,
+    });
+  });
+  poly(slide, CHEVRON_R, 2.419, 0.264, 0.194, 0.286, WHITE);
+  poly(slide, CHEVRON_R, 2.613, 0.264, 0.194, 0.286, WHITE);
+  poly(slide, CHEVRON_L, 7.323, 0.264, 0.194, 0.286, WHITE);
+  poly(slide, CHEVRON_L, 7.517, 0.264, 0.194, 0.286, WHITE);
+  slide.addShape('line', { x: 3.510, y: 0.407, w: 3.111, h: 0, line: { color: WHITE, width: 0.75 } });
+
+  text(slide, pageNo + '/24', {
+    x: 0.379, y: 6.950, w: 0.609, h: 0.286,
+    fontFace: BODY, fontSize: 11, color: WHITE, wrap: false,
+  });
+  text(slide, 'Your Website Here', {
+    x: 11.412, y: 6.950, w: 1.543, h: 0.286,
+    fontFace: BODY, fontSize: 11, color: WHITE, align: 'right', wrap: false,
+  });
+}
+
+/* ------------------------------------------------------------ slide builders */
+
+// 01 - cover
+function slide01(s) {
+  hexagon(s, 7.842, 2.787, 2.540, 2.190, ORANGE);
+  heroTitle(s, 1.210, 2.453, 5.093, [
+    { text: 'GYM', options: { color: ORANGE } },
+    { text: 'PRESS', options: { color: WHITE } },
+  ]);
+  text(s, 'Gym Presentation Template', {
+    x: 1.210, y: 3.395, w: 3.808, h: 0.337,
+    fontFace: BODY, fontSize: 14, color: WHITE, charSpacing: 3, wrap: false,
+  });
+  body(s, 1.210, 3.940, 5.904, 0.905, LOREM_HERO);
+  learnMore(s, 1.300, 5.358);
+  chrome(s, '01');
+}
+
+// 02 - table of content
+function slide02(s) {
+  poly(s, BANNER_NOTCH_R, 3.704, 4.374, 6.533, 1.988, ORANGE);
+  heading(s, 5.654, 1.690, 4.348, 0.572, 'TABLE OF ', 'CONTENT');
+  body(s, 5.654, 2.408, 6.667, 1.183, LOREM_LONG);
+  [['About', 5.074, 4.735, 0.837], ['Service', 7.408, 4.735, 0.952],
+   ['Team', 5.073, 5.436, 0.773], ['Portfolio', 7.410, 5.436, 1.094]].forEach(([t, x, y, w]) => {
+    label(s, x, y, w, t);
+    body(s, x, y + 0.218, 1.988, 0.350, 'Lorem ipsum dolor amet');
+  });
+  chrome(s, '02');
+}
+
+// 03 - welcome message
+function slide03(s) {
+  poly(s, ARROW_HOLLOW_R, 6.843, 1.813, 1.343, 4.688, ORANGE);
+  heading(s, 9.150, 1.896, 2.859, 1.043, 'WELCOME ', 'MESSAGE');
+  body(s, 9.150, 3.227, 3.099, 2.294,
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed eiusmod tempor incididunt ulabore ' +
+    'dolore magna aliqua. Ut enim minim veniam, quis nostrud exercitation ullamco laboris nisut aliquip ' +
+    'ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu');
+  learnMore(s, 9.234, 6.014);
+  chrome(s, '03');
+}
+
+// 04 - about our gym studio
+function slide04(s) {
+  rect(s, 0, 2.049, 4.512, 1.680, ORANGE);
+  hexagon(s, 3.795, 1.794, 2.540, 2.190, DARK);
+  text(s, '91%', {
+    x: 0.332, y: 2.636, w: 0.842, h: 0.505,
+    fontFace: HEAD, fontSize: 24, bold: true, color: WHITE, wrap: false,
+  });
+  label(s, 1.318, 2.410, 1.808, 'About Our Gym');
+  body(s, 1.318, 2.740, 2.272, 0.627, 'Lorem ipsum dolor sit amet, consectetur adipiscing');
+  heading(s, 1.204, 5.430, 2.984, 1.043, 'ABOUT OUR ', 'GYM STUDIO');
+  body(s, 4.903, 5.360, 7.375, 1.183,
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore ' +
+    'et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ' +
+    'aliquip exea commodo consequat. Duis aute irure dolor in reprehenderitn voluptate velit esse cillum ' +
+    'dolore eu fugiat nulla pariatur. ');
+  chrome(s, '04');
+}
+
+// 05 - our gym history
+function slide05(s) {
+  poly(s, SNIP_LEFT, 8.8385, 1.7425, 4.494, 4.829, ORANGE);
+  heading(s, 1.204, 1.889, 4.255, 0.572, 'OUR GYM ', 'HISTORY');
+  body(s, 1.204, 2.667, 6.667, 1.183, LOREM_LONG);
+  rect(s, 0, 4.732, 6.667, 1.645, ORANGE);
+  [0.409, 3.330].forEach((x) => {
+    label(s, x, 5.076, 1.380, 'Our History');
+    body(s, x, 5.406, 2.699, 0.627, LOREM_CARD + ' ');
+  });
+  chrome(s, '05');
+}
+
+// 06 - the best gym in town
+function slide06(s) {
+  heading(s, 1.204, 1.716, 3.381, 1.043, 'THE BEST GYM ', 'IN TOWN');
+  body(s, 5.463, 1.646, 6.667, 1.183, LOREM_LONG);
+  poly(s, SLASH, 11.031, 4.637, 0.949, 1.978, ORANGE);
+  chrome(s, '06');
+}
+
+// 07 - our vision and mission
+function slide07(s) {
+  rect(s, 9.891, 4.416, 3.443, 1.678, ORANGE);
+  heading(s, 5.020, 4.734, 3.812, 1.043, 'OUR VISION AND ', 'MISSION');
+  body(s, 1.094, 1.537, 4.471, 0.905,
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore ' +
+    'et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation');
+  label(s, 1.094, 2.664, 1.277, 'Our Vision', ORANGE);
+  body(s, 2.613, 2.523, 2.952, 0.627, LOREM_AMET);
+  label(s, 10.902, 4.776, 1.420, 'Our Mission', WHITE, 'center');
+  body(s, 10.267, 5.107, 2.690, 0.627, 'Lorem ipsum dolor sit consectetur adipiscing elit, sed ',
+    { align: 'center' });
+  learnMore(s, 6.550, 2.100);
+  chrome(s, '07');
+}
+
+// 08 - enjoy the facilities in our gym
+function slide08(s) {
+  poly(s, BANNER_NOTCH_L, 5.899, 4.692, 7.435, 1.801, ORANGE);
+  heading(s, 5.613, 1.996, 3.439, 1.515, 'ENJOY THE ', 'FACILITIES IN OUR GYM');
+  body(s, 9.455, 1.606, 2.910, 2.294,
+    'Lorem ipsum dolor amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore ' +
+    'et dolore magna aliqua. Ut enim ad minim veniam quis nostrud exercita ullamco laboris nisi ut ' +
+    'aliquip ecommodo consequat. Duis aute irure reprehend in voluptate velit esse cillum');
+  [6.776, 10.003].forEach((x) => {
+    label(s, x, 5.111, 1.277, 'Our Vision');
+    body(s, x, 5.447, 2.952, 0.627, LOREM_AMET);
+  });
+  chrome(s, '08');
+}
+
+// 09 - why should you choose our gym?
+function slide09(s) {
+  poly(s, ARROW_HOLLOW_L, 7.540, 1.606, 1.447, 5.101, ORANGE);
+  heading(s, 1.212, 2.173, 4.595, 1.043, 'WHY SHOULD YOU ', 'CHOOSE OUR GYM?');
+  body(s, 1.210, 3.455, 5.310, 1.183,
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore ' +
+    'et dolore magna aliqua. Ut enim minim veniam, quis nostrud exercitation ullamco laboris nisi aliquip ' +
+    'commodo aute irure dolor in reprehenderit in voluptate velit');
+  [5.018, 5.738].forEach((y) => {
+    label(s, 1.210, y, 1.199, 'Title Here', ORANGE);
+    body(s, 2.729, y - 0.141, 3.791, 0.627,
+      'Lorem ipsum dolor amet consectetur adipisci elit, sed do eiusmod tempor incididunt ');
+  });
+  chrome(s, '09');
+}
+
+// 10 - our excellent services
+function slide10(s) {
+  heading(s, 1.212, 2.469, 3.854, 1.043, 'OUR EXCELLENT ', 'SERVICES');
+  body(s, 1.210, 3.744, 4.137, 1.461, LOREM_SERVICES);
+  body(s, 1.210, 5.302, 4.137, 0.627, LOREM_SERVICES2);
+  rect(s, 6.667, 4.792, 6.667, 1.730, ORANGE);
+  [['Best Equipment', 7.548, 1.869, 7.129], ['Cozy Place', 10.858, 1.319, 10.164]]
+    .forEach(([t, lx, lw, bx]) => {
+      label(s, lx, 5.175, lw, t, WHITE, 'center');
+      body(s, bx, 5.512, 2.707, 0.627, LOREM_CARD, { align: 'center' });
+    });
+  chrome(s, '10');
+}
+
+// 11 - our services
+function slide11(s) {
+  poly(s, ARROW_HOLLOW_R2, 5.588, 3.741, 0.932, 2.945, ORANGE);
+  heading(s, 1.158, 1.991, 3.854, 0.572, 'OUR ', 'SERVICES');
+  body(s, 5.011, 1.547, 3.200, 1.461,
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore ' +
+    'dolore magna aliqua. Ut enim ad minim venam quis nostrud exercitation ullamco laboris nisi aliquip ex');
+  [['Best Equipment', 4.474, 1.869], ['Cozy Place', 5.648, 1.319]].forEach(([t, y, w]) => {
+    label(s, 7.307, y, w, t, ORANGE);
+    body(s, 7.307, y + 0.336, 5.112, 0.627,
+      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed eiusmod tempor incididunt ut labore et');
+  });
+  chrome(s, '11');
+}
+
+// 12 - our best gym services
+function slide12(s) {
+  poly(s, SPEECH_BLOCK, 3.026, 4.543, 7.120, 2.167, ORANGE);
+  heading(s, 4.438, 2.166, 3.499, 1.043, 'OUR BEST GYM ', 'SERVICES');
+  [['Best Equipment', 1.612, 1.869], ['Cozy Place', 2.786, 1.319]].forEach(([t, y, w]) => {
+    label(s, 8.468, y, w, t, ORANGE);
+    body(s, 8.468, y + 0.337, 3.864, 0.627, LOREM_ITEM);
+  });
+  body(s, 4.099, 5.035, 5.136, 1.183,
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed eiusmod tempor incididunt ut labore ' +
+    'et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ' +
+    'aliquip ex ea commodo consequat. ');
+  chrome(s, '12');
+}
+
+// 13 - the services we provide
+function slide13(s) {
+  heading(s, 1.182, 1.945, 4.075, 1.043, 'THE SERVICES WE ', 'PROVIDE');
+  body(s, 1.182, 3.174, 4.400, 0.905, LOREM_PROVIDE);
+  [['Best Equipment', 4.354, 1.869, 4.693], ['Cozy Place', 5.487, 1.319, 5.826]]
+    .forEach(([t, y, w, by]) => {
+      bullet(s, 1.267, by, ORANGE);
+      label(s, 1.719, y, w, t, ORANGE);
+      body(s, 1.719, y + 0.337, 3.864, 0.627, LOREM_ITEM);
+    });
+  chrome(s, '13');
+}
+
+// 14 - break slide
+function slide14(s) {
+  heading(s, 1.158, 5.665, 3.854, 0.572, 'BREAK ', 'SLIDES');
+  body(s, 5.038, 5.360, 4.435, 1.183, LOREM_BREAK);
+  learnMore(s, 10.156, 5.708);
+  chrome(s, '14');
+}
+
+// 15 - our great trainer
+function slide15(s) {
+  poly(s, PODIUM, 0.962, 4.547, 11.409, 2.183, ORANGE);
+  heading(s, 4.305, 1.643, 4.722, 0.572, 'OUR GREAT ', 'TRAINER', 'center');
+  body(s, 1.158, 2.310, 11.017, 0.627, LOREM_CENTER, { align: 'center' });
+  [['Charles Grover', 1.987, 1.718], ['James Underwood', 4.328, 2.130],
+   ['Donald Demarco', 6.969, 1.943], ['David Wolfe', 9.752, 1.471]].forEach(([n, x, w]) => {
+    label(s, x, 6.059, w, n, WHITE, 'center');
+  });
+  chrome(s, '15');
+}
+
+// 16 - meet our best trainer
+function slide16(s) {
+  poly(s, BANNER_NOTCH_L2, 8.265, 2.017, 5.069, 1.698, ORANGE);
+  poly(s, BANNER_NOTCH_L2, 8.265, 4.599, 5.069, 1.698, ORANGE);
+  heading(s, 1.215, 1.896, 3.273, 1.043, 'MEET OUR ', 'BEST TRAINER');
+  body(s, 1.213, 3.194, 3.850, 1.461,
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore ' +
+    'dolore magna aliqua. Ut enim aminim veniam, quis nostrud exercitation ullamco laboris nisi aliquip ' +
+    'deserunt mollit anim id est laborum.');
+  body(s, 1.213, 4.648, 3.850, 0.905,
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore ' +
+    'deserunt mollit anim id est laborum.');
+  [['David Covert', 2.384, 1.540], ['James Smith', 4.963, 1.529]].forEach(([n, y, w]) => {
+    bullet(s, 9.049, y + 0.339, WHITE);
+    label(s, 9.501, y, w, n);
+    body(s, 9.501, y + 0.337, 3.501, 0.627,
+      'Lorem ipsum dolor sit, consectetur adipiscing sed eiusmod tempor incididunt');
+  });
+  learnMore(s, 1.298, 6.014);
+  chrome(s, '16');
+}
+
+// 17 - charles grover
+function slide17(s) {
+  poly(s, ARROW_HOLLOW_R3, 6.801, 3.046, 1.133, 3.640, ORANGE);
+  heading(s, 1.158, 1.650, 4.223, 0.572, 'CHARLES', ' GROVER');
+  body(s, 5.889, 1.436, 2.253, 0.905,
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed eiusmod tempor incidid');
+  body(s, 8.954, 3.304, 3.182, 1.461,
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod incididunt ut labore ' +
+    'et dolore magna aliqua. Utenim ad minim venia quis nostrud exercitation ullamco laboris nisi ut aliquip',
+    { align: 'justify' });
+  progressBar(s, 9.096, 5.297, 2.447, '90%', 'Your Title Here', 1.344, ORANGE);
+  progressBar(s, 9.096, 6.039, 2.280, '85%', 'Your Title Here', 1.432, ORANGE);
+  chrome(s, '17');
+}
+
+// 18 - james smith
+function slide18(s) {
+  heading(s, 1.210, 1.793, 3.143, 0.572, 'JAMES', ' SMITH');
+  body(s, 1.210, 2.488, 6.667, 1.183, LOREM_LONG);
+  rect(s, 1.294, 4.537, 7.928, 1.923, ORANGE);
+  body(s, 3.590, 4.907, 1.790, 1.183,
+    'PLACEHOLDER',
+    { align: 'justify' });
+  progressBar(s, 5.752, 4.976, 2.447, '90%', 'Your Title Here', 1.344, DARK);
+  progressBar(s, 5.752, 5.718, 2.280, '85%', 'Your Title Here', 1.432, DARK);
+  chrome(s, '18');
+}
+
+// 19 - our awesome portfolio
+function slide19(s) {
+  heading(s, 1.210, 1.793, 3.632, 1.043, 'OUR AWESOME ', 'PORTFOLIO');
+  body(s, 5.517, 1.723, 6.667, 1.183, LOREM_LONG);
+  rect(s, 9.444, 4.216, 3.889, 1.923, ORANGE);
+  bullet(s, 9.857, 5.034, WHITE);
+  label(s, 10.309, 4.695, 1.964, 'Gym Photograph');
+  body(s, 10.309, 5.032, 2.726, 0.627, LOREM_CARD);
+  chrome(s, '19');
+}
+
+// 20 - our best gym
+function slide20(s) {
+  rect(s, 1.304, 3.182, 10.726, 2.453, ORANGE);
+  heading(s, 4.305, 1.643, 4.722, 0.572, 'OUR BEST ', 'GYM', 'center');
+  [[2.015, 2.315], [7.038, 7.339]].forEach(([bx, tx]) => {
+    bullet(s, bx, 4.920, WHITE);
+    body(s, tx, 4.888, 4.115, 0.350, 'Lorem ipsum dolor sit, consectetur adipiscing eiusmod');
+  });
+  body(s, 1.158, 5.940, 11.017, 0.627, LOREM_CENTER, { align: 'center' });
+  chrome(s, '20');
+}
+
+// 21 - our best gym photograph
+function slide21(s) {
+  hexagon(s, 6.666, 2.090, 2.288, 1.972, ORANGE);
+  hexagon(s, 6.666, 4.252, 2.288, 1.972, ORANGE);
+  heading(s, 1.182, 1.945, 4.075, 1.043, 'OUR BEST GYM ', 'PHOTOGRAPH');
+  body(s, 1.182, 3.174, 4.400, 0.905, LOREM_PROVIDE);
+  [['Best Equipment', 4.354, 1.869, 4.693], ['Cozy Place', 5.487, 1.319, 5.826]]
+    .forEach(([t, y, w, by]) => {
+      bullet(s, 1.267, by, ORANGE);
+      label(s, 1.719, y, w, t, ORANGE);
+      body(s, 1.719, y + 0.337, 3.864, 0.627, LOREM_ITEM);
+    });
+  chrome(s, '21');
+}
+
+// 22 - our best pricing plan
+function slide22(s) {
+  heading(s, 1.212, 2.469, 3.854, 1.043, 'OUR BEST ', 'PRICING PLAN');
+  body(s, 1.210, 3.744, 4.137, 1.461, LOREM_SERVICES);
+  body(s, 1.210, 5.302, 4.137, 0.627, LOREM_SERVICES2);
+
+  const plans = [
+    { y: 1.551, price: '$15', priceX: 6.913, priceW: 0.747, name: 'Package One', nameW: 1.576 },
+    { y: 3.351, price: '$25', priceX: 6.879, priceW: 0.814, name: 'Package Two', nameW: 1.583 },
+    { y: 5.150, price: '$35', priceX: 6.878, priceW: 0.816, name: 'Package Three', nameW: 1.739 },
+  ];
+  plans.forEach((p) => {
+    rect(s, 7.286, p.y, 6.047, 1.613, ORANGE);
+    hexagon(s, 6.666, p.y + 0.356, 1.241, 0.901, WHITE);
+    text(s, p.price, {
+      x: p.priceX, y: p.y + 0.554, w: p.priceW, h: 0.505,
+      fontFace: HEAD, fontSize: 24, bold: true, color: DARK,
+      align: 'center', wrap: false,
+    });
+    bullet(s, 8.333, p.y + 0.664, WHITE);
+    label(s, 8.785, p.y + 0.325, p.nameW, p.name);
+    body(s, 8.785, p.y + 0.661, 4.157, 0.627,
+      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut');
+  });
+  chrome(s, '22');
+}
+
+// 23 - contact us
+function slide23(s) {
+  poly(s, BANNER_NOTCH_R2, 0, 4.108, 8.073, 2.349, ORANGE);
+  heading(s, 1.158, 2.061, 3.295, 0.572, 'CONTACT ', 'US');
+  body(s, 4.904, 1.755, 4.435, 1.183, LOREM_BREAK);
+  learnMore(s, 10.156, 2.104);
+  [['Phone Number', 4.678, 1.766, 4.532, 4.710], ['Our Address', 5.556, 1.483, 5.406, 5.583]]
+    .forEach(([t, ly, lw, by, cy]) => {
+      bullet(s, 0.683, cy, WHITE);
+      label(s, 1.135, ly, lw, t);
+      body(s, 3.158, by, 3.889, 0.627,
+        'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor');
+    });
+  chrome(s, '23');
+}
+
+// 24 - thank you
+function slide24(s) {
+  hexagon(s, 2.951, 2.787, 2.540, 2.190, ORANGE);
+  heroTitle(s, 6.483, 2.453, 5.530, [{ text: 'THANK YOU', options: { color: ORANGE } }]);
+  text(s, 'For Watching This Presentation', {
+    x: 6.483, y: 3.395, w: 4.309, h: 0.337,
+    fontFace: BODY, fontSize: 14, color: WHITE, charSpacing: 3, wrap: false,
+  });
+  body(s, 6.483, 3.940, 5.904, 0.905, LOREM_HERO);
+  learnMore(s, 6.573, 5.358);
+  chrome(s, '24');
+}
+
+/* ---------------------------------------------------------------------- main */
+
+const BUILDERS = [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08,
+  slide09, slide10, slide11, slide12, slide13, slide14, slide15, slide16,
+  slide17, slide18, slide19, slide20, slide21, slide22, slide23, slide24];
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'GYM16x9', width: 13.3333333, height: 7.5 });
+  pptx.layout = 'GYM16x9';
+  pptx.title = 'Gym Presentation Template';
+
+  BUILDERS.forEach((fn) => {
+    const slide = pptx.addSlide();
+    slide.background = { color: DARK };
+    fn(slide);
+  });
+
+  return pptx.writeFile({
+    fileName: path.join(__dirname, '0c0db122-da19-4c87-9bce-6b3e771fa66e_grok_final.pptx'),
+  });
+}
+
+build().then((f) => console.log('wrote', f)).catch((e) => { console.error(e); process.exit(1); });
