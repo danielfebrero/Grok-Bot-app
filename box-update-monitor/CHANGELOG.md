@@ -9,6 +9,17 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-11-02 16:45 (Paris) — snapshot `2026-11-02_10-46` → `2026-11-02_16-45`
+
+**Hot-update sand-host** `95b8cfb` → `2b353c7` (supervisor `upgrade-2b353c7`, `pendingUpgradeVersion` = None). Image `fcbae14`, box-scripts `fcbae14`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, agent-store-fuse `9c656ea`, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~4.
+
+- **Features** : paiement de commande par texto — nouvel outil `PayTextedOrder` (`messaging.orderPay`) : la réponse de l'utilisateur dans un fil iMessage/RCS peut valoir « Pay » sur la carte de commande la plus récente (refus si carte fermée/remplacée, commande trop ancienne, ou tour sans réponse de l'utilisateur) ; `messaging.saveContactCard` ; brouillons `imessage` dans `SendGrokBotDraftRequest`. Nouvelles RPC profil utilisateur `Get/Set/DeleteGrokBotUserProfilePhoto` (photo `selfie`). Nouvelles RPC équipe `Get/UpdateTeamIngressIpAllowlist` (allowlist IP entrante par CIDR, modes `enabled`/`shadow`). Popup opt-in entraînement (`ShouldShowGrokBotTrainingOptInPopup`, `MarkGrokBotTrainingOptInPromptSeen`, `SandUpgradeOption`). Migration de compte Grok Bot étendue côté admin (`AdminProposeGrokBotAccountMigrationPairs`, `AdminListGrokBotAccountMigrationLedger`, `AdminOverrideGrokBotAccountMigrationItem`, `AdminCleanGrokBotAccountMigration`, options `carry_skills`/`carry_conversation_state`/`carry_pages`). `ChangeXaiTeamPlan` : mise à jour du moyen de paiement (Stripe).
+- **Change** : connecteurs — `GetMcpServerStatus` liste aussi ceux en attente de connexion, `SearchPlugins` à consulter avant web/navigateur, nouveaux motifs `connector_gap`/`connector_error`/`connected_check_repeat`, refus OAuth MCP par politique admin (`admin_policy_enforced`, `provider_account_required`), annotations d'outils MCP (`destructiveHint`, `idempotentHint`, `openWorldHint`) ; reprise de sign-in desktop (`grok_bot_desktop_signin_resume`) ; retrait de signature Gmail (`grok_bot_gmail_signature_remove`). `cache.json` des skills gérées rafraîchi (`fetchedAt` seul).
+- **Bugfix** : envoi de fichiers par texto — motifs d'échec explicites (trop gros, illisible, type non pris en charge, contenu ne correspondant pas au type, ressemble à un secret, trop de fichiers pour un seul texto, refus du service de messagerie).
+- **Autre-infra** : `host-main.cjs` (+3 087/−674 après découpage) et `sand-eval-runner.cjs` (+50 446/−48 985, rebuild massif) rebuildés.
+
+Rapport : [reports/2026-11-02_16-45.md](reports/2026-11-02_16-45.md).
+
 ## 2026-11-02 10:46 (Paris) — snapshot `2026-11-02_08-46` → `2026-11-02_10-46`
 
 **Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `6a3224a08fd08e59be3776797865c612a937f0f3` → `9c656ea57367dd3dd76385cbf46625c81bae4cce` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`). Toutes les autres versions plateforme inchangées (image `fcbae14`, box-scripts `fcbae14`, sand-host `95b8cfb` (supervisor `upgrade-95b8cfb`, `pendingUpgradeVersion` = None), exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7). Fichiers : +0 / −0 / ~1.
