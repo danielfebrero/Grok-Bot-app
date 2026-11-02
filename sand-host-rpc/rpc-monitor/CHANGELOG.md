@@ -9,6 +9,17 @@ packages confondus. Entrées les plus récentes en haut. Heures de Paris
 
 <!-- NOUVELLES-ENTREES-ICI -->
 
+## 2026-11-02 18:07 (Paris) — `2026-11-01_18-09` → `2026-11-02_18-07`
+
+Changement de surface RPC détecté : **11 méthode(s) ajoutée(s)**, **3 supprimée(s)**.
+
+Ajoutées : `DashboardService.GetTeamIngressIpAllowlist`, `DashboardService.MarkGrokBotTrainingOptInPromptSeen`, `DashboardService.ShouldShowGrokBotTrainingOptInPopup`, `DashboardService.UpdateTeamIngressIpAllowlist`, `GrokBotService.AdminCleanGrokBotAccountMigration`, `GrokBotService.AdminListGrokBotAccountMigrationLedger`, `GrokBotService.AdminOverrideGrokBotAccountMigrationItem`, `GrokBotService.AdminProposeGrokBotAccountMigrationPairs`, `GrokBotService.DeleteGrokBotUserProfilePhoto`, `GrokBotService.GetGrokBotUserProfile`, `GrokBotService.SetGrokBotUserProfilePhoto`
+
+Supprimées : `BackgroundComposerService.CheckCustomerTunnelOwnership`, `BackgroundComposerService.ListCustomerPrivatelinkAllowedHosts`, `BackgroundComposerService.MintCustomerPrivatelinkProxyToken`
+
+Rapport : [reports/2026-11-02_18-07.md](reports/2026-11-02_18-07.md).
+
+
 ## 2026-11-01 18:09 (Paris) — `2026-10-30_18-06` → `2026-11-01_18-09`
 
 Changement de surface RPC détecté : **10 méthode(s) ajoutée(s)**.
