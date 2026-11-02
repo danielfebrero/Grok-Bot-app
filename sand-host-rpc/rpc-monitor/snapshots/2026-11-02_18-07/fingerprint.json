@@ -1,0 +1,27 @@
+{
+ "global": "a7b448b9d458c4538df354223904595859ed2106671134e24ac9ea7f5bbee353",
+ "services": 20,
+ "methodes": 2118,
+ "par_service": {
+  "AgentService": "1fb954d7487e74bbfcac170d4712f70e48057d441ffa630cc10cae07163bc660",
+  "AgentStoreService": "ec46b6ac434f4038744bd08611357817a15b8d2f5afb55c82f1b72cc474f7581",
+  "AiService": "cb90259ae1c1a96685af1bb045948204eb757c7aeea04f01e850be462b63e952",
+  "AnalyticsService": "1d88b5eef59ad1e5da3f9ada842a093f8dcba3c1303ee3764fa229a933dd021a",
+  "AppPublishService": "0e85d68f180a190ed6618b04938c13e5d16b38289bd94629e188ae916b5e7b7e",
+  "AutomationsService": "e80887cc5375694f9030f7302ec9eea7c08e816e4b4374df7f90ee445ff59036",
+  "BackgroundComposerService": "b7d66d396f659d71edea90ac7ccfe2dea59daa96f4982871e72a9c8bf1cf2173",
+  "ChatRequestEventService": "2ccd95ad155b115eb29e7684a6a06f09a95b44a3bbefd4f2ed2aa430fd8df298",
+  "ControlService": "965738576cf8ce703a0d5f7688d17e7e1d3ed2ed300dfcbef4b90fc7a9ad60f8",
+  "DaemonService": "3ebf2ed7c51e30291a61c5edc490a3117be9a38f8c171a191651f4f1a930a5f5",
+  "DashboardService": "53b5bdbc5e86c94a6215d57450f26dc1a952d9151045734aad074370c0aa28ae",
+  "ExecService": "30b4145f664b91dd106175cb89e36b8307c364cab8c170ececf93cf84072343a",
+  "GrokBotService": "50611a454399b4e72db33d8ea3d01c6aa8259eaf1847473e8b96831252f826da",
+  "InferenceService": "a9ab32a44a392c8706aad7bab48d7701a5e8bb2e060e5132967718cda27f960b",
+  "MetricsService": "581c3602ad269d1a53f8238a963dc2ffcc2f5ff3329f9a917e5d04ccd4082063",
+  "PerformanceEventService": "b93b40fce9e9a6066c2629ae6af7c7ad0c86133109f82a6fa3f9c98947f8b2a1",
+  "ProfilingService": "101d13e0742379b327476c29d194daab6bb36c200b8f1bdcb068ff34248d7c8c",
+  "ToolCallEventService": "f1e0fc3de5abd4ec3dc271813b59e7a4d02748efe37fcc4ff49ec933488d82e2",
+  "TraceService": "e90abca474697107664d0940c6e9ae4350b9122ae267b891537b7c00a9937da7",
+  "WebProfilingService": "9418a0fed22dd2f50ef11d637a9ad440f6616617c39a266eefdbadc9790c4ce9"
+ }
+}
