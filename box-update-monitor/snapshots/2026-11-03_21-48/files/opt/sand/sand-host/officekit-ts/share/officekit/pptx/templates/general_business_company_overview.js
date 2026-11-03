@@ -1,0 +1,734 @@
+/**
+ * "Your Beautiful Title Goes Here" — 25-slide editorial template (16:9, 13.333" x 7.5").
+ * Rebuilt from scratch with pptxgenjs. Raster artwork in the source deck (line-art icons,
+ * botanical branches, device mockups, puzzle pieces) is redrawn with native vector shapes.
+ */
+
+const PptxGenJS = require('pptxgenjs');
+const path = require('path');
+
+/* ------------------------------------------------------------------ palette */
+
+const C = {
+  ink: '000000',        // titles (theme dk1)
+  dark: '262626',       // secondary headings
+  gray: '555556',       // body copy
+  gray2: '595959',       // body copy (alt)
+  gray3: '7B7B7B',       // hairline diagonals
+  gray4: '7F7F7F',       // eyebrow / subtitle
+  hair: '575758',       // short rules on the cover
+  silver: 'A5A5A5',      // theme accent3, used for the active agenda row
+  white: 'FFFFFF',
+  blush: 'E8E0DC',      // page background tint
+  blush2: 'E8E0DD',     // panel tint
+  blush3: 'E9E0DE',     // card tint
+  blush4: 'E9E0DD',     // icon-bubble tint
+  branch: 'E7E0DB',     // faint botanical line art
+  bar: 'B5B5B5',        // donut gauge track
+};
+
+const F = {
+  serif: 'Playfair Display',
+  serifMed: 'Playfair Display Medium',
+  serifSemi: 'Playfair Display SemiBold',
+  sans: 'Montserrat',
+  sansMed: 'Montserrat Medium',
+  sansLight: 'Manrope Light',
+};
+
+/** Google-Slides text-box insets: [left, right, bottom, top] in points. */
+const INSET = [7.2, 7.2, 3.6, 3.6];
+
+/* ------------------------------------------------------- repeated copy blocks */
+
+const TITLE2 = ['Your Beautiful', 'Title Goes Here'];
+const TITLE3 = ['Your Beautiful', 'Title Goes', 'Here'];
+const TITLE_BIG2 = ['Your Beautiful Title', 'Goes Here'];
+const TITLE_ONE = 'Your Beautiful Title Goes Here';
+
+const LOREM_FLOW = 'Two driven jocks help fax my big quiz. Quick, Baz, get my woven flax jodhpurs! ';
+const LOREM3 = ['Two driven jocks help fax my', 'big quiz. Quick, Baz, get my', 'woven flax jodhpurs!'];
+const LOREM2 = ['Two driven jocks help fax my big quiz.', 'Quick, Baz, get my woven flax jodhpurs!'];
+const LOREM2W = ['Two driven jocks help fax my big quiz. Quick, Baz,', 'get my woven flax jodhpurs!'];
+const LOREM4 = ['Two driven jocks help', 'fax my big quiz.', 'Quick, Baz, get my', 'woven flax jodhpurs!'];
+
+/* ----------------------------------------------------------------- text tools */
+
+/** One text box; every entry of `lines` becomes its own paragraph. */
+function text(slide, o) {
+  const runs = o.lines.map((t, i) => ({
+    text: t,
+    options: { breakLine: true, paraSpaceBefore: i > 0 ? (o.spaceBefore || 0) : 0 },
+  }));
+  slide.addText(runs, {
+    x: o.x, y: o.y, w: o.w, h: o.h,
+    fontFace: o.font, fontSize: o.size, color: o.color,
+    align: o.align || 'left', valign: 'top', margin: INSET,
+    bold: !!o.bold, italic: !!o.italic,
+    lineSpacingMultiple: o.lineSpacing || 1,
+  });
+}
+
+/** 53 pt Playfair display title (the deck's hero type). */
+function title(slide, x, y, w, h, lines, align, size) {
+  text(slide, {
+    x, y, w, h, lines, align: align || 'left',
+    font: F.serif, size: size || 53, color: C.ink,
+  });
+}
+
+/** Montserrat Medium body copy; paragraphs are separated by 4.6 pt. */
+function body(slide, x, y, w, h, lines, size, align) {
+  text(slide, {
+    x, y, w, h, lines, align: align || 'left', spaceBefore: 4.6,
+    font: F.sansMed, size: size || 12, color: C.gray,
+  });
+}
+
+/** All-caps eyebrow label above a title. */
+function eyebrow(slide, x, y, w, label, align, color) {
+  text(slide, {
+    x, y, w, h: 0.262, lines: [label], align: align || 'center',
+    font: F.sans, size: 12, color: color || C.gray4, lineSpacing: 0.8,
+  });
+}
+
+/* ---------------------------------------------------------------- shape tools */
+
+/** Straight connector from (x, y) to (x + w, y + h); `flip` mirrors it horizontally. */
+function rule(slide, x, y, w, h, color, flip, width) {
+  slide.addShape('line', {
+    x, y, w, h, flipH: !!flip,
+    line: { color, width: width || 1 },
+  });
+}
+
+/** The long 45-degree hairlines that decorate the corners of most pages. */
+function diagonal(slide, x, y, size) {
+  rule(slide, x, y, size, size, C.gray3, true);
+}
+
+function panel(slide, x, y, w, h, color) {
+  slide.addShape('rect', { x, y, w, h, fill: { color } });
+}
+
+/* ------------------------------------------------- botanical line art (vector) */
+
+// Both motifs are described in unit coordinates (0..1 of the artwork box):
+// `stems` are smoothed polylines, `leaves` are [base, tip] pairs drawn as almonds.
+const BRANCH = {
+  stems: [[[0.225, 0.075], [0.268, 0.215], [0.295, 0.310], [0.370, 0.405], [0.450, 0.470],
+    [0.520, 0.520], [0.585, 0.600], [0.650, 0.685], [0.715, 0.760]]],
+  leaves: [
+    [[0.295, 0.312], [0.132, 0.442]], [[0.372, 0.405], [0.655, 0.385]],
+    [[0.560, 0.565], [0.800, 0.525]], [[0.408, 0.442], [0.408, 0.730]],
+    [[0.596, 0.615], [0.520, 0.900]], [[0.628, 0.680], [0.868, 0.782]],
+  ],
+  bulge: 0.155,
+};
+
+const SPRIG = {
+  stems: [[[0.428, 0.698], [0.520, 0.640], [0.608, 0.582]], [[0.520, 0.645], [0.596, 0.596]]],
+  leaves: [[[0.428, 0.695], [0.432, 0.412]], [[0.570, 0.498], [0.535, 0.288]]],
+  bulge: 0.30,
+};
+
+/** Quadratic path that runs smoothly through a polyline of [x, y] anchors. */
+function smooth(pts) {
+  const out = [{ x: pts[0][0], y: pts[0][1], moveTo: true }];
+  for (let i = 1; i < pts.length - 1; i++) {
+    const [cx, cy] = pts[i], [nx, ny] = pts[i + 1];
+    out.push({ curve: { type: 'quadratic', x1: cx, y1: cy }, x: (cx + nx) / 2, y: (cy + ny) / 2 });
+  }
+  out.push({ x: pts[pts.length - 1][0], y: pts[pts.length - 1][1] });
+  return out;
+}
+
+/** Almond leaf outline from base to tip, plus its midrib. */
+function leafPath(a, b, bulge) {
+  const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
+  const px = -(b[1] - a[1]) * bulge, py = (b[0] - a[0]) * bulge;
+  return [
+    { x: a[0], y: a[1], moveTo: true },
+    { curve: { type: 'quadratic', x1: mx + px, y1: my + py }, x: b[0], y: b[1] },
+    { curve: { type: 'quadratic', x1: mx - px, y1: my - py }, x: a[0], y: a[1] },
+    { x: a[0], y: a[1], moveTo: true },
+    { curve: { type: 'quadratic', x1: mx + px * 0.4, y1: my + py * 0.4 }, x: b[0], y: b[1] },
+  ];
+}
+
+/** Draws a unit-coordinate motif as a single outlined custom-geometry shape. */
+function motif(slide, art, o) {
+  const h = o.h || o.w;
+  const at = (t) => [t[0] * o.w, t[1] * h];
+  const points = [];
+  art.stems.forEach((line) => points.push(...smooth(line.map(at))));
+  art.leaves.forEach(([a, b]) => points.push(...leafPath(at(a), at(b), art.bulge)));
+  slide.addShape('custGeom', {
+    x: o.x, y: o.y, w: o.w, h,
+    flipH: !!o.flipH, flipV: !!o.flipV, rotate: o.rotate || 0,
+    points, line: { color: o.color, width: 0.75 },
+  });
+}
+
+const branch = (slide, o) => motif(slide, BRANCH, o);
+const sprig = (slide, o) => motif(slide, SPRIG, o);
+
+/* --------------------------------------------------------- line-art icon set */
+
+const STROKE = C.gray2;
+
+function iconGrid(slide, x, y, s) {
+  const cell = s * 0.222, gap = s * 0.056;
+  [[0, 0], [1, 0], [0, 1], [1, 1]].forEach(([cx, cy]) => {
+    slide.addShape('roundRect', {
+      x: x + s * 0.25 + cx * (cell + gap), y: y + s * 0.25 + cy * (cell + gap),
+      w: cell, h: cell, rectRadius: cell * 0.18, line: { color: STROKE, width: 1 },
+    });
+  });
+}
+
+function iconEnvelope(slide, x, y, s) {
+  slide.addShape('roundRect', {
+    x: x + s * 0.215, y: y + s * 0.300, w: s * 0.540, h: s * 0.385,
+    rectRadius: s * 0.030, line: { color: STROKE, width: 1 },
+  });
+  slide.addShape('line', { x: x + s * 0.228, y: y + s * 0.388, w: s * 0.257, h: s * 0.117, line: { color: STROKE, width: 1 } });
+  slide.addShape('line', { x: x + s * 0.485, y: y + s * 0.388, w: s * 0.257, h: s * 0.117, flipH: true, line: { color: STROKE, width: 1 } });
+}
+
+function iconSearch(slide, x, y, s) {
+  slide.addShape('ellipse', { x: x + s * 0.220, y: y + s * 0.220, w: s * 0.360, h: s * 0.360, line: { color: STROKE, width: 1 } });
+  slide.addShape('ellipse', { x: x + s * 0.300, y: y + s * 0.300, w: s * 0.200, h: s * 0.200, line: { color: STROKE, width: 1 } });
+  slide.addShape('line', { x: x + s * 0.525, y: y + s * 0.520, w: s * 0.205, h: s * 0.225, line: { color: STROKE, width: 2.5 } });
+}
+
+function iconBulb(slide, x, y, s) {
+  slide.addShape('ellipse', { x: x + s * 0.300, y: y + s * 0.175, w: s * 0.405, h: s * 0.405, line: { color: STROKE, width: 1 } });
+  // Neck: the glass tapers from the bulb down onto the screw base.
+  slide.addShape('line', { x: x + s * 0.360, y: y + s * 0.520, w: s * 0.048, h: s * 0.155, line: { color: STROKE, width: 1 } });
+  slide.addShape('line', { x: x + s * 0.594, y: y + s * 0.520, w: s * 0.048, h: s * 0.155, flipH: true, line: { color: STROKE, width: 1 } });
+  // Filament: two loops rising out of the socket.
+  [0.412, 0.522].forEach((u) => slide.addShape('roundRect', {
+    x: x + s * u, y: y + s * 0.440, w: s * 0.066, h: s * 0.240,
+    rectRadius: s * 0.033, line: { color: STROKE, width: 1 },
+  }));
+  slide.addShape('rect', { x: x + s * 0.405, y: y + s * 0.675, w: s * 0.190, h: s * 0.105, line: { color: STROKE, width: 1 } });
+  [0.708, 0.745].forEach((t) => slide.addShape('line', { x: x + s * 0.425, y: y + s * t, w: s * 0.150, h: 0, line: { color: STROKE, width: 1 } }));
+}
+
+/** Desktop monitor outline (screen, camera dot and flared stand). */
+function monitor(slide, x, y, s) {
+  slide.addShape('roundRect', {
+    x: x + s * 0.090, y: y + s * 0.215, w: s * 0.815, h: s * 0.522,
+    rectRadius: s * 0.040, line: { color: STROKE, width: 1 },
+  });
+  slide.addShape('ellipse', { x: x + s * 0.478, y: y + s * 0.702, w: s * 0.036, h: s * 0.036, line: { color: STROKE, width: 1 } });
+  // Stand: a straight neck that flares into the foot, drawn as one open outline.
+  const neck = [[0.412, 0.000], [0.412, 0.395], [0.355, 0.980], [0.645, 0.980], [0.588, 0.395], [0.588, 0.000]];
+  slide.addShape('custGeom', {
+    x: x + s * 0.090, y: y + s * 0.737, w: s * 0.815, h: s * 0.118,
+    points: neck.map(([u, v], i) => ({ x: u * s * 0.815, y: v * s * 0.118, moveTo: i === 0 })),
+    line: { color: STROKE, width: 1 },
+  });
+}
+
+/** Phone outline (body + home button). */
+function phone(slide, x, y, s) {
+  slide.addShape('roundRect', {
+    x: x + s * 0.290, y: y + s * 0.126, w: s * 0.406, h: s * 0.752,
+    rectRadius: s * 0.030, line: { color: STROKE, width: 1 },
+  });
+  slide.addShape('ellipse', { x: x + s * 0.468, y: y + s * 0.797, w: s * 0.052, h: s * 0.052, line: { color: STROKE, width: 1 } });
+}
+
+/* --------------------------------------------------------------- deck builder */
+
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'WIDE', width: 40 / 3, height: 7.5 });   // 12192000 x 6858000 EMU
+pptx.layout = 'WIDE';
+pptx.author = 'pptxgenjs';
+pptx.title = 'Your Beautiful Title Goes Here';
+
+function newSlide(bg) {
+  const s = pptx.addSlide();
+  s.background = { color: bg || C.white };
+  return s;
+}
+
+/* 1 — cover: white dome on blush, mirrored branches */
+function slide01() {
+  const s = newSlide(C.blush);
+  s.addShape('pie', {
+    x: 1.558, y: 1.136, w: 10.217, h: 10.217,
+    rotate: 180, angleRange: [0, 179.653], fill: { color: C.white },
+  });
+  branch(s, { x: 9.829, y: -0.045, w: 4.888, color: C.white, flipH: true, flipV: true });
+  branch(s, { x: -1.358, y: -0.045, w: 4.888, color: C.white, flipV: true });
+  title(s, 3.863, 3.13, 5.608, 1.919, TITLE2, 'center');
+  rule(s, 4.92, 5.52, 0.56, 0, C.hair);
+  rule(s, 7.63, 5.52, 0.56, 0, C.hair);
+  eyebrow(s, 5.608, 5.392, 2.022, 'SUBTITLE HERE');
+}
+
+/* 2 — agenda list */
+function slide02() {
+  const s = newSlide(C.blush);
+  const items = [
+    ['Introduction', 1.998, C.silver, true],
+    ['About Us', 2.794, C.dark, false],
+    ['Our Service', 3.589, C.dark, false],
+    ['Our Team', 4.431, C.dark, false],
+    ['Market Plan', 5.295, C.dark, false],
+  ];
+  items.forEach(([label, y, color, italic]) => {
+    text(s, {
+      x: 4.128, y, w: 5.077, h: 0.586, lines: [label], align: 'center',
+      font: F.serifMed, size: 36, color, italic, lineSpacing: 0.8,
+    });
+  });
+  rule(s, 4.356, 2.248, 0.576, 0, C.silver);
+  eyebrow(s, 5.719, 0.771, 1.895, 'LIST AGENDA');
+  diagonal(s, 1.483, 0.322, 2.262);
+  diagonal(s, 9.668, 4.662, 2.262);
+}
+
+/* 3 — three team cards */
+function slide03() {
+  const s = newSlide();
+  diagonal(s, 0.451, 0, 2.262);
+  diagonal(s, 9.332, 6.511, 2.262);
+  text(s, {
+    x: 3.24, y: 1.441, w: 6.854, h: 1.393, lines: [TITLE_ONE], align: 'center',
+    font: F.serifMed, size: 48, color: C.dark, lineSpacing: 0.8,
+  });
+  eyebrow(s, 5.719, 0.771, 2.193, 'SUBTITLE HERE');
+  rule(s, 3.259, 1.258, 0.576, 0, C.dark);
+  const cards = [
+    { cx: 1.669, cy: 2.775, tx: 2.006, name: 'Richard Kyle', ny: 4.946, by: 5.457 },
+    { cx: 5.382, cy: 3.180, tx: 5.719, name: 'Anne Marie', ny: 5.351, by: 5.862 },
+    { cx: 9.204, cy: 2.726, tx: 9.541, name: 'Anne Marie', ny: 4.897, by: 5.408 },
+  ];
+  cards.forEach((c) => {
+    panel(s, c.cx, c.cy, 2.391, 3.19, C.blush3);
+    text(s, {
+      x: c.tx, y: c.ny, w: 2.391, h: 0.463, lines: [c.name],
+      font: F.serifSemi, size: 18, color: C.dark, bold: true, lineSpacing: 1.3,
+    });
+    text(s, {
+      x: c.tx, y: c.by, w: 2.543, h: 0.867, lines: [LOREM_FLOW],
+      font: F.sansMed, size: 12, color: C.gray2, lineSpacing: 1.3,
+    });
+  });
+}
+
+/* 4 — right-aligned title over a long diagonal */
+function slide04() {
+  const s = newSlide();
+  title(s, 4.095, 1.293, 8.348, 2.777, TITLE3, 'right');
+  text(s, {
+    x: 7.73, y: 5.548, w: 4.698, h: 0.572, align: 'right', spaceBefore: 4.6,
+    lines: ['Two driven jocks help fax my big quiz. Quick, Baz, get my woven flax jodhpurs!'],
+    font: F.sansMed, size: 14, color: C.gray,
+  });
+  text(s, {
+    x: 8.455, y: 4.582, w: 3.979, h: 0.872, align: 'right', spaceBefore: 4.6,
+    lines: ['Two driven jocks help fax my big quiz.', 'Quick, Baz, get my woven flax jodhpurs!'],
+    font: F.sansMed, size: 14, color: C.gray,
+  });
+  rule(s, 1.007, 1.299, 6.076, 5.541, C.gray);
+}
+
+/* 5 — four numbered points */
+function slide05() {
+  const s = newSlide();
+  panel(s, -0.208, 0, 2.827, 7.5, C.blush);
+  title(s, 2.756, 0.482, 7.772, 1.919, TITLE2, 'center');
+  const points = [
+    { n: '01', nx: 3.675, ny: 2.591, nw: 0.918, bx: 3.675, by: 3.449, bw: 2.992 },
+    { n: '02', nx: 9.251, ny: 2.585, nw: 1.008, bx: 9.258, by: 3.449, bw: 3.091 },
+    { n: '03', nx: 3.629, ny: 4.957, nw: 1.008, bx: 3.650, by: 5.829, bw: 2.992 },
+    { n: '04', nx: 9.251, ny: 4.952, nw: 1.008, bx: 9.258, by: 5.825, bw: 3.091 },
+  ];
+  points.forEach((p) => {
+    title(s, p.nx, p.ny, p.nw, 0.993, [p.n], 'center');
+    body(s, p.bx, p.by, p.bw, 0.836, LOREM3, 12);
+  });
+}
+
+/* 6 — centred 60 pt statement */
+function slide06() {
+  const s = newSlide(C.blush);
+  text(s, {
+    x: 2.695, y: 1.441, w: 7.943, h: 1.717, lines: [TITLE_ONE], align: 'center',
+    font: F.serifMed, size: 60, color: C.dark, lineSpacing: 0.8,
+  });
+  text(s, {
+    x: 5.719, y: 0.771, w: 2.262, h: 0.267, lines: ['SUBTITLE HERE'], align: 'center',
+    font: F.sansLight, size: 12, color: C.gray4, bold: true, lineSpacing: 0.8,
+  });
+  text(s, {
+    x: 0.779, y: 4.319, w: 1.688, h: 0.689, lines: ['Insert Your Beautiful Title'], align: 'right',
+    font: F.sansMed, size: 14, color: C.gray2, lineSpacing: 1.3,
+  });
+  text(s, {
+    x: 10.867, y: 4.319, w: 1.688, h: 0.689, lines: ['Insert Your Beautiful Title'],
+    font: F.sansMed, size: 14, color: C.gray2, lineSpacing: 1.3,
+  });
+  rule(s, 2.425, 1.258, 0.576, 0, C.dark);
+  diagonal(s, 0.451, 0, 2.262);
+  diagonal(s, 9.058, 5.995, 2.262);
+}
+
+/* 7 — section header with a full-height blush block */
+function slide07() {
+  const s = newSlide();
+  panel(s, 0, 0, 6.875, 7.5, C.blush);
+  title(s, 7.419, 2.245, 7.835, 2.777, TITLE3);
+  body(s, 9.589, 4.957, 3.135, 0.937, LOREM3, 14);
+  rule(s, 7.514, 1.971, 0.916, 0, C.gray);
+  rule(s, 12.058, 6.066, 0.496, 0.488, C.gray);
+}
+
+/* 8 — two long diagonals framing the title */
+function slide08() {
+  const s = newSlide();
+  rule(s, 0.7, 1.087, 4.207, 5.774, C.gray);
+  rule(s, 10.509, 3.749, 2.727, 3.543, C.gray);
+  eyebrow(s, 11.427, 0.516, 1.62, 'SUBTITLE HERE', 'left', C.gray3);
+  rule(s, 7.899, 6.052, 0.834, 0, C.gray);
+  body(s, 6.26, 4.538, 3.424, 0.937, LOREM3, 14);
+  title(s, 4.076, 1.841, 7.765, 2.778, TITLE3);
+}
+
+/* 9 — comparison */
+function slide09() {
+  const s = newSlide();
+  eyebrow(s, 0.353, 0.534, 1.712, 'SUBTITLE HERE', 'left', C.gray3);
+  body(s, 1.056, 4.043, 3.592, 0.937, LOREM3, 14);
+  body(s, 0.994, 5.586, 3.654, 0.937, LOREM3, 14);
+  rule(s, 11.069, 2.026, 1.27, 1.297, C.gray, true);
+  title(s, 7.725, 3.744, 7.925, 1.885, TITLE2);
+  body(s, 7.827, 5.792, 5.506, 0.637, LOREM2W, 14);
+}
+
+/* 10 — title only, on blush */
+function slide10() {
+  const s = newSlide(C.blush);
+  body(s, 8.671, 5.833, 4.141, 0.637, LOREM2, 14);
+  body(s, 8.654, 4.754, 4.141, 0.937, LOREM3, 14);
+  title(s, 0.985, 1.189, 7.317, 2.778, TITLE3);
+}
+
+/* 11 — pull quote */
+function slide11() {
+  const s = newSlide();
+  panel(s, -0.029, 1.429, 12.017, 4.859, C.blush2);
+  text(s, {
+    x: 5.049, y: 2.007, w: 1.32, h: 2.036, lines: ['\u201C'], align: 'center',
+    font: F.serif, size: 115, color: C.ink,
+  });
+  branch(s, { x: 9.128, y: 3.851, w: 4.904, h: 4.756, color: C.branch, flipV: true });
+  sprig(s, { x: 9.03, y: 2.854, w: 4.878, color: C.white });
+  text(s, {
+    x: 5.318, y: 3.067, w: 7.163, h: 1.773, spaceBefore: 2,
+    lines: ['Two driven jocks help fax', 'my big quiz. Quick, Baz, get', 'my woven flax jodhpurs!'],
+    font: F.serif, size: 32, color: C.ink,
+  });
+}
+
+/* 12 — left title, right blush column */
+function slide12() {
+  const s = newSlide();
+  rule(s, 1.174, 2.369, 0.576, 0, C.dark);
+  text(s, {
+    x: 1.057, y: 2.727, w: 4.482, h: 2.04, lines: [TITLE_ONE],
+    font: F.serifMed, size: 48, color: C.dark, lineSpacing: 0.8,
+  });
+  eyebrow(s, 1.057, 0.771, 2.281, 'SUBTITLE HERE', 'left');
+  panel(s, 8.944, 0, 4.39, 7.5, C.blush3);
+  text(s, {
+    x: 3.339, y: 4.72, w: 2.87, h: 1.324, lines: [LOREM_FLOW],
+    font: F.sansMed, size: 14, color: C.gray2, lineSpacing: 1.3,
+  });
+  diagonal(s, 9.614, 0.688, 2.262);
+  diagonal(s, 7.142, 4.584, 2.262);
+}
+
+/* 13 — picture-with-caption composition */
+function slide13() {
+  const s = newSlide(C.blush);
+  branch(s, { x: 8.835, y: -2.216, w: 4.888, color: C.white, flipH: true });
+  body(s, 10.018, 5.695, 3.316, 0.937, LOREM3, 14);
+  rule(s, 1.575, 2.154, 3.473, 3.541, C.white);
+  title(s, 7.444, 2.861, 7.08, 2.778, TITLE3);
+}
+
+/* 14 — three staggered numbered rows */
+function slide14() {
+  const s = newSlide();
+  const rows = [
+    { n: '01', nx: 7.099, ny: 1.369, nw: 0.918, bx: 8.058, by: 1.659 },
+    { n: '02', nx: 7.807, ny: 3.315, nw: 1.058, bx: 8.847, by: 3.592 },
+    { n: '03', nx: 8.473, ny: 5.145, nw: 1.058, bx: 9.513, by: 5.421 },
+  ];
+  rows.forEach((r) => title(s, r.nx, r.ny, r.nw, 0.993, [r.n], 'center'));
+  panel(s, 11.714, 0, 1.827, 7.5, C.blush2);
+  rows.forEach((r) => body(s, r.bx, r.by, 4.487, 0.57, LOREM2, 12));
+}
+
+/* 15 — content with caption + icon bubbles */
+function slide15() {
+  const s = newSlide();
+  slide15Bubble(s, 10.258, 4.039);
+  title(s, 1.086, 1.472, 7.097, 1.919, TITLE2, 'center');
+  panel(s, -0.208, 6.411, 13.75, 1.089, C.blush2);
+  slide15Bubble(s, 7.111, 4.037);
+  iconGrid(s, 7.145, 4.085, 0.771);
+  iconSearch(s, 10.299, 4.073, 0.771);
+  body(s, 5.957, 4.995, 3.147, 0.836, LOREM3, 12, 'center');
+  body(s, 8.711, 5.023, 3.931, 0.836, LOREM3, 12, 'center');
+}
+
+function slide15Bubble(s, x, y) {
+  s.addShape('ellipse', { x, y, w: 0.839, h: 0.839, fill: { color: C.blush4 } });
+}
+
+/* 16 — icon list beside a blush column */
+function slide16() {
+  const s = newSlide();
+  panel(s, 8.092, 0.004, 5.454, 7.504, C.blush2);
+  title(s, 1.254, 1.157, 6.699, 1.919, TITLE2);
+  [3.549, 4.555, 5.536].forEach((y, i) => body(s, i === 2 ? 2.805 : 2.81, y, 4.241, 0.57, LOREM2, 12));
+  rule(s, 0.926, 0.88, 0.916, 0, C.gray);
+  rule(s, 6.555, 6.206, 0.496, 0.488, C.gray);
+  iconGrid(s, 1.864, 3.444, 0.789);
+  iconEnvelope(s, 1.863, 4.424, 0.789);
+  iconSearch(s, 1.858, 5.472, 0.789);
+}
+
+/* 17 — numbered rows stepping down the right edge */
+function slide17() {
+  const s = newSlide();
+  diagonal(s, 5.575, 1.261, 2.262);
+  rule(s, 1.328, 1.015, 0.576, 0, C.dark);
+  text(s, {
+    x: 1.211, y: 1.372, w: 4.482, h: 2.687, lines: [TITLE_ONE],
+    font: F.serifMed, size: 48, color: C.dark, lineSpacing: 0.8,
+  });
+  const rows = [
+    { n: '01', nx: 8.905, ny: 0.806, bx: 9.723, by: 1.397, bw: 3.230 },
+    { n: '02', nx: 8.474, ny: 2.883, bx: 9.293, by: 3.350, bw: 3.254 },
+    { n: '03', nx: 8.044, ny: 4.836, bx: 8.861, by: 5.303, bw: 3.366 },
+  ];
+  rows.forEach((r) => {
+    text(s, {
+      x: r.bx, y: r.by, w: r.bw, h: 0.995, lines: [LOREM_FLOW],
+      font: F.sansMed, size: 14, color: C.gray2, lineSpacing: 1.3,
+    });
+    text(s, {
+      x: r.nx, y: r.ny, w: 0.983, h: 0.747, lines: [r.n], align: 'right',
+      font: F.serifMed, size: 48, color: C.dark, lineSpacing: 0.8,
+    });
+  });
+}
+
+/* 18 — blush column left, two numbered notes right */
+function slide18() {
+  const s = newSlide();
+  panel(s, 0.811, 0.627, 3.725, 6.184, C.blush2);
+  title(s, 5.435, 3.337, 0.918, 0.993, ['01'], 'center');
+  body(s, 5.422, 4.195, 3.725, 0.836, LOREM3, 12);
+  title(s, 5.370, 4.960, 1.023, 0.993, ['02'], 'center');
+  body(s, 5.408, 5.818, 3.725, 0.836, LOREM3, 12);
+  body(s, 1.590, 4.677, 3.725, 0.836, LOREM3, 12);
+  title(s, 1.525, 1.162, 7.622, 2.777, TITLE3);
+}
+
+/* 19 — blush card with a white tick, branches behind */
+function slide19() {
+  const s = newSlide();
+  panel(s, 7.036, 2.221, 4.693, 4.499, C.blush2);
+  body(s, 7.483, 5.408, 4.246, 0.937, LOREM3, 14);
+  title(s, 7.364, 0.821, 7.938, 2.777, TITLE3);
+  rule(s, 7.622, 3.79, 0, 1.302, C.white);
+  branch(s, { x: 8.879, y: 4.277, w: 4.904, h: 4.756, color: C.branch, flipV: true });
+  sprig(s, { x: 8.782, y: 3.28, w: 4.878, color: C.white });
+}
+
+/* 20 — phone mockup */
+function slide20() {
+  const s = newSlide(C.blush);
+  title(s, 1.537, 2.362, 6.911, 2.777, TITLE3);
+  rule(s, 1.709, 1.952, 0.916, 0, C.gray);
+  rule(s, 6.28, 6.162, 0.496, 0.488, C.gray);
+  phone(s, 6.464, 0.357, 6.911);
+  body(s, 3.767, 4.819, 3.378, 0.937, LOREM3, 14);
+}
+
+/* 21 — desktop mockup */
+function slide21() {
+  const s = newSlide();
+  title(s, 7.206, 2.954, 6.962, 1.919, TITLE2);
+  body(s, 7.352, 4.989, 5.608, 0.637, LOREM2W, 14);
+  monitor(s, 0.292, 0.21, 6.962);
+  branch(s, { x: 8.586, y: -1.865, w: 4.81, color: C.gray2, flipH: true });
+}
+
+/* 22 — four arched feature cards */
+function slide22() {
+  const s = newSlide();
+  title(s, 3.253, 0.44, 7.076, 1.919, TITLE2, 'center');
+  branch(s, { x: -1.129, y: -1.938, w: 4.81, color: C.gray2 });
+  branch(s, { x: 10.052, y: -1.938, w: 4.81, color: C.gray2, flipH: true });
+  const cards = [
+    { ax: 1.260, ay: 2.807, bx: 1.657, by: 3.199, ix: 1.746, iy: 3.276, tx: 0.962, ty: 5.353, tw: 3.081, icon: iconGrid },
+    { ax: 4.138, ay: 2.799, bx: 4.561, by: 3.179, ix: 4.650, iy: 3.276, tx: 3.884, ty: 5.349, tw: 3.094, icon: iconSearch },
+    { ax: 7.023, ay: 2.799, bx: 7.447, by: 3.179, ix: 7.511, iy: 3.256, tx: 6.739, ty: 5.358, tw: 3.072, icon: iconEnvelope },
+    { ax: 9.901, ay: 2.790, bx: 10.334, by: 3.202, ix: 10.415, iy: 3.318, tx: 9.696, ty: 5.349, tw: 3.001, icon: iconBulb },
+  ];
+  cards.forEach((c) => s.addShape('round2SameRect', {
+    x: c.ax, y: c.ay, w: 2.505, h: 3.835, angleRange: [0.8333, 0], fill: { color: C.blush3 },
+  }));
+  cards.forEach((c) => s.addShape('ellipse', { x: c.bx, y: c.by, w: 1.7, h: 1.7, fill: { color: C.white } }));
+  cards.forEach((c) => c.icon(s, c.ix, c.iy, 1.562));
+  cards.forEach((c) => body(s, c.tx, c.ty, c.tw, 1.103, LOREM4, 12, 'center'));
+}
+
+/* 23 — hand-drawn bar chart */
+function slide23() {
+  const s = newSlide(C.blush);
+  title(s, 2.994, 0.811, 7.283, 0.993, ['Your Title Here'], 'center');
+  [[1.232, 2.106, 1.266, 2.154, iconGrid], [1.282, 4.727, 1.316, 4.747, iconSearch]].forEach(([bx, by, ix, iy, icon]) => {
+    s.addShape('ellipse', { x: bx, y: by, w: 0.839, h: 0.839, fill: { color: C.white } });
+    icon(s, ix, iy, 0.771);
+  });
+  body(s, 1.232, 3.121, 3.22, 0.836, LOREM3, 12);
+  body(s, 1.232, 5.674, 3.22, 0.836, LOREM3, 12);
+
+  // gridlines with their value labels, bottom (100) to top (500)
+  const grid = [[6.091, 5.933, '100'], [5.257, 5.106, '200'], [4.304, 4.152, '300'], [3.493, 3.368, '400'], [2.526, 2.374, '500']];
+  grid.forEach(([gy]) => rule(s, 5.812, gy, 6.178, 0, C.gray));
+  const bars = [
+    { x: 6.319, y: 3.968, h: 2.123, label: '100', lx: 6.509 },
+    { x: 7.718, y: 2.945, h: 3.129, label: '200', lx: 7.916 },
+    { x: 9.117, y: 5.025, h: 1.049, label: '300', lx: 9.348 },
+    { x: 10.553, y: 2.722, h: 3.343, label: '400', lx: 10.780 },
+  ];
+  bars.forEach((b) => s.addShape('rect', { x: b.x, y: b.y, w: 0.931, h: b.h, fill: { color: C.white } }));
+  grid.forEach(([, ly, label], i) => axisLabel(s, i === 0 ? 5.188 : 5.203, ly, label));
+  bars.forEach((b, i) => axisLabel(s, b.lx, [6.275, 6.284, 6.283, 6.297][i], b.label));
+}
+
+function axisLabel(s, x, y, label) {
+  text(s, { x, y, w: 0.547, h: 0.303, lines: [label], font: F.sans, size: 12, color: C.gray });
+}
+
+/* 24 — four-piece puzzle with icon captions */
+function slide24() {
+  const s = newSlide();
+  title(s, 2.436, 0.408, 8.461, 1.885, TITLE_BIG2, 'center');
+  const notes = [
+    { ix: 1.125, iy: 2.660, is: 0.977, tx: 1.221, ty: 3.491, tw: 3.635, icon: iconGrid },
+    { ix: 1.079, iy: 4.679, is: 0.977, tx: 1.204, ty: 5.541, tw: 3.635, icon: iconSearch },
+    { ix: 9.276, iy: 2.664, is: 0.977, tx: 9.405, ty: 3.488, tw: 3.928, icon: iconEnvelope },
+    { ix: 9.232, iy: 4.654, is: 1.017, tx: 9.388, ty: 5.538, tw: 3.928, icon: iconBulb },
+  ];
+  notes.forEach((n) => body(s, n.tx, n.ty, n.tw, 0.836, LOREM3, 12));
+  notes.forEach((n) => n.icon(s, n.ix, n.iy, n.is));
+  puzzle(s);
+}
+
+// Fractions of the piece body: corner rounding, tab depth, tab half-width at the base.
+const PZ = { corner: 0.15, depth: 0.20, neck: 0.205 };
+
+/**
+ * One jigsaw piece, walked clockwise from the top-left corner. `edges` maps
+ * top/right/bottom/left to +1 (tab bulges outward), -1 (socket) or 0 (straight edge).
+ * x/y/w/h describe the square body; the tab overhang is added around it.
+ */
+function puzzlePiece(s, o) {
+  const size = (o.w + o.h) / 2;
+  const depth = PZ.depth * size, neck = PZ.neck * size, R = PZ.corner * size;
+  const x0 = depth, y0 = depth, x1 = depth + o.w, y1 = depth + o.h;
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  const pts = [{ x: x0 + R, y: y0, moveTo: true }];
+
+  /**
+   * Runs along one side to the corner tangent point `to`. When `kind` is set, a
+   * half-round tab (+1) or socket (-1) is inserted at the side's midpoint `mid`,
+   * bulging along the outward normal (ox, oy); (ux, uy) is the travel direction.
+   */
+  const edge = (kind, mid, to, ux, uy, ox, oy) => {
+    if (kind) {
+      const cd = kind * neck * 4 / 3;   // cubic control depth that traces a semicircle
+      pts.push({ x: mid[0] - ux * neck, y: mid[1] - uy * neck });
+      pts.push({
+        curve: {
+          type: 'cubic',
+          x1: mid[0] - ux * neck + ox * cd, y1: mid[1] - uy * neck + oy * cd,
+          x2: mid[0] + ux * neck + ox * cd, y2: mid[1] + uy * neck + oy * cd,
+        },
+        x: mid[0] + ux * neck, y: mid[1] + uy * neck,
+      });
+    }
+    pts.push({ x: to[0], y: to[1] });
+  };
+  const corner = (ctrl, to) => pts.push({ curve: { type: 'quadratic', x1: ctrl[0], y1: ctrl[1] }, x: to[0], y: to[1] });
+
+  edge(o.edges.top, [cx, y0], [x1 - R, y0], 1, 0, 0, -1);
+  corner([x1, y0], [x1, y0 + R]);
+  edge(o.edges.right, [x1, cy], [x1, y1 - R], 0, 1, 1, 0);
+  corner([x1, y1], [x1 - R, y1]);
+  edge(o.edges.bottom, [cx, y1], [x0 + R, y1], -1, 0, 0, 1);
+  corner([x0, y1], [x0, y1 - R]);
+  edge(o.edges.left, [x0, cy], [x0, y0 + R], 0, -1, -1, 0);
+  corner([x0, y0], [x0 + R, y0]);
+  pts.push({ close: true });
+
+  const shape = {
+    x: o.x - depth, y: o.y - depth, w: o.w + 2 * depth, h: o.h + 2 * depth,
+    points: pts, fill: { color: o.fill },
+  };
+  if (o.stroke) shape.line = { color: o.stroke, width: 1 };
+  s.addShape('custGeom', shape);
+}
+
+/** 2x2 interlocking jigsaw: blush pieces on one diagonal, outlined ones on the other. */
+function puzzle(s) {
+  [
+    { x: 4.669, y: 2.813, w: 1.868, h: 1.874, fill: C.branch, edges: { right: 1, bottom: -1 } },
+    { x: 6.699, y: 2.748, w: 1.943, h: 1.943, fill: C.white, stroke: STROKE, edges: { left: -1, bottom: 1 } },
+    { x: 4.615, y: 4.821, w: 1.943, h: 1.943, fill: C.white, stroke: STROKE, edges: { top: 1, right: -1 } },
+    { x: 6.723, y: 4.860, w: 1.868, h: 1.874, fill: C.branch, edges: { top: -1, left: 1 } },
+  ].forEach((p) => puzzlePiece(s, p));
+}
+
+/* 25 — three donut gauges */
+function slide25() {
+  const s = newSlide(C.blush);
+  const gauges = [
+    { dx: 1.542, dy: 2.778, ax: 1.641, ay: 2.877, end: 356.671, tx: 2.198, tw: 1.386, label: '75%', ty: 3.494 },
+    { dx: 5.602, dy: 2.771, ax: 5.701, ay: 2.870, end: 303.458, tx: 6.108, tw: 1.601, label: '60%', ty: 3.487 },
+    { dx: 9.384, dy: 2.784, ax: 9.484, ay: 2.887, end: 260.547, tx: 9.900, tw: 1.601, label: '50%', ty: 3.494 },
+  ];
+  gauges.forEach((g) => s.addShape('donut', { x: g.dx, y: g.dy, w: 2.509, h: 2.509, fill: { color: C.bar }, rectRadius: 0.2057 }));
+  title(s, 2.506, 0.522, 8.322, 1.885, TITLE_BIG2, 'center');
+  body(s, 0.815, 5.834, 3.961, 0.836, LOREM3, 12, 'center');
+  body(s, 5.130, 5.834, 3.458, 0.836, LOREM3, 12, 'center');
+  body(s, 8.797, 5.834, 3.807, 0.836, LOREM3, 12, 'center');
+  rule(s, 0.763, 1.169, 0.881, 0.881, C.gray);
+  panel(s, 12.903, 0, 0.638, 7.5, C.white);
+  gauges.forEach((g) => title(s, g.tx, g.ty, g.tw, 0.993, [g.label], 'center'));
+  gauges.forEach((g) => s.addShape('arc', {
+    x: g.ax, y: g.ay, w: 2.308, h: 2.308,
+    angleRange: [88.404, g.end], line: { color: C.white, width: 15 },
+  }));
+}
+
+[slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09,
+  slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18,
+  slide19, slide20, slide21, slide22, slide23, slide24, slide25].forEach((build) => build());
+
+pptx.writeFile({ fileName: path.join(__dirname, '0b9846a1-96a2-4eaf-8cbe-16b61b3e1ecb_grok_final.pptx') })
+  .then((f) => console.log('wrote', f));

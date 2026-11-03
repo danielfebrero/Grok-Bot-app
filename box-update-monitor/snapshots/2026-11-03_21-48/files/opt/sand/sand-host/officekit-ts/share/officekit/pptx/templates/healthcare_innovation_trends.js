@@ -1,0 +1,465 @@
+/**
+ * "Innovation in Healthcare" — Malaya Healthcare Services deck.
+ *
+ * Standalone pptxgenjs re-creation of 027d6033-4d44-4f43-ad1d-13114446d708.pptx
+ * Slide size 20" x 11.25" (16:9), 10 slides.
+ *
+ * The source deck's raster/SVG artwork (line icons, quote marks, contact
+ * glyphs) is redrawn here with native pptxgenjs shapes — rings, arcs,
+ * hexagons, hearts, pies — rather than embedded image data.
+ */
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ *
+ * Design tokens
+ * ------------------------------------------------------------------ */
+
+const SLIDE_W = 20;
+const SLIDE_H = 11.25;
+
+const BLUE = '341BCA';
+const ORANGE = 'E8692A';
+const YELLOW = 'FFC924';
+const GREEN = '5DAD57';
+const WHITE = 'FFFFFF';
+
+const HEAD = 'Poppins Bold';
+const BODY = 'Poppins';
+
+// Ring artwork in the source deck is a circle whose hole radius is
+// 0.4494 x the outer radius; pptxgenjs expresses a donut by ring thickness.
+const RING_HOLE = 0.4494;
+
+const LOREM =
+  'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent consectetur, ' +
+  'nisl a egestas elementum, justo elit rutrum est, ac volutpat nisi nisi vel neque.';
+const LOREM_SHORT = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. ';
+
+/* ------------------------------------------------------------------ *
+ * Shape helpers
+ * ------------------------------------------------------------------ */
+
+const rect = (s, x, y, w, h, color, rotate) =>
+  s.addShape('rect', { x, y, w, h, fill: { color }, ...(rotate ? { rotate } : {}) });
+
+const circle = (s, x, y, w, h, color) =>
+  s.addShape('ellipse', { x, y, w, h, fill: { color } });
+
+/** Flat ring matching the deck's circular artwork. */
+const ring = (s, x, y, w, h, color) =>
+  s.addShape('donut', {
+    x, y, w, h,
+    rectRadius: ((1 - RING_HOLE) / 2) * Math.min(w, h),
+    fill: { color },
+  });
+
+/** Rounded card; `r` is the corner radius in inches. */
+const card = (s, x, y, w, h, r, color) =>
+  s.addShape('roundRect', { x, y, w, h, rectRadius: r, fill: { color } });
+
+/**
+ * Half-ring opening upwards ("U"), cut out of a chord by a smaller chord.
+ * (x, y) is the top-left of the visible half, `w` its full width, `h` its
+ * height; `hole` is the inner/outer radius ratio.
+ */
+function archUp(s, x, y, w, h, hole, color, bgColor) {
+  s.addShape('chord', { x, y: y - h, w, h: 2 * h, angleRange: [0, 180], fill: { color } });
+  s.addShape('chord', {
+    x: x + (w * (1 - hole)) / 2,
+    y: y - h * hole,
+    w: w * hole,
+    h: 2 * h * hole,
+    angleRange: [0, 180],
+    fill: { color: bgColor },
+  });
+}
+
+/** Outline-only shape, used for the deck's white line icons. */
+const stroke = (s, shape, o) =>
+  s.addShape(shape, {
+    fill: { type: 'none' },
+    line: { color: o.color || WHITE, width: o.width || 3 },
+    ...o,
+  });
+
+/** Open polyline through `pts`, given in multiples of `unit` from (x, y). */
+function polyline(s, x, y, unit, pts, width) {
+  pts.slice(0, -1).forEach((pt, i) => {
+    const nxt = pts[i + 1];
+    stroke(s, 'line', {
+      x: x + pt[0] * unit, y: y + pt[1] * unit,
+      w: (nxt[0] - pt[0]) * unit, h: (nxt[1] - pt[1]) * unit,
+      width,
+    });
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Text helper — every text box in the source deck is inset-free,
+ * top-anchored and uses exact (spcPts) line spacing.
+ * ------------------------------------------------------------------ */
+
+const text = (s, content, o) =>
+  s.addText(content, {
+    x: o.x, y: o.y, w: o.w, h: o.h,
+    fontFace: o.font || BODY,
+    fontSize: o.size,
+    color: o.color || WHITE,
+    align: o.align || 'left',
+    valign: 'top',
+    lineSpacing: o.lineSpacing,
+    margin: 0,
+    ...(o.charSpacing ? { charSpacing: o.charSpacing } : {}),
+  });
+
+/* ------------------------------------------------------------------ *
+ * Icon helpers — native stand-ins for the deck's SVG line icons
+ * ------------------------------------------------------------------ */
+
+/** Clipboard carrying an ECG trace and a heart (slide 3, card 1). */
+function iconClipboardHeart(s, x, y, w, h) {
+  stroke(s, 'roundRect', { x: x + w * 0.02, y: y + h * 0.09, w: w * 0.62, h: h * 0.79, rectRadius: 0.06, width: 4.4 });
+  stroke(s, 'roundRect', { x: x + w * 0.2, y: y + h * 0.02, w: w * 0.26, h: h * 0.1, rectRadius: 0.05, width: 4.4 });
+  s.addShape('ellipse', { x: x + w * 0.29, y: y - h * 0.005, w: w * 0.08, h: w * 0.08, fill: { color: WHITE } });
+  stroke(s, 'line', { x: x + w * 0.09, y: y + h * 0.22, w: w * 0.11, h: 0, width: 5.5 });
+  stroke(s, 'line', { x: x + w * 0.25, y: y + h * 0.22, w: w * 0.07, h: 0, width: 5.5 });
+
+  polyline(s, x + w * 0.06, y + h * 0.38, w * 0.075,
+    [[0, 0], [0.9, 0], [1.35, -0.5], [1.85, 0.85], [2.5, -1.05], [3.05, 0.4], [3.6, 0], [4.9, 0]], 4.4);
+  stroke(s, 'ellipse', { x: x + w * 0.032, y: y + h * 0.38 - w * 0.028, w: w * 0.056, h: w * 0.056, width: 4 });
+
+  [0.55, 0.72].forEach(f => {
+    stroke(s, 'rect', { x: x + w * 0.08, y: y + h * f, w: w * 0.1, h: h * 0.1, width: 4.4 });
+    stroke(s, 'line', { x: x + w * 0.24, y: y + h * (f + 0.05), w: w * 0.13, h: 0, width: 5.5 });
+    stroke(s, 'line', { x: x + w * 0.42, y: y + h * (f + 0.05), w: w * 0.08, h: 0, width: 5.5 });
+  });
+
+  stroke(s, 'heart', { x: x + w * 0.42, y: y + h * 0.22, w: w * 0.56, h: h * 0.48, width: 5 });
+  polyline(s, x + w * 0.46, y + h * 0.43, w * 0.045,
+    [[0, 0], [0.7, 0], [1.2, -0.7], [1.9, 0.5], [2.5, 0], [3.6, 0]], 4);
+}
+
+/** Checklist with a pencil (slide 3, card 2). */
+function iconChecklistPencil(s, x, y, w, h) {
+  stroke(s, 'snip1Rect', { x: x + w * 0.05, y: y + h * 0.03, w: w * 0.64, h: h * 0.9, rectRadius: w * 0.16, width: 4.4 });
+  for (let i = 0; i < 3; i++) {
+    const ly = y + h * 0.24 + i * h * 0.235;
+    stroke(s, 'line', { x: x + w * 0.13, y: ly + w * 0.02, w: w * 0.045, h: w * 0.05, width: 5 });
+    stroke(s, 'line', { x: x + w * 0.175, y: ly + w * 0.07, w: w * 0.095, h: -w * 0.115, width: 5 });
+    stroke(s, 'line', { x: x + w * 0.34, y: ly + w * 0.035, w: w * 0.28, h: 0, width: 5.5 });
+  }
+  // Pencil laid along the 45-degree diagonal: shaft, ferrule, tip
+  stroke(s, 'rect', { x: x + w * 0.615, y: y + h * 0.335, w: w * 0.125, h: h * 0.4, rotate: 45, width: 4.4 });
+  stroke(s, 'rect', { x: x + w * 0.735, y: y + h * 0.165, w: w * 0.125, h: h * 0.135, rotate: 45, width: 4.4 });
+  stroke(s, 'triangle', { x: x + w * 0.475, y: y + h * 0.645, w: w * 0.125, h: h * 0.135, rotate: 225, width: 4.4 });
+}
+
+/** Stethoscope (slide 3, card 3). */
+function iconStethoscope(s, x, y, w, h) {
+  const T = 7; // tube thickness
+  const START = 325; // ear-tube arc sweeps 325deg -> 215deg, leaving a gap at the top
+  stroke(s, 'arc', { x: x + w * 0.01, y: y + h * 0.03, w: w * 0.62, h: h * 0.7, angleRange: [START, 215], width: T });
+
+  const rad = (START * Math.PI) / 180;
+  const tipY = y + h * 0.38 + Math.sin(rad) * h * 0.35;
+  [[-1, -28], [1, 28]].forEach(([side, rotate]) => {
+    const tipX = x + w * 0.32 + side * Math.cos(rad) * w * 0.31;
+    s.addShape('roundRect', {
+      x: tipX - w * 0.065, y: tipY - h * 0.038, w: w * 0.13, h: h * 0.075,
+      rectRadius: 0.05, fill: { color: WHITE }, rotate,
+    });
+  });
+
+  stroke(s, 'line', { x: x + w * 0.32, y: y + h * 0.6, w: 0, h: h * 0.05, width: T });
+  stroke(s, 'arc', { x: x + w * 0.3, y: y + h * 0.3, w: w * 0.6, h: h * 0.7, angleRange: [0, 180], width: T });
+  stroke(s, 'ellipse', { x: x + w * 0.762, y: y + h * 0.47, w: w * 0.235, h: w * 0.235, width: T });
+  s.addShape('ellipse', { x: x + w * 0.845, y: y + h * 0.552, w: w * 0.07, h: w * 0.07, fill: { color: WHITE } });
+}
+
+/** Medical cross in a double circle beside pill boxes (slide 3, card 4). */
+function iconCrossCircle(s, x, y, w, h) {
+  stroke(s, 'ellipse', { x: x + w * 0.2, y: y + h * 0.02, w: w * 0.78, h: h * 0.8, width: 4.6 });
+  stroke(s, 'arc', { x: x + w * 0.09, y: y + h * 0.05, w: w * 0.78, h: h * 0.8, angleRange: [140, 250], width: 4.6 });
+  stroke(s, 'plus', { x: x + w * 0.37, y: y + h * 0.15, w: w * 0.44, h: h * 0.46, width: 5.5 });
+  stroke(s, 'rect', { x: x + w * 0.01, y: y + h * 0.52, w: w * 0.22, h: h * 0.42, width: 4.2 });
+  stroke(s, 'line', { x: x + w * 0.01, y: y + h * 0.62, w: w * 0.22, h: 0, width: 4.2 });
+  stroke(s, 'rect', { x: x + w * 0.13, y: y + h * 0.64, w: w * 0.31, h: h * 0.3, width: 4.2 });
+  stroke(s, 'line', { x: x + w * 0.13, y: y + h * 0.72, w: w * 0.31, h: 0, width: 4.2 });
+  stroke(s, 'plus', { x: x + w * 0.24, y: y + h * 0.775, w: w * 0.1, h: h * 0.1, width: 4 });
+}
+
+/** Hexagon holding a heart above a cupped hand (slide 7 list bullets). */
+function iconHexHeart(s, x, y, w, h) {
+  stroke(s, 'hexagon', { x, y, w, h, rotate: 90, width: 4 });
+  stroke(s, 'heart', { x: x + w * 0.24, y: y + h * 0.19, w: w * 0.52, h: h * 0.36, width: 4 });
+  stroke(s, 'arc', { x: x + w * 0.12, y: y + h * 0.36, w: w * 0.72, h: h * 0.42, angleRange: [10, 170], width: 4 });
+  stroke(s, 'line', { x: x + w * 0.34, y: y + h * 0.575, w: w * 0.26, h: 0, width: 4 });
+}
+
+/** A pair of filled "66" quote marks (slide 9). */
+function quoteMarks(s, x, y, w, h, color) {
+  const markW = w * 0.47;
+  [x, x + w - markW].forEach(mx =>
+    s.addShape('pie', { x: mx, y, w: markW, h, angleRange: [20, 290], fill: { color } }));
+}
+
+/** White disc holding a green contact glyph (slide 10). */
+function contactBadge(s, x, y, d, kind) {
+  circle(s, x, y, d, d, WHITE);
+  const g = { color: GREEN, width: 1.4 };
+
+  if (kind === 'phone') {
+    s.addShape('blockArc', {
+      x: x + d * 0.1, y: y + d * 0.12, w: d * 0.56, h: d * 0.6,
+      angleRange: [130, 50], arcThicknessRatio: 0.62, fill: { color: GREEN },
+    });
+    stroke(s, 'arc', { x: x + d * 0.32, y: y + d * 0.14, w: d * 0.54, h: d * 0.54, angleRange: [275, 50], ...g });
+    stroke(s, 'arc', { x: x + d * 0.4, y: y + d * 0.22, w: d * 0.38, h: d * 0.38, angleRange: [275, 50], ...g });
+  } else if (kind === 'mail') {
+    s.addShape('rect', { x: x + d * 0.18, y: y + d * 0.3, w: d * 0.64, h: d * 0.42, fill: { color: GREEN } });
+    stroke(s, 'line', { x: x + d * 0.18, y: y + d * 0.3, w: d * 0.32, h: d * 0.21, color: WHITE, width: 1.6 });
+    stroke(s, 'line', { x: x + d * 0.5, y: y + d * 0.51, w: d * 0.32, h: -d * 0.21, color: WHITE, width: 1.6 });
+  } else {
+    stroke(s, 'ellipse', { x: x + d * 0.16, y: y + d * 0.16, w: d * 0.68, h: d * 0.68, ...g });
+    stroke(s, 'ellipse', { x: x + d * 0.38, y: y + d * 0.16, w: d * 0.24, h: d * 0.68, ...g });
+    stroke(s, 'line', { x: x + d * 0.16, y: y + d * 0.5, w: d * 0.68, h: 0, ...g });
+    stroke(s, 'line', { x: x + d * 0.21, y: y + d * 0.33, w: d * 0.58, h: 0, ...g });
+    stroke(s, 'line', { x: x + d * 0.21, y: y + d * 0.67, w: d * 0.58, h: 0, ...g });
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Slides
+ * ------------------------------------------------------------------ */
+
+// 1 — Title
+function slide1(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: BLUE };
+
+  rect(s, 17.3929, 0, 2.6525, 11.2163, ORANGE);
+  rect(s, 17.3929, 8.6864, 2.6071, 2.5636, YELLOW);
+  circle(s, 17.4155, 0, 2.5618, 2.5618, GREEN);
+  rect(s, 0.7581, 9.3807, 3.6865, 3.6711, YELLOW, -45);
+
+  text(s, 'Innovation in Healthcare',
+    { x: 1.3786, y: 2.7619, w: 13.793, h: 3.7646, size: 96, lineSpacing: 134.4, font: HEAD });
+  text(s, 'Malaya Healthcare Services',
+    { x: 1.3786, y: 2.1556, w: 9.9929, h: 0.7125, size: 36, lineSpacing: 50.4 });
+  text(s, 'Prepared by Fibrinosa Wilson',
+    { x: 1.3786, y: 6.5733, w: 9.0769, h: 0.4646, size: 24, lineSpacing: 33.59 });
+}
+
+// 2 — Emerging Trends
+function slide2(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: BLUE };
+
+  text(s, 'Emerging Trends',
+    { x: 10.826, y: 2.6324, w: 6.8397, h: 1.0172, size: 51.85, lineSpacing: 72.59, font: HEAD });
+  text(s, LOREM,
+    { x: 10.826, y: 4.3587, w: 7.7682, h: 2.1424, size: 27.49, lineSpacing: 38.49, align: 'justify' });
+
+  ring(s, -3.2969, 7.9669, 6.5938, 6.5938, YELLOW);
+  rect(s, 17.1885, 8.4503, 2.8115, 2.8135, YELLOW);
+  circle(s, 15.7828, 8.4503, 2.8115, 2.8115, ORANGE);
+}
+
+// 3 — Telehealth and Virtual Care
+function slide3(pptx) {
+  const s = pptx.addSlide();
+
+  const CARDS = [
+    { x: 0.6849, label: 'Healthcare providers', lx: 1.3006, lw: 1.6595, lh: 0.7879, icon: iconClipboardHeart, ix: 1.3006, iy: 2.8756, iw: 2.0757, ih: 2.0757 },
+    { x: 3.7048, label: 'Improved access to care', lx: 4.11, lw: 2.0804, lh: 0.7879, icon: iconChecklistPencil, ix: 4.5112, iy: 3.0438, iw: 1.9075, ih: 1.9075 },
+    { x: 6.7247, label: 'Increased convenience and flexibility', lx: 6.9978, lw: 2.3447, lh: 1.1787, icon: iconStethoscope, ix: 7.3648, iy: 2.8788, iw: 1.6923, ih: 2.2374 },
+    { x: 9.7446, label: 'Potential cost savings', lx: 10.3429, lw: 1.8059, lh: 0.7879, icon: iconCrossCircle, ix: 10.1575, iy: 2.8749, iw: 2.1467, ih: 2.0764 },
+  ];
+
+  CARDS.forEach(c => {
+    card(s, c.x, 2.201, 2.8896, 3.593, 0.4564, ORANGE);
+    text(s, c.label, {
+      x: c.lx, y: 0.7859, w: c.lw, h: c.lh,
+      size: 20.22, lineSpacing: 28.32, align: 'center', color: BLUE,
+    });
+  });
+
+  // Decorative cluster, right edge
+  rect(s, 17.3234, 1.0818, 5.208, 5.1863, GREEN, -45);
+  rect(s, 16.2525, 3.6749, 3.7475, 3.49, ORANGE);
+  ring(s, 12.3967, 3.6749, 7.7116, 7.7116, YELLOW);
+
+  // Blue banner over the lower third
+  rect(s, 0, 7.1649, 20, 4.0851, BLUE);
+  text(s, 'Telehealth and Virtual Care',
+    { x: 1.125, y: 8.2568, w: 17.4189, h: 1.4146, size: 72, lineSpacing: 100.8, font: HEAD });
+
+  CARDS.forEach(c => c.icon(s, c.ix, c.iy, c.iw, c.ih));
+}
+
+// 4 — Precision Medicine and Personalized Care
+function slide4(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: BLUE };
+
+  text(s, 'Precision Medicine and Personalized Care',
+    { x: 10.2366, y: 3.246, w: 8.6384, h: 2.0122, size: 51.85, lineSpacing: 72.59, font: HEAD });
+  text(s, LOREM,
+    { x: 10.2366, y: 5.7053, w: 8.3215, h: 2.1424, size: 27.49, lineSpacing: 38.49, align: 'justify' });
+
+  rect(s, 6.6377, 8.6864, 2.5618, 2.5636, YELLOW);
+  circle(s, 6.6377, 6.1246, 2.5618, 2.5618, GREEN);
+  circle(s, 17.8437, 1.0462, 1.0313, 1.0313, ORANGE);
+}
+
+// 5 — Artificial Intelligence (AI) in Healthcare
+function slide5(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: BLUE };
+
+  rect(s, 8.7555, 6.0767, 11.2445, 3.7839, ORANGE);
+  circle(s, 18.3177, 6.0794, 3.7812, 3.7812, YELLOW);
+
+  text(s, 'Artificial Intelligence (AI) in Healthcare',
+    { x: 9.3021, y: 6.174, w: 7.9844, h: 2.0122, size: 51.85, lineSpacing: 72.59, font: HEAD });
+  text(s, LOREM,
+    { x: 9.3021, y: 8.3042, w: 7.9844, h: 1.1931, size: 20.47, lineSpacing: 28.66, font: HEAD, align: 'justify' });
+}
+
+// 6 — Three coloured columns of benefits
+function slide6(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: BLUE };
+
+  rect(s, 6.6658, 3.35, 6.6658, 7.9, GREEN);
+  rect(s, 13.3109, 0.017, 6.6891, 11.233, ORANGE);
+  rect(s, 6.8792, -1.068, 10.4574, 4.9351, GREEN, -45);
+  rect(s, 4.2324, -2.4875, 4.9566, 4.8103, YELLOW, -45);
+
+  const COLUMNS = [
+    { x: 0.5731, hy: 5.4402, hh: 0.8167, head: 'Continuous health monitoring of vital signs and activity levels' },
+    { x: 7.3155, hy: 5.4402, hh: 0.8167, head: 'Early detection of potential health issues' },
+    { x: 14.0579, hy: 5.237, hh: 1.2229, head: 'Improved patient engagement and self-management of chronic conditions' },
+  ];
+
+  COLUMNS.forEach(c => {
+    text(s, c.head,
+      { x: c.x, y: c.hy, w: 5.369, h: c.hh, size: 21, lineSpacing: 29.4, font: HEAD });
+    [6.666, 8.2882].forEach(y =>
+      text(s, LOREM,
+        { x: c.x, y, w: 4.7944, h: 1.216, size: 15.99, lineSpacing: 22.39, align: 'justify' }));
+  });
+}
+
+// 7 — Deep Analytics in Healthcare
+function slide7(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: BLUE };
+
+  const BARS = [
+    { y: 1.3359, iy: 2.0039, tx: 10.9495, ty: 2.1932, tw: 8.2826 },
+    { y: 4.2681, iy: 4.8965, tx: 10.9495, ty: 5.1254, tw: 8.2826 },
+    { y: 7.1952, iy: 7.789, tx: 11.1402, ty: 8.0598, tw: 8.0919 },
+  ];
+
+  BARS.forEach(b => card(s, 8.6095, b.y, 12.4317, 2.7188, 0.2084, ORANGE));
+  BARS.forEach(b => {
+    iconHexHeart(s, 9.2918, b.iy, 1.3564, 1.4571);
+    text(s, LOREM_SHORT,
+      { x: b.tx, y: b.ty, w: b.tw, h: 0.9316, size: 24.21, lineSpacing: 33.89 });
+  });
+
+  ring(s, -2.7103, -0.1102, 5.7352, 5.7352, ORANGE);
+  text(s, 'Deep Analytics in Healthcare',
+    { x: 3.3359, y: 4.1118, w: 4.9716, h: 2.8042, size: 48, lineSpacing: 67.19, font: HEAD });
+  rect(s, 0, 8.397, 2.7103, 2.853, YELLOW);
+  circle(s, 2.7591, 8.5397, 2.7103, 2.7103, GREEN);
+}
+
+// 8 — Conclusion
+function slide8(pptx) {
+  const s = pptx.addSlide();
+
+  text(s, 'Conclusion',
+    { x: 12.2295, y: 7.3438, w: 6.6455, h: 0.95, size: 48, lineSpacing: 67.19, font: HEAD, color: BLUE, align: 'right' });
+  text(s, LOREM,
+    { x: 7.9606, y: 8.5347, w: 11.087, h: 1.3813, size: 24, lineSpacing: 33.59, color: BLUE, align: 'right' });
+
+  circle(s, -3.75, 0, 7.5, 7.5, BLUE);
+  ring(s, -3.75, 3.75, 7.5, 7.5, YELLOW);
+  rect(s, -0.0556, 3.75, 3.8056, 3.75, GREEN);
+  rect(s, 3.75, 6.7058, 3.8056, 4.5442, ORANGE);
+}
+
+// 9 — Pull quote
+function slide9(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: BLUE };
+
+  rect(s, 17.6804, -2.3099, 4.6392, 4.6199, YELLOW, -45);
+  rect(s, 16.7264, 7.8569, 3.2736, 3.3931, ORANGE);
+  archUp(s, 17.7085, 3.2735, 2.2917, 4.5833, 0.7, GREEN, BLUE);
+
+  circle(s, 0, 0, 1.9194, 1.9194, ORANGE);
+  quoteMarks(s, 0.4067, 0.58, 1.1, 0.76, WHITE);
+
+  text(s, 'He who has health, has hope; and he who has hope, has everything.',
+    { x: 0.9597, y: 3.1635, w: 16.6848, h: 3.9208, size: 72, lineSpacing: 93.6, font: HEAD, align: 'center' });
+  text(s, '- ARABIAN PROVERB',
+    { x: 4.1464, y: 7.524, w: 10.3115, h: 0.4167, size: 24, lineSpacing: 28.79, font: HEAD, align: 'center', charSpacing: 3.6 });
+}
+
+// 10 — Contact Information
+function slide10(pptx) {
+  const s = pptx.addSlide();
+
+  circle(s, 0, 0.0014, 11.25, 11.25, GREEN);
+  rect(s, 0, 0, 5.625, 11.2514, GREEN);
+  ring(s, 18.4027, 8.0568, 3.1946, 3.1946, YELLOW);
+
+  s.addText(
+    [
+      { text: 'Contact', options: { breakLine: true } },
+      { text: 'Information' },
+    ],
+    {
+      x: 1.1875, y: 2.1715, w: 8.875, h: 3.4535,
+      fontFace: HEAD, fontSize: 87.99, color: WHITE,
+      align: 'left', valign: 'top', lineSpacing: 123.19, margin: 0,
+    });
+
+  const CONTACTS = [
+    { y: 6.2605, iy: 6.3292, kind: 'phone', value: '123-456-7890' },
+    { y: 7.0919, iy: 7.1605, kind: 'mail', value: 'hello@reallygreatsite.com' },
+    { y: 7.9295, iy: 8.0233, kind: 'globe', value: 'www.reallygreatsite.com' },
+  ];
+
+  CONTACTS.forEach(c => {
+    contactBadge(s, 1.1875, c.iy, 0.55, c.kind);
+    text(s, c.value,
+      { x: 1.949, y: c.y, w: 5.899, h: 0.5935, size: 30.58, lineSpacing: 42.81 });
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Build
+ * ------------------------------------------------------------------ */
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'CUSTOM', width: SLIDE_W, height: SLIDE_H });
+  pptx.layout = 'CUSTOM';
+  pptx.title = 'Innovation in Healthcare';
+  pptx.author = 'Fibrinosa Wilson';
+
+  [slide1, slide2, slide3, slide4, slide5, slide6, slide7, slide8, slide9, slide10]
+    .forEach(fn => fn(pptx));
+
+  return pptx;
+}
+
+build()
+  .writeFile({ fileName: path.join(__dirname, '027d6033-4d44-4f43-ad1d-13114446d708_grok_final.pptx') })
+  .then(f => console.log('Wrote', f));
