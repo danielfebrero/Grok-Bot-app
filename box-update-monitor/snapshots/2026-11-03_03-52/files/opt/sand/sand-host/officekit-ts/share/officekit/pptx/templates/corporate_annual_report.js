@@ -1,0 +1,714 @@
+/**
+ * "Annual Report" infographic deck - 15 slides, 13.333 x 7.5 in.
+ * Rebuilt with pptxgenjs only. Raster icons of the original are re-drawn with
+ * native shapes; the (empty) picture placeholders of the original layouts are
+ * intentionally not drawn, they carry no artwork.
+ */
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ palette */
+const NAVY = '04337B';
+const TEAL = '0D8782';
+const WHITE = 'FFFFFF';
+const BLACK = '000000';
+const GREY = '666666'; // body copy
+const GREY_DARK = '595959'; // tx1 @ 65% luminance
+const GREY_LIGHT = 'BFBFBF'; // footer
+const NAVY_DARK = '02255A'; // accent1 shaded 50% - default outline colour
+const HEADER_GREY = '404040';
+
+const MAJOR = 'Plus Jakarta Sans SemiBold';
+const MINOR = 'Poppins Light';
+
+const LOREM = 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo';
+const LOREM_LONG =
+  'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis';
+const LOREM_SHORT = 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. ';
+const LOREM_TINY = 'Lorem ipsum dolor sit amet, consectetuer';
+const LOREM_CHECK = 'Lorem ipsum dolor sit amet, consectetur';
+
+/* ------------------------------------------------------------------ helpers */
+function rect(slide, x, y, w, h, opts) {
+  slide.addShape('rect', Object.assign({ x, y, w, h }, opts));
+}
+
+function solid(color) {
+  return { fill: { color } };
+}
+
+function outline(color, width) {
+  return { line: { color, width: width || 1 } };
+}
+
+function ellipse(slide, x, y, w, h, opts) {
+  slide.addShape('ellipse', Object.assign({ x, y, w, h }, opts));
+}
+
+/** White disc with the soft drop shadow used behind the round icons. */
+function disc(slide, x, y, size) {
+  ellipse(slide, x, y, size, size, {
+    fill: { color: WHITE },
+    shadow: { type: 'outer', color: BLACK, opacity: 0.15, blur: 25, offset: 3, angle: 45 },
+  });
+}
+
+function vline(slide, x, y, h, color, width) {
+  slide.addShape('line', { x, y, w: 0, h, line: { color, width: width || 0.5 } });
+}
+
+function hline(slide, x, y, w, color, width, transparency) {
+  slide.addShape('line', { x, y, w, h: 0, line: { color, width: width || 0.5, transparency: transparency || 0 } });
+}
+
+function text(slide, content, opts) {
+  slide.addText(content, Object.assign({ fontFace: MINOR, valign: 'top' }, opts));
+}
+
+/** 48 pt display headline (the recurring slide title). */
+function title(slide, str, x, y, w, h) {
+  text(slide, str, { x, y, w, h, fontFace: MAJOR, fontSize: 48, lineSpacingMultiple: 0.9 });
+}
+
+/** 14 pt justified intro paragraph. */
+function paragraph(slide, str, x, y, w, h, color) {
+  text(slide, str, { x, y, w, h, fontSize: 14, color: color || GREY, align: 'justify', lineSpacingMultiple: 1.5 });
+}
+
+/** 16 pt semibold card heading. */
+function heading(slide, str, x, y, w, color, h) {
+  text(slide, str, { x, y, w, h: h || 0.37, fontFace: MAJOR, fontSize: 16, color: color || BLACK });
+}
+
+/** 12 pt supporting copy. */
+function note(slide, str, x, y, w, h, color) {
+  text(slide, str, { x, y, w, h, fontSize: 12, color: color || BLACK, lineSpacingMultiple: 1.3 });
+}
+
+/** "Learn | More" split button. */
+function learnMore(slide, x, y) {
+  rect(slide, x, y + 0.007, 1.101, 0.389, outline(NAVY_DARK, 1));
+  rect(slide, x + 1.066, y, 1.101, 0.408, solid(NAVY));
+  text(slide, 'Learn', { x: x + 0.077, y: y + 0.053, w: 0.84, h: 0.303, fontSize: 12, color: NAVY, align: 'center' });
+  text(slide, 'More', { x: x + 1.207, y: y + 0.053, w: 0.84, h: 0.303, fontSize: 12, color: WHITE, align: 'center' });
+}
+
+/** Navy "Total Revenue $50" + teal "Net Profit $3,2M" tile pair. */
+function kpiPair(slide, x, y, gap) {
+  rect(slide, x, y, 2.334, 1.431, solid(NAVY));
+  rect(slide, x + gap, y, 2.334, 1.431, solid(TEAL));
+  heading(slide, 'Total Revenue', x + 0.161, y + 0.137, 2.01, WHITE);
+  text(slide, '$50', { x: x + 0.161, y: y + 0.458, w: 1.714, h: 0.841, fontFace: MAJOR, fontSize: 44, color: WHITE });
+  heading(slide, 'Net Profit', x + gap + 0.162, y + 0.137, 2.01, WHITE);
+  text(
+    slide,
+    [
+      { text: '$3,2', options: { fontSize: 44 } },
+      { text: 'M', options: { fontSize: 24 } },
+    ],
+    { x: x + gap + 0.158, y: y + 0.458, w: 2.176, h: 0.841, fontFace: MAJOR, color: WHITE }
+  );
+}
+
+/** "$75m / Revenue / Lorem ..." rows with hairline separators. */
+function metricRows(slide, valueX, textX, rows, valueColor) {
+  rows.forEach(function (row, i) {
+    text(slide, row.value, {
+      x: valueX, y: row.y, w: 1.349, h: 0.505, fontFace: MAJOR, fontSize: 24, color: valueColor,
+    });
+    heading(slide, row.label, textX, row.y, row.labelW, GREY_DARK);
+    note(slide, row.body, textX, row.y + 0.294, 3.391, 0.345, GREY_DARK);
+    if (i < rows.length - 1) hline(slide, valueX + 0.045, row.y + 0.759, 4.12, GREY_DARK, 0.5, 46);
+  });
+}
+
+/* -------------------------------------------------------------- icon stand-ins
+ * The original deck embeds small monochrome PNG/SVG pictograms. They are
+ * redrawn here from primitive shapes. Every icon is described inside a unit
+ * box and scaled to the requested size:
+ *   ['rect'|'ellipse'|'donut'|'star12', x, y, w, h]   filled shape
+ *   ['arrow', x1, y1, x2, y2, weight]                 line with a triangle head
+ *   ['glyph', '$', x, y, w, h]                        knock-out character
+ */
+const ICONS = {
+  target: [
+    ['donut', 0, 0, 1, 1],
+    ['ellipse', 0.34, 0.34, 0.32, 0.32],
+    ['arrow', 0.4, 0.6, 1.02, -0.02, 0.14],
+  ],
+  percent: [['star12', 0, 0, 1, 1], ['glyph', '%', 0.18, 0.24, 0.64, 0.52]],
+  coins: [
+    ['ellipse', 0, 0.04, 0.58, 0.26], ['ellipse', 0, 0.26, 0.58, 0.26],
+    ['ellipse', 0, 0.48, 0.58, 0.26],
+    ['ellipse', 0.38, 0.38, 0.62, 0.62], ['glyph', '$', 0.38, 0.44, 0.62, 0.5],
+  ],
+  growth: [
+    ['rect', 0.02, 0.79, 0.26, 0.07], ['rect', 0.02, 0.9, 0.26, 0.07],
+    ['rect', 0.35, 0.57, 0.26, 0.07], ['rect', 0.35, 0.68, 0.26, 0.07],
+    ['rect', 0.35, 0.79, 0.26, 0.07], ['rect', 0.35, 0.9, 0.26, 0.07],
+    ['rect', 0.68, 0.35, 0.26, 0.07], ['rect', 0.68, 0.46, 0.26, 0.07],
+    ['rect', 0.68, 0.57, 0.26, 0.07], ['rect', 0.68, 0.68, 0.26, 0.07],
+    ['rect', 0.68, 0.79, 0.26, 0.07], ['rect', 0.68, 0.9, 0.26, 0.07],
+    ['arrow', 0.02, 0.66, 0.54, 0.26, 0.075],
+    ['ellipse', 0.58, 0.0, 0.34, 0.34], ['glyph', '$', 0.58, 0.02, 0.34, 0.3],
+  ],
+  people: [
+    ['ellipse', 0.02, 0.18, 0.25, 0.25], ['round2SameRect', 0.0, 0.46, 0.29, 0.48],
+    ['ellipse', 0.73, 0.18, 0.25, 0.25], ['round2SameRect', 0.71, 0.46, 0.29, 0.48],
+    ['ellipse', 0.35, 0.08, 0.3, 0.3], ['round2SameRect', 0.28, 0.4, 0.44, 0.54],
+    ['rect', 0.47, 0.42, 0.06, 0.52],
+  ],
+  hand: [
+    ['rect', 0.22, 0.32, 0.12, 0.2], ['rect', 0.44, 0.16, 0.12, 0.36],
+    ['rect', 0.66, 0.26, 0.12, 0.26], ['ellipse', 0.62, 0.06, 0.24, 0.24],
+    ['glyph', '$', 0.62, 0.06, 0.24, 0.22],
+    ['ellipse', 0.1, 0.56, 0.8, 0.34], ['rect', 0.0, 0.62, 0.5, 0.14],
+  ],
+};
+
+/** `color` paints the pictogram, `bg` is the surface it sits on (knock-out glyphs). */
+function icon(slide, kind, x, y, size, color, bg) {
+  ICONS[kind].forEach(function (part) {
+    if (part[0] === 'arrow') {
+      slide.addShape('line', {
+        x: x + Math.min(part[1], part[3]) * size, y: y + Math.min(part[2], part[4]) * size,
+        w: Math.abs(part[3] - part[1]) * size, h: Math.abs(part[4] - part[2]) * size,
+        flipV: part[4] < part[2],
+        line: {
+          color, width: part[5] * size * 72,
+          endArrowType: 'triangle',
+        },
+      });
+    } else if (part[0] === 'glyph') {
+      slide.addText(part[1], {
+        x: x + part[2] * size, y: y + part[3] * size, w: part[4] * size, h: part[5] * size,
+        fontFace: MAJOR, fontSize: Math.round(part[5] * size * 60), bold: true,
+        color: bg || WHITE, align: 'center', valign: 'middle',
+      });
+    } else {
+      slide.addShape(part[0], {
+        x: x + part[1] * size, y: y + part[2] * size,
+        w: part[3] * size, h: part[4] * size,
+        fill: { color },
+      });
+    }
+  });
+}
+
+/** Chunky tick mark used in the bullet lists. */
+function checkMark(slide, x, y, w, h, color) {
+  slide.addShape('line', { x, y: y + h * 0.42, w: w * 0.36, h: h * 0.58, line: { color, width: 2.5 } });
+  slide.addShape('line', { x: x + w * 0.36, y, w: w * 0.64, h, line: { color, width: 2.5 }, flipV: true });
+}
+
+/** Flat ↗ glyph in the corner of the financial tiles: shaft + square arrow head. */
+function arrowUpRight(slide, x, y, size, color) {
+  const stroke = size * 0.165 * 72;
+  slide.addShape('line', { x, y, w: size, h: size, flipV: true, line: { color, width: stroke } });
+  slide.addShape('line', { x: x + size * 0.4, y, w: size * 0.6, h: 0, line: { color, width: stroke } });
+  slide.addShape('line', { x: x + size, y, w: 0, h: size * 0.6, line: { color, width: stroke } });
+}
+
+/* ------------------------------------------------------------------- slides */
+
+// 1 - Annual Report cover with four dated task cards.
+function slide01(pptx) {
+  const s = pptx.addSlide({ masterName: 'BASE' });
+  text(s, 'Annual Report', { x: 0.817, y: 0.554, w: 9.45, h: 1.212, fontFace: MAJOR, fontSize: 66 });
+
+  const cards = [
+    { x: 3.672, y: 2.183, day: '10', fill: NAVY },
+    { x: 8.098, y: 2.183, day: '15', fill: TEAL },
+    { x: 3.672, y: 3.99, day: '20', fill: TEAL },
+    { x: 8.098, y: 3.99, day: '25', fill: NAVY },
+  ];
+  cards.forEach(function (c) {
+    rect(s, c.x, c.y, 4.336, 1.735, solid(c.fill));
+    text(
+      s,
+      [
+        { text: c.day + ' ', options: { fontSize: 40, fontFace: MAJOR } },
+        { text: 'Sep', options: { fontSize: 24 } },
+      ],
+      { x: c.x + 0.188, y: c.y + 0.279, w: 0.985, h: 1.178, color: WHITE, align: 'center' }
+    );
+    vline(s, c.x + 1.356, c.y + 0.266, 1.204, WHITE, 1);
+    text(s, 'Project Task', { x: c.x + 1.507, y: c.y + 0.222, w: 2.313, h: 0.404, fontFace: MAJOR, color: WHITE });
+    note(s, LOREM, c.x + 1.507, c.y + 0.626, 2.717, 0.87, WHITE);
+  });
+
+  text(s, LOREM_LONG.replace('Cum sociis', 'Cum sociis natoque penatibus et magnis dis parturient'), {
+    x: 3.803, y: 5.946, w: 8.966, h: 0.774, fontSize: 14, italic: true, color: GREY, lineSpacingMultiple: 1.5,
+  });
+}
+
+// 2 - Income and expense details: four full-bleed revenue bars.
+function slide02(pptx) {
+  const s = pptx.addSlide({ masterName: 'BASE' });
+  const rows = [
+    { y: 0.889, fill: NAVY, value: '$50', kind: 'target', iconColor: NAVY },
+    { y: 2.327, fill: TEAL, value: '$40', kind: 'coins', iconColor: TEAL },
+    { y: 3.765, fill: NAVY, value: '$30', kind: 'percent', iconColor: NAVY },
+    { y: 5.202, fill: TEAL, value: '$20', kind: 'growth', iconColor: TEAL },
+  ];
+  rows.forEach(function (r) {
+    rect(s, 0, r.y, 6.582, 1.408, solid(r.fill));
+    text(s, r.value, { x: 0.495, y: r.y + 0.351, w: 1.714, h: 0.707, fontFace: MAJOR, fontSize: 36, color: WHITE });
+    vline(s, 1.888, r.y + 0.303, 0.802, WHITE);
+    heading(s, 'Total Revenue', 2.203, r.y + 0.192, 2.313, WHITE);
+    note(s, LOREM, 2.203, r.y + 0.563, 3.777, 0.608, WHITE);
+    disc(s, 6.133, r.y + 0.256, 0.898);
+    icon(s, r.kind, 6.381, r.y + 0.503, 0.402, r.iconColor, WHITE);
+  });
+
+  title(s, 'Income and Expense Details', 7.677, 1.107, 4.785, 2.282);
+  paragraph(s, LOREM_LONG + ' natoque penatibus et magnis dis parturient', 7.677, 4.912, 4.57, 1.481);
+}
+
+// 3 - Financial overview: six coloured metric tiles.
+function slide03(pptx) {
+  const s = pptx.addSlide({ masterName: 'BASE' });
+  title(s, 'Financial Overview', 0.729, 1.384, 3.436, 1.555);
+  paragraph(s, LOREM_LONG.replace('Cum sociis', 'Cum sociis natoque penatibus et magnis dis'), 0.729, 3.214, 3.436, 1.835);
+  learnMore(s, 0.854, 5.635);
+
+  const tiles = [
+    { x: 4.671, y: 1.154, fill: NAVY }, { x: 7.282, y: 1.154, fill: TEAL }, { x: 9.892, y: 1.154, fill: NAVY },
+    { x: 4.671, y: 3.783, fill: TEAL }, { x: 7.282, y: 3.783, fill: NAVY }, { x: 9.892, y: 3.783, fill: TEAL },
+  ];
+  tiles.forEach(function (t) {
+    rect(s, t.x, t.y, 2.438, 2.438, solid(t.fill));
+    arrowUpRight(s, t.x + 2.055, t.y + 2.076, 0.25, WHITE);
+  });
+
+  const amount = function (runs, x, y) {
+    text(s, runs, { x, y, w: 2.01, h: 1.111, fontFace: MAJOR, color: WHITE });
+  };
+  heading(s, 'Basic Plan', 4.841, 1.495, 2.01, WHITE);
+  amount([{ text: '$50', options: { fontSize: 36, breakLine: true } }, { text: 'million', options: { fontSize: 24 } }], 4.841, 2.026);
+
+  icon(s, 'people', 7.454, 1.432, 0.4, WHITE, TEAL);
+  note(s, LOREM_SHORT, 7.368, 2.282, 2.213, 0.87, WHITE);
+
+  heading(s, 'Total Assets', 10.145, 1.495, 2.01, WHITE);
+  amount([{ text: '$40,5', options: { fontSize: 36, breakLine: true } }, { text: 'million', options: { fontSize: 24 } }], 10.145, 2.026);
+
+  icon(s, 'growth', 4.865, 4.003, 0.4, WHITE, TEAL);
+  note(s, LOREM_SHORT, 4.784, 4.854, 2.213, 0.87, WHITE);
+
+  heading(s, 'Net Profit', 7.454, 4.12, 2.01, WHITE);
+  amount(
+    [
+      { text: '$3 ', options: { fontSize: 36 } },
+      { text: 'million', options: { fontSize: 24, breakLine: true } },
+      { text: '(18% YoY)', options: { fontSize: 24 } },
+    ],
+    7.454, 4.651
+  );
+
+  icon(s, 'target', 10.073, 4.003, 0.4, WHITE, TEAL);
+  note(s, LOREM_SHORT, 9.99, 4.854, 2.213, 0.87, WHITE);
+}
+
+// 4 - Flexible pricing plans: three price columns.
+function slide04(pptx) {
+  const s = pptx.addSlide({ masterName: 'BASE' });
+  title(s, 'Flexible Pricing Plans', 0.729, 0.988, 5.938, 1.555);
+  paragraph(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean', 8.313, 1.599, 4.042, 0.774);
+
+  const cols = [
+    { x: 0.958, accent: NAVY, price: TEAL, plan: 'Basic Plan', headX: 1.729, bodyX: 1.378, btnX: 1.34, btnTextX: 2.025 },
+    { x: 4.891, accent: TEAL, price: NAVY, plan: 'Premium Plan', headX: 5.682, bodyX: 5.329, btnX: 5.292, btnTextX: 5.976 },
+    { x: 8.823, accent: NAVY, price: NAVY, plan: 'Enterprise Plan', headX: 9.594, bodyX: 9.26, btnX: 9.222, btnTextX: 9.907 },
+  ];
+  cols.forEach(function (c, i) {
+    rect(s, c.x, 2.917, 3.552, 1.264, outline(c.accent, 1));
+    rect(s, c.x, 4.181, 3.552, 1.963, solid(c.accent));
+    text(s, c.plan, {
+      x: c.headX, y: 2.98, w: 2.01, h: 0.303, fontFace: MAJOR, fontSize: 12, color: c.accent, align: 'center',
+    });
+
+    if (i === 2) {
+      text(s, [
+        { text: 'Custom Pricing', options: { fontSize: 16, color: BLACK, breakLine: true } },
+        { text: 'Contact us for a quote', options: { fontSize: 12, color: TEAL, fontFace: MINOR } },
+      ], { x: 9.448, y: 3.283, w: 2.302, h: 0.793, fontFace: MAJOR, align: 'center', lineSpacingMultiple: 1.5 });
+    } else {
+      text(s, [
+        { text: '$196', options: { fontSize: 36, fontFace: MAJOR } },
+        { text: ' /month', options: { fontSize: 12 } },
+      ], { x: c.headX, y: 3.355, w: 2.01, h: 0.707, color: c.price, align: 'center' });
+    }
+
+    [4.453, 4.947].forEach(function (y) {
+      text(s, 'Lorem ipsum dolor sit amet, ', {
+        x: c.bodyX, y, w: 2.717, h: 0.345, fontSize: 12, color: WHITE, align: 'center', lineSpacingMultiple: 1.3,
+      });
+    });
+    hline(s, c.bodyX, 4.882, 2.717, WHITE);
+
+    rect(s, c.btnX, 5.494, 2.792, 0.408, solid(WHITE));
+    text(s, 'Choose Plan', {
+      x: c.btnTextX, y: 5.547, w: 1.423, h: 0.303, fontSize: 12, color: c.accent, align: 'center',
+    });
+  });
+}
+
+// 5 - Operational insights: navy statistics band across the bottom.
+function slide05(pptx) {
+  const s = pptx.addSlide({ masterName: 'BASE' });
+  rect(s, 0.758, 4.792, 11.817, 1.875, solid(NAVY));
+  title(s, 'Operational Insights & Impact', 0.688, 0.933, 5.795, 1.555);
+  paragraph(s, LOREM_LONG, 0.688, 2.488, 4.73, 1.128);
+  learnMore(s, 0.758, 4.0);
+
+  const stats = [
+    { x: 1.169, value: '79%' }, { x: 4.214, value: '19%' },
+    { x: 7.199, value: '1M+' }, { x: 10.113, value: '22+' },
+  ];
+  stats.forEach(function (st) {
+    text(s, st.value, {
+      x: st.x, y: 4.845, w: 2.138, h: 0.889, fontFace: MAJOR, fontSize: 36, color: WHITE, lineSpacingMultiple: 1.5,
+    });
+    note(s, LOREM_TINY, st.x, 5.734, 2.138, 0.608, WHITE);
+  });
+  [[3.728, 5.191], [6.667, 5.132], [9.712, 5.154]].forEach(function (p) {
+    vline(s, p[0], p[1], 1.195, WHITE);
+  });
+}
+
+// 6 - Sustainability & CSR: two wide panels joined by a round icon.
+function slide06(pptx) {
+  const s = pptx.addSlide({ masterName: 'BASE' });
+  title(s, 'Sustainabilitiy & CSR', 0.729, 0.988, 4.949, 1.555);
+  paragraph(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean', 8.313, 1.599, 4.042, 0.774);
+
+  rect(s, 0.857, 2.917, 5.678, 2.766, solid(NAVY));
+  rect(s, 6.798, 2.917, 5.678, 2.766, solid(TEAL));
+
+  text(s, [
+    { text: 'Donated ', options: { bold: true } },
+    { text: 'to tech education programs for students in Asia.' },
+  ], { x: 1.183, y: 3.158, w: 4.597, h: 0.692, fontSize: 14, color: WHITE, lineSpacingMultiple: 1.3 });
+  text(s, '$364,000', { x: 1.183, y: 4.738, w: 3.005, h: 0.707, fontFace: MAJOR, fontSize: 36, color: WHITE });
+
+  text(s, [
+    { text: 'Reduced carbon emissions by 20% ', options: { bold: true } },
+    { text: 'through the use of green energy.' },
+  ], { x: 7.189, y: 3.158, w: 4.962, h: 0.692, fontSize: 14, color: WHITE, lineSpacingMultiple: 1.3 });
+  text(s, [
+    { text: '45% ', options: { fontSize: 36, fontFace: MAJOR } },
+    { text: '/month', options: { fontSize: 14 } },
+  ], { x: 7.189, y: 4.738, w: 3.005, h: 0.707, color: WHITE });
+
+  disc(s, 5.994, 3.702, 1.195);
+  icon(s, 'growth', 6.324, 4.032, 0.535, NAVY, WHITE);
+
+  text(s, LOREM_LONG.replace('Cum sociis', 'Cum sociis natoque penatibus et magnis dis parturient'), {
+    x: 2.376, y: 5.806, w: 8.966, h: 0.774, fontSize: 14, italic: true, color: GREY,
+    align: 'center', lineSpacingMultiple: 1.5,
+  });
+}
+
+// 7 - Strategic tech performance: two stacked highlight cards.
+function slide07(pptx) {
+  const s = pptx.addSlide({ masterName: 'BASE' });
+  title(s, 'Strategic Tech Performance Review', 0.729, 0.988, 6.222, 2.282);
+  paragraph(
+    s,
+    LOREM_LONG.replace('Cum sociis', 'Cum sociis natoque penatibus et magnis dis parturient') +
+      ' Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa',
+    0.729, 3.434, 5.637, 1.835
+  );
+  learnMore(s, 0.854, 5.734);
+
+  const cards = [
+    { y: 1.231, fill: NAVY, name: 'AI-powered CRM System', value: '3200+', valueW: 2.01, caption: 'Users in 6 month.', kind: 'target', iconColor: NAVY },
+    { y: 3.874, fill: TEAL, name: 'CyberShield Security', value: '%30 YoY', valueW: 2.879, caption: 'Revenue increased', kind: 'coins', iconColor: TEAL },
+  ];
+  cards.forEach(function (c) {
+    rect(s, 7.263, c.y, 4.568, 2.395, solid(c.fill));
+    text(s, c.name, { x: 7.459, y: c.y + 0.215, w: 2.398, h: 0.303, fontFace: MAJOR, fontSize: 12, color: WHITE });
+    note(s, LOREM_SHORT, 7.459, c.y + 0.518, 3.777, 0.608, WHITE);
+    text(s, c.value, {
+      x: 7.459, y: c.y + 1.023, w: c.valueW, h: 0.889, fontFace: MAJOR, fontSize: 36, color: WHITE, lineSpacingMultiple: 1.5,
+    });
+    text(s, c.caption, { x: 7.459, y: c.y + 1.878, w: 3.923, h: 0.303, fontSize: 12, color: WHITE });
+    disc(s, 11.383, c.y + 0.738, 0.898);
+    icon(s, c.kind, 11.631, c.y + 0.985, 0.402, c.iconColor, WHITE);
+  });
+}
+
+// 8 - Organizational progress: four shadowed cards plus a KPI pair.
+function slide08(pptx) {
+  const s = pptx.addSlide({ masterName: 'BASE' });
+  title(s, 'Organizational Progress Report', 6.731, 1.541, 5.795, 1.555);
+  paragraph(s, LOREM_LONG, 6.731, 3.23, 5.536, 1.128);
+
+  const cards = [
+    { x: 0.723, y: 1.605, label: 'Best Eployee', color: TEAL, kind: 'people' },
+    { x: 3.675, y: 1.605, label: 'Work Growth', color: NAVY, kind: 'growth' },
+    { x: 0.723, y: 4.278, label: 'Net Profit', color: NAVY, kind: 'coins' },
+    { x: 3.675, y: 4.278, label: 'Net Profit', color: TEAL, kind: 'target' },
+  ];
+  cards.forEach(function (c) {
+    rect(s, c.x, c.y, 2.57, 1.909, {
+      fill: { color: WHITE },
+      shadow: { type: 'outer', color: BLACK, opacity: 0.15, blur: 25, offset: 3, angle: 90 },
+    });
+    heading(s, c.label, c.x + 0.164, c.y + 0.663, 2.01, c.color);
+    note(s, LOREM_TINY, c.x + 0.172, c.y + 1.002, 2.084, 0.608, BLACK);
+    ellipse(s, c.x + 0.256, c.y - 0.292, 0.757, 0.757, solid(c.color));
+    icon(s, c.kind, c.x + 0.434, c.y - 0.114, 0.4, WHITE, c.color);
+  });
+
+  kpiPair(s, 6.921, 4.69, 2.82);
+}
+
+// 9 - Growth journey recap: bullet list beside four framed KPI rows.
+function slide09(pptx) {
+  const s = pptx.addSlide({ masterName: 'BASE' });
+  title(s, 'Growth Journey Recap', 0.729, 1.506, 5.584, 1.555);
+  paragraph(s, LOREM, 0.729, 3.008, 5.255, 0.774, GREY_DARK);
+  heading(s, 'Your Title Here', 0.729, 4.066, 2.479, NAVY);
+  [4.572, 5.112, 5.657].forEach(function (y) {
+    checkMark(s, 0.907, y + 0.127, 0.231, 0.173, NAVY);
+    text(s, LOREM_CHECK, { x: 1.265, y, w: 4.182, h: 0.386, fontSize: 14, color: GREY_DARK, lineSpacingMultiple: 1.3 });
+  });
+
+  const rows = [
+    { y: 1.14, fill: NAVY, border: NAVY_DARK, value: '84%', label: 'Revenue Growth', labelW: 2.268 },
+    { y: 2.47, fill: TEAL, border: TEAL, value: '180K', label: 'New Customer', labelW: 2.268 },
+    { y: 3.782, fill: NAVY, border: NAVY_DARK, value: '+7', label: 'New Market Entered', labelW: 3.481 },
+    { y: 5.094, fill: TEAL, border: TEAL, value: '20', label: 'Industry Awards Win', labelW: 2.545 },
+  ];
+  rows.forEach(function (r) {
+    rect(s, 6.812, r.y, 5.792, 1.237, outline(r.border, 1));
+    rect(s, 6.799, r.y, 1.774, 1.237, solid(r.fill));
+    text(s, r.value, {
+      x: 6.884, y: r.y + 0.265, w: 1.603, h: 0.707, fontFace: MAJOR, fontSize: 36, color: WHITE, align: 'center',
+    });
+    heading(s, r.label, 8.733, r.y + 0.132, r.labelW, r.fill);
+    note(s, LOREM, 8.733, r.y + 0.502, 3.704, 0.608, GREY_DARK);
+  });
+}
+
+// 10 - Customer experience metrics: full-height colour column.
+function slide10(pptx) {
+  const s = pptx.addSlide({ masterName: 'BASE' });
+  title(s, 'Customer Experience Metrics', 7.625, 1.173, 4.417, 2.282);
+  paragraph(
+    s,
+    LOREM_LONG.replace('Cum sociis', 'Cum sociis natoque penatibus et magnis dis parturient') +
+      ' Lorem ipsum dolor sit amet,',
+    7.625, 3.619, 4.417, 1.835
+  );
+  learnMore(s, 7.75, 5.919);
+
+  const blocks = [
+    { y: 0, h: 2.496, fill: NAVY, label: 'Active Customers', labelY: 0.413, value: '16.000+', valueY: 0.682, bodyY: 1.571 },
+    { y: 2.5, h: 2.496, fill: TEAL, label: 'Customer Retention', labelY: 2.864, value: '95%', valueY: 3.133, bodyY: 4.022 },
+    { y: 4.996, h: 2.504, fill: NAVY, label: 'New Clients', labelY: 5.36, value: '1.500+', valueY: 5.629, bodyY: 6.518 },
+  ];
+  blocks.forEach(function (b) {
+    rect(s, 3.5, b.y, 3.5, b.h, solid(b.fill));
+    text(s, b.label, { x: 3.906, y: b.labelY, w: 2.688, h: 0.404, fontFace: MAJOR, color: WHITE });
+    text(s, b.value, {
+      x: 3.906, y: b.valueY, w: 2.544, h: 0.889, fontFace: MAJOR, fontSize: 36, color: WHITE, lineSpacingMultiple: 1.5,
+    });
+    note(s, LOREM_TINY, 3.906, b.bodyY, 2.138, 0.608, WHITE);
+  });
+}
+
+// 11 - Key hurdles: KPI pair over a three-row metric table.
+function slide11(pptx) {
+  const s = pptx.addSlide({ masterName: 'BASE' });
+  title(s, 'Key Hurdles & Adaptive Strategies', 0.729, 0.939, 5.938, 2.282);
+  text(s, 'Your Subtitle Here', { x: 0.729, y: 3.415, w: 2.688, h: 0.404, fontFace: MAJOR });
+  paragraph(
+    s,
+    LOREM_LONG.replace('Cum sociis', 'Cum sociis natoque penatibus et magnis dis parturient') +
+      ' Lorem ipsum dolor sit amet, consectetuer',
+    0.729, 3.726, 3.436, 2.542
+  );
+  kpiPair(s, 5.576, 1.661, 2.578);
+
+  metricRows(s, 5.011, 6.146, [
+    { y: 3.806, value: '$75m', label: 'Revenue', labelW: 2.077, body: 'Lorem ipsum dolor sit amet, Lorem,' },
+    { y: 4.681, value: '$8m', label: 'Net Provit', labelW: 2.077, body: 'Lorem ipsum dolor sit amet, Lorem' },
+    { y: 5.556, value: '11,2%', label: 'Operating Margin', labelW: 2.677, body: 'Lorem ipsum dolor sit amet, Lorem ' },
+  ], NAVY);
+  vline(s, 4.613, 3.819, 2.348, GREY_DARK, 0.5);
+}
+
+// 12 - Organizational progress recap with a navy checklist panel.
+function slide12(pptx) {
+  const s = pptx.addSlide({ masterName: 'BASE' });
+  rect(s, 7.25, 1.121, 6.083, 2.817, solid(NAVY));
+  title(s, 'Organizational Progress Report', 0.872, 1.121, 5.795, 1.555);
+  paragraph(s, LOREM_LONG, 0.872, 2.81, 5.536, 1.128);
+
+  heading(s, 'Your Title Here', 7.745, 1.563, 2.479, WHITE);
+  [2.069, 2.609, 3.154].forEach(function (y) {
+    checkMark(s, 7.922, y + 0.127, 0.231, 0.173, WHITE);
+    text(s, LOREM_CHECK, { x: 8.28, y, w: 4.182, h: 0.386, fontSize: 14, color: WHITE, lineSpacingMultiple: 1.3 });
+  });
+}
+
+// 13 - Operational achievements: icon panel, doughnut chart, callout card.
+function slide13(pptx) {
+  const s = pptx.addSlide({ masterName: 'BASE' });
+  rect(s, 0.583, 0.846, 3.098, 5.807, solid(NAVY));
+  rect(s, 3.682, 2.746, 2.904, 3.908, solid(TEAL));
+  rect(s, 3.696, 0.846, 2.904, 1.9, {
+    fill: { color: WHITE },
+    shadow: { type: 'outer', color: BLACK, opacity: 0.15, blur: 25, offset: 3, angle: 90 },
+  });
+
+  icon(s, 'growth', 1.329, 1.348, 1.568, WHITE, NAVY);
+  text(s, 'Total Revenue', {
+    x: 0.957, y: 3.083, w: 2.313, h: 0.37, fontFace: MAJOR, fontSize: 16, color: WHITE, align: 'center',
+  });
+  text(s, LOREM_LONG.replace('Cum sociis', 'Cum sociis natoque penatibus et magnis'), {
+    x: 0.957, y: 3.584, w: 2.451, h: 2.542, fontSize: 14, color: WHITE, lineSpacingMultiple: 1.5,
+  });
+
+  text(s, [
+    { text: 'Reduced carbon emissions by 20% ', options: { bold: true } },
+    { text: 'through the use of green energy.' },
+  ], { x: 3.999, y: 1.12, w: 2.268, h: 1.305, fontSize: 14, color: NAVY, lineSpacingMultiple: 1.3 });
+
+  text(s, 'Revenue Growth', {
+    x: 3.999, y: 3.062, w: 2.268, h: 0.37, fontFace: MAJOR, fontSize: 16, color: WHITE, align: 'center',
+  });
+  s.addChart('doughnut', [{ name: 'Sales', labels: ['1st Qtr', '2nd Qtr'], values: [85, 15] }], {
+    x: 4.158, y: 3.432, w: 1.951, h: 1.904,
+    holeSize: 75, firstSliceAng: 0,
+    chartColors: [WHITE, '569593'],
+    dataBorder: { pt: 0, color: WHITE },
+    showLegend: false, showTitle: false, showValue: false,
+    chartArea: { fill: { color: WHITE, transparency: 100 } },
+    plotArea: { fill: { color: WHITE, transparency: 100 } },
+  });
+  text(s, '84%', {
+    x: 4.447, y: 4.105, w: 1.401, h: 0.505, fontFace: MAJOR, fontSize: 24, color: WHITE, align: 'center',
+  });
+  note(s, LOREM_SHORT, 3.999, 5.325, 2.372, 0.87, WHITE);
+
+  title(s, 'Operational Achievements', 7.238, 1.901, 5.276, 1.555);
+  paragraph(s, LOREM_LONG, 7.238, 3.625, 4.73, 1.128);
+  learnMore(s, 7.333, 5.191);
+}
+
+// 14 - Performance overview 2025: two highlight cards with metric rows.
+function slide14(pptx) {
+  const s = pptx.addSlide({ masterName: 'BASE' });
+  title(s, 'Performance Overview 2025', 1.191, 0.737, 6.245, 1.555);
+  rect(s, 7.436, 0.832, 5.898, 1.339, solid(NAVY));
+  paragraph(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean', 7.726, 1.07, 4.042, 0.774, WHITE);
+
+  const panels = [
+    { x: 1.205, tab: 1.577, iconX: 1.752, kind: 'people', color: NAVY, label: 'Financial Highlights', labelX: 2.667, labelW: 2.688, valueX: 1.465, textX: 2.6 },
+    { x: 6.658, tab: 7.034, iconX: 7.208, kind: 'hand', color: TEAL, label: 'Operational Highlights', labelX: 8.196, labelW: 3.038, valueX: 6.967, textX: 8.102 },
+  ];
+  const metrics = [
+    [
+      { y: 3.94, value: '$75m', label: 'Revenue', labelW: 2.077, body: 'Lorem ipsum dolor sit amet, Lorem,' },
+      { y: 4.816, value: '$8m', label: 'Net Provit', labelW: 2.077, body: 'Lorem ipsum dolor sit amet, Lorem' },
+      { y: 5.691, value: '11,2%', label: 'Operating Margin', labelW: 2.677, body: 'Lorem ipsum dolor sit amet, Lorem ' },
+    ],
+    [
+      { y: 3.94, value: '230+', label: 'New Clients', labelW: 2.077, body: 'Lorem ipsum dolor sit amet, Lorem,' },
+      { y: 4.816, value: '15%', label: 'Employee Growth', labelW: 2.751, body: 'Lorem ipsum dolor sit amet, Lorem' },
+      { y: 5.691, value: '96%', label: 'Project Completion Rate', labelW: 2.926, body: 'Lorem ipsum dolor sit amet, Lorem ' },
+    ],
+  ];
+  panels.forEach(function (p, i) {
+    rect(s, p.x, 2.763, 5.094, 4.0, {
+      fill: { color: WHITE },
+      shadow: { type: 'outer', color: BLACK, opacity: 0.15, blur: 25, offset: 3, angle: 90 },
+    });
+    rect(s, p.tab, 2.763, 0.803, 0.83, solid(p.color));
+    icon(s, p.kind, p.iconX, 2.951, 0.455, WHITE, p.color);
+    text(s, p.label, { x: p.labelX, y: 3.211, w: p.labelW, h: 0.404, fontFace: MAJOR, color: p.color });
+    metricRows(s, p.valueX, p.textX, metrics[i], p.color);
+  });
+}
+
+// 15 - Strategic targets: four tiles topped with circular icons.
+function slide15(pptx) {
+  const s = pptx.addSlide({ masterName: 'BASE' });
+  title(s, 'Strategic Targets & Achievements', 0.859, 1.09, 6.245, 1.555);
+
+  const tiles = [
+    { x: 0.859, fill: NAVY, circleX: 1.074, iconX: 1.251, kind: 'target', lineX: 1.226, textX: 1.074 },
+    { x: 3.763, fill: TEAL, circleX: 3.988, iconX: 4.165, kind: 'coins', lineX: 4.13, textX: 3.977 },
+    { x: 6.667, fill: NAVY, circleX: 6.927, iconX: 7.104, kind: 'percent', lineX: 7.034, textX: 6.881 },
+    { x: 9.57, fill: TEAL, circleX: 9.778, iconX: 9.955, kind: 'growth', lineX: 9.937, textX: 9.785 },
+  ];
+  tiles.forEach(function (t) {
+    rect(s, t.x, 3.469, 2.904, 2.904, solid(t.fill));
+    hline(s, t.lineX, 4.222, 2.537, WHITE, 1);
+    text(s, 'Target Here', { x: t.textX, y: 4.553, w: 2.064, h: 0.404, fontFace: MAJOR, color: WHITE });
+    text(s, LOREM_SHORT, {
+      x: t.textX, y: 4.957, w: 2.56, h: 0.998, fontSize: 14, color: WHITE, lineSpacingMultiple: 1.3,
+    });
+    ellipse(s, t.circleX, 3.108, 0.754, 0.752, { fill: { color: t.fill }, line: { color: WHITE, width: 3 } });
+    icon(s, t.kind, t.iconX, 3.284, 0.4, WHITE, t.fill);
+  });
+}
+
+/* -------------------------------------------------------------------- build */
+function build() {
+  const pptx = new PptxGenJS();
+  // 12192000 x 6858000 EMU, i.e. 13 1/3 x 7.5 in.
+  pptx.defineLayout({ name: 'WIDE_13x75', width: 12192000 / 914400, height: 7.5 });
+  pptx.layout = 'WIDE_13x75';
+  pptx.title = 'Annual Report';
+  pptx.theme = { headFontFace: MAJOR, bodyFontFace: MINOR };
+
+  pptx.defineSlideMaster({
+    title: 'BASE',
+    background: { color: WHITE },
+    objects: [
+      {
+        text: {
+          text: 'Annual Report',
+          options: {
+            x: 10.551, y: 0.342, w: 2.329, h: 0.242, align: 'right', valign: 'top',
+            fontFace: MAJOR, fontSize: 10.5, color: HEADER_GREY, lineSpacingMultiple: 0.8,
+          },
+        },
+      },
+      {
+        text: {
+          text: 'Infographic 2025',
+          options: {
+            x: 0.423, y: 6.996, w: 2.055, h: 0.249, valign: 'top',
+            fontFace: MINOR, fontSize: 10.5, color: GREY_LIGHT, lineSpacingMultiple: 0.8,
+          },
+        },
+      },
+    ],
+    slideNumber: {
+      x: 11.578, y: 6.995, w: 1.3, h: 0.303, align: 'right',
+      fontFace: MINOR, fontSize: 12, color: GREY_DARK,
+    },
+  });
+
+  [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08,
+    slide09, slide10, slide11, slide12, slide13, slide14, slide15].forEach(function (fn) {
+    fn(pptx);
+  });
+
+  return pptx.writeFile({
+    fileName: path.join(__dirname, '063cb7b5-6b9c-4de8-8062-a38a19945b15_grok_final.pptx'),
+  });
+}
+
+build().then(function (file) {
+  console.log('wrote ' + file);
+}).catch(function (err) {
+  console.error(err);
+  process.exit(1);
+});
