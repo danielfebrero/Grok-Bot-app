@@ -1,0 +1,36 @@
+{
+  "description": "Read one path at a ref in an Origin-hosted repository. Files larger than the byte cap are truncated. A directory returns type dir and its immediate children as entries (name, path, type, sha, and size for files) instead of content; entries past the cap are dropped and truncated is set.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "endLine": {
+        "type": "number"
+      },
+      "name": {
+        "description": "Origin repository name within that namespace",
+        "type": "string"
+      },
+      "owner": {
+        "description": "Origin namespace (owner) slug, taken from list_namespaces or an earlier Origin result. A GitHub owner or org name is not an Origin namespace unless list_namespaces returns it.",
+        "type": "string"
+      },
+      "path": {
+        "type": "string"
+      },
+      "ref": {
+        "type": "string"
+      },
+      "startLine": {
+        "type": "number"
+      }
+    },
+    "required": [
+      "owner",
+      "name",
+      "path"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_file_contents"
+}

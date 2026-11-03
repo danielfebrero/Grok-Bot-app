@@ -1,0 +1,67 @@
+{
+  "description": "Update a draft email. Use sendAt (ISO 8601 datetime) to schedule or reschedule automatic sending without another tool call. Changes to a scheduled draft affect the content and recipients of the email sent at that time; once it is sending, edits are refused.",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "bcc": {
+        "description": "Blind-copied addresses, hidden from the other recipients",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "cc": {
+        "description": "Copied addresses, visible to every recipient",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "draftId": {
+        "description": "Draft ID, from list_drafts or create_draft",
+        "type": "string"
+      },
+      "html": {
+        "description": "HTML body for formatted mail; inline images use cid:<contentId>",
+        "type": "string"
+      },
+      "inboxId": {
+        "description": "Inbox ID: the inbox's email address, from list_inboxes",
+        "type": "string"
+      },
+      "replyTo": {
+        "description": "Addresses that replies should go to instead of this inbox",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "sendAt": {
+        "description": "New send time, as ISO 8601 with a timezone (e.g. 2026-04-01T09:00:00Z)",
+        "type": "string"
+      },
+      "subject": {
+        "description": "Subject line recipients see",
+        "type": "string"
+      },
+      "text": {
+        "description": "Plain-text body; include it even with html, since no text version is generated from html",
+        "type": "string"
+      },
+      "to": {
+        "description": "Recipient addresses, each a bare address or \"Name <address>\"",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "inboxId",
+      "draftId"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "update_draft"
+}

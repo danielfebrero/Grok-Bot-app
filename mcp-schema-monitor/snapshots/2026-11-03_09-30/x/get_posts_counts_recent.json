@@ -1,0 +1,48 @@
+{
+  "description": "Retrieves the count of Posts from the last 7 days matching a search query. At most one of `pagination_token`, `next_token` may be provided. The search string is query, not q. Date operators are since:YYYY-MM-DD or since:YYYY-MM-DD_HH:MM:SS_UTC (UTC only).",
+  "inputSchema": {
+    "properties": {
+      "end_time": {
+        "type": "string"
+      },
+      "granularity": {
+        "enum": [
+          "minute",
+          "hour",
+          "day"
+        ],
+        "type": "string"
+      },
+      "next_token": {
+        "description": "A base32hex-encoded pagination token.",
+        "type": "string"
+      },
+      "pagination_token": {
+        "description": "A base32hex-encoded pagination token.",
+        "type": "string"
+      },
+      "query": {
+        "type": "string"
+      },
+      "search_count.fields": {
+        "type": "string"
+      },
+      "since_id": {
+        "type": "string"
+      },
+      "start_time": {
+        "description": "Must be within the last 7 days.",
+        "type": "string"
+      },
+      "until_id": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_posts_counts_recent"
+}

@@ -1,0 +1,23 @@
+{
+  "description": "Permanently delete a draft; this cannot be undone. Deleting a scheduled draft cancels its send.",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "draftId": {
+        "description": "Draft ID, from list_drafts or create_draft",
+        "type": "string"
+      },
+      "inboxId": {
+        "description": "Inbox ID: the inbox's email address, from list_inboxes",
+        "type": "string"
+      }
+    },
+    "required": [
+      "inboxId",
+      "draftId"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "delete_draft"
+}

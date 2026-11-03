@@ -1,0 +1,35 @@
+{
+  "description": "Mark a pull request ready for review (`draft: false`) or convert it back to a draft (`draft: true`). GitHub exposes this only through GraphQL (markPullRequestReadyForReview / convertPullRequestToDraft), so the reply is that mutation's `pullRequest` object, not the REST one. A pull request already in the requested state is returned as is.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "additionalProperties": false,
+    "properties": {
+      "draft": {
+        "description": "true = convert to draft; false = ready.",
+        "type": "boolean"
+      },
+      "owner": {
+        "description": "Repository owner (user or org login).",
+        "type": "string"
+      },
+      "pull_number": {
+        "description": "Pull request number.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "repo": {
+        "description": "Repository name.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "repo",
+      "pull_number",
+      "draft"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "set_pull_request_draft"
+}

@@ -1,0 +1,27 @@
+{
+  "description": "Set an inbox's calendar default time zone, used for events created later without one; existing events keep their own. ifMatch is optional; with the calendar's etag the update is refused (412) if it changed since. Calendar works for every organization in US production; EU production returns 403 \"Calendar isn't available in this region yet\".",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "ifMatch": {
+        "description": "Optional: the etag from your latest read or write of it. The change is then refused with 412 if it changed since; without it the change applies to it as it is now",
+        "type": "string"
+      },
+      "inboxId": {
+        "description": "Inbox ID: the inbox's email address, from list_inboxes",
+        "type": "string"
+      },
+      "timezone": {
+        "description": "New default time zone for events created without one; existing events keep theirs. IANA time zone, e.g. America/New_York, Europe/London or UTC. Any case and aliases such as US/Eastern are accepted and stored under the canonical name, which can differ from the spelling sent; abbreviations such as PST and UTC offsets are refused",
+        "type": "string"
+      }
+    },
+    "required": [
+      "inboxId",
+      "timezone"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "update_calendar"
+}
