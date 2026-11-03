@@ -1,0 +1,904 @@
+/**
+ * "Interiores" interior-design deck - rebuilt with pptxgenjs.
+ *
+ * Raster photos in the source deck are flat grey plates; they are recreated
+ * here as plain coloured rectangles (see `photo()`).
+ *
+ * Run: node 1759578b-c380-4ba7-aaba-ca714ce04620_grok_final.js
+ */
+
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ *
+ * Palette / fonts
+ * ------------------------------------------------------------------ */
+
+const C = {
+  ink: '522E20',        // Playfair headings
+  brown: 'A35C40',      // icon glyphs
+  cocoa: '7A4530',      // button + card copy
+  body: '909090',       // body copy
+  slate: '383838',      // small card copy
+  text: '222222',       // theme tx1
+  accent: 'CF9A85',     // footer / quote
+  peach: 'EED4C7',      // buttons, badges, rules
+  rose: 'E7CDC6',       // cards
+  blush: 'EFDDD6',      // icon tiles
+  cream: 'F9F1EC',      // panels
+  track: 'F3E6E2',      // progress-bar track
+  dot: 'DFBCAE',        // dot grids
+  ring: 'DBB5A9',       // concentric arcs
+  white: 'FFFFFF',
+};
+
+const FONT = { head: 'Playfair Display', body: 'Source Sans Pro' };
+
+// The three grey plates that stand in for the deck's photography.
+const GREY = { light: 'CCCCCC', mid: 'B3B3B3', dark: '959595' };
+
+/* ------------------------------------------------------------------ *
+ * Vector paths (fractions of the shape's bounding box)
+ * ------------------------------------------------------------------ */
+
+// Organic background silhouette: outer contour + inner contour (punched hole).
+const BLOB_PATH = [
+  ['M', 0.4688, 0.0004],
+  ['C', 0.4856, -0.0014, 0.5045, 0.0023, 0.5276, 0.0139],
+  ['C', 0.6509, 0.0755, 0.7236, 0.3221, 0.9384, 0.5069],
+  ['C', 1.1533, 0.6918, 0.7545, 1.0, 0.5276, 1.0],
+  ['C', 0.3008, 1.0, 0.3201, 0.607, 0.1168, 0.5069],
+  ['C', -0.0864, 0.4069, -0.0022, 0.1597, 0.199, 0.1371],
+  ['C', 0.3625, 0.1188, 0.3959, 0.0082, 0.4688, 0.0004],
+  ['Z'],
+  ['M', 0.4792, 0.1654],
+  ['C', 0.4303, 0.1706, 0.4079, 0.2448, 0.2983, 0.257],
+  ['C', 0.1634, 0.2722, 0.1069, 0.4379, 0.2432, 0.505],
+  ['C', 0.3795, 0.5722, 0.3665, 0.8357, 0.5187, 0.8357],
+  ['C', 0.6709, 0.8357, 0.9383, 0.629, 0.7942, 0.505],
+  ['C', 0.6501, 0.3811, 0.6014, 0.2157, 0.5187, 0.1744],
+  ['C', 0.5032, 0.1666, 0.4905, 0.1642, 0.4792, 0.1654],
+  ['Z'],
+];
+
+// Same silhouette without the hole - drawn again, smaller, inside the ring.
+const BLOB_CORE = BLOB_PATH.slice(0, 8);
+
+// Pitched roof of the little "house" icon.
+const ROOF_PATH = [
+  ['M', 0.5034, 0.0],
+  ['C', 0.5237, 0.0, 0.544, 0.0153, 0.5595, 0.0459],
+  ['L', 0.9767, 0.8689],
+  ['C', 0.9922, 0.8995, 1.0, 0.9395, 1.0, 0.9796],
+  ['L', 0.998, 1.0],
+  ['L', 0.0007, 1.0],
+  ['L', 0.0, 0.9931],
+  ['C', 0.0, 0.953, 0.0078, 0.9129, 0.0233, 0.8823],
+  ['L', 0.4473, 0.0459],
+  ['C', 0.4628, 0.0153, 0.4831, 0.0, 0.5034, 0.0],
+  ['Z'],
+];
+
+/* ------------------------------------------------------------------ *
+ * Low-level helpers
+ * ------------------------------------------------------------------ */
+
+let pptx; // set in build()
+
+function scalePath(cmds, w, h) {
+  return cmds.map(function (c) {
+    switch (c[0]) {
+      case 'M': return { x: c[1] * w, y: c[2] * h, moveTo: true };
+      case 'L': return { x: c[1] * w, y: c[2] * h };
+      case 'C': return {
+        x: c[5] * w, y: c[6] * h,
+        curve: { type: 'cubic', x1: c[1] * w, y1: c[2] * h, x2: c[3] * w, y2: c[4] * h },
+      };
+      default: return { close: true };
+    }
+  });
+}
+
+// PowerPoint's roundRect adjust value expressed the way pptxgenjs wants it.
+function radius(w, h, pct) {
+  return Math.min(w, h) * (pct === undefined ? 0.16667 : pct);
+}
+
+// Every raised roundRect in the deck carries the same faint 45-degree shadow.
+// pptxgenjs rewrites the object it is handed, so hand it a fresh one each time.
+function lift() {
+  return { type: 'outer', angle: 45, blur: 4, offset: 3, color: '000000', opacity: 0.13 };
+}
+
+function box(slide, x, y, w, h, fill) {
+  slide.addShape(pptx.ShapeType.rect, { x: x, y: y, w: w, h: h, fill: { color: fill }, line: { type: 'none' } });
+}
+
+function pill(slide, x, y, w, h, fill, pct) {
+  slide.addShape(pptx.ShapeType.roundRect, {
+    x: x, y: y, w: w, h: h, fill: { color: fill }, line: { type: 'none' }, rectRadius: radius(w, h, pct),
+  });
+}
+
+// Approximates the cover card's top-to-bottom wash with a stack of rounded
+// bands: each band shares the card's bottom edge, so the silhouette stays clean.
+function washPill(slide, x, y, w, h, pct, stops, bands) {
+  const at = function (t) {
+    let i = 1;
+    while (i < stops.length - 1 && stops[i][0] < t) i++;
+    const a = stops[i - 1], b = stops[i];
+    const k = (t - a[0]) / (b[0] - a[0]);
+    return a[1].map(function (v, j) { return Math.round(v + (b[1][j] - v) * k); })
+      .map(function (v) { return ('0' + v.toString(16)).slice(-2).toUpperCase(); }).join('');
+  };
+  for (let i = 0; i < bands; i++) {
+    const t = i / bands;
+    pill(slide, x, y + h * t, w, h * (1 - t), at(t), pct);
+  }
+}
+
+function raisedPill(slide, x, y, w, h, fill) {
+  slide.addShape(pptx.ShapeType.roundRect, {
+    x: x, y: y, w: w, h: h, fill: { color: fill }, line: { type: 'none' },
+    rectRadius: radius(w, h), shadow: lift(),
+  });
+}
+
+function txt(slide, content, x, y, w, h, o) {
+  o = o || {};
+  slide.addText(content, {
+    x: x, y: y, w: w, h: h,
+    fontFace: o.font || FONT.body,
+    fontSize: o.size || 12,
+    color: o.color || C.text,
+    bold: !!o.bold,
+    italic: !!o.italic,
+    align: o.align || 'left',
+    valign: 'top',
+    wrap: o.wrap !== false,
+    lineSpacingMultiple: o.lh,
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Decorative motifs
+ * ------------------------------------------------------------------ */
+
+// Grid of small circles (3x3 unless told otherwise).
+function dots(slide, x, y, w, h, o) {
+  o = o || {};
+  const cols = o.cols || 3, rows = o.rows || 3;
+  const d = o.d || w * 0.1337;
+  const dx = cols > 1 ? (w - d) / (cols - 1) : 0;
+  const dy = rows > 1 ? (h - d) / (rows - 1) : 0;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      slide.addShape(pptx.ShapeType.ellipse, {
+        x: x + c * dx, y: y + r * dy, w: d, h: d,
+        fill: { color: o.color || C.dot }, line: { type: 'none' },
+      });
+    }
+  }
+}
+
+// Three concentric hairline circles, bottom-left / top-right corner accent.
+function rings(slide, x, y, size, color) {
+  [1, 0.847, 0.674].forEach(function (k) {
+    const d = size * k, off = (size - d) / 2;
+    slide.addShape(pptx.ShapeType.ellipse, {
+      x: x + off, y: y + off, w: d, h: d,
+      fill: { type: 'none' }, line: { color: color, width: 1 },
+    });
+  });
+}
+
+// Rotated organic silhouette (ring + smaller solid copy tucked inside).
+function blob(slide, x, y, w, h, rot, color) {
+  const cx = x + w / 2, cy = y + h / 2;
+  const a = (rot * Math.PI) / 180;
+  // Inner copy keeps the group's proportions: 53.1% wide, 52.5% tall, offset 23.2% / 22.9%.
+  const iw = w * 0.5309, ih = h * 0.5249;
+  const ix = x + w * 0.232, iy = y + h * 0.2286;
+  const icx = cx + (ix + iw / 2 - cx) * Math.cos(a) - (iy + ih / 2 - cy) * Math.sin(a);
+  const icy = cy + (ix + iw / 2 - cx) * Math.sin(a) + (iy + ih / 2 - cy) * Math.cos(a);
+
+  slide.addShape(pptx.ShapeType.custGeom, {
+    x: x, y: y, w: w, h: h, rotate: rot,
+    fill: { color: color }, line: { type: 'none' }, points: scalePath(BLOB_PATH, w, h),
+  });
+  slide.addShape(pptx.ShapeType.custGeom, {
+    x: icx - iw / 2, y: icy - ih / 2, w: iw, h: ih, rotate: rot,
+    fill: { color: color }, line: { type: 'none' }, points: scalePath(BLOB_CORE, iw, ih),
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Icon tiles - rounded square plate plus a small brown pictogram
+ * ------------------------------------------------------------------ */
+
+// Each glyph is drawn inside its own box (gx, gy, gw, gh); the parts below are
+// fractions of that box, measured from the original artwork.
+function house(slide, gx, gy, gw, gh) {
+  slide.addShape(pptx.ShapeType.custGeom, {
+    x: gx, y: gy, w: gw, h: gh * 0.506,
+    fill: { color: C.brown }, line: { type: 'none' },
+    points: scalePath(ROOF_PATH, gw, gh * 0.506),
+  });
+  pill(slide, gx + gw * 0.186, gy + gh * 0.471, gw * 0.631, gh * 0.506, C.brown, 0.10603);
+}
+
+function desk(slide, gx, gy, gw, gh) {
+  pill(slide, gx, gy, gw, gh * 0.231, C.brown);                                    // table top
+  pill(slide, gx + gw * 0.080, gy + gh * 0.271, gw * 0.094, gh * 0.725, C.brown);  // left leg
+  pill(slide, gx + gw * 0.201, gy + gh * 0.283, gw * 0.596, gh * 0.231, C.brown);  // stretcher
+  pill(slide, gx + gw * 0.829, gy + gh * 0.271, gw * 0.094, gh * 0.725, C.brown);  // right leg
+}
+
+function chair(slide, gx, gy, gw, gh) {
+  const bar = function (fx, fy, fw, fh, rot) {
+    slide.addShape(pptx.ShapeType.roundRect, {
+      x: gx + gw * fx, y: gy + gh * fy, w: gw * fw, h: gh * fh, rotate: rot,
+      fill: { color: C.brown }, line: { type: 'none' }, rectRadius: radius(gw * fw, gh * fh),
+    });
+  };
+  bar(0.000, 0.501, 1.000, 0.108, 0);        // seat
+  bar(-0.391, 0.242, 1.066, 0.098, 74);      // back rest
+  bar(0.410, 0.754, 0.820, 0.040, 90);       // right leg
+  bar(-0.207, 0.756, 0.820, 0.040, 90);      // left leg
+}
+
+// Glyph size and centre inside its tile, as fractions of the tile width.
+const GLYPH = {
+  house: { draw: house, cx: 0.499, cy: 0.501, w: 0.422, h: 0.412 },
+  desk: { draw: desk, cx: 0.499, cy: 0.506, w: 0.458, h: 0.334 },
+  chair: { draw: chair, cx: 0.505, cy: 0.489, w: 0.346, h: 0.637 },
+};
+
+// gs enlarges the glyph on the handful of oversized tiles in the deck.
+function tile(slide, kind, x, y, s, plate, gs) {
+  raisedPill(slide, x, y, s, s * 1.011, plate || C.blush);
+  glyph(slide, kind, x, y, s, gs);
+}
+
+function glyph(slide, kind, x, y, s, gs) {
+  const g = GLYPH[kind];
+  const gw = s * g.w * (gs || 1), gh = s * g.h * (gs || 1);
+  g.draw(slide, x + s * g.cx - gw / 2, y + s * g.cy - gh / 2, gw, gh);
+}
+
+/* ------------------------------------------------------------------ *
+ * Recurring furniture: rules, buttons, badges, cards, bars
+ * ------------------------------------------------------------------ */
+
+function rule(slide, x, y, w, color) {
+  box(slide, x, y, w === undefined ? 1.0 : w, 0.05, color || C.peach);
+}
+
+function heading(slide, lines, x, y, w, h, size, o) {
+  o = o || {};
+  const runs = lines.map(function (t, i) {
+    return { text: t, options: { breakLine: i < lines.length - 1 } };
+  });
+  txt(slide, runs, x, y, w, h, {
+    font: FONT.head, size: size, bold: true, color: o.color || C.ink,
+    align: o.align, wrap: o.wrap,
+  });
+}
+
+function para(slide, text, x, y, w, h, o) {
+  o = o || {};
+  txt(slide, text, x, y, w, h, {
+    size: o.size || 10, color: o.color || C.body,
+    align: o.align || 'justify', lh: 1.5, wrap: o.wrap,
+  });
+}
+
+function learnMore(slide, x, y) {
+  raisedPill(slide, x, y, 1.566, 0.464, C.peach);
+  txt(slide, 'Learn More', x + 0.209, y + 0.005, 1.149, 0.372,
+    { size: 12, bold: true, color: C.cocoa, align: 'center', lh: 1.5 });
+}
+
+// Bottom-right page badge.
+function badge(slide, label, x, y) {
+  x = x === undefined ? 12.389 : x;
+  y = y === undefined ? 6.670 : y;
+  raisedPill(slide, x, y, 0.548, 0.554, C.peach);
+  txt(slide, label, x - 0.050, y + 0.111, 0.647, 0.333,
+    { size: 14, bold: true, align: 'center', wrap: false });
+}
+
+// Centred "Page Number NN" strip flanked by two dot pairs.
+function footer(slide, label) {
+  txt(slide, 'Page Number ' + label, 5.973, 6.963, 1.387, 0.303,
+    { size: 12, bold: true, italic: true, color: C.accent, align: 'center', wrap: false });
+  dots(slide, 5.318, 7.071, 0.363, 0.086, { cols: 2, rows: 1, d: 0.086 });
+  dots(slide, 7.604, 7.071, 0.363, 0.086, { cols: 2, rows: 1, d: 0.086 });
+}
+
+function pageMarks(slide, label) {
+  footer(slide, label);
+  badge(slide, label);
+}
+
+// Small square feature card: centred title over centred copy.
+const CARD_BODY = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut vel scelerisque nisi. ';
+
+function smallCard(slide, x, y, title) {
+  pill(slide, x, y, 2.060, 2.063, C.rose, 0.09434);
+  txt(slide, title, x + 0.088, y + 0.682, 1.887, 0.440, { size: 13, bold: true, align: 'center' });
+  txt(slide, CARD_BODY, x + 0.192, y + 0.942, 1.677, 0.759,
+    { size: 9, color: C.slate, align: 'center', lh: 1.5 });
+}
+
+// Wide feature card: title on the left, copy on the right, white rule above.
+function wideCard(slide, x, y, title, o) {
+  o = o || {};
+  pill(slide, x, y, 4.723, 1.595, C.rose, 0.09434);
+  txt(slide, title, x + 0.763, y + (o.titleDy || 0.583), 1.707, o.titleH || 0.652, { size: 16, bold: true });
+  txt(slide, CARD_BODY, x + (o.bodyDx || 2.187), y + 0.418, o.bodyW || 2.152, 0.759,
+    { size: 9, color: C.slate, lh: 1.5 });
+  rule(slide, x + 0.864, y + (o.barDy || 0.431), 1.0, C.white);
+}
+
+// Numbered plate used beside list items.
+function numberPlate(slide, n, x, y, s, plate) {
+  const h = s * 1.011;
+  raisedPill(slide, x, y, s, h, plate);
+  txt(slide, n, x + (s - 0.647) / 2, y + (h - 0.469) / 2, 0.647, 0.469,
+    { size: 22, bold: true, align: 'center', wrap: false });
+}
+
+// Skill meter: pale track with a filled portion, label sitting above it.
+function meter(slide, x, y, w, fillW, label, labelW) {
+  txt(slide, label, x - 0.070, y - 0.440, labelW, 0.440, { size: 13, bold: true });
+  pill(slide, x, y, w, 0.195, C.track, 0.09434);
+  pill(slide, x, y, fillW, 0.195, C.rose, 0.09434);
+}
+
+// Stand-in for a photograph.
+function photo(slide, x, y, w, h, tone) {
+  box(slide, x, y, w, h, tone || GREY.light);
+}
+
+/* ------------------------------------------------------------------ *
+ * Copy used again and again
+ * ------------------------------------------------------------------ */
+
+const LOREM_LONG = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut vel scelerisque nisi. Etiam quis ex tellus. Donec et accumsan tellus, a tristique turpis.  ';
+const LOREM_MED = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut vel scelerisque nisi. Etiam quis ex tellus. Donec et accumsan tellus ';
+const LOREM_SHORT = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut vel scelerisque nisi.  ';
+const LOREM_TINY = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.  ';
+const EXP_INTERIOR = 'Interior Design Experiences';
+const EXP_FURNITURE = 'Furniture Design Experiences';
+
+/* ------------------------------------------------------------------ *
+ * Slides
+ * ------------------------------------------------------------------ */
+
+const SLIDES = [];
+
+// 1 - Cover
+SLIDES.push(function (s) {
+  s.background = { color: C.blush };
+  washPill(s, 5.380, 0.878, 6.679, 5.726, 0.04902, [
+    [0.00, [255, 254, 253]],
+    [0.74, [251, 247, 242]],
+    [0.83, [251, 247, 242]],
+    [1.00, [252, 250, 246]],
+  ], 10);
+  rings(s, -1.123, 5.483, 3.321, C.white);
+  blob(s, 10.712, -1.018, 3.704, 3.164, 304.6, C.cream);
+  photo(s, 1.004, 0.896, 5.105, 5.708);
+  heading(s, ['Interiores'], 6.901, 2.747, 2.888, 0.774, 40, { color: C.text, wrap: false });
+  rule(s, 10.059, 3.088, 2.0);
+  txt(s, 'Interior Design', 6.927, 3.522, 1.510, 0.337, { size: 14 });
+  dots(s, 11.155, 1.328, 0.503, 0.541);
+  para(s, LOREM_LONG, 6.927, 3.997, 4.010, 0.978, { size: 12 });
+  txt(s, '\u201CLorem ipsum dolor sit amet\u201D', 7.549, 5.908, 2.341, 0.303,
+    { size: 12, bold: true, italic: true, color: C.accent, align: 'center', wrap: false });
+  badge(s, '01', 11.275, 5.825);
+  tile(s, 'house', 5.770, 2.800, 0.667, C.peach, 1.18);
+});
+
+// 2 - Intro
+SLIDES.push(function (s) {
+  rings(s, -1.123, 5.483, 3.321, C.ring);
+  dots(s, 0.395, 0.374, 0.643, 0.690);
+  blob(s, 11.697, -0.948, 3.094, 2.644, 304.6, C.cream);
+  heading(s, ['Hello We Are ', 'Interiores'], 1.907, 1.349, 3.194, 1.215, 32, { wrap: false });
+  txt(s, 'Interior Design Specialist', 1.923, 2.523, 2.447, 0.295, { size: 14 });
+  rule(s, 5.359, 1.503);
+  para(s, LOREM_LONG, 5.262, 1.644, 4.169, 0.978, { size: 12 });
+  learnMore(s, 9.920, 1.785);
+  photo(s, 0.000, 3.557, 13.333, 3.224);
+  pageMarks(s, '02');
+});
+
+// 3 - The Interior Specialist
+SLIDES.push(function (s) {
+  box(s, 10.185, 0.000, 3.148, 7.500, C.cream);
+  blob(s, -0.584, -1.322, 3.094, 2.644, 304.6, C.cream);
+  heading(s, ['The Interior', 'Specialist'], 1.495, 2.364, 3.194, 1.215, 32, { wrap: false });
+  para(s, LOREM_LONG, 1.495, 3.765, 3.194, 1.281, { size: 12 });
+  photo(s, 8.067, 1.014, 4.303, 5.472);
+  pill(s, 5.343, 2.024, 3.842, 3.506, C.rose, 0.10575);
+  pill(s, 6.741, 2.778, 1.088, 0.093, C.white);
+  heading(s, ['Interior & Furniture', 'Specialist'], 5.667, 3.103, 3.194, 0.903, 22,
+    { color: C.cocoa, align: 'center', wrap: false });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut vel scelerisque nisi. Etiam quis ex tellus.  ',
+    5.776, 4.005, 2.977, 0.905, { size: 11, color: C.cocoa, align: 'center', lh: 1.5 });
+  tile(s, 'desk', 5.048, 1.709, 0.932, C.blush, 1.07);
+  dots(s, 0.460, 6.587, 0.503, 0.541);
+  pageMarks(s, '03');
+});
+
+// 4 - Our History
+SLIDES.push(function (s) {
+  heading(s, ['Our ', 'History'], 0.778, 2.294, 2.278, 1.215, 30, { wrap: false });
+  para(s, LOREM_SHORT, 0.778, 3.509, 2.111, 0.905, { size: 11 });
+  learnMore(s, 0.778, 4.725);
+  blob(s, 11.697, -0.948, 3.094, 2.644, 304.6, C.cream);
+  rings(s, -1.661, -1.727, 3.321, C.ring);
+  dots(s, 0.460, 6.587, 0.503, 0.541);
+  [['The Story', 1.906], ['Company Profile', 3.957]].forEach(function (item) {
+    rule(s, 10.611, item[1]);
+    heading(s, [item[0]], 10.481, item[1] + 0.171, 2.278, 0.400, 20, { wrap: false });
+    para(s, LOREM_SHORT, 10.481, item[1] + 0.680, 1.858, 0.832);
+  });
+  photo(s, 3.481, 1.014, 3.000, 5.472);
+  photo(s, 6.852, 1.014, 3.000, 5.472);
+  pageMarks(s, '04');
+});
+
+// 5 - What We Do?
+SLIDES.push(function (s) {
+  box(s, 9.630, 0.000, 3.704, 7.500, C.cream);
+  rings(s, 11.277, -1.275, 3.321, C.white);
+  blob(s, -1.020, -0.950, 3.094, 2.644, 304.6, C.cream);
+  heading(s, ['What We Do?'], 1.279, 2.859, 3.194, 0.698, 32, { wrap: false });
+  para(s, LOREM_LONG, 1.254, 3.648, 3.194, 0.832);
+  raisedPill(s, 5.886, 0.897, 0.740, 0.748, C.blush);  // plate tucks behind the card
+  photo(s, 6.963, 1.014, 5.407, 5.472);
+  pill(s, 5.318, 1.253, 2.060, 1.908, C.rose, 0.09434);
+  pill(s, 5.266, 3.885, 2.060, 2.063, C.rose, 0.09434);
+  txt(s, 'Interior Design', 5.593, 1.810, 1.510, 0.337, { size: 14, bold: true });
+  txt(s, CARD_BODY, 5.510, 2.069, 1.677, 0.759, { size: 9, color: C.slate, align: 'center', lh: 1.5 });
+  txt(s, 'Furniture ', 5.523, 4.526, 1.510, 0.337, { size: 14, bold: true, align: 'center' });
+  txt(s, CARD_BODY, 5.440, 4.785, 1.677, 0.759, { size: 9, color: C.slate, align: 'center', lh: 1.5 });
+  tile(s, 'desk', 5.886, 3.558, 0.740);
+  glyph(s, 'chair', 5.886, 0.897, 0.740);
+  dots(s, 0.460, 6.587, 0.503, 0.541);
+  pageMarks(s, '05');
+});
+
+// 6 - Our Great Specialities
+SLIDES.push(function (s) {
+  box(s, 0.000, 0.000, 4.524, 7.500, C.cream);
+  blob(s, 11.697, -0.948, 3.094, 2.644, 304.6, C.cream);
+  photo(s, 0.892, 1.014, 4.524, 5.472);
+  smallCard(s, 4.374, 2.718, 'Interior Specialist');
+  smallCard(s, 6.838, 2.718, 'Architect');
+  tile(s, 'house', 5.090, 2.384, 0.740);
+  tile(s, 'chair', 7.488, 2.375, 0.740);
+  heading(s, ['Our Great ', 'Specialities'], 9.528, 2.279, 3.194, 1.215, 32, { wrap: false });
+  para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut vel scelerisque nisi. Etiam quis ex tellus. Donec et accumsan ',
+    9.528, 3.680, 2.811, 0.832);
+  learnMore(s, 9.559, 4.780);
+  dots(s, 5.716, 0.532, 0.433, 0.465);
+  dots(s, 0.360, 6.670, 0.433, 0.465);
+  pageMarks(s, '06');
+});
+
+// 7 - The Interior Specialist (two photos)
+SLIDES.push(function (s) {
+  box(s, 0.000, 0.000, 3.143, 7.500, C.cream);
+  photo(s, 1.249, 1.014, 3.143, 5.472);
+  photo(s, 4.657, 1.014, 3.143, 5.472);
+  blob(s, 11.697, -0.948, 3.094, 2.644, 304.6, C.cream);
+  rings(s, -1.661, -1.727, 3.321, C.ring);
+  heading(s, ['The Interior', 'Specialist'], 8.521, 1.752, 3.194, 1.215, 32, { wrap: false });
+  para(s, LOREM_LONG, 8.536, 2.932, 3.934, 0.832);
+  [['Our History', 8.536, 8.637], ['Our Specialities', 10.707, 10.837]].forEach(function (item) {
+    rule(s, item[2], 4.129);
+    heading(s, [item[0]], item[1], 4.300, 2.278, 0.400, 14, { wrap: false });
+    para(s, LOREM_TINY, item[1], 4.618, 1.905, 0.579);
+  });
+  learnMore(s, 8.666, 5.508);
+  dots(s, 0.460, 6.587, 0.503, 0.541);
+  pageMarks(s, '07');
+});
+
+// 8 - Our Great Stories
+SLIDES.push(function (s) {
+  box(s, 0.000, 0.000, 3.143, 7.500, C.cream);
+  blob(s, 11.697, -0.948, 3.094, 2.644, 304.6, C.cream);
+  photo(s, 1.249, 1.014, 3.143, 5.472);
+  photo(s, 4.585, 1.014, 2.860, 3.179);
+  photo(s, 4.579, 4.410, 2.860, 2.076);
+  rule(s, 8.698, 1.846);
+  heading(s, ['Our Great', 'Stories'], 8.578, 2.124, 3.194, 1.215, 32, { wrap: false });
+  para(s, LOREM_LONG, 8.578, 3.524, 3.194, 1.281, { size: 12 });
+  learnMore(s, 8.578, 5.190);
+  pageMarks(s, '08');
+});
+
+// 9 - Break slide
+SLIDES.push(function (s) {
+  box(s, 0.000, 0.000, 6.667, 7.500, C.cream);
+  blob(s, 11.697, -0.948, 3.094, 2.644, 304.6, C.cream);
+  rings(s, -1.661, -1.727, 3.321, C.ring);
+  photo(s, 1.382, 1.441, 7.515, 4.618);
+  pill(s, 8.166, 1.762, 4.644, 3.506, C.rose, 0.10575);
+  rule(s, 9.099, 2.862, 1.0, C.accent);
+  heading(s, ['Break Slides'], 8.969, 3.033, 2.723, 0.400, 25, { wrap: false });
+  para(s, LOREM_LONG, 8.969, 3.544, 3.194, 0.832, { color: C.cocoa });
+  tile(s, 'house', 11.554, 2.075, 0.932, C.blush, 1.16);
+  footer(s, '04'); // reference deck repeats "04" in this footer
+  badge(s, '09');
+});
+
+// 10 - Our Best Services
+SLIDES.push(function (s) {
+  box(s, 0.000, 5.824, 2.015, 1.676, C.cream);
+  photo(s, 2.868, 1.235, 8.103, 2.515);
+  blob(s, -1.020, -0.950, 3.094, 2.644, 304.6, C.cream);
+  rings(s, 11.673, -1.652, 3.321, C.ring);
+  heading(s, ['Our Best Services'], 2.770, 4.764, 3.194, 0.511, 25, { wrap: false });
+  para(s, LOREM_LONG, 2.785, 5.406, 3.179, 0.832);
+  smallCard(s, 6.446, 4.362, 'Interior Specialist');
+  smallCard(s, 8.910, 4.362, 'Architect');
+  tile(s, 'house', 7.106, 3.988, 0.740);
+  tile(s, 'desk', 9.571, 3.979, 0.740);
+  dots(s, 2.073, 3.270, 0.433, 0.465);
+  pageMarks(s, '10');
+});
+
+// 11 - Service list
+SLIDES.push(function (s) {
+  box(s, 0.000, 0.000, 4.071, 7.500, C.cream);
+  photo(s, 1.382, 1.441, 4.938, 4.618);
+  wideCard(s, 7.383, 1.127, 'Interior Specialist');
+  wideCard(s, 7.383, 2.959, 'Architecture', { titleDy: 0.761, titleH: 0.337, bodyDx: 2.470, bodyW: 1.869, barDy: 0.609 });
+  wideCard(s, 7.394, 4.747, 'Room Organizing', { titleDy: 0.511, bodyDx: 2.470, bodyW: 1.869, barDy: 0.360 });
+  tile(s, 'house', 7.013, 1.543, 0.740);
+  tile(s, 'desk', 7.013, 3.387, 0.740);
+  tile(s, 'chair', 7.012, 5.161, 0.740);
+  rings(s, -1.661, -1.727, 3.321, C.ring);
+  blob(s, 11.786, 6.247, 3.094, 2.644, 304.6, C.cream);
+  dots(s, 12.486, 0.395, 0.433, 0.465);
+  footer(s, '11');
+});
+
+// 12 - The Interior Services
+SLIDES.push(function (s) {
+  photo(s, 1.382, 1.441, 7.028, 2.773);
+  smallCard(s, 7.391, 2.957, 'Interior Specialist');
+  smallCard(s, 9.953, 3.047, 'Architect');
+  tile(s, 'house', 8.023, 2.614, 0.740);
+  tile(s, 'desk', 10.613, 2.614, 0.740);
+  rings(s, 11.673, -1.652, 3.321, C.ring);
+  blob(s, -1.348, 5.944, 3.094, 2.644, 304.6, C.cream);
+  rule(s, 2.166, 5.186);
+  heading(s, ['The Interior', 'Services'], 2.046, 5.463, 3.194, 1.215, 32, { wrap: false });
+  para(s, LOREM_LONG, 5.240, 5.655, 3.934, 0.832);
+  learnMore(s, 9.625, 5.729);
+  dots(s, 8.801, 1.441, 0.433, 0.465);
+  pageMarks(s, '12');
+});
+
+// 13 - Interior specialist (stacked photos)
+SLIDES.push(function (s) {
+  box(s, 0.000, 5.824, 2.015, 1.676, C.cream);
+  rings(s, 11.673, -1.661, 3.321, C.ring);
+  blob(s, -0.805, -0.846, 2.467, 2.108, 304.6, C.cream);
+  photo(s, 1.089, 1.214, 6.161, 2.536);
+  photo(s, 1.103, 3.750, 6.147, 2.536, GREY.mid);
+  rule(s, 8.214, 2.035);
+  heading(s, ['The Interior Specialist'], 8.179, 2.376, 4.063, 0.762, 20, { wrap: false });
+  para(s, LOREM_LONG, 8.196, 2.847, 4.357, 0.832);
+  wideCard(s, 8.214, 4.131, 'Interior Specialist');
+  tile(s, 'house', 7.880, 4.554, 0.740);
+  footer(s, '13');
+  badge(s, '12'); // reference deck repeats "12" here
+});
+
+// 14 - Three photos + two cards
+SLIDES.push(function (s) {
+  box(s, 12.662, 6.250, 0.672, 1.250, C.cream);
+  photo(s, 1.525, 1.441, 3.403, 2.309);
+  photo(s, 4.929, 1.441, 3.403, 2.309, GREY.mid);
+  photo(s, 8.332, 1.441, 3.403, 2.309);
+  rings(s, -1.661, -1.661, 3.321, C.ring);
+  blob(s, -1.616, 6.029, 3.094, 2.644, 304.6, C.cream);
+  rule(s, 1.646, 4.642);
+  heading(s, ['The Interior', 'Specialist'], 1.525, 4.919, 3.194, 1.215, 25, { wrap: false });
+  para(s, LOREM_LONG, 4.083, 4.857, 2.584, 1.084);
+  smallCard(s, 7.091, 4.368, 'Interior Specialist');
+  smallCard(s, 9.675, 4.368, 'Architect');
+  tile(s, 'house', 7.751, 3.996, 0.740);
+  tile(s, 'desk', 10.335, 4.010, 0.740);
+  dots(s, 12.486, 0.395, 0.433, 0.465);
+  pageMarks(s, '14');
+});
+
+// 15 - Our Best Services (overlapping photos)
+SLIDES.push(function (s) {
+  box(s, 0.000, 0.000, 4.585, 7.500, C.cream);
+  photo(s, 0.989, 0.961, 4.987, 3.235);
+  photo(s, 2.339, 3.304, 4.839, 3.255, GREY.mid);
+  rings(s, -1.661, -1.689, 3.321, C.ring);
+  blob(s, -1.616, 6.029, 3.094, 2.644, 304.6, C.white);
+  rule(s, 6.919, 1.251);
+  heading(s, ['Our Best ', 'Services'], 6.799, 1.528, 2.648, 0.957, 26, { wrap: false });
+  para(s, LOREM_LONG, 8.833, 1.654, 3.169, 0.832);
+  wideCard(s, 8.008, 3.161, 'Interior Specialist');
+  wideCard(s, 8.054, 5.008, 'Room Organizing');
+  tile(s, 'house', 7.632, 3.606, 0.740);
+  tile(s, 'desk', 7.734, 5.440, 0.740);
+  dots(s, 12.486, 0.395, 0.433, 0.465);
+  footer(s, '15');
+});
+
+// 16 - Take A Break
+SLIDES.push(function (s) {
+  s.background = { color: C.cream };
+  rings(s, 11.673, -1.661, 3.321, C.ring);
+  blob(s, -1.020, -0.950, 3.094, 2.644, 304.6, C.white);
+  dots(s, 0.360, 6.670, 0.433, 0.465);
+  photo(s, 1.836, 1.108, 9.661, 3.255);
+  photo(s, 7.358, 4.088, 2.235, 2.509, GREY.mid);
+  photo(s, 9.868, 4.088, 2.235, 2.509, GREY.mid);
+  rule(s, 1.851, 4.877);
+  // (dot grid drawn above, before the photos)
+  heading(s, ['Take A ', 'Break'], 1.731, 5.155, 3.194, 1.215, 25, { wrap: false });
+  para(s, LOREM_LONG, 3.384, 5.093, 3.194, 0.832);
+  pageMarks(s, '16');
+});
+
+// 17 - Interior Design Portfolio
+SLIDES.push(function (s) {
+  box(s, 0.000, 0.000, 4.333, 7.500, C.cream);
+  rings(s, 11.673, -1.661, 3.321, C.ring);
+  blob(s, -1.038, 6.178, 3.094, 2.644, 194.6, C.white);
+  photo(s, 0.989, 0.941, 3.721, 4.074);
+  photo(s, 2.895, 3.986, 3.960, 2.573, GREY.dark);
+  photo(s, 5.700, 2.080, 2.402, 2.573, GREY.mid);
+  rule(s, 9.168, 2.360);
+  heading(s, ['Interior Design', 'Portfolio'], 9.048, 2.638, 2.648, 0.957, 26, { wrap: false });
+  para(s, LOREM_MED, 9.048, 3.713, 2.519, 1.084);
+  learnMore(s, 9.168, 5.041);
+  pageMarks(s, '17');
+});
+
+// 18 - Interior Specialist (collage)
+SLIDES.push(function (s) {
+  box(s, 0.000, 0.000, 5.015, 3.750, C.cream);
+  photo(s, 1.511, 2.060, 2.402, 3.379);
+  photo(s, 5.567, 0.498, 2.853, 2.290);
+  photo(s, 4.215, 3.285, 2.452, 3.379);
+  blob(s, -0.914, 5.881, 3.094, 2.644, 304.6, C.cream);
+  rings(s, 11.673, -1.661, 3.321, C.ring);
+  rule(s, 9.194, 1.342);
+  heading(s, ['Interior Specialist'], 9.073, 1.619, 3.194, 1.215, 32);
+  learnMore(s, 7.378, 4.265);
+  para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut vel scelerisque nisi. Etiam quis ex tellus. Donec et accumsan  ',
+    7.378, 5.009, 2.206, 1.084);
+  smallCard(s, 10.120, 4.144, 'Interior Specialist');
+  tile(s, 'house', 10.780, 3.770, 0.740);
+  pageMarks(s, '18');
+});
+
+// 19 - Our Furniture Design
+SLIDES.push(function (s) {
+  box(s, 11.039, 0.000, 2.232, 3.750, C.cream);
+  photo(s, 10.151, 4.507, 2.402, 2.361);
+  photo(s, 4.727, 4.710, 2.402, 2.158);
+  photo(s, 7.439, 1.846, 2.402, 3.379);
+  photo(s, 10.151, 0.752, 2.402, 3.379);
+  blob(s, -1.029, 5.838, 3.094, 2.644, 304.6, C.cream);
+  rings(s, -1.661, -1.661, 3.321, C.ring);
+  rule(s, 1.300, 2.290);
+  heading(s, ['Our Furniture', 'Design'], 1.179, 2.568, 3.194, 1.215, 32, { wrap: false });
+  para(s, LOREM_MED, 4.374, 2.636, 2.293, 1.084);
+  learnMore(s, 1.300, 4.227);
+  dots(s, 7.439, 5.618, 0.433, 0.465);
+  badge(s, '19');
+});
+
+// 20 - Numbered list
+SLIDES.push(function (s) {
+  photo(s, 0.914, 0.975, 2.402, 3.090);
+  photo(s, 3.680, 3.375, 4.449, 3.090);
+  rings(s, 11.673, -1.661, 3.321, C.ring);
+  blob(s, -1.029, 5.838, 3.094, 2.644, 304.6, C.cream);
+  rule(s, 4.428, 1.384);
+  heading(s, ['The Interior', 'Specialist'], 4.308, 1.662, 3.194, 1.215, 32, { wrap: false });
+  para(s, LOREM_MED, 7.360, 1.857, 3.010, 0.832);
+  [['01', 'Interior Specialist', 3.916, 3.881], ['02', 'Furniture', 5.266, 5.238]].forEach(function (item) {
+    numberPlate(s, item[0], 7.710, item[2], 0.839, C.peach);
+    txt(s, item[1], 9.004, item[3], 1.887, 0.440, { size: 13, bold: true });
+    para(s, LOREM_SHORT, 9.004, item[3] + 0.383, 2.625, 0.579);
+  });
+  pageMarks(s, '20');
+});
+
+// 21 - Our Great Portfolio
+SLIDES.push(function (s) {
+  box(s, 0.000, 0.000, 2.402, 7.500, C.cream);
+  photo(s, 1.098, 1.537, 2.402, 4.425);
+  photo(s, 3.825, 1.537, 2.402, 4.425);
+  photo(s, 10.353, 1.537, 2.980, 4.425);
+  rings(s, 11.468, -2.135, 3.321, C.ring);
+  blob(s, -1.131, 6.041, 3.094, 2.644, 341.7, C.white);
+  rule(s, 7.227, 2.449);
+  heading(s, ['Our Great', 'Portfolio'], 7.107, 2.726, 2.793, 1.215, 32, { wrap: false });
+  para(s, LOREM_MED, 7.081, 4.091, 2.293, 1.084);
+  pageMarks(s, '21');
+});
+
+// 22 - The Interior Projects
+SLIDES.push(function (s) {
+  box(s, 0.000, 0.000, 2.402, 7.500, C.cream);
+  blob(s, -0.980, 5.810, 3.094, 2.644, 304.6, C.white);
+  rings(s, 11.673, -1.661, 3.321, C.ring);
+  photo(s, 1.043, 1.062, 2.660, 5.377);
+  photo(s, 4.006, 1.062, 2.660, 5.377);
+  rule(s, 7.597, 2.387);
+  heading(s, ['The Interior', 'Projects'], 7.477, 2.664, 2.793, 1.215, 32, { wrap: false });
+  para(s, LOREM_MED, 7.492, 3.892, 2.293, 1.084);
+  learnMore(s, 10.492, 3.307);
+  para(s, LOREM_TINY, 10.455, 4.051, 1.934, 0.579);
+  dots(s, 6.988, 0.654, 0.433, 0.465);
+  pageMarks(s, '22');
+});
+
+// 23 - Break Slide Goes Here
+SLIDES.push(function (s) {
+  s.background = { color: C.cream };
+  blob(s, -0.688, 5.093, 3.094, 2.644, 290.8, C.white);
+  rings(s, 11.673, -1.661, 3.321, C.ring);
+  photo(s, 1.098, 1.537, 3.390, 4.425);
+  photo(s, 4.488, 1.537, 4.000, 4.425, GREY.mid);
+  rule(s, 9.716, 2.387);
+  heading(s, ['Break Slide', 'Goes Here'], 9.595, 2.664, 2.793, 1.215, 32, { wrap: false });
+  para(s, LOREM_MED, 9.569, 4.029, 2.293, 1.084);
+  dots(s, 0.426, 0.654, 0.501, 0.538);
+  pageMarks(s, '23');
+});
+
+// 24 - Jane Young Doe
+SLIDES.push(function (s) {
+  box(s, 0.000, 0.000, 5.015, 7.500, C.cream);
+  blob(s, -1.547, -0.850, 3.094, 2.644, 240.0, C.white);
+  rings(s, 11.673, -1.661, 3.321, C.ring);
+  photo(s, 1.328, 0.882, 5.158, 2.750);
+  photo(s, 1.328, 3.916, 5.158, 2.750);
+  rule(s, 7.413, 1.690);
+  heading(s, ['Jane Young Doe'], 7.293, 1.967, 4.156, 0.536, 25, { wrap: false });
+  para(s, LOREM_MED, 7.293, 2.607, 4.534, 0.579);
+  learnMore(s, 7.363, 3.385);
+  meter(s, 7.363, 4.717, 4.534, 3.505, EXP_INTERIOR, 2.661);
+  meter(s, 7.363, 5.602, 4.534, 3.505, EXP_FURNITURE, 2.846);
+  dots(s, 0.450, 6.629, 0.433, 0.465);
+  pageMarks(s, '24');
+});
+
+// 25 - John Young Doe
+SLIDES.push(function (s) {
+  photo(s, 0.962, 1.095, 2.233, 2.441, GREY.mid);
+  photo(s, 2.909, 2.316, 3.758, 4.302);
+  blob(s, -1.029, 5.838, 3.094, 2.644, 304.6, C.cream);
+  rings(s, 11.673, -1.661, 3.321, C.ring);
+  rule(s, 7.483, 1.975);
+  heading(s, ['John Young Doe'], 7.363, 2.253, 4.534, 0.765, 28, { wrap: false });
+  para(s, LOREM_MED + ' Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut vel scelerisque nisi',
+    7.390, 3.001, 4.604, 0.832);
+  meter(s, 7.485, 4.571, 4.534, 3.505, EXP_INTERIOR, 2.708);
+  meter(s, 7.485, 5.455, 4.534, 3.505, EXP_FURNITURE, 2.708);
+  dots(s, 3.792, 1.154, 0.574, 0.617);
+  pageMarks(s, '25');
+});
+
+// 26 - Mia Young Doe
+SLIDES.push(function (s) {
+  box(s, 10.756, 0.000, 2.577, 3.415, C.cream);
+  photo(s, 0.740, 3.632, 2.821, 3.230);
+  photo(s, 8.640, 0.779, 3.758, 4.302);
+  blob(s, -1.020, -0.950, 3.094, 2.644, 304.6, C.cream);
+  smallCard(s, 1.120, 2.127, 'Interior Specialist');
+  smallCard(s, 9.636, 4.699, 'Interior Specialist');
+  tile(s, 'desk', 1.780, 1.757, 0.740);
+  tile(s, 'chair', 10.296, 4.326, 0.740);
+  rule(s, 4.652, 2.382);
+  heading(s, ['Mia Young Doe'], 4.531, 2.659, 2.829, 0.765, 27, { wrap: false });
+  para(s, LOREM_MED, 4.531, 3.248, 3.386, 0.832);
+  meter(s, 4.617, 4.844, 3.300, 2.551, EXP_INTERIOR, 2.621);
+  meter(s, 4.617, 5.729, 3.300, 2.551, EXP_FURNITURE, 2.621);
+  dots(s, 7.743, 0.779, 0.574, 0.617);
+  pageMarks(s, '26');
+});
+
+// 27 - Jane Young Doe (portrait)
+SLIDES.push(function (s) {
+  box(s, 4.957, 0.000, 3.419, 7.500, C.cream);
+  photo(s, 4.465, 0.884, 4.402, 5.732);
+  blob(s, -1.020, -0.950, 3.094, 2.644, 304.6, C.cream);
+  rings(s, 11.673, -1.661, 3.321, C.ring);
+  rule(s, 1.167, 2.203);
+  heading(s, ['Jane Young', 'Doe'], 1.046, 2.480, 2.648, 0.957, 26, { wrap: false });
+  para(s, LOREM_MED, 1.046, 3.555, 2.519, 1.084);
+  learnMore(s, 1.167, 4.883);
+  para(s, LOREM_MED, 9.438, 2.399, 3.186, 0.832);
+  meter(s, 9.523, 3.995, 3.100, 2.396, EXP_INTERIOR, 2.624);
+  meter(s, 9.523, 4.879, 3.100, 2.396, EXP_FURNITURE, 2.624);
+  pageMarks(s, '27');
+});
+
+// 28 - Clara Young Doe
+SLIDES.push(function (s) {
+  box(s, 0.000, 0.798, 6.105, 5.904, C.cream);
+  photo(s, 0.687, 1.544, 6.105, 4.449);
+  blob(s, 11.390, -1.047, 3.094, 2.644, 304.6, C.cream);
+  rule(s, 7.846, 1.553);
+  heading(s, ['Clara Young Doe'], 7.726, 1.831, 4.534, 0.765, 27, { wrap: false });
+  para(s, LOREM_MED + '  ', 7.753, 2.474, 4.604, 0.579);
+  meter(s, 7.835, 3.714, 4.534, 3.505, EXP_FURNITURE, 3.020);
+  wideCard(s, 7.782, 4.367, 'Furniture Specialist');
+  numberPlate(s, '01', 7.412, 4.795, 0.740, C.blush);
+  pageMarks(s, '28');
+});
+
+// 29 - Contact Our Team
+SLIDES.push(function (s) {
+  box(s, 0.000, 0.000, 6.667, 7.500, C.cream);
+  blob(s, -1.121, 5.641, 3.094, 2.644, 290.8, C.white);
+  rings(s, 11.673, -1.661, 3.321, C.ring);
+  rule(s, 1.479, 2.456);
+  heading(s, ['Contact Our Team '], 1.358, 2.734, 3.904, 0.807, 32, { wrap: false });
+  para(s, LOREM_MED + ' Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut vel scelerisque nisi. Etiam quis ex tellus.  ',
+    1.358, 3.710, 3.904, 1.337);
+  wideCard(s, 7.666, 1.982, 'Contact Our Call Center');
+  numberPlate(s, '01', 7.296, 2.410, 0.740, C.blush);
+  numberPlate(s, '02', 7.893, 4.172, 0.839, C.peach);
+  txt(s, 'Visit Our Website', 9.187, 4.138, 1.887, 0.440, { size: 13, bold: true });
+  para(s, LOREM_SHORT, 9.187, 4.520, 2.625, 0.579);
+  dots(s, 0.426, 0.654, 0.501, 0.538);
+  pageMarks(s, '29');
+});
+
+// 30 - Thanks For Watching
+SLIDES.push(function (s) {
+  box(s, 1.711, 1.224, 2.603, 3.717, C.cream);
+  photo(s, 2.615, 1.978, 8.103, 3.544);
+  rings(s, 11.673, -1.652, 3.321, C.ring);
+  blob(s, -1.029, 5.838, 3.094, 2.644, 304.6, C.cream);
+  rule(s, 4.916, 1.390);
+  heading(s, ['Thanks For Watching'], 5.916, 1.077, 4.952, 0.675, 32, { align: 'right', wrap: false });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut vel scelerisque nisi. Etiam quis ex tellus.  ',
+    2.615, 5.775, 3.863, 0.675, { size: 12, color: C.body, lh: 1.5 });
+  dots(s, 0.489, 0.590, 0.501, 0.538);
+  dots(s, 10.275, 6.000, 0.433, 0.465, { color: C.accent });
+  badge(s, '30');
+});
+
+/* ------------------------------------------------------------------ *
+ * Build
+ * ------------------------------------------------------------------ */
+
+function build() {
+  pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'DECK', width: 13.3333333, height: 7.5 });
+  pptx.layout = 'DECK';
+  pptx.author = 'Interiores';
+  pptx.title = 'Interiores - Interior Design';
+
+  SLIDES.forEach(function (draw) { draw(pptx.addSlide()); });
+
+  const out = path.join(__dirname, '1759578b-c380-4ba7-aaba-ca714ce04620_grok_final.pptx');
+  return pptx.writeFile({ fileName: out }).then(function () { console.log('wrote ' + out); });
+}
+
+build().catch(function (err) { console.error(err); process.exit(1); });

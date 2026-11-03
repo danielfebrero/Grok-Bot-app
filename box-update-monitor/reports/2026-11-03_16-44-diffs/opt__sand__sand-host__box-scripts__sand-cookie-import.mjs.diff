@@ -1,0 +1,29 @@
+--- 2026-11-03_12-53:/opt/sand/sand-host/box-scripts/sand-cookie-import.mjs
++++ 2026-11-03_16-44:/opt/sand/sand-host/box-scripts/sand-cookie-import.mjs
+@@ -11,7 +11,14 @@
+   readCookies,
+   toCookieParam,
+ } from "./cdp-cookies.mjs";
+-import { dropToBoxUser, readSeed, serializeSeed, withSeedLock } from "./sand-cookie-persist.mjs";
++import {
++  dropToBoxUser,
++  isWallEvidenceGateOn,
++  readSeed,
++  seedLineageToWrite,
++  serializeSeed,
++  withSeedLock,
++} from "./sand-cookie-persist.mjs";
+ 
+ const SEED_PATH =
+   process.env.SAND_COOKIE_SEED_PATH ?? "/home/box/sand-data/chrome-cookie-seed.json";
+@@ -152,7 +159,9 @@
+         const merged = mergeSeedCookies(seed.kind === "ok" ? seed.cookies : [], batch);
+         fs.mkdirSync(dirname(seedPath), { recursive: true });
+         const tmp = `${seedPath}.tmp`;
+-        fs.writeFileSync(tmp, serializeSeed(merged));
++        const now = Date.now();
++        const gateOn = options.gateOn ?? isWallEvidenceGateOn;
++        fs.writeFileSync(tmp, serializeSeed(merged, now, seedLineageToWrite(seed, now, gateOn())));
+         fs.renameSync(tmp, seedPath);
+         return { seedSize: merged.length };
+       },

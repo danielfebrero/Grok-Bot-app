@@ -1,0 +1,119 @@
+--- 2026-11-03_12-53:/opt/sand/sand-host/box-launchers/box-chrome
++++ 2026-11-03_16-44:/opt/sand/sand-host/box-launchers/box-chrome
+@@ -193,6 +193,10 @@
+ BOX_BROWSER_GPU_MODE_FILE="${SAND_BOX_BROWSER_GPU_MODE}-${CHROME_DEBUG_PORT}"
+ SAND_BOX_BROWSER_LAUNCH_MARKERS=/tmp/sand-box-browser-launch-markers
+ BOX_BROWSER_LAUNCH_MARKERS_FILE="${SAND_BOX_BROWSER_LAUNCH_MARKERS}-${CHROME_DEBUG_PORT}"
++SAND_PROFILE_DIR=/tmp/sand-profile-dir
++BOX_PROFILE_DIR_FILE="${SAND_PROFILE_DIR}-${CHROME_DEBUG_PORT}"
++SAND_PROFILE_PRIOR_BOOT=/tmp/sand-profile-prior-boot
++BOX_PROFILE_PRIOR_BOOT_FILE="${SAND_PROFILE_PRIOR_BOOT}-${CHROME_DEBUG_PORT}"
+ UNGOOGLED_CHROMIUM=/opt/ungoogled-chromium/chrome
+ box_browser_ungoogled_wanted() {
+ 	[ "${SAND_BOX_BROWSER_UNGOOGLED:-0}" = "1" ] || [ -e "${SAND_BOX_BROWSER_UNGOOGLED_FILE:-/tmp/sand-box-browser-ungoogled}" ]
+@@ -317,6 +321,7 @@
+ SAND_WEBAUTHN_MARKER=/home/box/.sand-webauthn-proxy-enabled
+ CHROME_LOG="/tmp/chrome${DISPLAY:-:1}.log"
+ BOX_CHROME_LAUNCHER_VERSION=5
++BOX_WALL_EVIDENCE_WRITER_VERSION=2
+ CHROME_FLAGS+=(--sand-box-chrome-launcher="${BOX_CHROME_LAUNCHER_VERSION}")
+ CHROME_LAUNCH_WAIT_S=20
+ CHROME_RELEASE_GRACE_S=10
+@@ -534,9 +539,6 @@
+ # launch. The governor rereads its markers once a browser has no page open.
+ box_browser_launch_markers() {
+ 	local markers=()
+-	marker_gate_on "${SAND_BROWSER_HARDWARE_PROFILE:-}" \
+-		"${SAND_BROWSER_HARDWARE_PROFILE_FILE:-/tmp/sand-browser-hardware-profile}" 1 &&
+-		markers+=(hardware_profile)
+ 	marker_gate_on "${SAND_BOX_BROWSER_COHERENT_FINGERPRINT:-}" \
+ 		"${SAND_BOX_BROWSER_COHERENT_FINGERPRINT_FILE:-/tmp/sand-box-browser-coherent-fingerprint}" 1 &&
+ 		markers+=(coherent_fingerprint)
+@@ -669,8 +671,7 @@
+ }
+ 
+ next_launch_attempt() {
+-	local counter="${CHROME_PROFILE}/.sand-launch-count"
+-	local boot="${SAND_BOX_BOOT_ID:-${SAND_BOX_BOOT_STARTED_AT_MS:-unknown}}"
++	local counter="${CHROME_PROFILE}/.sand-launch-count" boot="$1"
+ 	local recorded_boot="" count=0
+ 	read -r recorded_boot count 2>/dev/null <"${counter}" || true
+ 	[ "${recorded_boot}" = "${boot}" ] && [ "${count}" -ge 0 ] 2>/dev/null || count=0
+@@ -679,11 +680,75 @@
+ 	printf '%s' "${count}"
+ }
+ 
++profile_boot_id() {
++	case "$1" in
++	'' | unknown | *[!A-Za-z0-9-]*) return 1 ;;
++	esac
++	[ "${#1}" -le 64 ] || return 1
++	printf '%s' "$1"
++}
++
++box_boot_id() {
++	local boot="${SAND_BOX_BOOT_ID:-}"
++	if [ -z "${boot}" ]; then
++		read -r boot 2>/dev/null <"${SAND_BOX_BOOT_ID_FILE:-/tmp/sand-box-boot-id}" || true
++		boot="$(profile_boot_id "${boot}")" || boot=""
++	fi
++	printf '%s' "${boot:-${SAND_BOX_BOOT_STARTED_AT_MS:-unknown}}"
++}
++
++write_profile_file() {
++	printf '%s\n' "$2" 2>/dev/null >"$1.$$" && mv -f "$1.$$" "$1" 2>/dev/null || rm -f "$1.$$" 2>/dev/null || true
++}
++
++# Runs before next_launch_attempt so the launch count still names the boot
++# that last launched this profile.
++record_profile_origin() {
++	local boot launched_boot="" prior_boot="" prior_recorded="" prior_profile="" recorded="-" late_gate="" gate=0
++	local marker="${CHROME_PROFILE}/.sand-profile-origin.json" origin=unknown created="" boot_field launcher="" writer_boot=""
++	[ -e "${SAND_BOX_WALL_EVIDENCE_RECORDERS_FILE:-/tmp/sand-box-wall-evidence-recorders}" ] && gate=1
++	[ "${gate}" -eq 0 ] || write_profile_file "${BOX_PROFILE_DIR_FILE}" "${CHROME_PROFILE}"
++	boot="$(profile_boot_id "$1")" || return 0
++	read -r launched_boot _ 2>/dev/null <"${CHROME_PROFILE}/.sand-launch-count" || true
++	if [ "${launched_boot}" = "${boot}" ]; then
++		late_gate=',"lateGate":true'
++		read -r prior_boot prior_recorded prior_profile 2>/dev/null <"${BOX_PROFILE_PRIOR_BOOT_FILE}" || true
++		if [ "${prior_boot}" = "${boot}" ] && [ "${prior_profile}" = "${CHROME_PROFILE}" ]; then
++			recorded="$(profile_boot_id "${prior_recorded}")" || recorded="-"
++		fi
++	else
++		recorded="$(profile_boot_id "${launched_boot}")" || recorded="-"
++		write_profile_file "${BOX_PROFILE_PRIOR_BOOT_FILE}" "${boot} ${recorded} ${CHROME_PROFILE}"
++	fi
++	[ "${gate}" -eq 1 ] || return 0
++	[ ! -e "${marker}" ] && [ ! -L "${marker}" ] || return 0
++	# Chrome writes Local State on its first run, so a profile without it or a
++	# launch count has never been opened; any other profile predates the marker.
++	if [ ! -e "${CHROME_PROFILE}/Local State" ] && [ ! -e "${CHROME_PROFILE}/.sand-launch-count" ]; then
++		origin=fresh
++		[ "${BOX_DISPLAY_NUM:-1}" -ge 2 ] 2>/dev/null && origin=fork
++		created="\"createdMs\":$(date +%s%3N),"
++		boot_field="\"${boot}\""
++	elif [ "${recorded}" = "-" ]; then
++		boot_field=null
++		writer_boot=",\"writerBootId\":\"${boot}\""
++	else
++		boot_field="\"${recorded}\""
++	fi
++	case "${SAND_BOX_CHROME_LAUNCHER_SOURCE:-}" in
++	bundle | image) launcher=",\"launcherSource\":\"${SAND_BOX_CHROME_LAUNCHER_SOURCE}\"" ;;
++	esac
++	write_profile_file "${marker}" \
++		"{${created}\"origin\":\"${origin}\",\"bootId\":${boot_field},\"writerVersion\":${BOX_WALL_EVIDENCE_WRITER_VERSION}${launcher}${late_gate}${writer_boot}}"
++}
++
+ start_chrome() {
+-	local mode="$1" visible=1 started_ms attempt outcome duration_ms cdp_ready_ms launcher_fields shown
++	local mode="$1" visible=1 started_ms attempt outcome duration_ms cdp_ready_ms launcher_fields shown boot
+ 	shift
+ 	[ "${mode}" = window ] || visible=0
+-	attempt="$(next_launch_attempt)"
++	boot="$(box_boot_id)"
++	record_profile_origin "${boot}"
++	attempt="$(next_launch_attempt "${boot}")"
+ 	started_ms="$(date +%s%3N)"
+ 	if [ "${CHROME_PORT_HELD}" -eq 0 ]; then
+ 		if [ "${policy_status:-0}" = 3 ]; then

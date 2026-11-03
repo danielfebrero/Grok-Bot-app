@@ -1,0 +1,33 @@
+--- 2026-11-03_12-53:/home/box/sand-data/managed-skills/skills/flight-booking/SKILL.md
++++ 2026-11-03_16-44:/home/box/sand-data/managed-skills/skills/flight-booking/SKILL.md
+@@ -42,7 +42,7 @@
+  the tool is the ask. After a receipt or a hand-back, dispatch the subagent again;
+  the session persists across turns. Seats, bags, and paid add-ons are the user's choices;
+  surface them, do not buy them.
+-10. Confirm the itinerary and total with a question widget, then pay (see Paying and confirming).
++10. Run the savings check (see Savings check). Then confirm the itinerary and total with a question widget and pay (see Paying and confirming).
+ 11. Report the booking reference, the itinerary, and the total from the confirmation page. Save a stated preference (a new loyalty number, a favorite airline) with `UpdateMemory` only when the user confirmed it.
+ 
+ ## Presenting choices
+@@ -53,6 +53,21 @@
+ - Use a question widget for the pick only when the shortlist is real and short. Otherwise send the summary and let the user reply.
+ - Show what you collected in the user's language, which is the language they write to you in unless they asked for another or the Memory section names one they prefer. When a page is in another language, translate the words you put in a card or a summary, such as titles, descriptions, specs and their labels, notes, review summaries, policies, delivery and status lines, and option names. Keep brand, store, seller, and venue names, model numbers, order numbers and other codes, prices with their currency, and links as the page shows them. Brief the browser subagent and type into the site in the site's own words, and match a choice the user makes in their language back to those words.
+ 
++## Savings check
++
++Run this once, on the final review page's total with shipping, tax, and fees, before you ask for the approval;
++ a total from an earlier page can still be missing some of them. When the checkout takes codes only on an earlier page, gather them as Codes and offers below says before you leave that page and enter them there;
++ the rest of the check still runs on the final page. It is one short pass, not a new search.
++
++- Codes and offers. Apply the offers the checkout itself shows, such as a coupon to clip, an automatic cart promotion, or a member price for a membership in the Memory section. When an email connector is installed, search the user's mail for this store's promo codes, such as a welcome, newsletter, or loyalty offer, and keep only codes that have not expired. When the checkout has a promo code field and neither a tool result nor the mail gave a code, ask whether the user has one. Enter only a code the user, a tool result, or the user's mail gave, once each;
++ never guess codes or take them from a list of codes on another site, since stores treat that as abuse. When the store rejects a code, or the total does not drop after it, carry on at the total the page shows with any code that did apply. Tell the user in one message every code you found, where each came from (the email's sender and subject, the tool result, or the user), and which one applied. Cash-back portals and rebate sites are not part of this check;
++ leave them out.
++- The merchant's own site. When you are buying through a marketplace seller, a travel site, or another reseller and the total is above 100 USD, or that amount converted to the checkout's currency at today's rate, or above an amount the user set for this check, read the same item, dates, and terms on the merchant's own site (the brand's store, the airline, the hotel). Tell the user both totals. When the merchant's is lower and the user wants it, start the purchase over on the merchant's site from the cart or booking step, so the cart summary, the review, and the approval all come from that site;
++ never carry lines or a total from one site to the other. Keep the reseller when the user chose it for a reason, such as a perk or their account there. When `CheckSubscriptionUsage` reports that most of this cycle's included usage is used and does not say that on-demand usage is enabled, skip this part and say so in one line.
++- The card. When you will pay with a card from the user's vault (see Paying and confirming), the user has not already chosen the card, as a message naming it by Vault id does, and `Vault` list shows more than one saved card, pick the one whose `When to use:` line fits this store or this kind of purchase, and give the reason in that line's words. Name only perks a `When to use:` line states, never a reward rate or protection you assume a card has. Without such a line, pick as you otherwise would and give no reason. When the user tells you a card's perk, such as extra points on groceries or a travel credit, offer to add it to that card's hint with `Vault`, and change the hint only when they say yes.
++- Then say in one line what the check saved and how ("Saved $6.00 with CAMP6 from the store's welcome email", "Saved €297 by booking direct"), or that the codes you tried did not apply. Say nothing about savings when there was nothing to try.
++- After the order is placed, record each saving, since the user paid the lower price: kind promo_code for a code or checkout offer, or direct_booking for buying on the merchant's own site instead of a reseller, with the reseller's total, including any code that applied there, less the merchant's total before any code you entered on the merchant's site, since that code is its own promo_code saving, dated the order date, with the order's https link as proof. Save one fact of type "journal" with UpdateMemory for each saving, in exactly this shape: `Saving YYYYMM: YYYY-MM-DD | kind | amount CURRENCY | store | proof link`. YYYYMM is the year and month of that date with no separator. amount CURRENCY is how much less the user paid, with its ISO 4217 code, such as 6.00 USD. Never start any other fact with Saving and a month. Save nothing when nothing was saved.
++
+ ## Paying and confirming
+ 
+ - Before payment, send one question widget that restates the full itinerary, passenger names, fare, and total.

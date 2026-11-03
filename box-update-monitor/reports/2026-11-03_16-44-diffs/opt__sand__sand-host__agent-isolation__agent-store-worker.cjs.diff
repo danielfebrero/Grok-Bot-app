@@ -1,0 +1,61 @@
+--- 2026-11-03_12-53:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
++++ 2026-11-03_16-44:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
+@@ -18919,6 +18919,8 @@
+ var SimulatedMsgReason = /* @__PURE__ */ enumType(proto3, __protoPackage75, "SimulatedMsgReason", [[0, "UNSPECIFIED"], [1, "PLAN_EXECUTION"], [2, "COMMIT_REMINDER"], [3, "BACKGROUND_TASK_COMPLETION"], [4, "DIFF_TAB_COMMIT"], [5, "DIFF_TAB_COMMIT_AND_PUSH"], [6, "DIFF_TAB_PUSH"], [7, "DIFF_TAB_CREATE_PR"], [8, "DIFF_TAB_FIX_MERGE_CONFLICTS"], [9, "USER_SENT_TO_SUBAGENT"], [10, "USER_INTERRUPTED_SUBAGENT"], [11, "USER_QUEUED_TO_SUBAGENT"], [12, "BABYSIT_PR_IN_CLOUD"], [13, "CI_PANEL_INVESTIGATE_FAILURE"], [14, "MULTITASK"], [15, "BUILD_IN_PARALLEL"], [16, "MULTITASK_SPLIT_PRS"], [17, "APPLY_LOCALLY"], [18, "CHECKOUT_BRANCH"], [19, "DIFF_TAB_UPDATE_BRANCH"], [20, "PR_TAB_BUGBOT_FIX"], [22, "RUN_BUGBOT_REVIEW"], [23, "RUN_SECURITY_REVIEW"], [24, "FSD_APPLY_FINDING"], [25, "FSD_UNDO_FINDING"], [26, "FSD_START"], [27, "FSD_PR_INTERRUPT"], [28, "SUBSCRIPTION"], [29, "DIFF_TAB_CREATE_BRANCH"], [30, "AGENT_STORE_CONFLICT"], [31, "GOAL_CONTINUATION"], [32, "PROJECT_KICKOFF"], [33, "MARKDOWN_PROMPT_BUTTON"], [34, "USER_QUICK_ACTION"], [35, "INTERACTION_RESPONSE"]], 1);
+ var SubscriptionSource = /* @__PURE__ */ enumType(proto3, __protoPackage75, "SubscriptionSource", [[0, "UNSPECIFIED"], [1, "SLACK"], [2, "GITHUB"], [3, "LINEAR"], [4, "ORIGIN"], [5, "FACTORY"]], 1);
+ var ReplyAudience = /* @__PURE__ */ enumType(proto3, __protoPackage75, "ReplyAudience", [[0, "UNSPECIFIED"], [1, "USER"], [2, "AGENT"]], 1);
++var TurnRunStatus = /* @__PURE__ */ enumType(proto3, __protoPackage75, "TurnRunStatus", [[0, "UNSPECIFIED"], [1, "RUNNING"], [2, "COMPLETED"], [3, "FAILED"], [4, "INTERRUPTED"]], 1);
++var TurnInterruptReason = /* @__PURE__ */ enumType(proto3, __protoPackage75, "TurnInterruptReason", [[0, "UNSPECIFIED"], [1, "CANCELLED"], [2, "MAX_STEPS"]], 1);
+ var TaskArgs = class _TaskArgs extends __protoMessage373 {
+   constructor(data) {
+     super();
+@@ -20005,7 +20007,7 @@
+     return proto3.util.equals(_AgentConversationTurnStructure, a, b);
+   }
+   static $() {
+-    return ["AgentConversationTurnStructure|1 user_message 12|2 steps 12*|3 request_id 9?|4 encrypted_model 9?|5 dynamic_tool_count 13?|6 send_message_step_indices 13*|7 routed_model_display_name 9?|8 subagent_dispatch_steps #0*|9 dynamic_tool_names 9*|10 user_message_id 9?|11 long_reasoning_reminder #1?|12 long_reasoning_reminder_exposure_logged 8|13 assistant_text_step_indices 13*|14 assistant_text_steps_recorded 8?|15 app_secrets_request_step_indices 13*|16 preference_change_step_indices 13*", SubagentDispatchStep, LongReasoningReminderState];
++    return ["AgentConversationTurnStructure|1 user_message 12|2 steps 12*|3 request_id 9?|4 encrypted_model 9?|5 dynamic_tool_count 13?|6 send_message_step_indices 13*|7 routed_model_display_name 9?|8 subagent_dispatch_steps #0*|9 dynamic_tool_names 9*|10 user_message_id 9?|11 long_reasoning_reminder #1?|12 long_reasoning_reminder_exposure_logged 8|13 assistant_text_step_indices 13*|14 assistant_text_steps_recorded 8?|15 app_secrets_request_step_indices 13*|16 preference_change_step_indices 13*|17 run #2?", SubagentDispatchStep, LongReasoningReminderState, TurnRunRecord];
+   }
+ };
+ var LongReasoningReminderState = class _LongReasoningReminderState extends __protoMessage373 {
+@@ -20335,6 +20337,31 @@
+     return ["TurnTelemetryState|1 completed_turn_count_capped 13|2 last_completed_turn_timestamp_ms 4?"];
+   }
+ };
++var TurnRunRecord = class _TurnRunRecord extends __protoMessage373 {
++  constructor(data) {
++    super();
++    this.runId = "";
++    this.status = TurnRunStatus.UNSPECIFIED;
++    this.startedAtMs = protoInt64.zero;
++    this.attemptCount = 0;
++    proto3.util.initPartial(data, this);
++  }
++  static fromBinary(bytes, options) {
++    return new _TurnRunRecord().fromBinary(bytes, options);
++  }
++  static fromJson(jsonValue, options) {
++    return new _TurnRunRecord().fromJson(jsonValue, options);
++  }
++  static fromJsonString(jsonString, options) {
++    return new _TurnRunRecord().fromJsonString(jsonString, options);
++  }
++  static equals(a, b) {
++    return proto3.util.equals(_TurnRunRecord, a, b);
++  }
++  static $() {
++    return ["TurnRunRecord|1 run_id 9|2 status #0|3 started_at_ms 4|4 finished_at_ms 4?|5 attempt_count 13|6 interrupt_reason #1?", TurnRunStatus, TurnInterruptReason];
++  }
++};
+ var CommunicateUpdateHistoryEntry = class _CommunicateUpdateHistoryEntry extends __protoMessage373 {
+   constructor(data) {
+     super();
+@@ -20493,7 +20520,7 @@
+     return proto3.util.equals(_ConversationStateStructure, a, b);
+   }
+   static $() {
+-    return ["ConversationStateStructure|1 root_prompt_messages_json 12*|8 turns 12*|3 todos 12*|4 pending_tool_calls 9*|5 token_details #0|6 summary 12?|7 plan 12?|9 previous_workspace_uris 9*|10 mode #1?|11 summary_archive 12?|12 file_states 9,12|15 file_states_v2 9,#2|13 summary_archives 12*|14 turn_timings #3*|16 subagent_states 9,#4|17 self_summary_count 13|18 read_paths 9*|19 active_branch_name 9?|20 plans 9,#5|21 tracked_git_repo_branches #6*|22 agent_type 9?|23 communicate_update_history #7*|24 subagent_threads 9,9|25 communicate_update_final_summary 9?|28 communicate_update_completed_subtitle 9?|29 communicate_update_states_by_parent_tool_call_id 9,#8|30 subagent_runs_by_parent_tool_call_id 9,#9|26 conversation_started_timestamp_ms 4?|27 conversation_started_time_zone 9?|31 subagent_state_refs 9,12|32 goal_state #10?|33 is_root_project_conversation 8?|34 completed_ask_question_tool_call_ids 9*|35 durable_skill_blocks 9*|36 durable_custom_mode_id 9?|37 message_count_at_last_compaction 13?|38 recent_user_message_ids 9*|39 recent_user_message_ids_older_turn_count 13?|40 turn_telemetry #11?|42 mentioned_agent_ids 9*|43 voice_call_utterances #12*|44 voice_call_pending_answer #13?|45 voice_call_time_task_ids 9*|46 writes_voice_call_utterances 8|47 voice_calls_read_utterances 8?|49 user_time_zone 9?|50 project_coordinator_system_section 9?", ConversationTokenDetails, AgentMode, FileStateStructure, StepTiming, SubagentPersistedState, PlanRegistryEntry, TrackedGitRepo, CommunicateUpdateHistoryEntry, CommunicateUpdateTurnState, SubagentRunState, GoalState, TurnTelemetryState, VoiceCallUtterance, VoiceCallPendingAnswer];
++    return ["ConversationStateStructure|1 root_prompt_messages_json 12*|8 turns 12*|3 todos 12*|4 pending_tool_calls 9*|5 token_details #0|6 summary 12?|7 plan 12?|9 previous_workspace_uris 9*|10 mode #1?|11 summary_archive 12?|12 file_states 9,12|15 file_states_v2 9,#2|13 summary_archives 12*|14 turn_timings #3*|16 subagent_states 9,#4|17 self_summary_count 13|18 read_paths 9*|19 active_branch_name 9?|20 plans 9,#5|21 tracked_git_repo_branches #6*|22 agent_type 9?|23 communicate_update_history #7*|24 subagent_threads 9,9|25 communicate_update_final_summary 9?|28 communicate_update_completed_subtitle 9?|29 communicate_update_states_by_parent_tool_call_id 9,#8|30 subagent_runs_by_parent_tool_call_id 9,#9|26 conversation_started_timestamp_ms 4?|27 conversation_started_time_zone 9?|31 subagent_state_refs 9,12|32 goal_state #10?|33 is_root_project_conversation 8?|34 completed_ask_question_tool_call_ids 9*|35 durable_skill_blocks 9*|36 durable_custom_mode_id 9?|37 message_count_at_last_compaction 13?|38 recent_user_message_ids 9*|39 recent_user_message_ids_older_turn_count 13?|40 turn_telemetry #11?|42 mentioned_agent_ids 9*|43 voice_call_utterances #12*|44 voice_call_pending_answer #13?|45 voice_call_time_task_ids 9*|46 writes_voice_call_utterances 8|47 voice_calls_read_utterances 8?|49 user_time_zone 9?|50 project_coordinator_system_section 9?|51 project_coordinator_system_section_communication_rules 8?|52 last_run #14?", ConversationTokenDetails, AgentMode, FileStateStructure, StepTiming, SubagentPersistedState, PlanRegistryEntry, TrackedGitRepo, CommunicateUpdateHistoryEntry, CommunicateUpdateTurnState, SubagentRunState, GoalState, TurnTelemetryState, VoiceCallUtterance, VoiceCallPendingAnswer, TurnRunRecord];
+   }
+ };
+ var VoiceCallUtterance = class _VoiceCallUtterance extends __protoMessage373 {

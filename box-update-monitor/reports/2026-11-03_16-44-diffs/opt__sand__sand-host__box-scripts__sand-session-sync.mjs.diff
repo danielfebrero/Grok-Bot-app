@@ -1,0 +1,119 @@
+--- 2026-11-03_12-53:/opt/sand/sand-host/box-scripts/sand-session-sync.mjs
++++ 2026-11-03_16-44:/opt/sand/sand-host/box-scripts/sand-session-sync.mjs
+@@ -2,6 +2,14 @@
+ import { dirname } from "node:path";
+ import { pathToFileURL } from "node:url";
+ import {
++  BOX_WALL_EVIDENCE_RECORDERS_MARKER_PATH,
++  WALL_EVIDENCE_COOKIE_COUNT_MAX,
++  WALL_EVIDENCE_COOKIE_FACT_DOMAINS,
++  WALL_EVIDENCE_COOKIE_FACTS_MAX_BYTES,
++  WALL_EVIDENCE_COOKIE_FLAGS,
++  wallEvidenceCookieFactsPath,
++} from "./box-contract.generated.mjs";
++import {
+   attachToPage,
+   CDP_PORT_BASE,
+   connectBrowser,
+@@ -353,12 +361,33 @@
+ }
+ 
+ // Chrome keeps an in-memory list of all cookies and reads the backing store only until it has fetched them all (https://chromium.googlesource.com/chromium/src/+/refs/tags/151.0.7922.169/net/cookies/cookie_monster.h), and the DevTools IndexedDB domain has no method that writes an entry (https://chromedevtools.github.io/devtools-protocol/tot/IndexedDB/).
++export function cookieFactsFromJar(cookies, observedAtMs) {
++  const facts = Object.fromEntries(
++    WALL_EVIDENCE_COOKIE_FACT_DOMAINS.map((domain) => [
++      domain,
++      { count: 0, flags: 0, observedAtMs },
++    ]),
++  );
++  for (const cookie of cookies) {
++    const flag = WALL_EVIDENCE_COOKIE_FLAGS.indexOf(cookie.name);
++    for (const domain of WALL_EVIDENCE_COOKIE_FACT_DOMAINS) {
++      if (!hostMatchesCookieDomain(cookie.domain, domain)) continue;
++      const fact = facts[domain];
++      fact.count = Math.min(fact.count + 1, WALL_EVIDENCE_COOKIE_COUNT_MAX);
++      if (flag >= 0) fact.flags |= 1 << flag;
++    }
++  }
++  return facts;
++}
++
+ export class SessionSyncer {
+   constructor({
+     ledgerPath = SIGNED_OUT_LEDGER_PATH,
+     policyPath = BOX_CHROME_POLICY_PATH,
+     fs = { mkdirSync, readFileSync, renameSync, statSync, writeFileSync },
+     now = Date.now,
++    wallEvidenceMarkerPath = BOX_WALL_EVIDENCE_RECORDERS_MARKER_PATH,
++    cookieFactsPath = wallEvidenceCookieFactsPath,
+   } = {}) {
+     this.browsers = new Map();
+     this.cookieViews = new Map();
+@@ -377,6 +406,10 @@
+     this.ledgerUnsaved = false;
+     this.restoresSessions = null;
+     this.policyReadFailed = false;
++    this.wallEvidenceMarkerPath = wallEvidenceMarkerPath;
++    this.cookieFactsPath = cookieFactsPath;
++    this.cookieFactsFailedPorts = new Set();
++    this.wallEvidenceMarkerUnreadable = false;
+     this.loadLedger();
+   }
+ 
+@@ -466,6 +499,45 @@
+     }
+   }
+ 
++  wallEvidenceRecordersOn() {
++    try {
++      const on =
++        this.fs.statSync(this.wallEvidenceMarkerPath, { throwIfNoEntry: false }) !== undefined;
++      this.wallEvidenceMarkerUnreadable = false;
++      return on;
++    } catch (error) {
++      if (!this.wallEvidenceMarkerUnreadable) {
++        log(`wall evidence marker unreadable, reading it as off: ${error?.code ?? error?.name}`);
++      }
++      this.wallEvidenceMarkerUnreadable = true;
++      return false;
++    }
++  }
++
++  writeCookieFacts(port, cookies) {
++    try {
++      const text = JSON.stringify(cookieFactsFromJar(cookies, this.now()));
++      if (Buffer.byteLength(text) > WALL_EVIDENCE_COOKIE_FACTS_MAX_BYTES) {
++        this.cookieFactsWriteFailed(port, "over_size_cap");
++        return;
++      }
++      const path = this.cookieFactsPath(port);
++      const tmp = `${path}.tmp`;
++      this.fs.writeFileSync(tmp, text);
++      this.fs.renameSync(tmp, path);
++      this.cookieFactsFailedPorts.delete(port);
++    } catch (error) {
++      this.cookieFactsWriteFailed(port, error?.code ?? error?.name ?? "error");
++    }
++  }
++
++  cookieFactsWriteFailed(port, reason) {
++    if (!this.cookieFactsFailedPorts.has(port)) {
++      log(`writing cookie facts for CDP port ${port} failed: ${reason}`);
++    }
++    this.cookieFactsFailedPorts.add(port);
++  }
++
+   async readJars(live) {
+     const reads = new Map();
+     for (const browser of live) {
+@@ -560,6 +632,10 @@
+     }
+     if (plan.ledgerChanged) this.ledgerUnsaved = true;
+     if (this.ledgerUnsaved) this.saveLedger();
++    if (this.wallEvidenceRecordersOn()) {
++      for (const port of reads.keys())
++        this.writeCookieFacts(port, this.cookieViews.get(port).jar.values());
++    }
+     if (deleted > 0) log(`deleted ${deleted} signed-out cookie cop${deleted === 1 ? "y" : "ies"}`);
+     if (pushed > 0) log(`mirrored ${pushed} cookie write(s) across ${reads.size} monitors`);
+     return newCookieDomains;

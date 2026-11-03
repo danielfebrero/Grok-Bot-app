@@ -1,0 +1,21 @@
+--- 2026-11-03_12-53:/opt/sand/sand-host/extensions/content-search/search-index-worker.cjs
++++ 2026-11-03_16-44:/opt/sand/sand-host/extensions/content-search/search-index-worker.cjs
+@@ -623,6 +623,9 @@
+ // src/shared/transcript/flights.ts
+ var SAND_FLIGHT_MAX_METRO_AIRPORTS = 4;
+ var SAND_FLIGHT_TRAVELER_GENDERS = ["female", "male"];
++var SAND_FLIGHT_MAX_GROUPS = 6;
++var SAND_FLIGHT_MAX_GROUP_OFFERS = 8;
++var SAND_FLIGHT_MAX_GROUPED_OFFERS = SAND_FLIGHT_MAX_GROUPS * SAND_FLIGHT_MAX_GROUP_OFFERS;
+ var SAND_FLIGHT_MAX_TRAVELERS = 9;
+ var IATA_AIRPORT = /^[A-Z]{3}$/;
+ var MAX_DURATION_MIN = 7 * 24 * 60;
+@@ -728,6 +731,8 @@
+ }
+ 
+ // src/shared/transcript/phone-call.ts
++var SAND_PHONE_CALL_RECORDING_BAR_FLOOR = 4 / 24;
++var RECORDING_FALLBACK_LEVELS = [SAND_PHONE_CALL_RECORDING_BAR_FLOOR, 14 / 24, 1];
+ var SAND_PHONE_CALL_RETENTION_MS = 30 * 24 * 60 * 60 * 1e3;
+ var SAND_PHONE_CALL_RECORDING_WAIT_MS = 10 * 60 * 1e3;
+ var RECORDING_WAIT_GRACE_MS = 2 * 60 * 1e3;

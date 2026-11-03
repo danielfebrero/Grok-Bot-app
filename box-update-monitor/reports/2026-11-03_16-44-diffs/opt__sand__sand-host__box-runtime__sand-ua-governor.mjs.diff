@@ -1,0 +1,206 @@
+--- 2026-11-03_12-53:/opt/sand/sand-host/box-runtime/sand-ua-governor.mjs
++++ 2026-11-03_16-44:/opt/sand/sand-host/box-runtime/sand-ua-governor.mjs
+@@ -25,7 +25,6 @@
+   BOX_BROWSER_FINGERPRINT_LOG_SITES_PATH,
+   SAND_BOX_CDP_PORT_BASE,
+   BROWSER_EGRESS_TIMEZONE_MARKER_PATH,
+-  BROWSER_HARDWARE_PROFILE_MARKER_PATH,
+ } from "./box-contract.generated.mjs";
+ import {
+   CDP_ERROR_CODES,
+@@ -37,14 +36,11 @@
+ } from "./cdp-cookies.mjs";
+ import {
+   ACCEPT_LANGUAGE_EXTENSION_NAME,
+-  LINUX_GPU_PATCH_PROFILE,
+   buildAcceptLanguageExtension,
+-  buildHardwareProfileDocumentScript,
+   buildUserAgentOverride,
+   coherentHardwareProfile,
+   configuredAcceptLanguage,
+   normalizeGpuMode,
+-  resolveCanvasSeed,
+   verifyCoherentWebgl,
+ } from "./sand-fingerprint-profiles.mjs";
+ import {
+@@ -305,13 +301,6 @@
+   }
+ }
+ 
+-export function documentScriptMap(browser) {
+-  if (browser.documentScripts == null) {
+-    browser.documentScripts = new Map();
+-  }
+-  return browser.documentScripts;
+-}
+-
+ const WORKER_TARGET_TYPES = new Set(["worker", "shared_worker", "service_worker"]);
+ 
+ export function isWorkerTargetType(targetType) {
+@@ -343,20 +332,6 @@
+   }
+ }
+ 
+-export function resolveHardwareProfileEnabled({
+-  envValue = process.env.SAND_BROWSER_HARDWARE_PROFILE,
+-  markerPath = BROWSER_HARDWARE_PROFILE_MARKER_PATH,
+-  readFile = readFileSync,
+-} = {}) {
+-  return resolveMarkerGate({
+-    label: "hardware profile",
+-    envValue,
+-    markerPath,
+-    readFile,
+-    honorContents: true,
+-  });
+-}
+-
+ export function resolveCoherentHardwareProfileEnabled({
+   envValue = process.env.SAND_BOX_BROWSER_COHERENT_FINGERPRINT,
+   markerPath = BOX_BROWSER_COHERENT_FINGERPRINT_MARKER_PATH,
+@@ -389,13 +364,6 @@
+   return ready ? "off" : "undecided";
+ }
+ 
+-export function hardwareProfileEnabledForBrowser(browser, resolve = resolveHardwareProfileEnabled) {
+-  if (!Object.prototype.hasOwnProperty.call(browser, "hardwareProfileEnabled")) {
+-    browser.hardwareProfileEnabled = resolve() === true;
+-  }
+-  return browser.hardwareProfileEnabled === true;
+-}
+-
+ export function coherentHardwareProfileEnabledForBrowser(
+   browser,
+   resolve = resolveCoherentHardwareProfileEnabled,
+@@ -407,8 +375,7 @@
+ }
+ 
+ export function hardwareTreatmentForBrowser(browser) {
+-  if (coherentHardwareProfileEnabledForBrowser(browser)) return "coherent";
+-  return hardwareProfileEnabledForBrowser(browser) ? "legacy" : "off";
++  return coherentHardwareProfileEnabledForBrowser(browser) ? "coherent" : "off";
+ }
+ 
+ export function resolveBoxBrowserGpuMode({
+@@ -1161,47 +1128,6 @@
+   return lookup.inFlight;
+ }
+ 
+-export function canvasSeedForBrowser(browser) {
+-  if (Object.prototype.hasOwnProperty.call(browser, "canvasSeed")) {
+-    const seed = browser.canvasSeed;
+-    return typeof seed === "number" && Number.isFinite(seed) ? seed >>> 0 : null;
+-  }
+-  if (!Object.prototype.hasOwnProperty.call(browser, "resolvedCanvasSeed")) {
+-    browser.resolvedCanvasSeed = resolveCanvasSeed();
+-  }
+-  return browser.resolvedCanvasSeed;
+-}
+-
+-function documentScript(browser) {
+-  return buildHardwareProfileDocumentScript(LINUX_GPU_PATCH_PROFILE, {
+-    canvasSeed: canvasSeedForBrowser(browser),
+-  });
+-}
+-
+-export async function removeDocumentScript(browser, sessionId) {
+-  const identifier = documentScriptMap(browser).get(sessionId);
+-  if (identifier == null) return;
+-  try {
+-    await browser.send("Page.removeScriptToEvaluateOnNewDocument", { identifier }, sessionId);
+-  } catch (error) {
+-    console.error(
+-      `document script remove failed: ${error instanceof Error ? error.name : typeof error}`,
+-    );
+-  }
+-  documentScriptMap(browser).delete(sessionId);
+-}
+-
+-export async function installDocumentScript(browser, sessionId, script) {
+-  if (documentScriptMap(browser).has(sessionId)) await removeDocumentScript(browser, sessionId);
+-  const [, added] = await Promise.all([
+-    browser.send("Page.enable", {}, sessionId),
+-    browser.send("Page.addScriptToEvaluateOnNewDocument", { source: script }, sessionId),
+-  ]);
+-  if (typeof added?.identifier === "string") {
+-    documentScriptMap(browser).set(sessionId, added.identifier);
+-  }
+-}
+-
+ function relatedTargetSessions(browser) {
+   if (browser.relatedTargetSessions == null) {
+     browser.relatedTargetSessions = new Map();
+@@ -1265,10 +1191,6 @@
+     });
+ }
+ 
+-function startsBeforeFirstDocument(target) {
+-  return target?.type === "iframe" && target.waitingForDebugger === true;
+-}
+-
+ async function settleAll(steps) {
+   const failed = (await Promise.allSettled(steps)).find((step) => step.status === "rejected");
+   if (failed != null) throw failed.reason;
+@@ -1294,9 +1216,6 @@
+       acceptLanguageEnUs || coherent
+         ? applyDesktopUaToTarget(browser, sessionId, target?.browserContextId)
+         : null,
+-      hardware === "legacy"
+-        ? browser.send("Runtime.evaluate", { expression: documentScript(browser) }, sessionId)
+-        : null,
+       coherent ? applyCoherentHardwareToTarget(browser, sessionId) : null,
+       egressTimeZone ? applyEgressTimeZoneToTarget(browser, sessionId) : null,
+       target.type === "service_worker" ? null : attachRelatedTargets(browser, sessionId),
+@@ -1304,23 +1223,9 @@
+     ]);
+     return;
+   }
+-  if (hardware !== "legacy") {
+-    await settleAll([
+-      applyDesktopUaToTarget(browser, sessionId, target?.browserContextId),
+-      coherent ? applyCoherentHardwareToTarget(browser, sessionId) : null,
+-      egressTimeZone ? applyEgressTimeZoneToTarget(browser, sessionId) : null,
+-      attachRelatedTargets(browser, sessionId),
+-      applyFingerprintLoggerToTarget(browser, sessionId, target),
+-    ]);
+-    return;
+-  }
+-  const script = documentScript(browser);
+   await settleAll([
+     applyDesktopUaToTarget(browser, sessionId, target?.browserContextId),
+-    startsBeforeFirstDocument(target)
+-      ? null
+-      : browser.send("Runtime.evaluate", { expression: script }, sessionId),
+-    installDocumentScript(browser, sessionId, script),
++    coherent ? applyCoherentHardwareToTarget(browser, sessionId) : null,
+     egressTimeZone ? applyEgressTimeZoneToTarget(browser, sessionId) : null,
+     attachRelatedTargets(browser, sessionId),
+     applyFingerprintLoggerToTarget(browser, sessionId, target),
+@@ -1511,7 +1416,6 @@
+ }
+ 
+ export function resolveBrowserSettings({
+-  resolveHardwareProfile = resolveHardwareProfileEnabled,
+   resolveCoherentHardwareProfile = resolveCoherentHardwareProfileEnabled,
+   readAcceptLanguage = readAcceptLanguageEnUsMarker,
+   resolveEgressGate = resolveEgressTimeZoneGate,
+@@ -1520,7 +1424,6 @@
+   const fingerprintRaw = readFingerprintMarker();
+   const fingerprintConfig = fingerprintRaw == null ? null : parseFingerprintMarker(fingerprintRaw);
+   return {
+-    hardwareProfile: resolveHardwareProfile() === true,
+     coherentHardwareProfile: resolveCoherentHardwareProfile() === true,
+     acceptLanguage: readAcceptLanguage(),
+     egressTimeZone: resolveEgressGate(),
+@@ -1536,11 +1439,6 @@
+ export function changedBrowserSettings(browser, settings) {
+   const changes = [];
+   const has = (key) => Object.prototype.hasOwnProperty.call(browser, key);
+-  if (has("hardwareProfileEnabled")) {
+-    const before = onOff(browser.hardwareProfileEnabled === true);
+-    const after = onOff(settings.hardwareProfile);
+-    if (before !== after) changes.push(`hardware-profile ${before}->${after}`);
+-  }
+   if (has("coherentHardwareProfileEnabled")) {
+     const before = onOff(browser.coherentHardwareProfileEnabled === true);
+     const after = onOff(settings.coherentHardwareProfile);

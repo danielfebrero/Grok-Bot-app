@@ -1,0 +1,355 @@
+--- 2026-11-03_12-53:/opt/sand/sand-host/box-runtime/sand-cookie-persist.mjs
++++ 2026-11-03_16-44:/opt/sand/sand-host/box-runtime/sand-cookie-persist.mjs
+@@ -1,11 +1,16 @@
+ import { randomBytes } from "node:crypto";
+ import {
+   appendFileSync,
++  closeSync,
+   constants,
+   copyFileSync,
++  existsSync,
++  fstatSync,
+   mkdirSync,
++  openSync,
+   readdirSync,
+   readFileSync,
++  readSync,
+   renameSync,
+   rmdirSync,
+   rmSync,
+@@ -15,7 +20,18 @@
+ } from "node:fs";
+ import { basename, dirname, join } from "node:path";
+ import { pathToFileURL } from "node:url";
+-import { TAILNET_HOST_SUFFIXES_PATH } from "./box-contract.generated.mjs";
++import {
++  BOX_WALL_EVIDENCE_RECORDERS_MARKER_PATH,
++  TAILNET_HOST_SUFFIXES_PATH,
++  WALL_EVIDENCE_BOX_BOOT_ID_MAX_BYTES,
++  WALL_EVIDENCE_BOX_BOOT_ID_PATH,
++  WALL_EVIDENCE_BOX_BOOT_ID_SOURCE,
++  WALL_EVIDENCE_BOX_BOOT_ID_UNKNOWN,
++  WALL_EVIDENCE_COOKIE_LINEAGE_PATH,
++  WALL_EVIDENCE_RESTORE_FACTS_MAX_BYTES,
++  WALL_EVIDENCE_RESTORE_FACTS_PATH,
++  WALL_EVIDENCE_WRITER_VERSION,
++} from "./box-contract.generated.mjs";
+ import {
+   CDP_PORT_BASE,
+   connectBrowser,
+@@ -103,6 +119,8 @@
+   "save-unchanged": "seed already holds the live jar",
+   "save-paused": "seed unreadable, corrupt, or of an unsupported version; nothing saved",
+   "save-failed": "saving the live jar failed",
++  "restore-facts-failed": "recording the restore facts failed",
++  "lineage-promote-failed": "promoting the restore facts to the cookie lineage failed",
+ });
+ 
+ const PERSIST_COUNT_NAMES = new Set(["refused", "total", "cookies", "seed"]);
+@@ -328,8 +346,47 @@
+   return on(env.SAND_BOX_STORE_COPY_IN) || on(env.SAND_BOX_STORE_SYNC);
+ }
+ 
+-export function serializeSeed(cookies, now = Date.now()) {
+-  return JSON.stringify({ version: SEED_VERSION, savedAt: now, cookies });
++export function serializeSeed(cookies, now = Date.now(), lineage = undefined) {
++  return JSON.stringify({
++    version: SEED_VERSION,
++    savedAt: now,
++    ...(lineage === undefined ? {} : { firstSavedAt: lineage.firstSavedAt }),
++    ...(lineage?.firstSavedAtFloor === true ? { firstSavedAtFloor: true } : {}),
++    cookies,
++  });
++}
++
++function epochMs(value) {
++  return Number.isSafeInteger(value) && value >= 0 ? value : undefined;
++}
++
++function seedLineage(parsed) {
++  const firstSavedAt = epochMs(parsed.firstSavedAt);
++  if (firstSavedAt !== undefined) {
++    return parsed.firstSavedAtFloor === true
++      ? { firstSavedAt, firstSavedAtFloor: true }
++      : { firstSavedAt };
++  }
++  const savedAt = epochMs(parsed.savedAt);
++  return savedAt === undefined ? undefined : { firstSavedAt: savedAt, firstSavedAtFloor: true };
++}
++
++export function nextSeedLineage(seed, now) {
++  if (seed.kind === "absent") return { firstSavedAt: now };
++  return seed.kind === "ok" && seed.lineage !== undefined
++    ? seed.lineage
++    : { firstSavedAt: now, firstSavedAtFloor: true };
++}
++
++export const isWallEvidenceGateOn = () => existsSync(BOX_WALL_EVIDENCE_RECORDERS_MARKER_PATH);
++
++export function seedLineageToWrite(seed, now, gateOn) {
++  if (gateOn) return nextSeedLineage(seed, now);
++  return seed.kind === "ok" && seed.lineageStored === true ? seed.lineage : undefined;
++}
++
++function seedWriteLineage(deps, seed, now) {
++  return seedLineageToWrite(seed, now, deps.wallEvidence?.gateOn() === true);
+ }
+ 
+ export function parseSeed(text) {
+@@ -363,9 +420,15 @@
+     return { kind: "unsupported-version", version };
+   }
+   const cookies = parsed?.cookies;
+-  return Array.isArray(cookies)
+-    ? { kind: "ok", cookies, savedAt: parsed.savedAt }
+-    : { kind: "corrupt" };
++  if (!Array.isArray(cookies)) return { kind: "corrupt" };
++  const lineage = seedLineage(parsed);
++  return {
++    kind: "ok",
++    cookies,
++    savedAt: parsed.savedAt,
++    ...(lineage === undefined ? {} : { lineage }),
++    ...(epochMs(parsed.firstSavedAt) === undefined ? {} : { lineageStored: true }),
++  };
+ }
+ 
+ const DNS_NAME = /^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
+@@ -660,7 +723,8 @@
+     return result;
+   }
+   const copy = seed.kind === "corrupt" ? seedStep("copy", () => copyCorruptSeed(deps)) : null;
+-  writeSeedFile(deps, serializeSeed(cookies, deps.now?.() ?? Date.now()));
++  const now = deps.now?.() ?? Date.now();
++  writeSeedFile(deps, serializeSeed(cookies, now, seedWriteLineage(deps, seed, now)));
+   return copy == null ? result : { ...result, discardedCorrupt: true, keptCopy: copy };
+ }
+ 
+@@ -875,6 +939,7 @@
+     missingAfter,
+     seedCount: seedCookies.length,
+     ...(deleted > 0 ? { deleted } : {}),
++    ...(seed.kind === "ok" && seed.lineage !== undefined ? { lineage: seed.lineage } : {}),
+     ...faults,
+   };
+ }
+@@ -884,13 +949,137 @@
+   return deleted > 0 ? "restore-deleted" : "restore-present";
+ }
+ 
+-function logRestoreOutcome(deps, outcome, { injected, deleted, seedCount, code, refusal }) {
+-  if (outcome === "ok") logLine(deps, okRestoreLine(injected, deleted));
+-  else if (outcome === "empty") logLine(deps, "restore-empty");
++function logRestoreOutcome(deps, outcome, attempt) {
++  const { injected, deleted, seedCount, code, refusal } = attempt;
++  if (outcome === "ok") {
++    const line = okRestoreLine(injected, deleted);
++    if (line === "restore-injected") writeRestoreFacts(deps, attempt.lineage);
++    logLine(deps, line);
++  } else if (outcome === "empty") logLine(deps, "restore-empty");
+   else if (seedCount === 0) logLine(deps, "restore-seed-unusable");
+   else logLine(deps, "restore-incomplete", code ?? null, refusal ?? null);
+ }
+ 
++function writeJsonFile(fs, path, value) {
++  const tmp = `${path}.${process.pid}.tmp`;
++  try {
++    fs.writeFileSync(tmp, JSON.stringify(value));
++    fs.renameSync(tmp, path);
++  } finally {
++    fs.rmSync?.(tmp, { force: true });
++  }
++}
++
++const BOOT_ID = new RegExp(WALL_EVIDENCE_BOX_BOOT_ID_SOURCE);
++const BOX_FILE_FS = { openSync, fstatSync, readSync, closeSync };
++
++function readBoxFile(fs, path, maxBytes) {
++  let fd;
++  try {
++    fd = fs.openSync(path, constants.O_RDONLY | constants.O_NONBLOCK | constants.O_NOFOLLOW);
++  } catch (error) {
++    if (error?.code === "ENOENT") return undefined;
++    throw error;
++  }
++  try {
++    const stat = fs.fstatSync(fd);
++    if (!stat.isFile() || stat.size > maxBytes) return { stat };
++    const buffer = Buffer.alloc(maxBytes + 1);
++    const length = fs.readSync(fd, buffer, 0, buffer.length, 0);
++    return length > maxBytes ? { stat } : { stat, text: buffer.toString("utf8", 0, length) };
++  } finally {
++    fs.closeSync(fd);
++  }
++}
++
++export function readBoxBootId(env = process.env, path = WALL_EVIDENCE_BOX_BOOT_ID_PATH) {
++  let text = env.SAND_BOX_BOOT_ID;
++  if (text === undefined || text === "") {
++    try {
++      text = readBoxFile(BOX_FILE_FS, path, WALL_EVIDENCE_BOX_BOOT_ID_MAX_BYTES + 1)?.text?.split(
++        "\n",
++      )[0];
++    } catch {
++      return null;
++    }
++  }
++  return text !== undefined && BOOT_ID.test(text) && text !== WALL_EVIDENCE_BOX_BOOT_ID_UNKNOWN
++    ? text
++    : null;
++}
++
++function writeRestoreFacts(deps, lineage) {
++  const config = deps.wallEvidence;
++  if (config === undefined) return;
++  try {
++    writeJsonFile(deps.fs, config.restoreFactsPath, {
++      seededAtMs: deps.now?.() ?? Date.now(),
++      bootId: config.bootId(),
++      ...(lineage === undefined ? {} : { lineageMs: lineage.firstSavedAt }),
++      ...(lineage?.firstSavedAtFloor === true ? { lineageFloor: true } : {}),
++      writerVersion: WALL_EVIDENCE_WRITER_VERSION,
++    });
++  } catch (error) {
++    logLine(deps, "restore-facts-failed", faultCode(error));
++  }
++}
++
++function restoreFacts(text) {
++  let parsed;
++  try {
++    parsed = JSON.parse(text);
++  } catch {
++    return undefined;
++  }
++  const seededAtMs = epochMs(parsed?.seededAtMs);
++  if (seededAtMs === undefined) return undefined;
++  const lineageMs = epochMs(parsed.lineageMs);
++  const writerVersion = Number.isSafeInteger(parsed.writerVersion)
++    ? parsed.writerVersion
++    : undefined;
++  return {
++    seededAtMs,
++    bootId: typeof parsed.bootId === "string" && BOOT_ID.test(parsed.bootId) ? parsed.bootId : null,
++    ...(lineageMs === undefined ? {} : { lineageMs }),
++    ...(lineageMs !== undefined && parsed.lineageFloor === true ? { lineageFloor: true } : {}),
++    writerVersion: WALL_EVIDENCE_WRITER_VERSION,
++    ...(writerVersion === undefined ? {} : { restoreWriterVersion: writerVersion }),
++  };
++}
++
++function statOrUndefined(fs, path) {
++  try {
++    return fs.statSync(path);
++  } catch (error) {
++    if (error?.code === "ENOENT") return undefined;
++    throw error;
++  }
++}
++
++export function promoteRestoreFacts(deps, state) {
++  const config = deps.wallEvidence;
++  if (config === undefined || !config.gateOn()) return state;
++  try {
++    const facts = readBoxFile(
++      deps.fs,
++      config.restoreFactsPath,
++      WALL_EVIDENCE_RESTORE_FACTS_MAX_BYTES,
++    );
++    if (facts === undefined || facts.stat.mtimeMs === state.restoreFactsAt) return state;
++    const next = { ...state, restoreFactsAt: facts.stat.mtimeMs, promoteFault: undefined };
++    const lineageAt = statOrUndefined(deps.fs, config.lineagePath)?.mtimeMs;
++    if (lineageAt !== undefined && lineageAt > facts.stat.mtimeMs) return next;
++    const lineage = facts.text === undefined ? undefined : restoreFacts(facts.text);
++    if (lineage === undefined) logLine(deps, "lineage-promote-failed");
++    else writeJsonFile(deps.fs, config.lineagePath, lineage);
++    return next;
++  } catch (error) {
++    const code = faultCode(error);
++    if (code !== state.promoteFault) logLine(deps, "lineage-promote-failed", code);
++    return { ...state, promoteFault: code };
++  }
++}
++
+ export async function restoreLaunchedChrome(deps, port) {
+   const attempt = await restoreFromSeed(deps, port, new Map(), [port]);
+   if (attempt.unreadable != null) {
+@@ -953,7 +1142,8 @@
+           logLine(deps, "save-unchanged");
+           return "unchanged";
+         }
+-        writeSeedFile(deps, serializeSeed(cookies, deps.now?.() ?? Date.now()));
++        const now = deps.now?.() ?? Date.now();
++        writeSeedFile(deps, serializeSeed(cookies, now, seedWriteLineage(deps, seed, now)));
+         logLine(deps, "save-saved", null, { cookies: cookies.length });
+         return "saved";
+       },
+@@ -1023,12 +1213,14 @@
+ }
+ 
+ export async function runPersistTick(deps, state) {
++  let next;
+   try {
+-    return await persistTick(deps, state);
++    next = await persistTick(deps, state);
+   } catch (error) {
+     logLine(deps, "tick-failed", faultCode(error));
+-    return state;
++    next = state;
+   }
++  return promoteRestoreFacts(deps, next);
+ }
+ 
+ async function restorePass(deps, state) {
+@@ -1074,6 +1266,15 @@
+   };
+ }
+ 
++function wallEvidenceDeps() {
++  return {
++    gateOn: () => isWallEvidenceGateOn(),
++    bootId: () => readBoxBootId(),
++    restoreFactsPath: WALL_EVIDENCE_RESTORE_FACTS_PATH,
++    lineagePath: WALL_EVIDENCE_COOKIE_LINEAGE_PATH,
++  };
++}
++
+ async function main() {
+   const log = createPersistLog();
+   exitOnUncaught(log);
+@@ -1112,6 +1313,7 @@
+           writeFileSync,
+         },
+         tailnetSuffixes: () => readTailnetSuffixes(),
++        wallEvidence: wallEvidenceDeps(),
+         log,
+       },
+       savePort,
+@@ -1125,9 +1327,10 @@
+         connect,
+         discoverPorts: () => [],
+         seedPath: SEED_PATH,
+-        fs: { readFileSync },
++        fs: { readFileSync, renameSync, rmSync, writeFileSync },
+         tailnetSuffixes: () => readTailnetSuffixes(),
+         readSignedOut: () => readSignedOutLedger(),
++        wallEvidence: wallEvidenceDeps(),
+         log,
+       },
+       restorePort,
+@@ -1144,6 +1347,7 @@
+     discoverPorts: () => discoverMonitorPorts(undefined, report.onUnreadable),
+     seedPath: SEED_PATH,
+     fs: {
++      ...BOX_FILE_FS,
+       copyFileSync,
+       mkdirSync,
+       readdirSync,
+@@ -1157,6 +1361,7 @@
+     },
+     tailnetSuffixes: () => readTailnetSuffixes(),
+     readSignedOut: () => readSignedOutLedger(),
++    wallEvidence: wallEvidenceDeps(),
+     log,
+     emitTelemetry: (event) => appendTelemetry(log, event),
+   };
