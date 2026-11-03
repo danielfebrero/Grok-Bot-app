@@ -9,6 +9,15 @@ packages confondus. Entrées les plus récentes en haut. Heures de Paris
 
 <!-- NOUVELLES-ENTREES-ICI -->
 
+## 2026-11-03 18:09 (Paris) — `2026-11-02_18-07` → `2026-11-03_18-09`
+
+Changement de surface RPC détecté : **19 méthode(s) ajoutée(s)**.
+
+Ajoutées : `AutomationsService.SetAutomationProject`, `DashboardService.CopyTeamIngressIpAllowlistToOrganization`, `DashboardService.GetOrganizationIngressIpAllowlist`, `DashboardService.GetTeamSandLocalEgressPrivateDestinations`, `DashboardService.ListAppMemberAppsApiKeys`, `DashboardService.ListOrganizationMemberSessions`, `DashboardService.ListServiceTokenApps`, `DashboardService.ListTeamAppsApiKeys`, `DashboardService.ListTeamMemberSessions`, `DashboardService.RevokeOrganizationMemberSession`, `DashboardService.RevokeTeamMemberSession`, `DashboardService.SetSandAutomationSlackWorkspace`, `DashboardService.SetServiceTokenApps`, `DashboardService.UpdateOrganizationIngressIpAllowlist`, `DashboardService.UpdateTeamSandLocalEgressPrivateDestinations`, `GrokBotService.AdminGetGrokBotAccountMigrationHeldSummary`, `GrokBotService.AdminGetGrokBotAgentResources`, `GrokBotService.LookupGrokBotShoppingProduct`, `GrokBotService.SetGrokBotAgentRoutineForTeam`
+
+Rapport : [reports/2026-11-03_18-09.md](reports/2026-11-03_18-09.md).
+
+
 ## 2026-11-02 18:07 (Paris) — `2026-11-01_18-09` → `2026-11-02_18-07`
 
 Changement de surface RPC détecté : **11 méthode(s) ajoutée(s)**, **3 supprimée(s)**.
