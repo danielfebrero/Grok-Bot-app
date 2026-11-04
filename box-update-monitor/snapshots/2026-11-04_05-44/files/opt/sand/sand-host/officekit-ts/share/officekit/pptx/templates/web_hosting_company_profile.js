@@ -1,0 +1,899 @@
+/*
+ * "duvet" pitch deck — recreated with pptxgenjs.
+ *
+ * Raster photography in the source deck is replaced by flat colour blocks
+ * labelled "[image]"; vector illustrations become "[illustration]" blocks.
+ *
+ * Run: node 013ea5de-199e-429a-ab65-f835565e5ddd_grok_final.js
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+const pptx = new PptxGenJS();
+const SH = pptx.shapes;
+
+// ---------------------------------------------------------------- design tokens
+const SLIDE_W = 13.3333;
+const SLIDE_H = 7.5;
+
+const PURPLE = '4D05E8'; // page background
+const DEEP = '3200EA'; // deep accent / footer text
+const CYAN = '22A7F0'; // frame + card accent
+const CORNER = '68E3FD'; // little gradient square bottom-right
+const WHITE = 'FFFFFF';
+const INK = '0D0D0D'; // tx1 (95% lum) — dark text on light cards
+const RED = 'E1194D'; // logo triangle
+
+const MAJOR = 'Lato Black'; // theme major latin (+mj-lt)
+const MINOR = 'Open Sans'; // theme minor latin
+
+// Average colour of the abstract-gradient photo, per crop region.
+const PHOTO = '8D3F5B';
+
+// ---------------------------------------------------------------- copy deck
+const FIRM = 'The firm works at multiple scales and with various organizations right from private clients to corporates & NGOs';
+const FIRM_DOT = FIRM + '.';
+const FIRM_TO = 'The firm works at multiple scales and with various organizations right from private clients to.';
+const FIRM_FROM = 'The firm works at multiple scales and with various organizations right from.';
+const QUOTE = '“The firm works at multiple scales and with various organizations right from private clients”';
+const QUOTE_NGO = '“The firm works at multiple scales and with various organizations right from private clients to corporates & NGOs”';
+const WHETHER = ['“Whether you think you can, or think you can’t.', "you're right”"];
+const CONGRATS = 'Congratulations! As any experienced engineer or manager knows, manufacturing and service processes tend in practice to be amazingly complicated. In truth, unexpected complexity is in fact expected, and few investors will be surprised at difficulties with innovative processes.';
+const ASANY = 'As any experienced engineer or manager knows, manufacturing and service processes tend in practice to be amazingly complicated. In truth, unexpected complexity is in fact expected, and few investors will be surprised at difficulties with innovative processes.';
+const CONGRATS2 = 'Congratulations! As any experienced engineer or manager knows, manufacturing and service processes tend in practice to be amazingly complicated. In truth, unexpected complexity is in fact expected.';
+const ASANY2 = 'As any experienced engineer or manager knows, manufacturing and service processes tend in practice to be amazingly complicated. In truth, unexpected complexity is in.';
+const LOREM = "But the majority have suffered alteration in some form, by injected humour or randomised words which don't look even slightly believable.";
+const ACCOM = 'PLACEHOLDER';
+
+// ---------------------------------------------------------------- helpers
+const SHADOW = { type: 'outer', blur: 8, offset: 3, angle: 45, color: '000000', opacity: 0.4 };
+
+/** Body / heading text box. Reference boxes are top-anchored, so make that the default. */
+function txt(slide, text, o) {
+    slide.addText(text, Object.assign({ valign: 'top', fontFace: MINOR, color: WHITE }, o));
+}
+
+/** Multi-line paragraph block: each entry of `lines` becomes its own paragraph. */
+function lines(slide, list, o) {
+    txt(slide, list.map((t, i) => ({ text: t, options: { breakLine: i < list.length - 1 } })), o);
+}
+
+/** Section heading, e.g. "Our" / "Service" stacked on two lines. */
+function heading(slide, list, o) {
+    lines(slide, list, Object.assign({ fontFace: MAJOR, bold: true, fontSize: 28 }, o));
+}
+
+function rect(slide, x, y, w, h, fill, extra) {
+    slide.addShape(SH.RECTANGLE, Object.assign({ x, y, w, h, fill: { color: fill } }, extra));
+}
+
+function card(slide, x, y, w, h, fill, radius, extra) {
+    slide.addShape(SH.ROUNDED_RECTANGLE, Object.assign({
+        x, y, w, h, rectRadius: radius, fill: { color: fill }, shadow: SHADOW,
+    }, extra));
+}
+
+/** Pill / progress bar (fully rounded ends). */
+function pill(slide, x, y, w, h, fill) {
+    slide.addShape(SH.ROUNDED_RECTANGLE, { x, y, w, h, rectRadius: h / 2, fill: { color: fill }, shadow: SHADOW });
+}
+
+/**
+ * Open stroked polyline through absolute points, with rounded corners.
+ * Emitted as a single custGeom path so corners stay crisp at any zoom.
+ */
+function stroke(slide, pts, o) {
+    const opt = o || {};
+    const r = opt.r || 0;
+    const x0 = Math.min.apply(null, pts.map((p) => p[0]));
+    const y0 = Math.min.apply(null, pts.map((p) => p[1]));
+    const w = Math.max(0.01, Math.max.apply(null, pts.map((p) => p[0])) - x0);
+    const h = Math.max(0.01, Math.max.apply(null, pts.map((p) => p[1])) - y0);
+    const P = pts.map((p) => [p[0] - x0, p[1] - y0]);
+    const out = [{ x: P[0][0], y: P[0][1] }];
+    for (let i = 1; i < P.length - 1; i++) {
+        const a = P[i - 1], b = P[i], c = P[i + 1];
+        const d1 = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+        const d2 = Math.hypot(c[0] - b[0], c[1] - b[1]) || 1;
+        const t1 = Math.min(r, d1 / 2) / d1;
+        const t2 = Math.min(r, d2 / 2) / d2;
+        out.push({ x: b[0] + (a[0] - b[0]) * t1, y: b[1] + (a[1] - b[1]) * t1 });
+        out.push({ x: b[0] + (c[0] - b[0]) * t2, y: b[1] + (c[1] - b[1]) * t2, curve: { type: 'quadratic', x1: b[0], y1: b[1] } });
+    }
+    out.push({ x: P[P.length - 1][0], y: P[P.length - 1][1] });
+    slide.addShape('custGeom', {
+        x: x0, y: y0, w, h, points: out,
+        fill: { type: 'none' }, line: { color: opt.color || WHITE, width: opt.width || 1.25 },
+    });
+}
+
+/** Filled polygon through absolute points. */
+function polygon(slide, pts, fill) {
+    const x0 = Math.min.apply(null, pts.map((p) => p[0]));
+    const y0 = Math.min.apply(null, pts.map((p) => p[1]));
+    slide.addShape('custGeom', {
+        x: x0, y: y0,
+        w: Math.max.apply(null, pts.map((p) => p[0])) - x0,
+        h: Math.max.apply(null, pts.map((p) => p[1])) - y0,
+        points: pts.map((p) => ({ x: p[0] - x0, y: p[1] - y0 })).concat([{ close: true }]),
+        fill: { color: fill },
+    });
+}
+
+function dot(slide, cx, cy, d, fill, line) {
+    slide.addShape(SH.OVAL, { x: cx - d / 2, y: cy - d / 2, w: d, h: d, fill: { color: fill }, line });
+}
+
+/**
+ * The "duvet" wordmark. The original is a set of freeform glyph outlines; here it is
+ * type-set in the theme's display face and anchored by its ink box: (x, y) is the top-left
+ * of the glyphs, `h` their cap height. The constants come from measuring Lato Black.
+ */
+function duvet(slide, x, y, h, color) {
+    const size = h * 95.6; // pt of type per inch of glyph height
+    slide.addText('duvet', {
+        x: x - size * 0.000395, y: y - size * 0.003463, w: h * 6, h: h * 2.2, margin: 0,
+        fontFace: MAJOR, bold: true, fontSize: size, charSpacing: -size * 0.094,
+        color, align: 'left', valign: 'top',
+    });
+    dot(slide, x + h * 3.467, y + h * 0.502, h * 0.245, color); // the tittle trailing the "t"
+}
+
+/** Cover mark: the outlined triangle tumbling behind the wordmark. */
+function logoMark(slide, cx, cy, w) {
+    const h = w * 0.7057;
+    slide.addShape(SH.ISOSCELES_TRIANGLE, {
+        x: cx - w / 2, y: cy - h / 2, w, h, rotate: 71.32,
+        fill: { type: 'none' }, line: { color: RED, width: 5.5 * (w / 2.298) },
+    });
+}
+
+/**
+ * Generic line-art glyph standing in for the deck's icon set: a document sheet with a
+ * folded corner and two text rules, drawn at 1pt like the originals.
+ */
+function glyph(slide, cx, cy, s, color) {
+    const w = s * 0.72;
+    const l = cx - w / 2;
+    const t = cy - s / 2;
+    const fold = s * 0.24;
+    stroke(slide, [
+        [l + w, t + fold], [l + w - fold, t], [l, t], [l, t + s], [l + w, t + s], [l + w, t + fold], [l + w - fold, t + fold], [l + w - fold, t],
+    ], { color, width: 1, r: s * 0.05 });
+    stroke(slide, [[l + w * 0.18, cy], [l + w * 0.82, cy]], { color, width: 1 });
+    stroke(slide, [[l + w * 0.18, cy + s * 0.2], [l + w * 0.6, cy + s * 0.2]], { color, width: 1 });
+}
+
+/** Rounded tile with an icon inside — the deck's recurring bullet marker. */
+function iconTile(slide, x, y, s, fill, iconColor) {
+    card(slide, x, y, s, s, fill, s * 0.1667);
+    glyph(slide, x + s / 2, y + s / 2, s * 0.5, iconColor || WHITE);
+}
+
+/** Flat stand-in for a photograph. */
+function photo(slide, o) {
+    const shape = o.r ? SH.ROUNDED_RECTANGLE : SH.RECTANGLE;
+    slide.addShape(shape, {
+        x: o.x, y: o.y, w: o.w, h: o.h, rectRadius: o.r || 0,
+        fill: { color: o.c || PHOTO }, line: o.line,
+    });
+    const fs = Math.max(8, Math.min(18, Math.min(o.w, o.h) * 9));
+    slide.addText(o.label || '[image]', {
+        x: o.x, y: o.y + o.h / 2 - 0.25, w: o.w, h: 0.5, margin: 0,
+        align: 'center', valign: 'middle', fontFace: MINOR, fontSize: fs, color: WHITE, transparency: 30,
+    });
+}
+
+/** Flat stand-in for one of the deck's vector illustrations. */
+function illustration(slide, x, y, w, h, color) {
+    slide.addShape(SH.ROUNDED_RECTANGLE, {
+        x, y, w, h, rectRadius: 0.16, fill: { color, transparency: 45 },
+    });
+    slide.addText('[illustration]', {
+        x, y: y + h / 2 - 0.25, w, h: 0.5, margin: 0,
+        align: 'center', valign: 'middle', fontFace: MINOR, fontSize: 12, color: WHITE, transparency: 30,
+    });
+}
+
+// ---------------------------------------------------------------- page chrome
+/** Blue outer frame + purple page + teal corner chip, shared by nearly every slide. */
+function frame(slide, pageFill) {
+    rect(slide, 0, 0, SLIDE_W, SLIDE_H, CYAN);
+    if (pageFill !== null) rect(slide, 0, 0, 12.806, 6.973, pageFill || PURPLE);
+    rect(slide, 12.806, 6.973, 0.527, 0.527, CORNER);
+}
+
+function sideLabel(slide) {
+    txt(slide, 'Presentation', {
+        x: 11.671, y: 1.412, w: 2.75, h: 0.32, rotate: 270, align: 'right',
+        fontFace: MAJOR, bold: true, fontSize: 10, charSpacing: 3, color: DEEP, lineSpacingMultiple: 1.5,
+    });
+}
+
+function pageNumber(slide, n) {
+    txt(slide, n, {
+        x: 12.658, y: 7.065, w: 0.871, h: 0.338, align: 'center',
+        bold: true, fontSize: 10.5, color: DEEP, lineSpacingMultiple: 1.5,
+    });
+}
+
+function chrome(slide, n) {
+    sideLabel(slide);
+    if (n) pageNumber(slide, n);
+    duvet(slide, 0.25, 7.15, 0.15, DEEP);
+}
+
+// ---------------------------------------------------------------- shared blocks
+/** Heading + body pair used down the side of many slides ("Mission #01" + paragraph). */
+function bulletRow(slide, o) {
+    txt(slide, o.title, {
+        x: o.x, y: o.y, w: o.tw || 2.5, h: 0.417, bold: true, fontSize: o.ts || 14,
+        charSpacing: o.spc === undefined ? 3 : o.spc, color: o.color || WHITE, lineSpacingMultiple: 1.5,
+    });
+    txt(slide, o.body, {
+        x: o.x, y: o.y + (o.gap || 0.394), w: o.bw || 3.0, h: 0.868, fontSize: o.bs || 10.5,
+        color: o.color || WHITE, lineSpacingMultiple: 1.5,
+    });
+}
+
+/** Three evenly spaced icon+text rows (Mission / Service / Solution / Strategy lists). */
+function bulletList(slide, o) {
+    o.titles.forEach((title, i) => {
+        const y = o.y + i * o.step;
+        iconTile(slide, o.iconX, y + (o.iconDy || 0), o.iconS || 0.743, o.iconFill, o.iconColor);
+        bulletRow(slide, {
+            x: o.textX, y: y + (o.textDy || 0.14), title, body: o.body || FIRM,
+            tw: o.tw, bw: o.bw, ts: o.ts, bs: o.bs, gap: o.gap, spc: o.spc, color: o.color,
+        });
+    });
+}
+
+// ================================================================ slides
+const build = [];
+
+// --- 1. Cover -------------------------------------------------------------
+build.push(function (s) {
+    rect(s, 0, 0, SLIDE_W, SLIDE_H, PURPLE);
+    photo(s, { x: 0.544, y: 0.578, w: 6.667, h: 6.344, c: '8B4968' });
+    photo(s, { x: 0.281, y: 1.267, w: 8.674, h: 4.967, c: '865664' });
+    logoMark(s, 11.38, 3.883, 2.045);
+    duvet(s, 9.717, 3.267, 0.733, WHITE);
+});
+
+// --- 2. Cover (split) -----------------------------------------------------
+build.push(function (s) {
+    rect(s, 0, 0, SLIDE_W, SLIDE_H, PURPLE);
+    photo(s, { x: 0, y: 3.75, w: SLIDE_W, h: 3.75, c: 'A28F72' });
+    photo(s, { x: 1.5, y: 3.229, w: 10.333, h: 1.688, c: 'AB9684' });
+    logoMark(s, 6.923, 1.667, 1.477);
+    duvet(s, 5.716, 1.233, 0.517, WHITE);
+});
+
+// --- 3. Table of content --------------------------------------------------
+build.push(function (s) {
+    frame(s);
+    photo(s, { x: 0, y: 0, w: 4.611, h: 6.973, c: '92325B' });
+    heading(s, ['TABLE ', 'OF ', 'CONTENT'], { x: 4.995, y: 1.236, w: 3.224, h: 1.515 });
+    const items = [
+        ['1', 'INTRODUCTION'], ['2', 'WHO WE ARE'], ['3', 'VISION & MISSION'],
+        ['4', 'OUR SERVICES'], ['5', 'OUR FACILITIES'], ['6', 'INFOGRAPHICS'],
+    ];
+    items.forEach((it, i) => {
+        const col = i < 3 ? 0 : 1;
+        const row = i % 3;
+        const bx = col ? 9.087 : 5.079;
+        const by = 3.477 + row * 0.7965 + (col ? 0 : 0.016);
+        card(s, bx, by, 0.589, 0.589, CYAN, 0.098);
+        txt(s, it[0], { x: bx - 0.084, y: by + 0.11, w: 0.757, h: 0.37, align: 'center', fontFace: MAJOR, bold: true, fontSize: 16 });
+        txt(s, it[1], { x: bx + 0.758, y: by + 0.033, w: 2.661, h: 0.417, bold: true, fontSize: 14, charSpacing: 3, lineSpacingMultiple: 1.5 });
+    });
+    chrome(s, '01');
+});
+
+// --- 4. Brief introduction ------------------------------------------------
+build.push(function (s) {
+    frame(s);
+    photo(s, { x: 0, y: 0, w: 12.806, h: 3.556, c: 'A78884' });
+    heading(s, ['BRIEF', 'INTRODUCTION'], { x: 0.919, y: 1.023, w: 3.387, h: 0.909, fontSize: 24 });
+    card(s, 0.81, 4.4, 3.865, 1.841, CYAN, 0.231);
+    txt(s, QUOTE_NGO, {
+        x: 1.514, y: 4.452, w: 2.761, h: 1.663, align: 'center', bold: true,
+        fontSize: 10.5, charSpacing: 3, lineSpacingMultiple: 1.5,
+    });
+    txt(s, CONGRATS, { x: 5.363, y: 4.418, w: 3.104, h: 1.841, fontSize: 10, lineSpacingMultiple: 1.5 });
+    txt(s, ASANY, { x: 8.742, y: 4.418, w: 3.104, h: 1.841, fontSize: 10, lineSpacingMultiple: 1.5 });
+    chrome(s, '02');
+});
+
+// --- 5. Welcome message ---------------------------------------------------
+build.push(function (s) {
+    frame(s);
+    photo(s, { x: 0.4, y: 0.622, w: 6.667, h: 5.9, c: '894059' });
+    heading(s, ['Welcome ', 'Message'], { x: 7.762, y: 1.197, w: 3.057, h: 1.043 });
+    card(s, 7.762, 2.706, 3.978, 1.585, CYAN, 0.116);
+    txt(s, QUOTE_NGO, { x: 8.126, y: 2.967, w: 3.25, h: 0.904, bold: true, fontSize: 11, lineSpacingMultiple: 1.5 });
+    lines(s, [
+        'On duvetHost each account is completely isolated from the others for greater security. With our solution even if one account is not secure, other accounts on the same server cannot be attacked.',
+        'We have a set of proprietary rules in order to identify and mitigate the most common brute force attacks on.',
+    ], { x: 7.762, y: 4.772, w: 3.978, h: 1.337, fontSize: 10, fontFace: 'Inter', lineSpacingMultiple: 1.5 });
+    chrome(s, '03');
+});
+
+// --- 6. About us ----------------------------------------------------------
+build.push(function (s) {
+    frame(s);
+    photo(s, { x: 2.021, y: 2.326, w: 10.785, h: 4.647, c: '5F6984' });
+    heading(s, ['About Us'], { x: 2.065, y: 0.711, w: 4.349, h: 0.572 });
+    lines(s, WHETHER, {
+        x: 9.132, y: 0.711, w: 2.852, h: 1.043, align: 'right', bold: true, fontSize: 14, charSpacing: 3,
+    });
+    card(s, 1.596, 2.903, 6.109, 3.264, CYAN, 0.089);
+    lines(s, [
+        'The speed of a website depends on three factors: the hardware that is used, the software used on the server and how the website is developed. OPcache and memcached are available on all plans, and on WordPress hosting, semi-dedicated hosting and PrestaShop hosting we use LiteSpeed + LSCache to give you the best performances.',
+        '',
+        'At this point it’s up to you to have a light and fast website. We always use top hardware and constantly renew it to offer the best to our customers. With a 1 Gbit/s connection.We keep all our servers up to date and avoid overloading them to make sure your site is always responsive.',
+    ], { x: 2.065, y: 3.236, w: 5.171, h: 2.598, fontSize: 10, lineSpacingMultiple: 1.5 });
+    chrome(s, '04');
+});
+
+// --- 7. CEO message -------------------------------------------------------
+build.push(function (s) {
+    frame(s);
+    photo(s, { x: 1.164, y: 0, w: 3.981, h: 6.973, c: '92305D' });
+    heading(s, ['CEO', 'Message'], { x: 6.678, y: 0.486, w: 4.207, h: 1.043 });
+    lines(s, [CONGRATS, '', ASANY], { x: 6.667, y: 2.004, w: 4.805, h: 2.346, fontSize: 10, lineSpacingMultiple: 1.5 });
+    lines(s, WHETHER, { x: 6.678, y: 4.824, w: 2.629, h: 1.043, bold: true, fontSize: 14, charSpacing: 3 });
+    chrome(s, '05');
+});
+
+// --- 8. Company mission (card left) --------------------------------------
+build.push(function (s) {
+    frame(s);
+    photo(s, { x: 6.667, y: 0, w: 6.14, h: 6.973, c: '705078' });
+    card(s, 0.949, 0.828, 8.225, 5.467, CYAN, 0.152);
+    heading(s, ['Company', 'Mission'], { x: 1.596, y: 1.341, w: 3.17, h: 1.043 });
+    txt(s, QUOTE, { x: 1.596, y: 4.503, w: 2.904, h: 1.398, bold: true, fontSize: 10.5, charSpacing: 3, lineSpacingMultiple: 1.5 });
+    bulletList(s, {
+        titles: ['Mission #01', 'Mission #02', 'Mission #03'],
+        y: 1.47, step: 1.6855, iconX: 5.014, iconFill: PURPLE, textX: 5.947, textDy: -0.25, bw: 3.003,
+    });
+    chrome(s, '06');
+});
+
+// --- 9. Company mission (card right) -------------------------------------
+build.push(function (s) {
+    frame(s);
+    photo(s, { x: 0, y: 1.468, w: 12.806, h: 4.38, c: '4FA7D2' });
+    card(s, 3.367, 1.08, 8.895, 5.102, CYAN, 0.101);
+    heading(s, ['Company', 'Mission'], { x: 4.01, y: 1.57, w: 3.721, h: 1.043 });
+    txt(s, QUOTE, { x: 3.958, y: 4.544, w: 3.199, h: 1.084, bold: true, fontSize: 10, charSpacing: 3, lineSpacingMultiple: 1.5 });
+    bulletList(s, {
+        titles: ['Mission #01', 'Mission #02', 'Mission #03'],
+        y: 1.76, step: 1.4975, iconX: 7.674, iconFill: PURPLE, textX: 8.616, textDy: -0.276, bw: 2.893,
+    });
+    chrome(s, '07');
+});
+
+// --- 10. Vision -----------------------------------------------------------
+build.push(function (s) {
+    frame(s);
+    photo(s, { x: 0, y: 0, w: 12.806, h: 6.973, c: '5C1E9C' });
+    rect(s, 0, 0.967, 9.959, 5.121, PURPLE, { shadow: SHADOW });
+    rect(s, 0.128, 0.967, 9.708, 0.127, CYAN);
+    heading(s, ['Vision'], { x: 3.226, y: 1.564, w: 3.507, h: 0.572, align: 'center' });
+    lines(s, [
+        'The speed of a website depends on three factors: the hardware that is used, the software used on the server and how the website is developed.',
+        '',
+        'OPcache and memcached are available on all plans, and on WordPress hosting, semi-dedicated hosting and PrestaShop hosting we use LiteSpeed + LSCache to give you the best performances.',
+        '',
+        'At this point it’s up to you to have a light and fast website. We always use top hardware and constantly renew it to offer the best to our customers. With a 1 Gbit/s connection.We keep all our servers up to date and avoid overloading them to make sure your site is always responsive.',
+    ], { x: 1.957, y: 2.605, w: 6.044, h: 3.103, align: 'center', fontSize: 10, lineSpacingMultiple: 1.5 });
+    chrome(s, '08');
+});
+
+// --- 11. Quote break ------------------------------------------------------
+build.push(function (s) {
+    photo(s, { x: 0, y: 0, w: SLIDE_W, h: SLIDE_H, c: '5324A6' });
+    s.addShape(SH.SNIP_2_SAME_RECTANGLE, {
+        x: 0, y: 0, w: SLIDE_W, h: 4.433, fill: { color: DEEP }, flipV: true, shadow: SHADOW,
+    });
+    lines(s, ['“Whether you think you can, or think you can’t.', "You're right”"], {
+        x: 5.241, y: 1.747, w: 2.852, h: 1.784, align: 'center', bold: true, fontSize: 20, charSpacing: 3,
+    });
+});
+
+// --- 12. Our service (four cards) ----------------------------------------
+build.push(function (s) {
+    frame(s, null);
+    photo(s, { x: 0, y: 0, w: 12.806, h: 6.973, c: '4150B6' });
+    card(s, 0.228, 1.19, 12.305, 4.089, CYAN, 0.089);
+    heading(s, ['Our', 'Service'], { x: 0.863, y: 1.54, w: 4.135, h: 1.043 });
+    txt(s, QUOTE, { x: 9.02, y: 1.488, w: 2.782, h: 1.386, align: 'right', bold: true, fontSize: 10.5, charSpacing: 3, lineSpacingMultiple: 1.5 });
+    [0.667, 3.569, 6.465, 9.368].forEach((x, i) => {
+        const y = i < 2 ? 3.811 : 3.795;
+        card(s, x, y, 2.766, 2.378, DEEP, 0.13);
+        iconTile(s, x + 1.011, y - 0.354, 0.743, DEEP);
+        txt(s, 'Service One', { x: x + 0.133, y: y + 0.389, w: 2.5, h: 0.417, align: 'center', bold: true, fontSize: 14, lineSpacingMultiple: 1.5 });
+        txt(s, LOREM, { x: x + 0.197, y: y + 0.791, w: 2.372, h: 1.398, align: 'center', fontSize: 10.5, lineSpacingMultiple: 1.5 });
+    });
+    chrome(s, '11');
+});
+
+// --- 13. Our service (list) ----------------------------------------------
+build.push(function (s) {
+    frame(s);
+    photo(s, { x: 5.329, y: 0, w: 7.477, h: 6.973, c: '615B85' });
+    rect(s, 12.806, 6.973, 0.527, 0.527, CORNER);
+    card(s, 4.04, 1.128, 5.498, 5.245, CYAN, 0.121);
+    heading(s, ['Our', 'Service'], { x: 0.755, y: 1.34, w: 3.285, h: 1.313, fontSize: 36 });
+    txt(s, QUOTE, { x: 0.7, y: 4.548, w: 2.782, h: 1.386, bold: true, fontSize: 10.5, charSpacing: 3, lineSpacingMultiple: 1.5 });
+    bulletList(s, {
+        titles: ['Service #01', 'Service #02', 'Service #03'],
+        y: 1.806, step: 1.474, iconX: 4.968, iconFill: DEEP, textX: 5.897,
+        textDy: -0.176, bw: 2.858, color: INK, iconColor: WHITE,
+    });
+    chrome(s, '12');
+});
+
+// --- 14. Web hosting (illustration right) --------------------------------
+build.push(function (s) {
+    frame(s);
+    illustration(s, 5.033, 0.527, 7.614, 6.197, '5B4DB1');
+    heading(s, ['Web', 'Hosting'], { x: 1.575, y: 0.56, w: 3.228, h: 1.043 });
+    bulletList(s, {
+        titles: ['Strategy #01', 'Strategy #02', 'Strategy #03'],
+        y: 2.176, step: 1.4795, iconX: 0.646, iconFill: CYAN, textX: 1.633,
+        textDy: -0.144, bw: 3.033, ts: 11, gap: 0.34,
+    });
+    chrome(s, '13');
+});
+
+// --- 15. Web hosting (photo + card) --------------------------------------
+build.push(function (s) {
+    frame(s);
+    photo(s, { x: 4.073, y: 1.151, w: 8.733, h: 5.199, c: '5889BC' });
+    s.addShape(SH.ROUNDED_RECTANGLE, {
+        x: 7.216, y: 1.427, w: 5.69, h: 4.646, rotate: 270, rectRadius: 0.265,
+        fill: { color: CYAN }, shadow: SHADOW,
+    });
+    heading(s, ['Web', 'Hosting'], { x: 0.528, y: 1.13, w: 2.764, h: 1.043, align: 'right' });
+    txt(s, QUOTE, { x: 0.949, y: 4.304, w: 2.342, h: 1.663, align: 'right', bold: true, fontSize: 10.5, charSpacing: 3, lineSpacingMultiple: 1.5 });
+    bulletList(s, {
+        titles: ['STRATEGY ONE', 'STRATEGY TWO', 'STRATEGY THREE'],
+        y: 2.173, step: 1.389, iconX: 8.29, iconFill: DEEP, textX: 9.301,
+        textDy: -0.254, bw: 2.847, ts: 11, spc: 0, gap: 0.309, body: FIRM_DOT,
+    });
+    chrome(s, '14');
+});
+
+// --- 16. Our solution (photo left) ---------------------------------------
+build.push(function (s) {
+    frame(s);
+    photo(s, { x: 0, y: 0, w: 6.368, h: 6.973, c: '765486' });
+    card(s, 4.035, 1.478, 3.451, 4.653, CYAN, 0.16);
+    heading(s, ['Our', 'Solution'], { x: 4.594, y: 1.895, w: 3.019, h: 0.909, fontSize: 24 });
+    txt(s, QUOTE, { x: 4.482, y: 4.451, w: 2.782, h: 1.398, bold: true, fontSize: 10.5, charSpacing: 3, lineSpacingMultiple: 1.5 });
+    bulletList(s, {
+        titles: ['Solution 01', 'Solution #02', 'Solution #03'],
+        y: 2.0, step: 1.558, iconX: 8.725, iconFill: CYAN, textX: 9.653, textDy: -0.395, bw: 2.938,
+    });
+    chrome(s, '15');
+});
+
+// --- 17. Our solution (illustration left) --------------------------------
+build.push(function (s) {
+    frame(s);
+    illustration(s, 1.148, 0.956, 4.943, 5.491, '6643B8');
+    heading(s, ['Our', 'Solution'], { x: 8.811, y: 0.475, w: 3.218, h: 1.043 });
+    bulletList(s, {
+        titles: ['Solution 01', 'Solution 02', 'Solution 03'],
+        y: 2.173, step: 1.5885, iconX: 7.86, iconFill: CYAN, textX: 8.811, textDy: -0.297, bw: 2.938,
+    });
+    chrome(s, '16');
+});
+
+// --- 18. Case study (centred) --------------------------------------------
+build.push(function (s) {
+    frame(s);
+    photo(s, { x: 0, y: 1.709, w: 12.806, h: 5.264, c: '5C6BA6' });
+    card(s, 2.835, 0.962, 7.21, 4.807, CYAN, 0.105);
+    heading(s, ['Case Study'], { x: 4.373, y: 1.224, w: 4.135, h: 0.572, align: 'center' });
+    lines(s, [CONGRATS2, ASANY2], {
+        x: 3.64, y: 1.971, w: 5.601, h: 1.589, align: 'center', fontSize: 10, lineSpacingMultiple: 1.5,
+    });
+    [['Problem One', 3.199], ['Problem Two', 6.482]].forEach(([title, x]) => {
+        card(s, x, 4.359, 3.196, 2.322, DEEP, 0.083);
+        iconTile(s, x + 1.227, 3.965, 0.743, DEEP);
+        txt(s, title, { x: x + 0.348, y: 5.009, w: 2.5, h: 0.372, align: 'center', bold: true, fontSize: 12, charSpacing: 3, lineSpacingMultiple: 1.5 });
+        txt(s, FIRM, { x: x + 0.274, y: 5.472, w: 2.649, h: 0.831, align: 'center', fontSize: 10, lineSpacingMultiple: 1.5 });
+    });
+    chrome(s, '17');
+});
+
+// --- 19. Case study (photo left) -----------------------------------------
+build.push(function (s) {
+    frame(s);
+    photo(s, { x: 0.392, y: 1.116, w: 7.97, h: 5.227, c: '4E6FA7' });
+    card(s, 1.741, 2.571, 9.828, 3.301, CYAN, 0.132);
+    heading(s, ['Case', 'Study'], { x: 8.928, y: 1.07, w: 2.908, h: 1.043 });
+    lines(s, [CONGRATS2, '', ASANY2], { x: 2.12, y: 3.152, w: 4.236, h: 2.094, fontSize: 10, lineSpacingMultiple: 1.5 });
+    bulletList(s, {
+        titles: ['Problem One', 'Problem Two'],
+        y: 3.155, step: 1.5, iconX: 7.476, iconFill: DEEP, textX: 8.371, textDy: -0.356, bw: 2.938,
+    });
+    chrome(s, '18');
+});
+
+// --- 20. Project timeline (four cards) -----------------------------------
+build.push(function (s) {
+    frame(s);
+    heading(s, ['Project', 'Timeline'], { x: 4.803, y: 0.898, w: 3.078, h: 1.043, align: 'center' });
+    txt(s, QUOTE, { x: 3.427, y: 2.174, w: 5.814, h: 0.603, align: 'center', bold: true, fontSize: 10.5, charSpacing: 3, lineSpacingMultiple: 1.5 });
+    [0.6, 3.56, 6.539, 9.5].forEach((x) => {
+        card(s, x, 3.529, 2.598, 2.322, CYAN, 0.394);
+        iconTile(s, x + 0.915, 3.794, 0.743, DEEP);
+        txt(s, FIRM_FROM, { x: x + 0.233, y: 4.728, w: 2.133, h: 0.758, align: 'center', fontSize: 9, lineSpacingMultiple: 1.5 });
+        pill(s, x + 0.948, 5.719, 0.701, 0.132, WHITE);
+    });
+    chrome(s, '19');
+});
+
+// --- 21. Project timeline (rocket) ---------------------------------------
+build.push(function (s) {
+    frame(s);
+    heading(s, ['Project', 'Timeline'], { x: 0.961, y: 1.369, w: 3.109, h: 1.043 });
+    lines(s, [CONGRATS2, '', ASANY2], { x: 0.971, y: 2.927, w: 3.174, h: 2.598, fontSize: 10, lineSpacingMultiple: 1.5 });
+    illustration(s, 4.436, 1.603, 3.607, 4.928, 'AF9EAD');
+    // Arc of nodes fanning out to the four labels.
+    s.addShape('custGeom', {
+        x: 7.6, y: 1.79, w: 1.3, h: 3.75, fill: { type: 'none' }, line: { color: WHITE, width: 1 },
+        points: [
+            { x: 0.31, y: 0 },
+            { x: 0.85, y: 1.23, curve: { type: 'quadratic', x1: 1.06, y1: 0.5 } },
+            { x: 1.2, y: 2.31, curve: { type: 'quadratic', x1: 1.16, y1: 1.79 } },
+            { x: 0.56, y: 3.75, curve: { type: 'quadratic', x1: 1.22, y1: 3.2 } },
+        ],
+    });
+    const nodes = [[7.823, 2.458], [8.454, 3.024], [8.802, 4.096], [8.429, 5.261]];
+    const rows = [1.527, 2.736, 3.82, 4.995];
+    nodes.forEach((n, i) => {
+        stroke(s, [[n[0], n[1]], [9.14, rows[i] + 0.279]], { color: WHITE, width: 1 });
+        dot(s, n[0], n[1], 0.29, 'BF3FF7');
+        dot(s, n[0], n[1], 0.18, WHITE);
+        card(s, 9.138, rows[i], 0.558, 0.558, CYAN, 0.093, { line: { color: WHITE, width: 1 } });
+        glyph(s, 9.417, rows[i] + 0.279, 0.32, WHITE);
+        bulletRow(s, {
+            x: 9.872, y: rows[i] - 0.226, title: 'TITTLE HERE', body: FIRM_TO,
+            ts: 11, bs: 8, bw: 1.911, gap: 0.302,
+        });
+    });
+    chrome(s, '20');
+});
+
+// --- 22. Plan strategy (staircase) ---------------------------------------
+build.push(function (s) {
+    frame(s);
+    heading(s, ['Plan', 'Strategy'], { x: 9.035, y: 4.92, w: 3.367, h: 1.043, align: 'center' });
+    /*
+     * One continuous ribbon: down the right edge, across the top, then four
+     * left-and-down steps into the bottom run — plus a spur off each landing.
+     */
+    const R = 0.33;
+    stroke(s, [
+        [12.243, 4.628], [12.243, 1.272], [8.988, 1.272], [8.988, 2.150], [6.189, 2.150],
+        [6.189, 3.028], [3.391, 3.028], [3.391, 3.906], [0.592, 3.906], [0.592, 5.688], [8.677, 5.688],
+    ], { color: WHITE, width: 1.25, r: R });
+    [
+        [[8.988, 2.150], [8.988, 3.033], [10.494, 3.033]],
+        [[6.189, 3.028], [6.189, 3.916], [7.721, 3.916]],
+        [[3.391, 3.906], [3.391, 4.791], [4.851, 4.791]],
+    ].forEach((spur) => stroke(s, spur, { color: WHITE, width: 1.25, r: R }));
+    [[10.494, 3.033], [12.243, 4.628], [8.677, 5.688], [7.721, 3.916], [4.851, 4.791]].forEach((p) => dot(s, p[0], p[1], 0.122, WHITE));
+    const steps = [
+        { icon: [1.491, 3.35], tx: 0.668, ty: 4.288 },
+        { icon: [4.531, 2.519], tx: 3.686, ty: 3.437 },
+        { icon: [7.362, 1.689], tx: 6.532, ty: 2.64 },
+        { icon: [10.4, 0.857], tx: 9.581, ty: 1.812 },
+    ];
+    steps.forEach((st) => {
+        card(s, st.icon[0], st.icon[1], 0.855, 0.855, CYAN, 0.143, { line: { color: WHITE, width: 2 } });
+        glyph(s, st.icon[0] + 0.428, st.icon[1] + 0.428, 0.48, WHITE);
+        txt(s, 'TITTLE HERE', { x: st.tx, y: st.ty, w: 2.5, h: 0.349, align: 'center', bold: true, fontSize: 11, charSpacing: 3, lineSpacingMultiple: 1.5 });
+        txt(s, FIRM_TO, { x: st.tx + 0.294, y: st.ty + 0.303, w: 1.911, h: 0.685, align: 'center', fontSize: 8, lineSpacingMultiple: 1.5 });
+    });
+    chrome(s, '21');
+});
+
+// --- 23. Strategy plan (three cards) -------------------------------------
+build.push(function (s) {
+    frame(s);
+    illustration(s, 6.19, 1.39, 5.82, 4.485, '9B70AF');
+    heading(s, ['Strategy', 'Plan'], { x: 5.693, y: 1.184, w: 2.928, h: 1.043 });
+    [1.137, 2.912, 4.673].forEach((y, i) => {
+        card(s, 0.77, y, 4.211, 1.651, CYAN, 0.135);
+        iconTile(s, 1.081, y + 0.456, 0.743, DEEP);
+        bulletRow(s, { x: 2.043, y: y + 0.22, title: 'TITTLE HERE', body: FIRM, ts: 12, bw: 2.938, gap: 0.364, color: INK });
+        void i;
+    });
+    chrome(s, '22');
+});
+
+// --- 24. Why us ? ---------------------------------------------------------
+build.push(function (s) {
+    frame(s);
+    photo(s, { x: 7.101, y: 0.267, w: 5.221, h: 6.167, c: '89486E', r: 0.067 });
+    heading(s, ['Why Us ?'], { x: 1.143, y: 0.703, w: 4.135, h: 0.572 });
+    txt(s, CONGRATS2 + ' ' + ASANY2, { x: 1.143, y: 1.686, w: 3.714, h: 2.094, fontSize: 10, lineSpacingMultiple: 1.5 });
+    txt(s, QUOTE, { x: 9.162, y: 0.576, w: 2.848, h: 1.398, align: 'right', bold: true, fontSize: 10.5, charSpacing: 3, color: INK, lineSpacingMultiple: 1.5 });
+    [[1.143, 1.454, 2.357, 4.597], [5.464, 5.809, 6.662, 4.555]].forEach(([cx, ix, tx, ty]) => {
+        card(s, cx, 4.35, 4.211, 1.651, CYAN, 0.097);
+        iconTile(s, ix, ty + 0.212, 0.743, DEEP);
+        bulletRow(s, { x: tx, y: ty, title: 'TITTLE HERE', body: FIRM, ts: 12, bw: 2.938, gap: 0.304, color: INK });
+    });
+    chrome(s, '23');
+});
+
+// --- 25. Why us? (glass card) --------------------------------------------
+build.push(function (s) {
+    frame(s);
+    photo(s, { x: 0, y: 0, w: 12.806, h: 6.973, c: 'A89193' });
+    s.addShape(SH.ROUNDED_RECTANGLE, {
+        x: 0.633, y: 0.686, w: 11.103, h: 5.442, rectRadius: 0.33,
+        fill: { color: WHITE, transparency: 55 }, shadow: SHADOW,
+    });
+    heading(s, ['Why Us?'], { x: 1.445, y: 1.853, w: 4.034, h: 0.572, color: INK });
+    lines(s, [CONGRATS2, '', ASANY2], { x: 1.33, y: 2.843, w: 3.753, h: 2.346, fontSize: 10, color: INK, lineSpacingMultiple: 1.5 });
+    [[6.211, 2.966, 2.659], [6.185, 4.55, 4.287]].forEach(([ix, iy, ty]) => {
+        card(s, ix, iy, 0.743, 0.743, 'C15CFA', 0.124);
+        glyph(s, ix + 0.372, iy + 0.372, 0.4, WHITE);
+        bulletRow(s, { x: 7.219, y: ty, title: 'TITTLE HERE', body: FIRM, ts: 12, bw: 2.938, gap: 0.364, color: INK });
+    });
+    chrome(s, '24');
+});
+
+// --- 26. What we do ? (glass tiles) --------------------------------------
+build.push(function (s) {
+    frame(s);
+    photo(s, { x: 0.291, y: 0.351, w: 5.848, h: 6.27, c: 'B28596', r: 0.133 });
+    heading(s, ['What We', 'Do ?'], { x: 7.521, y: 1.141, w: 3.123, h: 1.043 });
+    lines(s, [CONGRATS2, '', ASANY2], { x: 7.521, y: 2.934, w: 3.382, h: 2.598, fontSize: 10, lineSpacingMultiple: 1.5 });
+    [[0.577, 1.029], [3.351, 1.029], [0.577, 3.49], [3.351, 3.49]].forEach(([x, y]) => {
+        s.addShape(SH.ROUNDED_RECTANGLE, {
+            x, y, w: 2.598, h: 2.322, rectRadius: 0.394,
+            fill: { color: WHITE, transparency: 45 }, shadow: SHADOW,
+        });
+        s.addShape(SH.ROUNDED_RECTANGLE, {
+            x: x + 0.927, y: y + 0.074, w: 0.743, h: 0.743, rectRadius: 0.124,
+            fill: { color: WHITE, transparency: 25 }, shadow: SHADOW,
+        });
+        glyph(s, x + 1.298, y + 0.446, 0.4, 'C15CFA');
+        txt(s, 'TITTLE ONE', { x: x + 0.041, y: y + 0.734, w: 2.5, h: 0.372, align: 'center', bold: true, fontSize: 12, color: INK, lineSpacingMultiple: 1.5 });
+        txt(s, FIRM, { x: x + 0.041, y: y + 1.026, w: 2.5, h: 1.133, align: 'center', fontSize: 10.5, color: INK, lineSpacingMultiple: 1.5 });
+    });
+    chrome(s, '25');
+});
+
+// --- 27. What we do ? (illustration) -------------------------------------
+build.push(function (s) {
+    frame(s);
+    illustration(s, 0.456, 0.533, 6.211, 6.434, '9A99DA');
+    heading(s, ['What We', 'Do ?'], { x: 7.638, y: 0.825, w: 2.5, h: 1.043 });
+    txt(s, QUOTE, { x: 7.638, y: 2.345, w: 2.75, h: 1.398, bold: true, fontSize: 10.5, charSpacing: 3, lineSpacingMultiple: 1.5 });
+    txt(s, CONGRATS2 + ' ' + ASANY2, { x: 7.638, y: 4.488, w: 3.985, h: 1.841, fontSize: 10, lineSpacingMultiple: 1.5 });
+    chrome(s, '26');
+});
+
+// --- 28. SWOT analysis ----------------------------------------------------
+build.push(function (s) {
+    frame(s);
+    heading(s, ['SWOT', 'Analysis'], { x: 4.599, y: 0.558, w: 4.135, h: 1.043, align: 'center' });
+    const cols = [
+        { x: 1.246, letter: 'S', label: 'STRENGTHS' },
+        { x: 3.528, letter: 'W', label: 'WEAKNESSES' },
+        { x: 5.81, letter: 'O', label: 'OPPORTUNITIES' },
+        { x: 8.092, letter: 'T', label: 'THREATS' },
+    ];
+    cols.forEach((c, i) => {
+        // Vertical pill: a 3.984 x 2.188 rounded rect turned on its side.
+        s.addShape(SH.ROUNDED_RECTANGLE, { x: c.x, y: 3.271, w: 3.984, h: 2.188, rotate: 90, rectRadius: 1.094, fill: { color: 'F2F2F2' }, shadow: SHADOW });
+        s.addShape(SH.ROUNDED_RECTANGLE, { x: c.x + 0.084, y: 3.36, w: 3.817, h: 2.029, rotate: 90, rectRadius: 1.015, fill: { color: 'FCFCFC' } });
+        txt(s, c.letter, { x: 2.757 + i * 2.282, y: 2.795, w: 0.962, h: 1.313, align: 'center', bold: true, fontSize: 72, color: INK });
+        txt(s, c.label, { x: 1.989 + i * 2.283, y: 4.147, w: 2.5, h: 0.372, align: 'center', bold: true, fontSize: 12, charSpacing: 3, color: INK, lineSpacingMultiple: 1.5 });
+        txt(s, FIRM, { x: 2.271 + i * 2.283, y: 4.601, w: 1.936, h: 1.336, align: 'center', fontSize: 10, color: INK, lineSpacingMultiple: 1.5 });
+    });
+    chrome(s, '27');
+});
+
+// --- 29. Team leader ------------------------------------------------------
+build.push(function (s) {
+    frame(s);
+    photo(s, { x: 7.876, y: 0, w: 4.931, h: 6.973, c: '92335B' });
+    heading(s, ['Team', 'Leader'], { x: 1.095, y: 0.933, w: 3.18, h: 1.043 });
+    txt(s, ASANY2, { x: 1.095, y: 2.318, w: 6.26, h: 0.579, bold: true, fontSize: 10, lineSpacingMultiple: 1.5 });
+    card(s, 1.095, 3.965, 2.773, 2.269, CYAN, 0.07);
+    txt(s, 'Senya Calye', { x: 1.258, y: 4.274, w: 2.513, h: 0.404, align: 'center', fontFace: MAJOR, bold: true, fontSize: 18 });
+    txt(s, 'CEO', { x: 1.258, y: 4.734, w: 2.513, h: 0.269, align: 'center', fontSize: 10 });
+    txt(s, ACCOM, { x: 1.383, y: 5.155, w: 2.263, h: 0.832, align: 'center', fontSize: 10, lineSpacingMultiple: 1.5 });
+    [[4.518, 4.238, 1.347], [4.501, 4.956, 1.347], [4.501, 5.655, 1.729]].forEach(([gx, gy, fill]) => {
+        glyph(s, gx + 0.165, gy + 0.167, 0.33, WHITE);
+        pill(s, 5.213, gy + 0.115, 1.862, 0.105, WHITE);
+        pill(s, 5.213, gy + 0.115, fill, 0.105, CYAN);
+    });
+    chrome(s, '28');
+});
+
+// --- 30. Our team (two overlapping cards) --------------------------------
+build.push(function (s) {
+    frame(s);
+    const outline = { color: WHITE, width: 1.25 };
+    photo(s, { x: 4.811, y: 1.897, w: 2.982, h: 3.375, c: '795079', r: 0.25, line: outline });
+    photo(s, { x: 7.992, y: 0.527, w: 2.982, h: 3.375, c: '78507B', r: 0.25, line: outline });
+    heading(s, ['Our', 'Team'], { x: 0.939, y: 1.808, w: 3.325, h: 1.043 });
+    txt(s, CONGRATS2, { x: 0.83, y: 3.974, w: 3.11, h: 1.336, fontSize: 10, lineSpacingMultiple: 1.5 });
+    [['Anyara Kuzack', 6.37, 4.143], ['Tyele De Naa', 9.75, 2.515]].forEach(([name, x, y]) => {
+        card(s, x, y, 2.847, 2.47, CYAN, 0.491);
+        txt(s, name, { x: x + 0.167, y: y + 0.438, w: 2.513, h: 0.404, align: 'center', fontFace: MAJOR, bold: true, fontSize: 18 });
+        txt(s, 'CEO', { x: x + 0.167, y: y + 0.898, w: 2.513, h: 0.269, align: 'center', fontSize: 10 });
+        txt(s, ACCOM, { x: x + 0.318, y: y + 1.167, w: 2.211, h: 0.832, align: 'center', fontSize: 10, lineSpacingMultiple: 1.5 });
+    });
+    chrome(s, '29');
+});
+
+// --- 31. Our team (three portraits) --------------------------------------
+build.push(function (s) {
+    frame(s);
+    heading(s, ['Our Team'], { x: 4.816, y: 0.577, w: 2.7, h: 1.043, align: 'center' });
+    ['Steanly', 'Mercury', 'Badudu'].forEach((name, i) => {
+        const x = 0.866 + i * 3.622;
+        photo(s, { x, y: 2.044, w: 3.411, h: 3.411, c: '814A6A', r: 0.4 });
+        card(s, x + 0.735, 4.911, 1.927, 0.545, CYAN, 0.1);
+        txt(s, name, { x: x + 0.442, y: 5.0, w: 2.513, h: 0.404, align: 'center', fontFace: MAJOR, bold: true, fontSize: 18 });
+        txt(s, ACCOM, { x: x + 0.442, y: 5.57, w: 2.38, h: 0.832, align: 'center', fontSize: 10, lineSpacingMultiple: 1.5 });
+    });
+    chrome(s, '30');
+});
+
+// --- 32. Our team (four portraits) ---------------------------------------
+build.push(function (s) {
+    frame(s);
+    heading(s, ['Our Team'], { x: 1.051, y: 0.627, w: 2.7, h: 1.043 });
+    txt(s, QUOTE, { x: 9.267, y: 0.627, w: 2.75, h: 1.398, align: 'right', bold: true, fontSize: 10.5, charSpacing: 3, lineSpacingMultiple: 1.5 });
+    ['Steanly', 'Rochelle', 'Hanna', 'Corleone'].forEach((name, i) => {
+        const x = 0.527 + i * 3.011;
+        photo(s, { x, y: 3.266, w: 2.828, h: 2.828, c: '795475', r: 0.35 });
+        rect(s, x + 0.87, 3.265, 1.09, 0.167, CYAN);
+        card(s, x + 0.452, 5.548, 1.927, 0.545, CYAN, 0.1);
+        txt(s, name, { x: x + 0.474, y: 5.652, w: 1.883, h: 0.337, align: 'center', fontFace: MAJOR, bold: true, fontSize: 14 });
+    });
+    chrome(s, '31');
+});
+
+// --- 33. Device mockup (phone) -------------------------------------------
+build.push(function (s) {
+    frame(s);
+    // Phone shell drawn natively; the screen itself is the image stand-in.
+    s.addShape(SH.ROUNDED_RECTANGLE, { x: 4.85, y: 0.53, w: 3.72, h: 6.97, rectRadius: 0.42, fill: { color: 'F4F4F6' }, shadow: SHADOW });
+    photo(s, { x: 5.022, y: 0.941, w: 3.289, h: 6.559, c: '903C66', r: 0.24 });
+    s.addShape(SH.ROUNDED_RECTANGLE, { x: 6.11, y: 0.53, w: 1.2, h: 0.28, rectRadius: 0.14, fill: { color: 'F4F4F6' } });
+    heading(s, ['Device ', 'Mockup'], { x: 1.583, y: 0.964, w: 3.582, h: 1.043 });
+    lines(s, [CONGRATS2, '', ASANY2], { x: 9.017, y: 3.251, w: 3.379, h: 2.598, fontSize: 10, lineSpacingMultiple: 1.5 });
+    [3.251, 4.689].forEach((y) => {
+        iconTile(s, 0.513, y, 0.743, CYAN);
+        bulletRow(s, { x: 1.499, y: y - 0.183, title: 'TITTLE HERE', body: FIRM_DOT, ts: 11, bs: 9, bw: 2.5, gap: 0.35 });
+    });
+    chrome(s, '32');
+});
+
+// --- 34. Device mockup (desktop) -----------------------------------------
+build.push(function (s) {
+    frame(s);
+    rect(s, 6.13, 1.36, 6.02, 4.0, '1D1D22', { shadow: SHADOW });
+    photo(s, { x: 6.403, y: 1.668, w: 5.483, h: 3.315, c: '865361' });
+    rect(s, 6.13, 5.36, 6.02, 0.62, 'C9CDD3');
+    rect(s, 8.52, 5.98, 1.24, 0.72, 'B9BEC5');
+    s.addShape(SH.OVAL, { x: 7.86, y: 6.58, w: 2.56, h: 0.34, fill: { color: 'CFD3D8' } });
+    heading(s, ['Device ', 'Mockup'], { x: 1.699, y: 1.442, w: 4.135, h: 1.043 });
+    lines(s, [
+        'Congratulations As any experienced engineer or manager knows, manufacturing and service processes tend in practice to be amazingly complicated. In truth, unexpected complexity is in fact expected.',
+        '',
+        ASANY2,
+    ], { x: 1.694, y: 3.254, w: 3.722, h: 2.346, fontSize: 10, lineSpacingMultiple: 1.5 });
+    chrome(s, '33');
+});
+
+// --- 35. Device mockup (laptop) ------------------------------------------
+build.push(function (s) {
+    frame(s);
+    rect(s, 6.86, 2.9, 5.0, 3.32, '26262C', { shadow: SHADOW });
+    photo(s, { x: 7.156, y: 3.231, w: 4.418, h: 2.717, c: '855160' });
+    s.addShape(SH.ROUNDED_RECTANGLE, { x: 6.13, y: 6.2, w: 6.45, h: 0.28, rectRadius: 0.12, fill: { color: 'B7BBC2' } });
+    heading(s, ['Device ', 'Mockup'], { x: 2.446, y: 0.981, w: 4.135, h: 1.043 });
+    txt(s, QUOTE, { x: 8.105, y: 0.884, w: 2.782, h: 1.386, align: 'right', bold: true, fontSize: 10.5, charSpacing: 3, lineSpacingMultiple: 1.5 });
+    [[1.459, 3.555, 2.446, 3.296], [1.459, 5.256, 2.491, 5.048]].forEach(([ix, iy, tx, ty]) => {
+        iconTile(s, ix, iy, 0.743, CYAN);
+        bulletRow(s, { x: tx, y: ty, title: 'TITTLE HERE', body: FIRM_DOT, ts: 14, bs: 9, bw: 2.378, gap: 0.463 });
+    });
+    chrome(s, '34');
+});
+
+// --- 36. Recent project (grid right) -------------------------------------
+build.push(function (s) {
+    frame(s);
+    heading(s, ['Recent', 'Project'], { x: 0.81, y: 0.535, w: 2.924, h: 1.043 });
+    bulletRow(s, { x: 9.116, y: 0.535, title: 'PROJECT NAME : ARESTI ', body: FIRM_DOT, ts: 11, bs: 9, tw: 3.407, bw: 2.809, gap: 0.349 });
+    txt(s, QUOTE, { x: 0.629, y: 4.403, w: 2.434, h: 1.663, bold: true, fontSize: 10.5, charSpacing: 3, lineSpacingMultiple: 1.5 });
+    photo(s, { x: 6.211, y: 2.29, w: 6.595, h: 4.674, c: '874B5E' });
+    photo(s, { x: 3.4, y: 2.29, w: 2.739, h: 2.304, c: '884159' });
+    photo(s, { x: 3.4, y: 4.661, w: 2.739, h: 2.304, c: '884159' });
+    chrome(s, '35');
+});
+
+// --- 37. Recent project (grid left) --------------------------------------
+build.push(function (s) {
+    frame(s);
+    photo(s, { x: 0, y: 0, w: 5.0, h: 5.983, c: '913658' });
+    photo(s, { x: 5.121, y: 0, w: 2.733, h: 2.95, c: '8D3857' });
+    photo(s, { x: 5.121, y: 3.033, w: 2.733, h: 2.95, c: '8D3857' });
+    heading(s, ['Recent', 'Project'], { x: 8.625, y: 0.686, w: 4.135, h: 1.043 });
+    bulletRow(s, { x: 8.625, y: 2.529, title: 'PROJECT NAME : NAMESA', body: FIRM_DOT, ts: 11, bs: 9, tw: 3.478, bw: 2.863, gap: 0.349 });
+    txt(s, QUOTE, { x: 8.625, y: 4.585, w: 2.75, h: 1.398, bold: true, fontSize: 10.5, charSpacing: 3, lineSpacingMultiple: 1.5 });
+    chrome(s, '36');
+});
+
+// --- 38. Trusted by ... ---------------------------------------------------
+build.push(function (s) {
+    frame(s);
+    heading(s, ["Trusted by Some of the World's Biggest Companies."], {
+        x: 3.554, y: 1.012, w: 6.225, h: 1.043, align: 'center',
+    });
+    for (let r = 0; r < 2; r++) {
+        for (let c = 0; c < 4; c++) {
+            photo(s, {
+                x: 3.557 + c * 1.6355, y: 3.157 + r * 1.448, w: 1.316, h: 1.186,
+                c: '8C4460', r: 0.14, line: { color: WHITE, width: 1.25 },
+            });
+        }
+    }
+    chrome(s, '37');
+});
+
+// --- 39. Customer testimonial --------------------------------------------
+build.push(function (s) {
+    frame(s);
+    photo(s, { x: 7.314, y: 0.999, w: 3.667, h: 3.667, c: '8D3D5C', r: 0.6, line: { color: WHITE, width: 2 } });
+    heading(s, ['What Our Customers Says'], { x: 1.248, y: 1.603, w: 3.578, h: 1.043 });
+    txt(s, 'Atsumi Brown', { x: 7.891, y: 5.121, w: 2.513, h: 0.404, align: 'center', fontFace: MAJOR, bold: true, fontSize: 18 });
+    txt(s, 'Kuzato CEO', { x: 7.891, y: 5.581, w: 2.513, h: 0.269, align: 'center', bold: true, fontSize: 10 });
+    txt(s, '“Talkspace gives all people the opportunity to get the help they need”', {
+        x: 7.124, y: 5.898, w: 4.047, h: 0.603, align: 'center', bold: true, fontSize: 10.5, lineSpacingMultiple: 1.5,
+    });
+    bulletRow(s, { x: 1.348, y: 5.121, title: 'PROJECT NAME : NAMESA', body: FIRM_DOT, ts: 11, bs: 9, tw: 3.478, bw: 2.863, gap: 0.349 });
+    chrome(s, '38');
+});
+
+// --- 40. Thank you --------------------------------------------------------
+build.push(function (s) {
+    frame(s);
+    photo(s, { x: 7.107, y: 2.542, w: 4.418, h: 2.717, c: '855161', r: 0.046 });
+    logoMark(s, 3.457, 3.908, 1.518);
+    duvet(s, 2.216, 3.467, 0.533, WHITE);
+    lines(s, ['THANK', 'YOU'], {
+        x: 10.058, y: 5.806, w: 2.666, h: 0.774, fontFace: MAJOR, bold: true, fontSize: 20, charSpacing: 3,
+    });
+    chrome(s, null);
+});
+
+// ================================================================ output
+pptx.defineLayout({ name: 'WIDE', width: SLIDE_W, height: SLIDE_H });
+pptx.layout = 'WIDE';
+pptx.theme = { headFontFace: MAJOR, bodyFontFace: MINOR };
+pptx.author = 'duvet';
+pptx.title = 'duvet presentation';
+
+build.forEach((fn) => fn(pptx.addSlide()));
+
+pptx.writeFile({
+    fileName: path.join(__dirname, '013ea5de-199e-429a-ab65-f835565e5ddd_grok_final.pptx'),
+}).then((f) => console.log('wrote', f));
