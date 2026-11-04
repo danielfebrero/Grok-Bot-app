@@ -1,0 +1,755 @@
+/**
+ * "The Tech Deck" — 20-slide pitch deck rebuilt with pptxgenjs.
+ * Run: node 11de34a5-975f-4bad-ba21-7d4d9b246f97_grok_final.js
+ */
+'use strict';
+
+const PptxGenJS = require('pptxgenjs');
+const path = require('path');
+
+/* ------------------------------------------------------------------ *
+ * Design tokens
+ * ------------------------------------------------------------------ */
+
+const FONT = 'Red Hat Display';
+
+const C = {
+  black: '000000',
+  panel: '171717',   // dark card / ink on lime
+  hair: '262626',    // hairline connectors
+  white: 'FFFFFF',
+  lime: '9EF132',    // accent 1 — primary brand green
+  lime2: 'A7FF33',   // accent 2
+  lime3: 'B8FF5C',   // accent 3
+  lime4: 'C6FF7D',   // accent 4
+  lime5: 'D3FF99',   // accent 5
+  pale: 'DCFFAD',    // gradient highlight
+  pale2: 'D8F9AD'
+};
+
+const SLIDE_W = 13.3333;
+const SLIDE_H = 7.5;
+
+// Recurring geometry (inches)
+const M = 0.7604;        // left page margin
+const TITLE_Y = 0.7708;  // standard title top
+const FOOT_Y = 6.9375;   // master footer strip
+
+// Type ramp (points)
+const SZ = { hero: 66, huge: 138, title: 54, num: 40, stat: 36, big: 32, mid: 28, lead: 20, sub: 18, small: 16, body: 14, foot: 10 };
+
+/* ------------------------------------------------------------------ *
+ * Colour helpers
+ * ------------------------------------------------------------------ */
+
+const hex2rgb = (h) => [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+const rgb2hex = (c) => c.map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0').toUpperCase()).join('');
+
+function mix(a, b, t) {
+  const [ar, ag, ab] = hex2rgb(a);
+  const [br, bg, bb] = hex2rgb(b);
+  return rgb2hex([ar + (br - ar) * t, ag + (bg - ag) * t, ab + (bb - ab) * t]);
+}
+
+/**
+ * A ramp that neither starts at 0 % nor ends at 100 % is stretched to fill
+ * the shape; ramps anchored to an edge keep their flat run.
+ */
+function normalizeStops(stops) {
+  const first = stops[0][0];
+  const last = stops[stops.length - 1][0];
+  if (first <= 0 || last >= 1) return stops;
+  return stops.map(([p, c]) => [(p - first) / (last - first), c]);
+}
+
+/** stops: [[position 0..1, hex], ...] — sample the ramp anywhere. */
+function colorAt(stops, t) {
+  if (t <= stops[0][0]) return stops[0][1];
+  if (t >= stops[stops.length - 1][0]) return stops[stops.length - 1][1];
+  for (let i = 1; i < stops.length; i++) {
+    const [p0, c0] = stops[i - 1];
+    const [p1, c1] = stops[i];
+    if (t <= p1) return mix(c0, c1, (t - p0) / (p1 - p0));
+  }
+  return stops[stops.length - 1][1];
+}
+
+/* ------------------------------------------------------------------ *
+ * Geometry helpers
+ *
+ * Outlines are compact path arrays in fractions of the shape box:
+ *   ['M', x, y]  ['L', x, y]  ['C', c1x, c1y, c2x, c2y, x, y]  ['Z']
+ * ------------------------------------------------------------------ */
+
+const RECT_PATH = [['M', 0, 0], ['L', 1, 0], ['L', 1, 1], ['L', 0, 1], ['Z']];
+
+/** Mirror a path left-to-right (the closing slide flips the cover artwork). */
+const mirrorPath = (p) => p.map((seg) => {
+  if (seg[0] === 'C') return ['C', 1 - seg[1], seg[2], 1 - seg[3], seg[4], 1 - seg[5], seg[6]];
+  if (seg[0] === 'Z') return seg;
+  return [seg[0], 1 - seg[1], seg[2]];
+});
+
+/** Path -> polygon in inches; cubic segments are subdivided. */
+function flatten(p, w, h, steps = 14) {
+  const poly = [];
+  let cur = { x: 0, y: 0 };
+  p.forEach((seg) => {
+    if (seg[0] === 'M' || seg[0] === 'L') {
+      cur = { x: seg[1] * w, y: seg[2] * h };
+      poly.push(cur);
+    } else if (seg[0] === 'C') {
+      const p0 = cur;
+      const c1 = { x: seg[1] * w, y: seg[2] * h };
+      const c2 = { x: seg[3] * w, y: seg[4] * h };
+      const p1 = { x: seg[5] * w, y: seg[6] * h };
+      for (let i = 1; i <= steps; i++) {
+        const t = i / steps, u = 1 - t;
+        poly.push({
+          x: u * u * u * p0.x + 3 * u * u * t * c1.x + 3 * u * t * t * c2.x + t * t * t * p1.x,
+          y: u * u * u * p0.y + 3 * u * u * t * c1.y + 3 * u * t * t * c2.y + t * t * t * p1.y
+        });
+      }
+      cur = p1;
+    }
+  });
+  return poly;
+}
+
+/** Sutherland–Hodgman clip: keep the half-plane nx*x + ny*y <= d. */
+function clipHalfPlane(poly, nx, ny, d) {
+  const out = [];
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i], b = poly[(i + 1) % poly.length];
+    const da = nx * a.x + ny * a.y - d, db = nx * b.x + ny * b.y - d;
+    if (da <= 0) out.push(a);
+    if ((da < 0 && db > 0) || (da > 0 && db < 0)) {
+      const t = da / (da - db);
+      out.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+    }
+  }
+  return out;
+}
+
+/* ------------------------------------------------------------------ *
+ * Drawing primitives
+ * ------------------------------------------------------------------ */
+
+const NO_LINE = { type: 'none' };
+
+function rect(slide, o) {
+  slide.addShape('rect', {
+    x: o.x, y: o.y, w: o.w, h: o.h,
+    fill: { color: o.color, transparency: o.transparency || 0 },
+    line: NO_LINE,
+    ...(o.rotate ? { rotate: o.rotate } : {})
+  });
+}
+
+function polygon(slide, o, pts) {
+  slide.addShape('custGeom', {
+    x: o.x, y: o.y, w: o.w, h: o.h, fill: { color: o.color }, line: NO_LINE,
+    points: pts.map((p, i) => ({
+      x: Math.max(0, Math.min(o.w, p.x)),
+      y: Math.max(0, Math.min(o.h, p.y)),
+      ...(i === 0 ? { moveTo: true } : {})
+    })).concat([{ close: true }])
+  });
+}
+
+/**
+ * Linear gradient. pptxgenjs writes solid fills only, so the outline is
+ * sliced into bands perpendicular to the gradient axis and every band gets
+ * its own sampled colour. The ramp spans the shape's bounding box, as OOXML
+ * does. `angle` follows OOXML: 0 = left→right, 90 = top→bottom.
+ */
+function gradShape(slide, o) {
+  const poly = flatten(o.path || RECT_PATH, o.w, o.h);
+  const stops = normalizeStops(o.stops);
+  const rad = (o.angle || 0) * Math.PI / 180;
+  const nx = Math.cos(rad), ny = Math.sin(rad);
+  const corners = [[0, 0], [o.w, 0], [0, o.h], [o.w, o.h]].map(([x, y]) => nx * x + ny * y);
+  const lo = Math.min(...corners), hi = Math.max(...corners);
+  const bands = Math.max(12, Math.min(56, Math.round((hi - lo) / 0.1)));
+  const step = (hi - lo) / bands;
+  for (let i = 0; i < bands; i++) {
+    // Bands overlap slightly so the next one paints over the previous seam.
+    let band = clipHalfPlane(poly, nx, ny, lo + step * (i + 1) + step * 0.6);
+    if (band.length) band = clipHalfPlane(band, -nx, -ny, -(lo + step * i));
+    if (band.length < 3) continue;
+    polygon(slide, { x: o.x, y: o.y, w: o.w, h: o.h, color: colorAt(stops, (i + 0.5) / bands) }, band);
+  }
+}
+
+const gradRect = (slide, o) => gradShape(slide, { ...o, path: RECT_PATH });
+
+/** The deck's "▪ ▪ ▪" motif: three squares filling the given box. */
+function dots(slide, o) {
+  const unit = o.w * 0.2475;   // square side; gaps are half a square
+  [0, 0.3762, 0.7525].forEach((f) => {
+    slide.addShape('rect', { x: o.x + o.w * f, y: o.y, w: unit, h: o.h, fill: { color: o.color }, line: NO_LINE });
+  });
+}
+
+function hairline(slide, o) {
+  slide.addShape('line', { x: o.x, y: o.y, w: o.w, h: o.h, line: { color: o.color || C.hair, width: o.width || 2 } });
+}
+
+/** Stand-in for the raster device mock-ups in the source deck. */
+function imagePlaceholder(slide, o) {
+  slide.addShape('roundRect', {
+    x: o.x, y: o.y, w: o.w, h: o.h, rectRadius: o.radius,
+    fill: { color: '0A0A0A' }, line: { color: '4A4A4A', width: 1.5 }
+  });
+  const capH = 0.32;
+  text(slide, '[image]', {
+    x: o.x, y: o.y + Math.min(o.h, SLIDE_H - o.y) / 2 - capH / 2, w: o.w, h: capH,
+    size: 12, color: '4A4A4A', align: 'center'
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Text primitives
+ * ------------------------------------------------------------------ */
+
+function text(slide, body, o) {
+  slide.addText(body, {
+    x: o.x, y: o.y, w: o.w, h: o.h,
+    fontFace: FONT, fontSize: o.size, color: o.color, bold: !!o.bold,
+    align: o.align || 'left', valign: o.valign || 'top', isTextBox: true, wrap: true,
+    ...(o.lineSpacingMultiple ? { lineSpacingMultiple: o.lineSpacingMultiple } : {}),
+    ...(o.paraSpaceAfter ? { paraSpaceAfter: o.paraSpaceAfter } : {})
+  });
+}
+
+/** Page headline — 54 pt bold white, tight leading. */
+function title(slide, body, o) {
+  text(slide, body, { size: SZ.title, color: C.white, bold: true, lineSpacingMultiple: 0.8, ...o });
+}
+
+/** Section label — 18 pt, brand green by default. */
+function label(slide, body, o) {
+  text(slide, body, { size: SZ.sub, color: C.lime, h: 0.4039, ...o });
+}
+
+/** Paragraph copy — 14 pt, 130 % leading, 24 pt paragraph spacing. */
+function copy(slide, paras, o) {
+  const runs = [].concat(paras).map((t, i, all) => ({ text: t, options: i < all.length - 1 ? { breakLine: true } : {} }));
+  text(slide, runs, { size: SZ.body, color: C.white, lineSpacingMultiple: 1.3, paraSpaceAfter: 24, ...o });
+}
+
+/** Oversized statistic. */
+function stat(slide, body, o) {
+  text(slide, body, { size: SZ.stat, color: C.lime, bold: true, h: 0.7068, ...o });
+}
+
+/* ------------------------------------------------------------------ *
+ * Deck scaffolding
+ * ------------------------------------------------------------------ */
+
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'WIDE', width: SLIDE_W, height: SLIDE_H });
+pptx.layout = 'WIDE';
+pptx.theme = { headFontFace: FONT, bodyFontFace: FONT };
+pptx.title = 'The Tech Deck';
+
+function newSlide() {
+  const s = pptx.addSlide();
+  s.background = { color: C.black };
+  return s;
+}
+
+/** Master furniture: running head bottom-left, page number bottom-right. */
+function footer(slide, page, numColor) {
+  text(slide, 'Tech Deck', { x: M, y: FOOT_Y, w: 3.0, h: 0.3993, size: SZ.foot, color: C.lime2, valign: 'middle' });
+  text(slide, String(page), { x: 9.5729, y: FOOT_Y, w: 3.0, h: 0.3993, size: SZ.foot, color: numColor || C.lime2, align: 'right', valign: 'middle' });
+}
+
+/* ------------------------------------------------------------------ *
+ * Shared artwork (cover, dividers, closing)
+ * ------------------------------------------------------------------ */
+
+const RIBBON_TOP = [
+  ['M', 1.0, 0], ['L', 1.0, 1.0], ['L', 0.9754, 0.9869],
+  ['C', 0.7155, 0.8554, 0.3901, 0.7898, 0.0362, 0.8102],
+  ['L', 0, 0.8129], ['L', 0, 0.5845], ['L', 0.0424, 0.573],
+  ['C', 0.4244, 0.4618, 0.7543, 0.2609, 0.9881, 0.013], ['Z']
+];
+
+const RIBBON_BOTTOM = [
+  ['M', 1.0, 0], ['L', 1.0, 0.6185], ['L', 0.9288, 0.6279],
+  ['C', 0.8435, 0.642, 0.7573, 0.6616, 0.6703, 0.6871],
+  ['C', 0.445, 0.753, 0.2281, 0.854, 0.0228, 0.9847],
+  ['L', 0, 1.0], ['L', 0, 0.2217], ['L', 0.1149, 0.2224],
+  ['C', 0.287, 0.2178, 0.4641, 0.1899, 0.6444, 0.1372],
+  ['C', 0.7405, 0.1091, 0.8351, 0.0745, 0.9279, 0.0341], ['Z']
+];
+
+const WEDGE_DIAGONAL = [
+  ['M', 0.7229, 0], ['L', 1.0, 0], ['L', 1.0, 1.0], ['L', 0, 1.0], ['L', 0.019, 0.9823],
+  ['C', 0.2813, 0.73, 0.5216, 0.4006, 0.7144, 0.0174], ['Z']
+];
+
+const SWOOSH_TOP = [
+  ['M', 0.5965, 0], ['L', 0.6226, 0.108],
+  ['C', 0.6793, 0.3239, 0.7579, 0.5168, 0.8582, 0.6739],
+  ['C', 0.8979, 0.7361, 0.9396, 0.7905, 0.9828, 0.8372],
+  ['L', 1.0, 0.8548], ['L', 0.9426, 1.0], ['L', 0.9194, 0.9466],
+  ['C', 0.8893, 0.8825, 0.8565, 0.8224, 0.821, 0.7667],
+  ['C', 0.6017, 0.4231, 0.3215, 0.3179, 0.0485, 0.4267],
+  ['L', 0, 0.4487], ['L', 0, 0], ['Z']
+];
+
+const SWOOSH_BOTTOM = [
+  ['M', 0.1207, 0], ['L', 0.1528, 0.0305],
+  ['C', 0.4074, 0.2596, 0.6855, 0.3767, 0.9698, 0.3876],
+  ['L', 1.0, 0.3879], ['L', 1.0, 1.0], ['L', 0.2586, 1.0], ['L', 0.2297, 0.895],
+  ['C', 0.1759, 0.7104, 0.113, 0.5347, 0.0412, 0.3699],
+  ['L', 0, 0.2824], ['Z']
+];
+
+// Gradient ramps reused across the deck
+const RAMP_RIBBON_TOP = [[0, C.pale], [0.7, C.lime]];
+const RAMP_RIBBON_BOTTOM = [[0.3, C.lime], [1, C.pale]];
+const RAMP_CARD = [[0.26, C.lime], [0.66, C.lime4]];
+const RAMP_BAR = [[0, C.pale2], [0.78, C.lime]];
+
+/* ------------------------------------------------------------------ *
+ * Slides
+ * ------------------------------------------------------------------ */
+
+// 1 — Cover
+function slide01() {
+  const s = newSlide();
+  text(s, 'The Tech Deck', { x: M, y: 0.7569, w: 4.4764, h: 1.9121, size: SZ.hero, color: C.white, bold: true, lineSpacingMultiple: 0.8 });
+  text(s, 'Powering the Next Wave', { x: 3.2598, y: 1.8197, w: 1.7187, h: 0.6395, size: SZ.small, color: C.lime });
+  text(s, '0xB1Z | Decode the Future', { x: M, y: 7.0036, w: 2.9583, h: 0.2693, size: SZ.foot, color: C.lime });
+  gradShape(s, { x: 5.2328, y: -0.0021, w: 8.1005, h: 5.6894, path: RIBBON_TOP, stops: RAMP_RIBBON_TOP, angle: 310 });
+  gradShape(s, { x: 0, y: 4.6158, w: 5.2328, h: 2.1017, path: RIBBON_BOTTOM, stops: RAMP_RIBBON_BOTTOM, angle: 315 });
+  return s;
+}
+
+// 2 — Welcome
+function slide02() {
+  const s = newSlide();
+  gradShape(s, { x: 6.9838, y: 0, w: 6.3495, h: 7.5215, path: WEDGE_DIAGONAL, stops: RAMP_RIBBON_BOTTOM, angle: 315 });
+  title(s, 'Welcome to the Pitch', { x: M, y: TITLE_Y, w: 5.3448, h: 1.5828 });
+  text(s, 'X-Tech Mode', { x: 4.2373, y: 1.6035, w: 0.8669, h: 0.5722, size: SZ.body, color: C.lime });
+  dots(s, { x: 0.853, y: 4.3673, w: 0.4664, h: 0.1155, color: C.lime });
+  label(s, 'About the Venture', { x: M, y: 4.6847, w: 4.9521 });
+  copy(s, [
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, ',
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing.'
+  ], { x: M, y: 5.0886, w: 4.9521, h: 1.6405 });
+  return s;
+}
+
+// 3 — Introduction
+function slide03() {
+  const s = newSlide();
+  dots(s, { x: 0.9444, y: 4.5589, w: 0.6207, h: 0.1537, color: C.lime });
+  title(s, 'Introduction Sequence', { x: M, y: 5.1602, w: 5.9062, h: 1.5828 });
+  [
+    { x: 6.5298, head: 'Who We Are' },
+    { x: 9.9479, head: 'What We Are' }
+  ].forEach((col) => {
+    label(s, col.head, { x: col.x, y: 5.1602, w: 2.625 });
+    copy(s, 'Lorem ipsum dolor sit amet, elit porttitor congue massa posuere, magna sed.', { x: col.x, y: 5.5642, w: 2.625, h: 0.9976 });
+  });
+  return s;
+}
+
+// 4 — Section divider 01
+function slide04() {
+  const s = newSlide();
+  gradShape(s, { x: 0, y: -0.0181, w: 9.8185, h: 4.9651, path: SWOOSH_TOP, stops: [[0.35, C.lime], [1, C.pale]], angle: 0 });
+  gradShape(s, { x: 8.6922, y: 4.9466, w: 4.6721, h: 2.5557, path: SWOOSH_BOTTOM, stops: [[0, C.pale], [0.8, C.lime]], angle: 45 });
+  title(s, 'Future Mode Active', { x: M, y: 4.1626, w: 4.3146, h: 2.3098 });
+  text(s, 'Layering The Future', { x: M, y: 6.3728, w: 2.6354, h: 0.3702, size: SZ.small, color: C.lime });
+  text(s, '01', { x: 8.6079, y: 1.172, w: 3.965, h: 2.0298, size: SZ.huge, color: C.white, bold: true, align: 'right', lineSpacingMultiple: 0.8 });
+  dots(s, { x: 11.7439, y: 0.8218, w: 0.6207, h: 0.1537, color: C.lime });
+  return s;
+}
+
+// 5 — Reimagining the Grid (metrics)
+function slide05() {
+  const s = newSlide();
+  rect(s, { x: M, y: 5.034, w: 2.8785, h: 1.709, color: C.panel });
+  title(s, 'Reimagining the Grid', { x: 7.963, y: TITLE_Y, w: 4.61, h: 1.5828 });
+  label(s, 'Synthesizing data and tech.', { x: 7.963, y: 2.9051, w: 4.61 });
+  copy(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa posuere, magna sed pulvinar.', { x: 7.963, y: 3.309, w: 4.61, h: 0.9976 });
+
+  text(s, '+280,9', { x: 1.0668, y: 5.2568, w: 2.2656, h: 0.5722, size: SZ.mid, color: C.lime, bold: true });
+  copy(s, 'Lorem ipsum dolor sit amet, elit porttitor.', { x: 1.0668, y: 5.829, w: 2.2656, h: 0.6913 });
+
+  [
+    { x: 7.963, y: 5.033, value: '34%' },
+    { x: 10.3073, y: 5.034, value: '77%' }
+  ].forEach((m) => {
+    stat(s, m.value, { x: m.x, y: m.y, w: 1.5747 });
+    copy(s, 'Lorem ipsum dolor sit amet.', { x: m.x, y: m.y + 0.796, w: 1.5747, h: 0.6913 });
+  });
+  return s;
+}
+
+// 6 — Launching the Next Signal (two cards)
+function slide06() {
+  const s = newSlide();
+  gradRect(s, { x: 7.1771, y: 3.3056, w: 2.4545, h: 3.4375, stops: [[0.38, C.lime], [1, C.lime4]], angle: 45 });
+  rect(s, { x: 10.1185, y: 3.3056, w: 2.4545, h: 3.4375, color: C.panel });
+  title(s, 'Launching the Next Signal', { x: M, y: TITLE_Y, w: 5.9062, h: 1.5828 });
+  label(s, 'Structure, speed, and scale\u2014built from line', { x: 7.0799, y: 0.8079, w: 5.3958 });
+  copy(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit porttitor congue massa, magna sed pulvinar.', { x: 7.0799, y: 1.2118, w: 5.3958, h: 0.6913 });
+  dots(s, { x: 7.1771, y: 2.2449, w: 0.8883, h: 0.2199, color: C.lime });
+
+  // left card sits on lime -> dark ink; right card is dark -> lime ink
+  label(s, 'Mission Frame', { x: 7.3918, y: 3.548, w: 2.035, color: C.panel });
+  copy(s, 'Lorem ipsum dolor sit amet, elit porttitor congue massa sed posuere, magna.', { x: 7.3918, y: 3.952, w: 2.035, h: 1.3039, color: C.panel });
+  stat(s, '59%', { x: 7.3918, y: 5.7324, w: 1.5747, color: C.panel });
+
+  stat(s, '67%', { x: 10.3282, y: 3.548, w: 1.5747 });
+  label(s, 'Vision Exe', { x: 10.3282, y: 4.7314, w: 2.035 });
+  copy(s, 'Lorem ipsum dolor sit amet, elit porttitor congue massa sed posuere, magna.', { x: 10.3282, y: 5.1353, w: 2.035, h: 1.3039 });
+  return s;
+}
+
+// 7 — Team
+function slide07() {
+  const s = newSlide();
+  title(s, 'Human Protocol', { x: M, y: TITLE_Y, w: 11.8125, h: 0.8558, align: 'center' });
+  [
+    { x: M, nameW: 2.5633, name: 'Ethan Carter, ', role: 'Leader' },
+    { x: 3.8435, nameW: 2.6704, name: 'Liam Novak, ', role: 'Strategy' },
+    { x: 6.9265, nameW: 2.7775, name: 'Noah Bennett, ', role: 'System' },
+    { x: 10.0096, nameW: 2.5633, name: 'Julian Reyes, ', role: 'UI UX' }
+  ].forEach((p) => {
+    text(s, [
+      { text: p.name, options: { color: C.white } },
+      { text: p.role, options: { color: C.lime } }
+    ], { x: p.x, y: 5.4877, w: p.nameW, h: 0.4039, size: SZ.sub, color: C.white, align: 'center' });
+    copy(s, 'Nunc viverra imperdiet enim Vivamus tellus.', { x: p.x, y: 5.8916, w: 2.5633, h: 0.6913, align: 'center' });
+  });
+  return s;
+}
+
+// 8 — This is Where It Begins (progress bar)
+function slide08() {
+  const s = newSlide();
+  rect(s, { x: 6.7745, y: 4.154, w: 2.4812, h: 2.6969, color: C.panel, rotate: 270 });
+  title(s, 'This is Where It Begins', { x: M, y: TITLE_Y, w: 4.8291, h: 1.5828 });
+  label(s, 'Future Of Tech-enabled Ventures', { x: M, y: 2.8603, w: 4.8291 });
+  copy(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus.', { x: M, y: 3.2642, w: 4.8291, h: 0.9976 });
+  dots(s, { x: 0.8692, y: 4.8536, w: 0.9595, h: 0.2375, color: C.lime });
+
+  label(s, 'Prototype To Power', { x: M, y: 5.683, w: 4.8291 });
+  rect(s, { x: M, y: 6.2171, w: 3.8229, h: 0.2095, color: C.panel });
+  rect(s, { x: 0.8007, y: 6.2626, w: 2.4545, h: 0.1183, color: C.lime });
+  label(s, '67%', { x: 4.75, y: 6.1199, w: 0.8395 });
+
+  stat(s, '+390,1', { x: 6.9976, y: 4.5333, w: 2.035 });
+  label(s, 'Vision Exe', { x: 6.9976, y: 5.3764, w: 2.035 });
+  copy(s, 'Lorem ipsum dolor sit amet, elit.', { x: 6.9976, y: 5.7803, w: 2.035, h: 0.6913 });
+  return s;
+}
+
+// 9 — Reimagining the Grid (callouts)
+function slide09() {
+  const s = newSlide();
+  rect(s, { x: 4.0396, y: 0.7569, w: 2.7674, h: 1.4097, color: C.panel });
+  rect(s, { x: M, y: 5.3333, w: 2.7674, h: 1.4097, color: C.panel });
+  title(s, 'Reimagining the Grid', { x: 7.963, y: TITLE_Y, w: 4.61, h: 1.5828 });
+  label(s, 'Future Of Tech-enabled Ventures', { x: 7.963, y: 2.8603, w: 4.61 });
+  copy(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit porttitor.', { x: 7.963, y: 3.2642, w: 4.61, h: 0.6913 });
+
+  [
+    { statY: 4.6265, rowY: 4.5854, value: '44%', name: 'Option 1' },
+    { statY: 5.8516, rowY: 5.8105, value: '55%', name: 'Option 2' }
+  ].forEach((r) => {
+    stat(s, r.value, { x: 7.963, y: r.statY, w: 1.5747 });
+    label(s, r.name, { x: 9.8762, y: r.rowY, w: 2.6968 });
+    copy(s, 'Lorem ipsum dolor sit amet.', { x: 9.8762, y: r.rowY + 0.4039, w: 2.6968, h: 0.385 });
+  });
+
+  [
+    { x: 4.2905, y: 1.0673, name: 'Option 2' },
+    { x: 1.0113, y: 5.6437, name: 'Option 1' }
+  ].forEach((card) => {
+    label(s, card.name, { x: card.x, y: card.y, w: 2.2656 });
+    copy(s, 'Lorem ipsum dolor sit.', { x: card.x, y: card.y + 0.4039, w: 2.2656, h: 0.385 });
+  });
+  return s;
+}
+
+// 10 — Statement / CTA
+function slide10() {
+  const s = newSlide();
+  gradRect(s, { x: M, y: 1.5938, w: 3.9375, h: 4.3125, stops: [[0.3, C.lime], [0.79, C.lime4]], angle: 45 });
+  rect(s, { x: 8.6354, y: 1.5938, w: 3.9375, h: 4.3125, color: C.panel });
+  text(s, 'Every system has a beginning. Welcome to ours.', { x: 1.1566, y: 2.3346, w: 3.1451, h: 2.8307, size: SZ.stat, color: C.panel, bold: true, lineSpacingMultiple: 0.9 });
+  dots(s, { x: 3.3878, y: 1.455, w: 1.1206, h: 0.2774, color: C.white });
+  text(s, 'Let\u2019s Begin', { x: 9.592, y: 3.0937, w: 1.8924, h: 1.3127, size: SZ.stat, color: C.lime, bold: true });
+  chevron(s, { x: 11.3525, y: 3.5102, w: 0.2639, h: 0.4798, color: C.lime });
+  dots(s, { x: 8.9232, y: 5.7675, w: 1.1206, h: 0.2774, color: C.lime });
+  return s;
+}
+
+/** ">" glyph drawn as two strokes. */
+function chevron(slide, o) {
+  slide.addShape('custGeom', {
+    x: o.x, y: o.y, w: o.w, h: o.h,
+    points: [{ x: 0, y: 0, moveTo: true }, { x: o.w, y: o.h / 2 }, { x: 0, y: o.h }],
+    fill: NO_LINE, line: { color: o.color, width: 3 }
+  });
+}
+
+// 11 — Core Advantages (numbered list)
+function slide11() {
+  const s = newSlide();
+  title(s, 'Core Advantages ', { x: M, y: TITLE_Y, w: 6.809, h: 0.8558 });
+  dots(s, { x: 11.7209, y: 1.0895, w: 0.852, h: 0.2109, color: C.lime });
+  const lorem = 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna.';
+  [['01', 'Option 1', 2.1167], ['02', 'Option 2', 3.7317], ['03', 'Option 3', 5.3468]].forEach(([num, name, y]) => {
+    text(s, num, { x: M, y, w: 1.5747, h: 0.7742, size: SZ.num, color: C.lime, bold: true });
+    label(s, name, { x: 1.8381, y: y + 0.0813, w: 10.7348 });
+    copy(s, lorem, { x: 1.8381, y: y + 0.5335, w: 10.7348, h: 0.6913 });
+  });
+  return s;
+}
+
+// 12 — Three feature cards, the middle one raised
+function slide12() {
+  const s = newSlide();
+  gradRect(s, { x: 4.4874, y: 1.3513, w: 4.3585, h: 4.7736, stops: RAMP_CARD, angle: 45 });
+  rect(s, { x: 8.8459, y: 1.6971, w: 3.727, h: 4.082, color: C.panel });
+  rect(s, { x: M, y: 1.6971, w: 3.727, h: 4.082, color: C.panel });
+
+  const sideCopy = 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit porttitor congue massa posuere, sed pulvinar ultricies.';
+  [
+    { x: 1.1051, num: '01', name: 'Modular System' },
+    { x: 9.1906, num: '03', name: 'Cloud Ready' }
+  ].forEach((card) => {
+    text(s, card.num, { x: card.x, y: 2.3, w: 3.0377, h: 0.7742, size: SZ.num, color: C.lime, bold: true });
+    text(s, card.name, { x: card.x, y: 3.4795, w: 3.0377, h: 0.3702, size: SZ.small, color: C.lime });
+    copy(s, sideCopy, { x: card.x, y: 3.8722, w: 3.0377, h: 1.3039 });
+  });
+
+  text(s, '02', { x: 4.8321, y: 1.7901, w: 3.6692, h: 0.9088, size: 48, color: C.panel, bold: true });
+  text(s, 'Fast Deployment', { x: 4.8321, y: 3.0028, w: 3.6692, h: 0.4376, size: SZ.lead, color: C.panel });
+  copy(s, [
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. ',
+    'Fusce posuere, magna sed pulvinar ultricies, purus lectus libero.'
+  ], { x: 4.8321, y: 3.5726, w: 3.6692, h: 1.9468, color: C.panel });
+
+  dots(s, { x: 7.3806, y: 1.2126, w: 1.1206, h: 0.2774, color: C.white });
+  dots(s, { x: 11.1076, y: 5.6404, w: 1.1206, h: 0.2774, color: C.lime });
+  dots(s, { x: 3.0221, y: 5.6404, w: 1.1206, h: 0.2774, color: C.lime });
+  return s;
+}
+
+// 13 — Why It Works
+function slide13() {
+  const s = newSlide();
+  gradRect(s, { x: 0.7685, y: 4.1111, w: 5.6503, h: 2.6319, stops: RAMP_CARD, angle: 45 });
+  rect(s, { x: 6.9226, y: 4.1111, w: 5.6503, h: 2.6319, color: C.panel });
+  title(s, 'Why It Works', { x: M, y: TITLE_Y, w: 11.8125, h: 0.8558 });
+  dots(s, { x: 11.7209, y: 1.0895, w: 0.852, h: 0.2109, color: C.lime });
+  label(s, 'Seamless Intregation', { x: M, y: 2.198, w: 11.8125 });
+  copy(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna. Nunc viverra imperdiet enim. Fusce est. Vivamus a tellus. Pellentesque habitant morbi tristique senectus et netus.', { x: M, y: 2.6502, w: 11.8125, h: 0.9976 });
+
+  const cardCopy = [
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. ',
+    'Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. '
+  ];
+  [
+    { x: 1.0797, head: 'Real Time Sync', ink: C.panel, headInk: C.panel },
+    { x: 7.2339, head: 'Scalable Design', ink: C.white, headInk: C.lime }
+  ].forEach((card) => {
+    label(s, card.head, { x: card.x, y: 4.3807, w: 5.0278, color: card.headInk });
+    copy(s, cardCopy, { x: card.x, y: 4.8329, w: 5.0278, h: 1.6405, color: card.ink });
+  });
+  return s;
+}
+
+// 14 — Bar chart
+function slide14() {
+  const s = newSlide();
+  hairline(s, { x: 5.5984, y: 5.4049, w: 1.8842, h: 0 });
+  hairline(s, { x: 3.8278, y: 3.2858, w: 3.6548, h: 0 });
+  hairline(s, { x: 1.4443, y: 1.1667, w: 6.0383, h: 0 });
+  hairline(s, { x: 1.4443, y: 1.151, w: 0, h: 1.8422 });
+
+  [
+    { x: M, y: 2.9933, h: 3.7498 },
+    { x: 2.5158, y: 1.9158, h: 4.8273 },
+    { x: 4.2712, y: 4.3515, h: 2.3916 }
+  ].forEach((bar) => gradRect(s, { x: bar.x, y: bar.y, w: 1.3677, h: bar.h, stops: RAMP_BAR, angle: 330 }));
+
+  const legendCopy = 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa sed pulvinar.';
+  [
+    { y: 0.9049, value: '38%', name: 'Option 1', color: C.lime },
+    { y: 3.0239, value: '56%', name: 'Option 2', color: C.lime3 },
+    { y: 5.143, value: '24%', name: 'Option 3', color: C.lime5 }
+  ].forEach((row) => {
+    text(s, row.value, { x: 7.8702, y: row.y, w: 1.5747, h: 0.7742, size: SZ.num, color: row.color, bold: true });
+    label(s, row.name, { x: 7.8702, y: row.y + 0.9, w: 1.5747, color: row.color });
+    copy(s, legendCopy, { x: 9.6576, y: row.y, w: 2.8935, h: 1.3039 });
+  });
+  return s;
+}
+
+// 15 — Pricing table
+function slide15() {
+  const s = newSlide();
+  title(s, 'Tech Stack Distribution', { x: M, y: TITLE_Y, w: 11.8125, h: 0.8558 });
+  dots(s, { x: 11.7209, y: 1.0895, w: 0.852, h: 0.2109, color: C.lime });
+
+  const data = [
+    ['Real Time Sync', 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit', '$197', C.lime],
+    ['AI Engine', 'Lorem ipsum dolor sit amet, adipiscing elit', '$278', C.lime2],
+    ['Cloud Integration', 'Lorem ipsum dolor sit amet, elit', '$348', C.lime3],
+    ['Custom Report', 'Lorem ipsum dolor sit amet, consectetuer elit', '$492', C.lime4],
+    ['Dedicated Support', 'Lorem ipsum dolor sit elit', '$544', C.lime5]
+  ];
+
+  const rows = data.map(([name, desc, price, fill]) => ([
+    { text: name, options: { fill: { color: fill }, margin: [0.05, 0.1, 0.05, 0.2756] } },
+    { text: desc, options: { fill: { color: fill }, margin: [0.05, 0.1, 0.05, 0.2756] } },
+    { text: price, options: { fill: { color: fill }, margin: [0.05, 0.315, 0.05, 0.2756], fontSize: 34, bold: true, align: 'right' } }
+  ]));
+
+  s.addTable(rows, {
+    x: M, y: 2.0849, w: 11.8125,
+    colW: [3.3369, 6.125, 2.3506],
+    rowH: 0.8957,
+    fontFace: FONT, fontSize: SZ.body, color: C.panel,
+    valign: 'middle', border: { type: 'none' }
+  });
+  return s;
+}
+
+// 16 — From Input to Impact
+function slide16() {
+  const s = newSlide();
+  title(s, 'From Input to Impact', { x: M, y: TITLE_Y, w: 11.8125, h: 0.8558 });
+  dots(s, { x: 11.7209, y: 1.0895, w: 0.852, h: 0.2109, color: C.lime });
+  copy(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. ', { x: M, y: 1.7229, w: 11.8125, h: 0.385 });
+
+  hairline(s, { x: 3.736, y: 3.8517, w: 0, h: 2.5197, width: 1.25 });
+  hairline(s, { x: 6.6667, y: 3.8517, w: 0, h: 2.5197, width: 1.25 });
+  hairline(s, { x: 9.6198, y: 3.8517, w: 0, h: 2.4803, width: 1.25 });
+
+  [
+    { x: M, textX: 0.9586, pctX: 0.9586, tint: C.lime2, name: 'Option 1', pct: '20%' },
+    { x: 3.7136, textX: 3.9117, pctX: 3.9535, tint: C.lime3, name: 'Option 2', pct: '40%' },
+    { x: 6.6667, textX: 6.8842, pctX: 6.8842, tint: C.lime4, name: 'Option 3', pct: '60%' },
+    { x: 9.6198, textX: 9.8164, pctX: 9.7955, tint: C.lime5, name: 'Option 4', pct: '80%' }
+  ].forEach((col) => {
+    rect(s, { x: col.x, y: 3.0824, w: 2.9531, h: 0.7692, color: col.tint });
+    label(s, col.name, { x: col.textX, y: 3.2651, w: 1.9163, color: C.panel });
+    text(s, col.pct, { x: col.pctX, y: 4.386, w: 1.5747, h: 0.6395, size: SZ.big, color: col.tint, bold: true });
+    copy(s, 'Pellentesque habitant morbi tristique senectus et netus et ac turpis. ', { x: col.textX, y: 5.2082, w: 2.5599, h: 0.9976 });
+  });
+  return s;
+}
+
+// 17 — Stacked staircase
+function slide17() {
+  const s = newSlide();
+  [
+    { x: 3.5139, y: 2.3904, w: 9.059, h: 2.119, color: C.lime2 },
+    { x: 2.5556, y: 2.7436, w: 7.0642, h: 1.7658, color: C.lime3 },
+    { x: 1.5694, y: 3.0968, w: 5.0972, h: 1.4126, color: C.lime4 },
+    { x: M, y: 3.4499, w: 2.9531, h: 1.0595, color: C.lime5 }
+  ].forEach((band) => rect(s, { ...band, transparency: 15 }));
+
+  title(s, 'Evolution in Motion', { x: M, y: TITLE_Y, w: 11.8125, h: 0.8558 });
+  dots(s, { x: 11.7209, y: 1.0895, w: 0.852, h: 0.2109, color: C.lime });
+
+  [
+    { x: M, name: 'Option 1', tint: C.lime5 },
+    { x: 3.7135, name: 'Option 2', tint: C.lime4 },
+    { x: 6.6667, name: 'Option 3', tint: C.lime3 },
+    { x: 9.6198, name: 'Option 4', tint: C.lime2 }
+  ].forEach((col) => {
+    label(s, col.name, { x: col.x, y: 4.8745, w: 2.3562, color: col.tint });
+    copy(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. ', { x: col.x, y: 5.3267, w: 2.3562, h: 0.9976 });
+  });
+  return s;
+}
+
+// 18 — Interface showcase (tablet mock-up)
+function slide18() {
+  const s = newSlide();
+  title(s, 'Interface Showcase', { x: M, y: TITLE_Y, w: 5.061, h: 1.5828 });
+  copy(s, 'Lorem ipsum dolor sit amet, adipiscing elit porttitor congue.', { x: M, y: 2.4144, w: 4.1789, h: 0.6913 });
+
+  [
+    { y: 3.7292, bulletY: 3.8151, head: 'Rendered Reality' },
+    { y: 5.3606, bulletY: 5.4465, head: 'System Visualized' }
+  ].forEach((item) => {
+    rect(s, { x: M, y: item.bulletY, w: 0.2306, h: 0.2306, color: C.lime });
+    label(s, item.head, { x: 1.2014, y: item.y, w: 4.1789 });
+    copy(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit porttitor congue.', { x: 1.2014, y: item.y + 0.4039, w: 4.1789, h: 0.6913 });
+  });
+
+  imagePlaceholder(s, { x: 6.1548, y: 0.6133, w: 6.5119, h: 4.9157, radius: 0.28 });
+  rect(s, { x: 6.4259, y: 5.529, w: 6.0, h: 1.214, color: C.panel });
+  text(s, '+288M', { x: 6.6667, y: 5.8163, w: 1.9444, h: 0.6395, size: SZ.big, color: C.lime, bold: true });
+  label(s, 'Modular System', { x: 8.7801, y: 5.7416, w: 3.3588 });
+  copy(s, 'Lorem ipsum dolor sit amet elit. ', { x: 8.7801, y: 6.1455, w: 3.3588, h: 0.385 });
+  return s;
+}
+
+// 19 — Your Experience Starts Here (phone mock-up)
+function slide19() {
+  const s = newSlide();
+  imagePlaceholder(s, { x: 0.6057, y: 0.7143, w: 4.922, h: 8.7522, radius: 0.55 });
+  title(s, 'Your Experience Starts Here', { x: 6.5, y: TITLE_Y, w: 6.0729, h: 1.5828 });
+  label(s, 'Designed to Deliver', { x: 6.5, y: 2.8603, w: 6.0729 });
+  copy(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa posuere, magna sed.', { x: 6.5, y: 3.2642, w: 6.0729, h: 0.6913 });
+
+  gradRect(s, { x: 6.5, y: 4.5579, w: 2.7624, h: 2.0183, stops: [[0.17, C.lime], [1, C.lime4]], angle: 45 });
+  rect(s, { x: 9.8105, y: 4.5579, w: 2.7624, h: 2.0183, color: C.panel });
+
+  [
+    { x: 6.7085, value: '+288,91M', head: 'Secure by Default', ink: C.panel, body: C.panel },
+    { x: 10.019, value: '+398,42M', head: 'Modular System', ink: C.lime, body: C.white }
+  ].forEach((card) => {
+    text(s, card.value, { x: card.x, y: 4.8107, w: 2.3454, h: 0.5722, size: SZ.mid, color: card.ink, bold: true });
+    label(s, card.head, { x: card.x, y: 5.5344, w: 2.3454, color: card.ink });
+    copy(s, 'Lorem ipsum dolor sit.', { x: card.x, y: 5.9383, w: 2.3454, h: 0.385, color: card.body });
+  });
+  return s;
+}
+
+// 20 — Thank You (cover artwork, mirrored)
+function slide20() {
+  const s = newSlide();
+  gradShape(s, { x: 0, y: 0.7855, w: 8.1005, h: 5.6894, path: mirrorPath(RIBBON_TOP), stops: RAMP_RIBBON_TOP, angle: 230 });
+  gradShape(s, { x: 8.1005, y: 2.8085, w: 5.2328, h: 2.1017, path: mirrorPath(RIBBON_BOTTOM), stops: RAMP_RIBBON_BOTTOM, angle: 225 });
+  text(s, 'Thank You', { x: 7.6111, y: 0.7569, w: 4.9348, h: 1.0235, size: SZ.hero, color: C.white, bold: true, align: 'right', lineSpacingMultiple: 0.8 });
+  text(s, 'Beginning of Possibility', { x: 7.6111, y: 1.7805, w: 4.9348, h: 0.3702, size: SZ.small, color: C.lime, align: 'right' });
+  text(s, 'www.TechDeck.com', { x: M, y: 7.0036, w: 2.9583, h: 0.2693, size: SZ.foot, color: C.lime });
+  text(s, '@TheTech_Deck', { x: 9.6146, y: 7.0036, w: 2.9583, h: 0.2693, size: SZ.foot, color: C.lime, align: 'right' });
+  return s;
+}
+
+/* ------------------------------------------------------------------ *
+ * Build — [builder, page number, page-number colour]
+ * Cover, divider and closing slides hide the master footer.
+ * ------------------------------------------------------------------ */
+
+const DECK = [
+  [slide01], [slide02, 2, C.panel], [slide03, 3], [slide04], [slide05, 5],
+  [slide06, 6], [slide07, 7], [slide08, 8], [slide09, 9], [slide10],
+  [slide11, 11], [slide12, 12], [slide13, 13], [slide14, 14], [slide15, 15],
+  [slide16, 16], [slide17, 17], [slide18, 18], [slide19, 19], [slide20]
+];
+
+DECK.forEach(([build, page, numColor]) => {
+  const s = build();
+  if (page) footer(s, page, numColor);
+});
+
+pptx.writeFile({ fileName: path.join(__dirname, '11de34a5-975f-4bad-ba21-7d4d9b246f97_grok_final.pptx') })
+  .then((f) => console.log('wrote', f));
