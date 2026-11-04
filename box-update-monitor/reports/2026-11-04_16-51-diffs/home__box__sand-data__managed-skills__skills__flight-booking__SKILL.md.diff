@@ -1,0 +1,159 @@
+--- 2026-11-04_09-47:/home/box/sand-data/managed-skills/skills/flight-booking/SKILL.md
++++ 2026-11-04_16-51:/home/box/sand-data/managed-skills/skills/flight-booking/SKILL.md
+@@ -2,53 +2,77 @@
+ name: flight-booking
+ description: >-
+   When the user asks you to find, compare, book, change, or check in for a
+-  flight, look up an itinerary, or fetch a boarding pass, before you search any
+-  airline or travel site or touch a checkout.
++  flight, look up an itinerary, or fetch a boarding pass, before you search for
++  flights, open an airline or travel site, or touch a checkout.
+ ---
+ # Flight booking
+ 
+-You find, compare, and book flights, then handle check-in and boarding passes. Grok Bot has no flight index of its own. Every price and schedule comes from a connector, a travel site in your browser, or a web search, and you say which one you used.
++You find, compare, and book flights, then handle check-in and boarding passes. When `FlightSearch` is in your tools, its results are your fares and schedules. Otherwise Grok Bot has no flight index of its own: every price and schedule comes from a connector, a travel site in your browser, or a web search, and you say which one you used.
+ 
+ ## Entry points
+ 
+ - "Get me on a flight to Chicago next Thursday" gives a destination and a date;
+- resolve the rest.
++ the home airport is the origin.
+ - "Cheapest nonstop LAX to JFK on the 12th" is a fixed route with a ranking rule.
+-- "I have to be in Lisbon sometime in May" is a flexible date search;
+- the price calendar matters more than any single fare.
++- "I have to be in Lisbon sometime in May" is a flexible window;
++ find its cheapest dates before you search fares.
+ - A forwarded confirmation or deal email is an itinerary to look up, check in for, or rebook, not a new search.
+ 
+-## Before you start
++## Before you search
+ 
+-- Pin down origin, destination, dates, passenger count, cabin, and any hard constraint (arrive before a meeting, no red-eyes, one alliance only). Infer harmless defaults such as one adult in economy and say what you assumed. Ask only when the answer changes which flights qualify.
+-- Resolve relative dates against the time zone in your prompt's Time section. Say the weekday and the date together ("Thursday, October 9") before you type a date into any site.
+-- Read the Memory section for the home airport, seat and airline preferences, loyalty programs, known traveler numbers, and passport expiry. Call RecallMemory for older trips or preferences that are not listed.
+-- Run SearchPlugins for a flights or travel connector and for the airline the user names. Use a connector when one is installed. Install a missing connector with InstallPlugin without asking;
+- its connect card is the ask. Ask in one widget first only when the user named no service and several plugins fit (Gmail or Outlook, Google or Outlook Calendar), or the plugin has no connector. Say in the user's words why it helps, without saying plugin, MCP, or plugin id, and never paste a connect link. Do not assert that any airline has a connector before the search says so.
+-- Vague places need airports. "Washington" means DCA, IAD, and BWI. Search all of them and label the airport in each option unless the user has ruled one out.
++- Read the Memory section for the home airport, who usually travels with the user, seat, cabin, stop, and airline preferences, loyalty programs, known traveler numbers, and passport expiry. Call RecallMemory for older trips or preferences that are not listed.
++- A search needs an origin, a destination, and dates. The home airport is the origin unless the user names another. When the user has several home airports or names a metro, pass the metro as `origin` ("Bay Area", "New York", "NYC") so one search covers all of them;
++ an airport code searches only that airport. Ask only for what is still unknown, in one short question, without saying you will search. A flexible window ("sometime in May", "a long weekend in spring") needs only a trip length to search. Take it from the user's words: "a long weekend" is 2 to 4 nights, leaving Thursday or Friday and coming back Sunday or Monday, and "a week" is 6 to 8 nights. When the length names days, only pairs on those days count, including the pairs a price calendar returns. Ask for a length only when nothing the user said implies one.
++- A flexible destination is up to 3 places. Search each place the user names ("Lisbon or Porto"). For an open one ("somewhere warm", "a beach in March"), pick 2 or 3 places that fit the season and the origin instead of asking. Name them in one short line before your first search or calendar read, because those can take minutes. When the user names more than 3, ask which 3 to compare. With several places and a window that needs a price calendar, read each place's calendar at one trip length, the middle one the user allows ("a long weekend" is 3 nights, Thursday to Sunday or Friday to Monday), so a turn reads at most 3 calendars;
++ the dates a day either side cover the other lengths.
++- Search one adult in economy unless the user or the Memory section says otherwise, and say what you assumed. When the trip sounds like a group ("we", "the kids", "my team", several names) and the head count is unknown, ask how many travel, with children's ages, before you search.
++- Resolve relative dates against the time zone in your prompt's Time section. A date without a year ("Jan 12", "Tue Mar 20") is its next future occurrence;
++ when the user also gave a weekday, take the year where the weekday matches. Search that date without asking the user to confirm the year. Say the weekday and the date together ("Thursday, October 9") before you type a date into any site.
++
++## Searching with FlightSearch
++
++When `FlightSearch` is in your tools, it runs before any connector or site. Use those only when it finds no fares or the user asks for a site;
++ the one exception is the price calendar for flexible dates below.
++
++- Plan 2 to 4 searches from what you know about the user and run them in one `FlightSearch` call: the trip exactly as the user asked, plus 1 to 3 `variants` that could change the pick for this user. Each variant changes one thing:
++  - the dates, a day earlier or later on either end, when they aren't tied to an event;
++
++  - the stop limit, allowing one stop when the trip as asked is nonstop only. Never add a stops variant that narrows the trip as asked (nonstop only when it already allows stops), even for a user who prefers nonstop, because its flights are already in those results;
+ 
+-## Flow
++  - the airports, nearby ones at either end (OAK or SJC for SFO) that the trip's search doesn't already cover;
+ 
+-1. If a flights connector exists, search through it with the resolved route, dates, passengers, and cabin, and refine there. Skip to step 4.
++  - the cabin, when the user flies another one or the flight is long.
++- A question about one flight ("is UA 232 on the 12th still under $300?") needs no variants.
++- When the user's window allows more than 4 date pairs, one search can't cover it. First dispatch a `computerUse` subagent with the Google Flights "prices across a date window" job, giving it the route, the window, the trip lengths, the cabin, every traveler, and the stop limit. Give it at most 3 trip lengths, since each one is another calendar read: when the user allows more ("a week or two"), pick 3 typical ones (7, 10, and 14 nights) and say which you checked. Then run one `FlightSearch` with the cheapest pair it returns as the trip and the next 3 as `dates` variants. Calendar prices are estimates, so quote fares only from the card. When the calendar can't be read, search 4 pairs spread across the window and say the rest went unchecked.
++- For several destinations, run the trip to the first and an `airports` variant with `to` for each other place, on the same dates. With a window that needs the calendar, read it for each destination first, then make the trip the cheapest destination and pair, give the other destinations `airports` variants on those dates, and fill any slot left with that destination's next cheapest pair as a `dates` variant. When another destination's own cheapest dates differ and come close in price, run a second `FlightSearch` for it on those dates.
++- A limit the user stated (arrive before a meeting, no red-eyes, one alliance only) applies to every search. A remembered preference only adds a variant or shapes the pick;
++ it never removes the trip as asked.
++- Pick `recommended` only from flights that meet every limit the user stated for this trip ("land by 6pm", "no red-eyes");
++ a stated limit beats a remembered preference. Among those, prefer the user's preferences in the Memory section (airlines and loyalty programs, nonstop, time of day, cabin), then price. Order `groups` the same way, so the comparison that best fits the stated limits comes first.
++- When `ArrangeFlights` is in your tools, pass it the card id from the search result, `recommended`, and `groups`, and show the card it returns instead of the search's card.
++- Describe refunds, changes, and bags only from the fare rules the flight tools give.
++
++## Searching sites
++
++Without `FlightSearch`, or when it finds no fares:
++
++1. Run SearchPlugins for a flights or travel connector and for the airline the user names. Use a connector when one is installed, with the resolved route, dates, passengers, and cabin, and refine there. Install a missing connector with InstallPlugin without asking;
++ its connect card is the ask. Ask in one widget first only when the user named no service and several plugins fit (Gmail or Outlook, Google or Outlook Calendar), or the plugin has no connector. Say in the user's words why it helps, without saying plugin, MCP, or plugin id, and never paste a connect link. Do not assert that any airline has a connector before the search says so.
+ 2. Otherwise dispatch a `computerUse` subagent to Google Flights or the airline's own site with the tightest URL you can build (route, dates, passengers, and cabin in the query string). Tell it what to read back: airline and flight number, departure and arrival times, duration, stops, connecting airports, fare name, total price, and bag rules when shown.
+ 3. Refine with the site's filters instead of asking the user again. "No connections", "leave after lunch", "not Newark", and "anything cheaper" are filter changes. Re-dispatch with the new URL or the filter to click.
+-4. Treat every time as local wall clock at that airport. An "arrive before 23:00" rule means the local arrival date and the local clock, so check both. When a trip crosses zones, label each time with its airport ("departs SFO 08:15, arrives JFK 16:45") and convert to the user's zone only when you say you did.
++4. Vague places need airports. "Washington" means DCA, IAD, and BWI. Search all of them and label the airport in each option unless the user has ruled one out.
+ 5. Never report that a route has no service from one empty result. Run WebSearch for the route and check the airline's own site first.
+-6. Present the options (see Presenting choices) and stop for an explicit pick.
+-7. Book on the site the user prefers. With no preference, book on the airline's own site. If a travel site shows the fare but hands payment to the airline, say so before you start, because the airline page is a new sign-in.
+-8. Enter passenger details. Legal names, dates of birth, and contact details come from memory when you have them. Anything else comes through `RequestUserForm` with fields targeted at the live page. Passport numbers and expiry dates go into the form as secret fields, never into chat. Loyalty and known traveler numbers come from memory or from a saved vault key listed in the `RequestUserForm` description (the key `ktn` names one fact on every site;
+- a frequent flyer key carries the airline in its name). Multi-step passenger pages get one form per page.
+-9. When the site wants a sign-in, a one-time code, or a verify-you-are-human check, follow the Cursor-managed `sign-in` skill in its order, which ends with the Secure Form (`RequestUserForm`) and then handing over the screen with `request_box_help` and one instruction ("Sign in to your <service> account"). Never send a question widget before these;
+- the tool is the ask. After a receipt or a hand-back, dispatch the subagent again;
+- the session persists across turns. Seats, bags, and paid add-ons are the user's choices;
+- surface them, do not buy them.
+-10. Run the savings check (see Savings check). Then confirm the itinerary and total with a question widget and pay (see Paying and confirming).
+-11. Report the booking reference, the itinerary, and the total from the confirmation page. Save a stated preference (a new loyalty number, a favorite airline) with `UpdateMemory` only when the user confirmed it.
++6. When the user's window allows more than 4 date pairs, read its prices first with the Google Flights "prices across a date window" job, with at most 3 trip lengths as in Searching with FlightSearch. Search the cheapest pair it returns as in step 2 without asking which dates to search, and name the next 2 cheapest pairs as other dates the user can pick. Calendar prices are estimates, so quote fares only from the site's results. When the calendar can't be read, search the window's first pair and say the rest went unchecked.
+ 
+ ## Presenting choices
+ 
+-- Show three to five options that differ on something the user cares about. For each: airline and flight number, departure and arrival times with airport codes, duration, stops, fare name, bag and change caveats when shown, and the total for all passengers.
+-- For flexible dates, take a Screenshot of the price calendar or date grid, attach the saved path, summarize the two or three cheapest or most convenient combinations, and ask which dates to search.
++Keep replies short and factual: what you found and what happens next. Start with the finding. No openers or acknowledgements ("Good news", "On it", "Got it", "Sorted", "Great choice"), greetings, emoji, filler, or enthusiasm.
++
++- When you show a flights card, the card carries the flights, prices, and fare rules. Write one or two short lines at most, such as which flight fits and why, named by airline and departure time, never by an offer ref. Don't list the flights or their prices, and mention a button only when the card shows it.
++- When SendToUser rejects a reply for restating the card, rewrite it shorter but keep the answer the user asked for (the saving, the yes or no, the flight that fits). Never trade it for a vague line.
++- When you searched other dates, say plainly whether moving the dates saves money, with one amount worked out from the result totals: "Flying a day later saves $40." or "Other dates aren't cheaper."
++- Without a card, send a compact list of three to five flights, best first, one line each: airline and flight number, departure and arrival times with airport codes, stops, duration, and the total for all travelers. Add a bag or change caveat only when it changes the choice.
++- Treat every time as local wall clock at that airport. An "arrive before 23:00" rule means the local arrival date and the local clock, so check both. When a trip crosses zones, label each time with its airport ("departs SFO 08:15, arrives JFK 16:45") and convert to the user's zone only when you say you did.
+ - When the user gave exact criteria ("the cheapest direct flight") and one option clearly wins, you may pick it, but still show the picked itinerary and total and get a yes before payment.
+ - Use a question widget for the pick only when the shortlist is real and short. Otherwise send the summary and let the user reply.
+ - Show what you collected in the user's language, which is the language they write to you in unless they asked for another or the Memory section names one they prefer. When a page is in another language, translate the words you put in a card or a summary, such as titles, descriptions, specs and their labels, notes, review summaries, policies, delivery and status lines, and option names. Keep brand, store, seller, and venue names, model numbers, order numbers and other codes, prices with their currency, and links as the page shows them. Brief the browser subagent and type into the site in the site's own words, and match a choice the user makes in their language back to those words.
+@@ -68,6 +92,34 @@
+ - Then say in one line what the check saved and how ("Saved $6.00 with CAMP6 from the store's welcome email", "Saved €297 by booking direct"), or that the codes you tried did not apply. Say nothing about savings when there was nothing to try.
+ - After the order is placed, record each saving, since the user paid the lower price: kind promo_code for a code or checkout offer, or direct_booking for buying on the merchant's own site instead of a reseller, with the reseller's total, including any code that applied there, less the merchant's total before any code you entered on the merchant's site, since that code is its own promo_code saving, dated the order date, with the order's https link as proof. Save one fact of type "journal" with UpdateMemory for each saving, in exactly this shape: `Saving YYYYMM: YYYY-MM-DD | kind | amount CURRENCY | store | proof link`. YYYYMM is the year and month of that date with no separator. amount CURRENCY is how much less the user paid, with its ISO 4217 code, such as 6.00 USD. Never start any other fact with Saving and a month. Save nothing when nothing was saved.
+ 
++## Booking
++
++When the user picks a flight, in words or from a card, book it.
++
++No flight tool holds or books a fare. When `FlightDetails` gives a time for its price, say "this price is good until <time>", and that the airline confirms the price at payment. Selecting flights on a site holds nothing either: say the flights are selected. Say a fare is held or reserved only when the airline's own page says so, and never say a price is verified or locked in.
++
++1. Check the pick before the browser starts, in one message. When `FlightDetails` is in your tools, call it for the flight and show its card. From the fare rules, flag anything the fare lacks that the user asked for or mentioned (checked bags, carry-on, seats together, changes), and say so when the rules leave bags to the airline. Flag a red-eye or a long layover. When more than one fare is offered for the flight, say in one line what each adds (bags, changes, seat choice) and the price difference, and let the user pick.
++2. When none of your tools books this fare in chat, book it in the browser on the airline's own site, or on the site the user prefers. Dispatch a `computerUse` subagent with the flight numbers, dates, fare, cabin, and travelers. When the airline playbook's booking snippet has a `<CHECKOUT LINK>` slot, fill it with the `checkoutUrl` in the user's Book request only when that link is on the airline's own site;
++ the snippet falls back to its search link when the checkout link doesn't open the trip. With no booking snippet for the airline, start the subagent at that `checkoutUrl`. If a travel site shows the fare but hands payment to the airline, say so before you start, because the airline page is a new sign-in.
++3. Enter passenger details. Never ask for them in chat, not even one field.
++   - Legal names, dates of birth, and contact details come from memory when you have them. Collect the rest with `RequestUserForm`.
++   - Ask for the fields the subagent reported on the passenger page, in the same shape, because form values reach the page exactly as entered and can't be split or joined: one name box gets one field, separate first, middle, and last name boxes get three. Before that page is open, use separate first, middle, and last name fields and separate birth month, day, and year fields, the shape most airline pages use.
++   - Use the fewest forms the tool's field limit allows: fit as many whole travelers in a form as the limit holds, and split a traveler across forms only when their fields alone exceed it. Ask for each field once;
++ the contact phone and email go in the first form. Mark middle name optional (`required: false`).
++   - Passport numbers and expiry dates go into the form as secret fields. Loyalty and known traveler numbers come from memory or from a saved vault key listed in the `RequestUserForm` description (the key `ktn` names one fact on every site;
++ a frequent flyer key carries the airline in its name).
++   - When a later page asks for something new, send a form with only the new fields.
++4. When the site wants a sign-in, a one-time code, or a verify-you-are-human check, follow the Cursor-managed `sign-in` skill in its order, which ends with the Secure Form (`RequestUserForm`) and then handing over the screen with `request_box_help` and one instruction ("Sign in to your <service> account"). Never send a question widget before these;
++ the tool is the ask. After a receipt or a hand-back, dispatch the subagent again;
++ the session persists across turns. Seats, bags, and paid add-ons are the user's choices;
++ surface them, do not buy them.
++5. Run the savings check (see Savings check). Then confirm the itinerary and total with a question widget and pay (see Paying and confirming).
++6. Report the booking reference, the itinerary, and the total from the confirmation page. Save a stated preference (a new loyalty number, a favorite airline) with `UpdateMemory` only when the user confirmed it.
++7. Whenever the booking stops before confirmation, for any reason (a captcha or other wall the sign-in order can't clear, a site error, a fare the site no longer sells, or the user skipping or declining a help request), end your reply with a link for the chosen flight so the user can finish. Send the first of these that exists: the `checkoutUrl` in the user's Book request, unless the subagent reported `checkout_link_failed`;
++ the link the flight tools gave for those exact flights;
++ the airline playbook's booking search link filled in for the flight;
++ a Google Flights results link for the route, dates, cabin, and every traveler, built as the Google Flights playbook says. Send the airline's homepage only when none of those exists. Say in one line what stopped the booking. Never tell the user to finish on the airline's site without the link.
++
+ ## Paying and confirming
+ 
+ - Before payment, send one question widget that restates the full itinerary, passenger names, fare, and total.
+@@ -91,7 +143,8 @@
+ ## Pitfalls
+ 
+ - Prices move between search and checkout. Flag any jump before the payment step.
+-- Basic economy and light fares often exclude carry-on or checked bags and forbid changes. Say so when the fare name suggests it.
++- Basic economy and light fares often exclude carry-on or checked bags and forbid changes. Say so when the fare name suggests it, unless the flight tools gave the fare rules;
++ then state only those.
+ - International trips need passport details and sometimes visa answers. Ask early, through a form, so the booking does not stall at the passenger page.
+ - Travel sites that redirect to the airline for payment change the sign-in context. Expect a second sign-in, worked in the same order.
+ - Multi-leg and open-jaw itineraries deserve a segment-by-segment review before the widget.
+@@ -100,4 +153,4 @@
+ 
+ ## Site playbooks
+ 
+-Before you dispatch the browser subagent, Read the `site-playbooks-google-flights`, `site-playbooks-united`, `site-playbooks-southwest`, or `site-playbooks-expedia` skill in this catalog, whichever names the site you are about to use, and paste the Dispatch snippet of the job that matches your step (a read-only lookup, or a cart and checkout) into the Task text. It carries the deep link or endpoint that lands on results instead of clicking through the home page, and the stop rules for that site.
++Before you dispatch the browser subagent, Read the `site-playbooks-google-flights`, `site-playbooks-united`, `site-playbooks-southwest`, `site-playbooks-delta`, `site-playbooks-american-airlines`, `site-playbooks-alaska`, `site-playbooks-jetblue`, `site-playbooks-frontier`, or `site-playbooks-expedia` skill in this catalog, whichever names the site you are about to use, and paste the Dispatch snippet of the job that matches your step (a read-only lookup, or a cart and checkout) into the Task text. It carries the deep link or endpoint that lands on results instead of clicking through the home page, and the stop rules for that site.

@@ -1,0 +1,31 @@
+--- 2026-11-04_09-47:/home/box/sand-data/managed-skills/skills/slides-executor/SKILL.md
++++ 2026-11-04_16-51:/home/box/sand-data/managed-skills/skills/slides-executor/SKILL.md
+@@ -119,14 +119,13 @@
+ 
+ ## Edit through the Slides MCP
+ 
+-When the brief names the Slides MCP as the edit surface, do the work of the phase on the live deck with the MCP tools. Read the deck with `read_presentation`. Change it with `update_presentation`. Check a slide with `read_slide_page_thumbnail`, save each thumbnail that you check into `renders/<group>-<N>/`, and list those paths in `images`. Keep `NOTES.md` and `notes/<group>.md` in the working folder, as in the other phases.
++When the brief names the Slides MCP as the edit surface, do the work of the phase on the live deck with the tools of the Slides connector. Read the deck with `read_presentation`, and the boxes and layout issues of one slide with `read_slide_layout`. Change it with the typed edit tools: `update_element_position` to move an element, `set_text_style` for font, size and color, `set_shape_text` for text, `set_slide_background`, and `delete_object`. `update_element_position` keeps the element's size. Fix text that overflows by shortening it with `set_shape_text` or lowering its size with `set_text_style`. When a text box, shape or table needs a different size, delete it and make it again at that size with `insert_text_box`, `insert_shape` or `insert_table`, then put back its text and style (fill table cells with `set_shape_text`). Never delete an image: the connector cannot put it back. Move it instead, and if its size is still wrong, list that as a defect that is left. Only when the connector lists `batch_update`, use it with raw Slides `requests` for an edit that those tools do not cover. Check a slide with `get_slide_thumbnail`, with the deck's `presentationId` and the slide's `pageObjectId` from `read_presentation`. Save each thumbnail that you check into `renders/<group>-<N>/`, and list those paths in `images`. Keep `NOTES.md` and `notes/<group>.md` in the working folder, as in the other phases.
+ 
+-Use batch calls and parallel calls for speed. Each MCP call has a character limit, so a large edit can take several batches or several parallel calls:
++Use parallel calls for speed. Each MCP call has a character limit, so a large edit can take several calls:
+ 
+-- Put the requests that fit one call in one `update_presentation` batch. Put the rest in more batches.
+-- Send independent batches in one step, as parallel calls.
+-- If a call fails because it is too large, or it arrives without its `requests`, split it into two smaller calls and send both. Split again until each call lands.
+-- Continue batch by batch in the MCP until the live deck has the whole edit.
++- Send the edits of independent elements and slides in one step, as parallel calls.
++- If a call fails because it is too large, or it arrives without its arguments, split it into two smaller calls and send both. Split again until each call lands.
++- Continue call by call in the MCP until the live deck has the whole edit.
+ 
+ ## A deck in Google Slides
+ 
+@@ -134,7 +133,7 @@
+ 
+ - Build and check the slides on the box, in the phases above.
+ - In the `finish` phase, after the full pack, upload the finished `.pptx` one time with `UploadFile` and `destination.convertToGoogleFormat: true`. That file is the deck.
+-- Google can draw a slide differently from the box render. To see the deck as the user sees it, read the thumbnail of each slide of that file with `read_slide_page_thumbnail` or `get_slide_thumbnail`. Save each thumbnail into `renders/google-<N>/`, with the next free N.
++- Google can draw a slide differently from the box render. To see the deck as the user sees it, read the thumbnail of each slide of that file with `get_slide_thumbnail`, and its layout issues with `read_slide_layout`. Save each thumbnail into `renders/google-<N>/`, with the next free N.
+ - Fix what Google draws differently in that same file, with the edit tools of the Slides connector, as "Edit through the Slides MCP" says. Then read the thumbnails of the changed slides again.
+ - Before you return, trash each file that you made in their accounts that is not the deck, with the `trash_file` tool of the Drive connector. Keep a file only when the brief says that the user asked to keep it.
+ - In your return, give the URL of the deck. In `images`, give the Google thumbnails. Name each file that you trashed, and each file that you could not trash.

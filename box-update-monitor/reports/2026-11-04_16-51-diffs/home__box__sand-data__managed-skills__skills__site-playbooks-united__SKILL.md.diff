@@ -1,0 +1,63 @@
+--- 2026-11-04_09-47:/home/box/sand-data/managed-skills/skills/site-playbooks-united/SKILL.md
++++ 2026-11-04_16-51:/home/box/sand-data/managed-skills/skills/site-playbooks-united/SKILL.md
+@@ -1,7 +1,8 @@
+ ---
+ name: site-playbooks-united
+ description: >-
+-  United site playbook: cash fares or awards, not a booked trip, upgrades or
++  United site playbook: fares, awards, or booking a flight;
++ not upgrades or
+   check-in.
+ ---
+ # Site playbook: United
+@@ -9,7 +10,8 @@
+ Read this before you dispatch a computerUse subagent to this site. Follow the Fastest path, fill in every URL you know, then paste the Dispatch snippet into the Task text as written. The subagent does not read skills, so every rule it needs is in the snippet, including the ground rules at its end. Secrets never go in the Task text. They come through `RequestUserForm`.
+ 
+ Jobs in this file: United Airlines flight search;
+- United award search.
++ United award search;
++ United booking a picked flight.
+ 
+ ## United Airlines flight search
+ 
+@@ -127,6 +129,40 @@
+ - Do not re-dispatch the same URL. A user-pasted award results URL is opened as is, with the same stop rules.
+ - Same Akamai tells and rules as the cash section. If the page asks for a password, 2FA code, captcha, or payment, stop. Do not solve or bypass. Report which wall appeared and the URL it was on.
+ 
++## United booking a picked flight
++
++### When to use
++
++The user picked a United flight, from FlightSearch, a card, or the cash section, and none of your tools books it in chat. The parent needs the flight numbers and departure time of each leg, the dates, the fare brand, the cabin, the adult count, and each child's or lap infant's age. Children and lap infants are not URL params, so the subagent adds them in the traveler selector on the results page. Fill `<CHECKOUT LINK>` with the `checkoutUrl` in the user's Book request only when its host is united.com or a subdomain of it;
++ otherwise leave the slot as is. The subagent selects those fares and stops at the first page that asks for travelers, a sign-in, or payment. The parent fills that page as the `flight-booking` skill says and resumes the same subagent.
++
++### Fastest path
++
++Start from `<CHECKOUT LINK>` when it is filled in;
++ it should open on those exact flights. When it is not filled in, or opens neither a trip summary nor the search page, start from the cash results deep link with the same route, dates, `tt`, and `clm` the user's flight was searched with, and `px` set to the adult count. There is no hand-built deep link past the results page, so selecting the flight and fare then takes clicks.
++
++### Dispatch snippet
++
++```
++If <CHECKOUT LINK> is a united.com link, open it and dismiss any cookie banner. On a trip summary with flights <UA flight numbers> and the <fare brand> fare already selected, go to the summary-page line below. On a united.com search form or results, stay there and skip the Open line. On anything else, also report checkout_link_failed with its URL.
++Open https://www.united.com/en/us/fsr/choose-flights?f=<ORIGIN>&t=<DEST>&d=<YYYY-MM-DD>&r=<RETURN or omit>&tt=<0 round trip|1 one way>&sc=7&px=<ADULTS>&taxng=1&clm=<7 economy|6 premium|4 business|3 first>&st=departtime
++Wait 4 s after load, then snapshot. With <CHILDREN> or <LAP INFANTS> above 0, add them with their ages in the traveler selector on the results page, then update the search;
++ if it won't take them, report children_not_set with the URL and stop. After an update, wait 4 s and snapshot again.
++Find the outbound card for <UA flight numbers> departing <HH:MM>. If it is missing, report flight_not_found with the URL and stop.
++Click that card's <fare brand> price, then Select. For a round trip, pick the return card for <UA flight numbers> the same way.
++Continue through each summary page. Decline seats, bags, upgrades, and insurance;
++ buy nothing extra.
++Stop at the first page that asks for traveler details, a sign-in, or payment. Report its URL, the fields it shows, the flights and fares selected, and the total shown, with one screenshot path.
++If the total isn't for <ADULTS + CHILDREN> seated travelers or a flight differs from the ones above, report the difference and stop. If a captcha, Akamai 403, password, or 2FA prompt appears, stop and report the URL.
++Ground rules for this Task. A Timeout or a net::ERR_* code from browser_navigate means the box cannot reach that host. Do not retry it, even if the tool result says to, and do not run DNS or connectivity checks. Move to the next source this Task names, or report the code and URL. An HTTP block (403, 419, 429, 503) follows this Task's own rule. Work in the tab you start in. Do not open a second tab, and switch tabs only when a tool result names a page you did not intend. In-page tabs are part of the page. A page script is an async (page) => function: run it with browser_run_code if you hold it. Without it, read rendered text from browser_snapshot or browser_find, read a <script> tag from the HTML that curl fetches in the box shell, and report a field neither yields as unreadable, never visible text in its place. Name the read you used. Snapshot a page state once. After a click, a scroll, or a wait this Task calls for, take one new snapshot. Do not snapshot the same state twice. Report as soon as the stop rule above is met, one line per item, only the fields asked for, no page dumps.
++```
++
++### When blocked
++
++- Same Akamai tells and site error banner as the cash section.
++- After a block, a site error, a stop code, or the user skipping a help request, do not dispatch again. Send the user the link the `flight-booking` skill's stopped-booking step names.
++- If the page asks for a password, 2FA code, captcha, or payment, stop. Do not solve or bypass. Report which wall appeared and the URL it was on.
++
+ ## Working with the subagent
+ 
+ Recipe steps name actions, not tools. A page script, a scroll, or a fill lands on whichever browser tools the subagent holds, and the ground rules say how, so paste the snippet as written. A subagent without a page-script tool reads what the snapshot or a shell fetch shows and names that read in its report.

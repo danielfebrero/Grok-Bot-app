@@ -1,0 +1,30 @@
+--- 2026-11-04_09-47:/home/box/sand-data/managed-skills/skills/shopping-connectors/SKILL.md
++++ 2026-11-04_16-51:/home/box/sand-data/managed-skills/skills/shopping-connectors/SKILL.md
+@@ -1,15 +1,16 @@
+ ---
+ name: shopping-connectors
+ description: >-
+-  When the user wants to shop for, find, compare, or order something, before you
+-  search for it, so you offer and use their shopping connectors.
++  When the user wants to shop for, find, compare, or order something while the
++  Gopuff shopping connector is connected, or asks to connect it, before you
++  search for it, so you search and order through that connector.
+ ---
+ # Shopping connectors
+ 
+-Two connectors can search and order for the user. Gopuff covers groceries, snacks, drinks, household items, and other everyday goods delivered in minutes. Shop searches products across many merchants, and keeps carts, checkout, and order history for the user's Shop account. A connector is connected when its plugin's MCP tools are among your tools this turn. Once connected, its tools, not the open web, are the place to look for what it sells.
+-- When the user wants to shop for something, check GetMcpServerStatus for each connector that could plausibly fill the request. For each one that is not installed, offer it once, in one short friendly line, before you search elsewhere: say what it can search and order, and ask if they want to connect it. Offer both in the same line when both fit. Do not offer one again in this conversation if they decline or ignore it.
+-- If they agree, call InstallPlugin with plugin_id 77083001 for Gopuff or 77565631 for Shop. If it is already installed but its server needsAuth, call AuthenticateMcpServer on that server instead. Never write a link to it yourself: in the app its connect card resumes you when they finish, and elsewhere the result says what to relay.
+-- When a connector is connected, search it for every shopping request it could plausibly fill, alongside your other ways to search for products rather than after them, and compare what each returns. Read that plugin's own skills and tool descriptions before its first action and follow them for addresses, carts, and orders.
++The Gopuff connector can search and order for the user. It covers groceries, snacks, drinks, household items, and other everyday goods delivered in minutes. A connector is connected when its plugin's MCP tools are among your tools this turn.
++- When Gopuff is connected and could plausibly fill the shopping request, search it to find products. When it is not connected or has no match, find products with ProductSearch.
++- When the user asks to use or connect Gopuff and it is not connected, call InstallPlugin with plugin_id 77083001. If it is already installed but its server needsAuth, call AuthenticateMcpServer on that server instead. Never write a link to it yourself: in the app its connect card resumes you when they finish, and elsewhere the result says what to relay.
++- Read that plugin's own skills and tool descriptions before its first action and follow them for addresses, carts, and orders.
+ - Name where each result came from, and say plainly when a connector has no match instead of leaving it out. Prices, availability, and delivery depend on the delivery address, so confirm the address before you quote them.
+ - Searching is free to do on your own, but changing a cart or placing an order is not: ask before you add anything to a cart, and place an order only after the user approves that exact order and its total.
+ - Some connectors take payment in their own tools: Gopuff quotes an order with get_quote and charges it with place_order. Pay those orders only with a way to pay that the connector's quote lists, such as a payment method saved on the user's account there or cash where offered. Never pay one with a card number, whether from RequestVirtualCard, Shop, X Money, or the Secure Form: those cards are typed into a web checkout page, and a connector order has none. A Stripe Link option on the quote is paid with a one-time Link shared payment token instead, and only while RequestVirtualCard is among your tools, which means Stripe Link is connected;
+@@ -20,4 +21,3 @@
+  when the order is delivered, canceled, or otherwise finished, or the connector says it is no longer tracked, the run first deletes the routine, then tells the user. When the rewrite fails with an error, including an error while reviewing it, the run stays quiet so the next run tries again;
+  when it's refused for any other reason, such as a block or the user declining its approval card, the run deletes the routine, then tells the user once the new status and that updates have stopped. Whenever a delete doesn't save, the run pauses the routine instead before it speaks, and its message adds that the paused routine can be removed from the routine list. When a check fails, including when the connector needs the user to sign in again, the run stays quiet and leaves the routine running rather than pausing it, so the deadline still ends it. Delete the routine whenever the user asks you to stop. A tracking run only reads the order's status and never changes or re-places the order. With the order confirmation, tell the user in one line that you'll send updates until it arrives;
+  if the routine can't be saved, tell them they can ask for the order's status any time instead.
+-- When the user declines a connector or it cannot fill the request, carry on with the other ways to shop without bringing that connector up again.

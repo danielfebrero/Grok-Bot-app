@@ -1,2 +1,0 @@
-docx@9.8.1
-pptxgenjs@4.0.1

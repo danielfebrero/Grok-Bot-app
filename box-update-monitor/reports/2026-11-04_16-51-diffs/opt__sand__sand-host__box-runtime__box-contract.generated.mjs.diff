@@ -1,0 +1,15 @@
+--- 2026-11-04_09-47:/opt/sand/sand-host/box-runtime/box-contract.generated.mjs
++++ 2026-11-04_16-51:/opt/sand/sand-host/box-runtime/box-contract.generated.mjs
+@@ -1,6 +1,11 @@
+-// @generated SignedSource<<2c6b9283704646f07797801a806c33f39687acb6788093a939e420bb5b952d11>>
++// @generated SignedSource<<09f19a03df7cb8ff3a2d2df47c1684e657bdc7b1ed5452a908789cf5de715d1e>>
+ // Emitted by scripts/gen-box-contract.mts from sand/src/shared/box/box-contract.ts;
+ // regenerate with `pnpm --filter sand run gen:box-contract`.
++export const CURSOR_AGENT_SOCKET_ENV_VAR = "CURSOR_AGENT_SOCKET";
++export const GROK_BOT_BOX_IDENTITY_SOCKET_PATH = "/tmp/sand-identity.sock";
++export const GROK_BOT_BOX_HOST_ATTESTATION_HEADER = "x-cursor-box-host-attestation";
++export const GROK_BOT_BOX_HOST_ATTESTATION_INFERENCE_CREDENTIAL_SURFACE = "inference_credential";
++export const GROK_BOT_BOX_HOST_ATTESTATION_SOCKET_PATH = "/v1/attestations/sand-box-credential-use";
+ export const BOX_BROWSER_COHERENT_FINGERPRINT_MARKER_PATH = "/tmp/sand-box-browser-coherent-fingerprint";
+ export const BOX_BROWSER_UNGOOGLED_MARKER_PATH = "/tmp/sand-box-browser-ungoogled";
+ export const BOX_EXPERIMENTS_READY_MARKER_PATH = "/tmp/sand-box-experiments-ready";

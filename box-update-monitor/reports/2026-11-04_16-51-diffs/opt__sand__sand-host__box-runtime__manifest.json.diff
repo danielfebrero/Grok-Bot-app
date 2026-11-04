@@ -1,0 +1,20 @@
+--- 2026-11-04_09-47:/opt/sand/sand-host/box-runtime/manifest.json
++++ 2026-11-04_16-51:/opt/sand/sand-host/box-runtime/manifest.json
+@@ -2,7 +2,7 @@
+   "files": [
+     {
+       "name": "box-contract.generated.mjs",
+-      "sha256": "30be58ab955ed1dc6dd1c52d50a3409d59fcf5d6f06c0cac240bf5a736600666"
++      "sha256": "94dd1edeeb1913ca66bdb58f785f2f86f2ac7667a4d87cb54aa65ae1d01bf8c8"
+     },
+     {
+       "name": "cdp-cookies.mjs",
+@@ -42,7 +42,7 @@
+     },
+     {
+       "name": "sand-web-bot-auth.mjs",
+-      "sha256": "d53c85690316b970c0cf85d6371b994e6d0fa49db6f8794c49a860bbd7e79302"
++      "sha256": "bdebe0bacb17fcfe6667bc589bc6c8714055893bcdbcdc6347f102e305d82e22"
+     }
+   ]
+ }

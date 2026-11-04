@@ -1,0 +1,180 @@
+--- 2026-11-04_09-47:/opt/sand/sand-host/box-runtime/sand-web-bot-auth.mjs
++++ 2026-11-04_16-51:/opt/sand/sand-host/box-runtime/sand-web-bot-auth.mjs
+@@ -6,10 +6,16 @@
+   watch,
+   writeFileSync,
+ } from "node:fs";
+-import { basename, dirname } from "node:path";
++import http from "node:http";
++import { basename, dirname, resolve } from "node:path";
+ import { pathToFileURL } from "node:url";
+ 
+ import {
++  CURSOR_AGENT_SOCKET_ENV_VAR,
++  GROK_BOT_BOX_IDENTITY_SOCKET_PATH,
++  GROK_BOT_BOX_HOST_ATTESTATION_HEADER,
++  GROK_BOT_BOX_HOST_ATTESTATION_INFERENCE_CREDENTIAL_SURFACE,
++  GROK_BOT_BOX_HOST_ATTESTATION_SOCKET_PATH,
+   SAND_BOX_TAILNET_CHROME_CDP_PORT,
+   WEB_BOT_AUTH_SIGNATURE_SOURCES,
+   WEB_BOT_AUTH_SIGNED_CACHE_PATH,
+@@ -179,6 +185,8 @@
+ const SIGN_PATH = "/sand-box/web-bot-auth-signature";
+ const RENEWAL_PATH = "/sand-box/inference-credential";
+ const DEFAULT_BACKEND_URL = "https://api2.cursor.sh";
++export const BOX_HOST_ATTESTATION_TIMEOUT_MS = 250;
++const BOX_HOST_ATTESTATION_MAX_RESPONSE_BYTES = 8 * 1024;
+ const REQUEST_TIMEOUT_MS = 1_000;
+ const OFF_HOT_PATH_RENEWAL_TIMEOUT_MS = 2_000;
+ const RENEWAL_BACKOFF = {
+@@ -319,6 +327,7 @@
+     now = Date.now,
+     random = Math.random,
+     timeoutMs = OFF_HOT_PATH_RENEWAL_TIMEOUT_MS,
++    getHostAttestation = async () => undefined,
+   }) {
+     this.credential = credential;
+     this.renewalEndpoint = renewalEndpoint;
+@@ -326,6 +335,7 @@
+     this.now = now;
+     this.random = random;
+     this.timeoutMs = timeoutMs;
++    this.getHostAttestation = getHostAttestation;
+     this.consecutiveFailures = { accessLapsed: 0, otherFailure: 0 };
+     this.cached = null;
+     this.nextRenewalAtMs = 0;
+@@ -358,13 +368,24 @@
+   async renew() {
+     let status = null;
+     try {
++      let hostAttestation;
++      try {
++        hostAttestation = await this.getHostAttestation();
++      } catch (_hostAttestationUnavailable) {
++        hostAttestation = undefined;
++      }
+       const { response, body } = await fetchWithTimeout(
+         this.fetchImpl,
+         this.renewalEndpoint,
+         {
+           method: "POST",
+           redirect: "error",
+-          headers: { "content-type": "application/json" },
++          headers: {
++            "content-type": "application/json",
++            ...(hostAttestation == null
++              ? {}
++              : { [GROK_BOT_BOX_HOST_ATTESTATION_HEADER]: `Bearer ${hostAttestation}` }),
++          },
+           body: JSON.stringify({ credential: this.credential }),
+         },
+         this.timeoutMs,
+@@ -391,15 +412,93 @@
+   }
+ }
+ 
++export function createBoxHostAttestationReader({
++  socketPath,
++  requestImpl = http.request,
++  timeoutMs = BOX_HOST_ATTESTATION_TIMEOUT_MS,
++}) {
++  const payload = JSON.stringify({
++    surface: GROK_BOT_BOX_HOST_ATTESTATION_INFERENCE_CREDENTIAL_SURFACE,
++  });
++  return async () =>
++    await new Promise((resolve) => {
++      let settled = false;
++      const finish = (assertion) => {
++        if (settled) return;
++        settled = true;
++        resolve(assertion);
++      };
++      const req = requestImpl(
++        {
++          socketPath,
++          path: GROK_BOT_BOX_HOST_ATTESTATION_SOCKET_PATH,
++          method: "POST",
++          timeout: timeoutMs,
++          headers: {
++            "content-type": "application/json",
++            "content-length": Buffer.byteLength(payload),
++          },
++        },
++        (res) => {
++          if (res.statusCode !== 200) {
++            res.resume();
++            finish(undefined);
++            return;
++          }
++          const chunks = [];
++          let total = 0;
++          res.on("data", (chunk) => {
++            if (settled) return;
++            total += chunk.byteLength;
++            if (total > BOX_HOST_ATTESTATION_MAX_RESPONSE_BYTES) {
++              res.destroy();
++              finish(undefined);
++              return;
++            }
++            chunks.push(chunk);
++          });
++          res.on("end", () => {
++            if (settled) return;
++            try {
++              const parsed = JSON.parse(Buffer.concat(chunks).toString("utf8"));
++              finish(
++                typeof parsed?.assertion === "string" && parsed.assertion.length > 0
++                  ? parsed.assertion
++                  : undefined,
++              );
++            } catch {
++              finish(undefined);
++            }
++          });
++          res.on("error", () => finish(undefined));
++        },
++      );
++      req.on("timeout", () => {
++        req.destroy();
++        finish(undefined);
++      });
++      req.on("error", () => finish(undefined));
++      req.end(payload);
++    });
++}
++
+ export function resolveWebBotAuthConfig(env = process.env) {
+   const credential = env.SAND_INFERENCE_RENEWAL_CREDENTIAL?.trim() ?? "";
+   if (credential === "") return null;
+   const base = env.SAND_BACKEND_URL ?? env.CURSOR_API_BASE_URL ?? DEFAULT_BACKEND_URL;
+   if (!URL.canParse(SIGN_PATH, base)) return null;
++  const rawIdentitySocketPath = env[CURSOR_AGENT_SOCKET_ENV_VAR]?.trim();
++  const anyrunIdentitySocketPath =
++    rawIdentitySocketPath == null ||
++    rawIdentitySocketPath === "" ||
++    resolve(rawIdentitySocketPath) === resolve(GROK_BOT_BOX_IDENTITY_SOCKET_PATH)
++      ? undefined
++      : rawIdentitySocketPath;
+   return {
+     credential,
+     endpoint: new URL(SIGN_PATH, base).toString(),
+     renewalEndpoint: new URL(RENEWAL_PATH, base).toString(),
++    ...(anyrunIdentitySocketPath ? { anyrunIdentitySocketPath } : {}),
+   };
+ }
+ 
+@@ -757,7 +856,13 @@
+   let signer = null;
+   let tokenSource = null;
+   if (config != null) {
+-    tokenSource = new SessionTokenSource(config);
++    tokenSource = new SessionTokenSource({
++      ...config,
++      getHostAttestation:
++        config.anyrunIdentitySocketPath == null
++          ? undefined
++          : createBoxHostAttestationReader({ socketPath: config.anyrunIdentitySocketPath }),
++    });
+     signer = new WebBotAuthSigner({
+       endpoint: config.endpoint,
+       getToken: () => tokenSource.getToken(),

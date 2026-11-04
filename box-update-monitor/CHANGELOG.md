@@ -9,6 +9,16 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-11-04 16:51 (Paris) — snapshot `2026-11-04_09-47` → `2026-11-04_16-51`
+
+**Hot-update sand-host** `cda89bd` → `f0b5e3e` (supervisor `upgrade-f0b5e3e`, `pendingUpgradeVersion` = None). Image `fcbae14`, box-scripts `fcbae14`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, agent-store-fuse `50893219`, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +5 / −0 / ~19 (9 sous `/opt/sand`, 15 skills gérées dont 5 nouvelles).
+
+- **Features** : skill `flight-booking` refondue autour d'un nouvel outil `FlightSearch` (prioritaire sur connecteurs et sites quand il est présent) ; 5 nouveaux site-playbooks compagnies aériennes (`alaska`, `american-airlines`, `delta`, `frontier`, `jetblue`) et playbooks `google-flights`, `southwest`, `united` étoffés. `shopping-connectors` : connecteur Gopuff (plugin `77083001`). `purchases` : champ `order.gift` (destinataire, message, gift receipt, deliverBy) et paiements multiples sur une seule carte d'ordre. `shopping` : nouvelle section « Gifts ». `slides-executor` : édition en direct via le MCP Slides (`read_presentation`, `get_slide_thumbnail`, `read_slide_layout`).
+- **Change** : attestation d'hôte pour la signature « web bot auth » — `sand-web-bot-auth.mjs` (25 408 → 28 832 o) demande une attestation (surface `inference_credential`) au socket `/tmp/sand-identity.sock` (POST `/v1/attestations/sand-box-credential-use`, timeout 250 ms, réponse ≤ 8 Kio) et l'ajoute en en-tête `x-cursor-box-host-attestation: Bearer …` quand elle est disponible ; nouvelles constantes dans `box-contract.generated.mjs` (`CURSOR_AGENT_SOCKET`, `GROK_BOT_BOX_IDENTITY_SOCKET_PATH`…). Flags vus dans les lignes ajoutées du bundle : `grok_bot_suite_connect_google(_desktop)`, `grok_bot_wall_evidence_network`. `no-connector-fallback` raccourcie.
+- **Autre-infra** : `host-main.cjs` (32,6 → 32,9 Mo) et `sand-eval-runner.cjs` (26,8 → 27,0 Mo) rebuildés ; `agent-store-worker.cjs` rebuildé ; `cache.json` des skills gérées rafraîchi.
+
+Rapport : [reports/2026-11-04_16-51.md](reports/2026-11-04_16-51.md).
+
 ## 2026-11-04 09:47 (Paris) — snapshot `2026-11-04_08-46` → `2026-11-04_09-47`
 
 **Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `cb8f4595580e13c0913b461aeacd3373c5500a7c` → `50893219b50cd301879122126249d45927a4779e` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`). Toutes les autres versions plateforme inchangées (image `fcbae14`, box-scripts `fcbae14`, sand-host `cda89bd` (supervisor `upgrade-cda89bd`, `pendingUpgradeVersion` = None), exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7). Fichiers : +0 / −0 / ~1.
