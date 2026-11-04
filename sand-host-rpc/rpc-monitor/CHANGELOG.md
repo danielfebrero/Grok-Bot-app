@@ -9,6 +9,17 @@ packages confondus. Entrées les plus récentes en haut. Heures de Paris
 
 <!-- NOUVELLES-ENTREES-ICI -->
 
+## 2026-11-04 18:03 (Paris) — `2026-11-03_18-09` → `2026-11-04_18-03`
+
+Changement de surface RPC détecté : **35 méthode(s) ajoutée(s)**, **2 supprimée(s)**.
+
+Ajoutées : `AutomationsService.RerunGrokBotAutomationFromCard`, `BackgroundComposerService.UpdateProjectWorkerModel`, `DashboardService.GetGrokBotUsageBreakdown`, `DashboardService.GetSandEnterpriseSpendLimit`, `DashboardService.GetTeamUnifiedStatusInternal`, `DashboardService.GetTeamXaiDataRetention`, `DashboardService.ListGrokRequestLogBodies`, `DashboardService.ListGrokRequestLogs`, `DashboardService.SearchApiKeys`, `DashboardService.StaffArchiveServiceAccount`, `DashboardService.StaffDeleteServiceAccount`, `DashboardService.StaffListOwnerApiKeys`, `DashboardService.StaffListServiceAccountApiKeys`, `DashboardService.StaffResumeServiceAccount`, `DashboardService.StaffRevokeApiKey`, `DashboardService.StaffSearchApiKeys`, `DashboardService.StaffSuspendServiceAccount`, `DashboardService.UnlinkXaiUnificationCursorAccount`, `GrokBotService.ActOnGrokBotMeetingPrompt`, `GrokBotService.AnswerGrokBotLabelerQuestion`, `GrokBotService.CreateGrokBotOnboardingDripRouteInternal`, `GrokBotService.GetGrokBotPlaceDetails`, `GrokBotService.ListGrokBotCartItems`, `GrokBotService.MakeGrokBotAgentFilePrivate`, `GrokBotService.MakeGrokBotAgentSkillPrivate` …
+
+Supprimées : `GrokBotService.BeginOnePasswordConnection`, `GrokBotService.CompleteOnePasswordConnection`
+
+Rapport : [reports/2026-11-04_18-03.md](reports/2026-11-04_18-03.md).
+
+
 ## 2026-11-03 18:09 (Paris) — `2026-11-02_18-07` → `2026-11-03_18-09`
 
 Changement de surface RPC détecté : **19 méthode(s) ajoutée(s)**.
