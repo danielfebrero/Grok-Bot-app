@@ -1,0 +1,88 @@
+{
+  "description": "Sends a message or reaction to a specific Chat conversation. Send either `encoded_message_create_event`, an encrypted event built with the Chat XDK, or `content`, a plaintext message or reaction that is sent unencrypted. Use the recipient's `receives_your_chat` user field to choose: `encrypted` takes `encoded_message_create_event`, `unencrypted` takes `content`, and `none` means the recipient cannot be messaged. For 1:1 conversations, provide the recipient's user ID; the server constructs the canonical conversation ID from the authenticated user and recipient. A recipient who cannot be messaged (closed inbox, system/notification account, or a 1:1 block) returns HTTP 403 with type https://api.x.com/2/problems/recipient-not-messageable.",
+  "inputSchema": {
+    "properties": {
+      "content": {
+        "properties": {
+          "message": {
+            "properties": {
+              "text": {
+                "description": "Text of the message.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "text"
+            ],
+            "type": "object"
+          },
+          "reaction_add": {
+            "properties": {
+              "emoji": {
+                "description": "Emoji of the reaction.",
+                "type": "string"
+              },
+              "event_id": {
+                "description": "ID of the message event the reaction is on.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "event_id",
+              "emoji"
+            ],
+            "type": "object"
+          },
+          "reaction_remove": {
+            "properties": {
+              "emoji": {
+                "description": "Emoji of the reaction.",
+                "type": "string"
+              },
+              "event_id": {
+                "description": "ID of the message event the reaction is on.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "event_id",
+              "emoji"
+            ],
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "conversation_token": {
+        "description": "Optional conversation token.",
+        "type": "string"
+      },
+      "encoded_message_create_event": {
+        "description": "Base64-encoded Thrift MessageCreateEvent containing encrypted message contents. Omit when sending...",
+        "type": "string"
+      },
+      "encoded_message_event_signature": {
+        "description": "Base64-encoded Thrift MessageEventSignature for message verification.",
+        "type": "string"
+      },
+      "id": {
+        "type": "string"
+      },
+      "message_id": {
+        "description": "Unique identifier for this message.",
+        "type": "string"
+      },
+      "xdk_version": {
+        "description": "Version of the Chat XDK that produced the payload.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "message_id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "send_chat_message"
+}

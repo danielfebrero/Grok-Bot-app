@@ -1,0 +1,31 @@
+{
+  "description": "Read one email conversation in full, oldest message first, by the thread_id that SearchEmailThreads returned. Do not invent thread ids.\nEach message shows who sent it, to whom, when, its delivery state, its body, and its stored attachments with the attachment_id to open each one. An image pasted into the body is listed as inline; the body marks where it sat as [inline image: <content id>]. A marker that names no inline attachment of that message is rewritten, so the body cannot invent one.\nA picture the email shows from the web, such as a ticket's QR code or barcode, is marked [image: <description> (<address>)]: it is in the message but is not an attachment. To pass a message on as it arrived, images and attachments included, forward it by its message_id; never retype it.\nA body can be marked not indexed: the message arrived within the last minute and its text is not readable yet, so wait briefly and read again. A purged body was removed by retention and will not return.",
+  "inputSchema": {
+    "properties": {
+      "body_max_chars": {
+        "description": "Per-message body cap in characters (default 4000). Raise it only when a long message was cut off.",
+        "maximum": 50000,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "max_messages": {
+        "description": "Most recent messages to include (default 20, max 50). Older ones are counted, not shown.",
+        "maximum": 50,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "thread_id": {
+        "description": "A thread_id returned by SearchEmailThreads.",
+        "maxLength": 64,
+        "minLength": 1,
+        "type": "string"
+      }
+    },
+    "required": [
+      "thread_id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "ReadEmailThread"
+}

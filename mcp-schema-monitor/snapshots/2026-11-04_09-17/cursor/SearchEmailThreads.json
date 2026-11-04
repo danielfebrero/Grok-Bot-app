@@ -1,0 +1,50 @@
+{
+  "description": "Search the email in your inboxes and get back matching conversation threads, newest activity and best match first.\nEach thread lists its id, subject, participants, message count, and up to two matching messages with a snippet. To read a whole conversation, call ReadEmailThread with the thread id. Search first; do not guess thread ids.\nUse mode \"keyword\" for an exact phrase, address or identifier; leave it on \"hybrid\" otherwise.\nBodies of messages that arrived in the last minute may not be indexed yet, in which case the snippet says so; the message is still listed.",
+  "inputSchema": {
+    "properties": {
+      "after": {
+        "description": "Only messages after this time, an ISO 8601 timestamp such as 2026-09-01T00:00:00Z.",
+        "type": "string"
+      },
+      "before": {
+        "description": "Only messages before this time, an ISO 8601 timestamp such as 2026-09-01T00:00:00Z.",
+        "type": "string"
+      },
+      "from_address": {
+        "description": "Only messages sent from this exact address.",
+        "type": "string"
+      },
+      "inbox_email": {
+        "description": "Search only this inbox. Must be one of your own addresses (see ListEmailInboxes); omit to search all of them.",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Maximum threads to return (default 10, max 25).",
+        "maximum": 25,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "mode": {
+        "description": "\"hybrid\" (default) blends keyword and meaning and suits most questions. \"keyword\" is exact-term matching: use it for a quoted phrase, an email address, an order or ticket number. \"semantic\" matches by meaning only.",
+        "enum": [
+          "hybrid",
+          "keyword",
+          "semantic"
+        ],
+        "type": "string"
+      },
+      "query": {
+        "description": "What to look for: a topic, a phrase, a name or an address. Matched against subjects and bodies.",
+        "maxLength": 1000,
+        "minLength": 1,
+        "type": "string"
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "SearchEmailThreads"
+}

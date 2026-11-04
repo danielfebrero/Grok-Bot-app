@@ -1,0 +1,37 @@
+{
+  "description": "Add or remove labels on every message in a thread: add trash to move it to trash, or remove unread to mark it read. System labels such as received and sent cannot be changed. Returns the thread's labels after the change.",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "addLabels": {
+        "description": "Labels to add to every message in the thread, e.g. trash to move it to trash, or your own",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "inboxId": {
+        "description": "Inbox ID: the inbox's email address, from list_inboxes",
+        "type": "string"
+      },
+      "removeLabels": {
+        "description": "Labels to remove from every message in the thread, e.g. unread to mark it read",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "threadId": {
+        "description": "Thread ID, from list_threads, search_threads, or a message's threadId",
+        "type": "string"
+      }
+    },
+    "required": [
+      "inboxId",
+      "threadId"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "update_thread"
+}

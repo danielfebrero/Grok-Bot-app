@@ -1,0 +1,142 @@
+{
+  "description": "Send an email from an inbox right away; once sent it cannot be recalled. Returns the messageId and threadId of the sent message.",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "attachments": {
+        "description": "Attachments. Each item must specify exactly one of content (base64) or url",
+        "items": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "content": {
+                  "description": "Base64 encoded content",
+                  "type": "string"
+                },
+                "contentDisposition": {
+                  "description": "inline to show it in the HTML body, attachment to offer it as a download",
+                  "enum": [
+                    "inline",
+                    "attachment"
+                  ],
+                  "type": "string"
+                },
+                "contentId": {
+                  "description": "ID the HTML body references as cid:<contentId> to show it inline",
+                  "type": "string"
+                },
+                "contentType": {
+                  "description": "MIME type, e.g. application/pdf; inferred when omitted",
+                  "type": "string"
+                },
+                "filename": {
+                  "description": "File name recipients see, e.g. report.pdf",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "content"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "contentDisposition": {
+                  "description": "inline to show it in the HTML body, attachment to offer it as a download",
+                  "enum": [
+                    "inline",
+                    "attachment"
+                  ],
+                  "type": "string"
+                },
+                "contentId": {
+                  "description": "ID the HTML body references as cid:<contentId> to show it inline",
+                  "type": "string"
+                },
+                "contentType": {
+                  "description": "MIME type, e.g. application/pdf; inferred when omitted",
+                  "type": "string"
+                },
+                "filename": {
+                  "description": "File name recipients see, e.g. report.pdf",
+                  "type": "string"
+                },
+                "url": {
+                  "description": "Publicly accessible URL to fetch the attachment from",
+                  "format": "uri",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "url"
+              ],
+              "type": "object"
+            }
+          ],
+          "description": "Attachment: provide exactly one of content (base64) or url"
+        },
+        "type": "array"
+      },
+      "bcc": {
+        "description": "Blind-copied addresses, hidden from the other recipients",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "cc": {
+        "description": "Copied addresses, visible to every recipient",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "html": {
+        "description": "HTML body for formatted mail; inline images use cid:<contentId>",
+        "type": "string"
+      },
+      "inboxId": {
+        "description": "Inbox ID: the inbox's email address, from list_inboxes",
+        "type": "string"
+      },
+      "labels": {
+        "description": "Your own labels for the message; AgentMail sets system labels such as sent",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "replyTo": {
+        "description": "Addresses that replies should go to instead of this inbox",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "subject": {
+        "description": "Subject line recipients see",
+        "type": "string"
+      },
+      "text": {
+        "description": "Plain-text body; include it even with html, since no text version is generated from html",
+        "type": "string"
+      },
+      "to": {
+        "description": "Recipient addresses, each a bare address or \"Name <address>\"; at least one of to, cc or bcc is required",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "inboxId",
+      "to"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "send_message"
+}

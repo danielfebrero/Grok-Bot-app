@@ -1,0 +1,35 @@
+{
+  "description": "Returns newest-first chat messages for a broadcast owned by the authenticated user.",
+  "inputSchema": {
+    "properties": {
+      "broadcast_chat_message.fields": {
+        "description": "A comma separated list of BroadcastChatMessage fields to display.",
+        "type": "string"
+      },
+      "expansions": {
+        "description": "A comma separated list of fields to expand.",
+        "type": "string"
+      },
+      "id": {
+        "type": "string"
+      },
+      "max_results": {
+        "type": "integer"
+      },
+      "pagination_token": {
+        "description": "A 64-bit signed integer.",
+        "type": "string"
+      },
+      "user.fields": {
+        "description": "A comma separated list of User fields to display.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_broadcast_chat"
+}

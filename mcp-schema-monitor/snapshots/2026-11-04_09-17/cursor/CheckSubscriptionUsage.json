@@ -1,0 +1,61 @@
+{
+  "description": "Report the user's Grok Bot subscription plan and usage. With no arguments it gives their plan, where their Grok Bot usage comes from now (their weekly usage limit, a trial, or their team's Enterprise usage), how much of it is used, their on-demand usage, and when it resets or the trial ends. Pass `breakdown` to group by up to two of bot, activity, routine, or day and show which bots, activities, routines, or days used it, as shares of all Grok Bot usage in the period. bot and routine take names as the user calls them and narrow the report to that bot or routine; activity narrows it to one kind of activity. period is this_week (the default), last_7_days, last_30_days, or this_billing_cycle, which covers an Enterprise team's current billing cycle so far and gives other plans the last 30 days instead; it can't pick an exact earlier week or billing cycle, or go back further than the last 30 days or the current billing cycle, and an earlier period shows only shares, never how much of that week's limit was used. limit caps how many bots or routines are listed. Call this when the user asks about their subscription, plan, usage, limits, on-demand usage, spend limit, when their usage resets, or which bots, routines, or days used the most. Read the Cursor-managed `usage-review` skill before you answer from this report, and follow it. Included usage covers Grok Bot only unless the report says the weekly usage limit is shared with the other apps on their plan. An on-demand amount covers Grok Bot and Cursor together. It can't see Cursor usage on its own, including Cloud Agents, so for that point the user to https://cursor.com/dashboard?tab=usage. Once included usage and credits run out and on-demand usage is off or at its spend limit, Grok Bot can't reply, run routines, or start work on its computer, wherever that computer runs, until usage resets or more is added. Answer in the report's own words. Never name this tool, its options, or a skill to the user.",
+  "inputSchema": {
+    "properties": {
+      "activity": {
+        "description": "Only this kind of activity.",
+        "enum": [
+          "chats",
+          "routines",
+          "bot_to_bot",
+          "group_chats"
+        ],
+        "type": "string"
+      },
+      "bot": {
+        "description": "A bot name as the user calls it.",
+        "minLength": 1,
+        "type": "string"
+      },
+      "breakdown": {
+        "description": "Up to two of bot, activity, routine, or day to group by, outermost first.",
+        "items": {
+          "enum": [
+            "bot",
+            "activity",
+            "routine",
+            "day"
+          ],
+          "type": "string"
+        },
+        "maxItems": 2,
+        "minItems": 1,
+        "type": "array"
+      },
+      "limit": {
+        "description": "Most bots or routines listed per level; the rest are summed. Default 5.",
+        "maximum": 20,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "period": {
+        "description": "The window the shares cover. Default this_week. this_billing_cycle is an Enterprise team's current billing cycle. The percent used, on-demand, and reset are always current.",
+        "enum": [
+          "this_week",
+          "last_7_days",
+          "last_30_days",
+          "this_billing_cycle"
+        ],
+        "type": "string"
+      },
+      "routine": {
+        "description": "A routine name as the user calls it.",
+        "minLength": 1,
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "CheckSubscriptionUsage"
+}

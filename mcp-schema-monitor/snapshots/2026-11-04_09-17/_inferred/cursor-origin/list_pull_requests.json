@@ -1,0 +1,21 @@
+{
+  "namespace": "cursor-origin",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-11-04T09:16:25+01:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "pullRequests": {
+          "items": {},
+          "type": "array"
+        }
+      },
+      "required": [
+        "pullRequests"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "list_pull_requests"
+}
