@@ -1,0 +1,794 @@
+/**
+ * "Scientific Method" pitch deck - 20 slides, 13.333 x 7.5 in (16:9).
+ * Rebuilt with pptxgenjs only. Raster photos/mockups from the original are
+ * replaced by flat "[image]" placeholder shapes of the same footprint.
+ */
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ palette */
+const C = {
+  bg: 'FBFBFB',
+  white: 'FFFFFF',
+  ink: '404040',
+  teal: '35CFDF',
+  tealLt: '88E2EC',
+  tealDk: '1CA5B3',
+  blue: '00A4F0',
+  imgBg: 'EFEFEF',
+  imgFg: '9A9A9A',
+  g1: 'F2F2F2',
+  g2: 'D9D9D9',
+  g3: 'BFBFBF',
+};
+/* the deck's signature fill: a 60-degree linear ramp 88E2EC -> 35CFDF.
+   pptxgenjs has no gradient fill, so shapes using it are sliced into bands. */
+const GRAD = { from: '88E2EC', to: '35CFDF', angle: 60, mid: '5FD8E5' };
+
+const F = { major: 'Figtree SemiBold', minor: 'Inter' };
+
+/* pptxgenjs mutates the shadow object it is given, so hand it a fresh one each time */
+const shadow = (opacity = 0.06) => ({ type: 'outer', blur: 31, offset: 10, angle: 45, color: '000000', opacity });
+
+/* --------------------------------------------------------------- geometries */
+/* Fractional outlines (0..1 inside the shape box) reused across the deck. */
+const HEX_V = [ // pointy-top hexagon (tall)
+  [0.5, 0], [0.554, 0.013], [0.946, 0.214], [1, 0.299],
+  [1, 0.701], [0.946, 0.786], [0.554, 0.987], [0.446, 0.987],
+  [0.054, 0.786], [0, 0.701], [0, 0.299], [0.054, 0.214], [0.446, 0.013],
+];
+const HEX_H = [ // flat-top hexagon (wide)
+  [0, 0.299], [0, 0.701], [0.054, 0.786], [0.446, 0.987], [0.554, 0.987],
+  [0.946, 0.786], [1, 0.701], [1, 0.299], [0.946, 0.214], [0.554, 0.013], [0.446, 0.013], [0.054, 0.214],
+];
+const HEX_BOTTOM = [ // hexagon top half sitting on a flat bottom edge
+  [0.5, 0], [0.554, 0.033], [0.946, 0.536], [1, 0.66], [1, 1], [0, 1], [0, 0.66], [0.054, 0.536], [0.446, 0.033],
+];
+const HEX_TOP = [ // flat top edge, hexagon point at the bottom
+  [0, 0], [1, 0], [1, 0.682], [0.582, 0.981], [0.467, 0.981], [0.057, 0.689], [0, 0.566],
+];
+const CHEVRON = [ // ">" arrow used in the round buttons
+  [0.878, 0.349], [0.238, 0.021], [0.041, 0.021], [0.04, 0.122], [0.041, 0.122],
+  [0.683, 0.449], [0.683, 0.55], [0.683, 0.551], [0.041, 0.878], [0.041, 0.979],
+  [0.238, 0.979], [0.878, 0.651],
+];
+
+/* ------------------------------------------------------------------ helpers */
+const deck = new PptxGenJS();
+deck.defineLayout({ name: 'W16', width: 13.333, height: 7.5 });
+deck.layout = 'W16';
+deck.theme = { headFontFace: F.major, bodyFontFace: F.minor };
+
+function newSlide(bg) {
+  const s = deck.addSlide();
+  s.background = { color: bg || C.bg };
+  return s;
+}
+
+/** Free-form polygon from fractional points. */
+function poly(slide, x, y, w, h, pts, opt = {}) {
+  const points = pts.map(([u, v]) => ({ x: +(u * w).toFixed(3), y: +(v * h).toFixed(3) }));
+  points.push({ close: true });
+  slide.addShape('custGeom', Object.assign({ x, y, w, h, points }, opt));
+}
+
+/* --- linear-gradient emulation -------------------------------------------
+   Slice a polygon into bands perpendicular to the ramp direction, each band a
+   flat shape whose colour is the ramp evaluated at the band's midpoint. */
+const GRAD_BANDS = 16;
+const RAMP_DIR = [Math.cos((GRAD.angle * Math.PI) / 180), Math.sin((GRAD.angle * Math.PI) / 180)];
+/* the ramp spans the whole slide diagonal, so every shape stays in register */
+const RAMP_LO = 0;
+const RAMP_HI = 13.333 * RAMP_DIR[0] + 7.5 * RAMP_DIR[1];
+
+function mixHex(a, b, f) {
+  const ch = (i) => {
+    const v = Math.round(parseInt(a.substr(i, 2), 16) * (1 - f) + parseInt(b.substr(i, 2), 16) * f);
+    return v.toString(16).toUpperCase().padStart(2, '0');
+  };
+  return ch(0) + ch(2) + ch(4);
+}
+
+/** Sutherland-Hodgman clip of a polygon against the half plane dot(p,dir) <= limit. */
+function clipHalf(pts, dir, limit, keepBelow) {
+  const val = (p) => (p[0] * dir[0] + p[1] * dir[1] - limit) * (keepBelow ? 1 : -1);
+  const out = [];
+  for (let i = 0; i < pts.length; i++) {
+    const cur = pts[i];
+    const prev = pts[(i + pts.length - 1) % pts.length];
+    const dc = val(cur);
+    const dp = val(prev);
+    if (dc <= 0) {
+      if (dp > 0) out.push(lerpPt(prev, cur, dp / (dp - dc)));
+      out.push(cur);
+    } else if (dp <= 0) {
+      out.push(lerpPt(prev, cur, dp / (dp - dc)));
+    }
+  }
+  return out;
+}
+const lerpPt = (a, b, f) => [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
+
+/** Fill an absolute-coordinate polygon with the deck's teal ramp. */
+function gradPoly(slide, pts, opt = {}) {
+  const ts = pts.map((p) => p[0] * RAMP_DIR[0] + p[1] * RAMP_DIR[1]);
+  const step = (RAMP_HI - RAMP_LO) / GRAD_BANDS;
+  const first = Math.max(0, Math.floor((Math.min(...ts) - RAMP_LO) / step));
+  const last = Math.min(GRAD_BANDS - 1, Math.floor((Math.max(...ts) - RAMP_LO) / step));
+  for (let i = first; i <= last; i++) {
+    let band = pts;
+    band = clipHalf(band, RAMP_DIR, RAMP_LO + (i + 1) * step + 0.006, true);
+    band = clipHalf(band, RAMP_DIR, RAMP_LO + i * step - 0.006, false);
+    if (band.length < 3) continue;
+    quadShape(slide, band, mixHex(GRAD.from, GRAD.to, (i + 0.5) / GRAD_BANDS),
+      i === first ? opt : undefined);
+  }
+}
+
+/** Same, but the shape is given as fractional points inside a box. */
+function gradShape(slide, x, y, w, h, pts, opt) {
+  gradPoly(slide, pts.map(([u, v]) => [x + u * w, y + v * h]), opt);
+}
+
+/** Polygon given by absolute slide points, e.g. the tilted device bodies. */
+function quadShape(slide, pts, color, opt) {
+  const xs = pts.map((p) => p[0]);
+  const ys = pts.map((p) => p[1]);
+  const x = Math.min(...xs);
+  const y = Math.min(...ys);
+  const w = Math.max(...xs) - x;
+  const h = Math.max(...ys) - y;
+  poly(slide, x, y, Math.max(w, 0.001), Math.max(h, 0.001),
+    pts.map(([px, py]) => [w ? (px - x) / w : 0, h ? (py - y) / h : 0]),
+    Object.assign({ fill: { color } }, opt));
+}
+
+/** Flat grey stand-in for a photo / device mockup. */
+function imagePlaceholder(slide, x, y, w, h, pts) {
+  const opt = { fill: { color: C.imgBg } };
+  if (pts) poly(slide, x, y, w, h, pts, opt);
+  else slide.addShape('rect', Object.assign({ x, y, w, h }, opt));
+  const cy = Math.min(y + h / 2, 7.0) - 0.16;
+  slide.addText('[image]', {
+    x: Math.max(x, 0), y: cy, w: Math.min(w, 13.333 - Math.max(x, 0)), h: 0.32,
+    align: 'center', fontSize: 11, color: C.imgFg, fontFace: F.minor,
+  });
+}
+
+/** Upright smartphone stand-in: dark body + light screen. */
+function phoneMockup(slide, x, y, w, h) {
+  const b = 0.09;
+  slide.addShape('roundRect', { x, y, w, h, rectRadius: 0.36, fill: { color: '2B2B2B' } });
+  slide.addShape('roundRect', {
+    x: x + b, y: y + b, w: w - 2 * b, h: h - 2 * b, rectRadius: 0.29, fill: { color: C.imgBg },
+  });
+  slide.addShape('roundRect', { x: x + w / 2 - 0.42, y: y + b + 0.06, w: 0.84, h: 0.2, rectRadius: 0.1, fill: { color: '2B2B2B' } });
+  slide.addText('[image]', {
+    x, y: Math.min(y + h / 2, 6.9), w, h: 0.32, align: 'center', fontSize: 11, color: C.imgFg, fontFace: F.minor,
+  });
+}
+
+/** Tilted tablet stand-in: silver back plate, dark bezel, light screen. */
+function tabletMockup(slide) {
+  quadShape(slide, [[7.78, 2.08], [12.32, 1.90], [11.40, 5.72], [6.96, 5.65]], 'A8AAAD');
+  slide.addShape('roundRect', { x: 11.44, y: 2.08, w: 0.62, h: 0.62, rectRadius: 0.16, fill: { color: '8E9093' } });
+  quadShape(slide, [[6.99, 2.53], [11.35, 2.42], [10.61, 6.16], [6.19, 6.09]], '1A1A1A');
+  quadShape(slide, [[7.11, 2.66], [11.22, 2.56], [10.50, 6.03], [6.31, 5.96]], C.imgBg);
+  slide.addText('[image]', { x: 6.3, y: 4.15, w: 4.6, h: 0.32, align: 'center', fontSize: 11, color: C.imgFg, fontFace: F.minor });
+}
+
+/** Tilted laptop on a stone pedestal (slide 17). */
+function laptopMockup(slide) {
+  quadShape(slide, [[5.90, 6.44], [7.42, 5.92], [9.82, 6.28], [8.22, 6.86]], '9C9C9C'); // pedestal top
+  quadShape(slide, [[5.90, 6.44], [8.22, 6.86], [8.22, 7.50], [5.90, 7.50]], '787878'); // pedestal left face
+  quadShape(slide, [[8.22, 6.86], [9.82, 6.28], [9.82, 7.50], [8.22, 7.50]], '8A8A8A'); // pedestal right face
+  quadShape(slide, [[6.00, 3.05], [10.05, 4.72], [8.00, 6.28], [4.91, 4.20]], 'C7C9CB'); // keyboard deck
+  quadShape(slide, [[6.35, 3.60], [8.90, 4.66], [7.60, 5.66], [5.65, 4.45]], '3A3A3A'); // keyboard well
+  quadShape(slide, [[7.25, 1.03], [10.30, 3.06], [8.93, 5.16], [5.87, 3.12]], 'D6D7D9'); // lid back
+  quadShape(slide, [[7.37, 0.93], [10.42, 2.96], [9.05, 5.06], [5.99, 3.02]], '2B2B2B'); // screen bezel
+  imagePlaceholder(slide, 6.114, 1.095, 4.175, 3.829, [[0.301, 0], [1, 0.507], [0.699, 1], [0, 0.493]]);
+}
+
+/** Slide number, bottom-right (from the slide master). */
+function pageNo(slide, n) {
+  slide.addText(String(n), {
+    x: 10.03, y: 6.825, w: 3.0, h: 0.4, align: 'right', valign: 'middle',
+    fontSize: 12, color: C.ink, fontFace: F.minor,
+  });
+}
+
+/** White rounded "pill" label with a coloured dot, e.g. the "Science" chip. */
+function chip(slide, x, y, opt = {}) {
+  const w = opt.w || 1.224;
+  slide.addShape('roundRect', { x, y, w, h: 0.379, rectRadius: 0.19, fill: { color: C.white }, shadow: shadow() });
+  slide.addShape('ellipse', { x: x + 0.102, y: y + 0.087, w: 0.206, h: 0.206, fill: { color: opt.dot || C.tealLt } });
+  slide.addText(opt.text || 'Science', {
+    x: x + 0.36, y: y + 0.055, w: w - 0.3, h: 0.269,
+    fontSize: 10, color: opt.color || C.ink, fontFace: F.minor,
+  });
+}
+
+/** Round "next" button with a chevron. */
+function arrowButton(slide, x, y) {
+  slide.addShape('ellipse', { x, y, w: 0.379, h: 0.379, fill: { color: C.white }, shadow: shadow() });
+  poly(slide, x + 0.162, y + 0.117, 0.074, 0.144, CHEVRON, { fill: { color: C.teal } });
+}
+
+/** Multi-line heading in the display face. */
+function heading(slide, x, y, w, lines, size = 32, color = C.ink) {
+  slide.addText(lines.map((t, i) => ({ text: t, options: { breakLine: i < lines.length - 1 } })), {
+    x, y, w, h: lines.length * 0.5726, fontSize: size, color, fontFace: F.major, valign: 'top',
+  });
+}
+
+/** Multi-line 12 pt body copy (130 % leading, like the original). */
+function body(slide, x, y, w, lines, opt = {}) {
+  slide.addText(lines.map((t, i) => ({ text: t, options: { breakLine: i < lines.length - 1 } })), {
+    x, y, w, h: lines.length * 0.2876, fontSize: 12, color: opt.color || C.ink,
+    fontFace: F.minor, align: opt.align || 'left', lineSpacingMultiple: 1.3, valign: 'top',
+  });
+}
+
+/** A dot + caption, the deck's legend element. */
+function legend(slide, x, y, items, size = 12) {
+  items.forEach(([text, color, dx]) => {
+    slide.addShape('ellipse', { x: x + dx, y: y + 0.085, w: 0.221, h: 0.221, fill: { color } });
+    slide.addText(text, {
+      x: x + dx + 0.309, y, w: 1.964, h: 0.338, fontSize: size, color: C.ink,
+      fontFace: F.minor, lineSpacingMultiple: 1.3, valign: 'top',
+    });
+  });
+}
+
+/** The recurring "Experimentation / Generalization" legend pair. */
+function legendPair(slide, y, colors = [C.teal, C.blue]) {
+  legend(slide, 0.959, y, [['Experimentation', colors[0], 0], ['Generalization', colors[1], 2.217]]);
+}
+
+/** The recurring "258+ / 723+" big-number pair. */
+function statPair(slide, y, a = '258+', b = '723+') {
+  [[a, C.teal, 0], [b, C.blue, 2.025]].forEach(([text, color, dx]) => {
+    slide.addShape('ellipse', { x: 0.959 + dx, y: y + 0.305, w: 0.221, h: 0.221, fill: { color } });
+    slide.addText(text, {
+      x: 1.311 + dx, y, w: 1.674, h: 0.738, fontSize: 32, color: C.ink,
+      fontFace: F.major, lineSpacingMultiple: 1.3, valign: 'top',
+    });
+  });
+}
+
+/** Big display number, optionally with a differently coloured tail run. */
+function bigNumber(slide, x, y, w, runs, opt = {}) {
+  slide.addText(runs.map(([text, color]) => ({ text, options: { color: color || C.ink } })), {
+    x, y, w, h: opt.h || 1.01, fontSize: opt.size || 54, fontFace: F.major,
+    align: opt.align || 'left', bold: opt.bold || false, color: C.ink,
+    lineSpacingMultiple: opt.ls, valign: 'top',
+  });
+}
+
+/** Centred caption/number inside a hexagon badge. */
+function badgeText(slide, x, y, w, text, size, color) {
+  slide.addText(text, { x, y, w, h: size / 77 + 0.13, align: 'center', fontSize: size, color, fontFace: F.major, valign: 'top' });
+}
+
+/* -------------------------------------------------------------------- icons */
+/* Small line-art marks drawn from native shapes (the original used SVG paths). */
+function icon(slide, kind, cx, cy, s, color) {
+  const R = (x, y, w, h, o) => slide.addShape('rect', Object.assign({ x: cx + x * s, y: cy + y * s, w: w * s, h: h * s, fill: { color } }, o));
+  const RR = (x, y, w, h, o) => slide.addShape('roundRect', Object.assign({ x: cx + x * s, y: cy + y * s, w: w * s, h: h * s, rectRadius: 0.02 * s, fill: { color } }, o));
+  const O = (x, y, d, o) => slide.addShape('ellipse', Object.assign({ x: cx + x * s, y: cy + y * s, w: d * s, h: d * s }, o));
+  switch (kind) {
+    case 'flask': // Erlenmeyer flask with a little gear
+      RR(-0.30, -0.50, 0.60, 0.10);
+      R(-0.16, -0.42, 0.07, 0.30);
+      R(0.09, -0.42, 0.07, 0.30);
+      poly(slide, cx - 0.42 * s, cy - 0.16 * s, 0.62 * s, 0.66 * s,
+        [[0.28, 0], [0.72, 0], [1, 0.78], [0.86, 1], [0.14, 1], [0, 0.78]], { fill: { color } });
+      O(0.14, 0.10, 0.36, { fill: { color }, line: { color: C.white, width: 1.2 } });
+      break;
+    case 'dna': // twin helix between two bars
+      RR(-0.36, -0.50, 0.72, 0.09);
+      RR(-0.36, 0.41, 0.72, 0.09);
+      slide.addShape('rect', { x: cx - 0.30 * s, y: cy - 0.05 * s, w: 0.72 * s, h: 0.09 * s, rotate: 38, fill: { color } });
+      slide.addShape('rect', { x: cx - 0.42 * s, y: cy - 0.05 * s, w: 0.72 * s, h: 0.09 * s, rotate: -38, fill: { color } });
+      RR(-0.20, -0.09, 0.40, 0.07);
+      RR(-0.26, -0.29, 0.52, 0.07);
+      RR(-0.26, 0.22, 0.52, 0.07);
+      break;
+    case 'atom': // nucleus with two crossed orbits
+      O(-0.5, -0.22, 1.0, { h: 0.44 * s, rotate: 30, fill: { type: 'none' }, line: { color, width: 1.3 } });
+      O(-0.5, -0.22, 1.0, { h: 0.44 * s, rotate: -30, fill: { type: 'none' }, line: { color, width: 1.3 } });
+      O(-0.12, -0.12, 0.24, { fill: { color } });
+      break;
+    case 'mail': // envelope
+      RR(-0.5, -0.34, 1.0, 0.68);
+      slide.addShape('triangle', { x: cx - 0.36 * s, y: cy - 0.30 * s, w: 0.72 * s, h: 0.34 * s, rotate: 180, fill: { color: C.blue } });
+      break;
+    case 'globe': // meridian grid
+      O(-0.5, -0.5, 1.0, { fill: { type: 'none' }, line: { color, width: 1.4 } });
+      O(-0.22, -0.5, 0.44, { h: 1.0 * s, fill: { type: 'none' }, line: { color, width: 1.4 } });
+      R(-0.5, -0.06, 1.0, 0.09);
+      break;
+    case 'phone': // handset
+      slide.addShape('blockArc', {
+        x: cx - 0.52 * s, y: cy - 0.52 * s, w: 1.04 * s, h: 1.04 * s,
+        angleRange: [30, 155], arcThicknessRatio: 0.62, rotate: 45, fill: { color },
+      });
+      break;
+  }
+}
+
+/* ------------------------------------------------------------- title slides */
+function titleSlide(n, title, titleSize, chipText) {
+  const s = newSlide(GRAD.mid);
+  poly(s, 0, 1.462, 6.448, 6.038,
+    [[0, 0], [0.006, 0.003], [0.878, 0.541], [1, 0.766], [1, 1], [0, 1]], { fill: { color: GRAD.lo } });
+  poly(s, 7.904, 0, 5.43, 5.38,
+    [[0, 0], [1, 0], [1, 1], [0.144, 0.502], [0, 0.249]], { fill: { color: GRAD.hi } });
+
+  /* wordmark */
+  poly(s, 5.775, 1.216, 0.283, 0.207,
+    [[0.5, 0], [1, 0.62], [1, 1], [0, 1], [0, 0.62]], { fill: { color: C.white } });
+  slide_text(s, 'THINKLAB', 6.107, 1.118, 1.451, 0.404, { fontSize: 18, color: C.white, fontFace: F.major, align: 'center' });
+
+  slide_text(s, title, 0.406, 2.774 + (titleSize === 72 ? 0.101 : 0), 12.521, 1.447,
+    { fontSize: titleSize, color: C.white, fontFace: F.major, align: 'center' });
+  slide_text(s, 'Scientific Method Pitch Deck Presentation Template',
+    0.406, titleSize === 72 ? 4.188 : 4.288, 12.521, 0.438,
+    { fontSize: 20, color: C.white, align: 'center' });
+
+  const pillW = chipText === 'Learn More' ? 1.404 : 1.985;
+  const pillX = chipText === 'Learn More' ? 5.712 : 5.438;
+  chip(s, pillX, 5.917, { w: pillW, text: chipText, color: C.teal });
+  arrowButton(s, pillX + pillW + 0.126, 5.917);
+  return s;
+}
+
+function slide_text(s, text, x, y, w, h, opt) {
+  s.addText(text, Object.assign({ x, y, w, h, fontFace: F.minor, valign: 'top' }, opt));
+}
+
+/* ------------------------------------------------------------ slide builders */
+const build = [];
+
+/* 1 - cover */
+build.push(() => titleSlide(1, 'Scientific Method', 80, 'Learn More'));
+
+/* 2 - overview */
+build.push(() => {
+  const s = newSlide();
+  imagePlaceholder(s, 3.771, 5.606, 4.225, 1.894, HEX_BOTTOM);
+  imagePlaceholder(s, 6.154, 1.693, 4.225, 4.736, HEX_V);
+  poly(s, 8.536, 0, 4.225, 2.516,
+    [[0, 0], [1, 0], [1, 0.438], [0.946, 0.596], [0.554, 0.976], [0.446, 0.976], [0.054, 0.596], [0, 0.438]],
+    { fill: { color: GRAD.mid } });
+  poly(s, 9.155, 5.197, 0.946, 1.06, HEX_V, { fill: { color: C.white }, shadow: shadow(0.1) });
+  icon(s, 'flask', 9.628, 5.727, 0.25, C.teal);
+
+  slide_text(s, '95%', 8.997, 0.609, 3.304, 1.01, { fontSize: 54, color: C.white, fontFace: F.major, align: 'center' });
+  bigNumber(s, 10.466, 5.171, 2.373, [['1,5'], ['M', C.teal]], { size: 60, h: 1.111 });
+  body(s, 10.499, 6.206, 2.373, ['Strong hypotheses guide']);
+
+  chip(s, 0.863, 1.284);
+  heading(s, 0.827, 1.869, 8.329, ['Modern Introduction to ', 'the Scientific Method ', 'Overview']);
+  body(s, 0.848, 3.998, 8.329, ['The scientific method is a systematic process used by ',
+    'scientists to explore observations, answer questions, ', 'and solve problems. ']);
+  legendPair(s, 5.096);
+  pageNo(s, 2);
+});
+
+/* 3 - team */
+build.push(() => {
+  const s = newSlide();
+  imagePlaceholder(s, 6.309, 3.6, 2.7, 3.026, HEX_V);
+  imagePlaceholder(s, 4.713, 0.874, 2.7, 3.026, HEX_V);
+
+  heading(s, 0.827, 2.832, 5.499, ['Introducing ', 'Our Team of ', 'Trusted Professional']);
+  chip(s, 0.863, 2.248);
+  body(s, 0.87, 5.065, 5.555, ['The scientific method is a systematic process used by ',
+    'scientists to explore observations and solve problems. ']);
+  statPair(s, 5.768);
+
+  [['Dr. Ethan Marshall', 1.329, 7.122, 1.351, C.teal, 'dna', 7.948, 2.06],
+   ['Prof. Liam Carter', 4.055, 8.717, 4.077, C.blue, 'flask', 9.544, 4.786]].forEach(
+    ([name, ny, ox, oy, col, ic, tx, by]) => {
+      s.addShape('ellipse', { x: ox, y: oy, w: 0.583, h: 0.583, fill: { color: col }, shadow: shadow(0.1) });
+      icon(s, ic, ox + 0.2915, oy + 0.2915, 0.21, C.white);
+      slide_text(s, name, tx, ny, 3.296, 0.579, { fontSize: 24, color: C.ink, fontFace: F.major, lineSpacingMultiple: 1.3 });
+      body(s, tx + 0.017, by, 4.001, ['The scientific method helps explain ', 'natural world phenomena.']);
+    });
+  pageNo(s, 3);
+});
+
+/* 4 - repeating & refining */
+build.push(() => {
+  const s = newSlide();
+  imagePlaceholder(s, 6.926, 0, 6.408, 5.186, HEX_TOP);
+  heading(s, 0.827, 2.182, 7.159, ['Accurately Repeating & ', 'Effectively Refining ', 'Experiments']);
+  chip(s, 0.863, 1.598);
+  body(s, 0.853, 4.579, 5.555, ['The scientific method is a systematic process used by ',
+    'scientists to explore observations, answer questions, ', 'and solve problems. ']);
+  legendPair(s, 5.564);
+
+  bigNumber(s, 8.316, 5.384, 4.164, [['+15'], ['K', C.teal]], { size: 48, bold: true, align: 'right', ls: 1.2 });
+  body(s, 8.527, 6.255, 4.001, ['Experiments reveal truth'], { align: 'right' });
+
+  poly(s, 6.545, 3.355, 2.411, 2.703, HEX_H, { fill: { color: GRAD.mid }, shadow: shadow() });
+  badgeText(s, 6.099, 4.285, 3.304, '12M', 44, C.white);
+  pageNo(s, 4);
+});
+
+/* 5 - real daily life */
+build.push(() => {
+  const s = newSlide();
+  imagePlaceholder(s, 3.03, 4.206, 4.885, 3.294, HEX_BOTTOM);
+  imagePlaceholder(s, 0, 0, 5.473, 5.15,
+    [[0, 0], [0.999, 0], [1, 0.015], [1, 0.581], [0.936, 0.699], [0.475, 0.982], [0.346, 0.982], [0, 0.769]]);
+
+  heading(s, 6.339, 1.74, 7.159, ['Applying Scientific ', 'Method in Real Daily Life']);
+  chip(s, 6.375, 1.156);
+  body(s, 6.361, 3.416, 5.555, ['PLACEHOLDER',
+    'explore observations, answer questions, and solve problems. ']);
+
+  s.addShape('ellipse', { x: 7.539, y: 5.228, w: 0.752, h: 0.752, fill: { color: C.blue }, shadow: shadow(0.1) });
+  icon(s, 'atom', 7.915, 5.604, 0.3, C.white);
+  slide_text(s, '$2.950', 8.654, 5.099, 3.86, 1.01, { fontSize: 54, color: C.ink, fontFace: F.major });
+  body(s, 8.683, 6.04, 4.059, ['Scientific method process is used by scientists.']);
+  pageNo(s, 5);
+});
+
+/* 6 - consistently repeating (teal wedge) */
+build.push(() => {
+  const s = newSlide();
+  poly(s, 7.829, 0, 5.505, 4.541,
+    [[0, 0], [1, 0], [1, 0.818], [0.775, 0.975], [0.622, 0.975], [0.076, 0.593], [0, 0.433]],
+    { fill: { color: GRAD.mid } });
+  imagePlaceholder(s, 5.681, 0.556, 6.069, 6.944);
+
+  chip(s, 0.863, 1.138);
+  heading(s, 0.827, 1.722, 7.159, ['PLACEHOLDER']);
+  slide_text(s, '1.290+', 1.728, 5.038, 7.159, 1.01, { fontSize: 54, color: C.ink, fontFace: F.major });
+  body(s, 0.849, 6.024, 5.555, ['The scientific method process is used by scientists.']);
+  s.addShape('ellipse', { x: 0.965, y: 5.252, w: 0.583, h: 0.583, fill: { color: C.blue } });
+  icon(s, 'flask', 1.2565, 5.5435, 0.21, C.white);
+
+  bigNumber(s, 8.373, 1.517, 4.164, [['85%', C.white]], { size: 54, bold: true, align: 'right', ls: 1.2, h: 1.108 });
+  body(s, 8.509, 2.531, 4.001, ['Formulate Hypothesis'], { color: C.white, align: 'right' });
+  pageNo(s, 6);
+});
+
+/* 7 - everyday daily life */
+build.push(() => {
+  const s = newSlide();
+  imagePlaceholder(s, 7.149, 2.962, 3.491, 3.913, HEX_V);
+  imagePlaceholder(s, 8.725, 0, 4.608, 3.826,
+    [[0, 0], [1, 0], [1, 0.696], [0.59, 0.981], [0.474, 0.981], [0.058, 0.692], [0, 0.571]]);
+
+  heading(s, 0.826, 1.726, 7.159, ['Applying the Scientific ', 'Method in Everyday ', 'Daily Life'], 36);
+  chip(s, 0.862, 1.141);
+  body(s, 0.853, 4.545, 6.877, ['The scientific method is a clear, systematic, and logical process ',
+    'carefully used by scientists to explore observations, answer ',
+    'questions, and solve complex problems effectively.']);
+  statPair(s, 5.62);
+
+  poly(s, 11.127, 3.147, 1.21, 1.356, HEX_V, { fill: { color: GRAD.mid }, shadow: shadow() });
+  icon(s, 'atom', 11.732, 3.825, 0.35, C.white);
+  pageNo(s, 7);
+});
+
+/* 8 - phone mockups */
+build.push(() => {
+  const s = newSlide();
+  phoneMockup(s, 10.46, -1.7, 2.85, 7.14);
+  phoneMockup(s, 6.61, 1.76, 3.28, 6.5);
+
+  heading(s, 0.827, 1.766, 7.159, ['Understanding Common ', 'Errors in Scientific ', 'Research']);
+  chip(s, 0.863, 1.182);
+  slide_text(s, '1.290+', -1.919, 4.824, 7.159, 1.01, { fontSize: 54, color: C.ink, fontFace: F.major, align: 'right' });
+  body(s, 0.565, 5.809, 5.555, ['PLACEHOLDER',
+    'to explore observations, answer questions, and solve problems. '], { align: 'right' });
+  s.addShape('ellipse', { x: 5.421, y: 5.038, w: 0.583, h: 0.583, fill: { color: C.blue } });
+  icon(s, 'flask', 5.7125, 5.3295, 0.21, C.white);
+
+  poly(s, 10.961, 4.596, 1.498, 1.679, HEX_V, { fill: { color: GRAD.mid }, shadow: shadow() });
+  badgeText(s, 10.961, 5.149, 1.498, '83%', 28, C.white);
+  pageNo(s, 8);
+});
+
+/* 9 - hexagon cluster */
+build.push(() => {
+  const s = newSlide();
+  /* one photo in the original, clipped into four interlocking hexagons */
+  [[5.938, 4.855], [9.214, -0.845], [7.572, 2.005], [10.848, 2.005],
+  ].forEach(([x, y]) => imagePlaceholder(s, x, y, 3.113, 3.445, HEX_V));
+
+  poly(s, 8.688, 5.141, 0.946, 1.06, HEX_V, { fill: { color: C.white }, shadow: shadow(0.1) });
+  icon(s, 'dna', 9.161, 5.671, 0.25, C.teal);
+  slide_text(s, '15%', 10.014, 5.251, 2.373, 0.842, { fontSize: 44, color: C.ink, fontFace: F.major });
+  body(s, 10.047, 6.092, 2.373, ['Strong hypotheses guide']);
+
+  heading(s, 0.827, 1.764, 7.159, ['PLACEHOLDER']);
+  chip(s, 0.863, 1.18);
+  body(s, 0.853, 4.506, 5.555, ['The scientific method is a systematic process used by ',
+    'scientists to explore observations, answer questions, ', 'and solve problems. ']);
+  statPair(s, 5.582);
+
+  poly(s, 10.297, 2.284, 0.946, 1.06, HEX_V, { fill: { color: GRAD.mid }, shadow: shadow() });
+  icon(s, 'flask', 10.77, 2.814, 0.25, C.white);
+  pageNo(s, 9);
+});
+
+/* 10 - process steps */
+build.push(() => {
+  const s = newSlide();
+  [[6.986, 4.523], [8.108, 2.591], [6.986, 0.675]].forEach(([x, y]) =>
+    imagePlaceholder(s, x, y, 2.053, 2.301, HEX_V));
+
+  heading(s, 0.827, 1.766, 7.159, ['Key Common Errors in ', 'Scientific Research']);
+  chip(s, 0.863, 1.182);
+  slide_text(s, '1.290+', 1.728, 4.663, 7.159, 1.01, { fontSize: 54, color: C.ink, fontFace: F.major });
+  body(s, 0.849, 5.648, 5.555, ['PLACEHOLDER',
+    'to explore observations, answer questions, and solve problems. ']);
+  s.addShape('ellipse', { x: 0.965, y: 4.876, w: 0.583, h: 0.583, fill: { color: C.blue } });
+  icon(s, 'flask', 1.2565, 5.1675, 0.21, C.white);
+
+  poly(s, 5.668, 2.591, 2.053, 2.301, HEX_V, { fill: { color: GRAD.mid }, shadow: shadow() });
+  s.addText([{ text: 'Scientific ', options: { breakLine: true } }, { text: 'Research' }], {
+    x: 5.37, y: 3.388, w: 2.65, h: 0.707, align: 'center', fontSize: 18, color: C.white, fontFace: F.major, valign: 'top',
+  });
+
+  [['2.5M', 'Formulate Hypothesis', 8.9, 1.688, 9.59, 1.216],
+   ['1.2M', 'Analyze Results', 10.022, 3.603, 10.712, 3.132],
+   ['5.8K', 'Conduct Experiment', 8.9, 5.536, 9.59, 5.064]].forEach(([num, cap, ox, oy, tx, ty]) => {
+    s.addShape('ellipse', { x: ox, y: oy, w: 0.277, h: 0.277, fill: { color: C.teal }, line: { color: C.white, width: 5 }, shadow: shadow(0.1) });
+    slide_text(s, num, tx, ty, 3.296, 0.977, { fontSize: 44, color: C.ink, fontFace: F.major, lineSpacingMultiple: 1.3 });
+    slide_text(s, cap, tx + 0.002, ty + 0.896, 4.001, 0.323, { fontSize: 12, color: C.ink, lineSpacingMultiple: 1.2 });
+  });
+  pageNo(s, 10);
+});
+
+/* 11 - microscope illustration */
+build.push(() => {
+  const s = newSlide();
+  /* vector microscope: flat shapes, back to front */
+  const MICRO = [
+    [5.479, 6.261, 3.367, 0.217, C.g3, [[0.989, 1], [0.011, 1], [0, 0.826], [0, 0.174], [0.011, 0], [0.989, 0], [1, 0.174], [1, 0.826]]],
+    [5.505, 5.521, 3.273, 0.859, C.g1, [[0.151, 0.064], [0.003, 0.885], [0.019, 1], [0.984, 1], [0.999, 0.921], [0.97, 0.544], [0.955, 0.5], [0.318, 0.5], [0.281, 0.307], [0.291, 0.193], [0.255, 0], [0.183, 0]]],
+    [5.889, 2.29, 0.663, 0.92, C.g3, [[1, 0.849], [0.357, 1], [0.117, 0.42], [0.063, 0.288], [0.007, 0.153], [0, 0.136], [0.577, 0], [0.651, 0.15], [0.697, 0.242], [0.716, 0.279]]],
+    [5.851, 2.232, 0.446, 0.2, C.g2, [[0.955, 0.367], [0.098, 0.993], [0.015, 0.899], [0.003, 0.817], [0.045, 0.633], [0.902, 0.007], [0.985, 0.101], [0.997, 0.183]]],
+    [5.931, 2.427, 0.402, 0.162, C.g1, [[1, 0.21], [0.026, 1], [0, 0.787], [0.97, 0]]],
+    [5.957, 2.512, 0.407, 0.164, C.g1, [[1, 0.207], [0.025, 1], [0, 0.789], [0.97, 0]]],
+    [6.037, 2.898, 0.901, 1.198, C.g1, [[1, 0.827], [0.294, 1], [0.069, 0.349], [0.034, 0.247], [0.001, 0.15], [0.015, 0.13], [0.542, 0.001], [0.618, 0.103], [0.655, 0.173], [0.67, 0.201]]],
+    [6.068, 3.022, 0.54, 0.207, C.tealLt, [[1, 0.162], [0.017, 1], [0, 0.831], [0.975, 0]]],
+    [6.091, 3.106, 0.55, 0.21, C.tealLt, [[1, 0.16], [0.017, 1], [0, 0.834], [0.976, 0]]],
+    [5.325, 3.258, 1.456, 2.777, C.teal, [[0.996, 0.934], [0.795, 0.997], [0.415, 0.909], [0.115, 0.739], [0.016, 0.589], [0, 0.502], [0.007, 0.434], [0.132, 0.217], [0.322, 0.063], [0.375, 0.032], [0.676, 0.195], [0.646, 0.211], [0.55, 0.273], [0.386, 0.56], [0.434, 0.651], [0.786, 0.818], [0.876, 0.835]]],
+    [5.745, 3.258, 0.661, 0.699, C.tealDk, [[0.856, 0.773], [0.852, 0.777], [0.826, 0.8], [0.716, 0.915], [0.553, 1], [0, 0.477], [0.075, 0.25], [0.156, 0.162], [0.184, 0.134], [0.866, 0.137]]],
+    [5.784, 3.189, 0.731, 0.731, C.g3, [[0.854, 0.146], [0.854, 0.854], [0.146, 0.854], [0.146, 0.146]]],
+    [5.961, 3.365, 0.377, 0.377, C.g1, [[0.613, 0.013], [0.987, 0.613], [0.388, 0.987], [0.013, 0.388]]],
+    [5.658, 3.873, 0.25, 0.25, C.g3, [[1, 0.5], [0.5, 1], [0, 0.5], [0.5, 0]]],
+    [5.65, 3.904, 0.25, 0.25, C.tealDk, [[1, 0.5], [0.5, 1], [0, 0.5], [0.5, 0]]],
+    [5.718, 3.934, 0.129, 0.129, C.g1, [[1, 0.5], [0.5, 1], [0, 0.5], [0.5, 0]]],
+    [6.323, 3.965, 0.731, 0.479, C.g3, [[0, 0.445], [0.106, 0.94], [0.2, 0.993], [0.942, 0.622], [0.998, 0.496], [0.891, 0]]],
+    [6.276, 3.989, 0.725, 0.119, C.g2, [[0, 0.966], [0.95, -0.917], [1, 0.035], [0.05, 1.917]]],
+    [6.432, 4.184, 0.231, 0.616, C.g1, [[0.803, 0.135], [0.969, 0.729], [0.998, 0.833], [0.723, 0.993], [0.64, 0.999], [0.197, 0.865], [0.167, 0.758], [0.002, 0.167], [0.36, 0.001], [0.748, 0.074]]],
+    [6.604, 4.128, 0.317, 0.588, C.g1, [[0.572, 0.109], [0.986, 0.792], [0.997, 0.819], [0.798, 0.992], [0.448, 0.916], [0.428, 0.891], [0.015, 0.207], [0.001, 0.173], [0.202, 0.008], [0.529, 0.065]]],
+    [6.772, 4.073, 0.404, 0.559, C.g1, [[0.885, 0.977], [0.57, 0.917], [0.491, 0.819], [0.075, 0.304], [0.031, 0.25], [0, 0.166], [0.115, 0.023], [0.43, 0.083], [0.884, 0.645], [0.969, 0.75]]],
+    [6.471, 4.633, 0.191, 0.07, C.g3, [[0.971, 0], [1, 0.752], [0.029, 1], [0, 0.248]]],
+    [6.729, 4.558, 0.192, 0.108, C.g3, [[0.921, 0], [1, 0.472], [0.093, 1], [0, 0.536]]],
+    [6.971, 4.434, 0.185, 0.143, C.g3, [[1, 0.321], [0.144, 1], [0, 0.679], [0.856, 0]]],
+    [6.378, 5.008, 1.273, 0.199, C.g1, [[1, 0.038], [0.504, 0.691], [0, 0.962], [0.496, 0.309]]],
+    [6.379, 5.107, 1.286, 0.101, C.g3, [[0, 0.89], [0.99, -0.88], [1, 0.11], [0.01, 1.88]]],
+    [6.393, 5.108, 1.273, 0.199, C.g3, [[1, 0.038], [0.504, 0.691], [0, 0.962], [0.496, 0.309]]],
+    [6.378, 5.245, 0.286, 0.379, C.tealDk, [[0, 0.844], [0.274, 0], [0.804, 0], [1, 0.992]]],
+    [6.354, 5.689, 0.428, 0.347, C.tealDk, [[0.988, 0.475], [0.344, 0.985], [0.207, 0.945], [0.046, 0.887], [0.225, 0], [0.695, 0.467], [0.997, 0.262]]],
+    [6.861, 5.429, 0.787, 0.258, C.g3, [[0.958, 0.646], [0.069, 0.999], [0.015, 0.872], [0, 0.518], [0.042, 0.353], [0.931, 0.001], [0.985, 0.128], [1, 0.482]]],
+    [6.606, 5.607, 0.581, 0.177, C.white, [[0.098, 1], [0.001, 0.722], [0.085, 0.361], [0.889, 0.003], [0.999, 0.278], [0.915, 0.639], [0.111, 0.997]]],
+    [6.093, 5.602, 0.233, 0.233, C.g3, [[0.613, 0.013], [0.987, 0.613], [0.388, 0.987], [0.013, 0.388]]],
+    [6.149, 5.658, 0.12, 0.12, C.teal, [[0.5, 1], [0, 0.5], [0.5, 0], [1, 0.5]]],
+  ];
+  MICRO.forEach(([x, y, w, h, color, pts]) => poly(s, x, y, w, h, pts, { fill: { color } }));
+
+  heading(s, 0.829, 1.298, 5.37, ['Developing a Strong ', 'and Testable Key ', 'Hypothesis'], 36);
+  chip(s, 11.109, 4.492);
+  [['Experimentation', 'Experiments reveal truth.', 4.492, C.teal],
+   ['Experimentation', 'Experiments disprove scientific ideas.', 5.675, C.blue]].forEach(([t1, t2, y, col]) => {
+    s.addShape('ellipse', { x: 0.955, y: y + 0.085, w: 0.221, h: 0.221, fill: { color: col } });
+    slide_text(s, t1, 1.264, y, 1.964, 0.338, { fontSize: 12, color: C.ink, fontFace: F.major, lineSpacingMultiple: 1.3 });
+    slide_text(s, t2, 1.264, y + 0.374, 3.367, 0.338, { fontSize: 12, color: C.ink, lineSpacingMultiple: 1.3 });
+  });
+
+  poly(s, 7.685, 1.491, 2.26, 2.533, HEX_V, { fill: { color: GRAD.mid }, shadow: shadow() });
+  badgeText(s, 7.685, 2.284, 2.26, '83%', 40, C.white);
+  slide_text(s, 'Observe', 7.685, 2.894, 2.26, 0.338, { fontSize: 12, color: C.white, align: 'center', lineSpacingMultiple: 1.3 });
+
+  poly(s, 10.348, 0.943, 1.579, 1.77, HEX_V, { fill: { color: C.white }, shadow: shadow(0.1) });
+  badgeText(s, 10.007, 1.481, 2.26, '42%', 24, C.ink);
+  slide_text(s, 'Analyze', 8.541, 1.906, 5.193, 0.269, { fontSize: 10, color: C.ink, align: 'center' });
+
+  bigNumber(s, 8.273, 5.042, 4.232, [['1.290'], ['+', C.blue]], { size: 54, align: 'right' });
+  slide_text(s, 'Scientists ask important questions', 6.886, 6.09, 5.555, 0.303,
+    { fontSize: 12, color: C.ink, align: 'right' });
+  pageNo(s, 11);
+});
+
+/* 12 - tablet mockup */
+build.push(() => {
+  const s = newSlide();
+  tabletMockup(s);
+
+  heading(s, 0.827, 2.163, 7.159, ['Smart Modern Tools ', 'in Scientific Research']);
+  chip(s, 0.863, 1.579);
+  body(s, 0.853, 4.107, 6.877, ['The scientific method is a clear, systematic, and logical process ',
+    'carefully used by scientists to explore observations, answer ',
+    'questions, and solve complex problems effectively.']);
+  statPair(s, 5.183);
+
+  poly(s, 11.013, 4.918, 1.13, 1.267, HEX_V, { fill: { color: GRAD.mid }, shadow: shadow() });
+  icon(s, 'dna', 11.578, 5.552, 0.3, C.white);
+  poly(s, 6.467, 1.839, 1.13, 1.267, HEX_V, { fill: { color: C.white }, shadow: shadow(0.1) });
+  icon(s, 'flask', 7.032, 2.473, 0.3, C.teal);
+  pageNo(s, 12);
+});
+
+/* 13 - $5.720+ */
+build.push(() => {
+  const s = newSlide();
+  imagePlaceholder(s, 6.108, 0, 7.225, 6.027,
+    [[0, 0], [1, 0], [1, 0.695], [0.586, 0.982], [0.471, 0.982], [0.058, 0.695], [0, 0.576]]);
+
+  bigNumber(s, 0.822, 1.191, 7.159, [['$5.720'], ['+', C.teal]], { size: 60, h: 1.111 });
+  body(s, 0.849, 2.302, 5.555, ['Scientific method is a systematic process used by ',
+    'scientists to explore observations and solve problems. ']);
+
+  heading(s, 0.827, 5.373, 7.159, ['Applying the Scientific ', 'Method in Everyday Daily Life']);
+  chip(s, 0.863, 4.789);
+
+  poly(s, 5.655, 3.299, 1.498, 1.679, HEX_V, { fill: { color: GRAD.mid }, shadow: shadow() });
+  badgeText(s, 4.752, 3.853, 3.304, '83%', 28, C.white);
+  pageNo(s, 13);
+});
+
+/* 14 - two hexagon photos */
+build.push(() => {
+  const s = newSlide();
+  imagePlaceholder(s, 6.483, 3.75, 5.068, 3.75, HEX_BOTTOM);
+  imagePlaceholder(s, 0.965, 0, 5.518, 4.393,
+    [[0.001, 0], [0.999, 0], [1, 0.013], [1, 0.58], [0.946, 0.698], [0.554, 0.982], [0.446, 0.982], [0.054, 0.698], [0, 0.58], [0, 0.013]]);
+
+  heading(s, 0.827, 5.373, 7.159, ['Smart Modern Tools ', 'in Scientific Research']);
+  chip(s, 0.863, 4.789);
+
+  poly(s, 10.546, 3.872, 1.498, 1.679, HEX_V, { fill: { color: GRAD.mid }, shadow: shadow() });
+  badgeText(s, 10.546, 4.425, 1.498, '83%', 28, C.white);
+  poly(s, 5.918, 0.983, 1.498, 1.679, HEX_V, { fill: { color: C.bg }, shadow: shadow(0.1) });
+  badgeText(s, 5.918, 1.537, 1.498, '75%', 28, C.ink);
+
+  bigNumber(s, 7.971, 1.161, 7.159, [['1.290'], ['+', C.blue]], { size: 54 });
+  body(s, 7.997, 2.147, 5.555, ['The scientific method helps scientists ',
+    'investigate questions through experiments.']);
+  pageNo(s, 14);
+});
+
+/* 15 - intermission */
+build.push(() => {
+  const s = newSlide();
+  poly(s, 7.759, 0, 5.574, 3.75,
+    [[0, 0], [1, 0], [1, 0.725], [0.712, 0.972], [0.572, 0.972], [0.07, 0.541], [0, 0.361]],
+    { fill: { color: GRAD.mid } });
+  imagePlaceholder(s, 5.574, 0.714, 6.79, 6.786);
+
+  chip(s, 0.863, 1.355);
+  slide_text(s, 'Brief Intermission ', 0.806, 1.95, 7.557, 1.01, { fontSize: 54, color: C.ink, fontFace: F.major });
+  slide_text(s, "– We'll Resume Shortly", 0.861, 3.043, 6.667, 0.505, { fontSize: 24, color: C.ink, fontFace: F.major });
+  slide_text(s, '60 min', 1.74, 5.045, 7.159, 0.909, { fontSize: 48, color: C.ink, fontFace: F.major });
+  body(s, 0.861, 5.971, 5.555, ['PLACEHOLDER',
+    'to explore observations, answer questions, and solve problems. ']);
+  s.addShape('ellipse', { x: 0.977, y: 5.2, w: 0.583, h: 0.583, fill: { color: C.blue } });
+  icon(s, 'dna', 1.2685, 5.4915, 0.21, C.white);
+  pageNo(s, 15);
+});
+
+/* 16 - two big percentages */
+build.push(() => {
+  const s = newSlide();
+  poly(s, 5.809, 3.761, 5.082, 3.739, HEX_BOTTOM, { fill: { color: GRAD.mid } });
+  badgeText(s, 5.753, 5.068, 5.193, '83%', 66, C.white);
+  slide_text(s, 'Scientists ask important questions', 5.753, 6.187, 5.193, 0.303,
+    { fontSize: 12, color: C.white, align: 'center' });
+
+  poly(s, 9.073, 0.733, 3.303, 3.703, HEX_V, { fill: { color: C.bg }, shadow: shadow(0.1) });
+  badgeText(s, 8.129, 1.869, 5.193, '56%', 54, C.ink);
+  s.addText([{ text: 'Scientists ask ', options: { breakLine: true } }, { text: 'important questions' }], {
+    x: 8.129, y: 2.82, w: 5.193, h: 0.505, align: 'center', fontSize: 12, color: C.ink, fontFace: F.minor, valign: 'top',
+  });
+
+  heading(s, 0.827, 1.974, 7.159, ['Applying the Scientific Method ', 'in Everyday Daily Life']);
+  chip(s, 0.863, 1.39);
+  body(s, 0.853, 4.787, 5.555, ['The scientific method is a systematic process used by ',
+    'scientists to explore observations, answer questions, ', 'and solve problems. ']);
+  legendPair(s, 5.772);
+
+  s.addShape('ellipse', { x: 6.479, y: 3.999, w: 0.873, h: 0.873, fill: { color: C.white }, shadow: shadow(0.1) });
+  icon(s, 'flask', 6.9155, 4.4355, 0.32, C.teal);
+  s.addShape('ellipse', { x: 8.841, y: 1.365, w: 0.652, h: 0.652, fill: { color: C.blue }, shadow: shadow(0.1) });
+  icon(s, 'atom', 9.167, 1.691, 0.24, C.white);
+  pageNo(s, 16);
+});
+
+/* 17 - laptop on pedestal */
+build.push(() => {
+  const s = newSlide();
+  laptopMockup(s);
+
+  heading(s, 0.827, 1.768, 7.159, ['Developing a Strong ', 'and Testable Key ', 'Hypothesis']);
+  chip(s, 0.863, 1.184);
+  body(s, 0.848, 4.879, 8.329, ['The scientific method is a systematic process ',
+    'used by scientists to explore observations, answer ', 'questions, and solve problems. ']);
+  legendPair(s, 5.978);
+
+  [['97.2%', 1.667, 1.508, 2.404, GRAD.mid, C.white, 'atom'],
+   ['50.3%', 4.173, 4.014, 4.91, C.white, C.teal, 'flask']].forEach(([num, hy, ty, cy2, hexFill, icoCol, ic]) => {
+    poly(s, 9.062, hy, 0.946, 1.06, HEX_V, { fill: { color: hexFill }, shadow: shadow(hexFill === C.white ? 0.1 : 0.06) });
+    icon(s, ic, 9.535, hy + 0.53, 0.25, icoCol);
+    slide_text(s, num, 10.434, ty, 3.296, 0.977, { fontSize: 44, color: C.ink, fontFace: F.major, lineSpacingMultiple: 1.3 });
+    slide_text(s, 'Formulate Hypothesis', 10.437, cy2, 4.001, 0.323, { fontSize: 12, color: C.ink, lineSpacingMultiple: 1.2 });
+  });
+  pageNo(s, 17);
+});
+
+/* 18 - bar chart */
+build.push(() => {
+  const s = newSlide();
+  [[9.376, 3.365, 2.094, 4.135, C.g1], [5.928, 4.542, 2.104, 2.958, C.g1],
+   [6.856, 2.781, 2.094, 4.719, C.blue], [10.303, 1.594, 2.094, 5.906, C.teal]].forEach(
+    ([x, y, w, h, color]) => s.addShape('rect', { x, y, w, h, fill: { color } }));
+
+  heading(s, 0.827, 1.89, 7.159, ['Common Methodological ', 'Errors in Scientific ', 'Research']);
+  chip(s, 0.863, 1.306);
+  body(s, 0.853, 4.7, 5.555, ['The scientific method is a systematic process used by ',
+    'scientists to explore observations, answer questions, ', 'and solve problems. ']);
+  legendPair(s, 5.856, [C.blue, C.teal]);
+
+  badgeText(s, 6.852, 3.606, 2.09, '65%', 40, C.white);
+  slide_text(s, 'Experimentation', 6.916, 4.308, 1.964, 0.338, { fontSize: 12, color: C.white, align: 'center', lineSpacingMultiple: 1.3 });
+  badgeText(s, 10.299, 2.422, 2.09, '70%', 40, C.white);
+  slide_text(s, 'Generalization', 10.299, 3.124, 2.09, 0.338, { fontSize: 12, color: C.white, align: 'center', lineSpacingMultiple: 1.3 });
+
+  s.addShape('ellipse', { x: 7.553, y: 2.459, w: 0.688, h: 0.688, fill: { color: C.white }, shadow: shadow(0.1) });
+  icon(s, 'dna', 7.897, 2.803, 0.25, C.blue);
+  s.addShape('ellipse', { x: 11.0, y: 1.275, w: 0.688, h: 0.688, fill: { color: C.white }, shadow: shadow(0.1) });
+  icon(s, 'flask', 11.344, 1.619, 0.25, C.teal);
+  pageNo(s, 18);
+});
+
+/* 19 - contact */
+build.push(() => {
+  const s = newSlide();
+  imagePlaceholder(s, 3.925, 0, 9.409, 4.993,
+    [[0, 0], [1, 0], [1, 0.554], [0.618, 0.969], [0.497, 0.969], [0.061, 0.495], [0, 0.297]]);
+
+  heading(s, 0.827, 3.015, 7.159, ['Reach Out & Start ', 'a Conversation With Us']);
+  chip(s, 0.863, 2.431);
+  body(s, 0.849, 4.518, 5.555, ['The scientific method is a systematic and logical process ',
+    'used by scientists to explore observations and solve problems.']);
+
+  [['addmail@yourmail.com', 0.965, 3.358, 'mail'],
+   ['www.yourwebsite.com', 5.32, 3.295, 'globe'],
+   ['+012 3456 7890', 9.612, 2.756, 'phone']].forEach(([text, x, w, ic]) => {
+    s.addShape('roundRect', { x, y: 5.647, w, h: 0.851, rectRadius: 0.42, fill: { color: C.white }, shadow: shadow() });
+    s.addShape('ellipse', { x: x + 0.181, y: 5.8, w: 0.547, h: 0.547, fill: { color: C.blue } });
+    icon(s, ic, x + 0.4545, 6.0735, 0.25, C.white);
+    slide_text(s, text, x + 0.876, 5.91, w - 0.95, 0.325, { fontSize: 12, color: C.ink, fontFace: F.major, lineSpacingMultiple: 1.2 });
+  });
+
+  poly(s, 11.398, 3.22, 0.946, 1.06, HEX_V, { fill: { color: GRAD.mid }, shadow: shadow() });
+  icon(s, 'atom', 11.871, 3.75, 0.25, C.white);
+  pageNo(s, 19);
+});
+
+/* 20 - closing */
+build.push(() => titleSlide(20, 'Thanks for Attention', 72, 'Explore Hypotheses'));
+
+/* ---------------------------------------------------------------- write out */
+build.forEach((fn) => fn());
+deck.writeFile({ fileName: path.join(__dirname, '0bc79f39-1fc6-42b0-9ed9-2ba74323ad15_grok_final.pptx') })
+  .then((f) => console.log('wrote', f));
