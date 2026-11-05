@@ -1,0 +1,48 @@
+{
+  "files": [
+    {
+      "name": "box-contract.generated.mjs",
+      "sha256": "8688aa645ea4810170d37d0df3b43957b46123b0cafbf17a06db1c7f977bc3e4"
+    },
+    {
+      "name": "cdp-cookies.mjs",
+      "sha256": "27e1042a977044efb4622ea7742f72459614a1aa0076e1f7d8fe8b547a1b1316"
+    },
+    {
+      "name": "sand-cookie-import.mjs",
+      "sha256": "512cfaa3ea163f41b441c8e8bee374dc4ff1ef447b87d650dfe62acee25892ce"
+    },
+    {
+      "name": "sand-cookie-persist.mjs",
+      "sha256": "834096d143a251913a15e36f690589c3c4874ded4c98a2bcf4121b94b9a3cf1f"
+    },
+    {
+      "name": "sand-egress-timezone.mjs",
+      "sha256": "d2cc0c922fddc3c3f3ef15583cfdde174c9dc63e272c89b21a0fea649727edd5"
+    },
+    {
+      "name": "sand-egress-tunnel",
+      "sha256": "0ac6cc2f72d77116ce25eb5291a5a86c1fed7f2344020e02ece1418498586fae"
+    },
+    {
+      "name": "sand-fingerprint-profiles.mjs",
+      "sha256": "b106f5f5a6aff897fa6359c9a95c8d2408e2df5b6a27df06b8cb0cb60e72e937"
+    },
+    {
+      "name": "sand-locale-match.mjs",
+      "sha256": "76505c4d68f6de85a3c1d2983f5323220216eaf59d1f7592ab19d6380d150f00"
+    },
+    {
+      "name": "sand-session-sync.mjs",
+      "sha256": "0afd111bf9261e5c076b12978cf3fc2a6684a3573d9460c1d7ad6d0fdbbd8ae7"
+    },
+    {
+      "name": "sand-ua-governor.mjs",
+      "sha256": "d08207775bdfb1b589d137b722ad4f9c9471498d2c1e417319d9251f1bee4578"
+    },
+    {
+      "name": "sand-web-bot-auth.mjs",
+      "sha256": "bdebe0bacb17fcfe6667bc589bc6c8714055893bcdbcdc6347f102e305d82e22"
+    }
+  ]
+}
