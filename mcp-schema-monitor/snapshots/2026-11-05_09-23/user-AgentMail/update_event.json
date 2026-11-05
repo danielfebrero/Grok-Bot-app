@@ -1,0 +1,202 @@
+{
+  "description": "Change a calendar event: send only the fields to change. For a recurring event, its UUID changes every date not edited on its own; a dated ID (<uuid>_<slot>) changes that date, or with mode future that date and every later one. Once a date has started its start cannot move, and once it has ended only title, description, location, attendees and metadata can change. Attendees hear about a change only when sendInvites is passed on this call: it does not carry over from create_event, so a reschedule needs it again. ifMatch is optional; with an etag the change is refused (412) if the event changed since, and a 409 race_condition without it means retry. Calendar works for every organization in US production; EU production returns 403 \"Calendar isn't available in this region yet\".",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "allDay": {
+        "description": "Switches between a timed and an all-day event; send start, end (as dates for all-day) and timezone with it. Not for a dated ID",
+        "type": "boolean"
+      },
+      "attendees": {
+        "description": "Replaces the whole list: to add or remove someone, send the list get_event returned with the change, keeping each status, and pass ifMatch so a response that arrived meanwhile isn't overwritten",
+        "items": {
+          "properties": {
+            "comment": {
+              "description": "Note the attendee sent with their response; when replacing the list, keep the one get_event returned",
+              "type": "string"
+            },
+            "email": {
+              "description": "Attendee's email address, unique within the event",
+              "type": "string"
+            },
+            "name": {
+              "description": "Name shown for the attendee in the invitation",
+              "type": "string"
+            },
+            "respondedAt": {
+              "description": "When the attendee last responded; when replacing the list, keep the one get_event returned",
+              "type": "string"
+            },
+            "role": {
+              "description": "Whether their presence is required (the default) or optional",
+              "enum": [
+                "required",
+                "optional"
+              ],
+              "type": "string"
+            },
+            "status": {
+              "description": "Their response so far, needs_action when omitted; when replacing the list, keep each status get_event returned",
+              "enum": [
+                "needs_action",
+                "accepted",
+                "declined",
+                "tentative"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "email"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "description": {
+        "description": "New details; null clears them",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "end": {
+        "description": "New local end in the event's timezone; a dated ID accepts end alone",
+        "type": "string"
+      },
+      "eventId": {
+        "description": "Event ID: a one-off or recurring event's UUID, or a dated ID (<uuid>_<slot>) for one date of a recurring event; from get_agenda, create_event, or a message's calendarEventId",
+        "type": "string"
+      },
+      "ifMatch": {
+        "description": "Optional: the etag from your latest read or write of it. The change is then refused with 412 if it changed since; without it the change applies to it as it is now",
+        "type": "string"
+      },
+      "inboxId": {
+        "description": "Inbox ID: the inbox's email address, from list_inboxes",
+        "type": "string"
+      },
+      "location": {
+        "description": "New place or meeting link; null clears it",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "metadata": {
+        "anyOf": [
+          {
+            "additionalProperties": {},
+            "description": "Your own JSON object, returned when the event is read; never sent to attendees",
+            "propertyNames": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Replaces your data whole, so send what get_event returned with your change; null clears it. Never sent to attendees"
+      },
+      "mode": {
+        "description": "For a dated ID only: single (the default) changes just that date, future that date and every later one",
+        "enum": [
+          "single",
+          "future"
+        ],
+        "type": "string"
+      },
+      "recurrence": {
+        "anyOf": [
+          {
+            "properties": {
+              "exdates": {
+                "description": "Dates to skip, each the original start of a date: YYYY-MM-DDTHH:mm:ss for a timed event, YYYY-MM-DD for an all-day one",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "rdates": {
+                "description": "Extra dates the rule does not produce: YYYY-MM-DDTHH:mm:ss for a timed event, YYYY-MM-DD for an all-day one, or for a timed event a period",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "properties": {
+                        "duration": {
+                          "description": "ISO 8601 length of the extra date, e.g. PT30M; give end or duration",
+                          "type": "string"
+                        },
+                        "end": {
+                          "description": "Local end of the extra date; give end or duration",
+                          "type": "string"
+                        },
+                        "start": {
+                          "description": "Local start of the extra date, YYYY-MM-DDTHH:mm:ss",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "start"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                },
+                "type": "array"
+              },
+              "rule": {
+                "description": "RFC 5545 RRULE evaluated in the event's timezone from its start, e.g. FREQ=WEEKLY;BYDAY=MO,WE,FR or FREQ=MONTHLY;BYDAY=-1FR;COUNT=12",
+                "type": "string"
+              }
+            },
+            "required": [
+              "rule"
+            ],
+            "type": "object"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Replaces the whole recurrence, exdates and rdates included, so send what get_event returned with your change; null makes it a one-off event. Not for a dated ID"
+      },
+      "sendInvites": {
+        "description": "Email every attendee the invitation (one send per attendee against send limits). Applies to this request only, so pass it again on each change attendees should hear about. Only for events this inbox organizes",
+        "type": "boolean"
+      },
+      "start": {
+        "description": "New local start in the event's timezone, as in create_event; for a one-off or recurring event send it with end. Refused with mode future: to move every date of a recurring event, send start and end with its UUID",
+        "type": "string"
+      },
+      "status": {
+        "description": "confirmed, tentative, or cancelled (the event stays readable but no longer happens)",
+        "enum": [
+          "confirmed",
+          "tentative",
+          "cancelled"
+        ],
+        "type": "string"
+      },
+      "timezone": {
+        "description": "New time zone; not for a dated ID. IANA time zone, e.g. America/New_York, Europe/London or UTC. Any case and aliases such as US/Eastern are accepted and stored under the canonical name, which can differ from the spelling sent; abbreviations such as PST and UTC offsets are refused",
+        "type": "string"
+      },
+      "title": {
+        "description": "New title",
+        "type": "string"
+      }
+    },
+    "required": [
+      "inboxId",
+      "eventId"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "update_event"
+}

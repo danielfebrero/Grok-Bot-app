@@ -1,0 +1,17 @@
+{
+  "description": "Adds a moderator to the authenticated broadcaster's persistent list and returns the updated moderator user IDs. The list applies to all current and future broadcast chats.",
+  "inputSchema": {
+    "properties": {
+      "user_id": {
+        "description": "The user to appoint as a moderator.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "user_id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "add_chat_moderator"
+}

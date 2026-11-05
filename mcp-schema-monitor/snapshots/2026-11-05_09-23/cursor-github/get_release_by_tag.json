@@ -1,0 +1,29 @@
+{
+  "description": "GET /repos/{owner}/{repo}/releases/tags/{tag}: the release published for a tag. Always call `list_releases` first.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "additionalProperties": false,
+    "properties": {
+      "owner": {
+        "description": "Repository owner (user or org login).",
+        "type": "string"
+      },
+      "repo": {
+        "description": "Repository name.",
+        "type": "string"
+      },
+      "tag": {
+        "description": "Tag name, e.g. v1.2.0.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "repo",
+      "tag"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_release_by_tag"
+}

@@ -1,0 +1,30 @@
+{
+  "description": "GET /repos/{owner}/{repo}/pulls/{pull_number} with the diff media type: the pull request's unified diff as text. GitHub answers 406 when the diff is too large to render; list the files instead.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "additionalProperties": false,
+    "properties": {
+      "owner": {
+        "description": "Repository owner (user or org login).",
+        "type": "string"
+      },
+      "pull_number": {
+        "description": "Pull request number.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "repo": {
+        "description": "Repository name.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "repo",
+      "pull_number"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_pull_request_diff"
+}

@@ -1,0 +1,17 @@
+{
+  "description": "Deletes one of the authenticated user's stream sources.",
+  "inputSchema": {
+    "properties": {
+      "id": {
+        "description": "Source id, from GET /2/sources.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "delete_source"
+}

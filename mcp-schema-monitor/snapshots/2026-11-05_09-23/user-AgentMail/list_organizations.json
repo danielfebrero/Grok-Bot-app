@@ -1,0 +1,9 @@
+{
+  "description": "List the organizations you belong to and show which one is currently selected for AgentMail operations: each with its ID, its name, and whether it is selected. Use `select_organization` to change it. OAuth sessions only -- API-key requests return an error explaining that organization selection does not apply to API-key authentication.",
+  "inputSchema": {
+    "properties": {},
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "list_organizations"
+}

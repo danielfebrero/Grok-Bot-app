@@ -1,0 +1,20 @@
+{
+  "description": "Removes a User from a List by their ID.",
+  "inputSchema": {
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "user_id": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "user_id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "remove_lists_member_by_user_id"
+}
