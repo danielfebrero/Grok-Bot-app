@@ -1,0 +1,173 @@
+--- 2026-11-05_07-52:/opt/sand/sand-host/box-runtime/sand-session-sync.mjs
++++ 2026-11-05_16-45:/opt/sand/sand-host/box-runtime/sand-session-sync.mjs
+@@ -1,7 +1,18 @@
+-import { mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
++import {
++  mkdirSync,
++  readdirSync,
++  readFileSync,
++  renameSync,
++  rmSync,
++  statSync,
++  writeFileSync,
++} from "node:fs";
+ import { dirname } from "node:path";
+ import { pathToFileURL } from "node:url";
+ import {
++  BOX_SESSION_SYNC_PAUSE_DIR,
++  BOX_SESSION_SYNC_PAUSE_TTL_MS,
++  BOX_SESSION_SYNC_PAUSED_DIR,
+   BOX_WALL_EVIDENCE_RECORDERS_MARKER_PATH,
+   WALL_EVIDENCE_COOKIE_COUNT_MAX,
+   WALL_EVIDENCE_COOKIE_FACT_DOMAINS,
+@@ -139,7 +150,7 @@
+   return live;
+ }
+ 
+-function planCookieSync({ views, reads, ledger, now, restoresSessions }) {
++function planCookieSync({ views, reads, ledger, now, restoresSessions, afterPause }) {
+   const continuing = [];
+   for (const [port, read] of reads) {
+     const view = views.get(port);
+@@ -165,6 +176,8 @@
+       if (view.sent.get(key) === fingerprint) continue;
+       if (before != null && isSignedOutCopy(ledger, key, before)) {
+         addToListMap(retired, key, cookie);
++      } else if (afterPause && isSignedOutCopy(ledger, key, cookie)) {
++        continue;
+       } else {
+         addToSetMap(written, key, cookieDigest(cookie));
+       }
+@@ -587,7 +600,7 @@
+     return { deleted: stale.length + replaced, fill };
+   }
+ 
+-  async syncCookies(live) {
++  async syncCookies(live, { afterPause = false } = {}) {
+     const reads = await this.readJars(live);
+     for (const [port, read] of reads) {
+       if (this.cookieViews.get(port)?.browserId !== read.browserId) {
+@@ -601,6 +614,7 @@
+       ledger: this.ledger,
+       now: this.now(),
+       restoresSessions: this.readRestoresSessions(),
++      afterPause,
+     });
+     if (plan.signedOut.length > 0) {
+       log(
+@@ -749,10 +763,10 @@
+     return reloadHosts;
+   }
+ 
+-  async tick() {
++  async tick({ afterPause = false } = {}) {
+     await this.ensureConnections();
+     const live = [...this.browsers.values()].filter((b) => !b.isClosed);
+-    const newCookieDomains = await this.syncCookies(live);
++    const newCookieDomains = await this.syncCookies(live, { afterPause });
+     if (live.length === 0) return;
+     const livePorts = live.map((b) => b.port);
+     if (
+@@ -886,19 +900,95 @@
+   }
+ }
+ 
+-async function main() {
+-  log("starting; mirroring cookies + localStorage across box monitors");
+-  const syncer = new SessionSyncer();
+-  for (;;) {
++const PAUSE_HOLDER_NAME = /^[A-Za-z0-9_-]{1,64}$/;
++
++function listDir(fs, dir) {
++  try {
++    return fs.readdirSync(dir).filter((name) => PAUSE_HOLDER_NAME.test(name));
++  } catch (error) {
++    if (error?.code !== "ENOENT") log(`${dir} unreadable: ${String(error)}`);
++    return [];
++  }
++}
++
++export function freshPauseHolders({
++  fs = { readdirSync, statSync },
++  pauseDir = BOX_SESSION_SYNC_PAUSE_DIR,
++  now = Date.now(),
++} = {}) {
++  return listDir(fs, pauseDir).filter((name) => {
++    try {
++      return now - fs.statSync(`${pauseDir}/${name}`).mtimeMs < BOX_SESSION_SYNC_PAUSE_TTL_MS;
++    } catch (error) {
++      if (error?.code !== "ENOENT") log(`pause holder ${name} unreadable: ${String(error)}`);
++      return false;
++    }
++  });
++}
++
++export function acknowledgePause({
++  fs = { mkdirSync, readdirSync, rmSync, writeFileSync },
++  pausedDir = BOX_SESSION_SYNC_PAUSED_DIR,
++  holders,
++}) {
++  const held = new Set(holders);
++  for (const name of listDir(fs, pausedDir)) {
++    if (!held.has(name)) fs.rmSync(`${pausedDir}/${name}`, { force: true });
++  }
++  if (held.size === 0) return;
++  fs.mkdirSync(pausedDir, { recursive: true });
++  for (const name of held) fs.writeFileSync(`${pausedDir}/${name}`, "");
++}
++
++export async function runSyncLoop({ syncer, sleep, pauseHolders, acknowledge, rounds = Infinity }) {
++  let paused = false;
++  let afterPause = false;
++  for (let round = 0; round < rounds; round += 1) {
++    const holders = pauseHolders();
+     try {
+-      await syncer.tick();
++      acknowledge(holders);
+     } catch (error) {
+-      log(`tick failed: ${String(error)}`);
++      log(`pause acknowledgement failed: ${String(error)}`);
++    }
++    if (holders.length > 0 !== paused) {
++      paused = holders.length > 0;
++      if (paused) afterPause = true;
++      log(paused ? `paused for ${holders.join(", ")}` : "resumed");
+     }
+-    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
++    if (!paused) {
++      try {
++        await syncer.tick({ afterPause });
++        afterPause = false;
++      } catch (error) {
++        log(`tick failed: ${String(error)}`);
++      }
++    }
++    await sleep(POLL_INTERVAL_MS);
+   }
+ }
+ 
++export function syncLoopPause({
++  env = process.env,
++  fs = { mkdirSync, readdirSync, rmSync, statSync, writeFileSync },
++} = {}) {
++  if (env.SAND_SESSION_SYNC_PAUSE !== "1") {
++    return { pauseHolders: () => [], acknowledge: () => {} };
++  }
++  return {
++    pauseHolders: () => freshPauseHolders({ fs }),
++    acknowledge: (holders) => acknowledgePause({ fs, holders }),
++  };
++}
++
++async function main() {
++  log("starting; mirroring cookies + localStorage across box monitors");
++  await runSyncLoop({
++    syncer: new SessionSyncer(),
++    sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
++    ...syncLoopPause(),
++  });
++}
++
+ if (process.argv[1] != null && import.meta.url === pathToFileURL(process.argv[1]).href) {
+   void main();
+ }

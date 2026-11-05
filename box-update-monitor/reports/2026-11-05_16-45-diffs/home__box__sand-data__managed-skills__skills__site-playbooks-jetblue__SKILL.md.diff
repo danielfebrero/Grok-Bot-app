@@ -1,0 +1,11 @@
+--- 2026-11-05_07-52:/home/box/sand-data/managed-skills/skills/site-playbooks-jetblue/SKILL.md
++++ 2026-11-05_16-45:/home/box/sand-data/managed-skills/skills/site-playbooks-jetblue/SKILL.md
+@@ -77,7 +77,7 @@
+ 
+ ### When blocked
+ 
+-- jetblue.com runs a client challenge. A browser that exposes automation gets a "Client Challenge" page that says "Enter the characters seen in the image". Other tells are Access Denied or a results page that never fills.
++- jetblue.com runs a client challenge. A browser that exposes automation gets a "Client Challenge" page that says "Enter the characters seen in the image". That was a live check from a residential connection, not yet from a box. Other tells are Access Denied or a results page that never fills.
+ - After a block or `empty_grid`, do not dispatch the deep link again. Hand the route to the Google Flights playbook and read JetBlue's rows there.
+ - If the page asks for a password, 2FA code, captcha, or payment, stop. Do not solve or bypass. Report which wall appeared and the URL it was on.
+ 

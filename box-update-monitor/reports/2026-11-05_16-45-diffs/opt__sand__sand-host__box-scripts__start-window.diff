@@ -1,0 +1,10 @@
+--- 2026-11-05_07-52:/opt/sand/sand-host/box-scripts/start-window
++++ 2026-11-05_16-45:/opt/sand/sand-host/box-scripts/start-window
+@@ -122,6 +122,7 @@
+ 		--port "${EXEC_DAEMON_PORT}" \
+ 		--pty-websocket-port "${PTY_PORT}" \
+ 		--auth-token local \
++		--pty-auth-token local-pty \
+ 		--rg-path /exec-daemon/rg \
+ 		--computer-use-enabled \
+ 		--computer-use-lazy-init \

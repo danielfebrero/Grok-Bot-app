@@ -1,0 +1,29 @@
+--- 2026-11-05_07-52:/opt/sand/sand-host/box-runtime/manifest.json
++++ 2026-11-05_16-45:/opt/sand/sand-host/box-runtime/manifest.json
+@@ -2,7 +2,7 @@
+   "files": [
+     {
+       "name": "box-contract.generated.mjs",
+-      "sha256": "94dd1edeeb1913ca66bdb58f785f2f86f2ac7667a4d87cb54aa65ae1d01bf8c8"
++      "sha256": "8688aa645ea4810170d37d0df3b43957b46123b0cafbf17a06db1c7f977bc3e4"
+     },
+     {
+       "name": "cdp-cookies.mjs",
+@@ -22,7 +22,7 @@
+     },
+     {
+       "name": "sand-egress-tunnel",
+-      "sha256": "57750818337683dc33e3c17c3bfebca72b2f157331eea8c2519a975401cd7a2a"
++      "sha256": "0ac6cc2f72d77116ce25eb5291a5a86c1fed7f2344020e02ece1418498586fae"
+     },
+     {
+       "name": "sand-fingerprint-profiles.mjs",
+@@ -34,7 +34,7 @@
+     },
+     {
+       "name": "sand-session-sync.mjs",
+-      "sha256": "0ff10a4151059968b15ca2b6c5ebd50f294136262f58116365c4f3d3f567087e"
++      "sha256": "0afd111bf9261e5c076b12978cf3fc2a6684a3573d9460c1d7ad6d0fdbbd8ae7"
+     },
+     {
+       "name": "sand-ua-governor.mjs",

@@ -1,0 +1,865 @@
+/**
+ * MedicaCare — Comprehensive Healthcare Solutions
+ * Standalone pptxgenjs re-creation of the 20-slide reference deck (13.333" x 7.5").
+ *
+ * Raster photos in the original are re-created as flat grey "Image Here" panels,
+ * and the hand-drawn vector icon glyphs are approximated with native shapes.
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ theme */
+
+const BLUE = '0069F6'; // accent1
+const PALE = '629DFB'; // accent2 @ lumMod 75%
+const MINT = '6CD9CE'; // accent3
+const CHIP = '3184FC'; // flat stand-in for the accent1 -> accent2 title gradient
+const BLACK = '000000';
+const WHITE = 'FFFFFF';
+const INK = '262626'; // tx1 @ lumMod 85%
+const GREY85 = 'D9D9D9';
+const GREY75 = 'BFBFBF';
+const GREY50 = '808080'; // tx1 @ 50% alpha over white — the photo panels
+const TRACK = 'EFEFEF'; // faint bar-chart track
+const BG2 = 'E7E6E6';
+
+/** Passed as `lineSpacingMultiple` where the reference leaves line spacing at the font default. */
+const NATURAL = undefined;
+
+const HEAD = 'Montserrat SemiBold';
+const BODY = 'Montserrat';
+
+/** Wide, almost-invisible drop shadow used on every floating white card.
+ *  Returns a fresh object each call — pptxgenjs rewrites shadow options in place. */
+const softShadow = () => ({ type: 'outer', blur: 25, offset: 0.02, angle: 45, color: BLACK, opacity: 0.13 });
+
+/* Repeated body copy of the template. */
+const LOREM_LONG =
+  'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ' +
+  'ut labore et dolore magna aliqua. Ut enim ad minim veniam';
+const LOREM_MED =
+  'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ' +
+  'ut labore et dolore magna aliqua';
+const LOREM_SHORT = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor';
+const LOREM_MAURIS =
+  'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris ultrices sollicitudin dolor ut euismod.';
+const LOREM_TINY = 'Lorem ipsum dolor sit amet consectetur';
+const EIUSMOD = 'eiusmod tempor incididunt ut labore et dolore magna aliqua';
+
+/* ------------------------------------------------------- drawing helpers */
+
+/** round2DiagRect / arc adjust values are written through pptxgenjs' `angleRange`
+ *  escape hatch, which emits `<a:gd name="adjN" fmla="val round(v*60000)"/>`. */
+const adj = (a1, a2 = 0) => [a1 / 60000, a2 / 60000];
+
+/** Rounded-diagonal-corner panel — the signature shape of this template. */
+function panel(slide, o) {
+  slide.addShape('round2DiagRect', {
+    x: o.x, y: o.y, w: o.w, h: o.h,
+    angleRange: adj(o.adj === undefined ? 16667 : o.adj, o.adj2 || 0),
+    fill: { color: o.fill },
+    rotate: o.rotate, flipH: o.flipH,
+    shadow: o.shadow ? softShadow() : { type: 'none' },
+  });
+}
+
+/** Gradient-look headline chip with white display text. */
+function chip(slide, o) {
+  slide.addText(o.text, {
+    shape: 'round2DiagRect', x: o.x, y: o.y, w: o.w, h: o.h,
+    angleRange: adj(o.adj === undefined ? 26542 : o.adj, 0),
+    fill: { color: CHIP }, line: { type: 'none' },
+    fontFace: HEAD, fontSize: o.fontSize || 44, color: WHITE,
+    valign: 'middle', margin: [7.2, 7.2, o.bIns === undefined ? 7.2 : o.bIns, 7.2],
+  });
+}
+
+/** Plain text block: top anchored, Montserrat, matching the deck's line spacing. */
+function tx(slide, text, o) {
+  slide.addText(text, Object.assign({
+    fontFace: BODY, fontSize: 14, color: BLACK,
+    valign: 'top', align: 'left', lineSpacingMultiple: 1.3,
+  }, o));
+}
+
+/** Display/heading text (Montserrat SemiBold). */
+function head(slide, text, o) {
+  tx(slide, text, Object.assign({ fontFace: HEAD, lineSpacingMultiple: 1.1 }, o));
+}
+
+/** Little framed-photo glyph drawn in the middle of every image placeholder. */
+function imageGlyph(slide, cx, cy) {
+  const w = 0.86, h = 0.68;
+  const x = cx - w / 2, y = cy - h / 2;
+  slide.addShape('rect', { x, y, w, h, fill: { color: WHITE }, line: { color: GREY75, width: 1 } });
+  slide.addShape('ellipse', {
+    x: x + 0.13 * w, y: y + 0.16 * h, w: 0.17 * w, h: 0.21 * h,
+    fill: { color: 'F5C242' }, line: { type: 'none' },
+  });
+  [[0.10, 0.44, 0.72], [0.36, 0.30, 1.0]].forEach(m => slide.addShape('triangle', {
+    x: x + m[0] * w, y: y + (1 - 0.12 - m[2] * 0.62) * h, w: m[1] * w, h: m[2] * 0.62 * h,
+    fill: { color: '7FAEE3' }, line: { type: 'none' },
+  }));
+}
+
+/** Grey stand-in for a photograph, carrying the template's "Image Here" prompt.
+ *  The originals are picture placeholders filled with 50%-transparent black,
+ *  so wherever they overlap a coloured card the card shows through, darkened. */
+function photo(slide, o) {
+  const filled = o.filled !== false;
+  if (filled) {
+    slide.addShape('rect', {
+      x: o.x, y: o.y, w: o.w, h: o.h,
+      fill: { color: BLACK, transparency: 50 }, line: { type: 'none' },
+    });
+  }
+  slide.addText('Image Here', {
+    x: o.x, y: o.y + 0.08, w: o.w, h: 0.4,
+    fontFace: BODY, fontSize: 18, color: filled ? WHITE : BLACK,
+    align: 'center', valign: 'top',
+  });
+  imageGlyph(slide, o.x + o.w / 2, o.y + o.h / 2);
+}
+
+/** Three outlined bubbles used as a corner ornament throughout the deck.
+ *  Geometry is expressed as fractions of the group box, then rotated about
+ *  the group centre so the rotated variants land where the original does. */
+function bubbles(slide, o) {
+  const w = o.w;
+  const h = w * (1.173 / 0.826);
+  const rot = ((o.rotate || 0) * Math.PI) / 180;
+  const cx = o.x + w / 2;
+  const cy = o.y + h / 2;
+  const parts = [
+    { fx: 0.120, fy: 0.000, fd: 0.561, pt: 1.75, color: o.colors ? o.colors[0] : MINT },
+    { fx: 0.680, fy: 0.775, fd: 0.320, pt: 1.5, color: o.colors ? o.colors[1] : BLUE },
+    { fx: 0.000, fy: 0.606, fd: 0.240, pt: 1.5, color: o.colors ? o.colors[2] : PALE },
+  ];
+  parts.forEach(p => {
+    const d = p.fd * w;
+    const px = o.x + p.fx * w + d / 2 - cx;
+    const py = o.y + p.fy * h + d / 2 - cy;
+    const rx = px * Math.cos(rot) - py * Math.sin(rot);
+    const ry = px * Math.sin(rot) + py * Math.cos(rot);
+    slide.addShape('ellipse', {
+      x: cx + rx - d / 2, y: cy + ry - d / 2, w: d, h: d,
+      fill: { type: 'none' },
+      line: { color: p.color, width: p.pt, transparency: o.transparency || 0 },
+    });
+  });
+}
+
+/** Oversized thin ring that bleeds off the top-right corner (slides 3 & 9). */
+function cornerRing(slide, x, y) {
+  slide.addShape('ellipse', { x, y, w: 2.553, h: 2.553, fill: { type: 'none' }, line: { color: BLUE, width: 1 } });
+}
+
+/** Stethoscope mark of the MedicaCare logo: three mint rings joined by two
+ *  blue tubes. Each tube is the lower half of an ellipse, so the drawn box is
+ *  twice the visible dip and sits half above the tube's top edge. */
+function stethoscope(slide, x, y, w) {
+  const h = w * (0.810 / 0.754);
+  const ring = 0.268 * w;
+  const lw = Math.max(0.6, w * 2.8);
+  const tube = (fx, fw, fyTop, fDepth) => slide.addShape('arc', {
+    x: x + fx * w, y: y + (fyTop - fDepth) * h, w: fw * w, h: 2 * fDepth * h,
+    angleRange: [0, 180], line: { color: BLUE, width: lw },
+  });
+  tube(0.106, 0.603, 0.199, 0.306); // yoke joining the two earpieces
+  tube(0.381, 0.512, 0.470, 0.530); // tube down to the chest piece
+  [[0.000, 0.000], [0.549, 0.000], [0.732, 0.369]].forEach(p => {
+    slide.addShape('ellipse', {
+      x: x + p[0] * w, y: y + p[1] * h, w: ring, h: ring,
+      fill: { color: WHITE }, line: { color: MINT, width: lw },
+    });
+  });
+}
+
+/** "MedicaCare" wordmark: black "Medica" + chip-backed white "Care". */
+function wordmark(slide, o) {
+  const fs = o.fontSize;
+  stethoscope(slide, o.x, o.y + 0.22 * fs / 14 * 0.35, o.iconW);
+  head(slide, 'Medica', {
+    x: o.x + o.iconW * 0.76, y: o.y, w: fs * 0.069, h: fs * 0.0246,
+    fontSize: fs, color: BLACK, valign: 'middle',
+  });
+  chip(slide, {
+    x: o.chipX, y: o.y + fs * 0.0041, w: fs * 0.0408, h: fs * 0.0167,
+    text: '', fontSize: fs, adj: 16667,
+  });
+  head(slide, 'Care', {
+    x: o.chipX - 0.058 * fs / 14, y: o.y, w: fs * 0.0489, h: fs * 0.0246,
+    fontSize: fs, color: WHITE, valign: 'middle',
+  });
+}
+
+/** Small top-left logo + page number that the slide master paints on slides 2-19. */
+function masterFurniture(slide, pageNo) {
+  stethoscope(slide, 0.667, 0.532, 0.196);
+  head(slide, 'Medica', { x: 0.815, y: 0.453, w: 0.964, h: 0.344, fontSize: 14, valign: 'middle' });
+  chip(slide, { x: 1.688, y: 0.510, w: 0.571, h: 0.234, text: '', adj: 16667 });
+  head(slide, 'Care', { x: 1.630, y: 0.453, w: 0.684, h: 0.344, fontSize: 14, color: WHITE, valign: 'middle' });
+  head(slide, String(pageNo), { x: 12.329, y: 6.963, w: 0.565, h: 0.303, fontSize: 12, align: 'right' });
+}
+
+/** Flat medical glyph (white cross) used on the small coloured icon tiles. */
+function crossIcon(slide, x, y, w, h, color) {
+  const s = Math.min(w, h);
+  slide.addShape('roundRect', {
+    x: x + (w - s) / 2, y: y + (h - s) / 2, w: s, h: s, rectRadius: s * 0.28,
+    fill: { type: 'none' }, line: { color, width: Math.max(0.75, s * 4) },
+  });
+  slide.addShape('mathPlus', {
+    x: x + (w - s * 0.5) / 2, y: y + (h - s * 0.5) / 2, w: s * 0.5, h: s * 0.5,
+    fill: { color }, line: { type: 'none' },
+  });
+}
+
+/** Rounded tile carrying a cross glyph (the deck's repeated icon badge). */
+function iconTile(slide, o) {
+  panel(slide, { x: o.x, y: o.y, w: o.w, h: o.h, adj: o.adj === undefined ? 13767 : o.adj, fill: o.fill });
+  crossIcon(slide, o.x, o.y, o.w, o.h, o.icon);
+}
+
+/** Two stacked round-cap rules forming a progress bar. */
+function progressBar(slide, o) {
+  slide.addShape('line', { x: o.x, y: o.y, w: o.w, h: 0, line: { color: o.track, width: o.pt } });
+  slide.addShape('line', { x: o.x, y: o.y, w: o.w * o.pct, h: 0, line: { color: o.color, width: o.pt } });
+}
+
+/** Circular progress gauge made from two arcs (grey track + coloured value). */
+function gauge(slide, o) {
+  slide.addShape('arc', {
+    x: o.x, y: o.y, w: o.size, h: o.size,
+    angleRange: [270, 266.2], line: { color: GREY85, width: 6.5 },
+  });
+  slide.addShape('arc', {
+    x: o.x, y: o.y, w: o.size, h: o.size,
+    angleRange: [270, 270 + 360 * o.pct - 360], line: { color: BLUE, width: 10 },
+  });
+}
+
+/* --------------------------------------------------------------- slides */
+
+function slide01(pptx) {
+  const s = pptx.addSlide();
+  chip(s, { x: 7.781, y: 2.955, w: 2.999, h: 1.284, text: '', adj: 16667 });
+  head(s, 'Care', { x: 7.871, y: 2.822, w: 2.853, h: 1.489, fontSize: 80, color: WHITE, valign: 'middle' });
+  head(s, 'Medica', { x: 3.452, y: 2.822, w: 4.467, h: 1.489, fontSize: 80, valign: 'middle' });
+  stethoscope(s, 2.609, 3.173, 0.754);
+  tx(s, 'Comprehensive Healthcare Solutions', {
+    x: 3.774, y: 4.436, w: 5.786, h: 0.408, fontSize: 18, align: 'center', valign: 'middle',
+  });
+  // top-right bubble cluster (its own arrangement on the cover)
+  [[12.046, 0.773, 0.264, BLUE, 1.5], [12.568, 1.318, 0.198, MINT, 1.5], [12.046, 1.318, 0.198, PALE, 1.5]]
+    .forEach(c => s.addShape('ellipse', {
+      x: c[0], y: c[1], w: c[2], h: c[2], fill: { type: 'none' }, line: { color: c[3], width: c[4] },
+    }));
+  bubbles(s, { x: 0.336, y: 5.412, w: 0.826, colors: [MINT, MINT, MINT], transparency: 21 });
+}
+
+function slide02(pptx) {
+  const s = pptx.addSlide();
+  masterFurniture(s, 2);
+  photo(s, { x: 7.216, y: 0.625, w: 4.901, h: 6.25 });
+  panel(s, { x: 1.388, y: 5.022, w: 1.212, h: 0.981, adj: 23145, fill: MINT, shadow: true });
+  chip(s, { x: 0.676, y: 1.896, w: 4.115, h: 0.810, text: 'MedicaCare' });
+  head(s, 'Introduction to', { x: 0.735, y: 1.040, w: 5.156, h: 0.864, fontSize: 44 });
+  tx(s, LOREM_LONG, { x: 0.676, y: 3.045, w: 5.442, h: 0.992 });
+  panel(s, { x: 2.267, y: 4.405, w: 5.971, h: 2.214, adj: 26542, fill: WHITE, shadow: true });
+  crossIcon(s, 1.647, 5.300, 0.402, 0.425, WHITE);
+  head(s, 'Healthcare Solutions', { x: 2.679, y: 4.744, w: 3.394, h: 0.436, fontSize: 18, color: BLUE });
+  tx(s, LOREM_MED, { x: 2.671, y: 5.285, w: 5.218, h: 0.992 });
+  bubbles(s, { x: 11.704, y: 1.040, w: 0.826 });
+}
+
+function slide03(pptx) {
+  const s = pptx.addSlide();
+  masterFurniture(s, 3);
+  panel(s, { x: 3.071, y: 3.380, w: 5.943, h: 2.307, adj: 26542, fill: WHITE, shadow: true });
+  chip(s, { x: 4.756, y: 1.420, w: 4.115, h: 0.810, text: 'Cardiology ' });
+  head(s, 'Heart Health Experts', { x: 4.756, y: 2.255, w: 7.220, h: 0.864, fontSize: 44 });
+  panel(s, { x: 0.903, y: 1.253, w: 3.159, h: 4.880, adj: 18101, fill: BLUE, shadow: true });
+  photo(s, { x: 1.211, y: 1.539, w: 2.533, h: 2.799 });
+  head(s, 'Dr. Daly Bene', {
+    x: 1.289, y: 4.581, w: 2.378, h: 0.473, fontSize: 20, color: WHITE, align: 'center', lineSpacingMultiple: 1.2,
+  });
+  tx(s, LOREM_TINY, { x: 1.357, y: 5.085, w: 2.242, h: 0.602, fontSize: 12, color: WHITE, align: 'center' });
+  tx(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod', {
+    x: 4.691, y: 5.980, w: 7.871, h: 0.379, color: BLUE,
+  });
+
+  // two feature tiles with captions
+  [{ y: 3.783, fill: BLUE, title: 'Cardiology', sub: 'Lorem ipsum dolor', ty: 3.694, sy: 4.055 },
+   { y: 4.640, fill: MINT, title: 'Heart Health', sub: 'Lorem ipsum dolor sit', ty: 4.551, sy: 4.912 }]
+    .forEach(f => {
+      iconTile(s, { x: 9.576, y: f.y, w: 0.607, h: 0.570, adj: 19702, fill: f.fill, icon: WHITE });
+      head(s, f.title, { x: 10.285, y: f.ty, w: 2.310, h: 0.436, fontSize: 18, lineSpacingMultiple: 1.2 });
+      tx(s, f.sub, { x: 10.285, y: f.sy, w: 2.310, h: 0.339, fontSize: 12 });
+    });
+
+  // two labelled progress bars inside the white card
+  [{ y: 4.234, ly: 3.807, pct: 0.85, label: 'Consectetur adipiscing', value: '85%', color: BLUE },
+   { y: 5.032, ly: 4.603, pct: 0.96, label: 'Adipiscing eiusmod', value: '96%', color: MINT }]
+    .forEach(b => {
+      progressBar(s, { x: 4.833, y: b.y, w: 3.700, pct: b.pct, pt: 5.75, track: GREY85, color: b.color });
+      tx(s, b.label, { x: 4.691, y: b.ly, w: 2.567, h: 0.379 });
+      tx(s, b.value, { x: 8.055, y: b.ly, w: 0.623, h: 0.379 });
+    });
+
+  cornerRing(s, 11.747, -0.704);
+  bubbles(s, { x: 0.895, y: 1.947, w: 0.826 });
+}
+
+function slide04(pptx) {
+  const s = pptx.addSlide();
+  photo(s, { x: 0.206, y: 0.167, w: 12.922, h: 3.311 });
+  masterFurniture(s, 4);
+
+  const checklist = [
+    'Lorem ipsum dolor sit amet,',
+    'Consectetur adipiscing elit. ',
+    'Mauris ultrices sollicitudin dolor ut euismod. ',
+  ];
+  [5.411, 9.449].forEach(x => {
+    s.addText(checklist.map(t => ({
+      text: t,
+      options: { breakLine: true, bullet: { characterCode: '2713', indent: 22.5 } },
+    })), {
+      x, y: 4.723, w: 3.277, h: 1.523,
+      fontFace: BODY, fontSize: 14, color: BLACK, valign: 'top',
+      lineSpacingMultiple: 1.3, paraSpaceAfter: 8,
+    });
+  });
+
+  bubbles(s, { x: 12.212, y: 3.136, w: 0.785, rotate: 180 });
+  head(s, 'Our Vision', { x: 0.667, y: 4.099, w: 4.071, h: 0.864, fontSize: 44 });
+  chip(s, { x: 0.762, y: 4.976, w: 3.475, h: 0.891, text: '& Mission' });
+  head(s, 'Our Vison', { x: 5.411, y: 4.250, w: 1.758, h: 0.473, fontSize: 20, lineSpacingMultiple: 1.2 });
+  head(s, 'Our Mission', { x: 9.449, y: 4.250, w: 2.179, h: 0.473, fontSize: 20, color: BLUE, lineSpacingMultiple: 1.2 });
+  [[5.108, BLACK], [9.177, BLUE]].forEach(t => s.addShape('triangle', {
+    x: t[0], y: 4.425, w: 0.239, h: 0.187, rotate: 90, fill: { color: t[1] }, line: { type: 'none' },
+  }));
+}
+
+function slide05(pptx) {
+  const s = pptx.addSlide();
+  masterFurniture(s, 5);
+  s.addShape('round1Rect', {
+    x: 7.270, y: 3.861, w: 4.793, h: 3.639, rectRadius: 0.679,
+    fill: { color: BLUE }, line: { type: 'none' },
+  });
+  photo(s, { x: 6.867, y: 0.625, w: 5.6, h: 6.875, filled: false });
+  head(s, 'Healthcare Service', { x: 0.678, y: 2.255, w: 6.284, h: 0.864, fontSize: 44 });
+  chip(s, { x: 0.678, y: 1.460, w: 5.373, h: 0.810, text: 'Comprehensive' });
+
+  const services = [
+    { y: 3.811, text: '01  Healthcare Services Hearth', color: BLACK, size: 20 },
+    { y: 4.628, text: '02  Healthcare Services Bone', color: BLACK, size: 20 },
+    { y: 5.444, text: '03  Cancer Treatment Care', color: BLUE, size: 24 },
+    { y: 6.335, text: '04  Healthcare Services Childcare', color: BLACK, size: 20 },
+  ];
+  services.forEach(it => head(s, it.text, {
+    x: 0.723, y: it.y, w: 5.328, h: it.size === 24 ? 0.548 : 0.473,
+    fontSize: it.size, color: it.color, valign: 'middle', lineSpacingMultiple: 1.2,
+  }));
+  [4.456, 5.273, 6.164].forEach(y => s.addShape('line', {
+    x: 0.667, y, w: 5.511, h: 0, line: { color: BLACK, width: 0.75 },
+  }));
+
+  iconTile(s, { x: 6.816, y: 5.738, w: 0.908, h: 0.852, adj: 19702, fill: MINT, icon: WHITE });
+  bubbles(s, { x: 11.237, y: 1.460, w: 0.826 });
+}
+
+function slide06(pptx) {
+  const s = pptx.addSlide();
+  masterFurniture(s, 6);
+  chip(s, { x: 0.667, y: 2.085, w: 4.760, h: 0.810, text: 'MedicaCare ?' });
+  head(s, 'Why Chose', { x: 0.726, y: 1.230, w: 5.156, h: 0.864, fontSize: 44 });
+  head(s, 'Future Plans', { x: 6.758, y: 1.474, w: 2.264, h: 0.473, fontSize: 20, lineSpacingMultiple: 1.2 });
+  tx(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore',
+    { x: 6.724, y: 1.953, w: 5.942, h: 0.686 });
+  bubbles(s, { x: 11.630, y: 0.398, w: 0.826, rotate: 180 });
+  photo(s, { x: 0.667, y: 3.354, w: 6.94, h: 3.521 });
+
+  panel(s, { x: 7.165, y: 5.815, w: 1.868, h: 0.834, adj: 24606, fill: BLUE });
+  panel(s, { x: 6.903, y: 3.940, w: 2.393, h: 2.277, adj: 11529, fill: WHITE, shadow: true });
+  gauge(s, { x: 7.254, y: 4.252, size: 1.690, pct: 0.80 });
+  head(s, '80%', { x: 7.394, y: 4.769, w: 1.428, h: 0.656, fontSize: 32, align: 'center' });
+  head(s, 'Healthcare', {
+    x: 7.281, y: 6.223, w: 1.637, h: 0.362, fontSize: 14, color: WHITE, align: 'center', lineSpacingMultiple: 1.2,
+  });
+
+  head(s, 'Best Medical', { x: 9.667, y: 4.296, w: 2.264, h: 0.473, fontSize: 20, color: BLUE, lineSpacingMultiple: 1.2 });
+  tx(s, LOREM_SHORT + ' ', { x: 9.667, y: 4.827, w: 2.333, h: 1.298 });
+}
+
+function slide07(pptx) {
+  const s = pptx.addSlide();
+  masterFurniture(s, 7);
+  chip(s, { x: 0.667, y: 3.518, w: 2.595, h: 0.891, text: 'Team', fontSize: 54 });
+  head(s, 'Expert Medical', { x: 0.726, y: 1.382, w: 4.084, h: 2.038, fontSize: 54 });
+  tx(s, LOREM_SHORT + ' ' + LOREM_SHORT.replace(' tempor', ''), { x: 0.726, y: 4.820, w: 4.641, h: 1.298 });
+
+  // the photo placeholders sit ON TOP of the blue cards, darkening the overlap
+  [{ y: 1.297, name: 'Dr. Fago Yaka', ny: 1.622, sy: 2.126, py: 0.994 },
+   { y: 4.329, name: 'Dr. Zayne Dore', ny: 4.717, sy: 5.221, py: 4.076 }]
+    .forEach(card => {
+      panel(s, { x: 7.801, y: card.y, w: 4.059, h: 1.786, adj: 18101, fill: BLUE, shadow: true });
+      head(s, card.name, {
+        x: 8.812, y: card.ny, w: 2.378, h: 0.473, fontSize: 20, color: WHITE, lineSpacingMultiple: 1.2,
+      });
+      tx(s, LOREM_TINY, { x: 8.812, y: card.sy, w: 2.242, h: 0.602, fontSize: 12, color: WHITE });
+      photo(s, { x: 6.287, y: card.py, w: 2.2, h: 2.43 });
+    });
+
+  bubbles(s, { x: 5.049, y: 1.170, w: 0.636 });
+}
+
+function slide08(pptx) {
+  const s = pptx.addSlide();
+  masterFurniture(s, 8);
+  chip(s, { x: 0.726, y: 2.736, w: 3.624, h: 0.810, text: 'Programs' });
+  head(s, 'Health & Wellness', { x: 0.726, y: 1.057, w: 3.141, h: 1.679, fontSize: 44 });
+  photo(s, { x: 5.727, y: 0.729, w: 6.94, h: 2.921 });
+  bubbles(s, { x: 4.720, y: 1.170, w: 0.636 });
+
+  const programs = [
+    { x: 0.697, title: 'Program One', tx: 1.387, tw: 2.264, bx: 1.023, card: BLUE, ink: WHITE, tile: 2.031, tileFill: WHITE, glyph: BLUE },
+    { x: 4.919, title: 'Program Two', tx: 5.610, tw: 2.264, bx: 5.246, card: WHITE, ink: BLACK, tile: 6.253, tileFill: MINT, glyph: WHITE },
+    { x: 9.121, title: 'Program Three', tx: 9.704, tw: 2.478, bx: 9.448, card: WHITE, ink: BLACK, tile: 10.455, tileFill: MINT, glyph: WHITE },
+  ];
+  programs.forEach(p => {
+    panel(s, { x: p.x, y: 4.177, w: 3.541, h: 2.651, adj: 13767, fill: p.card, shadow: p.card === WHITE });
+    head(s, p.title, {
+      x: p.tx, y: 4.949, w: p.tw, h: 0.473, fontSize: 20, color: p.ink, align: 'center', lineSpacingMultiple: 1.2,
+    });
+    tx(s, LOREM_SHORT, { x: p.bx, y: 5.470, w: 2.992, h: 0.992, color: p.ink, align: 'center' });
+    iconTile(s, { x: p.tile, y: 4.042, w: 0.872, h: 0.748, fill: p.tileFill, icon: p.glyph });
+  });
+}
+
+function slide09(pptx) {
+  const s = pptx.addSlide();
+  masterFurniture(s, 9);
+  head(s, 'Innovative Medical', { x: 6.535, y: 0.897, w: 5.5, h: 1.582, fontSize: 44, lineSpacingMultiple: NATURAL });
+  chip(s, { x: 6.535, y: 2.591, w: 4.167, h: 0.891, text: 'Technology' });
+  tx(s, LOREM_SHORT + ' Lorem ipsum dolor sit amet', { x: 6.585, y: 3.948, w: 5.860, h: 0.686 });
+
+  // captioned photo panels on the left
+  [{ y: 1.112, ly: 2.870, label: 'Telemedicine Services' },
+   { y: 3.817, ly: 5.612, label: 'Advanced Technology' }]
+    .forEach(p => {
+      photo(s, { x: 0.667, y: p.y, w: 5.233, h: 2.571 });
+      panel(s, { x: 1.002, y: p.ly + 0.051, w: 3.165, h: 0.521, adj: 31217, fill: WHITE });
+      iconTile(s, { x: 0.530, y: p.ly, w: 0.672, h: 0.630, adj: 19702, fill: BLUE, icon: WHITE });
+      head(s, p.label, {
+        x: 1.238, y: p.ly + 0.103, w: 2.852, h: 0.399, fontSize: 16, valign: 'middle', lineSpacingMultiple: 1.2,
+      });
+    });
+
+  // two thick statistic bars
+  [{ y: 5.275, pct: 0.875, label: 'Robotic Surgery', value: '+200', ly: 4.816 },
+   { y: 6.085, pct: 0.798, label: 'AI-Powered', value: '+390', ly: 5.626 }]
+    .forEach(b => {
+      progressBar(s, { x: 6.667, y: b.y, w: 5.600, pct: b.pct, pt: 9.5, track: BG2, color: MINT });
+      head(s, b.label, { x: 6.667, y: b.ly, w: 2.522, h: 0.362, fontSize: 14, valign: 'middle', lineSpacingMultiple: 1.2 });
+      head(s, b.value, {
+        x: 11.278, y: b.ly, w: 1.010, h: 0.362, fontSize: 14, align: 'right', valign: 'middle', lineSpacingMultiple: 1.2,
+      });
+    });
+
+  cornerRing(s, 11.390, -0.287);
+}
+
+function slide10(pptx) {
+  const s = pptx.addSlide();
+  masterFurniture(s, 10);
+  chip(s, { x: 0.667, y: 2.640, w: 3.556, h: 0.891, text: 'Services' });
+  head(s, 'Emergency & Trauma', { x: 0.667, y: 0.946, w: 4.167, h: 1.679, fontSize: 44 });
+
+  photo(s, { x: 6.667, y: 0.625, w: 2.789, h: 2.906 });
+  photo(s, { x: 9.878, y: 0.625, w: 2.789, h: 2.906 });
+  photo(s, { x: 9.878, y: 3.750, w: 2.789, h: 2.906 });
+
+  panel(s, { x: 6.666, y: 3.776, w: 2.789, h: 2.881, adj: 13767, fill: WHITE, flipH: true, shadow: true });
+  iconTile(s, { x: 7.003, y: 3.685, w: 0.655, h: 0.618, fill: BLUE, icon: WHITE });
+  head(s, 'Healthcare', { x: 6.887, y: 4.416, w: 2.264, h: 0.473, fontSize: 20, color: BLUE, lineSpacingMultiple: 1.2 });
+  tx(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod', { x: 6.887, y: 4.970, w: 2.264, h: 1.298 });
+
+  [[0.701, 4.416], [0.701, 5.322], [3.624, 4.416], [3.624, 5.322]].forEach(p => {
+    tx(s, 'Lorem ipsum dolor sit amet, consectetur', { x: p[0] + 0.276, y: p[1], w: 2.343, h: 0.686 });
+    s.addShape('triangle', {
+      x: p[0] - 0.016, y: p[1] + 0.257, w: 0.229, h: 0.198, rotate: 90,
+      fill: { color: MINT }, line: { type: 'none' },
+    });
+  });
+
+  bubbles(s, { x: 5.501, y: 1.737, w: 0.636 });
+}
+
+function slide11(pptx) {
+  const s = pptx.addSlide();
+  masterFurniture(s, 11);
+  panel(s, { x: 0.467, y: 3.167, w: 12.200, h: 3.286, adj: 10781, fill: BLUE, rotate: 180 });
+  photo(s, { x: 0.467, y: 1.133, w: 6.4, h: 6.367, filled: false });
+
+  head(s, 'Cutting-Edge', { x: 6.535, y: 1.133, w: 4.776, h: 0.841, fontSize: 44, lineSpacingMultiple: NATURAL });
+  head(s, 'Medical', { x: 6.535, y: 1.952, w: 2.820, h: 0.841, fontSize: 44, lineSpacingMultiple: NATURAL });
+  chip(s, { x: 9.244, y: 1.950, w: 3.056, h: 0.891, text: 'Services' });
+
+  head(s, 'Medical Services', {
+    x: 6.580, y: 3.696, w: 3.087, h: 0.473, fontSize: 20, color: WHITE, lineSpacingMultiple: 1.2,
+  });
+  tx(s, LOREM_LONG, { x: 6.580, y: 4.214, w: 5.490, h: 0.992, color: WHITE });
+
+  panel(s, { x: 8.275, y: 5.758, w: 3.322, h: 0.870, adj: 25078, fill: WHITE });
+  head(s, '12.000', { x: 9.178, y: 5.760, w: 2.215, h: 0.864, fontSize: 44, valign: 'middle' });
+  s.addShape('triangle', {
+    x: 8.560, y: 6.030, w: 0.378, h: 0.326, fill: { color: MINT }, line: { type: 'none' },
+  });
+  iconTile(s, { x: 6.691, y: 5.758, w: 1.082, h: 0.870, adj: 25078, fill: MINT, icon: WHITE });
+  bubbles(s, { x: 3.031, y: 1.048, w: 0.636 });
+}
+
+function slide12(pptx) {
+  const s = pptx.addSlide();
+  masterFurniture(s, 12);
+  photo(s, { x: 0.667, y: 1.125, w: 4.289, h: 2.625 });
+  photo(s, { x: 9.378, y: 3.967, w: 3.289, h: 2.906 });
+
+  head(s, 'Collaboration with Healthcare', { x: 5.361, y: 1.269, w: 6.033, h: 1.582, fontSize: 44, lineSpacingMultiple: NATURAL });
+  chip(s, { x: 5.361, y: 2.818, w: 4.233, h: 0.891, text: 'Institutions' });
+
+  panel(s, { x: 5.745, y: 3.967, w: 3.322, h: 2.905, adj: 25078, fill: WHITE, shadow: true });
+  gauge(s, { x: 6.686, y: 4.278, size: 1.456, pct: 0.80 });
+  head(s, '80%', { x: 6.700, y: 4.720, w: 1.428, h: 0.587, fontSize: 28, align: 'center' });
+  tx(s, 'Amet Consectetur Adipiscing Elit', { x: 6.027, y: 5.950, w: 2.773, h: 0.686, align: 'center' });
+  iconTile(s, { x: 9.267, y: 4.356, w: 0.655, h: 0.618, fill: BLUE, icon: WHITE });
+
+  head(s, 'Institutions', { x: 0.765, y: 4.041, w: 1.906, h: 0.473, fontSize: 20, color: BLUE, lineSpacingMultiple: 1.2 });
+  [['01', 4.654, 4.605], ['02', 5.447, 5.397], ['03', 6.239, 6.190]].forEach(row => {
+    head(s, row[0], { x: 0.765, y: row[1], w: 1.049, h: 0.587, fontSize: 28, color: BLUE });
+    tx(s, EIUSMOD, { x: 1.505, y: row[2], w: 3.987, h: 0.686 });
+  });
+
+  bubbles(s, { x: 11.801, y: 1.726, w: 0.636 });
+}
+
+function slide13(pptx) {
+  const s = pptx.addSlide();
+  masterFurniture(s, 13);
+  photo(s, { x: 9.378, y: 0.625, w: 3.289, h: 6.25 });
+  head(s, 'United States', { x: 0.667, y: 0.946, w: 4.553, h: 0.864, fontSize: 44 });
+  chip(s, { x: 0.677, y: 1.790, w: 4.170, h: 0.891, text: 'MedicaCare' });
+
+  usMap(s, { x: -1.098, y: 3.236, w: 6.318, h: 3.951 });
+
+  const states = [
+    { card: 7.178, cy: 1.678, badge: 6.578, by: 1.961, num: '22+', numFill: BLACK, numInk: WHITE, name: 'South Dakota', nx: 7.678, ny: 1.915, nw: 2.341, bx: 7.686, byy: 2.302 },
+    { card: 6.472, cy: 3.444, badge: 5.859, by: 3.762, num: '85+', numFill: MINT, numInk: BLACK, name: 'New York', nx: 6.892, ny: 3.771, nw: 1.780, bx: 6.899, byy: 4.157 },
+    { card: 7.178, cy: 5.211, badge: 6.578, by: 5.474, num: '12-', numFill: BLUE, numInk: WHITE, name: 'Oklahoma', nx: 7.678, ny: 5.446, nw: 1.780, bx: 7.686, byy: 5.833 },
+  ];
+  states.forEach(st => {
+    panel(s, { x: st.card, y: st.cy, w: 3.844, h: 1.314, adj: 18101, fill: WHITE, shadow: true });
+    chipBadge(s, st.badge, st.by, st.num, st.numFill, st.numInk);
+    head(s, st.name, { x: st.nx, y: st.ny, w: st.nw, h: 0.473, fontSize: 20, lineSpacingMultiple: 1.2 });
+    tx(s, 'eiusmod tempor incididunt ut', { x: st.bx, y: st.byy, w: 3.365, h: 0.379 });
+  });
+
+  bubbles(s, { x: 5.001, y: 5.561, w: 0.636 });
+}
+
+/** Simplified outline of the contiguous United States (fractions of the
+ *  bounding box) plus the three states the deck calls out in colour. */
+const US_OUTLINE = [
+  [0.03, 0.06], [0.60, 0.02], [0.64, 0.07], [0.68, 0.13], [0.72, 0.07], [0.76, 0.14],
+  [0.81, 0.10], [0.86, 0.05], [0.93, 0.12], [0.90, 0.20], [0.94, 0.25], [0.89, 0.31],
+  [0.93, 0.37], [0.90, 0.45], [0.95, 0.51], [0.92, 0.59], [0.90, 0.67], [0.93, 0.79],
+  [0.90, 0.95], [0.86, 0.80], [0.80, 0.74], [0.72, 0.72], [0.66, 0.77], [0.60, 0.72],
+  [0.52, 0.81], [0.44, 0.74], [0.38, 0.66], [0.32, 0.69], [0.22, 0.69], [0.14, 0.66],
+  [0.10, 0.58], [0.06, 0.48], [0.02, 0.36], [0.05, 0.26], [0.02, 0.14],
+];
+/** Highlighted states, each a rough polygon inside its own bounding box. */
+const US_STATES = [
+  {
+    name: 'South Dakota', fill: BLACK, x: 1.234, y: 4.071, w: 0.851, h: 0.572,
+    shape: [[0, 0], [1, 0], [1, 0.72], [0.74, 0.92], [0.56, 0.78], [0.34, 1], [0, 1]],
+  },
+  {
+    name: 'New York', fill: MINT, x: 3.944, y: 3.988, w: 0.903, h: 0.670,
+    shape: [[0.05, 0.38], [0.36, 0], [0.63, 0.13], [1, 0.55], [0.84, 0.76], [0.70, 1], [0.52, 0.70], [0.18, 0.62]],
+  },
+  {
+    name: 'Oklahoma', fill: BLUE, x: 1.257, y: 5.456, w: 1.049, h: 0.568,
+    shape: [[0, 0.10], [0.34, 0.10], [0.34, 0], [1, 0], [1, 0.60], [0.84, 0.86], [0.70, 1],
+            [0.54, 0.72], [0.34, 0.62], [0.20, 0.40], [0, 0.36]],
+  },
+];
+
+function usMap(slide, box) {
+  const poly = (x, y, w, h, pts, fill) => slide.addShape('custGeom', {
+    x, y, w, h,
+    points: pts.map(p => ({ x: p[0] * w, y: p[1] * h })).concat([{ close: true }]),
+    fill: { color: fill }, line: { color: GREY85, width: 1 },
+  });
+  poly(box.x, box.y, box.w, box.h, US_OUTLINE, WHITE);
+  US_STATES.forEach(st => poly(st.x, st.y, st.w, st.h, st.shape, st.fill));
+}
+
+/** Small numbered square used on the map and timeline slides. */
+function chipBadge(slide, x, y, text, fill, ink, w, h) {
+  slide.addText(text, {
+    shape: 'round2DiagRect', x, y, w: w || 0.963, h: h || 0.748, angleRange: adj(13767, 0),
+    fill: { color: fill }, line: { type: 'none' },
+    fontFace: HEAD, fontSize: 24, color: ink, align: 'center', valign: 'middle',
+  });
+}
+
+function slide14(pptx) {
+  const s = pptx.addSlide();
+  masterFurniture(s, 14);
+  head(s, 'MedicaCare Data', { x: 0.667, y: 1.245, w: 6.25, h: 0.864, fontSize: 44 });
+  chip(s, { x: 6.446, y: 1.231, w: 2.656, h: 0.891, text: 'Insight' });
+
+  // frame trimmed from the original 4.402x4.569 so the plot ring lands on the
+  // same spot — pptxgenjs has no manual plot-area layout
+  s.addChart(pptx.charts.DOUGHNUT,
+    [{ name: 'Sales', labels: ['1st Qtr', '2nd Qtr', '3rd Qtr', '4th Qtr'], values: [5, 3, 2, 1] }],
+    {
+      x: 0.942, y: 2.675, w: 3.826, h: 3.970,
+      chartColors: [MINT, BLACK, BLUE, GREY75],
+      dataBorder: { pt: 1.5, color: WHITE },
+      holeSize: 36, showLegend: false, showValue: false, showPercent: true, showLabel: true,
+      dataLabelFontFace: BODY, dataLabelFontSize: 10, dataLabelColor: WHITE,
+      chartArea: { fill: { color: WHITE } },
+    });
+  crossIcon(s, 2.747, 4.365, 0.365, 0.451, BLACK);
+
+  const stats = [
+    { value: '+790', color: MINT, y: 2.609, ly: 3.361, by: 2.706 },
+    { value: '+500', color: BLACK, y: 4.074, ly: 4.826, by: 4.171 },
+    { value: '+92', color: BLUE, y: 5.539, ly: 6.291, by: 5.636 },
+  ];
+  stats.forEach(st => {
+    head(s, st.value, { x: 5.541, y: st.y, w: 1.810, h: 0.864, fontSize: 44, color: st.color });
+    head(s, 'Medical Data', { x: 5.541, y: st.ly, w: 1.739, h: 0.362, fontSize: 14, lineSpacingMultiple: 1.2 });
+    tx(s, LOREM_MED + '. ', { x: 7.488, y: st.by, w: 5.381, h: 0.992 });
+  });
+  [3.920, 5.396].forEach(y => s.addShape('line', {
+    x: 5.631, y, w: 7.036, h: 0, line: { color: GREY75, width: 0.75 },
+  }));
+
+  bubbles(s, { x: 11.403, y: 0.745, w: 0.936, rotate: 90 });
+}
+
+function slide15(pptx) {
+  const s = pptx.addSlide();
+  masterFurniture(s, 15);
+  head(s, 'MedicaCare', { x: 2.991, y: 1.106, w: 4.071, h: 0.864, fontSize: 44 });
+  chip(s, { x: 7.062, y: 1.092, w: 3.280, h: 0.891, text: 'Timeline' });
+
+  s.addShape('line', {
+    x: 1.114, y: 4.705, w: 11.105, h: 0,
+    line: { color: BLACK, width: 2.75, endArrowType: 'triangle' },
+  });
+
+  const milestones = [
+    { num: '01', x: 1.114, badgeY: 4.703, fill: BLUE, ink: WHITE, year: '2023', yearY: 5.461, bodyY: 5.876, tx: 1.114 },
+    { num: '02', x: 3.381, badgeY: 3.972, fill: MINT, ink: BLACK, year: '2024', yearY: 2.448, bodyY: 2.863, tx: 3.375 },
+    { num: '03', x: 5.647, badgeY: 4.703, fill: BLUE, ink: WHITE, year: '2025', yearY: 5.461, bodyY: 5.876, tx: 5.635 },
+    { num: '04', x: 7.913, badgeY: 3.972, fill: MINT, ink: BLACK, year: '2026', yearY: 2.448, bodyY: 2.863, tx: 7.895 },
+    { num: '05', x: 10.180, badgeY: 4.703, fill: BLUE, ink: WHITE, year: '2027', yearY: 5.461, bodyY: 5.876, tx: 10.156 },
+  ];
+  milestones.forEach(m => {
+    chipBadge(s, m.x, m.badgeY, m.num, m.fill, m.ink);
+    head(s, m.year, { x: m.tx, y: m.yearY, w: 1.830, h: 0.498, fontSize: 20, bold: true, lineSpacingMultiple: 1.3 });
+    tx(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. ', { x: m.tx, y: m.bodyY, w: 2.260, h: 0.992 });
+  });
+
+  bubbles(s, { x: 11.717, y: 1.820, w: 0.785, rotate: 90 });
+  bubbles(s, { x: 0.353, y: 3.526, w: 0.628 });
+}
+
+function slide16(pptx) {
+  const s = pptx.addSlide();
+  masterFurniture(s, 16);
+  head(s, 'MedicaCare Data', { x: 0.667, y: 1.133, w: 6.25, h: 0.864, fontSize: 44 });
+  chip(s, { x: 6.446, y: 1.120, w: 3.066, h: 0.891, text: 'Records' });
+
+  const rows = [
+    { y: 2.702, label: 'Data A', bar: 4.559, color: BLUE, pct: '82%' },
+    { y: 3.492, label: 'Data B', bar: 5.547, color: MINT, pct: '96%' },
+    { y: 4.282, label: 'Data C', bar: 1.826, color: INK, pct: '27%' },
+    { y: 5.073, label: 'Data D', bar: 2.626, color: GREY75, pct: '41%' },
+  ];
+  rows.forEach(r => {
+    s.addShape('rect', { x: 2.108, y: r.y, w: 6.559, h: 0.449, fill: { color: TRACK }, line: { type: 'none' } });
+    s.addShape('rect', { x: 2.108, y: r.y, w: r.bar, h: 0.449, fill: { color: r.color }, line: { type: 'none' } });
+    head(s, r.label, {
+      x: 0.667, y: r.y + 0.064, w: 1.251, h: 0.370, fontSize: 16, align: 'right', lineSpacingMultiple: 1.0,
+    });
+    tx(s, r.pct, { x: 7.029, y: r.y + 0.064, w: 1.471, h: 0.337, align: 'right', lineSpacingMultiple: 1.0 });
+    tx(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing.', {
+      x: 8.962, y: r.y - 0.089, w: 3.439, h: 0.644, lineSpacingMultiple: NATURAL,
+    });
+  });
+
+  tx(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed iaculis mattis augue, ' +
+        'et hendrerit augue semper sed. Nunc sit amet posuere massa.',
+    { x: 1.777, y: 6.040, w: 7.735, h: 0.644, lineSpacingMultiple: 1.2 });
+  crossIcon(s, 0.987, 6.113, 0.471, 0.498, BLUE);
+  bubbles(s, { x: 11.622, y: 5.801, w: 0.785, rotate: 270 });
+}
+
+function slide17(pptx) {
+  const s = pptx.addSlide();
+  masterFurniture(s, 17);
+  photo(s, { x: 0.667, y: 3.494, w: 4.84, h: 3.381 });
+  head(s, 'MedicaCare', { x: 0.667, y: 1.306, w: 4.553, h: 0.864, fontSize: 44 });
+  chip(s, { x: 0.677, y: 2.104, w: 4.692, h: 0.891, text: 'Pricing Plans' });
+
+  s.addShape('roundRect', {
+    x: 6.417, y: 1.037, w: 5.833, h: 5.590, rectRadius: 0.234,
+    fill: { color: WHITE }, line: { type: 'none' }, shadow: softShadow(),
+  });
+  panel(s, { x: 6.220, y: 4.173, w: 6.194, h: 0.604, adj: 26523, fill: BLUE });
+
+  const priceRows = [
+    ['1', 'Lorem ipsum dolor sit amet', '$100'],
+    ['2', 'Lorem ipsum dolor sit amet', '$100'],
+    ['3', 'Lorem ipsum dolor sit amet', '$100'],
+    ['4', 'Lorem ipsum dolor', '$200'],
+    ['5', 'Lorem ipsum dolor sit amet', '$100'],
+    ['6', 'Lorem ipsum dolor sit amet', '$100'],
+  ];
+  // borders: blue rule under the header, hairline rules between the body rows
+  const rule = color => [{ type: 'none' }, { type: 'none' }, { pt: 1, color }, { type: 'none' }];
+  const cell = (text, options) => ({ text, options });
+  const rows = [
+    ['Code', 'Name of Service', 'Price'].map((t, i) => cell(t, {
+      fontFace: HEAD, fontSize: 16, color: BLACK, align: i === 1 ? 'left' : 'center', border: rule(BLUE),
+    })),
+  ].concat(priceRows.map((r, ri) => r.map((t, i) => cell(t, {
+    fontFace: ri === 3 ? HEAD : BODY, fontSize: ri === 3 ? 16 : 14,
+    color: ri === 3 ? WHITE : BLACK, align: i === 1 ? 'left' : 'center',
+    border: ri === 5 ? [{ type: 'none' }, { type: 'none' }, { type: 'none' }, { type: 'none' }] : rule(GREY85),
+  }))));
+
+  s.addTable(rows, {
+    x: 6.667, y: 1.306, w: 5.319, colW: [0.833, 3.0, 1.486],
+    rowH: [0.771, 0.687, 0.687, 0.687, 0.687, 0.687, 0.687],
+    valign: 'middle', margin: [3.6, 7.2, 3.6, 7.2],
+  });
+
+  bubbles(s, { x: 0.527, y: 3.917, w: 0.785, rotate: 90 });
+}
+
+function slide18(pptx) {
+  const s = pptx.addSlide();
+  masterFurniture(s, 18);
+  head(s, 'Customized', { x: 0.667, y: 1.308, w: 4.071, h: 0.864, fontSize: 44 });
+  chip(s, { x: 0.762, y: 2.184, w: 2.905, h: 0.891, text: 'Medical' });
+  head(s, 'Medical Services', { x: 0.762, y: 3.613, w: 3.087, h: 0.473, fontSize: 20, lineSpacingMultiple: 1.2 });
+  tx(s, LOREM_MAURIS, { x: 0.762, y: 4.116, w: 3.929, h: 0.992 });
+  tx(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit', { x: 1.536, y: 5.480, w: 3.000, h: 0.686, color: BLUE });
+  stethoscope(s, 0.893, 5.641, 0.344);
+
+  [{ px: 5.191, cx: 5.298, fill: BLUE, ink: WHITE, big: '+300K', tx: 5.558 },
+   { px: 9.107, cx: 9.238, fill: MINT, ink: BLACK, big: '-190', tx: 9.499 }]
+    .forEach(col => {
+      photo(s, { x: col.px, y: 0.983, w: 3.56, h: 2.084 });
+      panel(s, { x: col.cx, y: 2.524, w: 3.333, h: 4.167, adj: 10781, fill: col.fill, rotate: 180, shadow: true });
+      head(s, col.big, { x: col.tx, y: 3.225, w: 2.739, h: 1.050, fontSize: 48, color: col.ink, lineSpacingMultiple: 1.3 });
+      head(s, 'Lorem ipsum', {
+        x: col.tx, y: 4.328, w: 2.739, h: 0.498, fontSize: 20, bold: true, color: col.ink, lineSpacingMultiple: 1.3,
+      });
+      tx(s, LOREM_MAURIS, { x: col.tx, y: 4.868, w: 2.972, h: 1.298, color: col.ink });
+    });
+
+  bubbles(s, { x: 5.261, y: 0.470, w: 0.785, rotate: 90 });
+}
+
+function slide19(pptx) {
+  const s = pptx.addSlide();
+  masterFurniture(s, 19);
+  head(s, 'Data Driven Decision', { x: 7.984, y: 1.171, w: 4.790, h: 1.679, fontSize: 44 });
+  chip(s, { x: 8.079, y: 2.895, w: 2.802, h: 0.891, text: 'Making' });
+  tx(s, LOREM_MAURIS, { x: 8.079, y: 4.540, w: 3.039, h: 1.298 });
+
+  [{ x: 0.938, tx: 1.271, fill: BLUE, ink: WHITE, year: '2025', value: '176M' },
+   { x: 4.327, tx: 4.690, fill: MINT, ink: BLACK, year: '2026', value: '244M' }]
+    .forEach(k => {
+      panel(s, { x: k.x, y: 4.987, w: 2.888, h: 1.617, adj: 16667, fill: k.fill });
+      tx(s, k.year, { x: k.tx, y: 5.348, w: 1.900, h: 0.337, bold: true, color: k.ink, lineSpacingMultiple: 1.0 });
+      head(s, k.value, { x: k.tx, y: 5.582, w: 2.079, h: 0.841, fontSize: 44, color: k.ink, lineSpacingMultiple: NATURAL });
+    });
+
+  panel(s, { x: 0.667, y: 1.171, w: 6.887, h: 4.023, adj: 7790, fill: WHITE, shadow: true });
+  head(s, 'Trending MedicaCare ', {
+    x: 1.097, y: 1.564, w: 5.405, h: 0.370, fontSize: 16, lineSpacingMultiple: 1.0,
+  });
+  s.addChart(pptx.charts.SCATTER, [
+    { name: 'X', values: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] },
+    { name: 'Column1', values: [1, 2, 4, 5, 2, 4, 3, 3, 3, 2, 3, 4] },
+    { name: 'Series 2', values: [2, 1.3, 2.5, 2.2, 4, 4.3, 4, 4.5, 5, 4, 3.6, 3] },
+  ], {
+    x: 1.018, y: 2.003, w: 6.197, h: 2.537,
+    chartColors: [BLUE, MINT], lineSize: 2, lineSmooth: true, lineDataSymbol: 'none',
+    showLegend: false, valAxisHidden: true,
+    catAxisMaxVal: 14, catAxisMajorUnit: 2, catAxisLineColor: GREY85,
+    catAxisLabelColor: BLACK, catAxisLabelFontFace: BODY, catAxisLabelFontSize: 12,
+    valGridLine: { color: GREY85, size: 1 }, catGridLine: { style: 'none' },
+    chartArea: { fill: { color: WHITE } },
+  });
+
+  bubbles(s, { x: 11.446, y: 5.474, w: 0.785, rotate: 90 });
+}
+
+function slide20(pptx) {
+  const s = pptx.addSlide();
+  photo(s, { x: 0.0, y: 0.625, w: 4.84, h: 6.25 });
+  wordmark(s, { x: 5.462, y: 1.331, iconW: 0.237, chipX: 6.770, fontSize: 18 });
+  head(s, 'Get In', { x: 5.462, y: 1.994, w: 3.438, h: 1.038, fontSize: 54 });
+  chip(s, { x: 8.102, y: 2.052, w: 2.841, h: 0.980, text: 'Touch', fontSize: 54 });
+
+  const contacts = [
+    { x: 3.042, tx: 3.338, fill: WHITE, ink: BLACK, label: 'Email', value: 'contact@yourmail.com' },
+    { x: 6.342, tx: 6.582, fill: BLUE, ink: WHITE, label: 'Website', value: 'www.yourwebsite.com' },
+    { x: 9.642, tx: 9.882, fill: MINT, ink: BLACK, label: 'Phone', value: '(123) 234-567-899' },
+  ];
+  contacts.forEach(c => {
+    panel(s, { x: c.x, y: 3.572, w: 3.024, h: 1.533, adj: 18101, fill: c.fill, shadow: true });
+    head(s, c.label, { x: c.tx, y: 3.899, w: 1.605, h: 0.473, fontSize: 20, color: c.ink, lineSpacingMultiple: 1.2 });
+    tx(s, c.value, { x: c.tx, y: 4.318, w: 2.627, h: 0.379, color: c.ink });
+  });
+
+  tx(s, LOREM_MAURIS, { x: 5.552, y: 5.615, w: 6.028, h: 0.686 });
+  bubbles(s, { x: 11.717, y: 0.599, w: 0.785, rotate: 90 });
+}
+
+/* ------------------------------------------------------------------ main */
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'MEDICA_16x9', width: 13.3333333, height: 7.5 });
+  pptx.layout = 'MEDICA_16x9';
+  pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
+  pptx.title = 'MedicaCare';
+  pptx.author = 'MedicaCare';
+
+  [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
+   slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20]
+    .forEach(fn => fn(pptx));
+
+  return pptx.writeFile({
+    fileName: path.join(__dirname, '1622e609-b20e-4ce5-89b6-ba4c59b3b881_grok_final.pptx'),
+  });
+}
+
+build().then(f => console.log('wrote ' + f)).catch(err => {
+  console.error(err);
+  process.exit(1);
+});

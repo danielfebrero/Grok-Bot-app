@@ -1,0 +1,22 @@
+--- 2026-11-05_07-52:/opt/sand/sand-host/extensions/content-search/search-index-worker.cjs
++++ 2026-11-05_16-45:/opt/sand/sand-host/extensions/content-search/search-index-worker.cjs
+@@ -823,6 +823,10 @@
+ var TEAM_SETUP_CARD_KINDS = new Set(
+   SAND_TEAM_SETUP_SLOT_KINDS.filter((kind) => kind !== "description")
+ );
++var UNDRAWN_TIMELINE_EVENT_TYPES = /* @__PURE__ */ new Set([
++  "task-changed",
++  "cloud-agent-launched"
++]);
+ 
+ // src/shared/transcript/transcript-window-edge.ts
+ var BACKGROUND_TASK_STOP_NOTICE_PREFIX = "A background task was stopped ";
+@@ -833,7 +837,7 @@
+   return entry.kind === "send-message" && entry.streaming === true && entry.message.type === "text" && entry.message.content.length === 0;
+ }
+ function isTimelineHiddenEntry(entry) {
+-  return isEmptyStreamingPreviewEntry(entry) || isSuppressedEntry(entry) || entry.kind === "tool-call" || isBackgroundTaskStopNotice(entry) || isExpiredLocalToolPermissionEntry(entry) || isBotShareAutoReviewEntry(entry) || isHiddenOutboundAgentPeerMessageEntry(entry) || isCardReplyEntry(entry) || isOffChatChannelEntry(entry) || entry.kind === "send-message" && entry.message.type === "user-form" && entry.message.phoneCallQuestion === void 0 && entry.id.startsWith(SAND_PHONE_CALL_QUESTION_ENTRY_PREFIX) || entry.kind === "event" && entry.event.type === "desktop-goal" || entry.kind === "event" && entry.event.type === "team-shared" && isBlankTeamSharedEvent(entry.event);
++  return isEmptyStreamingPreviewEntry(entry) || isSuppressedEntry(entry) || entry.kind === "tool-call" || isBackgroundTaskStopNotice(entry) || isExpiredLocalToolPermissionEntry(entry) || isBotShareAutoReviewEntry(entry) || isHiddenOutboundAgentPeerMessageEntry(entry) || isCardReplyEntry(entry) || isOffChatChannelEntry(entry) || entry.kind === "send-message" && entry.message.type === "user-form" && entry.message.phoneCallQuestion === void 0 && entry.id.startsWith(SAND_PHONE_CALL_QUESTION_ENTRY_PREFIX) || entry.kind === "event" && (entry.event.type === "desktop-goal" || UNDRAWN_TIMELINE_EVENT_TYPES.has(entry.event.type)) || entry.kind === "event" && entry.event.type === "team-shared" && isBlankTeamSharedEvent(entry.event);
+ }
+ 
+ // src/host/sand-data-files.ts

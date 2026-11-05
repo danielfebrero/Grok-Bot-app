@@ -1,0 +1,18 @@
+--- 2026-11-05_07-52:/opt/sand/sand-host/box-runtime/box-contract.generated.mjs
++++ 2026-11-05_16-45:/opt/sand/sand-host/box-runtime/box-contract.generated.mjs
+@@ -1,4 +1,4 @@
+-// @generated SignedSource<<09f19a03df7cb8ff3a2d2df47c1684e657bdc7b1ed5452a908789cf5de715d1e>>
++// @generated SignedSource<<3aed02530e99587cedd474017748b9940e1e41f128dd0c0eae4d9d6b03424f01>>
+ // Emitted by scripts/gen-box-contract.mts from sand/src/shared/box/box-contract.ts;
+ // regenerate with `pnpm --filter sand run gen:box-contract`.
+ export const CURSOR_AGENT_SOCKET_ENV_VAR = "CURSOR_AGENT_SOCKET";
+@@ -46,6 +46,9 @@
+ export const WALL_EVIDENCE_COOKIE_FACTS_MAX_BYTES = 4096;
+ export const WALL_EVIDENCE_COOKIE_COUNT_MAX = 10000;
+ export const BOX_WALL_EVIDENCE_RECORDERS_MARKER_PATH = "/tmp/sand-box-wall-evidence-recorders";
++export const BOX_SESSION_SYNC_PAUSE_DIR = "/tmp/sand-session-sync-pause.d";
++export const BOX_SESSION_SYNC_PAUSED_DIR = "/tmp/sand-session-sync-paused.d";
++export const BOX_SESSION_SYNC_PAUSE_TTL_MS = 180000;
+ export function webBotAuthStatePath(port) {
+   return "/tmp/sand-web-bot-auth-state-" + port + ".json";
+ }

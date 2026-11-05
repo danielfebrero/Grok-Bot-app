@@ -1,0 +1,11 @@
+--- 2026-11-05_07-52:/home/box/sand-data/managed-skills/skills/site-playbooks-delta/SKILL.md
++++ 2026-11-05_16-45:/home/box/sand-data/managed-skills/skills/site-playbooks-delta/SKILL.md
+@@ -74,7 +74,7 @@
+ 
+ ### When blocked
+ 
+-- Akamai fronts delta.com. In a browser that exposes automation the form loads, but Find Flights returns an "Access Denied" page with a Reference number. Other tells are a captcha or a results page that never fills.
++- Akamai fronts delta.com. In a browser that exposes automation the form loads, but Find Flights returns an "Access Denied" page with a Reference number. That was a live check from a residential connection, not yet from a box. Other tells are a captcha or a results page that never fills.
+ - After a block or `empty_grid`, do not dispatch the deep link again. Hand the route to the Google Flights playbook and read Delta's rows there.
+ - If the page asks for a password, 2FA code, captcha, or payment, stop. Do not solve or bypass. Report which wall appeared and the URL it was on.
+ 

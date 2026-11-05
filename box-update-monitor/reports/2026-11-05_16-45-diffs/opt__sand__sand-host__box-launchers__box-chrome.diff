@@ -1,0 +1,19 @@
+--- 2026-11-05_07-52:/opt/sand/sand-host/box-launchers/box-chrome
++++ 2026-11-05_16-45:/opt/sand/sand-host/box-launchers/box-chrome
+@@ -483,12 +483,15 @@
+ 	merge_flags=("${merge_flags[@]}")
+ }
+ 
++BOX_BROWSER_CGROUP_ENTER=/usr/local/bin/box-browser-cgroup-enter.sh
+ launch_chrome() {
+-	local flags=("${CHROME_FLAGS[@]}") env=("${CHROME_ENV[@]}")
++	local flags=("${CHROME_FLAGS[@]}") env=("${CHROME_ENV[@]}") leaf=()
+ 	[ "${CHROME_BIN}" != "${UNGOOGLED_CHROMIUM}" ] || flags+=("${UNGOOGLED_CHROMIUM_FLAGS[@]}")
+ 	merge_disable_features flags
+ 	[ -z "${CHROME_TMPDIR:-}" ] || [ ! -d "${CHROME_TMPDIR}" ] || env+=(TMPDIR="${CHROME_TMPDIR}")
++	[ ! -x "${BOX_BROWSER_CGROUP_ENTER}" ] || leaf=("${BOX_BROWSER_CGROUP_ENTER}" --exec --)
+ 	setsid -f /usr/local/bin/box-bounded-log --run "${CHROME_LOG}" -- \
++		"${leaf[@]}" \
+ 		"${env[@]}" \
+ 		nice -n 10 "${CHROME_BIN}" "${flags[@]}" "$@" \
+ 		</dev/null >/dev/null 2>&1 9>&-

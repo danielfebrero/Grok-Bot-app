@@ -1,0 +1,124 @@
+--- 2026-11-05_07-52:/opt/sand/sand-host/box-scripts/start-desktop.sh
++++ 2026-11-05_16-45:/opt/sand/sand-host/box-scripts/start-desktop.sh
+@@ -251,10 +251,10 @@
+ 		"localhost:${VNC_PORT}"
+ 	)
+ 	/usr/local/bin/box-bounded-log --run "/tmp/novnc${DISPLAY}.log" -- \
+-		websockify "${WEBSOCKIFY_ARGS[@]}" &
++		/usr/local/bin/box-websockify.py "${WEBSOCKIFY_ARGS[@]}" &
+ 	sand_desktop_register "${SAND_DESKTOP_GROUP}" websockify 4 "/tmp/novnc${DISPLAY}.log" "$!" -- \
+ 		/usr/local/bin/box-bounded-log --run "/tmp/novnc${DISPLAY}.log" -- \
+-		websockify "${WEBSOCKIFY_ARGS[@]}"
++		/usr/local/bin/box-websockify.py "${WEBSOCKIFY_ARGS[@]}"
+ fi
+ 
+ /usr/local/bin/box-bounded-log --run "/tmp/xfwm4${DISPLAY}.log" -- \
+@@ -411,20 +411,30 @@
+   <property name="configver" type="int" value="2"/>
+   <property name="panels" type="array">
+     <value type="int" value="1"/>
++    <property name="dark-mode" type="bool" value="true"/>
+     <property name="panel-1" type="empty">
+       <property name="position" type="string" value="p=10;x=0;y=0"/>
+       <property name="position-locked" type="bool" value="true"/>
+       <property name="length" type="double" value="100"/>
+-      <property name="size" type="uint" value="40"/>
+-      <property name="icon-size" type="uint" value="24"/>
++      <!-- size 41: background-style 1 drops the theme's 1px border, so the strut stays 41px (https://docs.xfce.org/xfce/xfce4-panel/preferences) -->
++      <property name="size" type="uint" value="41"/>
++      <property name="icon-size" type="uint" value="28"/>
+       <property name="autohide-behavior" type="uint" value="0"/>
+       <property name="enable-struts" type="bool" value="true"/>
++      <property name="background-style" type="uint" value="1"/>
++      <property name="background-rgba" type="array">
++        <value type="double" value="0.075"/>
++        <value type="double" value="0.082"/>
++        <value type="double" value="0.106"/>
++        <value type="double" value="0.96"/>
++      </property>
+       <property name="plugin-ids" type="array">
++        <value type="int" value="10"/>
++        <value type="int" value="9"/>
+         <value type="int" value="1"/>
+         <value type="int" value="2"/>
+         <value type="int" value="3"/>
+         <value type="int" value="4"/>
+-        <value type="int" value="5"/>
+         <value type="int" value="6"/>
+         <value type="int" value="7"/>
+         <value type="int" value="8"/>
+@@ -432,7 +442,23 @@
+     </property>
+   </property>
+   <property name="plugins" type="empty">
+-    <property name="plugin-1" type="string" value="applicationsmenu"/>
++    <!-- plugin-10 mirrors plugin-8 so the expanding separators center the launchers; gtk.css hides it, and its command and empty tooltip keep it inert (https://docs.xfce.org/xfce/xfce4-panel/clock) -->
++    <property name="plugin-10" type="string" value="clock">
++      <property name="mode" type="uint" value="2"/>
++      <property name="digital-layout" type="uint" value="3"/>
++      <property name="digital-time-format" type="string" value="%a %b %-d   %-I:%M %p"/>
++      <property name="digital-time-font" type="string" value="Sans 10"/>
++      <property name="command" type="string" value="true"/>
++      <property name="tooltip-format" type="string" value=""/>
++    </property>
++    <property name="plugin-9" type="string" value="separator">
++      <property name="expand" type="bool" value="true"/>
++      <property name="style" type="uint" value="0"/>
++    </property>
++    <property name="plugin-1" type="string" value="applicationsmenu">
++      <property name="show-button-title" type="bool" value="false"/>
++      <property name="button-icon" type="string" value="org.xfce.panel.applicationsmenu"/>
++    </property>
+     <property name="plugin-2" type="string" value="launcher">
+       <property name="items" type="array">
+         <value type="string" value="box-chrome.desktop"/>
+@@ -448,17 +474,45 @@
+         <value type="string" value="xfce4-terminal.desktop"/>
+       </property>
+     </property>
+-    <property name="plugin-5" type="string" value="separator"/>
+-    <property name="plugin-6" type="string" value="tasklist"/>
++    <property name="plugin-6" type="string" value="tasklist">
++      <property name="flat-buttons" type="bool" value="true"/>
++      <property name="show-handle" type="bool" value="false"/>
++      <property name="show-labels" type="bool" value="true"/>
++      <property name="grouping" type="uint" value="1"/>
++    </property>
+     <property name="plugin-7" type="string" value="separator">
+       <property name="expand" type="bool" value="true"/>
+       <property name="style" type="uint" value="0"/>
+     </property>
+-    <property name="plugin-8" type="string" value="clock"/>
++    <property name="plugin-8" type="string" value="clock">
++      <property name="mode" type="uint" value="2"/>
++      <property name="digital-layout" type="uint" value="3"/>
++      <property name="digital-time-format" type="string" value="%a %b %-d   %-I:%M %p"/>
++      <property name="digital-time-font" type="string" value="Sans 10"/>
++    </property>
+   </property>
+ </channel>
+ EOF
+-	mv -f "${channel_dir}/.xfce4-panel.xml.$$" "${channel_dir}/xfce4-panel.xml"
++	mv -f "${channel_dir}/.xfce4-panel.xml.$$" "${channel_dir}/xfce4-panel.xml" || return 1
++	# Hiding plugin-10 and padding the menu button evenly center the visible launchers (https://docs.gtk.org/gtk3/css-overview.html).
++	append_gtk_css_rule '#clock-10, #clock-10 * { opacity: 0; }' || true
++	append_gtk_css_rule '#applicationsmenu-1 > button { padding-left: 6px; padding-right: 6px; }' || true
++}
++
++append_gtk_css_rule() {
++	local css="${HOME}/.config/gtk-3.0/gtk.css" rule="$1" line="" IFS=$' \t'
++	local -a words=()
++	mkdir -p "${css%/*}" || return 1
++	if [ -f "${css}" ]; then
++		while IFS= read -r line; do
++			read -r -a words <<<"${line//$'\r'/}"
++			[ "${words[*]}" != "${rule}" ] || return 0
++		done <"${css}"
++		read -r -a words <<<"${line//$'\r'/}"
++		[ "${words[*]}" != "${rule}" ] || return 0
++		[ -z "${line}" ] || printf '\n' >>"${css}" || return 1
++	fi
++	printf '%s\n' "${rule}" >>"${css}"
+ }
+ 
+ start_desktop_panel() {

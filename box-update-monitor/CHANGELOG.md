@@ -9,6 +9,19 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-11-05 16:45 (Paris) — snapshot `2026-11-05_07-52` → `2026-11-05_16-45`
+
+**Hot-update sand-host `f0b5e3e` → `2cf9f8b`** (supervisor `upgrade-2cf9f8b`, `pendingUpgradeVersion` = None) + bump agent-store-fuse `af067ab79c963a4c8963cde71aa2a542cc82f5cc` → `3d09248c1a826a04f85a98d8e1eaf96b02e73ced` + rafraîchissement des skills gérées. Image `fcbae14`, box-scripts, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~21.
+
+- **Features** : `sand-session-sync.mjs` (box-runtime + box-scripts) gagne un mécanisme de **pause de la synchro cookies/localStorage** entre moniteurs : dossiers `/tmp/sand-session-sync-pause.d` (détenteurs, TTL 180 s) et `/tmp/sand-session-sync-paused.d` (accusé), nouvelles constantes dans `box-contract.generated.mjs` ; après une pause, les copies « déconnectées » d'un cookie ne sont plus réappliquées (`afterPause` / `isSignedOutCopy`).
+- **Change (desktop)** : `start-desktop.sh` remplace `websockify` par `/usr/local/bin/box-websockify.py` pour noVNC ; panneau XFCE refait (dark mode, taille 41 px, icônes 28 px, fond sombre semi-opaque, horloge + séparateurs extensibles pour centrer les lanceurs, menu Applications retiré).
+- **Change (browser)** : `box-chrome` lance Chrome via `/usr/local/bin/box-browser-cgroup-enter.sh --exec --` s'il est présent (Chrome placé dans un cgroup dédié).
+- **Change (sécurité)** : `start-window` passe `--pty-auth-token local-pty` à l'exec-daemon (jeton distinct pour le websocket PTY).
+- **Autre-infra** : `host-main.cjs` (32 921 725 → 33 110 824 o), `sand-eval-runner.cjs`, `agent-store-worker.cjs`, `search-index-worker.cjs`, `sand-egress-tunnel` (binaire) et `box-runtime/manifest.json` rebuildés ; pointeur `/usr/local/bin/cursor_agent_store_fuse_version` mis à jour.
+- **Skills gérées** : `cache.json` rafraîchi ; SKILL.md modifiés : `flight-booking`, `purchases`, `site-playbooks-alaska`, `site-playbooks-delta`, `site-playbooks-jetblue`.
+
+Rapport : [reports/2026-11-05_16-45.md](reports/2026-11-05_16-45.md).
+
 ## 2026-11-05 07:52 (Paris) — snapshot `2026-11-05_06-46` → `2026-11-05_07-52`
 
 **Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `0a1fb8465e218bf65f33101713afefe73a4fe51b` → `af067ab79c963a4c8963cde71aa2a542cc82f5cc` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`). Toutes les autres versions plateforme inchangées (image `fcbae14`, box-scripts `fcbae14`, sand-host `f0b5e3e` (supervisor `upgrade-f0b5e3e`, `pendingUpgradeVersion` = None), exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7). Fichiers : +0 / −0 / ~1.

@@ -1,0 +1,232 @@
+--- 2026-11-05_07-52:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
++++ 2026-11-05_16-45:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
+@@ -7637,7 +7637,31 @@
+     return proto3.util.equals(_McpSuccess, a, b);
+   }
+   static $() {
+-    return ["McpSuccess|1 content #0*|2 is_error 8|3 structured_content #1|4 system_reminders #2*|5 result_meta #1", McpToolResultContentItem, Struct, SystemReminder];
++    return ["McpSuccess|1 content #0*|2 is_error 8|3 structured_content #1|4 system_reminders #2*|5 result_meta #1|6 mcp_app_document #3", McpToolResultContentItem, Struct, SystemReminder, McpAppDocument];
++  }
++};
++var McpAppDocument = class _McpAppDocument extends __protoMessage320 {
++  constructor(data) {
++    super();
++    this.uri = "";
++    this.mimeType = "";
++    this.text = "";
++    proto3.util.initPartial(data, this);
++  }
++  static fromBinary(bytes, options) {
++    return new _McpAppDocument().fromBinary(bytes, options);
++  }
++  static fromJson(jsonValue, options) {
++    return new _McpAppDocument().fromJson(jsonValue, options);
++  }
++  static fromJsonString(jsonString, options) {
++    return new _McpAppDocument().fromJsonString(jsonString, options);
++  }
++  static equals(a, b) {
++    return proto3.util.equals(_McpAppDocument, a, b);
++  }
++  static $() {
++    return ["McpAppDocument|1 uri 9|2 mime_type 9|3 text 9|4 meta_json 9?"];
+   }
+ };
+ var McpRejected = class _McpRejected extends __protoMessage320 {
+@@ -15321,6 +15345,166 @@
+     return ["StopProjectUpdatesToolCall|1 args #0|2 result #1", StopProjectUpdatesArgs, StopProjectUpdatesResult];
+   }
+ };
++var ManageAccessTarget = class _ManageAccessTarget extends __protoMessage364 {
++  constructor(data) {
++    super();
++    this.kind = "";
++    this.id = "";
++    proto3.util.initPartial(data, this);
++  }
++  static fromBinary(bytes, options) {
++    return new _ManageAccessTarget().fromBinary(bytes, options);
++  }
++  static fromJson(jsonValue, options) {
++    return new _ManageAccessTarget().fromJson(jsonValue, options);
++  }
++  static fromJsonString(jsonString, options) {
++    return new _ManageAccessTarget().fromJsonString(jsonString, options);
++  }
++  static equals(a, b) {
++    return proto3.util.equals(_ManageAccessTarget, a, b);
++  }
++  static $() {
++    return ["ManageAccessTarget|1 kind 9|2 id 9"];
++  }
++};
++var ManageAccessArgs = class _ManageAccessArgs extends __protoMessage364 {
++  constructor(data) {
++    super();
++    this.toolCallId = "";
++    this.action = "";
++    proto3.util.initPartial(data, this);
++  }
++  static fromBinary(bytes, options) {
++    return new _ManageAccessArgs().fromBinary(bytes, options);
++  }
++  static fromJson(jsonValue, options) {
++    return new _ManageAccessArgs().fromJson(jsonValue, options);
++  }
++  static fromJsonString(jsonString, options) {
++    return new _ManageAccessArgs().fromJsonString(jsonString, options);
++  }
++  static equals(a, b) {
++    return proto3.util.equals(_ManageAccessArgs, a, b);
++  }
++  static $() {
++    return ["ManageAccessArgs|1 tool_call_id 9|2 action 9|3 target #0?", ManageAccessTarget];
++  }
++};
++var ManageAccessGrant = class _ManageAccessGrant extends __protoMessage364 {
++  constructor(data) {
++    super();
++    this.name = "";
++    this.grantedBy = "";
++    this.grantedAtMs = protoInt64.zero;
++    this.scope = "";
++    proto3.util.initPartial(data, this);
++  }
++  static fromBinary(bytes, options) {
++    return new _ManageAccessGrant().fromBinary(bytes, options);
++  }
++  static fromJson(jsonValue, options) {
++    return new _ManageAccessGrant().fromJson(jsonValue, options);
++  }
++  static fromJsonString(jsonString, options) {
++    return new _ManageAccessGrant().fromJsonString(jsonString, options);
++  }
++  static equals(a, b) {
++    return proto3.util.equals(_ManageAccessGrant, a, b);
++  }
++  static $() {
++    return ["ManageAccessGrant|1 target #0|2 name 9|3 granted_by 9|4 granted_at_ms 4|5 scope 9", ManageAccessTarget];
++  }
++};
++var ManageAccessSuccess = class _ManageAccessSuccess extends __protoMessage364 {
++  constructor(data) {
++    super();
++    this.decision = "";
++    this.grants = [];
++    this.message = "";
++    proto3.util.initPartial(data, this);
++  }
++  static fromBinary(bytes, options) {
++    return new _ManageAccessSuccess().fromBinary(bytes, options);
++  }
++  static fromJson(jsonValue, options) {
++    return new _ManageAccessSuccess().fromJson(jsonValue, options);
++  }
++  static fromJsonString(jsonString, options) {
++    return new _ManageAccessSuccess().fromJsonString(jsonString, options);
++  }
++  static equals(a, b) {
++    return proto3.util.equals(_ManageAccessSuccess, a, b);
++  }
++  static $() {
++    return ["ManageAccessSuccess|1 decision 9|2 grants #0*|3 message 9", ManageAccessGrant];
++  }
++};
++var ManageAccessError = class _ManageAccessError extends __protoMessage364 {
++  constructor(data) {
++    super();
++    this.error = "";
++    proto3.util.initPartial(data, this);
++  }
++  static fromBinary(bytes, options) {
++    return new _ManageAccessError().fromBinary(bytes, options);
++  }
++  static fromJson(jsonValue, options) {
++    return new _ManageAccessError().fromJson(jsonValue, options);
++  }
++  static fromJsonString(jsonString, options) {
++    return new _ManageAccessError().fromJsonString(jsonString, options);
++  }
++  static equals(a, b) {
++    return proto3.util.equals(_ManageAccessError, a, b);
++  }
++  static $() {
++    return ["ManageAccessError|1 error 9"];
++  }
++};
++var ManageAccessResult = class _ManageAccessResult extends __protoMessage364 {
++  constructor(data) {
++    super();
++    this.result = { case: void 0 };
++    proto3.util.initPartial(data, this);
++  }
++  static fromBinary(bytes, options) {
++    return new _ManageAccessResult().fromBinary(bytes, options);
++  }
++  static fromJson(jsonValue, options) {
++    return new _ManageAccessResult().fromJson(jsonValue, options);
++  }
++  static fromJsonString(jsonString, options) {
++    return new _ManageAccessResult().fromJsonString(jsonString, options);
++  }
++  static equals(a, b) {
++    return proto3.util.equals(_ManageAccessResult, a, b);
++  }
++  static $() {
++    return ["ManageAccessResult|1 success #0 result|2 error #1 result", ManageAccessSuccess, ManageAccessError];
++  }
++};
++var ManageAccessToolCall = class _ManageAccessToolCall extends __protoMessage364 {
++  constructor(data) {
++    super();
++    proto3.util.initPartial(data, this);
++  }
++  static fromBinary(bytes, options) {
++    return new _ManageAccessToolCall().fromBinary(bytes, options);
++  }
++  static fromJson(jsonValue, options) {
++    return new _ManageAccessToolCall().fromJson(jsonValue, options);
++  }
++  static fromJsonString(jsonString, options) {
++    return new _ManageAccessToolCall().fromJsonString(jsonString, options);
++  }
++  static equals(a, b) {
++    return proto3.util.equals(_ManageAccessToolCall, a, b);
++  }
++  static $() {
++    return ["ManageAccessToolCall|1 args #0|2 result #1", ManageAccessArgs, ManageAccessResult];
++  }
++};
+ var StopAgentArgs = class _StopAgentArgs extends __protoMessage364 {
+   constructor(data) {
+     super();
+@@ -19154,7 +19338,7 @@
+     return proto3.util.equals(_NewCloudVmTarget, a, b);
+   }
+   static $() {
+-    return ["NewCloudVmTarget|1 environment_build_id 9?|2 base_branch 9?"];
++    return ["NewCloudVmTarget|1 environment_build_id 9?|2 base_branch 9?|4 environment_id 9?|5 repo_url 9?"];
+   }
+ };
+ var SelfHostedWorkerTarget = class _SelfHostedWorkerTarget extends __protoMessage374 {
+@@ -19442,7 +19626,7 @@
+     return proto3.util.equals(_ToolCall, a, b);
+   }
+   static $() {
+-    return ["ToolCall|1 shell_tool_call #0 tool|3 delete_tool_call #1 tool|4 glob_tool_call #2 tool|5 grep_tool_call #3 tool|8 read_tool_call #4 tool|9 update_todos_tool_call #5 tool|10 read_todos_tool_call #6 tool|12 edit_tool_call #7 tool|13 ls_tool_call #8 tool|14 read_lints_tool_call #9 tool|15 mcp_tool_call #10 tool|16 sem_search_tool_call #11 tool|17 create_plan_tool_call #12 tool|18 web_search_tool_call #13 tool|19 task_tool_call #14 tool|20 list_mcp_resources_tool_call #15 tool|21 read_mcp_resource_tool_call #16 tool|22 apply_agent_diff_tool_call #17 tool|23 ask_question_tool_call #18 tool|24 fetch_tool_call #19 tool|25 switch_mode_tool_call #20 tool|28 generate_image_tool_call #21 tool|29 record_screen_tool_call #22 tool|30 computer_use_tool_call #23 tool|31 write_shell_stdin_tool_call #24 tool|32 reflect_tool_call #25 tool|33 setup_vm_environment_tool_call #26 tool|34 truncated_tool_call #27 tool|35 start_grind_execution_tool_call #28 tool|36 start_grind_planning_tool_call #29 tool|37 web_fetch_tool_call #30 tool|38 report_bugfix_results_tool_call #31 tool|39 ai_attribution_tool_call #32 tool|40 pr_management_tool_call #33 tool|41 mcp_auth_tool_call #34 tool|42 await_tool_call #35 tool|43 blame_by_file_path_tool_call #36 tool|44 get_mcp_tools_tool_call #37 tool|45 report_bug_tool_call #38 tool|46 set_active_branch_tool_call #39 tool|48 communicate_update_tool_call #40 tool|49 send_final_summary_tool_call #41 tool|51 replace_env_tool_call #42 tool|52 edit_pr_labels_tool_call #43 tool|53 record_ci_investigation_findings_tool_call #44 tool|55 send_message_tool_call #45 tool|56 fetch_cloud_agent_data_tool_call #46 tool|58 send_to_user_tool_call #47 tool|68 connect_scm_tool_call #48 tool|69 search_conversations_tool_call #49 tool|70 create_goal_tool_call #50 tool|71 update_goal_tool_call #51 tool|73 get_agent_status_tool_call #52 tool|74 send_to_agent_tool_call #53 tool|75 read_agent_transcript_tool_call #54 tool|76 create_agent_tool_call #55 tool|77 stop_agent_tool_call #56 tool|79 write_canvas_tool_call #57 tool|80 read_canvas_tool_call #58 tool|81 generate_video_tool_call #59 tool|82 x_search_tool_call #60 tool|83 get_origin_pr_code_tour_tool_call #61 tool|84 update_origin_pr_code_tour_tool_call #62 tool|85 list_tracked_tasks_tool_call #63 tool|86 create_tracked_tasks_tool_call #64 tool|87 update_tracked_tasks_tool_call #65 tool|88 delete_tracked_tasks_tool_call #66 tool|89 update_tracked_task_statuses_tool_call #67 tool|90 create_project_tool_call #68 tool|91 update_tracked_task_tags_tool_call #69 tool|93 stop_project_updates_tool_call #70 tool|94 start_project_updates_tool_call #71 tool|1000 execute_tool_call #72 tool|54 hook_additional_contexts #73*|57 tool_call_id 9?|59 started_at_ms 4?|60 completed_at_ms 4?", ShellToolCall, DeleteToolCall, GlobToolCall, GrepToolCall, ReadToolCall, UpdateTodosToolCall, ReadTodosToolCall, EditToolCall, LsToolCall, ReadLintsToolCall, McpToolCall, SemSearchToolCall, CreatePlanToolCall, WebSearchToolCall, TaskToolCall, ListMcpResourcesToolCall, ReadMcpResourceToolCall, ApplyAgentDiffToolCall, AskQuestionToolCall, FetchToolCall, SwitchModeToolCall, GenerateImageToolCall, RecordScreenToolCall, ComputerUseToolCall, WriteShellStdinToolCall, ReflectToolCall, SetupVmEnvironmentToolCall, TruncatedToolCall, StartGrindExecutionToolCall, StartGrindPlanningToolCall, WebFetchToolCall, ReportBugfixResultsToolCall, AiAttributionToolCall, PrManagementToolCall, McpAuthToolCall, AwaitToolCall, BlameByFilePathToolCall, GetMcpToolsToolCall, ReportBugToolCall, SetActiveBranchToolCall, CommunicateUpdateToolCall, SendFinalSummaryToolCall, ReplaceEnvToolCall, EditPrLabelsToolCall, RecordCiInvestigationFindingsToolCall, SendMessageToolCall, FetchCloudAgentDataToolCall, SendToUserToolCall, ConnectScmToolCall, SearchConversationsToolCall, CreateGoalToolCall, UpdateGoalToolCall, GetAgentStatusToolCall, SendToAgentToolCall, ReadAgentTranscriptToolCall, CreateAgentToolCall, StopAgentToolCall, WriteCanvasToolCall, ReadCanvasToolCall, GenerateVideoToolCall, XSearchToolCall, GetPrCodeTourToolCall, UpdatePrCodeTourToolCall, ListTrackedTasksToolCall, CreateTrackedTasksToolCall, UpdateTrackedTasksToolCall, DeleteTrackedTasksToolCall, UpdateTrackedTaskStatusesToolCall, CreateProjectToolCall, UpdateTrackedTaskTagsToolCall, StopProjectUpdatesToolCall, StartProjectUpdatesToolCall, ExecuteToolCall, HookAdditionalContext];
++    return ["ToolCall|1 shell_tool_call #0 tool|3 delete_tool_call #1 tool|4 glob_tool_call #2 tool|5 grep_tool_call #3 tool|8 read_tool_call #4 tool|9 update_todos_tool_call #5 tool|10 read_todos_tool_call #6 tool|12 edit_tool_call #7 tool|13 ls_tool_call #8 tool|14 read_lints_tool_call #9 tool|15 mcp_tool_call #10 tool|16 sem_search_tool_call #11 tool|17 create_plan_tool_call #12 tool|18 web_search_tool_call #13 tool|19 task_tool_call #14 tool|20 list_mcp_resources_tool_call #15 tool|21 read_mcp_resource_tool_call #16 tool|22 apply_agent_diff_tool_call #17 tool|23 ask_question_tool_call #18 tool|24 fetch_tool_call #19 tool|25 switch_mode_tool_call #20 tool|28 generate_image_tool_call #21 tool|29 record_screen_tool_call #22 tool|30 computer_use_tool_call #23 tool|31 write_shell_stdin_tool_call #24 tool|32 reflect_tool_call #25 tool|33 setup_vm_environment_tool_call #26 tool|34 truncated_tool_call #27 tool|35 start_grind_execution_tool_call #28 tool|36 start_grind_planning_tool_call #29 tool|37 web_fetch_tool_call #30 tool|38 report_bugfix_results_tool_call #31 tool|39 ai_attribution_tool_call #32 tool|40 pr_management_tool_call #33 tool|41 mcp_auth_tool_call #34 tool|42 await_tool_call #35 tool|43 blame_by_file_path_tool_call #36 tool|44 get_mcp_tools_tool_call #37 tool|45 report_bug_tool_call #38 tool|46 set_active_branch_tool_call #39 tool|48 communicate_update_tool_call #40 tool|49 send_final_summary_tool_call #41 tool|51 replace_env_tool_call #42 tool|52 edit_pr_labels_tool_call #43 tool|53 record_ci_investigation_findings_tool_call #44 tool|55 send_message_tool_call #45 tool|56 fetch_cloud_agent_data_tool_call #46 tool|58 send_to_user_tool_call #47 tool|68 connect_scm_tool_call #48 tool|69 search_conversations_tool_call #49 tool|70 create_goal_tool_call #50 tool|71 update_goal_tool_call #51 tool|73 get_agent_status_tool_call #52 tool|74 send_to_agent_tool_call #53 tool|75 read_agent_transcript_tool_call #54 tool|76 create_agent_tool_call #55 tool|77 stop_agent_tool_call #56 tool|79 write_canvas_tool_call #57 tool|80 read_canvas_tool_call #58 tool|81 generate_video_tool_call #59 tool|82 x_search_tool_call #60 tool|83 get_origin_pr_code_tour_tool_call #61 tool|84 update_origin_pr_code_tour_tool_call #62 tool|85 list_tracked_tasks_tool_call #63 tool|86 create_tracked_tasks_tool_call #64 tool|87 update_tracked_tasks_tool_call #65 tool|88 delete_tracked_tasks_tool_call #66 tool|89 update_tracked_task_statuses_tool_call #67 tool|90 create_project_tool_call #68 tool|91 update_tracked_task_tags_tool_call #69 tool|93 stop_project_updates_tool_call #70 tool|94 start_project_updates_tool_call #71 tool|95 manage_access_tool_call #72 tool|1000 execute_tool_call #73 tool|54 hook_additional_contexts #74*|57 tool_call_id 9?|59 started_at_ms 4?|60 completed_at_ms 4?", ShellToolCall, DeleteToolCall, GlobToolCall, GrepToolCall, ReadToolCall, UpdateTodosToolCall, ReadTodosToolCall, EditToolCall, LsToolCall, ReadLintsToolCall, McpToolCall, SemSearchToolCall, CreatePlanToolCall, WebSearchToolCall, TaskToolCall, ListMcpResourcesToolCall, ReadMcpResourceToolCall, ApplyAgentDiffToolCall, AskQuestionToolCall, FetchToolCall, SwitchModeToolCall, GenerateImageToolCall, RecordScreenToolCall, ComputerUseToolCall, WriteShellStdinToolCall, ReflectToolCall, SetupVmEnvironmentToolCall, TruncatedToolCall, StartGrindExecutionToolCall, StartGrindPlanningToolCall, WebFetchToolCall, ReportBugfixResultsToolCall, AiAttributionToolCall, PrManagementToolCall, McpAuthToolCall, AwaitToolCall, BlameByFilePathToolCall, GetMcpToolsToolCall, ReportBugToolCall, SetActiveBranchToolCall, CommunicateUpdateToolCall, SendFinalSummaryToolCall, ReplaceEnvToolCall, EditPrLabelsToolCall, RecordCiInvestigationFindingsToolCall, SendMessageToolCall, FetchCloudAgentDataToolCall, SendToUserToolCall, ConnectScmToolCall, SearchConversationsToolCall, CreateGoalToolCall, UpdateGoalToolCall, GetAgentStatusToolCall, SendToAgentToolCall, ReadAgentTranscriptToolCall, CreateAgentToolCall, StopAgentToolCall, WriteCanvasToolCall, ReadCanvasToolCall, GenerateVideoToolCall, XSearchToolCall, GetPrCodeTourToolCall, UpdatePrCodeTourToolCall, ListTrackedTasksToolCall, CreateTrackedTasksToolCall, UpdateTrackedTasksToolCall, DeleteTrackedTasksToolCall, UpdateTrackedTaskStatusesToolCall, CreateProjectToolCall, UpdateTrackedTaskTagsToolCall, StopProjectUpdatesToolCall, StartProjectUpdatesToolCall, ManageAccessToolCall, ExecuteToolCall, HookAdditionalContext];
+   }
+ };
+ var TruncatedToolCallArgs = class _TruncatedToolCallArgs extends __protoMessage374 {
+@@ -21212,10 +21396,9 @@
+   }
+ };
+ var HEX_LUT = Array.from({ length: 256 }, (_, i) => i.toString(16).padStart(2, "0"));
+-var STRICT_HEX_RE = /^[0-9a-f]*$/;
+ var NATIVE_HEX_MIN_CHARS = 64;
+ function fromHexNative(clean) {
+-  if (!STRICT_HEX_RE.test(clean))
++  if (Buffer.byteLength(clean, "utf8") !== clean.length)
+     return void 0;
+   try {
+     const out = new Uint8Array(clean.length / 2);
