@@ -1,0 +1,860 @@
+/**
+ * "Kreate Tribe - Pitch Deck" rebuilt with pptxgenjs.
+ * 30 slides, 13.333 x 7.5 in.   Run:  node <this-file>
+ *
+ * Layout note: the source deck positions everything absolutely, so every slide
+ * builder below is a flat list of shapes in z-order, in inches.
+ */
+'use strict';
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+// ------------------------------------------------------------------ palette
+const PLUM = '5B0350';      // brand aubergine - dark section backgrounds
+const MAGENTA = 'FF35FF';   // accent 1 - buttons, highlights
+const ORANGE = 'FF6924';    // accent 3
+const LILAC = 'FFD5FF';     // accent 4 - pale wash panels
+const LIME = 'E8E766';
+const CITRON = 'EAE668';    // gradient end (yellow)
+const PETAL = 'FFC1F9';     // gradient start (pink)
+const HOTPINK = 'FF00C0';
+const ROSE = 'FEAEFF';
+const BLUSH = 'FFF7FF';
+const PEACH = 'FFE0D3';
+const ORCHID = 'FE85FF';
+const WHITE = 'FFFFFF';
+const BLACK = '000000';
+const INK = '262626';       // bold lead-in copy
+const GREY = '3F3F3F';      // body copy
+const SLATE = '595959';
+const SILVER = 'A5A5A5';
+const ASH = 'BFBFBF';
+const MIST = 'D8D8D8';
+const FOG = 'F2F2F2';
+const PEBBLE = 'D0CECE';
+const STONE = '7F7F7F';
+const FUCHSIA = 'FA32DF';
+const MULBERRY = '6B166B';
+const APRICOT = 'FFC2A7';
+const BUTTER = 'F5F5C1';
+
+// -------------------------------------------------------------------- fonts
+const R = 'Roboto';
+const RM = 'Roboto Medium';
+const RL = 'Roboto Light';
+const O = 'Oswald';
+const OM = 'Oswald Medium';
+const OS = 'Oswald SemiBold';
+const PO = 'Poppins';
+const DS = 'Dancing Script';
+
+const M = [7.2, 7.2, 3.6, 3.6];   // text insets (pt) used by every text box
+
+// ------------------------------------------------------------------ helpers
+/** A text run. */
+function r(text, fontSize, fontFace, color, more) {
+  return { text: text, options: Object.assign({ fontSize: fontSize, fontFace: fontFace, color: color }, more) };
+}
+
+/** A text box. */
+function T(s, x, y, w, h, runs, opts) {
+  s.addText(runs, Object.assign({ x: x, y: y, w: w, h: h, margin: M, valign: 'top' }, opts));
+}
+
+/** A plain shape. */
+function S(s, kind, x, y, w, h, opts) {
+  s.addShape(kind, Object.assign({ x: x, y: y, w: w, h: h }, opts));
+}
+
+/** A straight rule / arrow. */
+function L(s, x, y, w, h, line) {
+  s.addShape('line', { x: x, y: y, w: w, h: h, line: line });
+}
+
+/** The running head shared by nearly every slide. */
+function header(s, page, color) {
+  T(s, 0.661, 0.628, 1.04, 0.286, [r('Kreate Tribe', 11, R, color)]);
+  T(s, 6.706, 0.628, 0.675, 0.286, [r('Beauty', 11, R, color)]);
+  T(s, 12.271, 0.628, 0.374, 0.286, [r(page, 11, R, color)]);
+}
+
+// ---------------------------------------------------------------- gradients
+// pptxgenjs exposes solid fills only, so two-stop linear gradients are painted
+// as a stack of thin slices clipped to the host shape's silhouette.
+function mix(a, b, t) {
+  const ch = (c, i) => parseInt(c.substr(i * 2, 2), 16);
+  const v = i => Math.round(ch(a, i) + (ch(b, i) - ch(a, i)) * t).toString(16).padStart(2, '0');
+  return (v(0) + v(1) + v(2)).toUpperCase();
+}
+
+/** Half-width of `kind` at vertical fraction t (0..1) of the box. */
+function halfWidth(kind, w, h, radius, t) {
+  if (kind === 'ellipse') return (w / 2) * Math.sqrt(Math.max(0, 1 - Math.pow(2 * t - 1, 2)));
+  if (kind === 'roundRect') {
+    const rr = Math.min(radius, h / 2, w / 2), dy = Math.min(t, 1 - t) * h;
+    if (dy >= rr) return w / 2;
+    return w / 2 - rr + Math.sqrt(Math.max(0, rr * rr - (rr - dy) * (rr - dy)));
+  }
+  return w / 2;
+}
+
+/** Linear gradient inside rect / roundRect / ellipse. dir 90 = top->bottom. */
+function gradFill(s, kind, x, y, w, h, from, to, dir, radius) {
+  const STEPS = 26;
+  s.addShape(kind, Object.assign({ x: x, y: y, w: w, h: h, fill: { color: mix(from, to, 0.5) } },
+    kind === 'roundRect' ? { rectRadius: radius } : {}));
+  for (let i = 0; i < STEPS; i++) {
+    const t0 = i / STEPS, t1 = (i + 1) / STEPS;
+    const hw = Math.min(halfWidth(kind, w, h, radius, t0), halfWidth(kind, w, h, radius, t1));
+    if (hw <= 0) continue;
+    const t = dir === 270 ? 1 - (t0 + t1) / 2 : (t0 + t1) / 2;
+    s.addShape('rect', { x: x + w / 2 - hw, y: y + t0 * h, w: hw * 2, h: h / STEPS + 0.004,
+      fill: { color: mix(from, to, t) } });
+  }
+}
+
+/**
+ * Gradient ring (slide 1 hero): a full annulus drawn as arc segments, each
+ * coloured by projecting its mid-angle onto the gradient direction `dirDeg`.
+ */
+function gradRing(s, x, y, w, h, from, to, thickness, dirDeg) {
+  const SEGS = 36, LO = 0.26, HI = 0.78;   // the ring only spans part of the ramp
+  for (let i = 0; i < SEGS; i++) {
+    const a0 = (360 * i) / SEGS, a1 = (360 * (i + 1)) / SEGS;
+    const t = LO + (HI - LO) * (0.5 + 0.5 * Math.cos(((a0 + a1) / 2 - dirDeg) * Math.PI / 180));
+    S(s, 'blockArc', x, y, w, h, {
+      angleRange: [Math.round(a0) % 360, Math.round(a1 + 1) % 360],
+      arcThicknessRatio: thickness,
+      fill: { color: mix(from, to, t) },
+    });
+  }
+}
+
+/**
+ * A rectangle with independent top / bottom corner radii - the deck's "arch"
+ * panels.  Built from cubic corners because pptxgenjs only exposes one radius.
+ */
+function arch(s, x, y, w, h, rt, rb, opts) {
+  const K = 0.5523, p = [];
+  const at = (px, py, moveTo) => p.push({ x: px, y: py, moveTo: !!moveTo });
+  const cu = (x1, y1, x2, y2, px, py) => p.push({ x: px, y: py, curve: { type: 'cubic', x1: x1, y1: y1, x2: x2, y2: y2 } });
+  at(0, rt, true);
+  if (rt) cu(0, rt - K * rt, rt - K * rt, 0, rt, 0); else at(0, 0);
+  at(w - rt, 0);
+  if (rt) cu(w - rt + K * rt, 0, w, rt - K * rt, w, rt);
+  at(w, h - rb);
+  if (rb) cu(w, h - rb + K * rb, w - rb + K * rb, h, w - rb, h);
+  at(rb, h);
+  if (rb) cu(rb - K * rb, h, 0, h - rb + K * rb, 0, h - rb);
+  p.push({ close: true });
+  s.addShape('custGeom', Object.assign({ x: x, y: y, w: w, h: h, points: p }, opts));
+}
+
+// -------------------------------------------------------------- line icons
+// Outlines traced from the deck's vector icons, normalised into a 0..1 box and
+// stored as flat [x0,y0, x1,y1, ...] sub-paths.
+const ICONS = {
+  archHalf: [[0,0,1,0,0.991,0.292,0.965,0.459,0.923,0.609,0.868,0.74,0.802,0.849,0.726,0.93,0.641,0.982,0.551,1,0.449,1,0.359,0.982,0.274,0.93,0.198,0.849,0.132,0.74,0.077,0.609,0.035,0.459,0.009,0.292,0,0]],
+  arrowNE: [[0.256,0,0.256,0.098,0.829,0.098,0.016,0.92,0.007,0.954,0.032,0.992,0.049,1,0.077,0.989,0.902,0.171,0.902,0.744,1,0.744,1,0,0.256,0]],
+  arrowUp: [[0,0.364,0.07,0.415,0.453,0.136,0.453,0.966,0.468,0.989,0.5,1,0.532,0.989,0.547,0.966,0.547,0.136,0.93,0.415,1,0.364,0.5,0,0,0.364]],
+  bag: [[0.925,1,0.081,1,0.039,0.985,0.007,0.947,0,0.912,0.01,0.69,0.044,0.45,0.062,0.4,0.064,0.373,0.092,0.323,0.131,0.293,0.163,0.283,0.281,0.281,0.286,0.175,0.299,0.134,0.346,0.065,0.416,0.017,0.5,0,0.546,0.005,0.626,0.038,0.687,0.097,0.707,0.134,0.72,0.175,0.725,0.281,0.843,0.282,0.876,0.29,0.914,0.318,0.939,0.36,0.963,0.45,0.984,0.609,1,0.919,0.994,0.95,0.977,0.976,0.953,0.993,0.925,1], [0.075,0.512,0.054,0.667,0.044,0.868,0.047,0.933,0.067,0.959,0.925,0.963,0.945,0.955,0.959,0.936,0.955,0.714,0.931,0.512,0.6,0.65,0.597,0.733,0.58,0.755,0.55,0.762,0.45,0.762,0.423,0.755,0.401,0.724,0.4,0.65,0.075,0.512], [0.45,0.6,0.444,0.605,0.445,0.718,0.562,0.717,0.561,0.602,0.45,0.6], [0.45,0.562,0.571,0.566,0.592,0.583,0.6,0.613,0.923,0.466,0.894,0.362,0.871,0.335,0.825,0.319,0.173,0.319,0.145,0.324,0.118,0.348,0.081,0.463,0.4,0.613,0.416,0.576,0.45,0.562], [0.325,0.281,0.681,0.281,0.678,0.183,0.667,0.149,0.628,0.094,0.571,0.057,0.5,0.044,0.43,0.057,0.375,0.094,0.338,0.149,0.328,0.183,0.325,0.281]],
+  blobLeft: [[0,0,0.81,0,0.864,0.065,0.928,0.171,0.973,0.287,0.997,0.412,0.996,0.55,0.965,0.692,0.907,0.821,0.825,0.937,0.762,1,0,1,0,0]],
+  bulb: [[0.381,0.65,0.448,0.655,0.482,0.645,0.542,0.605,0.585,0.547,0.621,0.431,0.662,0.35,0.564,0.344,0.477,0.357,0.404,0.385,0.347,0.425,0.31,0.473,0.296,0.526,0.306,0.58,0.345,0.631,0.39,0.547,0.441,0.482,0.508,0.426,0.547,0.406,0.487,0.464,0.437,0.528,0.401,0.593,0.381,0.65], [0.489,0.15,0.413,0.157,0.342,0.176,0.277,0.207,0.22,0.248,0.174,0.297,0.138,0.353,0.116,0.415,0.108,0.481,0.124,0.573,0.168,0.657,0.238,0.728,0.282,0.757,0.338,0.781,0.348,0.713,0.367,0.662,0.345,0.662,0.309,0.713,0.226,0.642,0.176,0.55,0.165,0.481,0.172,0.425,0.191,0.372,0.22,0.326,0.26,0.285,0.308,0.252,0.363,0.227,0.424,0.212,0.489,0.206,0.552,0.212,0.612,0.227,0.665,0.252,0.712,0.285,0.751,0.326,0.781,0.372,0.799,0.425,0.806,0.481,0.799,0.536,0.781,0.588,0.751,0.634,0.712,0.675,0.665,0.709,0.612,0.734,0.552,0.751,0.46,0.756,0.46,0.85,0.317,0.85,0.317,0.9,0.518,0.9,0.518,0.806,0.589,0.796,0.654,0.775,0.713,0.744,0.763,0.705,0.805,0.658,0.837,0.604,0.856,0.545,0.863,0.481,0.856,0.415,0.834,0.353,0.8,0.297,0.754,0.248,0.699,0.207,0.636,0.176,0.565,0.157,0.489,0.15], [0.338,0.956,0.496,0.956,0.518,0.919,0.317,0.919,0.338,0.956], [0.353,1,0.482,1,0.496,0.969,0.338,0.969,0.353,1], [0.511,0.006,0.482,0.006,0.468,0.081,0.525,0.081,0.511,0.006], [0.259,0.138,0.151,0,0.129,0.013,0.216,0.163,0.259,0.138], [0,0.237,0,0.256,0.101,0.306,0.122,0.263,0,0.237], [0.993,0.275,0.906,0.294,0.921,0.338,1,0.3,0.993,0.275], [0.755,0.156,0.799,0.181,0.885,0.037,0.871,0.025,0.755,0.156]],
+  docLeaf: [[0.506,0.828,0.47,0.882,0.444,0.951,0.512,1,0.519,0.918,0.537,0.828,0.527,0.822,0.506,0.828], [0.5,0.787,0.574,0.58,0.654,0.422,0.704,0.349,0.761,0.286,0.825,0.238,0.726,0.377,0.647,0.536,0.591,0.693,0.562,0.828,0.613,0.844,0.665,0.839,0.717,0.815,0.766,0.776,0.811,0.722,0.85,0.658,0.88,0.586,0.939,0.309,1,0.107,0.848,0.092,0.712,0.124,0.597,0.193,0.509,0.29,0.45,0.407,0.426,0.534,0.441,0.664,0.5,0.787], [0.35,0.516,0.173,0.518,0.163,0.53,0.164,0.588,0.181,0.598,0.356,0.598,0.35,0.516], [0.181,0.385,0.163,0.399,0.163,0.454,0.173,0.466,0.35,0.467,0.362,0.385,0.181,0.385], [0.069,0.139,0.506,0.139,0.555,0.099,0.637,0.049,0.069,0.049,0.031,0.065,0.005,0.105,0,0.139,0,0.869,0.005,0.902,0.02,0.928,0.055,0.949,0.362,0.951,0.388,0.869,0.069,0.869,0.069,0.139], [0.181,0.648,0.164,0.661,0.165,0.722,0.181,0.73,0.224,0.726,0.231,0.713,0.229,0.657,0.217,0.648,0.181,0.648], [0.181,0.336,0.292,0.335,0.3,0.32,0.296,0.259,0.17,0.257,0.163,0.267,0.163,0.323,0.181,0.336]],
+  leaves: [[0.401,0.2,0.332,0.102,0.287,0.009,0.273,0.001,0.179,0.139,0.118,0.26,0.078,0.37,0.056,0.469,0.048,0.556,0.052,0.632,0.079,0.747,0.106,0.802,0.177,0.894,0.268,0.96,0.319,0.982,0.373,0.995,0.463,1,0.472,0.994,0.478,0.972,0.366,0.799,0.321,0.685,0.3,0.571,0.299,0.513,0.335,0.645,0.387,0.764,0.447,0.865,0.518,0.946,0.531,0.933,0.574,0.815,0.593,0.706,0.59,0.605,0.57,0.512,0.537,0.425,0.495,0.345,0.401,0.2], [0.514,0.9,0.444,0.805,0.379,0.677,0.33,0.529,0.31,0.371,0.299,0.353,0.282,0.367,0.267,0.52,0.287,0.672,0.343,0.82,0.435,0.967,0.327,0.95,0.237,0.902,0.162,0.829,0.132,0.784,0.093,0.685,0.079,0.556,0.085,0.476,0.105,0.385,0.14,0.284,0.194,0.174,0.271,0.053,0.316,0.132,0.468,0.354,0.54,0.51,0.56,0.597,0.564,0.691,0.55,0.791,0.514,0.9], [0.915,0.033,0.904,0.02,0.893,0.02,0.708,0.124,0.595,0.21,0.5,0.318,0.561,0.437,0.597,0.552,0.619,0.553,0.684,0.427,0.61,0.64,0.611,0.759,0.597,0.839,0.571,0.907,0.572,0.925,0.58,0.933,0.661,0.919,0.768,0.862,0.828,0.802,0.853,0.767,0.906,0.66,0.944,0.505,0.952,0.408,0.952,0.298,0.94,0.173,0.915,0.033], [0.831,0.747,0.784,0.805,0.731,0.85,0.672,0.88,0.61,0.893,0.639,0.77,0.638,0.647,0.761,0.303,0.757,0.293,0.743,0.295,0.722,0.315,0.651,0.418,0.61,0.493,0.573,0.391,0.531,0.32,0.569,0.274,0.664,0.191,0.766,0.124,0.887,0.06,0.922,0.31,0.916,0.503,0.881,0.647,0.831,0.747]],
+  phoneOutline: [[0.098,0,0.902,0,0.957,0.009,0.992,0.031,1,0.051,1,0.949,0.983,0.977,0.94,0.996,0.902,1,0.098,1,0.043,0.991,0.008,0.969,0,0.949,0,0.051,0.008,0.031,0.029,0.015,0.098,0], [0.098,0.005,0.035,0.018,0.016,0.033,0.009,0.051,0.009,0.949,0.016,0.967,0.048,0.988,0.098,0.996,0.902,0.996,0.937,0.992,0.976,0.975,0.991,0.949,0.991,0.051,0.984,0.033,0.952,0.013,0.902,0.005,0.098,0.005]],
+  playCircle: [[0.5,0,0.398,0.01,0.303,0.039,0.218,0.086,0.145,0.147,0.084,0.221,0.039,0.306,0.01,0.4,0,0.5,0.01,0.602,0.039,0.697,0.084,0.782,0.145,0.855,0.218,0.916,0.303,0.961,0.398,0.99,0.5,1,0.599,0.99,0.692,0.961,0.776,0.916,0.851,0.855,0.913,0.782,0.96,0.697,0.99,0.602,1,0.5,0.99,0.4,0.96,0.306,0.913,0.221,0.851,0.147,0.776,0.086,0.692,0.039,0.599,0.01,0.5,0], [0.706,0.525,0.388,0.725,0.369,0.725,0.356,0.704,0.358,0.293,0.369,0.281,0.388,0.281,0.706,0.481,0.719,0.5,0.706,0.525]],
+  plusPlus: [[0.77,0,0.814,0,0.814,0.449,1,0.449,1,0.553,0.814,0.553,0.814,1,0.77,1,0.77,0.553,0.583,0.553,0.583,0.449,0.77,0.449], [0.186,0,0.23,0,0.23,0.449,0.417,0.449,0.417,0.553,0.23,0.553,0.23,1,0.186,1,0.186,0.553,0,0.553,0,0.449,0.186,0.449]],
+  quote: [[0,1,0,0.545,0.295,0,0.464,0,0.238,0.545,0.426,0.545,0.426,1,0,1], [0.566,1,0.566,0.545,0.859,0,1,0,0.794,0.545,1,0.545,1,1,0.566,1]],
+  swoosh: [[0,0.747,0.033,0.833,0.072,0.907,0.125,0.97,0.189,1,0.264,0.973,0.348,0.866,0.439,0.657,0.541,0.369,0.607,0.22,0.683,0.092,0.762,0.012,0.841,0.011,0.916,0.114,0.965,0.291,1,0.577]],
+  twitter: [[1,0.118,0.997,0.134,0.967,0.178,0.905,0.248,0.883,0.466,0.843,0.601,0.779,0.723,0.738,0.778,0.679,0.837,0.613,0.885,0.541,0.921,0.467,0.946,0.389,0.96,0.31,0.963,0.232,0.956,0.155,0.938,0.082,0.905,0,0.854,0.007,0.849,0.08,0.854,0.164,0.834,0.262,0.791,0.298,0.757,0.209,0.723,0.146,0.66,0.111,0.585,0.196,0.583,0.12,0.539,0.082,0.493,0.055,0.437,0.038,0.342,0.125,0.368,0.108,0.353,0.064,0.281,0.043,0.206,0.043,0.126,0.068,0.051,0.163,0.151,0.26,0.221,0.369,0.269,0.488,0.299,0.494,0.194,0.52,0.119,0.575,0.053,0.643,0.013,0.708,0.004,0.754,0.012,0.806,0.042,0.845,0.076,0.913,0.057,0.975,0.023,0.946,0.104,0.915,0.141,0.893,0.153,1,0.118]],
+  vRule: [[1,0,0,0,0,1]],};
+
+// Icons that are open strokes rather than filled outlines.
+const OPEN_ICONS = ['swoosh', 'vRule'];
+
+function icon(s, name, x, y, w, h, opts) {
+  const pts = [];
+  ICONS[name].forEach(function (poly) {
+    for (let i = 0; i < poly.length; i += 2) {
+      pts.push({ x: poly[i] * w, y: poly[i + 1] * h, moveTo: i === 0 });
+    }
+    if (OPEN_ICONS.indexOf(name) < 0) pts.push({ close: true });
+  });
+  s.addShape('custGeom', Object.assign({ x: x, y: y, w: w, h: h, points: pts }, opts));
+}
+
+
+function slide01(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: PLUM };
+  S(s, 'rect', 0, -0.004, 13.329, 7.504);
+  S(s, 'rect', 8.794, 0, 1.638, 7.504, {fill:{color:WHITE, transparency:90}});
+  T(s, 4.02, 0.672, 0.525, 0.278, [r("shop", 10.5, R, WHITE)]);
+  T(s, 4.709, 0.672, 0.593, 0.278, [r("About", 10.5, R, WHITE)]);
+  T(s, 5.464, 0.672, 0.495, 0.278, [r("Blog", 10.5, R, WHITE)]);
+  T(s, 6.126, 0.672, 0.716, 0.278, [r("Contact", 10.5, R, WHITE)]);
+  T(s, 0.657, 0.642, 1.282, 0.337, [r("Kreate Tribe", 14, R, WHITE)]);
+  gradRing(s, 6.626, 0.794, 5.912, 5.912, HOTPINK, ORANGE, 0.191, 322);
+  T(s, 0.623, 3.834, 5.868, 1.245, [r("PITCH DECK", 68, PO, WHITE, {bold:true})]);
+  T(s, 0.586, 4.535, 5.184, 0.69, [r("Presentation Template ", 35, DS, ROSE)]);
+  L(s, 0.926, 6.736, 3.706, 0, {color:WHITE, width:1});
+  S(s, 'rect', 0.781, 6.689, 0.458, 0.094, {fill:{color:WHITE}});
+  T(s, 0.67, 5.9, 2.202, 0.667, [
+    r("DECK TO", 10.5, R, WHITE, {breakLine:true}),
+    r("ANTONY DAVIS", 10.5, R, WHITE, {breakLine:true}),
+    r("CEO DECK PRESENTATION", 10.5, R, WHITE)], {lineSpacingMultiple:1.1});
+}
+
+function slide02(pptx) {
+  const s = pptx.addSlide();
+  S(s, 'ellipse', 5.685, 0.999, 2.028, 2.028, {fill:{color:WHITE}, shadow:{type:'outer', blur:8, offset:5, angle:40, color:BLACK, opacity:0.23}});
+  T(s, 1.511, 4.037, 10.375, 1.703, [r("PLACEHOLDER", 28, O, BLACK)], {align:'center', lineSpacingMultiple:1.2});
+  L(s, 5.199, 3.778, 0.976, 0, {color:ORCHID, width:1.5});
+  L(s, 7.293, 3.778, 0.906, 0, {color:ORCHID, width:1.5});
+  T(s, 6.276, 3.593, 0.889, 0.37, [r("Details", 16, R, BLACK)]);
+  S(s, 'roundRect', 5.896, 6.03, 1.605, 0.528, {fill:{color:MAGENTA}, shadow:{type:'outer', blur:8, offset:5, angle:40, color:BLACK, opacity:0.23}, rectRadius:0.264});
+  S(s, 'ellipse', 5.971, 6.094, 0.4, 0.4, {fill:{color:WHITE}, shadow:{type:'outer', blur:8, offset:5, angle:40, color:BLACK, opacity:0.23}});
+  icon(s, 'twitter', 6.068, 6.206, 0.206, 0.177, {fill:{color:'0C0C0C'}});
+  T(s, 6.371, 6.143, 0.914, 0.303, [r("See More", 12, R, PLUM)]);
+}
+
+function slide03(pptx) {
+  const s = pptx.addSlide();
+  S(s, 'rect', 7.583, -0.007, 5.75, 7.5, {fill:{color:LILAC, transparency:80}});
+  S(s, 'roundRect', 5.987, 1.561, 3.319, 4.834, {line:{color:PLUM, width:0.75}, rectRadius:1.66});
+  T(s, 9.954, 2.844, 1.206, 0.337, [r("Easy to use", 14, RM, BLACK)]);
+  T(s, 9.954, 3.17, 2.67, 0.926, [r("By learning from the experience of in Digital Marketing in Ukraine and abroad. Quantico team was able to build from in the learning", 10, R, GREY)], {lineSpacingMultiple:1.3});
+  T(s, 9.954, 4.132, 2.67, 0.707, [r("By learning from the experience of into Digital Marketing in Ukraine and abroad. Quantico team was able", 10, R, GREY)], {lineSpacingMultiple:1.3});
+  T(s, 0.667, 2.013, 4.554, 2.04, [
+    r("Your Journey To Timeless Beauty ", 48, OM, BLACK, {breakLine:true}),
+    r("Begins Here", 48, OM, BLACK)], {lineSpacingMultiple:0.8});
+  L(s, 0.776, 5.286, 3.094, 0, {color:SILVER, width:1});
+  L(s, 0.776, 6.088, 3.094, 0, {color:SILVER, width:1});
+  T(s, 1.422, 6.284, 1.85, 0.411, [r("I am so happy with the new customer's great work.", 8, R, BLACK)], {lineSpacingMultiple:1.3});
+  T(s, 1.422, 5.411, 1.85, 0.411, [r("I am so happy with the new customer's great work.", 8, R, BLACK)], {lineSpacingMultiple:1.3});
+  T(s, 0.661, 4.008, 3.85, 0.488, [r("By learning from the experience of in Digital Marketing in Ukraine and abroad. Quantico team", 10, R, GREY)], {lineSpacingMultiple:1.3});
+  icon(s, 'playCircle', 10.97, 5.948, 0.456, 0.456, {fill:{color:PLUM}});
+  L(s, 10.063, 5.45, 0.375, 0, {color:SLATE, width:0.75, endArrowType:'triangle'});
+  T(s, 0.658, 4.853, 0.821, 0.303, [r("Reviews", 12, R, BLACK)]);
+  S(s, 'roundRect', 3.279, 5.472, 0.598, 0.307, {fill:{color:MAGENTA}, rectRadius:0.153});
+  T(s, 3.313, 5.487, 0.416, 0.278, [r("5.0 ", 10.5, R, BLACK, {bold:true})]);
+  S(s, 'star5', 3.661, 5.564, 0.123, 0.123, {fill:{color:BLACK}});
+  S(s, 'roundRect', 3.279, 6.35, 0.598, 0.307, {fill:{color:ORANGE}, rectRadius:0.153});
+  T(s, 3.313, 6.36, 0.461, 0.286, [r("6.4 ", 10.5, R, BLACK, {bold:true})]);
+  S(s, 'star5', 3.685, 6.442, 0.123, 0.123, {fill:{color:BLACK}});
+  header(s, '01', PLUM);
+  gradFill(s, 'ellipse', 7.288, 5.695, 1.023, 1.023, PETAL, CITRON, 270, 0);
+  T(s, 7.36, 5.933, 0.914, 0.589, [r("Get Started", 14, RM, BLACK)], {align:'center', lineSpacingMultiple:1.071, rotate:328.3});
+}
+
+function slide04(pptx) {
+  const s = pptx.addSlide();
+  S(s, 'rect', 8.778, 0, 4.556, 7.5, {fill:{color:LILAC, transparency:80}});
+  S(s, 'roundRect', 9.116, 0.784, 3.436, 5.303, {fill:{color:WHITE}, rectRadius:1.718});
+  T(s, 0.632, 2.133, 5.736, 2.525, [r("KEEP YOUR OWN SKIN IN GOOD HEALTH", 60, OM, BLACK)], {lineSpacingMultiple:0.8});
+  L(s, 4.76, 4.04, 1.01, 0, {color:MIST, width:2.25});
+  gradFill(s, 'roundRect', 0.773, 6.157, 1.865, 0.583, PETAL, CITRON, 270, 0.138);
+  T(s, 0.893, 6.297, 1.569, 0.303, [r("Create Video Here", 12, RM, BLACK)]);
+  S(s, 'roundRect', 2.752, 6.157, 0.565, 0.583, {fill:{color:MAGENTA}, rectRadius:0.134});
+  icon(s, 'playCircle', 2.876, 6.29, 0.317, 0.317, {fill:{color:PLUM}});
+  T(s, 0.665, 4.698, 4.617, 0.976, [
+    r("Dummy text ", 10, R, INK, {bold:true}),
+    r("ever since the 1500s, when an unknown printer took a galley of type and passages, and more recently with desktop  softy like Aldus PageMaker including versions of lorem ipsum. Recently a and with desktop with there art manager.", 10, R, GREY)], {lineSpacingMultiple:1.4});
+  header(s, '02', PLUM);
+}
+
+function slide05(pptx) {
+  const s = pptx.addSlide();
+  header(s, '03', PLUM);
+  T(s, 7.149, 2.022, 4.671, 1.717, [
+    r("TAKE CARE Of", 60, OM, BLACK, {breakLine:true}),
+    r("YOUR SKIN.", 60, OM, BLACK)], {lineSpacingMultiple:0.8});
+  S(s, 'roundRect', 7.323, 6.157, 1.865, 0.583, {fill:{color:MAGENTA}, rectRadius:0.138});
+  T(s, 7.443, 6.297, 1.569, 0.303, [r("Create Video Here", 12, RM, PLUM)]);
+  S(s, 'roundRect', 9.302, 6.157, 0.565, 0.583, {fill:{color:ORANGE}, rectRadius:0.134});
+  icon(s, 'playCircle', 9.426, 6.29, 0.317, 0.317, {fill:{color:PLUM}});
+  T(s, 7.196, 4.895, 4.617, 1.027, [
+    r("Dummy text ", 10, R, INK, {bold:true}),
+    r("ever since the 1500s, when an unknown printer took a galley of type and passages, and more recently with desktop  softy like Aldus PageMaker including versions of lorem ipsum. Recently a and with desktop with there art manager.", 10, R, GREY)], {lineSpacingMultiple:1.5});
+  T(s, 7.196, 4.043, 2.63, 0.855, [
+    r("IN ONE SENTENCE INTO TOOK", 14, O, BLACK, {breakLine:true}),
+    r("BRIEFLY YOUR PORTFOLIO THERE IN CREDENTIALS ART", 14, O, BLACK)], {lineSpacingMultiple:1.1});
+  gradFill(s, 'ellipse', 0.77, 5.177, 1.554, 1.554, HOTPINK, ORANGE, 90, 0);
+  T(s, 1.096, 5.818, 1.058, 0.613, [
+    r("60% ", 28, RM, WHITE),
+    r("OFF", 20, RM, WHITE)], {lineSpacingMultiple:0.643});
+  T(s, 1.45, 5.475, 0.561, 0.252, [r("UP TO", 9, RM, WHITE)]);
+  L(s, 1.083, 5.602, 0.367, 0, {color:WHITE, width:0.75, endArrowType:'triangle'});
+}
+
+function slide06(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: WHITE };
+  L(s, 9.381, 3.334, 1.097, 0, {color:ASH, width:1});
+  L(s, 10.478, 3.334, 0, 0.499, {color:ASH, width:1, endArrowType:'stealth'});
+  S(s, 'ellipse', 3.164, 2.146, 7.545, 3.489, {line:{color:STONE, width:1}, rotate:318.2});
+  T(s, 10.081, 3.983, 2.938, 1.717, [
+    r("Finest Materials Eco-Friendly", 24, R, BLACK, {breakLine:true}),
+    r("- Higher ", 24, R, BLACK, {breakLine:true}),
+    r("Durability", 24, R, BLACK)], {lineSpacingMultiple:1});
+  T(s, 10.112, 5.677, 2.604, 0.508, [r("when an unknown printer and more recently with ipsum. ", 10.5, R, GREY)], {lineSpacingMultiple:1.3});
+  S(s, 'roundRect', 10.202, 6.347, 1.301, 0.376, {line:{color:GREY, width:1}, rectRadius:0.167});
+  T(s, 10.425, 6.392, 0.854, 0.286, [r("See More", 11, R, BLACK)], {align:'center'});
+  header(s, '04', PLUM);
+  T(s, 0.677, 5.306, 2.51, 0.926, [
+    r("Dummy text ", 10, R, INK, {bold:true}),
+    r("ever since the, when an unknown printer passages, and more recently with desktop  softy lorem ipsum to there. ", 10, R, GREY)], {lineSpacingMultiple:1.3});
+  gradFill(s, 'roundRect', 0.782, 6.348, 1.301, 0.376, PETAL, CITRON, 270, 0.188);
+  T(s, 1.005, 6.392, 0.854, 0.286, [r("See More", 11, R, GREY)], {align:'center'});
+  T(s, 0.677, 4.877, 1.812, 0.406, [r("Web designer", 16, RM, BLACK)], {lineSpacingMultiple:1.438});
+  T(s, 0.677, 1.731, 1.323, 0.337, [r("Company Here", 14, O, GREY)]);
+  T(s, 0.661, 2.099, 6.619, 1.919, [r("From The First Raw Ingredient To The Very Last Molecule, Our Formulas Are All Good", 40, O, BLACK)], {lineSpacingMultiple:0.9});
+}
+
+function slide07(pptx) {
+  const s = pptx.addSlide();
+  S(s, 'rect', 0, 3.823, 13.333, 3.67, {fill:{color:LILAC, transparency:80}});
+  T(s, 4.638, 0.702, 4.038, 0.841, [r("Our Best Product", 44, O, BLACK)], {align:'center'});
+  S(s, 'roundRect', 0.738, 2.115, 2.636, 3.395, {line:{color:PEACH, width:1}, rectRadius:1.318});
+  T(s, 0.78, 6.084, 2.552, 0.646, [
+    r("But I must explain to you it’s How to", 9, R, BLACK, {breakLine:true}),
+    r(" be all this mistaken idea of design denouncing pleasure", 9, R, BLACK)], {align:'center', lineSpacingMultiple:1.3});
+  T(s, 0.94, 5.734, 2.232, 0.37, [r("Growly colour matte", 16, RM, BLACK)], {align:'center'});
+  S(s, 'roundRect', 5.328, 2.115, 2.636, 3.395, {line:{color:PEACH, width:1}, rectRadius:1.318});
+  T(s, 5.37, 6.084, 2.552, 0.646, [
+    r("But I must explain to you it’s How to", 9, R, BLACK, {breakLine:true}),
+    r(" be all this mistaken idea of design denouncing pleasure", 9, R, BLACK)], {align:'center', lineSpacingMultiple:1.3});
+  T(s, 5.686, 5.734, 1.92, 0.37, [r("Our Best Product", 16, RM, BLACK)], {align:'center'});
+  S(s, 'roundRect', 9.918, 2.115, 2.636, 3.395, {line:{color:PEACH, width:1}, rectRadius:1.318});
+  T(s, 9.96, 6.084, 2.552, 0.646, [
+    r("But I must explain to you it’s How to", 9, R, BLACK, {breakLine:true}),
+    r(" be all this mistaken idea of design denouncing pleasure", 9, R, BLACK)], {align:'center', lineSpacingMultiple:1.3});
+  T(s, 10.12, 5.734, 2.232, 0.37, [r("Growly colour matte", 16, RM, BLACK)], {align:'center'});
+  L(s, 4.354, 6.082, 0, 0.641, {color:PEBBLE, width:1.5});
+  L(s, 8.958, 6.082, 0, 0.641, {color:PEBBLE, width:1.5});
+}
+
+function slide08(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: WHITE };
+  T(s, 0.667, 1.91, 3.646, 1.879, [r("UNLEASH YOUR", 66, OM, WHITE)], {lineSpacingMultiple:0.8});
+  L(s, 2.906, 3.056, 1.083, 0, {color:WHITE, width:6});
+  header(s, '05', WHITE);
+  T(s, 8.219, 5.167, 4.475, 1.879, [
+    r("BEAUTY ", 66, OM, WHITE, {breakLine:true}),
+    r("POTENTIAL", 66, OM, WHITE)], {lineSpacingMultiple:0.8});
+  T(s, 0.667, 5.267, 1.135, 0.387, [r("Details:", 17, RM, WHITE)]);
+  T(s, 0.683, 5.563, 1.218, 0.236, [r("Tagline Goes Here", 8, R, WHITE)]);
+  T(s, 0.667, 5.904, 3.04, 0.936, [
+    r("IN ONE SENTENCE ", 16, O, WHITE, {lineSpacingMultiple:1.1, breakLine:true}),
+    r("BRIEFLY YOU KNOWS IMPRESSIVE PORTFOLIO CREDENTIALS", 16, O, WHITE, {lineSpacingMultiple:1})]);
+  icon(s, 'arrowUp', 0.766, 4.512, 0.228, 0.387, {fill:{color:LILAC}, rotate:180});
+}
+
+function slide09(pptx) {
+  const s = pptx.addSlide();
+  T(s, 0.593, 5.611, 3.976, 1.447, [r("Maximize", 80, O, BLACK)]);
+  T(s, 6.988, 5.611, 5.752, 1.447, [r("In Confidence", 80, O, BLACK)]);
+  L(s, 4.681, 6.723, 2.111, 0, {color:MAGENTA, width:3});
+  header(s, '06', PLUM);
+  T(s, 0.662, 4.419, 1.038, 0.836, [r("Achieve smooth glow", 14, R, BLACK)], {lineSpacingMultiple:1.06});
+  T(s, 11.781, 3.384, 0.959, 0.836, [r("Use the right product", 14, R, BLACK)], {lineSpacingMultiple:1.06});
+  L(s, 0.761, 4.326, 1.528, 0, {color:FUCHSIA, width:0.75});
+  L(s, 11.025, 3.216, 1.528, 0, {color:FUCHSIA, width:0.75});
+}
+
+function slide10(pptx) {
+  const s = pptx.addSlide();
+  S(s, 'rect', 0, 3.726, 13.333, 3.767, {fill:{color:LILAC, transparency:80}});
+  arch(s, 8.186, 0.777, 4.374, 5.946, 2.187, 2.187, {line:{color:SILVER, width:1}, rotate:180});
+  T(s, 0.658, 2.775, 5.758, 2.04, [
+    r("TAKE CARE Of", 72, OM, BLACK, {breakLine:true}),
+    r("   YOUR SKIN.", 72, OM, BLACK)], {lineSpacingMultiple:0.8});
+  header(s, '07', PLUM);
+  L(s, 0.813, 3.75, 0, 1.09, {color:MIST, width:2.25, endArrowType:'triangle'});
+  T(s, 0.658, 4.864, 3.589, 0.404, [r("The Perfect Skin Care for you.", 18, RM, GREY)]);
+  T(s, 0.663, 2.32, 1.139, 0.303, [r("Company Here", 12, O, GREY)]);
+  S(s, 'roundRect', 0.773, 5.844, 2.823, 0.885, {line:{color:FOG, width:1.5}, rectRadius:0.443});
+  T(s, 1.319, 6.068, 1.731, 0.438, [r("SHOP NOW.", 20, RM, PLUM)], {align:'center'});
+  T(s, 3.772, 6.101, 2.549, 0.337, [
+    r("Usa coupon code ", 14, R, BLACK),
+    r("Myskina", 14, R, MAGENTA),
+    r(" ", 14, R, BLACK)]);
+  gradFill(s, 'ellipse', 7.381, 4.453, 2.042, 2.042, PETAL, CITRON, 270, 0);
+  T(s, 7.771, 5.265, 1.583, 1.071, [
+    r("50% ", 40, RM, PLUM),
+    r("OFF", 32, RM, PLUM)], {lineSpacingMultiple:0.8});
+  T(s, 8.25, 4.864, 0.756, 0.337, [r("UP TO", 14, RM, PLUM)]);
+  L(s, 7.891, 5.033, 0.316, 0, {color:SLATE, width:0.75, endArrowType:'triangle'});
+}
+
+function slide11(pptx) {
+  const s = pptx.addSlide();
+  S(s, 'roundRect', 4.773, 2.255, 3.958, 4.479, {line:{color:FOG, width:2.25}, rectRadius:0.177});
+  T(s, 4.309, 0.729, 4.716, 0.909, [r("Product Launching", 48, O, BLACK)], {align:'center'});
+  gradFill(s, 'roundRect', 6.028, 6.193, 1.448, 0.385, HOTPINK, ORANGE, 90, 0.067);
+  T(s, 6.164, 6.242, 1.177, 0.286, [r("Find Out More", 11, R, WHITE)], {align:'center'});
+  T(s, 1.494, 5.687, 1.834, 0.37, [r("Hormone Therapy", 16, O, BLACK)], {align:'center'});
+  T(s, 10.016, 5.872, 1.983, 0.37, [r("Medical Aesthetics", 16, O, BLACK)], {align:'center'});
+  T(s, 5.889, 5.218, 1.727, 0.37, [r("Vitamin Therapy", 16, O, BLACK)], {align:'center'});
+  T(s, 5.311, 5.569, 2.883, 0.488, [r("when an unknown printer took a galley, and more recently with lorem", 10, R, BLACK)], {align:'center', lineSpacingMultiple:1.3});
+}
+
+function slide12(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: PLUM };
+  T(s, -0.458, 1.979, 13.792, 4.427, [r("BEAUTY", 257, R, SILVER, {bold:true})], {align:'center'});
+  header(s, '08', WHITE);
+}
+
+function slide13(pptx) {
+  const s = pptx.addSlide();
+  L(s, 9.601, 5.16, 1.097, 0, {color:ASH, width:1});
+  L(s, 10.698, 5.16, 0, 0.499, {color:ASH, width:1, endArrowType:'stealth'});
+  S(s, 'ellipse', 6.464, 2.692, 5.92, 3.066, {line:{color:MIST, width:1}, rotate:330.1});
+  header(s, '09', PLUM);
+  icon(s, 'swoosh', 0.003, 1.771, 13.33, 3.943, {line:{color:FOG, width:0.75}});
+  T(s, 0.636, 2.203, 5.85, 1.717, [r("Reveal Your Most Radiant Glow.", 60, OM, BLACK)], {lineSpacingMultiple:0.8});
+  T(s, 0.677, 1.731, 1.323, 0.337, [r("Company Here", 14, O, GREY)]);
+  gradFill(s, 'ellipse', 0.784, 4.08, 0.539, 0.539, PETAL, CITRON, 270, 0);
+  icon(s, 'arrowUp', 0.962, 4.195, 0.182, 0.309, {fill:{color:PLUM}, rotate:90});
+  T(s, 1.535, 4.085, 3.215, 0.508, [r("when an unknown printer took a galley of type and passages, their art manager.", 10.5, RM, GREY)], {lineSpacingMultiple:1.3});
+  T(s, 2.223, 6.007, 2.824, 0.828, [r("PLACEHOLDER", 12, RM, GREY)], {lineSpacingMultiple:1.3});
+  T(s, 10.56, 5.73, 2.604, 0.488, [r("when an unknown printer and more recently with ipsum. ", 10, R, GREY)], {lineSpacingMultiple:1.3});
+  S(s, 'roundRect', 10.65, 6.357, 1.301, 0.376, {line:{color:GREY, width:1}, rectRadius:0.167});
+  T(s, 10.873, 6.402, 0.854, 0.286, [r("See More", 11, R, BLACK)], {align:'center'});
+}
+
+function slide14(pptx) {
+  const s = pptx.addSlide();
+  header(s, '10', PLUM);
+  T(s, 5.466, 1.707, 1.323, 0.337, [r("Company Here", 14, O, GREY)]);
+  T(s, 5.45, 2.123, 5.323, 1.919, [
+    r("Unleash The Radiance Within And Let You Inner ", 40, O, BLACK),
+    r("Glow Shine!", 40, O, MAGENTA)], {lineSpacingMultiple:0.9});
+  S(s, 'roundRect', 1.031, 2.016, 2.055, 0.507, {line:{color:FOG, width:1}, rectRadius:0.172});
+  T(s, 1.117, 2.118, 1.883, 0.303, [r("Skin Care By Beauty", 12, R, WHITE)], {align:'center'});
+  S(s, 'roundRect', 5.761, 4.778, 2.055, 0.507, {line:{color:WHITE, width:1}, rectRadius:0.172});
+  T(s, 5.847, 4.88, 1.883, 0.303, [r("Skin Care By Beauty", 12, R, WHITE)], {align:'center'});
+  gradFill(s, 'ellipse', 4.105, 5.504, 0.611, 0.611, HOTPINK, ORANGE, 90, 0);
+  icon(s, 'arrowNE', 4.291, 5.692, 0.237, 0.236, {fill:{color:LILAC}});
+  T(s, 1.031, 5.504, 2.824, 0.788, [
+    r("By learning from the experience ", 12, RM, WHITE, {breakLine:true}),
+    r("of in Digital Marketing in Ukraine and abroad Quantico", 12, RM, WHITE)], {lineSpacingMultiple:1.2});
+  S(s, 'roundRect', 9.417, 4.778, 2.055, 0.507, {line:{color:WHITE, width:1}, rectRadius:0.172});
+  T(s, 9.504, 4.88, 1.883, 0.303, [r("Skin Care By Beauty", 12, R, WHITE)], {align:'center'});
+}
+
+function slide15(pptx) {
+  const s = pptx.addSlide();
+  S(s, 'rect', 0, 0.01, 13.333, 7.5, {fill:{color:PLUM, transparency:8}});
+  T(s, 0.637, 2.138, 6.031, 1.717, [r("PROVEN TRUSTED SCALABLE", 60, OM, WHITE)], {lineSpacingMultiple:0.8});
+  header(s, '11', WHITE);
+  T(s, 0.661, 1.71, 1.139, 0.303, [r("Company Here", 12, O, WHITE)]);
+  T(s, 0.682, 3.713, 4.019, 0.707, [r("when an unknown printer took a galley of type and passages, and more recently with desktop  softy like Aldus PageMaker including versions of lorem ipsum. ", 10, R, WHITE)], {lineSpacingMultiple:1.3});
+  S(s, 'rect', 0.77, 5.031, 5.896, 1.896, {fill:{color:MAGENTA}});
+  S(s, 'rect', 6.657, 5.031, 5.896, 1.896, {fill:{color:ORANGE}});
+  T(s, 0.969, 5.188, 2.672, 1.582, [r("450+", 88, OS, PLUM)]);
+  T(s, 6.949, 5.188, 2.662, 1.582, [r("32%", 88, OS, PLUM)]);
+  T(s, 4.306, 5.778, 2.107, 0.707, [r("when an unknown printer took a galley softie like Aldus lorem ipsum there its fine. ", 10, R, PLUM)], {lineSpacingMultiple:1.3});
+  T(s, 4.277, 5.465, 1.853, 0.337, [r("Growly colour here", 14, RM, PLUM)], {align:'center'});
+  T(s, 10.023, 5.778, 2.107, 0.707, [r("when an unknown printer took a galley softie like Aldus lorem ipsum there its fine. ", 10, R, PLUM)], {lineSpacingMultiple:1.3});
+  T(s, 9.995, 5.465, 1.853, 0.337, [r("Growly colour here", 14, RM, PLUM)], {align:'center'});
+}
+
+function slide16(pptx) {
+  const s = pptx.addSlide();
+  T(s, 4.053, 0.667, 5.207, 0.774, [r("Key Benefits & Features ", 40, O, BLACK)], {align:'center'});
+  arch(s, 4.551, 2.554, 4.156, 4.17, 2.078, 0, {line:{color:MIST, width:1}});
+  T(s, 9.604, 3.564, 1.994, 0.337, [r("Glowing Nature here", 14, RM, BLACK)]);
+  T(s, 9.605, 3.874, 2.395, 0.707, [r("when an unknown printer took a galley of more recently with and desktop to ipsum. ", 10, R, GREY)], {lineSpacingMultiple:1.3});
+  T(s, 9.604, 5.656, 2.255, 0.337, [r("Cruelly – Free & Vegan ", 14, RM, BLACK)]);
+  T(s, 9.605, 5.967, 2.395, 0.707, [r("when an unknown printer took a galley of more recently with and desktop to ipsum. ", 10, R, GREY)], {lineSpacingMultiple:1.3});
+  T(s, 3.843, 1.376, 5.627, 0.488, [r("when an unknown printer took a galley of type and passages, and more recently with desktop  softy like. Recently a and with art manager.", 10, R, SLATE)], {align:'center', lineSpacingMultiple:1.3});
+  S(s, 'ellipse', 9.718, 2.906, 0.542, 0.542, {fill:{color:ORANGE}});
+  icon(s, 'leaves', 9.842, 3.052, 0.295, 0.25, {fill:{color:PLUM}});
+  T(s, 1.239, 5.656, 1.557, 0.337, [r("Deep Hydration", 14, RM, BLACK)], {lineSpacingMultiple:1.3});
+  T(s, 1.24, 5.967, 2.395, 0.707, [r("when an unknown printer took a galley of more recently with and desktop to ipsum. ", 10, R, GREY)], {lineSpacingMultiple:1.3});
+  S(s, 'ellipse', 1.353, 4.999, 0.542, 0.542, {fill:{color:PLUM}});
+  icon(s, 'bulb', 1.49, 5.116, 0.268, 0.308, {fill:{color:LILAC}});
+  S(s, 'ellipse', 1.353, 2.906, 0.542, 0.542, {fill:{color:MAGENTA}});
+  T(s, 1.239, 3.564, 2.416, 0.337, [r("100% Natural Ingredients", 14, RM, BLACK)], {lineSpacingMultiple:1.3});
+  T(s, 1.24, 3.874, 2.395, 0.707, [r("when an unknown printer took a galley of more recently with and desktop to ipsum. ", 10, R, GREY)], {lineSpacingMultiple:1.3});
+  icon(s, 'docLeaf', 1.487, 3.073, 0.274, 0.209, {fill:{color:PLUM}});
+  S(s, 'ellipse', 9.718, 4.999, 0.542, 0.542, {fill:{color:LILAC}});
+  icon(s, 'bag', 9.86, 5.141, 0.258, 0.258, {fill:{color:PLUM}});
+}
+
+function slide17(pptx) {
+  const s = pptx.addSlide();
+  S(s, 'roundRect', 0.781, 3.042, 11.772, 3.663, {fill:{color:BLUSH}, rectRadius:0.16});
+  L(s, 4.725, 3.524, 0, 2.798, {color:MIST, width:0.75});
+  L(s, 8.718, 3.524, 0, 2.798, {color:MIST, width:0.75});
+  gradFill(s, 'roundRect', 9.317, 4.348, 3.056, 1.291, PETAL, CITRON, 270, 0.326);
+  T(s, 9.248, 3.325, 1.093, 0.471, [r("TILLIX", 22, R, BLACK)]);
+  T(s, 9.243, 5.922, 2.144, 0.572, [r("BILL PAYMENTS MADE EASY", 14, RM, BLACK)], {lineSpacingMultiple:1});
+  T(s, 9.461, 4.633, 1.224, 0.303, [r("Total Balance", 12, R, BLACK)]);
+  T(s, 9.486, 4.915, 1.063, 0.438, [r("$5,790", 20, RM, BLACK)]);
+  L(s, 1.263, 4.982, 0.518, 0, {color:ASH, width:1});
+  L(s, 1.263, 4.483, 0, 0.499, {color:ASH, width:1, endArrowType:'stealth'});
+  L(s, 3.978, 4.984, 0, 0.499, {color:ASH, width:1, endArrowType:'stealth'});
+  L(s, 3.46, 4.984, 0.518, 0, {color:ASH, width:1});
+  gradFill(s, 'ellipse', 1.583, 4.153, 1.541, 1.541, PETAL, CITRON, 270, 0);
+  S(s, 'ellipse', 2.84, 4.559, 0.885, 0.885, {fill:{color:BUTTER}});
+  T(s, 1.013, 5.922, 2.278, 0.572, [r("GLOBAL PAYMENT STACK", 14, RM, BLACK)], {lineSpacingMultiple:1});
+  T(s, 0.987, 3.325, 1.298, 0.471, [r("MONAY", 22, R, BLACK)]);
+  T(s, 1.016, 4.144, 0.57, 0.303, [r("Bank", 12, RL, BLACK)]);
+  T(s, 3.518, 5.55, 0.933, 0.303, [r("E- Wallets", 12, RL, BLACK)], {align:'center'});
+  T(s, 5.448, 3.325, 1.208, 0.471, [r("NUDGE", 22, R, BLACK)]);
+  T(s, 5.475, 5.922, 2.278, 0.572, [r("COMMUNICATION PLATFORM", 14, RM, BLACK)], {lineSpacingMultiple:1});
+  S(s, 'roundRect', 5.572, 4.761, 0.189, 0.815, {fill:{color:MAGENTA}, rectRadius:0.031});
+  S(s, 'roundRect', 5.881, 5.282, 0.189, 0.295, {fill:{color:MAGENTA}, rectRadius:0.031});
+  S(s, 'roundRect', 6.19, 5.026, 0.189, 0.55, {fill:{color:MAGENTA}, rectRadius:0.031});
+  S(s, 'roundRect', 6.499, 5.12, 0.189, 0.456, {fill:{color:MAGENTA}, rectRadius:0.031});
+  S(s, 'roundRect', 6.808, 4.896, 0.189, 0.68, {fill:{color:MAGENTA}, rectRadius:0.031});
+  S(s, 'roundRect', 7.117, 5.026, 0.189, 0.55, {fill:{color:MAGENTA}, rectRadius:0.031});
+  S(s, 'roundRect', 7.426, 4.761, 0.189, 0.815, {fill:{color:WHITE}, rectRadius:0.031});
+  S(s, 'roundRect', 7.735, 5.204, 0.189, 0.373, {fill:{color:MAGENTA}, rectRadius:0.031});
+  S(s, 'roundRect', 8.044, 4.896, 0.189, 0.68, {fill:{color:MAGENTA}, rectRadius:0.031});
+  T(s, 5.463, 4.017, 0.705, 0.303, [r("Emails", 12, R, STONE)]);
+  T(s, 5.448, 4.239, 0.977, 0.404, [r("14,572", 18, RM, BLACK)]);
+  S(s, 'wedgeRoundRectCallout', 7.355, 4.237, 0.583, 0.303, {fill:{color:MAGENTA}});
+  icon(s, 'arrowUp', 7.449, 4.332, 0.087, 0.114, {fill:{color:LILAC}, rotate:180});
+  T(s, 7.472, 4.246, 0.486, 0.286, [r("30%", 11, R, LILAC)]);
+  T(s, 0.625, 1.621, 4.656, 0.869, [r("Reveal Your Radian.", 40, OM, BLACK)], {lineSpacingMultiple:1.45});
+  T(s, 0.667, 1.408, 1.323, 0.337, [r("Company Here", 14, O, GREY)]);
+  header(s, '12', PLUM);
+  T(s, 1.889, 4.637, 0.931, 0.572, [r("62%", 28, R, PLUM)], {align:'center'});
+  T(s, 2.973, 4.816, 0.619, 0.37, [r("38%", 16, R, PLUM)], {align:'center'});
+  S(s, 'roundRect', 11.562, 4.748, 0.491, 0.49, {fill:{color:PLUM}, rectRadius:0.079});
+  icon(s, 'leaves', 11.633, 4.845, 0.35, 0.296, {fill:{color:LILAC}});
+}
+
+function slide18(pptx) {
+  const s = pptx.addSlide();
+  S(s, 'rect', 10.594, 0, 2.74, 7.493, {fill:{color:LILAC, transparency:80}});
+  header(s, '13', PLUM);
+  S(s, 'roundRect', 4.806, 3.331, 3.271, 0.833, {line:{color:MULBERRY, width:1}, rectRadius:0.333});
+  T(s, 0.314, 1.853, 7.512, 2.471, [
+    r("        Your Skin ", 88, OM, BLACK, {breakLine:true}),
+    r(" Breathe", 88, OM, BLACK)], {lineSpacingMultiple:0.8});
+  T(s, 0.661, 5.656, 1.557, 0.337, [r("Deep Hydration", 14, RM, BLACK)]);
+  T(s, 0.662, 5.967, 2.395, 0.707, [r("when an unknown printer took a galley of more recently with and desktop to ipsum. ", 10, R, GREY)], {lineSpacingMultiple:1.3});
+  T(s, 4.489, 5.656, 2.416, 0.337, [r("100% Natural Ingredients", 14, RM, BLACK)]);
+  T(s, 4.491, 5.967, 2.395, 0.707, [r("when an unknown printer took a galley of more recently with and desktop to ipsum. ", 10, R, GREY)], {lineSpacingMultiple:1.3});
+  T(s, 0.688, 1.953, 1.853, 0.926, [r("when an unknown printer passages, and more to me recently with ipsum to for in to the there. ", 10, R, GREY)], {lineSpacingMultiple:1.3});
+  L(s, 3.764, 6.097, 0, 0.546, {color:MIST, width:1});
+  S(s, 'ellipse', 0.775, 4.999, 0.542, 0.542, {fill:{color:PLUM}});
+  icon(s, 'bulb', 0.912, 5.116, 0.268, 0.308, {fill:{color:LILAC}});
+  S(s, 'ellipse', 4.604, 4.999, 0.542, 0.542, {fill:{color:MAGENTA}});
+  icon(s, 'docLeaf', 4.737, 5.165, 0.274, 0.209, {fill:{color:PLUM}});
+}
+
+function slide19(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: PLUM };
+  header(s, '14', WHITE);
+  arch(s, 4.135, 1.396, 5.042, 5.325, 2.521, 0, {line:{color:WHITE, width:1}});
+  T(s, 1.316, 5.506, 1.17, 0.404, [r("Scandal ", 18, RM, WHITE)], {align:'center'});
+  T(s, 1.202, 5.838, 1.398, 0.269, [r("Perfume Concentra", 10, RL, WHITE)], {align:'center'});
+  T(s, 10.828, 1.537, 1.17, 0.404, [r("Scandal ", 18, RM, WHITE)], {align:'center'});
+  T(s, 10.814, 1.869, 1.198, 0.269, [r("Eha Do Perfume", 10, RL, WHITE)], {align:'center'});
+  T(s, 5.098, 1.954, 3.116, 1.151, [
+    r("World Class ", 40, OM, WHITE),
+    r("Fragrance", 38, OM, WHITE)], {align:'center', lineSpacingMultiple:0.8});
+  T(s, 10.17, 5.204, 2.554, 0.707, [r("when an unknown printer took a of type and passages, and more with there art manager.", 10, R, WHITE)], {lineSpacingMultiple:1.3});
+  T(s, 10.159, 5.946, 1.376, 0.278, [r("Explore More", 10.5, RM, WHITE)]);
+  L(s, 10.274, 6.246, 0.623, 0, {color:WHITE, width:1});
+  icon(s, 'quote', 10.279, 5.041, 0.138, 0.134, {fill:{color:WHITE}});
+  T(s, 0.672, 1.828, 2.554, 0.707, [r("when an unknown printer took a of type and passages, and more with there art manager.", 10, R, WHITE)], {lineSpacingMultiple:1.3});
+  T(s, 0.662, 2.57, 1.376, 0.278, [r("Explore More", 10.5, RM, WHITE)]);
+  L(s, 0.776, 2.87, 0.623, 0, {color:WHITE, width:1});
+  icon(s, 'quote', 0.781, 1.666, 0.138, 0.134, {fill:{color:WHITE}});
+  icon(s, 'archHalf', 0.77, 5.402, 2.26, 1.146, {line:{color:WHITE, width:1}});
+  icon(s, 'archHalf', 10.283, 1.175, 2.26, 1.146, {line:{color:WHITE, width:1}, rotate:180});
+  S(s, 'rect', 1.776, 6.41, 0.249, 0.258, {fill:{color:MAGENTA}, rotate:43.8});
+  icon(s, 'arrowUp', 1.859, 6.469, 0.083, 0.141, {fill:{color:PLUM}, rotate:90});
+  S(s, 'rect', 11.289, 1.081, 0.249, 0.258, {fill:{color:MAGENTA}, rotate:43.8});
+  icon(s, 'arrowUp', 11.372, 1.14, 0.083, 0.141, {fill:{color:PLUM}, rotate:90});
+}
+
+function slide20(pptx) {
+  const s = pptx.addSlide();
+  header(s, '15', PLUM);
+  T(s, 6.658, 1.12, 5.395, 2.423, [r("22.9%", 138, OM, ASH)]);
+  T(s, 6.717, 3.386, 4.479, 0.421, [r("Revolutionary Patent Pending Blend", 19, RM, INK)]);
+  T(s, 6.745, 3.791, 4.617, 0.508, [r("when an unknown printer took a galley of type and passages, and more recently with desktop manager.", 10.5, R, GREY)], {lineSpacingMultiple:1.3});
+  S(s, 'rect', 6.828, 5.141, 3.997, 0.37, {fill:{color:FOG}});
+  T(s, 6.717, 4.635, 1.482, 0.37, [r("Usual Serum", 16, RM, ASH)]);
+  S(s, 'rect', 6.828, 6.358, 5.724, 0.37, {fill:{color:ORANGE}});
+  T(s, 6.716, 5.827, 1.976, 0.37, [r("Minimalist Serum", 16, RM, BLACK)]);
+  T(s, 11.92, 5.844, 0.702, 0.337, [r("22.9%", 14, O, BLACK)]);
+  T(s, 0.677, 1.774, 2.51, 0.926, [
+    r("Dummy text ", 10, R, INK, {bold:true}),
+    r("ever since the, when an unknown printer passages, and more recently with desktop  softy lorem ipsum to there. ", 10, R, GREY)], {lineSpacingMultiple:1.3});
+  gradFill(s, 'roundRect', 0.783, 2.815, 1.301, 0.376, PETAL, CITRON, 270, 0.188);
+  T(s, 1.006, 2.86, 0.854, 0.286, [r("See More", 11, R, GREY)], {align:'center'});
+  T(s, 0.677, 1.345, 1.812, 0.406, [r("Web designer", 16, RM, BLACK)], {lineSpacingMultiple:1.438});
+  T(s, 0.677, 4.651, 1.323, 0.337, [r("Company Here", 14, O, GREY)]);
+  T(s, 0.661, 5.077, 5.07, 1.919, [r("From The First Raw Two Ingredient Very Formula Are All Good", 40, O, BLACK)], {lineSpacingMultiple:0.9});
+}
+
+function slide21(pptx) {
+  const s = pptx.addSlide();
+  T(s, 0.657, 2.086, 2.938, 1.838, [
+    r("Finest Materials Eco-Friendly", 24, R, BLACK, {breakLine:true}),
+    r("- Higher ", 24, R, BLACK, {breakLine:true}),
+    r("Durability", 24, R, BLACK)], {lineSpacingMultiple:1.1});
+  L(s, 0.765, 4.261, 0.784, 0, {color:ORANGE, width:4});
+  L(s, 1.589, 4.261, 2.325, 0, {color:BLACK, width:1.5, transparency:90});
+  icon(s, 'vRule', 3.914, 2.184, 0.67, 4.558, {line:{color:BLACK, width:1, transparency:90}});
+  header(s, '16', PLUM);
+  T(s, 4.806, 2.016, 2.609, 0.337, [
+    r("Presentation ", 14, R, BLACK),
+    r("Gadgets", 14, R, BLACK, {bold:true, underline:{style:'sng'}}),
+    r(" # 02", 14, R, BLACK)]);
+  L(s, 4.916, 4.653, 2.535, 0, {color:BLACK, width:4, transparency:94});
+  L(s, 4.916, 5.316, 2.535, 0, {color:BLACK, width:4, transparency:94});
+  L(s, 4.916, 5.978, 2.535, 0, {color:BLACK, width:4, transparency:94});
+  L(s, 4.916, 6.641, 2.535, 0, {color:BLACK, width:4, transparency:94});
+  L(s, 4.916, 4.653, 2.026, 0, {color:MAGENTA, width:4});
+  L(s, 4.916, 5.316, 2.281, 0, {color:PLUM, width:4});
+  L(s, 4.916, 5.978, 1.391, 0, {color:ORANGE, width:4});
+  L(s, 4.916, 6.641, 0.654, 0, {color:LIME, width:4});
+  T(s, 4.819, 4.241, 1.513, 0.286, [r("First Subtitle", 11, RM, BLACK)]);
+  T(s, 4.819, 4.918, 1.513, 0.286, [r("Second Subtitle", 11, RM, BLACK)]);
+  T(s, 4.819, 5.595, 1.513, 0.286, [r("Third Subtitle", 11, RM, BLACK)]);
+  T(s, 4.819, 6.272, 1.513, 0.286, [r("Four Subtitle", 11, RM, BLACK)]);
+  T(s, 7.53, 4.488, 0.605, 0.286, [r("21%", 11, R, BLACK)]);
+  T(s, 7.53, 5.165, 0.605, 0.286, [r("45%", 11, R, BLACK)]);
+  T(s, 7.53, 5.842, 0.605, 0.286, [r("89%", 11, R, BLACK)]);
+  T(s, 7.53, 6.519, 0.605, 0.286, [r("10%", 11, R, BLACK)]);
+  T(s, 0.661, 5.314, 2.51, 0.926, [
+    r("Dummy text ", 10, R, INK, {bold:true}),
+    r("ever since the, when an unknown printer passages, and more recently with desktop  softy lorem ipsum to there. ", 10, R, GREY)], {lineSpacingMultiple:1.3});
+  gradFill(s, 'roundRect', 0.766, 6.356, 1.301, 0.376, PETAL, CITRON, 270, 0.188);
+  T(s, 0.99, 6.4, 0.854, 0.286, [r("See More", 11, R, GREY)], {align:'center'});
+  T(s, 0.661, 4.885, 1.812, 0.406, [r("Web designer", 16, RM, BLACK)], {lineSpacingMultiple:1.438});
+  T(s, 4.826, 2.823, 2.03, 0.337, [r("Revolutionary Patent", 14, RM, INK)]);
+  T(s, 4.826, 3.15, 3.241, 0.508, [r("when an unknown printer took a galley of type more with desktop manager.", 10.5, R, GREY)], {lineSpacingMultiple:1.3});
+}
+
+function slide22(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: PLUM };
+  header(s, '17', LILAC);
+  T(s, 6.639, 1.73, 6.014, 1.447, [r("Canet Get Off", 80, OM, WHITE)], {align:'right'});
+  T(s, 8.191, 1.056, 4.492, 1.01, [r("Ingredients You", 54, O, WHITE)], {align:'right'});
+  T(s, 9.771, 2.842, 2.884, 1.01, [r("The Sheaf", 54, O, WHITE)], {align:'right'});
+  T(s, 0.67, 5.109, 3.042, 1.737, [r("Allow you to know what’s in going.", 36, O, WHITE)], {lineSpacingMultiple:0.9});
+  T(s, 3.731, 2.101, 2.045, 0.707, [r("when an unknown printer passages, including ipsum. with  manager.", 10, R, WHITE)], {lineSpacingMultiple:1.3});
+  T(s, 3.72, 2.83, 1.376, 0.278, [r("Explore More", 10.5, RM, WHITE)]);
+  L(s, 3.835, 3.13, 0.593, 0, {color:WHITE, width:1});
+  icon(s, 'quote', 3.831, 1.963, 0.087, 0.085, {fill:{color:WHITE}});
+  T(s, 9.254, 4.207, 2.884, 0.926, [r("when an unknown printer took a galley of type and passages, and more recently with including versions of lorem ipsum. with there art manager.", 10, R, WHITE)], {lineSpacingMultiple:1.3});
+  T(s, 9.243, 5.276, 1.376, 0.278, [r("Explore More", 10.5, RM, WHITE)]);
+  L(s, 9.358, 5.576, 0.623, 0, {color:WHITE, width:1});
+  icon(s, 'quote', 9.342, 4.059, 0.138, 0.134, {fill:{color:WHITE}});
+}
+
+function slide23(pptx) {
+  const s = pptx.addSlide();
+  icon(s, 'blobLeft', -0.02, 0, 7.067, 7.5, {fill:{color:BLUSH}});
+  header(s, '18', PLUM);
+  S(s, 'roundRect', 10.547, 1.115, 2.006, 5.61, {fill:{color:LIME}, shadow:{type:'outer', blur:30, offset:7, angle:140, color:BLACK, opacity:0.1}, rectRadius:0.334});
+  S(s, 'roundRect', 8.3, 3.317, 2.006, 3.408, {fill:{color:ORANGE}, shadow:{type:'outer', blur:30, offset:7, angle:140, color:BLACK, opacity:0.1}, rectRadius:0.334});
+  S(s, 'roundRect', 6.151, 4.57, 1.908, 2.149, {fill:{color:PLUM}, shadow:{type:'outer', blur:30, offset:7, angle:140, color:BLACK, opacity:0.1}, rectRadius:0.255});
+  T(s, 0.674, 1.745, 5.833, 2.282, [r("2025 and beyond: growth in precision optimized", 54, O, BLACK)], {lineSpacingMultiple:0.8});
+  T(s, 0.625, 4.444, 4.562, 2.895, [r("78%", 166, OM, BLACK)]);
+  T(s, 6.522, 4.743, 1.257, 0.774, [r("18%", 40, OS, LILAC)], {align:'center'});
+  T(s, 6.47, 5.464, 1.361, 0.278, [r("Unit Development", 10.5, R, LILAC)], {align:'center'});
+  T(s, 6.47, 6.037, 1.395, 0.455, [r("when an unknown printer and more", 10, R, LILAC)], {align:'center', lineSpacingMultiple:1.3});
+  T(s, 8.64, 3.56, 1.326, 0.774, [r("28%", 40, OS, PLUM)], {align:'center'});
+  T(s, 8.622, 4.293, 1.361, 0.278, [r("Unit Development", 10.5, R, PLUM)], {align:'center'});
+  T(s, 8.605, 5.846, 1.395, 0.637, [r("when an unknown printer and more recently with", 10, R, PLUM)], {align:'center', lineSpacingMultiple:1.3});
+  T(s, 10.876, 1.322, 1.347, 0.774, [r("80%", 40, OS, PLUM)], {align:'center'});
+  T(s, 10.869, 2.036, 1.361, 0.278, [r("Unit Development", 10.5, R, PLUM)], {align:'center'});
+  T(s, 10.852, 5.846, 1.395, 0.637, [r("when an unknown printer and more recently with", 10, R, PLUM)], {align:'center', lineSpacingMultiple:1.3});
+}
+
+function slide24(pptx) {
+  const s = pptx.addSlide();
+  header(s, '19', PLUM);
+  T(s, 0.539, 0.851, 11.76, 3.097, [r("Essentialized", 178, O, SILVER)]);
+  S(s, 'roundRect', 1.18, 4.267, 2.055, 0.507, {line:{color:FOG, width:1}, rectRadius:0.172});
+  T(s, 1.267, 4.369, 1.883, 0.303, [r("Skin Care By Beauty", 12, R, WHITE)], {align:'center'});
+  gradFill(s, 'ellipse', 11.369, 5.643, 0.611, 0.611, HOTPINK, ORANGE, 90, 0);
+  icon(s, 'arrowNE', 11.555, 5.83, 0.237, 0.236, {fill:{color:LILAC}});
+  T(s, 8.295, 5.643, 2.824, 0.707, [
+    r("By learning from the experience ", 12, RM, WHITE, {breakLine:true}),
+    r("of in Digital Marketing in Ukraine and abroad Quantico", 12, RM, WHITE)], {lineSpacingMultiple:1});
+}
+
+function slide25(pptx) {
+  const s = pptx.addSlide();
+  S(s, 'rect', 0, 4.031, 13.333, 3.462, {fill:{color:LILAC, transparency:80}});
+  header(s, '20', PLUM);
+  T(s, 8.264, 5.235, 3.33, 0.488, [r("when an unknown printer took a galley of type and recently versions of lorem ipsum. ", 10, R, GREY)], {lineSpacingMultiple:1.3});
+  T(s, 8.253, 4.94, 2.074, 0.337, [r("10 Years of Expertise", 14, RM, BLACK)], {lineSpacingMultiple:1.3});
+  T(s, 8.264, 6.263, 3.33, 0.488, [r("when an unknown printer took a galley of type and recently versions of lorem ipsum. ", 10, R, GREY)], {lineSpacingMultiple:1.3});
+  T(s, 8.264, 5.968, 1.959, 0.337, [r("344 Collection Style", 14, RM, BLACK)], {lineSpacingMultiple:1.3});
+  T(s, 4.351, 5.308, 2.51, 0.926, [
+    r("Dummy text ", 10, R, INK, {bold:true}),
+    r("ever since the, when an unknown printer passages, and more recently with desktop  softy lorem ipsum to there. ", 10, R, GREY)], {lineSpacingMultiple:1.3});
+  gradFill(s, 'roundRect', 4.456, 6.349, 1.301, 0.376, PETAL, CITRON, 270, 0.188);
+  T(s, 4.68, 6.394, 0.854, 0.286, [r("See More", 11, R, GREY)], {align:'center', lineSpacingMultiple:1.3});
+  T(s, 4.351, 4.879, 1.813, 0.37, [r("Web designer", 16, RM, BLACK)], {lineSpacingMultiple:1.3});
+  T(s, 0.625, 1.825, 4.792, 1.394, [r("Reveal Your Most Radiant Glow.", 48, OM, BLACK)], {lineSpacingMultiple:0.8});
+  T(s, 0.667, 1.425, 1.323, 0.337, [r("Company Here", 14, O, GREY)]);
+  gradFill(s, 'ellipse', 7.617, 2.262, 1.415, 1.415, HOTPINK, ORANGE, 90, 0);
+  T(s, 7.913, 2.888, 0.963, 0.558, [
+    r("60% ", 28, RM, WHITE),
+    r("OFF", 20, RM, WHITE)], {lineSpacingMultiple:0.643});
+  T(s, 8.236, 2.534, 0.511, 0.23, [r("UP TO", 9, RM, WHITE)]);
+  L(s, 7.902, 2.649, 0.334, 0, {color:WHITE, width:0.75, endArrowType:'triangle'});
+}
+
+function slide26(pptx) {
+  const s = pptx.addSlide();
+  S(s, 'roundRect', 0.781, 3.514, 11.772, 3.218, {fill:{color:BLUSH}, shadow:{type:'outer', blur:8, offset:5, angle:40, color:BLACK, opacity:0.23}, rectRadius:0.141});
+  header(s, '21', PLUM);
+  T(s, 0.625, 1.852, 4.69, 0.869, [r("Reveal Your Radian.", 40, OM, BLACK)], {align:'center', lineSpacingMultiple:1.45});
+  T(s, 0.667, 1.68, 1.323, 0.337, [r("Company Here", 14, O, GREY)], {align:'center'});
+  L(s, 4.999, 4.026, 0, 2.361, {color:MIST, width:1});
+  L(s, 8.346, 4.026, 0, 2.361, {color:MIST, width:1});
+  T(s, 8.642, 4.861, 2.756, 0.747, [r("Disaster  Response", 24, RM, BLACK)], {align:'center', lineSpacingMultiple:0.8});
+  T(s, 8.8, 5.666, 2.439, 0.707, [r("when an unknown printer took a galley of type and recently versions of lorem ipsum. ", 10, R, GREY)], {align:'center', lineSpacingMultiple:1.3});
+  T(s, 2.043, 4.861, 2.224, 0.747, [r("Construction & Industry", 24, RM, BLACK)], {align:'center', lineSpacingMultiple:0.8});
+  T(s, 1.936, 5.666, 2.439, 0.707, [r("when an unknown printer took a galley of type and recently versions of lorem ipsum. ", 10, R, GREY)], {align:'center', lineSpacingMultiple:1.3});
+  S(s, 'ellipse', 2.76, 3.859, 0.792, 0.792, {fill:{color:MAGENTA}});
+  icon(s, 'bulb', 2.97, 4.041, 0.371, 0.427, {fill:{color:PLUM}});
+  T(s, 5.315, 4.861, 2.386, 0.747, [r("Event infrastructure", 24, RM, BLACK)], {align:'center', lineSpacingMultiple:0.8});
+  T(s, 5.289, 5.666, 2.439, 0.707, [r("when an unknown printer took a galley of type and recently versions of lorem ipsum. ", 10, R, GREY)], {align:'center', lineSpacingMultiple:1.3});
+  S(s, 'ellipse', 6.112, 3.859, 0.792, 0.792, {fill:{color:ORANGE}});
+  icon(s, 'docLeaf', 6.298, 4.095, 0.42, 0.32, {fill:{color:PLUM}});
+  S(s, 'ellipse', 9.624, 3.859, 0.792, 0.792, {fill:{color:PLUM}});
+  icon(s, 'leaves', 9.831, 4.095, 0.377, 0.32, {fill:{color:WHITE}});
+}
+
+function slide27(pptx) {
+  const s = pptx.addSlide();
+  gradFill(s, 'rect', 0.761, 5.673, 5.433, 1.052, PETAL, CITRON, 270, 0);
+  T(s, 1.114, 5.915, 2.938, 0.567, [
+    r("Pushing boundaries Redefining           ", 14, R, BLACK, {breakLine:true}),
+    r("     trends. Owning the moment.", 14, R, BLACK)], {lineSpacingMultiple:1.214});
+  icon(s, 'arrowUp', 4.077, 6.169, 0.187, 0.246, {fill:{color:PLUM}, rotate:42.7});
+  header(s, '22', PLUM);
+  T(s, 0.661, 1.767, 1.323, 0.337, [r("Company Here", 14, O, GREY)]);
+  T(s, 0.636, 2.166, 4.551, 2.101, [r("FOR THOSE WHO DARE TO LEADTHE FUTURE", 44, OM, BLACK)], {lineSpacingMultiple:0.9});
+  T(s, 9.625, 2.086, 2.959, 0.488, [r("when an unknown printer took a galley of type versions of lorem ipsum. ", 10, R, GREY)], {align:'right', lineSpacingMultiple:1.3});
+  T(s, 10.51, 1.791, 2.074, 0.337, [r("10 Years of Expertise", 14, RM, BLACK)], {align:'right'});
+  T(s, 0.668, 4.223, 3.478, 0.976, [
+    r("Dummy text ", 10, R, INK, {bold:true}),
+    r("ever since the 1500s, when an unknown printer took a galley of type and passages, and more recently with desktop  softy like Aldus PageMaker including", 10, R, GREY),
+    r(" ", 10, R, GREY),
+    r("versions of lorem ipsum. ", 10, R, GREY)], {lineSpacingMultiple:1.4});
+}
+
+function slide28(pptx) {
+  const s = pptx.addSlide();
+  S(s, 'ellipse', 0.733, 1.052, 5.82, 5.82, {line:{color:MIST, width:1, transparency:55, dashType:'dash'}});
+  S(s, 'ellipse', 6.731, 1.052, 5.82, 5.82, {line:{color:MIST, width:1, transparency:55, dashType:'dash'}});
+  L(s, 8.641, 0, 0, 7.5, {color:MIST, width:1, transparency:55, dashType:'dash'});
+  L(s, 4.729, 0, 0, 7.5, {color:MIST, width:1, transparency:55, dashType:'dash'});
+  L(s, 0.744, 0, 0, 7.5, {color:MIST, width:1, transparency:55, dashType:'dash'});
+  L(s, 12.553, 0, 0, 7.5, {color:MIST, width:1, transparency:55, dashType:'dash'});
+  header(s, '23', PLUM);
+  T(s, 0.646, 1.68, 3.854, 1.232, [r("Its–about moment    24  ", 48, OM, BLACK)], {lineSpacingMultiple:0.7});
+  S(s, 'ellipse', 2.973, 2.317, 0.447, 0.447, {line:{color:MULBERRY, width:3}});
+  T(s, 2.984, 2.151, 0.425, 0.707, [r("c", 36, OM, BLACK)], {align:'center'});
+  T(s, 4.504, 6.369, 2.644, 0.286, [
+    r("International – going distance ", 11, RM, BLACK),
+    r("2024", 11, RL, BLACK)]);
+  T(s, 9.715, 4.899, 2.227, 0.286, [
+    r("International – just do it ", 11, RM, BLACK),
+    r("2024", 11, RL, BLACK)]);
+  T(s, 0.665, 5.693, 2.045, 0.707, [r("when an unknown printer passages, including ipsum. with  manager.", 10, R, INK)], {lineSpacingMultiple:1.3});
+  T(s, 0.654, 6.422, 1.376, 0.278, [r("Explore More", 10.5, RM, BLACK)]);
+  L(s, 0.769, 6.723, 0.593, 0, {color:GREY, width:1});
+  icon(s, 'quote', 0.765, 5.587, 0.087, 0.085, {fill:{color:GREY}});
+  T(s, 11.081, 6.262, 1.475, 0.471, [r("To Celebrate Your in Moment", 11, R, GREY)], {lineSpacingMultiple:1});
+  icon(s, 'arrowNE', 7.197, 1.892, 0.107, 0.107, {fill:{color:GREY}, rotate:137.9, flipH:true});
+  S(s, 'roundRect', 7.08, 1.835, 0.331, 0.239, {line:{color:GREY, width:0.75}, rotate:182.7, flipH:true, rectRadius:0.12});
+  T(s, 0.626, 3.413, 2.806, 1.717, [
+    r("Finest Materials Eco-Friendly", 24, R, BLACK, {breakLine:true}),
+    r("- Higher ", 24, R, BLACK, {breakLine:true}),
+    r("Durability", 24, R, BLACK)], {lineSpacingMultiple:1});
+  S(s, 'roundRect', 8.206, 3.518, 0.753, 0.631, {fill:{color:WHITE}, rectRadius:0.074});
+  icon(s, 'docLeaf', 8.372, 3.673, 0.42, 0.32, {fill:{color:PLUM}});
+}
+
+function slide29(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: PLUM };
+  icon(s, 'phoneOutline', 4.959, 2.461, 3.412, 6.547, {fill:{color:FOG}});
+  S(s, 'ellipse', 6.616, 2.701, 0.095, 0.095, {fill:{color:FOG}});
+  header(s, '24', WHITE);
+  arch(s, 0.795, 5.042, 11.741, 2.479, 0.302, 0, {fill:{color:BLUSH}});
+  arch(s, 9.663, 5.738, 2.115, 1.283, 0.155, 0, {fill:{color:MIST, transparency:50}});
+  T(s, 9.768, 6.508, 1.903, 0.404, [r("We offer low rate of commission", 9, R, BLACK)], {align:'center', lineSpacingMultiple:1});
+  T(s, 10.319, 6.079, 0.605, 0.505, [r("6X", 24, RM, BLACK)]);
+  icon(s, 'arrowUp', 10.892, 6.222, 0.1, 0.169, {fill:{color:BLACK}, rotate:182.8});
+  T(s, 4.963, 5.518, 3.472, 0.858, [r("Track changes in income and access data on each payment", 18, R, BLACK)], {align:'center', lineSpacingMultiple:1});
+  gradFill(s, 'roundRect', 5.98, 6.58, 1.438, 0.446, HOTPINK, ORANGE, 90, 0.085);
+  T(s, 6.156, 6.652, 1.085, 0.303, [r("Get  Started", 12, R, WHITE)], {align:'center'});
+  arch(s, 1.62, 5.738, 2.115, 1.283, 0.155, 0, {fill:{color:MIST, transparency:50}});
+  T(s, 1.726, 6.508, 1.903, 0.404, [r("We offer low rate of commission", 9, R, BLACK)], {align:'center', lineSpacingMultiple:1});
+  T(s, 2.341, 6.079, 0.605, 0.505, [r("2X", 24, RM, BLACK)]);
+  icon(s, 'arrowUp', 2.914, 6.222, 0.1, 0.169, {fill:{color:BLACK}, rotate:182.8});
+  S(s, 'ellipse', 2.243, 5.196, 0.778, 0.778, {fill:{color:MAGENTA}});
+  icon(s, 'bulb', 2.448, 5.372, 0.369, 0.425, {fill:{color:PLUM}});
+  S(s, 'ellipse', 2.806, 5.668, 0.306, 0.306, {fill:{color:ROSE}});
+  T(s, 2.822, 5.678, 0.274, 0.286, [r("%", 11, R, PLUM)], {align:'center'});
+  S(s, 'ellipse', 10.284, 5.196, 0.778, 0.778, {fill:{color:ORANGE}});
+  icon(s, 'docLeaf', 10.509, 5.46, 0.327, 0.249, {fill:{color:PLUM}});
+  S(s, 'ellipse', 10.85, 5.668, 0.306, 0.306, {fill:{color:APRICOT}});
+  T(s, 10.866, 5.678, 0.274, 0.286, [r("%", 11, R, PLUM)], {align:'center'});
+  T(s, 4.516, 2.537, 5.986, 1.111, [r("& investments", 60, R, WHITE)]);
+  T(s, 2.828, 1.795, 4.212, 1.111, [r("exchanges", 60, R, WHITE)]);
+  T(s, 4.409, 1.052, 3.92, 1.111, [r("Crypto  ", 60, R, WHITE)]);
+}
+
+function slide30(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: PLUM };
+  header(s, '25', PLUM);
+  L(s, 8.911, 3.039, 0, 3.684, {color:FOG, width:1.5, transparency:80});
+  L(s, 8.911, 3.997, 3.558, 0, {color:FOG, width:1.5, transparency:80});
+  T(s, 9.34, 2.916, 2.931, 0.841, [r("Thank You!", 44, OM, WHITE)]);
+  T(s, 9.357, 4.315, 1.972, 0.536, [
+    r("Phone & Fax:", 10, R, WHITE, {bold:true, breakLine:true}),
+    r("+1 028 280 093/+1 203 30", 10, R, WHITE)], {lineSpacingMultiple:1.6});
+  T(s, 9.357, 5.165, 2.525, 0.761, [
+    r("Emails:", 10, R, WHITE, {bold:true, breakLine:true}),
+    r("myemail@domain.com", 10, R, WHITE, {breakLine:true}),
+    r("2ndemail@domain.net", 10, R, WHITE)], {lineSpacingMultiple:1.6});
+  T(s, 9.357, 6.24, 2.353, 0.536, [
+    r("Social Media:", 10, R, WHITE, {bold:true, breakLine:true}),
+    r("Twitteridname#01 Instagram %id", 10, R, WHITE)], {lineSpacingMultiple:1.6});
+  L(s, 9.448, 5.034, 0.271, 0, {color:WHITE, width:1.5});
+  L(s, 9.448, 6.141, 0.271, 0, {color:WHITE, width:1.5});
+  icon(s, 'plusPlus', 0.794, 6.58, 0.348, 0.141, {fill:{color:WHITE}});
+  header(s, '25', LILAC);
+  T(s, 0.683, 1.432, 3.886, 1.01, [r("Contact Us!", 54, OM, WHITE)]);
+}
+
+// ---------------------------------------------------------------- assembly
+const BUILDERS = [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20, slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29, slide30];
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'DECK', width: 13.3333333, height: 7.5 });   // 12192000 x 6858000 EMU
+  pptx.layout = 'DECK';
+  pptx.author = 'Kreate Tribe';
+  pptx.title = 'Pitch Deck';
+  BUILDERS.forEach(fn => fn(pptx));
+  return pptx.writeFile({ fileName: path.join(__dirname, '0c7e30dd-4b06-4fbf-a962-df6e0371a35d_grok_final.pptx') });
+}
+
+build().then(f => console.log('wrote', f)).catch(e => { console.error(e); process.exit(1); });
