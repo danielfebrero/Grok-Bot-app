@@ -9,6 +9,18 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-11-06 19:53 (Paris) — snapshot `2026-11-06_18-48` → `2026-11-06_19-53`
+
+**Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `19b465f8cab30cc00d0607c1fee2542c31699e13` → `f6c38261252c0b548878ea6b853d95a6c9f2cc55` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`). Toutes les autres versions plateforme inchangées (image `fcbae14`, box-scripts `fcbae14`, sand-host `0299e17` (supervisor `upgrade-0299e17`, `pendingUpgradeVersion` = None), exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7). Fichiers : +0 / −0 / ~1.
+
+Rapport : [reports/2026-11-06_19-53.md](reports/2026-11-06_19-53.md).
+
+## 2026-11-06 18:48 (Paris) — snapshot `2026-11-06_16-37` → `2026-11-06_18-48`
+
+**Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `6a951a94963afe8d8ee1f367c67543f39c7d5565` → `19b465f8cab30cc00d0607c1fee2542c31699e13` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`). Toutes les autres versions plateforme inchangées (image `fcbae14`, box-scripts `fcbae14`, sand-host `0299e17` (supervisor `upgrade-0299e17`, `pendingUpgradeVersion` = None), exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7). Fichiers : +0 / −0 / ~1.
+
+Rapport : [reports/2026-11-06_18-48.md](reports/2026-11-06_18-48.md).
+
 ## 2026-11-06 16:37 (Paris) — snapshot `2026-11-06_11-50` → `2026-11-06_16-37`
 
 **Hot-update sand-host `2cf9f8b` → `0299e17`** (supervisor `upgrade-0299e17`, `pendingUpgradeVersion` = None) + bump agent-store-fuse `72907d931363b697a7a3189653c000e4d4bb8696` → `6a951a94963afe8d8ee1f367c67543f39c7d5565` + rafraîchissement des skills gérées. Image `fcbae14`, box-scripts `fcbae14`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +2 / −0 / ~26.
