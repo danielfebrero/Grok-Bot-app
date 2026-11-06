@@ -1,0 +1,716 @@
+/**
+ * "Automotive Wheels" deck — rebuilt with pptxgenjs.
+ * Run: node 10832c74-3b29-41ab-9486-3a3e963f4438_grok_final.js
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ theme */
+
+const SLIDE_W = 13.3333333333;
+const SLIDE_H = 7.5;
+
+const C = {
+  navy: '14213D', // theme accent1
+  amber: 'FCA311', // theme accent2
+  white: 'FFFFFF',
+  ink: '0D0D0D', // near-black slide background (tx1 lum 95/5)
+  navyDark: '1F325D', // accent1 lum 90/10
+  navyLight: '2E4D8E', // accent1 lum 75/25
+  amberPale: 'FDC870', // accent2 lum 60/40
+  grey65: '595959', // tx1 lum 65/35 — body copy
+  grey75: '404040', // tx1 lum 75/25 — body copy (dark variant)
+  greyPale: 'F2F2F2', // bg1 lum 95 — empty calendar dots
+  ring: 'C7D5E0', // pale ring outline
+  imgFill: 'E9EAEC',
+  imgLine: 'D2D5DA',
+  imgText: '9AA0AA',
+};
+
+const F = { head: 'Anton', body: 'Roboto' };
+
+const SH = { rect: 'rect', roundRect: 'roundRect', ellipse: 'ellipse', line: 'line', arc: 'arc', custGeom: 'custGeom' };
+const NO_LINE = { type: 'none' };
+
+/** Soft card shadow used by every raised panel. A fresh object per call — pptxgenjs mutates it. */
+const cardShadow = () => ({ type: 'outer', color: '000000', opacity: 0.1, blur: 45, offset: 3, angle: 45 });
+
+/* ---------------------------------------------------------------- helpers */
+
+/** OOXML roundRect "adj" (0..100000) expressed as pptxgenjs rectRadius (inches). */
+const radius = (adj, w, h) => (adj / 100000) * Math.min(w, h);
+
+const shape = (s, type, o) => s.addShape(type, o);
+const rect = (s, o) => s.addShape(SH.rect, o);
+const oval = (s, o) => s.addShape(SH.ellipse, o);
+
+/** Rounded rectangle; `adj` is the OOXML corner adjust value. */
+function roundRect(s, o) {
+  const { adj = 16667, ...rest } = o;
+  s.addShape(SH.roundRect, { ...rest, rectRadius: radius(adj, o.w, o.h) });
+}
+
+/** Body copy: Roboto, 14pt, 1.3 line spacing. */
+function body(s, text, o) {
+  s.addText(text, {
+    fontFace: F.body, fontSize: 14, color: C.grey65, lineSpacingMultiple: 1.3,
+    valign: 'top', margin: [7.2, 7.2, 3.6, 3.6], ...o,
+  });
+}
+
+/** Display copy: Anton (the deck's major font). */
+function head(s, text, o) {
+  s.addText(text, {
+    fontFace: F.head, fontSize: 20, color: C.amber,
+    valign: 'top', margin: [7.2, 7.2, 3.6, 3.6], ...o,
+  });
+}
+
+/** Section title: Anton 54pt navy, 0.9 line spacing. */
+const title = (s, text, o) =>
+  head(s, text, { fontSize: 54, color: C.navy, lineSpacingMultiple: 0.9, ...o });
+
+/**
+ * Master footer ("Wheels" + slide number), inherited by slides 2-19.
+ * A few slides re-state one half in white so it stays legible over a navy band.
+ */
+function footer(s, num, opts = {}) {
+  const { color = C.navy, label = true, number = true } = opts;
+  const base = { y: 7.016, w: 3.0, h: 0.399, fontFace: F.body, fontSize: 10, color, valign: 'middle', margin: [7.2, 3.6, 7.2, 3.6] };
+  if (label) s.addText('Wheels', { ...base, x: 0.76 });
+  if (number) s.addText(String(num), { ...base, x: 9.573, align: 'right' });
+}
+
+/** Rounded square badge holding a two-digit step number (slides 11 & 12). */
+function badge(s, x, y, label) {
+  const size = 0.786;
+  roundRect(s, { x, y, w: size, h: size, adj: 20944, fill: { color: C.amber }, line: { color: C.white, width: 4 } });
+  head(s, label, { x: x + 0.09, y: y + 0.145, w: 0.606, h: 0.572, fontSize: 28, color: C.white, align: 'center' });
+}
+
+/** Stat block: big Anton number over an amber caption (slides 6 & 8). */
+function statBlock(s, x, y, value, caption) {
+  head(s, value, { x, y, w: 2.9, h: 0.919, fontSize: 54, color: C.navy, align: 'center', lineSpacingMultiple: 0.9 });
+  head(s, caption, { x, y: y + 0.982, w: 2.9, h: 0.774, align: 'center' });
+}
+
+/** Caption + paragraph pair used across the "Option n" columns. */
+function optionBlock(s, x, y, label, text, o = {}) {
+  head(s, label, { x, y, w: o.w || 2.947, h: 0.438, color: o.labelColor || C.amber, align: o.align });
+  body(s, text, { x, y: y + (o.gap || 0.379), w: o.w || 2.947, h: 0.686, align: o.align });
+}
+
+/** Raster images from the source deck are represented by a neutral box. */
+function imagePlaceholder(s, x, y, w, h) {
+  rect(s, { x, y, w, h, fill: { color: C.imgFill }, line: { color: C.imgLine, width: 1 } });
+  s.addText('[image]', {
+    x, y: y + h / 2 - 0.2, w, h: 0.4, align: 'center', valign: 'middle',
+    fontFace: F.body, fontSize: 12, color: C.imgText,
+  });
+}
+
+/** Front-of-car pictogram in white, used inside the slide-9 icon tiles. */
+function carIcon(s, cx, cy, w) {
+  const roof = { x: cx - 0.31 * w, y: cy - 0.38 * w, w: 0.62 * w, h: 0.26 * w };
+  const bodyBox = { x: cx - 0.45 * w, y: cy - 0.16 * w, w: 0.90 * w, h: 0.34 * w };
+  roundRect(s, { ...roof, adj: 26000, fill: { color: C.white } });
+  roundRect(s, { ...bodyBox, adj: 26000, fill: { color: C.white } });
+  shape(s, SH.line, { x: cx - 0.5 * w, y: cy - 0.06 * w, w, h: 0, line: { color: C.white, width: 2 } });
+  // navy headlight slots punched out of the body
+  [-0.36, 0.06].forEach((dx) =>
+    roundRect(s, { x: cx + dx * w, y: cy - 0.02 * w, w: 0.3 * w, h: 0.11 * w, adj: 50000, fill: { color: C.navy } }));
+  // wheels peeking below the body
+  [-0.42, 0.24].forEach((dx) =>
+    roundRect(s, { x: cx + dx * w, y: cy + 0.16 * w, w: 0.18 * w, h: 0.16 * w, adj: 30000, fill: { color: C.white } }));
+}
+
+/* --------------------------------------------------------------- geometry */
+
+/** Rounded "D" panel on slide 5 (freeform in the source deck). */
+function dPanel(s, x, y, w, h) {
+  const r = h / 2;
+  const k = r * 0.5523;
+  shape(s, SH.custGeom, {
+    x, y, w, h,
+    fill: { color: C.navy }, line: NO_LINE,
+    points: [
+      { x: 0, y: 0 },
+      { x: w - r, y: 0 },
+      { x: w, y: r, curve: { type: 'cubic', x1: w - r + k, y1: 0, x2: w, y2: r - k } },
+      { x: w - r, y: h, curve: { type: 'cubic', x1: w, y1: r + k, x2: w - r + k, y2: h } },
+      { x: 0, y: h },
+      { close: true },
+    ],
+  });
+}
+
+/** Four-cusp white star that separates the SWOT quadrants (slide 14). */
+function astroid(s, x, y, d) {
+  const m = d / 2;
+  const arm = (px, py, x1, y1, x2, y2) => ({ x: px, y: py, curve: { type: 'cubic', x1, y1, x2, y2 } });
+  shape(s, SH.custGeom, {
+    x, y, w: d, h: d,
+    fill: { color: C.white }, line: NO_LINE,
+    points: [
+      { x: m, y: d, moveTo: true },
+      arm(0, m, m, 0.709 * d, 0.291 * d, m),
+      arm(m, 0, 0.291 * d, m, m, 0.291 * d),
+      arm(d, m, m, 0.291 * d, 0.709 * d, m),
+      arm(m, d, 0.709 * d, m, m, 0.709 * d),
+      { close: true },
+    ],
+  });
+}
+
+/**
+ * Slide 16 "area chart" waves. Paths are the source freeforms normalised to
+ * 0..1; `[x,y]` is a line-to and `[x,y,x1,y1,x2,y2]` a cubic bezier.
+ */
+const WAVE_TALL = [
+  [0.3464, 0.0002], [0.367, 0.0079, 0.3529, 0.0009, 0.3598, 0.0034],
+  [0.6, 0.66, 0.4826, 0.08, 0.505, 0.5802], [0.8404, 0.3967, 0.695, 0.7398, 0.7958, 0.5265],
+  [0.9332, 0.2245, 0.8738, 0.3003, 0.8988, 0.2301], [1, 0.3169, 0.988, 0.2158, 1, 0.3034],
+  [1, 0.9988], [0.9998, 1], [0.0002, 1], [0, 0.9988], [0, 0.533],
+  [0.0402, 0.4389, 0, 0.5147, 0.0078, 0.463], [0.1918, 0.4916, 0.1342, 0.3691, 0.1646, 0.5769],
+  [0.3464, 0.0002, 0.2267, 0.3819, 0.2485, -0.0105],
+];
+const WAVE_LOW = [
+  [0.0167, 0], [0.0992, 0.2823, 0.0343, 0.0015, 0.0643, 0.0476],
+  [0.2585, 0.339, 0.155, 0.658, 0.2004, 0.4757], [0.6617, 0.9525, 0.4357, -0.08, 0.5671, 0.9398],
+  [0.892, 0.2601, 0.7359, 0.9626, 0.8016, 0.4593], [1, 0.3957, 0.9586, 0.1139, 1, 0.3957],
+  [1, 0.9976], [0.9998, 1], [0.0002, 1], [0, 0.9976], [0, 0.0143],
+  [0.0167, 0, 0, 0.0143, 0.0061, -0.0009],
+];
+
+/**
+ * The source waves are filled with a vertical gradient: opaque down to 25% of
+ * the shape, then fading to fully transparent at the baseline. pptxgenjs emits
+ * solid fills only, so the fade is approximated by nested translucent white
+ * veils, each running from its own top edge down to the baseline. Because the
+ * veils overlap rather than abut, their opacities multiply into a smooth ramp
+ * with no seams between bands.
+ */
+function fadeToWhite(s, o, bands = 24) {
+  let carried = 1; // light still passing through the veils drawn so far
+  for (let i = 1; i <= bands; i++) {
+    const r = (i + 0.5) / bands;
+    const target = Math.max(0, Math.min(1, 1 - (r - 0.25) / 0.77));
+    const opacity = 1 - target / carried;
+    carried = target;
+    if (opacity <= 0.002) continue;
+    rect(s, {
+      x: o.x, y: o.y + (i / bands) * o.h, w: o.w, h: o.h * (1 - i / bands),
+      fill: { color: C.white, transparency: Math.round((1 - opacity) * 100) }, line: NO_LINE,
+    });
+    if (target === 0) break;
+  }
+}
+
+function wave(s, pathPts, o) {
+  const points = pathPts.map((p, i) => {
+    const pt = { x: +(p[0] * o.w).toFixed(3), y: +(p[1] * o.h).toFixed(3) };
+    if (i === 0) pt.moveTo = true;
+    if (p.length === 6) {
+      pt.curve = {
+        type: 'cubic',
+        x1: +(p[2] * o.w).toFixed(3), y1: +(p[3] * o.h).toFixed(3),
+        x2: +(p[4] * o.w).toFixed(3), y2: +(p[5] * o.h).toFixed(3),
+      };
+    }
+    return pt;
+  });
+  points.push({ close: true });
+  shape(s, SH.custGeom, {
+    x: o.x, y: o.y, w: o.w, h: o.h, flipH: o.flipH || false,
+    fill: { color: o.color, transparency: o.transparency }, line: NO_LINE,
+    points,
+  });
+}
+
+/* -------------------------------------------------------- shared copy text */
+
+const LOREM_LONG =
+  'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. ' +
+  'Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero.';
+const LOREM_MED = 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa.';
+const LOREM_SHORT = 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit porttitor congue.';
+const LOREM_TINY = 'Lorem ipsum dolor sit amet, adipiscing elit porttitor congue.';
+const LOREM_SWOT = 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit porttitor congue massa.';
+const LOREM_FUSCE = 'Fusce posuere, magna sed pulvinar ultricies.';
+const LOREM_PELL = 'Pellentesque habitant morbi tristique senectus et.';
+const LOREM_CARD = 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit porttitor congue.';
+
+/* ----------------------------------------------------------- slide builders */
+
+// 1 — Cover
+function slide01(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: C.ink };
+  head(s, 'AUTOMOTIVE WHEELS', {
+    x: 4.611, y: 2.457, w: 7.962, h: 3.009,
+    fontSize: 96, color: C.amber, align: 'right', lineSpacingMultiple: 0.9,
+  });
+  s.addText('Engineered For Performance', {
+    x: 6.153, y: 4.425, w: 2.342, h: 0.707,
+    fontFace: F.body, fontSize: 18, color: C.white, align: 'right', valign: 'top',
+    margin: [7.2, 7.2, 3.6, 3.6],
+  });
+  rect(s, { x: 11.606, y: 6.474, w: 0.967, h: 0.405, fill: { color: C.navy } });
+  head(s, '2025', {
+    x: 11.672, y: 6.495, w: 0.873, h: 0.404,
+    fontSize: 18, color: C.white, align: 'center', charSpacing: 3,
+  });
+}
+
+// 2 — Materials in Wheel Manufacturing
+function slide02(pptx) {
+  const s = pptx.addSlide();
+  title(s, 'Materials in Wheel Manufacturing', { x: 6.412, y: 1.475, w: 6.161, h: 1.737 });
+  body(s, LOREM_LONG, { x: 6.412, y: 3.555, w: 6.161, h: 0.992 });
+  head(s, '"Precision and performance drive progress. Keep moving forward."', {
+    x: 6.412, y: 5.197, w: 6.161, h: 0.828, fontSize: 24, italic: true, lineSpacingMultiple: 0.9,
+  });
+  footer(s, 2);
+}
+
+// 3 — Wheel Design Affects Vehicle Handling
+function slide03(pptx) {
+  const s = pptx.addSlide();
+  rect(s, { x: 0, y: 4.735, w: 13.333, h: 2.384, fill: { color: C.navy } });
+  title(s, 'Wheel Design Affects Vehicle Handling', { x: 0.774, y: 0.615, w: 4.976, h: 2.555 });
+  body(s, LOREM_LONG, { x: 6.667, y: 0.552, w: 5.892, h: 0.992 });
+  body(s, LOREM_MED, { x: 6.681, y: 1.775, w: 5.892, h: 0.686 });
+  roundRect(s, { x: 6.667, y: 3.259, w: 5.642, h: 1.303, fill: { color: C.amber } });
+  head(s, '"Speed means nothing without control. Master the road ahead."', {
+    x: 6.972, y: 3.456, w: 5.032, h: 0.909,
+    fontSize: 24, bold: true, italic: true, color: C.white, align: 'center',
+  });
+  footer(s, 3);
+  footer(s, 3, { color: C.white });
+}
+
+// 4 — Which One is Better?
+function slide04(pptx) {
+  const s = pptx.addSlide();
+  roundRect(s, { x: 0.76, y: 1.066, w: 4.753, h: 5.368, adj: 12971, fill: { color: C.navy } });
+  head(s, [
+    { text: 'Which One is ', options: { color: C.navy } },
+    { text: 'Better?', options: { color: C.amber } },
+  ], { x: 5.976, y: 1.125, w: 6.161, h: 2.767, fontSize: 88, lineSpacingMultiple: 0.9 });
+  head(s, '01', {
+    x: 0.907, y: 2.161, w: 4.46, h: 4.448,
+    fontSize: 287, color: C.white, align: 'center', lineSpacingMultiple: 0.9,
+  });
+  footer(s, 4);
+}
+
+// 5 — Break Time
+function slide05(pptx) {
+  const s = pptx.addSlide();
+  dPanel(s, -0.031, 1.082, 6.104, 5.336);
+  head(s, '30', {
+    x: 2.029, y: 3.012, w: 2.444, h: 1.313,
+    fontSize: 80, color: C.white, align: 'center', lineSpacingMultiple: 0.9,
+  });
+  head(s, 'Menit', { x: 2.298, y: 4.083, w: 1.907, h: 0.404, fontSize: 18, bold: true, color: C.white, align: 'center' });
+  title(s, 'Break Time', { x: 8.78, y: 2.114, w: 3.559, h: 2.767, fontSize: 88 });
+  head(s, 'Let\u2019s Take a Break Now', { x: 8.78, y: 4.881, w: 3.559, h: 0.505, fontSize: 24, bold: true });
+  footer(s, 5);
+}
+
+// 6 — Sustainable Materials in Wheel Manufacturing
+function slide06(pptx) {
+  const s = pptx.addSlide();
+  rect(s, { x: 0, y: 3.75, w: 9.359, h: 3.75, fill: { color: C.navy } });
+  title(s, 'Sustainable Materials in Wheel Manufacturing', { x: 0.774, y: 0.615, w: 7.545, h: 1.737 });
+  head(s, 'Automotive Wheels', { x: 0.774, y: 2.546, w: 3.973, h: 0.438 });
+  body(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa posuere, magna.', {
+    x: 0.774, y: 4.255, w: 3.972, h: 0.992, color: C.white,
+  });
+  head(s, 'Subtitle', { x: 0.785, y: 5.783, w: 3.973, h: 0.438, color: C.white });
+  // 75% progress bar (rotated rounded bars in the source deck)
+  roundRect(s, { x: 0.785, y: 6.288, w: 2.778, h: 0.301, adj: 50000, fill: { color: C.navyDark } });
+  roundRect(s, { x: 0.853, y: 6.34, w: 1.722, h: 0.192, adj: 50000, fill: { color: C.white } });
+  s.addText('75%', {
+    x: 3.72, y: 6.22, w: 1.096, h: 0.438,
+    fontFace: F.body, fontSize: 20, color: C.white, valign: 'top', margin: [7.2, 7.2, 3.6, 3.6],
+  });
+  statBlock(s, 9.897, 4.628, '+244', 'Built for Extreme Conditions');
+  footer(s, 6);
+  footer(s, 6, { color: C.white, number: false });
+}
+
+// 7 — The Science Behind Wheel Performance
+function slide07(pptx) {
+  const s = pptx.addSlide();
+  title(s, 'The Science Behind Wheel Performance', { x: 6.337, y: 0.615, w: 6.235, h: 1.737 });
+  head(s, 'Automotive Wheels', { x: 6.34, y: 2.531, w: 5.5, h: 0.438 });
+  // vertical "2025" tab
+  rect(s, { x: 5.085, y: 2.783, w: 0.425, h: 0.967, fill: { color: C.navy } });
+  head(s, '2025', {
+    x: 4.814, y: 3.054, w: 0.967, h: 0.425, rotate: 90,
+    fontSize: 18, color: C.white, align: 'center', charSpacing: 3,
+  });
+  [['01', 4.205], ['02', 5.546]].forEach(([num, y]) => {
+    head(s, num, { x: 0.747, y, w: 0.503, h: 0.438, color: C.navy });
+    head(s, 'Subtitle', { x: 1.25, y: y + 0.002, w: 4.37, h: 0.438 });
+    body(s, LOREM_SHORT, { x: 1.25, y: y + 0.38, w: 4.536, h: 0.686, color: C.grey75 });
+  });
+  footer(s, 7);
+}
+
+// 8 — Gallery of Performance Wheels
+function slide08(pptx) {
+  const s = pptx.addSlide();
+  rect(s, { x: 0, y: 3.09, w: 13.333, h: 1.319, fill: { color: C.navy } });
+  head(s, 'Gallery of Performance Wheels', {
+    x: 0.76, y: 3.374, w: 11.812, h: 0.919,
+    fontSize: 54, color: C.white, align: 'center', lineSpacingMultiple: 0.9,
+  });
+  [['Option 1', 3.93, 0.86], ['Option 2', 7.288, 5.321]].forEach(([label, x, y]) => {
+    head(s, label, { x: x + 0.037, y, w: 1.914, h: 0.438, align: 'center' });
+    body(s, 'Fusce posuere, magna sed pulvinar ultriciespurus.', { x, y: y + 0.379, w: 2.088, h: 0.992, align: 'center' });
+  });
+  statBlock(s, 10.218, 0.667, '+244', 'Built for Extreme Conditions');
+  statBlock(s, 0.218, 5.087, '+556', 'Built for Extreme Conditions');
+  footer(s, 8);
+  footer(s, 8, { color: C.white, label: false });
+}
+
+// 9 — Masterpieces on the Road
+function slide09(pptx) {
+  const s = pptx.addSlide();
+  title(s, 'Masterpieces on the Road', { x: 0.76, y: 0.615, w: 11.812, h: 0.919, align: 'center' });
+  head(s, 'A Wheel Collection', { x: 0.76, y: 1.533, w: 11.812, h: 0.505, fontSize: 24, align: 'center' });
+  [[0.76, 4.589, 'Option 1', 1.547, 5.612], [4.855, 4.62, 'Option 2', 5.642, 5.596], [8.951, 4.62, 'Option 3', 9.737, 5.596]]
+    .forEach(([ix, iy, label, tx, ty]) => {
+      roundRect(s, { x: ix, y: iy, w: 0.786, h: 0.786, adj: 20944, fill: { color: C.navy }, line: { color: C.white, width: 4 } });
+      carIcon(s, ix + 0.393, iy + 0.393, 0.42);
+      optionBlock(s, tx, ty, label, LOREM_FUSCE);
+    });
+  footer(s, 9);
+}
+
+// 10 — Automotive Wheel Designs
+function slide10(pptx) {
+  const s = pptx.addSlide();
+  rect(s, { x: 7.139, y: 0, w: 6.194, h: 7.5, fill: { color: C.navy } });
+  title(s, 'Automotive Wheel Designs', { x: 0.773, y: 1.475, w: 4.532, h: 2.555 });
+  head(s, 'Automotive Wheels', { x: 0.773, y: 4.286, w: 3.761, h: 0.438 });
+  body(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa posuere, magna sed.', {
+    x: 0.773, y: 4.723, w: 4.019, h: 0.992,
+  });
+  [[5.654, 5.816, 6.003, '$1300', 'Option 1'], [9.35, 9.511, 9.699, '$1200', 'Option 2']]
+    .forEach(([cardX, priceX, colX, price, label]) => {
+      roundRect(s, { x: cardX, y: 1.4, w: 3.223, h: 4.709, adj: 10777, fill: { color: C.white }, shadow: cardShadow() });
+      head(s, price, { x: priceX, y: 4.283, w: 2.9, h: 0.646, fontSize: 36, color: C.navy, align: 'center', lineSpacingMultiple: 0.9 });
+      head(s, label, { x: colX, y: 5.012, w: 2.525, h: 0.438, align: 'center' });
+      body(s, 'Lorem ipsum dolor.', { x: colX, y: 5.41, w: 2.525, h: 0.38, align: 'center' });
+    });
+  footer(s, 10);
+}
+
+// 11 — Anatomy of Automotive Wheel
+function slide11(pptx) {
+  const s = pptx.addSlide();
+  const cards = [
+    { x: 0.76, y: 0.601, dark: false, label: 'Subtitle 1', tx: 1.183, ty: 0.984, badge: [5.157, 1.154, '01'] },
+    { x: 2.762, y: 2.804, dark: true, label: 'Subtitle 2', tx: 3.669, ty: 3.188, badge: [2.368, 3.357, '02'] },
+    { x: 0.76, y: 4.997, dark: false, label: 'Subtitle 3', tx: 1.183, ty: 5.386, badge: [5.157, 5.555, '03'] },
+  ];
+  cards.forEach((c) => {
+    roundRect(s, {
+      x: c.x, y: c.y, w: 4.79, h: 1.902, adj: 14572,
+      fill: { color: c.dark ? C.navy : C.white }, shadow: cardShadow(),
+    });
+    head(s, c.label, { x: c.tx, y: c.ty, w: 3.761, h: 0.438, color: c.dark ? C.white : C.amber });
+    body(s, LOREM_TINY, { x: c.tx, y: c.ty + 0.438, w: 3.318, h: 0.686, color: c.dark ? C.white : C.grey65 });
+  });
+  cards.forEach((c) => badge(s, c.badge[0], c.badge[1], c.badge[2]));
+  title(s, 'Anatomy of Automotive Wheel', { x: 8.565, y: 1.475, w: 3.839, h: 2.555, align: 'right' });
+  head(s, 'Automotive Wheels', { x: 8.812, y: 4.624, w: 3.761, h: 0.438, align: 'right' });
+  body(s, LOREM_SHORT, { x: 8.037, y: 5.062, w: 4.536, h: 0.686, align: 'right' });
+  footer(s, 11);
+}
+
+// 12 — Finding the Perfect Balance
+function slide12(pptx) {
+  const s = pptx.addSlide();
+  title(s, 'Finding the Perfect Balance', { x: 0.774, y: 0.615, w: 11.799, h: 0.919, align: 'center' });
+  body(s, LOREM_SHORT, { x: 0.77, y: 1.623, w: 11.799, h: 0.38, align: 'center' });
+  const cols = [
+    { cardX: 0.774, cardY: 3.028, dark: false, badgeX: 2.185, statX: 1.129, textX: 1.212, stat: '244+', label: 'Subtitle 1', num: '01' },
+    { cardX: 4.869, cardY: 3.014, dark: true, badgeX: 6.273, statX: 5.217, textX: 5.3, stat: '556+', label: 'Subtitle 2', num: '02' },
+    { cardX: 8.964, cardY: 3.014, dark: false, badgeX: 10.375, statX: 9.319, textX: 9.402, stat: '116+', label: 'Subtitle 3', num: '03' },
+  ];
+  cols.forEach((c) => roundRect(s, {
+    x: c.cardX, y: c.cardY, w: 3.608, h: 3.872, adj: 10777,
+    fill: { color: c.dark ? C.navy : C.white }, shadow: cardShadow(),
+  }));
+  cols.forEach((c) => badge(s, c.badgeX, 2.66, c.num));
+  cols.forEach((c) => {
+    const fg = c.dark ? C.white : C.navy;
+    head(s, c.stat, { x: c.statX, y: 3.911, w: 2.9, h: 0.919, fontSize: 54, color: fg, align: 'center', lineSpacingMultiple: 0.9 });
+    head(s, c.label, { x: c.textX, y: 5.043, w: 2.734, h: 0.438, color: c.dark ? C.white : C.amber, align: 'center' });
+    body(s, LOREM_SHORT, { x: c.textX, y: 5.481, w: 2.734, h: 0.992, color: c.dark ? C.white : C.grey65, align: 'center' });
+  });
+  footer(s, 12);
+}
+
+// 13 — How Advanced Wheel Technology Enhances Vehicle Performance
+function slide13(pptx) {
+  const s = pptx.addSlide();
+  title(s, 'How Advanced Wheel Technology Enhances Vehicle Performance', {
+    x: 0.76, y: 0.615, w: 11.812, h: 1.737, align: 'center',
+  });
+  head(s, 'Pushing the Limits', { x: 1.401, y: 3.064, w: 10.531, h: 0.438, align: 'center' });
+  const long = 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. ' +
+    'Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna.';
+  body(s, long + ' Nunc viverra imperdiet enim. Fusce est. Vivamus a tellus.', {
+    x: 1.401, y: 3.501, w: 10.531, h: 0.992, color: C.navy, align: 'center',
+  });
+  body(s, long + ' ', { x: 1.401, y: 4.576, w: 10.531, h: 0.686, color: C.navy, align: 'center' });
+  head(s, '\u201CGreat wheels don\u2019t just carry a car\u2014they define its performance, style, and soul.\u201D', {
+    x: 0.76, y: 6.281, w: 11.812, h: 0.464, fontSize: 24, italic: true, align: 'center', lineSpacingMultiple: 0.9,
+  });
+  footer(s, 13);
+}
+
+// 14 — SWOT Analysis
+function slide14(pptx) {
+  const s = pptx.addSlide();
+  title(s, 'SWOT Analysis', { x: 0.774, y: 0.615, w: 11.799, h: 0.919, align: 'center' });
+  // four interlocking rings (filled circle + white core), then a white
+  // astroid in the middle that carves the quadrants apart
+  const RING = 2.287, CORE = 1.539, INSET = (RING - CORE) / 2;
+  [[4.567, 2.355, C.navy], [6.48, 2.355, C.amber], [6.48, 4.268, C.navy], [4.567, 4.268, C.amber]]
+    .forEach(([x, y, color]) => {
+      oval(s, { x, y, w: RING, h: RING, fill: { color } });
+      oval(s, { x: x + INSET, y: y + INSET, w: CORE, h: CORE, fill: { color: C.white } });
+    });
+  astroid(s, 5.835, 3.623, 1.618);
+  [['S', 5.247, 3.163, C.navy], ['W', 7.163, 3.163, C.amber], ['O', 5.247, 5.056, C.amber], ['T', 7.163, 5.056, C.navy]]
+    .forEach(([letter, x, y, color]) =>
+      head(s, letter, { x, y, w: 0.927, h: 0.919, fontSize: 54, color, align: 'center', lineSpacingMultiple: 0.9 }));
+  const quads = [
+    { label: 'Strengths', color: C.navy, lx: 1.682, x: 0.869, y: 2.345, align: 'right' },
+    { label: 'Opportunities', color: C.amber, lx: 1.682, x: 0.869, y: 4.803, align: 'right' },
+    { label: 'Weaknesses', color: C.amber, lx: 9.303, x: 9.303, y: 2.345, align: 'left' },
+    { label: 'Threats', color: C.navy, lx: 9.303, x: 9.303, y: 4.803, align: 'left' },
+  ];
+  quads.forEach((q) => {
+    head(s, q.label, { x: q.lx, y: q.y, w: 2.348, h: 0.438, color: q.color, align: q.align });
+    body(s, LOREM_SWOT, { x: q.x, y: q.y + 0.438, w: 3.161, h: 0.992, align: q.align });
+  });
+  footer(s, 14);
+}
+
+// 15 — Built for Extreme Conditions
+function slide15(pptx) {
+  const s = pptx.addSlide();
+  title(s, 'Built for Extreme Conditions', { x: 0.774, y: 0.615, w: 11.799, h: 0.919, align: 'center' });
+  // three concentric gauge rings: pale full circle + coloured arc
+  const rings = [
+    { x: 1.069, y: 2.368, d: 4.03, color: C.navyDark, range: [270, 177.3] },
+    { x: 1.683, y: 2.981, d: 2.803, color: C.amber, range: [270.2, 87.7] },
+    { x: 2.28, y: 3.578, d: 1.61, color: C.navy, range: [272.3, 2.0] },
+  ];
+  rings.forEach((r) => {
+    oval(s, { x: r.x, y: r.y, w: r.d, h: r.d, fill: { type: 'none' }, line: { color: C.ring, width: 25, transparency: 70 } });
+    shape(s, SH.arc, {
+      x: r.x, y: r.y, w: r.d, h: r.d, angleRange: r.range,
+      fill: { type: 'none' }, line: { color: r.color, width: 25 },
+    });
+  });
+  const leaders = [
+    { x: 3.55, y: 2.58, w: 3.57, color: C.navyDark },
+    { x: 3.899, y: 4.134, w: 3.222, color: C.navy },
+    { x: 3.138, y: 5.74, w: 3.983, color: C.amber },
+  ];
+  leaders.forEach((l) => shape(s, SH.line, {
+    x: l.x, y: l.y, w: l.w, h: 0, line: { color: l.color, width: 1.5, endArrowType: 'oval' },
+  }));
+  [['Option 1', 2.393, C.navy], ['Option 2', 3.983, C.navy], ['Option 3', 5.573, C.amber]]
+    .forEach(([label, y, color]) => {
+      head(s, label, { x: 7.3, y, w: 4.372, h: 0.438, color });
+      body(s, LOREM_MED, { x: 7.3, y: y + 0.438, w: 5.273, h: 0.686 });
+    });
+  footer(s, 15);
+}
+
+// 16 — Advances in Lightweight Wheel (area chart)
+function slide16(pptx) {
+  const s = pptx.addSlide();
+  title(s, 'Advances in Lightweight Wheel', { x: 0.774, y: 0.615, w: 11.799, h: 0.919, align: 'center' });
+  [
+    { path: WAVE_TALL, x: 5.775, y: 4.009, w: 6.798, h: 2.237, color: C.navy },
+    { path: WAVE_TALL, x: 5.775, y: 4.411, w: 6.798, h: 1.834, color: C.amber, flipH: true },
+    { path: WAVE_LOW, x: 5.775, y: 4.827, w: 6.797, h: 1.418, color: C.navyLight },
+  ].forEach((band) => { wave(s, band.path, band); fadeToWhite(s, band); });
+  ['Jan', 'Feb', 'Marc', 'Apr', 'Mei', 'June'].forEach((m, i) => {
+    s.addText(m, {
+      x: 5.92 + i * 1.2032, y: 6.34, w: 0.493, h: 0.303,
+      fontFace: F.body, fontSize: 10.5, color: C.grey65, valign: 'top', wrap: false, margin: [7.2, 7.2, 3.6, 3.6],
+    });
+  });
+  [['$310M', 6.177, 3.203, C.amber], ['$179M', 10.963, 3.623, C.amberPale]].forEach(([label, x, y, color]) => {
+    roundRect(s, { x, y, w: 1.193, h: 0.547, adj: 50000, fill: { color } });
+    head(s, label, { x: x + 0.096, y: y + 0.068, w: 1.0, h: 0.404, fontSize: 18, color: C.white, align: 'center' });
+  });
+  head(s, 'Jan - June', { x: 5.757, y: 2.289, w: 2.603, h: 0.404, fontSize: 18 });
+  head(s, '2025', { x: 9.856, y: 2.289, w: 2.603, h: 0.404, fontSize: 18, align: 'right' });
+  const legend = [
+    { y: 2.245, dot: C.navy, label: 'Option 1', labelColor: C.navy },
+    { y: 3.881, dot: C.amber, label: 'Option 2', labelColor: C.amber },
+    { y: 5.517, dot: C.navyLight, label: 'Option 3', labelColor: C.navy },
+  ];
+  legend.forEach((l) => {
+    oval(s, { x: 0.996, y: l.y, w: 0.493, h: 0.493, fill: { color: l.dot } });
+    head(s, l.label, { x: 1.685, y: l.y + 0.044, w: 3.097, h: 0.404, fontSize: 18, color: l.labelColor });
+    body(s, LOREM_PELL, { x: 1.688, y: l.y + 0.448, w: 3.018, h: 0.684 });
+  });
+  footer(s, 16);
+}
+
+// 17 — Advances in Lightweight Wheel (schedule)
+function slide17(pptx) {
+  const s = pptx.addSlide();
+  title(s, 'Advances in Lightweight Wheel', { x: 0.774, y: 0.615, w: 11.799, h: 0.919, align: 'center' });
+  const rows = [
+    { y: 2.086, dot: C.navy, label: 'Option 1', labelColor: C.navy },
+    { y: 3.729, dot: C.amber, label: 'Option 2', labelColor: C.amber },
+    { y: 5.373, dot: C.navyLight, label: 'Option 3', labelColor: C.navy },
+  ];
+  rows.forEach((r) => {
+    roundRect(s, { x: 0.923, y: r.y, w: 4.229, h: 1.204, adj: 16375, fill: { color: C.white }, shadow: cardShadow() });
+    oval(s, { x: 1.239, y: r.y + 0.212, w: 0.404, h: 0.404, fill: { color: r.dot } });
+    head(s, r.label, { x: 1.739, y: r.y + 0.203, w: 3.097, h: 0.404, fontSize: 18, color: r.labelColor });
+    body(s, 'Lorem ipsum dolor sit amet.', { x: 1.742, y: r.y + 0.607, w: 3.018, h: 0.38, color: C.grey75 });
+  });
+  head(s, 'Couple Month', { x: 5.808, y: 2.124, w: 1.702, h: 0.381, fontSize: 14, align: 'center' });
+  [['Week 1', 2.838, C.navy], ['Week 2', 3.702, C.amber], ['Week 3', 4.588, C.navyLight]]
+    .forEach(([label, y, color]) => {
+      roundRect(s, { x: 5.808, y, w: 1.702, h: 0.478, adj: 50000, fill: { color } });
+      head(s, label, { x: 5.808, y: y + 0.054, w: 1.702, h: 0.404, fontSize: 18, color: C.white, align: 'center' });
+    });
+  ['M', 'T', 'W', 'T', 'F', 'S', 'S'].forEach((d, i) => {
+    s.addText(d, {
+      x: 7.864 + i * 0.6617, y: 2.124, w: 0.576, h: 0.316, align: 'center',
+      fontFace: F.body, fontSize: 11, color: C.grey75, valign: 'top', margin: [7.2, 7.2, 3.6, 3.6],
+    });
+  });
+  const G = C.greyPale, N = C.navy, A = C.amber, B = C.navyLight;
+  const dots = [
+    [G, B, A, G, N, B, G],
+    [N, A, G, N, G, B, G],
+    [B, G, A, N, G, G, A],
+  ];
+  dots.forEach((row, r) => row.forEach((color, c) => {
+    oval(s, { x: 7.91 + c * 0.6627, y: 2.838 + r * 0.877, w: 0.478, h: 0.478, fill: { color } });
+  }));
+  head(s, 'Note:', { x: 5.813, y: 5.538, w: 3.097, h: 0.404, fontSize: 18 });
+  body(s, 'Lorem ipsum dolor sit amet, consectetuer elit. ', { x: 5.808, y: 5.891, w: 3.653, h: 0.686 });
+  head(s, '+7442', { x: 10.38, y: 5.78, w: 2.039, h: 0.909, fontSize: 48, align: 'right' });
+  footer(s, 17);
+}
+
+// 18 — The Future of Custom Wheels
+function slide18(pptx) {
+  const s = pptx.addSlide();
+  title(s, 'The Future of Custom Wheels', { x: 0.774, y: 0.615, w: 3.973, h: 2.555 });
+  head(s, 'Personalization & Aesthetics', { x: 0.774, y: 3.292, w: 3.973, h: 0.438 });
+  body(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit congue massa.', {
+    x: 0.774, y: 3.853, w: 3.876, h: 0.686, color: C.grey75,
+  });
+  [['+218', 'Option 1', 0.76, 'center'], ['+544', 'Option 2', 2.937, 'left']].forEach(([stat, label, x, align]) => {
+    head(s, stat, { x, y: 5.202, w: 1.571, h: 0.909, fontSize: 48, color: C.navy, align });
+    head(s, label, { x, y: 6.238, w: 1.571, h: 0.438, align: 'center' });
+  });
+  imagePlaceholder(s, 6.042, 0.992, 3.08, 5.477);
+  footer(s, 18);
+}
+
+// 19 — Emerging Trends in Automotive Wheel
+function slide19(pptx) {
+  const s = pptx.addSlide();
+  imagePlaceholder(s, 0.633, 0, 5.001, 7.5);
+  title(s, 'Emerging Trends in Automotive Wheel', { x: 6.562, y: 0.615, w: 6.011, h: 1.737 });
+  head(s, 'Personalization & Aesthetics', { x: 6.562, y: 2.717, w: 6.011, h: 0.438 });
+  body(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa posuere.', {
+    x: 6.562, y: 3.278, w: 6.011, h: 0.686,
+  });
+  [['+544', 6.667, 7.204, 6.846], ['+416', 9.79, 10.323, 9.969]].forEach(([stat, cardX, statX, textX]) => {
+    roundRect(s, { x: cardX, y: 4.516, w: 2.783, h: 1.902, adj: 14572, fill: { color: C.navy }, shadow: cardShadow() });
+    head(s, stat, { x: statX, y: 4.787, w: 1.571, h: 0.707, fontSize: 36, color: C.white, align: 'center' });
+    body(s, 'Lorem ipsum dolor sit ametadipiscing elit. ', {
+      x: textX, y: 5.462, w: 2.424, h: 0.686, color: C.white, align: 'center',
+    });
+  });
+  footer(s, 19);
+}
+
+// 20 — Thank you
+function slide20(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: C.ink };
+  head(s, 'THANK YOU!', {
+    x: 0.76, y: 2.466, w: 6.286, h: 1.555, fontSize: 96, lineSpacingMultiple: 0.9,
+  });
+  s.addText('The Next Generation of Automotive Wheels', {
+    x: 0.76, y: 3.919, w: 5.906, h: 0.404,
+    fontFace: F.body, fontSize: 18, color: C.white, valign: 'top', margin: [7.2, 7.2, 3.6, 3.6],
+  });
+  const contacts = [
+    { y: 5.721, icon: 'globe', text: 'www.automotivewheels.com' },
+    { y: 6.21, icon: 'in', text: 'Automotive_wheels' },
+    { y: 6.7, icon: 'camera', text: 'Automotive_Wheels' },
+  ];
+  contacts.forEach((c) => {
+    socialIcon(s, c.icon, 0.812, c.y, 0.245);
+    s.addText(c.text, {
+      x: 1.28, y: c.y, w: 2.379, h: 0.286,
+      fontFace: F.body, fontSize: 11, color: C.white, valign: 'top', margin: [7.2, 7.2, 3.6, 3.6],
+    });
+  });
+}
+
+/** White outline pictograms for the closing slide's contact list. */
+function socialIcon(s, kind, x, y, d) {
+  if (kind === 'globe') {
+    oval(s, { x, y, w: d, h: d, fill: { type: 'none' }, line: { color: C.white, width: 1 } });
+    oval(s, { x: x + d * 0.31, y, w: d * 0.38, h: d, fill: { type: 'none' }, line: { color: C.white, width: 1 } });
+    shape(s, SH.line, { x, y: y + d / 2, w: d, h: 0, line: { color: C.white, width: 1 } });
+  } else if (kind === 'in') {
+    s.addText('in', {
+      x: x - 0.03, y: y - 0.05, w: d + 0.06, h: d + 0.1, align: 'center', valign: 'middle',
+      fontFace: F.body, fontSize: 14, bold: true, color: C.white, margin: 0,
+    });
+  } else {
+    roundRect(s, { x, y, w: d, h: d, adj: 28000, fill: { type: 'none' }, line: { color: C.white, width: 1 } });
+    oval(s, { x: x + d * 0.28, y: y + d * 0.28, w: d * 0.44, h: d * 0.44, fill: { type: 'none' }, line: { color: C.white, width: 1 } });
+    oval(s, { x: x + d * 0.7, y: y + d * 0.16, w: d * 0.12, h: d * 0.12, fill: { color: C.white } });
+  }
+}
+
+/* --------------------------------------------------------------------- run */
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'DECK', width: SLIDE_W, height: SLIDE_H });
+  pptx.layout = 'DECK';
+  pptx.title = 'Automotive Wheels';
+  pptx.theme = { headFontFace: F.head, bodyFontFace: F.body };
+
+  [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
+    slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20]
+    .forEach((fn) => fn(pptx));
+
+  return pptx;
+}
+
+build()
+  .writeFile({ fileName: path.join(__dirname, '10832c74-3b29-41ab-9486-3a3e963f4438_grok_final.pptx') })
+  .then((f) => console.log('wrote', f))
+  .catch((e) => { console.error(e); process.exit(1); });
