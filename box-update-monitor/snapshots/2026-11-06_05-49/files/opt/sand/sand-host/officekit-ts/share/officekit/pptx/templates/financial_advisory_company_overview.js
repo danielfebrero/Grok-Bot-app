@@ -1,0 +1,1124 @@
+/**
+ * "Finant" financial presentation - 24 slides, 13.333 x 7.5 in.
+ * Rebuilt with pptxgenjs only. Photographs of the original deck are replaced
+ * by flat colour placeholders (see imageBox / glowBox / deviceFrame).
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ palette */
+const DARK = '1F322C'; // deep green page background
+const CREAM = 'E4EBE3'; // light page background
+const LIME = '98F579'; // accent green
+const WHITE = 'FFFFFF';
+const OFFWHITE = 'F2F2F2';
+const SILVER = 'D8D8D8';
+const GREY = '737373'; // muted text on light backgrounds
+const GREY_D = 'ADACAC'; // muted text on dark backgrounds
+const SLATE = '333F4F';
+const PHOTO = 'C4D4DC'; // stand-in colour for every photograph
+const DEVICE = '242828'; // stand-in colour for device mock-ups
+const AMBER = 'FBBB4E'; // rating stars
+
+/* -------------------------------------------------------------------- fonts */
+const SEMI = 'Poppins SemiBold';
+const MED = 'Poppins Medium';
+const LIGHT = 'Poppins Light';
+const REG = 'Poppins';
+
+/* ------------------------------------------------- reusable custom outlines
+ * Coordinates are fractions of the shape box, drawn by poly() below.
+ * M = moveTo, L = lineTo, C = cubic bezier (x1,y1,x2,y2,x,y), Z = close.
+ */
+const QUOTE = [ // quarter ring - the "comma" motif used across the deck
+  ['M', 1, 0], ['L', 1, 0.3676],
+  ['C', 0.6507, 0.3676, 0.3676, 0.6507, 0.3676, 1],
+  ['L', 0, 1], ['C', 0, 0.4477, 0.4477, 0, 1, 0], ['Z'],
+];
+const QUARTER = [ // quarter disc, centre at the top-left corner
+  ['M', 0, 0], ['L', 1, 0],
+  ['C', 1, 0.5523, 0.5523, 1, 0, 1], ['L', 0, 1], ['Z'],
+];
+const DTILE = [ // half stadium - flat left edge, round right edge
+  ['M', 1, 0.5], ['C', 1, 0.2239, 0.7761, 0, 0.5, 0],
+  ['L', 0, 0], ['L', 0, 1], ['L', 0.5, 1],
+  ['C', 0.7761, 1, 1, 0.7761, 1, 0.5], ['Z'],
+];
+const HALFRING = [ // half ring opening to the right
+  ['M', 0.5, 0], ['C', 0.7761, 0, 1, 0.2239, 1, 0.5], ['L', 0.8162, 0.5],
+  ['C', 0.8162, 0.3254, 0.6746, 0.1838, 0.5, 0.1838],
+  ['C', 0.3254, 0.1838, 0.1838, 0.3254, 0.1838, 0.5],
+  ['C', 0.1838, 0.6746, 0.3254, 0.8162, 0.5, 0.8162], ['L', 0.5, 1],
+  ['C', 0.2239, 1, 0, 0.7761, 0, 0.5], ['C', 0, 0.2239, 0.2239, 0, 0.5, 0], ['Z'],
+];
+const WIDERING = [ // squashed half ring, opening to the right
+  ['M', 1, 0], ['L', 1, 0.1838],
+  ['C', 0.6507, 0.1838, 0.3676, 0.3254, 0.3676, 0.5],
+  ['C', 0.3676, 0.6746, 0.6507, 0.8162, 1, 0.8162], ['L', 1, 1],
+  ['C', 0.4477, 1, 0, 0.7761, 0, 0.5], ['C', 0, 0.2239, 0.4477, 0, 1, 0], ['Z'],
+];
+const CORNERCUT = [ // rectangle whose bottom-left corner is a quarter disc
+  ['M', 1, 1], ['L', 1, 0], ['L', 0.5, 0],
+  ['C', 0.2239, 0, 0, 0.4475, 0, 1], ['Z'],
+];
+const PETAL = [ // square with the top-right corner carved away by an arc
+  ['M', 0, 0], ['C', 0.552, 0, 1, 0.448, 1, 1], ['L', 0, 1], ['Z'],
+];
+const LEAF = [ // tall lens shape, flat on the right
+  ['M', 1, 0], ['L', 1, 0.5], ['L', 0.995, 0.551],
+  ['C', 0.944, 0.803, 0.518, 1, 0, 1], ['L', 0, 0.5], ['L', 0.005, 0.449],
+  ['C', 0.056, 0.197, 0.482, 0, 1, 0], ['Z'],
+];
+const ROUNDTL = [ // square with a fully rounded top-left corner
+  ['M', 1, 0], ['L', 1, 1], ['L', 0, 1], ['C', 0, 0.448, 0.448, 0, 1, 0], ['Z'],
+];
+const SEMIBOT = [ // square top, semicircular bottom
+  ['M', 0, 0], ['L', 1, 0], ['L', 1, 0.5],
+  ['C', 1, 0.776, 0.776, 1, 0.5, 1], ['C', 0.224, 1, 0, 0.776, 0, 0.5], ['Z'],
+];
+const CHECK = [ // tick mark
+  ['M', 0.366, 1], ['L', 1, 0.1375], ['L', 0.893, 0], ['L', 0.366, 0.725],
+  ['L', 0.107, 0.3625], ['L', 0, 0.5], ['Z'],
+];
+const TREND = [ // zig-zag "growth" glyph
+  ['M', 0.077, 1], ['L', 0, 0.887], ['L', 0.383, 0.312], ['L', 0.569, 0.589],
+  ['L', 0.923, 0], ['L', 1, 0.113], ['L', 0.569, 0.83], ['L', 0.383, 0.553], ['Z'],
+];
+const THUMB = [ // thumbs-up glyph
+  ['M', 0.0, 0.42], ['L', 0.26, 0.42], ['L', 0.26, 1], ['L', 0.0, 1], ['Z'],
+  ['M', 0.32, 0.4], ['L', 0.6, 0.05], ['L', 0.66, 0.09], ['L', 0.58, 0.4],
+  ['L', 0.95, 0.4], ['C', 1, 0.4, 1, 0.46, 0.98, 0.52], ['L', 0.85, 0.94],
+  ['C', 0.82, 1, 0.78, 1, 0.74, 1], ['L', 0.32, 1], ['Z'],
+];
+
+/* ----------------------------------------------------------- tiny utilities */
+const pres = new PptxGenJS();
+pres.defineLayout({ name: 'FINANT', width: 13.333, height: 7.5 });
+pres.layout = 'FINANT';
+
+function slide(bg) {
+  const s = pres.addSlide();
+  s.background = { color: bg };
+  return s;
+}
+/** solid/none fill helper: 'RRGGBB' or ['RRGGBB', transparency] */
+function fill(v) {
+  if (!v) return { type: 'none' };
+  return Array.isArray(v) ? { color: v[0], transparency: v[1] } : { color: v };
+}
+function rect(s, o) { s.addShape('rect', shp(o)); }
+function oval(s, o) { s.addShape('ellipse', shp(o)); }
+function roundRect(s, o) { s.addShape('roundRect', shp(o)); }
+function tri(s, o) { s.addShape('triangle', shp(o)); }
+function pie(s, o) { s.addShape('pie', shp(o)); }
+function shp(o) {
+  const r = { x: o.x, y: o.y, w: o.w, h: o.h, fill: fill(o.fill), line: o.line || { type: 'none' } };
+  if (o.rotate) r.rotate = o.rotate;
+  if (o.flipH) r.flipH = true;
+  if (o.flipV) r.flipV = true;
+  if (o.rectRadius !== undefined) r.rectRadius = o.rectRadius;
+  if (o.angleRange) r.angleRange = o.angleRange;
+  if (o.points) r.points = o.points;
+  return r;
+}
+/** custom outline: path fractions scaled into the shape box */
+function poly(s, pathDef, o) {
+  const pts = [];
+  pathDef.forEach((c) => {
+    if (c[0] === 'Z') pts.push({ close: true });
+    else if (c[0] === 'M') pts.push({ x: c[1] * o.w, y: c[2] * o.h, moveTo: true });
+    else if (c[0] === 'L') pts.push({ x: c[1] * o.w, y: c[2] * o.h });
+    else pts.push({
+      x: c[5] * o.w, y: c[6] * o.h,
+      curve: { type: 'cubic', x1: c[1] * o.w, y1: c[2] * o.h, x2: c[3] * o.w, y2: c[4] * o.h },
+    });
+  });
+  s.addShape('custGeom', shp(Object.assign({ points: pts }, o)));
+}
+function hline(s, o) {
+  s.addShape('line', {
+    x: o.x, y: o.y, w: o.w, h: o.h || 0,
+    line: { color: o.color, width: o.width || 1, transparency: o.transparency || 0 },
+  });
+}
+/** text box: runs may be a string or an array of {text, options} */
+function txt(s, runs, o) {
+  const opts = Object.assign({ valign: 'top', margin: 0, isTextBox: true }, o);
+  s.addText(runs, opts);
+}
+
+/* --------------------------------------------------------------- iconography
+ * The original deck uses detailed vector glyphs; these compact helpers rebuild
+ * the same silhouettes out of primitive shapes.
+ */
+function iconDots(s, x, y, sz, color) { // 5 x 5 dot grid ("globe" / network)
+  const step = sz / 5, d = step * 0.52;
+  for (let r = 0; r < 5; r++) {
+    for (let c = 0; c < 5; c++) {
+      if ((r === 0 || r === 4) && (c === 0 || c === 4)) continue;
+      oval(s, { x: x + c * step + (step - d) / 2, y: y + r * step + (step - d) / 2, w: d, h: d, fill: color });
+    }
+  }
+}
+function iconFingerprint(s, x, y, sz, color) { // three nested rings plus a core
+  const w = Math.max(0.5, sz * 5);
+  [1, 0.68, 0.36].forEach((k) => {
+    s.addShape('ellipse', {
+      x: x + sz * (1 - k) / 2, y: y + sz * (1 - k) / 2, w: sz * k, h: sz * k,
+      fill: { type: 'none' }, line: { color: color, width: w },
+    });
+  });
+  oval(s, { x: x + sz * 0.44, y: y + sz * 0.44, w: sz * 0.12, h: sz * 0.12, fill: color });
+}
+function iconWifi(s, x, y, sz, color) { // two arcs plus a dot
+  const w = Math.max(0.5, sz * 8);
+  [1, 0.6].forEach((k) => {
+    s.addShape('arc', {
+      x: x + sz * (1 - k) / 2, y: y + sz * (1 - k) / 2, w: sz * k, h: sz * k,
+      angleRange: [200, 340], line: { color: color, width: w },
+    });
+  });
+  oval(s, { x: x + sz * 0.42, y: y + sz * 0.62, w: sz * 0.17, h: sz * 0.17, fill: color });
+}
+function iconBarChart(s, x, y, sz, color) { // framed bar chart
+  s.addShape('rect', {
+    x: x, y: y, w: sz, h: sz, fill: { type: 'none' },
+    line: { color: color, width: Math.max(0.5, sz * 8), dashType: 'solid' },
+  });
+  [[0.24, 0.42], [0.45, 0.62], [0.66, 0.30]].forEach(([bx, bh]) => {
+    rect(s, { x: x + sz * bx, y: y + sz * (0.76 - bh), w: sz * 0.12, h: sz * bh, fill: color });
+  });
+}
+function iconRuler(s, x, y, sz, color) { // set-square / triangle outline
+  const w = Math.max(0.5, sz * 8);
+  hline(s, { x: x + sz * 0.12, y: y + sz * 0.1, w: 0, h: sz * 0.8, color: color, width: w });
+  hline(s, { x: x + sz * 0.12, y: y + sz * 0.9, w: sz * 0.8, h: 0, color: color, width: w });
+  hline(s, { x: x + sz * 0.12, y: y + sz * 0.1, w: sz * 0.8, h: sz * 0.8, color: color, width: w });
+}
+function iconBolt(s, x, y, w, h, color) {
+  s.addShape('lightningBolt', { x: x, y: y, w: w, h: h, fill: fill(color), line: { type: 'none' } });
+}
+function iconThumb(s, x, y, w, h, color) { poly(s, THUMB, { x: x, y: y, w: w, h: h, fill: color }); }
+function iconPhoto(s, x, y, sz, color) { // portrait: framed head and shoulders
+  const w = Math.max(0.5, sz * 6);
+  s.addShape('rect', { x: x, y: y, w: sz, h: sz, fill: { type: 'none' }, line: { color: color, width: w } });
+  s.addShape('ellipse', {
+    x: x + sz * 0.33, y: y + sz * 0.22, w: sz * 0.34, h: sz * 0.34,
+    fill: { type: 'none' }, line: { color: color, width: w },
+  });
+  s.addShape('arc', {
+    x: x + sz * 0.15, y: y + sz * 0.6, w: sz * 0.7, h: sz * 0.62,
+    angleRange: [180, 360], line: { color: color, width: w },
+  });
+}
+function iconBadge(s, x, y, sz, color) { // rosette with a tick
+  s.addShape('star12', { x: x, y: y, w: sz, h: sz, fill: fill(color), line: { type: 'none' } });
+  poly(s, CHECK, { x: x + sz * 0.26, y: y + sz * 0.34, w: sz * 0.46, h: sz * 0.33, fill: WHITE });
+}
+function iconCompass(s, x, y, sz, color) {
+  s.addShape('ellipse', {
+    x: x, y: y, w: sz, h: sz, fill: { type: 'none' },
+    line: { color: color, width: Math.max(0.75, sz * 6) },
+  });
+  poly(s, [['M', 0, 1], ['L', 0.71, 0.71], ['L', 1, 0], ['L', 0.29, 0.3], ['Z']],
+    { x: x + sz * 0.26, y: y + sz * 0.26, w: sz * 0.48, h: sz * 0.48, fill: color });
+}
+function iconPhone(s, x, y, sz, color) { // handset
+  poly(s, [
+    ['M', 0.0, 0.22], ['C', 0.0, 0.7, 0.3, 1, 0.78, 1], ['C', 0.9, 1, 1, 0.9, 1, 0.79],
+    ['L', 0.74, 0.62], ['L', 0.58, 0.75], ['C', 0.42, 0.66, 0.34, 0.58, 0.25, 0.42],
+    ['L', 0.38, 0.26], ['L', 0.21, 0], ['C', 0.1, 0, 0.0, 0.1, 0.0, 0.22], ['Z'],
+  ], { x: x, y: y, w: sz, h: sz, fill: color });
+}
+function iconPlay(s, x, y, sz, bg, fg, round) { // circular / rounded play button
+  if (round === 'rect') roundRect(s, { x: x, y: y, w: sz, h: sz, fill: bg });
+  else oval(s, { x: x, y: y, w: sz, h: sz, fill: bg });
+  tri(s, { x: x + sz * 0.39, y: y + sz * 0.41, w: sz * 0.26, h: sz * 0.18, fill: fg, rotate: 90 });
+}
+function stars(s, x, y, n, litColor) { // 5 rating stars, n of them highlighted
+  for (let i = 0; i < 5; i++) {
+    s.addShape('star5', {
+      x: x + i * 0.296, y: y, w: 0.214, h: 0.2,
+      fill: fill(i < n ? litColor : WHITE), line: { type: 'none' },
+    });
+  }
+}
+
+/* ------------------------------------------------------- image stand-ins */
+function imageBox(s, o) { // flat rectangle where a photograph used to be
+  rect(s, { x: o.x, y: o.y, w: o.w, h: o.h, fill: o.fill || PHOTO });
+  if (o.w >= 1.5 && o.h >= 1.0 && o.label !== false) {
+    txt(s, '[image]', {
+      x: o.x, y: o.y + o.h / 2 - 0.12, w: o.w, h: 0.24, align: 'center',
+      fontFace: REG, fontSize: 9, color: '8FA3AC',
+    });
+  }
+}
+/** Soft radial halo replacing a blurred bitmap: nested translucent ellipses
+ *  whose radii shrink quadratically, so opacity builds up towards the centre.
+ *  `peak` is the resulting opacity in the middle, expressed as a percentage. */
+function glow(s, o) {
+  const n = 14;
+  const transparency = 100 - o.peak / n;
+  for (let i = 0; i < n; i++) {
+    const k = Math.pow(1 - i / n, 2);
+    oval(s, {
+      x: o.cx - o.r * k, y: o.cy - o.r * k, w: o.r * 2 * k, h: o.r * 2 * k,
+      fill: [o.color, transparency],
+    });
+  }
+}
+function deviceFrame(s, o) { // laptop / tablet body around a screen placeholder
+  roundRect(s, { x: o.x, y: o.y, w: o.w, h: o.h, fill: DEVICE, rectRadius: o.radius || 0.08 });
+  if (o.base) roundRect(s, { x: o.base[0], y: o.base[1], w: o.base[2], h: o.base[3], fill: DEVICE, rectRadius: 0.05 });
+}
+
+/* --------------------------------------------------- page chrome (all slides)
+ * theme = 'dark'  -> deep green page,  theme = 'light' -> cream page
+ */
+function chrome(s, theme) {
+  const dark = theme === 'dark';
+  const ink = dark ? CREAM : DARK;
+  const muted = dark ? GREY_D : GREY;
+  const pill = dark ? CREAM : DARK;
+
+  // logo mark: four rounded "quote" tiles, the last one accented
+  [[0.926, 0.371, false, CREAM], [1.057, 0.371, false, CREAM],
+   [0.926, 0.502, true, CREAM], [1.057, 0.502, true, LIME]].forEach(([x, y, flip, c]) => {
+    poly(s, QUOTE, { x: x, y: y, w: 0.131, h: 0.131, fill: c === LIME ? LIME : ink, flipH: flip, flipV: flip });
+  });
+  txt(s, 'Finant', { x: 1.4, y: 0.409, w: 0.696, h: 0.185, fontFace: SEMI, fontSize: 11, color: ink });
+
+  // navigation links
+  txt(s, 'About Us', { x: 4.96, y: 0.431, w: 0.546, h: 0.135, align: 'center', fontFace: MED, fontSize: 8, color: dark ? WHITE : DARK });
+  [['Solutions', 5.943, 0.536], ['Blog', 6.916, 0.334], ['Testimonial', 7.687, 0.686]].forEach(([t, x, w]) => {
+    txt(s, t, { x: x, y: 0.431, w: w, h: 0.135, align: 'center', fontFace: REG, fontSize: 8, color: muted });
+  });
+
+  // "Presentation | Financial" switch
+  s.addShape('leftBracket', {
+    x: 9.737, y: 0.371, w: 0.05, h: 0.25, fill: { type: 'none' },
+    line: { color: ink, width: 1, transparency: 80 },
+  });
+  txt(s, 'Presentation', { x: 9.778, y: 0.447, w: 0.857, h: 0.101, align: 'center', fontFace: REG, fontSize: 6, color: dark ? WHITE : GREY });
+  roundRect(s, { x: 10.636, y: 0.373, w: 0.898, h: 0.25, fill: [pill, 90] });
+  txt(s, 'Financial', { x: 10.766, y: 0.447, w: 0.637, h: 0.101, align: 'center', fontFace: MED, fontSize: 6, color: dark ? WHITE : DARK });
+
+  // social row bottom-left
+  oval(s, { x: 2.031, y: 6.913, w: 0.292, h: 0.292, fill: null, line: { color: ink, width: 1, transparency: 50 } });
+  [['Fb', 1.763, ink], ['Tw', 2.052, dark ? LIME : DARK], ['In', 2.342, ink], ['Ig', 2.631, ink]].forEach(([t, x, c]) => {
+    txt(s, t, { x: x, y: 6.991, w: 0.252, h: 0.135, align: 'center', fontFace: REG, fontSize: 8, color: c, charSpacing: -0.5 });
+  });
+}
+
+/* -------------------------------------------------------- shared text styles */
+const H1 = { fontFace: SEMI, fontSize: 36 };
+const BODY = { fontFace: LIGHT, fontSize: 11, lineSpacingMultiple: 1.5 };
+
+const r = (t, o) => ({ text: t, options: o || {} });                       // inline run
+const rl = (t, o) => ({ text: t, options: Object.assign({ breakLine: true }, o) }); // run + line break
+
+/** bulleted paragraphs - pptxgenjs needs the bullet flag on every run */
+function bullets(items, indentPt) {
+  const bu = { characterCode: '2022', indent: indentPt };
+  return items.map(([text, color], i) => ({
+    text: text,
+    options: { color: color, bullet: bu, breakLine: i < items.length - 1 },
+  }));
+}
+
+/* =========================================================== 1. cover slide */
+function slide01() {
+  const s = slide(DARK);
+  glow(s, { cx: 8.7, cy: 3.7, r: 2.9, color: LIME, peak: 16 });
+
+  // background "comma" motif, bottom right
+  poly(s, QUOTE, { x: 8.587, y: 6.027, w: 1.473, h: 1.473, fill: [WHITE, 90] });
+  poly(s, QUOTE, { x: 10.06, y: 6.027, w: 1.473, h: 1.473, fill: [WHITE, 90] });
+
+  // small phone behind
+  roundRect(s, { x: 9.879, y: 1.989, w: 1.654, h: 3.52, fill: WHITE, rectRadius: 0.14 });
+  roundRect(s, { x: 9.952, y: 2.062, w: 1.508, h: 3.374, fill: PHOTO, rectRadius: 0.12 });
+
+  chrome(s, 'dark');
+
+  txt(s, [r('Your Trusted ', { color: LIME }), r('Partners For Expert Advice.', { color: WHITE })],
+    Object.assign({ x: 1.8, y: 1.858, w: 4.867, h: 1.818 }, H1));
+  txt(s, [r('Aliquam condimentum congue odrporta ', { fontFace: MED }),
+    r('lobortis amet. Phasellus metus araviverra at risus quis, portlasa mianc ut turpis a lacus lobortis')],
+  Object.assign({ x: 1.8, y: 3.978, w: 4.251, h: 0.807, color: OFFWHITE }, BODY));
+
+  roundRect(s, { x: 1.8, y: 5.242, w: 1.6, h: 0.4, fill: LIME });
+  txt(s, 'Explore to Discover', { x: 2.044, y: 5.375, w: 1.113, h: 0.135, align: 'center', fontFace: MED, fontSize: 8, color: DARK });
+  oval(s, { x: 3.644, y: 5.242, w: 0.4, h: 0.4, fill: null, line: { color: CREAM, width: 0.5 } });
+  iconFingerprint(s, 3.763, 5.352, 0.18, CREAM);
+  txt(s, 'Discover More', { x: 4.273, y: 5.38, w: 1.013, h: 0.135, fontFace: REG, fontSize: 8, color: CREAM });
+
+  // big phone in front
+  roundRect(s, { x: 8.257, y: 1.499, w: 2.208, h: 4.5, fill: WHITE, rectRadius: 0.18 });
+  roundRect(s, { x: 9.213, y: 1.617, w: 0.296, h: 0.021, fill: SILVER, rectRadius: 0.01 });
+  oval(s, { x: 9.565, y: 1.599, w: 0.057, h: 0.056, fill: SILVER });
+  roundRect(s, { x: 8.334, y: 1.564, w: 2.054, h: 4.371, fill: PHOTO, rectRadius: 0.15 });
+  iconPlay(s, 8.096, 3.549, 0.4, WHITE, DARK, 'rect');
+}
+
+/* ================================================== 2. scalable payment intro */
+function slide02() {
+  const s = slide(DARK);
+  poly(s, QUOTE, { x: 8.587, y: 0, w: 1.473, h: 1.473, fill: [WHITE, 90], rotate: 180 });
+  poly(s, QUOTE, { x: 10.06, y: 0, w: 1.473, h: 1.473, fill: [WHITE, 90], rotate: 180 });
+  chrome(s, 'dark');
+
+  txt(s, [r('Scalable Payment Infrastructure For ', { color: WHITE }),
+    r('Brands & Digital Gigs ', { color: LIME }), r('Platforms', { color: WHITE })],
+  Object.assign({ x: 5.661, y: 1.845, w: 5.872, h: 2.423 }, H1));
+  txt(s, 'Aenean ut massa sit amet leo imperdiet pretium. Aliquam ansantum congue odio, at porta est '
+    + 'lobortis sit amet. Phasellus metus arcu, viverra at risus quis, porta vestibulum mi. Nunc ut turpis '
+    + 'a lacus lbortis ullamcorper lorambsa curabitur sit amet ante tellus.',
+  Object.assign({ x: 5.661, y: 4.571, w: 5.742, h: 1.085, color: OFFWHITE }, BODY));
+
+  poly(s, HALFRING, { x: -0.453, y: 3.748, w: 4.506, h: 4.506, fill: [WHITE, 90], rotate: 270 });
+  imageBox(s, { x: 1.8, y: 1.498, w: 2.253, h: 2.253 });
+  poly(s, PETAL, { x: 1.8, y: 3.748, w: 2.253, h: 2.253, fill: PHOTO });
+}
+
+/* ============================================== 3. problems & solves (laptop) */
+function slide03() {
+  const s = slide(CREAM);
+  glow(s, { cx: 11.0, cy: 2.9, r: 2.6, color: LIME, peak: 62 });
+  poly(s, WIDERING, { x: 1.8, y: 6.03, w: 1.473, h: 2.946, fill: [DARK, 90] });
+  poly(s, QUOTE, { x: 3.273, y: 6.03, w: 1.473, h: 1.473, fill: [DARK, 90] });
+  chrome(s, 'light');
+
+  deviceFrame(s, { x: 7.631, y: 2.4, w: 3.885, h: 2.63, radius: 0.06, base: [7.409, 5.07, 4.329, 0.09] });
+  imageBox(s, { x: 7.706, y: 2.508, w: 3.76, h: 2.438 });
+
+  txt(s, 'Problems & Solves The Complexity ', Object.assign({ x: 1.8, y: 1.898, w: 4.867, h: 1.212, color: DARK }, H1));
+  txt(s, [r('Aliquam condimentum congue odrporta ', { fontFace: MED }),
+    r('lobortis amet. Phasellus metus araviverra at risus quis, portlasa mianc ut turpis a lacus lobortis ')],
+  Object.assign({ x: 1.8, y: 3.413, w: 4.867, h: 0.807, color: DARK }, BODY));
+
+  [['340K', DARK, 1.8, 'tiaculis diam.'], ['85%', LIME, 4.225, 'mianc ut turpis a lacus']]
+    .forEach(([big, col, x, sub]) => {
+      txt(s, big, { x: x, y: 4.676, w: 2.008, h: 0.74, fontFace: SEMI, fontSize: 44, color: col });
+      txt(s, sub, { x: x, y: 5.416, w: 2.181, h: 0.185, fontFace: LIGHT, fontSize: 11, color: DARK });
+    });
+}
+
+/* ================================================================ 4. stories */
+function slide04() {
+  const s = slide(CREAM);
+  roundRect(s, { x: 1.798, y: 3.817, w: 4.618, h: 1.083, fill: DARK, rectRadius: 0.08 });
+  poly(s, WIDERING, { x: 1.8, y: -1.473, w: 1.473, h: 2.946, fill: [DARK, 90] });
+  poly(s, QUOTE, { x: 3.273, y: -1.473, w: 1.473, h: 1.473, fill: [DARK, 90] });
+  chrome(s, 'light');
+
+  txt(s, 'Our Stories', Object.assign({ x: 1.8, y: 1.898, w: 4.867, h: 0.606, color: DARK }, H1));
+
+  const COLS = [
+    ['Aliquam condimentum congue odrporta lobortis ametloan nasnas. Phasellus metus araviverra at risus quis, portlasasa mianc ut turpis a lacus lobortis ',
+      'Aliquam condimentum congue odio, at porta est lobortis sit amet. Phasellus metus arcu, viverra at risus quis, portaloans vestibulum mi. Nunc ut turpis',
+      'Nam condimentum magna a tellus accumsan, vel varis Pellentesque dictum a nisl vel fermentum. Aenean egetana neque sagittis, mattis libero quis, rhoncus augue. '],
+    ['Aliquam condimentum congue odrporta lobortis amet nasnas. Phasellus metus araviverra at risus quis, portlasa mianc ut turpis a lacus lobortis ',
+      'Aliquam condimentum congue odio, at porta est lobortis sit amet. Phasellus metus arcu, viverra at risus quis, porta vestibulum mi. Nunc ut turpis a lacus',
+      'Nam condimentum magna a tellus accumsan, vel varis Pellentesque dictum a nisl vel fermentum. Aenean egeta neque sagittis, mattis libero quis, rhoncus augue. '],
+  ];
+  COLS.forEach((col, ci) => {
+    col.forEach((t, ri) => {
+      const highlighted = ci === 0 && ri === 1;
+      txt(s, t, Object.assign({
+        x: highlighted ? 1.983 : (ci === 0 ? 1.8 : 6.916),
+        y: [2.807, 3.921, 5.037][ri],
+        w: highlighted ? 4.25 : 4.618, h: 0.807,
+        color: highlighted ? CREAM : DARK,
+      }, BODY));
+    });
+  });
+
+  poly(s, QUOTE, { x: 11.86, y: 4.554, w: 1.473, h: 1.473, fill: [DARK, 90] });
+  poly(s, QUOTE, { x: 11.86, y: 6.027, w: 1.473, h: 1.473, fill: [DARK, 90] });
+}
+
+/* ================================================= 5. four-tile feature block */
+function slide05() {
+  const s = slide(CREAM);
+  const TILES = [
+    { x: 1.793, y: 1.498, fill: DARK }, { x: 4.051, y: 1.498, fill: DARK },
+    { x: 1.8, y: 3.748, fill: DARK }, { x: 4.051, y: 3.748, fill: LIME },
+  ];
+  TILES.forEach((t) => poly(s, QUARTER, { x: t.x, y: t.y, w: 2.253, h: 2.253, fill: t.fill, rotate: 90, flipH: true }));
+
+  // tile captions (all right aligned inside their quarter)
+  const CARDS = [
+    { head: ['Smart', 'Protection'], y: 2.424, x: 2.031, bx: 2.182, by: 3.006, bw: 1.559, bh: 0.385, col: WHITE, body: 'Namans condimentum magna a tellus' },
+    { head: ['Better Life', 'Choice'], y: 2.424, x: 4.27, bx: 4.421, by: 3.006, bw: 1.559, bh: 0.385, col: WHITE, body: 'Namans condimentum magna a tellus' },
+    { head: ['Advertising', 'Photo'], y: 4.677, x: 2.031, bx: 2.182, by: 5.259, bw: 1.559, bh: 0.385, col: WHITE, body: 'Namans condimentum magna a tellus' },
+    { head: ['Grow Market'], y: 4.677, x: 4.27, bx: 4.421, by: 5.053, bw: 1.559, bh: 0.587, col: DARK, body: 'Phasellus metus arcu, viverra at risus quis, porta vestibulum mi. ' },
+  ];
+  CARDS.forEach((c) => {
+    txt(s, c.head.map((t, i) => (i === c.head.length - 1 ? r(t) : rl(t))),
+      { x: c.x, y: c.y, w: 1.71, h: c.head.length * 0.202, align: 'right', fontFace: SEMI, fontSize: 12, color: c.col });
+    txt(s, c.body, { x: c.bx, y: c.by, w: c.bw, h: c.bh, align: 'right', fontFace: LIGHT, fontSize: 8, color: c.col, lineSpacingMultiple: 1.5 });
+  });
+
+  iconFingerprint(s, 3.536, 1.98, 0.23, WHITE);   // smart protection
+  iconDots(s, 5.731, 1.98, 0.249, WHITE);         // better life choice
+  iconPhoto(s, 3.492, 4.233, 0.245, WHITE);       // advertising photo
+  iconBarChart(s, 5.751, 4.233, 0.23, DARK);      // grow market
+
+  poly(s, QUOTE, { x: -0.468, y: 1.498, w: 2.256, h: 2.256, fill: [DARK, 90] });
+  poly(s, QUOTE, { x: -0.468, y: 3.745, w: 2.256, h: 2.256, fill: [DARK, 90] });
+  chrome(s, 'light');
+
+  txt(s, 'Leave The Worrying To The Experts.', Object.assign({ x: 7.394, y: 1.866, w: 4.139, h: 1.818, color: DARK }, H1));
+  txt(s, 'Nam condimentum magna a tellus accumsan, vel varius nisi mattis. Cras in orci quis velit dapibus '
+    + 'mollis. Pellentesque dictum a nisl vel fermentum. Aenean eget neque sagittis, mattis libero',
+  Object.assign({ x: 7.394, y: 3.986, w: 4.139, h: 1.085, color: DARK }, BODY));
+  iconPlay(s, 7.362, 5.373, 0.261, DARK, WHITE);
+  txt(s, 'Explore to Discover', { x: 7.798, y: 5.414, w: 2.252, h: 0.168, fontFace: REG, fontSize: 10, color: DARK });
+}
+
+/* ============================================== 6. put your trust (big circle) */
+function slide06() {
+  const s = slide(CREAM);
+  oval(s, { x: 7.031, y: 1.499, w: 4.503, h: 4.502, fill: PHOTO });
+  poly(s, QUOTE, { x: 7.031, y: 3.75, w: 2.251, h: 2.251, fill: [DARK, 90], flipH: true, flipV: true });
+  poly(s, QUOTE, { x: 9.282, y: 1.499, w: 2.251, h: 2.251, fill: [DARK, 90] });
+  poly(s, QUOTE, { x: 7.031, y: 1.499, w: 2.251, h: 2.251, fill: [DARK, 90] });
+  poly(s, QUOTE, { x: 9.282, y: 3.75, w: 2.251, h: 2.251, fill: LIME, flipH: true, flipV: true });
+  chrome(s, 'light');
+
+  roundRect(s, { x: 1.798, y: 4.646, w: 4.367, h: 0.307, fill: DARK, rectRadius: 0.1535 });
+  txt(s, 'Put Your Trust Where It Belongs', Object.assign({ x: 1.8, y: 1.861, w: 4.367, h: 1.212, color: DARK }, H1));
+  txt(s, 'lobortis amet. Phasellus metus araviverra at risus quis, portlasa mianca ut turpis a lacus lobortis ',
+    Object.assign({ x: 1.8, y: 3.375, w: 4.367, h: 0.529, color: DARK }, BODY));
+
+  txt(s, bullets([
+    ['Morbi volutpat dignissim dolor non mollis. ', DARK],
+    ['Etiam accumsan, ante eu luctus tincidunt, nulla ante', WHITE],
+    ['Raculis tortor, et auctor purus nunc eu metus. ', DARK],
+    ['Sed pharetra eu tellus eget fringilla. ', DARK],
+  ], 13.5), { x: 1.8, y: 4.207, w: 4.367, h: 1.432, fontFace: LIGHT, fontSize: 11, lineSpacingMultiple: 2 });
+}
+
+/* ================================================== 7. be confident (leaf art) */
+function slide07() {
+  const s = slide(CREAM);
+  poly(s, QUOTE, { x: -0.458, y: 3.75, w: 2.251, h: 2.251, fill: [DARK, 90], flipH: true, flipV: true });
+  poly(s, QUOTE, { x: -0.458, y: 1.499, w: 2.251, h: 2.251, fill: [DARK, 90] });
+  poly(s, QUARTER, { x: 1.793, y: 3.75, w: 2.253, h: 2.253, fill: LIME, rotate: 270, flipH: true });
+  chrome(s, 'light');
+
+  txt(s, 'Be Confident.', Object.assign({ x: 7.687, y: 2.001, w: 3.847, h: 0.606, color: DARK }, H1));
+  txt(s, 'Aliquam condimentum congue odrporta lobortis ametloan nasnas. Phasellus metus araviverra at '
+    + 'risus quis, portlasasa mianc ut turpis a lacusloans lobortis loramns. convallis id finibus quis,loansa '
+    + 'sollicitudin vel magna.',
+  Object.assign({ x: 7.687, y: 2.909, w: 3.847, h: 1.362, color: DARK }, BODY));
+
+  [['Building towards a better financial future.', 4.848, 4.895, 3.452],
+   ['Active Online Product ', 5.222, 5.268, 2.886]].forEach(([t, cy, ty, w]) => {
+    oval(s, { x: 7.682, y: cy, w: 0.277, h: 0.277, fill: [DARK, 70], line: { color: DARK, width: 1 } });
+    txt(s, t, { x: 8.081, y: ty, w: w, h: 0.185, fontFace: REG, fontSize: 11, color: DARK });
+  });
+  iconDots(s, 7.757, 5.297, 0.127, DARK);
+  poly(s, TREND, { x: 7.758, y: 4.945, w: 0.124, h: 0.084, fill: DARK });
+
+  txt(s, 'Compact', { x: 2.096, y: 4.054, w: 1.51, h: 0.202, fontFace: SEMI, fontSize: 12, color: DARK });
+  txt(s, 'Aliquamon imetum conguest', { x: 2.096, y: 4.341, w: 1.51, h: 0.481, fontFace: LIGHT, fontSize: 10, color: DARK, lineSpacingMultiple: 1.5 });
+  iconBolt(s, 2.096, 5.083, 0.276, 0.34, DARK);
+
+  poly(s, LEAF, { x: 4.047, y: 1.498, w: 2.253, h: 4.503, fill: PHOTO });
+  poly(s, ROUNDTL, { x: 1.794, y: 1.498, w: 2.253, h: 2.253, fill: PHOTO });
+}
+
+/* =============================================== 8. let's us show you (tablet) */
+function slide08() {
+  const s = slide(DARK);
+  poly(s, HALFRING, { x: 7.112, y: 3.074, w: 2.946, h: 2.946, fill: [WHITE, 90], rotate: 180 });
+  poly(s, QUOTE, { x: 10.06, y: 4.547, w: 1.473, h: 1.473, fill: [WHITE, 90], rotate: 180 });
+  poly(s, QUOTE, { x: 11.533, y: 4.547, w: 1.473, h: 1.473, fill: [WHITE, 90], rotate: 180 });
+  chrome(s, 'dark');
+
+  deviceFrame(s, { x: 7.673, y: 2.347, w: 3.843, h: 2.861, radius: 0.12 });
+  imageBox(s, { x: 7.788, y: 2.454, w: 3.615, h: 2.592 });
+
+  txt(s, [rl('Let\u2019s Us Show You ', { color: WHITE }), r('The Magic!', { color: LIME })],
+    Object.assign({ x: 1.8, y: 2.087, w: 4.867, h: 1.212 }, H1));
+  txt(s, 'Accumsan, ante eu luctus tincidunt, nulla ante iaculisans tortor, et auctor purus nunc eu metus. '
+    + 'Sed pharetra eu tellus egetas fringilla. Mauris ex nisi, convallis id finibus quis, sollicitudin velan '
+    + 'magna sollicitudin vel magna.',
+  Object.assign({ x: 1.8, y: 3.601, w: 4.867, h: 1.085, color: SILVER }, BODY));
+
+  iconPlay(s, 1.8, 5.152, 0.261, LIME, DARK);
+  txt(s, 'https://app.demo/', { x: 2.286, y: 5.181, w: 1.491, h: 0.185, fontFace: REG, fontSize: 11, color: LIME });
+  hline(s, { x: 4.063, y: 5.152, w: 0, h: 0.261, color: CREAM, width: 1 });
+  txt(s, 'Discover More', { x: 4.32, y: 5.181, w: 1.491, h: 0.185, fontFace: REG, fontSize: 11, color: OFFWHITE });
+
+  txt(s, [r('Active ', { color: WHITE }), r('Online Product ', { color: LIME })],
+    { x: 8.157, y: 2.002, w: 2.886, h: 0.185, align: 'center', fontFace: REG, fontSize: 11 });
+  iconPlay(s, 9.4, 4.913, 0.4, LIME, DARK, 'rect');
+}
+
+/* ============================================== 9. strategies (mosaic of tiles) */
+function slide09() {
+  const s = slide(DARK);
+  rect(s, { x: 3.296, y: 4.501, w: 1.502, h: 1.502, fill: WHITE });
+  poly(s, QUARTER, { x: 1.794, y: 1.498, w: 1.502, h: 1.502, fill: [WHITE, 90], rotate: 90, flipH: true });
+  rect(s, { x: 1.794, y: 2.999, w: 1.502, h: 1.502, fill: [WHITE, 60] });
+  poly(s, QUARTER, { x: 1.794, y: 4.501, w: 1.502, h: 1.502, fill: [WHITE, 90], flipH: true });
+  rect(s, { x: 3.296, y: 1.498, w: 1.502, h: 1.502, fill: [WHITE, 80] });
+  rect(s, { x: 3.296, y: 2.999, w: 1.502, h: 1.502, fill: [WHITE, 70] });
+  poly(s, QUARTER, { x: 4.798, y: 1.498, w: 1.502, h: 1.502, fill: [WHITE, 90], rotate: 180, flipH: true });
+  chrome(s, 'dark');
+
+  txt(s, [rl('Strategies '), r('To Protect and Secure.')],
+    Object.assign({ x: 7.667, y: 1.871, w: 3.867, h: 1.818, color: WHITE }, H1));
+  txt(s, [rl('Nam condimentum magna a tellus accumsan, '),
+    r('vel varius nisi mattis. Cras in orci quis velit dapibus mollis. Pellentesque dictum a nisl vel fermentum. Aenean eget neque sagittis.')],
+  Object.assign({ x: 7.667, y: 3.991, w: 3.867, h: 1.085, color: OFFWHITE }, BODY));
+  txt(s, 'Proin pellentesque egetetus euismod',
+    Object.assign({ x: 7.667, y: 5.378, w: 3.867, h: 0.251, color: LIME }, BODY));
+
+  const CAP = 'a lacus lobortis ulcorper.';
+  // outer tiles (white text)
+  [[3.547, 2.32, 3.562, 1.775, '8 min', 20, WHITE, true],
+   [2.045, 3.819, 2.06, 3.274, '2 Day', 20, WHITE, true],
+   [5.043, 3.819, 5.058, 3.274, '6 Sec', 20, WHITE, true]].forEach(([cx, cy, hx, hy, head, sz, col]) => {
+    txt(s, [rl('Nunc ut turpis '), r(CAP)],
+      { x: cx, y: cy, w: 0.999, h: 0.404, align: 'center', fontFace: LIGHT, fontSize: 8, color: col });
+    txt(s, head, { x: hx, y: hy, w: 0.969, h: 0.337, align: 'center', fontFace: SEMI, fontSize: sz, color: col, bold: true });
+  });
+
+  // centre lime tile
+  rect(s, { x: 3.296, y: 2.997, w: 1.502, h: 1.502, fill: LIME });
+  txt(s, CAP, { x: 3.547, y: 3.954, w: 0.999, h: 0.269, align: 'center', fontFace: LIGHT, fontSize: 8, color: DARK });
+  txt(s, '43+', { x: 3.562, y: 3.274, w: 0.969, h: 0.539, align: 'center', fontFace: SEMI, fontSize: 32, color: DARK, bold: true });
+
+  // bottom white tile
+  txt(s, [rl('Nunc ut turpis '), r(CAP)],
+    { x: 3.547, y: 5.322, w: 0.999, h: 0.404, align: 'center', fontFace: LIGHT, fontSize: 8, color: DARK });
+  txt(s, '7', { x: 3.562, y: 4.777, w: 0.969, h: 0.269, align: 'center', fontFace: SEMI, fontSize: 16, color: DARK, bold: true });
+  txt(s, 'Second', { x: 3.562, y: 5.042, w: 0.969, h: 0.168, align: 'center', fontFace: SEMI, fontSize: 10, color: DARK, bold: true });
+
+  rect(s, { x: 4.798, y: 2.999, w: 1.502, h: 1.502, fill: [WHITE, 60] });
+  iconPlay(s, 4.598, 4.299, 0.4, CREAM, DARK, 'rect');
+}
+
+/* ========================================================= 10. financial recap */
+function slide10() {
+  const s = slide(DARK);
+  poly(s, QUARTER, { x: 1.8, y: 4.056, w: 1.965, h: 1.965, fill: PHOTO });
+  chrome(s, 'dark');
+
+  txt(s, 'Financial Recap', Object.assign({ x: 1.8, y: 1.898, w: 4.367, h: 0.606, color: WHITE }, H1));
+  txt(s, 'Aliquam condimentum congue odrporta lobortis aatloan nasnas. Phasellus metus araviverra at '
+    + 'risus quis, paasasa mianc ut turpis a lacus lobortis ',
+  Object.assign({ x: 1.8, y: 2.807, w: 4.367, h: 0.807, color: OFFWHITE }, BODY));
+
+  txt(s, [r('We remove the '), r('legislative complexity', { bold: true }),
+    r(', while facilitating payouts at any volume or frequency.  ')],
+  { x: 6.667, y: 1.973, w: 4.867, h: 0.404, fontFace: SEMI, fontSize: 12, color: WHITE });
+  txt(s, [rl('We help businesses solve the administrative and compliance complexity of engaging a high volume of short-term workers, for task-based work. '),
+    rl(' '), r('Through our '), r('API or UI ', { bold: true }), r('we help our customers with: ')],
+  Object.assign({ x: 6.667, y: 2.807, w: 4.903, h: 1.388, color: OFFWHITE }, BODY));
+
+  txt(s, bullets([
+    ['Storage of sensitive short-term worker data  ', WHITE],
+    ['Blended payout flow to Swedish Individuals without a company (EoR) ', LIME],
+    ['International payouts for Swedish customers (Q3', WHITE],
+  ], 17), { x: 6.667, y: 4.52, w: 4.867, h: 1.481, fontFace: REG, fontSize: 11, lineSpacingMultiple: 2 });
+
+  poly(s, QUOTE, { x: 1.8, y: 4.056, w: 1.965, h: 1.965, fill: [DARK, 90], rotate: 180 });
+  poly(s, QUOTE, { x: 3.765, y: 4.056, w: 1.965, h: 1.965, fill: [WHITE, 90], rotate: 180 });
+  poly(s, QUOTE, { x: 3.765, y: 6.001, w: 1.965, h: 1.965, fill: [WHITE, 90], rotate: 180 });
+}
+
+/* ======================================================= 11. shared benefits */
+function slide11() {
+  const s = slide(DARK);
+  const D = (x, y, f, rot) => poly(s, DTILE, { x: x, y: y, w: 2.253, h: 2.253, fill: f, rotate: rot, flipH: true });
+  D(7.027, 3.748, LIME, 270);
+  D(4.774, 1.498, [WHITE, 90], 90);
+  chrome(s, 'dark');
+  D(7.027, 1.498, CREAM, 90);
+  D(9.28, 3.748, WHITE, 270);
+  D(4.774, 3.748, WHITE, 270);
+
+  // three columns: each has a top (dark bg) and bottom (light bg) card
+  const COLS = [
+    { x: 5.254, ty: 1.917, top: { title: 'Market Size', col: WHITE, big: '+24%', bigCol: LIME, bigY: 2.862 },
+      bot: { title: 'Anti Pandemic', y: 4.183, play: [5.701, 5.167] } },
+    { x: 7.521, ty: 1.933, top: { title: 'Advertising', col: DARK, play: [7.968, 2.917] },
+      bot: { title: 'Society Growth', y: 4.167, big: '500K', bigCol: DARK, bigY: 5.112, bigX: 7.493 } },
+    { x: 9.76, ty: 1.917, top: { title: 'Market Size', col: WHITE, big: '54M', bigCol: LIME, bigY: 2.862 },
+      bot: { title: 'Anti Pandemic', y: 4.183, play: [10.207, 5.167] } },
+  ];
+  COLS.forEach((c, i) => {
+    if (i === 2) { D(9.28, 1.498, [WHITE, 90], 90); D(9.28, 3.748, WHITE, 270); }
+    const t = c.top;
+    txt(s, t.title, { x: c.x, y: c.ty, w: 1.294, h: 0.185, align: 'center', fontFace: SEMI, fontSize: 11, color: t.col });
+    txt(s, 'Dimem conguena odio atporta', { x: c.x, y: c.ty + 0.283, w: 1.294, h: 0.481, align: 'center', fontFace: LIGHT, fontSize: 10, color: t.col, lineSpacingMultiple: 1.5 });
+    if (t.big) txt(s, t.big, { x: c.x, y: t.bigY, w: 1.294, h: 0.471, align: 'center', fontFace: SEMI, fontSize: 28, color: t.bigCol });
+    if (t.play) iconPlay(s, t.play[0], t.play[1], 0.4, DARK, WHITE);
+
+    const b = c.bot;
+    txt(s, b.title, { x: c.x, y: b.y, w: 1.294, h: 0.185, align: 'center', fontFace: SEMI, fontSize: 11, color: DARK });
+    txt(s, 'Dimem conguena odio atporta', { x: c.x, y: b.y + 0.283, w: 1.294, h: 0.481, align: 'center', fontFace: LIGHT, fontSize: 10, color: DARK, lineSpacingMultiple: 1.5 });
+    if (b.big) txt(s, b.big, { x: b.bigX, y: b.bigY, w: 1.294, h: 0.471, align: 'center', fontFace: SEMI, fontSize: 28, color: b.bigCol });
+    if (b.play) iconPlay(s, b.play[0], b.play[1], 0.4, DARK, WHITE);
+  });
+
+  txt(s, [rl('Shared'), r('Benefits')], Object.assign({ x: 1.8, y: 2.087, w: 2.253, h: 1.212, color: WHITE }, H1));
+  txt(s, [rl('Accumsan, ante eu luctus iaculisans tortor, et auctoran purus nunc. '), rl(' '),
+    r('Sed pharetra eu tellegetas fringilla. Mauris ex nisi. ')],
+  Object.assign({ x: 1.8, y: 3.601, w: 2.253, h: 1.64, color: SILVER }, BODY));
+}
+
+/* ======================================================= 12. helping you get */
+function slide12() {
+  const s = slide(DARK);
+  poly(s, SEMIBOT, { x: 1.763, y: 1.499, w: 4.505, h: 4.503, fill: PHOTO });
+  chrome(s, 'dark');
+
+  txt(s, 'Helping You Get Where You Want To Be.', Object.assign({ x: 7.667, y: 1.732, w: 3.867, h: 1.818, color: WHITE }, H1));
+  txt(s, [rl('Nam condimentum magna a tellus accumsanan '), r('vel varius nisi mattis. Cras in orci quis velit')],
+    { x: 7.667, y: 3.852, w: 3.867, h: 0.529, fontFace: SEMI, fontSize: 11, color: LIME, lineSpacingMultiple: 1.5 });
+  txt(s, 'Mauris et pharetra nisl. Mauris feugiat lectus eget facilisis mattis. Nam nec ex congue risus '
+    + 'pretium vehicula hendrerit eta ipsum. Praesent egetloansa maximus nisi. Proin pellentesque',
+  Object.assign({ x: 7.667, y: 4.684, w: 3.867, h: 1.085, color: OFFWHITE }, BODY));
+
+  poly(s, QUOTE, { x: 1.8, y: 3.768, w: 2.234, h: 2.234, fill: [WHITE, 90], rotate: 180 });
+  poly(s, QUOTE, { x: 4.034, y: 3.768, w: 2.234, h: 2.234, fill: LIME, rotate: 180 });
+}
+
+/* ================================================== 13. embrace your dreams */
+function slide13() {
+  const s = slide(CREAM);
+  poly(s, CORNERCUT, { x: 8.156, y: 2.624, w: 4.503, h: 2.252, fill: LIME, rotate: 90, flipH: true });
+  poly(s, CORNERCUT, { x: 5.903, y: 2.624, w: 4.503, h: 2.252, fill: DARK, rotate: 90, flipH: true });
+  [[11.533, 3.749, 90], [11.533, 1.499, 90], [9.281, 1.499, 95], [9.281, 3.749, 95]]
+    .forEach(([x, y, a]) => poly(s, QUOTE, { x: x, y: y, w: 2.252, h: 2.252, fill: [DARK, a], rotate: 180 }));
+  chrome(s, 'light');
+
+  txt(s, [rl('Embrace '), r('Your Dreams Of Financial')],
+    Object.assign({ x: 1.788, y: 1.739, w: 4.139, h: 1.818, color: DARK }, H1));
+  txt(s, 'Nam condimentum magna a tellus accumsan, vel varius nisi mattis. Cras in orci quis velit dapibus '
+    + 'mollis. Pellentesque dictum a nisl vel fermentum. ',
+  Object.assign({ x: 1.788, y: 3.859, w: 4.139, h: 0.807, color: DARK }, BODY));
+
+  // small donut
+  oval(s, { x: 1.788, y: 5.085, w: 0.67, h: 0.67, fill: WHITE, flipH: true });
+  pie(s, { x: 1.788, y: 5.085, w: 0.67, h: 0.67, fill: LIME, flipH: true, angleRange: [113.72, 270] });
+  pie(s, { x: 1.788, y: 5.085, w: 0.67, h: 0.67, fill: DARK, flipH: true, angleRange: [150.95, 270] });
+  oval(s, { x: 1.969, y: 5.267, w: 0.306, h: 0.306, fill: CREAM, flipH: true });
+  txt(s, '9800', { x: 2.639, y: 5.2, w: 0.781, h: 0.236, fontFace: SEMI, fontSize: 14, color: DARK, bold: true });
+  txt(s, 'Proin pellentesque', { x: 2.639, y: 5.449, w: 1.581, h: 0.168, fontFace: LIGHT, fontSize: 10, color: DARK });
+
+  // dark panel
+  txt(s, '20', { x: 7.317, y: 1.851, w: 1.64, h: 0.909, fontFace: SEMI, fontSize: 54, color: WHITE });
+  txt(s, '34', { x: 7.317, y: 2.561, w: 1.64, h: 0.909, fontFace: SEMI, fontSize: 54, color: LIME });
+  txt(s, [rl('Many paths. '), r('One destination.')], { x: 7.31, y: 3.728, w: 1.663, h: 0.404, fontFace: MED, fontSize: 12, color: WHITE });
+  txt(s, 'Proin vitae arcu morbi volutpat dignissim dolor non',
+    { x: 7.317, y: 4.347, w: 1.64, h: 0.733, fontFace: LIGHT, fontSize: 10, color: WHITE, lineSpacingMultiple: 1.5 });
+
+  // lime panel
+  txt(s, [rl('Creative'), r('Project Review')], { x: 9.57, y: 1.846, w: 1.663, h: 0.471, fontFace: MED, fontSize: 14, color: DARK });
+  hline(s, { x: 9.57, y: 2.561, w: 1.674, color: DARK, width: 1 });
+  txt(s, 'Greats', { x: 9.571, y: 2.84, w: 1.663, h: 0.202, fontFace: SEMI, fontSize: 12, color: DARK });
+  txt(s, 'Nam condigna a tellus accumsan ', { x: 9.57, y: 3.057, w: 1.663, h: 0.481, fontFace: LIGHT, fontSize: 10, color: DARK, lineSpacingMultiple: 1.5 });
+  stars(s, 9.568, 3.867, 4, AMBER);
+  txt(s, 'Pellentsque dictuma', { x: 9.571, y: 4.41, w: 1.673, h: 0.168, fontFace: LIGHT, fontSize: 10, color: DARK });
+  txt(s, 'Choice', { x: 9.568, y: 4.621, w: 1.091, h: 0.185, fontFace: MED, fontSize: 11, color: DARK });
+  iconThumb(s, 9.589, 5.172, 0.308, 0.292, DARK);
+}
+
+/* ================================================= 14. for your brighter future */
+function slide14() {
+  const s = slide(CREAM);
+  poly(s, QUARTER, { x: 2.913, y: 2.623, w: 3.376, h: 3.376, fill: PHOTO });
+  poly(s, QUOTE, { x: 2.913, y: 1.499, w: 1.124, h: 1.124, fill: [DARK, 90], rotate: 180 });
+  poly(s, QUOTE, { x: 1.789, y: 2.623, w: 1.124, h: 1.124, fill: [DARK, 90], rotate: 180 });
+  rect(s, { x: 1.788, y: 1.497, w: 1.125, h: 1.125, fill: DARK });
+  poly(s, QUARTER, { x: 1.788, y: 1.497, w: 1.125, h: 1.125, fill: LIME });
+  oval(s, { x: 2.056, y: 1.764, w: 0.391, h: 0.391, fill: [DARK, 80] });
+  poly(s, TREND, { x: 2.137, y: 1.883, w: 0.229, h: 0.155, fill: DARK });
+  chrome(s, 'light');
+
+  txt(s, 'Aenean egeta nequeante tellus.', { x: 3.181, y: 1.859, w: 2.347, h: 0.168, fontFace: LIGHT, fontSize: 10, color: DARK });
+  txt(s, 'Fixed shot', { x: 3.181, y: 2.06, w: 1.002, h: 0.202, fontFace: MED, fontSize: 12, color: DARK });
+  poly(s, QUOTE, { x: 2.913, y: 2.623, w: 1.124, h: 1.124, fill: [DARK, 90], rotate: 180 });
+
+  [['80+', 2.879, 'Phasell usas', 3.28, 0.168], ['45%', 3.903, 'Phasell usas metus', 4.264, 0.481]]
+    .forEach(([big, by, sub, sy, sh]) => {
+      txt(s, big, { x: 1.788, y: by, w: 0.848, h: 0.303, fontFace: MED, fontSize: 18, color: DARK });
+      txt(s, sub, { x: 1.788, y: sy, w: 0.976, h: sh, fontFace: LIGHT, fontSize: 10, color: DARK, lineSpacingMultiple: 1.5 });
+    });
+
+  txt(s, [rl('For Your '), r('Brighter Future')], Object.assign({ x: 7.667, y: 1.806, w: 4.435, h: 1.212, color: DARK }, H1));
+  txt(s, [r('Aliquam condimentum congue odrporta ', { fontFace: MED }),
+    r('lobortis amet. Phasellus metus araviverra at risus quisa nsi portlasa mianc ut turpis a lacus lobortis ')],
+  Object.assign({ x: 7.667, y: 3.32, w: 3.867, h: 0.807, color: DARK }, BODY));
+
+  [['Aa', 4.43, 'Phasellus metus arcu, viverra at risus quis, porta vestibulum mi. Nunc ut turpis', 3.501],
+   ['Bb', 5.213, 'enean eget neque sagittis, mattis libero quis, rhoncus augue. ', 3.059]]
+    .forEach(([tag, y, body, w]) => {
+      txt(s, tag, { x: 7.687, y: y, w: 0.345, h: 0.229, fontFace: MED, fontSize: 10, color: DARK, lineSpacingMultiple: 1.5 });
+      txt(s, body, { x: 8.032, y: y, w: w, h: 0.481, fontFace: MED, fontSize: 10, color: DARK, lineSpacingMultiple: 1.5 });
+    });
+}
+
+/* ================================================ 15. competitive advantage */
+function slide15() {
+  const s = slide(CREAM);
+  poly(s, QUOTE, { x: 1.794, y: 6.0, w: 1.948, h: 1.948, fill: [DARK, 95], flipH: true, flipV: true });
+  poly(s, QUOTE, { x: 3.742, y: 6.0, w: 1.948, h: 1.948, fill: [DARK, 95], flipH: true, flipV: true });
+  chrome(s, 'light');
+
+  txt(s, 'Competitive Advantage', Object.assign({ x: 3.325, y: 1.898, w: 6.684, h: 0.606, align: 'center', color: DARK }, H1));
+  txt(s, 'Aliquam condimentum congue odrporta lobortis ametloan nasnas. Phasellus metus araviverra '
+    + 'at risus quis, portlasasa mianc ut turpis a lacus lobortis ',
+  Object.assign({ x: 3.029, y: 2.807, w: 7.275, h: 0.529, align: 'center', color: DARK }, BODY));
+
+  const CARDS = [
+    { x: 1.793, dark: false, title: 'Newest', tx: 2.013, icon: 'thumb', ix: 2.575 },
+    { x: 3.741, dark: true, title: 'Compact', tx: 3.961, icon: 'dots', ix: 4.523 },
+    { x: 5.689, dark: false, title: 'Agile', tx: 5.909, icon: 'bolt', ix: 6.472 },
+    { x: 7.637, dark: true, title: 'Compact', tx: 7.839, icon: 'badge', ix: 8.419 },
+    { x: 9.585, dark: false, title: 'Secure', tx: 9.804, icon: 'print', ix: 10.365 },
+  ];
+  CARDS.forEach((c) => roundRect(s, {
+    x: c.x, y: c.dark ? 4.053 : 4.055, w: 1.948, h: 1.948,
+    fill: c.dark ? DARK : WHITE, rotate: 270, flipH: true,
+  }));
+  poly(s, QUOTE, { x: 1.796, y: 4.052, w: 1.948, h: 1.948, fill: [DARK, 95] });
+  poly(s, QUOTE, { x: 3.742, y: 4.052, w: 1.948, h: 1.948, fill: [WHITE, 95] });
+
+  CARDS.forEach((c) => {
+    const col = c.dark ? WHITE : DARK;
+    txt(s, c.title, { x: c.tx, y: 4.736, w: 1.51, h: 0.202, align: 'center', fontFace: SEMI, fontSize: 12, color: col });
+    txt(s, 'Aliquamon imentum congue est', { x: c.tx, y: 5.024, w: 1.51, h: 0.481, align: 'center', fontFace: LIGHT, fontSize: 10, color: col, lineSpacingMultiple: 1.5 });
+    const lime = c.icon === 'dots' || c.icon === 'badge';
+    oval(s, { x: c.ix, y: 3.853, w: 0.385, h: 0.385, fill: lime ? LIME : DARK });
+    const fg = lime ? DARK : WHITE;
+    if (c.icon === 'thumb') iconThumb(s, c.ix + 0.099, 3.954, 0.187, 0.177, fg);
+    if (c.icon === 'dots') iconDots(s, c.ix + 0.104, 3.957, 0.177, fg);
+    if (c.icon === 'bolt') iconBolt(s, c.ix + 0.121, 3.957, 0.144, 0.177, fg);
+    if (c.icon === 'badge') iconBadge(s, c.ix + 0.098, 3.956, 0.189, DARK);
+    if (c.icon === 'print') iconFingerprint(s, c.ix + 0.113, 3.956, 0.16, fg);
+  });
+}
+
+/* ============================================================ 16. sample table */
+function slide16() {
+  const s = slide(DARK);
+  chrome(s, 'dark');
+  roundRect(s, { x: 4.859, y: 1.499, w: 6.675, h: 4.499, fill: WHITE, rectRadius: 0.1444 });
+
+  const HEAD = ['Market Leader', 'Challenger', 'Competitor', 'Explanations'];
+  const BODY_ROWS = [
+    ['GROWTH', 'nam nec ex congue sus pretium', 'Nam nec ex congue', 'nam nec ex congue risus pretium'],
+    ['INCOME', 'vehicula hendrerit \net ipsum..', 'risus pretium vehicula hendrerit et', 'vehicula hendrerit etips'],
+    ['TECHNOLOGY', 'praesent eget maxi nisi pellentesque', 'Praesent et maximus', 'praesent eget maxims nisi pellentesque'],
+    ['SIZE', 'praesent eget maxi nisi pellentesque', 'Praesent et maximus', 'praesent eget maxims nisi pellentesque'],
+  ];
+  const base = { fill: { color: WHITE }, color: DARK, valign: 'middle', align: 'left', margin: 0 };
+  const rows = [HEAD.map((t) => ({
+    text: t,
+    options: Object.assign({}, base, { fontFace: SEMI, fontSize: 11, border: [{ type: 'none' }, { type: 'none' }, { type: 'solid', color: LIME, pt: 1 }, { type: 'none' }] }),
+  }))];
+  BODY_ROWS.forEach((row, ri) => {
+    const last = ri === BODY_ROWS.length - 1;
+    const bot = last ? { type: 'none' } : { type: 'solid', color: GREY, pt: 0.5 };
+    rows.push(row.map((t, ci) => ({
+      text: t,
+      options: Object.assign({}, base, {
+        fontFace: ci === 0 ? MED : LIGHT, fontSize: ci === 0 ? 10 : 8,
+        border: [{ type: 'none' }, { type: 'none' }, bot, { type: 'none' }],
+      }),
+    })));
+  });
+  s.addTable(rows, { x: 5.233, y: 2.04, w: 5.947, colW: [1.487, 1.487, 1.487, 1.487], rowH: [0.667, 0.798, 0.798, 0.798, 0.798] });
+
+  // toolbar icons above the table
+  roundRect(s, { x: 5.233, y: 1.708, w: 0.22, h: 0.22, fill: LIME, rectRadius: 0.11 });
+  poly(s, TREND, { x: 5.299, y: 1.794, w: 0.089, h: 0.06, fill: DARK });
+  iconRuler(s, 5.631, 1.778, 0.091, DARK);
+  iconBarChart(s, 5.969, 1.778, 0.091, DARK);
+  iconWifi(s, 6.313, 1.771, 0.096, DARK);
+
+  txt(s, [rl('Sample'), r('Table')], Object.assign({ x: 1.8, y: 2.087, w: 2.253, h: 1.212, color: WHITE }, H1));
+  txt(s, [rl('Accumsan, ante eu luctus iaculisans tortor, et auctoran purus nunc. '), rl(' '),
+    r('Sed pharetra eu tellegetas fringilla. Mauris ex nisi. ')],
+  Object.assign({ x: 1.8, y: 3.601, w: 2.253, h: 1.64, color: SILVER }, BODY));
+}
+
+/* ======================================================= 17. service that soars */
+function slide17() {
+  const s = slide(DARK);
+  chrome(s, 'dark');
+  [[1.8, WHITE], [3.762, LIME], [5.724, WHITE]].forEach(([x, f]) => {
+    roundRect(s, { x: x, y: 1.498, w: 1.962, h: 4.503, fill: f, rotate: 180, flipH: true, rectRadius: 0.327 });
+  });
+  poly(s, QUOTE, { x: 1.796, y: 4.036, w: 1.964, h: 1.964, fill: [DARK, 95] });
+  poly(s, QUOTE, { x: 3.76, y: 4.036, w: 1.964, h: 1.964, fill: [DARK, 95] });
+
+  // card 1
+  txt(s, 'Market Size', { x: 2.134, y: 1.958, w: 1.294, h: 0.202, align: 'center', fontFace: MED, fontSize: 12, color: DARK });
+  txt(s, 'conguena odio atporta', { x: 2.134, y: 2.242, w: 1.294, h: 0.505, align: 'center', fontFace: REG, fontSize: 10.5, color: DARK, lineSpacingMultiple: 1.5 });
+  txt(s, '+34', { x: 2.134, y: 2.993, w: 1.294, h: 0.471, align: 'center', fontFace: MED, fontSize: 28, color: DARK });
+  hline(s, { x: 2.077, y: 3.75, w: 1.409, color: SLATE, width: 1 });
+  txt(s, 'Anti Pandemic', { x: 2.134, y: 4.103, w: 1.294, h: 0.202, align: 'center', fontFace: MED, fontSize: 12, color: DARK });
+  txt(s, 'conguena odio atporta', { x: 2.134, y: 4.386, w: 1.294, h: 0.505, align: 'center', fontFace: REG, fontSize: 10.5, color: DARK, lineSpacingMultiple: 1.5 });
+  iconPlay(s, 2.581, 5.249, 0.4, DARK, WHITE);
+
+  // card 2 (accent)
+  txt(s, 'Advertising', { x: 4.111, y: 1.958, w: 1.294, h: 0.202, align: 'center', fontFace: MED, fontSize: 12, color: DARK });
+  txt(s, 'vestibulum mi. Nunc ut turpis a lacus', { x: 4.111, y: 2.242, w: 1.294, h: 0.764, align: 'center', fontFace: REG, fontSize: 10.5, color: DARK, lineSpacingMultiple: 1.5 });
+  txt(s, '86', { x: 4.082, y: 3.135, w: 1.294, h: 0.808, align: 'center', fontFace: MED, fontSize: 48, color: DARK, bold: true });
+  txt(s, 'Society Growth', { x: 4.111, y: 4.102, w: 1.294, h: 0.202, align: 'center', fontFace: MED, fontSize: 12, color: DARK });
+  txt(s, 'conguena odio atporta', { x: 4.111, y: 4.385, w: 1.294, h: 0.505, align: 'center', fontFace: REG, fontSize: 10.5, color: DARK, lineSpacingMultiple: 1.5 });
+  iconFingerprint(s, 4.611, 5.286, 0.32, DARK);
+
+  // card 3
+  txt(s, 'Advertising', { x: 6.059, y: 1.96, w: 1.294, h: 0.202, align: 'center', fontFace: MED, fontSize: 12, color: DARK });
+  txt(s, 'conguena odio atporta', { x: 6.059, y: 2.243, w: 1.294, h: 0.481, align: 'center', fontFace: REG, fontSize: 10, color: DARK, lineSpacingMultiple: 1.5 });
+  txt(s, 'Society Growth', { x: 6.059, y: 3.243, w: 1.294, h: 0.202, align: 'center', fontFace: MED, fontSize: 12, color: DARK });
+  txt(s, 'conguena odio atporta', { x: 6.059, y: 3.527, w: 1.294, h: 0.481, align: 'center', fontFace: REG, fontSize: 10, color: DARK, lineSpacingMultiple: 1.5 });
+  hline(s, { x: 6.001, y: 4.5, w: 1.409, color: SLATE, width: 1 });
+  txt(s, '547.', { x: 6.059, y: 4.683, w: 1.294, h: 0.539, align: 'center', fontFace: MED, fontSize: 32, color: DARK });
+  txt(s, 'conguena odio', { x: 6.059, y: 5.408, w: 1.294, h: 0.168, align: 'center', fontFace: REG, fontSize: 10, color: DARK });
+
+  txt(s, 'Service That Soars', Object.assign({ x: 8.687, y: 2.087, w: 2.847, h: 1.212, align: 'right', color: WHITE }, H1));
+  txt(s, [rl('Aenean uta nurat massa sit amet leo imperdiet loransa pretium. Aliquam condimentum congue odio, at porta est lobortis sit amet. '),
+    rl(' '), r('Phasellus metus arcu, viverra at risus quis, porta vestibulum mi')],
+  Object.assign({ x: 8.687, y: 3.601, w: 2.847, h: 1.918, align: 'right', color: SILVER }, BODY));
+}
+
+/* =================================================== 18. making your future */
+function slide18() {
+  const s = slide(DARK);
+  poly(s, QUOTE, { x: 7.031, y: 1.497, w: 2.251, h: 2.251, fill: [CREAM, 90] });
+  poly(s, QUOTE, { x: 9.282, y: 1.497, w: 2.251, h: 2.251, fill: [CREAM, 90] });
+  poly(s, QUOTE, { x: 7.031, y: 3.749, w: 2.251, h: 2.251, fill: [CREAM, 90], rotate: 90, flipH: true, flipV: true });
+  poly(s, QUOTE, { x: 9.282, y: 3.749, w: 2.251, h: 2.251, fill: LIME, rotate: 90, flipH: true, flipV: true });
+  chrome(s, 'dark');
+
+  txt(s, [rl('Making '), r('Your Future Our Business.')],
+    Object.assign({ x: 1.798, y: 1.947, w: 4.145, h: 1.818, color: WHITE }, H1));
+  txt(s, [rl('Nam condimentum magna a tellus accumsan, '),
+    r('vel varius nisi mattis. Cras in orci quis velit dapibus mollis. Pellentesque dictum a')],
+  Object.assign({ x: 1.798, y: 4.067, w: 4.145, h: 0.807, color: OFFWHITE }, BODY));
+
+  roundRect(s, { x: 1.796, y: 5.176, w: 3.009, h: 0.384, fill: LIME, rectRadius: 0.192 });
+  txt(s, [r('86', { fontSize: 12 }), r('+', { fontSize: 13 })],
+    { x: 1.938, y: 5.267, w: 0.332, h: 0.202, align: 'center', fontFace: SEMI, color: DARK });
+  txt(s, 'Mandis', { x: 2.392, y: 5.293, w: 0.499, h: 0.151, fontFace: SEMI, fontSize: 9, color: DARK });
+  txt(s, 'Nam condimentans magna', { x: 3.016, y: 5.301, w: 1.586, h: 0.135, fontFace: REG, fontSize: 8, color: DARK });
+
+  txt(s, 'Pre', { x: 10.929, y: 3.38, w: 0.604, h: 0.202, align: 'right', fontFace: SEMI, fontSize: 12, color: WHITE });
+  txt(s, 'Aliqua metum congust', { x: 10.394, y: 3.667, w: 1.139, h: 0.481, align: 'right', fontFace: LIGHT, fontSize: 10, color: CREAM, lineSpacingMultiple: 1.5 });
+}
+
+/* ================================================= 19. your partner (pie chart) */
+function slide19() {
+  const s = slide(CREAM);
+  poly(s, QUOTE, { x: 4.065, y: 1.477, w: 2.265, h: 2.265, fill: [DARK, 90] });
+  poly(s, QUOTE, { x: 1.8, y: 3.742, w: 2.265, h: 2.265, fill: [DARK, 90], flipH: true, flipV: true });
+  chrome(s, 'light');
+
+  oval(s, { x: 1.8, y: 1.485, w: 4.53, h: 4.53, fill: 'BFBFBF', flipH: true });
+  pie(s, { x: 1.8, y: 1.485, w: 4.53, h: 4.53, fill: LIME, flipH: true, angleRange: [26.04, 270] });
+  pie(s, { x: 1.8, y: 1.481, w: 4.53, h: 4.53, fill: DARK, flipH: true, angleRange: [62.93, 270] });
+  oval(s, { x: 3.544, y: 3.229, w: 1.042, h: 1.042, fill: 'F3F3F3', flipH: true });
+  poly(s, TREND, { x: 3.835, y: 3.581, w: 0.49, h: 0.331, fill: DARK });
+
+  txt(s, [rl('Your Partner '), r('To New Heights')], Object.assign({ x: 7.667, y: 2.042, w: 4.789, h: 1.212, color: DARK }, H1));
+  txt(s, [r('Aliquam condimentum congue odrporta ', { fontFace: MED }),
+    r('lobortis amet. Phasellus metus araviverra at risus quisa nsi portlasa mianc ut turpis a')],
+  Object.assign({ x: 7.667, y: 3.556, w: 3.867, h: 0.807, color: DARK }, BODY));
+
+  [['01', 7.667, DARK, WHITE, 8.302, 'First', '34.000', 'TAM', 1.502],
+   ['02', 9.707, LIME, DARK, 10.343, 'Second', '57.000', 'SAC', 1.191]]
+    .forEach(([num, cx, cfill, ncol, tx, label, value, unit, vw]) => {
+      oval(s, { x: cx, y: 4.832, w: 0.498, h: 0.498, fill: cfill });
+      txt(s, num, { x: cx + 0.024, y: 4.96, w: 0.449, h: 0.236, align: 'center', fontFace: MED, fontSize: 14, color: ncol, bold: true });
+      txt(s, label, { x: tx, y: 4.666, w: 1.128, h: 0.202, fontFace: REG, fontSize: 12, color: SLATE });
+      txt(s, value, { x: tx, y: 4.934, w: vw, h: 0.337, fontFace: MED, fontSize: 20, color: DARK, bold: true });
+      txt(s, unit, { x: tx, y: 5.324, w: 0.872, h: 0.135, fontFace: REG, fontSize: 8, color: SLATE });
+    });
+}
+
+/* ================================================== 20. earning is a new skill */
+function slide20() {
+  const s = slide(CREAM);
+  chrome(s, 'light');
+
+  // paired column chart: dark bar then lime bar, bottoms aligned at y = 5.644
+  const BASE = 5.644;
+  const GROUPS = [
+    { label: 'LO', x: 5.667, dark: 2.526, lime: 1.172 },
+    { label: 'RE', x: 6.644, dark: 2.189, lime: 1.741 },
+    { label: 'MI', x: 7.622, dark: 2.977, lime: 1.043, bold: true },
+    { label: 'TJ', x: 8.6, dark: 2.674, lime: 1.978, bold: true },
+    { label: 'XO', x: 9.578, dark: 2.189, lime: 0.483 },
+    { label: 'YH', x: 10.556, dark: 1.741, lime: 0.811 },
+  ];
+  GROUPS.forEach((g) => {
+    rect(s, { x: g.x, y: BASE - g.dark, w: 0.489, h: g.dark, fill: DARK });
+    rect(s, { x: g.x + 0.489, y: BASE - g.lime, w: 0.489, h: g.lime, fill: LIME });
+  });
+  GROUPS.concat([{ x: 11.533 }]).forEach((g) => hline(s, { x: g.x, y: 1.494, w: 0, h: 4.507, color: SLATE, width: 1, transparency: 70 }));
+  GROUPS.forEach((g) => txt(s, g.label, {
+    x: g.x + 0.235, y: 5.799, w: 0.507, h: 0.202, align: 'center',
+    fontFace: REG, fontSize: 12, color: DARK, bold: !!g.bold,
+  }));
+  txt(s, 'Grow', { x: 7.683, y: 1.609, w: 0.864, h: 0.202, align: 'center', fontFace: REG, fontSize: 12, color: DARK });
+  txt(s, '+86%', { x: 7.622, y: 1.858, w: 0.986, h: 0.337, align: 'center', fontFace: REG, fontSize: 20, color: DARK, bold: true });
+
+  txt(s, 'Earning Is A New Skill.', Object.assign({ x: 1.8, y: 1.861, w: 2.867, h: 1.212, color: DARK }, H1));
+  txt(s, 'lobortis amet. Phasellus metusansa araviverra at risus quis, portlasa loran mianca ut turpis',
+    Object.assign({ x: 1.8, y: 3.375, w: 2.867, h: 0.807, color: DARK }, BODY));
+  txt(s, '340K', { x: 1.8, y: 4.676, w: 2.008, h: 0.74, fontFace: SEMI, fontSize: 44, color: DARK });
+  txt(s, 'tiaculis diam.', { x: 1.8, y: 5.416, w: 2.181, h: 0.185, fontFace: LIGHT, fontSize: 11, color: DARK });
+}
+
+/* ========================================================== 21. data statistic */
+function slide21() {
+  const s = slide(CREAM);
+  chrome(s, 'light');
+
+  // two identical stacked bar panels; only the row captions differ
+  const ROWS = [
+    { y: 1.499, bars: [2.097, 1.295, 1.678], num: '01', lyN: 1.719, lyT: 1.952 },
+    { y: 2.712, bars: [1.694, 0.947, 1.413], num: '02', lyN: 2.955, lyT: 3.188 },
+    { y: 3.925, bars: [2.316, 1.43, 1.853], num: '03', lyN: 4.146, lyT: 4.379 },
+    { y: 5.139, bars: [2.036, 1.138, 1.697], num: '04', lyN: 5.361, lyT: 5.594 },
+  ];
+  const COLORS = [DARK, LIME, 'BFBFBF'];
+  const PANELS = [
+    { bx: 2.351, lx: 1.788, caps: ['Data', 'Data', 'Sample', 'Data'] },
+    { bx: 5.851, lx: 5.288, caps: ['Data', 'Sample', 'Data', 'Data'] },
+  ];
+  PANELS.forEach((p) => {
+    for (let i = 0; i < 5; i++) hline(s, { x: p.bx + 0.001 + i * 0.5787, y: 1.499, w: 0, h: 4.502, color: '29295F', width: 1, transparency: 70 });
+    ROWS.forEach((row, ri) => {
+      row.bars.forEach((w, bi) => rect(s, { x: p.bx, y: row.y + bi * 0.2885, w: w, h: 0.289, fill: COLORS[bi] }));
+      txt(s, row.num, { x: p.lx, y: row.lyN, w: 0.322, h: 0.202, fontFace: MED, fontSize: 12, color: DARK });
+      txt(s, p.caps[ri], { x: p.lx, y: row.lyT, w: 0.647, h: 0.168, fontFace: REG, fontSize: 10, color: DARK });
+    });
+  });
+
+  txt(s, [rl('Data'), r('Statistic')], Object.assign({ x: 9.167, y: 1.895, w: 2.367, h: 1.212, align: 'right', color: DARK }, H1));
+  txt(s, [rl('PLACEHOLDER'),
+    rl(' '), r('Aenean ut massa sit amet leo ansimperdiet pretium. Aliquam condimentum congue')],
+  Object.assign({ x: 9.167, y: 3.41, w: 2.367, h: 2.195, align: 'right', color: DARK }, BODY));
+}
+
+/* ============================================================= 22. smart move */
+function slide22() {
+  const s = slide(CREAM);
+  chrome(s, 'light');
+
+  const BASE = 5.644;
+  const MONTHS = [
+    ['Jan', 1.904, 1.467], ['Feb', 2.722, 0.886], ['Mar', 3.539, 1.6], ['Apr', 4.357, 1.741],
+    ['May', 5.172, 1.6], ['Jun', 5.989, 1.045], ['Jul', 6.807, 1.356], ['Aug', 7.624, 0.202],
+    ['Sep', 8.444, 1.6], ['Oct', 9.261, 0.544], ['Nov', 10.079, 1.894], ['Dec', 10.896, 1.356],
+  ];
+  [1.724, 2.542, 3.359, 4.176, 4.994, 5.811, 6.629, 7.446, 8.264, 9.081, 9.898, 10.716, 11.533]
+    .forEach((x) => hline(s, { x: x, y: 3.75, w: 0, h: 1.894, color: '29295F', width: 1, transparency: 70 }));
+  MONTHS.forEach(([label, x, h]) => {
+    const limeH = h * 1.138 / 1.741;
+    rect(s, { x: x, y: BASE - h, w: 0.229, h: h, fill: DARK });
+    rect(s, { x: x + 0.229, y: BASE - limeH, w: 0.229, h: limeH, fill: LIME });
+    txt(s, label, { x: x - 0.025, y: 5.799, w: 0.507, h: 0.202, align: 'center', fontFace: REG, fontSize: 12, color: DARK });
+  });
+
+  txt(s, 'Smart Move!', Object.assign({ x: 1.719, y: 1.794, w: 4.271, h: 0.606, color: DARK }, H1));
+  txt(s, 'Aliquam condimentum congue odrporta lobortis ametloan nasnas. Phasellus metus',
+    Object.assign({ x: 1.719, y: 2.702, w: 3.847, h: 0.529, color: DARK }, BODY));
+  [['400M', 6.667, 'Aenean ut massa sit amet leo imperdiet pretium. '],
+   ['98%', 9.332, 'Phasellus metus arcu, viverra at risus quis vestibulum.']]
+    .forEach(([big, x, sub], i) => {
+      txt(s, big, Object.assign({ x: x, y: 1.794, w: 2.006, h: 0.606, color: DARK }, H1));
+      txt(s, sub, Object.assign({ x: i === 0 ? 6.667 : 9.335, y: 2.702, w: 2.198, h: 0.529, color: DARK }, BODY));
+    });
+}
+
+/* ========================================================== 23. bundling price */
+function slide23() {
+  const s = slide(DARK);
+  chrome(s, 'dark');
+
+  const PLANS = [
+    { x: 4.777, cardFill: WHITE, tick: LIME, name: 'INSURANCE', price: '$30.00', tx: 5.256, px: 4.94, lx: 5.06, dx: 5.128, ix: 5.326, n: 4 },
+    { x: 7.029, cardFill: LIME, tick: DARK, name: 'EXCLUSIVE', price: '$60.00', tx: 7.511, px: 7.196, lx: 7.316, dx: 7.384, ix: 7.582, n: 6 },
+    { x: 9.282, cardFill: WHITE, tick: LIME, name: 'REGULAR', price: '$90.00', tx: 9.761, px: 9.445, lx: 9.566, dx: 9.634, ix: 9.831, n: 5 },
+  ];
+  const FEATURES = ['Pellen tesque dictuna ', 'Etiam accumsan luctuamas', 'Nante iaculis tortoret auctor',
+    'Purus nunc eu metus. ', 'Sed pharetra tellus.', 'Curabitur sit amet ante'];
+
+  PLANS.forEach((p) => {
+    roundRect(s, { x: p.x, y: 1.498, w: 2.251, h: 4.503, fill: p.cardFill, rotate: 180, flipH: true, rectRadius: 0.375 });
+    for (let i = 0; i < p.n; i++) {
+      const y = 4.017 + i * (i < 4 ? 0.3053 : 0.3025);
+      oval(s, { x: p.dx - 0.029, y: y - 0.044, w: 0.135, h: 0.135, fill: p.tick === LIME ? LIME : DARK });
+      poly(s, CHECK, { x: p.dx, y: y, w: 0.076, h: 0.054, fill: p.tick === LIME ? DARK : WHITE });
+      txt(s, FEATURES[i], { x: p.ix, y: y - 0.044, w: 1.419, h: 0.118, fontFace: LIGHT, fontSize: 7, color: DARK });
+    }
+    txt(s, p.name, { x: p.tx, y: 1.839, w: 1.294, h: 0.185, align: 'center', fontFace: REG, fontSize: 11, color: '595959' });
+    txt(s, p.price, { x: p.px, y: 2.249, w: 1.925, h: 0.539, align: 'center', fontFace: SEMI, fontSize: 32, color: DARK });
+    txt(s, 'Detail Price', { x: p.lx, y: 2.975, w: 1.684, h: 0.177, align: 'center', fontFace: SEMI, fontSize: 10.5, color: DARK });
+    txt(s, [rl(' Pellentesque dictumans '), r('neque sagitti.')],
+      { x: p.lx, y: 3.232, w: 1.684, h: 0.385, align: 'center', fontFace: LIGHT, fontSize: 8, color: DARK, lineSpacingMultiple: 1.5 });
+  });
+
+  txt(s, 'Bundling Price', Object.assign({ x: 1.8, y: 2.087, w: 2.844, h: 1.212, color: WHITE }, H1));
+  txt(s, 'Aenean ut massa sit amet congue odio, at porta est lobortis sit amet. Phasellus metus arcu',
+    Object.assign({ x: 1.8, y: 3.601, w: 2.253, h: 1.085, color: SILVER }, BODY));
+  oval(s, { x: 1.8, y: 5.006, w: 0.384, h: 0.384, fill: LIME });
+  iconBarChart(s, 1.912, 5.118, 0.161, DARK);
+  txt(s, 'Updated Pricing', { x: 2.347, y: 4.988, w: 1.659, h: 0.168, fontFace: LIGHT, fontSize: 10, color: WHITE });
+  txt(s, '2034', { x: 2.347, y: 5.22, w: 1.659, h: 0.185, fontFace: MED, fontSize: 11, color: WHITE });
+}
+
+/* ============================================================= 24. contact us */
+function slide24() {
+  const s = slide(DARK);
+  chrome(s, 'dark');
+
+  txt(s, 'Let\u2019s Keep In Touch', Object.assign({ x: 1.8, y: 1.898, w: 5.887, h: 0.606, color: WHITE }, H1));
+  txt(s, 'Aliquam condimentum congue odrporta lobortis aatloannas nasnas. Phasellus metus araviverra '
+    + 'at risus quis, paasasa mianc ut turpis a lacus lobortis ',
+  Object.assign({ x: 1.8, y: 2.807, w: 4.867, h: 0.807, color: OFFWHITE }, BODY));
+  txt(s, 'Aliquam condimentum congue odrporta lobortis aatloannas nasnas. ',
+    Object.assign({ x: 7.687, y: 2.807, w: 3.847, h: 0.529, color: OFFWHITE }, BODY));
+
+  poly(s, QUOTE, { x: 7.031, y: 5.249, w: 2.251, h: 2.251, fill: [CREAM, 90] });
+  poly(s, QUOTE, { x: 9.282, y: 5.249, w: 2.251, h: 2.251, fill: LIME });
+
+  const CONTACTS = [
+    { icon: 'phone', cx: 1.8, cy: 4.184, tx: 2.392, ty: 4.177, w: 1.659, title: 'Telephone', value: '099 \u2013 2345 - 6789', vw: 1.659 },
+    { icon: 'dots', cx: 4.35, cy: 4.184, tx: 4.951, ty: 4.177, w: 1.39, title: 'Website', value: 'meetcirke.com', vw: 1.39 },
+    { icon: 'compass', cx: 1.8, cy: 5.149, tx: 2.401, ty: 5.142, w: 1.659, title: 'Address', value: 'Sabare Nagar 1st Block Bangalore-560016', vw: 3.203 },
+  ];
+  CONTACTS.forEach((c) => {
+    oval(s, { x: c.cx, y: c.cy, w: 0.391, h: 0.391, fill: LIME });
+    if (c.icon === 'phone') iconPhone(s, c.cx + 0.091, c.cy + 0.091, 0.21, DARK);
+    if (c.icon === 'dots') iconDots(s, c.cx + 0.089, c.cy + 0.088, 0.215, DARK);
+    if (c.icon === 'compass') iconCompass(s, c.cx + 0.073, c.cy + 0.073, 0.246, DARK);
+    txt(s, c.title, { x: c.tx, y: c.ty, w: c.w, h: 0.185, fontFace: MED, fontSize: 11, color: WHITE });
+    txt(s, c.value, { x: c.tx, y: c.ty + 0.237, w: c.vw, h: 0.168, fontFace: LIGHT, fontSize: 10, color: WHITE });
+  });
+}
+
+const BUILDERS = [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08,
+  slide09, slide10, slide11, slide12, slide13, slide14, slide15, slide16,
+  slide17, slide18, slide19, slide20, slide21, slide22, slide23, slide24];
+
+/* ----------------------------------------------------------------- assemble */
+const OUT = path.join(__dirname, '17cf9404-b48a-4895-9f25-f7fb8ea3af0a_grok_final.pptx');
+BUILDERS.forEach((fn) => fn());
+pres.writeFile({ fileName: OUT }).then(() => console.log('wrote ' + OUT));
