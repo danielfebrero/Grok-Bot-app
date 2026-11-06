@@ -1,0 +1,652 @@
+/**
+ * NAMINA — Project Proposal Presentation (24 slides, 13.333in x 7.5in widescreen).
+ *
+ * Standalone pptxgenjs re-creation of the reference deck. Every slide is built by
+ * an explicit `slideNN(s)` function below; shared visual primitives live in the
+ * helper section so the per-slide code reads as a list of design decisions.
+ *
+ * Photographs in the original are replaced by flat grey `photo()` placeholders.
+ *
+ * Run: node <this file>   ->   writes the .pptx next to this file.
+ */
+
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ palette */
+// Names follow how the colours are used; hex values are taken from the deck theme
+// ("Ngaran Colorful") after its lumMod/lumOff tints were resolved.
+const C = {
+  ink: '242527', // theme tx1 — near-black panels
+  inkSoft: '393A3E', // tx1 @90% — footer bar, sub-headings
+  gray: '585B60', // tx1 @75% — body copy
+  rule: 'C6C8CB', // tx1 @25% — hairlines and outlines
+  ruleDark: '8E9197', // tx1 @50% — hairline on dark slides
+  silver: 'BFBFBF', // bg1 @75%
+  white: 'FFFFFF',
+  navy: '32477D', // accent3 @50% — display headings
+  blueMid: 'BBC6E3', // accent3 @60%
+  blueLite: 'E8ECF6', // accent3 @20% — pale blue blocks
+  amber: 'F39C12', // accent1 — brand tag, arrows
+  amberLite: 'F8C471', // accent1 @60% — short dashes, dot
+  amberSoft: 'FAD7A0', // accent1 @40% — button fills
+  amberPale: 'FDEBD0', // accent1 @20% — progress troughs, price headers
+  dotDark: '808080',
+  dotMid: 'A6A6A6',
+  dotLite: 'F2F2F2',
+  photo: 'CCCCCC', // stand-in for image1.jpg
+  photoAlt: 'B3B3B3', // stand-in for image2.png
+};
+
+const F = {
+  sans: 'Source Sans Pro', // headings, labels, UI text
+  body: 'Open Sans', // paragraph copy
+  serif: 'Playfair Display', // eyebrow / kicker lines
+};
+
+/* --------------------------------------------------------------- primitives */
+
+function rect(s, x, y, w, h, fill) {
+  s.addShape('rect', { x, y, w, h, fill: { color: fill }, line: { type: 'none' } });
+}
+
+// Outlined box with no fill (typography specimens, pricing cards, timeline frame).
+// Widths come from the theme's line styles: 1pt for boxes, 0.5pt for hairlines.
+function frame(s, x, y, w, h, color, width) {
+  s.addShape('rect', { x, y, w, h, fill: { type: 'none' }, line: { color, width } });
+}
+
+// Thin horizontal accent dash that sits beside every kicker line.
+function dash(s, x, y, w) {
+  rect(s, x, y, w === undefined ? 0.5906 : w, 0.0572, C.amberLite);
+}
+
+function rule(s, x, y, w, h, color, width) {
+  s.addShape('line', { x, y, w, h, line: { color, width } });
+}
+
+// Flat grey block standing in for a photograph in the reference deck.
+function photo(s, x, y, w, h, tone) {
+  rect(s, x, y, w, h, tone || C.photo);
+}
+
+// Rounded-top "arch" swatch used by the colour-palette slide. The original is a
+// freeform: a semicircular cap over straight sides. Coordinates below are unit
+// fractions of the shape box, taken from that path.
+const ARCH_PATH = [
+  { x: 0.5, y: 0 },
+  { curve: { type: 'cubic', x1: 0.7416, y1: 0, x2: 0.9432, y2: 0.1417 }, x: 0.9898, y: 0.3301 },
+  { x: 0.9968, y: 0.3875 }, { x: 1, y: 0.3875 }, { x: 1, y: 1 }, { x: 0, y: 1 },
+  { x: 0, y: 0.3875 }, { x: 0.0032, y: 0.3875 }, { x: 0.0102, y: 0.3301 },
+  { curve: { type: 'cubic', x1: 0.0568, y1: 0.1417, x2: 0.2584, y2: 0 }, x: 0.5, y: 0 },
+  { close: true },
+];
+
+function arch(s, x, y, w, h, fill) {
+  const points = ARCH_PATH.map(p => (p.close
+    ? p
+    : Object.assign({}, p, { x: p.x * w, y: p.y * h },
+        p.curve && { curve: { type: 'cubic', x1: p.curve.x1 * w, y1: p.curve.y1 * h, x2: p.curve.x2 * w, y2: p.curve.y2 * h } })));
+  s.addShape('custGeom', { x, y, w, h, points, fill: { color: fill }, line: { type: 'none' } });
+}
+
+// Small right-pointing triangle used as a play/next marker on buttons.
+function playMark(s, x, y, w, h, fill) {
+  s.addShape('triangle', { x, y, w, h, rotate: 90, fill: { color: fill }, line: { type: 'none' } });
+}
+
+// The folded corner under a percentage badge.
+function badgeTail(s, x, y, w, h) {
+  s.addShape('rtTriangle', { x, y, w, h, rotate: 180, fill: { color: C.amber }, line: { type: 'none' } });
+}
+
+/* ------------------------------------------------------------------ text */
+
+// Base text writer. `lines` may be a string, an array of strings (soft breaks)
+// or an array of pptxgenjs text-run objects.
+function text(s, x, y, w, h, lines, opts) {
+  const o = Object.assign({ x, y, w, h, valign: 'top', isTextBox: true }, opts || {});
+  if (o.nowrap) { o.wrap = false; delete o.nowrap; }
+  delete o.soft;
+  // `fit` mirrors PowerPoint's "resize shape to fit text" used throughout the deck.
+  if (o.fit) { o.fit = 'resize'; }
+  s.addText(lines, o);
+}
+
+// Turns a string, or an array of lines, into runs. `soft` picks a line break
+// inside one paragraph (tighter) instead of one paragraph per line.
+function lineRuns(lines, soft) {
+  return (Array.isArray(lines) ? lines : [lines]).map((t, i) => ({
+    text: t, options: soft ? { softBreakBefore: i > 0 } : { breakLine: true },
+  }));
+}
+
+// Body copy: Open Sans 10pt on 1.5 line spacing.
+function para(s, x, y, w, h, lines, opts) {
+  text(s, x, y, w, h, lineRuns(lines, opts && opts.soft), Object.assign({
+    fontFace: F.body, fontSize: 10, color: C.gray, lineSpacingMultiple: 1.5,
+  }, opts));
+}
+
+// Letter-spaced display heading in Source Sans Pro.
+function head(s, x, y, w, h, lines, size, color, opts) {
+  text(s, x, y, w, h, lineRuns(lines, opts && opts.soft), Object.assign({
+    fontFace: F.sans, fontSize: size, color, charSpacing: 6, fit: true,
+  }, opts));
+}
+
+// Plain (untracked) Source Sans Pro heading, e.g. "About Us", "Project Goals".
+function sub(s, x, y, w, h, str, size, color, opts) {
+  text(s, x, y, w, h, str, Object.assign({ fontFace: F.sans, fontSize: size, color, fit: true }, opts));
+}
+
+// Playfair Display eyebrow above the big headings.
+function kicker(s, x, y, w, h, str, size, color) {
+  text(s, x, y, w, h, str, { fontFace: F.serif, fontSize: size, color, charSpacing: 3, fit: true });
+}
+
+/* ---------------------------------------------------- repeated slide chrome */
+
+// Section label (top-left), amber dash after it, right-hand hairline, footer bar,
+// page-number tab and brand tag — present on all 24 slides.
+function chrome(s, label, labelColor, labelW, dashX, vRuleColor) {
+  text(s, 0.3876, 0.3025, labelW, 0.3366, label,
+    { fontFace: F.sans, fontSize: 14, color: labelColor, charSpacing: 6, nowrap: true, fit: true });
+  dash(s, dashX, 0.4696);
+
+  rule(s, 12.8219, 3.5262, 0, 2.4444, vRuleColor || C.rule, 0.5);
+
+  rect(s, -0.0185, 6.894, 12.478, 0.6457, C.inkSoft);
+  text(s, 0.0244, 7.0366, 3.9323, 0.3534, 'YOUR WEBSITE GOES HERE',
+    { fontFace: F.sans, fontSize: 15, color: C.white, charSpacing: 3, align: 'center', fit: true });
+
+  [[11.2498, C.dotLite], [11.5341, C.dotMid], [11.8165, C.dotDark]].forEach(([x, color]) => {
+    s.addShape('ellipse', { x, y: 7.1504, w: 0.1506, h: 0.1506, fill: { color }, line: { type: 'none' } });
+  });
+
+  // Page-number tab bleeding off the bottom-right corner, with its amber pip on top.
+  rect(s, 12.478, 6.2407, 0.8308, 1.2733, C.blueLite);
+  s.slideNumber = {
+    x: 12.523, y: 6.49, w: 0.74, h: 0.404, align: 'center', valign: 'middle',
+    fontFace: F.body, fontSize: 14, color: C.gray,
+  };
+  s.addShape('ellipse', { x: 12.8219, y: 6.9627, w: 0.175, h: 0.175, fill: { color: C.amberLite }, line: { type: 'none' } });
+
+  rect(s, 11.0, -0.0279, 2.3921, 0.69, C.amber);
+  text(s, 11.2498, 0.1953, 1.9883, 0.3029, 'BRAND NAME',
+    { fontFace: F.sans, fontSize: 12, color: C.white, charSpacing: 6, nowrap: true, fit: true });
+}
+
+/* ------------------------------------------------------------------ slides */
+
+/* Slide 1 — Cover — NAMINA */
+function slide01(s) {
+  rect(s, -0.0638, 0, 5.8763, 6.8866, C.ink);
+  rect(s, 0.7963, 2.629, 6.5249, 2.2419, C.blueLite);
+  head(s, 8.0286, 2.3128, 3.78, 1.1949, 'NAMINA', 65, C.navy, { nowrap: true });
+  kicker(s, 8.0656, 3.3781, 3.9323, 0.3198, 'Project Proposal Presentation', 13, C.gray);
+  para(s, 8.0286, 3.9433, 4.1193, 1.1949, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus dictum. Aliquam bibendum aliquam sem vel cursus.  Duis lacinia aliquam tristique. Cras tristique neque non velit  ');
+  dash(s, 8.193, 2.2479, 1.1765);
+  photo(s, 1.4508, 1.0074, 5.2158, 5.2212);
+  chrome(s, 'ABOUT US', C.white, 1.7306, 2.1395);
+}
+
+/* Slide 2 — Table of contents */
+function slide02(s) {
+  rect(s, 5.8034, 1.345, 1.9016, 4.843, C.blueLite);
+  head(s, 1.3081, 2.7767, 3.1646, 1.279, ['TABLE OF', 'CONTENTS'], 35, C.navy, { soft: true, nowrap: true });
+  para(s, 1.2419, 4.0557, 3.0836, 1.1949, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus dictum. Aliquam bibendum aliquam sem vel cursus.  Duis lacinia aliquam tristique.  ');
+  kicker(s, 1.3081, 2.361, 1.9622, 0.4039, 'Welcome', 18, C.gray);
+  dash(s, 2.9198, 2.5606);
+  sub(s, 8.9338, 1.9617, 1.4764, 0.5049, 'About Us', 24, C.inkSoft, { nowrap: true });
+  sub(s, 8.9385, 2.6115, 1.3677, 0.5049, 'Services', 24, C.inkSoft, { nowrap: true });
+  sub(s, 8.9302, 3.2401, 1.4414, 0.5049, 'Portfolio', 24, C.inkSoft, { nowrap: true });
+  sub(s, 8.952, 3.8686, 1.3151, 0.5049, 'Contact', 24, C.inkSoft, { nowrap: true });
+  para(s, 8.974, 4.5886, 2.6004, 1.1949, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus dictum. Aliquam bibendum aliquam  ');
+  photo(s, 5.0365, 1.7447, 3.2674, 4.0106);
+  chrome(s, 'ABOUT US', C.navy, 1.7306, 2.1395);
+}
+
+/* Slide 3 — Color palette */
+function slide03(s) {
+  rect(s, 0.9592, 3.75, 6.4716, 2.2419, C.blueLite);
+  arch(s, 8.2458, 4.1431, 1.0013, 1.2108, C.gray);
+  arch(s, 9.0584, 4.143, 1.0013, 1.2108, C.blueMid);
+  arch(s, 9.8709, 4.143, 1.0013, 1.2108, C.amberSoft);
+  arch(s, 10.6835, 4.143, 1.0013, 1.2108, C.amber);
+  head(s, 8.1884, 2.3489, 4.0061, 0.5722, 'COLOR PALETTE', 28, C.navy, { nowrap: true });
+  para(s, 8.1905, 2.9291, 4.004, 1.1949, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus dictum. Aliquam bibendum aliquam sem vel cursus.  Duis lacinia aliquam  ');
+  kicker(s, 8.1884, 1.912, 2.2174, 0.4376, 'Hero Color', 20, C.gray);
+  dash(s, 10.3073, 2.1116);
+  sub(s, 8.2369, 5.5042, 0.8401, 0.3198, '#423456', 13, C.navy, { nowrap: true, align: 'center' });
+  sub(s, 9.077, 5.5042, 0.8401, 0.3198, '#423456', 13, C.navy, { nowrap: true, align: 'center' });
+  sub(s, 9.9233, 5.5042, 0.8401, 0.3198, '#423456', 13, C.navy, { nowrap: true, align: 'center' });
+  sub(s, 10.7678, 5.5042, 0.8401, 0.3198, '#423456', 13, C.navy, { nowrap: true, align: 'center' });
+  photo(s, 1.2141, 1.7447, 2.8386, 4.0106);
+  photo(s, 4.3544, 1.7447, 2.8386, 4.0106);
+  chrome(s, 'ABOUT US', C.navy, 1.7306, 2.1395);
+}
+
+/* Slide 4 — Project typography */
+function slide04(s) {
+  rect(s, -0.0185, -0.0279, 6.6852, 6.9625, C.ink);
+  frame(s, 7.6329, 1.9399, 1.2005, 1.1304, C.rule, 1);
+  head(s, 7.7771, 2.0409, 0.6683, 0.9424, 'A', 50, C.inkSoft, { nowrap: true, align: 'center' });
+  head(s, 8.1754, 2.0442, 0.6683, 0.9424, 'a', 50, C.inkSoft, { nowrap: true, align: 'center' });
+  sub(s, 9.1565, 1.8977, 2.218, 0.69, 'Main Title', 35, C.inkSoft, { nowrap: true });
+  para(s, 9.1821, 2.4851, 2.6004, 0.6551, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare.');
+  frame(s, 7.9198, 3.5016, 0.9135, 0.8602, C.rule, 1);
+  head(s, 8.0263, 3.5712, 0.5526, 0.69, 'A', 35, C.inkSoft, { nowrap: true, align: 'center' });
+  head(s, 8.3358, 3.5757, 0.5368, 0.69, 'a', 35, C.inkSoft, { nowrap: true, align: 'center' });
+  sub(s, 9.1565, 3.4062, 1.8796, 0.4881, 'Second Title', 23, C.inkSoft, { nowrap: true });
+  para(s, 9.1565, 3.8649, 2.6004, 0.6208, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare.');
+  frame(s, 8.1754, 4.7862, 0.6972, 0.6565, C.rule, 1);
+  head(s, 8.2261, 4.8476, 0.4772, 0.5217, 'A', 25, C.inkSoft, { nowrap: true, align: 'center' });
+  head(s, 8.4517, 4.847, 0.4649, 0.5217, 'a', 25, C.inkSoft, { nowrap: true, align: 'center' });
+  sub(s, 9.1821, 4.6905, 1.1819, 0.4039, 'Text Title', 18, C.inkSoft, { nowrap: true });
+  para(s, 9.1821, 5.0316, 2.6004, 0.6208, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare.');
+  head(s, 0.8086, 2.5413, 5.0264, 0.5049, 'PROJECT TYPOGRAPHY', 24, C.white, { nowrap: true });
+  para(s, 0.7742, 4.0616, 4.9089, 1.1383, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus dictum. Aliquam bibendum aliquam sem vel cursus.  Duis lacinia aliquam  Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus dictum. ', { color: C.white });
+  text(s, 0.8086, 3.287, 4.9089, 0.6854, [
+    { text: 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus dictum. ', options: { fontFace: F.serif, fontSize: 12, color: C.silver, bold: true, lineSpacingMultiple: 1.5 } },
+  ]);
+  chrome(s, 'ABOUT US', C.white, 1.7306, 2.1395);
+}
+
+/* Slide 5 — Brand story */
+function slide05(s) {
+  rect(s, 5.033, 2.5709, 3.2674, 2.8786, C.blueLite);
+  para(s, 9.7537, 2.5756, 2.5067, 0.7627, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus dictum.  ');
+  sub(s, 9.7733, 2.1107, 2.1812, 0.4376, 'About The Brand', 20, C.inkSoft, { nowrap: true });
+  sub(s, 9.7308, 3.6404, 1.7499, 0.4376, 'Short History', 20, C.inkSoft, { nowrap: true });
+  head(s, 0.8951, 2.8856, 2.8876, 0.4544, 'BRAND STORY', 21, C.navy, { nowrap: true });
+  para(s, 0.8839, 3.3722, 3.0148, 1.1949, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus dictum. Aliquam bibendum aliquam sem vel, vitae finibus tellus dictum.  ');
+  para(s, 9.7417, 4.1099, 2.5067, 0.7627, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus dictum.  ');
+  rect(s, 0.935, 4.7484, 2.5591, 0.5903, C.amberSoft);
+  head(s, 1.0981, 4.9113, 1.8884, 0.2861, 'LEARN MORE', 11, C.inkSoft, { nowrap: true });
+  playMark(s, 3.078, 4.9794, 0.1731, 0.1492, C.amber);
+  photo(s, 4.2893, 1.3777, 3.2674, 3.3989);
+  photo(s, 5.923, 3.4335, 3.2674, 2.6888, C.photoAlt);
+  chrome(s, 'ABOUT US', C.navy, 1.7306, 2.1395);
+}
+
+/* Slide 6 — Project overview */
+function slide06(s) {
+  photo(s, 6.647, 1.4259, 5.5294, 4.8149);
+  head(s, 1.3081, 2.7767, 3.0261, 1.279, ['PROJECT', 'OVERVIEW'], 35, C.navy, { soft: true, nowrap: true });
+  para(s, 1.2419, 4.0557, 3.0836, 1.1949, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus dictum. Aliquam bibendum aliquam sem vel cursus.  Duis lacinia aliquam tristique.  ');
+  kicker(s, 1.3349, 2.4851, 2.5325, 0.3029, 'About The Project', 12, C.gray);
+  dash(s, 3.6977, 2.608);
+  rect(s, 5.0099, 2.1245, 3.3135, 3.307, C.blueLite);
+  para(s, 5.3599, 4.2149, 2.5067, 0.8145, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus dictum.  ', { align: 'center' });
+  sub(s, 5.7865, 3.8281, 1.7604, 0.4376, 'Project Goals', 20, C.inkSoft, { nowrap: true, align: 'center' });
+  photo(s, 5.3443, 2.513, 2.6054, 1.1784, C.photoAlt);
+  chrome(s, 'ABOUT US', C.navy, 1.7306, 2.1395);
+}
+
+/* Slide 7 — Project objectives */
+function slide07(s) {
+  rect(s, 4.4966, 0.6778, 8.9374, 6.2179, C.ink);
+  head(s, 8.3764, 2.7343, 3.6011, 1.279, ['PROJECT', 'OBJECTIVES'], 35, C.white, { nowrap: true });
+  para(s, 8.3971, 4.0133, 3.0836, 1.1949, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus dictum. Aliquam bibendum aliquam sem vel cursus.  Duis lacinia aliquam tristique.  ', { color: C.white });
+  kicker(s, 8.3764, 2.3186, 2.4753, 0.3029, 'About The Project', 12, C.white);
+  dash(s, 10.7272, 2.4457);
+  photo(s, 1.2442, 1.3383, 4.5833, 4.8149);
+  photo(s, 4.39, 2.0502, 3.3465, 3.3912, C.photoAlt);
+  chrome(s, 'ABOUT US', C.navy, 1.7306, 2.1395);
+}
+
+/* Slide 8 — The project goals */
+function slide08(s) {
+  rect(s, 7.872, 5.0009, 4.0301, 0.6729, C.amberSoft);
+  rect(s, -0.0638, 0.9149, 7.1064, 6.6248, C.ink);
+  head(s, 1.2443, 2.4999, 4.5454, 1.1781, ['THE PROJECT', 'GOALS'], 32, C.white, { soft: true });
+  para(s, 1.178, 3.8989, 4.5454, 1.4975, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus dictum. Aliquam bibendum aliquam sem vel cursus.  Duis lacinia aliquam tristique.  Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus dictum. Aliquam bibendum aliquam sem vel cursus.   ', { color: C.rule });
+  dash(s, 4.9717, 2.8273);
+  para(s, 7.8268, 1.8823, 4.0753, 0.8529, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus dictum. Aliquam bibendum aliquam sem vel cursus.  Duis lacinia aliquam tristique.  ');
+  head(s, 8.1142, 5.1821, 2.1969, 0.3534, 'LEARN MORE', 15, C.navy, { nowrap: true });
+  playMark(s, 11.362, 5.2509, 0.221, 0.1905, C.amber);
+  rule(s, 10.341, 5.348, 0.7336, 0, C.white, 0.5);
+  photo(s, 7.8946, 3.0553, 4.0753, 1.7447);
+  chrome(s, 'ABOUT US', C.navy, 1.7306, 2.1395);
+}
+
+/* Slide 9 — Project timeline */
+function slide09(s) {
+  frame(s, 1.1048, 4.373, 10.9088, 1.7966, C.rule, 1);
+  photo(s, 1.3976, 2.6891, 3.2695, 2.2143);
+  photo(s, 4.9571, 2.6891, 3.2695, 2.2143);
+  photo(s, 8.5167, 2.6891, 3.2695, 2.2143);
+  rect(s, 1.3867, 4.1417, 1.6669, 0.5041, C.white);
+  head(s, 1.3867, 1.707, 4.8812, 0.5217, 'PROJECT TIMELINE', 25, C.navy);
+  para(s, 6.2679, 1.6426, 5.3633, 0.8529, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus dictum. Aliquam bibendum aliquam sem vel cursus.  Duis lacinia aliquam  ');
+  sub(s, 1.599, 4.1777, 1.0206, 0.4039, 'Phase 1', 18, C.inkSoft, { nowrap: true });
+  para(s, 1.3867, 5.1921, 3.2695, 0.5771, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus  ');
+  rect(s, 4.9245, 4.1417, 1.6669, 0.5041, C.white);
+  sub(s, 5.1368, 4.1777, 1.0206, 0.4039, 'Phase 2', 18, C.inkSoft, { nowrap: true });
+  rect(s, 8.4846, 4.1461, 1.6669, 0.5041, C.white);
+  sub(s, 8.6968, 4.1822, 1.0206, 0.4039, 'Phase 3', 18, C.inkSoft, { nowrap: true });
+  para(s, 4.9245, 5.1853, 3.2695, 0.5771, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus  ');
+  para(s, 8.5058, 5.1819, 3.2695, 0.5771, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus  ');
+  chrome(s, 'SERVICES', C.inkSoft, 1.671, 2.1395);
+}
+
+/* Slide 10 — Services offered */
+function slide10(s) {
+  rect(s, 5.1603, 1.4732, 5.9905, 2.4444, C.blueLite);
+  head(s, 1.3144, 2.553, 2.9806, 1.279, ['SERVICES', 'OFFERED'], 35, C.navy, { nowrap: true });
+  para(s, 1.2481, 3.8321, 3.0836, 1.1949, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus dictum. Aliquam bibendum aliquam sem vel cursus.  Duis lacinia aliquam tristique.  ');
+  kicker(s, 1.3144, 2.1374, 2.2293, 0.3029, 'Project Services', 12, C.gray);
+  dash(s, 3.4188, 2.279);
+  para(s, 5.3641, 4.8336, 2.5067, 0.7627, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus dictum.  ');
+  sub(s, 5.3837, 4.3687, 2.3214, 0.4376, 'Services Overview', 20, C.inkSoft, { nowrap: true });
+  para(s, 8.5504, 4.8336, 2.5067, 0.7627, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus dictum.  ');
+  sub(s, 8.57, 4.3687, 2.3512, 0.4376, 'Service Excellence', 20, C.inkSoft, { nowrap: true });
+  frame(s, 1.3144, 5.3064, 2.5539, 0.505, C.rule, 1);
+  head(s, 1.4986, 5.417, 1.969, 0.3029, 'LEARN MORE', 12, C.navy, { nowrap: true });
+  playMark(s, 3.534, 5.5015, 0.1402, 0.1208, C.gray);
+  photo(s, 5.3707, 1.6583, 2.8562, 2.4444);
+  photo(s, 8.557, 1.6583, 2.8562, 2.4444);
+  chrome(s, 'SERVICES', C.inkSoft, 1.7306, 2.1395);
+}
+
+/* Slide 11 — Main offerings */
+function slide11(s) {
+  rect(s, 7.0004, 3.7145, 4.815, 1.0558, C.blueLite);
+  head(s, 7.1109, 1.8673, 4.7045, 0.6395, 'MAIN OFFERINGS', 32, C.navy);
+  kicker(s, 7.1399, 1.6256, 2.2369, 0.3029, 'Project Services', 12, C.gray);
+  dash(s, 9.2733, 1.7527);
+  para(s, 7.1109, 2.6567, 4.664, 1.0578, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus dictum. Aliquam bibendum aliquam sem vel cursus.  Duis lacinia aliquam tristique.  ');
+  para(s, 7.0913, 5.4629, 2.5067, 0.6122, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare ');
+  sub(s, 7.1109, 5.1513, 1.8937, 0.3702, 'Services Overview', 16, C.inkSoft, { nowrap: true });
+  para(s, 9.613, 5.4629, 2.5067, 0.6122, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare ');
+  sub(s, 9.6327, 5.1513, 2.0111, 0.3702, 'Services Excellence', 16, C.inkSoft, { nowrap: true });
+  photo(s, 0.0244, 0.9058, 6.3329, 5.9812);
+  photo(s, 7.1685, 3.8799, 2.3505, 1.0887);
+  photo(s, 9.6903, 3.8964, 2.3505, 1.0887);
+  chrome(s, 'SERVICES', C.inkSoft, 1.7306, 2.1395);
+}
+
+/* Slide 12 — The services */
+function slide12(s) {
+  rect(s, -0.0638, 0.9305, 3.0519, 5.956, C.ink);
+  rect(s, 9.7346, 3.6452, 2.5309, 2.4444, C.blueLite);
+  para(s, 4.9993, 3.5238, 3.2634, 0.6457, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus  ');
+  sub(s, 4.9993, 3.1896, 2.5134, 0.3366, 'Services Overview', 14, C.inkSoft);
+  para(s, 4.9993, 4.6251, 3.2634, 0.6457, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus  ');
+  sub(s, 4.9993, 4.2909, 2.5134, 0.3366, 'Services Excellence', 14, C.inkSoft);
+  head(s, 4.9844, 2.446, 3.4166, 0.4881, 'THE SERVICES', 23, C.navy);
+  kicker(s, 4.9993, 2.1412, 2.2369, 0.3029, 'Project Services', 12, C.gray);
+  dash(s, 7.1327, 2.2684);
+  photo(s, 1.2529, 1.5413, 3.0519, 4.3039);
+  photo(s, 8.9309, 1.5413, 3.0519, 4.3039);
+  chrome(s, 'SERVICES', C.inkSoft, 1.671, 2.1395);
+}
+
+/* Slide 13 — Project offerings */
+function slide13(s) {
+  rect(s, 8.6261, 2.1112, 2.1871, 3.5379, C.blueLite);
+  para(s, 4.6637, 2.8586, 2.3402, 0.8953, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus  ');
+  sub(s, 4.6637, 2.5244, 2.5134, 0.3534, 'Service Overview', 15, C.inkSoft);
+  para(s, 4.6315, 4.3375, 2.3402, 0.8953, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus  ');
+  sub(s, 4.6315, 4.0034, 2.5134, 0.3534, 'Service Excellence', 15, C.inkSoft);
+  head(s, 1.1922, 2.4556, 2.9858, 1.1107, ['PROJECT', 'OFFERINGS'], 30, C.navy, { soft: true, nowrap: true });
+  para(s, 1.2202, 3.7028, 3.0036, 1.1949, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus dictum. Aliquam bibendum aliquam sem  ');
+  rect(s, 1.2623, 4.8697, 2.2504, 0.5903, C.amberSoft);
+  head(s, 1.4184, 5.0326, 1.969, 0.3029, 'LEARN MORE', 12, C.inkSoft, { nowrap: true, align: 'center' });
+  kicker(s, 1.2202, 2.1879, 2.2369, 0.3029, 'Project Services', 12, C.gray);
+  dash(s, 3.3536, 2.3151);
+  photo(s, 9.7196, 1.4138, 2.3402, 3.6499, C.photoAlt);
+  photo(s, 7.3794, 2.5846, 2.3402, 3.6499);
+  chrome(s, 'SERVICES', C.inkSoft, 1.7306, 2.1395);
+}
+
+/* Slide 14 — Let's take a break */
+function slide14(s) {
+  s.background = { color: C.ink };
+  rect(s, 6.5895, 1.1374, 2.1656, 1.8333, C.blueLite);
+  head(s, 1.4745, 2.3991, 4.5454, 1.279, ['LET’S TAKE', 'A BREAK'], 35, C.white);
+  para(s, 1.4475, 3.7879, 4.5454, 1.4975, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus dictum. Aliquam bibendum aliquam sem vel cursus.  Duis lacinia aliquam tristique.  Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus dictum. Aliquam bibendum aliquam sem vel cursus.   ', { color: C.rule });
+  dash(s, 4.9633, 2.7137);
+  photo(s, 6.8688, 1.4452, 5.1433, 4.6095);
+  chrome(s, 'ABOUT US', C.white, 1.7306, 2.1395, C.ruleDark);
+}
+
+/* Slide 15 — Team — John Doe */
+function slide15(s) {
+  rect(s, 11.6164, 3.898, 0.411, 0.2832, C.amber);
+  rect(s, 1.0173, 1.1403, 3.3135, 3.307, C.blueLite);
+  rect(s, 8.7048, 4.3791, 3.3465, 0.2205, C.amberPale);
+  head(s, 5.0134, 2.1344, 4.0156, 0.6059, 'JOHN DOE', 30, C.navy);
+  kicker(s, 5.0134, 1.7622, 1.9622, 0.3702, 'Our Team', 16, C.gray);
+  dash(s, 6.6316, 1.9329);
+  para(s, 8.0582, 1.7826, 4.0156, 0.9009, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus dictum. Aliquam bibendum aliquam sem vel cursus.  Duis lacinia aliquam tristique.  ');
+  rect(s, 8.7048, 4.3994, 2.7224, 0.2215, C.amberLite);
+  sub(s, 8.6029, 3.9342, 2.5134, 0.3534, 'Creative Skills', 15, C.inkSoft);
+  rect(s, 8.7003, 5.2581, 3.3465, 0.2205, C.amberPale);
+  rect(s, 8.7003, 5.2784, 2.9845, 0.1999, C.amberLite);
+  sub(s, 8.5984, 4.8132, 2.5134, 0.3534, 'Creative Experiences', 15, C.inkSoft);
+  badgeTail(s, 11.9359, 4.1808, 0.0919, 0.0919);
+  text(s, 11.5524, 3.901, 0.5796, 0.2693, [
+    { text: '70%', options: { fontFace: F.sans, fontSize: 10, color: C.white, bold: true, align: 'center' } },
+  ], { align: 'center', fit: true });
+  rect(s, 11.6164, 4.7722, 0.411, 0.2832, C.amber);
+  badgeTail(s, 11.9359, 5.055, 0.0919, 0.0919);
+  text(s, 11.5524, 4.7752, 0.5796, 0.2693, [
+    { text: '80%', options: { fontFace: F.sans, fontSize: 10, color: C.white, bold: true, align: 'center' } },
+  ], { align: 'center', fit: true });
+  photo(s, 1.305, 1.379, 3.2671, 4.6095);
+  photo(s, 4.763, 3.3771, 3.2671, 2.5669);
+  chrome(s, 'OUR TEAM', C.inkSoft, 1.7429, 2.1395);
+}
+
+/* Slide 16 — Team — Jane Doe */
+function slide16(s) {
+  rect(s, 5.0853, 3.75, 7.1026, 2.7865, C.blueLite);
+  rect(s, 1.0173, 1.3901, 3.0697, 1.8025, C.blueLite);
+  para(s, 7.9373, 2.0071, 4.2251, 0.8085, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus dictum. Aliquam bibendum aliquam sem vel cursus.  Duis lacinia aliquam tristique.  ');
+  rect(s, 1.275, 4.9189, 3.3465, 0.2205, C.amberPale);
+  rect(s, 1.275, 4.9392, 2.7224, 0.2215, C.amberLite);
+  sub(s, 1.1731, 4.474, 2.5134, 0.3534, 'Creative Skills', 15, C.inkSoft);
+  rect(s, 1.2705, 5.7979, 3.3465, 0.2205, C.amberPale);
+  rect(s, 1.2705, 5.8182, 2.7224, 0.2215, C.amberLite);
+  sub(s, 1.1686, 5.353, 2.5134, 0.3534, 'Creative Experiences', 15, C.inkSoft);
+  para(s, 5.4535, 4.4345, 3.2416, 0.6114, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus  ');
+  sub(s, 5.4535, 4.1175, 2.5134, 0.3534, 'Skill Description', 15, C.inkSoft);
+  rect(s, 4.2017, 4.4491, 0.411, 0.2832, C.amber);
+  badgeTail(s, 4.5212, 4.7319, 0.0919, 0.0919);
+  text(s, 4.1377, 4.4521, 0.5796, 0.2693, [
+    { text: '70%', options: { fontFace: F.sans, fontSize: 10, color: C.white, bold: true, align: 'center' } },
+  ], { align: 'center', fit: true });
+  rect(s, 4.2017, 5.3233, 0.411, 0.2832, C.amber);
+  badgeTail(s, 4.5212, 5.6061, 0.0919, 0.0919);
+  text(s, 4.1377, 5.3263, 0.5796, 0.2693, [
+    { text: '80%', options: { fontFace: F.sans, fontSize: 10, color: C.white, bold: true, align: 'center' } },
+  ], { align: 'center', fit: true });
+  head(s, 5.0853, 2.3003, 4.0156, 0.6059, 'JANE DOE', 30, C.navy);
+  kicker(s, 5.0853, 1.9281, 1.9622, 0.3702, 'Our Team', 16, C.gray);
+  dash(s, 6.7035, 2.0987);
+  para(s, 5.4535, 5.4283, 3.2416, 0.6114, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus  ');
+  sub(s, 5.4535, 5.1113, 2.5134, 0.3534, 'Skill Description', 15, C.inkSoft);
+  photo(s, 1.2411, 1.6067, 3.2671, 2.5669);
+  photo(s, 8.7743, 3.4124, 3.1929, 2.9044);
+  chrome(s, 'OUR TEAM', C.inkSoft, 1.7306, 2.1395);
+}
+
+/* Slide 17 — Our great team */
+function slide17(s) {
+  rect(s, 5.1132, 4.3385, 1.8813, 1.8076, C.blueLite);
+  rect(s, 0.9883, 1.3663, 1.8813, 1.8076, C.blueLite);
+  head(s, 7.4924, 2.3876, 4.4747, 0.5722, 'OUR GREAT TEAM', 28, C.navy);
+  kicker(s, 7.4924, 1.972, 1.9622, 0.4376, 'Our Team', 20, C.gray);
+  dash(s, 9.394, 2.1716);
+  para(s, 7.4924, 2.9766, 4.664, 1.0578, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus dictum. Aliquam bibendum aliquam sem vel cursus.  Duis lacinia aliquam tristique.  ');
+  rect(s, 1.1538, 5.4359, 1.6669, 0.5041, C.white);
+  sub(s, 1.3661, 5.4719, 1.203, 0.4039, 'John Doe', 18, C.inkSoft, { nowrap: true });
+  para(s, 7.4924, 4.4935, 2.3402, 0.8953, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus  ');
+  sub(s, 7.4924, 4.1593, 2.5134, 0.3534, 'John Doe / Designer', 15, C.inkSoft);
+  para(s, 9.8106, 4.4717, 2.3402, 0.8953, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus  ');
+  sub(s, 9.8106, 4.1375, 2.5134, 0.3534, 'Jane Doe / Branding', 15, C.inkSoft);
+  photo(s, 1.2335, 1.5707, 2.686, 2.0618);
+  photo(s, 4.1377, 1.5707, 2.686, 2.0618);
+  photo(s, 1.2335, 3.8729, 2.686, 2.0618);
+  photo(s, 4.1377, 3.8729, 2.686, 2.0618);
+  chrome(s, 'OUR TEAM', C.inkSoft, 1.7306, 2.1395);
+}
+
+/* Slide 18 — Team — Jane Doe (skills + quote) */
+function slide18(s) {
+  rect(s, -0.0638, 0.9305, 2.686, 6.0322, C.ink);
+  rect(s, 9.1105, 2.0307, 2.7566, 2.6618, C.blueLite);
+  rect(s, 4.8869, 4.5321, 3.3465, 0.2205, C.amberPale);
+  rect(s, 4.8869, 4.5524, 2.7224, 0.2215, C.amberLite);
+  sub(s, 4.785, 4.0872, 2.5134, 0.3534, 'Creative Skills', 15, C.inkSoft);
+  rect(s, 4.8824, 5.4111, 3.3465, 0.2205, C.amberPale);
+  rect(s, 4.8824, 5.4314, 2.7224, 0.2215, C.amberLite);
+  sub(s, 4.7805, 4.9663, 2.5134, 0.3534, 'Creative Experiences', 15, C.inkSoft);
+  head(s, 4.7605, 2.2089, 3.5625, 0.6059, 'JANE DOE', 30, C.navy);
+  kicker(s, 4.7605, 1.7933, 1.9622, 0.4376, 'Our Team', 20, C.gray);
+  dash(s, 6.6621, 1.9929);
+  para(s, 4.7605, 2.8702, 3.6857, 1.0578, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus dictum. Aliquam bibendum aliquam sem vel cursus.   ');
+  para(s, 9.1481, 4.9279, 2.819, 0.8953, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus  ');
+  rect(s, 7.8074, 4.0742, 0.411, 0.2832, C.amber);
+  badgeTail(s, 8.1268, 4.3569, 0.0919, 0.0919);
+  text(s, 7.7434, 4.0772, 0.5796, 0.2693, [
+    { text: '70%', options: { fontFace: F.sans, fontSize: 10, color: C.white, bold: true, align: 'center' } },
+  ], { align: 'center', fit: true });
+  rect(s, 7.8074, 4.9484, 0.411, 0.2832, C.amber);
+  badgeTail(s, 8.1268, 5.2311, 0.0919, 0.0919);
+  text(s, 7.7434, 4.9514, 0.5796, 0.2693, [
+    { text: '80%', options: { fontFace: F.sans, fontSize: 10, color: C.white, bold: true, align: 'center' } },
+  ], { align: 'center', fit: true });
+  photo(s, 9.3188, 1.3978, 2.8772, 3.051);
+  photo(s, 1.2218, 1.3005, 2.686, 2.3277);
+  photo(s, 1.2218, 3.9212, 2.686, 2.3277);
+  chrome(s, 'OUR TEAM', C.inkSoft, 1.7306, 2.1395);
+}
+
+/* Slide 19 — Project highlights */
+function slide19(s) {
+  rect(s, 9.3321, 1.2996, 2.7566, 2.6618, C.blueLite);
+  rect(s, -0.0638, 0.9149, 7.7067, 6.6248, C.ink);
+  head(s, 1.2931, 2.4613, 4.5454, 1.279, ['PROJECT', 'HIGLIGHTS'], 35, C.white, { soft: true });
+  para(s, 1.2661, 3.8501, 4.2285, 1.0785, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus dictum. Aliquam bibendum aliquam sem vel cursus.  Duis lacinia aliquam tristique.  Duis lacinia aliquam tristique. Cras tristique neque non velit ornare.', { color: C.rule });
+  dash(s, 4.1926, 2.7937);
+  rect(s, 1.3649, 5.321, 2.5591, 0.5903, C.amberSoft);
+  head(s, 1.528, 5.4838, 1.8884, 0.2861, 'LEARN MORE', 11, C.inkSoft, { nowrap: true });
+  playMark(s, 3.5079, 5.5519, 0.1731, 0.1492, C.amber);
+  photo(s, 6.2641, 1.5612, 5.5412, 4.6635);
+  chrome(s, 'PORTFOLIO', C.inkSoft, 1.9235, 2.3569);
+}
+
+/* Slide 20 — Project planning */
+function slide20(s) {
+  rect(s, 4.4765, 1.6138, 2.5686, 2.6618, C.blueLite);
+  head(s, 8.0584, 2.641, 4.4649, 0.5049, 'PROJECT PLANNING', 24, C.navy);
+  kicker(s, 8.0584, 2.2978, 2.159, 0.3366, 'Project Details', 14, C.gray);
+  dash(s, 10.2063, 2.4539);
+  para(s, 8.0584, 3.23, 4.3354, 1.0578, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus dictum. Aliquam bibendum aliquam sem vel cursus.  Duis lacinia aliquam tristique.  ');
+  para(s, 5.9445, 5.1025, 3.2301, 0.6725, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus  ');
+  sub(s, 5.9445, 4.7684, 2.5134, 0.3534, 'Project Timeline', 15, C.inkSoft);
+  para(s, 9.1637, 5.1025, 3.2301, 0.6725, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus  ');
+  sub(s, 9.1637, 4.7684, 2.5134, 0.3534, 'Project Budget', 15, C.inkSoft);
+  photo(s, 0.8867, 1.3133, 2.7038, 3.1989);
+  photo(s, 2.0772, 3.7622, 3.3818, 2.4907, C.photoAlt);
+  photo(s, 4.7103, 1.8461, 2.7038, 2.4417);
+  chrome(s, 'PORTFOLIO', C.inkSoft, 1.9235, 2.3569);
+}
+
+/* Slide 21 — Project benefits */
+function slide21(s) {
+  rect(s, 4.3161, 4.1917, 7.5004, 1.8128, C.blueLite);
+  rect(s, -0.0638, 0.9149, 3.4746, 6.6248, C.ink);
+  para(s, 7.3119, 4.7306, 3.8594, 0.8807, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus dictum. Aliquam bibendum aliquam sem vel cursus.   ');
+  head(s, 7.4123, 2.2755, 4.8645, 0.5217, 'PROJECT BENEFITS', 25, C.navy);
+  kicker(s, 7.4123, 1.9323, 2.1819, 0.3366, 'Project Details', 14, C.gray);
+  dash(s, 9.5602, 2.1029);
+  para(s, 7.4123, 2.8645, 4.4042, 1.0578, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus dictum. Aliquam bibendum aliquam sem vel cursus.  Duis lacinia aliquam tristique.  ');
+  photo(s, 4.3161, 1.4917, 2.3505, 2.4444);
+  photo(s, 4.5688, 4.4917, 2.0979, 1.2054);
+  photo(s, 1.0565, 1.4917, 3.0329, 4.5091);
+  chrome(s, 'PORTFOLIO', C.inkSoft, 1.9235, 2.3569);
+}
+
+/* Slide 22 — Pricing table */
+function slide22(s) {
+  frame(s, 4.9886, 2.2878, 3.3284, 3.5976, C.rule, 1);
+  rect(s, 5.2917, 1.5354, 2.7224, 1.5047, C.amberPale);
+  frame(s, 8.6201, 2.2878, 3.3284, 3.5976, C.rule, 1);
+  rect(s, 8.9232, 1.5354, 2.7224, 1.5047, C.amberPale);
+  head(s, 5.3679, 1.7218, 2.57, 0.7068, ['SILVER', 'PACKAGE'], 18, C.navy, { soft: true, align: 'center' });
+  head(s, 8.9993, 1.7218, 2.57, 0.7068, ['GOLD', 'PACKAGE'], 18, C.navy, { soft: true, align: 'center' });
+  text(s, 5.9609, 2.3929, 1.4116, 0.4712, [
+    { text: '$30 - $50', options: { fontFace: F.sans, fontSize: 22, color: C.navy, bold: true } },
+  ], { nowrap: true, fit: true });
+  text(s, 9.5768, 2.3794, 1.4116, 0.4712, [
+    { text: '$30 - $50', options: { fontFace: F.sans, fontSize: 22, color: C.navy, bold: true } },
+  ], { nowrap: true, fit: true });
+  head(s, 1.1427, 2.7935, 2.5195, 1.279, ['PRICING', 'TABLE'], 35, C.navy, { soft: true, nowrap: true });
+  para(s, 1.0765, 4.0726, 3.0836, 1.1949, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus dictum. Aliquam bibendum aliquam sem vel cursus.  Duis lacinia aliquam tristique.  ');
+  kicker(s, 1.1427, 2.4503, 2.2196, 0.3029, 'Project Pricing', 12, C.gray);
+  dash(s, 3.1167, 2.592);
+  text(s, 5.3679, 3.5262, 2.6107, 1.651, [
+    { text: 'Duis lacinia aliquam tristique. ', options: { fontFace: F.body, fontSize: 10, color: C.gray, bold: true, align: 'center', lineSpacingMultiple: 2, breakLine: true } },
+    { text: 'Cras tristique neque non velit ornare, vitae finibus tellus dictum. Aliquam bibendum aliquam sem vel cursus.  Duis lacinia aliquam tristique.  ', options: { fontFace: F.body, fontSize: 10, color: C.gray, align: 'center', lineSpacingMultiple: 2 } },
+  ], { align: 'center' });
+  text(s, 8.9773, 3.5262, 2.6107, 1.651, [
+    { text: 'Duis lacinia aliquam tristique. ', options: { fontFace: F.body, fontSize: 10, color: C.gray, bold: true, align: 'center', lineSpacingMultiple: 2, breakLine: true } },
+    { text: 'Cras tristique neque non velit ornare, vitae finibus tellus dictum. Aliquam bibendum aliquam sem vel cursus.  Duis lacinia aliquam tristique.  ', options: { fontFace: F.body, fontSize: 10, color: C.gray, align: 'center', lineSpacingMultiple: 2 } },
+  ], { align: 'center' });
+  chrome(s, 'PRICING', C.inkSoft, 1.4799, 2.1395);
+}
+
+/* Slide 23 — Get in touch */
+function slide23(s) {
+  rect(s, -0.0638, -0.0179, 6.7305, 7.0304, C.ink);
+  rect(s, 4.625, 1.0279, 2.0417, 2.4742, C.blueLite);
+  para(s, 9.445, 2.2805, 2.5067, 0.7627, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus dictum.  ');
+  sub(s, 9.4647, 1.8156, 1.0031, 0.4376, 'Call Us', 20, C.inkSoft, { nowrap: true });
+  sub(s, 9.4341, 3.9938, 1.9287, 0.4376, 'Visit Our Office', 20, C.inkSoft, { nowrap: true });
+  para(s, 9.445, 4.4632, 2.5067, 0.7627, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus dictum.  ');
+  head(s, 1.2067, 2.1167, 2.7124, 1.279, ['GET IN ', 'TOUCH'], 35, C.white, { soft: true });
+  para(s, 1.1405, 3.5447, 3.1792, 1.4975, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus dictum. Aliquam bibendum aliquam sem vel cursus.  Duis lacinia aliquam tristique.  Duis lacinia aliquam tristique.  ', { color: C.rule });
+  dash(s, 3.3357, 2.4491);
+  photo(s, 4.9361, 1.3304, 3.9972, 2.2143);
+  photo(s, 4.9409, 3.5354, 3.9972, 2.2143, C.photoAlt);
+  chrome(s, 'CONTACT US', C.white, 2.1128, 2.5308);
+}
+
+/* Slide 24 — Thanks for watching */
+function slide24(s) {
+  rect(s, -0.0638, -0.0179, 13.456, 3.25, C.ink);
+  head(s, 1.4806, 4.6607, 3.7116, 1.279, ['THANKS FOR', 'WATCHING'], 35, C.navy, { soft: true, nowrap: true });
+  kicker(s, 5.4965, 4.6134, 1.9622, 0.4376, 'Thank You', 20, C.gray);
+  dash(s, 7.4694, 4.813);
+  para(s, 5.4965, 5.0615, 6.3335, 0.9825, 'Duis lacinia aliquam tristique. Cras tristique neque non velit ornare, vitae finibus tellus dictum. Aliquam bibendum aliquam sem vel cursus.  Duis lacinia aliquam tristique.  Duis lacinia aliquam tristique. Cras tristique neque non velit ornare,  ', { color: C.inkSoft });
+  photo(s, 1.4806, 1.3376, 10.3721, 2.7874);
+  chrome(s, 'THANK YOU', C.white, 1.9287, 2.3569, C.ruleDark);
+}
+
+/* ------------------------------------------------------------------- build */
+
+const BUILDERS = [
+  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08,
+  slide09, slide10, slide11, slide12, slide13, slide14, slide15, slide16,
+  slide17, slide18, slide19, slide20, slide21, slide22, slide23, slide24,
+];
+
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'DECK', width: 12192000 / 914400, height: 6858000 / 914400 }); // 13.333in x 7.5in
+pptx.layout = 'DECK';
+pptx.title = 'NAMINA — Project Proposal Presentation';
+
+BUILDERS.forEach(build => {
+  const s = pptx.addSlide();
+  s.background = { color: C.white };
+  build(s);
+});
+
+pptx.writeFile({ fileName: path.join(__dirname, '0c212f39-d767-4489-85ae-498d9be32c5b_grok_final.pptx') })
+  .then(f => console.log('wrote ' + f));
