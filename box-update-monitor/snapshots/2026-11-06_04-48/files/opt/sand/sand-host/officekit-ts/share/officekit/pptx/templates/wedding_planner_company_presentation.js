@@ -1,0 +1,1057 @@
+/**
+ * "Forever.co" wedding-planner deck  —  36 slides, 13.333 x 7.5 in (16:9).
+ * Rebuilt from scratch with pptxgenjs only.  Raster photos/logos in the
+ * original are replaced by programmatic placeholder shapes.
+ */
+'use strict';
+
+const PptxGenJS = require('pptxgenjs');
+const path = require('path');
+
+/* ------------------------------------------------------------------ palette */
+const DARK = '232D38'; // deep navy background / headline ink
+const GOLD = 'C37D1C'; // brand gold
+const LEMON = 'FEEE87'; // pale yellow accent (used on dark slides)
+const CREAM = 'F6EFEB'; // warm card fill
+const PAPER = 'F9F5F3'; // light slide background
+const SOFT = 'FAF6F3'; // slightly lighter card fill
+const GREY = 'A6A6A6'; // body copy
+const GREY2 = '808080';
+const GREY3 = 'BFBFBF';
+const GREY4 = 'D9D9D9';
+const WHITE = 'FFFFFF';
+const OFFWHITE = 'F2F2F2';
+const SLATE = '44546A';
+const INK = '404040';
+
+const SERIF = 'Playfair Display';
+const SANS = 'DM Sans';
+const SANSM = 'DM Sans Medium';
+const SCRIPT = 'Great Vibes';
+
+/* Gradient text in the source renders flat; these are the two resulting inks. */
+const TITLE_DARK = DARK;
+const TITLE_GOLD = GOLD;
+
+const CARD_SHADOW = { type: 'outer', color: '404040', blur: 22, offset: 0, angle: 90, opacity: 0.14 };
+
+let pptx, S; // presentation + shape-name enum, initialised in build()
+
+/* ----------------------------------------------------------------- helpers */
+const TEXT_DEFAULTS = { fontFace: SANS, fontSize: 11, color: GREY, valign: 'top' };
+
+/** Text box. `t` is a string or an array of pptxgenjs text runs. */
+function T(s, t, o) {
+  s.addText(t, Object.assign({}, TEXT_DEFAULTS, o));
+}
+
+/** Body paragraph: 11pt grey DM Sans on 1.5 line spacing. */
+function body(s, t, o) {
+  T(s, t, Object.assign({ lineSpacingMultiple: 1.5 }, o));
+}
+
+/** Section heading: 32pt bold Playfair. `runs` = [[text, {i:true}], ...] */
+function heading(s, runs, o) {
+  const color = (o && o.color) || TITLE_DARK;
+  T(s, runs.map(function (r) {
+    return { text: r[0], options: Object.assign({ bold: true, italic: false, color: color }, r[1]) };
+  }), Object.assign({ fontFace: SERIF, fontSize: 32, color: color, h: 0.64 }, o));
+}
+
+/** Rectangle / rounded rectangle / ellipse … thin wrapper for readability. */
+function shape(s, kind, o) {
+  s.addShape(kind, o);
+}
+
+/** Straight connector between two points, with optional diamond end caps. */
+function seg(s, x0, y0, x1, y1, o) {
+  const opt = Object.assign({}, o);
+  shape(s, S.line, {
+    x: Math.min(x0, x1), y: Math.min(y0, y1),
+    w: Math.abs(x1 - x0), h: Math.abs(y1 - y0),
+    flipH: x1 < x0, flipV: y1 < y0,
+    line: opt,
+  });
+}
+
+/** Pill button: rounded rectangle + centred caption. */
+function pill(s, o) {
+  shape(s, S.roundRect, {
+    x: o.x, y: o.y, w: o.w, h: o.h, rectRadius: o.h / 2,
+    fill: o.fill ? { color: o.fill, transparency: o.fillTrans || 0 } : { type: 'none' },
+    line: o.line || { color: GOLD, width: 0.75 },
+  });
+  if (o.text) {
+    T(s, o.text, {
+      x: o.x, y: o.y, w: o.w, h: o.h, align: 'center', valign: 'middle',
+      fontSize: o.fontSize || 10, color: o.color || GREY3, charSpacing: o.charSpacing,
+      fontFace: o.fontFace || SANS,
+    });
+  }
+}
+
+/**
+ * Flat pictograms assembled from primitives, sized to fit a square of side
+ * `d` at (x, y).  Keys match the icon set used in the source deck.
+ */
+const ICONS = {
+  phone: function (s, x, y, d, c) {
+    shape(s, S.roundRect, { x: x + d * 0.08, y: y + d * 0.42, w: d * 0.84, h: d * 0.34, rectRadius: d * 0.1, fill: { color: c } });
+    shape(s, S.chord, { x: x + d * 0.16, y: y + d * 0.12, w: d * 0.68, h: d * 0.48, fill: { color: c } });
+  },
+  pin: function (s, x, y, d, c) {
+    shape(s, S.ellipse, { x: x + d * 0.15, y: y + d * 0.05, w: d * 0.70, h: d * 0.70, fill: { color: c } });
+    shape(s, S.triangle, { x: x + d * 0.30, y: y + d * 0.50, w: d * 0.40, h: d * 0.45, rotate: 180, fill: { color: c } });
+    shape(s, S.ellipse, { x: x + d * 0.36, y: y + d * 0.24, w: d * 0.28, h: d * 0.28, fill: { color: CREAM } });
+  },
+  heart: function (s, x, y, d, c) {
+    shape(s, S.ellipse, { x: x, y: y, w: d, h: d, fill: { color: c } });
+    shape(s, S.heart, { x: x + d * 0.24, y: y + d * 0.26, w: d * 0.52, h: d * 0.48, fill: { color: WHITE } });
+  },
+  mobile: function (s, x, y, d, c) {
+    shape(s, S.roundRect, { x: x + d * 0.28, y: y, w: d * 0.44, h: d, rectRadius: d * 0.08, fill: { color: c } });
+    shape(s, S.rect, { x: x + d * 0.34, y: y + d * 0.12, w: d * 0.32, h: d * 0.70, fill: { color: GOLD } });
+  },
+  store: function (s, x, y, d, c) {
+    shape(s, S.trapezoid, { x: x, y: y + d * 0.10, w: d, h: d * 0.28, fill: { color: c } });
+    shape(s, S.rect, { x: x + d * 0.08, y: y + d * 0.40, w: d * 0.84, h: d * 0.52, fill: { color: c } });
+    shape(s, S.rect, { x: x + d * 0.22, y: y + d * 0.52, w: d * 0.56, h: d * 0.40, fill: { color: GOLD } });
+  },
+  monitor: function (s, x, y, d, c) {
+    shape(s, S.rect, { x: x, y: y + d * 0.10, w: d, h: d * 0.66, fill: { color: c } });
+    shape(s, S.rect, { x: x + d * 0.12, y: y + d * 0.22, w: d * 0.76, h: d * 0.42, fill: { color: GOLD } });
+    shape(s, S.rect, { x: x + d * 0.38, y: y + d * 0.76, w: d * 0.24, h: d * 0.16, fill: { color: c } });
+  },
+  camera: function (s, x, y, d, c) {
+    shape(s, S.rect, { x: x + d * 0.28, y: y + d * 0.10, w: d * 0.28, h: d * 0.12, fill: { color: c } });
+    shape(s, S.roundRect, { x: x, y: y + d * 0.20, w: d, h: d * 0.66, rectRadius: d * 0.08, fill: { color: c } });
+    shape(s, S.ellipse, { x: x + d * 0.32, y: y + d * 0.34, w: d * 0.36, h: d * 0.36, fill: { color: GOLD } });
+  },
+  videocam: function (s, x, y, d, c) {
+    shape(s, S.roundRect, { x: x, y: y + d * 0.34, w: d * 0.62, h: d * 0.42, rectRadius: d * 0.08, fill: { color: c } });
+    shape(s, S.triangle, { x: x + d * 0.62, y: y + d * 0.38, w: d * 0.34, h: d * 0.34, rotate: 90, fill: { color: c } });
+    [0.02, 0.32].forEach(function (u) {
+      shape(s, S.ellipse, { x: x + d * u, y: y + d * 0.06, w: d * 0.30, h: d * 0.30, fill: { color: c } });
+      shape(s, S.ellipse, { x: x + d * (u + 0.10), y: y + d * 0.16, w: d * 0.10, h: d * 0.10, fill: { color: CREAM } });
+    });
+  },
+  /* Camera iris: a disc sliced into blades by three chords through the centre. */
+  aperture: function (s, x, y, d, c) {
+    shape(s, S.ellipse, { x: x, y: y, w: d, h: d, fill: { color: c } });
+    [0, 60, 120].forEach(function (a) {
+      shape(s, S.rect, { x: x - d * 0.02, y: y + d * 0.48, w: d * 1.04, h: d * 0.045, rotate: a, fill: { color: CREAM } });
+    });
+  },
+  waiter: function (s, x, y, d, c) {
+    shape(s, S.ellipse, { x: x + d * 0.34, y: y, w: d * 0.32, h: d * 0.32, fill: { color: c } });
+    shape(s, S.trapezoid, { x: x + d * 0.18, y: y + d * 0.36, w: d * 0.64, h: d * 0.50, fill: { color: c } });
+    shape(s, S.rect, { x: x, y: y + d * 0.52, w: d * 0.20, h: d * 0.34, fill: { color: c } });
+  },
+  document: function (s, x, y, d, c) {
+    shape(s, S.rect, { x: x + d * 0.12, y: y, w: d * 0.62, h: d, fill: { type: 'none' }, line: { color: c, width: 1.25 } });
+    shape(s, S.ellipse, { x: x + d * 0.52, y: y + d * 0.52, w: d * 0.40, h: d * 0.40, fill: { color: 'FFF4E1' }, line: { color: c, width: 1.25 } });
+  },
+};
+function icon(s, kind, x, y, d, c) { ICONS[kind](s, x, y, d, c); }
+
+/** Small circular badge with a white tick — used for feature bullets. */
+function tick(s, x, y, d, fill) {
+  shape(s, S.ellipse, { x: x, y: y, w: d, h: d, fill: { color: fill || GOLD } });
+  T(s, '\u2713', {
+    x: x, y: y, w: d, h: d, align: 'center', valign: 'middle',
+    color: WHITE, fontSize: Math.round(d * 46), bold: true,
+  });
+}
+
+/**
+ * Decorative olive sprig: a slender stem carrying four leaf pairs plus a tip
+ * leaf, each a narrow outlined ellipse angled away from the stem.  The sprig
+ * is laid out in a local (across, along) frame in inches and then rotated
+ * `rot` degrees about the centre of its bounding box.
+ */
+const LEAF_ANGLE = 34;                                    // splay from the stem
+const SPRIG_LEAVES = [                                    // [along, side, length]
+  [-0.44, 0, 0.26], [-0.28, -1, 0.34], [-0.28, 1, 0.34], [-0.06, -1, 0.38],
+  [-0.06, 1, 0.38], [0.16, -1, 0.34], [0.16, 1, 0.34], [0.36, -1, 0.27], [0.36, 1, 0.27],
+];
+function sprig(s, o) {
+  const cx = o.x + o.w / 2, cy = o.y + o.h / 2;
+  const rad = (o.rot || 0) * Math.PI / 180, cos = Math.cos(rad), sin = Math.sin(rad);
+  const at = function (u, v) { return { x: cx + u * cos - v * sin, y: cy + u * sin + v * cos }; };
+  const pen = { color: o.color, width: 0.75, transparency: o.transparency || 0 };
+  const lead = LEAF_ANGLE * Math.PI / 180;
+
+  const tip = at(0, -0.5 * o.h), base = at(0, 0.5 * o.h);
+  seg(s, base.x, base.y, tip.x, tip.y, pen);
+
+  SPRIG_LEAVES.forEach(function (L) {
+    const len = L[2] * o.h, wid = len / 2.6, side = L[1];
+    const u = 0.5 * len * Math.sin(lead) * side;
+    const v = L[0] * o.h - 0.5 * len * Math.cos(lead);
+    const c = at(u, v);
+    shape(s, S.ellipse, {
+      x: c.x - wid / 2, y: c.y - len / 2, w: wid, h: len,
+      rotate: (o.rot || 0) + side * LEAF_ANGLE, fill: { type: 'none' }, line: pen,
+    });
+  });
+}
+
+/**
+ * Placeholder standing in for a raster image (photo / mock-up / logo) from
+ * the original deck: a flat rectangle of roughly the artwork's tone, with a
+ * short caption.
+ */
+function imagePlaceholder(s, o) {
+  shape(s, o.round ? S.roundRect : S.rect, Object.assign({
+    x: o.x, y: o.y, w: o.w, h: o.h,
+    fill: { color: o.fill || 'E4DEDA' },
+    line: o.line || { color: o.stroke || GREY3, width: 0.75 },
+  }, o.round ? { rectRadius: o.round } : {}));
+  if (o.label !== false) {
+    T(s, '[image]', {
+      x: o.x, y: o.y + o.h / 2 - 0.16, w: o.w, h: 0.32,
+      align: 'center', valign: 'middle', fontSize: 10, color: o.labelColor || GREY2,
+    });
+  }
+}
+
+/* ------------------------------------------------------------ page furniture */
+/* Every slide carries the same faux website chrome: a diamond monogram flanked
+ * by two rules, a small menu, and a "Contact" link at the far right. */
+const MENUS = {
+  wide: [['Home', 0.866, 0.968], ['About Us', 2.201, 1.451], ['Services', 4.019, 0.968]],
+  logo: [['Home', 2.575, 0.968], ['About Us', 3.453, 1.451], ['Services', 4.699, 0.968]],
+  logo2: [['Home', 2.490, 0.968], ['About Us', 3.368, 1.451], ['Services', 4.614, 0.968]],
+  tight: [['Home', 0.866, 0.968], ['About Us', 1.726, 1.451], ['Services', 3.120, 0.968]],
+};
+
+function navbar(s, n) {
+  const accent = { color: n.accent, width: 1, transparency: n.accentTrans === undefined ? 10 : n.accentTrans };
+  shape(s, S.diamond, { x: 6.352, y: 0.317, w: 0.305, h: 0.305, fill: { type: 'none' }, line: { color: n.accent, width: 1 } });
+  shape(s, S.diamond, { x: 6.505, y: 0.316, w: 0.305, h: 0.305, fill: { type: 'none' }, line: { color: n.accent, width: 1 } });
+  seg(s, 7.129, 0.469, 12.538, 0.469, Object.assign({ endArrowType: 'diamond' }, accent));
+  seg(s, 0.789, 0.469, 6.033, 0.469, Object.assign({ beginArrowType: 'diamond' }, accent));
+  seg(s, 0.789, 1.009, 12.538, 1.009, Object.assign({ beginArrowType: 'diamond', endArrowType: 'diamond' }, accent));
+  seg(s, 11.284, 0.468, 11.284, 1.008, accent);
+
+  if (n.logo) {
+    T(s, 'Forever.co', {
+      x: 0.807, y: 0.564, w: 1.071, h: 0.404, wrap: false, align: 'center',
+      fontFace: SCRIPT, fontSize: 18, color: n.logo,
+    });
+  }
+  const sz = n.menuSize || 10;
+  MENUS[n.menu].forEach(function (m) {
+    T(s, m[0], { x: m[1], y: 0.621, w: m[2], h: sz > 10 ? 0.286 : 0.269, align: 'center', fontSize: sz, color: n.menuColor });
+  });
+  T(s, 'Contact', { x: n.contactX || 11.415, y: 0.628, w: 0.741, h: 0.269, align: 'center', fontSize: 10, color: n.contact });
+  T(s, '\u2197', { x: 12.02, y: 0.60, w: 0.36, h: 0.28, fontSize: 11, color: n.contact });
+}
+
+/** Bottom rule plus the rounded "www.forever.com" tag. */
+function footer(s, f) {
+  if (f.rule) {
+    seg(s, f.rule[0], 6.944, f.rule[0] + f.rule[1], 6.944,
+      { color: f.ruleColor, width: 1, transparency: f.ruleTrans || 0, beginArrowType: 'diamond', endArrowType: 'diamond' });
+  }
+  if (f.tag === 'wide') {
+    pill(s, { x: 10.973, y: 6.742, w: 1.956, h: 0.404, line: { color: LEMON, width: 1, transparency: 10 }, text: 'www.forever.com', fontSize: 11, color: GREY3 });
+  } else if (f.tag === 'slim') {
+    pill(s, { x: 11.202, y: 6.772, w: 1.578, h: 0.328, line: { color: LEMON, width: 1, transparency: 10 }, text: 'www.forever.com', fontSize: 10, color: GREY3 });
+  }
+}
+
+/* Per-slide chrome configuration (index 0 == slide 1). */
+const GOLD_NAV = { accent: GOLD, logo: GOLD, menu: 'logo', menuColor: GREY3, contact: GOLD };
+const GOLD_NAV2 = Object.assign({}, GOLD_NAV, { menu: 'logo2' });
+const DARK_NAV = { accent: LEMON, menu: 'wide', menuSize: 11, menuColor: GREY3, contact: GREY4 };
+
+const CHROME = [
+  { nav: DARK_NAV, foot: { rule: [0.658, 9.911], ruleColor: LEMON, tag: 'wide' } },                    // 1
+  { nav: Object.assign({}, GOLD_NAV, { menuColor: GREY4 }), foot: { rule: [0.789, 10.044], ruleColor: GOLD, tag: 'slim' } }, // 2
+  { nav: GOLD_NAV }, { nav: GOLD_NAV }, { nav: GOLD_NAV }, { nav: GOLD_NAV }, { nav: GOLD_NAV },       // 3-7
+  { nav: { accent: OFFWHITE, accentTrans: 0, logo: OFFWHITE, menu: 'logo', menuColor: OFFWHITE, contact: OFFWHITE } }, // 8
+  { nav: GOLD_NAV }, { nav: GOLD_NAV }, { nav: GOLD_NAV }, { nav: GOLD_NAV },                          // 9-12
+  { nav: DARK_NAV, foot: { rule: [0.658, 9.911], ruleColor: LEMON, ruleTrans: 10, tag: 'wide' } },     // 13
+  { nav: GOLD_NAV }, { nav: GOLD_NAV },                                                                // 14-15
+  { nav: DARK_NAV },                                                                                   // 16
+  { nav: { accent: OFFWHITE, logo: WHITE, menu: 'logo', menuColor: GREY3, contact: WHITE } },           // 17
+  { nav: GOLD_NAV },                                                                                   // 18
+  { nav: Object.assign({}, GOLD_NAV2, { menuColor: GREY4 }), foot: { rule: [0.789, 10.211], ruleColor: GOLD, tag: 'slim' } }, // 19
+  { nav: Object.assign({}, GOLD_NAV2, { menuColor: GREY4 }) },                                          // 20
+  { nav: DARK_NAV },                                                                                   // 21
+  { nav: { accent: OFFWHITE, logo: WHITE, menu: 'logo', menuColor: GREY3, contact: WHITE }, foot: { rule: [0.658, 9.911], ruleColor: OFFWHITE, tag: 'wide' } }, // 22
+  { nav: Object.assign({}, GOLD_NAV2, { menuColor: GREY4 }) },                                          // 23
+  { nav: Object.assign({}, GOLD_NAV2, { menuColor: GREY4 }) },                                          // 24
+  { nav: Object.assign({}, GOLD_NAV2, { menuColor: GREY4 }) },                                          // 25
+  { nav: DARK_NAV },                                                                                   // 26
+  { nav: GOLD_NAV2 },                                                                                  // 27
+  { nav: { accent: LEMON, logo: OFFWHITE, menu: 'logo', menuColor: GREY3, contact: GREY, contactX: 11.389 } }, // 28
+  { nav: GOLD_NAV2 }, { nav: GOLD_NAV2 }, { nav: GOLD_NAV2 },                                          // 29-31
+  { nav: Object.assign({}, DARK_NAV, { menu: 'tight' }) },                                             // 32
+  { nav: GOLD_NAV2 }, { nav: GOLD_NAV2 }, { nav: Object.assign({}, GOLD_NAV2, { menuColor: GOLD }) },  // 33-35
+  { nav: Object.assign({}, DARK_NAV, { menu: 'tight' }), foot: { rule: [0.658, 9.911], ruleColor: LEMON, tag: 'wide' } }, // 36
+];
+
+/** Three tiny social-media glyph tiles (facebook / whatsapp / instagram). */
+function socialRow(s, x, y, d, color) {
+  const gap = d * 1.6;
+  ['f', '\u260E', '\u25CE'].forEach(function (g, i) {
+    shape(s, S.roundRect, {
+      x: x + i * gap, y: y, w: d, h: d, rectRadius: d * 0.2,
+      fill: { type: 'none' }, line: { color: color, width: 0.75 },
+    });
+    T(s, g, { x: x + i * gap, y: y, w: d, h: d, align: 'center', valign: 'middle', fontSize: 6, color: color });
+  });
+}
+
+/* =================================================================== SLIDES */
+
+/* Copy that repeats across several slides. */
+const QUOTE_LOVE = '\u201CLove is the master key that opens the gates of happiness, of hatred, of jealousy, and, most easily of all, the gate of fear.\u201D';
+const LOREM_SOUL = 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy with my whole heart. I am alone, and feel the charm of existence';
+const LOREM_NUNC = 'Lorem ipsum dolor sit amet, consectetur adipiscing elite. Nuncle rutrun or molestiery semper laoreet, quam.';
+const LOREM_MINIM = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore etes dolore magna aliqua ut enim ad minim veniam quis nostrud';
+const QUOTE_JOB = '\u201CYou did an amazing job for us and I am very grateful for the key input you provided in the process of this big day. We had a brilliant day in no small part of your work.\u201D';
+
+/** The pale "Read More" button used on several light slides. */
+function readMore(s, x, y) {
+  pill(s, {
+    x: x, y: y, w: 1.707, h: 0.404, fill: SOFT, line: { color: GREY3, width: 1, transparency: 10 },
+    text: 'Read More', fontSize: 11, color: GREY2, charSpacing: 1,
+  });
+}
+
+/* 1 — Cover: script wordmark, save-the-date block, quote. */
+function slide01(s) {
+  s.background = { color: DARK };
+  sprig(s, { x: 3.568, y: 4.471, w: 1.81, h: 2.183, rot: 34, color: LEMON });
+  sprig(s, { x: 8.366, y: 5.696, w: 0.95, h: 1.146, rot: -19, color: LEMON });
+
+  T(s, 'Forever.co', {
+    x: 6.769, y: 2.966, w: 5.778, h: 2.036, wrap: false, align: 'center',
+    fontFace: SCRIPT, fontSize: 115, color: GOLD,
+  });
+  T(s, 'Wedding Planner & Organizer', { x: 8.757, y: 4.763, w: 3.744, h: 0.337, align: 'right', fontSize: 14, color: GREY3 });
+
+  T(s, 'Dec', { x: 0.671, y: 3.631, w: 0.904, h: 0.505, align: 'right', fontSize: 24, color: GREY });
+  T(s, 'Sun', { x: 1.645, y: 3.555, w: 0.771, h: 0.404, align: 'center', fontSize: 18, color: GREY });
+  T(s, '10', { x: 1.741, y: 3.870, w: 0.579, h: 0.505, align: 'center', fontSize: 24, color: GREY });
+  T(s, '2025', { x: 2.466, y: 3.631, w: 1.254, h: 0.505, fontSize: 24, color: GREY });
+  [1.666, 2.396].forEach(function (x) {
+    seg(s, x, 3.404, x, 4.397, { color: LEMON, width: 1, beginArrowType: 'diamond', endArrowType: 'diamond' });
+  });
+  T(s, QUOTE_LOVE, { x: 0.613, y: 4.870, w: 2.973, h: 0.841, align: 'center', italic: true, color: GREY2 });
+}
+
+/* 2 — Hero: big serif headline, quote, outlined photo frame. */
+function slide02(s) {
+  sprig(s, { x: 4.989, y: 3.52, w: 3.337, h: 4.024, rot: 15, color: LEMON, transparency: 30 });
+  heading(s, [['Make Your Wedding ', {}], ['More Memorable ', { italic: true }], ['\n', {}], ['With Us.', { italic: true }]],
+    { x: 0.962, y: 2.148, w: 5.148, h: 1.919, fontSize: 36 });
+  body(s, QUOTE_LOVE, { x: 0.939, y: 4.232, w: 5.104, h: 0.631, color: GREY3 });
+  readMore(s, 1.076, 5.230);
+
+  shape(s, S.roundRect, {
+    x: 7.426, y: 2.264, w: 5.045, h: 3.131, rectRadius: 1.5655,
+    fill: { type: 'none' }, line: { color: GOLD, width: 1 },
+  });
+  T(s, 'WEDDING PLANNER & ORGANIZER', { x: 8.234, y: 5.669, w: 3.495, h: 0.286, align: 'center', color: GOLD, charSpacing: 2 });
+}
+
+/* 3 — About: full-bleed photo left, copy right. */
+function slide03(s) {
+  sprig(s, { x: 10.111, y: 4.481, w: 2.585, h: 3.117, rot: 15, color: LEMON, transparency: 52 });
+  heading(s, [['About Forever.co', {}]], { x: 7.333, y: 2.503, w: 4.176 });
+  body(s, 'Your Text Title Here', { x: 7.333, y: 3.338, w: 1.949, h: 0.376, fontSize: 12, bold: true });
+  body(s, 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy with my whole heart. I am alone, and feel the charm of existence in this spot, which was created for. A wonderful serenity has taken possession of my entire soul, like these sweet',
+    { x: 7.333, y: 3.715, w: 4.823, h: 1.464 });
+  readMore(s, 7.333, 5.465);
+}
+
+/* 4 — Stats row under a two-line headline. */
+function slide04(s) {
+  heading(s, [['Timeless Moments of The ', {}], ['Wedding Romance', { italic: true }]],
+    { x: 1.285, y: 2.421, w: 6.3, h: 1.178 });
+  body(s, LOREM_SOUL, { x: 1.343, y: 3.930, w: 5.373, h: 0.909 });
+
+  const stats = [[1.347, '120+', 'Wedding Planned', 1.751], [3.543, '58+', 'Event Succes', 1.871], [5.371, '85', 'Client Trust', 1.871]];
+  stats.forEach(function (st) {
+    T(s, st[1], { x: st[0], y: 5.372, w: 1.404, h: 0.687, fontFace: SERIF, fontSize: 32, bold: true, color: GOLD, charSpacing: 1, lineSpacingMultiple: 1.2 });
+    T(s, st[2], { x: st[0], y: 6.040, w: st[3], h: 0.286, color: GREY2 });
+  });
+  [3.098, 5.0].forEach(function (x) { seg(s, x, 5.695, x, 6.027, { color: GOLD, width: 1, transparency: 20 }); });
+}
+
+/* 5 — Two feature cards over a photo column. */
+function slide05(s) {
+  heading(s, [['Timeless Moments of The ', {}], ['Wedding Romance', { italic: true }]],
+    { x: 5.514, y: 1.683, w: 6.3, h: 1.178 });
+  body(s, LOREM_SOUL, { x: 5.603, y: 3.010, w: 6.935, h: 0.631 });
+
+  shape(s, S.rect, { x: 2.375, y: 4.354, w: 5.646, h: 2.458, fill: { color: 'FFF4E1' }, shadow: CARD_SHADOW });
+  shape(s, S.rect, { x: 8.182, y: 4.354, w: 4.260, h: 2.458, fill: { color: LEMON }, shadow: CARD_SHADOW });
+
+  icon(s, 'camera', 2.891, 4.748, 0.46, INK);
+  icon(s, 'document', 8.665, 4.768, 0.394, INK);
+
+  T(s, 'Made With Love', { x: 2.786, y: 5.121, w: 2.667, h: 0.424, fontFace: SERIF, fontSize: 14, bold: true, color: INK });
+  body(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero,',
+    { x: 2.786, y: 5.545, w: 4.736, h: 0.909, color: GREY2 });
+  T(s, 'Awesome Support', { x: 8.557, y: 5.121, w: 2.667, h: 0.424, fontFace: SERIF, fontSize: 14, bold: true, color: INK });
+  body(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed',
+    { x: 8.557, y: 5.545, w: 3.513, h: 0.909, color: '595959' });
+}
+
+/* 6 — Vision & Mission next to a rounded photo panel. */
+function slide06(s) {
+  shape(s, S.round2SameRect, {
+    x: 6.872, y: 1.554, w: 5.445, h: 5.568, rotate: 270, rectRadius: 1.83,
+    fill: { color: SOFT }, line: { color: LEMON, width: 1 },
+  });
+
+  heading(s, [['About The Vision & Mission ', {}], ['Organizer', { italic: true }]], { x: 1.038, y: 1.799, w: 5.232, h: 1.178 });
+  [['OUR VISION ', 3.400, 3.804, 4.928], ['OUR MISSION', 5.345, 5.748, 4.898]].forEach(function (b) {
+    T(s, b[0], { x: 1.122, y: b[1], w: 2.48, h: 0.357, fontFace: SERIF, fontSize: 14, bold: true, color: GOLD, charSpacing: 1, lineSpacingMultiple: 1.2 });
+    body(s, LOREM_MINIM, { x: 1.122, y: b[2], w: b[3], h: 0.909 });
+  });
+  seg(s, 1.25, 4.971, 7.646, 4.971, { color: GOLD, width: 1, transparency: 10, beginArrowType: 'diamond', endArrowType: 'diamond' });
+}
+
+/* 7 — Skill bars on the dark theme. */
+function slide07(s) {
+  s.background = { color: DARK };
+  sprig(s, { x: 10.532, y: 3.697, w: 1.766, h: 2.13, rot: 15, color: LEMON, transparency: 20 });
+  heading(s, [['A Truly Authentic ', {}], ['Experience', { italic: true }]], { x: 0.789, y: 1.873, w: 4.639, h: 1.178 });
+  seg(s, 5.907, 2.119, 5.907, 3.192, { color: GOLD, width: 1, transparency: 10, beginArrowType: 'diamond', endArrowType: 'diamond' });
+
+  [['Event planning', '87%', 1.873, 2.305, 1.820], ['Guest Service', '92%', 2.628, 3.060, 2.575]].forEach(function (b) {
+    T(s, b[0], { x: 6.827, y: b[2], w: 3.996, h: 0.303, fontSize: 12, color: GREY2 });
+    shape(s, S.roundRect, { x: 6.905, y: b[3], w: 4.948, h: 0.132, rectRadius: 0.066, fill: { color: CREAM } });
+    shape(s, S.roundRect, { x: 6.905, y: b[3], w: 4.492, h: 0.132, rectRadius: 0.066, fill: { color: GOLD } });
+    T(s, b[1], { x: 11.205, y: b[4], w: 1.159, h: 0.438, fontSize: 20, color: GREY2 });
+  });
+}
+
+/* 8 — Full-width photo band above a split caption. */
+function slide08(s) {
+  heading(s, [['Make Your Wedding Day Truly ', {}], ['Unforgettable', { italic: true }]], { x: 0.991, y: 5.347, w: 5.942, h: 1.178 });
+  T(s, 'Special Made With Love', { x: 7.702, y: 5.422, w: 3.77, h: 0.394, fontFace: SERIF, fontSize: 16, bold: true, color: GREY2, charSpacing: 1, lineSpacingMultiple: 1.2 });
+  seg(s, 7.765, 6.026, 10.848, 6.026, { color: 'C7B399', width: 1, beginArrowType: 'diamond', endArrowType: 'diamond' });
+  body(s, 'Lorem ipsum dolor amet consectetur adipiscing elit sed do eiusmod tempor incididunt labore etes dolore magna.', { x: 7.702, y: 6.176, w: 4.64, h: 0.631 });
+}
+
+/* 9 — Video still with a play button and three captions. */
+function slide09(s) {
+  shape(s, S.rect, { x: 0, y: 2.351, w: 10.396, h: 3.158, fill: { color: CREAM } });
+  shape(s, S.rect, { x: 10.521, y: 0, w: 2.812, h: 5.529, fill: { color: CREAM } });
+  shape(s, S.rect, { x: 10.521, y: -0.01, w: 2.812, h: 5.549, fill: { color: CREAM, transparency: 12 } });
+
+  heading(s, [['Our Event Coverage', {}]], { x: 3.083, y: 1.360, w: 7.167, align: 'center' });
+  shape(s, S.ellipse, { x: 4.488, y: 3.514, w: 0.833, h: 0.833, fill: { color: CREAM }, shadow: CARD_SHADOW });
+  shape(s, S.triangle, { x: 4.788, y: 3.803, w: 0.294, h: 0.254, rotate: 90, fill: { color: GOLD } });
+
+  [['ONCE IN A LIFE TIME', 1.672, 1.585], ['MADE WITH LOVE', 5.667, 5.581], ['SPECIAL OCCASSION', 9.466, 9.379]].forEach(function (c) {
+    T(s, c[0], { x: c[1], y: 5.967, w: 2.48, h: 0.357, align: 'center', fontFace: SERIF, fontSize: 14, bold: true, color: GOLD, charSpacing: 1, lineSpacingMultiple: 1.2 });
+    body(s, 'Lorem ipsum dolor sit amet, consectetur', { x: c[2], y: 6.345, w: 2.654, h: 0.631, align: 'center' });
+  });
+}
+
+/* 10 — Milestone timeline: alternating cards above / below the axis. */
+const TIMELINE_CARDS = [
+  { x: 1.154, y: 2.829, text: 'Established as a Global Leader in \nWedding Planning', tri: [2.229, 3.971] },
+  { x: 5.508, y: 2.898, text: 'Won the International Weddings Planner Awards ', tri: [6.583, 4.039] },
+  { x: 9.853, y: 2.914, text: 'The Start of Brides Wedding Planner & Organizer ', tri: [10.928, 4.055] },
+  { x: 3.415, y: 4.722, text: 'Featured in 10+ Publications', tri: [4.406, 4.648], up: true },
+  { x: 7.768, y: 4.760, text: 'Partnering with 10+ Global Wedding Planning Partners ', tri: [8.759, 4.686], up: true },
+];
+const TIMELINE_YEARS = [['2020', 1.296, 4.648], ['2021', 3.472, 3.769], ['2022', 5.649, 4.648], ['2023', 7.826, 3.769], ['2024', 10.003, 4.648]];
+const TIMELINE_DOTS = [[2.225, 0.175, 'ED7D31'], [4.402, 0.175, 'FFC000'], [6.556, 0.220, 'ED7D31'], [8.756, 0.175, 'FFC000'], [10.933, 0.175, 'ED7D31']];
+
+function slide10(s) {
+  shape(s, S.rect, { x: 0, y: 4.390, w: 13.333, h: 3.110, fill: { color: CREAM } });
+  shape(s, S.rect, { x: 0, y: 4.365, w: 13.333, h: 3.135, fill: { color: CREAM, transparency: 28 } });
+  heading(s, [['Unrivaled Scenery Timeline', {}]], { x: 2.01, y: 1.565, w: 9.313, align: 'center' });
+
+  seg(s, 1.347, 4.365, 11.986, 4.365, { color: GREY4, width: 1 });
+  [1.239, 12.026].forEach(function (x) {
+    seg(s, x, 4.331, x, 4.399, { color: GREY4, width: 0.75 });
+    seg(s, x + 0.034, 4.365, x + 0.102, 4.365, { color: GREY4, width: 0.75 });
+  });
+
+  TIMELINE_CARDS.forEach(function (c) {
+    shape(s, S.roundRect, {
+      x: c.x, y: c.y, w: 2.319, h: 1.141, rectRadius: 0.03,
+      fill: { color: CREAM }, line: { color: GREY3, width: 1, transparency: 55 },
+    });
+    T(s, c.text, { x: c.x, y: c.y, w: 2.319, h: 1.141, align: 'center', valign: 'middle', color: GREY2 });
+    shape(s, S.triangle, {
+      x: c.tri[0], y: c.tri[1], w: 0.168, h: 0.074, rotate: 180, flipV: !!c.up,
+      fill: { color: c.up ? 'FFC000' : GOLD },
+    });
+  });
+  TIMELINE_YEARS.forEach(function (y) {
+    T(s, y[0], { x: y[1], y: y[2], w: 2.035, h: 0.331, align: 'center', fontSize: 18, color: GOLD, charSpacing: 1 });
+  });
+  TIMELINE_DOTS.forEach(function (d) {
+    const r = d[1], cy = 4.365 - r / 2;
+    shape(s, S.ellipse, { x: d[0], y: cy, w: r, h: r, fill: { color: d[2], transparency: 83 }, line: { color: WHITE, width: 0.75, transparency: 70 } });
+    shape(s, S.ellipse, { x: d[0] + r / 4, y: cy + r / 4, w: r / 2, h: r / 2, fill: { color: d[2] } });
+  });
+}
+
+/* 11 — Photography team: three portraits with name cards. */
+const TEAM_PHOTOS = [
+  { card: 1.569, name: 'Wilbert Hilpert', nx: 1.726, ny: 5.767, ly: 6.096, lx: 1.984, sx: 2.446, sy: 6.529, ph: 1.222 },
+  { card: 5.597, name: "Vada O'Connell", nx: 5.756, ny: 5.788, ly: 6.118, lx: 6.014, sx: 6.501, sy: 6.529, ph: 5.250 },
+  { card: 9.625, name: 'Donna Joe', nx: 9.758, ny: 5.788, ly: 6.118, lx: 10.016, sx: 10.506, sy: 6.510, ph: 9.278 },
+];
+function slide11(s) {
+  heading(s, [['Our Best Photography Team', {}]], { x: 3.575, y: 1.548, w: 6.183, align: 'center' });
+  TEAM_PHOTOS.forEach(function (m) {
+    shape(s, S.rect, { x: m.card, y: 5.516, w: 2.423, h: 1.363, fill: { color: CREAM } });
+    T(s, m.name, { x: m.nx, y: m.ny, w: 2.108, h: 0.37, align: 'center', fontFace: SERIF, fontSize: 16, bold: true, color: '000000' });
+    T(s, 'PHOTOGRAPHER', { x: m.lx, y: m.ly, w: 1.593, h: 0.307, align: 'center', fontSize: 9, color: GREY, charSpacing: 1, lineSpacingMultiple: 1.5 });
+    socialRow(s, m.sx, m.sy, 0.146, '333333');
+  });
+}
+
+/* 12 — Team row with one highlighted gold profile card. */
+const TEAM_ROW = [
+  { ph: 0.956, py: 3.471, name: 'Dennis Goodman', nx: 1.032, ny: 5.862, nw: 2.195, role: 'Designer', rx: 1.715, ry: 6.118, rw: 0.828 },
+  { ph: 3.771, py: 3.471, name: 'Isabelle Lucia', nx: 3.850, ny: 5.862, nw: 2.189, role: 'Reservations Manager', rx: 4.056, ry: 6.118, rw: 1.776 },
+  { ph: 6.586, py: 3.471, name: 'Rea Smith', nx: 6.739, ny: 5.862, nw: 2.042, role: 'Event Coordinator', rx: 7.006, ry: 6.118, rw: 1.506 },
+];
+function slide12(s) {
+  shape(s, S.round2SameRect, { x: 9.401, y: 2.617, w: 2.977, h: 4.17, rectRadius: 0.225, fill: { color: GOLD } });
+  heading(s, [['Awesome Forever.co Team', {}]], { x: 1.087, y: 1.430, w: 6.183 });
+  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore etes dolore magna aliqua ut', { x: 1.087, y: 2.116, w: 5.702, h: 0.631 });
+
+  TEAM_ROW.forEach(function (m) {
+    T(s, m.name, { x: m.nx, y: m.ny, w: m.nw, h: 0.337, align: 'center', fontFace: SERIF, fontSize: 14, bold: true, color: SLATE });
+    T(s, m.role, { x: m.rx, y: m.ry, w: m.rw, h: 0.286, align: 'center', color: GOLD });
+  });
+  T(s, 'Erric Zudiga', { x: 9.868, y: 5.364, w: 2.042, h: 0.337, align: 'center', fontFace: SERIF, fontSize: 14, bold: true, color: WHITE });
+  T(s, 'Creative Director', { x: 10.176, y: 5.620, w: 1.427, h: 0.286, align: 'center', color: WHITE });
+  body(s, 'A wonderful serenity has taken possession of my entires', { x: 9.629, y: 5.906, w: 2.508, h: 0.631, align: 'center', color: OFFWHITE });
+}
+
+/* 13 — Personal contact card on the dark theme. */
+function slide13(s) {
+  s.background = { color: DARK };
+  sprig(s, { x: 4.196, y: 2.829, w: 1.81, h: 2.183, rot: 42, color: LEMON });
+
+  heading(s, [['Scarlett Sans Hills', { italic: true }]], { x: 6.825, y: 1.779, w: 5.148, color: GOLD });
+  T(s, 'Co Owner And Business Manager', { x: 6.897, y: 2.426, w: 4.778, h: 0.337, fontSize: 14, italic: true, color: LEMON });
+
+  T(s, 'PHONE', { x: 6.834, y: 3.284, w: 1.48, h: 0.337, fontFace: SANSM, fontSize: 14, color: CREAM, charSpacing: 1 });
+  body(s, '+12-345-567-909', { x: 6.834, y: 3.498, w: 1.911, h: 0.353 });
+  T(s, 'ADDRESS ', { x: 9.399, y: 3.258, w: 1.853, h: 0.337, fontFace: SANSM, fontSize: 14, color: CREAM, charSpacing: 1 });
+  body(s, ' 652 Larkin Crest, New York, USA', { x: 9.399, y: 3.472, w: 3.111, h: 0.361 });
+  seg(s, 8.866, 3.316, 8.866, 3.832, { color: LEMON, width: 1, transparency: 10, beginArrowType: 'diamond', endArrowType: 'diamond' });
+
+  body(s, 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy with my whole heart. I am alone, and feel the charm of existence in this spot, ',
+    { x: 6.847, y: 4.261, w: 5.445, h: 0.909 });
+  T(s, 'Scarlett S.H', { x: 6.777, y: 5.621, w: 2.521, h: 0.404, fontFace: SCRIPT, fontSize: 18, italic: true, color: GOLD });
+  socialRow(s, 8.745, 5.764, 0.117, CREAM);
+  T(s, '- Social Media ', { x: 9.462, y: 5.696, w: 1.228, h: 0.252, fontSize: 9, color: CREAM });
+}
+
+/* 14 — Five-up team strip. */
+const TEAM_FIVE = [
+  { x: 0.806, name: 'Madie Schmitt', nx: 0.756, nw: 2.352, role: 'Designer', rx: 1.465, rw: 0.828 },
+  { x: 3.173, name: 'Scarlett Hills', nx: 3.256, nw: 2.086, role: 'Reservations Manager', rx: 3.494, rw: 1.776 },
+  { x: 5.540, name: 'Jade Krajcik', nx: 5.623, nw: 2.086, role: 'Event Coordinator', rx: 5.982, rw: 1.506 },
+  { x: 7.908, name: 'Laisha Hansen', nx: 7.991, nw: 2.086, role: 'Videographer', rx: 8.388, rw: 1.171 },
+  { x: 10.275, name: 'Julio Batz', nx: 10.358, nw: 2.086, role: 'Designer', rx: 10.988, rw: 0.828 },
+];
+function slide14(s) {
+  shape(s, S.rect, { x: 0, y: 3.417, w: 13.333, h: 4.083, fill: { color: CREAM, transparency: 10 } });
+  heading(s, [['Awesome Forever.co Team', {}]], { x: 3.575, y: 1.456, w: 6.183 });
+
+  TEAM_FIVE.forEach(function (m) {
+    shape(s, S.rect, { x: m.x, y: 5.384, w: 2.253, h: 0.852, fill: { color: CREAM } });
+    T(s, m.name, { x: m.nx, y: 5.474, w: m.nw, h: 0.404, align: 'center', fontFace: SERIF, fontSize: 18, bold: true, color: DARK });
+    T(s, m.role, { x: m.rx, y: 5.849, w: m.rw, h: 0.286, align: 'center', color: GOLD });
+    body(s, 'Lorem ipsum dolor sit amet, consectetur.', { x: m.x + 0.083, y: 6.374, w: 2.086, h: 0.63, align: 'center' });
+  });
+}
+
+/* 15 — "Handle everything" with two ticked feature blurbs. */
+function slide15(s) {
+  heading(s, [['With ', {}], ['Forever we ', { italic: true }], ['Handle Everything', {}]], { x: 1.251, y: 2.426, w: 4.691, h: 1.178 });
+  body(s, 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy with my whole heart. I am alone, and feel the charm of existence in this spot, which was created for',
+    { x: 1.251, y: 3.815, w: 4.284, h: 1.186 });
+  readMore(s, 1.251, 5.342);
+
+  shape(s, S.roundRect, { x: 6.186, y: 3.756, w: 6.083, h: 2.410, rectRadius: 0.114, fill: { color: CREAM }, shadow: CARD_SHADOW });
+  [[7.617, 6.568, 'Wedding timeline creation & management'], [10.338, 9.289, 'Guest list and RSVP wedding coordination']].forEach(function (c) {
+    tick(s, c[0], 4.141, 0.5);
+    T(s, c[2], { x: c[1], y: 4.829, w: 2.599, h: 0.776, align: 'center', fontSize: 14, bold: true, color: GREY2, lineSpacingMultiple: 1.5 });
+  });
+}
+
+/* 16 — Wedding services grid (2 x 3) on the dark theme. */
+const SERVICES = [
+  ['Photographer', 1.518, 2.027, 0.722, 2.928], ['Makeup Artist', 5.653, 2.027, 4.858, 2.928], ['Wedding Officiant', 9.376, 2.853, 8.994, 2.928],
+  ['Floristc', 1.518, 2.027, 0.722, 4.933], ['Caterer', 5.653, 2.027, 4.858, 4.933], ['DJ or Band', 9.789, 2.027, 8.994, 4.933],
+];
+function slide16(s) {
+  s.background = { color: DARK };
+  heading(s, [['Wedding Services', { italic: true }]], { x: 4.093, y: 1.648, w: 5.148, align: 'center', color: GOLD });
+
+  SERVICES.forEach(function (sv) {
+    T(s, sv[0], { x: sv[1], y: sv[4], w: sv[2], h: 0.438, align: 'center', fontFace: SERIF, fontSize: 20, bold: true, italic: true, color: LEMON });
+    body(s, 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy with my whole heart.',
+      { x: sv[3], y: sv[4] + 0.494, w: 3.617, h: 0.909, align: 'center' });
+  });
+  const rule = { color: LEMON, width: 1, transparency: 20, beginArrowType: 'diamond', endArrowType: 'diamond' };
+  seg(s, 0, 4.686, 13.271, 4.686, rule);
+  [4.604, 8.771].forEach(function (x) { seg(s, x, 3.551, x, 5.847, rule); });
+}
+
+/* 17 — Four icon columns over a photo banner. */
+// [caption, circle x, text x, button x, divider x, icon]
+const FEATURES4 = [
+  ['Fully Responsive', 0.789, 0.810, 0.913, null, 'mobile'],
+  ['Woocommerce', 4.076, 4.076, 4.184, 3.457, 'store'],
+  ['Perfect Design', 7.295, 7.295, 7.454, 6.690, 'monitor'],
+  ['Documentation', 10.314, 10.429, 10.445, 9.915, 'camera'],
+];
+function slide17(s) {
+  shape(s, S.rect, { x: 0, y: 0, w: 13.333, h: 4.25, fill: { color: CREAM } });
+  heading(s, [['With ', {}], ['Forever we ', { italic: true }], ['Handle Everything', {}]],
+    { x: 2.485, y: 1.770, w: 8.363, align: 'center', color: WHITE });
+
+  FEATURES4.forEach(function (f) {
+    shape(s, S.ellipse, { x: f[1], y: 3.634, w: 0.886, h: 0.886, fill: { color: GOLD }, line: { color: SOFT, width: 4.5 } });
+    icon(s, f[5], f[1] + 0.268, 3.898, 0.35, WHITE);
+    T(s, f[0], { x: f[2], y: 4.718, w: 2.582, h: 0.404, fontFace: SERIF, fontSize: 18, bold: true, color: SLATE });
+    body(s, 'Lorem ipsum dolor sit amet, consec tetur adipiscing er arcu massa.', { x: f[2], y: 5.034, w: 2.262, h: 0.909 });
+    pill(s, { x: f[3], y: 6.118, w: 1.132, h: 0.321, fill: GOLD, line: { type: 'none' }, text: 'Read More', fontSize: 11, color: CREAM });
+    if (f[4]) seg(s, f[4], 5.034, f[4], 5.897, { color: GOLD, width: 1, transparency: 10, beginArrowType: 'diamond' });
+  });
+}
+
+/* 18 — Three service cards, the third highlighted. */
+const CARDS3 = [
+  { x: 1.025, ix: 2.163, fill: CREAM, ink: SLATE, sub: GREY, icon: 'videocam', title: 'Videography', tx: 1.472, tw: 1.984, bx: 1.498 },
+  { x: 4.114, ix: 5.252, fill: CREAM, ink: SLATE, sub: GREY, icon: 'aperture', title: 'Photography', tx: 4.510, tw: 2.086, bx: 4.587 },
+  { x: 7.199, ix: 8.238, fill: GOLD, ink: WHITE, sub: OFFWHITE, icon: 'waiter', title: 'Best Services', tx: 7.647, tw: 1.984, bx: 7.672 },
+];
+function slide18(s) {
+  heading(s, [['With ', {}], ['Forever we ', { italic: true }], ['Handle Everything', {}]], { x: 1.073, y: 1.579, w: 5.327, h: 1.178 });
+  CARDS3.forEach(function (c, i) {
+    shape(s, S.roundRect, { x: c.x, y: 3.340, w: 2.879, h: 3.158, rectRadius: 0.02, fill: { color: c.fill } });
+    icon(s, c.icon, c.ix, 3.858, 0.62, i === 2 ? WHITE : GOLD);
+    T(s, c.title, { x: c.tx, y: 4.856, w: c.tw, h: 0.438, align: 'center', fontFace: SERIF, fontSize: 20, bold: true, color: c.ink });
+    body(s, 'Lorem ipsum dolor sit amet consectetur', { x: c.bx, y: 5.362, w: 1.933, h: 0.631, align: 'center', color: c.sub });
+  });
+}
+
+/* 19 — Break slide: oversized script wordmark. */
+function slide19(s) {
+  sprig(s, { x: 7.902, y: 4.461, w: 2.491, h: 3.005, rot: 32, color: LEMON, transparency: 30 });
+  T(s, 'Break Slide', { x: 4.986, y: 2.839, w: 7.328, h: 2.036, wrap: false, align: 'center', fontFace: SCRIPT, fontSize: 115, color: GOLD });
+  T(s, 'Let\u2019s Take a break 45 Minutes', { x: 8.414, y: 4.690, w: 3.744, h: 0.37, align: 'right', fontSize: 16, color: GREY3 });
+}
+
+/* 20 — Portfolio mosaic with a floating label. */
+function slide20(s) {
+  shape(s, S.rect, { x: 0, y: 1.162, w: 6.352, h: 6.338, fill: { color: CREAM, transparency: 16 } });
+  [[6.505, 1.198], [9.905, 1.198], [6.520, 4.393], [9.921, 4.393]].forEach(function (t) {
+    shape(s, S.rect, { x: t[0], y: t[1], w: 3.238, h: 3.024, fill: { color: CREAM } });
+  });
+  shape(s, S.roundRect, { x: 4.562, y: 3.797, w: 2.868, h: 1.159, rectRadius: 0.055, fill: { color: CREAM }, shadow: CARD_SHADOW });
+  heading(s, [['Portfolio', {}]], { x: 4.902, y: 4.057, w: 2.189, align: 'center' });
+}
+
+/** Linear blend between two hex colours; `t` runs 0 (a) to 1 (b). */
+function mixHex(a, b, t) {
+  let out = '';
+  for (let i = 0; i < 6; i += 2) {
+    const ca = parseInt(a.substr(i, 2), 16), cb = parseInt(b.substr(i, 2), 16);
+    out += ('0' + Math.round(ca + (cb - ca) * t).toString(16)).slice(-2).toUpperCase();
+  }
+  return out;
+}
+
+/**
+ * pptxgenjs shapes take solid fills only, so a linear fade is built from
+ * `steps` opaque slices whose colour is interpolated between `from` and the
+ * band's own background — no alpha stacking, hence no visible seams.
+ */
+function fadeBand(s, o) {
+  const steps = 48, sw = o.w / steps;
+  for (let i = 0; i < steps; i++) {
+    const t = i / (steps - 1), e = o.toRight ? t : 1 - t;
+    const k = e * e * (3 - 2 * e); // smoothstep
+    shape(s, S.rect, {
+      x: o.x + i * sw, y: o.y, w: sw + 0.01, h: o.h,
+      fill: { color: mixHex(o.from, o.to, k) }, line: { type: 'none' },
+    });
+  }
+}
+
+/* 21 — Three photo bands, each with a name fading out of a dark wash. */
+const BANDS = [
+  { y: 1.283, h: 2.093, tint: CREAM, gx: 0, gy: 1.283, gw: 6.810, gh: 2.105, toRight: true, nx: 0.326, ny: 2.344, dx: 0.993, dy: 2.703 },
+  { y: 3.377, h: 2.070, tint: SOFT, gx: 7.286, gy: 3.407, gw: 6.057, gh: 2.019, toRight: false, nx: 9.752, ny: 4.465, dx: 10.420, dy: 4.824 },
+  { y: 5.458, h: 2.070, tint: CREAM, gx: 0.009, gy: 5.481, gw: 6.810, gh: 2.019, toRight: true, nx: 0.171, ny: 6.491, dx: 0.838, dy: 6.850 },
+];
+function slide21(s) {
+  s.background = { color: DARK };
+  BANDS.forEach(function (b) {
+    shape(s, S.rect, { x: 0, y: b.y, w: 13.342, h: b.h, fill: { color: b.tint } });
+    fadeBand(s, { x: b.gx, y: b.gy, w: b.gw, h: b.gh, from: DARK, to: b.tint, toRight: b.toRight });
+    T(s, 'Victoria & Billy', { x: b.nx, y: b.ny, w: 3.326, h: 0.505, align: 'center', fontFace: SERIF, fontSize: 24, italic: true, color: WHITE });
+    T(s, 'February 14, 2029', { x: b.dx, y: b.dy, w: 1.933, h: 0.353, align: 'center', color: LEMON, lineSpacingMultiple: 1.5 });
+  });
+}
+
+/* 22 — Full-bleed dark overlay with a centred statement. */
+function slide22(s) {
+  shape(s, S.rect, { x: 0, y: 0, w: 13.333, h: 7.5, fill: { color: WHITE } });
+  shape(s, S.rect, { x: 0, y: 0, w: 13.333, h: 7.5, fill: { color: DARK, transparency: 46 } });
+  T(s, 'MADE WITH LOVE', {
+    x: 2.826, y: 2.588, w: 8.215, h: 0.909, wrap: false, align: 'center',
+    fontFace: SERIF, fontSize: 48, bold: true, color: WHITE, charSpacing: 10,
+  });
+  body(s, "There's a big difference between falling in love with someone and falling in love",
+    { x: 2.015, y: 3.513, w: 9.838, h: 0.422, align: 'center', fontSize: 14, italic: true, color: OFFWHITE });
+  pill(s, { x: 6.035, y: 5.204, w: 1.263, h: 0.328, line: { color: CREAM, width: 0.75 }, text: 'View More', color: WHITE });
+}
+
+/* 23 — Wedding invitation card. */
+function slide23(s) {
+  shape(s, S.rect, { x: 7.341, y: 1.716, w: 4.815, h: 5.315, fill: { type: 'none' }, line: { color: GOLD, width: 2 } });
+  sprig(s, { x: 11.604, y: 1.916, w: 0.95, h: 1.146, rot: 146, color: GOLD });
+  sprig(s, { x: 6.768, y: 5.518, w: 1.072, h: 1.293, rot: 36, color: GOLD });
+
+  T(s, 'HAPPY', { x: 9.293, y: 2.138, w: 0.912, h: 0.286, align: 'center', wrap: false, color: GOLD, charSpacing: 3 });
+  T(s, 'Wedding Day', { x: 7.735, y: 2.367, w: 4.027, h: 0.774, align: 'center', fontFace: SCRIPT, fontSize: 40, bold: true, color: DARK });
+  T(s, [{ text: 'BASHI', options: { breakLine: true } }, { text: '&', options: { breakLine: true } }, { text: 'ANGEL' }],
+    { x: 7.791, y: 3.300, w: 3.915, h: 2.121, align: 'center', fontFace: SERIF, fontSize: 40, bold: true, italic: true, color: DARK });
+  shape(s, S.rect, { x: 8.880, y: 5.529, w: 1.736, h: 0.289, fill: { color: GOLD } });
+  T(s, 'Date : 19 July 2029', { x: 8.844, y: 5.559, w: 1.809, h: 0.269, align: 'center', fontSize: 10, color: WHITE });
+  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elita. Nuncle rutrun orci molestie semper laoreet.',
+    { x: 7.909, y: 5.969, w: 3.679, h: 0.607, align: 'center', fontSize: 10.5 });
+}
+
+/* 24 — Portfolio highlights card. */
+function slide24(s) {
+  sprig(s, { x: 8.204, y: 5.845, w: 1.072, h: 1.293, rot: 36, color: GOLD, transparency: 55 });
+
+  heading(s, [['Our Best Portfolio ', {}]], { x: 0.867, y: 5.367, w: 5.327 });
+  seg(s, 1.074, 6.504, 4.614, 6.504, { color: GOLD, width: 1, transparency: 10, beginArrowType: 'diamond' });
+
+  shape(s, S.roundRect, { x: 5.927, y: 3.834, w: 6.611, h: 3.038, rectRadius: 0.02, fill: { color: CREAM }, shadow: CARD_SHADOW });
+  [['Perfect Moments', 4.283, 2.05], ['Extensive Documentation', 5.501, 3.069]].forEach(function (f) {
+    tick(s, 6.461, f[1], 0.291);
+    T(s, f[0], { x: 6.829, y: f[1], w: f[2], h: 0.37, fontFace: SERIF, fontSize: 16, bold: true, color: SLATE });
+    body(s, LOREM_NUNC, { x: 6.829, y: f[1] + 0.291, w: 4.807, h: 0.631 });
+  });
+}
+
+/* 25 — Portfolio intro with a full-width rule. */
+function slide25(s) {
+  heading(s, [['Best Forever.co Portfolio ', {}]], { x: 0.680, y: 1.664, w: 4.82, h: 1.178 });
+  seg(s, 0.818, 3.109, 13.333, 3.109, { color: GOLD, width: 1, transparency: 10, beginArrowType: 'diamond' });
+  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elite. Nuncle rutrun Lorem ipsum dolor sit amet, ', { x: 0.745, y: 3.372, w: 4.438, h: 0.631 });
+  sprig(s, { x: 8.204, y: 5.845, w: 1.072, h: 1.293, rot: 36, color: GOLD });
+  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elite. Nuncle rutrun', { x: 9.268, y: 6.555, w: 3.156, h: 0.631 });
+}
+
+/* 26 — Testimonial on the dark theme. */
+function slide26(s) {
+  s.background = { color: DARK };
+  sprig(s, { x: 9.196, y: 4.238, w: 1.538, h: 1.854, rot: -66, color: LEMON });
+
+  T(s, 'TESTIMONIALS', { x: 2.361, y: 2.567, w: 2.633, h: 0.331, align: 'center', fontSize: 12, color: OFFWHITE });
+  heading(s, [['Review', { italic: true }], [' Of The Day', {}]], { x: 1.104, y: 2.909, w: 5.148, align: 'center', color: GOLD });
+  body(s, '\u201CYou did an amazing job for us and I am very grateful for the key input you provided in the process of this big day. We had a brilliant day in no small part of your work.\u201D',
+    { x: 1.068, y: 3.917, w: 5.22, h: 0.909, align: 'center', italic: true });
+  T(s, 'IVA STAMM & ZANDER B', { x: 1.222, y: 5.039, w: 4.913, h: 0.467, align: 'center', fontFace: SERIF, fontSize: 20, italic: true, color: GREY3 });
+  T(s, '25 OCTOBER 2028', { x: 2.361, y: 5.635, w: 2.633, h: 0.331, align: 'center', fontSize: 12, color: GREY3 });
+}
+
+/* 27 — Pull quote framed by three rules and a giant quotation mark. */
+function slide27(s) {
+  const rule = { color: GOLD, width: 1, transparency: 10, beginArrowType: 'diamond', endArrowType: 'diamond' };
+  seg(s, 1.036, 1.838, 1.036, 6.545, rule);
+  seg(s, 1.036, 6.545, 11.824, 6.545, rule);
+  seg(s, 1.036, 1.838, 5.902, 1.838, { color: GOLD, width: 1, transparency: 10, endArrowType: 'diamond' });
+
+  // Oversized gold quote glyph anchored bottom-right of the frame.
+  T(s, '\u201C', { x: 6.6, y: 3.9, w: 4.4, h: 3.2, fontFace: SERIF, fontSize: 260, bold: true, color: GOLD });
+  T(s, '\u201C', { x: 5.05, y: 1.35, w: 1.4, h: 1.0, fontFace: SERIF, fontSize: 66, bold: true, color: GOLD });
+  sprig(s, { x: 7.907, y: 4.516, w: 1.538, h: 1.854, rot: -66, color: LEMON, transparency: 30 });
+
+  T(s, 'QUOTES', { x: 2.079, y: 2.623, w: 1.46, h: 0.37, fontFace: SERIF, fontSize: 16, color: GOLD });
+  body(s, [
+    { text: "There's a big difference between falling in love with someone and falling in love with someone and getting married. ", options: { color: INK } },
+    { text: 'Usually, after you get married, you fall in love with the person even more.', options: { color: GOLD } },
+  ], { x: 2.079, y: 3.147, w: 6.225, h: 1.877, fontSize: 18, italic: true });
+  seg(s, 2.220, 5.477, 3.223, 5.477, rule);
+  T(s, [
+    { text: 'Dave Grohl ', options: { color: INK } },
+    { text: '- CEO', options: { color: GOLD, bold: true } },
+  ], { x: 3.672, y: 5.244, w: 2.526, h: 0.404, fontFace: SERIF, fontSize: 18, italic: true });
+}
+
+/* 28 — Pricing table: four plans, the third featured. */
+const PLANS = [
+  { x: 1.018, price: '$99', px: 1.371, sx: 2.448, sw: 0.997, name: 'Starter', featured: false, btn: [1.615, 6.149] },
+  { x: 3.844, price: '$190', px: 4.198, sx: 5.411, sw: 0.864, name: 'Basic', featured: false, btn: [4.446, 6.126] },
+  { x: 6.671, price: '$290', px: 6.944, sx: 8.197, sw: 0.920, name: 'Standard', featured: true, btn: [7.351, 6.157] },
+  { x: 9.498, price: '$390', px: 9.824, sx: 11.076, sw: 0.787, name: 'Premium', featured: false, btn: [10.150, 6.145] },
+];
+const PLAN_FEATURES = ['Lorem ipsum dolor sit', 'Nuncle rutrun orcu ', 'Adipiscing elit am', 'Dolor sit amet'];
+function slide28(s) {
+  s.background = { color: DARK };
+  heading(s, [['Pricing Plan ', {}], ['Forefer.co', { italic: true }]], { x: 3.332, y: 1.476, w: 6.669, align: 'center', color: GOLD });
+
+  PLANS.forEach(function (p) {
+    const ink = p.featured ? WHITE : LEMON;
+    const sub = p.featured ? OFFWHITE : GREY;
+    shape(s, S.roundRect, {
+      x: p.x, y: 2.589, w: 2.632, h: 3.902, rectRadius: 0.18,
+      fill: { color: p.featured ? GOLD : DARK },
+      line: p.featured ? { color: LEMON, width: 1, transparency: 30 } : { type: 'none' },
+      shadow: CARD_SHADOW,
+    });
+    T(s, p.price, { x: p.px, y: p.featured ? 2.860 : 2.943, w: 1.925, h: 0.572, align: 'center', fontSize: 28, bold: true, color: ink });
+    T(s, '/Project', { x: p.sx, y: p.featured ? 3.128 : 3.27, w: p.sw, h: 0.252, fontSize: 9, color: sub });
+    T(s, p.name, { x: p.x + 0.597, y: 3.582, w: 1.311, h: 0.337, align: 'center', fontFace: SERIF, fontSize: 14, bold: true, color: ink });
+    seg(s, p.x + 0.231, p.featured ? 4.086 : 4.149, p.x + 2.401, p.featured ? 4.086 : 4.149,
+      { color: p.featured ? OFFWHITE : LEMON, width: 1, transparency: p.featured ? 0 : 30, beginArrowType: 'diamond', endArrowType: 'diamond' });
+    PLAN_FEATURES.forEach(function (f, i) {
+      T(s, f, {
+        x: p.x + 0.343, y: 4.480 + i * 0.313, w: 2.2, h: 0.33, fontSize: 10, color: sub,
+        bullet: { characterCode: '2713' }, lineSpacingMultiple: 1.5,
+      });
+    });
+    pill(s, {
+      x: p.btn[0], y: p.btn[1], w: 1.273, h: 0.409, fill: p.featured ? CREAM : GOLD,
+      line: { color: WHITE, width: 0.25 }, text: 'SELECT', color: p.featured ? GOLD : OFFWHITE, fontFace: SANSM,
+    });
+  });
+}
+
+/* 29 — Area/line chart plus a KPI strip. */
+const CHART_CATS = ['Jan 03', 'Jan 04', 'Jan 05', 'Jan 06', 'Jan 07', 'Jan 08', 'Jan 09', 'Jan 10', 'Jan 11', 'Jan 12',
+  'Jan 13', 'Jan 14', 'Jan 15', 'Jan 16', 'Jan 17', 'Jan 18', 'Jan 19', 'Jan 20', 'Jan 21', 'Jan 22', 'Jan 23',
+  'Jan 24', 'Jan 25', 'Jan 26', 'Jan 27', 'Jan 28', 'Jan 29', 'Jan 30', 'Jan 31'];
+const SERIES_A = [5, 5, 8, 5, 9, 14, 11, 16, 14, 11, 7, 14, 20, 22, 28, 33, 56, 144, 134, 104, 110, 60, 45, 50, 40, 22, 12, 8, 10];
+const SERIES_B = [10, 2, 2, 8, 13, 20, 19, 34, 12, 40, 22, 35, 35, 30, 33, 40, 80, 105, 80, 70, 40, 30, 35, 39, 37, 45, 30, 25, 20];
+const KPIS = [['230+', 1.942, 1.879, 1.272], ['130K', 3.957, 3.894, 1.272], ['8230K', 6.028, 6.018, 1.607]];
+
+function slide29(s) {
+  heading(s, [['Chart Slide', {}]], { x: 1.482, y: 2.142, w: 4.176 });
+  body(s, 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy with my whole heart. I am alone, and feel the charm of existence in this spot, which was created for.',
+    { x: 1.482, y: 3.108, w: 4.536, h: 1.186 });
+
+  s.addChart('area',
+    [
+      { name: 'Category B Fill', labels: CHART_CATS, values: SERIES_B },
+      { name: 'Category A Fill', labels: CHART_CATS, values: SERIES_A },
+    ],
+    {
+      x: 6.658, y: 1.850, w: 5.548, h: 2.649, chartColors: ['F4C1B1', 'BB6226'],
+      barGrouping: 'standard', catAxisHidden: true, valAxisHidden: true,
+      valAxisMaxVal: 160, showLegend: false, showTitle: false,
+      valGridLine: { color: OFFWHITE, size: 0.5 }, catGridLine: { style: 'none' },
+      chartArea: { fill: { color: PAPER } },
+    }
+  );
+  s.addChart('line',
+    [
+      { name: 'Category B', labels: CHART_CATS, values: SERIES_B },
+      { name: 'Category A', labels: CHART_CATS, values: SERIES_A },
+    ],
+    {
+      x: 6.658, y: 1.850, w: 5.548, h: 2.649, chartColors: ['EF9872', 'DD752D'],
+      lineSize: 1.5, lineDataSymbol: 'circle', lineDataSymbolSize: 4,
+      catAxisHidden: true, valAxisHidden: true, valAxisMaxVal: 160,
+      showLegend: false, showTitle: false, valGridLine: { style: 'none' }, catGridLine: { style: 'none' },
+    }
+  );
+
+  shape(s, S.roundRect, { x: 1.482, y: 5.038, w: 10.724, h: 1.453, rectRadius: 0.02, fill: { color: CREAM } });
+  KPIS.forEach(function (k) {
+    T(s, k[0], { x: k[1], y: 5.30, w: k[3], h: 0.64, fontFace: SERIF, fontSize: 32, color: TITLE_DARK });
+    body(s, 'Your Text here', { x: k[2], y: 5.82, w: 1.272, h: 0.353, align: 'center' });
+  });
+  [3.543, 5.567, 7.810].forEach(function (x) { seg(s, x, 5.495, x, 6.035, { color: GOLD, width: 1, transparency: 77 }); });
+  body(s, '* I am alone, and feel the charm of existence in this spot, which was created ', { x: 8.327, y: 5.449, w: 3.524, h: 0.631, italic: true });
+  pill(s, { x: 10.388, y: 6.312, w: 1.263, h: 0.328, fill: CREAM, line: { color: GOLD, width: 0.75 }, text: 'View More', color: GREY });
+}
+
+/* 30 — Three progress doughnuts. */
+const DOUGHNUTS = [
+  { x: 1.908, value: 45, ring: 'AFABAB', label: '45%', labelColor: SLATE, tx: 1.556 },
+  { x: 5.299, value: 50, ring: 'CCA174', label: '50%', labelColor: GREY2, tx: 5.204 },
+  { x: 8.689, value: 75, ring: '131C25', label: '75%', labelColor: GREY2, tx: 8.773 },
+];
+function slide30(s) {
+  shape(s, S.roundRect, { x: 1.305, y: 2.315, w: 10.724, h: 3.531, rectRadius: 0.17, fill: { color: CREAM, transparency: 6 } });
+  heading(s, [['Chart Forever.co Slide', {}]], { x: 4.153, y: 1.399, w: 5.028, align: 'center' });
+
+  DOUGHNUTS.forEach(function (d) {
+    s.addChart('doughnut',
+      [{ name: 'Ratio', labels: ['done', 'rest'], values: [d.value, 100 - d.value] }],
+      {
+        x: d.x, y: 2.537, w: 3.049, h: 3.043, holeSize: 55,
+        chartColors: [d.ring, 'D0CECE'], dataBorder: { pt: 0, color: CREAM },
+        showLegend: false, showTitle: false, showValue: false,
+        chartArea: { fill: { color: CREAM } },
+      }
+    );
+    T(s, d.label, {
+      x: d.x + 0.75, y: 3.78, w: 1.55, h: 0.55, align: 'center', valign: 'middle',
+      fontSize: 24, bold: true, color: d.labelColor, fill: { color: WHITE },
+    });
+    body(s, 'Far far away, behind the word mountains, far from the countries', { x: d.tx, y: 6.071, w: 3.111, h: 0.631, align: 'center' });
+  });
+}
+
+/* 31 — Four bullets radiating around a wedding-rings illustration. */
+const RADIAL = [
+  { badge: 1.186, by: 2.590, ring: 1.357, ry: 2.765, tx: 1.997, ty: 2.765, bx: 1.279, byy: 3.434 },
+  { badge: 1.154, by: 4.840, ring: 1.325, ry: 5.015, tx: 1.966, ty: 5.015, bx: 1.247, byy: 5.684 },
+  { badge: 9.476, by: 2.579, ring: 9.647, ry: 2.754, tx: 10.288, ty: 2.754, bx: 9.569, byy: 3.423 },
+  { badge: 9.444, by: 4.829, ring: 9.615, ry: 5.004, tx: 10.256, ty: 5.004, bx: 9.537, byy: 5.673 },
+];
+function slide31(s) {
+  heading(s, [['Chart Forever.co Slide', {}]], { x: 4.153, y: 1.399, w: 5.028, align: 'center' });
+
+  // rings + diamond, drawn from primitives
+  shape(s, S.ellipse, { x: 4.75, y: 3.55, w: 2.35, h: 2.35, fill: { type: 'none' }, line: { color: GOLD, width: 5 } });
+  shape(s, S.ellipse, { x: 6.05, y: 3.75, w: 2.10, h: 2.10, fill: { type: 'none' }, line: { color: GOLD, width: 5 } });
+  shape(s, S.triangle, { x: 6.42, y: 2.90, w: 1.02, h: 0.62, rotate: 180, fill: { color: GOLD } });
+  shape(s, S.trapezoid, { x: 6.42, y: 2.52, w: 1.02, h: 0.40, fill: { color: GOLD } });
+  [{ x: 4.741, y: 3.435, r: 30 }, { x: 6.837, y: 2.680, r: 30 }, { x: 8.111, y: 4.472, r: 30 }].forEach(function (p) {
+    sprig(s, { x: p.x, y: p.y, w: 0.765, h: 1.066, rot: p.r, color: GOLD, transparency: 52 });
+  });
+
+  RADIAL.forEach(function (r) {
+    shape(s, S.ellipse, { x: r.badge, y: r.by, w: 0.63, h: 0.655, fill: { color: CREAM } });
+    shape(s, S.ellipse, { x: r.ring, y: r.ry, w: 0.294, h: 0.305, fill: { type: 'none' }, line: { color: GOLD, width: 1 } });
+    T(s, '\u2713', { x: r.ring, y: r.ry, w: 0.294, h: 0.305, align: 'center', valign: 'middle', fontSize: 9, color: GOLD });
+    T(s, 'Your Text Here ', {
+      x: r.tx, y: r.ty, w: 1.86, h: 0.281, valign: 'middle', margin: 0,
+      fontFace: SERIF, fontSize: 14, bold: true, color: GOLD, lineSpacingMultiple: 1.3,
+    });
+    body(s, 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy',
+      { x: r.bx, y: r.byy, w: 2.969, h: 0.866, margin: 0 });
+  });
+}
+
+/* 32 — App promo with two phone mockups and a numbered list. */
+const APP_STEPS = [['Sign up now', 4.214, 4.196], ['Fill out the form', 5.044, 5.027], ['Wait for verification', 5.846, 5.828]];
+function slide32(s) {
+  s.background = { color: DARK };
+  imagePlaceholder(s, { x: 0.866, y: 1.860, w: 2.410, h: 4.832, fill: '1B242E', stroke: 'B9BDC2', round: 0.28, labelColor: GREY3 });
+  imagePlaceholder(s, { x: 3.694, y: 4.404, w: 4.606, h: 2.151, fill: '1B242E', stroke: 'B9BDC2', round: 0.28, labelColor: GREY3 });
+
+  heading(s, [['Get Discount Up to 50% With ', {}], ['Forever.co Wedding Apps', { italic: true }]],
+    { x: 4.089, y: 1.673, w: 7.895, h: 1.178, color: GOLD });
+  body(s, QUOTE_JOB, { x: 4.137, y: 2.970, w: 7.799, h: 0.631, italic: true });
+
+  APP_STEPS.forEach(function (st, i) {
+    T(s, String(i + 1), { x: 9.022, y: st[2], w: 0.489, h: 0.407, align: 'center', fontSize: 16, bold: true, color: WHITE, charSpacing: 1, lineSpacingMultiple: 1.2 });
+    T(s, st[0], { x: 9.788, y: st[1], w: 2.368, h: 0.37, fontSize: 16, color: GREY3, lineSpacingMultiple: 1 });
+    if (i < 2) seg(s, 8.226 + i * 0.038, 4.747 + i * 0.937, 12.825 + i * 0.038, 4.747 + i * 0.937, { color: LEMON, width: 1, transparency: 10, endArrowType: 'diamond' });
+  });
+}
+
+/* 33 — Laptop mock-up beside a highlights card. */
+function slide33(s) {
+  imagePlaceholder(s, { x: 7.365, y: 2.186, w: 5.968, h: 4.251, fill: '20262C', stroke: 'A9AEB4', labelColor: GREY3 });
+  heading(s, [['Make Memorable wedding with ', {}], ['Forever.co', { italic: true }]], { x: 1.101, y: 1.709, w: 5.443, h: 1.178 });
+  shape(s, S.roundRect, { x: 1.101, y: 3.454, w: 6.611, h: 3.038, rectRadius: 0.02, fill: { color: CREAM }, shadow: CARD_SHADOW });
+  [['Perfect Moments', 3.902, 2.05], ['Extensive Documentation', 5.121, 3.069]].forEach(function (f) {
+    tick(s, 1.636, f[1], 0.291);
+    T(s, f[0], { x: 2.003, y: f[1], w: f[2], h: 0.37, fontFace: SERIF, fontSize: 16, bold: true, color: GOLD });
+    body(s, LOREM_NUNC, { x: 2.003, y: f[1] + 0.291, w: 4.807, h: 0.631 });
+  });
+}
+
+/* 34 — Desktop mock-up flanked by two service cards. */
+function slide34(s) {
+  heading(s, [['Save the Date ', {}]], { x: 3.533, y: 1.395, w: 6.267, align: 'center' });
+  imagePlaceholder(s, { x: 4.172, y: 2.389, w: 4.939, h: 4.256, fill: 'D8DADD', stroke: 'A9AEB4' });
+  [
+    { x: 0.582, tx: 1.029, tw: 1.984, bx: 1.055, ix: 1.721, iy: 3.137, icon: 'videocam', title: 'Videography' },
+    { x: 9.659, tx: 10.055, tw: 2.086, bx: 10.132, ix: 10.797, iy: 3.189, icon: 'aperture', title: 'Photography' },
+  ].forEach(function (c) {
+    shape(s, S.roundRect, { x: c.x, y: 2.637, w: 2.879, h: 3.158, rectRadius: 0.02, fill: { color: CREAM } });
+    icon(s, c.icon, c.ix, c.iy, 0.62, GOLD);
+    T(s, c.title, { x: c.tx, y: 4.153, w: c.tw, h: 0.438, align: 'center', fontFace: SERIF, fontSize: 20, bold: true, color: SLATE });
+    body(s, 'Lorem ipsum dolor sit amet consectetur', { x: c.bx, y: 4.659, w: 1.933, h: 0.631, align: 'center' });
+  });
+}
+
+/* 35 — Contact page: details column plus a subscribe field. */
+const CONTACT_ROWS = [
+  { label: 'PHONE', value: '+12-345-567-909', lx: 6.761, ly: 5.002, vx: 6.761, vy: 5.216, vw: 1.911, ix: 6.340, iy: 5.017, id: 0.308, icon: 'phone' },
+  { label: 'ADDRESS ', value: ' 652 Larkin Crest, New York, USA', lx: 9.818, ly: 5.002, vx: 9.818, vy: 5.216, vw: 3.111, ix: 9.367, iy: 4.957, id: 0.427, icon: 'pin' },
+  { label: 'FOLLOW US', value: '@forever.co', lx: 6.761, ly: 5.987, vx: 6.761, vy: 6.201, vw: 1.386, ix: 6.309, iy: 6.007, id: 0.335, icon: 'heart' },
+];
+function slide35(s) {
+  shape(s, S.rect, { x: 5.667, y: 0, w: 7.666, h: 7.5, fill: { color: CREAM } });
+  heading(s, [['Contact ', {}], ['Forever.co', { italic: true }]], { x: 0.968, y: 4.937, w: 4.215 });
+  body(s, '* Please give us a call or write an email to get update.', { x: 1.046, y: 5.629, w: 2.758, h: 0.631, italic: true });
+
+  CONTACT_ROWS.forEach(function (r) {
+    icon(s, r.icon, r.ix, r.iy, r.id, INK);
+    T(s, r.label, { x: r.lx, y: r.ly, w: 1.853, h: 0.337, fontFace: SANSM, fontSize: 14, color: INK, charSpacing: 1 });
+    body(s, r.value, { x: r.vx, y: r.vy, w: r.vw, h: 0.361 });
+  });
+
+  body(s, 'Get Update?', { x: 9.578, y: 5.723, w: 1.825, h: 0.353, color: GREY2 });
+  pill(s, { x: 9.543, y: 6.167, w: 3.111, h: 0.409, fill: OFFWHITE, fillTrans: 35, line: { color: GREY4, width: 1 } });
+  T(s, 'Your email', { x: 9.703, y: 6.201, w: 1.825, h: 0.326, color: GREY, lineSpacingMultiple: 1.3 });
+  pill(s, { x: 11.381, y: 6.167, w: 1.273, h: 0.409, fill: GOLD, line: { color: WHITE, width: 0.25 }, text: 'SUBSCRIBE', color: OFFWHITE, fontFace: SANSM });
+  pill(s, { x: 9.617, y: 3.797, w: 1.578, h: 0.328, fill: CREAM, line: { color: GOLD, width: 0.75 }, text: 'www.forever.com', color: GREY });
+}
+
+/* 36 — Closing "Thanks" slide, mirror of the cover. */
+function slide36(s) {
+  s.background = { color: DARK };
+  sprig(s, { x: 10.089, y: 4.637, w: 1.81, h: 2.183, rot: 61, color: LEMON });
+  sprig(s, { x: 10.152, y: 3.551, w: 0.957, h: 1.154, rot: -9, color: LEMON });
+  sprig(s, { x: 5.759, y: 4.614, w: 0.957, h: 1.154, rot: -61, color: LEMON });
+
+  T(s, 'Thanks', { x: 0.658, y: 2.400, w: 4.322, h: 2.036, wrap: false, align: 'center', fontFace: SCRIPT, fontSize: 115, color: GOLD });
+  T(s, 'Wedding Planner & Organizer', { x: 1.222, y: 4.197, w: 3.744, h: 0.337, align: 'right', fontSize: 14, color: GREY3 });
+  body(s, QUOTE_LOVE, { x: 1.049, y: 4.798, w: 3.919, h: 0.909, align: 'right', italic: true, color: GREY2 });
+}
+
+/* ======================================================================= run */
+const BUILDERS = [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09,
+  slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19,
+  slide20, slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29,
+  slide30, slide31, slide32, slide33, slide34, slide35, slide36];
+
+function build() {
+  pptx = new PptxGenJS();
+  S = pptx.ShapeType;
+  pptx.defineLayout({ name: 'W16x9', width: 13.333, height: 7.5 });
+  pptx.layout = 'W16x9';
+  pptx.author = 'Forever.co';
+  pptx.title = 'Forever.co — Wedding Planner & Organizer';
+
+  BUILDERS.forEach(function (buildSlide, i) {
+    const s = pptx.addSlide();
+    s.background = { color: PAPER };
+    buildSlide(s);
+    const chrome = CHROME[i];
+    navbar(s, chrome.nav);
+    if (chrome.foot) footer(s, chrome.foot);
+  });
+
+  return pptx.writeFile({ fileName: path.join(__dirname, '03631c3f-f6d6-4e93-93d8-0b2f18437091_grok_final.pptx') });
+}
+
+build().then(function (f) { console.log('wrote ' + f); }, function (e) { console.error(e); process.exit(1); });
