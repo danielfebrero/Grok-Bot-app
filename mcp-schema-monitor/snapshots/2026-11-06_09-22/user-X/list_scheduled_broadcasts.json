@@ -1,0 +1,22 @@
+{
+  "description": "Returns scheduled broadcasts owned by the authenticated user.",
+  "inputSchema": {
+    "properties": {
+      "max_results": {
+        "type": "integer"
+      },
+      "newest_start_time": {
+        "type": "string"
+      },
+      "oldest_start_time": {
+        "type": "string"
+      },
+      "pagination_token": {
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "list_scheduled_broadcasts"
+}

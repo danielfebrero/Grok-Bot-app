@@ -1,0 +1,17 @@
+{
+  "description": "Returns one of the authenticated user's stream sources. Poll it after starting an encoder and wait for `is_stream_active` before going live. The stream key is not included; read it with GET /2/sources/:id/stream_key.",
+  "inputSchema": {
+    "properties": {
+      "id": {
+        "description": "Source id, from GET /2/sources.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_source"
+}

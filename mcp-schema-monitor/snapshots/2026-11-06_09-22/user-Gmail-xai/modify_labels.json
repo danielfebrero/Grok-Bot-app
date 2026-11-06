@@ -1,0 +1,31 @@
+{
+  "description": "Add or remove labels on a Gmail message. Use this for common email actions: - Mark as read: remove_label_ids = [\"UNREAD\"] - Mark as unread: add_label_ids = [\"UNREAD\"] - Star: add_label_ids = [\"STARRED\"] - Unstar: remove_label_ids = [\"STARRED\"] - Archive: remove_label_ids = [\"INBOX\"] - Move to inbox: add_label_ids = [\"INBOX\"] - Mark important: add_label_ids = [\"IMPORTANT\"] - Mark as spam: add_label_ids = [\"SPAM\"], remove_label_ids = [\"INBOX\"] - Move to trash: add_label_ids = [\"TRASH\"], remove_label_ids = [\"INBOX\"] The message_id should come from gmail_search or gmail_get_message results. This Gmail connection has no untrash, spam or filter tools. Restore a message from Trash with remove_label_ids [\"TRASH\"] and add_label_ids [\"INBOX\"]; mark spam with add_label_ids [\"SPAM\"] and remove_label_ids [\"INBOX\"] (the reverse for not spam). If Gmail refuses a system label, tell the user plainly that this connection cannot do that and that they can do it in Gmail. It cannot create, read or change Gmail filters: tell the user plainly and point them to Gmail's settings instead of trying other tool names or the browser.",
+  "inputSchema": {
+    "properties": {
+      "add_label_ids": {
+        "description": "Label IDs to add. Common labels: STARRED, IMPORTANT, TRASH, SPAM. Use INBOX to move back to inbox.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "message_id": {
+        "description": "The message ID to modify labels on. Use a message_id from gmail_search or gmail_get_message.",
+        "type": "string"
+      },
+      "remove_label_ids": {
+        "description": "Label IDs to remove. Common: UNREAD (mark as read), INBOX (archive), STARRED, IMPORTANT, SPAM.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "message_id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "modify_labels"
+}

@@ -1,0 +1,28 @@
+{
+  "description": "Copy a file from your box out to the user's computer, verbatim. Use this to hand the user a file you generated or downloaded in the box (a spreadsheet, report, log, archive, anything) by placing it on their selected computer where machine-targeted Shell, their editor, and apps can reach it. Any type, up to 100 MiB; the bytes are copied exactly (no truncation, binaries are safe). This is for putting a file ON their disk; to instead show a file inline in chat (an image, a video, or a downloadable attachment) use SendToUser with the box path. Give the box_path of the file and its machineId; it lands under its own name in that computer's working directory by default, or at a computer_path you choose.",
+  "inputSchema": {
+    "properties": {
+      "box_path": {
+        "description": "Path of the file in your box to push out. Absolute (e.g. /workspace/report.pdf) or relative to /workspace. Any file type, up to 100 MiB; copied verbatim. Expand any glob in Shell first and pass a concrete path.",
+        "minLength": 1,
+        "type": "string"
+      },
+      "computer_path": {
+        "description": "Destination path on the selected user's computer. Absolute, or relative to that computer's working directory. Omit to land it under its original filename in that directory.",
+        "minLength": 1,
+        "type": "string"
+      },
+      "machineId": {
+        "description": "Registered machine identifier.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "box_path",
+      "machineId"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "CopyFromBox"
+}

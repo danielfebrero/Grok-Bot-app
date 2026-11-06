@@ -1,0 +1,9 @@
+{
+  "description": "List the user's registered machines with their machineId, label, kind (desktop, ios, or android), and current local-exec connection status. Pass a desktop's machineId to Shell, Read, or AwaitShell to use that machine instead of the box, or to CopyToBox and CopyFromBox for file transfers; a phone never takes those tools. A connected phone, or a connected desktop that offers an on-device tool such as location, lists deviceLocalTools, each on-device tool with its state: ready, needs_permission (the machine can still ask for the OS permission), denied (only the machine's Settings app can grant it), or unavailable. A call to a tool still missing its permission posts a permission card in the chat for the user to tap; a machine without deviceLocalTools offers none right now. Messages the user sends from their desktop app carry a \"[Sent from machine <machineId>]\" note naming the machine they are on; when they don't say which machine to use, default to the one their latest message was sent from.",
+  "inputSchema": {
+    "properties": {},
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "ListMachines"
+}
