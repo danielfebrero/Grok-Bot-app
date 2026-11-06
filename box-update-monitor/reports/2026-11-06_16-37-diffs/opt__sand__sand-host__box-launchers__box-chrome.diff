@@ -1,0 +1,51 @@
+--- 2026-11-06_11-50:/opt/sand/sand-host/box-launchers/box-chrome
++++ 2026-11-06_16-37:/opt/sand/sand-host/box-launchers/box-chrome
+@@ -226,8 +226,12 @@
+ ungoogled-chromium) CHROME_BIN="${UNGOOGLED_CHROMIUM}" ;;
+ *) CHROME_BIN=google-chrome-stable ;;
+ esac
+-SAND_BOX_BROWSER_NO_LOCAL_DNS="${SAND_BOX_BROWSER_NO_LOCAL_DNS:-0}"
+-if [ -e "${SAND_BOX_BROWSER_NO_LOCAL_DNS_FILE:-/tmp/sand-box-browser-no-local-dns}" ]; then
++SAND_UNGOOGLED_FLAGS_ON=0
++if [ -e "${SAND_BOX_BROWSER_UNGOOGLED_FLAGS_FILE:-/tmp/sand-box-browser-ungoogled-flags}" ] && [ "${SAND_BOX_BROWSER_UNGOOGLED_FLAGS:-}" != 0 ]; then
++	SAND_UNGOOGLED_FLAGS_ON=1
++fi
++SAND_BOX_BROWSER_NO_LOCAL_DNS="${SAND_BOX_BROWSER_NO_LOCAL_DNS:-}"
++if [ -z "${SAND_BOX_BROWSER_NO_LOCAL_DNS}" ] && [ -e "${SAND_BOX_BROWSER_NO_LOCAL_DNS_FILE:-/tmp/sand-box-browser-no-local-dns}" ]; then
+ 	SAND_BOX_BROWSER_NO_LOCAL_DNS=1
+ fi
+ if [ "${SAND_BOX_BROWSER_NO_LOCAL_DNS}" = "1" ] && [ -n "${SAND_EGRESS_PROXY_BYPASS_FLAG:-}" ]; then
+@@ -241,11 +245,11 @@
+ if [ "${SAND_CHROME_DISABLE_QUIC}" = "1" ]; then
+ 	CHROME_FLAGS+=(--disable-quic)
+ fi
+-SAND_BOX_BROWSER_NO_SWIFTSHADER="${SAND_BOX_BROWSER_NO_SWIFTSHADER:-0}"
++SAND_BOX_BROWSER_NO_SWIFTSHADER="${SAND_BOX_BROWSER_NO_SWIFTSHADER:-}"
+ SAND_NO_SWIFTSHADER_FILE="${SAND_BOX_BROWSER_NO_SWIFTSHADER_FILE:-/tmp/sand-box-browser-no-swiftshader}"
+ SAND_NO_SWIFTSHADER_MODE=""
+ if [ -e "${SAND_NO_SWIFTSHADER_FILE}" ]; then
+-	SAND_BOX_BROWSER_NO_SWIFTSHADER=1
++	[ "${SAND_BOX_BROWSER_NO_SWIFTSHADER}" = 0 ] || SAND_BOX_BROWSER_NO_SWIFTSHADER=1
+ 	[ ! -f "${SAND_NO_SWIFTSHADER_FILE}" ] || read -r SAND_NO_SWIFTSHADER_MODE 2>/dev/null <"${SAND_NO_SWIFTSHADER_FILE}" || true
+ fi
+ if [ "${SAND_BOX_BROWSER_NO_SWIFTSHADER}" = "1" ] && [ -n "${SAND_SWIFTSHADER_FLAG:-}" ]; then
+@@ -303,7 +307,7 @@
+ }
+ SAND_BROWSER_ACCEPT_LANGUAGE_FILE="${SAND_BROWSER_ACCEPT_LANGUAGE_EN_US_FILE:-/tmp/sand-browser-accept-language-en-us}"
+ SAND_ACCEPT_LANGUAGE_FLAGGED=0
+-if [ -e "${SAND_BROWSER_ACCEPT_LANGUAGE_FILE}" ]; then
++if [ -e "${SAND_BROWSER_ACCEPT_LANGUAGE_FILE}" ] && [ "${SAND_BROWSER_ACCEPT_LANGUAGE_EN_US:-}" != 0 ]; then
+ 	SAND_ACCEPT_LANGUAGE_FLAGGED=1
+ 	CHROME_FLAGS+=(--accept-lang="$(sand_accept_language "${SAND_BROWSER_ACCEPT_LANGUAGE_FILE}")")
+ fi
+@@ -486,7 +490,9 @@
+ BOX_BROWSER_CGROUP_ENTER=/usr/local/bin/box-browser-cgroup-enter.sh
+ launch_chrome() {
+ 	local flags=("${CHROME_FLAGS[@]}") env=("${CHROME_ENV[@]}") leaf=()
+-	[ "${CHROME_BIN}" != "${UNGOOGLED_CHROMIUM}" ] || flags+=("${UNGOOGLED_CHROMIUM_FLAGS[@]}")
++	if [ "${CHROME_BIN}" = "${UNGOOGLED_CHROMIUM}" ] || [ "${SAND_UNGOOGLED_FLAGS_ON}" = 1 ]; then
++		flags+=("${UNGOOGLED_CHROMIUM_FLAGS[@]}")
++	fi
+ 	merge_disable_features flags
+ 	[ -z "${CHROME_TMPDIR:-}" ] || [ ! -d "${CHROME_TMPDIR}" ] || env+=(TMPDIR="${CHROME_TMPDIR}")
+ 	[ ! -x "${BOX_BROWSER_CGROUP_ENTER}" ] || leaf=("${BOX_BROWSER_CGROUP_ENTER}" --exec --)

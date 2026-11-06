@@ -1,0 +1,18 @@
+--- 2026-11-06_11-50:/opt/sand/sand-host/extensions/content-search/search-index-worker.cjs
++++ 2026-11-06_16-37:/opt/sand/sand-host/extensions/content-search/search-index-worker.cjs
+@@ -936,6 +936,7 @@
+ var SAND_ACK_OBLIGATIONS_FILE_NAME = "ack-obligations.json";
+ var SAND_PENDING_WAKE_FILE_NAME = "host-pending-wakes.json";
+ var SAND_DISK_PRESSURE_REMINDERS_FILE_NAME = "host-disk-pressure-reminders.json";
++var SAND_LAST_TEAM_LOCAL_EGRESS_MODE_FILE_NAME = "last-team-local-egress-mode";
+ var SAND_DATA_HOST_OWNED_FILE_NAMES = [
+   "gateway.json",
+   "webhook-keys.json",
+@@ -948,6 +949,7 @@
+   SAND_PENDING_WAKE_FILE_NAME,
+   SAND_DISK_PRESSURE_REMINDERS_FILE_NAME,
+   "sand-statsig-bootstrap.json",
++  `${SAND_LAST_TEAM_LOCAL_EGRESS_MODE_FILE_NAME}.*`,
+   ...SAND_DATA_HOST_OWNED_FILE_NAMES.map((name) => `${name}.*`)
+ ];
+ function hostNoFollowRoot(nonLinuxRoot) {

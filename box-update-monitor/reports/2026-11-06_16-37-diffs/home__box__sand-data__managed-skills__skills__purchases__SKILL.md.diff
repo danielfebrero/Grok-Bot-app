@@ -1,0 +1,11 @@
+--- 2026-11-06_11-50:/home/box/sand-data/managed-skills/skills/purchases/SKILL.md
++++ 2026-11-06_16-37:/home/box/sand-data/managed-skills/skills/purchases/SKILL.md
+@@ -39,7 +39,7 @@
+ ## The user's X Money
+ - For anything about the user's X Money, such as their balance, activity, sending money, or their X Money Card, use the X Money plugin, never money.x.com in your browser.
+ - When its tools aren't among yours this turn, call InstallPlugin with plugin_id 68516160 without asking first. If it is installed but its server needsAuth, call AuthenticateMcpServer on it instead. It connects through their X account when it can, and otherwise its connect card shows.
+-- Ask before installing it instead when they removed X Money or told you not to install it, on a team bot, or in a routine run with nobody there to answer.
++- Ask before installing it instead when they removed X Money or told you not to install it, or in a routine run with nobody there to answer.
+ 
+ ## Credit cards
+ Follow this whenever the user's own credit card comes up, before or at checkout, whatever an earlier message in the conversation said. The user keeps their cards in their vault, and RequestUserForm for a card is the only way to save one. Any other RequestUserForm saves no card, so never use one to take or keep a card. Card details or photos they send in chat are fine to accept and use for the purchase, but they are not saved, so never say a card is saved, or that you'll keep it, until the card form's receipt says so.

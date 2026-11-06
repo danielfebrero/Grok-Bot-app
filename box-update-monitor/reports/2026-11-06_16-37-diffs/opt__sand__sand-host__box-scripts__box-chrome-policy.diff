@@ -1,0 +1,47 @@
+--- 2026-11-06_11-50:/opt/sand/sand-host/box-scripts/box-chrome-policy
++++ 2026-11-06_16-37:/opt/sand/sand-host/box-scripts/box-chrome-policy
+@@ -1,15 +1,22 @@
+ #!/usr/bin/env bash
+-# Chrome resolves /etc/opt/chrome/policies/managed per policy key with the
+-# lexicographically last file winning the whole key
+-# (https://chromium.googlesource.com/chromium/src/+/151.0.7922.169/components/policy/core/common/config_dir_policy_loader.cc),
+-# uninstalls a force-installed extension that leaves the effective
+-# ExtensionInstallForcelist
+-# (https://chromium.googlesource.com/chromium/src/+/151.0.7922.169/components/policy/resources/templates/policy_definitions/Extensions/ExtensionInstallForcelist.yaml),
+-# and folds forcelist entries into the same per-extension map as
++# Chrome loads each JSON file under /etc/opt/chrome/policies/managed as one
++# platform source. The lexicographically last file wins a key and keeps the
++# earlier value as a conflict
++# (https://chromium.googlesource.com/chromium/src/+/151.0.7922.169/components/policy/core/common/config_dir_policy_loader.cc).
++# PolicyDictionaryMultipleSourceMergeList then merges a listed dictionary
++# across those conflicts. ExtensionSettings is one of the dictionaries Chrome
++# merges this way
++# (https://chromium.googlesource.com/chromium/src/+/151.0.7922.169/components/policy/core/common/policy_merger.cc,
++# https://support.google.com/chrome/a/answer/9037717).
++# ExtensionInstallForcelist is not merged across those files, and an extension
++# that leaves the winning list is uninstalled
++# (https://chromium.googlesource.com/chromium/src/+/151.0.7922.169/components/policy/resources/templates/policy_definitions/Extensions/ExtensionInstallForcelist.yaml).
++# Forcelist entries still fold into the same per-extension map as
+ # ExtensionSettings
+-# (https://chromium.googlesource.com/chromium/src/+/151.0.7922.169/chrome/browser/extensions/extension_management.cc),
+-# so this file writes the whole ExtensionSettings map: every Sand extension
+-# entry lives in this one file.
++# (https://chromium.googlesource.com/chromium/src/+/151.0.7922.169/chrome/browser/extensions/extension_management.cc).
++# Sand's entries stay in this file's ExtensionSettings, and the file lists
++# that policy for dictionary merge so another managed file's map is combined
++# with them.
+ set -u
+ 
+ policy_file="${SAND_WEBAUTHN_POLICY_FILE:-/etc/opt/chrome/policies/managed/sand-webauthn.json}"
+@@ -136,8 +143,10 @@
+ 		"${onepassword_id}")"
+ fi
+ 
++# https://chromeenterprise.google/policies/#PolicyDictionaryMultipleSourceMergeList
++extension_merge='"PolicyDictionaryMultipleSourceMergeList":["ExtensionSettings"]'
+ if [ -n "${entries}" ]; then
+-	write_policy "${policy_file}" "$(printf '{"ExtensionSettings":{%s}%s%s,%s%s}' "${entries}" "${devtools}" "${onepassword_policy}" "${restore}" "${webrtc:+,${webrtc}}")" || exit_unapplied 1
++	write_policy "${policy_file}" "$(printf '{%s,"ExtensionSettings":{%s}%s%s,%s%s}' "${extension_merge}" "${entries}" "${devtools}" "${onepassword_policy}" "${restore}" "${webrtc:+,${webrtc}}")" || exit_unapplied 1
+ else
+ 	write_policy "${policy_file}" "$(printf '{%s%s}' "${restore}" "${webrtc:+,${webrtc}}")" || exit_unapplied 1
+ fi

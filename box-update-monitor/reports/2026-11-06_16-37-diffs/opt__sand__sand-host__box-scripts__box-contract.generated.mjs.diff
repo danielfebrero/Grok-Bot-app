@@ -1,0 +1,16 @@
+--- 2026-11-06_11-50:/opt/sand/sand-host/box-scripts/box-contract.generated.mjs
++++ 2026-11-06_16-37:/opt/sand/sand-host/box-scripts/box-contract.generated.mjs
+@@ -1,4 +1,4 @@
+-// @generated SignedSource<<3aed02530e99587cedd474017748b9940e1e41f128dd0c0eae4d9d6b03424f01>>
++// @generated SignedSource<<fb47aa00d02442f2656b74f623c9e91008e4f3d26054fe33874bcaa30361e286>>
+ // Emitted by scripts/gen-box-contract.mts from sand/src/shared/box/box-contract.ts;
+ // regenerate with `pnpm --filter sand run gen:box-contract`.
+ export const CURSOR_AGENT_SOCKET_ENV_VAR = "CURSOR_AGENT_SOCKET";
+@@ -8,6 +8,7 @@
+ export const GROK_BOT_BOX_HOST_ATTESTATION_SOCKET_PATH = "/v1/attestations/sand-box-credential-use";
+ export const BOX_BROWSER_COHERENT_FINGERPRINT_MARKER_PATH = "/tmp/sand-box-browser-coherent-fingerprint";
+ export const BOX_BROWSER_UNGOOGLED_MARKER_PATH = "/tmp/sand-box-browser-ungoogled";
++export const BOX_BROWSER_UNGOOGLED_FLAGS_MARKER_PATH = "/tmp/sand-box-browser-ungoogled-flags";
+ export const BOX_EXPERIMENTS_READY_MARKER_PATH = "/tmp/sand-box-experiments-ready";
+ export const EGRESS_TUNNEL_FAIL_CLOSED_MARKER_PATH = "/tmp/sand-egress-tunnel-fail-closed";
+ export const BOX_BROWSER_WEBRTC_PROXY_ONLY_MARKER_PATH = "/tmp/sand-box-browser-webrtc-proxy-only";

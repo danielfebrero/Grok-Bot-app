@@ -1,0 +1,20 @@
+--- 2026-11-06_11-50:/opt/sand/sand-host/box-runtime/manifest.json
++++ 2026-11-06_16-37:/opt/sand/sand-host/box-runtime/manifest.json
+@@ -2,7 +2,7 @@
+   "files": [
+     {
+       "name": "box-contract.generated.mjs",
+-      "sha256": "8688aa645ea4810170d37d0df3b43957b46123b0cafbf17a06db1c7f977bc3e4"
++      "sha256": "d50117d5bde61af9d8262f6fc2828dc332a8b2e6e09030ac27babc26d41ba097"
+     },
+     {
+       "name": "cdp-cookies.mjs",
+@@ -22,7 +22,7 @@
+     },
+     {
+       "name": "sand-egress-tunnel",
+-      "sha256": "0ac6cc2f72d77116ce25eb5291a5a86c1fed7f2344020e02ece1418498586fae"
++      "sha256": "5c7cc6cd240ed43f13f60eff671a251cc3aaa00dd55cf8fd746656d775f44af3"
+     },
+     {
+       "name": "sand-fingerprint-profiles.mjs",
