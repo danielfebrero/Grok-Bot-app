@@ -1,0 +1,322 @@
+--- 2026-11-07_05-44:/opt/sand/sand-host/box-runtime/sand-locale-consistency.mjs
++++ 2026-11-07_16-49:/opt/sand/sand-host/box-runtime/sand-locale-consistency.mjs
+@@ -0,0 +1,319 @@
++import { existsSync, renameSync, rmSync, writeFileSync } from "node:fs";
++
++import {
++  BOX_WALL_EVIDENCE_RECORDERS_MARKER_PATH,
++  browserLocaleConsistencyPath,
++  LOCALE_CONSISTENCY_TZ_DELTA_KEY,
++  LOCALE_CONSISTENCY_VERSION,
++  LOCALE_CONSISTENCY_VERSION_KEY,
++} from "./box-contract.generated.mjs";
++import {
++  chromeBrowserArgsForPort,
++  EgressGeoError,
++  egressErrorCode,
++  egressProxyForPort,
++  readBoxTimeZone,
++  readZoneLinks,
++  readZonesByCountry,
++  requestText,
++} from "./sand-egress-timezone.mjs";
++import { isKnownTimeZone } from "./sand-locale-match.mjs";
++
++export const EXIT_COUNTRY_TRACE = Object.freeze({
++  host: "one.one.one.one",
++  path: "/cdn-cgi/trace",
++});
++export const LOCALE_CONSISTENCY_RETRY_MS = Object.freeze([5_000, 30_000, 120_000, 300_000]);
++export const CHROME_DEFAULT_UI_LOCALE = "en-US";
++
++const COUNTRY_CODE_RE = /^[A-Z]{2}$/;
++const CLOUDFLARE_NON_COUNTRIES = new Set(["XX", "T1"]);
++const LANGUAGE_TAG_RE = /^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{1,8})*$/;
++const UI_LOCALE_FLAG = "--lang=";
++
++function unlessRangeError(error) {
++  if (error instanceof RangeError) return undefined;
++  throw error;
++}
++
++export function parseTraceCountry(body) {
++  for (const line of String(body ?? "").split("\n")) {
++    if (!line.startsWith("loc=")) continue;
++    const code = line.slice("loc=".length).trim();
++    return COUNTRY_CODE_RE.test(code) && !CLOUDFLARE_NON_COUNTRIES.has(code) ? code : undefined;
++  }
++  return undefined;
++}
++
++export async function lookupExitCountry({
++  port,
++  userAgent,
++  proxyForPort = egressProxyForPort,
++  request = requestText,
++}) {
++  const proxy = proxyForPort(port);
++  const country = parseTraceCountry(
++    await request({ ...EXIT_COUNTRY_TRACE, proxy, accept: "text/plain", userAgent }),
++  );
++  if (country === undefined) throw new EgressGeoError("no_country");
++  return country;
++}
++
++export function chromeUiLocale(port, browserArgsForPort = chromeBrowserArgsForPort) {
++  const args = browserArgsForPort(port);
++  if (args === undefined) return undefined;
++  const flag = args.findLast((arg) => arg.startsWith(UI_LOCALE_FLAG));
++  return flag === undefined ? CHROME_DEFAULT_UI_LOCALE : flag.slice(UI_LOCALE_FLAG.length);
++}
++
++export function utcOffsetMinutes(timeZone, atMs) {
++  let name;
++  try {
++    name = new Intl.DateTimeFormat("en-US", { timeZone, timeZoneName: "longOffset" })
++      .formatToParts(atMs)
++      .find((part) => part.type === "timeZoneName")?.value;
++  } catch (error) {
++    return unlessRangeError(error);
++  }
++  const match = /^GMT(?:([+-])(\d{2}):(\d{2}))?$/.exec(name ?? "");
++  if (match === null) return undefined;
++  if (match[1] === undefined) return 0;
++  const minutes = Number(match[2]) * 60 + Number(match[3]);
++  return match[1] === "-" ? -minutes : minutes;
++}
++
++export function tzDeltaBucket(deltaMinutes) {
++  if (deltaMinutes === 0) return "0";
++  const hours = deltaMinutes / 60;
++  if (hours <= 1.5) return "1";
++  if (hours <= 3.5) return "2-3";
++  if (hours <= 6.5) return "4-6";
++  return "7-plus";
++}
++
++function languageTags(languages) {
++  return languages.flatMap((entry) => {
++    const tag = String(entry).split(";")[0]?.trim() ?? "";
++    if (!LANGUAGE_TAG_RE.test(tag)) return [];
++    try {
++      const locale = new Intl.Locale(tag);
++      return [{ language: locale.language, region: locale.region }];
++    } catch (error) {
++      return unlessRangeError(error) ?? [];
++    }
++  });
++}
++
++function likelyLanguage(country) {
++  try {
++    const locale = new Intl.Locale(`und-${country}`).maximize();
++    return locale.region === country ? locale.language : undefined;
++  } catch (error) {
++    return unlessRangeError(error);
++  }
++}
++
++function mismatchVerdict(tags, country) {
++  if (country === undefined || tags.length === 0) return "unknown";
++  if (tags.some((tag) => tag.region === country)) return "false";
++  const likely = likelyLanguage(country);
++  if (likely === undefined) return "unknown";
++  return tags.some((tag) => tag.language === likely) ? "false" : "true";
++}
++
++function zoneNames(timeZone, zoneLinks) {
++  const names = new Set([timeZone]);
++  const linked = zoneLinks.get(timeZone);
++  if (linked !== undefined) names.add(linked);
++  try {
++    names.add(new Intl.DateTimeFormat("en-US", { timeZone }).resolvedOptions().timeZone);
++  } catch (error) {
++    unlessRangeError(error);
++  }
++  return [...names];
++}
++
++function countryOfZone(timeZone, zonesByCountry, zoneLinks) {
++  const names = zoneNames(timeZone, zoneLinks);
++  for (const [country, zones] of zonesByCountry) {
++    if (COUNTRY_CODE_RE.test(country) && zones.some((zone) => names.includes(zone))) {
++      return country;
++    }
++  }
++  return undefined;
++}
++
++function nearestOffsetDelta(timeZone, zones, atMs) {
++  const own = utcOffsetMinutes(timeZone, atMs);
++  if (own === undefined) return undefined;
++  let best;
++  for (const zone of zones) {
++    const offset = utcOffsetMinutes(zone, atMs);
++    if (offset === undefined) continue;
++    const delta = Math.abs(own - offset);
++    if (best === undefined || delta < best) best = delta;
++  }
++  return best;
++}
++
++export function localeConsistencyVerdicts({
++  exitCountry,
++  timeZone,
++  languages,
++  zonesByCountry,
++  zoneLinks = new Map(),
++  atMs,
++}) {
++  const tags = languageTags(languages ?? []);
++  const zone = isKnownTimeZone(timeZone) ? timeZone : undefined;
++  const exitZones = exitCountry === undefined ? [] : (zonesByCountry.get(exitCountry) ?? []);
++  const delta =
++    zone === undefined || exitZones.length === 0
++      ? undefined
++      : nearestOffsetDelta(zone, exitZones, atMs);
++  return {
++    ip_tz_mismatch: delta === undefined ? "unknown" : String(delta !== 0),
++    ip_lang_mismatch: mismatchVerdict(tags, exitCountry),
++    tz_lang_mismatch: mismatchVerdict(
++      tags,
++      zone === undefined ? undefined : countryOfZone(zone, zonesByCountry, zoneLinks),
++    ),
++    ...(delta === undefined ? {} : { [LOCALE_CONSISTENCY_TZ_DELTA_KEY]: tzDeltaBucket(delta) }),
++  };
++}
++
++export function localeConsistencyRecord(verdicts) {
++  return `${Object.entries({
++    [LOCALE_CONSISTENCY_VERSION_KEY]: LOCALE_CONSISTENCY_VERSION,
++    ...verdicts,
++  })
++    .map(([key, value]) => `${key}=${value}`)
++    .join(" ")}\n`;
++}
++
++function writeAtomically(path, text) {
++  const tmp = `${path}.${process.pid}.tmp`;
++  try {
++    writeFileSync(tmp, text, { encoding: "utf8", mode: 0o644 });
++    renameSync(tmp, path);
++  } catch (error) {
++    rmSync(tmp, { force: true });
++    throw error;
++  }
++}
++
++export function removeLocaleConsistency(port, remove = rmSync) {
++  try {
++    remove(browserLocaleConsistencyPath(port), { force: true });
++  } catch (error) {
++    console.error(`locale consistency clear failed port=${port}: ${egressErrorCode(error)}`);
++  }
++}
++
++export function startLocaleConsistency(
++  browser,
++  {
++    languages,
++    lookupCountry = ({ port }) => lookupExitCountry({ port }),
++    timeZone = () => browser.egressTimeZone ?? readBoxTimeZone(),
++    uiLocale = () => chromeUiLocale(browser.port),
++    zonesByCountry = readZonesByCountry,
++    zoneLinks = readZoneLinks,
++    markerPresent = () => existsSync(BOX_WALL_EVIDENCE_RECORDERS_MARKER_PATH),
++    write = (text) => writeAtomically(browserLocaleConsistencyPath(browser.port), text),
++    remove = () => removeLocaleConsistency(browser.port),
++    report = (message) => console.error(message),
++    now = Date.now,
++  },
++) {
++  browser.localeConsistency = {
++    languages,
++    lookupCountry,
++    timeZone,
++    uiLocale,
++    zonesByCountry,
++    zoneLinks,
++    markerPresent,
++    write,
++    remove,
++    report,
++    exitCountry: undefined,
++    zones: undefined,
++    links: undefined,
++    locale: undefined,
++    attempts: 0,
++    nextAttemptAt: now(),
++    inFlight: null,
++    written: undefined,
++  };
++  remove();
++  return tickLocaleConsistency(browser, { now });
++}
++
++function writeVerdicts(browser, state, atMs) {
++  try {
++    state.zones ??= state.zonesByCountry();
++    state.links ??= state.zoneLinks();
++    state.locale ??= state.uiLocale() ?? null;
++    const languageList = state.languages();
++    const languages = [];
++    if (languageList != null) {
++      languages.push(...String(languageList).split(","));
++      if (state.locale != null) languages.push(state.locale);
++    }
++    const record = localeConsistencyRecord(
++      localeConsistencyVerdicts({
++        exitCountry: state.exitCountry,
++        timeZone: state.timeZone(),
++        languages,
++        zonesByCountry: state.zones,
++        zoneLinks: state.links,
++        atMs,
++      }),
++    );
++    if (record === state.written) return;
++    state.write(record);
++    state.written = record;
++  } catch (error) {
++    state.report(`locale consistency write failed port=${browser.port}: ${egressErrorCode(error)}`);
++  }
++}
++
++export function tickLocaleConsistency(browser, { now = Date.now } = {}) {
++  const state = browser.localeConsistency;
++  if (state == null || browser.isClosed) return null;
++  if (!state.markerPresent()) {
++    if (state.written !== undefined) {
++      state.remove();
++      state.written = undefined;
++    }
++    return state.inFlight;
++  }
++  writeVerdicts(browser, state, now());
++  if (
++    state.exitCountry !== undefined ||
++    state.inFlight != null ||
++    state.attempts > LOCALE_CONSISTENCY_RETRY_MS.length ||
++    now() < state.nextAttemptAt
++  ) {
++    return state.inFlight;
++  }
++  state.inFlight = (async () => {
++    try {
++      const country = await state.lookupCountry({ port: browser.port });
++      if (browser.isClosed) return;
++      state.exitCountry = country;
++      if (state.markerPresent()) writeVerdicts(browser, state, now());
++    } catch (error) {
++      state.report(
++        `locale consistency exit country unresolved port=${browser.port}: ${egressErrorCode(error)}`,
++      );
++      const retry = LOCALE_CONSISTENCY_RETRY_MS[state.attempts];
++      state.attempts += 1;
++      if (retry !== undefined) state.nextAttemptAt = now() + retry;
++    } finally {
++      state.inFlight = null;
++    }
++  })();
++  return state.inFlight;
++}

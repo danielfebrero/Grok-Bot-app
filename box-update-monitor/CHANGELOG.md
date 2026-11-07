@@ -9,6 +9,17 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-11-07 16:49 (Paris) — snapshot `2026-11-07_05-44` → `2026-11-07_16-49`
+
+**Hot-update sand-host `0299e17` → `fa1d911`** (supervisor `upgrade-fa1d911`, `pendingUpgradeVersion` = None) + rafraîchissement des skills gérées. Image `fcbae14`, box-scripts `fcbae14`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, agent-store-fuse `1a304ccc`, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +3 / −0 / ~15.
+
+- **Features (browser / locale)** : nouveau module `sand-locale-consistency.mjs` (`locale-consistency/v1`) — vérifie la cohérence IP / fuseau / langue de la sortie egress (checks `ip_tz_mismatch`, `ip_lang_mismatch`, `tz_lang_mismatch` ; buckets `ip_tz_delta_h` : `0` / `1` / `2-3` / `4-6` / `7-plus`). Pays de sortie via Cloudflare `one.one.one.one/cdn-cgi/trace` ; écrit `/tmp/sand-browser-locale-consistency-<port>` (constante `BROWSER_LOCALE_CONSISTENCY_MAX_BYTES` = 256).
+- **Change (timezone)** : nouveau gate « timezone follows exit » (marqueur `/tmp/sand-browser-timezone-follows-exit`) ; recheck toutes les 300 s (`EGRESS_TIME_ZONE_RECHECK_MS`) ; pin de timezone par session CDP (héritage parent→enfant, réapplication à la navigation, pas same-document). `sand-egress-timezone.mjs` : `chromeBrowserArgsForPort`, `egressProxyForPort`, `readZoneLinks` (`tzdata.zi`), split `requestText` / `requestJson`.
+- **Autre-infra** : `host-main.cjs` (33 451 013 → 33 667 703 o), `sand-eval-runner.cjs` (27 438 042 → 27 639 748 o), `sand-egress-tunnel` (binaire, 2 967 936 → 2 986 360 o), `box-runtime/manifest.json` (+ `sand-locale-consistency.mjs`). Les copies `box-scripts/` des `.mjs` concernés sont le miroir de `box-runtime/`.
+- **Skills gérées** : `cache.json` rafraîchi ; **ajout** `site-playbooks-booking` (Booking.com : recherche d’hébergements + réservation d’une chambre choisie) ; `accommodation-booking` pointe aussi vers ce playbook ; `shopping` : cartes produits aussi pour une source hors ProductSearch (rapport browser, page web, connecteur ex. Gopuff) + screenshot à côté des cartes ; `shopping-connectors` : cartes Gopuff via `get_products`, checkout via le connecteur depuis une Checkout sheet, suivi de commande via routine `@every 5m` (Gopuff `get_order_status`, deadline 3 h).
+
+Rapport : [reports/2026-11-07_16-49.md](reports/2026-11-07_16-49.md).
+
 ## 2026-11-07 05:44 (Paris) — snapshot `2026-11-07_04-54` → `2026-11-07_05-44`
 
 **Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `403cbf1870e714372dc6106e1c57bc6e502d1bb3` → `1a304ccc6faeca18ca982a6837406844b24262f2` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`). Toutes les autres versions plateforme inchangées (image `fcbae14`, box-scripts `fcbae14`, sand-host `0299e17` (supervisor `upgrade-0299e17`, `pendingUpgradeVersion` = None), exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7). Fichiers : +0 / −0 / ~1.

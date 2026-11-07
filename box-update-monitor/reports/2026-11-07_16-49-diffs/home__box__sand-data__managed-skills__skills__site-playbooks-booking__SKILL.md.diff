@@ -1,0 +1,142 @@
+--- 2026-11-07_05-44:/home/box/sand-data/managed-skills/skills/site-playbooks-booking/SKILL.md
++++ 2026-11-07_16-49:/home/box/sand-data/managed-skills/skills/site-playbooks-booking/SKILL.md
+@@ -0,0 +1,139 @@
++---
++name: site-playbooks-booking
++description: >-
++  Booking.com site playbook: search stays or book a picked room;
++ not existing
++  bookings.
++---
++# Site playbook: Booking.com
++
++Read this before you dispatch a computerUse subagent to this site. Follow the Fastest path, fill in every URL you know, then paste the Dispatch snippet into the Task text as written. The subagent does not read skills, so every rule it needs is in the snippet, including the ground rules at its end. Secrets never go in the Task text. They come through `RequestUserForm`.
++
++Jobs in this file: Booking.com stay search;
++ Booking.com booking a picked room.
++
++## Booking.com stay search
++
++### When to use
++
++The user wants hotels, apartments, or other stays on Booking.com for a place and dates, or one property's rooms and rates. The parent needs the destination with its region and country, check-in and check-out dates, adults, each child's age, and rooms, plus any sort or filters. The user gets each property's name, stars, review score, distance, the room shown, nightly price and stay total, cancellation and prepayment terms, and its hotel link, and for a named property its room table.
++
++### Fastest path
++
++A results link needs `dest_id` and `dest_type`. A destination name in `ss` without them redirects to the home page with `errorc_searchstring_not_found=ss` in its URL, however it is spelled. The home page link takes the same dates and guests and prefills them, so only the destination is typed. Each option shows the place on its first line and the region and country on its second, so a city name that several states or countries share lists each one, and the last option is "Search with AI". Search then opens results whose URL carries `dest_id` and `dest_type`.
++
++```
++https://www.booking.com/searchresults.html
++  ?dest_id={
++DEST_ID}
++
++  &dest_type={
++DEST_TYPE}
++           # city for a city
++  &checkin={
++YYYY-MM-DD}
++
++  &checkout={
++YYYY-MM-DD}
++
++  &group_adults={
++ADULTS}
++
++  &group_children={
++CHILDREN}
++
++  &age={
++AGE}
++                       # once per child
++  &no_rooms={
++ROOMS}
++
++  &lang=en-us&selected_currency=USD
++  &order=price                     # optional: lowest price first
++  &nflt={
++FILTERS}
++                  # optional
++```
++
++Send both dates in order and one `age` per child, since the room and price follow the ages. Without dates the page reuses the session's last search dates, or tonight's in a fresh session. Reversed dates or an unknown `dest_id` open a page with no heading and no cards.
++
++`nflt` joins filters with `%3B`: `class%3D4` for 4 stars (`class%3D4%3Bclass%3D5` for 4 or 5), `review_score%3D80` for 8+ (or `70`, `90`), `fc%3D2` for free cancellation, `fc%3D4` for book without credit card, and `price%3DUSD-min-150-1` for up to $150 a night.
++
++Put the `dest_id` and `dest_type` a report returns into later dispatches for the same place, which skips the home page.
++
++### Dispatch snippet
++
++```
++Close the "Sign in, save money" dialog with its X whenever it shows.
++If this task gives a dest_id, open https://www.booking.com/searchresults.html?dest_id=<DEST_ID>&dest_type=<DEST_TYPE>&checkin=<YYYY-MM-DD>&checkout=<YYYY-MM-DD>&group_adults=<ADULTS>&group_children=<CHILDREN><&age=AGE per child>&no_rooms=<ROOMS>&lang=en-us&selected_currency=USD<&order=price><&nflt=FILTERS>
++Otherwise open https://www.booking.com/index.html?checkin=<YYYY-MM-DD>&checkout=<YYYY-MM-DD>&group_adults=<ADULTS>&group_children=<CHILDREN><&age=AGE per child>&no_rooms=<ROOMS>&lang=en-us&selected_currency=USD, type <DESTINATION> in the search box, and pick the option whose second line names <REGION, COUNTRY>, never "Search with AI". Press Search, read dest_id and dest_type from the URL, and when this task sets a sort or filters, open the link above with them.
++Check the heading reads "<place>: N properties found" and the search box shows <CHECK-IN>, <CHECK-OUT>, and the guests. On the home page or a page with no heading, report link_error with the URL and stop.
++Scroll down twice. Skip cards marked "Missing filters". For each card read name, stars, Featured, area and distance, review score and count, room shown, Free cancellation, No prepayment, breakfast, "We have N left", Per night price, stay total with any crossed-out price, nights and guests line, any taxes line, and link path /hotel/<cc>/<slug>.html.
++For each property this task names, open its hotel link with the same query and read every room table row: room type, guests, meal, cancellation deadline, payment terms, No credit card needed, "We have N left", per night and stay prices, and the Excluded taxes.
++Return a table sorted by stay total, dest_id and dest_type, the page URL, and one screenshot path. Read only. Never set Select Rooms or press I'll reserve or Sign in.
++If a captcha, Access Denied, sign-in or password, 2FA, or payment wall appears, stop and report the URL.
++Ground rules for this Task. A Timeout or a net::ERR_* code from browser_navigate means the box cannot reach that host. Do not retry it, even if the tool result says to, and do not run DNS or connectivity checks. Move to the next source this Task names, or report the code and URL. An HTTP block (403, 419, 429, 503) follows this Task's own rule. Work in the tab you start in. Do not open a second tab, and switch tabs only when a tool result names a page you did not intend. In-page tabs are part of the page. A page script is an async (page) => function: run it with browser_run_code if you hold it. Without it, read rendered text from browser_snapshot or browser_find, read a <script> tag from the HTML that curl fetches in the box shell, and report a field neither yields as unreadable, never visible text in its place. Name the read you used. Snapshot a page state once. After a click, a scroll, or a wait this Task calls for, take one new snapshot. Do not snapshot the same state twice. Report as soon as the stop rule above is met, one line per item, only the fields asked for, no page dumps.
++```
++
++### Read the result
++
++The heading reads "<Place>: N properties found". About 15 cards render first and more load as the page scrolls, with no button. Each card has the name with a star row (squares instead of stars are Booking.com's own quality rating for homes, not a hotel class), a Featured label on paid placements, the area with Show on map and the distance from downtown, the review score with its rating word and review count, the room the stay would use, labels such as Free cancellation, No prepayment needed, Breakfast included, and "We have N left at this price", then Per night with a price, the total for the stay with a crossed-out original when discounted, and a line such as "3 nights, 2 adults".
++
++When a filter matches few properties, the matches come first and every card after them says "Missing filters" with the filter it fails.
++
++A hotel link `/hotel/<cc>/<slug>.html` with the same query opens on those dates and guests. Its Availability table has the columns Room type, Number of guests, Your choices, Today's Price, and Select Rooms. One room type spans several rows, one per rate, each with its meal, a cancellation deadline or Non-refundable, Pay online or No prepayment needed, sometimes No credit card needed, a per night price, the stay total, and an "Excluded:" line. "We have N left" sits under the room name.
++
++A stay total on a card or in the table leaves out what the "Excluded:" line names, such as a percentage tax, VAT, or a city tax per person per night. The checkout's Your price summary shows the total with them.
++
++### When blocked
++
++- The first page of a fresh session can answer HTTP 202 with a script that reloads the same URL with `chal_t` and `force_referer` added. It passes on its own within seconds, so wait for the reload instead of navigating again.
++- Tells of a wall are a captcha, Access Denied, or a results page that never fills.
++- After `link_error`, check the link has `dest_id`, `dest_type`, and both dates in order, or send the destination with its region and country so the subagent uses the home page, and dispatch once more. After a block, do not dispatch to Booking.com again;
++ hand the user the results link and use the Expedia playbook for hotels.
++- This page access was checked only from a residential connection, not from the box, so the box may meet a challenge or block that never appeared there. Treat a challenge that does not clear on its own reload as a block.
++- If the page asks for a password, 2FA code, captcha, or payment, stop. Do not solve or bypass. Report which wall appeared and the URL it was on.
++
++## Booking.com booking a picked room
++
++### When to use
++
++The user picked a Booking.com room and rate, from the search section or a pasted hotel link, and none of your tools books it in chat. The parent needs the hotel link path, the dates, adults, each child's age, rooms, and the room type with its rate terms (meal, cancellation, payment). The subagent selects that rate and stops at the first page that asks for guest details, a sign-in, or payment. Fill that page as the `accommodation-booking` skill says and resume the same subagent, which stops again on the last page, before Complete booking.
++
++Your Details asks the main guest's first and last name, email, Country/Region, and a phone number with a country code;
++ a US property also asked Address and City, with Zip optional. "I'm the main guest" is preselected, and "I'm booking for someone else" asks for the guest's name. The other boxes (paperless confirmation by text, car rental, taxi or shuttle, flights) start unchecked, and Special requests and the arrival time are optional.
++
++Some US stays add a Protection step, "Add Travel Protection?", with a priced Yes and No thanks and neither selected. Finish booking shows Your price summary: the Total marked "Includes taxes and fees", Price information listing each tax and any refundable damage deposit, and the amount in the property's currency when it differs. A prepaid rate says "Today you'll pay" in the property's currency, with any city tax left for the stay. A pay-at-the-property rate asks "When do you want to pay?" with Pay when you stay preselected, which still takes a card to hold the room, beside Pay now and a later charge date. Card fields sit in an embedded payment form, next to Apple Pay, Google Pay, PayPal, and Klarna, with a promo code box and an unchecked marketing consent box. The final button is Complete booking.
++
++A rate marked No credit card needed sent the guest to `account.booking.com/sign-in` ("Sign in or create an account") instead of Your Details. Offer another rate of the same room, or follow the `accommodation-booking` skill's sign-in step.
++
++### Fastest path
++
++There is no link past the hotel page, so the rate is selected there. The hotel link with the stay's query opens the table, and I'll reserve ("You won't be charged yet") opens `secure.booking.com/book.html`. Its steps read Your Selection, Your Details, Protection on some stays, and Finish booking, all on `/book.html`.
++
++### Dispatch snippet
++
++```
++Close the "Sign in, save money" dialog with its X whenever it shows.
++Open https://www.booking.com/hotel/<CC>/<SLUG>.html?checkin=<YYYY-MM-DD>&checkout=<YYYY-MM-DD>&group_adults=<ADULTS>&group_children=<CHILDREN><&age=AGE per child>&no_rooms=<ROOMS>&lang=en-us&selected_currency=USD
++If the search box doesn't show <CHECK-IN>, <CHECK-OUT>, and <ADULTS> adults, <CHILDREN> children, <ROOMS> room, report search_mismatch and stop.
++In the availability table find the <ROOM TYPE> row with <RATE TERMS> (meal, cancellation, payment). If none matches, report rate_not_available with the rows offered and stop. Set that row's Select Rooms to <ROOMS> and press I'll reserve.
++Stop at the first page that asks for guest details, a sign-in, or payment. Report its URL, the steps at the top, each field and whether it is required, each checkbox or offer and whether it is set, the room and rate selected, the Total and Price information in Your price summary (taxes, fees, currency, property currency), the cancellation cost, and the button at the bottom, with one screenshot path.
++When resumed with guest details, fill only empty fields from them, leave other boxes unchecked, and press the Next button. On "Add Travel Protection?" pick No thanks unless this task adds it. Stop on the page whose button reads Complete booking, Book now, or Confirm, and report the same items plus the payment choices and which is selected. Never press that button or type a card unless a later message says to.
++On a sign-in page, captcha, Access Denied, or 2FA prompt, stop and report the URL.
++Ground rules for this Task. A Timeout or a net::ERR_* code from browser_navigate means the box cannot reach that host. Do not retry it, even if the tool result says to, and do not run DNS or connectivity checks. Move to the next source this Task names, or report the code and URL. An HTTP block (403, 419, 429, 503) follows this Task's own rule. Work in the tab you start in. Do not open a second tab, and switch tabs only when a tool result names a page you did not intend. In-page tabs are part of the page. A page script is an async (page) => function: run it with browser_run_code if you hold it. Without it, read rendered text from browser_snapshot or browser_find, read a <script> tag from the HTML that curl fetches in the box shell, and report a field neither yields as unreadable, never visible text in its place. Name the read you used. Snapshot a page state once. After a click, a scroll, or a wait this Task calls for, take one new snapshot. Do not snapshot the same state twice. Report as soon as the stop rule above is met, one line per item, only the fields asked for, no page dumps.
++```
++
++### When blocked
++
++- Same tells as the search section.
++- After `search_mismatch` or `rate_not_available`, show the user what the subagent reported and get a new pick before dispatching again. After a block, a sign-in the user won't do, or a site error, do not dispatch again;
++ send the user the dated hotel link.
++- If the page asks for a password, 2FA code, captcha, or payment, stop. Do not solve or bypass. Report which wall appeared and the URL it was on.
++
++## Working with the subagent
++
++Recipe steps name actions, not tools. A page script, a scroll, or a fill lands on whichever browser tools the subagent holds, and the ground rules say how, so paste the snippet as written. A subagent without a page-script tool reads what the snapshot or a shell fetch shows and names that read in its report.
++
++Fill in every URL you know before you dispatch. A dispatch that changes something on the site (a cart, a booking, a form) never goes out without its URL. A read-only lookup may start from a name and a place when its section allows it. When the Fastest path is a shell call, run it with a short timeout and never queue a second lookup behind it. A failed call follows the section's own rule for that response (a single retry, a fresh key, or stop and report);
++ when the section has no rule for it, or the call hangs, dispatch the subagent at once. When the section says the call is unreliable from the box, dispatch in the same round and stop the subagent with `StopSubagent` if the call returns first. A change to a job in flight goes to the same subagent, with `MessageSubagent` while it runs and `Task` with `resume` after it reports. A fresh dispatch spends rounds finding a tab and re-reading the page before it does anything.

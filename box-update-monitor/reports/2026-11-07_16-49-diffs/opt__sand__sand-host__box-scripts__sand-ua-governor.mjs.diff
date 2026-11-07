@@ -1,0 +1,340 @@
+--- 2026-11-07_05-44:/opt/sand/sand-host/box-scripts/sand-ua-governor.mjs
++++ 2026-11-07_16-49:/opt/sand/sand-host/box-scripts/sand-ua-governor.mjs
+@@ -25,6 +25,7 @@
+   BOX_BROWSER_FINGERPRINT_LOG_SITES_PATH,
+   SAND_BOX_CDP_PORT_BASE,
+   BROWSER_EGRESS_TIMEZONE_MARKER_PATH,
++  BROWSER_TIMEZONE_FOLLOWS_EXIT_MARKER_PATH,
+ } from "./box-contract.generated.mjs";
+ import {
+   CDP_ERROR_CODES,
+@@ -49,6 +50,12 @@
+   isBoxClockUtc,
+   resolveEgressTimeZone,
+ } from "./sand-egress-timezone.mjs";
++import {
++  lookupExitCountry,
++  removeLocaleConsistency,
++  startLocaleConsistency,
++  tickLocaleConsistency,
++} from "./sand-locale-consistency.mjs";
+ 
+ const POLL_INTERVAL_MS = 100;
+ const FINGERPRINT_MARKER_MAX_BYTES = 8 * 1024;
+@@ -58,6 +65,7 @@
+ export const EGRESS_TIME_ZONE_ATTACH_WAIT_MS = 3_000;
+ export const EGRESS_TIME_ZONE_RETRY_MS = Object.freeze([5_000, 30_000, 120_000, 300_000]);
+ export const EGRESS_TIME_ZONE_GATE_WAIT_MS = 120_000;
++export const EGRESS_TIME_ZONE_RECHECK_MS = 300_000;
+ 
+ function delay(ms) {
+   return new Promise((resolve) => setTimeout(resolve, ms));
+@@ -346,16 +354,11 @@
+   });
+ }
+ 
+-export function resolveEgressTimeZoneGate({
+-  envValue = process.env.SAND_BROWSER_EGRESS_TIMEZONE,
+-  markerPath = BROWSER_EGRESS_TIMEZONE_MARKER_PATH,
+-  readyMarkerPath = BOX_EXPERIMENTS_READY_MARKER_PATH,
+-  readFile = readFileSync,
+-} = {}) {
++function resolveExperimentMarkerGate({ label, envValue, markerPath, readyMarkerPath, readFile }) {
+   if (envValue != null && String(envValue).trim() !== "") {
+     return MARKER_GATE_ON.has(String(envValue).trim().toLowerCase()) ? "on" : "off";
+   }
+-  if (resolveMarkerGate({ label: "egress time zone", markerPath, readFile })) return "on";
++  if (resolveMarkerGate({ label, markerPath, readFile })) return "on";
+   const ready = resolveMarkerGate({
+     label: "experiments ready",
+     markerPath: readyMarkerPath,
+@@ -364,6 +367,34 @@
+   return ready ? "off" : "undecided";
+ }
+ 
++export function resolveEgressTimeZoneGate({
++  envValue = process.env.SAND_BROWSER_EGRESS_TIMEZONE,
++  markerPath = BROWSER_EGRESS_TIMEZONE_MARKER_PATH,
++  readyMarkerPath = BOX_EXPERIMENTS_READY_MARKER_PATH,
++  readFile = readFileSync,
++} = {}) {
++  return resolveExperimentMarkerGate({
++    label: "egress time zone",
++    envValue,
++    markerPath,
++    readyMarkerPath,
++    readFile,
++  });
++}
++
++export function resolveTimeZoneFollowsExitGate({
++  markerPath = BROWSER_TIMEZONE_FOLLOWS_EXIT_MARKER_PATH,
++  readyMarkerPath = BOX_EXPERIMENTS_READY_MARKER_PATH,
++  readFile = readFileSync,
++} = {}) {
++  return resolveExperimentMarkerGate({
++    label: "time zone follows exit",
++    markerPath,
++    readyMarkerPath,
++    readFile,
++  });
++}
++
+ export function coherentHardwareProfileEnabledForBrowser(
+   browser,
+   resolve = resolveCoherentHardwareProfileEnabled,
+@@ -971,6 +1002,12 @@
+   return null;
+ }
+ 
++export function browserLanguageList(browser) {
++  return acceptLanguageEnUsEnabledForBrowser(browser)
++    ? configuredAcceptLanguage(browser.acceptLanguage)
++    : "en-US,en";
++}
++
+ export function egressTimeZoneEnabledForBrowser(
+   browser,
+   { resolveGate = resolveEgressTimeZoneGate, now = Date.now } = {},
+@@ -984,20 +1021,57 @@
+ }
+ 
+ export function applyEgressTimeZoneToTarget(browser, sessionId) {
+-  const timezoneId = browser.egressTimeZone;
++  const timezoneId = browser.egressTimeZonePinned?.get(sessionId) ?? browser.egressTimeZone;
+   if (typeof timezoneId !== "string") return null;
+   return browser.send("Emulation.setTimezoneOverride", { timezoneId }, sessionId);
+ }
+ 
++function applyEgressTimeZoneOrReport(browser, sessionId) {
++  applyEgressTimeZoneToTarget(browser, sessionId)?.catch((error) => {
++    if (isCdpTargetGone(error) || !browser.attachedSessions.has(sessionId)) return;
++    console.error(`time zone apply failed port=${browser.port}: ${errorClass(error)}`);
++  });
++}
++
+ export function reassertEgressTimeZone(browser) {
+   for (const sessionId of browser.attachedSessions ?? []) {
+-    applyEgressTimeZoneToTarget(browser, sessionId)?.catch((error) => {
++    applyEgressTimeZoneOrReport(browser, sessionId);
++  }
++}
++
++function pinOpenTargetsToTimeZone(browser, timeZone) {
++  browser.egressTimeZonePinned ??= new Map();
++  for (const sessionId of browser.attachedSessions ?? []) {
++    if (browser.egressTimeZonePinned.has(sessionId)) continue;
++    browser.egressTimeZonePinned.set(sessionId, timeZone);
++    if (browser.attachedTargetTypes?.get(sessionId) !== "page") continue;
++    browser.send("Page.enable", {}, sessionId).catch((error) => {
+       if (isCdpTargetGone(error) || !browser.attachedSessions.has(sessionId)) return;
+-      console.error(`time zone apply failed port=${browser.port}: ${errorClass(error)}`);
++      console.error(`navigation watch failed port=${browser.port}: ${errorClass(error)}`);
+     });
+   }
+ }
+ 
++function inheritPinnedTimeZone(browser, sessionId, parentSessionId) {
++  const timeZone = browser.egressTimeZonePinned?.get(parentSessionId);
++  if (timeZone !== undefined) browser.egressTimeZonePinned.set(sessionId, timeZone);
++}
++
++const SAME_DOCUMENT_NAVIGATIONS = new Set(["sameDocument", "historySameDocument"]);
++
++function applyEgressTimeZoneOnNavigation(browser, sessionId, params) {
++  if (
++    typeof sessionId !== "string" ||
++    params?.frameId !== browser.attachedTargetIds.get(sessionId) ||
++    SAME_DOCUMENT_NAVIGATIONS.has(params?.navigationType)
++  ) {
++    return;
++  }
++  recheckEgressTimeZoneIfDue(browser);
++  if (browser.egressTimeZonePinned?.delete(sessionId))
++    applyEgressTimeZoneOrReport(browser, sessionId);
++}
++
+ export function egressTimeZoneHold(browser) {
+   if (browser.egressTimeZoneEnabled !== true || typeof browser.egressTimeZone === "string") {
+     return null;
+@@ -1012,7 +1086,7 @@
+ 
+ function reportEgressTimeZone(browser, lookup, event) {
+   if (lookup.reported.has(event.outcome)) return;
+-  lookup.reported.add(event.outcome);
++  if (event.outcome !== "changed") lookup.reported.add(event.outcome);
+   try {
+     lookup.report({ kind: "egress_time_zone", ...event, boxClockUtc: lookup.boxClockIsUtc() });
+   } catch (error) {
+@@ -1024,6 +1098,7 @@
+   browser,
+   {
+     resolveZone = ({ port }) => resolveEgressTimeZone({ port }),
++    resolveFollowsExit = resolveTimeZoneFollowsExitGate,
+     now = Date.now,
+     report = appendBoxTelemetry,
+     boxClockIsUtc = isBoxClockUtc,
+@@ -1035,11 +1110,14 @@
+   });
+   browser.egressTimeZoneLookup = {
+     resolveZone,
++    resolveFollowsExit,
++    now,
+     report,
+     boxClockIsUtc,
+     reported: new Set(),
+     attempts: 0,
+     nextAttemptAt: now(),
++    recheckAt: null,
+     holdUntil: now() + EGRESS_TIME_ZONE_ATTACH_WAIT_MS,
+     inFlight: null,
+     releaseHold: () => {
+@@ -1093,18 +1171,20 @@
+   const lookup = browser.egressTimeZoneLookup;
+   if (lookup == null) return null;
+   if (browser.egressTimeZoneHold != null && now() >= lookup.holdUntil) lookup.releaseHold();
+-  if (
+-    browser.isClosed ||
+-    typeof browser.egressTimeZone === "string" ||
+-    lookup.inFlight != null ||
+-    now() < lookup.nextAttemptAt
+-  ) {
+-    return lookup.inFlight;
++  if (browser.isClosed || lookup.inFlight != null) return lookup.inFlight;
++  if (typeof browser.egressTimeZone === "string") {
++    if (!egressTimeZoneRecheckDue(browser, lookup, now)) return null;
++  } else if (now() < lookup.nextAttemptAt) {
++    return null;
+   }
+   lookup.inFlight = (async () => {
+     try {
+       const { timeZone, provider, source } = await lookup.resolveZone({ port: browser.port });
+       if (browser.isClosed) return;
++      if (typeof browser.egressTimeZone === "string") {
++        followExitTimeZone(browser, lookup, { timeZone, provider, source });
++        return;
++      }
+       browser.egressTimeZone = timeZone;
+       reassertEgressTimeZone(browser);
+       console.error(
+@@ -1112,6 +1192,12 @@
+       );
+       reportEgressTimeZone(browser, lookup, { outcome: "resolved", source, provider });
+     } catch (error) {
++      if (typeof browser.egressTimeZone === "string") {
++        reportOnce(
++          `egress time zone recheck failed port=${browser.port}: ${egressErrorCode(error)}`,
++        );
++        return;
++      }
+       reportOnce(`egress time zone unresolved port=${browser.port}: ${egressErrorCode(error)}`);
+       reportEgressTimeZone(browser, lookup, {
+         outcome: "unresolved",
+@@ -1122,12 +1208,37 @@
+       lookup.attempts += 1;
+     } finally {
+       lookup.inFlight = null;
++      if (typeof browser.egressTimeZone === "string") {
++        lookup.recheckAt = now() + EGRESS_TIME_ZONE_RECHECK_MS;
++      }
+       if (browser.egressTimeZoneHold != null) lookup.releaseHold();
+     }
+   })();
+   return lookup.inFlight;
+ }
+ 
++function recheckEgressTimeZoneIfDue(browser) {
++  const lookup = browser.egressTimeZoneLookup;
++  if (lookup == null || typeof browser.egressTimeZone !== "string") return;
++  void tickEgressTimeZone(browser, { now: lookup.now });
++}
++
++function egressTimeZoneRecheckDue(browser, lookup, now) {
++  if (now() < lookup.recheckAt || openPageCount(browser) === 0) return false;
++  lookup.recheckAt = now() + EGRESS_TIME_ZONE_RECHECK_MS;
++  return lookup.resolveFollowsExit() === "on";
++}
++
++function followExitTimeZone(browser, lookup, { timeZone, provider, source }) {
++  if (timeZone === browser.egressTimeZone) return;
++  pinOpenTargetsToTimeZone(browser, browser.egressTimeZone);
++  browser.egressTimeZone = timeZone;
++  console.error(
++    `egress time zone changed port=${browser.port} provider=${provider} source=${source}; open tabs keep their zone until their next top-level navigation`,
++  );
++  reportEgressTimeZone(browser, lookup, { outcome: "changed", source, provider });
++}
++
+ function relatedTargetSessions(browser) {
+   if (browser.relatedTargetSessions == null) {
+     browser.relatedTargetSessions = new Map();
+@@ -1264,8 +1375,22 @@
+   if (egressTimeZoneEnabledForBrowser(browser) && browser.egressTimeZoneLookup === undefined) {
+     void (browser.startEgressTimeZoneFor ?? startEgressTimeZone)(browser);
+   }
++  if (browser.localeConsistency === undefined) {
++    void (browser.startLocaleConsistencyFor ?? startLocaleConsistency)(browser, {
++      languages: () => browserLanguageList(browser),
++      lookupCountry: ({ port }) =>
++        lookupExitCountry({
++          port,
++          userAgent: buildUserAgentOverride(liveChromeProduct(browser)).userAgent,
++        }),
++    });
++  }
+   if (hardwareTreatmentForBrowser(browser) === "coherent") void verifyCoherentProfile(browser);
+   browser.onEvent((message) => {
++    if (message.method === "Page.frameStartedNavigating") {
++      applyEgressTimeZoneOnNavigation(browser, message.sessionId, message.params);
++      return;
++    }
+     if (message.method === "Target.targetDestroyed") {
+       const targetId = message.params?.targetId;
+       if (typeof targetId === "string") {
+@@ -1288,6 +1413,7 @@
+       browser.acceptLanguageOverriddenSessions?.delete(sessionId);
+       browser.acceptLanguageUnappliedSessions?.delete(sessionId);
+       browser.relatedTargetSessions?.delete(sessionId);
++      browser.egressTimeZonePinned?.delete(sessionId);
+       if (browser.egressTimeZoneEnabled === true) reassertEgressTimeZone(browser);
+       return;
+     }
+@@ -1301,6 +1427,8 @@
+     browser.attachedBrowserContexts.set(sessionId, browserContextId);
+     const targetId = message.params?.targetInfo?.targetId;
+     if (typeof targetId === "string") browser.attachedTargetIds.set(sessionId, targetId);
++    inheritPinnedTimeZone(browser, sessionId, message.sessionId);
++    if (targetType === "page") recheckEgressTimeZoneIfDue(browser);
+     const reportUnlessGone = (step) => (error) => {
+       if (isCdpTargetGone(error) || !browser.attachedSessions.has(sessionId)) return;
+       console.error(`${step} failed port=${browser.port}: ${errorClass(error)}`);
+@@ -1384,8 +1512,15 @@
+   return running === "ungoogled-chromium" ? "ungoogled-chromium" : "chrome";
+ }
+ 
+-export async function governUnlessUngoogled(browser, resolve = resolveBoxBrowser) {
+-  if (resolve({ port: browser.port }) === "ungoogled-chromium") return;
++export async function governUnlessUngoogled(
++  browser,
++  resolve = resolveBoxBrowser,
++  removeVerdicts = removeLocaleConsistency,
++) {
++  if (resolve({ port: browser.port }) === "ungoogled-chromium") {
++    removeVerdicts(browser.port);
++    return;
++  }
+   await configureUaGovernorBrowser(browser);
+ }
+ 
+@@ -1730,9 +1865,11 @@
+     for (const [port, browser] of browsers) {
+       if (browser.isClosed) {
+         browsers.delete(port);
++        if (browser.localeConsistency !== undefined) removeLocaleConsistency(port);
+         continue;
+       }
+       void tickEgressTimeZone(browser);
++      void tickLocaleConsistency(browser);
+       void tickAcceptLanguageExtension(browser);
+       reapplyChangedAcceptLanguage(browser);
+       reattachIfSettingsChanged(browser);

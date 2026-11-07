@@ -1,0 +1,125 @@
+--- 2026-11-07_05-44:/opt/sand/sand-host/box-runtime/sand-egress-timezone.mjs
++++ 2026-11-07_16-49:/opt/sand/sand-host/box-runtime/sand-egress-timezone.mjs
+@@ -88,6 +88,25 @@
+   return isUtcTimeZone(readBoxTimeZone({ readLink }));
+ }
+ 
++export function readZoneLinks({
++  path = "/usr/share/zoneinfo/tzdata.zi",
++  readFile = readFileSync,
++} = {}) {
++  let text;
++  try {
++    text = String(readFile(path, "utf8"));
++  } catch (error) {
++    if (error?.code === "ENOENT") return new Map();
++    throw error;
++  }
++  const links = new Map();
++  for (const line of text.split("\n")) {
++    const [kind, target, link] = line.split(" ");
++    if (kind === "L" && target !== undefined && link !== undefined) links.set(link, target);
++  }
++  return links;
++}
++
+ export function readZonesByCountry({
+   path = "/usr/share/zoneinfo/zone.tab",
+   readFile = readFileSync,
+@@ -100,7 +119,7 @@
+   }
+ }
+ 
+-export function chromeProxyServerForPort(
++export function chromeBrowserArgsForPort(
+   port,
+   { procRoot = "/proc", readDir = readdirSync, readFile = readFileSync } = {},
+ ) {
+@@ -116,12 +135,26 @@
+     }
+     const args = String(cmdline).split("\0");
+     if (!args.includes(debugPortArg) || args.some((arg) => arg.startsWith("--type="))) continue;
+-    const proxyArg = args.findLast((arg) => arg.startsWith("--proxy-server="));
+-    return proxyArg == null ? null : proxyArg.slice("--proxy-server=".length);
++    return args;
+   }
+   return undefined;
+ }
+ 
++export function chromeProxyServerForPort(port, deps) {
++  const args = chromeBrowserArgsForPort(port, deps);
++  if (args === undefined) return undefined;
++  const proxyArg = args.findLast((arg) => arg.startsWith("--proxy-server="));
++  return proxyArg == null ? null : proxyArg.slice("--proxy-server=".length);
++}
++
++export function egressProxyForPort(port, proxyServerForPort = chromeProxyServerForPort) {
++  const proxyServer = proxyServerForPort(port);
++  if (proxyServer === undefined) throw new EgressGeoError("browser_not_found");
++  const route = egressRouteFromProxyServer(proxyServer);
++  if (route.kind === "unsupported") throw new EgressGeoError("unsupported_proxy");
++  return route.kind === "proxy" ? { host: route.host, port: route.port } : null;
++}
++
+ export function egressRouteFromProxyServer(proxyServer) {
+   const value = proxyServer == null ? "" : proxyServer.trim();
+   if (value === "" || value === "direct://") return { kind: "direct" };
+@@ -175,11 +208,22 @@
+   });
+ }
+ 
+-export async function requestJson({
++export async function requestJson(options) {
++  const text = await requestText(options);
++  try {
++    return JSON.parse(text);
++  } catch (error) {
++    throw new EgressGeoError("bad_json", { cause: error });
++  }
++}
++
++export async function requestText({
+   host,
+   port = 443,
+   path,
+   proxy = null,
++  accept = "application/json",
++  userAgent = EGRESS_GEO_USER_AGENT,
+   timeoutMs = EGRESS_GEO_REQUEST_TIMEOUT_MS,
+   secureConnect = tlsConnect,
+ }) {
+@@ -192,7 +236,7 @@
+         port,
+         path,
+         method: "GET",
+-        headers: { host, accept: "application/json", "user-agent": EGRESS_GEO_USER_AGENT },
++        headers: { host, accept, "user-agent": userAgent },
+         timeout: timeoutMs,
+         createConnection: () =>
+           secureConnect(
+@@ -219,11 +263,7 @@
+         });
+         response.on("end", () => {
+           if (size > EGRESS_GEO_MAX_BODY_BYTES) return;
+-          try {
+-            resolve(JSON.parse(Buffer.concat(chunks).toString("utf8")));
+-          } catch (error) {
+-            reject(new EgressGeoError("bad_json", { cause: error }));
+-          }
++          resolve(Buffer.concat(chunks).toString("utf8"));
+         });
+         response.on("error", reject);
+       },
+@@ -275,11 +315,7 @@
+   boxTimeZone = readBoxTimeZone,
+   zonesByCountry = readZonesByCountry,
+ }) {
+-  const proxyServer = proxyServerForPort(port);
+-  if (proxyServer === undefined) throw new EgressGeoError("browser_not_found");
+-  const route = egressRouteFromProxyServer(proxyServer);
+-  if (route.kind === "unsupported") throw new EgressGeoError("unsupported_proxy");
+-  const proxy = route.kind === "proxy" ? { host: route.host, port: route.port } : null;
++  const proxy = egressProxyForPort(port, proxyServerForPort);
+   const { exitGeo, provider } = await fetchExitGeo({ providers, request, proxy, timeoutMs });
+   const { timeZone, source } = resolveTimeZone({
+     exitGeo,

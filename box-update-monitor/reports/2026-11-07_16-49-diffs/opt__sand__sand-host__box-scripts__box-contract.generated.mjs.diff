@@ -1,0 +1,33 @@
+--- 2026-11-07_05-44:/opt/sand/sand-host/box-scripts/box-contract.generated.mjs
++++ 2026-11-07_16-49:/opt/sand/sand-host/box-scripts/box-contract.generated.mjs
+@@ -1,4 +1,4 @@
+-// @generated SignedSource<<fb47aa00d02442f2656b74f623c9e91008e4f3d26054fe33874bcaa30361e286>>
++// @generated SignedSource<<6bd30aa5385459a69399151aa169f088c1ef3f24c8bcb94e809ebd743fe67c8c>>
+ // Emitted by scripts/gen-box-contract.mts from sand/src/shared/box/box-contract.ts;
+ // regenerate with `pnpm --filter sand run gen:box-contract`.
+ export const CURSOR_AGENT_SOCKET_ENV_VAR = "CURSOR_AGENT_SOCKET";
+@@ -25,6 +25,14 @@
+ export const BROWSER_ACCEPT_LANGUAGE_EN_US_MARKER_PATH = "/tmp/sand-browser-accept-language-en-us";
+ export const BOX_BROWSER_ACCEPT_LANGUAGE_PATH_PREFIX = "/tmp/sand-box-browser-accept-language";
+ export const BROWSER_EGRESS_TIMEZONE_MARKER_PATH = "/tmp/sand-browser-egress-timezone";
++export const BROWSER_TIMEZONE_FOLLOWS_EXIT_MARKER_PATH = "/tmp/sand-browser-timezone-follows-exit";
++export const BROWSER_LOCALE_CONSISTENCY_MAX_BYTES = 256;
++export const LOCALE_CONSISTENCY_CHECKS = ["ip_tz_mismatch","ip_lang_mismatch","tz_lang_mismatch"];
++export const LOCALE_CONSISTENCY_VERDICTS = ["true","false","unknown"];
++export const LOCALE_CONSISTENCY_TZ_DELTA_KEY = "ip_tz_delta_h";
++export const LOCALE_CONSISTENCY_TZ_DELTA_BUCKETS = ["0","1","2-3","4-6","7-plus"];
++export const LOCALE_CONSISTENCY_VERSION_KEY = "locale_consistency_version";
++export const LOCALE_CONSISTENCY_VERSION = "locale-consistency/v1";
+ export const WEB_BOT_AUTH_SIGNED_CACHE_PATH = "/tmp/sand-web-bot-auth-signed.json";
+ export const WEB_BOT_AUTH_SIGNED_TTL_MS = 120000;
+ export const WEB_BOT_AUTH_SIGNATURE_SOURCES = ["fresh","box_cache","fleet_cache"];
+@@ -68,6 +76,9 @@
+ export function wallEvidenceProfileDirPath(port) {
+   return "/tmp/sand-profile-dir-" + port + "";
+ }
++export function browserLocaleConsistencyPath(port) {
++  return "/tmp/sand-browser-locale-consistency-" + port + "";
++}
+ export const WALL_EVIDENCE_COOKIE_LINEAGE_PATH = "/home/box/chrome-profile/.sand-cookie-lineage.json";
+ export const WALL_EVIDENCE_BOX_BOOT_ID_PATH = "/tmp/sand-box-boot-id";
+ export const WALL_EVIDENCE_BOX_BOOT_ID_MAX_BYTES = 64;
