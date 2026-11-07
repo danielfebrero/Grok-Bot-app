@@ -1,0 +1,850 @@
+/**
+ * "The Brides" wedding deck - recreated with pptxgenjs.
+ * 30 slides, 13.333 x 7.5 in.  Raster photos in the original are replaced
+ * with flat grey "[image]" placeholders that keep the original clip shape.
+ */
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ theme */
+
+const C = {
+  cream: 'F0E9E0',   // light background
+  gold: 'B59412',    // primary accent
+  olive: '444719',   // dark background / secondary accent
+  ink: '404040',     // body text on light
+  white: 'FFFFFF',
+  grey: 'CCCCCC',    // image placeholder fill
+  greyTx: '8A8A8A',
+  slate: '222A35',
+  mute: '808080',
+  hair: 'F2F2F2',    // faint decorative grey
+  dash: 'D9D9D9'
+};
+
+const F = { title: 'Abril Fatface', body: 'Poppins', light: 'Poppins Light' };
+
+const NOLINE = { type: 'none' };
+const NOFILL = { type: 'none' };
+const SHADOW = { type: 'outer', blur: 20, offset: 10, angle: 45, color: '000000', opacity: 0.2 };
+
+// round2SameRect / blockArc adjust values are fed through pptxgenjs' `angleRange`,
+// which multiplies by 60000 - so divide the raw OOXML adjust value first.
+const adj = (a1, a2) => [a1 / 60000, (a2 || 0) / 60000];
+const ARCH = adj(50000);          // fully rounded top ("arch") corners
+
+/* ------------------------------------------------- reusable design pieces */
+
+// 13 faint circles that make up the watermark "blob" behind slides 1-18 + 30.
+const BLOBS = [
+  [0.81, 0.58, 1.03], [4.37, 0.58, 1.61], [7.22, 0.58, 1.61], [11.37, 0.58, 1.03],
+  [2.15, 1.61, 1.87], [9.18, 1.61, 1.87], [5.71, 2.89, 1.87],
+  [2.15, 4.10, 1.87], [9.18, 4.10, 1.87],
+  [4.37, 5.39, 1.61], [7.22, 5.39, 1.61], [0.81, 5.97, 1.03], [11.37, 5.97, 1.03]
+];
+
+// Concentric "tree ring" motif: [mid diameter / D, stroke weight / D].
+const RING_BANDS = [
+  [0.961, 0.0387], [0.797, 0.0297], [0.624, 0.0238], [0.443, 0.0149], [0.288, 0.0089]
+];
+
+function rings(s, cx, cy, d, color) {
+  RING_BANDS.forEach(function (b) {
+    const dd = d * b[0];
+    s.addShape('ellipse', {
+      x: cx - dd / 2, y: cy - dd / 2, w: dd, h: dd,
+      fill: NOFILL, line: { color: color, width: d * 72 * b[1] }
+    });
+  });
+}
+
+// top-left ring given by its bounding box (that is how the original stores them)
+const ringAt = (s, x, y, d, color) => rings(s, x + d / 2, y + d / 2, d, color);
+
+/** Background colour plus the faint watermark blob. Call first. */
+function backdrop(s, bg, showBlob) {
+  if (bg) s.background = { color: bg };
+  if (showBlob === false) return;
+  const fill = bg === C.olive ? { color: '575930', transparency: 92 } : { color: '886F0E', transparency: 97 };
+  BLOBS.forEach(function (b) {
+    s.addShape('ellipse', { x: b[0], y: b[1], w: b[2], h: b[2], fill: fill, line: NOLINE });
+  });
+}
+
+/** Corner ring motifs and running heads. These sit above the artwork. */
+function chrome(s, o) {
+  o = o || {};
+  const dark = o.bg === C.olive;
+  rings(s, 11.931, 0, 1.77, C.gold);                       // top right, half visible
+  rings(s, 0, 5.879, 2.242, dark ? C.gold : C.olive);      // bottom left, half visible
+  const tone = dark ? C.white : C.ink;
+  s.addText('Brides Wedding', { x: 0.363, y: 0.256, w: 1.408, h: 0.286, fontFace: F.body, fontSize: 11, color: tone, valign: 'top', wrap: false, fit: 'resize' });
+  if (o.footer !== false) {
+    s.addText('Slide Presents', { x: 11.766, y: 6.885, w: 1.266, h: 0.286, fontFace: F.body, fontSize: 11, color: tone, valign: 'top', wrap: false, fit: 'resize' });
+  }
+}
+
+/**
+ * Builds one slide in the deck's z-order: background, then the slide's own
+ * artwork, then the corner rings and running heads which always sit on top.
+ */
+function page(pptx, o, draw) {
+  const s = pptx.addSlide();
+  backdrop(s, o.bg, o.blob);
+  draw(s);
+  chrome(s, o);
+  return s;
+}
+
+/** Two tone 40pt display heading, e.g. "Day of " + "Wedding". */
+function heading(s, o) {
+  s.addText(
+    [{ text: o.a, options: { color: o.tone || C.ink } }, { text: o.b, options: { color: C.gold } }],
+    { x: o.x, y: o.y, w: o.w, h: 0.774, fontFace: F.title, fontSize: 40, align: o.align || 'left', valign: 'top', wrap: false, fit: 'resize' }
+  );
+}
+
+/** Heading block reused by every "Infographic Section" slide (19-29). */
+function infographicHead(s) {
+  ringAt(s, 6.349, 0.583, 0.635, C.gold);
+  heading(s, { x: 4.008, y: 1.292, w: 5.317, a: 'Infographic ', b: 'Section', align: 'center' });
+}
+
+/** Flat placeholder standing in for a photograph. */
+function photo(s, o) {
+  s.addShape(o.shape || 'rect', {
+    x: o.x, y: o.y, w: o.w, h: o.h, fill: { color: C.grey }, line: NOLINE,
+    rectRadius: o.r, rotate: o.rotate, angleRange: o.angleRange
+  });
+  const cy = Math.min(o.y + o.h / 2, 6.9) - 0.16;
+  s.addText(o.caption || '[image]', { x: o.x, y: cy, w: o.w, h: 0.32, align: 'center', valign: 'middle', fontFace: F.light, fontSize: 11, color: C.greyTx });
+}
+
+const pill = (w, h) => Math.min(w, h) / 2;   // rectRadius for a fully rounded rectangle
+
+/**
+ * An arch whose rounded side faces left/right instead of up.
+ * PowerPoint rotates about the centre, so swap w/h and re-centre.
+ */
+function sideArch(s, o) {
+  const cx = o.x + o.w / 2, cy = o.y + o.h / 2;
+  return { x: cx - o.h / 2, y: cy - o.w / 2, w: o.h, h: o.w, rotate: o.facing === 'left' ? 270 : 90 };
+}
+
+/** Body copy: 11pt Poppins, 150% leading, justified - the deck's default. */
+function body(s, text, o) {
+  s.addText(text, Object.assign({
+    fontFace: F.body, fontSize: 11, color: C.white, align: 'justify',
+    lineSpacingMultiple: 1.5, valign: 'top'
+  }, o));
+}
+
+/** Small pill button, e.g. "DOWNLOAD" / "LEARN MORE". */
+function button(s, label, o) {
+  s.addText(label, {
+    shape: 'roundRect', x: o.x, y: o.y, w: o.w, h: o.h, rectRadius: pill(o.w, o.h),
+    fill: { color: o.fill }, line: NOLINE, align: 'center', valign: 'middle',
+    fontFace: o.face || F.body, fontSize: o.size || 9, bold: o.bold !== false, color: o.color
+  });
+}
+
+/* ------------------------------------------------------------- the slides */
+
+// 1 + 30 share the same cover layout (olive band, gold arch, donut row).
+function cover(pptx, titleA, titleB, titleW) {
+  const s = pptx.addSlide();
+  backdrop(s, C.cream);
+  s.addShape('rect', { x: 0, y: 2.5, w: 7.928, h: 2.183, fill: { color: C.olive }, line: NOLINE });
+  s.addShape('round2SameRect', { x: 6.278, y: 0.542, w: 7.056, h: 6.958, angleRange: ARCH, fill: { color: C.gold }, line: NOLINE });
+  photo(s, { x: 6.444, y: 0.708, w: 6.692, h: 6.792, shape: 'round2SameRect', angleRange: ARCH });
+  ringAt(s, 0.895, 2.154, 0.705, C.gold);
+  chrome(s, { bg: C.cream });
+
+  s.addText([
+    { text: titleA, options: { color: C.white } },
+    { text: ' ', options: { color: C.ink } },
+    { text: titleB, options: { color: C.gold } }
+  ], { x: 0.446, y: 2.895, w: titleW, h: 1.111, fontFace: F.title, fontSize: 60, charSpacing: 3, valign: 'top', wrap: false, fit: 'resize' });
+  s.addText('Wedding Presentations Design', { x: 0.535, y: 4.025, w: 4.909, h: 0.286, fontFace: F.body, fontSize: 11, color: C.white, charSpacing: 6, valign: 'top', wrap: false, fit: 'resize' });
+
+  s.addShape('round2SameRect', { x: 1.621, y: 5.17, w: 4.24, h: 2.335, angleRange: adj(22831), fill: { color: C.gold }, line: NOLINE });
+  body(s, 'PLACEHOLDER', { x: 2.107, y: 5.703, w: 3.268, h: 0.934 });
+  [2.23, 2.76, 3.289].forEach(function (x) {
+    s.addShape('donut', { x: x, y: 6.908, w: 0.167, h: 0.167, fill: { color: C.white }, line: NOLINE });
+  });
+  [1.248, 2.643, 4.038, 5.433].forEach(function (x, i) {
+    s.addShape('donut', { x: x, y: 1.023 + i * 0.002, w: 0.813, h: 0.813, fill: { color: C.gold, transparency: 70 }, line: NOLINE });
+  });
+}
+
+function slide2(pptx) {
+  page(pptx, { bg: C.cream }, function (s) {
+    photo(s, { x: 0.724, y: 0.927, w: 2.845, h: 5.671, shape: 'roundRect', r: 1.42 });
+    photo(s, { x: 9.787, y: 0.927, w: 2.845, h: 5.671, shape: 'roundRect', r: 1.42 });
+    ringAt(s, 6.349, 1.125, 0.635, C.gold);
+    ringAt(s, 2.72, 0.927, 0.705, C.olive);
+    ringAt(s, 11.923, 5.756, 0.705, C.olive);
+    heading(s, { x: 4.522, y: 1.834, w: 4.29, a: 'Day of ', b: 'Wedding', align: 'center' });
+
+    // 2 x 2 grid of day cards
+    const cards = [
+      { x: 3.912, y: 3.025, fill: C.olive, day: 'Sunday', dw: 1.312 },
+      { x: 6.753, y: 3.025, fill: C.gold, day: 'Monday', dw: 1.387 },
+      { x: 3.912, y: 4.644, fill: C.gold, day: 'Wednesday', dw: 1.939 },
+      { x: 6.753, y: 4.644, fill: C.olive, day: 'Friday', dw: 1.117 }
+    ];
+    cards.forEach(function (c) {
+      s.addShape('roundRect', { x: c.x, y: c.y, w: 2.692, h: 1.463, rectRadius: pill(2.692, 1.463), fill: { color: c.fill }, line: NOLINE, shadow: SHADOW });
+    });
+    cards.forEach(function (c) {
+      s.addText(c.day, { x: c.x + 0.454, y: c.y + 0.298, w: c.dw, h: 0.438, fontFace: F.body, fontSize: 20, bold: true, color: C.white, valign: 'top', wrap: false, fit: 'resize' });
+      body(s, 'Awon derful serenity posse ssionmy', { x: c.x + 0.454, y: c.y + 0.71, w: 1.872, h: 0.454, fontSize: 10.5, lineSpacingMultiple: 1 });
+    });
+  });
+}
+
+function slide3(pptx) {
+  page(pptx, { bg: C.cream, footer: false }, function (s) {
+    photo(s, { x: 6.667, y: 1.376, w: 5.411, h: 2.374, shape: 'roundRect', r: pill(5.411, 2.374) });
+    photo(s, { x: 1.28, y: 3.767, w: 5.411, h: 2.374, shape: 'roundRect', r: pill(5.411, 2.374) });
+    ringAt(s, 1.74, 0.946, 0.635, C.gold);
+    ringAt(s, 11.502, 1.492, 0.705, C.olive);
+    ringAt(s, 1.669, 5.684, 0.705, C.olive);
+    heading(s, { x: 1.28, y: 1.655, w: 4.138, a: 'Great ', b: 'Wedding' });
+    body(s, 'PLACEHOLDER',
+      { x: 1.361, y: 2.58, w: 4.597, h: 0.63, color: C.ink, italic: true });
+
+    [
+      { x: 7.031, fill: C.olive, name: 'Bridesmaid', price: '$563.46', nw: 1.538, bx: 7.671 },
+      { x: 9.877, fill: C.gold, name: 'Gromsman', price: '$745.43', nw: 1.519, bx: 10.475 }
+    ].forEach(function (c) {
+      s.addShape('round2SameRect', { x: c.x, y: 4.068, w: 2.692, h: 3.423, angleRange: ARCH, fill: { color: c.fill }, line: NOLINE });
+      s.addText([{ text: c.name + '\n' }, { text: c.price }],
+        { x: c.x + 0.619, y: 4.758, w: c.nw, h: 0.64, fontFace: F.body, fontSize: 16, bold: true, color: C.white, align: 'center', valign: 'top', wrap: false, fit: 'resize' });
+      body(s, 'Awon derful serenity posse ssionmy derful serenity has tak', { x: c.x + 0.452, y: 5.453, w: 1.872, h: 0.934, align: 'center' });
+      button(s, 'DOWNLOAD', { x: c.bx, y: 6.635, w: 1.412, h: 0.45, fill: C.white, color: c.fill });
+    });
+  });
+}
+
+function slide4(pptx) {
+  page(pptx, { bg: C.olive }, function (s) {
+    photo(s, Object.assign(sideArch(s, { x: 6.667, y: 0.65, w: 6.667, h: 4.107, facing: 'left' }),
+      { shape: 'round2SameRect', angleRange: adj(16700) }));
+    ringAt(s, 2.055, 1.278, 0.635, C.gold);
+    ringAt(s, 10.618, 4.407, 0.705, C.gold);
+    ringAt(s, 6.612, 0.361, 0.705, C.gold);
+    s.addText([
+      { text: 'Smile', options: { color: C.white } }, { text: ' ', options: { color: C.ink } },
+      { text: 'Moment', options: { color: C.gold } }
+    ], { x: 1.595, y: 1.988, w: 3.911, h: 0.774, fontFace: F.title, fontSize: 40, valign: 'top', wrap: false, fit: 'resize' });
+
+    const lorem = 'PLACEHOLDER';
+    body(s, lorem, { x: 1.567, y: 2.954, w: 4.467, h: 0.934 });
+    button(s, 'Images', { x: 1.666, y: 4.181, w: 1.412, h: 0.45, fill: C.white, color: C.olive });
+    button(s, 'Video', { x: 3.361, y: 4.181, w: 1.412, h: 0.45, fill: C.white, color: C.olive });
+
+    s.addShape('round2SameRect', { x: 1.619, y: 5.181, w: 7.103, h: 2.325, angleRange: ARCH, fill: { color: C.gold }, line: NOLINE });
+    s.addText('67.754K', { x: 2.45, y: 5.709, w: 1.78, h: 0.572, fontFace: F.body, fontSize: 28, bold: true, color: C.white, valign: 'top', wrap: false, fit: 'resize' });
+    body(s, lorem, { x: 4.444, y: 5.661, w: 3.306, h: 1.212 });
+    s.addShape('line', { x: 4.55, y: 7.038, w: 1.61, h: 0, line: { color: C.white, width: 1, endArrowType: 'triangle' } });
+    body(s, 'PLACEHOLDER',
+      { x: 9.365, y: 5.735, w: 3.29, h: 0.934, bold: true, italic: true });
+  });
+}
+
+function slide5(pptx) {
+  page(pptx, { bg: C.cream }, function (s) {
+    ringAt(s, 6.349, 0.805, 0.635, C.gold);
+    heading(s, { x: 4.306, y: 1.515, w: 4.721, a: 'Party in ', b: 'Wedding', align: 'center' });
+
+    [
+      { x: 0.492, fill: C.gold, time: '07.00 AM', tx: 1.698, tw: 1.503 },
+      { x: 4.719, fill: C.olive, time: '11.30 AM', tx: 5.993, tw: 1.368 },
+      { x: 8.946, fill: C.gold, time: '07.30 PM', tx: 10.174, tw: 1.459 }
+    ].forEach(function (c, i) {
+      s.addShape('roundRect', { x: c.x, y: 2.625, w: 3.914, h: 1.611, rectRadius: pill(3.914, 1.611), fill: { color: c.fill }, line: NOLINE, shadow: SHADOW });
+      photo(s, { x: c.x, y: 4.572, w: 3.914, h: 2.149, shape: 'roundRect', r: 0.95 });
+      s.addText(c.time, { x: c.tx, y: 2.894, w: c.tw, h: 0.438, fontFace: F.body, fontSize: 20, bold: true, color: C.white, align: 'center', valign: 'top', wrap: false, fit: 'resize' });
+      body(s, 'Awon derful serenity posse derful serenity posse ssionmy',
+        { x: [0.893, 5.12, 9.347][i], y: 3.305, w: 3.114, h: 0.606, fontSize: 10.5, align: 'center' });
+    });
+    ringAt(s, 12.255, 4.572, 0.705, C.olive);
+    ringAt(s, 4.806, 6.158, 0.705, C.olive);
+  });
+}
+
+function slide6(pptx) {
+  page(pptx, { bg: C.cream }, function (s) {
+    photo(s, { x: 6.683, y: 0.734, w: 6.032, h: 6.032, shape: 'ellipse' });
+    ringAt(s, 1.884, 1.125, 0.635, C.gold);
+    heading(s, { x: 1.424, y: 1.834, w: 4.392, a: 'Percentage ', b: 'Like' });
+
+    s.addShape('roundRect', { x: 1.424, y: 3.008, w: 5.978, h: 1.611, rectRadius: pill(5.978, 1.611), fill: { color: C.olive }, line: NOLINE, shadow: SHADOW });
+    s.addText('45%', { x: 1.982, y: 3.423, w: 1.066, h: 0.572, fontFace: F.body, fontSize: 28, bold: true, color: C.white, valign: 'top', wrap: false, fit: 'resize' });
+    body(s, 'PLACEHOLDER',
+      { x: 3.275, y: 3.375, w: 3.639, h: 0.934 });
+
+    s.addShape('round2SameRect', { x: 1.424, y: 5.033, w: 5.159, h: 2.472, angleRange: adj(26699), fill: { color: C.gold }, line: NOLINE });
+    [5.548, 6.382].forEach(function (y) {
+      body(s, 'PLACEHOLDER',
+        { x: 2.012, y: y, w: 3.983, h: 0.656, bullet: { characterCode: '2713', indent: 13.5 } });
+    });
+    ringAt(s, 11.726, 1.519, 0.705, C.olive);
+    ringAt(s, 7.68, 5.952, 0.705, C.olive);
+  });
+}
+
+function slide7(pptx) {
+  page(pptx, { bg: C.olive }, function (s) {
+    [1.605, 5.095, 8.584].forEach(function (x) {
+      photo(s, { x: x, y: 2.556, w: 3.181, h: 3.222, shape: 'roundRect', r: 0.8 });
+    });
+    ringAt(s, 6.349, 0.708, 0.635, C.gold);
+    s.addText([
+      { text: 'Flowers for', options: { color: C.white } }, { text: ' ', options: { color: C.ink } },
+      { text: 'Wedding', options: { color: C.gold } }
+    ], { x: 3.853, y: 1.417, w: 5.628, h: 0.774, fontFace: F.title, fontSize: 40, align: 'center', valign: 'top', wrap: false, fit: 'resize' });
+
+    s.addShape('round2SameRect', { x: 1.605, y: 6.083, w: 10.147, h: 1.422, angleRange: ARCH, fill: { color: C.gold }, line: NOLINE });
+    [2.505, 5.546, 8.587].forEach(function (x) {
+      body(s, 'A wonderful serenity has taken possess aken',
+        { x: x, y: 6.496, w: 2.266, h: 0.656, bullet: { characterCode: '27A2', indent: 13.5 } });
+    });
+    ringAt(s, 11.225, 2.506, 0.705, C.gold);
+    ringAt(s, 1.193, 3.731, 0.705, C.gold);
+  });
+}
+
+function slide8(pptx) {
+  page(pptx, { bg: C.cream }, function (s) {
+    photo(s, { x: 0.631, y: 0.583, w: 5.032, h: 6.917, shape: 'round2SameRect', angleRange: ARCH });
+    ringAt(s, 6.861, 1.781, 0.635, C.gold);
+    ringAt(s, 4.557, 0.885, 0.705, C.olive);
+    heading(s, { x: 6.401, y: 2.491, w: 5.354, a: 'About ', b: 'Wedding Day' });
+
+    s.addText('+47.5', { x: 6.401, y: 3.715, w: 1.292, h: 0.572, fontFace: F.body, fontSize: 28, bold: true, color: C.gold, valign: 'top', wrap: false, fit: 'resize' });
+    body(s, 'PLACEHOLDER',
+      { x: 7.986, y: 3.666, w: 4.413, h: 1.212, color: C.ink });
+    body(s, 'PLACEHOLDER',
+      { x: 7.986, y: 5.157, w: 4.413, h: 0.934, color: C.ink, bold: true, italic: true });
+    s.addShape('line', { x: 8.097, y: 6.37, w: 2.095, h: 0, line: { color: C.gold, width: 1, endArrowType: 'triangle' } });
+
+    s.addShape('roundRect', { x: 3.856, y: 5.073, w: 3.614, h: 1.611, rectRadius: pill(3.614, 1.611), fill: { color: C.gold }, line: NOLINE, shadow: SHADOW });
+    // camera glyph
+    s.addShape('roundRect', { x: 4.4, y: 5.62, w: 0.53, h: 0.4, rectRadius: 0.07, fill: { color: C.white }, line: NOLINE });
+    s.addShape('rect', { x: 4.53, y: 5.55, w: 0.19, h: 0.09, fill: { color: C.white }, line: NOLINE });
+    s.addShape('ellipse', { x: 4.56, y: 5.71, w: 0.21, h: 0.21, fill: { color: C.gold }, line: NOLINE });
+    body(s, 'Awon derful serenity posse derful serenity posse derful', { x: 5.164, y: 5.436, w: 1.808, h: 0.934 });
+  });
+}
+
+function slide9(pptx) {
+  page(pptx, { bg: C.cream }, function (s) {
+    photo(s, { x: 5.913, y: 1.425, w: 3.319, h: 5.587, shape: 'roundRect', r: pill(3.319, 5.587) });
+    photo(s, { x: 9.455, y: 0.511, w: 3.319, h: 5.587, shape: 'roundRect', r: pill(3.319, 5.587) });
+    ringAt(s, 1.581, 1.261, 0.635, C.gold);
+    heading(s, { x: 1.121, y: 1.97, w: 3.862, a: 'Woman ', b: 'Photo' });
+    [1.219, 2.001, 2.782, 3.563, 4.345].forEach(function (x) {
+      s.addShape('star5', { x: x, y: 3.036, w: 0.431, h: 0.431, fill: { color: C.gold }, line: NOLINE });
+    });
+
+    s.addShape('roundRect', { x: 1.143, y: 3.98, w: 4.539, h: 1.145, rectRadius: pill(4.539, 1.145), fill: { color: C.gold }, line: NOLINE, shadow: SHADOW });
+    body(s, 'PLACEHOLDER', { x: 1.557, y: 4.21, w: 3.71, h: 0.63, italic: true });
+    s.addShape('roundRect', { x: 8.171, y: 3.98, w: 2.569, h: 1.145, rectRadius: pill(2.569, 1.145), fill: { color: C.gold }, line: NOLINE, shadow: SHADOW });
+    s.addText('654.3K', { x: 8.661, y: 4.267, w: 1.597, h: 0.572, fontFace: F.body, fontSize: 28, bold: true, color: C.white, valign: 'top', wrap: false, fit: 'resize' });
+    s.addShape('roundRect', { x: 4.629, y: 5.38, w: 2.569, h: 1.145, rectRadius: pill(2.569, 1.145), fill: { color: C.olive }, line: NOLINE, shadow: SHADOW });
+    s.addText('985.6K', { x: 5.119, y: 5.667, w: 1.589, h: 0.572, fontFace: F.body, fontSize: 28, bold: true, color: C.white, valign: 'top', wrap: false, fit: 'resize' });
+    s.addText([
+      { text: 'Awon derful serenity posse derful serenity ', options: { color: C.ink } },
+      { text: 'posse derful ssionmy derful sere', options: { color: C.gold } }
+    ], { x: 1.646, y: 5.592, w: 2.523, h: 0.934, fontFace: F.body, fontSize: 11, bold: true, italic: true, align: 'justify', lineSpacingMultiple: 1.5, valign: 'top' });
+
+    ringAt(s, 7.994, 1.228, 0.705, C.olive);
+    ringAt(s, 12.007, 5.2, 0.705, C.olive);
+  });
+}
+
+function slide10(pptx) {
+  page(pptx, { bg: C.olive }, function (s) {
+    photo(s, { x: 1.135, y: 2.583, w: 5.241, h: 2.431, shape: 'roundRect', r: 0.55 });
+    photo(s, { x: 6.967, y: 2.583, w: 5.241, h: 2.431, shape: 'roundRect', r: 0.55 });
+    ringAt(s, 6.349, 0.708, 0.635, C.gold);
+    s.addText([
+      { text: 'Classic of', options: { color: C.white } }, { text: ' ', options: { color: C.ink } },
+      { text: 'Wedding', options: { color: C.gold } }
+    ], { x: 4.132, y: 1.417, w: 5.068, h: 0.774, fontFace: F.title, fontSize: 40, align: 'center', valign: 'top', wrap: false, fit: 'resize' });
+
+    s.addShape('round2SameRect', { x: 4.912, y: 3.75, w: 3.532, h: 3.755, angleRange: ARCH, fill: { color: C.gold }, line: NOLINE });
+    s.addText([
+      { text: 'Wedding Cost\n', options: { fontSize: 20, bold: true } },
+      { text: '$ 475.574.475', options: { fontSize: 16, italic: true } }
+    ], { x: 5.523, y: 4.502, w: 2.237, h: 0.707, fontFace: F.body, color: C.white, align: 'center', valign: 'top', wrap: false, fit: 'resize' });
+    body(s, 'PLACEHOLDER', { x: 5.403, y: 5.339, w: 2.527, h: 0.934, align: 'center' });
+    button(s, 'LEARN MORE', { x: 5.757, y: 6.497, w: 1.893, h: 0.604, fill: C.white, color: C.gold, size: 10.5 });
+
+    const side = 'PLACEHOLDER';
+    body(s, side, { x: 8.848, y: 5.523, w: 3.422, h: 0.934, align: 'left' });
+    body(s, side, { x: 1.087, y: 5.523, w: 3.422, h: 0.934, align: 'right' });
+    ringAt(s, 11.637, 2.232, 0.705, C.gold);
+    ringAt(s, 0.775, 3.399, 0.705, C.gold);
+  });
+}
+
+function slide11(pptx) {
+  page(pptx, { bg: C.cream }, function (s) {
+    photo(s, { x: 0, y: 1.165, w: 3.819, h: 5.222, shape: 'ellipse' });
+    photo(s, { x: 9.533, y: 1.165, w: 3.8, h: 5.222, shape: 'ellipse' });
+    ringAt(s, 6.349, 1.139, 0.635, C.gold);
+    heading(s, { x: 4.223, y: 1.848, w: 4.888, a: 'About ', b: 'Bridesmaid', align: 'center' });
+
+    s.addShape('roundRect', { x: 3.2, y: 3.03, w: 6.953, h: 1.463, rectRadius: pill(6.953, 1.463), fill: { color: C.olive }, line: NOLINE, shadow: SHADOW });
+    body(s, 'PLACEHOLDER',
+      { x: 3.833, y: 3.434, w: 5.687, h: 0.656, align: 'center', bold: true, italic: true });
+    body(s, 'PLACEHOLDER',
+      { x: 4.111, y: 4.834, w: 5.111, h: 0.934, align: 'center', color: C.ink });
+    button(s, 'LEARN MORE', { x: 5.73, y: 5.987, w: 1.893, h: 0.604, fill: C.gold, color: C.white, size: 10.5 });
+    ringAt(s, 10.518, 1.165, 0.705, C.olive);
+    ringAt(s, 2.033, 5.77, 0.705, C.olive);
+  });
+}
+
+function slide12(pptx) {
+  page(pptx, { bg: C.cream }, function (s) {
+    // A very wide, shallow arch: an ellipse whose lower half falls off the slide.
+    photo(s, { x: 0.714, y: 1.576, w: 11.921, h: 11.32, shape: 'ellipse', caption: ' ' });
+    s.addText('[image]', { x: 0.714, y: 4.0, w: 11.921, h: 0.32, align: 'center', fontFace: F.light, fontSize: 11, color: C.greyTx });
+    // ...notched by a smaller arch rising from the bottom edge
+    s.addShape('ellipse', { x: 4.31, y: 5.17, w: 4.72, h: 4.66, fill: { color: C.cream }, line: NOLINE });
+    s.addShape('roundRect', { x: 1.938, y: 0.951, w: 9.479, h: 2.441, rectRadius: pill(9.479, 2.441), fill: { color: C.olive }, line: NOLINE, shadow: SHADOW });
+    s.addText([
+      { text: 'BREAK', options: { color: C.white } }, { text: ' ', options: { color: C.ink } },
+      { text: 'SLIDE', options: { color: C.gold } }
+    ], { x: 2.531, y: 1.348, w: 8.271, h: 1.582, fontFace: F.title, fontSize: 88, valign: 'top', wrap: false, fit: 'resize' });
+    s.addText([
+      { text: 'Awon derful serenity posse derful serenity ', options: { color: C.ink } },
+      { text: 'posse derful ssionmy derful sere', options: { color: C.gold } }
+    ], { x: 5.413, y: 6.066, w: 2.523, h: 0.934, fontFace: F.body, fontSize: 11, bold: true, italic: true, align: 'center', lineSpacingMultiple: 1.5, valign: 'top' });
+    ringAt(s, 11.225, 3.836, 0.705, C.olive);
+    ringAt(s, 1.316, 3.891, 0.705, C.olive);
+  });
+}
+
+function slide13(pptx) {
+  page(pptx, { bg: C.olive }, function (s) {
+    [1.381, 5.017, 8.653].forEach(function (x) {
+      [2.705, 4.603].forEach(function (y) {
+        photo(s, { x: x, y: y, w: 3.319, h: 1.639, shape: 'roundRect', r: pill(3.319, 1.639) });
+      });
+    });
+    ringAt(s, 6.349, 0.708, 0.635, C.gold);
+    s.addText([
+      { text: 'Great', options: { color: C.white } }, { text: ' ', options: { color: C.ink } },
+      { text: 'Wedding', options: { color: C.gold } }
+    ], { x: 4.598, y: 1.417, w: 4.138, h: 0.774, fontFace: F.title, fontSize: 40, align: 'center', valign: 'top', wrap: false, fit: 'resize' });
+    [[11.28, 2.535], [0.964, 3.18], [3.679, 5.879], [9.96, 5.902]].forEach(function (p) {
+      ringAt(s, p[0], p[1], 0.705, C.gold);
+    });
+  });
+}
+
+function slide14(pptx) {
+  page(pptx, { bg: C.cream }, function (s) {
+    ringAt(s, 1.926, 1.296, 0.635, C.gold);
+    heading(s, { x: 1.466, y: 2.005, w: 5.992, a: 'Best Moment ', b: 'Wedding' });
+
+    s.addShape('roundRect', { x: 1.313, y: 3.266, w: 6.486, h: 3.014, rectRadius: pill(6.486, 3.014), fill: { color: C.olive }, line: NOLINE, shadow: SHADOW });
+    photo(s, { x: 1.693, y: 3.666, w: 2.224, h: 2.224, shape: 'ellipse' });
+    ringAt(s, 1.466, 5.273, 0.705, C.gold);
+    s.addText('Beautiful Photo', { x: 4.312, y: 3.708, w: 2.406, h: 0.438, fontFace: F.body, fontSize: 20, bold: true, color: C.white, valign: 'top', wrap: false, fit: 'resize' });
+    body(s, 'PLACEHOLDER', { x: 4.312, y: 4.219, w: 2.643, h: 0.934 });
+    button(s, 'DOWNLOAD', { x: 4.391, y: 5.288, w: 1.412, h: 0.45, fill: C.white, color: C.olive });
+
+    // three stacked pills (rotated arches) with an icon + label
+    const rows = [
+      { y: -0.686, fill: C.gold, label: 'Home', ly: 1.497, lw: 1.398, icon: 'home', iy: 1.584 },
+      { y: 1.072, fill: '886F0E', label: 'Chart', ly: 3.283, lw: 1.361, icon: 'chart', iy: 3.356 },
+      { y: 2.831, fill: C.gold, label: 'Web', ly: 5.049, lw: 1.124, icon: 'web', iy: 5.181 }
+    ];
+    rows.forEach(function (r) {
+      s.addShape('round2SameRect', { x: 9.885, y: r.y, w: 1.563, h: 5.333, rotate: 270, angleRange: ARCH, fill: { color: r.fill }, line: NOLINE });
+      s.addText(r.label, { x: 9.361, y: r.ly, w: r.lw, h: 0.572, fontFace: F.body, fontSize: 28, bold: true, color: C.white, valign: 'top', wrap: false, fit: 'resize' });
+      body(s, 'Awon derful serenity posse derful serenity posse ssionmy', { x: 11.032, y: r.ly, w: 1.936, h: 0.934 });
+      icon(s, r.icon, 8.6, r.iy);
+    });
+  });
+}
+
+/** Thin white line-art pictograms used on slide 14. */
+function icon(s, kind, x, y) {
+  const stroke = { color: C.white, width: 1.5 };
+  if (kind === 'home') {
+    s.addShape('triangle', { x: x, y: y, w: 0.49, h: 0.25, fill: NOFILL, line: stroke });
+    s.addShape('rect', { x: x + 0.09, y: y + 0.24, w: 0.31, h: 0.21, fill: NOFILL, line: stroke });
+    s.addShape('rect', { x: x + 0.2, y: y + 0.32, w: 0.09, h: 0.13, fill: NOFILL, line: stroke });
+  } else if (kind === 'chart') {
+    [0.13, 0.2, 0.29, 0.34].forEach(function (h, i) {
+      s.addShape('rect', { x: x + 0.03 + i * 0.1, y: y + 0.35 - h, w: 0.072, h: h, fill: NOFILL, line: stroke });
+    });
+    s.addShape('line', { x: x, y: y + 0.37, w: 0.435, h: 0, line: stroke });
+  } else {
+    s.addShape('ellipse', { x: x, y: y, w: 0.44, h: 0.44, fill: NOFILL, line: stroke });
+    s.addShape('ellipse', { x: x + 0.14, y: y, w: 0.16, h: 0.44, fill: NOFILL, line: stroke });
+    s.addShape('line', { x: x, y: y + 0.22, w: 0.44, h: 0, line: stroke });
+    s.addShape('line', { x: x + 0.04, y: y + 0.1, w: 0.36, h: 0, line: stroke });
+    s.addShape('line', { x: x + 0.04, y: y + 0.34, w: 0.36, h: 0, line: stroke });
+  }
+}
+
+/** Solid white thumbs-up: a rounded fist plus the raised thumb and cuff. */
+function thumbsUp(s, x, y, k) {
+  k = k || 1;
+  s.addShape('roundRect', { x: x + 0.09 * k, y: y + 0.11 * k, w: 0.22 * k, h: 0.24 * k, rectRadius: 0.05 * k, fill: { color: C.white }, line: NOLINE });
+  s.addShape('roundRect', { x: x + 0.12 * k, y: y, w: 0.09 * k, h: 0.16 * k, rectRadius: 0.04 * k, fill: { color: C.white }, line: NOLINE });
+  s.addShape('roundRect', { x: x, y: y + 0.16 * k, w: 0.07 * k, h: 0.19 * k, rectRadius: 0.02 * k, fill: { color: C.white }, line: NOLINE });
+}
+
+function slide15(pptx) {
+  page(pptx, { bg: C.cream }, function (s) {
+    s.addShape('round2SameRect', { x: 4.63, y: 0.532, w: 4.074, h: 6.964, angleRange: ARCH, fill: { color: C.olive }, line: NOLINE });
+    photo(s, { x: 5.017, y: 0.899, w: 3.3, h: 3.3, shape: 'ellipse' });
+    s.addText('Best Couple', { x: 5.708, y: 4.698, w: 1.918, h: 0.438, fontFace: F.body, fontSize: 20, bold: true, color: C.white, align: 'center', valign: 'top', wrap: false, fit: 'resize' });
+    body(s, 'Awon derful serenity posse ssionmy derful serenity has derful serenity \nhas derful serenity has tak',
+      { x: 5.017, y: 5.264, w: 3.3, h: 0.934, align: 'center' });
+    button(s, 'DOWNLOAD', { x: 5.961, y: 6.455, w: 1.412, h: 0.45, fill: C.white, color: C.olive });
+
+    // three bullet rows either side of the arch (the left column is mirrored)
+    const copy = 'PLACEHOLDER';
+    [1.905, 3.648, 5.392].forEach(function (y) {
+      body(s, copy, { x: 9.563, y: y, w: 2.84, h: 0.934, color: C.ink, align: 'left' });
+      s.addShape('ellipse', { x: 9.143, y: y + 0.102, w: 0.236, h: 0.236, fill: { color: C.gold }, line: NOLINE });
+      body(s, copy, { x: 1.003, y: y, w: 2.84, h: 0.934, color: C.ink, align: 'right' });
+      s.addShape('ellipse', { x: 4.026, y: y + 0.102, w: 0.236, h: 0.236, fill: { color: C.gold }, line: NOLINE });
+    });
+    ringAt(s, 7.452, 1.019, 0.705, C.gold);
+    ringAt(s, 4.911, 3.113, 0.705, C.gold);
+  });
+}
+
+function slide16(pptx) {
+  page(pptx, { bg: C.olive }, function (s) {
+    photo(s, { x: 8.568, y: 1.139, w: 4.248, h: 6.361, shape: 'round2SameRect', angleRange: ARCH });
+    photo(s, { x: 1.319, y: 3.75, w: 3.319, h: 1.639, shape: 'roundRect', r: pill(3.319, 1.639) });
+    photo(s, { x: 4.943, y: 3.75, w: 3.319, h: 1.639, shape: 'roundRect', r: pill(3.319, 1.639) });
+    ringAt(s, 1.637, 0.938, 0.635, C.gold);
+    s.addText([
+      { text: 'Special of', options: { color: C.white } }, { text: ' ', options: { color: C.ink } },
+      { text: 'Wedding', options: { color: C.gold } }
+    ], { x: 1.177, y: 1.647, w: 5.149, h: 0.774, fontFace: F.title, fontSize: 40, valign: 'top', wrap: false, fit: 'resize' });
+
+    const copy = 'PLACEHOLDER';
+    body(s, 'PLACEHOLDER',
+      { x: 1.196, y: 2.602, w: 4.856, h: 0.656 });
+    button(s, 'DOWNLOAD', { x: 6.428, y: 2.667, w: 1.412, h: 0.45, fill: C.white, color: C.olive });
+    body(s, copy, { x: 1.559, y: 5.726, w: 2.84, h: 0.934 });
+    body(s, copy, { x: 5.178, y: 5.726, w: 2.84, h: 0.934 });
+    ringAt(s, 11.766, 1.349, 0.705, C.gold);
+    ringAt(s, 1.123, 3.579, 0.705, C.gold);
+    ringAt(s, 7.313, 5.038, 0.705, C.gold);
+  });
+}
+
+function slide17(pptx) {
+  page(pptx, { bg: C.cream }, function (s) {
+    photo(s, { x: 0.958, y: 3.417, w: 5.036, h: 4.083, shape: 'roundRect', r: 0.45 });
+    ringAt(s, 1.384, 1.47, 0.635, C.gold);
+    heading(s, { x: 0.924, y: 2.179, w: 4.883, a: 'Nice ', b: 'Wedding Day' });
+
+    [
+      { x: 6.339, tx: 6.765, fill: C.gold, title: 'Summer Day', tw: 2.079 },
+      { x: 9.83, tx: 10.298, fill: C.olive, title: 'Spring Day', tw: 1.778 }
+    ].forEach(function (col) {
+      s.addShape('roundRect', { x: col.x, y: 1.616, w: 3.146, h: 4.351, rectRadius: 0.529, fill: { color: col.fill }, line: NOLINE, shadow: SHADOW });
+      s.addText(col.title, { x: col.tx, y: 2.098, w: col.tw, h: 0.438, fontFace: F.body, fontSize: 20, bold: true, color: C.white, valign: 'top', wrap: false, fit: 'resize' });
+      [2.74, 3.773, 4.806].forEach(function (y) {
+        body(s, 'Awon derful serenity serenity has tak',
+          { x: col.tx, y: y, w: 2.193, h: 0.656, bullet: { characterCode: '27A2', indent: 13.5 } });
+      });
+    });
+  });
+}
+
+function slide18(pptx) {
+  page(pptx, { bg: C.olive }, function (s) {
+    s.addShape('roundRect', { x: 1.595, y: 1.387, w: 10.17, h: 4.726, rectRadius: pill(10.17, 4.726), fill: { color: C.gold }, line: NOLINE, shadow: SHADOW });
+    s.addText('Wedding Quotes', { x: 4.439, y: 1.867, w: 4.455, h: 0.774, fontFace: F.title, fontSize: 40, color: C.white, align: 'center', valign: 'top', wrap: false, fit: 'resize' });
+    s.addText('\u201CAwon derful serenity posse derful serenity posse derful posse ssionmy posse ssionmy derful serenity ssionmy ssionmy derful derful\u201D\n- Stefany Aomi',
+      { x: 2.278, y: 2.973, w: 8.79, h: 2.524, fontFace: F.body, fontSize: 24, bold: true, italic: true, color: C.white, align: 'center', lineSpacingMultiple: 1.5, valign: 'top' });
+  });
+}
+
+function slide19(pptx) {
+  page(pptx, { blob: false }, function (s) {
+    infographicHead(s);
+    s.addChart('bar', [
+      { name: 'Series 1', labels: ['Name 1', 'Name 2', 'Name 3', 'Name 4'], values: [1, 2, 3, 4] },
+      { name: 'Series 2', labels: ['Name 1', 'Name 2', 'Name 3', 'Name 4'], values: [3, 5, 6, 3] }
+    ], {
+      x: 1.232, y: 2.449, w: 5.128, h: 3.73,
+      layout: { x: 0.057, y: 0.043, w: 0.919, h: 0.70 },
+      barDir: 'col', barGrouping: 'clustered', barGapWidthPct: 182,
+      chartColors: ['DBD4CD', C.gold], showLegend: false, showTitle: false,
+      catAxisLabelFontFace: F.body, catAxisLabelFontSize: 11, catAxisLabelColor: '000000',
+      valAxisLabelFontFace: F.body, valAxisLabelFontSize: 11, valAxisLabelColor: '000000',
+      valGridLine: { color: 'F2F2F2', size: 0.5 }, catGridLine: { style: 'none' },
+      valAxisLineColor: 'BFBFBF', catAxisLineColor: 'BFBFBF',
+      valAxisMaxVal: 7, valAxisMajorUnit: 1
+    });
+    s.addText('REPORTS 2019', { x: 6.972, y: 2.45, w: 2.486, h: 0.37, fontFace: F.light, fontSize: 16, bold: true, color: '576579', valign: 'top' });
+    const lorem = "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley";
+    [3.004, 4.049].forEach(function (y) {
+      s.addText(lorem, { x: 6.972, y: y, w: 5.449, h: 1.145, fontFace: F.light, fontSize: 11, color: C.ink, lineSpacingMultiple: 1.5, valign: 'top' });
+    });
+    s.addText('SHOW MORE', { shape: 'rect', x: 7.081, y: 5.145, w: 1.271, h: 0.286, fill: { color: C.gold }, align: 'center', valign: 'middle', fontFace: F.light, fontSize: 11, color: C.white });
+  });
+}
+
+function slide20(pptx) {
+  page(pptx, { blob: false }, function (s) {
+    infographicHead(s);
+    const lorem = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin sed libero in magna \n\nultrices gravida sit amet at diam. Suspendisse placerat gravida magna vel';
+    [
+      { x: 2.09, tx: 1.46, bx: 1.302, ring: C.olive },
+      { x: 6.179, tx: 5.548, bx: 5.39, ring: C.gold },
+      { x: 10.267, tx: 9.636, bx: 9.478, ring: C.olive }
+    ].forEach(function (col) {
+      s.addShape('ellipse', { x: col.x, y: 2.836, w: 1.29, h: 1.29, fill: { color: col.ring }, line: NOLINE });
+      s.addShape('ellipse', { x: col.x + 0.158, y: 2.994, w: 0.974, h: 0.974, fill: { color: C.white }, line: NOLINE });
+      s.addShape('ellipse', { x: col.x + 0.302, y: 3.139, w: 0.686, h: 0.686, fill: { color: col.ring }, line: NOLINE });
+      s.addText('2020', { x: col.x + 0.278, y: 3.28, w: 0.735, h: 0.37, fontFace: F.light, fontSize: 16, bold: true, color: C.white, valign: 'top', wrap: false, fit: 'resize' });
+      s.addText('Write Something', { x: col.tx, y: 4.317, w: 2.551, h: 0.438, fontFace: F.light, fontSize: 20, bold: true, color: '000000', align: 'center', valign: 'top', wrap: false, fit: 'resize' });
+      s.addText(lorem, { x: col.bx, y: 4.788, w: 2.867, h: 1.648, fontFace: F.light, fontSize: 12, color: C.mute, align: 'center', lineSpacingMultiple: 1.1, valign: 'top' });
+    });
+  });
+}
+
+function slide21(pptx) {
+  page(pptx, { blob: false }, function (s) {
+    infographicHead(s);
+    // dashed arcs linking the milestones
+    [[2.492, 2.254], [5.401, 2.253], [8.439, 2.071]].forEach(function (p) {
+      s.addShape('blockArc', {
+        x: p[0], y: p[1], w: 2.384, h: 2.516, angleRange: [180, 355.6], arcThicknessRatio: 0.001,
+        fill: NOFILL, line: { color: C.hair, width: 3, dashType: 'dash' }
+      });
+    });
+    const stops = [
+      { x: 1.412, y: 2.979, fill: C.gold, year: '2018', yx: 1.837, yw: 0.794, tx: 1.081, sx: 1.377, ty: 5.426, sy: 4.969 },
+      { x: 4.311, y: 2.979, fill: C.olive, year: '2019', yx: 4.737, yw: 0.794, tx: 3.944, sx: 4.241, ty: 5.42, sy: 4.962 },
+      { x: 7.209, y: 2.979, fill: C.gold, year: '2020', yx: 7.601, yw: 0.872, tx: 6.811, sx: 7.107, ty: 5.42, sy: 4.962 },
+      { x: 10.105, y: 2.903, fill: C.olive, year: '2021', yx: 10.542, yw: 0.78, tx: 9.707, sx: 10.003, ty: 5.343, sy: 4.886 }
+    ];
+    stops.forEach(function (d) {
+      s.addShape('diamond', { x: d.x + 0.003, y: d.y + 0.273, w: 1.647, h: 1.647, fill: { color: C.hair }, line: NOLINE });
+      s.addShape('diamond', { x: d.x, y: d.y, w: 1.647, h: 1.647, fill: { color: d.fill }, line: NOLINE });
+      s.addText(d.year, { x: d.yx, y: d.y + 0.551, w: d.yw, h: 0.438, fontFace: F.light, fontSize: 20, color: C.white, align: 'center', valign: 'top', wrap: false, fit: 'resize' });
+      s.addText('Write Subtitle', { x: d.sx, y: d.sy, w: 1.838, h: 0.404, fontFace: F.light, fontSize: 18, bold: true, color: '000000', align: 'center', valign: 'top', wrap: false, fit: 'resize' });
+      s.addText('Lorem ipsum dolor sit amet, cons ectetur adipis cing elit, sed do',
+        { x: d.tx, y: d.ty, w: 2.444, h: 0.985, fontFace: F.light, fontSize: 12, color: C.mute, align: 'center', lineSpacingMultiple: 1.5, valign: 'top' });
+    });
+  });
+}
+
+function slide22(pptx) {
+  page(pptx, { blob: false }, function (s) {
+    infographicHead(s);
+    const feats = ['1000 web space', '2 GB banwith', '10 email', '2 FTP account'];
+    const unlim = ['unlimited web space', 'unlimited banwith', 'unlimited email', 'unlimited FTP account'];
+    const plans = [
+      { x: 1.218, w: 2.49, y: 2.366, h: 3.908, fill: C.gold, name: 'Bronze', nsz: 16, price: '$5', psz: 36, list: feats, ly: 3.98, btn: 1.692, bw: 1.538, bh: 0.383, bfill: 'D3BF71', bsz: 14, by: 5.553 },
+      { x: 4.121, w: 2.49, y: 2.366, h: 3.908, fill: C.olive, name: 'Silver', nsz: 16, price: '$40', psz: 36, list: feats, ly: 3.98, btn: 4.595, bw: 1.538, bh: 0.383, bfill: '8F9175', bsz: 14, by: 5.553 },
+      { x: 6.878, w: 2.49, y: 2.366, h: 3.908, fill: C.gold, name: 'Gold', nsz: 16, price: '$100', psz: 36, list: feats, ly: 3.98, btn: 7.352, bw: 1.538, bh: 0.383, bfill: 'DADAD1', bsz: 14, by: 5.553 },
+      { x: 9.725, w: 2.773, y: 2.144, h: 4.353, fill: C.gold, name: 'Platinum', nsz: 20, price: '$150', psz: 44, list: unlim, ly: 4.13, btn: 10.253, bw: 1.713, bh: 0.426, bfill: 'F6F2EC', bsz: 16, by: 5.639 }
+    ];
+    plans.forEach(function (p) {
+      s.addShape('snip2SameRect', { x: p.x, y: p.y, w: p.w, h: p.h, fill: { color: p.fill }, line: NOLINE });
+      s.addText(p.name, { x: p.x, y: p.y, w: p.w, h: p.w === 2.773 ? 0.596 : 0.535, fontFace: F.light, fontSize: p.nsz, bold: true, color: C.white, align: 'center', valign: 'middle' });
+      s.addText(p.price, { x: p.x - 0.004, y: 3.132, w: p.w + 0.004, h: p.psz === 44 ? 0.841 : 0.707, fontFace: F.light, fontSize: p.psz, color: C.white, align: 'center', valign: 'middle' });
+      s.addText(p.list.map(function (t) {
+        return { text: t, options: { breakLine: true, bullet: { characterCode: '2713', indent: 13.5 }, paraSpaceBefore: 12 } };
+      }), { x: p.x - 0.004, y: p.ly, w: p.w + 0.004, h: 1.6, fontFace: F.light, fontSize: 12, color: C.white, align: 'center', valign: 'top', lineSpacingMultiple: 1 });
+      s.addText('Get Plan', { shape: 'round2DiagRect', x: p.btn, y: p.by, w: p.bw, h: p.bh, fill: { color: p.bfill }, line: NOLINE, align: 'center', valign: 'middle', fontFace: F.light, fontSize: p.bsz, color: C.white });
+    });
+  });
+}
+
+function slide23(pptx) {
+  page(pptx, { blob: false }, function (s) {
+    infographicHead(s);
+    const cell = 'A wonderful serenity has taken possession';
+    const quads = [
+      { x: 7.46, y: 2.587, w: 2.152, h: 1.825, rotate: 180, fill: C.gold, tx: 7.717, ty: 3.315, ix: 8.323, iy: 2.844 },
+      { x: 9.277, y: 2.608, w: 2.152, h: 1.825, flipH: true, fill: C.olive, tx: 9.534, ty: 3.269, ix: 10.141, iy: 2.844 },
+      { x: 7.459, y: 4.548, w: 2.152, h: 1.802, flipH: true, fill: C.gold, tx: 7.716, ty: 5.278, ix: 8.338, iy: 4.827 },
+      { x: 9.277, y: 4.551, w: 2.152, h: 1.825, rotate: 180, fill: C.gold, tx: 9.534, ty: 5.278, ix: 10.156, iy: 4.827 }
+    ];
+    quads.forEach(function (q) {
+      s.addShape('trapezoid', { x: q.x, y: q.y, w: q.w, h: q.h, rotate: q.rotate, flipH: q.flipH, fill: { color: q.fill }, line: NOLINE });
+      s.addText(cell, { x: q.tx, y: q.ty, w: 1.594, h: 0.866, fontFace: F.light, fontSize: 10.5, color: C.white, align: 'center', lineSpacingMultiple: 1.5, valign: 'top' });
+      thumbsUp(s, q.ix, q.iy);
+    });
+    const para = 'Lorem ipsum dolor amet, consectetur adipiscing\nWhether you are an established business or a startup, ensuring established business an established';
+    [2.778, 3.987].forEach(function (y) {
+      s.addText(para, { x: 1.634, y: y, w: 4.622, h: 0.909, fontFace: F.light, fontSize: 12, color: C.slate, lineSpacingMultiple: 1.5, valign: 'top', margin: 0 });
+    });
+    s.addText('Show More', { shape: 'roundRect', x: 1.63, y: 5.151, w: 1.864, h: 0.482, rectRadius: 0.09, fill: { color: C.gold }, line: NOLINE, align: 'center', valign: 'middle', fontFace: F.light, fontSize: 18, color: C.white });
+  });
+}
+
+function slide24(pptx) {
+  page(pptx, { blob: false }, function (s) {
+    infographicHead(s);
+    [
+      { x: 2.505, fill: C.gold, day: '12', kx: 2.732, kf: C.cream, tx: 2.747, sx: 2.519 },
+      { x: 4.667, fill: C.gold, day: '13', kx: 4.884, kf: C.gold, tx: 4.881, sx: 4.671 },
+      { x: 6.829, fill: C.olive, day: '14', kx: 7.036, kf: C.olive, tx: 7.08, sx: 6.823 },
+      { x: 8.992, fill: C.gold, day: '15', kx: 9.187, kf: C.cream, tx: 9.218, sx: 8.975 }
+    ].forEach(function (d) {
+      s.addShape('roundRect', { x: d.x, y: 2.831, w: 1.837, h: 1.837, rotate: 44.7, rectRadius: 0.28, fill: { color: d.fill }, line: NOLINE });
+      s.addText([{ text: 'August\n' }, { text: d.day }, { text: 'TH', options: { fontSize: 14 } }],
+        { x: d.tx, y: 3.372, w: 1.368, h: 0.909, fontFace: F.light, fontSize: 24, color: C.white, align: 'center', valign: 'top', wrap: false, fit: 'resize' });
+      s.addText('Write Keyword', { shape: 'rect', x: d.kx, y: 5.146, w: 1.387, h: 0.303, fill: { color: d.kf }, align: 'center', valign: 'top', fontFace: F.light, fontSize: 12, bold: true, color: C.white, wrap: false, fit: 'resize' });
+      s.addText('Sed ut perspi ciatis unde omnis', { x: d.sx, y: 5.537, w: 1.812, h: 0.878, fontFace: F.light, fontSize: 14, color: C.slate, align: 'center', lineSpacingMultiple: 1.1, valign: 'top' });
+    });
+  });
+}
+
+function slide25(pptx) {
+  page(pptx, { blob: false }, function (s) {
+    infographicHead(s);
+    // dashed connector rails
+    s.addShape('line', { x: 2.459, y: 2.541, w: 7.892, h: 0, line: { color: C.dash, width: 1, dashType: 'dash' } });
+    s.addShape('line', { x: 2.527, y: 5.032, w: 7.892, h: 0, line: { color: C.dash, width: 1, dashType: 'dash' } });
+    s.addShape('line', { x: 2.581, y: 2.408, w: 0, h: 3.002, line: { color: C.dash, width: 1, dashType: 'dash' } });
+    s.addShape('line', { x: 10.351, y: 5.221, w: 0, h: 2.279, line: { color: C.dash, width: 1, dashType: 'dash' } });
+
+    const steps = [
+      { n: '01', x: 9.924, y: 2.098, fill: C.gold, nx: 10.108, tx: 9.924, ty: 2.943, align: 'left' },
+      { n: '02', x: 6.057, y: 2.098, fill: C.gold, nx: 6.216, tx: 6.057, ty: 2.941, align: 'left' },
+      { n: '03', x: 2.146, y: 2.098, fill: C.olive, nx: 2.278, tx: 3.015, ty: 2.941, align: 'left' },
+      { n: '04', x: 2.146, y: 4.589, fill: C.gold, nx: 2.273, tx: 0.937, ty: 5.491, align: 'right' },
+      { n: '05', x: 6.057, y: 4.589, fill: C.olive, nx: 6.209, tx: 4.88, ty: 5.491, align: 'right' },
+      { n: '06', x: 9.924, y: 4.589, fill: C.gold, nx: 10.051, tx: 7.998, ty: 5.491, align: 'right' }
+    ];
+    steps.forEach(function (st) {
+      s.addShape('rect', { x: st.x, y: st.y, w: 0.875, h: 0.875, fill: { color: st.fill }, line: NOLINE });
+      s.addText(st.n, { x: st.nx, y: st.y + 0.185, w: 0.61, h: 0.505, fontFace: F.light, fontSize: 24, color: C.white, align: 'center', valign: 'top', wrap: false, fit: 'resize' });
+      const off = st.align === 'right' ? 0.18 : 0;
+      s.addText('Write Something', { x: st.tx + off, y: st.ty, w: 2.083, h: 0.37, fontFace: F.light, fontSize: 16, bold: true, color: C.mute, align: st.align, valign: 'top', wrap: false, fit: 'resize' });
+      s.addText('Perspiciatis unde omnis iste voluptatem fringilla.', { x: st.tx, y: st.ty + 0.381, w: 2.264, h: 0.545, fontFace: F.light, fontSize: 12, color: C.mute, align: st.align, lineSpacingMultiple: 1.1, valign: 'top' });
+    });
+  });
+}
+
+/** Right hand "Main Aspects" grid reused by slides 26 and 28. */
+function aspectGrid(s, cols, rows, w) {
+  const copy = 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring my entire entire soul';
+  rows.forEach(function (row) {
+    cols.forEach(function (x) {
+      s.addText('Main Aspects', { x: x, y: row.title, w: 2.233, h: 0.367, fontFace: F.light, fontSize: 14, bold: true, color: C.cream, lineSpacingMultiple: 1.2, valign: 'top' });
+      s.addText(copy, { x: x, y: row.body, w: w, h: 0.949, fontFace: F.light, fontSize: 10.5, color: '262626', lineSpacingMultiple: 1.2, valign: 'top' });
+    });
+  });
+}
+
+function slide26(pptx) {
+  page(pptx, { blob: false }, function (s) {
+    infographicHead(s);
+    s.addShape('rect', { x: 1.697, y: 2.386, w: 0.348, h: 5.114, fill: { color: C.gold }, line: NOLINE });
+    [
+      { y: 2.386, w: 1.859, h: 1.274, fill: C.gold, label: '23M', lw: 0.91 },
+      { y: 3.66, w: 2.372, h: 1.283, fill: C.gold, label: '67M', lw: 0.905 },
+      { y: 4.943, w: 2.029, h: 1.283, fill: C.olive, label: '770K', lw: 0.98 },
+      { y: 6.226, w: 1.562, h: 1.274, fill: C.gold, label: '10K', lw: 0.717 }
+    ].forEach(function (b) {
+      s.addShape('homePlate', { x: 2.322, y: b.y, w: b.w, h: b.h, fill: { color: b.fill }, line: NOLINE });
+      s.addText(b.label, { x: 2.574, y: b.y + 0.362, w: b.lw, h: 0.505, fontFace: F.light, fontSize: 24, bold: true, color: C.white, valign: 'top', wrap: false, fit: 'resize' });
+    });
+    aspectGrid(s, [5.621, 9.055], [{ title: 2.364, body: 2.843 }, { title: 4.239, body: 4.717 }], 2.667);
+  });
+}
+
+function slide27(pptx) {
+  page(pptx, { blob: false }, function (s) {
+    infographicHead(s);
+    const quote = '\u201CA wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which';
+    [[1.678, 1.791], [6.966, 7.079]].forEach(function (col) {
+      [[2.569, 3.356], [4.311, 5.098]].forEach(function (row) {
+        s.addText(quote, { x: col[0], y: row[0], w: 4.883, h: 0.586, fontFace: F.light, fontSize: 12, color: C.slate, lineSpacingMultiple: 1.2, valign: 'top' });
+        s.addText('Learn More', { shape: 'roundRect', x: col[1], y: row[1], w: 1.694, h: 0.392, rectRadius: pill(1.694, 0.392), fill: { color: C.gold }, line: NOLINE, align: 'center', valign: 'middle', fontFace: F.light, fontSize: 12, color: C.white });
+      });
+    });
+  });
+}
+
+function slide28(pptx) {
+  page(pptx, { blob: false }, function (s) {
+    infographicHead(s);
+    // cluster of social / utility badges
+    const soft = 'DADDE1';
+    s.addShape('ellipse', { x: 2.158, y: 2.728, w: 1.138, h: 1.141, fill: { color: C.gold }, line: NOLINE });   // envelope
+    s.addShape('rect', { x: 2.42, y: 3.12, w: 0.61, h: 0.36, fill: { color: C.white }, line: NOLINE });
+    s.addShape('triangle', { x: 2.42, y: 3.14, w: 0.61, h: 0.24, rotate: 180, fill: { color: C.gold }, line: NOLINE });
+    s.addShape('ellipse', { x: 3.816, y: 3.488, w: 0.876, h: 0.873, fill: { color: C.olive }, line: NOLINE });  // thumbs up
+    thumbsUp(s, 4.02, 3.62, 1.15);
+    s.addShape('ellipse', { x: 3.0, y: 4.585, w: 1.078, h: 1.081, fill: { color: C.gold }, line: NOLINE });     // facebook
+    s.addText('f', { x: 3.0, y: 4.585, w: 1.078, h: 1.081, align: 'center', valign: 'middle', fontFace: F.body, fontSize: 30, bold: true, color: C.white });
+    s.addShape('teardrop', { x: 2.35, y: 3.95, w: 0.31, h: 0.31, rotate: 225, fill: { color: soft }, line: NOLINE });   // map pin
+    s.addShape('ellipse', { x: 2.16, y: 4.65, w: 0.31, h: 0.31, fill: NOFILL, line: { color: soft, width: 3 } });      // magnifier
+    s.addShape('line', { x: 2.17, y: 4.95, w: 0.14, h: 0.2, line: { color: soft, width: 3 } });
+    s.addShape('blockArc', { x: 4.53, y: 4.2, w: 0.52, h: 0.52, angleRange: [200, 100], arcThicknessRatio: 0.45, fill: { color: soft }, line: NOLINE }); // refresh
+    s.addShape('blockArc', { x: 4.53, y: 4.2, w: 0.52, h: 0.52, angleRange: [20, 100], arcThicknessRatio: 0.45, fill: { color: soft }, line: NOLINE });
+
+    aspectGrid(s, [5.996, 9.066], [{ title: 2.535, body: 3.013 }, { title: 4.409, body: 4.888 }], 2.449);
+  });
+}
+
+function slide29(pptx) {
+  page(pptx, { blob: false }, function (s) {
+    infographicHead(s);
+    // faint square brackets behind the chevrons
+    [[8.203, 4.135], [6.482, 3.354], [4.672, 3.346], [2.965, 4.143]].forEach(function (g) {
+      s.addShape('rect', { x: g[0], y: g[1], w: 0.447, h: 2.027, fill: { color: C.hair }, line: NOLINE });
+      s.addShape('rect', { x: g[0] + 0.79, y: g[1] + 0.782, w: 0.447, h: 2.027, rotate: 90, fill: { color: C.hair }, line: NOLINE });
+    });
+    const steps = [
+      { x: 2.369, y: 2.998, fill: C.gold, tx: 2.454, ty: 3.326, bx: 3.933, by: 2.491, bfill: C.cream, nx: 3.857, ny: 2.559, n: '01', dx: 4.443, dy: 2.357, dfill: C.cream },
+      { x: 4.025, y: 5.33, fill: C.gold, tx: 4.103, ty: 5.718, bx: 5.532, by: 4.834, bfill: C.gold, nx: 5.456, ny: 4.902, n: '02', dx: 6.038, dy: 4.701, dfill: C.gold },
+      { x: 5.781, y: 2.998, fill: C.olive, tx: 5.865, ty: 3.326, bx: 7.352, by: 2.491, bfill: C.olive, nx: 7.275, ny: 2.559, n: '03', dx: 7.9, dy: 2.357, dfill: C.olive },
+      { x: 7.487, y: 5.33, fill: C.gold, tx: 7.571, ty: 5.718, bx: 9.008, by: 4.834, bfill: C.cream, nx: 8.932, ny: 4.902, n: '04', dx: 9.506, dy: 4.668, dfill: C.cream },
+      { x: 9.193, y: 2.998, fill: C.gold, tx: 9.272, ty: 3.323, bx: 10.719, by: 2.458, bfill: C.cream, nx: 10.633, ny: 2.528, n: '05', dx: 11.269, dy: 2.357, dfill: C.cream }
+    ];
+    steps.forEach(function (st) {
+      s.addShape('homePlate', { x: st.x, y: st.y, w: 1.638, h: 1.638, rotate: 90, fill: { color: st.fill }, line: NOLINE });
+      s.addText('Insert Your Title', { x: st.tx, y: st.ty, w: 1.47, h: 0.572, fontFace: F.light, fontSize: 14, bold: true, color: C.white, align: 'center', valign: 'top' });
+      s.addShape('homePlate', { x: st.bx, y: st.by, w: 0.498, h: 0.498, rotate: 90, fill: { color: st.bfill }, line: NOLINE });
+      s.addText(st.n, { x: st.nx, y: st.ny, w: 0.651, h: 0.337, fontFace: F.light, fontSize: 14, bold: true, color: C.white, align: 'center', valign: 'top' });
+      s.addShape('homePlate', { x: st.dx, y: st.dy, w: 0.202, h: 0.202, rotate: 90, fill: { color: st.dfill }, line: NOLINE });
+    });
+  });
+}
+
+/* ------------------------------------------------------------------ build */
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'WIDE', width: 13.333, height: 7.5 });
+  pptx.layout = 'WIDE';
+  pptx.title = 'The Brides - Wedding Presentations Design';
+
+  cover(pptx, 'THE', 'BRIDES', 5.626);
+  [slide2, slide3, slide4, slide5, slide6, slide7, slide8, slide9, slide10,
+   slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18,
+   slide19, slide20, slide21, slide22, slide23, slide24, slide25, slide26,
+   slide27, slide28, slide29].forEach(function (fn) { fn(pptx); });
+  cover(pptx, 'THANK', 'YOU', 5.447);
+
+  return pptx.writeFile({ fileName: path.join(__dirname, '0a9bf01d-951e-462d-8264-1c2494a9ed26_grok_final.pptx') });
+}
+
+build().then(function (f) { console.log('wrote ' + f); }).catch(function (e) { console.error(e); process.exit(1); });
