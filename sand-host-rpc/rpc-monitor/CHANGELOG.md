@@ -9,6 +9,17 @@ packages confondus. Entrées les plus récentes en haut. Heures de Paris
 
 <!-- NOUVELLES-ENTREES-ICI -->
 
+## 2026-11-07 18:03 (Paris) — `2026-11-06_18-08` → `2026-11-07_18-03`
+
+Changement de surface RPC détecté : **19 méthode(s) ajoutée(s)**, **1 supprimée(s)**.
+
+Ajoutées : `AiService.SetVoiceChatEnabled`, `BackgroundComposerService.CompleteSlackSignIn`, `BackgroundComposerService.GetCursorFilesUrl`, `BackgroundComposerService.RedeemSlackSignInLink`, `ControlService.WarmCursorFilesServer`, `DashboardService.GetGrokCreditPackPurchaseAccount`, `DashboardService.GetOrganizationConnectorAccountOwnership`, `DashboardService.ListGrokModels`, `DashboardService.ReportGrokCreditPackPurchase`, `DashboardService.UpdateOrganizationConnectorAccountOwnership`, `DashboardService.UpdateTeamVoiceChatSetting`, `GrokBotService.AdminGetGrokBotModelComparison`, `GrokBotService.AdminGetGrokBotModelComparisonOptions`, `GrokBotService.AdminListGrokBotModelComparisons`, `GrokBotService.AdminSendGrokBotModelComparisonFollowUp`, `GrokBotService.AdminStartGrokBotModelComparison`, `GrokBotService.AdminStopGrokBotModelComparison`, `GrokBotService.DeleteGrokBotTryOnImage`, `GrokBotService.GetGrokBotMessagingGroupChatLog`
+
+Supprimées : `GrokBotService.ListGrokBotTeamsJoinedTeams`
+
+Rapport : [reports/2026-11-07_18-03.md](reports/2026-11-07_18-03.md).
+
+
 ## 2026-11-06 18:08 (Paris) — `2026-11-05_18-11` → `2026-11-06_18-08`
 
 Changement de surface RPC détecté : **7 méthode(s) ajoutée(s)**.
