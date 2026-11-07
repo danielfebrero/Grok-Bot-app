@@ -1,0 +1,39 @@
+{
+  "description": "POST /repos/{owner}/{repo}/git/refs: create a branch at `sha`, at the head of `from_branch`, or at the head of the default branch. GitHub answers 422 when the branch already exists.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "additionalProperties": false,
+    "properties": {
+      "branch": {
+        "description": "Name for the new branch.",
+        "minLength": 1,
+        "type": "string"
+      },
+      "from_branch": {
+        "description": "Branch to start from (default branch when omitted).",
+        "minLength": 1,
+        "type": "string"
+      },
+      "owner": {
+        "description": "Repository owner (user or org login).",
+        "type": "string"
+      },
+      "repo": {
+        "description": "Repository name.",
+        "type": "string"
+      },
+      "sha": {
+        "description": "Exact commit to start from; overrides from_branch.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "repo",
+      "branch"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "create_branch"
+}

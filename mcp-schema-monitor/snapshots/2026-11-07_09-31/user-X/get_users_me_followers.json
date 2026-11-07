@@ -1,0 +1,30 @@
+{
+  "description": "Returns the Users who follow the authenticated user. Same results as `GET /2/users/{id}/followers` with your own user ID, without looking it up.",
+  "inputSchema": {
+    "properties": {
+      "expansions": {
+        "description": "A comma separated list of fields to expand.",
+        "type": "string"
+      },
+      "max_results": {
+        "description": "The maximum number of users to return.",
+        "type": "integer"
+      },
+      "pagination_token": {
+        "description": "The next_token or previous_token from a previous response, to fetch that page. A base32hex-encode...",
+        "type": "string"
+      },
+      "post.fields": {
+        "description": "A comma separated list of Post fields to display.",
+        "type": "string"
+      },
+      "user.fields": {
+        "description": "A comma separated list of User fields to display.",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_users_me_followers"
+}

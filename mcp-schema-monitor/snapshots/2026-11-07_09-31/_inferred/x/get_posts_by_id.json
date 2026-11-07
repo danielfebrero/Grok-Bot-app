@@ -1,0 +1,166 @@
+{
+  "namespace": "x",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-11-02T09:23:52+01:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "data": {
+          "properties": {
+            "edit_history_tweet_ids": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "id": {
+              "type": "string"
+            },
+            "referenced_tweets": {
+              "items": {
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "type"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "text": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "edit_history_tweet_ids",
+            "id",
+            "referenced_tweets",
+            "text",
+            "url"
+          ],
+          "type": "object"
+        },
+        "includes": {
+          "properties": {
+            "tweets": {
+              "items": {
+                "properties": {
+                  "article": {
+                    "properties": {
+                      "cover_media": {
+                        "type": "string"
+                      },
+                      "entities": {
+                        "properties": {
+                          "mentions": {
+                            "items": {
+                              "properties": {
+                                "end": {
+                                  "type": "integer"
+                                },
+                                "start": {
+                                  "type": "integer"
+                                },
+                                "username": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "end",
+                                "start",
+                                "username"
+                              ],
+                              "type": "object"
+                            },
+                            "type": "array"
+                          },
+                          "urls": {
+                            "items": {
+                              "properties": {
+                                "text": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "text"
+                              ],
+                              "type": "object"
+                            },
+                            "type": "array"
+                          }
+                        },
+                        "required": [
+                          "mentions",
+                          "urls"
+                        ],
+                        "type": "object"
+                      },
+                      "plain_text": {
+                        "type": "string"
+                      },
+                      "preview_text": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "cover_media",
+                      "entities",
+                      "plain_text",
+                      "preview_text",
+                      "title"
+                    ],
+                    "type": "object"
+                  },
+                  "edit_history_tweet_ids": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "article",
+                  "edit_history_tweet_ids",
+                  "id",
+                  "text"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "tweets"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "includes"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "get_posts_by_id"
+}

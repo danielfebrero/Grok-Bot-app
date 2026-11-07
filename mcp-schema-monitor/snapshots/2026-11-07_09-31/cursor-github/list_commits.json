@@ -1,0 +1,55 @@
+{
+  "description": "GET /repos/{owner}/{repo}/commits: one page of commits, optionally from a branch or SHA, touching a path, or by author or date range.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "additionalProperties": false,
+    "properties": {
+      "author": {
+        "description": "GitHub login or email address.",
+        "type": "string"
+      },
+      "owner": {
+        "description": "Repository owner (user or org login).",
+        "type": "string"
+      },
+      "page": {
+        "description": "1-based page number.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "path": {
+        "description": "Only commits touching this path.",
+        "type": "string"
+      },
+      "per_page": {
+        "description": "Results per page (GitHub's default is 30, max 100).",
+        "maximum": 100,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "repo": {
+        "description": "Repository name.",
+        "type": "string"
+      },
+      "sha": {
+        "description": "Branch name or commit SHA to start from (default branch when omitted).",
+        "type": "string"
+      },
+      "since": {
+        "description": "ISO 8601 timestamp.",
+        "type": "string"
+      },
+      "until": {
+        "description": "ISO 8601 timestamp.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "repo"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "list_commits"
+}

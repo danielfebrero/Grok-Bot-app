@@ -1,0 +1,75 @@
+{
+  "description": "Marks a specific Chat conversation as read on behalf of the authenticated user. For 1:1 conversations, provide the recipient's user ID; the server constructs the canonical conversation ID from the authenticated user and recipient. Without action_signatures the conversation is marked read up to its newest event and the read receipt is unsigned. With one action signature over a MarkConversationReadEvent, the server sends that signed read receipt, marking the conversation read up to the event it names.",
+  "inputSchema": {
+    "properties": {
+      "action_signatures": {
+        "description": "Signature over the read receipt (a MarkConversationReadEvent). Omit to send it unsigned.",
+        "items": {
+          "properties": {
+            "encoded_message_event_detail": {
+              "description": "Base64-encoded Thrift MessageEventDetail for the signed action.",
+              "type": "string"
+            },
+            "message_event_signature": {
+              "properties": {
+                "message_signing_key_info_list": {
+                  "description": "List of signing key information for message verification.",
+                  "items": {
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "public_key_version": {
+                  "description": "The version of the public key used for signing.",
+                  "type": "string"
+                },
+                "signature": {
+                  "description": "The signature of the message event.",
+                  "type": "string"
+                },
+                "signature_version": {
+                  "description": "The version of the signature algorithm.",
+                  "type": "string"
+                },
+                "signing_public_key": {
+                  "description": "The public key used for signing.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "signature",
+                "public_key_version",
+                "signature_version"
+              ],
+              "type": "object"
+            },
+            "message_id": {
+              "description": "Client-generated ID of the message being signed.",
+              "type": "string"
+            },
+            "signature_payload": {
+              "description": "Payload string the client signed; used only in server-side failure logs.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "message_id",
+            "encoded_message_event_detail",
+            "message_event_signature"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "id": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "mark_chat_conversation_read"
+}

@@ -1,0 +1,34 @@
+{
+  "description": "Create an empty Origin-hosted repository. Pick an owner from list_namespaces where viewerCanCreateRepositories is true; omit owner to use the caller's personal namespace, which Origin claims on first use (needs an eligible plan, a Privacy Mode that allows code storage, and no team membership; team members pass their team slug). Both steps are one approval: confirm with the user before calling. defaultBranch defaults to main, and visibility defaults to internal; pass private when the user asks to limit the repository to explicitly granted people and groups. Repository names are unique per owner, so retrying after a success fails with a conflict; read the repository with get_repository instead. Returns the created repository, including cloneUrl.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "defaultBranch": {
+        "description": "Default branch name. Omit for main.",
+        "type": "string"
+      },
+      "name": {
+        "description": "Origin repository name within that namespace",
+        "type": "string"
+      },
+      "owner": {
+        "description": "Origin namespace (owner) slug, taken from list_namespaces or an earlier Origin result. A GitHub owner or org name is not an Origin namespace unless list_namespaces returns it.",
+        "type": "string"
+      },
+      "visibility": {
+        "description": "internal (visible to members of the owner) or private (only explicitly granted people and groups). Omit for internal.",
+        "enum": [
+          "internal",
+          "private"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "create_repository"
+}

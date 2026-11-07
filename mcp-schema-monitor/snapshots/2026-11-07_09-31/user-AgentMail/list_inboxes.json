@@ -1,0 +1,20 @@
+{
+  "description": "List the organization's inboxes, newest first, paginated. Each comes with its inboxId (its email address), display name, metadata, and creation time; use search_inboxes to find one by name or address.",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "limit": {
+        "default": 10,
+        "description": "Number of items per page",
+        "type": "number"
+      },
+      "pageToken": {
+        "description": "nextPageToken from the previous page's result; omit for the first page",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "list_inboxes"
+}

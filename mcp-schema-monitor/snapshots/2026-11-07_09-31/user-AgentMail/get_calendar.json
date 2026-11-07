@@ -1,0 +1,26 @@
+{
+  "description": "Get an inbox's calendar: its default time zone (used for events created without one), how many events it holds, and its etag. Every inbox has one calendar, so this works before any event exists. Calendar works for every organization in US production; EU production returns 403 \"Calendar isn't available in this region yet\".",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "consistency": {
+        "description": "primary to read a change made moments ago; the default, eventual, can trail a change by a few seconds",
+        "enum": [
+          "eventual",
+          "primary"
+        ],
+        "type": "string"
+      },
+      "inboxId": {
+        "description": "Inbox ID: the inbox's email address, from list_inboxes",
+        "type": "string"
+      }
+    },
+    "required": [
+      "inboxId"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_calendar"
+}
