@@ -1,0 +1,1163 @@
+/**
+ * Orthopedic - Presentation Template (35 slides, 26.67 x 15 in)
+ *
+ * Standalone recreation of the reference deck with pptxgenjs only.
+ * Run:  node 06dca208-86be-4e60-99a9-a2fffbf7508a_grok_final.js
+ *
+ * Raster photos in the original are replaced by flat grey placeholder blocks
+ * (see `imageBox`); everything else is drawn with native pptxgenjs shapes.
+ */
+
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ theme */
+
+const SLIDE_W = 26.67;
+const SLIDE_H = 15;
+
+const PURPLE  = '9871FE';
+const YELLOW  = 'FFC000';
+const MINT    = 'BCFEF4';
+const CREAM   = 'F9F9F9';
+const WHITE   = 'FFFFFF';
+const BLACK   = '000000';
+const INK     = '1A1A1A';
+const GOLD    = 'F7BF08';
+const SKY     = '028EFE';
+const GREY    = 'D9D9D9';
+
+const HEAD_FONT = 'Poppins';    // titles, nav chrome, page numbers
+const BODY_FONT = 'Open Sans';  // paragraph copy
+const BODY_SIZE = 23;           // pt - the deck's default body size
+const PAGE_BG = CREAM;          // slide master background
+
+const BACK = true;              // navButton direction flag
+const CHECK = { characterCode: '2713', indent: 27 }; // tick bullet used on slide 28
+
+/* -------------------------------------------------------- repeated strings */
+
+const FOOTER = 'Orthopedic-Presentation Template ©2023';
+const LOREM =
+  'Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book.';
+const LOREM_A =
+  'Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s, when an unknown printer..';
+const LOREM_B = 'Lorem Ipsum has been the industry\'s standard dummy text ever since.';
+const LOREM_C = 'Lorem Ipsum has been the industry\'s standard dummy';
+const LOREM_D = 'Lorem Ipsum has been the industry\'s standard dummy text ever since';
+const LOREM_E = 'Lorem Ipsum has been the industry\'s';
+const LOREM_F = 'Lorem Ipsum has been the industry\'s standard dummy.';
+const QUOTE = '“This is a quote Words full of wisdom that someone important said”';
+const SURVIVED =
+  'It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged.';
+
+/* ------------------------------------------------------------------------ *
+ * Vector glyphs. Each entry is a flat command list in a 0..1000 unit box:
+ *   'm' x y            move to
+ *   'l' x y            line to
+ *   'c' x1 y1 x2 y2 x y  cubic bezier
+ *   'z'                close
+ * `glyph()` / `outline()` scale them into the shape's own width & height.
+ * ------------------------------------------------------------------------ */
+
+const FACEBOOK_BADGE = [
+  'm', 501, 0, 'c', 775, 0, 1000, 225, 1000, 501, 'c', 1000, 777, 777, 1000, 501, 1000, 'c', 225, 1000, 0,
+  777, 0, 501, 'c', 0, 225, 225, 0, 501, 0, 'z', 'm', 624, 209, 'l', 543, 209, 'c', 459, 209, 420, 244,
+  417, 314, 'l', 417, 417, 'l', 334, 417, 'l', 334, 501, 'l', 417, 501, 'l', 417, 791, 'l', 541, 791, 'l',
+  541, 501, 'l', 615, 501, 'l', 624, 417, 'l', 541, 417, 'l', 541, 367, 'c', 541, 345, 544, 336, 564, 334,
+  'l', 624, 334, 'l', 624, 209, 'z'
+];
+const INSTAGRAM_BADGE = [
+  'm', 501, 0, 'c', 775, 0, 1000, 225, 1000, 501, 'c', 1000, 777, 777, 1000, 501, 1000, 'c', 225, 1000, 0,
+  777, 0, 501, 'c', 0, 225, 225, 0, 501, 0, 'z', 'm', 562, 209, 'l', 438, 209, 'c', 411, 209, 401, 210,
+  380, 210, 'c', 278, 215, 219, 271, 212, 370, 'l', 210, 407, 'c', 209, 420, 209, 435, 209, 464, 'l', 209,
+  572, 'c', 209, 592, 210, 602, 210, 620, 'c', 216, 726, 274, 784, 380, 790, 'l', 423, 791, 'c', 439, 791,
+  461, 791, 501, 791, 'l', 572, 791, 'c', 592, 791, 602, 790, 620, 790, 'c', 726, 784, 784, 726, 790, 620,
+  'l', 791, 577, 'c', 791, 561, 791, 539, 791, 501, 'l', 791, 428, 'c', 791, 408, 790, 398, 790, 380, 'c',
+  785, 278, 729, 219, 630, 212, 'l', 605, 210, 'c', 592, 210, 581, 209, 562, 209, 'z', 'm', 617, 263, 'c',
+  697, 266, 734, 305, 737, 383, 'l', 738, 413, 'c', 738, 425, 738, 439, 738, 463, 'l', 738, 562, 'c', 738,
+  587, 738, 598, 737, 617, 'c', 734, 695, 697, 734, 617, 737, 'l', 592, 738, 'c', 580, 738, 565, 738, 537,
+  738, 'l', 445, 738, 'c', 416, 738, 404, 738, 383, 737, 'c', 306, 734, 269, 698, 263, 626, 'l', 262, 595,
+  'c', 262, 580, 262, 564, 262, 530, 'l', 262, 439, 'c', 262, 413, 262, 402, 263, 383, 'c', 266, 308, 300,
+  269, 374, 263, 'l', 393, 263, 'c', 411, 262, 425, 262, 461, 262, 'l', 564, 262, 'c', 587, 262, 598, 262,
+  617, 263, 'z', 'm', 501, 351, 'c', 419, 351, 351, 419, 351, 501, 'c', 351, 583, 419, 649, 501, 649, 'c',
+  583, 649, 649, 581, 649, 501, 'c', 649, 419, 581, 351, 501, 351, 'z', 'm', 501, 404, 'c', 553, 404, 596,
+  447, 596, 501, 'c', 596, 553, 555, 596, 501, 596, 'c', 447, 596, 404, 553, 404, 501, 'c', 404, 447, 447,
+  404, 501, 404, 'z', 'm', 655, 309, 'c', 636, 309, 620, 325, 620, 345, 'c', 620, 364, 636, 380, 655, 380,
+  'c', 675, 380, 691, 364, 691, 345, 'c', 691, 325, 675, 309, 655, 309, 'z'
+];
+const LINKEDIN_BADGE = [
+  'm', 501, 0, 'c', 775, 0, 1000, 225, 1000, 501, 'c', 1000, 777, 777, 1000, 501, 1000, 'c', 225, 1000, 0,
+  777, 0, 501, 'c', 0, 225, 225, 0, 501, 0, 'z', 'm', 417, 417, 'l', 334, 417, 'l', 334, 666, 'l', 417,
+  666, 'l', 417, 417, 'z', 'm', 709, 527, 'c', 709, 393, 583, 395, 543, 459, 'l', 541, 463, 'l', 541, 417,
+  'l', 459, 417, 'l', 459, 666, 'l', 541, 666, 'l', 541, 547, 'c', 541, 479, 620, 470, 624, 540, 'l', 624,
+  666, 'l', 709, 666, 'l', 709, 527, 'z', 'm', 376, 287, 'c', 351, 287, 330, 308, 330, 334, 'c', 330, 359,
+  351, 380, 376, 380, 'c', 401, 380, 422, 359, 422, 334, 'c', 422, 308, 401, 287, 376, 287, 'z'
+];
+const HAND_HEART = [
+  'm', 599, 414, 'c', 580, 394, 551, 394, 533, 414, 'l', 500, 451, 'c', 464, 493, 405, 494, 368, 454, 'c',
+  331, 414, 330, 347, 366, 306, 'c', 367, 305, 368, 304, 368, 303, 'l', 630, 9, 'c', 793, -33, 955, 82,
+  993, 265, 'c', 1014, 370, 990, 480, 927, 562, 'l', 829, 673, 'l', 599, 414, 'z', 'm', 89, 100, 'c', 188,
+  -12, 342, -32, 461, 51, 'l', 302, 229, 'c', 230, 311, 230, 443, 302, 525, 'c', 372, 604, 485, 608, 559,
+  532, 'l', 566, 525, 'l', 763, 747, 'l', 566, 969, 'c', 529, 1010, 471, 1010, 434, 969, 'l', 89, 581,
+  'c', -29, 448, -29, 232, 89, 100, 'z'
+];
+const THUMBS_UP = [
+  'm', 0, 1000, 'l', 100, 1000, 'c', 128, 1000, 150, 975, 150, 944, 'l', 150, 444, 'c', 150, 414, 128,
+  389, 100, 389, 'l', 0, 389, 'l', 0, 1000, 'z', 'm', 992, 605, 'c', 997, 591, 1000, 576, 1000, 560, 'l',
+  1000, 500, 'c', 1000, 439, 955, 389, 900, 389, 'l', 625, 389, 'l', 671, 131, 'c', 673, 118, 672, 105,
+  667, 94, 'c', 656, 69, 641, 46, 623, 26, 'l', 600, 0, 'l', 279, 356, 'c', 260, 377, 250, 406, 250, 435,
+  'l', 250, 870, 'c', 250, 942, 302, 1000, 367, 1000, 'l', 772, 1000, 'c', 807, 1000, 841, 980, 858, 946,
+  'l', 992, 605, 'z'
+];
+const QUOTE_TICK = [
+  'm', 0, 0, 'l', 1000, 0, 'l', 1000, 477, 'l', 1000, 477, 'l', 1000, 477, 'l', 983, 571, 'c', 903, 784,
+  556, 953, 113, 996, 'l', 28, 1000, 'l', 28, 732, 'l', 105, 721, 'c', 255, 691, 371, 630, 419, 556, 'l',
+  445, 477, 'l', 0, 477, 'z'
+];
+const BIG_QUOTE = [
+  'm', 0, 0, 'l', 1000, 0, 'l', 1000, 477, 'l', 1000, 477, 'l', 1000, 477, 'l', 983, 571, 'c', 903, 784,
+  556, 953, 113, 996, 'l', 28, 1000, 'l', 28, 732, 'l', 105, 721, 'c', 255, 691, 371, 630, 419, 556, 'l',
+  444, 477, 'l', 0, 477, 'z'
+];
+const PUZZLE_BL = [
+  'm', 936, 661, 'c', 929, 662, 921, 663, 913, 666, 'c', 889, 675, 866, 684, 843, 689, 'c', 808, 697, 772,
+  699, 734, 684, 'c', 655, 655, 627, 583, 672, 530, 'c', 727, 466, 829, 474, 911, 509, 'c', 947, 524, 991,
+  510, 1000, 483, 'l', 1000, 336, 'l', 1000, 240, 'l', 1000, 240, 'l', 1000, 233, 'l', 998, 233, 'l', 998,
+  238, 'l', 637, 238, 'c', 609, 233, 591, 215, 593, 196, 'c', 593, 189, 595, 182, 601, 176, 'c', 622, 151,
+  642, 125, 643, 99, 'c', 644, 86, 639, 72, 627, 57, 'c', 585, 4, 479, -16, 402, 15, 'c', 354, 34, 333,
+  62, 331, 92, 'c', 331, 120, 346, 149, 370, 175, 'c', 378, 183, 380, 192, 379, 200, 'c', 378, 218, 361,
+  234, 334, 239, 'l', 116, 239, 'l', 20, 239, 'c', 19, 240, 18, 241, 17, 242, 'c', -10, 272, -5, 295, 36,
+  314, 'c', 62, 326, 89, 336, 112, 352, 'c', 147, 376, 149, 391, 122, 420, 'c', 92, 454, 92, 455, 138,
+  479, 'c', 150, 486, 164, 491, 146, 503, 'c', 121, 521, 130, 538, 152, 551, 'c', 182, 570, 187, 593, 181,
+  619, 'c', 176, 642, 169, 665, 163, 687, 'c', 146, 749, 169, 777, 250, 793, 'c', 335, 810, 420, 796, 504,
+  790, 'c', 561, 786, 616, 773, 674, 783, 'c', 712, 789, 733, 805, 738, 834, 'c', 745, 876, 763, 916, 774,
+  957, 'c', 782, 991, 804, 1001, 848, 1000, 'c', 885, 999, 938, 998, 1000, 998, 'l', 1000, 692, 'c', 993,
+  672, 965, 659, 936, 661, 'z'
+];
+const PUZZLE_TR = [
+  'm', 0, 313, 'c', 9, 338, 57, 352, 95, 337, 'c', 183, 303, 291, 295, 351, 359, 'c', 399, 411, 368, 483,
+  284, 511, 'c', 243, 526, 205, 524, 167, 516, 'c', 143, 511, 118, 503, 92, 494, 'c', 84, 491, 76, 489,
+  68, 488, 'c', 37, 486, 7, 499, 0, 519, 'l', 0, 662, 'l', 0, 662, 'l', 0, 758, 'l', 0, 758, 'l', 0, 761,
+  'l', 0, 765, 'l', 2, 765, 'l', 393, 765, 'c', 428, 773, 446, 800, 426, 822, 'c', 391, 861, 360, 900,
+  397, 943, 'c', 443, 997, 556, 1016, 638, 986, 'c', 739, 948, 727, 879, 672, 824, 'c', 650, 801, 668,
+  773, 705, 764, 'l', 944, 764, 'c', 975, 713, 994, 661, 999, 610, 'c', 1007, 479, 967, 370, 872, 281,
+  'c', 678, 100, 405, 17, 89, 1, 'c', 59, 0, 29, 0, 0, 0, 'l', 0, 166, 'l', 0, 313, 'z'
+];
+const PUZZLE_BR = [
+  'm', 827, 999, 'c', 870, 997, 849, 967, 829, 921, 'c', 669, 546, 860, 245, 892, 203, 'c', 939, 139, 975,
+  70, 1000, 0, 'l', 818, 0, 'c', 791, 11, 777, 48, 794, 78, 'c', 835, 152, 845, 243, 768, 293, 'c', 705,
+  334, 619, 308, 585, 237, 'c', 556, 180, 580, 128, 607, 77, 'c', 622, 47, 608, 11, 581, 0, 'l', 284, 0,
+  'l', 284, 309, 'c', 284, 313, 284, 317, 283, 321, 'l', 283, 322, 'c', 276, 356, 239, 374, 211, 354, 'c',
+  144, 309, 62, 298, 16, 383, 'c', -20, 452, 7, 545, 71, 584, 'c', 101, 602, 129, 601, 156, 591, 'c', 175,
+  584, 193, 573, 212, 561, 'c', 218, 557, 225, 555, 231, 554, 'c', 256, 549, 277, 564, 283, 594, 'l', 283,
+  595, 'c', 284, 599, 284, 603, 284, 607, 'l', 284, 997, 'c', 478, 996, 774, 1002, 827, 999, 'z'
+];
+const PUZZLE_TL = [
+  'm', 984, 470, 'c', 942, 386, 866, 396, 804, 441, 'c', 777, 461, 744, 443, 737, 409, 'c', 736, 405, 736,
+  401, 736, 397, 'l', 736, 0, 'c', 644, 5, 555, 37, 469, 87, 'c', 446, 101, 423, 115, 400, 130, 'c', 243,
+  236, 155, 398, 162, 635, 'c', 166, 768, 116, 864, 42, 946, 'c', 29, 961, 15, 975, 4, 993, 'c', 3, 995,
+  1, 998, 0, 1000, 'l', 72, 1000, 'l', 236, 1000, 'c', 256, 994, 270, 973, 270, 950, 'c', 270, 940, 268,
+  930, 263, 921, 'c', 244, 886, 233, 846, 234, 809, 'c', 235, 771, 251, 734, 288, 709, 'c', 345, 669, 425,
+  694, 457, 764, 'c', 465, 783, 469, 801, 469, 819, 'c', 468, 855, 453, 889, 437, 923, 'c', 433, 930, 431,
+  938, 431, 945, 'c', 429, 970, 443, 993, 464, 1000, 'l', 736, 1000, 'l', 736, 993, 'l', 736, 692, 'c',
+  736, 687, 736, 683, 737, 679, 'c', 742, 653, 763, 637, 785, 639, 'c', 791, 640, 797, 642, 802, 646, 'c',
+  820, 658, 837, 669, 855, 676, 'c', 881, 687, 908, 689, 937, 670, 'c', 996, 632, 1018, 538, 984, 470, 'z'
+];
+const BRAIN_ICON = [
+  'm', 1000, 715, 'c', 1000, 679, 989, 652, 972, 634, 'c', 983, 615, 989, 593, 989, 566, 'c', 989, 529,
+  977, 502, 960, 484, 'c', 969, 471, 972, 448, 972, 430, 'c', 972, 380, 946, 335, 912, 335, 'c', 907, 335,
+  904, 335, 898, 339, 'c', 901, 330, 904, 317, 904, 303, 'c', 904, 253, 878, 208, 844, 208, 'c', 836, 208,
+  830, 213, 824, 213, 'c', 819, 167, 796, 136, 768, 136, 'c', 754, 136, 739, 145, 731, 158, 'c', 725, 109,
+  700, 68, 669, 68, 'c', 646, 68, 626, 86, 615, 118, 'c', 615, 118, 615, 113, 615, 113, 'c', 615, 50, 584,
+  0, 544, 0, 'c', 516, 0, 490, 27, 479, 68, 'c', 470, 36, 450, 18, 428, 18, 'c', 408, 18, 391, 36, 380,
+  59, 'c', 368, 36, 351, 18, 331, 18, 'c', 303, 18, 278, 54, 275, 95, 'c', 266, 90, 258, 86, 249, 86, 'c',
+  221, 86, 198, 118, 193, 158, 'c', 190, 158, 187, 158, 184, 158, 'c', 153, 158, 125, 199, 125, 253, 'c',
+  125, 262, 125, 271, 127, 281, 'c', 99, 285, 74, 326, 74, 376, 'c', 74, 385, 74, 394, 76, 407, 'c', 76,
+  407, 74, 407, 74, 407, 'c', 34, 407, 0, 462, 0, 525, 'c', 0, 588, 34, 643, 74, 643, 'c', 85, 643, 93,
+  638, 102, 634, 'l', 102, 634, 'c', 102, 634, 111, 715, 159, 724, 'c', 207, 733, 215, 719, 235, 742, 'c',
+  255, 765, 309, 756, 309, 756, 'c', 309, 756, 312, 810, 385, 837, 'c', 459, 864, 476, 805, 564, 882, 'c',
+  632, 941, 677, 919, 677, 919, 'l', 677, 919, 'c', 686, 928, 697, 932, 705, 932, 'c', 725, 932, 745, 914,
+  756, 887, 'c', 765, 919, 785, 946, 810, 946, 'c', 824, 946, 836, 937, 847, 928, 'c', 858, 968, 884,
+  1000, 915, 1000, 'c', 958, 1000, 989, 946, 989, 878, 'c', 989, 846, 980, 819, 969, 796, 'c', 986, 787,
+  1000, 756, 1000, 715, 'z'
+];
+const HEART_ICON = [
+  'm', 5, 360, 'c', 5, 360, 29, 132, 241, 45, 'c', 453, -43, 537, 14, 601, 80, 'c', 665, 141, 689, 229,
+  847, 299, 'c', 1004, 373, 1019, 500, 985, 645, 'c', 945, 790, 901, 1009, 714, 1000, 'c', 527, 991, 635,
+  938, 290, 838, 'c', -59, 733, 5, 360, 5, 360, 'z'
+];
+const LIVER_ICON = [
+  'm', 898, 42, 'c', 898, 42, 620, -52, 307, 42, 'c', -7, 136, -22, 295, 14, 558, 'c', 50, 821, 75, 1014,
+  250, 999, 'c', 425, 989, 410, 850, 682, 756, 'c', 954, 657, 980, 677, 975, 503, 'c', 980, 330, 1062,
+  126, 898, 42, 'z'
+];
+const STOMACH_ICON = [
+  'm', 766, 201, 'c', 600, 175, 519, 229, 519, 229, 'c', 519, 229, 419, 186, 407, 106, 'c', 403, 69, 399,
+  37, 395, 20, 'c', 395, 9, 380, 0, 368, 0, 'l', 326, 0, 'c', 303, 0, 291, 9, 291, 20, 'l', 291, 120, 'c',
+  291, 189, 326, 238, 368, 284, 'c', 411, 327, 442, 415, 415, 473, 'c', 384, 530, 376, 573, 229, 593, 'c',
+  79, 610, 29, 751, 9, 820, 'c', -6, 871, 2, 948, 5, 983, 'c', 5, 991, 17, 1000, 32, 1000, 'l', 71, 1000,
+  'c', 86, 1000, 98, 991, 98, 980, 'c', 98, 940, 98, 854, 117, 840, 'c', 144, 820, 183, 805, 218, 834,
+  'c', 252, 862, 349, 903, 550, 874, 'c', 754, 845, 901, 708, 971, 596, 'c', 1036, 481, 1002, 238, 766,
+  201, 'z'
+];
+const HEART_BIG = [
+  'm', 966, 143, 'c', 774, -163, 502, 194, 502, 194, 'c', 502, 194, 248, -181, 41, 111, 'c', -166, 403,
+  481, 1000, 481, 1000, 'c', 481, 1000, 1158, 448, 966, 143, 'z'
+];
+const PALM_LEFT = [
+  'm', 1000, 8, 'c', 989, 40, 968, 100, 887, 174, 'c', 829, 227, 719, 305, 612, 407, 'c', 534, 480, 489,
+  524, 464, 548, 'c', 446, 565, 434, 584, 428, 604, 'l', 615, 974, 'l', 171, 1000, 'c', 171, 1000, 4, 615,
+  4, 453, 'c', 4, 453, 4, 453, 4, 453, 'c', 4, 434, 4, 414, 3, 393, 'c', -1, 294, -44, 216, 389, 213, 'c',
+  391, 213, 393, 213, 394, 212, 'c', 411, 208, 437, 200, 475, 180, 'c', 481, 176, 488, 173, 495, 169, 'c',
+  538, 144, 578, 125, 615, 109, 'c', 812, 28, 1009, -20, 1000, 8, 'z'
+];
+const FINGERS_LEFT = [
+  'm', 1000, 246, 'c', 988, 187, 897, 0, 897, 0, 'c', 897, 0, 807, 10, 774, 38, 'c', 678, 119, 710, 279,
+  715, 280, 'c', 715, 280, 558, 425, 532, 518, 'c', 532, 518, 532, 518, 532, 518, 'c', 532, 518, 117, 627,
+  29, 705, 'c', 24, 710, 20, 714, 16, 719, 'c', 4, 736, -1, 760, 0, 787, 'c', 3, 881, 80, 1009, 196, 999,
+  'c', 225, 997, 893, 637, 920, 573, 'c', 927, 558, 1006, 278, 1000, 246, 'z'
+];
+const FINGER_TIP = [
+  'm', 475, 0, 'c', 475, 0, 421, 491, 957, 60, 'l', 1000, 624, 'l', 254, 1000, 'l', 0, 586, 'l', 475, 0,
+  'z'
+];
+const KNUCKLE = [
+  'm', 1000, 0, 'c', 877, 45, 129, 621, 88, 639, 'c', -5, 773, -21, 970, 24, 992, 'c', 86, 1022, 224, 962,
+  315, 867, 'c', 438, 740, 474, 571, 510, 478, 'c', 527, 436, 636, 375, 677, 313, 'c', 786, 151, 986, 13,
+  1000, 0, 'z'
+];
+const PALM_BACK = [
+  'm', 250, 460, 'c', 250, 460, 858, 93, 926, 0, 'c', 926, 0, 1033, 29, 990, 151, 'c', 947, 272, 648, 491,
+  630, 577, 'c', 563, 900, 317, 1000, 317, 1000, 'c', 317, 1000, -349, 822, 250, 460, 'z'
+];
+const THUMB_LEFT = [
+  'm', 1000, 1000, 'c', 692, 1000, 365, 1000, 31, 1000, 'c', 21, 748, 13, 497, 7, 328, 'c', 7, 325, 7,
+  322, 7, 318, 'c', 2, 194, 0, 116, 0, 116, 'c', 0, 116, 1, 115, 3, 115, 'c', 9, 111, 25, 104, 47, 93,
+  'c', 80, 78, 128, 59, 181, 41, 'c', 297, 3, 443, -25, 530, 33, 'c', 541, 40, 550, 49, 559, 58, 'c', 565,
+  65, 571, 73, 577, 82, 'c', 577, 82, 577, 82, 577, 83, 'c', 581, 91, 612, 157, 657, 253, 'c', 752, 456,
+  908, 794, 1000, 1000, 'z'
+];
+const FACEBOOK_F = [
+  'm', 1000, 350, 'l', 665, 350, 'l', 665, 250, 'c', 665, 198, 673, 166, 813, 166, 'l', 991, 166, 'l',
+  991, 7, 'c', 905, 2, 818, 0, 731, 0, 'c', 473, 0, 285, 83, 285, 235, 'l', 285, 350, 'l', 0, 350, 'l', 0,
+  550, 'l', 285, 550, 'l', 285, 1000, 'l', 665, 1000, 'l', 665, 550, 'l', 956, 550, 'l', 1000, 350, 'z'
+];
+const TWITTER_BIRD = [
+  'm', 1000, 613, 'l', 1000, 1000, 'l', 786, 1000, 'l', 786, 639, 'c', 786, 548, 755, 486, 677, 486, 'c',
+  618, 486, 583, 528, 567, 568, 'c', 561, 583, 560, 603, 560, 623, 'l', 560, 1000, 'l', 346, 1000, 'c',
+  346, 1000, 348, 389, 346, 325, 'l', 560, 325, 'l', 560, 421, 'c', 560, 422, 559, 422, 559, 423, 'l',
+  560, 423, 'l', 560, 421, 'c', 588, 375, 639, 309, 753, 309, 'c', 894, 309, 1000, 406, 1000, 613, 'z',
+  'm', 121, 0, 'c', 48, 0, 0, 50, 0, 117, 'c', 0, 181, 47, 233, 119, 233, 'l', 120, 233, 'c', 195, 233,
+  241, 181, 241, 117, 'c', 240, 50, 195, 0, 121, 0, 'z', 'm', 13, 1000, 'l', 227, 1000, 'l', 227, 325,
+  'l', 13, 325, 'l', 13, 1000, 'z'
+];
+const LINKEDIN_IN = [
+  'm', 1000, 118, 'c', 963, 138, 924, 152, 882, 158, 'c', 925, 127, 957, 77, 972, 18, 'c', 933, 47, 889,
+  68, 842, 80, 'c', 805, 31, 751, 0, 692, 0, 'c', 579, 0, 487, 113, 487, 252, 'c', 487, 272, 489, 292,
+  493, 310, 'c', 322, 300, 171, 199, 70, 46, 'c', 52, 83, 42, 127, 42, 173, 'c', 42, 261, 78, 338, 133,
+  383, 'c', 100, 382, 68, 370, 40, 351, 'l', 40, 355, 'c', 40, 477, 111, 579, 205, 602, 'c', 188, 608,
+  169, 611, 151, 611, 'c', 137, 611, 125, 609, 112, 607, 'c', 138, 707, 214, 780, 304, 782, 'c', 234, 850,
+  145, 890, 49, 890, 'c', 32, 890, 16, 889, 0, 886, 'c', 91, 958, 199, 1000, 314, 1000, 'c', 692, 1000,
+  898, 615, 898, 282, 'l', 897, 249, 'c', 938, 213, 973, 169, 1000, 118, 'z'
+];
+
+function pathPoints(cmds, w, h) {
+  const pts = [];
+  const X = (v) => (v / 1000) * w;
+  const Y = (v) => (v / 1000) * h;
+  for (let i = 0; i < cmds.length; ) {
+    const op = cmds[i++];
+    if (op === 'm') pts.push({ x: X(cmds[i++]), y: Y(cmds[i++]), moveTo: true });
+    else if (op === 'l') pts.push({ x: X(cmds[i++]), y: Y(cmds[i++]) });
+    else if (op === 'c') {
+      const x1 = X(cmds[i++]), y1 = Y(cmds[i++]);
+      const x2 = X(cmds[i++]), y2 = Y(cmds[i++]);
+      pts.push({ x: X(cmds[i++]), y: Y(cmds[i++]), curve: { type: 'cubic', x1, y1, x2, y2 } });
+    } else if (op === 'z') pts.push({ close: true });
+  }
+  return pts;
+}
+
+/* --------------------------------------------------------------- primitives */
+
+function rect(s, x, y, w, h, color, opts) {
+  s.addShape('rect', Object.assign({ x, y, w, h, fill: { color } }, opts));
+}
+
+function circle(s, x, y, d, color) {
+  s.addShape('ellipse', { x, y, w: d, h: d, fill: { color } });
+}
+
+function card(s, x, y, w, h, color, radius, opts) {
+  s.addShape('roundRect', Object.assign(
+    { x, y, w, h, fill: { color }, rectRadius: radius }, opts));
+}
+
+function star(s, x, y, color) {
+  s.addShape('star5', { x, y, w: 0.427, h: 0.427, fill: { color } });
+}
+
+function arrow(s, x, y, color, opts) {
+  s.addShape('rightArrow', Object.assign(
+    { x, y, w: 0.909, h: 0.155, fill: { color } }, opts));
+}
+
+function glyph(s, x, y, w, h, cmds, color, opts) {
+  s.addShape('custGeom', Object.assign(
+    { x, y, w, h, fill: { color }, points: pathPoints(cmds, w, h) }, opts));
+}
+
+function outline(s, x, y, w, h, cmds, color, opts) {
+  s.addShape('custGeom', Object.assign(
+    { x, y, w, h, line: { color, width: 2.5 }, points: pathPoints(cmds, w, h) }, opts));
+}
+
+/* Photo stand-in: the reference deck fills these frames with stock imagery. */
+function imageBox(s, x, y, w, h) {
+  rect(s, x, y, w, h, GREY);
+  s.addText('[image]', {
+    x, y, w, h, align: 'center', valign: 'middle',
+    fontFace: BODY_FONT, fontSize: 23, color: '8C8C8C',
+  });
+}
+
+/* -------------------------------------------------------------------- text */
+
+/**
+ * Text content shorthand. A plain string is one paragraph; an array is one
+ * paragraph per entry, where an entry is either `'text'` or `['text', opts]`.
+ */
+function paragraphs(content) {
+  if (!Array.isArray(content)) return content;
+  return content.map((item) => {
+    const [text, opts] = Array.isArray(item) ? item : [item, null];
+    return { text, options: Object.assign({ breakLine: true }, opts) };
+  });
+}
+
+/** Body copy: Open Sans 23pt, vertically centred, 3.6pt inset (as in the deck). */
+function copy(s, x, y, w, h, content, opts) {
+  s.addText(paragraphs(content), Object.assign({
+    x, y, w, h, valign: 'middle', margin: 3.6,
+    fontFace: BODY_FONT, fontSize: BODY_SIZE, color: INK,
+  }, opts));
+}
+
+/** Free-standing heading text box - top aligned, default PowerPoint insets. */
+function headline(s, x, y, w, h, content, opts) {
+  s.addText(paragraphs(content), Object.assign({
+    x, y, w, h, valign: 'top', fontFace: HEAD_FONT, color: BLACK,
+  }, opts));
+}
+
+/** Top-aligned Open Sans text: card headings, price figures, numbering. */
+function label(s, x, y, w, h, content, opts) {
+  s.addText(paragraphs(content), Object.assign({
+    x, y, w, h, valign: 'top',
+    fontFace: BODY_FONT, fontSize: BODY_SIZE, color: BLACK,
+  }, opts));
+}
+
+/** The deck's big 100pt Poppins slide title. */
+function title(s, x, y, w, h, content, color, opts) {
+  headline(s, x, y, w, h, content,
+    Object.assign({ fontSize: 100, bold: true, color: color || BLACK }, opts));
+}
+
+/** The oversized decorative asterisk used as the brand mark. */
+function asterisk(s, x, y, color) {
+  s.addText('*', {
+    x, y, w: 3.196, h: 3.467, valign: 'top', align: 'center',
+    fontFace: HEAD_FONT, fontSize: 200, bold: true, color,
+  });
+}
+
+function footer(s, color) {
+  s.addText(FOOTER, {
+    x: 0.379, y: 14.013, w: 7.937, h: 0.488, valign: 'top',
+    fontFace: HEAD_FONT, fontSize: 23, bold: true, color: color || BLACK,
+  });
+}
+
+function pageNumber(s, n, color) {
+  s.addText(n + '/35', {
+    x: 23.796, y: 13.929, w: 2.495, h: 0.572, valign: 'top', align: 'right',
+    fontFace: HEAD_FONT, fontSize: 28, bold: true, color: color || BLACK,
+  });
+}
+
+/** Pill button: rounded plate + label + long thin arrow. */
+function navButton(s, x, y, plate, ink, back) {
+  card(s, x, y, 3.031, 0.75, plate, 0.216);
+  s.addText(back ? 'Back page' : 'Next page', {
+    x: x + (back ? 1.103 : 0.079), y: y + 0.131, w: back ? 1.928 : 2.291, h: 0.488,
+    valign: 'top', fontFace: HEAD_FONT, fontSize: 23, color: ink,
+  });
+  arrow(s, x + (back ? 0.193 : 1.915), y + 0.298, ink, back ? { flipH: true } : null);
+}
+
+/** Hairline divider terminated by a small dot - a motif on almost every slide. */
+function rule(s, x, y, w, color) {
+  rect(s, x, y, w, 0.05, color);
+  circle(s, x + w - 0.14, y - 0.11, 0.27, color);
+}
+
+/* ------------------------------------------------------------------ charts */
+
+const CHART_BASE = {
+  showLegend: true, legendPos: 'b', legendFontFace: BODY_FONT,
+  showTitle: true, titleFontSize: 18.6, titleFontFace: BODY_FONT, titleColor: WHITE,
+  chartArea: { fill: { color: WHITE, transparency: 100 } },
+  plotArea: { fill: { color: WHITE, transparency: 100 } },
+};
+
+/** Two-slice "Sales" donut-less pie used twice on slide 24. */
+function pieChart(s, x, y, w, h, sliceColor) {
+  s.addChart('pie', [{ name: 'Sales', labels: ['1st Qtr', '2nd Qtr'], values: [8.2, 3.2] }],
+    Object.assign({}, CHART_BASE, {
+      x, y, w, h, title: 'Sales',
+      chartColors: [sliceColor, WHITE],
+      legendFontSize: 28, legendColor: WHITE,
+      dataBorder: { pt: 0, color: WHITE }, showLeaderLines: false,
+    }));
+}
+
+/** Stacked column chart on slide 25. */
+function barChart(s, x, y, w, h) {
+  const cats = ['Category 1', 'Category 2', 'Category 3', 'Category 4'];
+  s.addChart('bar', [
+    { name: 'Series 1', labels: cats, values: [2.3, 2.5, 3.5, 4.5] },
+    { name: 'Series 2', labels: cats, values: [2.4, 4.4, 3, 2.8] },
+    { name: 'Series 3', labels: cats, values: [2, 2, 4, 5] },
+  ], Object.assign({}, CHART_BASE, {
+    x, y, w, h, title: 'Chart Title',
+    barDir: 'col', barGrouping: 'stacked', barGapWidthPct: 150, barOverlapPct: 100,
+    chartColors: [YELLOW, MINT, CREAM],
+    legendFontSize: 12, legendColor: WHITE,
+    catAxisLabelFontSize: 12, catAxisLabelColor: WHITE, catAxisLineShow: false,
+    valAxisLabelFontSize: 12, valAxisLabelColor: WHITE, valAxisLineShow: false,
+    valGridLine: { color: 'D9D9D9', size: 0.75 }, catGridLine: { style: 'none' },
+  }));
+}
+
+/* ------------------------------------------------------------------ slides */
+
+/*  1. Orthopedic */
+function slide01(s) {
+  headline(s, 10.277, 5.107, 14.51, 2.794, 'Orthopedic', { fontSize: 160, bold: true });
+  headline(s, 10.282, 8.24, 11.249, 1.111, 'Presentation Template', { fontSize: 60 });
+  rect(s, 10.345, 9.35, 9.6, 0.15, PURPLE);
+  rule(s, 10.282, 2.474, 14.1, BLACK);
+  asterisk(s, 22.198, 3.278, PURPLE);
+  glyph(s, 10.282, 10.386, 1.101, 1.101, FACEBOOK_BADGE, YELLOW);
+  glyph(s, 12.165, 10.386, 1.101, 1.101, INSTAGRAM_BADGE, YELLOW);
+  glyph(s, 14.044, 10.386, 1.101, 1.101, LINKEDIN_BADGE, YELLOW);
+  pageNumber(s, 1);
+  navButton(s, 21.485, 11.776, PURPLE, WHITE);
+}
+
+/*  2. Welcome Message */
+function slide02(s) {
+  rect(s, 0, 6.419, 13.452, 8.581, PURPLE);
+  footer(s, WHITE);
+  title(s, 3.889, 8.605, 9.414, 3.467, ['Welcome', 'Message'], WHITE);
+  pageNumber(s, 2);
+  asterisk(s, 1.151, 7.538, MINT);
+  copy(s, 2.348, 2.491, 7.937, 1.649, LOREM);
+  rule(s, 2.348, 4.625, 8.2, BLACK);
+  copy(s, 15.366, 10.009, 4.258, 0.732, 'Lorem Ipsum', { fontSize: 28, bold: true, lineSpacingMultiple: 1.5 });
+  copy(s, 15.366, 10.883, 8.489, 1.649, LOREM);
+  navButton(s, 20.273, 8.808, PURPLE, WHITE);
+  card(s, 20.273, 5.828, 7.182, 2.753, YELLOW, 0.395);
+  copy(s, 21.019, 6.423, 4.949, 1.649, LOREM_A);
+}
+
+/*  3. About Us */
+function slide03(s) {
+  footer(s);
+  pageNumber(s, 3);
+  title(s, 2.267, 2.641, 9.652, 1.784, 'About Us');
+  asterisk(s, 9.449, 1.8, PURPLE);
+  copy(s, 2.267, 5.022, 11.443, 1.262, LOREM);
+  card(s, 17.222, 5.877, 7.182, 2.753, PURPLE, 0.395);
+  copy(s, 17.968, 6.666, 5.922, 1.262, LOREM_A, { color: WHITE });
+  card(s, 17.222, 2.553, 7.182, 2.753, YELLOW, 0.395);
+  copy(s, 17.968, 3.342, 5.922, 1.262, LOREM_A);
+  navButton(s, 1.72, 12.04, PURPLE, WHITE);
+}
+
+/*  4. About Us */
+function slide04(s) {
+  footer(s, WHITE);
+  pageNumber(s, 4, WHITE);
+  title(s, 14.31, 2.415, 9.652, 1.784, 'About Us', WHITE);
+  rule(s, 14.31, 4.657, 10, MINT);
+  copy(s, 14.31, 5.728, 8.174, 3.198, [LOREM, '', SURVIVED], { color: WHITE });
+  card(s, 11.161, 9.694, 13.284, 2.803, YELLOW, 0.402);
+  copy(s, 12.076, 11.065, 5.789, 0.875, LOREM_B);
+  copy(s, 12.076, 10.168, 4.258, 0.732, 'Lorem Ipsum', { fontSize: 28, bold: true, lineSpacingMultiple: 1.5 });
+  copy(s, 18.174, 11.065, 5.789, 0.875, LOREM_B);
+  copy(s, 18.174, 10.168, 4.258, 0.732, 'Lorem Ipsum', { fontSize: 28, bold: true, lineSpacingMultiple: 1.5 });
+  asterisk(s, 23.304, 0.998, MINT);
+  navButton(s, 3.001, 12.122, YELLOW, BLACK);
+}
+
+/*  5. About Our Company */
+function slide05(s) {
+  rect(s, 14.452, 0, 12.219, 12.548, PURPLE);
+  footer(s);
+  pageNumber(s, 5);
+  title(s, 2.267, 3.331, 9.15, 5.15, ['About ', 'Our', 'Company']);
+  copy(s, 19.369, 4.793, 5.561, 4.359, [LOREM, '', SURVIVED], { color: WHITE });
+  copy(s, 19.369, 3.387, 4.258, 0.732, 'Lorem Ipsum', { fontSize: 28, bold: true, color: WHITE, lineSpacingMultiple: 1.5 });
+  copy(s, 2.267, 9.993, 8.065, 1.649, LOREM);
+  rect(s, 2.297, 8.507, 7.2, 0.15, PURPLE);
+  navButton(s, 21.372, 10.1, YELLOW, BLACK);
+  asterisk(s, 8.373, 1.819, PURPLE);
+}
+
+/*  6. About Our Company */
+function slide06(s) {
+  rect(s, 0, 0, 26.67, 7.5, PURPLE);
+  footer(s);
+  pageNumber(s, 6);
+  title(s, 13.335, 2.605, 12.346, 3.467, ['About ', 'Our Company'], WHITE);
+  card(s, 2.219, 8.517, 5.173, 3.24, YELLOW, 0.465);
+  copy(s, 2.973, 10.009, 3.931, 1.262, LOREM_B);
+  copy(s, 2.973, 9.028, 4.258, 0.732, 'Lorem Ipsum', { fontSize: 28, bold: true, lineSpacingMultiple: 1.5 });
+  copy(s, 13.335, 8.507, 7.937, 3.198, [LOREM, '', SURVIVED]);
+  rule(s, 13.335, 12.448, 8.2, BLACK);
+  navButton(s, 2.219, 11.893, PURPLE, WHITE);
+  asterisk(s, 22.099, 8.907, PURPLE);
+}
+
+/*  7. Why Choose Us */
+function slide07(s) {
+  rect(s, 15.396, 1.484, 11.275, 13.516, PURPLE);
+  footer(s);
+  pageNumber(s, 7, WHITE);
+  title(s, 2.202, 8.543, 13.443, 1.784, 'Why Choose Us');
+  copy(s, 2.202, 11.122, 11.185, 1.262, LOREM);
+  rect(s, 5.975, 10.327, 5.3, 0.15, PURPLE);
+  copy(s, 17.194, 2.856, 7.485, 1.649, LOREM, { color: WHITE });
+  rule(s, 17.194, 4.99, 7.5, MINT);
+  card(s, 17.194, 5.877, 7.62, 1.573, YELLOW, 0.29);
+  copy(s, 17.749, 6.377, 5.692, 0.572, 'Option One', { fontSize: 28, bold: true });
+  card(s, 17.194, 7.638, 7.62, 1.573, MINT, 0.29);
+  copy(s, 17.749, 8.138, 5.692, 0.572, 'Option Two', { fontSize: 28, bold: true });
+  card(s, 17.194, 9.398, 7.62, 1.573, YELLOW, 0.29);
+  copy(s, 17.749, 9.899, 5.692, 0.572, 'Option Three', { fontSize: 28, bold: true });
+  card(s, 17.194, 11.159, 7.62, 1.573, CREAM, 0.29);
+  copy(s, 17.749, 11.659, 5.692, 0.572, 'Option Four', { fontSize: 28, bold: true });
+  navButton(s, 2.29, 2.177, PURPLE, WHITE);
+}
+
+/*  8. Why Choose Us */
+function slide08(s) {
+  card(s, 13.205, 8.222, 8.194, 4.194, PURPLE, 0.602);
+  circle(s, 13.643, 8.646, 1.343, CREAM);
+  footer(s);
+  pageNumber(s, 8);
+  title(s, 2.267, 2.414, 9.652, 3.467, ['Why ', 'Choose Us']);
+  copy(s, 2.315, 7.335, 7.937, 3.198, [LOREM, '', SURVIVED]);
+  rule(s, 2.315, 11.276, 8.2, BLACK);
+  navButton(s, 2.315, 11.836, PURPLE, WHITE);
+  copy(s, 15.548, 9.036, 3.405, 0.572, 'Option Two', { fontSize: 28, bold: true, color: WHITE });
+  copy(s, 15.548, 9.926, 4.949, 1.649, LOREM_A, { color: WHITE });
+  card(s, 13.126, 3.676, 8.194, 4.194, YELLOW, 0.602);
+  circle(s, 13.565, 4.1, 1.343, CREAM);
+  copy(s, 15.47, 4.49, 3.405, 0.572, 'Option One', { fontSize: 28, bold: true });
+  copy(s, 15.47, 5.38, 4.949, 1.649, LOREM_A);
+  glyph(s, 13.816, 4.487, 0.841, 0.748, HAND_HEART, PURPLE);
+  glyph(s, 13.908, 8.94, 0.814, 0.732, THUMBS_UP, YELLOW);
+  asterisk(s, 9.829, 1.904, PURPLE);
+  rect(s, 2.394, 5.737, 5.3, 0.15, PURPLE);
+}
+
+/*  9. Why Choose Us */
+function slide09(s) {
+  footer(s, WHITE);
+  pageNumber(s, 9, WHITE);
+  title(s, 15.391, 7.234, 9.652, 3.467, ['Why ', 'Choose Us'], WHITE);
+  copy(s, 15.461, 2.488, 7.937, 1.649, LOREM, { color: WHITE });
+  rule(s, 15.461, 4.622, 8.2, MINT);
+  card(s, 2.24, 2.488, 6.076, 3.72, YELLOW, 0.534);
+  circle(s, 2.678, 2.912, 1.343, CREAM);
+  copy(s, 4.347, 3.371, 3.405, 0.572, 'Option One', { fontSize: 28, bold: true });
+  copy(s, 4.347, 4.126, 3.405, 1.262, LOREM_C);
+  glyph(s, 2.929, 3.3, 0.841, 0.748, HAND_HEART, PURPLE);
+  card(s, 2.24, 9.28, 6.076, 3.72, MINT, 0.534);
+  circle(s, 2.678, 9.704, 1.343, CREAM);
+  copy(s, 4.347, 10.162, 3.405, 0.572, 'Option One', { fontSize: 28, bold: true });
+  copy(s, 4.347, 10.917, 3.405, 1.262, LOREM_C);
+  glyph(s, 2.948, 9.969, 0.814, 0.732, THUMBS_UP, PURPLE);
+  navButton(s, 21.399, 12.25, YELLOW, BLACK);
+  asterisk(s, 18.427, 6.036, MINT);
+}
+
+/* 10. Patient Testimonials */
+function slide10(s) {
+  footer(s);
+  pageNumber(s, 10);
+  rect(s, 0, -0.04, 13.335, 8.581, PURPLE);
+  title(s, 2.327, 2.454, 10.369, 3.467, 'Patient Testimonials', WHITE);
+  copy(s, 2.34, 9.497, 3.092, 0.572, 'Name Here', { fontSize: 28, bold: true });
+  copy(s, 2.34, 10.523, 7.208, 1.262, '“Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s, when an unknown printer took.”', { italic: true });
+  glyph(s, 10.074, 9.318, 0.321, 0.673, QUOTE_TICK, YELLOW, { rotate: 180, flipH: true, flipV: true });
+  glyph(s, 9.548, 9.318, 0.321, 0.673, QUOTE_TICK, YELLOW, { rotate: 180, flipH: true, flipV: true });
+  star(s, 2.34, 12.055, YELLOW);
+  star(s, 2.922, 12.055, YELLOW);
+  star(s, 3.503, 12.055, YELLOW);
+  star(s, 4.084, 12.056, YELLOW);
+  star(s, 4.665, 12.056, YELLOW);
+  copy(s, 15.024, 2.454, 7.937, 1.649, LOREM);
+  rule(s, 15.024, 4.588, 8.2, BLACK);
+  asterisk(s, 10.267, 6.065, MINT);
+  navButton(s, 21.299, 12.055, PURPLE, WHITE);
+}
+
+/* 11. Patient Testimonials */
+function slide11(s) {
+  footer(s);
+  pageNumber(s, 11);
+  title(s, 14.263, 3.323, 10.369, 3.467, 'Patient Testimonials');
+  rect(s, 14.263, 6.64, 9.3, 0.15, PURPLE);
+  copy(s, 14.263, 8.21, 7.937, 3.198, [LOREM, '', SURVIVED]);
+  glyph(s, 9.548, 1.534, 3.787, 7.941, BIG_QUOTE, PURPLE, { rotate: 180, flipH: true, flipV: true });
+  card(s, 2.05, 9.806, 5.498, 2.71, YELLOW, 0.389);
+  copy(s, 2.737, 10.551, 3.092, 0.572, 'Name Here', { fontSize: 28, bold: true });
+  copy(s, 2.737, 11.226, 4.36, 0.875, LOREM_C);
+  navButton(s, 21.426, 11.803, PURPLE, WHITE);
+  asterisk(s, 22.149, 2.089, PURPLE);
+}
+
+/* 12. Our Service */
+function slide12(s) {
+  footer(s, WHITE);
+  pageNumber(s, 12, WHITE);
+  title(s, 2.327, 2.423, 11.286, 1.784, 'Our Service', WHITE);
+  rule(s, 2.388, 4.647, 21.9, MINT);
+  navButton(s, 21.386, 3.409, YELLOW, BLACK);
+  copy(s, 2.327, 7.295, 5.833, 1.262, 'Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s, when an unknown printer.', { color: WHITE });
+  copy(s, 2.327, 11.698, 6.241, 0.875, LOREM_B, { color: WHITE });
+  copy(s, 2.327, 11.126, 5.595, 0.572, 'Service', { fontSize: 28, bold: true, color: WHITE });
+  copy(s, 2.327, 9.763, 6.241, 0.875, LOREM_B, { color: WHITE });
+  copy(s, 2.327, 9.191, 5.595, 0.572, 'Service', { fontSize: 28, bold: true, color: WHITE });
+  card(s, 9.758, 10.638, 7.154, 1.871, YELLOW, 0.398);
+  copy(s, 10.404, 11.213, 5.899, 0.875, LOREM_D);
+  card(s, 17.479, 10.655, 6.863, 1.871, MINT, 0.398);
+  copy(s, 18.125, 11.229, 5.659, 0.875, LOREM_D);
+}
+
+/* 13. Our Service */
+function slide13(s) {
+  rect(s, 17.799, 0, 8.871, 15, PURPLE);
+  title(s, 2.327, 2.423, 7.937, 3.467, ['Our ', 'Service']);
+  label(s, 19.693, 3.253, 3.578, 1.111, '01', { fontSize: 60, bold: true, color: WHITE });
+  copy(s, 19.693, 5.335, 4.555, 0.875, LOREM_C, { color: WHITE });
+  label(s, 19.693, 4.629, 5.083, 0.572, 'Service', { fontSize: 28, bold: true, color: WHITE });
+  label(s, 19.72, 6.947, 3.578, 1.111, '02', { fontSize: 60, bold: true, color: WHITE });
+  copy(s, 19.72, 9.029, 4.555, 0.875, LOREM_C, { color: WHITE });
+  label(s, 19.693, 8.323, 4.555, 0.572, 'Service', { fontSize: 28, bold: true, color: WHITE });
+  footer(s);
+  pageNumber(s, 13, WHITE);
+  copy(s, 2.422, 7.084, 6.76, 2.036, LOREM);
+  rule(s, 2.422, 9.74, 7.8, BLACK);
+  card(s, 2.327, 10.601, 3.854, 1.468, MINT, 0.271);
+  copy(s, 2.605, 11.029, 3.299, 0.572, 'Lorem Ipsum', { fontSize: 28, bold: true, align: 'center' });
+  card(s, 6.41, 10.601, 3.854, 1.468, YELLOW, 0.271);
+  copy(s, 6.687, 11.029, 3.299, 0.572, 'Lorem Ipsum', { fontSize: 28, bold: true, align: 'center' });
+  asterisk(s, 6.718, 1.289, PURPLE);
+  navButton(s, 19.693, 11.747, YELLOW, BLACK);
+}
+
+/* 14. Our Service */
+function slide14(s) {
+  card(s, 2.27, 10.167, 5.127, 2.281, PURPLE, 0.328);
+  footer(s);
+  pageNumber(s, 14);
+  label(s, 2.758, 10.538, 4.56, 0.572, 'Service Three', { fontSize: 28, bold: true, color: WHITE });
+  copy(s, 2.798, 11.246, 4.494, 0.875, LOREM_C, { color: WHITE });
+  copy(s, 2.358, 2.529, 4.272, 1.649, 'Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s, when an unknown printer .', { color: BLACK });
+  card(s, 2.27, 7.671, 5.127, 2.281, MINT, 0.328);
+  label(s, 2.758, 8.043, 4.56, 0.572, 'Service Two', { fontSize: 28, bold: true });
+  copy(s, 2.798, 8.751, 4.494, 0.875, LOREM_C);
+  card(s, 2.27, 5.143, 5.127, 2.281, YELLOW, 0.328);
+  label(s, 2.758, 5.515, 4.56, 0.572, 'Service One', { fontSize: 28, bold: true });
+  copy(s, 2.798, 6.223, 4.494, 0.875, LOREM_C);
+  title(s, 16.248, 2.62, 8.025, 3.467, ['Our ', 'Service']);
+  rect(s, 16.248, 5.909, 5.4, 0.15, PURPLE);
+  asterisk(s, 22.198, 2.075, PURPLE);
+  navButton(s, 21.241, 11.927, PURPLE, WHITE);
+}
+
+/* 15. Reservation Via Phone */
+function slide15(s) {
+  imageBox(s, 3.909, 0.685, 8.743, 13.327);
+  imageBox(s, 1.474, 3.442, 5.55, 8.46);
+  card(s, 10.252, 9.636, 14.142, 2.841, YELLOW, 0.408);
+  title(s, 13.262, 5.153, 10.521, 3.467, ['Reservation', 'Via Phone'], WHITE);
+  copy(s, 13.335, 10.426, 9.742, 1.262, LOREM);
+  footer(s, WHITE);
+  pageNumber(s, 15, WHITE);
+  navButton(s, 21.245, 2.464, YELLOW, BLACK);
+  asterisk(s, 11.057, 2.761, MINT);
+}
+
+/* 16. Reservation Via Laptop */
+function slide16(s) {
+  imageBox(s, 10.564, 4.098, 13.232, 7.969);
+  rect(s, 0, -0.04, 14.061, 8.979, PURPLE);
+  footer(s);
+  pageNumber(s, 16);
+  title(s, 2.388, 2.127, 10.521, 5.15, ['Reservation', 'Via ', 'Laptop'], WHITE);
+  rule(s, 2.388, 12.415, 21.9, BLACK);
+  copy(s, 2.388, 9.853, 7.937, 1.649, LOREM);
+  navButton(s, 19.169, 3.174, PURPLE, WHITE);
+  asterisk(s, 7.812, 5.387, MINT);
+  card(s, 19.244, 7.254, 5.173, 3.24, YELLOW, 0.465);
+  copy(s, 19.998, 8.746, 3.931, 1.262, LOREM_B);
+  copy(s, 19.998, 7.765, 4.258, 0.732, 'Lorem Ipsum', { fontSize: 28, bold: true, lineSpacingMultiple: 1.5 });
+}
+
+/* 17. Our Team Member */
+function slide17(s) {
+  rect(s, 15.258, 0, 11.412, 15, PURPLE);
+  footer(s);
+  pageNumber(s, 17, WHITE);
+  title(s, 17.47, 4.39, 8.197, 5.15, ['Our ', 'Team ', 'Member'], WHITE);
+  navButton(s, 17.47, 11.52, YELLOW, BLACK);
+  asterisk(s, 21.847, 2.158, MINT);
+  card(s, 2.502, 5.143, 5.127, 1.457, YELLOW, 0.3);
+  label(s, 2.786, 5.585, 4.56, 0.572, 'Name Here', { fontSize: 28, bold: true, align: 'center' });
+  card(s, 7.345, 11.052, 5.127, 1.457, MINT, 0.3);
+  label(s, 7.629, 11.494, 4.56, 0.572, 'Name Here', { fontSize: 28, bold: true, align: 'center' });
+  copy(s, 2.424, 8.036, 4.444, 2.81, LOREM);
+}
+
+/* 18. Our Team Member */
+function slide18(s) {
+  footer(s);
+  pageNumber(s, 18);
+  title(s, 2.217, 7.806, 8.197, 5.15, ['Our ', 'Team ', 'Member']);
+  copy(s, 2.348, 2.491, 7.937, 1.649, LOREM);
+  rule(s, 2.348, 4.625, 8.2, BLACK);
+  card(s, 16.747, 4.14, 7.576, 3.054, YELLOW, 0.439);
+  copy(s, 17.525, 4.694, 3.092, 0.572, 'Name Here', { fontSize: 28, bold: true });
+  copy(s, 17.525, 5.873, 6.086, 0.875, LOREM_C);
+  copy(s, 17.539, 5.322, 3.092, 0.488, 'Doctor', { italic: true });
+  card(s, 16.747, 9.899, 7.576, 3.054, PURPLE, 0.439);
+  copy(s, 17.525, 10.453, 3.092, 0.572, 'Name Here', { fontSize: 28, bold: true, color: WHITE });
+  copy(s, 17.525, 11.632, 6.086, 0.875, LOREM_C, { color: WHITE });
+  copy(s, 17.539, 11.081, 3.092, 0.488, 'Doctor', { italic: true, color: WHITE });
+  navButton(s, 7.28, 5.575, PURPLE, WHITE);
+  asterisk(s, 23.095, 1.048, PURPLE);
+}
+
+/* 19. Our Team Member */
+function slide19(s) {
+  title(s, 4.67, 2.349, 17.33, 1.784, 'Our Team Member', BLACK, { align: 'center' });
+  rect(s, 0, 8.452, 26.67, 6.548, PURPLE);
+  footer(s, WHITE);
+  pageNumber(s, 19, WHITE);
+  rect(s, 9.642, 3.959, 4.1, 0.15, PURPLE);
+  card(s, 1.891, 10.03, 7.258, 2.55, YELLOW, 0.366);
+  copy(s, 3.225, 11.112, 4.59, 0.488, 'Doctor', { italic: true, align: 'center' });
+  copy(s, 3.225, 10.514, 4.59, 0.572, 'Name Here', { fontSize: 28, bold: true, align: 'center' });
+  copy(s, 2.529, 11.723, 5.982, 0.488, LOREM_E, { align: 'center' });
+  card(s, 9.706, 10.03, 7.258, 2.55, MINT, 0.366);
+  copy(s, 11.04, 11.112, 4.59, 0.488, 'Doctor', { italic: true, align: 'center' });
+  copy(s, 11.04, 10.514, 4.59, 0.572, 'Name Here', { fontSize: 28, bold: true, align: 'center' });
+  copy(s, 10.344, 11.723, 5.982, 0.488, LOREM_E, { align: 'center' });
+  card(s, 17.521, 10.03, 7.258, 2.55, CREAM, 0.366);
+  copy(s, 18.855, 11.112, 4.59, 0.488, 'Doctor', { italic: true, align: 'center' });
+  copy(s, 18.855, 10.514, 4.59, 0.572, 'Name Here', { fontSize: 28, bold: true, align: 'center' });
+  copy(s, 18.159, 11.723, 5.982, 0.488, LOREM_E, { align: 'center' });
+  navButton(s, 21.748, 4.889, PURPLE, WHITE);
+}
+
+/* 20. Our Gallery */
+function slide20(s) {
+  footer(s, WHITE);
+  pageNumber(s, 20, WHITE);
+  title(s, 2.442, 9.099, 6.982, 3.467, ['Our ', 'Gallery'], WHITE);
+  rule(s, 10.028, 12.091, 14.2, MINT);
+  copy(s, 10.028, 10.832, 5.789, 0.875, LOREM_B, { color: WHITE });
+  copy(s, 10.028, 9.936, 4.258, 0.732, 'Lorem Ipsum', { fontSize: 28, bold: true, color: WHITE, lineSpacingMultiple: 1.5 });
+  copy(s, 17.487, 10.832, 5.789, 0.875, LOREM_B, { color: WHITE });
+  copy(s, 17.487, 9.936, 4.258, 0.732, 'Lorem Ipsum', { fontSize: 28, bold: true, color: WHITE, lineSpacingMultiple: 1.5 });
+  asterisk(s, 1.252, 6.065, MINT);
+  navButton(s, 4.347, 7.798, YELLOW, BLACK);
+}
+
+/* 21. Our Gallery */
+function slide21(s) {
+  rect(s, 0, 8.27, 13.335, 6.73, PURPLE);
+  footer(s, WHITE);
+  pageNumber(s, 21);
+  title(s, 2.442, 2.432, 9.558, 1.784, 'Our Gallery');
+  rule(s, 2.388, 5.183, 21.9, BLACK);
+  copy(s, 2.442, 11.078, 4.258, 1.262, LOREM_B, { color: WHITE });
+  copy(s, 2.442, 9.935, 4.258, 0.732, 'Lorem Ipsum', { fontSize: 28, bold: true, color: WHITE, lineSpacingMultiple: 1.5 });
+  navButton(s, 2.388, 7.887, YELLOW, BLACK);
+  copy(s, 15.899, 2.572, 7.535, 1.649, LOREM);
+  asterisk(s, 12.351, 1.905, PURPLE);
+  card(s, 20.57, 6.499, 3.854, 1.468, YELLOW, 0.271);
+  copy(s, 20.848, 6.928, 3.299, 0.572, 'Lorem Ipsum', { fontSize: 28, bold: true, align: 'center' });
+  card(s, 20.562, 8.326, 3.854, 1.468, MINT, 0.271);
+  copy(s, 20.84, 8.754, 3.299, 0.572, 'Lorem Ipsum', { fontSize: 28, bold: true, align: 'center' });
+}
+
+/* 22. Our Infographic */
+function slide22(s) {
+  footer(s);
+  pageNumber(s, 22);
+  glyph(s, 14.368, 5.675, 3.734, 5.468, PUZZLE_BL, YELLOW);
+  glyph(s, 18.102, 2.766, 3.497, 5.518, PUZZLE_TR, YELLOW);
+  glyph(s, 16.802, 6.987, 4.602, 4.159, PUZZLE_BR, PURPLE);
+  glyph(s, 14.442, 2.769, 4.967, 4.211, PUZZLE_TL, PURPLE);
+  rect(s, 14.256, 1.732, 0.05, 2, YELLOW, { rotate: 270 });
+  rect(s, 15.235, 2.726, 0.05, 1, YELLOW);
+  circle(s, 15.107, 3.723, 0.306, YELLOW);
+  circle(s, 12.021, 1.778, 1.81, YELLOW);
+  outline(s, 12.251, 2.184, 1.255, 0.785, BRAIN_ICON, BLACK);
+  copy(s, 11.214, 3.858, 3.405, 0.732, 'Lorem Ipsum', { fontSize: 28, bold: true, align: 'center', lineSpacingMultiple: 1.5 });
+  rect(s, 22.078, 1.721, 0.05, 2, PURPLE, { rotate: 90 });
+  rect(s, 21.099, 2.715, 0.05, 1, PURPLE);
+  circle(s, 20.971, 3.712, 0.306, PURPLE);
+  rect(s, 14.146, 10.569, 0.05, 2, SKY, { rotate: 90 });
+  rect(s, 15.126, 10.575, 0.05, 1, PURPLE);
+  circle(s, 14.998, 10.272, 0.306, PURPLE);
+  circle(s, 22.502, 1.776, 1.81, PURPLE);
+  outline(s, 23.046, 2.468, 0.722, 0.811, HEART_ICON, WHITE);
+  copy(s, 21.73, 3.858, 3.405, 0.732, 'Lorem Ipsum', { fontSize: 28, bold: true, align: 'center', lineSpacingMultiple: 1.5 });
+  circle(s, 12.087, 10.608, 1.81, PURPLE);
+  outline(s, 12.341, 11.245, 0.691, 0.717, LIVER_ICON, WHITE);
+  copy(s, 11.153, 12.631, 3.405, 0.732, 'Lorem Ipsum', { fontSize: 28, bold: true, align: 'center', lineSpacingMultiple: 1.5 });
+  rect(s, 22.078, 10.519, 0.05, 2, YELLOW, { rotate: 270 });
+  rect(s, 21.099, 10.525, 0.05, 1, YELLOW);
+  circle(s, 20.971, 10.222, 0.306, YELLOW);
+  circle(s, 22.554, 10.626, 1.81, YELLOW);
+  outline(s, 22.951, 10.905, 0.921, 1.24, STOMACH_ICON, BLACK);
+  copy(s, 21.704, 12.543, 3.405, 0.732, 'Lorem Ipsum', { fontSize: 28, bold: true, align: 'center', lineSpacingMultiple: 1.5 });
+  title(s, 2.251, 4.588, 10.05, 3.467, ['Our', 'Infographic']);
+  rect(s, 2.251, 8.173, 8.5, 0.15, PURPLE);
+  copy(s, 2.251, 8.907, 7.937, 1.649, LOREM);
+  navButton(s, 2.251, 11.727, PURPLE, WHITE);
+  asterisk(s, 4.701, 2.426, PURPLE);
+}
+
+/* 23. Our Infographic */
+function slide23(s) {
+  footer(s);
+  pageNumber(s, 23);
+  glyph(s, 10.312, 4.848, 6.28, 5.418, HEART_BIG, YELLOW);
+  glyph(s, 13.798, 9.245, 3.45, 5.228, PALM_LEFT, PURPLE);
+  glyph(s, 15.38, 7.301, 1.974, 4.091, FINGERS_LEFT, PURPLE);
+  glyph(s, 14.879, 9.961, 0.725, 0.765, FINGER_TIP, PURPLE);
+  glyph(s, 14.989, 9.42, 1.441, 1.273, KNUCKLE, PURPLE);
+  glyph(s, 13.79, 8.704, 2.306, 3.082, PALM_BACK, PURPLE);
+  glyph(s, 14.015, 12.611, 2.693, 2.386, THUMB_LEFT, PURPLE);
+  glyph(s, 9.58, 9.311, 3.45, 5.228, PALM_LEFT, PURPLE, { flipH: true });
+  glyph(s, 9.474, 7.367, 1.974, 4.091, FINGERS_LEFT, PURPLE, { flipH: true });
+  glyph(s, 11.224, 10.027, 0.725, 0.765, FINGER_TIP, PURPLE, { flipH: true });
+  glyph(s, 10.398, 9.486, 1.441, 1.273, KNUCKLE, PURPLE, { flipH: true });
+  glyph(s, 10.732, 8.77, 2.306, 3.082, PALM_BACK, PURPLE, { flipH: true });
+  glyph(s, 10.12, 12.677, 2.693, 2.386, THUMB_LEFT, PURPLE, { flipH: true });
+  rect(s, 7.125, 7.185, 0.05, 3, PURPLE, { rotate: 270 });
+  rect(s, 5.65, 7.67, 0.05, 1, PURPLE);
+  circle(s, 8.65, 8.526, 0.306, PURPLE);
+  copy(s, 3.947, 5.729, 3.405, 0.732, 'Lorem Ipsum', { fontSize: 28, bold: true, align: 'center', lineSpacingMultiple: 1.5 });
+  label(s, 2.607, 6.656, 6.087, 0.774, LOREM_B, { align: 'center', margin: 0 });
+  rect(s, 7.13, 8.191, 0.05, 3, PURPLE, { rotate: 270 });
+  rect(s, 5.655, 9.685, 0.05, 1, PURPLE);
+  circle(s, 8.655, 9.532, 0.306, PURPLE);
+  copy(s, 3.952, 10.81, 3.405, 0.732, 'Lorem Ipsum', { fontSize: 28, bold: true, align: 'center', lineSpacingMultiple: 1.5 });
+  label(s, 2.611, 11.737, 6.087, 0.774, LOREM_B, { align: 'center', margin: 0 });
+  rect(s, 20.027, 7.191, 0.05, 3, PURPLE, { rotate: 90 });
+  rect(s, 21.502, 7.677, 0.05, 1, PURPLE);
+  circle(s, 18.246, 8.532, 0.306, PURPLE);
+  copy(s, 19.849, 5.736, 3.405, 0.732, 'Lorem Ipsum', { fontSize: 28, bold: true, align: 'center', lineSpacingMultiple: 1.5 });
+  label(s, 18.509, 6.663, 6.087, 0.774, LOREM_B, { align: 'center', margin: 0 });
+  rect(s, 20.022, 8.198, 0.05, 3, PURPLE, { rotate: 90 });
+  rect(s, 21.497, 9.692, 0.05, 1, PURPLE);
+  circle(s, 18.241, 9.538, 0.306, PURPLE);
+  copy(s, 19.845, 10.817, 3.405, 0.732, 'Lorem Ipsum', { fontSize: 28, bold: true, align: 'center', lineSpacingMultiple: 1.5 });
+  label(s, 18.504, 11.744, 6.087, 0.774, LOREM_B, { align: 'center', margin: 0 });
+  title(s, 5.83, 2.095, 14.903, 1.784, 'Our Infographic', BLACK, { align: 'center' });
+  navButton(s, 21.335, 3.475, PURPLE, WHITE);
+  asterisk(s, 1.151, 2.778, PURPLE);
+}
+
+/* 24. Our Company in Number */
+function slide24(s) {
+  card(s, 2.409, 7.852, 5.494, 4.495, MINT, 0.572);
+  footer(s, WHITE);
+  pageNumber(s, 24, WHITE);
+  title(s, 15.389, 2.253, 9.143, 5.15, ['Our', 'Company ', 'in Number'], WHITE);
+  pieChart(s, 2.047, 2.35, 6.219, 4.543, MINT);
+  copy(s, 3.099, 10.898, 3.749, 0.572, 'August 2022', { fontSize: 28, bold: true, italic: true });
+  copy(s, 3.092, 9.762, 4.553, 0.875, LOREM_F);
+  copy(s, 3.099, 8.484, 3.749, 1.212, '1.0K', { fontSize: 66, bold: true });
+  card(s, 8.266, 7.852, 5.494, 4.495, YELLOW, 0.572);
+  pieChart(s, 7.903, 2.35, 6.219, 4.543, GOLD);
+  copy(s, 8.955, 10.898, 3.749, 0.572, 'August 2022', { fontSize: 28, bold: true, italic: true });
+  copy(s, 8.949, 9.762, 4.553, 0.875, LOREM_F);
+  copy(s, 8.955, 8.484, 3.749, 1.212, '1.0K', { fontSize: 66, bold: true });
+  rule(s, 15.389, 7.865, 9.1, MINT);
+  copy(s, 15.398, 8.562, 8.174, 2.81, [LOREM, '', 'It has survived not only five centuries, but also the leap into electronic.'], { color: WHITE });
+  navButton(s, 21.23, 11.884, YELLOW, BLACK);
+  asterisk(s, 22.198, 1.792, MINT);
+}
+
+/* 25. Our Company in Number */
+function slide25(s) {
+  rect(s, 12.387, 2.437, 12.018, 10.212, PURPLE);
+  footer(s);
+  pageNumber(s, 25);
+  title(s, 2.453, 2.35, 9.934, 5.15, ['Our', 'Company ', 'in Number']);
+  barChart(s, 13.613, 3.452, 9.491, 5.695);
+  copy(s, 13.613, 10.161, 3.749, 1.212, '1.0K', { fontSize: 66, bold: true, color: WHITE });
+  copy(s, 16.677, 10.668, 6.865, 1.262, 'Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s, when an unknown printer took.', { color: WHITE });
+  copy(s, 16.677, 9.777, 4.258, 0.732, 'Lorem Ipsum', { fontSize: 28, bold: true, color: WHITE, lineSpacingMultiple: 1.5 });
+  rect(s, 4.066, 7.35, 6.1, 0.15, PURPLE);
+  copy(s, 2.453, 9.036, 7.937, 1.649, LOREM);
+  rule(s, 2.453, 11.17, 8.2, BLACK);
+  navButton(s, 2.453, 11.705, PURPLE, WHITE);
+}
+
+/* 26. Our Pricing */
+function slide26(s) {
+  rect(s, 0, 0, 11.645, 8.312, PURPLE);
+  footer(s);
+  pageNumber(s, 26);
+  title(s, 16.844, 2.519, 7.794, 3.467, ['Our ', 'Pricing']);
+  rect(s, 16.983, 6.175, 5.6, 0.15, PURPLE);
+  copy(s, 16.983, 7.702, 7.468, 3.198, [LOREM, '', SURVIVED]);
+  navButton(s, 16.837, 11.731, PURPLE, WHITE);
+  asterisk(s, 13.641, 2.026, PURPLE);
+  copy(s, 2.467, 2.354, 4.258, 0.732, 'Lorem Ipsum', { fontSize: 28, bold: true, color: WHITE, lineSpacingMultiple: 1.5 });
+  copy(s, 2.467, 3.2, 6.63, 2.036, LOREM, { color: WHITE });
+  card(s, 2.467, 6.412, 5.494, 4.309, YELLOW, 0.548);
+  copy(s, 3.548, 8.276, 4.012, 1.651, 'Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s.', { fontSize: 23.02 });
+  copy(s, 3.553, 6.861, 2.419, 1.178, '$50', { fontSize: 70, bold: true });
+}
+
+/* 27. Our Pricing */
+function slide27(s) {
+  card(s, 7.644, 5.758, 5.494, 6.441, MINT, 0.699);
+  card(s, 13.335, 4.824, 5.345, 7.375, CREAM, 0.68);
+  card(s, 18.856, 4.056, 5.452, 8.168, YELLOW, 0.693);
+  footer(s, WHITE);
+  pageNumber(s, 27, WHITE);
+  copy(s, 14.3, 5.734, 3.813, 1.717, '$39', { fontSize: 96, bold: true });
+  label(s, 8.591, 6.5, 3.028, 1.717, '$19', { fontSize: 96, bold: true });
+  copy(s, 14.3, 8.498, 3.543, 2.81, 'Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled.');
+  copy(s, 8.667, 9.079, 3.455, 2.423, 'Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s, when an unknown printer.');
+  label(s, 8.667, 8.268, 3.753, 0.64, 'Lorem Ipsum', { fontSize: 32, bold: true });
+  copy(s, 14.3, 7.575, 3.813, 0.639, 'Lorem Ipsum', { fontSize: 32, bold: true });
+  label(s, 19.861, 4.979, 3.028, 1.717, '$69', { fontSize: 96, bold: true });
+  copy(s, 19.937, 7.917, 3.455, 3.585, LOREM);
+  label(s, 19.937, 6.94, 3.455, 0.64, 'Lorem Ipsum', { fontSize: 32, bold: true });
+  title(s, 2.353, 2.272, 10.031, 1.784, 'Our Pricing', WHITE);
+  rule(s, 2.388, 12.573, 21.9, MINT);
+  copy(s, 2.353, 8.831, 4.376, 2.81, LOREM, { color: WHITE });
+  navButton(s, 2.363, 7.311, YELLOW, BLACK);
+  asterisk(s, 10.786, 1.475, MINT);
+}
+
+/* 28. Our Pricing */
+function slide28(s) {
+  footer(s);
+  pageNumber(s, 28);
+  title(s, 2.727, 9.668, 9.769, 1.784, 'Our Pricing');
+  card(s, 16.903, 7.755, 7.516, 4.952, YELLOW, 0.565);
+  copy(s, 17.859, 9.658, 3.04, 1.269, '$69', { fontSize: 88, bold: true });
+  copy(s, 17.859, 8.386, 4.181, 0.6, 'Lorem Ipsum', { fontSize: 28, bold: true });
+  copy(s, 20.899, 8.759, 2.686, 2.945, [['Lorem Ipsum', { bullet: CHECK }], ['Lorem Ipsum', { bullet: CHECK }], ['Lorem Ipsum', { bullet: CHECK }], ['Lorem Ipsum', { bullet: CHECK }], ['Lorem Ipsum', { bullet: CHECK }]], { fontSize: 23.02, lineSpacingMultiple: 1.5 });
+  card(s, 16.903, 2.548, 7.516, 4.952, PURPLE, 0.565);
+  copy(s, 17.859, 4.45, 3.04, 1.269, '$69', { fontSize: 88, bold: true, color: WHITE });
+  copy(s, 17.859, 3.178, 4.181, 0.6, 'Lorem Ipsum', { fontSize: 28, bold: true, color: WHITE });
+  copy(s, 20.899, 3.551, 2.686, 2.945, [['Lorem Ipsum', { bullet: CHECK }], ['Lorem Ipsum', { bullet: CHECK }], ['Lorem Ipsum', { bullet: CHECK }], ['Lorem Ipsum', { bullet: CHECK }], ['Lorem Ipsum', { bullet: CHECK }]], { fontSize: 23.02, color: WHITE, lineSpacingMultiple: 1.5 });
+  navButton(s, 2.715, 7.955, PURPLE, WHITE);
+  asterisk(s, 11.504, 9.599, PURPLE);
+}
+
+/* 29. Keep in Touch */
+function slide29(s) {
+  footer(s);
+  pageNumber(s, 29);
+  title(s, 12.963, 2.702, 11.106, 1.784, 'Keep in Touch');
+  rule(s, 13.135, 4.963, 11.2, BLACK);
+  navButton(s, 2.359, 11.817, PURPLE, WHITE);
+  asterisk(s, 10.541, 1.186, PURPLE);
+  card(s, 17.715, 7.057, 6.677, 6.131, PURPLE, 0.7);
+  copy(s, 19.075, 11.787, 4.994, 0.488, 'youremail@gmail.com', { color: WHITE });
+  copy(s, 19.075, 11.13, 3.271, 0.572, 'Email', { fontSize: 28, bold: true, color: WHITE });
+  copy(s, 19.075, 10.174, 4.994, 0.488, 'www.yourwebsite.com', { color: WHITE });
+  copy(s, 19.075, 9.517, 3.271, 0.572, 'Website', { fontSize: 28, bold: true, color: WHITE });
+  copy(s, 19.075, 8.602, 4.994, 0.488, '+123 456 789', { color: WHITE });
+  copy(s, 19.075, 7.945, 3.271, 0.572, 'Phone', { fontSize: 28, bold: true, color: WHITE });
+  card(s, 7.31, 6.464, 1.631, 5.228, YELLOW, 0.186);
+  glyph(s, 7.981, 7.49, 0.291, 0.553, FACEBOOK_F, BLACK);
+  glyph(s, 7.981, 10.122, 0.431, 0.412, TWITTER_BIRD, BLACK);
+  glyph(s, 7.873, 8.877, 0.507, 0.412, LINKEDIN_IN, BLACK);
+}
+
+/* 30. Keep in Touch */
+function slide30(s) {
+  footer(s);
+  pageNumber(s, 30);
+  copy(s, 2.368, 2.495, 6.599, 1.649, 'Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled');
+  rule(s, 2.368, 4.438, 6.7, BLACK);
+  title(s, 2.368, 7.834, 7.711, 3.467, ['Keep ', 'in Touch']);
+  navButton(s, 2.368, 11.908, PURPLE, WHITE);
+  asterisk(s, 7.02, 6.587, PURPLE);
+  card(s, 9.974, 8.581, 7.164, 1.819, YELLOW, 0.393);
+  card(s, 17.138, 5.319, 7.164, 7.268, PURPLE, 0.516);
+  copy(s, 18.494, 6.83, 4.716, 0.875, LOREM_F, { color: WHITE });
+  copy(s, 18.494, 6.239, 3.851, 0.572, 'Address', { fontSize: 28, bold: true, color: WHITE });
+  copy(s, 18.494, 10.033, 3.969, 0.488, '+123 456 789', { color: WHITE });
+  copy(s, 18.494, 9.461, 3.851, 0.572, 'Phone', { fontSize: 28, bold: true, color: WHITE });
+  copy(s, 18.494, 8.529, 4.716, 0.488, 'Loremipsum@gmail.com.', { color: WHITE });
+  copy(s, 18.494, 8.035, 3.851, 0.572, 'Email', { fontSize: 28, bold: true, color: WHITE });
+  copy(s, 18.494, 11.349, 4.716, 0.488, 'www.loremipsum.com', { color: WHITE });
+  copy(s, 18.494, 10.855, 3.851, 0.572, 'Email', { fontSize: 28, bold: true, color: WHITE });
+  glyph(s, 11.583, 9.295, 0.291, 0.553, FACEBOOK_F, BLACK);
+  glyph(s, 15.098, 9.366, 0.431, 0.412, TWITTER_BIRD, BLACK);
+  glyph(s, 13.267, 9.366, 0.507, 0.412, LINKEDIN_IN, BLACK);
+}
+
+/* 31. Keep in Touch */
+function slide31(s) {
+  footer(s, WHITE);
+  title(s, 3.993, 4.543, 7.711, 3.467, ['Keep ', 'in Touch'], WHITE);
+  rule(s, 2.388, 10.12, 21.9, MINT);
+  asterisk(s, 8.879, 2.809, MINT);
+  copy(s, 2.388, 10.626, 7.333, 0.572, 'Contact Information', { fontSize: 28, bold: true, color: WHITE });
+  copy(s, 16.433, 10.626, 6.734, 0.875, 'Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s.', { color: WHITE });
+  copy(s, 13.335, 10.661, 3.851, 0.572, 'Address', { fontSize: 28, bold: true, color: WHITE });
+  copy(s, 16.412, 11.63, 7.939, 0.488, '+123 456 789', { color: WHITE });
+  copy(s, 13.335, 11.591, 2.337, 0.572, 'Phone', { fontSize: 28, bold: true, color: WHITE });
+  copy(s, 16.412, 12.206, 7.939, 0.488, 'www.yourwebsite.com', { color: WHITE });
+  copy(s, 13.335, 12.167, 2.337, 0.572, 'Website', { fontSize: 28, bold: true, color: WHITE });
+  pageNumber(s, 31, WHITE);
+  navButton(s, 20.291, 8.303, YELLOW, BLACK);
+}
+
+/* 32. Page Break */
+function slide32(s) {
+  rect(s, 0, 0, 11.645, 15, PURPLE);
+  footer(s, WHITE);
+  pageNumber(s, 32);
+  title(s, 17.379, 3.332, 6.337, 3.467, ['Page', 'Break']);
+  navButton(s, 1.815, 12.08, YELLOW, BLACK);
+  asterisk(s, 22.198, 1.912, PURPLE);
+  card(s, 13.46, 8.613, 10.886, 4.161, YELLOW, 0.465);
+  copy(s, 14.675, 9.594, 8.456, 2.12, QUOTE, { fontSize: 40, fontFace: 'Poppins' });
+}
+
+/* 33. Page Break */
+function slide33(s) {
+  footer(s);
+  pageNumber(s, 33);
+  title(s, 2.359, 5.767, 6.337, 3.467, ['Page', 'Break']);
+  navButton(s, 2.359, 2.405, PURPLE, WHITE);
+  rect(s, 2.437, 9.158, 4.3, 0.15, PURPLE);
+  card(s, 9.304, 7.5, 10.886, 4.952, PURPLE, 0.553);
+  copy(s, 10.519, 8.921, 8.456, 2.12, QUOTE, { fontSize: 40, color: WHITE, fontFace: 'Poppins' });
+}
+
+/* 34. Page Break */
+function slide34(s) {
+  rect(s, 14.806, 3.516, 11.864, 11.484, PURPLE);
+  footer(s);
+  pageNumber(s, 34, WHITE);
+  title(s, 17.138, 5.935, 6.337, 3.467, ['Page', 'Break'], WHITE);
+  copy(s, 17.138, 9.99, 6.829, 2.036, LOREM, { color: WHITE });
+  rule(s, 17.138, 12.318, 7.1, MINT);
+  card(s, 1.867, 8.461, 10.886, 4.161, YELLOW, 0.465);
+  copy(s, 3.082, 9.441, 8.456, 2.12, QUOTE, { fontSize: 40, fontFace: 'Poppins' });
+  navButton(s, 1.867, 7.406, PURPLE, WHITE);
+  asterisk(s, 22.198, 4.644, MINT);
+}
+
+/* 35. Thanks */
+function slide35(s) {
+  footer(s, WHITE);
+  pageNumber(s, 35, WHITE);
+  headline(s, 2.404, 2.498, 15.25, 2.794, 'Thanks', { fontSize: 160, bold: true, color: WHITE });
+  copy(s, 15.644, 2.498, 7.937, 1.649, LOREM, { color: WHITE });
+  rule(s, 15.644, 4.632, 8.2, MINT);
+  asterisk(s, 10.927, 1.825, MINT);
+  navButton(s, 2.147, 11.752, YELLOW, BLACK, BACK);
+  card(s, 23.416, 6.032, 1.631, 5.228, YELLOW, 0.186);
+  glyph(s, 24.087, 7.058, 0.291, 0.553, FACEBOOK_F, BLACK);
+  glyph(s, 24.087, 9.69, 0.431, 0.412, TWITTER_BIRD, BLACK);
+  glyph(s, 23.979, 8.445, 0.507, 0.412, LINKEDIN_IN, BLACK);
+}
+
+/* ---------------------------------------------------------------- assembly */
+
+const SLIDES = [
+  [slide01, PAGE_BG],
+  [slide02, PAGE_BG],
+  [slide03, PAGE_BG],
+  [slide04, PURPLE],
+  [slide05, PAGE_BG],
+  [slide06, PAGE_BG],
+  [slide07, PAGE_BG],
+  [slide08, PAGE_BG],
+  [slide09, PURPLE],
+  [slide10, PAGE_BG],
+  [slide11, PAGE_BG],
+  [slide12, PURPLE],
+  [slide13, PAGE_BG],
+  [slide14, PAGE_BG],
+  [slide15, PURPLE],
+  [slide16, PAGE_BG],
+  [slide17, PAGE_BG],
+  [slide18, PAGE_BG],
+  [slide19, PAGE_BG],
+  [slide20, PURPLE],
+  [slide21, PAGE_BG],
+  [slide22, PAGE_BG],
+  [slide23, PAGE_BG],
+  [slide24, PURPLE],
+  [slide25, PAGE_BG],
+  [slide26, PAGE_BG],
+  [slide27, PURPLE],
+  [slide28, PAGE_BG],
+  [slide29, PAGE_BG],
+  [slide30, PAGE_BG],
+  [slide31, PURPLE],
+  [slide32, PAGE_BG],
+  [slide33, PAGE_BG],
+  [slide34, PAGE_BG],
+  [slide35, PURPLE],
+];
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'WIDE', width: SLIDE_W, height: SLIDE_H });
+  pptx.layout = 'WIDE';
+  pptx.title = 'Orthopedic - Presentation Template';
+
+  SLIDES.forEach(([draw, bg]) => {
+    const s = pptx.addSlide();
+    s.background = { color: bg || PAGE_BG };
+    draw(s);
+  });
+
+  return pptx.writeFile({
+    fileName: path.join(__dirname, '06dca208-86be-4e60-99a9-a2fffbf7508a_grok_final.pptx'),
+  });
+}
+
+build().then((f) => console.log('wrote ' + f)).catch((e) => {
+  console.error(e);
+  process.exit(1);
+});
