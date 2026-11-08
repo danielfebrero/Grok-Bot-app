@@ -9,6 +9,15 @@ packages confondus. Entrées les plus récentes en haut. Heures de Paris
 
 <!-- NOUVELLES-ENTREES-ICI -->
 
+## 2026-11-08 18:09 (Paris) — `2026-11-07_18-03` → `2026-11-08_18-09`
+
+Changement de surface RPC détecté : **8 méthode(s) ajoutée(s)**.
+
+Ajoutées : `DashboardService.ApproveOAuthAuthorizationRequest`, `DashboardService.CreateOAuthApplication`, `DashboardService.DeleteOAuthApplication`, `DashboardService.GetOAuthAuthorizationRequest`, `DashboardService.ListOAuthApplications`, `DashboardService.RotateOAuthApplicationSecret`, `DashboardService.SetOAuthApplicationEnabled`, `DashboardService.UpdateOAuthApplication`
+
+Rapport : [reports/2026-11-08_18-09.md](reports/2026-11-08_18-09.md).
+
+
 ## 2026-11-07 18:03 (Paris) — `2026-11-06_18-08` → `2026-11-07_18-03`
 
 Changement de surface RPC détecté : **19 méthode(s) ajoutée(s)**, **1 supprimée(s)**.
