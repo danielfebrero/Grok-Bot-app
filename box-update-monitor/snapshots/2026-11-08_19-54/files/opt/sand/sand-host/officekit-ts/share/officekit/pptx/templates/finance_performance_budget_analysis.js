@@ -1,0 +1,687 @@
+/*
+ * "Financial Performance" deck (18 slides, 13.333 x 7.5 in) rebuilt with pptxgenjs.
+ * Raster icons of the original are replaced by native shape placeholders.
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+const W = 13.333;               // slide width  (in)
+const H = 7.5;                  // slide height (in)
+
+// theme palette (ppt/theme/theme1.xml "Custom 156")
+const C = {
+  ink: 'F2F2F2',                // bg2 / lt2 - primary light text
+  mint: '39F0BA',               // accent3
+  blue: '0E48D8',               // accent5
+  card: '262626',               // tx1 lumMod 85%  - card + circle fill
+  rail: '404040',               // tx1 lumMod 75%  - timeline rail
+  slot: '1B1B1B',               // empty progress-bar track
+  dim: '797979',                // muted caption grey
+  grey: '595959',               // inactive dot
+  dark: '0D0D0D',               // text on mint
+  day: 'CECECE'
+};
+
+const HEAD = 'Sora SemiBold';   // theme major latin font
+const BODY = 'Inter';           // theme minor latin font
+const CHRT = 'Be Vietnam Pro Light';
+
+const NOLINE = { type: 'none' };
+const NOTE = 'Financial performance indicators guide management.';
+const LEDE = 'Financial performance represents the overall financial ' +
+  'condition and results achieved by a business within a specific period.';
+const LEDE2 = ['A financial performance represents overall ',
+  'financial condition and results achieved by ', 'a business.'];
+const LEDE3 = ['A financial performance represents overall financial condition ',
+  'and results achieved by a business.'];
+const LEDE4 = ['Financial performance reflects profitability, ',
+  'efficiency, liquidity, and overall business ', 'strength and resilience.'];
+
+// ---------------------------------------------------------------- helpers ---
+
+/** Diagonal charcoal->black wash of the original (#313131 at the top-left
+ *  corner fading to #000000 at the bottom-right). pptxgenjs has no gradient
+ *  fill API, so it is approximated by 45-degree bands of flat colour. */
+function backdrop(slide) {
+  const bands = 48;
+  const axis = (W + H) / Math.SQRT2;      // length of the gradient axis
+  const bw = axis / bands + 0.02;         // band thickness (slight overlap)
+  const len = W + H;                      // band length, covers every corner
+  for (let i = 0; i < bands; i++) {
+    const t = (i + 0.5) / bands;
+    const v = Math.max(0, Math.round(49 * (1 - t)));
+    const hex = ('0' + v.toString(16)).slice(-2).toUpperCase().repeat(3);
+    const c = t * (W + H) / 2;            // band centre, on the diagonal
+    slide.addShape('rect', {
+      x: c - bw / 2, y: c - len / 2, w: bw, h: len,
+      rotate: 45, fill: { color: hex }, line: NOLINE
+    });
+  }
+}
+
+/** brand row: logo mark + wordmark, centred year, right-aligned url */
+function header(slide) {
+  slide.addShape('blockArc', {          // arch-shaped brand mark
+    x: 0.72, y: 0.656, w: 0.158, h: 0.19, fill: { color: C.mint }, line: NOLINE
+  });
+  slide.addText('Fiscal Tech', {
+    x: 0.878, y: 0.58, w: 1.507, h: 0.278,
+    fontFace: HEAD, fontSize: 10, color: C.ink, valign: 'middle'
+  });
+  slide.addText('2027', {
+    x: 5.291, y: 0.58, w: 2.752, h: 0.269, align: 'center',
+    fontFace: BODY, fontSize: 10, color: C.ink, valign: 'middle'
+  });
+  slide.addText('www.yourwebsite.com', {
+    x: 9.973, y: 0.58, w: 2.752, h: 0.269, align: 'right',
+    fontFace: BODY, fontSize: 10, color: C.ink, valign: 'middle'
+  });
+}
+
+/** chapter rail with circular stops; `dots` = [[x, isActive], ...] */
+function timeline(slide, lineFrom, lineTo, dots) {
+  slide.addShape('rect', {
+    x: lineFrom, y: 2.872, w: lineTo - lineFrom, h: 0.05,
+    fill: { color: C.rail }, line: NOLINE
+  });
+  dots.forEach(function (d) {
+    slide.addShape('ellipse', {
+      x: d[0], y: 2.532, w: 0.729, h: 0.729, fill: { color: C.card },
+      line: { color: d[1] ? C.mint : C.ink, width: d[1] ? 8 : 4 }
+    });
+    glyph(slide, d[0] + 0.218, 2.75, 0.293, C.ink);   // [image] pictogram
+  });
+}
+
+/** [image] stand-in for a monochrome pictogram of the original deck:
+ *  a solid disc with a wedge cut out, echoing the pie/finance icon set. */
+function glyph(slide, x, y, size, color) {
+  slide.addShape('pie', {
+    x: x + size * 0.06, y: y + size * 0.06, w: size * 0.88, h: size * 0.88,
+    fill: { color: color }, line: NOLINE
+  });
+  slide.addShape('pieWedge', {
+    x: x + size * 0.5, y: y + size * 0.06, w: size * 0.44, h: size * 0.44,
+    rotate: 270, fill: { color: color }, line: NOLINE
+  });
+}
+
+/** round "next" button: mint disc with a dark arrow */
+function arrowButton(slide, x, y, size) {
+  slide.addShape('ellipse', { x: x, y: y, w: size, h: size, fill: { color: C.mint }, line: NOLINE });
+  slide.addShape('rightArrow', {
+    x: x + size * 0.24, y: y + size * 0.33, w: size * 0.52, h: size * 0.34,
+    fill: { color: C.card }, line: NOLINE
+  });
+}
+
+/** globe / mail / phone buttons of the cover + closing slide */
+function contactButtons(slide) {
+  [10.796, 11.437, 12.078].forEach(function (x, i) {
+    slide.addShape('ellipse', {
+      x: x, y: 6.247, w: 0.534, h: 0.534, fill: { color: C.card }, line: NOLINE
+    });
+  });
+  slide.addShape('ellipse', {                                  // globe
+    x: 10.956, y: 6.407, w: 0.215, h: 0.215,
+    fill: NOLINE, line: { color: C.mint, width: 1.5 }
+  });
+  slide.addShape('ellipse', {
+    x: 11.019, y: 6.407, w: 0.089, h: 0.215,
+    fill: NOLINE, line: { color: C.mint, width: 1 }
+  });
+  slide.addShape('rect', {                                     // envelope
+    x: 11.597, y: 6.425, w: 0.215, h: 0.178, fill: { color: C.mint }, line: NOLINE
+  });
+  slide.addShape('triangle', {
+    x: 11.625, y: 6.425, w: 0.159, h: 0.05, rotate: 180,
+    fill: { color: C.card }, line: NOLINE
+  });
+  slide.addShape('blockArc', {                                 // handset
+    x: 12.238, y: 6.406, w: 0.215, h: 0.215, rotate: 200,
+    fill: { color: C.mint }, line: NOLINE
+  });
+}
+
+/** month kicker + multi-line headline + bottom note shared by slides 3..17 */
+function chapterText(slide, o) {
+  slide.addText(o.month, {
+    x: 0.727, y: 3.928, w: 5.363, h: 0.37,
+    fontFace: HEAD, fontSize: 16, color: C.mint, valign: 'top'
+  });
+  slide.addText(o.title.map(function (t, i) {
+    return { text: t, options: { breakLine: i < o.title.length - 1 } };
+  }), {
+    x: 0.728, y: 4.608, w: o.titleW || 7.238, h: o.titleH || 1.717,
+    fontFace: HEAD, fontSize: o.size || 32, color: C.ink, valign: 'top'
+  });
+  if (o.note) {
+    slide.addText(o.note.map(function (t, i) {
+      return { text: t, options: { breakLine: i < o.note.length - 1 } };
+    }), {
+      x: 0.756, y: 6.216, w: 5.546, h: 0.565, lineSpacingMultiple: 1.2,
+      fontFace: BODY, fontSize: 12, color: C.ink, valign: 'top'
+    });
+  } else {
+    slide.addText(NOTE, {
+      x: 0.757, y: 6.512, w: 4.773, h: 0.269,
+      fontFace: BODY, fontSize: 10, color: C.ink, valign: 'middle'
+    });
+  }
+}
+
+/** right-hand body copy, 12pt / 1.2 line spacing */
+function bodyCopy(slide, x, y, lines, opts) {
+  const o = opts || {};
+  slide.addText([].concat(lines).map(function (t, i, a) {
+    return { text: t, options: { breakLine: i < a.length - 1 } };
+  }), {
+    x: x, y: y, w: o.w || 4.773, h: o.h || 0.808,
+    lineSpacingMultiple: o.spacing || 1.2, fontFace: BODY,
+    fontSize: o.size || 12, color: C.ink, valign: o.valign || 'middle'
+  });
+}
+
+/** rounded track + filled portion, used for the D/E ratio + slider widgets */
+function meter(slide, x, y, w, h, pct, color, label, value, labelColor) {
+  slide.addShape('roundRect', {
+    x: x, y: y, w: w, h: h, rectRadius: h / 2, fill: { color: C.slot }, line: NOLINE
+  });
+  slide.addShape('roundRect', {
+    x: x, y: y, w: w * pct, h: h, rectRadius: h / 2, fill: { color: color }, line: NOLINE
+  });
+  slide.addText(label, {
+    x: x + 0.216, y: y + 0.066, w: 1.407, h: 0.303,
+    fontFace: HEAD, fontSize: 12, color: labelColor, valign: 'middle'
+  });
+  slide.addText(value, {
+    x: x + w * pct - 1.115, y: y + 0.066, w: 0.878, h: 0.303, align: 'right',
+    fontFace: HEAD, fontSize: 12, color: labelColor, valign: 'middle'
+  });
+}
+
+/** small white "tooltip" bubble with a coloured number */
+function tooltip(slide, x, y, w, text, color) {
+  slide.addShape('roundRect', {
+    x: x, y: y, w: w, h: 0.344, rectRadius: 0.08, fill: { color: C.ink }, line: NOLINE
+  });
+  slide.addText(text, {
+    x: x + 0.05, y: y + 0.02, w: w - 0.1, h: 0.303, align: 'center', wrap: false,
+    fontFace: HEAD, fontSize: 12, color: color, valign: 'middle'
+  });
+}
+
+/** coloured bullet + caption used by the chart legends */
+function legendDot(slide, x, y, d, color, label, font) {
+  slide.addShape('ellipse', { x: x, y: y, w: d, h: d, fill: { color: color }, line: NOLINE });
+  slide.addText(label, {
+    x: x + d + 0.081, y: y - 0.063, w: 2.5, h: 0.303,
+    fontFace: font || HEAD, fontSize: 12, color: C.ink, valign: 'middle'
+  });
+}
+
+// ----------------------------------------------------------------- slides ---
+
+const slides = [];
+
+// 1 - opening frame: artwork sits off-canvas in the source, only the wash shows
+slides.push(function (s) { /* backdrop only */ });
+
+// 2 - cover
+slides.push(function (s) {
+  header(s);
+  s.addText('Financial ', {
+    x: 0.478, y: 1.79, w: 11.115, h: 2.036,
+    fontFace: HEAD, fontSize: 115, bold: true, color: C.mint, valign: 'middle'
+  });
+  s.addText('Performance', {
+    x: 0.478, y: 3.673, w: 11.115, h: 2.036,
+    fontFace: HEAD, fontSize: 115, bold: true, color: C.ink, valign: 'middle'
+  });
+  s.addText(NOTE, {
+    x: 0.61, y: 6.512, w: 4.773, h: 0.269,
+    fontFace: BODY, fontSize: 10, color: C.ink, valign: 'middle'
+  });
+  contactButtons(s);
+});
+
+// 3 - Assessing Financial Performance
+slides.push(function (s) {
+  header(s);
+  timeline(s, 6.667, W, [[6.302, true], [11.854, false]]);
+  chapterText(s, {
+    month: 'October 2026',
+    title: ['Assessing Financial ', 'Performance for Strategic', 'Decisions']
+  });
+  s.addShape('roundRect', {
+    x: 8.379, y: 5.273, w: 1.719, h: 0.388, rectRadius: 0.194,
+    fill: { color: C.mint }, line: NOLINE
+  });
+  s.addText('Budget Report', {
+    x: 8.379, y: 5.332, w: 1.719, h: 0.269, align: 'center',
+    fontFace: BODY, fontSize: 10, bold: true, color: C.card, valign: 'top'
+  });
+  bodyCopy(s, 8.267, 5.974, LEDE);
+});
+
+// 4 - Cash Flow Strength (clustered column chart)
+slides.push(function (s, pptx) {
+  header(s);
+  timeline(s, 1.115, W, [[0.75, false], [6.302, true], [11.854, false]]);
+  chapterText(s, {
+    month: 'November 2026',
+    title: ['Cash Flow ', 'Strength & Operational ', 'Resilience Analysis']
+  });
+  const cats = ['Week 1', 'Week 2', 'Week 3'];
+  s.addChart(pptx.ChartType.bar, [
+    { name: 'Column1', labels: cats, values: [2, 2.5, 3.5] },
+    { name: 'Column2', labels: cats, values: [3, 4.4, 4] }
+  ], {
+    x: 7.994, y: 4.298, w: 4.941, h: 2.483,
+    barDir: 'col', barGrouping: 'clustered', barGapWidthPct: 50,
+    chartColors: [C.mint, C.blue],
+    showLegend: false, showTitle: false, showValue: true,
+    dataLabelPosition: 'outEnd', dataLabelColor: C.ink,
+    dataLabelFontFace: CHRT, dataLabelFontSize: 9, dataLabelFormatCode: 'General',
+    catAxisLabelColor: C.ink, catAxisLabelFontFace: CHRT, catAxisLabelFontSize: 9,
+    catAxisLineShow: false, catAxisMajorTickMark: 'none',
+    valAxisHidden: true, valGridLine: { style: 'none' }
+  });
+});
+
+// 5 - Capital Structure and Debt (equity / debt meters)
+slides.push(function (s) {
+  header(s);
+  timeline(s, 0, W, [[0.75, false], [6.302, true], [11.854, false]]);
+  chapterText(s, {
+    month: 'December 2026', title: ['Capital Structure and Debt'], size: 48
+  });
+  s.addText([
+    { text: 'Impact of ', options: { color: C.dim } },
+    { text: 'D/E Ratio', options: { color: C.ink } }
+  ], {
+    x: 7.843, y: 5.11, w: 4.773, h: 0.269, align: 'right',
+    fontFace: BODY, fontSize: 10, valign: 'middle'
+  });
+  meter(s, 8.353, 5.715, 4.264, 0.434, 0.8218, C.mint, 'Equity', '70%', C.card);
+  meter(s, 8.353, 6.347, 4.264, 0.434, 0.4597, C.blue, 'Debt', '30%', C.ink);
+});
+
+// 6 - Budget Variance for Cost Controls
+slides.push(function (s) {
+  header(s);
+  timeline(s, 0, W, [[0.75, false], [6.302, true], [11.854, false]]);
+  chapterText(s, {
+    month: 'January 2027', title: ['Budget Variance for Cost Controls'],
+    size: 44, titleW: 8.024, titleH: 1.582
+  });
+  s.addText('4B+', {
+    x: 7.031, y: 5.822, w: 2.406, h: 1.212,
+    fontFace: HEAD, fontSize: 66, color: C.mint, valign: 'top'
+  });
+  bodyCopy(s, 9.129, 5.974, LEDE4);
+});
+
+// 7 - Benchmarking Competitor (KPI card with a segmented progress bar)
+slides.push(function (s) {
+  header(s);
+  timeline(s, 0, W, [[0.75, false], [6.302, true], [11.854, false]]);
+  chapterText(s, {
+    month: 'February 2027', title: ['Benchmarking Competitor'],
+    size: 44, titleW: 8.024, titleH: 1.582
+  });
+  s.addShape('roundRect', {
+    x: 7.124, y: 5.065, w: 5.449, h: 1.718, rectRadius: 0.16,
+    fill: { color: C.card }, line: NOLINE
+  });
+  s.addText('$879,274', {
+    x: 7.36, y: 5.369, w: 1.565, h: 0.303, margin: 0,
+    fontFace: HEAD, fontSize: 18, color: C.ink, valign: 'middle'
+  });
+  s.addShape('ellipse', {
+    x: 8.686, y: 5.419, w: 0.203, h: 0.203, fill: { color: C.ink }, line: NOLINE
+  });
+  s.addShape('upArrow', {
+    x: 8.741, y: 5.462, w: 0.093, h: 0.117, fill: { color: C.card }, line: NOLINE
+  });
+  s.addShape('roundRect', {
+    x: 11.028, y: 5.72, w: 0.818, h: 0.269, rectRadius: 0.134,
+    fill: { color: C.rail }, line: NOLINE
+  });
+  s.addText('75%', {
+    x: 11.188, y: 5.72, w: 0.498, h: 0.269, align: 'center', wrap: false,
+    fontFace: HEAD, fontSize: 10, color: C.mint, valign: 'middle'
+  });
+  s.addText('Data transforms enterprise decision making.', {
+    x: 7.357, y: 5.765, w: 3.413, h: 0.179, margin: 0, lineSpacingMultiple: 1.3,
+    fontFace: BODY, fontSize: 9, color: C.ink, valign: 'top'
+  });
+  // 36 filled ticks fading blue -> mint, then 8 dim ticks
+  for (let i = 0; i < 36; i++) {
+    const t = i / 35;
+    const mix = function (a, b) { return Math.round(a + (b - a) * t); };
+    const hex = [mix(0x0e, 0x39), mix(0x48, 0xf0), mix(0xd8, 0xba)]
+      .map(function (v) { return ('0' + v.toString(16)).slice(-2); }).join('').toUpperCase();
+    s.addShape('roundRect', {
+      x: 7.37 + i * 0.1132, y: 6.13, w: 0.089, h: 0.331, rectRadius: 0.04,
+      fill: { color: hex }, line: NOLINE
+    });
+  }
+  for (let i = 0; i < 8; i++) {
+    s.addShape('roundRect', {
+      x: 11.451 + i * 0.1124, y: 6.13, w: 0.089, h: 0.331, rectRadius: 0.04,
+      fill: { color: C.ink, transparency: 80 }, line: NOLINE
+    });
+  }
+});
+
+// 8 - Evaluating Revenue Composition (slider)
+slides.push(function (s) {
+  header(s);
+  timeline(s, 0, W, [[0.75, false], [6.302, true], [11.854, false]]);
+  chapterText(s, {
+    month: 'March 2027',
+    title: ['Evaluating Revenue', 'Composition and Profit', 'Margins']
+  });
+  bodyCopy(s, 8.267, 5.166, LEDE);
+  s.addShape('roundRect', {
+    x: 8.217, y: 6.512, w: 4.361, h: 0.269, rectRadius: 0.134,
+    fill: { color: C.slot }, line: NOLINE
+  });
+  s.addShape('roundRect', {
+    x: 8.267, y: 6.512, w: 3.031, h: 0.269, rectRadius: 0.134,
+    fill: { color: C.mint }, line: NOLINE
+  });
+  s.addShape('ellipse', {
+    x: 11.138, y: 6.486, w: 0.321, h: 0.321,
+    fill: { color: C.mint }, line: { color: C.card, width: 5 }
+  });
+});
+
+// 9 - Measuring Returns to Shareholders (2x2 KPI tiles)
+slides.push(function (s) {
+  header(s);
+  timeline(s, 0, W, [[0.75, false], [6.302, true], [11.854, false]]);
+  chapterText(s, {
+    month: 'April 2027', title: ['Measuring Returns ', 'to Shareholders'],
+    size: 44, titleH: 1.582
+  });
+  const tiles = [
+    { x: 8.177, y: 4.558, value: '$193,520', label: 'Revenue Stability', hot: false, font: HEAD },
+    { x: 10.516, y: 4.558, value: '$251,280', label: 'Capital Strength', hot: false, font: BODY },
+    { x: 8.177, y: 5.796, value: '$521,930', label: 'Expense Control', hot: true, font: BODY },
+    { x: 10.516, y: 5.796, value: '$317,520', label: 'Asset Utilization', hot: false, font: BODY }
+  ];
+  tiles.forEach(function (t) {
+    s.addShape('roundRect', {
+      x: t.x, y: t.y, w: 2.062, h: 1.0, rectRadius: 0.1,
+      fill: { color: t.hot ? C.mint : C.card }, line: NOLINE
+    });
+    s.addText(t.value, {
+      x: t.x + 0.166, y: t.y + 0.147, w: 1.734, h: 0.404,
+      fontFace: t.font, fontSize: 18, bold: true,
+      color: t.hot ? C.card : C.mint, valign: 'middle'
+    });
+    s.addText(t.label, {
+      x: t.x + 0.166, y: t.y + 0.551, w: 1.734, h: 0.303,
+      fontFace: BODY, fontSize: 12, color: t.hot ? C.card : C.ink, valign: 'middle'
+    });
+  });
+});
+
+// 10 - Asset Turnover (doughnut card)
+slides.push(function (s, pptx) {
+  header(s);
+  timeline(s, 0, W, [[0.75, false], [6.302, true], [11.854, false]]);
+  chapterText(s, {
+    month: 'May 2027', titleW: 7.589,
+    title: ['Asset Turnover ', 'and Productivity ', 'Improvement Tactic']
+  });
+  s.addShape('roundRect', {
+    x: 8.01, y: 3.928, w: 4.568, h: 2.879, rectRadius: 0.18,
+    fill: { color: C.card }, line: NOLINE
+  });
+  s.addText('$29,731,520,39', {
+    x: 8.356, y: 4.248, w: 2.525, h: 0.404,
+    fontFace: HEAD, fontSize: 18, color: C.ink, valign: 'middle'
+  });
+  s.addText('Monthly Financial Report', {
+    x: 8.356, y: 4.655, w: 2.525, h: 0.252,
+    fontFace: BODY, fontSize: 9, color: C.dim, valign: 'middle'
+  });
+  arrowButton(s, 11.836, 4.31, 0.28);
+  s.addChart(pptx.ChartType.doughnut, [{
+    name: 'Sales', labels: ['1st Qtr', '2nd Qtr', '3rd Qtr'], values: [6.2, 2, 1.8]
+  }], {
+    x: 8.161, y: 4.998, w: 1.848, h: 1.592, holeSize: 62,
+    chartColors: [C.mint, C.blue, C.ink],
+    showLegend: false, showTitle: false, showValue: false, dataBorder: { pt: 0, color: C.card }
+  });
+  s.addText('30K', {
+    x: 8.652, y: 5.622, w: 0.867, h: 0.343, align: 'center',
+    fontFace: BODY, fontSize: 12, bold: true, color: C.ink, valign: 'middle'
+  });
+  s.addText('Expense Control', {
+    x: 10.009, y: 5.271, w: 2.413, h: 0.337,
+    fontFace: HEAD, fontSize: 14, color: C.ink, valign: 'middle'
+  });
+  bodyCopy(s, 10.009, 5.644, ['Financial performance reflects profitability, efficiency, and ',
+    'business strength.'], { w: 2.413, h: 0.673, size: 9, spacing: 1.3, valign: 'top' });
+});
+
+// 11 - Fiscal Risk Assessment (numbered points)
+slides.push(function (s) {
+  header(s);
+  timeline(s, 0, W, [[0.75, false], [6.302, true], [11.854, false]]);
+  chapterText(s, {
+    month: 'June 2027', titleW: 7.589,
+    title: ['Fiscal Risk Assessment ', 'and Mitigation ', 'Approaches']
+  });
+  [['01', 4.946, C.mint, C.dark], ['02', 6.074, C.blue, C.ink]].forEach(function (p) {
+    s.addShape('ellipse', {
+      x: 8.195, y: p[1], w: 0.66, h: 0.66, fill: { color: p[2] }, line: NOLINE
+    });
+    s.addText(p[0], {
+      x: 8.088, y: p[1] + 0.178, w: 0.874, h: 0.303, align: 'center',
+      fontFace: HEAD, fontSize: 12, color: p[3], valign: 'middle'
+    });
+  });
+  bodyCopy(s, 9.129, 4.872, LEDE2);
+  bodyCopy(s, 9.129, 6.0, LEDE2);
+});
+
+// 12 - Liquidity Management (weekly activity card)
+slides.push(function (s) {
+  header(s);
+  timeline(s, 0, W, [[0.75, false], [6.302, true], [11.854, false]]);
+  chapterText(s, {
+    month: 'July 2027', titleW: 7.589, titleH: 1.178, note: LEDE3,
+    title: ['Liquidity Management for Short-Term Obligations']
+  });
+  s.addShape('roundRect', {
+    x: 8.162, y: 4.065, w: 4.443, h: 2.739, rectRadius: 0.18,
+    fill: { color: C.card }, line: NOLINE
+  });
+  s.addText('Expense Control', {
+    x: 8.593, y: 4.368, w: 2.898, h: 0.404,
+    fontFace: HEAD, fontSize: 18, color: C.ink, valign: 'middle'
+  });
+  arrowButton(s, 11.747, 4.43, 0.28);
+  [[8.701, C.blue, 'Margin ', 0.775], [9.587, C.mint, 'Valuation', 0.874]].forEach(function (l) {
+    s.addShape('ellipse', {
+      x: l[0], y: 4.827, w: 0.092, h: 0.092, fill: { color: l[1] }, line: NOLINE
+    });
+    s.addText(l[2], {
+      x: l[0] + 0.092, y: 4.755, w: l[3], h: 0.236,
+      fontFace: BODY, fontSize: 8, color: C.dim, valign: 'middle'
+    });
+  });
+  const week = [
+    [C.mint, C.grey, C.blue, C.mint, C.blue, C.blue, C.grey],
+    [C.grey, C.blue, C.mint, C.grey, C.grey, C.mint, C.blue]
+  ];
+  week.forEach(function (row, r) {
+    row.forEach(function (color, i) {
+      s.addShape('ellipse', {
+        x: 8.626 + i * 0.5045, y: 5.275 + r * 0.513, w: 0.374, h: 0.374,
+        fill: { color: color }, line: NOLINE
+      });
+    });
+  });
+  ['S', 'M', 'T', 'W', 'T', 'F', 'S'].forEach(function (d, i) {
+    s.addText(d, {
+      x: 8.593 + i * 0.5045, y: 6.361, w: 0.438, h: 0.101, align: 'center', margin: 0,
+      fontFace: HEAD, fontSize: 6, color: C.day, valign: 'top'
+    });
+  });
+  tooltip(s, 10.83, 5.121, 0.771, '530+', C.blue);
+  tooltip(s, 8.812, 5.462, 0.771, '185+', '10CF97');
+});
+
+// 13 - Financial Forecasts
+slides.push(function (s) {
+  header(s);
+  timeline(s, 0, W, [[0.75, false], [6.302, true], [11.854, false]]);
+  chapterText(s, {
+    month: 'August 2027', size: 40, titleH: 1.447,
+    title: ['Financial Forecasts to ', 'Support Business']
+  });
+  s.addText('$135,270+', {
+    x: 8.269, y: 5.183, w: 4.207, h: 0.707,
+    fontFace: HEAD, fontSize: 36, color: C.mint, valign: 'top'
+  });
+  bodyCopy(s, 8.267, 5.974, LEDE);
+});
+
+// 14 - Profitability Trends (line chart card)
+slides.push(function (s, pptx) {
+  header(s);
+  timeline(s, 0, W, [[0.75, false], [6.302, true], [11.854, false]]);
+  chapterText(s, {
+    month: 'September 2027',
+    title: ['Profitability Trends ', 'Across Market Segments', 'Insights']
+  });
+  s.addShape('roundRect', {
+    x: 8.188, y: 4.418, w: 4.417, h: 2.376, rectRadius: 0.18,
+    fill: { color: C.card }, line: NOLINE
+  });
+  s.addText([
+    { text: 'Data ' }, { text: 'Insight', options: { bold: true } }
+  ], {
+    x: 8.475, y: 4.722, w: 1.271, h: 0.303,
+    fontFace: HEAD, fontSize: 12, color: C.ink, valign: 'top'
+  });
+  s.addChart(pptx.ChartType.line, [{
+    name: 'Column1',
+    labels: ['2020', '2021', '2022', '2023', '2024'],
+    values: [30, 50, 60, 90, 90]
+  }], {
+    x: 8.245, y: 4.972, w: 4.304, h: 1.582,
+    chartColors: [C.mint], lineSize: 1.25,
+    lineDataSymbol: 'circle', lineDataSymbolSize: 5,
+    lineDataSymbolLineSize: 0, lineDataSymbolLineColor: C.mint,
+    showLegend: false, showTitle: false, showValue: false,
+    catAxisLabelColor: C.ink, catAxisLabelFontFace: 'Be Vietnam Pro', catAxisLabelFontSize: 8,
+    catAxisLineShow: false, catAxisMajorTickMark: 'none',
+    valAxisHidden: true, valAxisMaxVal: 100, valGridLine: { style: 'none' }
+  });
+  tooltip(s, 10.313, 5.482, 0.857, '1,530+', C.card);
+});
+
+// 15 - Understanding Cost Allocation (legend)
+slides.push(function (s) {
+  header(s);
+  timeline(s, 0, W, [[0.75, false], [6.302, true], [11.854, false]]);
+  chapterText(s, {
+    month: 'October 2027',
+    title: ['Understanding Cost', 'Allocation and Efficiency', 'Metrics']
+  });
+  legendDot(s, 8.381, 5.516, 0.177, C.blue, 'Revenue Growth');
+  legendDot(s, 10.657, 5.516, 0.177, C.mint, 'Cost Efficiency');
+  bodyCopy(s, 8.267, 5.974, LEDE);
+});
+
+// 16 - Capital Structure Optimization (two stat cards)
+slides.push(function (s) {
+  header(s);
+  timeline(s, 0, W, [[0.75, false], [6.302, true], [11.854, false]]);
+  chapterText(s, {
+    month: 'November 2027', size: 40, titleH: 1.447, note: LEDE3,
+    title: ['Capital Structure Optimization']
+  });
+  [[7.361, '+768'], [10.111, '+632']].forEach(function (c) {
+    s.addShape('roundRect', {
+      x: c[0], y: 5.176, w: 2.506, h: 1.598, rectRadius: 0.14,
+      fill: { color: C.card }, line: NOLINE
+    });
+    s.addText(c[1], {
+      x: c[0] + 0.221, y: 5.352, w: 1.801, h: 0.64,
+      fontFace: HEAD, fontSize: 32, color: C.mint, valign: 'middle'
+    });
+    s.addText('Financial performance reflects profitability.', {
+      x: c[0] + 0.221, y: 5.958, w: 2.224, h: 0.601, lineSpacingMultiple: 1.3,
+      fontFace: BODY, fontSize: 12, color: C.ink, valign: 'top'
+    });
+  });
+});
+
+// 17 - Capital Structure Optimization (paired figures)
+slides.push(function (s) {
+  header(s);
+  timeline(s, 0, 6.666, [[0.75, false], [6.302, true]]);
+  chapterText(s, {
+    month: 'December 2027', size: 40, titleH: 1.447, note: LEDE3,
+    title: ['Capital Structure Optimization']
+  });
+  bodyCopy(s, 8.267, 4.614, LEDE);
+  [[8.269, '350+', 'Revenue Growth', 2.503, HEAD], [10.449, '182+', 'Cost Efficiency', 2.778, BODY]]
+    .forEach(function (f) {
+      s.addText(f[1], {
+        x: f[0], y: 5.774, w: 4.207, h: 0.707,
+        fontFace: HEAD, fontSize: 36, color: C.mint, valign: 'top'
+      });
+      s.addText(f[2], {
+        x: f[0] - 0.002, y: 6.478, w: f[3], h: 0.303,
+        fontFace: f[4], fontSize: 12, color: C.ink, valign: 'middle'
+      });
+    });
+});
+
+// 18 - closing
+slides.push(function (s) {
+  header(s);
+  s.addText('Thanks for', {
+    x: 0.589, y: 2.021, w: 11.115, h: 1.717,
+    fontFace: HEAD, fontSize: 96, bold: true, color: C.ink, valign: 'middle'
+  });
+  s.addText('Your Attention', {
+    x: 0.589, y: 3.763, w: 11.115, h: 1.717,
+    fontFace: HEAD, fontSize: 96, bold: true, color: C.mint, valign: 'middle'
+  });
+  s.addText(NOTE, {
+    x: 0.613, y: 6.512, w: 4.773, h: 0.269,
+    fontFace: BODY, fontSize: 10, color: C.ink, valign: 'middle'
+  });
+  contactButtons(s);
+});
+
+// ------------------------------------------------------------------ build ---
+
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'WIDE', width: W, height: H });
+pptx.layout = 'WIDE';
+pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
+pptx.title = 'Financial Performance';
+
+slides.forEach(function (build) {
+  const slide = pptx.addSlide();
+  slide.background = { color: '000000' };
+  backdrop(slide);
+  build(slide, pptx);
+});
+
+pptx.writeFile({
+  fileName: path.join(__dirname, '0e068427-9143-41d6-b063-1d353c49e713_grok_final.pptx')
+}).then(function (f) { console.log('wrote', f); });
