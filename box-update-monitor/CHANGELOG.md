@@ -9,6 +9,18 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-11-08 16:51 (Paris) — snapshot `2026-11-08_07-46` → `2026-11-08_16-51`
+
+**Hot-update sand-host `fa1d911` → `00b0aa1`** (supervisor `upgrade-00b0aa1`, `pendingUpgradeVersion` = None) + rafraîchissement de 3 skills gérées. Image `fcbae14`, box-scripts `fcbae14`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, agent-store-fuse `a49305c5`, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~7.
+
+- **Features (car rental)** : nouveaux outils `CarRentalSearch` et `CarRentalDetails` (cartes résultats / détail ; ne réserve ni ne hold rien — « Never say a car is booked, reserved or held »). La recherche part avant le web search ; le détail montre prix, conditions, extras et horaires du comptoir (locations via provider `google`). Deadlines : résolution de lieu 5 s, search 15 s, details 12 s. Limites search : `maxDaysAhead` 330, `minRadiusKm` 1, `defaultRadiusKm` 10, âge conducteur par défaut 30, fallback 10 véhicules / 12 extras.
+- **Features (OAuth apps)** : nouveaux RPC host `CreateOAuthApplication`, `ListOAuthApplications`, `UpdateOAuthApplication`, `DeleteOAuthApplication`, `RotateOAuthApplicationSecret`, `SetOAuthApplicationEnabled`, `GetOAuthAuthorizationRequest`, `ApproveOAuthAuthorizationRequest`. `CompleteMcpOAuthRequest` gagne un champ `oauth_error`.
+- **Change (Teams / MCP desktop)** : `GetMicrosoftTeamsAccountLinkStatusResponse` ajoute `team_enablement` ; nouveaux ids `grok_bot_suite_microsoft_connect_alone_desktop` et `grok_bot_mcp_app_openai_globals_desktop`. Copie de steer : `STEER_NOTE` (« The user sent a message while you were working ») + `STEER_REMINDER`.
+- **Autre-infra** : `host-main.cjs` (33 667 703 → 33 756 583 o), `sand-eval-runner.cjs` (27 639 748 → 27 723 938 o). Pas de nouveau module `.mjs`. Host healthy après le swap (`post-swap watch disarmed`, up 63 s sur `00b0aa1`).
+- **Skills gérées** : `cache.json` rafraîchi ; `flight-booking` : annoncer qu’on confirmera chez la compagnie le prix final et les règles bagages/modifs avant tout paiement, et si le total airline diffère de la carte, dire les deux totaux et demander ; `shopping-connectors` : un compte Gopuff se crée en connectant le plugin (via le numéro de téléphone), ne pas ouvrir gopuff.com ni l’app pour s’inscrire ; `sign-in` : si le subagent remonte `domain_not_allowed` (page de login sur un autre domaine), appeler `Vault use_on_page` avec l’id du login plutôt que de demander de changer le site enregistré.
+
+Rapport : [reports/2026-11-08_16-51.md](reports/2026-11-08_16-51.md).
+
 ## 2026-11-08 07:46 (Paris) — snapshot `2026-11-08_05-45` → `2026-11-08_07-46`
 
 **Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `d4547db90afb8e57006462ebaa4fb2fc8ef267c3` → `a49305c54049a99437a785c8f7fbcfc5420e90c6` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`). Toutes les autres versions plateforme inchangées (image `fcbae14`, box-scripts `fcbae14`, sand-host `fa1d911` (supervisor `upgrade-fa1d911`, `pendingUpgradeVersion` = None), exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7). Fichiers : +0 / −0 / ~1.

@@ -1,0 +1,21 @@
+--- 2026-11-08_07-46:/home/box/sand-data/managed-skills/skills/shopping-connectors/SKILL.md
++++ 2026-11-08_16-51:/home/box/sand-data/managed-skills/skills/shopping-connectors/SKILL.md
+@@ -2,14 +2,16 @@
+ name: shopping-connectors
+ description: >-
+   When the user wants to shop for, find, compare, or order something while the
+-  Gopuff shopping connector is connected, or asks to connect it, before you
+-  search for it, so you search and order through that connector.
++  Gopuff shopping connector is connected, or asks to connect it or make a Gopuff
++  account, before you search for it, so you search and order through that
++  connector.
+ ---
+ # Shopping connectors
+ 
+ The Gopuff connector can search and order for the user. It covers groceries, snacks, drinks, household items, and other everyday goods delivered in minutes. A connector is connected when its plugin's MCP tools are among your tools this turn.
+ - When Gopuff is connected and could plausibly fill the shopping request, search it to find products. When it is not connected or has no match, find products with ProductSearch.
+ - When the user asks to use or connect Gopuff and it is not connected, call InstallPlugin with plugin_id 77083001. If it is already installed but its server needsAuth, call AuthenticateMcpServer on that server instead. Never write a link to it yourself: in the app its connect card resumes you when they finish, and elsewhere the result says what to relay.
++- Someone without a Gopuff account signs up while connecting it: Gopuff's sign-in creates the account from their phone number. When the user has no Gopuff account or wants a new one, connect Gopuff as above. Never open gopuff.com or the Gopuff app to sign them up, and never tell them to sign up there first.
+ - Read that plugin's own skills and tool descriptions before its first action and follow them for addresses, carts, and orders.
+ - Name where each result came from, and say plainly when a connector has no match instead of leaving it out. Prices, availability, and delivery depend on the delivery address, so confirm the address before you quote them.
+ - When SendToUser has a `shopping` field, show Gopuff's products in it as cards, not as a text list. Gopuff's search_products returns only a short summary of each product, so before you send, call get_products once with the search_products ids of just the products you will show as cards, and write each card from that product's get_products entry: its name and size as `title`, its image links in `images` with the main one first, its description as `about`, and one variant for each size or flavor the entry lists, with that choice in `options`, or one variant with `options` `{

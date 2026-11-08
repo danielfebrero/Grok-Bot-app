@@ -1,0 +1,21 @@
+--- 2026-11-08_07-46:/home/box/sand-data/managed-skills/skills/flight-booking/SKILL.md
++++ 2026-11-08_16-51:/home/box/sand-data/managed-skills/skills/flight-booking/SKILL.md
+@@ -98,7 +98,8 @@
+ 
+ No flight tool holds or books a fare. When `FlightDetails` gives a time for its price, say "this price is good until <time>", and that the airline confirms the price at payment. Selecting flights on a site holds nothing either: say the flights are selected. Say a fare is held or reserved only when the airline's own page says so, and never say a price is verified or locked in.
+ 
+-A flight card's Book button sends "Book <trip>, <fare>, for <total>", an `Offer ref:` line with that flight's offer ref, and the card's link when that link is on the airline's own site. That is the user's pick of that flight and fare, so book it in the same turn without asking which flight or fare or searching again. For step 1, call `FlightDetails` with that offer ref to check the price, and when the price is gone or couldn't be checked, show its card and stop. Otherwise send no Selected trip card in this turn: say in one short line where you're starting ("Starting your booking on alaskaair.com."), then go on with step 2. The other steps all still apply, including the savings check and the confirmation before payment, and the airline confirms the final price at checkout.
++A flight card's Book button sends "Book <trip>, <fare>, for <total>", an `Offer ref:` line with that flight's offer ref, and the card's link when that link is on the airline's own site. That is the user's pick of that flight and fare, so book it in the same turn without asking which flight or fare or searching again. For step 1, call `FlightDetails` with that offer ref to check the price, and when the price is gone or couldn't be checked, show its card and stop. Otherwise send no Selected trip card in this turn: say in one short line where you're starting, and for a listed fare that you'll confirm the airline's final price and the bag and change rules there before any payment ("Starting your booking on alaskaair.com;
++ I'll confirm Alaska's final price and bag and change rules there before you pay."), then go on with step 2. The other steps all still apply, including the savings check and the confirmation before payment, and the airline confirms the final price at checkout.
+ 
+ 1. Check the pick before the browser starts, in one message. When `FlightDetails` is in your tools, call it for the flight and show its card. From the fare rules, say which extras the user asked for the fare already includes. When you will book in the browser (step 2), say which of the rest you will add there at the airline's price (step 5);
+  when a tool books the fare in chat, say the rest are added on the airline's site after booking. Say so when the rules leave bags to the airline, and flag anything else the fare lacks that the user mentioned, such as changes. Flag a red-eye or a long layover. When more than one fare is offered for the flight, say in one line what each adds (bags, changes, seat choice) and the price difference, and let the user pick.
+@@ -148,7 +149,7 @@
+ 
+ ## Pitfalls
+ 
+-- Prices move between search and checkout. Flag any jump before the payment step.
++- Prices move between search and checkout. When the airline's total differs from the card's, say so plainly with both totals and ask before the payment step.
+ - Basic economy and light fares often exclude carry-on or checked bags and forbid changes. Say so when the fare name suggests it, unless the flight tools gave the fare rules;
+  then state only those.
+ - International trips need passport details and sometimes visa answers. Ask early, through a form, so the booking does not stall at the passenger page.
