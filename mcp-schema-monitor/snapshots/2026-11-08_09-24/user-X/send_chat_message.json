@@ -1,0 +1,88 @@
+{
+  "description": "Sends a message or reaction to a specific Chat conversation. Send `encoded_message_create_event`, an end-to-end encrypted event built with the Chat XDK. `content`, a plaintext message or reaction sent unencrypted, is only a fallback for a 1:1 conversation that X Chat can't encrypt because one of the two users has connected an enterprise app that reads their DMs; check that the recipient's `receives_your_chat` user field is `unencrypted` before using it. Otherwise a `content` send is refused, and retrying it won't help: HTTP 400 https://api.x.com/2/problems/encryption-required when the conversation can be encrypted or is a group (send `encoded_message_create_event` instead), 400 https://api.x.com/2/problems/xchat-setup-required when you haven't set up X Chat, 400 https://api.x.com/2/problems/recipient-xchat-setup-required when the recipient hasn't, and 403 https://api.x.com/2/problems/message-request-not-supported when it would be a message request. HTTP 503 https://api.x.com/2/problems/chat-permissions-unavailable means the check failed and nothing was sent; retry it. For 1:1 conversations, provide the recipient's user ID; the server constructs the canonical conversation ID from the authenticated user and recipient. A recipient who cannot be messaged (closed inbox, system/notification account, or a 1:1 block) returns HTTP 403 with type https://api.x.com/2/problems/recipient-not-messageable.",
+  "inputSchema": {
+    "properties": {
+      "content": {
+        "properties": {
+          "message": {
+            "properties": {
+              "text": {
+                "description": "Text of the message.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "text"
+            ],
+            "type": "object"
+          },
+          "reaction_add": {
+            "properties": {
+              "emoji": {
+                "description": "Emoji of the reaction.",
+                "type": "string"
+              },
+              "event_id": {
+                "description": "ID of the message event the reaction is on.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "event_id",
+              "emoji"
+            ],
+            "type": "object"
+          },
+          "reaction_remove": {
+            "properties": {
+              "emoji": {
+                "description": "Emoji of the reaction.",
+                "type": "string"
+              },
+              "event_id": {
+                "description": "ID of the message event the reaction is on.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "event_id",
+              "emoji"
+            ],
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "conversation_token": {
+        "description": "Optional conversation token.",
+        "type": "string"
+      },
+      "encoded_message_create_event": {
+        "description": "Base64-encoded Thrift MessageCreateEvent containing encrypted message contents. Omit when sending...",
+        "type": "string"
+      },
+      "encoded_message_event_signature": {
+        "description": "Base64-encoded Thrift MessageEventSignature for message verification.",
+        "type": "string"
+      },
+      "id": {
+        "type": "string"
+      },
+      "message_id": {
+        "description": "Unique identifier for this message.",
+        "type": "string"
+      },
+      "xdk_version": {
+        "description": "Version of the Chat XDK that produced the payload.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "message_id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "send_chat_message"
+}

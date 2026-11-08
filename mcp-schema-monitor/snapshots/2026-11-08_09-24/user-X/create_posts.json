@@ -1,0 +1,221 @@
+{
+  "description": "Creates a new Post for the authenticated user, or edits an existing Post when edit_options are provided. Supports paid partnership disclosure via the paid_partnership field.",
+  "inputSchema": {
+    "properties": {
+      "card_uri": {
+        "description": "Card URI parameter.",
+        "type": "string"
+      },
+      "community_id": {
+        "description": "Community to post the tweet to.",
+        "type": "string"
+      },
+      "direct_message_deep_link": {
+        "description": "Direct message deep link.",
+        "type": "string"
+      },
+      "edit_options": {
+        "properties": {
+          "previous_post_id": {
+            "description": "The ID of the Post being edited.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "previous_post_id"
+        ],
+        "type": "object"
+      },
+      "for_super_followers_only": {
+        "description": "Restrict tweet to super followers.",
+        "type": "boolean"
+      },
+      "geo": {
+        "properties": {
+          "place_id": {
+            "description": "Place ID for geo tagging.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "place_id"
+        ],
+        "type": "object"
+      },
+      "made_with_ai": {
+        "description": "Disclose that the tweet contains AI-generated media.",
+        "type": "boolean"
+      },
+      "media": {
+        "properties": {
+          "call_to_actions": {
+            "properties": {
+              "app_install": {
+                "properties": {
+                  "app_store_id": {
+                    "description": "Apple App Store iPhone app id.",
+                    "type": "string"
+                  },
+                  "ipad_app_store_id": {
+                    "description": "Apple App Store iPad app id.",
+                    "type": "string"
+                  },
+                  "play_store_id": {
+                    "description": "Google Play Store app id.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "visit_site": {
+                "properties": {
+                  "url": {
+                    "description": "HTTPS URL the CTA links to.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "url"
+                ],
+                "type": "object"
+              },
+              "watch_now": {
+                "properties": {
+                  "url": {
+                    "description": "HTTPS URL the CTA links to.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "url"
+                ],
+                "type": "object"
+              }
+            },
+            "type": "object"
+          },
+          "description": {
+            "description": "Description for the media, rendered on the Post card for video and Amplify content.",
+            "type": "string"
+          },
+          "embeddable": {
+            "description": "When true, the media's asset URLs do not expire and external syndicated playback is allowed.",
+            "type": "boolean"
+          },
+          "media_ids": {
+            "description": "Media IDs to attach to the tweet.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "preview_media_id": {
+            "description": "Media id whose asset is used as the preview image.",
+            "type": "string"
+          },
+          "tagged_user_ids": {
+            "description": "User IDs tagged in the media.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "title": {
+            "description": "Title for the media, rendered on the Post card for video and Amplify content.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "media_ids"
+        ],
+        "type": "object"
+      },
+      "nullcast": {
+        "description": "If true, the tweet is not shown in the public timeline.",
+        "type": "boolean"
+      },
+      "paid_partnership": {
+        "description": "Disclose that the tweet is a paid partnership.",
+        "type": "boolean"
+      },
+      "poll": {
+        "properties": {
+          "duration_minutes": {
+            "description": "Duration of the poll in minutes.",
+            "type": "integer"
+          },
+          "options": {
+            "description": "Poll options (2-4 choices, 1-25 characters each).",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "reply_settings": {
+            "description": "Who can reply to the poll Tweet. Accepted for compatibility; it carries no backend argument and i...",
+            "enum": [
+              "following",
+              "mentionedUsers",
+              "subscribers",
+              "verified"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "options",
+          "duration_minutes"
+        ],
+        "type": "object"
+      },
+      "quote_tweet_id": {
+        "description": "Tweet ID to quote.",
+        "type": "string"
+      },
+      "reply": {
+        "properties": {
+          "auto_populate_reply_metadata": {
+            "description": "If true, reply metadata is automatically populated. Accepted for compatibility; it carries no bac...",
+            "type": "boolean"
+          },
+          "exclude_reply_user_ids": {
+            "description": "User IDs to exclude from the reply thread.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "in_reply_to_tweet_id": {
+            "description": "The ID of the tweet being replied to.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "in_reply_to_tweet_id"
+        ],
+        "type": "object"
+      },
+      "reply_settings": {
+        "description": "Who can reply to this tweet.",
+        "enum": [
+          "following",
+          "mentionedUsers",
+          "subscribers",
+          "verified"
+        ],
+        "type": "string"
+      },
+      "share_with_followers": {
+        "description": "Share an exclusive (super-follower) tweet with all followers.",
+        "type": "boolean"
+      },
+      "text": {
+        "description": "Text of the tweet. Required unless media is provided.  Defaulted to an empty string so it is alwa...",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "create_posts"
+}

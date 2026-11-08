@@ -1,0 +1,51 @@
+{
+  "description": "GET /user/repos for every GitHub account connected to this Cursor account: one page of the repositories each account can access, as a JSON array holding one array of repository objects per account (in get_me order). Use it to find a repository's owner/name before calling a repository tool.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "additionalProperties": false,
+    "properties": {
+      "affiliation": {
+        "description": "Comma-separated owner, collaborator, organization_member (GitHub's default is all three).",
+        "type": "string"
+      },
+      "direction": {
+        "enum": [
+          "asc",
+          "desc"
+        ],
+        "type": "string"
+      },
+      "page": {
+        "description": "1-based page number.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "per_page": {
+        "description": "Results per page (GitHub's default is 30, max 100).",
+        "maximum": 100,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "sort": {
+        "enum": [
+          "created",
+          "updated",
+          "pushed",
+          "full_name"
+        ],
+        "type": "string"
+      },
+      "visibility": {
+        "enum": [
+          "all",
+          "public",
+          "private"
+        ],
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "list_my_repositories"
+}

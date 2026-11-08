@@ -1,0 +1,27 @@
+{
+  "description": "Create an account at an app as an inbox, or sign an inbox that already holds one back in: mints a browser sign-in session and returns a single-use magic URL to open in the client that will hold the sign-in (usually the agent's own browser session), plus the ID of the pending sign-in key. The URL expires, is never re-issued, and nothing is connected until the sign-in completes — do not call again for the same app and inbox while a previous URL is still live (live sessions are limited per caller). Confirm completion with list_accounts for that appId. Works by ID for a registered app whether or not the catalog lists it, provided it has a sign-in entry point; a catalog app can also be named by its slug (appId: 'firecrawl'), which saves a search_apps call when the user names a well-known app. An app can cap sign-ups per organization; past the cap this fails with 403 limit_exceeded, whose fix says to sign in with an inbox that already holds an account there (see list_accounts). A 404 names what is missing: App (unknown ID or slug, or an app without a sign-in entry point) or Inbox (not in the organization or the credential's scope); with acceptDisclosure it can also mean the app does not support it, so retry without. Requires the app_connect permission. inboxId is required unless the credential is scoped to one inbox. To sign in to an app that is not registered (connect_app 404s, yet list_accounts may show accounts there), open the app, start its Sign in with AgentID, and pass the auth token the sign-in page shows to authorize_inbox.",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "acceptDisclosure": {
+        "description": "Accept the app's first-use disclosure up front, so the browser sign-in skips that page. Not every app or environment supports this: the call then fails (as a 404 or 400) even though the app ID is valid — retry without acceptDisclosure",
+        "type": "boolean"
+      },
+      "appId": {
+        "description": "ID of app (from list_apps or search_apps), or the slug of an app in the catalog, such as \"firecrawl\" (case, spaces and punctuation are ignored)",
+        "minLength": 1,
+        "type": "string"
+      },
+      "inboxId": {
+        "description": "The inbox (email address or inbox client ID) to connect. Required unless the API key is scoped to one inbox",
+        "type": "string"
+      }
+    },
+    "required": [
+      "appId"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "connect_app"
+}
