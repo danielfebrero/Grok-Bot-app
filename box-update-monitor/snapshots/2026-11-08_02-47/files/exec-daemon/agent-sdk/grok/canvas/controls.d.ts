@@ -1,0 +1,121 @@
+import { type JSX } from "react";
+export interface InputProps {
+    /** Quiet label over the field. */
+    label?: string;
+    /** The text in the field; keep it in `useState`. */
+    value: string;
+    onChange: (value: string) => void;
+    placeholder?: string;
+    /** `number` brings up the figure keyboard on a phone; the value stays text. */
+    type?: "text" | "number";
+}
+/** A one-line text field, its label above. It fills its block; a `Grid` puts two or three on a row. */
+export declare function Input({ label, value, onChange, placeholder, type, }: InputProps): JSX.Element;
+/**
+ * `primary` is the filled button: ink fill, paper label, for the one action
+ * the reader is meant to press. `quiet` is the neutral tint, for the rest.
+ */
+export type ButtonVariant = "primary" | "quiet";
+export interface ButtonProps {
+    /** The verb on the button, one to three words: "Recalculate", "Reset". */
+    label: string;
+    onClick: () => void;
+    /**
+     * `primary` fills the button in ink with a paper label, for the one action
+     * a row leads with (Apply, Recalculate); `quiet`, the default, is the
+     * neutral tint, for the rest (Reset). At most one `primary` per row.
+     */
+    variant?: ButtonVariant;
+    /** Dimmed and inert: no press, no hover, no focus. */
+    disabled?: boolean;
+}
+/**
+ * A pressable as wide as its label. On a heading line, pass it as the
+ * `Section`'s `actions`. One with no words draws nothing.
+ *
+ * @kitNote `variant="primary"` fills the one action a row leads with; the rest stay on the quiet default.
+ */
+export declare function Button({ label, onClick, variant, disabled, }: ButtonProps): JSX.Element | null;
+/** An option whose shown label differs from the value kept in state. */
+export interface SelectOption<T extends string = string> {
+    value: T;
+    label: string;
+}
+/**
+ * `T` is the option value type, inferred from `options`, `value`, and
+ * `onChange` together, so a pick kept in a `useState<"a" | "b">` and a
+ * handler typed on that union type-check without a cast.
+ */
+export interface SelectProps<T extends string = string> {
+    /** Quiet label over the pick, as on an `Input`. */
+    label?: string;
+    /** The choices, as short labels or `{ value, label }` pairs when the label shown differs from the value kept in state. */
+    options: readonly (T | SelectOption<T>)[];
+    /** The chosen value; keep it in `useState`. */
+    value: T;
+    onChange: (value: T) => void;
+    /** What the pick reads before a choice, or when `value` matches no option. */
+    placeholder?: string;
+    /** A faded pick that cannot be opened. */
+    disabled?: boolean;
+}
+/**
+ * A pick from a list, for a filter row: a 28 px tinted pill with the
+ * choice and a chevron, opening the platform's own menu. It is as wide as
+ * its longest option. Six or more choices, or choices that would not fit a
+ * `Segmented`, are a `Select`.
+ *
+ * @example
+ * ```tsx
+ * const [region, setRegion] = useState("All");
+ * <Select options={["All", "EMEA", "APAC"]} value={region} onChange={setRegion} />
+ * ```
+ */
+export declare function Select<T extends string = string>({ label, options, value, onChange, placeholder, disabled, }: SelectProps<T>): JSX.Element;
+export interface ToggleProps {
+    /** The words after the switch, e.g. "Show inactive". */
+    label?: string;
+    /** On or off; keep it in `useState`. */
+    value: boolean;
+    onChange: (value: boolean) => void;
+    /** A faded switch that cannot be flipped. */
+    disabled?: boolean;
+}
+/**
+ * An on/off switch with its label after it, for a filter row or a what-if
+ * card: a 28 × 16 px track that fills with ink when on and carries a paper
+ * knob. A view with two named states is a `Segmented`; a yes/no is a
+ * `Toggle`.
+ *
+ * @example
+ * ```tsx
+ * const [inactive, setInactive] = useState(false);
+ * <Toggle label="Show inactive" value={inactive} onChange={setInactive} />
+ * ```
+ */
+export declare function Toggle({ label, value, onChange, disabled }: ToggleProps): JSX.Element;
+export interface CheckboxProps {
+    /** The words after the box, e.g. "Include refunds". */
+    label?: string;
+    /** The recorded status: ticked or not. */
+    value: boolean;
+    /** A faded box: a status that does not apply as recorded. */
+    disabled?: boolean;
+}
+/**
+ * A tick box with its label after it, showing a recorded status: an 18 px
+ * box, inked with a check when ticked, outlined when not. It is read-only on
+ * the page: a Page is a document only its author updates, so the status
+ * changes when the author edits the page, through the conversation or a
+ * routine, never from a click. A list of items with a status each is a
+ * `Checklist`; a setting the reader may flip to change the view is a
+ * `Toggle`.
+ *
+ * @example
+ * ```tsx
+ * <Checkbox label="Refunds included" value />
+ * ```
+ *
+ * @kitNote Shows recorded status; the viewer cannot tick it. Phrase copy as status ("as of…"), and edit the page when it changes.
+ */
+export declare function Checkbox({ label, value, disabled }: CheckboxProps): JSX.Element;
