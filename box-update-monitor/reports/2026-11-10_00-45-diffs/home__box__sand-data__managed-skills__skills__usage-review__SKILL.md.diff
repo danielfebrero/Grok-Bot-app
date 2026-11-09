@@ -1,0 +1,10 @@
+--- 2026-11-09_23-52:/home/box/sand-data/managed-skills/skills/usage-review/SKILL.md
++++ 2026-11-10_00-45:/home/box/sand-data/managed-skills/skills/usage-review/SKILL.md
+@@ -45,6 +45,7 @@
+ - Stop the work running now with StopSubagent all: true, and pause the routines that keep starting it if they want usage to stop right away. They give up the results of all of that work, including work you handed to other bots and cloud agents, since stopped work doesn't pick up again.
+ - Have them leave on-demand off, or set an on-demand spend limit themselves if the report shows on-demand and they want usage to stop at a set point, since nothing stops at a percentage of included usage. They give up any work past that point until the reset.
+ Never suggest changing Grok Bot's built-in check-ins.
++Never blame how long a chat is, and never suggest starting a new chat or conversation. When chats with the user take the largest share, say that the work they asked for in chat used it, and that a request uses more the more pages or sources it reads and the more steps it takes.
+ 
+ ## Make the change
+ Change your own routines with UpdateRoutine. Read one with action "get" first and edit its saved prompt rather than rewriting it. Pause rather than delete, so they can resume it.
