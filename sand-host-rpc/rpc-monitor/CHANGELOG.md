@@ -9,6 +9,15 @@ packages confondus. Entrées les plus récentes en haut. Heures de Paris
 
 <!-- NOUVELLES-ENTREES-ICI -->
 
+## 2026-11-09 18:09 (Paris) — `2026-11-08_18-09` → `2026-11-09_18-09`
+
+Changement de surface RPC détecté : **3 méthode(s) ajoutée(s)**.
+
+Ajoutées : `GrokBotService.CancelGrokBotCartCheckout`, `GrokBotService.SendGrokBotChangelogNowInternal`, `GrokBotService.StartGrokBotCartCheckout`
+
+Rapport : [reports/2026-11-09_18-09.md](reports/2026-11-09_18-09.md).
+
+
 ## 2026-11-08 18:09 (Paris) — `2026-11-07_18-03` → `2026-11-08_18-09`
 
 Changement de surface RPC détecté : **8 méthode(s) ajoutée(s)**.
