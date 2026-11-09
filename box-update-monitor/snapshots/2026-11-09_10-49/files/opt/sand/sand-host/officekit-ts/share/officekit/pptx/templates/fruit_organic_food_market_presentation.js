@@ -1,0 +1,934 @@
+#!/usr/bin/env node
+'use strict';
+/**
+ * "Fruita" - Fruit & Organic Food presentation template (36 slides, 20" x 11.25").
+ * Rebuilt from scratch with pptxgenjs: every position, colour and string below is
+ * a plain literal so the deck's design can be read straight out of this file.
+ */
+const PptxGenJS = require('pptxgenjs');
+const path = require('path');
+
+/* ------------------------------------------------------------------ palette */
+const GREEN = '5DC001';   // brand green
+const GREEN2 = '5ECB0A';  // slightly lighter green used by one arc
+const DARK = '051626';    // near-black headline colour
+const GRAY = '7F7F7F';    // body copy (tx1 @ 50% luminance)
+const RED = 'FF4343';     // eyebrow / price accent
+const YELLOW = 'FFC819';  // rating stars
+const GOLD = 'FFC000';    // sparkle stars (theme accent 4)
+const WHITE = 'FFFFFF';
+const SMOKE = 'F7F7F7';   // product-card footer strip
+const NAVY = '051626';    // dark band on the services slide
+
+/* -------------------------------------------------------------------- fonts */
+const HEAD = 'Merriweather Black';
+const BODY = 'Catamaran';
+const POPPINS = 'Poppins SemiBold';
+
+/* ------------------------------------------------------------- shared copy */
+const LOREM = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed dolor eiusmod tempor incididunt ut labore et dolore magna aliqua. Nunc sed blandit libero volutpat. Vitae aliquet nec amcorper.';
+const BIB_LONG = 'Bibendum at varius vel pharetra vel turpis nunc. Ultrices tincidunt arcu non sodales neque sodales ut etiam. Suspendisse ultrices gravida dictum fusce ut placerat orci nulla pellentesque. Cursus mattis molestie a iaculis at. Maecenas sed enim ut seman tau. ';
+const BIB_MED = 'Bibendum at varius vel pharetra vel turpis nunc. Ultrices tincidunt arcu non sodales neque sodales ut etiam. Suspendisse ultrices gravida dictum fusce ut placerat orci nulla pellentesque. ';
+const BIB_SHORT = 'Bibendum at varius vel pharetra vel turpis nunc. Ultrices tincidunt arcu non sodales neque sodales ut etiam. Suspendisse ultrices gravida';
+const BIB_CARD = 'Bibendum at varius vel pharetra vel turpis nunc. Ultrices tincidunt arcu non sodales neque sodal ut etiam. Suspendisse ultrices gravida';
+const BIB_TILE = 'Bibendum at varius vel pharetra veluta turpis nunc. Ultrices tincidunt arcunu sodales neque sodal vegetab';
+const BIB_COL = 'Bibendum at varius vel phareta vel turpis nunc. Ultrices tincidu arcu non sodales neque soda  etiam suspendisse ultrice';
+const BIB_TINY = 'Bibendum at varius vel pharetra';
+const BIB_MOCK = 'Bibendum at varius vel pharetra vel turpis nunc. Ultrices tincidunt arcu non sodales neque sodales ut etiam uspendisse';
+const BIB_LIST = 'Bibendum at varius vel pharetra vel turpis nunc nltrices tincidunt arcu non sodales neque sodal ut etiam. Suspendisse ultrices gravida';
+const LOREM_SM = 'Lorem ipsum dolor sit amet conse consectetur adipisci elita sed do eiusmod fruit vegetables.';
+const TAGLINE = 'FRUIT & ORGANIC FOOD PRESENTATION TEMPLATE';
+
+/* Headline reused on six "about" slides. Each entry is one paragraph. */
+const NEED_TITLE = [
+  [['The need for fresh fruit ', DARK]],
+  [['and vegetables ', DARK], ["for your family's health", GREEN]]
+];
+
+/* ------------------------------------------------------------- text helpers */
+const TEXT_BASE = {
+  valign: 'top', wrap: true, isTextBox: true,
+  margin: [7.2, 7.2, 3.6, 3.6],           // PowerPoint textbox default insets
+  fontFace: BODY, fontSize: 18, color: GRAY
+};
+
+function text(s, x, y, w, h, content, opt) {
+  return s.addText(content, Object.assign({ x, y, w, h }, TEXT_BASE, opt));
+}
+
+/** Small red/white all-caps kicker above every section headline. */
+function eyebrow(s, x, y, w, t, opt) {
+  return text(s, x, y, w, 0.337, t,
+    Object.assign({ fontSize: 14, bold: true, charSpacing: 1, color: RED }, opt));
+}
+
+/** Body copy: Catamaran 18pt, 150% leading. */
+function para(s, x, y, w, h, t, opt) {
+  return text(s, x, y, w, h, t, Object.assign({ lineSpacingMultiple: 1.5 }, opt));
+}
+
+/** Merriweather Black headline. `lines` = [[ [text,colour], ... ], ...] */
+function head(s, x, y, w, h, lines, size, opt) {
+  const runs = [];
+  lines.forEach((line, i) => line.forEach((run, j) => runs.push({
+    text: run[0],
+    options: { color: run[1], breakLine: j === line.length - 1 && i < lines.length - 1 }
+  })));
+  return text(s, x, y, w, h, runs,
+    Object.assign({ fontFace: HEAD, fontSize: size, color: DARK }, opt));
+}
+
+/** Merriweather Black sub-heading (20pt by default). */
+function subhead(s, x, y, w, t, opt) {
+  return text(s, x, y, w, 0.438, t,
+    Object.assign({ fontFace: HEAD, fontSize: 20, color: DARK }, opt));
+}
+
+/* ------------------------------------------------------------ shape helpers */
+function rect(s, x, y, w, h, opt) { return s.addShape('rect', Object.assign({ x, y, w, h }, opt)); }
+
+/** Rounded rectangle; `f` is the corner radius as a fraction of the short side. */
+function rrect(s, x, y, w, h, f, opt) {
+  return s.addShape('roundRect', Object.assign({ x, y, w, h, rectRadius: f * Math.min(w, h) }, opt));
+}
+
+/* pptxgenjs rewrites the shadow object it is handed, so hand it a fresh one each time. */
+function cardShadow() { return { type: 'outer', blur: 60, offset: 0.01, angle: 90, color: 'A6A6A6', opacity: 0.3 }; }
+function tileShadow() { return { type: 'outer', blur: 35, offset: 0.01, angle: 90, color: 'BFBFBF', opacity: 0.4 }; }
+
+/** Numbered green chip + caption, the deck's most repeated list bullet. */
+function badge(s, x, y, num, label, labelW) {
+  rrect(s, x, y, 0.591, 0.591, 1 / 6, { fill: { color: GREEN } });
+  text(s, x - 0.013, y + 0.128, 0.618, 0.337, num,
+    { fontSize: 14, bold: true, charSpacing: 1, color: WHITE, align: 'center' });
+  subhead(s, x + 0.889, y + 0.077, labelW, label);
+}
+
+/** Row of five rating stars. */
+function stars(s, x, y, size, gap, color) {
+  for (let i = 0; i < 5; i++) s.addShape('star5', { x: x + i * gap, y, w: size, h: size, fill: { color } });
+}
+
+/** "Fruita" wordmark: the word plus the smile-arc that underlines it. */
+function wordmark(s, tx, ty, tw, th, size, color, ax, ay, aw, ah, lw, arcColor) {
+  text(s, tx, ty, tw, th, 'Fruita', { fontFace: HEAD, fontSize: size, color });
+  s.addShape('arc', {
+    x: ax, y: ay, w: aw, h: ah, angleRange: [21.53, 160.01],
+    line: { color: arcColor || GREEN, width: lw }
+  });
+}
+
+/** Line-art fruit glyph standing in for the template's detailed icon freeforms:
+    a round body, a stalk and a leaf. */
+function icon(s, x, y, w, h, color, lw) {
+  const width = lw || 1.6, line = { color, width };
+  s.addShape('ellipse', { x: x + w * 0.06, y: y + h * 0.26, w: w * 0.82, h: h * 0.74, line });
+  s.addShape('line', { x: x + w * 0.47, y: y + h * 0.1, w: w * 0.02, h: h * 0.22, line });
+  s.addShape('teardrop', { x: x + w * 0.5, y: y + h * 0.02, w: w * 0.38, h: h * 0.3, rotate: 225, line });
+}
+
+/* -------------------------------------------------------- device mockups */
+/* The template ships four device photographs; they are redrawn here as flat
+   shapes sized from the originals. The screens are left unfilled so whatever
+   sits behind them shows through, exactly as in the source images. */
+const SHELL = '2B2B2B';        // dark plastic / glass body
+const SHELL_LIGHT = 'C9CDD1';  // aluminium chin, stand and laptop base
+const BEZEL = 0.28;            // screen border thickness, inches
+
+/* One rounded-rectangle contour in normalised coordinates. Tracing the screen
+   opening the opposite way round punches it out of the body. */
+const BEZ = 0.5523;  // control-point offset that turns a corner into a quarter circle
+function roundRectPath(x0, y0, x1, y1, rx, ry, clockwise) {
+  const k = BEZ;
+  return clockwise ? [
+    ['M', x0 + rx, y0], ['L', x1 - rx, y0],
+    ['C', x1 - rx + k * rx, y0, x1, y0 + ry - k * ry, x1, y0 + ry], ['L', x1, y1 - ry],
+    ['C', x1, y1 - ry + k * ry, x1 - rx + k * rx, y1, x1 - rx, y1], ['L', x0 + rx, y1],
+    ['C', x0 + rx - k * rx, y1, x0, y1 - ry + k * ry, x0, y1 - ry], ['L', x0, y0 + ry],
+    ['C', x0, y0 + ry - k * ry, x0 + rx - k * rx, y0, x0 + rx, y0], ['Z']
+  ] : [
+    ['M', x0 + rx, y0],
+    ['C', x0 + rx - k * rx, y0, x0, y0 + ry - k * ry, x0, y0 + ry], ['L', x0, y1 - ry],
+    ['C', x0, y1 - ry + k * ry, x0 + rx - k * rx, y1, x0 + rx, y1], ['L', x1 - rx, y1],
+    ['C', x1 - rx + k * rx, y1, x1, y1 - ry + k * ry, x1, y1 - ry], ['L', x1, y0 + ry],
+    ['C', x1, y0 + ry - k * ry, x1 - rx + k * rx, y0, x1 - rx, y0], ['Z']
+  ];
+}
+
+/** Device body with a see-through screen opening inset by the bezel thickness. */
+function screenFrame(s, x, y, w, h, b, r) {
+  const rx = (r || 0) / w, ry = (r || 0) / h, bx = b / w, by = b / h;
+  const ir = Math.max(0, (r || 0) - b);
+  blob(s, x, y, w, h,
+    roundRectPath(0, 0, 1, 1, rx, ry, true)
+      .concat(roundRectPath(bx, by, 1 - bx, 1 - by, ir / w, ir / h, false)),
+    { fill: { color: SHELL } });
+}
+
+function mockup(s, x, y, w, h, kind) {
+  const b = BEZEL;
+  if (kind === 'desktop') {
+    const panelH = 4.24, chinH = 0.62, neckH = 0.66, footH = 0.32;
+    screenFrame(s, x, y, w, panelH, b, 0.03);
+    rect(s, x, y + panelH, w, chinH, { fill: { color: SHELL_LIGHT } });
+    rect(s, x + w / 2 - 0.79, y + panelH + chinH, 1.58, neckH, { fill: { color: SHELL_LIGHT } });
+    s.addShape('ellipse', { x: x + w / 2 - 2.63, y: y + panelH + chinH + neckH - footH / 2, w: 5.26, h: footH,
+      fill: { color: SHELL_LIGHT } });
+  } else if (kind === 'laptop') {
+    const lidH = h - 0.5;
+    screenFrame(s, x, y, w, lidH, b, 0.03);
+    rrect(s, x - 0.2, y + lidH, w + 0.4, 0.45, 0.5, { fill: { color: SHELL_LIGHT } });
+  } else {                                                        // tablet / phone
+    screenFrame(s, x, y, w, h, b, kind === 'phone' ? 0.11 : 0.05);
+    if (kind === 'phone') {                                       // speaker notch
+      rrect(s, x + w * 0.33, y + b + 0.06, w * 0.34, 0.16, 0.5, { fill: { color: SHELL } });
+    } else {                                                      // home button
+      s.addShape('ellipse', { x: x + w / 2 - 0.11, y: y + h - 0.24, w: 0.22, h: 0.22, line: { color: SHELL_LIGHT, width: 1 } });
+    }
+  }
+}
+
+/** Small globe + www address used as a page footer on the mockup slides. */
+function webFooter(s, iconX, textX, y, color, iconColor) {
+  s.addShape('ellipse', { x: iconX, y: y + 0.028, w: 0.249, h: 0.249, fill: { color: iconColor } });
+  text(s, textX, y, 2.905, 0.337, 'WWW.FRUITASHOP.COM',
+    { fontSize: 14, bold: true, charSpacing: 1, color });
+}
+
+/* ------------------------------------------------- organic background blobs */
+/* Outlines normalised to the 0..1 box; 'C' = cubic bezier, 'L' = line. */
+const DOME = [['M', .5, 0], ['C', .7761, 0, 1, .4477, 1, 1], ['L', 0, 1], ['C', 0, .4477, .2239, 0, .5, 0], ['Z']];
+const DOME_WIDE = [['M', .5, 0], ['C', .7271, 0, .9206, .3973, .9944, .954], ['L', 1, 1], ['L', 0, 1], ['L', .0056, .954], ['C', .0794, .3973, .2729, 0, .5, 0], ['Z']];
+const WAVE = [['M', 0, 0], ['C', .2345, .5364, .9149, .1162, .713, .4848], ['C', .5111, .8535, 1.0727, .69, .992, 1], ['L', 0, 1], ['L', 0, 0], ['Z']];
+const SPLASH = [['M', .502, 0], ['C', .5461, -.0019, .6066, .0265, .6935, .1053], ['C', .8479, .2453, .9291, .2235, .9827, .1879],
+  ['L', 1, .1753], ['L', 1, 1], ['L', .1071, 1], ['L', .1461, .9806], ['C', .2796, .9117, .4191, .8093, .1756, .6629],
+  ['C', -.2573, .4025, .2357, .3679, .322, .2749], ['C', .3841, .2081, .3893, .0051, .502, 0], ['Z']];
+const ARCH_TOP = [['M', 0, 0], ['L', 1, 0], ['L', .996, .0259], ['C', .8987, .6042, .7008, 1, .4726, 1],
+  ['C', .2798, 1, .1088, .7178, .0016, .2817], ['L', 0, .275], ['Z']];
+const ARCH_BOTTOM = [['M', .5334, 0], ['C', .7271, 0, .8979, .2541, .9988, .6405], ['L', 1, .6454], ['L', 1, 1],
+  ['L', 0, 1], ['L', .0061, .9532], ['C', .0848, .397, .2912, 0, .5334, 0], ['Z']];
+/* Rectangle whose top-right and bottom-left corners are rounded off by half the short side
+   (k = the bezier constant that turns two control points into a quarter circle). */
+function pillDiag(w, h) {
+  const k = 0.5523, r = 0.5 * Math.min(w, h), rx = r / w, ry = r / h;
+  return [['M', 0, 0], ['L', 1 - rx, 0],
+    ['C', 1 - rx + k * rx, 0, 1, k * ry, 1, ry], ['L', 1, 1], ['L', rx, 1],
+    ['C', rx - k * rx, 1, 0, 1 - k * ry, 0, 1 - ry], ['Z']];
+}
+
+function blob(s, x, y, w, h, outline, opt) {
+  const points = outline.map(seg => {
+    if (seg[0] === 'M') return { x: seg[1] * w, y: seg[2] * h, moveTo: true };
+    if (seg[0] === 'L') return { x: seg[1] * w, y: seg[2] * h };
+    if (seg[0] === 'C') return { x: seg[5] * w, y: seg[6] * h, curve: { type: 'cubic', x1: seg[1] * w, y1: seg[2] * h, x2: seg[3] * w, y2: seg[4] * h } };
+    return { close: true };
+  });
+  return s.addShape('custGeom', Object.assign({ x, y, w, h, points }, opt));
+}
+
+/* ================================================================ slides 1-6 */
+
+// 1 - Cover: giant wordmark centred low on a plain white stage.
+function slide01(s) {
+  head(s, 6.937, 7.279, 6.126, 2.121, [[['Fruita', GREEN]]], 120, { align: 'center' });
+  text(s, 5.313, 9.305, 9.373, 0.438, TAGLINE,
+    { fontFace: POPPINS, fontSize: 20, color: DARK, charSpacing: 2, align: 'center' });
+  s.addShape('arc', { x: 10.388, y: 8.466, w: 2.036, h: 2.036, angleRange: [22.33, 157.65], line: { color: GREEN, width: 10 } });
+}
+
+// 2 - Intro: headline left, green CTA pill, photo panel + circular badge right.
+function slide02(s) {
+  s.addShape('ellipse', { x: 10.781, y: 1.683, w: 2.301, h: 2.301, fill: { color: GREEN } });
+  icon(s, 11.55, 2.44, 0.75, 0.79, WHITE, 2);
+  head(s, 1.746, 3.109, 7.676, 2.827,
+    [[['Keep fruits and vegetables ', DARK], ['fresh to stay healthy', GREEN]]], 54);
+  para(s, 1.746, 6.186, 7.963, 0.972, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua sunc.');
+  rect(s, 1.877, 7.997, 4.964, 0.681, { fill: { color: GREEN } });
+  text(s, 2.174, 8.136, 4.37, 0.404, 'FRUIT & ORGANIC FOOD',
+    { bold: true, charSpacing: 1, color: WHITE, align: 'center' });
+  wordmark(s, 0.714, 0.548, 1.377, 0.438, 20, DARK, 1.192, 0.647, 0.421, 0.421, 3);
+}
+
+// 3 - About us, full-bleed photo on the right.
+function slide03(s) {
+  eyebrow(s, 1.465, 2.278, 1.836, 'ABOUT US');
+  head(s, 1.465, 2.743, 8.277, 2.121, [
+    [['Welcome to the best market ', DARK]],
+    [['in providing ', DARK], ['fruit, organic food and vegetables', GREEN]]
+  ], 40);
+  para(s, 1.465, 5.457, 7.868, 1.426, LOREM);
+  para(s, 1.465, 7.091, 7.868, 1.881, BIB_LONG);
+}
+
+// 4 - Photo left with a green "270 branch market" stat tile overlapping it.
+function slide04(s) {
+  rect(s, 5.75, 6.729, 3.396, 3.396, { fill: { color: GREEN } });
+  head(s, 6.277, 7.49, 2.341, 1.01, [[['270', WHITE]]], 54, { align: 'center' });
+  text(s, 5.684, 8.59, 3.527, 0.774, [
+    { text: 'BRANCH MARKET', options: { breakLine: true } }, { text: 'FRUITA' }
+  ], { fontSize: 20, bold: true, charSpacing: 1, color: WHITE, align: 'center' });
+  eyebrow(s, 10.813, 1.813, 1.836, 'ABOUT US');
+  head(s, 10.813, 2.277, 7.868, 2.121, NEED_TITLE, 40);
+  para(s, 10.813, 4.991, 7.868, 1.426, LOREM);
+  subhead(s, 10.813, 7.01, 4.265, 'Monthly vegetable needs');
+  para(s, 10.813, 7.557, 7.868, 1.881, BIB_LONG);
+}
+
+// 5 - Green wave filling the lower-left quarter, numbered list on the right.
+function slide05(s) {
+  blob(s, 0, 5.625, 9.531, 5.625, WAVE, { fill: { color: GREEN } });
+  eyebrow(s, 2.132, 1.309, 1.836, 'ABOUT US');
+  head(s, 2.132, 1.774, 12.277, 1.447, NEED_TITLE, 40);
+  subhead(s, 10.674, 4.138, 4.265, 'Vegetable and fruit market');
+  para(s, 10.674, 4.685, 7.868, 1.881, BIB_LONG);
+  para(s, 10.674, 6.674, 7.868, 0.972, BIB_SHORT);
+  badge(s, 10.687, 8.019, '01', 'Organic Food', 4.265);
+  badge(s, 10.687, 8.885, '02', 'Fresh Fruit & Vegetable ', 4.265);
+}
+
+// 6 - Three white price tiles over a full-height photo on the right.
+const PRICE_TILES = [
+  { x: 1.722, title: 'Fresh Vegetable', price: '$2.00' },
+  { x: 5.312, title: 'Organic Food', price: '$7.00' },
+  { x: 8.902, title: 'Fresh Fruits', price: '$5.00' }
+];
+function slide06(s) {
+  eyebrow(s, 1.722, 1.734, 1.836, 'ABOUT US');
+  head(s, 1.722, 2.198, 7.868, 2.121, NEED_TITLE, 40);
+  para(s, 1.722, 4.912, 7.868, 1.426, LOREM);
+  PRICE_TILES.forEach(t => {
+    rrect(s, t.x, 7.015, 3.033, 3.033, 1 / 6, { fill: { color: WHITE }, shadow: tileShadow() });
+    icon(s, t.x + 1.19, 7.38, 0.66, 0.63, GREEN);
+    text(s, t.x + 0.133, 8.225, 2.768, 0.404, t.title,
+      { fontFace: HEAD, fontSize: 18, color: DARK, align: 'center' });
+    text(s, t.x + 0.599, 8.859, 1.836, 0.337, 'START FROM',
+      { fontSize: 14, bold: true, charSpacing: 1, color: DARK, align: 'center' });
+    rrect(s, t.x + 0.89, 9.24, 1.254, 0.512, 1 / 6, { fill: { color: GREEN } });
+    text(s, t.x + 0.875, 9.327, 1.283, 0.337, t.price,
+      { fontSize: 14, bold: true, charSpacing: 1, color: WHITE, align: 'center' });
+  });
+}
+
+/* =============================================================== slides 7-12 */
+
+// 7 - Green field + photo top-left, white card holding the headline, list right.
+const S7_ITEMS = [
+  { y: 1.498, num: '01', title: 'Organic Food' },
+  { y: 4.553, num: '02', title: 'Fresh Fruits' },
+  { y: 7.608, num: '03', title: 'Vegetable Fresh' }
+];
+function slide07(s) {
+  rect(s, 0, 0, 11.5, 11.25, { fill: { color: GREEN } });
+  rect(s, 1.654, 5.71, 9.846, 4.443, { fill: { color: WHITE }, shadow: tileShadow() });
+  eyebrow(s, 2.975, 6.639, 1.836, 'ABOUT US');
+  head(s, 2.975, 7.104, 7.868, 2.121, NEED_TITLE, 40);
+  S7_ITEMS.forEach((it, i) => {
+    badge(s, 13.332 + i * 0.013, it.y, it.num, it.title, 4.265);
+    para(s, 13.221 + i * 0.013, it.y + 0.718, 5.167, 1.426, BIB_CARD);
+  });
+}
+
+// 8 - Two overlapping photos right with a green circle badge below them.
+function slide08(s) {
+  eyebrow(s, 1.705, 1.702, 1.836, 'ABOUT US');
+  head(s, 1.705, 2.166, 7.868, 2.121, NEED_TITLE, 40);
+  subhead(s, 1.705, 5.114, 4.265, 'Hygienic Vegetables');
+  para(s, 1.705, 5.661, 7.182, 1.426, BIB_MED);
+  subhead(s, 1.705, 7.576, 4.265, 'Fresh Fruit Everyday');
+  para(s, 1.705, 8.122, 7.182, 1.426, BIB_MED);
+  s.addShape('ellipse', { x: 14.141, y: 6.396, w: 2.658, h: 2.658, fill: { color: GREEN } });
+  icon(s, 14.95, 7.24, 1.02, 0.96, WHITE, 2);
+}
+
+// 9 - Four-step list left, tall photo right, green stat square bottom-right.
+const S9_STEPS = [
+  { num: '01', title: 'Organic Food' },
+  { num: '02', title: 'Food Market' },
+  { num: '03', title: 'Organic Drink' },
+  { num: '04', title: 'Fresh Fruit & Vegetable ' }
+];
+function slide09(s) {
+  eyebrow(s, 1.795, 1.469, 1.836, 'ABOUT US');
+  head(s, 1.795, 1.933, 7.868, 2.121, NEED_TITLE, 40);
+  para(s, 1.795, 4.713, 7.2, 1.426, LOREM);
+  S9_STEPS.forEach((st, i) => badge(s, 1.92, 6.602 + i * 0.863, st.num, st.title, 4.265));
+  rect(s, 15.358, 7.059, 3.334, 3.334, { fill: { color: GREEN } });
+  icon(s, 16.55, 7.8, 0.95, 0.9, WHITE, 2);
+  text(s, 15.262, 8.894, 3.527, 0.774, [
+    { text: 'BRANCH MARKET', options: { breakLine: true } }, { text: 'FRUITA' }
+  ], { fontSize: 20, bold: true, charSpacing: 1, color: WHITE, align: 'center' });
+}
+
+// 10 - Team: three portraits, the first one sitting on a tall green panel.
+const S10_MEMBERS = [
+  { x: 1.773, dark: false },
+  { x: 7.965, dark: true },
+  { x: 13.761, dark: true }
+];
+function slide10(s) {
+  rect(s, 1.341, 3.455, 5.795, 7.795, { fill: { color: GREEN } });
+  head(s, 6.066, 1.547, 7.868, 0.774, [[['Professional ', DARK], ['Best Team', GREEN]]], 40, { align: 'center' });
+  eyebrow(s, 9.082, 1.082, 1.836, 'TEAM', { align: 'center' });
+  S10_MEMBERS.forEach(m => {
+    text(s, m.x + 0.333, 9.332, 4.265, 0.505, 'Your Name Here',
+      { fontFace: HEAD, fontSize: 24, color: m.dark ? DARK : WHITE, align: 'center' });
+    text(s, m.x + 1.159, 9.837, 2.612, 0.518, 'Job Positions',
+      { lineSpacingMultiple: 1.5, color: m.dark ? GRAY : WHITE, align: 'center' });
+  });
+}
+
+// 11 - Profile with three skill bars; organic green blob behind the portrait.
+const S11_SKILLS = [
+  { label: 'Management Production', pct: '75%', barW: 6.278, y: 5.659, valX: 6.987 },
+  { label: 'Communication Skill', pct: '90%', barW: 8.19, y: 7.155, valX: 9.008 },
+  { label: 'Leadership Team', pct: '80%', barW: 7.103, y: 8.65, valX: 8.084 }
+];
+function slide11(s) {
+  blob(s, 11.496, 2.491, 8.504, 8.759, SPLASH, { fill: { color: GREEN } });
+  eyebrow(s, 1.584, 1.546, 1.836, 'TEAM');
+  head(s, 1.584, 2.011, 7.868, 1.01, [[['Stevano ', DARK], ['Danuarta', GREEN]]], 54);
+  para(s, 1.584, 2.925, 2.612, 0.518, 'Chief Fruita Group');
+  para(s, 1.584, 4.223, 7.2, 0.972, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed dolor eiusmod tempor incididunt ut labore et dolore magna.');
+  S11_SKILLS.forEach(sk => {
+    subhead(s, 1.584, sk.y, 4.471, sk.label);
+    subhead(s, sk.valX, sk.y, 1.152, sk.pct, { align: 'right' });
+    rect(s, 1.681, sk.y + 0.7, sk.barW, 0.233, { fill: { color: GREEN } });
+    s.addShape('ellipse', { x: 1.681 + sk.barW - 0.24, y: sk.y + 0.68, w: 0.42, h: 0.42, fill: { color: GREEN } });
+    s.addShape('teardrop', { x: 1.681 + sk.barW + 0.02, y: sk.y + 0.5, w: 0.24, h: 0.24, rotate: 225, fill: { color: GREEN } });
+  });
+  wordmark(s, 17.255, 1.325, 2.177, 0.707, 36, DARK, 18.002, 1.498, 0.885, 0.707, 6);
+}
+
+// 12 - Two green panels each carrying a portrait and a name plate.
+const S12_PEOPLE = [
+  { panelX: 8.795, picX: 8.978, name: ['Vania', 'Larasaty'], role: 'UI Designer', tx: 9.468 },
+  { panelX: 14.295, picX: 14.476, name: ['Steve', 'Buditama'], role: 'Web Deveoper', tx: 14.976 }
+];
+function slide12(s) {
+  S12_PEOPLE.forEach(p => {
+    rect(s, p.panelX, 0, 4.295, 11.25, { fill: { color: GREEN } });
+    text(s, p.tx, 0.533, 2.949, 1.313, [
+      { text: p.name[0], options: { breakLine: true } }, { text: p.name[1] }
+    ], { fontFace: HEAD, fontSize: 36, color: WHITE });
+    para(s, p.tx, 1.722, 2.612, 0.518, p.role, { color: WHITE });
+  });
+  [{ x: 12.508, y: 2.653, rot: 46.7 }, { x: 12.708, y: 3.769, rot: 225 }].forEach(a =>
+    s.addShape('arc', { x: a.x, y: a.y, w: 2.168, h: 2.168, rotate: a.rot, angleRange: [65.15, 208.16], line: { color: WHITE, width: 10 } }));
+  eyebrow(s, 1.663, 2.078, 1.836, 'TEAM');
+  head(s, 1.663, 2.543, 5.014, 1.447, [[['Amazing ', DARK], ['Best Team', GREEN]]], 40);
+  para(s, 1.663, 4.785, 5.451, 1.881, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed dolor eiusmod tempor incididunt ut labore et dolore magna aliqua. Nunc sed blandit liberosa volutpat. Vitae aliquet nec amcorper.');
+  subhead(s, 1.663, 7.199, 4.265, '10 Years Experience');
+  para(s, 1.663, 7.745, 5.451, 1.426, 'Bibendum at varius vel pharetra vel turpis nunc. Ultrices tincidunt arcu non sodales neque sodales ut etiam. Suspendisse ultrices gravida.');
+}
+
+/* ============================================================== slides 13-18 */
+
+// 13 - Team grid of four with EMPLOYEE / FREELANCER tags.
+const S13_TEAM = [
+  { x: 1.386, tag: 'EMPLOYEE' },
+  { x: 5.773, tag: 'FREELANCER' },
+  { x: 10.159, tag: 'EMPLOYEE' },
+  { x: 14.545, tag: 'FREELANCER' }
+];
+function slide13(s) {
+  head(s, 6.066, 1.641, 7.868, 0.774, [[['Professional ', DARK], ['Best Team', GREEN]]], 40, { align: 'center' });
+  eyebrow(s, 9.082, 1.176, 1.836, 'TEAM', { align: 'center' });
+  S13_TEAM.forEach(m => {
+    subhead(s, m.x - 0.098, 8.244, 4.265, 'Your Name Here', { align: 'center' });
+    para(s, m.x + 0.728, 8.62, 2.612, 0.518, 'Job Positions', { align: 'center' });
+    rrect(s, m.x + 0.654, 9.38, 2.761, 0.692, 0.1586, { fill: { color: GREEN } });
+    text(s, m.x + 0.781, 9.524, 2.508, 0.404, m.tag,
+      { bold: true, color: WHITE, align: 'center' });
+  });
+}
+
+// 14 - Six numbered services flanking a central green column.
+const S14_SERVICES = [
+  { x: 1.356, y: 1.379, num: '01' }, { x: 1.356, y: 4.553, num: '02' }, { x: 1.356, y: 7.726, num: '03' },
+  { x: 14.552, y: 1.379, num: '04' }, { x: 14.552, y: 4.553, num: '05' }, { x: 14.552, y: 7.726, num: '06' }
+];
+function slide14(s) {
+  rect(s, 6.898, 0, 6.205, 11.25, { fill: { color: GREEN } });
+  eyebrow(s, 9.082, 6.579, 1.836, 'SERVICES', { color: WHITE, align: 'center' });
+  head(s, 7.351, 7.044, 5.298, 1.447, [[['Fruita Best Services', WHITE]]], 40, { align: 'center' });
+  rrect(s, 8.62, 9.179, 2.761, 0.692, 0.1586, { fill: { color: WHITE } });
+  text(s, 8.746, 9.323, 2.508, 0.404, 'BEST MARKET', { bold: true, color: GREEN, align: 'center' });
+  S14_SERVICES.forEach((it, i) => {
+    badge(s, it.x, it.y, it.num, 'Your Title Services ' + (i + 1), 3.428);
+    para(s, it.x - 0.11, it.y + 0.718, 4.265, 1.426, BIB_TILE);
+  });
+}
+
+// 15 - Product catalogue: tab row plus four white cards with grey price strips.
+const S15_TABS = [{ x: 1.159, label: 'FRUITS' }, { x: 3.048, label: 'VEGETABLES' }, { x: 5.555, label: 'ORGANIC FOOD' }];
+const S15_CARDS = [
+  { x: 1.159, name: 'Green Kiwi', price: '$12.00' },
+  { x: 5.682, name: 'Ambon Banana', price: '$17.00' },
+  { x: 10.205, name: 'Dragon Fruit', price: '$21.00' },
+  { x: 14.727, name: 'Lemon Orange', price: '$11.00' }
+];
+function slide15(s) {
+  head(s, 5.625, 1.433, 8.75, 1.447,
+    [[['Offers a wide variety of ', DARK], ['fresh fruits and vegetables', GREEN]]], 40, { align: 'center' });
+  eyebrow(s, 9.082, 0.969, 1.836, 'SERVICES', { align: 'center' });
+  S15_TABS.forEach(t => text(s, t.x, 3.623, 2.508, 0.404, t.label, { bold: true, color: DARK }));
+  s.addShape('line', { x: 1.304, y: 4.131, w: 0.434, h: 0, line: { color: GREEN, width: 5 } });
+  S15_CARDS.forEach(c => {
+    rect(s, c.x, 4.703, 4.114, 5.114, { fill: { color: WHITE }, shadow: cardShadow() });
+    rect(s, c.x, 8.812, 4.114, 1.004, { fill: { color: SMOKE } });
+    subhead(s, c.x + 0.343, 7.53, 3.428, c.name, { align: 'center' });
+    para(s, c.x + 0.234, 7.895, 3.645, 0.518, BIB_TINY, { align: 'center' });
+    subhead(s, c.x + 0.315, 9.096, 1.271, c.price, { color: RED });
+    stars(s, c.x + 2.069, 9.163, 0.304, 0.356, GREEN);
+  });
+}
+
+// 16 - Four service columns, the third one framed with a green outline.
+const S16_COLUMNS = [
+  { x: 1.758, title: 'Organic Food', textW: 3.711 },
+  { x: 6.03, title: 'Vegetarian', textW: 3.711 },
+  { x: 10.49, title: 'Fresh Fruit', textW: 3.711 },
+  { x: 14.909, title: 'Food Market', textW: 3.486 }
+];
+function slide16(s) {
+  rect(s, 9.835, 3.818, 4.585, 5.958, { fill: { type: 'none' }, line: { color: GREEN, width: 2.25 } });
+  eyebrow(s, 1.604, 1.469, 1.836, 'SERVICES');
+  head(s, 1.604, 1.933, 7.727, 0.774, [[['Our Best Services Fruita', DARK]]], 40);
+  S16_COLUMNS.forEach(c => {
+    icon(s, c.x + 0.04, 4.49, 0.85, 0.82, GREEN, 2.15);
+    subhead(s, c.x, 5.67, 2.698, c.title);
+    para(s, c.x, 6.312, c.textW, 1.881, BIB_COL);
+    rrect(s, c.x + 0.096, 8.596, 1.666, 0.512, 1 / 6, { fill: { color: GREEN } });
+    text(s, c.x + 0.288, 8.684, 1.283, 0.337, 'SHARE',
+      { fontSize: 14, bold: true, charSpacing: 1, color: WHITE, align: 'center' });
+  });
+}
+
+// 17 - Three green domes over a dark navy band.
+const S17_DOMES = [
+  { x: 0.979, title: 'Fresh Fruits', tw: 2.698, tx: 2.536, px: 1.733 },
+  { x: 7.094, title: 'Organic Drink', tw: 3.158, tx: 8.421, px: 7.848 },
+  { x: 13.22, title: 'Healthy Vegetables', tw: 3.761, tx: 14.246, px: 13.974 }
+];
+function slide17(s) {
+  S17_DOMES.forEach(d => {
+    blob(s, d.x, 4.61, 5.812, 2.906, DOME, { fill: { color: GREEN } });
+  });
+  rect(s, 0, 7.516, 20, 3.734, { fill: { color: NAVY } });
+  head(s, 6.136, 1.413, 7.727, 0.774, [[['Our Best Services Fruita', DARK]]], 40, { align: 'center' });
+  eyebrow(s, 9.082, 0.948, 1.836, 'SERVICES', { align: 'center' });
+  para(s, 2.458, 2.471, 15.083, 0.972, 'Bibendum at varius vel pharetra vel turpis nunc. Ultrices tincidunt arcu non sodales neque sodales ut etiam. Suspendisse ultrices gravida dictum fusce ut placerat orci nulla pellentesque. Cursus mattis molestie a iaculis at. Maecenas sed enim ut seman.', { align: 'center' });
+  S17_DOMES.forEach(d => {
+    s.addShape('ellipse', { x: d.x + 2.207, y: 5.431, w: 1.398, h: 1.398, fill: { color: GREEN } });
+    icon(s, d.x + 2.62, 5.87, 0.57, 0.52, WHITE, 1.3);
+    subhead(s, d.tx, 8.287, d.tw, d.title, { color: WHITE, align: 'center' });
+    para(s, d.px, 8.857, 4.304, 1.426, BIB_TILE, { color: WHITE, align: 'center' });
+  });
+}
+
+// 18 - Break slide: two organic green shapes meeting mid-canvas.
+function slide18(s) {
+  blob(s, 3.21, 1.466, 13.58, 8.318, pillDiag(13.58, 8.318), { fill: { color: GREEN } });
+  blob(s, 0, 0, 11.708, 3.848, ARCH_TOP, { fill: { color: WHITE } });
+  blob(s, 8.226, 6.791, 11.54, 4.459, ARCH_BOTTOM, { fill: { color: WHITE } });
+  head(s, 4.23, 4.029, 11.54, 2.121, [[['Break Slide', WHITE]]], 120, { align: 'center' });
+  text(s, 5.313, 6.055, 9.373, 0.438, TAGLINE,
+    { fontFace: POPPINS, fontSize: 20, color: WHITE, charSpacing: 2, align: 'center' });
+  wordmark(s, 1.126, 9.325, 2.177, 0.707, 36, DARK, 1.873, 9.498, 0.885, 0.707, 6);
+  s.addShape('star4', { x: 15.77, y: 1.445, w: 0.435, h: 0.435, fill: { color: GOLD } });
+  s.addShape('star4', { x: 18.364, y: 3.13, w: 0.689, h: 0.689, fill: { color: GOLD } });
+}
+
+/* ============================================================== slides 19-24 */
+
+// 19 - Three product columns; the middle one sits on a green panel with a "best seller" ribbon.
+const S19_PRODUCTS = [
+  { picX: 1.452, titleX: 1.45, titleW: 4.017, title: 'Orange Fruit', textX: 1.308, starX: 2.596, boxX: 2.206, price: '$35.00', onGreen: false },
+  { picX: 7.991, titleX: 7.635, titleW: 4.731, title: 'Organic Drink', textX: 7.848, starX: 9.135, boxX: 8.746, price: '$70.00', onGreen: true },
+  { picX: 14.531, titleX: 13.978, titleW: 5.123, title: 'Fresh Vegetables', textX: 14.388, starX: 15.675, boxX: 15.286, price: '$90.00', onGreen: false }
+];
+function slide19(s) {
+  rect(s, 6.898, 0, 6.205, 11.25, { fill: { color: GREEN } });
+  S19_PRODUCTS.forEach(p => {
+    text(s, p.titleX, 6.021, p.titleW, 0.64, p.title,
+      { fontFace: HEAD, fontSize: 32, color: p.onGreen ? WHITE : DARK, align: 'center' });
+    stars(s, p.starX, 6.826, 0.304, 0.356, YELLOW);
+    para(s, p.textX, 7.518, 4.304, 1.426, BIB_TILE, { color: p.onGreen ? WHITE : GRAY, align: 'center' });
+    rect(s, p.boxX, 9.429, 2.508, 1.048, { fill: { color: p.onGreen ? WHITE : GREEN } });
+    text(s, p.boxX, 9.7, 2.508, 0.505, p.price,
+      { fontFace: HEAD, fontSize: 24, color: p.onGreen ? GREEN : WHITE, align: 'center' });
+  });
+  s.addShape('diagStripe', { x: 6.898, y: 0, w: 2.432, h: 2.432, fill: { color: YELLOW } });
+  text(s, 6.741, 0.688, 2.18, 0.37, 'BEST SELLER',
+    Object.assign({}, TEXT_BASE, { x: 6.741, y: 0.688, w: 2.18, h: 0.37, rotate: 315, fontSize: 16, bold: true, charSpacing: 1, color: WHITE, align: 'center' }));
+}
+
+// 20 - Discount panel: headline, 70% call-out and a three-item category list.
+const S20_CATEGORIES = [
+  { y: 7.287, num: '01', title: 'Organic Food', w: 2.571 },
+  { y: 8.028, num: '02', title: 'Fresh Vegetables', w: 3.048 },
+  { y: 8.839, num: '03', title: 'Orange Fruits ', w: 2.704 }
+];
+function slide20(s) {
+  eyebrow(s, 1.745, 1.779, 1.836, 'PORTFOLIO');
+  head(s, 1.745, 2.243, 7.738, 2.121, [
+    [['The most complete ', DARK]],
+    [['fresh fruit and ', DARK], ["vegetable market, let's shop now", GREEN]]
+  ], 40);
+  para(s, 1.745, 5.019, 7.342, 1.426, LOREM);
+  subhead(s, 1.745, 7.263, 4.265, 'Special Discount ');
+  head(s, 1.745, 7.777, 2.217, 0.841, [[['70%', RED]]], 44);
+  s.addShape('line', { x: 4.809, y: 7.263, w: 0, h: 2.208, line: { color: 'BFBFBF', width: 1 } });
+  S20_CATEGORIES.forEach((c, i) => badge(s, 5.516 + (i === 1 ? 0.013 : 0), c.y, c.num, c.title, c.w));
+  wordmark(s, 17.376, 0.627, 2.177, 0.64, 32, DARK, 18.05, 0.821, 0.738, 0.589, 6);
+}
+
+// 21 - Category rail on the left, two product cards on the right.
+const S21_CATEGORIES = [
+  { y: 4.009, label: 'Fresh Fruits', w: 2.571, active: false, iconY: 3.948 },
+  { y: 5.757, label: 'Vegetables', w: 2.571, active: true, iconY: 5.727 },
+  { y: 7.505, label: 'Organic Drink', w: 2.669, active: false, iconY: 7.494 },
+  { y: 9.254, label: 'Healthy Food', w: 2.571, active: false, iconY: 9.208 }
+];
+const S21_PRODUCTS = [
+  { x: 6.862, title: 'Vegetable Mustard', titleW: 3.428, price: '$5.10', buyX: 10.83 },
+  { x: 13.222, title: 'Cabbage', titleW: 2.205, price: '$6.40', buyX: 17.19 }
+];
+/** One catalogue card: rating, name, blurb, price and BUY button. */
+function productCard(s, p) {
+  subhead(s, p.x, 8.21, p.titleW, p.title);
+  para(s, p.x, 8.575, 3.645, 0.518, BIB_TINY);
+  stars(s, p.x + 0.116, 9.18, 0.248, 0.288, YELLOW);
+  text(s, p.x, 9.83, 2.716, 0.505,
+    [{ text: 'Price ', options: { color: DARK } }, { text: p.price, options: { color: RED } }],
+    { fontFace: HEAD, fontSize: 24 });
+  rect(s, p.buyX, 9.618, 1.487, 0.717, { fill: { color: GREEN } });
+  text(s, p.buyX + 0.101, 9.798, 1.283, 0.404, 'BUY',
+    { bold: true, charSpacing: 1, color: WHITE, align: 'center' });
+}
+function slide21(s) {
+  rect(s, 1.324, 5.412, 3.926, 1.129, { fill: { color: GREEN } });
+  eyebrow(s, 1.656, 0.915, 1.836, 'PORTFOLIO');
+  head(s, 1.656, 1.379, 8.344, 1.447, [[['All the products we ', DARK], ['market by category', GREEN]]], 40);
+  S21_CATEGORIES.forEach(c => {
+    icon(s, 1.8, c.iconY, 0.55, 0.55, c.active ? WHITE : GREEN, 1.8);
+    subhead(s, 2.678, c.y, c.w, c.label, { color: c.active ? WHITE : DARK });
+  });
+  s.addShape('line', { x: 6.013, y: 3.671, w: 0, h: 6.664, line: { color: 'BFBFBF', width: 1 } });
+  s.addShape('line', { x: 6.013, y: 5.444, w: 0, h: 1.097, line: { color: GREEN, width: 3 } });
+  S21_PRODUCTS.forEach(p => productCard(s, p));
+}
+
+// 22 - Same catalogue grid, this time three cards across.
+const S22_PRODUCTS = [
+  { x: 1.0, title: 'Orange Fruit', titleW: 3.428, price: '$3.20', buyX: 4.968 },
+  { x: 7.273, title: 'Avocado Fruit', titleW: 2.533, price: '$4.10', buyX: 11.241 },
+  { x: 13.546, title: 'Dragon Fruit', titleW: 2.913, price: '$5.00', buyX: 17.514 }
+];
+function slide22(s) {
+  head(s, 5.101, 1.342, 9.798, 1.447, [[['All the products we ', DARK], ['market by category', GREEN]]], 40, { align: 'center' });
+  eyebrow(s, 9.082, 0.878, 1.836, 'PORTFOLIO', { align: 'center' });
+  S22_PRODUCTS.forEach(p => productCard(s, p));
+}
+
+// 23 - Favourite products: vertical rule, two listings with right-aligned prices.
+const S23_ITEMS = [
+  { y: 4.392, name: 'Orange Fruits', textW: 4.013, price: '$3.20', starY: 4.906 },
+  { y: 9.868, name: 'Tomatoes', textW: 4.062, price: '$5.90', starY: 10.382 }
+];
+function slide23(s) {
+  eyebrow(s, 1.095, 5.912, 1.836, 'PORTFOLIO');
+  head(s, 1.095, 6.377, 3.503, 2.121, [[['Favorite product on the market', DARK]]], 40);
+  rect(s, 1.182, 9.244, 2.761, 0.692, { fill: { color: GREEN } });
+  text(s, 1.309, 9.388, 2.508, 0.404, 'BEST MARKET', { bold: true, color: WHITE, align: 'center' });
+  s.addShape('line', { x: 5.126, y: 0.494, w: 0, h: 10.262, line: { color: 'BFBFBF', width: 1 } });
+  s.addShape('line', { x: 5.126, y: 0.494, w: 0, h: 1.097, line: { color: GREEN, width: 3 } });
+  S23_ITEMS.forEach(it => {
+    subhead(s, 6.136, it.y, 3.428, it.name);
+    para(s, 6.136, it.y + 0.364, it.textW, 0.518, BIB_TINY);
+    text(s, 11.103, it.y, 1.925, 0.37,
+      [{ text: 'Price ', options: { color: DARK } }, { text: it.price, options: { color: RED } }],
+      { fontFace: HEAD, fontSize: 16, align: 'right' });
+    stars(s, 11.523, it.starY, 0.248, 0.288, YELLOW);
+  });
+}
+
+// 24 - Sales growth: three stat columns with gradient up-arrows.
+const S24_STATS = [
+  { x: 7.313, title: 'Organic Food', pct: '75%', pctX: 7.915, pctW: 1.618, arrowX: 7.394 },
+  { x: 11.382, title: 'Vegetables', pct: '80%', pctX: 12.001, pctW: 1.79, arrowX: 11.481 },
+  { x: 15.444, title: 'Fresh Fruit', pct: '60%', pctX: 15.965, pctW: 1.79, arrowX: 15.444 }
+];
+const ARROW_GRAD = { type: 'solid', color: GREEN };
+function slide24(s) {
+  eyebrow(s, 7.313, 1.48, 1.836, 'PORTFOLIO');
+  head(s, 7.313, 1.945, 9.405, 0.774, [[['Increase in sales ', DARK], ['this month', GREEN]]], 40);
+  S24_STATS.forEach(st => {
+    icon(s, st.x + 0.04, 4.33, 0.87, 0.83, GREEN, 2.15);
+    subhead(s, st.x, 5.511, 2.698, st.title);
+    para(s, st.x, 6.153, 3.711, 1.881, BIB_COL);
+    s.addShape('upArrow', { x: st.arrowX, y: 8.577, w: 0.34, h: 0.481, fill: ARROW_GRAD });
+    text(s, st.pctX, 8.497, st.pctW, 0.64, st.pct, { fontFace: HEAD, fontSize: 32, color: DARK });
+  });
+}
+
+/* ============================================================== slides 25-30 */
+
+// 25 - Green quote panel overlapped by a white card holding three list items.
+const S25_LIST = [
+  { y: 2.16, title: 'Organic Food' },
+  { y: 4.675, title: 'Fresh Fruits' },
+  { y: 7.191, title: 'Vegetables' }
+];
+function slide25(s) {
+  rect(s, 1.273, 2.341, 7.932, 6.568, { fill: { color: GREEN } });
+  rect(s, 8.962, 1.299, 9.568, 8.652, { fill: { color: WHITE }, shadow: cardShadow() });
+  eyebrow(s, 2.374, 3.34, 1.836, 'PORTFOLIO', { color: WHITE });
+  head(s, 2.374, 3.805, 5.967, 2.794, [
+    [['The most complete ', WHITE]],
+    [["fresh fruit and vegetable market, let's shop now", WHITE]]
+  ], 40);
+  para(s, 2.374, 6.938, 5.522, 0.972, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed dolor eiusmod tempor incididunt', { color: WHITE });
+  S25_LIST.forEach(it => {
+    subhead(s, 12.629, it.y, 4.265, it.title);
+    para(s, 12.629, it.y + 0.473, 5.167, 1.426, BIB_LIST);
+  });
+}
+
+// 26 - Desktop mockup (real bitmap in the source deck -> placeholder here).
+function slide26(s) {
+  mockup(s, 2.40, 3.41, 7.18, 6.0, 'desktop');
+  wordmark(s, 3.025, 6.484, 1.377, 0.438, 20, DARK, 3.503, 6.584, 0.421, 0.421, 3);
+  eyebrow(s, 11.199, 2.153, 2.914, 'MOCKUP DEVICE');
+  head(s, 11.199, 2.617, 7.738, 1.447, [
+    [['Desktop mockup ', DARK], ['device', GREEN]],
+    [['Fruita shop', GREEN]]
+  ], 40);
+  para(s, 11.199, 4.68, 7.342, 1.426, LOREM);
+  subhead(s, 11.199, 6.67, 4.265, 'Vegetable and fruit market');
+  para(s, 11.199, 7.217, 7.007, 1.881, BIB_LONG);
+  webFooter(s, 0.81, 1.199, 10.306, DARK, GREEN);
+}
+
+// 27 - Tablet mockup on a green dome, floating product card on the left.
+function slide27(s) {
+  blob(s, 3.132, 6.277, 13.736, 4.973, DOME_WIDE, { fill: { color: GREEN } });
+  mockup(s, 7.60, 2.575, 4.77, 7.36, 'tablet');
+  rect(s, 1.483, 1.87, 4.114, 5.114, { fill: { color: WHITE }, shadow: cardShadow() });
+  rect(s, 1.483, 5.979, 4.114, 1.004, { fill: { color: SMOKE } });
+  subhead(s, 1.826, 4.697, 3.428, 'Green Kiwi', { align: 'center' });
+  para(s, 1.717, 5.061, 3.645, 0.518, BIB_TINY, { align: 'center' });
+  subhead(s, 1.798, 6.262, 1.271, '$12.00', { color: RED });
+  stars(s, 3.552, 6.329, 0.304, 0.356, GREEN);
+  s.addShape('arc', { x: 2.841, y: 6.017, w: 2.743, h: 2.743, rotate: 320.2, angleRange: [127.79, 227.07], line: { color: GREEN, width: 2, endArrowType: 'arrow' } });
+  eyebrow(s, 14.403, 1.203, 2.983, 'MOCKUP DEVICE');
+  head(s, 14.403, 1.668, 4.911, 3.467, [
+    [['Available', DARK]],
+    [['fresh fruit and vegetable market, ', DARK], ["let's shop now", GREEN]]
+  ], 40);
+  rect(s, 14.58, 5.938, 3.023, 0.681, { fill: { color: GREEN } });
+  text(s, 14.628, 6.093, 2.927, 0.37, 'DOWNLOAD APP',
+    { fontSize: 16, bold: true, charSpacing: 1, color: WHITE, align: 'center' });
+}
+
+// 28 - Laptop mockup right, three growth figures under the copy.
+const S28_STATS = [
+  { pctX: 2.505, arrowX: 1.985, labelX: 1.858, pct: '75%', label: 'Organic Food' },
+  { pctX: 4.951, arrowX: 4.43, labelX: 4.304, pct: '90%', label: 'Vegetables' },
+  { pctX: 7.396, arrowX: 6.876, labelX: 6.749, pct: '60%', label: 'Fresh Fruits' }
+];
+function slide28(s) {
+  mockup(s, 11.78, 2.13, 8.22, 7.02, 'laptop');
+  eyebrow(s, 1.858, 2.119, 2.914, 'MOCKUP DEVICE');
+  head(s, 1.858, 2.584, 7.738, 1.447, [
+    [['Laptop mockup ', DARK], ['device', GREEN]],
+    [['Fruita shop', GREEN]]
+  ], 40);
+  para(s, 1.858, 4.647, 7.342, 1.426, LOREM);
+  para(s, 1.858, 6.202, 7.007, 0.972, BIB_MOCK);
+  S28_STATS.forEach(st => {
+    s.addShape('upArrow', { x: st.arrowX, y: 7.934, w: 0.34, h: 0.481, fill: ARROW_GRAD });
+    text(s, st.pctX, 7.855, 1.618, 0.64, st.pct, { fontFace: HEAD, fontSize: 32, color: DARK });
+    text(s, st.labelX, 8.693, 2.698, 0.438, st.label, { fontSize: 20, bold: true, color: GREEN });
+  });
+  webFooter(s, 16.174, 16.563, 10.306, DARK, GREEN);
+}
+
+// 29 - Phone mockup on a green sidebar.
+function slide29(s) {
+  rect(s, 0, 0, 4.328, 11.25, { fill: { color: GREEN } });
+  mockup(s, 2.16, 1.90, 6.50, 11.7, 'phone');
+  wordmark(s, 0.694, 0.524, 2.177, 0.64, 32, WHITE, 1.369, 0.718, 0.738, 0.589, 6, WHITE);
+  eyebrow(s, 10.705, 2.171, 2.914, 'MOCKUP DEVICE');
+  head(s, 10.705, 2.636, 7.738, 1.447, [
+    [['Phone mockup ', DARK], ['device', GREEN]],
+    [['Fruita shop', GREEN]]
+  ], 40);
+  para(s, 10.705, 4.699, 7.342, 1.426, LOREM);
+  para(s, 10.705, 6.254, 7.007, 0.972, BIB_MOCK);
+  badge(s, 10.812, 7.622, '01', 'Organic Food', 3.071);
+  badge(s, 10.812, 8.488, '02', 'Fresh Fruit & Vegetable ', 4.039);
+}
+
+// 30 - Radial infographic: four percentages orbiting a centre image.
+const S30_NODES = [
+  { arc: { x: 4.521, y: 3.343, w: 2.354, h: 2.534, rot: 106.9, range: [150.16, 253.37], flipV: true },
+    pct: '56%', pctX: 2.833, pctW: 1.785, pctY: 4.161,
+    titleX: 1.589, titleY: 4.932, bodyX: 0.665, bodyY: 5.402, align: 'right' },
+  { arc: { x: 13.392, y: 3.846, w: 2.204, h: 2.372, rot: 31.51, range: [175.18, 265.42] },
+    pct: '30%', pctX: 15.382, pctW: 1.618, pctY: 3.467,
+    titleX: 15.382, titleY: 4.238, bodyX: 15.382, bodyY: 4.708, align: 'left' },
+  { arc: { x: 6.812, y: 7.239, w: 1.915, h: 2.062, rot: 22.26, range: [150.16, 253.37], flipH: true, flipV: true },
+    pct: '20%', pctX: 5.656, pctW: 1.618, pctY: 7.632,
+    titleX: 4.245, titleY: 8.403, bodyX: 3.321, bodyY: 8.873, align: 'right' },
+  { arc: { x: 12.522, y: 6.786, w: 1.915, h: 2.062, rot: 337.74, range: [147.42, 253.37], flipV: true },
+    pct: '75%', pctX: 14.026, pctW: 1.618, pctY: 7.63,
+    titleX: 14.026, titleY: 8.402, bodyX: 14.026, bodyY: 8.872, align: 'left' }
+];
+function slide30(s) {
+  head(s, 4.201, 1.342, 11.598, 0.774, [[
+    ['Nutritional content in ', DARK], ['dragon', GREEN], [' ', DARK], ['fruit', GREEN]
+  ]], 40, { align: 'center' });
+  eyebrow(s, 9.082, 0.878, 1.836, 'PORTFOLIO', { align: 'center' });
+  S30_NODES.forEach(n => {
+    s.addShape('arc', { x: n.arc.x, y: n.arc.y, w: n.arc.w, h: n.arc.h, rotate: n.arc.rot, angleRange: n.arc.range, flipH: n.arc.flipH, flipV: n.arc.flipV, line: { color: GREEN, width: 2, endArrowType: 'arrow' } });
+    text(s, n.pctX, n.pctY, n.pctW, 0.64, n.pct, { fontFace: HEAD, fontSize: 32, color: GREEN, align: n.align });
+    subhead(s, n.titleX, n.titleY, 3.029, 'Write Your Here', { align: n.align });
+    para(s, n.bodyX, n.bodyY, 3.953, 1.426, LOREM_SM, { align: n.align });
+  });
+}
+
+/* ============================================================== slides 31-36 */
+
+// 31 - Section cover, wordmark shifted to the lower right.
+function slide31(s) {
+  head(s, 12.563, 6.636, 7.164, 2.289, [[['Fruita', GREEN]]], 130, {});
+  text(s, 12.563, 8.588, 7.241, 0.337, TAGLINE,
+    { fontFace: POPPINS, fontSize: 14, color: DARK, charSpacing: 2 });
+  s.addShape('arc', { x: 15.276, y: 7.462, w: 2.412, h: 2.412, angleRange: [22.33, 157.65], line: { color: GREEN, width: 15 } });
+}
+
+// 32 - Pull quote with an attribution and the wordmark as a signature.
+function slide32(s) {
+  head(s, 6.488, 2.551, 2.163, 0.774, [[['\u201C', GREEN]]], 40, { align: 'center' });
+  head(s, 7.261, 3.257, 7.795, 3.467, [[
+    ['Dragon fruit ', GREEN],
+    ['is very subtle, very delicate. So you want to ', DARK],
+    ['be careful not to kill ', GREEN],
+    ['it with things that have', DARK],
+    [' very strong flavor.', GREEN]
+  ]], 40);
+  para(s, 7.261, 7.481, 2.96, 0.518, 'Chief Marketing Projects');
+  wordmark(s, 7.261, 7.948, 2.177, 0.64, 32, DARK, 7.936, 8.142, 0.738, 0.589, 6);
+}
+
+// 33 - Pricing table: two white cards plus a featured green column.
+const S33_PLANS = [
+  { cardX: 4.176, tx: 5.128, name: 'Basic Plan', nameW: 2.451, amount: '39', amountX: 5.438,
+    dollarX: 5.128, pkgX: 6.426, btnX: 5.197, btnTextX: 5.352, rows: 5, dark: true },
+  { cardX: 9.198, tx: 10.15, name: 'Standard Plan', nameW: 2.657, amount: '79', amountX: 10.461,
+    dollarX: 10.15, pkgX: 11.448, btnX: 10.252, btnTextX: 10.409, rows: 5, dark: true }
+];
+function planFeatures(s, x, y, w, h, count, color) {
+  const items = [];
+  for (let i = 1; i <= count; i++) {
+    items.push({ text: 'Write Service Here ' + i, options: { bullet: { characterCode: '2713', indent: 22 }, breakLine: true } });
+  }
+  para(s, x, y, w, h, items, { color });
+}
+function slide33(s) {
+  rect(s, 14.221, 0, 5.779, 11.25, { fill: { color: GREEN } });
+  text(s, -1.922, 4.666, 8.299, 1.919,
+    [{ text: 'Choose your ', options: { color: DARK } }, { text: 'pricing plan fruita', options: { color: GREEN } }],
+    Object.assign({}, TEXT_BASE, { x: -1.922, y: 4.666, w: 8.299, h: 1.919, rotate: 270, fontFace: HEAD, fontSize: 54 }));
+  text(s, 0.181, 8.688, 1.836, 0.337, 'PORTFOLIO',
+    Object.assign({}, TEXT_BASE, { x: 0.181, y: 8.688, w: 1.836, h: 0.337, rotate: 270, fontSize: 14, bold: true, charSpacing: 1, color: RED }));
+  S33_PLANS.forEach(p => {
+    rect(s, p.cardX, 2.182, 5.023, 9.068, { fill: { color: WHITE }, shadow: cardShadow() });
+    subhead(s, p.tx, 3.047, p.nameW, p.name);
+    head(s, p.amountX, 3.707, 1.785, 1.01, [[[p.amount, GREEN]]], 54);
+    subhead(s, p.dollarX, 3.774, 0.621, '$', { color: GREEN });
+    text(s, p.pkgX, 4.128, 1.359, 0.404, '/package', { fontFace: HEAD, fontSize: 18, color: GREEN });
+    para(s, p.tx, 4.934, 3.331, 1.426, 'Lorem ipsum dolor sit amet consectetur adipiscing elitu sed dolor eiusmod fruit.');
+    planFeatures(s, p.tx, 6.668, 3.331, 2.335, p.rows, GRAY);
+    rect(s, p.btnX, 9.597, 2.465, 0.717, { fill: { color: GREEN } });
+    text(s, p.btnTextX, 9.777, 2.15, 0.404, 'ORDER NOW',
+      { bold: true, charSpacing: 1, color: WHITE, align: 'center' });
+  });
+  // Featured plan, printed straight onto the green band
+  subhead(s, 15.497, 0.879, 2.995, 'Completed Plan', { color: WHITE });
+  head(s, 15.808, 1.525, 2.308, 1.582, [[['99', WHITE]]], 88);
+  subhead(s, 15.497, 1.703, 0.621, '$', { color: WHITE });
+  text(s, 17.475, 2.673, 1.359, 0.404, '/package', { fontFace: HEAD, fontSize: 18, color: WHITE });
+  para(s, 15.484, 3.559, 3.331, 1.881, 'Lorem ipsum dolor sit ametus consectetur adipiscing elit frui sed dolor eiusmod tempor he incididunt ut laboreta. ', { color: WHITE });
+  planFeatures(s, 15.484, 5.765, 3.331, 3.244, 7, WHITE);
+  rect(s, 15.62, 9.59, 2.465, 0.717, { fill: { color: WHITE } });
+  text(s, 15.777, 9.77, 2.15, 0.404, 'ORDER NOW',
+    { bold: true, charSpacing: 1, color: GREEN, align: 'center' });
+}
+
+// 34 - Testimonials: three white cards with a circular portrait on top.
+const S34_CARDS = [
+  { cardX: 1.455, picX: 2.625, textX: 1.942, starX: 3.266, nameX: 1.834, roleX: 2.66 },
+  { cardX: 7.489, picX: 8.659, textX: 7.976, starX: 9.3, nameX: 7.868, roleX: 8.694 },
+  { cardX: 13.523, picX: 14.693, textX: 14.01, starX: 15.334, nameX: 13.902, roleX: 14.728 }
+];
+function slide34(s) {
+  head(s, 4.201, 1.456, 11.598, 0.774, [[['What consumers say ', DARK], ['about us', GREEN]]], 40, { align: 'center' });
+  eyebrow(s, 8.708, 0.991, 2.585, 'TESTIMONIALS', { align: 'center' });
+  S34_CARDS.forEach(c => {
+    rect(s, c.cardX, 4.521, 5.023, 5.738, { fill: { color: WHITE }, shadow: cardShadow() });
+    para(s, c.textX, 6.305, 4.048, 1.881, 'Lorem ipsum dolor sit amet consectetur adipiscing elit, sed dolor eiusmod tempor incididunt ut labore et dolore magna aliqua nunc.', { align: 'center' });
+    stars(s, c.starX, 8.347, 0.248, 0.288, YELLOW);
+    subhead(s, c.nameX, 8.994, 4.265, 'Your Name Here', { align: 'center' });
+    text(s, c.roleX, 9.382, 2.612, 0.471, 'Job Positions',
+      { fontSize: 16, lineSpacingMultiple: 1.5, color: GRAY, align: 'center' });
+  });
+}
+
+// 35 - Contact: address block under a full-width photo band.
+function slide35(s) {
+  eyebrow(s, 1.555, 7.665, 2.914, 'CONTACT US');
+  head(s, 1.555, 8.129, 6.528, 1.447, [[['Visit our outlets ', DARK], ['in several cities', GREEN]]], 40);
+  para(s, 10.147, 7.429, 8.293, 0.972, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed dolor eiusmod tempor incididunt ut labore et dolore magna aliqua nunc sed blandit.');
+  subhead(s, 10.147, 8.926, 4.265, 'Address Store');
+  para(s, 10.147, 9.399, 4.626, 0.972, '5 East 68th Street, New York, NY 10065 , The United States of America');
+  subhead(s, 15.605, 8.926, 2.834, 'Phone & Email');
+  para(s, 15.605, 9.399, 3.154, 0.972,
+    [{ text: '(001) 5678 8900 789 ', options: { breakLine: true } }, { text: 'market@fruita.com' }]);
+  rect(s, 14.979, 6.021, 5.021, 0.882, { fill: { color: GREEN } });
+  webFooter(s, 16.167, 16.556, 6.315, WHITE, WHITE);
+}
+
+// 36 - Closing slide: green field, white "Thank You" plate and green sub-bar.
+function slide36(s) {
+  rect(s, 6.308, 5.907, 11.751, 3.59, { fill: { color: WHITE }, shadow: tileShadow() });
+  head(s, 6.686, 6.59, 10.995, 2.121, [[['Thank', DARK], [' You', GREEN]]], 120, { align: 'center' });
+  rect(s, 8.621, 9.154, 7.125, 0.688, { fill: { color: GREEN } });
+  text(s, 8.945, 9.296, 6.477, 0.404, 'FOR WATCHING MY PRESENTATION',
+    { fontFace: POPPINS, fontSize: 18, color: WHITE, charSpacing: 2, align: 'center' });
+  wordmark(s, 17.255, 1.325, 2.177, 0.707, 36, DARK, 18.002, 1.498, 0.885, 0.707, 6);
+}
+
+/* ==================================================================== build */
+const SLIDES = [
+  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09,
+  slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18,
+  slide19, slide20, slide21, slide22, slide23, slide24, slide25, slide26, slide27,
+  slide28, slide29, slide30, slide31, slide32, slide33, slide34, slide35, slide36
+];
+
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'FRUITA', width: 20, height: 11.25 });
+pptx.layout = 'FRUITA';
+pptx.author = 'Fruita';
+pptx.title = 'Fruita - Fruit & Organic Food Presentation Template';
+
+SLIDES.forEach(build => {
+  const slide = pptx.addSlide();
+  slide.background = { color: WHITE };
+  build(slide);
+});
+
+pptx.writeFile({ fileName: path.join(__dirname, '07716ded-3333-488c-9929-19a694da4d04_grok_final.pptx') })
+  .then(f => console.log('wrote ' + f));
