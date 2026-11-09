@@ -1,0 +1,517 @@
+/**
+ * "Glavor - Fashion Pitchdeck" -- 25 slides, 13.333in x 7.5in, rebuilt with pptxgenjs.
+ *
+ * The source deck contains no real photographs: every picture slot is an empty
+ * picture placeholder filled with a gold hatch. Those slots are recreated here
+ * by `photoFrame()` - a hatched rectangle with the same prompt text and picture
+ * chip - so the script needs no external assets.
+ *
+ * Run: node 01c877fa-d862-4899-8713-a37e323802e1_grok_final.js
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ palette */
+
+const INK = '1F1D2D';       // deep aubergine background (theme bg1)
+const GOLD = 'D9C26F';      // brand gold: every glyph, rule and sparkle
+const CHIP_BG = 'FAFAFA';   // the little picture chip centred in each frame
+const CHIP_EDGE = 'B9B8B7';
+const CHIP_SKY = '83BEEC';
+const CHIP_SUN = 'F8DB8F';
+
+const SERIF = 'Playfair Display Medium';  // theme major font
+const SANS = 'Tenor Sans';                // theme minor font
+
+/* Every run in the deck uses one of these styles. */
+const TYPE = {
+    BRAND: { fontFace: SERIF, fontSize: 165 },
+    HERO: { fontFace: SERIF, fontSize: 96 },
+    TITLE: { fontFace: SERIF, fontSize: 60 },
+    FIGURE: { fontFace: SERIF, fontSize: 24 },
+    NAME: { fontFace: SERIF, fontSize: 20, bold: true, align: 'justify', lineSpacingMultiple: 1.5 },
+    LABEL: { fontFace: SERIF, fontSize: 13, bold: true, align: 'justify', lineSpacingMultiple: 1.5 },
+    BODY: { fontFace: SANS, fontSize: 11, align: 'justify', lineSpacingMultiple: 1.5 },
+    MICRO: { fontFace: SERIF, fontSize: 9 },
+    CAPTION: { fontFace: SANS, fontSize: 11, align: 'center' },
+};
+
+/* PowerPoint's default text insets, in points: [left, right, bottom, top]. */
+const INSETS = [7.2, 7.2, 3.6, 3.6];
+
+/* ------------------------------------------------------------------ helpers */
+
+/** Text box; `box` is [x, y, w, h] in inches and `preset` keys into TYPE. */
+function txt(slide, text, box, preset, extra) {
+    const body = Array.isArray(text)
+        ? text.map(function (line) { return { text: line, options: { breakLine: true } }; })
+        : text;
+    slide.addText(body, Object.assign(
+        { x: box[0], y: box[1], w: box[2], h: box[3], color: GOLD, valign: 'top', margin: INSETS },
+        TYPE[preset],
+        extra || {}
+    ));
+}
+
+/**
+ * Four-pointed sparkle - the deck's one freeform shape, reused 63 times.
+ * Points are fractions of the bounding box, straight from the original path.
+ */
+const SPARKLE = [
+    { x: 1.0000, y: 0.5000 },
+    { x: 0.5000, y: 1.0000, c: [0.6065, 0.5578, 0.5578, 0.6065] },
+    { x: 0.0000, y: 0.5000, c: [0.4422, 0.6065, 0.3935, 0.5578] },
+    { x: 0.5000, y: 0.0000, c: [0.3935, 0.4422, 0.4422, 0.3935] },
+    { x: 1.0000, y: 0.5000, c: [0.5578, 0.3935, 0.6065, 0.4422] },
+];
+
+/** Turn a fractional path into absolute inches for pptxgenjs `custGeom`. */
+function scalePath(shape, w, h) {
+    const pts = shape.map(function (p) {
+        const out = { x: p.x * w, y: p.y * h };
+        if (p.c) {
+            out.curve = { type: 'cubic', x1: p.c[0] * w, y1: p.c[1] * h, x2: p.c[2] * w, y2: p.c[3] * h };
+        }
+        return out;
+    });
+    pts.push({ close: true });
+    return pts;
+}
+
+/** Gold sparkle; `outlined` adds the dark keyline used where one sits on a ring. */
+function sparkle(slide, x, y, w, h, outlined) {
+    slide.addShape('custGeom', {
+        x: x, y: y, w: w, h: h,
+        points: scalePath(SPARKLE, w, h),
+        fill: { color: GOLD },
+        line: outlined ? { color: INK, width: 1.25 } : { type: 'none' },
+    });
+}
+
+/** Hairline tilted ellipse - the "orbit" ring that trails many sparkles. */
+function orbit(slide, x, y, w, h) {
+    slide.addShape('ellipse', {
+        x: x, y: y, w: w, h: h, rotate: 49.53,
+        fill: { type: 'none' },
+        line: { color: GOLD, width: 0.25 },
+    });
+}
+
+/** Hairline divider, used by the table of contents. */
+function rule(slide, x, y, w) {
+    slide.addShape('line', { x: x, y: y, w: w, h: 0, line: { color: GOLD, width: 1 } });
+}
+
+/** The small "no image yet" chip that sits at the centre of every frame. */
+function pictureChip(slide, cx, cy) {
+    const w = 0.847, h = 0.653;
+    const x = cx - w / 2, y = cy - h / 2;
+    slide.addShape('rect', { x: x, y: y, w: w, h: h, fill: { color: CHIP_BG }, line: { type: 'none' } });
+    slide.addShape('rect', {
+        x: x + 0.07, y: y + 0.06, w: w - 0.14, h: h - 0.12,
+        fill: { type: 'none' }, line: { color: CHIP_EDGE, width: 0.75 },
+    });
+    slide.addShape('ellipse', {
+        x: x + 0.115, y: y + 0.10, w: 0.16, h: 0.155,
+        fill: { color: CHIP_SUN }, line: { type: 'none' },
+    });
+    // two overlapping mountains, as triangles clipped to the chip's lower half
+    [[0.24, 0.46, 0.575], [0.44, 0.69, 0.385]].forEach(function (t) {
+        const x0 = x + t[0] * w, xa = x + t[1] * w, x1 = x + 0.92 * w;
+        const yTop = y + t[2] * h, yBot = y + 0.895 * h;
+        slide.addShape('custGeom', {
+            x: x0, y: yTop, w: x1 - x0, h: yBot - yTop,
+            points: [{ x: 0, y: yBot - yTop }, { x: xa - x0, y: 0 },
+                     { x: x1 - x0, y: yBot - yTop }, { close: true }],
+            fill: { color: CHIP_SKY }, line: { type: 'none' },
+        });
+    });
+}
+
+/**
+ * The picture frames of the source deck are filled with a fine 45-degree gold
+ * crosshatch (a "pct25" pattern fill). It is redrawn here as one custom-geometry
+ * shape per frame holding both families of diagonals as separate sub-paths.
+ */
+const HATCH_PITCH = 0.1111;   // spacing between neighbouring diagonals, inches
+const HATCH_GOLD = 'AD9A51';  // the hatch reads dimmer than solid gold at 25%
+
+function crosshatch(slide, x, y, w, h) {
+    const pts = [];
+    const line = function (ax, ay, bx, by) {
+        if (bx - ax > 0.02) { pts.push({ x: ax, y: ay, moveTo: true }, { x: bx, y: by }); }
+    };
+    for (let c = -w; c < h; c += HATCH_PITCH) {    // "\" diagonals: y - x = c
+        line(Math.max(0, -c), Math.max(0, -c) + c, Math.min(w, h - c), Math.min(w, h - c) + c);
+    }
+    for (let c = 0; c < w + h; c += HATCH_PITCH) { // "/" diagonals: y + x = c
+        line(Math.max(0, c - h), c - Math.max(0, c - h), Math.min(w, c), c - Math.min(w, c));
+    }
+    // opaque backdrop: the original pattern fill has a solid background colour,
+    // so the frame hides any orbit ring passing behind it
+    slide.addShape('rect', { x: x, y: y, w: w, h: h, fill: { color: INK }, line: { type: 'none' } });
+    slide.addShape('custGeom', {
+        x: x, y: y, w: w, h: h, points: pts,
+        fill: { type: 'none' }, line: { color: HATCH_GOLD, width: 0.25 },
+    });
+}
+
+/**
+ * Picture placeholder: hatched frame + prompt caption + chip. Some layouts keep
+ * the master's bullet on the prompt paragraph, hence `bullet`.
+ */
+function photoFrame(slide, x, y, w, h, bullet) {
+    crosshatch(slide, x, y, w, h);
+    // the prompt is one line centred on the frame; it may overhang narrow frames
+    txt(slide, 'Insert or Drag Picture Here', [x + w / 2 - 1.75, y - 0.03, 3.5, 0.3], 'CAPTION');
+    if (bullet) txt(slide, '\u2022', [x, y - 0.03, 0.5, 0.3], 'CAPTION', { align: 'left' });
+    pictureChip(slide, x + w / 2, y + h / 2);
+}
+
+/** Corner furniture, repeated on every slide. */
+function chrome(slide, num) {
+    txt(slide, 'Glavor', [0.673, 0.365, 1.178, 0.252], 'MICRO');
+    txt(slide, '0' + num, [11.395, 0.365, 1.178, 0.252], 'MICRO', { align: 'right' });
+    txt(slide, ['Fashion', 'Pitchdeck'], [0.673, 6.732, 1.178, 0.404], 'MICRO');
+    txt(slide, '2045', [11.482, 6.883, 1.178, 0.252], 'MICRO', { fontFace: SANS, align: 'right' });
+}
+
+/* Filler copy that the template repeats verbatim across many slides. */
+const LOREM_SHORT = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, ';
+const LOREM_LONG = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, ' +
+    'sed do eiusmod tempor incididunt ut labore et';
+
+/* ------------------------------------------------------------------- slides */
+
+const SLIDES = [
+    // 1 - Cover
+    function slide01(s) {
+          photoFrame(s, 5.151, 0.784, 3.031, 4.542);
+          txt(s, 'Glavor', [2.558, 2.353, 8.216, 2.878], 'BRAND', { align: 'center' });
+          txt(s, 'Fashion is not necessarily about labels. It\'s not about brands. It\'s about something else that comes from within you', [4.246, 5.737, 4.842, 0.626], 'BODY', { align: 'center' });
+          sparkle(s, 9.545, 2.485, 0.428, 0.429);
+          sparkle(s, 9.893, 2.405, 0.16, 0.16);
+    },
+    // 2 - Table of contents
+    function slide02(s) {
+        txt(s, 'Table Of Content', [1.124, 4.089, 4.288, 2.121], 'TITLE');
+        sparkle(s, 2.069, 2.135, 0.476, 0.476);
+        sparkle(s, 2.069, 2.223, 1.339, 1.34);
+        // five contents rows: label left, blurb right, hairline underneath
+        [[2.024, 2.804], [2.898, 3.643], [3.769, 4.543], [4.629, 5.41], [5.496, 6.203]]
+            .forEach(function (row, i) {
+                txt(s, 'Content 0' + (i + 1), [7.312, row[0], 2.367, 0.388], 'LABEL');
+                txt(s, LOREM_SHORT, [9.47, row[0] + 0.014, 2.367, 0.626], 'BODY');
+                rule(s, 7.369, row[1], 4.84);
+            });
+    },
+    // 3 - Introduction
+    function slide03(s) {
+          photoFrame(s, 3.121, 1.333, 3.227, 4.835, true);
+          txt(s, 'Introduction', [5.895, 3.574, 5.342, 1.111], 'TITLE');
+          sparkle(s, 1.939, 4.395, 1.728, 1.729);
+          txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Orci dapibus ultrices in', [6.667, 4.808, 4.57, 0.904], 'BODY');
+          sparkle(s, 10.761, 1.731, 0.721, 0.721);
+          sparkle(s, 10.582, 2.273, 0.36, 0.36);
+    },
+    // 4 - Problem statement
+    function slide04(s) {
+          photoFrame(s, 9.843, 0.825, 2.24, 3.664, true);
+          photoFrame(s, 1.62, 4.662, 1.036, 1.552, true);
+          txt(s, 'Problem Statement', [6.561, 2.15, 5.076, 2.121], 'TITLE');
+          txt(s, LOREM_LONG, [1.153, 2.874, 3.565, 0.904], 'BODY');
+          txt(s, LOREM_LONG, [6.597, 5.313, 3.565, 0.904], 'BODY');
+          txt(s, 'Problem 01', [1.153, 2.486, 3.565, 0.388], 'LABEL');
+          txt(s, 'Problem 02', [6.597, 4.925, 3.565, 0.388], 'LABEL');
+          sparkle(s, 3.031, 4.803, 0.851, 0.851);
+          sparkle(s, 3.49, 5.531, 0.4, 0.401);
+    },
+    // 5 - Solution
+    function slide05(s) {
+          photoFrame(s, 7.948, 1.204, 3.78, 4.835, true);
+          txt(s, 'Solution', [0.673, 3.066, 5.342, 1.111], 'TITLE');
+          txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt', [0.673, 4.769, 2.767, 0.904], 'BODY');
+          txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt', [3.9, 4.769, 2.767, 0.904], 'BODY');
+          orbit(s, 5.267, 2.039, 0.691, 2.34);
+          sparkle(s, 5.572, 2.579, 0.266, 0.266, true);
+          sparkle(s, 5.702, 3.149, 0.468, 0.468, true);
+    },
+    // 6 - Our service
+    function slide06(s) {
+          photoFrame(s, 5.205, 3.181, 3.78, 4.835, true);
+          txt(s, 'Our Service', [4.239, 1.567, 5.342, 1.111], 'TITLE', { align: 'center' });
+          txt(s, LOREM_LONG, [0.673, 3.873, 3.565, 0.904], 'BODY');
+          txt(s, LOREM_LONG, [9.973, 5.328, 2.6, 1.182], 'BODY');
+          txt(s, 'Service 01', [0.673, 3.538, 3.565, 0.388], 'LABEL');
+          txt(s, 'Service 02', [9.969, 4.993, 3.565, 0.388], 'LABEL');
+          orbit(s, 2.67, 5.059, 0.691, 2.34);
+          sparkle(s, 2.975, 5.599, 0.266, 0.266, true);
+          sparkle(s, 10.974, 3.335, 0.828, 0.829);
+          sparkle(s, 10.551, 3.873, 0.576, 0.576);
+    },
+    // 7 - Our portfolio
+    function slide07(s) {
+          photoFrame(s, 4.979, 4.991, 1.036, 1.552, true);
+          photoFrame(s, 6.667, 1.754, 2.927, 4.788, true);
+          photoFrame(s, 10.351, 1.047, 1.822, 2.703, true);
+          txt(s, 'Our Portfolio', [0.673, 1.908, 5.342, 1.111], 'TITLE');
+          txt(s, LOREM_LONG, [0.673, 3.696, 3.565, 0.904], 'BODY');
+          txt(s, 'Lorem ipsum dolor sit amet, consectetur', [10.351, 4.987, 1.822, 0.626], 'BODY');
+          sparkle(s, 10.724, 4.063, 0.663, 0.664);
+          sparkle(s, 11.213, 4.484, 0.349, 0.35);
+          orbit(s, 2.812, 4.445, 0.691, 2.342);
+          sparkle(s, 3.296, 5.613, 0.38, 0.38, true);
+    },
+    // 8 - Marketing & sales strategy
+    function slide08(s) {
+          orbit(s, 2.682, 0.728, 1.042, 4.214);
+          txt(s, 'Marketing & Sales Strategy', [6.547, 1.63, 6.62, 2.121], 'TITLE');
+          txt(s, LOREM_LONG, [1.42, 4.965, 3.565, 0.904], 'BODY');
+          sparkle(s, 11.129, 5.15, 0.707, 0.707);
+          txt(s, LOREM_LONG, [6.565, 4.965, 3.565, 0.904], 'BODY');
+          sparkle(s, 4.374, 1.968, 0.379, 0.38, true);
+          txt(s, 'Marketing Plan', [1.42, 4.567, 3.565, 0.388], 'LABEL');
+          txt(s, 'Sales Strategy', [6.565, 4.567, 3.565, 0.388], 'LABEL');
+          photoFrame(s, 2.005, 1.172, 2.236, 2.948, true);
+    },
+    // 9 - Break interstitial
+    function slide09(s) {
+          sparkle(s, 2.229, 3.75, 2.086, 2.087);
+          photoFrame(s, 3.634, 1.701, 3.092, 4.099, true);
+          txt(s, 'Let’s Take A Break', [6.4, 2.858, 5.082, 2.121], 'TITLE');
+          txt(s, 'Fashion is about dressing according to what\'s fashionable. Style is more about being yourself', [7.09, 4.979, 3.441, 0.904], 'BODY');
+          sparkle(s, 2.388, 3.699, 0.496, 0.496);
+          sparkle(s, 2.777, 3.177, 0.496, 0.496);
+    },
+    // 10 - Business model
+    function slide10(s) {
+          orbit(s, 1.576, 0.015, 2.128, 7.214);
+          photoFrame(s, 0.75, 1.176, 3.78, 4.835, true);
+          txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed', [9.768, 5.106, 2.679, 0.626], 'BODY');
+          txt(s, 'Pricing Strategy', [9.768, 4.69, 3.565, 0.388], 'LABEL');
+          txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed', [9.768, 2.454, 2.679, 0.626], 'BODY');
+          txt(s, 'Digital Marketing', [9.768, 2.037, 3.565, 0.388], 'LABEL');
+          sparkle(s, 9.996, 3.515, 0.662, 0.662);
+          txt(s, 'Business Model', [4.134, 2.142, 4.043, 2.121], 'TITLE');
+          txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod', [4.941, 5.106, 2.679, 0.904], 'BODY');
+    },
+    // 11 - Vision / Mission
+    function slide11(s) {
+          txt(s, 'Vision', [0.673, 3.75, 2.877, 1.111], 'TITLE');
+          txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore ma', [0.76, 4.991, 3.306, 0.904], 'BODY');
+          txt(s, 'Mission', [9.166, 1.605, 3.407, 1.111], 'TITLE', { align: 'right' });
+          photoFrame(s, 5.203, 1.245, 2.927, 4.788, true);
+          txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut', [9.52, 2.846, 3.053, 0.904], 'BODY');
+          sparkle(s, 10.528, 4.991, 0.828, 0.829);
+          sparkle(s, 10.356, 4.861, 0.343, 0.343);
+          orbit(s, 2.088, 0.923, 0.691, 2.342);
+          sparkle(s, 2.572, 2.091, 0.38, 0.38, true);
+    },
+    // 12 - Meet our team
+    function slide12(s) {
+        txt(s, 'Meet Our Team', [0.673, 2.095, 5.637, 2.121], 'TITLE');
+        txt(s, LOREM_LONG, [0.673, 4.56, 3.565, 0.904], 'BODY');
+        sparkle(s, 11.866, 0.971, 0.707, 0.707);
+        sparkle(s, 11.576, 1.388, 0.29, 0.291);
+        // three team cards
+        [[5.511, 5.755, 'Alice Rose', 'Creative Director'],
+         [8.007, 8.261, 'Boris Sven', 'Product Developer'],
+         [10.514, 10.766, 'George Tim', 'Marketing Officer']].forEach(function (card) {
+            photoFrame(s, card[1], 2.095, 1.805, 2.956, true);
+            txt(s, card[2], [card[0], 5.22, 2.312, 0.543], 'NAME', { align: 'center' });
+            txt(s, card[3], [card[0], 5.693, 2.312, 0.349], 'BODY', { align: 'center' });
+        });
+    },
+    // 13 - Design & innovation
+    function slide13(s) {
+          orbit(s, 8.864, 1.056, 1.652, 5.6);
+          txt(s, 'Design & Innovation', [0.673, 1.609, 5.637, 2.121], 'TITLE');
+          txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut', [0.673, 4.88, 2.713, 0.904], 'BODY');
+          txt(s, 'Design Philosophy', [0.673, 4.387, 2.713, 0.388], 'LABEL');
+          txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut', [3.953, 4.88, 2.713, 0.904], 'BODY');
+          txt(s, 'Unique Design Elements', [3.953, 4.387, 2.713, 0.388], 'LABEL');
+          sparkle(s, 11.6, 2.436, 0.379, 0.38, true);
+          sparkle(s, 5.723, 1.841, 0.663, 0.664);
+          sparkle(s, 6.273, 2.307, 0.35, 0.351);
+          photoFrame(s, 8.317, 1.609, 2.927, 4.788, true);
+    },
+    // 14 - New product launch plan
+    function slide14(s) {
+          sparkle(s, 7.198, 2.052, 1.636, 1.637);
+          txt(s, 'New Product Launch Plan', [0.609, 1.437, 5.637, 2.121], 'TITLE');
+          txt(s, LOREM_LONG, [0.673, 3.88, 3.565, 0.904], 'BODY');
+          txt(s, '02', [7.427, 5.811, 1.178, 0.505], 'FIGURE');
+          txt(s, LOREM_LONG, [8.016, 5.878, 4.011, 0.626], 'BODY');
+          txt(s, '01', [7.427, 4.63, 1.178, 0.505], 'FIGURE');
+          txt(s, LOREM_LONG, [8.016, 4.697, 4.011, 0.626], 'BODY');
+          sparkle(s, 7.114, 3.112, 0.627, 0.627);
+          orbit(s, 4.831, 4.516, 0.691, 2.342);
+          sparkle(s, 5.315, 5.684, 0.38, 0.38, true);
+          photoFrame(s, 8.413, 0.491, 3.07, 3.926, true);
+    },
+    // 15 - Financial projections
+    function slide15(s) {
+          photoFrame(s, 5.754, 1.54, 2.826, 4.623, true);
+          txt(s, 'Financial Projections', [0.649, 2.487, 4.885, 2.121], 'TITLE');
+          sparkle(s, 9.985, 2.936, 1.626, 1.627);
+          sparkle(s, 11.084, 2.936, 0.483, 0.483);
+          txt(s, 'Revenue Forecast', [8.963, 5.447, 1.835, 0.349], 'BODY', { align: 'center' });
+          txt(s, '$600M', [9.129, 5.061, 1.455, 0.438], 'NAME', { align: 'center', lineSpacingMultiple: 1 });
+          txt(s, 'Expenses', [10.92, 5.447, 1.835, 0.349], 'BODY', { align: 'center' });
+          txt(s, '$300M', [11.087, 5.061, 1.455, 0.438], 'NAME', { align: 'center', lineSpacingMultiple: 1 });
+          txt(s, LOREM_LONG, [0.737, 4.892, 3.565, 0.904], 'BODY');
+    },
+    // 16 - Competitive analysis
+    function slide16(s) {
+          photoFrame(s, 9.503, 1.053, 3.07, 3.926, true);
+          txt(s, 'Competitive Analysis', [5.702, 2.365, 4.885, 2.121], 'TITLE');
+          txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor', [1.082, 5.387, 3.565, 0.626], 'BODY');
+          txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor', [5.702, 5.408, 3.565, 0.626], 'BODY');
+          txt(s, 'Competitors', [1.082, 4.981, 3.565, 0.388], 'LABEL');
+          txt(s, 'Our Advantage', [5.702, 4.988, 3.565, 0.388], 'LABEL');
+          sparkle(s, 1.522, 2.365, 2.109, 2.11);
+          sparkle(s, 3.054, 3.785, 0.662, 0.663);
+    },
+    // 17 - Company milestone
+    function slide17(s) {
+          orbit(s, 7.276, 1.55, 1.099, 5.286);
+          photoFrame(s, 6.29, 2.23, 3.07, 3.926, true);
+          txt(s, 'Company Milestone', [1.104, 0.827, 4.885, 2.121], 'TITLE');
+          txt(s, 'Achievements & Awards (2019)', [1.191, 3.752, 3.565, 0.388], 'LABEL');
+          txt(s, 'Lorem ipsum dolor sit amet, adipiscing elit, sed do eiusmod ', [1.191, 4.193, 2.49, 0.626], 'BODY');
+          txt(s, 'Achievements & Awards (2027)', [1.191, 5.076, 3.565, 0.388], 'LABEL');
+          txt(s, 'Lorem ipsum dolor sit amet, adipiscing elit, sed do eiusmod', [1.191, 5.517, 2.49, 0.626], 'BODY');
+          txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod', [9.966, 5.239, 2.673, 0.904], 'BODY');
+          txt(s, 'Future Goal', [9.966, 4.798, 2.433, 0.388], 'LABEL');
+          sparkle(s, 10.405, 1.231, 1.717, 1.717);
+          sparkle(s, 11.575, 1.106, 0.572, 0.572);
+          sparkle(s, 11.629, 2.349, 0.572, 0.572);
+          sparkle(s, 5.618, 5.64, 0.379, 0.38, true);
+    },
+    // 18 - Partnerships & collaboration
+    function slide18(s) {
+          orbit(s, 10.002, 0.98, 1.099, 5.286);
+          sparkle(s, 2.906, 1.193, 1.1, 1.101);
+          photoFrame(s, 8.975, 1.743, 2.689, 4.4, true);
+          txt(s, 'Partnerships & Collaboration', [0.673, 2.393, 6.323, 2.121], 'TITLE');
+          txt(s, 'Partnership Benefits', [0.673, 5.107, 3.565, 0.388], 'LABEL');
+          txt(s, 'Lorem ipsum dolor sit amet, adipiscing elit, sed do eiusmod', [0.673, 5.517, 2.783, 0.626], 'BODY');
+          txt(s, 'Special Collection', [4.619, 5.107, 3.565, 0.388], 'LABEL');
+          txt(s, 'Lorem ipsum dolor sit amet, adipiscing elit, sed do eiusmod', [4.619, 5.517, 2.783, 0.626], 'BODY');
+          sparkle(s, 12.003, 2.599, 0.379, 0.38, true);
+          sparkle(s, 8.289, 4.963, 0.379, 0.38, true);
+    },
+    // 19 - Risk & mitigation
+    function slide19(s) {
+          txt(s, 'Risk & Mitigation', [0.673, 1.92, 4.42, 2.121], 'TITLE');
+          photoFrame(s, 5.747, 1.687, 3.326, 4.408, true);
+          txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed', [9.726, 4.136, 2.567, 0.626], 'BODY');
+          txt(s, 'Market Risks', [9.726, 3.78, 2.29, 0.388], 'LABEL');
+          txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed', [9.726, 5.428, 2.567, 0.626], 'BODY');
+          txt(s, 'Operational Risks', [9.726, 5.072, 2.29, 0.388], 'LABEL');
+          txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed', [0.673, 5.342, 2.567, 0.626], 'BODY');
+          txt(s, 'Financial Risks', [0.673, 4.986, 2.29, 0.388], 'LABEL');
+          sparkle(s, 11.116, 2.673, 0.479, 0.479);
+          sparkle(s, 10.093, 1.92, 1.18, 1.181);
+    },
+    // 20 - Customer testimonials
+    function slide20(s) {
+          orbit(s, 2.049, 0.547, 0.801, 3.853);
+          photoFrame(s, 1.477, 1.287, 2.031, 2.683, true);
+          photoFrame(s, 3.977, 2.229, 1.064, 1.741, true);
+          txt(s, 'Customer Testimonials', [6.97, 2.104, 5.993, 2.121], 'TITLE');
+          txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolor', [1.348, 5.158, 3.693, 0.904], 'BODY');
+          sparkle(s, 6.107, 4.881, 1.18, 1.181);
+          txt(s, 'Linda Yu', [1.348, 4.824, 2.29, 0.394], 'LABEL');
+          txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolor', [8.352, 5.158, 3.693, 0.904], 'BODY');
+          txt(s, 'Zak Terios', [8.352, 4.824, 2.29, 0.394], 'LABEL');
+          sparkle(s, 3.728, 1.059, 0.379, 0.38, true);
+          sparkle(s, 0.81, 3.591, 0.379, 0.38, true);
+    },
+    // 21 - Future plans
+    function slide21(s) {
+          orbit(s, 1.818, 1.031, 1.099, 5.286);
+          photoFrame(s, 0.76, 1.701, 3.092, 4.099, true);
+          txt(s, 'Future Plans', [3.348, 2.796, 5.993, 1.111], 'TITLE');
+          txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolor', [8.967, 4.822, 3.693, 0.904], 'BODY');
+          txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolor', [4.261, 4.854, 3.693, 0.904], 'BODY');
+          sparkle(s, 9.396, 1.354, 2.086, 2.087);
+          txt(s, 'Plan 01', [4.261, 4.332, 3.693, 0.552], 'NAME');
+          txt(s, 'Plan 02', [8.967, 4.332, 3.693, 0.552], 'NAME');
+          sparkle(s, 9.194, 2.822, 0.618, 0.618);
+    },
+    // 22 - Funding requirement
+    function slide22(s) {
+          orbit(s, 6.629, 2.065, 1.12, 5.388);
+          photoFrame(s, 5.643, 2.999, 3.092, 4.099, true);
+          txt(s, 'Funding Requirement', [0.673, 1.187, 5.993, 2.121], 'TITLE');
+          txt(s, 'Required Amount:', [0.785, 3.591, 1.751, 0.349], 'BODY', { align: 'left' });
+          txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor', [0.696, 5.157, 3.269, 0.626], 'BODY');
+          txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor', [9.237, 3.924, 3.269, 0.626], 'BODY');
+          sparkle(s, 4.89, 6.238, 0.379, 0.38, true);
+          sparkle(s, 8.356, 2.928, 0.379, 0.38, true);
+          txt(s, 'Product Development', [0.696, 4.772, 2.746, 0.388], 'LABEL', { align: 'left' });
+          txt(s, 'Marketing & Sales', [9.237, 3.547, 2.746, 0.388], 'LABEL', { align: 'left' });
+          txt(s, '$10.000M', [0.579, 3.898, 1.982, 0.505], 'FIGURE', { align: 'center' });
+          sparkle(s, 10.335, 1.666, 0.838, 0.745);
+          txt(s, '-Use Of Funds', [9.237, 5.67, 2.746, 0.388], 'LABEL', { align: 'left' });
+          sparkle(s, 10.224, 1.543, 0.321, 0.285);
+    },
+    // 23 - Research & development
+    function slide23(s) {
+          photoFrame(s, 1.52, 1.15, 2.746, 4.993, true);
+          txt(s, 'Reasearch & Development', [3.468, 2.402, 5.993, 2.121], 'TITLE');
+          txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ', [4.512, 5.015, 3.269, 0.626], 'BODY');
+          txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ', [8.871, 5.015, 3.269, 0.626], 'BODY');
+          txt(s, 'Product Development 01', [4.512, 4.666, 2.746, 0.388], 'LABEL', { align: 'left' });
+          txt(s, 'Product Development 02', [8.871, 4.666, 2.746, 0.388], 'LABEL', { align: 'left' });
+          orbit(s, 10.239, 1.715, 0.533, 2.562);
+          sparkle(s, 10.315, 3.154, 0.379, 0.38, true);
+    },
+    // 24 - Q&A
+    function slide24(s) {
+          txt(s, ['Q&A', 'Session'], [1.314, 1.478, 5.773, 3.332], 'HERO');
+          txt(s, 'Innovative Fashion for the Modern World', [4.305, 4.831, 1.88, 0.626], 'BODY', { align: 'left' });
+          txt(s, 'Inspired by the World, Designed for You', [1.314, 4.831, 1.88, 0.626], 'BODY', { align: 'left' });
+          sparkle(s, 7.644, 1.663, 4.205, 4.208);
+          sparkle(s, 10.459, 2.462, 0.682, 0.682);
+    },
+    // 25 - Thank you
+    function slide25(s) {
+          photoFrame(s, 4.813, 0.365, 3.708, 4.915, true);
+          txt(s, 'Fashion is not something that exists in dresses only. Fashion is in the sky, in the street, fashion has to do with ideas, the way we live, what is happening', [3.986, 5.623, 5.356, 0.904], 'BODY', { align: 'center' });
+          txt(s, 'Thank You', [2.8, 2.868, 7.729, 1.717], 'HERO', { align: 'center' });
+          sparkle(s, 3.536, 2.091, 0.713, 0.713);
+          sparkle(s, 4.047, 2.091, 0.244, 0.244);
+          sparkle(s, 9.069, 2.091, 0.713, 0.713);
+          sparkle(s, 9.045, 2.091, 0.244, 0.244);
+    },
+];
+
+/* ------------------------------------------------------------------ compose */
+
+function build() {
+    const pptx = new PptxGenJS();
+    pptx.defineLayout({ name: 'GLAVOR', width: 40 / 3, height: 7.5 }); // 13.333in x 7.5in
+    pptx.layout = 'GLAVOR';
+    pptx.author = 'Glavor';
+    pptx.title = 'Glavor — Fashion Pitchdeck';
+
+    SLIDES.forEach(function (draw, i) {
+        const slide = pptx.addSlide();
+        slide.background = { color: INK };
+        draw(slide);
+        chrome(slide, i + 1);
+    });
+
+    return pptx.writeFile({
+        fileName: path.join(__dirname, '01c877fa-d862-4899-8713-a37e323802e1_grok_final.pptx'),
+    });
+}
+
+build().then(function (f) { console.log('wrote ' + f); }, function (e) {
+    console.error(e);
+    process.exit(1);
+});
