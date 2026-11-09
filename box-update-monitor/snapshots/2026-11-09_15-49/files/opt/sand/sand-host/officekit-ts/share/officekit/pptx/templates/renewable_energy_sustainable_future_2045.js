@@ -1,0 +1,733 @@
+/**
+ * Recreation of "Innovating for a Sustainable Future" (25 slides, 16:9 / 13.333 x 7.5 in)
+ * with pptxgenjs only.  Run: node <thisfile>.js  ->  writes the .pptx next to itself.
+ *
+ * Design notes
+ *   Palette   : deep green + mint on white, or the same green as a full-bleed background.
+ *   Type      : "Manrope Medium" for everything upright, "Playfair Display" italic for
+ *               the accent word in every title.
+ *   Motifs    : an eight-lobed crescent strip, a 14-point asterisk star, thin rules,
+ *               rounded stat cards and a circled page number in the bottom-left corner.
+ *   Images    : the source deck ships no media parts — its layouts expose empty picture
+ *               placeholders that render as nothing — so there is nothing to stand in for.
+ */
+
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+// ---------------------------------------------------------------- palette
+const GREEN = '0A5338';   // accent1 - primary brand green
+const MINT  = 'A9EA98';   // accent2 - highlight cards
+const MIST  = 'D5E1E1';   // accent3 - muted cards
+const WHITE = 'FFFFFF';
+const BLACK = '000000';
+
+const SANS  = 'Manrope Medium';    // theme major font
+const SERIF = 'Playfair Display';  // theme minor font (used italic)
+
+// ---------------------------------------------------------------- text styles
+// Every text run in the deck reduces to one of these; `text()` merges in colour.
+const HERO     = { fontFace: SANS,  fontSize: 96,  lineSpacing: 95 };
+const HERO_IT  = { fontFace: SERIF, fontSize: 96,  lineSpacing: 95, italic: true };
+const MEGA     = { fontFace: SANS,  fontSize: 138 };
+const MEGA_IT  = { fontFace: SERIF, fontSize: 138, italic: true };
+const TITLE    = { fontFace: SANS,  fontSize: 60,  lineSpacing: 60 };
+const TITLE_IT = { fontFace: SERIF, fontSize: 60,  lineSpacing: 60, italic: true };
+const STAT     = { fontFace: SANS,  fontSize: 32 };
+const QUOTE    = { fontFace: SANS,  fontSize: 28 };
+const FIG      = { fontFace: SANS,  fontSize: 20 };
+const HEAD     = { fontFace: SANS,  fontSize: 18 };
+const LABEL    = { fontFace: SANS,  fontSize: 14 };
+const BODY     = { fontFace: SANS,  fontSize: 12,  lineSpacingMultiple: 1.5 };
+const BODY1    = { fontFace: SANS,  fontSize: 12 };
+const TICK     = { fontFace: SANS,  fontSize: 11,  lineSpacingMultiple: 1.5 };
+const FINE     = { fontFace: SANS,  fontSize: 10,  lineSpacingMultiple: 1.5 };
+const TAG      = { fontFace: SANS,  fontSize: 10 };
+
+// ---------------------------------------------------------------- helpers
+/** Text box: the source uses top-anchored boxes with PowerPoint's default insets. */
+function text(s, body, x, y, w, h, style, extra) {
+  s.addText(body, Object.assign({ x, y, w, h, valign: 'top', margin: [7.2, 7.2, 3.6, 3.6] },
+                                style, extra));
+}
+
+function card(s, x, y, w, h, color, radius) {
+  s.addShape('roundRect', { x, y, w, h, fill: { color }, line: { type: 'none' },
+                            rectRadius: (radius === undefined ? 1 / 6 : radius) * Math.min(w, h) });
+}
+
+/** Outlined stadium/pill (fully rounded, no fill). */
+function pill(s, x, y, w, h, color) {
+  s.addShape('roundRect', { x, y, w, h, fill: { type: 'none' },
+                            line: { color, width: 1 }, rectRadius: Math.min(w, h) / 2 });
+}
+
+function bar(s, x, y, w, h, color, rotate) {
+  s.addShape('rect', Object.assign({ x, y, w, h, fill: { color }, line: { type: 'none' } },
+                                   rotate ? { rotate } : {}));
+}
+
+function dot(s, x, y, w, h, color) {
+  s.addShape('ellipse', { x, y, w, h, fill: { color }, line: { type: 'none' } });
+}
+
+function ring(s, x, y, w, h, color, width) {
+  s.addShape('ellipse', { x, y, w, h, fill: { type: 'none' },
+                          line: { color, width: width || 1 } });
+}
+
+function hLine(s, x, y, w, color, width) {
+  s.addShape('line', { x, y, w, h: 0, line: { color, width: width || 1 } });
+}
+
+function vLine(s, x, y, h, color, width) {
+  s.addShape('line', { x, y, w: 0, h, line: { color, width: width || 1 } });
+}
+
+/**
+ * The deck's recurring "heading over a paragraph" pair.
+ * `head` / `lede` are [x, y, w, h] boxes; both share one ink colour.
+ */
+function blurb(s, ink, head, heading, lede, paragraph) {
+  text(s, heading, head[0], head[1], head[2], head[3], HEAD, { color: ink });
+  text(s, paragraph, lede[0], lede[1], lede[2], lede[3], BODY, { color: ink });
+}
+
+/** Circled page number pinned to the bottom-left corner of every content slide. */
+function pageBadge(s, label, labelX, labelW, color) {
+  ring(s, 0.322, 6.5893, 0.4655, 0.4655, color);
+  text(s, label, labelX, 6.6097, labelW, 0.3726,
+       BODY, { color: color === WHITE ? MIST : color });
+}
+
+// -- motif 1: the crescent strip -------------------------------------------
+// Eight lobes that morph from a full circle into a thin sliver.  Each row is
+// [x, y, w, h] inside the unit box followed by the outline's bezier points
+// (start point, then four cubic segments of three points each), also unit-scaled.
+const LOBES = [
+  [0.0000, 0.0096, 0.1914, 0.9808, [1.0000, 0.5000, 1.0000, 0.7761, 0.7761, 1.0000, 0.5000, 1.0000, 0.2239, 1.0000, 0.0000, 0.7761, 0.0000, 0.5000, 0.0000, 0.2239, 0.2239, 0.0000, 0.5000, 0.0000, 0.7761, 0.0000, 1.0000, 0.2239, 1.0000, 0.5000]],
+  [0.1945, 0.0078, 0.1723, 0.9845, [1.0000, 0.5000, 1.0000, 0.7697, 0.7353, 1.0244, 0.4446, 0.9981, 0.1827, 0.9744, 0.0028, 0.7319, 0.0000, 0.5060, -0.0028, 0.2756, 0.1788, 0.0261, 0.4446, 0.0019, 0.7353, -0.0244, 1.0000, 0.2308, 1.0000, 0.5000]],
+  [0.3710, 0.0028, 0.1433, 0.9942, [1.0000, 0.5001, 1.0000, 0.7877, 0.6018, 1.0448, 0.3321, 0.9934, 0.0975, 0.9485, 0.0049, 0.6784, 0.0002, 0.5146, -0.0046, 0.3334, 0.0921, 0.0518, 0.3321, 0.0064, 0.6025, -0.0441, 1.0000, 0.2131, 1.0000, 0.5001]],
+  [0.5190, 0.0010, 0.1234, 0.9981, [1.0000, 0.4999, 1.0000, 0.8008, 0.4678, 1.0504, 0.2244, 0.9913, 0.0164, 0.9410, 0.0062, 0.6630, 0.0015, 0.5278, -0.0024, 0.4194, -0.0150, 0.0658, 0.2244, 0.0086, 0.4701, -0.0501, 1.0000, 0.2001, 1.0000, 0.4999]],
+  [0.6479, 0.0000, 0.1071, 1.0000, [1.0000, 0.5000, 1.0000, 0.8097, 0.3283, 1.0519, 0.1068, 0.9904, 0.0073, 0.9631, 0.0037, 0.8177, 0.0010, 0.5278, -0.0026, 0.2027, -0.0017, 0.0394, 0.1068, 0.0096, 0.3319, -0.0520, 1.0000, 0.1913, 1.0000, 0.5000]],
+  [0.7551, 0.0004, 0.0996, 0.9993, [1.0000, 0.5000, 1.0000, 0.8184, 0.2174, 1.0499, 0.0395, 0.9908, -0.0655, 0.9560, 0.0871, 0.8353, 0.0949, 0.5278, 0.1027, 0.1885, -0.0762, 0.0475, 0.0385, 0.0092, 0.2193, -0.0499, 1.0000, 0.1821, 1.0000, 0.5000]],
+  [0.8360, 0.0073, 0.0968, 0.9851, [1.0000, 0.5001, 1.0000, 0.8327, 0.1183, 1.0403, 0.0113, 0.9934, -0.0708, 0.9577, 0.3225, 0.7868, 0.3175, 0.4926, 0.3125, 0.2054, -0.0678, 0.0411, 0.0113, 0.0063, 0.1173, -0.0395, 1.0000, 0.1681, 1.0000, 0.5001]],
+  [0.9039, 0.0357, 0.0961, 0.9285, [1.0000, 0.5000, 1.0000, 0.8448, 0.0693, 1.0298, 0.0038, 0.9961, -0.0506, 0.9678, 0.4979, 0.7865, 0.4979, 0.5000, 0.4979, 0.2135, -0.0506, 0.0322, 0.0038, 0.0039, 0.0683, -0.0298, 1.0000, 0.1552, 1.0000, 0.5000]],
+];
+const STRIP_W = 1.6768;   // strip footprint on the slide
+const STRIP_H = 0.3273;
+
+/**
+ * The crescent strip.  Lobes fade from 100% to 30% opacity across the run;
+ * `mirror` flips it left-to-right (the source rotates the group 180 degrees).
+ */
+function dotStrip(s, x, y, color, mirror) {
+  LOBES.forEach((lobe, i) => {
+    const [lx, ly, lw, lh, pts] = lobe;
+    const w = lw * STRIP_W;
+    const h = lh * STRIP_H;
+    const px = mirror ? x + STRIP_W - lx * STRIP_W - w : x + lx * STRIP_W;
+    const points = [{ x: pts[0] * w, y: pts[1] * h, moveTo: true }];
+    for (let k = 2; k < pts.length; k += 6) {
+      points.push({ x: pts[k + 4] * w, y: pts[k + 5] * h,
+                    curve: { type: 'cubic', x1: pts[k] * w, y1: pts[k + 1] * h,
+                             x2: pts[k + 2] * w, y2: pts[k + 3] * h } });
+    }
+    points.push({ close: true });
+    s.addShape('custGeom', { x: px, y: y + ly * STRIP_H, w, h, points,
+                             fill: { color, transparency: i * 10 }, line: { type: 'none' },
+                             flipH: !!mirror });
+  });
+}
+
+// -- motif 2: the asterisk star --------------------------------------------
+// 14 vertices of a slightly irregular star, unit-scaled.
+const STAR = [
+  [1.0000, 0.5481], [0.6013, 0.4513], [0.8794, 0.1372], [0.7138, 0.0070], [0.5026, 0.3737],
+  [0.3029, 0.0000], [0.1333, 0.1245], [0.4015, 0.4479], [0.0000, 0.5311], [0.0608, 0.7382],
+  [0.4378, 0.5714], [0.3893, 0.9965], [0.5964, 1.0000], [0.5612, 0.5734], [0.9328, 0.7530],
+];
+
+function asterisk(s, x, y, w, h, color, rotate) {
+  const points = STAR.map(([px, py], i) => ({ x: px * w, y: py * h, moveTo: i === 0 }));
+  points.push({ close: true });
+  s.addShape('custGeom', { x, y, w, h, points, rotate,
+                           fill: { color }, line: { type: 'none' } });
+}
+
+// -- motif 3: half disc (the "half full" pictogram on slide 4) -------------
+function halfDisc(s, x, y, w, h, color) {
+  s.addShape('custGeom', {
+    x, y, w, h, fill: { color }, line: { type: 'none' },
+    points: [
+      { x: w, y: 0, moveTo: true },
+      { x: 0, y: 0.5 * h, curve: { type: 'cubic', x1: 0.4475 * w, y1: 0, x2: 0, y2: 0.2238 * h } },
+      { x: w, y: h, curve: { type: 'cubic', x1: 0, y1: 0.7761 * h, x2: 0.4475 * w, y2: h } },
+      { x: w, y: 0 },
+      { close: true },
+    ],
+  });
+}
+
+// ================================================================= slides
+
+// 01 — cover: oversized two-tone wordmark, footer rule, meta line.
+function slide01(s) {
+  s.background = { color: WHITE };
+  text(s, 'Innovating for a Sustainable', 0.4956, 0.5863, 9.401, 2.7871, HERO, { color: GREEN });
+  text(s, 'Future', 0.413, 3.3684, 5.2695, 1.455, HERO_IT, { color: GREEN });
+  dotStrip(s, 11.4263, 3.7854, GREEN, true);
+  dotStrip(s, 11.4263, 4.2767, GREEN, true);
+  hLine(s, 0.34633, 6.15545, 12.63978, GREEN);
+  text(s, 'Company', 12.1497, 0.6563, 0.9535, 0.2693, TAG, { color: GREEN });
+  text(s, '2045', 0.4947, 6.6167, 0.5309, 0.2693, TAG, { color: GREEN });
+  pill(s, 6.1608, 6.6167, 0.8169, 0.2693, GREEN);
+  text(s, 'October', 6.2025, 6.6167, 0.9225, 0.2693, TAG, { color: GREEN });
+  text(s, 'Renewable Energy', 11.4873, 6.632, 1.487, 0.2693, TAG, { color: GREEN, align: 'right' });
+}
+
+// 02 — section opener on green with two mint stat cards.
+function slide02(s) {
+  s.background = { color: GREEN };
+  text(s, 'Introduction to Renewable', 0.2183, 0.3377, 5.8452, 1.7953, TITLE, { color: WHITE });
+  text(s, 'Energy', 0.1368, 2.0523, 3.5229, 0.9539, TITLE_IT, { color: MINT });
+  dotStrip(s, 10.8314, 0.6681, MIST, true);
+  dotStrip(s, 10.8314, 1.168, MIST, true);
+  asterisk(s, 3.7493, 3.845, 0.8397, 0.8029, WHITE, 195);
+
+  card(s, 6.5099, 4.3587, 1.9385, 0.9928, MINT);
+  text(s, '2030', 6.6603, 4.4737, 0.9232, 0.4376, FIG, { color: GREEN });
+  text(s, 'Year Founded', 6.627, 4.844, 1.6786, 0.3366, LABEL, { color: GREEN });
+
+  card(s, 8.9282, 3.8588, 1.9385, 1.4557, MINT);
+  text(s, '25', 9.0786, 4.0149, 0.9232, 0.4376, FIG, { color: GREEN });
+  text(s, 'Countries Operated', 9.0453, 4.5579, 1.3964, 0.5722, LABEL, { color: GREEN });
+  dot(s, 10.5077, 4.1106, 0.1511, 0.1511, GREEN);
+
+  text(s, 'a quande lingues coalesce, li grammatica del resultant lingue es plu simplic e regulari quam ti del coalescent lingues. Li nov lingua franca va esser plu simplic e regulari quam li existent Europan lingues.',
+       6.4194, 5.8175, 5.8452, 0.9784, BODY, { color: WHITE });
+  pageBadge(s, '02', 0.3624, 0.4655, WHITE);
+}
+
+// 03 — mission statement anchored to the bottom-left.
+function slide03(s) {
+  s.background = { color: WHITE };
+  text(s, 'Our', 1.8083, 5.1038, 2.0112, 0.9539, TITLE, { color: GREEN });
+  text(s, 'Mission', 1.8083, 5.9179, 4.0436, 0.953, TITLE_IT, { color: GREEN });
+  asterisk(s, 5.5566, 5.0065, 0.5907, 0.5648, GREEN, 195);
+  text(s, 'Ava esser tam simplic quam Occidental in fact, it va esser OccidentalCambridge amico dit me que Occidental es.  lingues es membres del sam familie. Lor separat existentie es un myth.',
+       7, 5.7199, 5.8452, 0.9784, BODY, { color: GREEN });
+  pageBadge(s, '03', 0.352, 0.4251, GREEN);
+}
+
+// 04 — headline claim in a big mint panel over a 5 x 2 "battery" of discs
+//      showing 8.5 of 10 filled (the last one is half full).
+function slide04(s) {
+  s.background = { color: GREEN };
+  text(s, 'Why Renewable', 0.2552, 0.3728, 4.6892, 1.7953, TITLE, { color: WHITE });
+  text(s, 'Energy?', 0.2552, 2.0819, 4.6892, 0.953, TITLE_IT, { color: MINT });
+  asterisk(s, 5.3492, 2.8521, 0.8397, 0.8029, WHITE, 195);
+  text(s, 'Li lingues differe solmen in li grammatica, li pronunciation e li plu commun francapayar custosi traductores.',
+       1.7344, 4.7587, 3.717, 0.9784, BODY, { color: WHITE });
+
+  card(s, 7.7657, 1.6349, 4.7963, 5.2885, MINT, 0.0753);
+  text(s, 'The cost of solar power has dropped by\n85% since 2036 ',
+       8.0809, 2.0819, 4.415, 1.5146, QUOTE, { color: GREEN });
+  hLine(s, 8.28571, 4.07708, 3.91455, GREEN);
+
+  const DISC = 0.6564, DX = 0.86573, ROW_Y = [4.7587, 5.6216];
+  for (let i = 0; i < 10; i++) {
+    const x = 8.0809 + (i % 5) * DX, y = ROW_Y[Math.floor(i / 5)];
+    if (i < 8) dot(s, x, y, DISC, DISC, GREEN);
+    else ring(s, x, y, DISC, DISC, GREEN, 2);
+  }
+  halfDisc(s, 10.6781, 5.6124, 0.3588, 0.6656, GREEN);  // the "half full" ninth disc
+  pageBadge(s, '04', 0.3624, 0.409, WHITE);
+}
+
+// 05 — four industry stats as a 2 x 2 block of colour-coded cards.
+function slide05(s) {
+  s.background = { color: WHITE };
+  text(s, 'Industry Overview', 0.2864, 0.6155, 4.5588, 1.7953, TITLE, { color: GREEN });
+  asterisk(s, 5.4259, 1.0034, 0.9482, 0.9066, MINT, 195);
+  text(s, ' it va esser Occidental. A un Angleso it va semblar un simplificat Angles',
+       1.6699, 3.678, 3.5438, 0.6755, BODY, { color: GREEN });
+  text(s, 'Ia esser tam simplic quam Occidental in fact, it va esser OccidentalCambridge amico dit me que',
+       1.6699, 4.5875, 3.5438, 0.9784, BODY, { color: GREEN });
+
+  // [cardX, cardY, fill, ink, figure, figX, figY, figW, label, labelX, labelY, labelW]
+  [[7.3044, 1.6935, BLACK, MIST,  '8-10%',      7.5355, 2.0172, 2.2833, 'Annual\nGrowth Rate',    7.5355, 3.2563, 1.6786],
+   [10.3074, 1.6935, MIST, GREEN, '11 Million+', 10.5384, 2.0172, 2.2833, 'Impact on Jobs',        10.5384, 3.2563, 0.9303],
+   [7.3044, 4.403,  MINT,  GREEN, '$500B',      7.5436, 4.7221, 1.6786, 'Annual Investment',      7.5436, 5.9658, 1.6786],
+   [10.2889, 4.403, GREEN, WHITE, '$1Trillion ', 10.5262, 4.5875, 2.4067, 'Projected Industry Value', 10.5262, 6.1035, 1.6786],
+  ].forEach(([cx, cy, fill, ink, fig, fx, fy, fw, lab, lx, ly, lw]) => {
+    card(s, cx, cy, 2.7453, 2.4557, fill);
+    text(s, fig, fx, fy, fw, 0.6395, STAT, { color: ink });
+    text(s, lab, lx, ly, lw, 0.5722, LABEL, { color: ink });
+  });
+  pageBadge(s, '05', 0.3624, 0.4251, GREEN);
+}
+
+// 06 — three evenly spaced benefit columns under a two-tone title.
+function slide06(s) {
+  s.background = { color: GREEN };
+  text(s, 'Harnessing', 0.2309, 1.2982, 4.3386, 0.9539, TITLE_IT, { color: MINT });
+  text(s, 'Solar Power: ', 0.2309, 0.5046, 8.16, 0.9539, TITLE, { color: WHITE });
+  text(s, 'the Sun', 4.5694, 1.2982, 4.3386, 0.9539, TITLE, { color: WHITE });
+  asterisk(s, 1.1657, 2.9123, 0.7991, 0.764, WHITE, 195);
+  dotStrip(s, 9.0811, 3.4171, MIST);
+
+  const LEDE = 'Li lingues differe solmen in li grammatica, li pronunciation e li plu commun apayar custosi traductores.';
+  [[1.7779, 'Rapid Growth and Affordability'],
+   [5.7163, 'Environmental Benefits'],
+   [9.6824, 'Economic Impact and Innovation'],
+  ].forEach(([x, heading]) => {
+    blurb(s, WHITE, [x, 4.6781, 2.5017, 0.7068], heading, [x, 5.9044, 3.4761, 0.9784], LEDE);
+  });
+  pageBadge(s, '06', 0.3624, 0.4655, WHITE);
+}
+
+// 07 — right-hand title, two cost cards and a wide "> 50%" banner.
+function slide07(s) {
+  s.background = { color: WHITE };
+  text(s, 'Wind Energy: Powering through', 5.8426, 0.6038, 7.2824, 1.7953, TITLE, { color: GREEN });
+  text(s, 'Innovation', 5.8426, 2.3019, 4.8425, 0.9539, TITLE_IT, { color: GREEN });
+  asterisk(s, 8.3269, 4.1152, 0.5907, 0.5648, GREEN, 195);
+  blurb(s, GREEN, [0.322, 0.5992, 2.5017, 0.7068], 'Global Wind Capacity',
+        [0.322, 1.6918, 2.9599, 0.9784],
+        'A un Angleso it va semblar un simplificat Angles, quam un skeptic Cambridge amico dit me que');
+  dotStrip(s, 0.3839, 3.8848, GREEN);
+
+  text(s, 'Cost Decline for Wind Energy', 3.5215, 4.0484, 2.4432, 0.7068, HEAD, { color: GREEN });
+  // [card x, text x, fill, figure, label]
+  [[3.5619, 3.6789, MINT, '$30-60 per MWh', 'Onshore Wind'],
+   [5.8476, 5.9647, MIST, '$0 p60-10er MWh', 'Offshore Wind'],
+  ].forEach(([x, tx, fill, figure, label]) => {
+    card(s, x, 5.1927, 1.9385, 1.6517, fill);
+    text(s, figure, tx, 5.3466, 1.6452, 0.7742, FIG, { color: GREEN });
+    text(s, label, tx, 6.3143, 1.6786, 0.3366, LABEL, { color: GREEN });
+  });
+
+  card(s, 9.5116, 5.5748, 3.5126, 1.2696, MINT, 0.2159);
+  text(s, 'Percentage Cost Reduction', 9.5892, 4.6219, 1.6786, 0.5722, LABEL, { color: GREEN });
+  text(s, ' >50%', 9.6287, 5.8914, 1.6786, 0.6395, STAT, { color: GREEN });
+  text(s, ' decline over the past decade', 11.2923, 5.9587, 1.6786, 0.5049, BODY1, { color: GREEN });
+  pageBadge(s, '07', 0.3624, 0.4655, GREEN);
+}
+
+// 08 — horizontal bar chart of capacity by source, with a swatch legend.
+function slide08(s) {
+  s.background = { color: GREEN };
+  text(s, 'Hydropower: Harnessing Water', 3.0515, 0.5621, 7.8247, 1.7953, TITLE, { color: WHITE });
+  text(s, 'Resources', 3.0515, 2.1871, 4.6441, 0.9539, TITLE_IT, { color: MINT });
+  asterisk(s, 8.2844, 3.366, 0.601, 0.5747, WHITE, 195);
+  dotStrip(s, 11.2814, 0.7207, MIST, true);
+
+  text(s, 'Global Energy Capacity by Source', 0.2823, 4.4233, 1.9062, 1.0098, HEAD, { color: WHITE });
+  // [source, colour, legendY, legendLabelX/Y, barY, barW, pct, pctX, pctY]
+  [['Hydropower', WHITE, 0.7534, 0.7471, 0.5891, 4.3821, 3.3459, '50%', 6.693,  4.4233],
+   ['Wind',       MIST,  1.174,  0.7156, 1.0055, 5.0055, 1.7412, '25%', 5.0969, 5.0327],
+   ['Solar',      MINT,  1.5556, 0.7156, 1.4209, 5.6289, 1.2713, '20%', 4.5483, 5.6289],
+   ['Other',      BLACK, 1.9747, 0.7156, 1.8146, 6.2523, 0.5485, '5%',  3.8699, 6.2908],
+  ].forEach(([name, color, swY, lx, ly, barY, barW, pct, px, py]) => {
+    bar(s, 0.3624, swY, 0.1229, 0.0961, color);
+    text(s, name, lx, ly, 1.3827, 0.3726, BODY, { color: WHITE });
+    bar(s, 3.277, barY, barW, 0.4583, color);
+    text(s, pct, px, py, 0.7665, 0.4039, HEAD, { color: WHITE });
+  });
+
+  blurb(s, WHITE, [9.3751, 4.4905, 1.9062, 0.7068], 'Innovations in Hydropower',
+        [9.3751, 5.9147, 3.4761, 0.9784],
+        'Li lingues differe solmen in li grammatica, li pronunciation e li plu commun apayar custosi traductores.');
+  pageBadge(s, '08', 0.3624, 0.4251, WHITE);
+}
+
+// 09 — three-part title with staggered indents, three text blocks.
+function slide09(s) {
+  s.background = { color: WHITE };
+  text(s, 'Biomass: Energy from', 0.3593, 0.451, 8.16, 1.7953, TITLE, { color: GREEN });
+  text(s, 'Organic', 2.4427, 1.2895, 3.349, 0.9539, TITLE_IT, { color: GREEN });
+  text(s, 'Matter', 0.3593, 2.2434, 3.349, 0.9539, TITLE, { color: GREEN });
+  asterisk(s, 4.0963, 2.7018, 0.5907, 0.5648, GREEN, 195);
+  dotStrip(s, 7.0211, 3.75, GREEN);
+
+  const LEDE = 'Li lingues differe solmen in li grammatica, li pronunciation e li plu commun apayar custosi traductores.';
+  blurb(s, GREEN, [9.0885, 0.5827, 3.0226, 0.7068], 'Innovations in Biomass Technology',
+        [9.0885, 1.809, 3.4761, 0.9784], LEDE);
+  blurb(s, GREEN, [1.2415, 4.7775, 2.5017, 0.7068], 'Sustainable Resource Use',
+        [1.2415, 6.0038, 3.4761, 0.9784], LEDE);
+  blurb(s, GREEN, [6.0123, 4.7775, 2.2327, 0.7068], 'Carbon Neutrality',
+        [6.0123, 6.0038, 3.2478, 0.9784],
+        'Li lingues differe solmen in li grammatica, li pronunciation e li plu custosi traductores.');
+  pageBadge(s, '09', 0.3624, 0.4251, GREEN);
+}
+
+// 10 — emissions comparison: four cards whose height encodes the value.
+function slide10(s) {
+  s.background = { color: GREEN };
+  text(s, 'Geothermal Energy:', 0.3479, 0.5641, 5.1283, 1.7953, TITLE, { color: WHITE });
+  text(s, 'Earth’s Heat', 0.3479, 2.2705, 5.7314, 0.9424, TITLE_IT, { color: MINT });
+  asterisk(s, 6.3661, 1.3569, 0.601, 0.5747, WHITE, 195);
+  text(s, 'or separat existentie es un myth. Por scientie, musica, sport etc, litot Europa usa li sam ammatica sam abular. pronunciation e li plu commun vocabules.',
+       1.9476, 3.9227, 4.5519, 0.9784, BODY, { color: WHITE });
+  dotStrip(s, 2.2626, 6.4948, MIST);
+
+  text(s, 'Emissions Comparison', 8.7548, 1.3143, 1.9062, 0.7068, HEAD, { color: WHITE });
+  // [x, y, h, fill, value, valueY, label]  — label always sits 0.530 above the card's foot
+  // [card x, text x, card y, card h, fill, value, valueY, label, labelY]
+  [[8.7682, 8.8853, 2.7813, 1.6517, MIST, '400 kg CO\u2082/MWh', 2.9353, 'Natural Gas', 3.9029],
+   [11.054, 11.171, 2.0625, 2.3706, MINT, '20 kg CO\u2082/MWh',  2.2122, 'Geothermal',  3.9029],
+   [8.7682, 8.8853, 4.8268, 2.0652, MIST, '900 kg CO\u2082/MWh', 5.0231, 'Coal',        6.3619],
+   [11.054, 11.171, 4.8268, 2.0652, MIST, '800 kg CO\u2082/MWh', 5.0231, 'Oil',         6.3619],
+  ].forEach(([x, tx, y, h, fill, value, vy, label, ly]) => {
+    card(s, x, y, 1.9385, h, fill);
+    text(s, value, tx, vy, 1.6452, 0.7742, FIG, { color: GREEN });
+    text(s, label, tx, ly, 1.6786, 0.3366, LABEL, { color: GREEN });
+  });
+  pageBadge(s, '10', 0.3624, 0.3847, WHITE);
+}
+
+// 11 — full-width rule splits an upper blurb from the lower title block.
+function slide11(s) {
+  s.background = { color: WHITE };
+  blurb(s, GREEN, [1.1441, 0.4243, 3.1476, 0.7068], 'Environmental and Economic Advantages',
+        [1.1441, 1.6506, 3.1476, 0.9784],
+        'Li lingues differe solmen in li grammatica, li pronunciation e li plu commun apayar custosi traductores.');
+  asterisk(s, 5.3742, 1.6555, 0.9105, 0.8705, MINT, 195);
+  hLine(s, 0.34678, 3.75, 12.63978, GREEN);
+
+  text(s, 'Benefits of Renewable', 1.1441, 4.4978, 4.9219, 1.7953, TITLE, { color: GREEN });
+  text(s, 'Energy', 1.1441, 6.1562, 3.2934, 0.9424, TITLE_IT, { color: GREEN });
+  blurb(s, GREEN, [7.3941, 4.6624, 3.0365, 0.7068], 'Energy Security and Cost-Effectiveness',
+        [7.3941, 5.8887, 3.4761, 0.9784],
+        'Li lingues differe solmen in li grammatica, li pronunciation e li plu commun apayar custosi traductores.');
+  dotStrip(s, 11.2292, 4.6731, GREEN);
+  pageBadge(s, '11', 0.3833, 0.4251, GREEN);
+}
+
+// 12 — challenge / solution pair stepping down the right half.
+function slide12(s) {
+  s.background = { color: GREEN };
+  text(s, 'Energy', 0.3698, 3.1753, 3.4497, 0.9424, TITLE_IT, { color: MINT });
+  text(s, 'Challenges and Solutions in Renewable ', 0.3698, 0.6753, 5.7552, 2.6254, TITLE, { color: WHITE });
+  asterisk(s, 3.3339, 4.6335, 0.8577, 0.82, WHITE, 165.99);
+
+  blurb(s, WHITE, [8.1455, 1.6001, 1.9062, 0.4039], 'Challenge',
+        [8.1455, 2.3183, 4.1566, 1.2814],
+        'or separat existentie es un myth. Por scientie, musica, sport etc, litot Europa usa li sam ammatica sam abular. pronunciation e li plu commun vocabules.');
+  blurb(s, WHITE, [5.1486, 4.7778, 1.9062, 0.4039], 'Solution',
+        [5.1486, 5.496, 3.7786, 1.2814],
+        'Li nov lingua franca va esser plu simplic e regulari quam li existent Europan lingues. It va esser tam simplic quam Occidental in fact, it va esser Occidental');
+  pageBadge(s, '12', 0.3624, 0.3847, WHITE);
+}
+
+// 13 — four numbered technology cards in a row.
+function slide13(s) {
+  s.background = { color: WHITE };
+  text(s, 'Technological', 5.6876, 0.6232, 5.9219, 0.9539, TITLE, { color: GREEN });
+  text(s, 'Advancements', 5.6876, 1.4407, 5.9219, 0.9424, TITLE_IT, { color: GREEN });
+  asterisk(s, 11.9199, 1.9934, 0.7209, 0.6893, MINT, 195);
+  dotStrip(s, 0.322, 0.7902, GREEN);
+  dotStrip(s, 0.322, 1.2858, GREEN);
+
+  // [card x, number x, label x, fill, ink, number, label]
+  [[2.3207, 2.5182, 2.5599, MIST,  GREEN, '01.', 'Energy Storage Solutions'],
+   [4.5888, 4.7863, 4.828,  MINT,  GREEN, '02.', 'Smart Grid Technology'],
+   [6.8985, 7.0961, 7.1377, GREEN, WHITE, '03.', 'Advanced Photovoltaics'],
+   [9.2083, 9.4058, 9.4475, BLACK, WHITE, '04.', 'Offshore Wind Technology'],
+  ].forEach(([x, nx, lx, fill, ink, num, label]) => {
+    card(s, x, 2.9726, 2.0706, 2.4557, fill);
+    text(s, num, nx, 3.1947, 1.1126, 0.6395, STAT, { color: ink });
+    text(s, label, lx, 4.5354, 1.6786, 0.5722, LABEL, { color: ink });
+  });
+
+  text(s, 'Li lingues differe solmen in li plu commun apayar', 1.3993, 6.3603, 2.6253, 0.6755, BODY, { color: GREEN });
+  pageBadge(s, '13', 0.3624, 0.3847, GREEN);
+}
+
+// 14 — title band across the middle, two blurbs on opposite diagonals.
+function slide14(s) {
+  s.background = { color: GREEN };
+  const LEDE = 'or separat existentie es un myth. Por scientie, musica, sport etc, sam abular. pronunciation e li plu commun vocabules.';
+  blurb(s, WHITE, [0.322, 0.5178, 2.8446, 0.7068], 'Significant Emission Reductions',
+        [3.3989, 0.5274, 4.1566, 0.9784], LEDE);
+  text(s, 'Impact on Climate', 0.217, 2.858, 6.6163, 1.7839, TITLE, { color: WHITE });
+  text(s, 'Change', 3.5252, 3.6995, 3.0998, 0.9424, TITLE_IT, { color: MINT });
+  asterisk(s, 7.1267, 2.448, 0.8577, 0.82, WHITE, 165.99);
+  blurb(s, WHITE, [8.9241, 4.6649, 2.9557, 0.7068], 'Improved Air Quality and Public Health',
+        [8.9241, 5.9341, 4.1566, 0.9784], LEDE);
+  dotStrip(s, 2.7554, 5.8305, MIST);
+  pageBadge(s, '14', 0.3624, 0.3847, WHITE);
+}
+
+// 15 — job-distribution bars, each labelled left and read out right.
+function slide15(s) {
+  s.background = { color: WHITE };
+  text(s, 'Renewable Energy and Job', 7.7096, 1.1445, 4.6029, 2.6368, TITLE, { color: GREEN });
+  text(s, 'Creation', 9.4505, 2.8037, 3.5608, 0.9424, TITLE_IT, { color: GREEN });
+  text(s, 'Sector Job Distribution', 1.367, 0.6556, 3.1476, 0.4039, HEAD, { color: GREEN });
+
+  // [sector, barY, labelY, width, colour, percentage]
+  // [sector, label box width, bar y, label y, bar width, colour, percentage]
+  [['Solar',      0.7873, 1.377,  1.3915, 3.4636, GREEN, '45%'],
+   ['Wind',       0.7873, 2.127,  2.1983, 2.8352, MINT,  '30%'],
+   ['Biomass',    0.8659, 2.877,  2.9454, 1.439,  MIST,  '15%'],
+   ['Hydro',      0.8659, 3.6688, 3.7813, 0.439,  MINT,  '7%'],
+   ['Geothermal', 1.2735, 4.4606, 4.5436, 0.2598, MIST,  '3%'],
+  ].forEach(([name, labW, barY, labY, w, color, pct]) => {
+    bar(s, 1.495, barY, w, 0.5977, color);
+    text(s, name, 0.2604, labY, labW, 0.3726, BODY, { color: GREEN });
+    text(s, pct, 5.2016, barY - 0.0418, 1.2735, 0.6395, STAT, { color: GREEN });
+  });
+
+  text(s, 'Li lingues differe solmen in li grammatica, li pronunciation e li plu commun apayar custosi traductores.',
+       7.7995, 4.4188, 3.4761, 0.9784, BODY, { color: GREEN });
+  hLine(s, 0.37151, 6.12304, 12.63978, GREEN);
+  asterisk(s, 11.645, 5.6604, 0.9678, 0.9253, MINT, 195);
+  pageBadge(s, '15', 0.3624, 0.3847, GREEN);
+}
+
+// 16 — divider: three numbered chips on top, title dropped to the baseline.
+function slide16(s) {
+  s.background = { color: GREEN };
+  [[1.1819, 1.5391, 0.8603, '01.'],
+   [4.3463, 4.7035, 0.6373, '02.'],
+   [7.3946, 7.7518, 0.7065, '03.'],
+  ].forEach(([chipX, labelX, labelW, num]) => {
+    pill(s, chipX, 0.563, 1.2292, 0.4347, WHITE);
+    text(s, num, labelX, 0.5718, labelW, 0.4039, HEAD, { color: WHITE });
+  });
+  text(s, 'or separat existentie es un myth. Por scientie, musica, commun vocabules.',
+       10.559, 0.4865, 2.4522, 0.9784, BODY, { color: WHITE });
+  asterisk(s, 10.3151, 4.8763, 0.8577, 0.82, WHITE, 165.99);
+  text(s, 'Our Renewable', 2.7064, 6.1632, 7.0005, 0.9539, TITLE, { color: WHITE });
+  text(s, 'Projects', 8.8644, 6.1385, 3.5251, 0.9424, TITLE_IT, { color: MINT });
+  pageBadge(s, '16', 0.3624, 0.3847, WHITE);
+}
+
+// 17 — case study, light variant.
+function slide17(s) {
+  s.background = { color: WHITE };
+  text(s, 'Project Case Study:', 0.2934, 0.6243, 6.5608, 1.7953, TITLE, { color: GREEN });
+  text(s, 'Solar Park', 3.0746, 1.522, 4.2691, 0.9424, TITLE_IT, { color: GREEN });
+  asterisk(s, 1.6749, 3.2217, 0.756, 0.7228, MINT, 195);
+  text(s, 'Name Project', 2.9521, 3.4082, 2.1564, 0.4376, FIG, { color: GREEN });
+
+  text(s, 'Project Overview', 0.3583, 5.1115, 3.0365, 0.4039, HEAD, { color: GREEN });
+  text(s, 'Li lingues differe solmen in li grammatica, li pronunciation e li plu commun apayar custosi traductores.',
+       3.5738, 5.0262, 3.4761, 0.9784, BODY, { color: GREEN });
+  text(s, 'At solmen va esser necessi far uniform grammatica, pronunciation e plu',
+       3.5738, 6.2105, 3.4761, 0.6755, BODY, { color: GREEN });
+
+  card(s, 8.2171, 5.5154, 1.6786, 1.4497, MINT);
+  text(s, '2038', 8.3575, 5.6921, 1.6452, 0.4376, FIG, { color: GREEN });
+  text(s, 'initiated in', 8.3575, 6.4702, 1.6786, 0.3366, LABEL, { color: GREEN });
+  dotStrip(s, 10.9794, 5.9323, GREEN, true);
+  dotStrip(s, 10.9794, 6.4075, GREEN, true);
+  pageBadge(s, '17', 0.3624, 0.3847, GREEN);
+}
+
+// 18 — the same case study on green; the stat sits in a tone-on-tone card.
+function slide18(s) {
+  s.background = { color: GREEN };
+  text(s, 'Project Case Study: Offshore', 0.3162, 0.5896, 6.414, 1.7839, TITLE, { color: WHITE });
+  text(s, 'Wind Farm', 0.3162, 2.3735, 4.693, 0.9424, TITLE_IT, { color: MINT });
+  asterisk(s, 5.786, 3.2457, 0.8577, 0.82, WHITE, 165.99);
+  blurb(s, WHITE, [1.8651, 4.7489, 3.0365, 0.4039], 'Project Overview',
+        [1.8651, 5.5903, 4.3175, 1.2814],
+        'Li lingues differe solmen in li grammatica, li pronunciation e li plu commun apayar custosi traductores. At solmen va esser necessi far uniform grammatica, pronunciation e plu');
+
+  card(s, 8.6806, 5.5903, 4.2903, 1.2927, GREEN);
+  text(s, 'Name Project', 8.9543, 5.8355, 1.5027, 0.7742, FIG, { color: WHITE });
+  text(s, '2038', 11.4289, 5.907, 1.6452, 0.4376, FIG, { color: WHITE });
+  text(s, 'initiated in', 11.4573, 6.2731, 1.2347, 0.3366, LABEL, { color: WHITE });
+  pageBadge(s, '18', 0.3624, 0.3847, WHITE);
+}
+
+// 19 — one stat card top-right plus three blurbs around the asterisk.
+function slide19(s) {
+  s.background = { color: WHITE };
+  text(s, 'Global Reach and Local', 0.2309, 0.5097, 5.4106, 1.7839, TITLE, { color: GREEN });
+  text(s, 'Impact', 0.2309, 2.2182, 3.0627, 0.9424, TITLE_IT, { color: GREEN });
+  asterisk(s, 4.4156, 3.2488, 0.9511, 0.9094, MINT, 162.21);
+
+  card(s, 7.4282, 0.64, 1.9385, 2.0494, MINT);
+  text(s, '25', 7.5786, 0.7962, 0.9232, 0.4376, FIG, { color: GREEN });
+  text(s, 'Countries Operated ', 7.5453, 1.9141, 1.3964, 0.5722, LABEL, { color: GREEN });
+  blurb(s, GREEN, [9.6351, 0.5097, 3.0365, 0.7068], 'Global Perspective on Renewable Energy',
+        [9.7506, 1.711, 3.1273, 0.9784],
+        'Li lingues differe solmen in li grammatica, li pronunciation e li plu commun apayar custosi traductores.');
+
+  blurb(s, GREEN, [1.8102, 4.6511, 2.6944, 0.7068], 'Local Engagement and Empowerment',
+        [1.8102, 5.9804, 3.6065, 0.6755],
+        'Li lingues differe solmen in li grammatica, li pronunciation e li plu commun apayar');
+  blurb(s, GREEN, [7.4282, 4.6511, 2.6944, 0.7068], 'Future Commitments',
+        [7.4282, 5.9804, 5.4497, 0.6755],
+        'Ma quande lingues coalesce, li grammatica del resultant lingue es plu simplic e regulari quam ti del coalescent lingues. franca va');
+  dotStrip(s, 10.9948, 4.8062, GREEN);
+  pageBadge(s, '19', 0.3624, 0.3847, GREEN);
+}
+
+// 20 — two engagement columns on the right half.
+function slide20(s) {
+  s.background = { color: GREEN };
+  text(s, 'Community', 5.0395, 0.6504, 5.3891, 0.9539, TITLE, { color: WHITE });
+  text(s, 'Engagement', 5.0612, 1.5939, 4.9547, 0.9424, TITLE_IT, { color: MINT });
+  asterisk(s, 10.9427, 1.7748, 0.8577, 0.82, WHITE, 165.99);
+
+  const LEDE = 'or separat existentie es un myth. Por scientie, musica, sport etc, sam abular. pronunciation e li plu commun vocabules.';
+  blurb(s, WHITE, [5.0305, 3.8399, 2.3861, 0.7068], 'Building Trust and Collaboration',
+        [5.0395, 5.1091, 3.5747, 0.9784], LEDE);
+  blurb(s, WHITE, [9.5225, 3.8399, 3.4484, 0.7068], 'Empowerment through Education and Investment',
+        [9.5225, 5.1091, 3.5747, 0.9784], LEDE);
+  dotStrip(s, 2.2916, 6.6323, MIST);
+  pageBadge(s, '20', 0.3624, 0.4251, WHITE);
+}
+
+// 21 — a five-row initiative list; rows 1, 3 and 5 sit on a tinted band.
+function slide21(s) {
+  s.background = { color: WHITE };
+  text(s, 'Sustainability', 0.54, 0.6999, 5.8425, 0.9539, TITLE, { color: GREEN });
+  text(s, 'Initiatives', 0.54, 1.6423, 4.541, 0.9424, TITLE_IT, { color: GREEN });
+  text(s, 'Li lingues differe solmen in li grammatica, li pronunciation e li plu commun apayar custosi traductores.',
+       0.54, 3.6141, 3.4761, 0.9784, BODY, { color: GREEN });
+  asterisk(s, 5.267, 3.1367, 0.8789, 0.8403, MINT, 162.21);
+  dotStrip(s, 2.6228, 6.4687, GREEN, true);
+
+  // [bandY, bandH or null, ink, numY, numX-width, labelY, labelW, number, label]
+  [[0.8678, 1.1922, GREEN, WHITE, 1.1164, 0.8473, 1.1149, 2.112,  '01.', 'Environmental Responsibility'],
+   [null,   null,   null,  GREEN, 2.2399, 0.9712, 2.251,  2.567,  '02.', 'Carbon Reduction and Net Zero Goals'],
+   [3.2447, 1.1424, MIST,  GREEN, 3.4179, 0.8539, 3.4415, 2.7557, '03.', 'Community and Social Initiatives'],
+   [null,   null,   null,  GREEN, 4.571,  0.9712, 4.5849, 3.3286, '04.', 'Innovation in Sustainable Technology'],
+   [5.6207, 1.095,  MINT,  GREEN, 5.807,  0.9712, 5.8111, 3.5923, '05.', 'Sustainable Development Goals (SDGs) Alignment'],
+  ].forEach(([bandY, bandH, bandFill, ink, numY, numW, labY, labW, num, label]) => {
+    if (bandY !== null) card(s, 7.3968, bandY, 5.5741, bandH, bandFill, 0.0753);
+    text(s, num, 7.7847, numY, numW, 0.6395, STAT, { color: ink });
+    text(s, label, 9.0673, labY, labW, 0.7068, HEAD, { color: ink });
+  });
+  pageBadge(s, '21', 0.3624, 0.3847, GREEN);
+}
+
+// 22 — rule under the title, three partnership cards below it.
+function slide22(s) {
+  s.background = { color: GREEN };
+  text(s, 'Partnerships and', 0.5364, 0.8535, 8.16, 0.9539, TITLE, { color: WHITE });
+  text(s, 'Collaborations', 0.5364, 1.7959, 6.4636, 0.9424, TITLE_IT, { color: MINT });
+  text(s, 'Li lingues differe solmen in li grammatica, li pronunciation e li plu commun apayar custosi traductores.',
+       8.9589, 1.5409, 3.1273, 0.9784, BODY, { color: WHITE });
+  hLine(s, 0.37151, 3.35915, 12.63978, WHITE);
+  asterisk(s, 2.1786, 4.0625, 0.8577, 0.82, WHITE, 165.99);
+
+  // [card x, number x, label x, label w, fill, number, label]
+  [[3.8852, 4.046,   4.0876, 2.329,  WHITE, '01.', 'Strategic Alliances with Industry Leaders'],
+   [7,      7.1608,  7.2025, 2.1308, MIST,  '02.', 'Government and Policy Collaborations'],
+   [10.1352, 10.296, 10.3376, 2.6207, MINT, '03.', 'Academic and Research Institution Collaborations'],
+  ].forEach(([x, nx, lx, lw, fill, num, label]) => {
+    card(s, x, 4.4762, 2.8232, 2.4557, fill);
+    text(s, num, nx, 4.6983, 1.1126, 0.6395, STAT, { color: GREEN });
+    text(s, label, lx, 6.039, lw, 0.5722, LABEL, { color: GREEN });
+  });
+  pageBadge(s, '22', 0.3624, 0.4655, WHITE);
+}
+
+// 23 — hand-drawn column chart: ten alternating bars on drawn axes.
+function slide23(s) {
+  s.background = { color: WHITE };
+  text(s, ' Financial', 0.1005, 0.5304, 4.4132, 0.9539, TITLE, { color: GREEN });
+  text(s, ' Overview', -0.0738, 1.3467, 4.4132, 0.9539, TITLE_IT, { color: GREEN });
+  asterisk(s, 4.5501, 2.6471, 0.9511, 0.9094, MINT, 162.21);
+  text(s, 'At solmen va esser necessi far uniform grammatica, pronunciation e plu',
+       0.2888, 3.9189, 3.4761, 0.6755, BODY, { color: GREEN });
+  text(s, 'Li lingues differe solmen in li grammatica, li pronunciation e li plu commun apayar custosi traductores.',
+       0.317, 4.786, 3.4761, 0.9784, BODY, { color: GREEN });
+
+  text(s, 'Revenue Growth Over 10 Years (2036 \u2013 2045)', 8.1393, 0.6399, 3.9004, 0.7068, HEAD, { color: GREEN });
+  vLine(s, 7.46615, 1.40833, 5.18091, GREEN, 0.5);
+  hLine(s, 7.46615, 6.58928, 5.51817, GREEN, 0.5);
+  text(s, 'Revenue (Million USD)', 5.4029, 4.1406, 2.5344, 0.3366, LABEL, { color: GREEN, rotate: 270 });
+  [['0', 6.9615, 6.4143], ['100', 6.9362, 5.7644], ['200', 6.9362, 5.0178], ['300', 6.9362, 4.2711],
+   ['400', 6.9362, 3.5245], ['500', 6.9362, 2.7778], ['600', 6.9362, 2.0312],
+  ].forEach(([tick, tx, ty]) => text(s, tick, tx, ty, 0.5299, 0.3499, TICK, { color: GREEN }));
+
+  // Ten columns rising left to right, alternating mint / green.  Each is drawn as a
+  // 0.3421 in tall rectangle rotated 270 degrees, so `len` is the column's height and
+  // [x, y] is the *unrotated* top-left corner (exactly as PowerPoint stores it).
+  // [year, labelX, x, y, len, colour]
+  [['2036', 7.6955, 7.6985, 5.9304, 0.4655, MINT],
+   ['2037', 8.2789, 8.1962, 5.8447, 0.637,  GREEN],
+   ['2038', 8.814,  8.5798, 5.6933, 0.9397, MINT],
+   ['2039', 9.332,  8.9294, 5.5052, 1.3159, GREEN],
+   ['2040', 9.8819, 9.2652, 5.3034, 1.7195, MINT],
+   ['2041', 10.4253, 9.6194, 5.1199, 2.0865, GREEN],
+   ['2042', 10.9634, 9.9447, 4.9075, 2.5113, MINT],
+   ['2043', 11.5119, 10.2556, 4.6808, 2.9647, GREEN],
+   ['2044', 12.0397, 10.5408, 4.4283, 3.4696, MINT],
+   ['2045', 12.5764, 10.7965, 4.1463, 4.0336, GREEN],
+  ].forEach(([year, lx, x, y, len, color]) => {
+    bar(s, x, y, len, 0.3421, color, 270);
+    text(s, year, lx, 6.6965, 0.5827, 0.3273, FINE, { color: GREEN });
+  });
+  pageBadge(s, '23', 0.3624, 0.4251, GREEN);
+}
+
+// 24 — numbered goals stacked down the left gutter.
+function slide24(s) {
+  s.background = { color: GREEN };
+  text(s, 'Future Goals and Expansion', 6.3281, 0.6312, 5.9684, 1.7953, TITLE, { color: WHITE });
+  text(s, 'Plans', 6.381, 2.3776, 2.6266, 0.9539, TITLE_IT, { color: MINT });
+  asterisk(s, 4.7715, 2.2341, 0.8577, 0.82, WHITE, 165.99);
+
+  [[0.4453, 'Increased Renewable Capacity',   2.0738],
+   [1.523,  'Geographical Expansion',         2.0738],
+   [2.6681, 'Advancements in Technology',     2.0738],
+   [3.8805, 'Sustainability and Net-Zero Goals', 2.0738],
+   [5.0235, 'Financial Growth and Shareholder Value', 2.3659],
+  ].forEach(([y, label, labelW], i) => {
+    text(s, '0' + (i + 1) + '.', 0.2804, y, 1.1126, 0.6395, STAT, { color: WHITE });
+    text(s, label, 1.0369, y + 0.0673, labelW, 0.5722, LABEL, { color: WHITE });
+  });
+
+  text(s, 'Li lingues differe solmen in li grammatica, li pronunciation e li plu commun apayar custosi traductores. At solmen va esser necessi far uniform grammatica, pronunciation e plu',
+       8.9829, 3.8805, 4.3175, 1.5843, BODY, { color: WHITE });
+  dotStrip(s, 9.25, 6.4256, MIST);
+  pageBadge(s, '24', 0.3624, 0.4251, WHITE);
+}
+
+// 25 — closing card: giant "Thank you", contact rail below the rule.
+function slide25(s) {
+  s.background = { color: WHITE };
+  text(s, 'Thank', 0.4122, 0.3962, 6.9489, 2.4234, MEGA, { color: GREEN });
+  text(s, 'you', 2.9688, 2.0025, 3.5135, 2.4234, MEGA_IT, { color: GREEN });
+  asterisk(s, 7.2079, 3.5892, 1.1121, 1.0633, GREEN, 195);
+  [0.5863, 0.9866, 1.4119].forEach(y => dotStrip(s, 11.1387, y, GREEN, true));
+  hLine(s, 0.34678, 5.84295, 12.63978, GREEN);
+
+  text(s, '2045', 0.3157, 6.2939, 0.6303, 0.7742, FIG, { color: GREEN });
+  text(s, 'Contact', 6.495, 6.1761, 1.1981, 0.3366, LABEL, { color: GREEN });
+  text(s, '(+0) 000 0000 0000', 6.5123, 6.5363, 1.7888, 0.2693, TAG, { color: GREEN });
+  text(s, 'Info@gmail.com', 6.495, 6.7526, 1.7888, 0.2693, TAG, { color: GREEN });
+  text(s, 'Address', 11.8195, 6.3444, 1.1981, 0.3366, LABEL, { color: GREEN, align: 'right' });
+  text(s, '123 Main Street. State, City, Country 1234',
+       11.1978, 6.6271, 1.7888, 0.4376, TAG, { color: GREEN, align: 'right' });
+}
+
+// ---------------------------------------------------------------- assembly
+const SLIDES = [slide01, slide02, slide03, slide04, slide05, slide06, slide07,
+                slide08, slide09, slide10, slide11, slide12, slide13, slide14,
+                slide15, slide16, slide17, slide18, slide19, slide20, slide21,
+                slide22, slide23, slide24, slide25];
+
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'DECK', width: 13.3333, height: 7.5 });
+pptx.layout = 'DECK';
+pptx.title = 'Innovating for a Sustainable Future';
+pptx.company = 'Renewable Energy';
+pptx.theme = { headFontFace: SANS, bodyFontFace: SANS };
+
+SLIDES.forEach(build => build(pptx.addSlide()));
+
+const outFile = path.join(__dirname,
+  '037f63fd-f4f5-4814-a727-2ba5721f8b83_grok_final.pptx');
+pptx.writeFile({ fileName: outFile }).then(() => console.log('wrote ' + outFile));
