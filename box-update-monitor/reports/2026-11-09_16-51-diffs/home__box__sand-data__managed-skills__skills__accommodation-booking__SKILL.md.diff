@@ -1,0 +1,8 @@
+--- 2026-11-09_15-49:/home/box/sand-data/managed-skills/skills/accommodation-booking/SKILL.md
++++ 2026-11-09_16-51:/home/box/sand-data/managed-skills/skills/accommodation-booking/SKILL.md
+@@ -93,4 +93,4 @@
+ 
+ ## Site playbooks
+ 
+-Before you dispatch the browser subagent, Read the `site-playbooks-airbnb`, `site-playbooks-expedia`, or `site-playbooks-booking` skill in this catalog, whichever names the site you are about to use, and paste the Dispatch snippet of the job that matches your step (a read-only lookup, or a cart and checkout) into the Task text. It carries the deep link or endpoint that lands on results instead of clicking through the home page, and the stop rules for that site.
++Before you dispatch the browser subagent, Read the `site-playbooks-airbnb`, `site-playbooks-expedia`, `site-playbooks-booking`, or `site-playbooks-marriott` skill in this catalog, whichever names the site you are about to use, and paste the Dispatch snippet of the job that matches your step (a read-only lookup, or a cart and checkout) into the Task text. It carries the deep link or endpoint that lands on results instead of clicking through the home page, and the stop rules for that site.

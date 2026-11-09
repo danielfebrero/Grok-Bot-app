@@ -1,0 +1,16 @@
+--- 2026-11-09_15-49:/opt/sand/sand-host/box-runtime/box-contract.generated.mjs
++++ 2026-11-09_16-51:/opt/sand/sand-host/box-runtime/box-contract.generated.mjs
+@@ -1,4 +1,4 @@
+-// @generated SignedSource<<6bd30aa5385459a69399151aa169f088c1ef3f24c8bcb94e809ebd743fe67c8c>>
++// @generated SignedSource<<84815e608e958f723e2bfa9a6eb6d19ba23f8f6e68b84fdd021d57910904e447>>
+ // Emitted by scripts/gen-box-contract.mts from sand/src/shared/box/box-contract.ts;
+ // regenerate with `pnpm --filter sand run gen:box-contract`.
+ export const CURSOR_AGENT_SOCKET_ENV_VAR = "CURSOR_AGENT_SOCKET";
+@@ -25,6 +25,7 @@
+ export const BROWSER_ACCEPT_LANGUAGE_EN_US_MARKER_PATH = "/tmp/sand-browser-accept-language-en-us";
+ export const BOX_BROWSER_ACCEPT_LANGUAGE_PATH_PREFIX = "/tmp/sand-box-browser-accept-language";
+ export const BROWSER_EGRESS_TIMEZONE_MARKER_PATH = "/tmp/sand-browser-egress-timezone";
++export const BROWSER_EXIT_LOCALE_MARKER_PATH = "/tmp/sand-browser-exit-locale";
+ export const BROWSER_TIMEZONE_FOLLOWS_EXIT_MARKER_PATH = "/tmp/sand-browser-timezone-follows-exit";
+ export const BROWSER_LOCALE_CONSISTENCY_MAX_BYTES = 256;
+ export const LOCALE_CONSISTENCY_CHECKS = ["ip_tz_mismatch","ip_lang_mismatch","tz_lang_mismatch"];

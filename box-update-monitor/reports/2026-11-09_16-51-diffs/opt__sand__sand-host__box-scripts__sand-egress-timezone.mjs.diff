@@ -1,0 +1,164 @@
+--- 2026-11-09_15-49:/opt/sand/sand-host/box-scripts/sand-egress-timezone.mjs
++++ 2026-11-09_16-51:/opt/sand/sand-host/box-scripts/sand-egress-timezone.mjs
+@@ -1,8 +1,17 @@
+-import { readdirSync, readFileSync, readlinkSync } from "node:fs";
++import {
++  readdirSync,
++  readFileSync,
++  readlinkSync,
++  renameSync,
++  rmSync,
++  writeFileSync,
++} from "node:fs";
+ import { request as httpRequest } from "node:http";
+ import { connect as tlsConnect } from "node:tls";
++import { pathToFileURL } from "node:url";
+ 
+ import {
++  exitAcceptLanguage,
+   isKnownTimeZone,
+   isUtcTimeZone,
+   parseZoneTab,
+@@ -325,3 +334,142 @@
+   if (!isKnownTimeZone(timeZone)) throw new EgressGeoError(`no_time_zone(${provider})`);
+   return { timeZone, provider, source };
+ }
++
++export const EXIT_LOCALE_CACHE_PATH = "/tmp/sand-browser-exit-geo";
++export const EXIT_LOCALE_CACHE_TTL_MS = 10 * 60_000;
++export const EXIT_LOCALE_REQUEST_TIMEOUT_MS = 1_750;
++export const EXIT_GEO_FLAG = "--sand-exit-geo=";
++const EXIT_GEO_PROVIDER_NAMES = new Set(EGRESS_GEO_PROVIDERS.map((provider) => provider.name));
++const EXIT_GEO_SOURCES = new Set([
++  "exit_geo",
++  "exit_region",
++  "user_in_exit_country",
++  "exit_country",
++  "exit_country_guess",
++]);
++
++export function readExitGeoCache({
++  path = EXIT_LOCALE_CACHE_PATH,
++  proxyServer,
++  now = Date.now,
++  readFile = readFileSync,
++}) {
++  let cached;
++  try {
++    cached = JSON.parse(String(readFile(path, "utf8")));
++  } catch (error) {
++    if (typeof error?.code === "string" || error instanceof SyntaxError) return null;
++    throw error;
++  }
++  if (
++    cached?.proxyServer !== proxyServer ||
++    typeof cached.at !== "number" ||
++    now() - cached.at > EXIT_LOCALE_CACHE_TTL_MS ||
++    now() < cached.at ||
++    !EXIT_GEO_PROVIDER_NAMES.has(cached.provider)
++  ) {
++    return null;
++  }
++  const exitGeo = exitGeoRecord(cached.exitGeo ?? {});
++  return exitGeo.country == null && exitGeo.timeZone == null
++    ? null
++    : { exitGeo, provider: cached.provider };
++}
++
++export function writeExitGeoCache({
++  path = EXIT_LOCALE_CACHE_PATH,
++  proxyServer,
++  exitGeo,
++  provider,
++  now = Date.now,
++}) {
++  const scratch = `${path}.${process.pid}`;
++  try {
++    writeFileSync(scratch, JSON.stringify({ proxyServer, at: now(), exitGeo, provider }), {
++      mode: 0o644,
++    });
++    renameSync(scratch, path);
++  } catch (error) {
++    rmSync(scratch, { force: true });
++    throw error;
++  }
++}
++
++export async function resolveExitLocale({
++  proxyServer,
++  configuredAcceptLanguage,
++  providers = EGRESS_GEO_PROVIDERS,
++  request = requestJson,
++  timeoutMs = EXIT_LOCALE_REQUEST_TIMEOUT_MS,
++  boxTimeZone = readBoxTimeZone,
++  zonesByCountry = readZonesByCountry,
++  readCache = readExitGeoCache,
++  writeCache = writeExitGeoCache,
++}) {
++  const route = egressRouteFromProxyServer(proxyServer);
++  if (route.kind === "unsupported") throw new EgressGeoError("unsupported_proxy");
++  const proxy = route.kind === "proxy" ? { host: route.host, port: route.port } : null;
++  let found = readCache({ proxyServer });
++  if (found == null) {
++    found = await fetchExitGeo({ providers, request, proxy, timeoutMs });
++    try {
++      writeCache({ proxyServer, exitGeo: found.exitGeo, provider: found.provider });
++    } catch (error) {
++      console.error(`exit geo cache write failed: ${egressErrorCode(error)}`);
++    }
++  }
++  const { exitGeo, provider } = found;
++  const { timeZone, source } = resolveTimeZone({
++    exitGeo,
++    userTimeZone: boxTimeZone(),
++    zonesByCountry: zonesByCountry(),
++  });
++  return {
++    timeZone: isKnownTimeZone(timeZone) ? timeZone : null,
++    source,
++    provider,
++    acceptLanguage: exitAcceptLanguage({
++      country: exitGeo.country,
++      configured: configuredAcceptLanguage,
++    }),
++  };
++}
++
++export function exitLocaleLine({ timeZone, source, provider, acceptLanguage }) {
++  return `${timeZone ?? "-"}\t${acceptLanguage}\t${provider}\t${source}\n`;
++}
++
++export function parseExitGeoFlag(args) {
++  const flag = args?.findLast((arg) => arg.startsWith(EXIT_GEO_FLAG));
++  if (flag === undefined) return null;
++  const [timeZone, provider, source] = flag.slice(EXIT_GEO_FLAG.length).split(",");
++  if (
++    !isKnownTimeZone(timeZone) ||
++    !EXIT_GEO_PROVIDER_NAMES.has(provider) ||
++    !EXIT_GEO_SOURCES.has(source)
++  ) {
++    return null;
++  }
++  return { timeZone, provider, source };
++}
++
++async function main(args) {
++  const [mode, proxyServer = "", configuredAcceptLanguage = ""] = args;
++  if (mode !== "--exit-locale") {
++    console.error("usage: sand-egress-timezone.mjs --exit-locale <proxy-server> <accept-language>");
++    process.exitCode = 2;
++    return;
++  }
++  try {
++    process.stdout.write(
++      exitLocaleLine(await resolveExitLocale({ proxyServer, configuredAcceptLanguage })),
++    );
++  } catch (error) {
++    console.error(`exit locale unresolved: ${egressErrorCode(error)}`);
++    process.exitCode = 1;
++  }
++}
++
++if (process.argv[1] != null && import.meta.url === pathToFileURL(process.argv[1]).href) {
++  await main(process.argv.slice(2));
++}

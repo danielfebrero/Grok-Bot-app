@@ -1,0 +1,123 @@
+--- 2026-11-09_15-49:/opt/sand/sand-host/box-launchers/box-chrome
++++ 2026-11-09_16-51:/opt/sand/sand-host/box-launchers/box-chrome
+@@ -293,13 +293,17 @@
+ 	done <"${BOX_CHROME_EXTRA_FLAGS_FILE}"
+ fi
+ # The UA governor's configuredAcceptLanguage rule, so it can leave the default context's header to this flag.
+-sand_accept_language() {
+-	local LC_ALL=C list=""
++sand_accept_language_valid() {
++	local LC_ALL=C
+ 	local re='^[A-Za-z]{1,8}(-[A-Za-z0-9]{1,8})*(,[A-Za-z]{1,8}(-[A-Za-z0-9]{1,8})*)*$'
++	[ "${#1}" -le 128 ] && [[ "$1" =~ ${re} ]]
++}
++sand_accept_language() {
++	local list=""
+ 	if [ -f "$1" ] && [ ! -L "$1" ]; then
+ 		IFS= read -r -N 129 list 2>/dev/null <"$1" || true
+ 	fi
+-	if [ "${#list}" -le 128 ] && [[ "${list}" =~ ${re} ]]; then
++	if sand_accept_language_valid "${list}"; then
+ 		printf '%s' "${list}"
+ 	else
+ 		printf '%s' "en-US,en-GB,en"
+@@ -307,9 +311,11 @@
+ }
+ SAND_BROWSER_ACCEPT_LANGUAGE_FILE="${SAND_BROWSER_ACCEPT_LANGUAGE_EN_US_FILE:-/tmp/sand-browser-accept-language-en-us}"
+ SAND_ACCEPT_LANGUAGE_FLAGGED=0
++SAND_ACCEPT_LANGUAGE_LIST=""
+ if [ -e "${SAND_BROWSER_ACCEPT_LANGUAGE_FILE}" ] && [ "${SAND_BROWSER_ACCEPT_LANGUAGE_EN_US:-}" != 0 ]; then
+ 	SAND_ACCEPT_LANGUAGE_FLAGGED=1
+-	CHROME_FLAGS+=(--accept-lang="$(sand_accept_language "${SAND_BROWSER_ACCEPT_LANGUAGE_FILE}")")
++	SAND_ACCEPT_LANGUAGE_LIST="$(sand_accept_language "${SAND_BROWSER_ACCEPT_LANGUAGE_FILE}")"
++	CHROME_FLAGS+=(--accept-lang="${SAND_ACCEPT_LANGUAGE_LIST}")
+ fi
+ policy_status=0
+ box_chrome_policy=/usr/local/bin/box-chrome-policy
+@@ -320,6 +326,14 @@
+ 	fi
+ 	;;
+ esac
++BOX_CHROME_GATES_READY=false
++[ ! -e "${SAND_BOX_EXPERIMENTS_READY_FILE:-/tmp/sand-box-experiments-ready}" ] || BOX_CHROME_GATES_READY=true
++BOX_CHROME_WEBRTC_PROXY_ONLY=false
++if [ "${SAND_BOX_BROWSER_WEBRTC_PROXY_ONLY:-0}" = "1" ] ||
++	[ -e "${SAND_BOX_BROWSER_WEBRTC_PROXY_ONLY_FILE:-/tmp/sand-box-browser-webrtc-proxy-only}" ] ||
++	[ -L "${SAND_BOX_BROWSER_WEBRTC_PROXY_ONLY_FILE:-/tmp/sand-box-browser-webrtc-proxy-only}" ]; then
++	BOX_CHROME_WEBRTC_PROXY_ONLY=true
++fi
+ "${box_chrome_policy}" || policy_status=$?
+ SAND_WEBAUTHN_ID_FILE=/usr/local/share/sand-webauthn-proxy.id
+ SAND_WEBAUTHN_MARKER=/home/box/.sand-webauthn-proxy-enabled
+@@ -487,6 +501,51 @@
+ 	merge_flags=("${merge_flags[@]}")
+ }
+ 
++SAND_BROWSER_EXIT_LOCALE_FILE="${SAND_BROWSER_EXIT_LOCALE_FILE:-/tmp/sand-browser-exit-locale}"
++SAND_EXIT_LOCALE_WAIT_S="${SAND_EXIT_LOCALE_WAIT_S:-8}"
++exit_locale_script() {
++	local bundled="${0%/box-launchers/box-chrome}/box-scripts/sand-egress-timezone.mjs"
++	case "$0" in
++	/*/box-launchers/box-chrome)
++		[ ! -r "${bundled}" ] || {
++			printf '%s' "${bundled}"
++			return 0
++		}
++		;;
++	esac
++	printf '%s' /usr/local/bin/sand-egress-timezone.mjs
++}
++# With TZ set, Chrome takes its zone from TZ instead of watching /etc/localtime
++# (https://chromium.googlesource.com/chromium/src/+/refs/tags/151.0.7922.169/services/device/time_zone_monitor/time_zone_monitor_linux.cc),
++# so every page and worker of this browser keeps the exit's zone, and the
++# governor reads the zone back from --sand-exit-geo. A lookup that fails or
++# runs out of time leaves the launch as it was.
++apply_exit_locale() {
++	local script line zone list provider source i as_box=()
++	[ -e "${SAND_BROWSER_EXIT_LOCALE_FILE}" ] && [ -n "${SAND_EGRESS_PROXY_ADDR}" ] || return 0
++	[ "${#SAND_TAILNET_SUFFIXES[@]}" -eq 0 ] || return 0
++	script="$(exit_locale_script)"
++	[ -x "${SAND_COOKIE_NODE}" ] && [ -r "${script}" ] || return 0
++	[ "$(id -u)" -ne 0 ] || as_box=(runuser -u box --)
++	line="$(timeout "${SAND_EXIT_LOCALE_WAIT_S}" "${as_box[@]}" "${SAND_COOKIE_NODE}" "${script}" \
++		--exit-locale "http://${SAND_EGRESS_PROXY_ADDR}" "${SAND_ACCEPT_LANGUAGE_LIST}" </dev/null 2>/dev/null 9>&-)" || return 0
++	IFS=$'\t' read -r zone list provider source <<<"${line}" || true
++	case "${zone}" in
++	'' | - | */ | /* | *..* | *[!A-Za-z0-9_+/-]*) return 0 ;;
++	esac
++	[ -f "/usr/share/zoneinfo/${zone}" ] || return 0
++	case "${provider},${source}" in
++	*[!a-z_,]*) return 0 ;;
++	esac
++	CHROME_ENV+=(TZ="${zone}")
++	CHROME_FLAGS+=(--sand-exit-geo="${zone},${provider},${source}")
++	if [ "${SAND_ACCEPT_LANGUAGE_FLAGGED}" = 1 ] && sand_accept_language_valid "${list}"; then
++		for i in "${!CHROME_FLAGS[@]}"; do
++			case "${CHROME_FLAGS[i]}" in --accept-lang=*) CHROME_FLAGS[i]="--accept-lang=${list}" ;; esac
++		done
++	fi
++}
++
+ BOX_BROWSER_CGROUP_ENTER=/usr/local/bin/box-browser-cgroup-enter.sh
+ launch_chrome() {
+ 	local flags=("${CHROME_FLAGS[@]}") env=("${CHROME_ENV[@]}") leaf=()
+@@ -764,6 +823,7 @@
+ 			echo "box-chrome: sand_box_browser_webrtc_proxy_only is on but its managed policy could not be written; not launching" >&2
+ 			exit 1
+ 		fi
++		apply_exit_locale
+ 		record_box_browser
+ 		drop_sync_store_for_ungoogled
+ 		reset_chrome_tmpdir
+@@ -796,6 +856,11 @@
+ 	case "${SAND_BOX_CHROME_LAUNCHER_SOURCE:-}" in
+ 	bundle | image) launcher_fields+=",\"launcherSource\":\"${SAND_BOX_CHROME_LAUNCHER_SOURCE}\"" ;;
+ 	esac
++	case "${BOX_CHROME_WEBRTC_PROXY_ONLY:-}:${BOX_CHROME_GATES_READY:-}" in
++	true:true | true:false | false:true | false:false)
++		launcher_fields+=",\"webrtcProxyOnly\":${BOX_CHROME_WEBRTC_PROXY_ONLY},\"gatesReady\":${BOX_CHROME_GATES_READY}"
++		;;
++	esac
+ 	printf '{"kind":"chrome_launch","display":%s,"mode":"%s","attempt":%s,"outcome":"%s","durationMs":%s%s}\n' \
+ 		"${BOX_DISPLAY_NUM:-1}" "${mode}" "${attempt}" "${outcome}" "${duration_ms}" "${launcher_fields}" \
+ 		2>/dev/null >>"${SAND_BOX_TELEMETRY_LOG:-/tmp/sand-box-telemetry.log}" || true

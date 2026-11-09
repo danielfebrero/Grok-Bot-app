@@ -1,0 +1,13 @@
+--- 2026-11-09_15-49:/home/box/sand-data/managed-skills/skills/site-playbooks-realtor/SKILL.md
++++ 2026-11-09_16-51:/home/box/sand-data/managed-skills/skills/site-playbooks-realtor/SKILL.md
+@@ -179,8 +179,8 @@
+ - If the Kasada challenge does not clear after about 3 seconds, the snippet retries once with a full wait, then reports `kasada_block_persistent` with the URL. If the page asks for a password, 2FA code, captcha, or payment, stop. Do not solve or bypass. Report which wall appeared and the URL it was on.
+ - After `kasada_block_persistent` the parent owns the next step, in this order, and does not dispatch the same URL again. When the Task lists several locations, the remaining slugs once each, in their own dispatches;
+  one 429 does not end the Realtor pass. Then the alternates below, in the same turn, without another Realtor round.
+-- Redfin serves listing cards to a plain fetch: `https://www.redfin.com/zipcode/<zip>` with the geocoder row's `postal_code`, or a `/city/<id>/<ST>/<City>` page when known, with filters as one path segment such as `/filter/max-price=900k,min-beds=2,property-type=condo`. Cards are `.bp-Homecard` (the `title` attribute is the address) with price, beds, baths, sqft, and a `/home/<id>` link. After a few fetches it answers HTTP 202 with `x-amzn-waf-action: challenge` and an empty body, so one shell fetch at most;
+- on that tell or any empty body, open the same URL in the browser and read the cards. Read only.
++- Redfin, through the Redfin playbook's home search with the geocoder row's `postal_code` as the ZIP;
++ that playbook holds Redfin's URLs and wall tells. Skip it when Redfin already reported `redfin_wall` this turn.
+ - Zillow answers a plain fetch with a PerimeterX 403 ("Access to this page has been denied", `px-captcha`). Do not use it from the shell.
+ - For a valuation or comps job when no listing site is reachable, the county assessor or GIS portal for the parcel is a public source with no sign-in: search by address or parcel number, read assessed value, last sale date and price, lot and building size, and name the county and the portal in the report. A public MLS mirror varies by market;
+  use one only when the Task or the user names it.

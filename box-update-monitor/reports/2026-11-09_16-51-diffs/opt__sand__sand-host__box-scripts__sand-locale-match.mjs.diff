@@ -1,0 +1,36 @@
+--- 2026-11-09_15-49:/opt/sand/sand-host/box-scripts/sand-locale-match.mjs
++++ 2026-11-09_16-51:/opt/sand/sand-host/box-scripts/sand-locale-match.mjs
+@@ -174,6 +174,33 @@
+   return isKnownTimeZone(userTimeZone) && !isUtcTimeZone(userTimeZone) ? userTimeZone : null;
+ }
+ 
++export function likelyLanguage(country) {
++  try {
++    const locale = new Intl.Locale(`und-${country}`).maximize();
++    return locale.region === country ? locale.language : undefined;
++  } catch (error) {
++    if (error instanceof RangeError) return undefined;
++    throw error;
++  }
++}
++
++/*
++navigator.language is the first Accept-Language entry while Intl follows
++Chrome's en-US UI locale
++(https://chromium.googlesource.com/chromium/src/+/refs/tags/156.0.8078.47/third_party/blink/renderer/core/frame/navigator_language.cc),
++so en-US stays first and the exit country's language follows it, as an
++English-UI browser in that country sends.
++*/
++export function exitAcceptLanguage({ country, configured }) {
++  if (typeof country !== "string" || !/^[A-Z]{2}$/.test(country) || country === "US") {
++    return configured;
++  }
++  const language = likelyLanguage(country);
++  if (language === undefined || !/^[a-z]{2,3}$/.test(language)) return configured;
++  if (language === "en") return `en-US,en-${country},en`;
++  return `en-US,en,${language}-${country},${language}`;
++}
++
+ export function resolveTimeZone({ exitGeo, userTimeZone, zonesByCountry }) {
+   const user = userZone(userTimeZone);
+   const country = exitGeo?.country;

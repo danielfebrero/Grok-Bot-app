@@ -1,0 +1,64 @@
+--- 2026-11-09_15-49:/opt/sand/sand-host/box-scripts/sand-ua-governor.mjs
++++ 2026-11-09_16-51:/opt/sand/sand-host/box-scripts/sand-ua-governor.mjs
+@@ -45,9 +45,11 @@
+   verifyCoherentWebgl,
+ } from "./sand-fingerprint-profiles.mjs";
+ import {
++  chromeBrowserArgsForPort,
+   egressErrorClass,
+   egressErrorCode,
+   isBoxClockUtc,
++  parseExitGeoFlag,
+   resolveEgressTimeZone,
+ } from "./sand-egress-timezone.mjs";
+ import {
+@@ -991,6 +993,7 @@
+   read = () => readAcceptLanguageEnUsMarker(undefined, null),
+ ) {
+   if (browser.isClosed || browser.acceptLanguageEnUsEnabled !== true) return null;
++  if (launchExitGeoForBrowser(browser) != null) return null;
+   const marker = read();
+   if (marker == null) return null;
+   const current = configuredAcceptLanguage(browser.acceptLanguage);
+@@ -1008,6 +1011,21 @@
+     : "en-US,en";
+ }
+ 
++export function launchExitGeoForBrowser(
++  browser,
++  browserArgs = () => chromeBrowserArgsForPort(browser.port),
++) {
++  if (browser.launchExitGeo === undefined) {
++    try {
++      browser.launchExitGeo = parseExitGeoFlag(browserArgs());
++    } catch (error) {
++      reportOnce(`exit geo launch flag read failed: ${errorClass(error)}`);
++      browser.launchExitGeo = null;
++    }
++  }
++  return browser.launchExitGeo;
++}
++
+ export function egressTimeZoneEnabledForBrowser(
+   browser,
+   { resolveGate = resolveEgressTimeZoneGate, now = Date.now } = {},
+@@ -1125,6 +1143,19 @@
+       release();
+     },
+   };
++  const launched = launchExitGeoForBrowser(browser);
++  if (launched != null) {
++    browser.egressTimeZone = launched.timeZone;
++    browser.egressTimeZoneLookup.recheckAt = now() + EGRESS_TIME_ZONE_RECHECK_MS;
++    browser.egressTimeZoneLookup.releaseHold();
++    reassertEgressTimeZone(browser);
++    reportEgressTimeZone(browser, browser.egressTimeZoneLookup, {
++      outcome: "resolved",
++      source: launched.source,
++      provider: launched.provider,
++    });
++    return null;
++  }
+   return tickEgressTimeZone(browser, { now });
+ }
+ 

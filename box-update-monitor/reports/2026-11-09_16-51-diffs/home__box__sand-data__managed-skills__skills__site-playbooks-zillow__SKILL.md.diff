@@ -1,0 +1,227 @@
+--- 2026-11-09_15-49:/home/box/sand-data/managed-skills/skills/site-playbooks-zillow/SKILL.md
++++ 2026-11-09_16-51:/home/box/sand-data/managed-skills/skills/site-playbooks-zillow/SKILL.md
+@@ -0,0 +1,224 @@
++---
++name: site-playbooks-zillow
++description: >-
++  Zillow site playbook: home search or one listing's details;
++ not tours or agent
++  contact.
++---
++# Site playbook: Zillow
++
++Read this before you dispatch a computerUse subagent to this site. Follow the Fastest path, fill in every URL you know, then paste the Dispatch snippet into the Task text as written. The subagent does not read skills, so every rule it needs is in the snippet, including the ground rules at its end. Secrets never go in the Task text. They come through `RequestUserForm`.
++
++Jobs in this file: Zillow home search;
++ Zillow listing details.
++
++## Zillow home search
++
++### When to use
++
++The user wants Zillow homes for sale, for rent, or recently sold in a city, ZIP, or neighborhood, filtered by price or rent, beds, baths, or home type. The parent needs the place with its state, the listing type, and the filters. The user gets each home's address, price (the rent, or the sale price and date), beds, baths, sqft, status, home type, days on Zillow, Zestimate, brokerage, zpid, and listing link, plus the total for the search. Read only.
++
++### Fastest path
++
++One URL carries the place and every filter, and the page embeds its results as JSON in `__NEXT_DATA__`, so one navigation and one page script read a whole page of results. PerimeterX watches each browser session, and a second Zillow navigation in a session often meets its block page, so read the JSON right after the first load.
++
++Resolve the place with Zillow's autocomplete, which answers a plain `curl` from the box shell.
++
++```bash
++curl -fsS 'https://www.zillowstatic.com/autocomplete/v3/suggestions?q=78704'
++```
++
++Each `results[]` row has `display`, `resultType` (`Region` or `Address`), and `metaData` with `regionId`, `regionType`, `city`, `state`, and `zipCode`. The URL takes `regionType` as a number: `city` is 6, `zipcode` 7, `neighborhood` 8. An `Address` row carries `metaData.zpid`, which opens the listing section below. A place name several states share returns a row per state, so match `state`.
++
++Search URL grammar. `searchQueryState` is readable JSON in the query string;
++ the browser encodes it.
++
++```
++https://www.zillow.com/homes/?searchQueryState={
++"usersSearchTerm":"{
++display}
++","regionSelection":[{
++"regionId":{
++regionId}
++,"regionType":{
++6|7|8}
++}
++],"isMapVisible":false,"isListVisible":true,"filterState":{
++FILTERS}
++}
++
++```
++
++| Filter | `filterState` entry |
++|---|---|
++| For sale | Nothing to add |
++| For rent | `"fr":{
++"value":true}
++` plus `"fsba"`, `"fsbo"`, `"nc"`, `"cmsn"`, `"auc"`, `"fore"` each `{
++"value":false}
++` |
++| Recently sold | `"rs":{
++"value":true}
++` plus the same six set to `{
++"value":false}
++`;
++ `"doz":{
++"value":"90"}
++` keeps sales from the last 90 days |
++| Price (sale, sold) | `"price":{
++"min":N,"max":N}
++`, either bound alone |
++| Rent per month | `"mp":{
++"min":N,"max":N}
++` |
++| Beds, baths | `"beds":{
++"min":N}
++`, `"baths":{
++"min":N}
++` |
++| Home type | Each type to leave out set to `{
++"value":false}
++`: `sf` single family, `tow` townhouse, `con` condo, `apco` apartment or condo, `apa` apartment, `mf` multi-family, `manu` manufactured, `land` lot or land |
++| Sort | `"sort":{
++"value":"days"}
++` newest first, `"pricea"` lowest price first |
++| Page | `"pagination":{
++"currentPage":N}
++` beside `filterState`, not inside it |
++
++Worked example, condos and townhouses in Seattle up to $900K with 2+ beds, cheapest first. `https://www.zillow.com/homes/?searchQueryState={
++"usersSearchTerm":"Seattle, WA","regionSelection":[{
++"regionId":16037,"regionType":6}
++],"isMapVisible":false,"isListVisible":true,"filterState":{
++"price":{
++"max":900000}
++,"beds":{
++"min":2}
++,"sort":{
++"value":"pricea"}
++,"sf":{
++"value":false}
++,"mf":{
++"value":false}
++,"land":{
++"value":false}
++,"manu":{
++"value":false}
++}
++}
++`
++
++Run the autocomplete call yourself, put `regionId` and `regionType` in the snippet, and fill `<FILTERS>` from the table. Send one place per dispatch.
++
++### Dispatch snippet
++
++```
++Find Zillow homes <for sale|for rent|recently sold> in <PLACE, ST> with <filters>. Read only: never click Contact agent, Request a tour, Save, Save search, or Sign in.
++Unless this task gives regionId and regionType, run in the box shell curl -fsS 'https://www.zillowstatic.com/autocomplete/v3/suggestions?q=<url-encoded place>' and take the first results[] row with resultType "Region" in <ST>;
++ regionType city is 6, zipcode 7, neighborhood 8.
++Open https://www.zillow.com/homes/?searchQueryState={
++"usersSearchTerm":"<row display>","regionSelection":[{
++"regionId":<ID>,"regionType":<6|7|8>}
++],"isMapVisible":false,"isListVisible":true,"filterState":{
++<FILTERS>}
++}
++
++Right after it loads, run the page script async (page) => {
++ const s = page.locator('#__NEXT_DATA__');
++ if (!(await s.count())) return {
++ error: 'NO_NEXT_DATA', title: await page.title() }
++;
++ const d = JSON.parse(await s.textContent()).props.pageProps.searchPageState, l = d.cat1.searchList;
++ return {
++ total: l.totalResultCount, pages: l.totalPages, filterState: d.queryState.filterState, results: d.cat1.searchResults.listResults.map((r) => {
++ const h = r.hdpData?.homeInfo ?? {
++}
++;
++ return {
++ zpid: h.zpid, url: new URL(r.detailUrl, 'https://www.zillow.com').href, address: r.address, price: r.price ?? (r.soldPrice || null), units: r.units, beds: r.beds, baths: r.baths, sqft: r.area, status: r.statusText, type: h.homeType, daysOnZillow: h.daysOnZillow, sold: h.dateSold && new Date(h.dateSold).toISOString().slice(0, 10), zestimate: h.zestimate, broker: r.brokerName }
++;
++ }
++) }
++;
++ }
++
++Report total, filterState, and, per result, zpid, address, price or units, beds, baths, sqft, status, type, daysOnZillow, sold, zestimate, broker, url.
++If the title reads "Access to this page has been denied" or a Press & Hold dialog covers the page, stop, never press it or reload, and report px_block with the URL and anything already read. Otherwise, if the script returns NO_NEXT_DATA, report no_next_data with the title and URL. Take one screenshot.
++Ground rules for this Task. A Timeout or a net::ERR_* code from browser_navigate means the box cannot reach that host. Do not retry it, even if the tool result says to, and do not run DNS or connectivity checks. Move to the next source this Task names, or report the code and URL. An HTTP block (403, 419, 429, 503) follows this Task's own rule. Work in the tab you start in. Do not open a second tab, and switch tabs only when a tool result names a page you did not intend. In-page tabs are part of the page. A page script is an async (page) => function: run it with browser_run_code if you hold it. Without it, read rendered text from browser_snapshot or browser_find, read a <script> tag from the HTML that curl fetches in the box shell, and report a field neither yields as unreadable, never visible text in its place. Name the read you used. Snapshot a page state once. After a click, a scroll, or a wait this Task calls for, take one new snapshot. Do not snapshot the same state twice. Report as soon as the stop rule above is met, one line per item, only the fields asked for, no page dumps.
++```
++
++### Read the result
++
++- `total` counts every match. `results` is one page of up to 41 homes, and Zillow serves 20 pages at most. The page draws about 9 cards until scrolled, so the JSON holds more than the screen shows.
++- Compare the returned `filterState` with the filters you sent. Zillow echoes what it applied under long names: `sort` as `sortSelection`, `fr` `isForRent`, `rs` `isRecentlySold`, `fsba` `isForSaleByAgent`, `fsbo` `isForSaleByOwner`, `nc` `isNewConstruction`, `cmsn` `isComingSoon`, `auc` `isAuction`, `fore` `isForSaleForeclosure`, `mp` `monthlyPayment`, `sf` `isSingleFamily`, `tow` `isTownhouse`, `con` `isCondo`, `apco` `isApartmentOrCondo`, `apa` `isApartment`, `mf` `isMultiFamily`, `manu` `isManufactured`, and `land` `isLotLand`. `price`, `beds`, `baths`, and `doz` keep their names, and a range comes back with both bounds, null for the one not sent. A filter missing from `filterState` was dropped. `pagination` is not echoed there.
++- Rental results mix single units, with a `price` such as `$1,399/mo`, and buildings, which have no `zpid`, a `units` list of beds with a starting price each, and an `/apartments/...` link.
++- A recently sold result carries `sold`, the sale date, and `price`, the sale price. In states that do not disclose sale prices `price` is null. `daysOnZillow` reads -1 where the MLS hides days on market.
++- For a later page, dispatch again with `pagination`. Each dispatch is one more navigation for PerimeterX to judge, so narrow the filters first.
++
++### When blocked
++
++- PerimeterX tells. An HTTP 403 page titled "Access to this page has been denied" with a Press & Hold button and a Reference ID, or a "Before we continue..." dialog with the same button laid over a page that loaded (`iframe#px-captcha-modal`). The dialog can appear 10 to 20 seconds after load, and once it has, the next navigation in that session usually gets the 403 page.
++- A plain `curl` of any `www.zillow.com` page gets the 403 block page. Only the autocomplete host answers the shell.
++- After `px_block`, do not dispatch to Zillow again for the rest of this chat, since the box's browser session stays flagged across turns. Hand the user the search URL, then follow the Realtor.com playbook, which names Redfin and the county assessor as later sources.
++- `no_next_data` is not a block: the page loaded without the results JSON. Check the URL against the grammar above and dispatch once more, or hand the user the URL and the title the subagent reported.
++- Zillow's pages were checked only from a test browser outside Grok Bot's production network, where the block followed the second navigation. The box may meet it sooner, so plan the next source before the first dispatch.
++- If the page asks for a password, 2FA code, captcha, or payment, stop. Do not solve or bypass. Report which wall appeared and the URL it was on.
++
++## Zillow listing details
++
++### When to use
++
++The user has a Zillow `/homedetails/<slug>/<zpid>_zpid/` link, a zpid, or a street address and wants that home's price, Zestimate and Rent Zestimate, facts and features, HOA, property tax rate and assessed value, days on Zillow, the listing agent and brokerage shown, and status. Read only.
++
++### Fastest path
++
++`https://www.zillow.com/homedetails/<zpid>_zpid/` redirects to the full slug URL, so a zpid is enough. For a street address, the search section's autocomplete call returns an `Address` row with `metaData.zpid`.
++
++The page embeds the listing in `__NEXT_DATA__` at `props.pageProps.componentProps.gdpClientCache`, a JSON string with one entry whose `property` is the listing. It holds `price`, `homeStatus`, `zestimate`, `rentZestimate`, `bedrooms`, `bathrooms`, `livingArea`, `lotSize`, `yearBuilt` (or `resoFacts.yearBuilt`), `daysOnZillow`, `monthlyHoaFee` and `resoFacts.hoaFeeTotal`, `propertyTaxRate`, `taxAssessedValue`, `resoFacts` (parking, subtype, price per sqft), `description`, and `attributionInfo` with `agentName`, `brokerName`, `mlsName`, and `trueStatus`.
++
++`priceHistory` and `taxHistory` are missing or empty there for most listings. The page fills its Price history and Public tax history sections from `www.zillow.com/graphql/` after load, and PerimeterX often answers those calls with 403, which leaves "Price history is unavailable." and "Tax history is unavailable." beside a "Something went wrong" panel.
++
++### Dispatch snippet
++
++```
++Read the Zillow listing <https://www.zillow.com/homedetails/<zpid>_zpid/ or the full /homedetails/ URL>. Read only: never click Contact agent, Request a tour, Save, Share, Get pre-qualified, or Sign in.
++For a street address, run in the box shell curl -fsS 'https://www.zillowstatic.com/autocomplete/v3/suggestions?q=<url-encoded address>' and take metaData.zpid from the resultType "Address" row;
++ with none, report address_not_found.
++Open the listing URL and, right after it loads, run the page script async (page) => {
++ const s = page.locator('#__NEXT_DATA__');
++ if (!(await s.count())) return {
++ error: 'NO_NEXT_DATA', title: await page.title() }
++;
++ const p = Object.values(JSON.parse(JSON.parse(await s.textContent()).props.pageProps.componentProps.gdpClientCache))[0].property, a = p.attributionInfo ?? {
++}
++;
++ return {
++ ...Object.fromEntries('zpid,hdpUrl,streetAddress,city,state,zipcode,homeStatus,homeType,price,zestimate,rentZestimate,bedrooms,bathrooms,livingArea,lotSize,daysOnZillow,monthlyHoaFee,propertyTaxRate,taxAssessedValue,mlsid,priceHistory,taxHistory,resoFacts,description'.split(',').map((k) => [k, p[k]])), yearBuilt: p.yearBuilt ?? p.resoFacts?.yearBuilt, mlsStatus: a.trueStatus, agent: a.agentName, broker: a.brokerName ?? p.brokerageName, mls: a.mlsName }
++;
++ }
++
++Report URL, address, homeStatus, mlsStatus, price, zestimate, rentZestimate, beds, baths, sqft, lotSize, yearBuilt, homeType, daysOnZillow, monthlyHoaFee or resoFacts.hoaFeeTotal, propertyTaxRate, taxAssessedValue, agent, broker, mls, and any priceHistory and taxHistory entries. A missing field is unreadable, never a guess. Empty histories are history_unavailable;
++ do not scroll or reload for them.
++If the title reads "Access to this page has been denied" or a Press & Hold dialog covers the page, stop, never press it or reload, and report px_block with the URL and anything already read. Otherwise, if the script returns NO_NEXT_DATA, report no_next_data with the title and URL. Take one screenshot.
++Ground rules for this Task. A Timeout or a net::ERR_* code from browser_navigate means the box cannot reach that host. Do not retry it, even if the tool result says to, and do not run DNS or connectivity checks. Move to the next source this Task names, or report the code and URL. An HTTP block (403, 419, 429, 503) follows this Task's own rule. Work in the tab you start in. Do not open a second tab, and switch tabs only when a tool result names a page you did not intend. In-page tabs are part of the page. A page script is an async (page) => function: run it with browser_run_code if you hold it. Without it, read rendered text from browser_snapshot or browser_find, read a <script> tag from the HTML that curl fetches in the box shell, and report a field neither yields as unreadable, never visible text in its place. Name the read you used. Snapshot a page state once. After a click, a scroll, or a wait this Task calls for, take one new snapshot. Do not snapshot the same state twice. Report as soon as the stop rule above is met, one line per item, only the fields asked for, no page dumps.
++```
++
++### Read the result
++
++- `homeStatus` is Zillow's status, such as `FOR_SALE`, `FOR_RENT`, or `RECENTLY_SOLD`, and `mlsStatus` the MLS's own, such as `Active`. `daysOnZillow` is -1 or null where the MLS hides days on market.
++- A recently sold home's page can carry `price` 0 and no sale price. The recently sold search card has the sale date and, where the state discloses it, the sale price.
++
++### When blocked
++
++- Same tells as the search section.
++- After `px_block`, do not dispatch to Zillow again for the rest of this chat, since the box's browser session stays flagged across turns;
++ hand the user the listing URL. `no_next_data` is not a block: a removed listing or a changed page loads without the JSON, so tell the user the title the subagent reported.
++- After `history_unavailable`, tell the user price history is not available: the Realtor.com playbook does not read it, and a county assessor shows only the last sale. For tax history, add `tax_history` to the fields the Realtor.com playbook's single address branch reports (its detail JSON carries `tax_history[]`), and when Realtor.com is blocked use the county assessor or GIS portal as that playbook describes. For `address_not_found`, follow the same single address branch.
++- If the page asks for a password, 2FA code, captcha, or payment, stop. Do not solve or bypass. Report which wall appeared and the URL it was on.
++
++## Working with the subagent
++
++Recipe steps name actions, not tools. A page script, a scroll, or a fill lands on whichever browser tools the subagent holds, and the ground rules say how, so paste the snippet as written. A subagent without a page-script tool reads what the snapshot or a shell fetch shows and names that read in its report.
++
++Fill in every URL you know before you dispatch. A dispatch that changes something on the site (a cart, a booking, a form) never goes out without its URL. A read-only lookup may start from a name and a place when its section allows it. When the Fastest path is a shell call, run it with a short timeout and never queue a second lookup behind it. A failed call follows the section's own rule for that response (a single retry, a fresh key, or stop and report);
++ when the section has no rule for it, or the call hangs, dispatch the subagent at once. When the section says the call is unreliable from the box, dispatch in the same round and stop the subagent with `StopSubagent` if the call returns first. A change to a job in flight goes to the same subagent, with `MessageSubagent` while it runs and `Task` with `resume` after it reports. A fresh dispatch spends rounds finding a tab and re-reading the page before it does anything.

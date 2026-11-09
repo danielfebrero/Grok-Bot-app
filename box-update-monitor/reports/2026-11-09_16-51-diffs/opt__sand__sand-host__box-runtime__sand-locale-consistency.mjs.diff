@@ -1,0 +1,27 @@
+--- 2026-11-09_15-49:/opt/sand/sand-host/box-runtime/sand-locale-consistency.mjs
++++ 2026-11-09_16-51:/opt/sand/sand-host/box-runtime/sand-locale-consistency.mjs
+@@ -17,7 +17,7 @@
+   readZonesByCountry,
+   requestText,
+ } from "./sand-egress-timezone.mjs";
+-import { isKnownTimeZone } from "./sand-locale-match.mjs";
++import { isKnownTimeZone, likelyLanguage } from "./sand-locale-match.mjs";
+ 
+ export const EXIT_COUNTRY_TRACE = Object.freeze({
+   host: "one.one.one.one",
+@@ -104,15 +104,6 @@
+   });
+ }
+ 
+-function likelyLanguage(country) {
+-  try {
+-    const locale = new Intl.Locale(`und-${country}`).maximize();
+-    return locale.region === country ? locale.language : undefined;
+-  } catch (error) {
+-    return unlessRangeError(error);
+-  }
+-}
+-
+ function mismatchVerdict(tags, country) {
+   if (country === undefined || tags.length === 0) return "unknown";
+   if (tags.some((tag) => tag.region === country)) return "false";

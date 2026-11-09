@@ -1,0 +1,14 @@
+--- 2026-11-09_15-49/meta/versions.txt
++++ 2026-11-09_16-51/meta/versions.txt
+@@ -1,8 +1,8 @@
+ image_sha (/etc/sand-box-image-sha)	fcbae14
+ box_scripts_version (/usr/local/share/sand-box-scripts/version)	fcbae14
+-sand_host_version (/opt/sand/sand-host/version)	00b0aa1
+-supervisor_status.hostVersion (runtime)	00b0aa1
+-supervisor_status.lastCommandId (runtime)	upgrade-00b0aa1
++sand_host_version (/opt/sand/sand-host/version)	1c44e65
++supervisor_status.hostVersion (runtime)	1c44e65
++supervisor_status.lastCommandId (runtime)	upgrade-1c44e65
+ supervisor_status.pendingUpgradeVersion (runtime)	None
+ exec_daemon.name	@anysphere/exec-daemon-runtime
+ exec_daemon.gitCommit	unknown
