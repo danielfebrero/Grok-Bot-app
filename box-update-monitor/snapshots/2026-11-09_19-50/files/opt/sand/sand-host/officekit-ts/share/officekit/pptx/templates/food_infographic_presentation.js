@@ -1,0 +1,1243 @@
+/**
+ * Food Infographic Presentation - 31 slides, 13.333 x 7.5 in (16:9)
+ * Rebuilt with pptxgenjs. Photographic/illustrated artwork from the source deck
+ * is replaced by labelled `[image]` placeholders in the same position and size.
+ */
+'use strict';
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ palette */
+const C = {
+  navy: '537188', gold: 'CBB279', sand: 'E1D4BB', mist: 'EEEEEE',
+  clay: '967E76', tan: 'D7C0AE', ink: '3F3F3F', black: '000000',
+  white: 'FFFFFF', page: 'FDFDFD', grey: 'D6D6D6', grey2: 'B2B2B2',
+  track: 'A5A5A5', hair: 'D8D8D8', chip: 'F2F2F2',
+};
+const F = { head: 'Montserrat SemiBold', body: 'Montserrat Light', med: 'Montserrat Medium' };
+
+/* Copy repeated verbatim throughout the deck. */
+const T = {
+  s1: 'Subtitle here',
+  s2: 'Subtitle Here',
+  t1: 'Title here',
+  t2: 'Tittle here',
+  it: 'Insert title here',
+  iy: 'Insert your text here',
+  w0: 'A wonderful serenity has taken.',
+  w1: 'A wonderful serenity has taken possession.',
+  w2: 'A wonderful serenity has taken possession of my entire soul.',
+  w3: 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings',
+  w4: 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring.',
+  w5: 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy with my whole heart.',
+  wp: 'What\u2019s Problem',
+};
+
+/* --------------------------------------------------------------- primitives */
+// Solid / outlined shape.
+function box(s, x, y, w, h, o) {
+  o = o || {};
+  const p = { x: x, y: y, w: w, h: h };
+  if (o.fill) p.fill = { color: o.fill, transparency: o.alpha || 0 };
+  else p.fill = { type: 'none' };
+  p.line = o.line ? { color: o.line, width: o.lw || 1 } : { type: 'none' };
+  if (o.rot) p.rotate = o.rot;
+  if (o.rad !== undefined) p.rectRadius = o.rad;
+  s.addShape(o.shape || 'rect', p);
+}
+
+// Two-tone deck heading: navy lead word + dark remainder.
+function title(s, x, y, w, h, sz, al, lead, rest) {
+  s.addText([
+    { text: lead, options: { color: C.navy } },
+    { text: rest, options: { color: C.ink } },
+  ], { x: x, y: y, w: w, h: h, fontFace: F.head, fontSize: sz, align: al, valign: 'top' });
+}
+
+// Bold section heading (theme major font).
+function hd(s, x, y, w, h, t, o) {
+  o = o || {};
+  s.addText(t, {
+    x: x, y: y, w: w, h: h, fontFace: F.head, bold: o.b !== false,
+    fontSize: o.sz || 18, color: o.c || C.ink, align: o.al || 'left',
+    valign: 'top', lineSpacingMultiple: o.line,
+  });
+}
+
+// Body copy (theme minor font).
+function bd(s, x, y, w, h, t, o) {
+  o = o || {};
+  s.addText(t, {
+    x: x, y: y, w: w, h: h, fontFace: o.f || F.body, fontSize: o.sz || 12,
+    color: o.c || C.ink, align: o.al || 'left', valign: o.v || 'top',
+    lineSpacingMultiple: o.line, bold: o.b,
+  });
+}
+
+// Big number followed by a smaller percent sign.
+function pct(s, x, y, w, h, n, o) {
+  o = o || {};
+  const col = o.c || C.ink;
+  s.addText([
+    { text: n, options: { fontSize: o.big || 20 } },
+    { text: '%', options: { fontSize: o.small || 12 } },
+  ], {
+    x: x, y: y, w: w, h: h, fontFace: F.head, bold: o.b !== false,
+    color: col, align: o.al || 'left', valign: 'top',
+  });
+}
+
+/* --------------------------------------------------------------- decorative */
+// Closed Catmull-Rom outline -> cubic bezier points (shape-local coordinates).
+function smooth(norm, w, h) {
+  const n = norm.length, P = norm.map(function (p) { return [p[0] * w, p[1] * h]; });
+  const out = [{ x: P[0][0], y: P[0][1] }], k = 1 / 6;
+  for (let i = 0; i < n; i++) {
+    const a = P[(i - 1 + n) % n], b = P[i], c = P[(i + 1) % n], d = P[(i + 2) % n];
+    out.push({
+      curve: { type: 'cubic', x1: b[0] + (c[0] - a[0]) * k, y1: b[1] + (c[1] - a[1]) * k,
+        x2: c[0] - (d[0] - b[0]) * k, y2: c[1] - (d[1] - b[1]) * k }, x: c[0], y: c[1],
+    });
+  }
+  out.push({ close: true });
+  return out;
+}
+const BLOBS = [
+  [[0.52, 0.00], [0.88, 0.10], [1.00, 0.42], [0.86, 0.78], [0.55, 1.00], [0.20, 0.94], [0.00, 0.62], [0.08, 0.24]],
+  [[0.44, 0.03], [0.80, 0.00], [1.00, 0.30], [0.90, 0.66], [0.62, 0.97], [0.24, 1.00], [0.00, 0.72], [0.12, 0.30]],
+  [[0.60, 0.02], [0.94, 0.22], [0.98, 0.60], [0.72, 0.92], [0.36, 1.00], [0.06, 0.80], [0.02, 0.38], [0.28, 0.08]],
+];
+function blob(s, x, y, w, h, col, o) {
+  o = o || {};
+  s.addShape('custGeom', {
+    x: x, y: y, w: w, h: h, points: smooth(BLOBS[o.v || 0], w, h),
+    fill: { color: col, transparency: o.alpha || 0 }, line: { type: 'none' }, rotate: o.rot || 0,
+  });
+}
+// Free stroke through a list of normalised points.
+function stroke(s, x, y, w, h, pts, o) {
+  o = o || {};
+  const P = pts.map(function (p) { return [p[0] * w, p[1] * h]; });
+  const d = [{ x: P[0][0], y: P[0][1] }], k = 1 / 5;
+  for (let i = 0; i < P.length - 1; i++) {
+    const a = P[Math.max(0, i - 1)], b = P[i], c = P[i + 1], e = P[Math.min(P.length - 1, i + 2)];
+    d.push({ curve: { type: 'cubic', x1: b[0] + (c[0] - a[0]) * k, y1: b[1] + (c[1] - a[1]) * k,
+      x2: c[0] - (e[0] - b[0]) * k, y2: c[1] - (e[1] - b[1]) * k }, x: c[0], y: c[1] });
+  }
+  s.addShape('custGeom', { x: x, y: y, w: w, h: h, points: d,
+    fill: { type: 'none' }, line: { color: o.c || C.ink, width: o.lw || 1.5 }, rotate: o.rot || 0 });
+}
+
+// Hand-drawn confetti of slanted dashes ("rain").
+function dashes(s, x, y, w, h, rot) {
+  const cols = 4, rows = 4;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if ((r * 2 + c) % 5 === 3) continue;
+      box(s, x + (c + (r % 2) * 0.4) * w / (cols + 0.4), y + r * h / rows,
+        w / cols * 0.24, h / rows * 0.46, { shape: 'ellipse', fill: C.ink, rot: (rot || 0) + 22 });
+    }
+  }
+}
+// Scattered ink dots of mixed sizes.
+function dots(s, x, y, w, h) {
+  const P = [[0.10, 0.15, 0.22], [0.52, 0.05, 0.13], [0.86, 0.30, 0.20], [0.28, 0.55, 0.11], [0.70, 0.72, 0.24], [0.05, 0.85, 0.14]];
+  P.forEach(function (p) { box(s, x + p[0] * w, y + p[1] * h, p[2] * w * 0.6, p[2] * h * 0.6, { shape: 'ellipse', fill: C.ink }); });
+}
+// Paper plane outline trailed by a looping flight path.
+function plane(s, x, y, w, h, rot) {
+  const pw = w * 0.5, ph = h * 0.55, px = x + w * 0.5, py = y;
+  s.addShape('custGeom', { x: px, y: py, w: pw, h: ph, rotate: rot || 0,
+    points: [{ x: 0, y: ph * 0.42 }, { x: pw, y: 0 }, { x: pw * 0.56, y: ph },
+      { x: pw * 0.42, y: ph * 0.55 }, { close: true }],
+    fill: { type: 'none' }, line: { color: C.ink, width: 1.4 } });
+  s.addShape('custGeom', { x: px, y: py, w: pw, h: ph, rotate: rot || 0,
+    points: [{ x: 0, y: ph * 0.42 }, { x: pw * 0.42, y: ph * 0.55 }, { x: pw, y: 0 }],
+    fill: { type: 'none' }, line: { color: C.ink, width: 1.1 } });
+  stroke(s, x, y + h * 0.30, w * 0.55, h * 0.65,
+    [[0.02, 1.0], [0.36, 0.72], [0.60, 0.36], [0.44, 0.24], [0.36, 0.42], [0.62, 0.52], [0.98, 0.18]],
+    { lw: 1.3, rot: rot || 0 });
+}
+// Long curled arrow sweeping down to the left, with a small arrowhead.
+function arrow(s, x, y, w, h) {
+  stroke(s, x, y, w, h, [[1.00, 0.00], [0.78, 0.22], [0.86, 0.50], [0.66, 0.62],
+    [0.72, 0.34], [0.48, 0.44], [0.30, 0.72], [0.04, 0.86]], { lw: 2 });
+  stroke(s, x, y, w, h, [[0.16, 0.60], [0.04, 0.86], [0.28, 0.94]], { lw: 2 });
+}
+// Three long parallel waves.
+function waves(s, x, y, w, h, rot) {
+  for (let i = 0; i < 3; i++) {
+    stroke(s, x + i * w * 0.06, y + i * h * 0.26, w * 0.90, h * 0.44,
+      [[0, 0.95], [0.22, 0.72], [0.52, 0.30], [0.78, 0.10], [1, 0.00]], { lw: 1.6, rot: rot || 0 });
+  }
+}
+// Cross-hatched pen strokes.
+function hatch(s, x, y, w, h) {
+  for (let i = 0; i < 5; i++) {
+    s.addShape('line', { x: x, y: y + i * h * 0.2, w: w * 0.9, h: h * 0.55, line: { color: C.ink, width: 1.4 }, flipV: true });
+    s.addShape('line', { x: x + i * w * 0.18, y: y, w: w * 0.5, h: h * 0.95, line: { color: C.ink, width: 1.4 } });
+  }
+}
+// Looping cursive squiggle.
+function loops(s, x, y, w, h, rot) {
+  stroke(s, x, y, w, h, [[0, 0.9], [0.14, 0.1], [0.26, 0.85], [0.42, 0.95], [0.52, 0.15], [0.66, 0.9], [0.86, 0.55], [1, 0.85]], { lw: 1.6, rot: rot || 0 });
+}
+// Pair of concentric arcs.
+function arcs(s, x, y, w, h, rot) {
+  stroke(s, x, y, w, h, [[0.1, 0], [0, 0.5], [0.2, 1]], { lw: 2.4, rot: rot || 0 });
+  stroke(s, x + w * 0.5, y, w * 0.5, h, [[0.1, 0], [0, 0.5], [0.2, 1]], { lw: 2.4, rot: rot || 0 });
+}
+// Outlined diamond / gem.
+function gem(s, x, y, w, h) {
+  s.addShape('custGeom', { x: x, y: y, w: w, h: h, fill: { type: 'none' }, line: { color: C.ink, width: 1.4 },
+    points: [{ x: w * 0.22, y: 0 }, { x: w * 0.78, y: 0 }, { x: w, y: h * 0.34 },
+      { x: w * 0.5, y: h }, { x: 0, y: h * 0.34 }, { close: true }] });
+  s.addShape('line', { x: x, y: y + h * 0.34, w: w, h: 0, line: { color: C.ink, width: 1.2 } });
+  s.addShape('line', { x: x + w * 0.22, y: y, w: w * 0.28, h: h * 0.34, line: { color: C.ink, width: 1.2 } });
+  s.addShape('line', { x: x + w * 0.5, y: y, w: w * 0.28, h: h * 0.34, line: { color: C.ink, width: 1.2 }, flipH: true });
+}
+// Solid ink ring.
+function ring(s, x, y, w, h) { box(s, x, y, w, h, { shape: 'donut', fill: C.ink }); }
+// Sharp zig-zag scribble.
+function scribble(s, x, y, w, h, rot) {
+  stroke(s, x, y, w, h, [[0, 0.9], [0.12, 0.1], [0.3, 0.75], [0.45, 0.05], [0.62, 0.8], [0.8, 0.15], [1, 0.85]], { lw: 1.8, rot: rot || 0 });
+}
+// Thin blue-grey wave (accent1).
+function blueWave(s, x, y, w, h) {
+  stroke(s, x, y, w, h, [[0, 0.2], [0.28, 0.85], [0.58, 0.2], [1, 0.7]], { lw: 1.6, c: C.navy });
+}
+
+/* Per-layout background furniture, exactly as the source slide masters place it. */
+const DECOR = {
+  Cover: [['blob', 10.44, 4.74, 2.89, 2.76, 'F3F6F7'], ['dashes', 10.66, 4.62, 1.61, 1.45, 6],
+    ['blob', 0.91, 1.90, 2.04, 1.48, 'F8F6F1', 1], ['blob', -0.3, -0.6, 2.6, 4.1, 'F5F5F5', 2],
+    ['arrow', 11.55, 0.50, 1.95, 1.42], ['plane', -0.28, 5.99, 2.48, 1.10],
+    ['gem', 1.77, 1.80, 0.57, 0.60], ['dots', 1.71, 1.07, 0.64, 0.64],
+    ['dashes', 8.33, 6.48, 0.13, 0.36], ['ring', 11.53, 1.08, 0.18, 0.14]],
+  'Option 1': [['blob', 2.11, 5.55, 1.76, 1.28, 'EEEBEA', 1], ['blob', -0.4, 4.88, 3.9, 2.9, 'F5F5F5'],
+    ['dashes', 1.09, -0.26, 1.23, 1.24], ['blob', 10.77, -0.5, 2.9, 4.6, 'F9F7F2', 2],
+    ['dashes', 11.12, 1.54, 1.61, 1.45, 6], ['hatch', 1.25, 4.88, 0.80, 0.92]],
+  'Option 2': [['blob', 8.05, -0.20, 3.53, 3.02, 'F4EFE4', 1, 20], ['blob', -1.41, 0.42, 6.77, 5.87, 'F6F6F6', 2],
+    ['dashes', 10.48, -0.15, 1.50, 1.35], ['waves', 3.62, 6.71, 1.84, 0.88, 61],
+    ['dots', -0.06, 3.42, 0.53, 0.53], ['plane', 12.59, 3.75, 1.06, 0.68]],
+  'Slide 5': [['blob', 10.44, 4.74, 2.89, 2.76, 'F3F6F7'], ['blob', 1.15, 2.41, 2.58, 1.87, 'F8F6F1', 1],
+    ['blob', -0.4, -0.6, 3.3, 5.0, 'F5F5F5', 2], ['dashes', 11.33, 6.24, 1.61, 1.45, 6],
+    ['arrow', 11.32, 0.00, 1.95, 1.42], ['dots', 0.81, 1.42, 0.64, 0.64]],
+  'Option 8': [['blob', -0.7, 3.44, 3.6, 4.36, 'F5F5F5'], ['blob', 8.31, 1.11, 4.88, 2.05, 'F7F5F1', 1],
+    ['blob', 7.39, -0.6, 3.81, 2.2, 'F2F2F2', 2], ['plane', 1.14, 0.53, 1.27, 1.43, 200],
+    ['blob', 9.43, 5.31, 3.53, 3.02, 'F4EFE4', 1, 202], ['dashes', 10.62, 0.13, 1.50, 1.35]],
+  'Option 12': [['blob', -0.6, 1.11, 4.1, 5.17, 'F5F5F5'], ['blob', 7.08, 1.11, 4.88, 2.05, 'F7F5F1', 1],
+    ['blob', 6.15, -0.6, 3.81, 2.2, 'F2F2F2', 2], ['blob', 6.68, 0.54, 0.96, 0.87, 'F2F2F2'],
+    ['dashes', 12.21, 3.84, 1.74, 1.56, 6], ['loops', -0.52, 0.82, 1.04, 0.58, 340],
+    ['plane', 10.36, 0.27, 1.27, 1.43]],
+  'Option 18': [['blob', -0.4, 4.24, 4.7, 3.5, 'F9F6F4'], ['blob', 7.48, -1.41, 6.77, 5.87, 'F6F6F6', 2],
+    ['dashes', -0.21, 3.85, 1.24, 1.11, 6], ['waves', 7.16, 6.46, 2.33, 1.11, 41],
+    ['plane', 2.78, -0.29, 1.27, 1.43]],
+  'Option 19': [['blob', -0.6, 2.34, 3.5, 4.36, 'F5F5F5'], ['blob', 6.81, 1.11, 4.88, 2.05, 'F7F5F1', 1],
+    ['blob', 5.89, -0.6, 3.81, 2.2, 'F2F2F2', 2], ['plane', 0.37, 1.11, 1.27, 1.43],
+    ['blob', 10.83, 4.80, 3.53, 3.02, 'F4EFE4', 1, 202], ['dashes', 12.44, 4.52, 1.50, 1.35]],
+  'Option 20': [['blob', 2.03, 5.56, 5.52, 2.4, 'F1F1F1'], ['blob', 8.97, -0.6, 4.9, 4.5, 'F0F3F5', 1],
+    ['dots', -0.10, 0.70, 0.64, 0.64]],
+  'Option 21': [['blob', 7.17, 5.69, 5.52, 2.4, 'F1F1F1'], ['blob', 8.97, -0.6, 4.9, 4.5, 'F0F3F5', 1],
+    ['blob', -0.98, 0.13, 3.53, 3.02, 'F4EFE4', 1, 251], ['dashes', 0.34, 2.90, 1.50, 1.35, 24]],
+  'Option 23': [['blob', 3.31, 5.71, 5.52, 2.4, 'F1F1F1'], ['blob', 9.08, -0.85, 3.53, 3.02, 'F4EFE4', 1, 48],
+    ['dashes', 12.39, 1.94, 1.50, 1.35], ['plane', -0.01, 0.31, 1.62, 1.82, 227]],
+  'Option 24': [['blob', 7.50, 5.69, 5.52, 2.4, 'F1F1F1'], ['blob', 8.97, -0.6, 4.9, 4.5, 'F0F3F5', 1],
+    ['blob', -0.73, -0.97, 3.53, 3.02, 'F4EFE4', 1, 18], ['dashes', 10.10, 5.46, 1.50, 1.35]],
+  'Option 25': [['blob', 4.93, 2.29, 6.77, 5.87, 'F7F7F7', 2], ['waves', -0.36, 6.36, 1.84, 0.88, 41],
+    ['blob', 1.26, -0.51, 6.09, 5.22, 'F9F6F0', 1, 344], ['dashes', 9.77, -0.42, 1.72, 1.55],
+    ['arcs', 1.16, 0.56, 0.23, 0.35, 5]],
+  'Option 26': [['blob', 10.44, 4.74, 2.89, 2.76, 'F3F6F7'], ['blob', 1.15, 2.41, 2.58, 1.87, 'F8F6F1', 1],
+    ['blob', -0.4, -0.6, 3.3, 5.0, 'F5F5F5', 2], ['dashes', 11.33, 6.24, 1.61, 1.45, 6],
+    ['arrow', 11.32, 0.00, 1.95, 1.42], ['dots', 2.58, 0.57, 0.64, 0.64]],
+  'Option 28': [['blob', 3.70, -1.0, 9.24, 4.1, 'F3F5F6', 1], ['blueWave', 11.64, 0.00, 1.83, 1.20],
+    ['blob', -0.6, 4.27, 5.7, 3.8, 'F3F1F0', 2], ['dashes', -0.51, 2.88, 1.93, 1.73]],
+  'Option 30': [['blob', -0.4, 4.35, 5.4, 3.6, 'F5F4F3'], ['blob', 4.96, -1.0, 7.25, 3.4, 'F0F2F4', 1],
+    ['plane', 3.89, 6.20, 1.59, 0.70], ['scribble', 11.80, 1.55, 0.89, 0.91, 11]],
+  'Option 31': [['blob', -0.7, 2.57, 3.6, 4.36, 'F5F5F5'], ['blob', 8.26, 1.11, 4.88, 2.05, 'F7F5F1', 1],
+    ['blob', 7.34, -0.6, 3.81, 2.2, 'F2F2F2', 2], ['blob', 9.38, 5.31, 3.53, 3.02, 'F4EFE4', 1, 202],
+    ['dashes', 9.44, 5.81, 1.50, 1.35], ['plane', 6.70, -0.32, 1.27, 1.43]],
+};
+const DRAW = { blob: blob, dashes: dashes, dots: dots, plane: plane, arrow: arrow, waves: waves,
+  hatch: hatch, loops: loops, arcs: arcs, gem: gem, ring: ring, scribble: scribble, blueWave: blueWave };
+
+// Every slide: page background, layout decoration, then the page-number footer.
+function newSlide(pptx, layout, num) {
+  const s = pptx.addSlide();
+  s.background = { color: C.page };
+  (DECOR[layout] || []).forEach(function (d) {
+    const fn = DRAW[d[0]];
+    if (d[0] === 'blob') blob(s, d[1], d[2], d[3], d[4], d[5], { v: d[6] || 0, rot: d[7] || 0 });
+    else fn(s, d[1], d[2], d[3], d[4], d[5]);
+  });
+  box(s, 6.301, 7.049, 0.089, 0.089, { shape: 'ellipse', fill: 'DDE3E7' });
+  box(s, 6.943, 7.049, 0.089, 0.089, { shape: 'ellipse', fill: 'DDE3E7' });
+  s.addText(String(num), { x: 6.358, y: 6.908, w: 0.616, h: 0.37, align: 'center',
+    fontFace: F.head, fontSize: 16, color: C.navy });
+  return s;
+}
+
+/* -------------------------------------------------------------- composites */
+// Placeholder standing in for a photographic / illustrated asset.
+function illus(s, x, y, w, h, col, cap) {
+  box(s, x, y, w, h, { shape: 'roundRect', fill: col, alpha: 45, rad: 0.06 });
+  s.addText(cap || '[image]', { x: x, y: y + h / 2 - 0.16, w: w, h: 0.32,
+    align: 'center', fontFace: F.body, fontSize: 10, color: '8A8A8A' });
+}
+// Round icon chip with a simple white pictogram.
+function icon(s, x, y, d, col, glyph) {
+  box(s, x, y, d, d, { shape: 'ellipse', fill: col });
+  const cx = x + d / 2, cy = y + d / 2;
+  if (glyph === 'martini') {
+    s.addShape('triangle', { x: cx - d * 0.19, y: cy - d * 0.20, w: d * 0.38, h: d * 0.22,
+      fill: { color: C.white }, line: { type: 'none' }, rotate: 180 });
+    box(s, cx - d * 0.02, cy - d * 0.02, d * 0.04, d * 0.16, { fill: C.white });
+    box(s, cx - d * 0.12, cy + d * 0.14, d * 0.24, d * 0.04, { fill: C.white });
+  } else if (glyph === 'flame') {
+    s.addShape('custGeom', { x: cx - d * 0.15, y: cy - d * 0.22, w: d * 0.30, h: d * 0.44,
+      points: [{ x: d * 0.15, y: 0 },
+        { curve: { type: 'cubic', x1: d * 0.34, y1: d * 0.18, x2: d * 0.30, y2: d * 0.38 }, x: d * 0.15, y: d * 0.44 },
+        { curve: { type: 'cubic', x1: d * 0.00, y1: d * 0.38, x2: -d * 0.04, y2: d * 0.18 }, x: d * 0.15, y: 0 },
+        { close: true }], fill: { color: C.white }, line: { type: 'none' } });
+    box(s, cx - d * 0.06, cy + d * 0.02, d * 0.12, d * 0.18, { shape: 'ellipse', fill: col });
+  } else if (glyph === 'cloche') {
+    box(s, cx - d * 0.20, cy - d * 0.16, d * 0.40, d * 0.32, { shape: 'ellipse', fill: C.white });
+    box(s, cx - d * 0.22, cy, d * 0.44, d * 0.20, { fill: col });
+    box(s, cx - d * 0.22, cy + d * 0.06, d * 0.44, d * 0.05, { fill: C.white });
+  } else if (glyph === 'bottle') {
+    box(s, cx - d * 0.03, cy - d * 0.22, d * 0.06, d * 0.14, { fill: C.white });
+    box(s, cx - d * 0.09, cy - d * 0.09, d * 0.18, d * 0.31, { shape: 'roundRect', fill: C.white });
+  }
+}
+// Small dot bullet with a white chevron, used beside subtitles.
+function chevDot(s, x, y, d, col, back) {
+  box(s, x, y, d, d, { shape: 'ellipse', fill: col });
+  s.addShape('custGeom', { x: x + d * (back ? 0.40 : 0.38), y: y + d * 0.28, w: d * 0.22, h: d * 0.44,
+    points: back ? [{ x: d * 0.22, y: 0 }, { x: 0, y: d * 0.22 }, { x: d * 0.22, y: d * 0.44 }]
+      : [{ x: 0, y: 0 }, { x: d * 0.22, y: d * 0.22 }, { x: 0, y: d * 0.44 }],
+    fill: { type: 'none' }, line: { color: C.white, width: 1.1 } });
+}
+// Outlined chevron in a white pill, used by the "What's Problem" note.
+function noteChev(s, x, y, d, back) {
+  box(s, x, y, d, d, { shape: 'ellipse', fill: C.white });
+  s.addShape('custGeom', { x: x + d * (back ? 0.40 : 0.38), y: y + d * 0.28, w: d * 0.22, h: d * 0.44,
+    points: back ? [{ x: d * 0.22, y: 0 }, { x: 0, y: d * 0.22 }, { x: d * 0.22, y: d * 0.44 }]
+      : [{ x: 0, y: 0 }, { x: d * 0.22, y: d * 0.22 }, { x: 0, y: d * 0.44 }],
+    fill: { type: 'none' }, line: { color: C.ink, width: 1.25 } });
+}
+// Grey track + coloured fill + right-aligned percentage caption.
+function bar(s, x, y, w, h, fillW, col, label, labelX) {
+  box(s, x, y, w, h, { fill: C.track, alpha: 50 });
+  box(s, x, y, fillW, h, { fill: col });
+  bd(s, labelX, y + 0.026, 0.9, 0.286, label, { sz: 11, c: C.white, al: 'center', f: F.head });
+}
+// Round speech bubble with a tail, holding a big value and a caption.
+function bubble(s, x, y, w, h, big, small, o) {
+  o = o || {};
+  box(s, x, y, w, h, { shape: 'ellipse', fill: C.white });
+  box(s, x + w * 0.033, y + h * 0.80, w * 0.16, h * 0.317, { shape: 'triangle', fill: C.white, rot: 218 });
+  bd(s, x - w * 0.050, y + h * 0.200, w * 1.100, h * 0.466, big, { sz: o.big || 28, c: C.black, al: 'center', f: F.head });
+  bd(s, x - w * 0.050, y + h * 0.553, w * 1.100, h * 0.247, small, { sz: o.small || 12, c: C.black, al: 'center' });
+}
+// Rounded "read more" pill with a chevron on the right.
+function pill(s, x, y, label) {
+  box(s, x, y, 2.167, 0.604, { shape: 'roundRect', fill: C.chip });
+  bd(s, x + 0.194, y + 0.127, 1.464, 0.35, label, { sz: 11, c: '7F7F7F', line: 1.5 });
+  s.addShape('custGeom', { x: x + 1.926, y: y + 0.223, w: 0.078, h: 0.184,
+    points: [{ x: 0, y: 0 }, { x: 0.078, y: 0.092 }, { x: 0, y: 0.184 }],
+    fill: { type: 'none' }, line: { color: C.ink, width: 1.1 } });
+}
+// Row of small colour swatches (proportion strip).
+function swatches(s, x, y, cw, h, gap, n, filled, on, off) {
+  for (let i = 0; i < n; i++) box(s, x + i * (cw + gap), y, cw, h, { fill: i < filled ? on : off });
+}
+// Kitchen-scale readout used on the weighing-scale illustrations.
+function scale(s, x, y, w, h, value) {
+  const u = w / 3.902;
+  box(s, x + 0.251 * u, y - 0.491 * u, 3.317 * u, 0.313 * u, { fill: 'BFBFBF' });
+  box(s, x + 0.803 * u, y - 0.186 * u, 2.298 * u, 0.189 * u, { fill: C.track });
+  s.addShape('custGeom', { x: x, y: y, w: w, h: h,
+    points: [{ x: 0.10 * w, y: 0 }, { x: 0.90 * w, y: 0 }, { x: w, y: h }, { x: 0, y: h }, { close: true }],
+    fill: { color: C.navy }, line: { type: 'none' } });
+  box(s, x + 0.05 * w, y + h * 0.86, w * 0.90, h * 0.11, { fill: '3E5466', alpha: 50 });
+  box(s, x + 0.05 * w, y + h, w * 0.21, h * 0.11, { fill: C.black });
+  box(s, x + 0.74 * w, y + h, w * 0.21, h * 0.11, { fill: C.black });
+  box(s, x + 0.128 * w, y + h * 0.198, w * 0.748, h * 0.52, { shape: 'roundRect', fill: 'FBFBFB' });
+  bd(s, x + 0.60 * w, y + h * 0.20, w * 0.25, h * 0.50, value, { sz: 28, c: '161C23', al: 'center', v: 'middle', f: F.head, b: true });
+}
+
+/* ------------------------------------------------- stylised food artwork */
+/* Each helper redraws one of the deck's flat vector illustrations from a
+   handful of native shapes, keeping the original palette and footprint.   */
+const FC = { skin: 'B68D6C', skinDk: '825D40', skinLt: 'E7D9CE', husk: '967E76', huskLt: 'C0B1AC',
+  steel: '7F7F7F', steelDk: '595959', steelLt: 'D8D8D8', blue: '92AABC', olive: '8E733F',
+  oliveLt: 'C1A673', cream: 'F3EDE3', creamDk: 'EDE5D6', shadow: 'E0E0E0' };
+
+function shadow(s, x, y, w, h) { box(s, x, y, w, h, { shape: 'ellipse', fill: FC.shadow, alpha: 35 }); }
+
+function plate(s, x, y, d) {
+  box(s, x, y, d, d, { shape: 'ellipse', fill: C.mist });
+  box(s, x + d * 0.079, y + d * 0.079, d * 0.843, d * 0.843, { shape: 'ellipse', fill: 'F8F8F8' });
+  box(s, x + d * 0.154, y + d * 0.154, d * 0.691, d * 0.691, { shape: 'ellipse', fill: 'FBFBFB' });
+}
+function utensil(s, x, y, w, h, col, kind) {
+  if (kind === 'fork') {
+    for (let i = 0; i < 3; i++) box(s, x + i * w * 0.38, y, w * 0.24, h * 0.22, { shape: 'roundRect', fill: col });
+    box(s, x, y + h * 0.14, w, h * 0.16, { shape: 'roundRect', fill: col });
+    box(s, x + w * 0.34, y + h * 0.26, w * 0.32, h * 0.74, { shape: 'roundRect', fill: col });
+  } else if (kind === 'knife') {
+    box(s, x, y, w, h * 0.46, { shape: 'roundRect', fill: col });
+    box(s, x + w * 0.15, y + h * 0.4, w * 0.7, h * 0.6, { shape: 'roundRect', fill: col });
+  } else {
+    box(s, x, y, w, h * 0.42, { shape: 'ellipse', fill: col });
+    box(s, x + w * 0.34, y + h * 0.34, w * 0.32, h * 0.66, { shape: 'roundRect', fill: col });
+  }
+}
+function jug(s, x, y, w, h) {
+  s.addShape('custGeom', { x: x, y: y, w: w, h: h, fill: { color: 'B6C6D2' }, line: { type: 'none' },
+    points: [{ x: 0, y: 0 }, { x: w, y: 0 }, { x: w * 0.86, y: h }, { x: w * 0.14, y: h }, { close: true }] });
+  box(s, x + w * 0.16, y + h * 0.02, w * 0.22, h * 0.96, { fill: 'DAE2E8' });
+  for (let i = 0; i < 15; i++) box(s, x + w * 0.5, y + h * (0.06 + i * 0.06), w * 0.28, h * 0.022, { fill: 'F8FCFE' });
+}
+function pumpkin(s, x, y, w, h) {
+  shadow(s, x + w * 0.06, y + h * 0.82, w * 0.9, h * 0.20);
+  box(s, x, y + h * 0.16, w * 0.56, h * 0.76, { shape: 'ellipse', fill: FC.husk });
+  box(s, x + w * 0.44, y + h * 0.16, w * 0.56, h * 0.76, { shape: 'ellipse', fill: FC.husk });
+  box(s, x + w * 0.24, y + h * 0.13, w * 0.52, h * 0.80, { shape: 'ellipse', fill: FC.huskLt });
+  box(s, x + w * 0.44, y, w * 0.14, h * 0.26, { shape: 'trapezoid', fill: FC.skinDk, rot: 196 });
+}
+// Bunch of three crescent bananas fanned out to the lower right.
+function banana(s, x, y, w, h) {
+  shadow(s, x + w * 0.10, y + h * 0.80, w * 0.86, h * 0.20);
+  [[0.02, 0.02, C.sand, -16], [0.10, 0.08, FC.creamDk, 0], [0.18, 0.16, FC.cream, 14]].forEach(function (b) {
+    const bw = w * 0.78, bh = h * 0.78, bx = x + b[0] * w, by = y + b[1] * h;
+    s.addShape('custGeom', { x: bx, y: by, w: bw, h: bh, rotate: b[3],
+      fill: { color: b[2] }, line: { type: 'none' },
+      points: [{ x: bw * 0.08, y: 0 },
+        { curve: { type: 'cubic', x1: bw * 0.44, y1: bh * 0.02, x2: bw * 0.84, y2: bh * 0.40 }, x: bw * 0.90, y: bh * 0.92 },
+        { curve: { type: 'cubic', x1: bw * 0.62, y1: bh * 0.58, x2: bw * 0.24, y2: bh * 0.36 }, x: bw * 0.08, y: 0 },
+        { close: true }] });
+    box(s, bx + bw * 0.80, by + bh * 0.84, bw * 0.13, bh * 0.11, { shape: 'roundRect', fill: FC.olive, rot: b[3] + 16 });
+  });
+}
+// Tapered root with leafy tops; body narrows to a point at the bottom.
+function carrot(s, x, y, w, h, rot) {
+  const r = rot || 0;
+  [[0.18, -22], [0.42, 0], [0.64, 22]].forEach(function (t) {
+    box(s, x + w * t[0], y, w * 0.18, h * 0.32, { shape: 'trapezoid', fill: FC.skin, rot: 180 + t[1] });
+  });
+  s.addShape('custGeom', { x: x + w * 0.08, y: y + h * 0.22, w: w * 0.84, h: h * 0.78, rotate: r,
+    points: [{ x: w * 0.06, y: h * 0.06 },
+      { curve: { type: 'cubic', x1: w * 0.30, y1: -h * 0.06, x2: w * 0.62, y2: h * 0.02 }, x: w * 0.78, y: h * 0.10 },
+      { curve: { type: 'cubic', x1: w * 0.70, y1: h * 0.38, x2: w * 0.54, y2: h * 0.62 }, x: w * 0.40, y: h * 0.78 },
+      { curve: { type: 'cubic', x1: w * 0.28, y1: h * 0.56, x2: w * 0.12, y2: h * 0.32 }, x: w * 0.06, y: h * 0.06 },
+      { close: true }], fill: { color: FC.husk }, line: { type: 'none' } });
+  box(s, x + w * 0.30, y + h * 0.32, w * 0.10, h * 0.30, { shape: 'roundRect', fill: FC.huskLt, rot: r + 16 });
+  for (let i = 1; i < 4; i++) {
+    box(s, x + w * (0.26 + i * 0.04), y + h * (0.38 + i * 0.15), w * 0.22, h * 0.02, { fill: FC.skinDk, rot: r + 24 });
+  }
+}
+// Cooking pot on legs with flames beneath; (x, y, w, h) frames the pot only.
+function pot(s, x, y, w, h) {
+  shadow(s, x + w * 0.064, y + h * 0.85, w * 0.885, h * 0.15);
+  box(s, x + w * 0.963, y + h * 0.247, w * 0.139, h * 0.181, { shape: 'round2SameRect', fill: C.black, rot: 90 });
+  box(s, x - w * 0.126, y + h * 0.247, w * 0.139, h * 0.181, { shape: 'round2SameRect', fill: C.black, rot: 270 });
+  [0.174, 0.500, 0.799].forEach(function (o) {
+    box(s, x + w * o, y + h * 0.719, w * 0.040, h * 0.247, { shape: 'roundRect', fill: C.black });
+  });
+  box(s, x, y + h * 0.119, w, h * 0.709, { shape: 'round2SameRect', fill: FC.steel, rot: 180 });
+  box(s, x + w * 0.545, y + h * 0.119, w * 0.452, h * 0.680, { fill: FC.steelDk });
+  box(s, x + w * 0.168, y + h * 0.203, w * 0.179, h * 0.596, { fill: C.white, alpha: 55 });
+  box(s, x, y, w, h * 0.185, { shape: 'roundRect', fill: FC.steelLt });
+  box(s, x + w * 0.064, y + h * 0.059, w * 0.875, h * 0.125, { shape: 'ellipse', fill: C.navy });
+  // flames licking round the base
+  [[0.20, 0.46], [0.40, 0.40], [0.60, 0.46]].forEach(function (f) {
+    s.addShape('custGeom', { x: x + w * f[0], y: y + h * f[1], w: w * 0.22, h: h * 0.38,
+      points: [{ x: w * 0.11, y: 0 },
+        { curve: { type: 'cubic', x1: w * 0.26, y1: h * 0.14, x2: w * 0.22, y2: h * 0.30 }, x: w * 0.11, y: h * 0.38 },
+        { curve: { type: 'cubic', x1: w * 0.00, y1: h * 0.30, x2: -w * 0.04, y2: h * 0.14 }, x: w * 0.11, y: 0 },
+        { close: true }], fill: { color: C.sand }, line: { type: 'none' } });
+  });
+  box(s, x + w * 0.36, y + h * 0.62, w * 0.28, h * 0.22, { shape: 'moon', fill: FC.husk, rot: 90 });
+}
+// Shopping basket brimming with produce; (x, y, w, h) frames the whole group.
+function basket(s, x, y, w, h) {
+  [0.58, 0.66, 0.74].forEach(function (p, i) {
+    box(s, x + w * p, y + h * 0.02, w * 0.055, h * 0.45, { shape: 'roundRect', fill: FC.olive, rot: (i - 1) * 12 });
+  });
+  box(s, x + w * 0.055, y + h * 0.20, w * 0.43, h * 0.34, { shape: 'ellipse', fill: C.sand });
+  box(s, x + w * 0.16, y + h * 0.14, w * 0.10, h * 0.10, { shape: 'star5', fill: FC.skin });
+  box(s, x + w * 0.42, y + h * 0.19, w * 0.36, h * 0.35, { shape: 'ellipse', fill: FC.skinLt, rot: 14 });
+  box(s, x + w * 0.50, y + h * 0.26, w * 0.24, h * 0.20, { shape: 'ellipse', fill: C.tan, rot: 14 });
+  s.addShape('custGeom', { x: x + w * 0.054, y: y + h * 0.52, w: w * 0.853, h: h * 0.48,
+    fill: { color: FC.blue }, line: { type: 'none' },
+    points: [{ x: 0, y: 0 }, { x: w * 0.853, y: 0 }, { x: w * 0.75, y: h * 0.48 }, { x: w * 0.10, y: h * 0.48 }, { close: true }] });
+  box(s, x, y + h * 0.47, w * 0.96, h * 0.075, { shape: 'roundRect', fill: C.navy });
+  box(s, x + w * 0.30, y + h * 0.485, w * 0.60, h * 0.045, { shape: 'roundRect', fill: C.grey });
+  [0.62, 0.74, 0.86].forEach(function (p) {
+    box(s, x + w * 0.17, y + h * p, w * 0.60, h * 0.04, { shape: 'roundRect', fill: C.sand });
+  });
+}
+function steak(s, x, y, w, h) {
+  blob(s, x, y + h * 0.20, w, h * 0.70, FC.olive, { v: 2 });
+  blob(s, x, y, w, h * 0.76, C.sand, { v: 2 });
+  box(s, x + w * 0.58, y + h * 0.18, w * 0.14, h * 0.14, { shape: 'ellipse', fill: C.white });
+}
+function cherry(s, x, y, w, h) {
+  stroke(s, x + w * 0.30, y, w * 0.45, h * 0.5, [[0.6, 0], [0.3, 0.5], [0, 1]], { c: FC.skinLt, lw: 3 });
+  box(s, x + w * 0.52, y + h * 0.10, w * 0.34, h * 0.24, { shape: 'ellipse', fill: FC.skin, rot: 24 });
+  box(s, x, y + h * 0.42, w * 0.58, h * 0.58, { shape: 'ellipse', fill: C.gold });
+  box(s, x + w * 0.40, y + h * 0.42, w * 0.58, h * 0.58, { shape: 'ellipse', fill: 'C1A673' });
+  box(s, x + w * 0.14, y + h * 0.56, w * 0.12, h * 0.12, { shape: 'ellipse', fill: FC.cream });
+  box(s, x + w * 0.56, y + h * 0.56, w * 0.12, h * 0.12, { shape: 'ellipse', fill: FC.cream });
+}
+function glass(s, x, y, w, h) {
+  for (let i = 0; i < 5; i++) box(s, x + w * 0.52, y + h * (0.02 + i * 0.07), w * 0.13, h * 0.045, { fill: C.navy, rot: 8 });
+  box(s, x + w * 0.53, y, w * 0.10, h * 0.40, { fill: FC.blue, rot: 8 });
+  s.addShape('custGeom', { x: x, y: y + h * 0.30, w: w, h: h * 0.70, fill: { color: C.tan }, line: { type: 'none' },
+    points: [{ x: 0, y: 0 }, { x: w, y: 0 }, { x: w * 0.88, y: h * 0.70 }, { x: w * 0.12, y: h * 0.70 }, { close: true }] });
+  box(s, x + w * 0.22, y + h * 0.88, w * 0.22, h * 0.06, { shape: 'roundRect', fill: 'E8DCD2' });
+}
+function egg(s, x, y, w, h, yolk) {
+  box(s, x, y, w, h, { shape: 'ellipse', fill: C.white, line: C.hair, lw: 0.75 });
+  box(s, x + w * 0.216, y + h * 0.306, w * 0.568, h * 0.493, { shape: 'ellipse', fill: yolk });
+}
+// Open palm holding a tomato and a slice; (x, y, w, h) frames the whole group.
+function hand(s, x, y, w, h) {
+  box(s, x + w * 0.60, y + h * 0.02, w * 0.37, h * 0.66, { shape: 'ellipse', fill: C.tan, rot: 20 });
+  box(s, x + w * 0.68, y + h * 0.08, w * 0.28, h * 0.54, { shape: 'ellipse', fill: FC.skin, rot: 20 });
+  box(s, x + w * 0.10, y + h * 0.06, w * 0.40, h * 0.46, { shape: 'ellipse', fill: C.gold });
+  box(s, x + w * 0.20, y + h * 0.13, w * 0.11, h * 0.11, { shape: 'ellipse', fill: FC.cream });
+  box(s, x + w * 0.24, y, w * 0.14, h * 0.12, { shape: 'star5', fill: FC.skin });
+  s.addShape('custGeom', { x: x + w * 0.217, y: y + h * 0.495, w: w * 0.783, h: h * 0.312,
+    fill: { color: FC.cream }, line: { type: 'none' },
+    points: [{ x: 0, y: h * 0.28 }, { x: w * 0.10, y: h * 0.05 }, { x: w * 0.78, y: 0 },
+      { x: w * 0.76, y: h * 0.16 }, { x: w * 0.16, y: h * 0.312 }, { close: true }] });
+  box(s, x, y + h * 0.62, w * 0.41, h * 0.375, { shape: 'diamond', fill: C.navy });
+  box(s, x + w * 0.17, y + h * 0.66, w * 0.30, h * 0.20, { shape: 'diamond', fill: C.navy });
+}
+// Ruffled leaf silhouette - gentle lobes rather than sharp points.
+const LEAF = [[0.50, 0.00], [0.68, 0.06], [0.80, 0.16], [0.94, 0.26], [0.88, 0.40], [0.98, 0.52],
+  [0.82, 0.62], [0.76, 0.76], [0.62, 0.84], [0.54, 1.00], [0.46, 0.84], [0.30, 0.78],
+  [0.22, 0.64], [0.06, 0.54], [0.14, 0.40], [0.04, 0.26], [0.20, 0.16], [0.32, 0.06]];
+function lettuce(s, x, y, w, h) {
+  [[0.00, 0.02, 0.60, 0.86, FC.skin], [0.40, 0.00, 0.60, 0.98, FC.skinDk], [0.24, 0.24, 0.44, 0.76, FC.skinLt]]
+    .forEach(function (l) {
+      const lx = x + l[0] * w, ly = y + l[1] * h, lw = w * l[2], lh = h * l[3];
+      s.addShape('custGeom', { x: lx, y: ly, w: lw, h: lh, points: smooth(LEAF, lw, lh),
+        fill: { color: l[4] }, line: { type: 'none' } });
+      box(s, lx + lw * 0.47, ly + lh * 0.22, lw * 0.05, lh * 0.92, { fill: FC.cream, alpha: 25 });
+    });
+}
+function tomato(s, x, y, w, h) {
+  box(s, x, y + h * 0.14, w, h * 0.86, { shape: 'ellipse', fill: C.gold });
+  box(s, x + w * 0.10, y + h * 0.24, w * 0.72, h * 0.62, { shape: 'ellipse', fill: 'D5BE86' });
+  box(s, x + w * 0.62, y + h * 0.30, w * 0.14, h * 0.14, { shape: 'ellipse', fill: FC.cream });
+  box(s, x + w * 0.30, y, w * 0.40, h * 0.28, { shape: 'star5', fill: FC.skin });
+}
+function peanut(s, x, y, w, h) {
+  [[0.00, 0.14], [0.42, 0.00]].forEach(function (o) {
+    const px = x + o[0] * w, py = y + o[1] * h, pw = w * 0.58, ph = h * 0.86;
+    s.addShape('custGeom', { x: px, y: py, w: pw, h: ph, rotate: 18,
+      fill: { color: FC.skinLt }, line: { type: 'none' },
+      points: [{ x: pw * 0.50, y: 0 },
+        { curve: { type: 'cubic', x1: pw * 1.02, y1: ph * 0.10, x2: pw * 0.62, y2: ph * 0.42 }, x: pw * 0.62, y: ph * 0.54 },
+        { curve: { type: 'cubic', x1: pw * 0.62, y1: ph * 0.80, x2: pw * 0.98, y2: ph }, x: pw * 0.44, y: ph },
+        { curve: { type: 'cubic', x1: -pw * 0.06, y1: ph * 0.94, x2: pw * 0.34, y2: ph * 0.62 }, x: pw * 0.34, y: ph * 0.48 },
+        { curve: { type: 'cubic', x1: pw * 0.34, y1: ph * 0.22, x2: -pw * 0.02, y2: ph * 0.08 }, x: pw * 0.50, y: 0 },
+        { close: true }] });
+    box(s, px + pw * 0.28, py + ph * 0.14, pw * 0.22, ph * 0.24, { shape: 'ellipse', fill: C.tan, rot: 18 });
+    box(s, px + pw * 0.34, py + ph * 0.60, pw * 0.22, ph * 0.24, { shape: 'ellipse', fill: C.tan, rot: 18 });
+  });
+}
+function bread(s, x, y, w, h) {
+  blob(s, x, y + h * 0.30, w, h * 0.70, FC.olive, { v: 1 });
+  blob(s, x, y, w, h * 0.80, C.sand, { v: 1 });
+  box(s, x + w * 0.60, y + h * 0.18, w * 0.16, h * 0.20, { shape: 'ellipse', fill: C.white });
+  stroke(s, x + w * 0.18, y + h * 0.42, w * 0.44, h * 0.14, [[0, 0], [0.5, 0.7], [1, 0.2]], { c: FC.olive, lw: 1.2 });
+}
+function sausage(s, x, y, w, h) {
+  box(s, x, y, w, h, { shape: 'ellipse', fill: FC.skinLt, rot: 24 });
+  box(s, x + w * 0.18, y + h * 0.18, w * 0.64, h * 0.60, { shape: 'ellipse', fill: C.tan, rot: 24 });
+}
+function eggplant(s, x, y, w, h) {
+  box(s, x + w * 0.46, y, w * 0.30, h * 0.20, { shape: 'ellipse', fill: FC.olive, rot: 20 });
+  box(s, x + w * 0.56, y + h * 0.10, w * 0.10, h * 0.16, { shape: 'roundRect', fill: FC.skinDk, rot: 20 });
+  s.addShape('custGeom', { x: x, y: y + h * 0.12, w: w, h: h * 0.88, fill: { color: C.white },
+    line: { color: C.grey, width: 0.75 },
+    points: [{ x: w * 0.72, y: h * 0.04 },
+      { curve: { type: 'cubic', x1: w * 1.02, y1: h * 0.34, x2: w * 0.86, y2: h * 0.78 }, x: w * 0.44, y: h * 0.84 },
+      { curve: { type: 'cubic', x1: w * 0.06, y1: h * 0.88, x2: w * 0.10, y2: h * 0.44 }, x: w * 0.44, y: h * 0.24 },
+      { curve: { type: 'cubic', x1: w * 0.58, y1: h * 0.14, x2: w * 0.64, y2: h * 0.06 }, x: w * 0.72, y: h * 0.04 },
+      { close: true }] });
+}
+function kiwi(s, x, y, w, h) {
+  box(s, x, y + h * 0.10, w, h * 0.90, { shape: 'ellipse', fill: C.gold, line: 'AF8E43', lw: 2 });
+  box(s, x + w * 0.36, y, w * 0.26, h * 0.26, { shape: 'star5', fill: FC.skinDk });
+  box(s, x + w * 0.46, y + h * 0.14, w * 0.05, h * 0.16, { fill: FC.skinDk, rot: 12 });
+  box(s, x + w * 0.62, y + h * 0.28, w * 0.16, h * 0.16, { shape: 'ellipse', fill: FC.cream });
+}
+
+/* ============================================================ slide builders */
+
+// 1 - Cover
+function slide01(p) {
+  const s = newSlide(p, 'Cover', 1);
+  title(s, 1.311, 2.791, 10.711, 1.919, 54, 'center', 'Food ', 'Infographic Presentation');
+}
+
+// 2 - intro: cutlery, four subtitle chips and a bar chart card
+function slide02(p) {
+  const s = newSlide(p, 'Option 31', 2);
+  title(s, 0.892, 1.124, 5.986, 0.842, 44, 'left', 'Food ', 'Infographic.');
+  bd(s, 0.892, 5.460, 5.721, 0.808, T.w5, { sz: 14 });
+
+  [[7.330, 1.611, C.navy], [7.330, 2.825, C.sand], [10.049, 1.611, C.gold], [10.049, 2.825, C.mist]]
+    .forEach(function (c) {
+      chevDot(s, c[0], c[1] + 0.075, 0.229, c[2]);
+      hd(s, c[0] + 0.314, c[1], 1.944, 0.343, T.s2, { sz: 16, c: c[2], line: 0.9, b: false });
+      bd(s, c[0] + 0.314, c[1] + 0.341, 1.944, 0.505, T.w0, { sz: 12 });
+    });
+
+  // place setting
+  plate(s, 2.536, 2.412, 2.418);
+  utensil(s, 1.022, 2.887, 0.341, 1.753, C.navy, 'fork');
+  utensil(s, 1.889, 2.419, 0.432, 2.221, C.gold, 'fork');
+  utensil(s, 5.171, 2.507, 0.261, 2.332, C.sand, 'knife');
+  utensil(s, 5.795, 2.500, 0.739, 2.359, C.tan, 'spoon');
+
+  // chart card
+  box(s, 7.330, 4.171, 4.977, 2.175, { shape: 'roundRect', fill: C.white, rad: 0.05 });
+  s.addChart(p.ChartType.bar, [{ name: 'Value', labels: ['A', 'B', 'C', 'D'], values: [4.3, 2.42, 2.03, 2.99] }], {
+    x: 7.500, y: 4.290, w: 4.430, h: 1.990, barDir: 'col', barGapWidthPct: 60,
+    chartColors: [C.mist, C.sand, C.gold, C.navy], showLegend: false, showValue: false,
+    catAxisHidden: true, valAxisMaxVal: 5, valAxisMinVal: 0, valAxisMajorUnit: 1,
+    valAxisLabelFontFace: F.head, valAxisLabelFontSize: 14, valAxisLabelFormatCode: '0.00',
+    valAxisLineShow: false, valGridLine: { style: 'solid', size: 1, color: 'F2F2F2' },
+    catAxisLineShow: false, plotArea: { fill: { color: C.white } }, chartArea: { fill: { color: C.white } },
+  });
+}
+
+// 3 - measuring jug with four labelled icons
+function slide03(p) {
+  const s = newSlide(p, 'Option 25', 3);
+  title(s, 3.164, 0.905, 7.005, 0.909, 48, 'center', 'Food ', 'Infographic.');
+  jug(s, 5.160, 2.463, 2.713, 3.372);
+
+  [[0.811, 2.762, 2.613, C.navy, 'right', 3.998, 2.943, 'martini'],
+   [1.241, 4.653, 2.613, C.gold, 'right', 4.453, 4.824, 'bottle'],
+   [9.709, 2.762, 2.613, C.sand, 'left', 8.533, 2.943, 'flame'],
+   [9.279, 4.653, 2.613, C.mist, 'left', 8.078, 4.824, 'cloche']].forEach(function (c) {
+    hd(s, c[0], c[1], 2.813, 0.417, T.s1, { sz: 18, c: c[3], al: c[4], line: 1.1, b: false });
+    bd(s, c[4] === 'right' ? c[0] + 0.2 : c[0], c[1] + 0.418, c[2], 0.685, T.w1, { sz: 14, al: c[4], line: 1.3 });
+    icon(s, c[5], c[6], 0.802, c[3], c[7]);
+  });
+}
+
+// 4 - produce wagons with three stat blocks
+function slide04(p) {
+  const s = newSlide(p, 'Option 28', 4);
+  title(s, 3.164, 0.905, 7.005, 0.909, 48, 'center', 'Food ', 'Infographic.');
+
+  [[2.302, C.gold, '73', 3.037], [5.155, C.clay, '81', 5.891], [8.018, C.sand, '92', 8.754]].forEach(function (c) {
+    pct(s, c[0], 2.730, 0.774, 0.439, c[2], { c: c[1] });
+    hd(s, c[3], 2.430, 2.079, 0.309, T.t1, { c: c[1] });
+    bd(s, c[3] + 0.04, 2.843, 2.06, 0.543, T.w1);
+  });
+
+  // three wagons on a rail, each loaded with a different crop
+  box(s, 4.90, 5.20, 3.80, 0.10, { fill: FC.steelDk });
+  [[2.799, C.sand, 'apple'], [5.623, C.mist, 'pumpkin'], [8.447, FC.blue, 'onion']].forEach(function (r) {
+    const x = r[0];
+    for (let i = 0; i < 12; i++) {
+      const cx = x + 0.10 + (i % 4) * 0.375 + (Math.floor(i / 4) % 2) * 0.19,
+        cy = 3.15 + Math.floor(i / 4) * 0.485;
+      if (r[2] === 'apple') { box(s, cx, cy + 0.10, 0.31, 0.28, { shape: 'ellipse', fill: C.gold }); box(s, cx + 0.13, cy, 0.05, 0.13, { fill: FC.olive }); }
+      else if (r[2] === 'pumpkin') { box(s, cx, cy + 0.10, 0.30, 0.27, { shape: 'ellipse', fill: C.clay }); box(s, cx + 0.12, cy, 0.06, 0.13, { fill: FC.olive }); }
+      else { box(s, cx + 0.02, cy, 0.26, 0.40, { shape: 'triangle', fill: C.sand }); }
+    }
+    box(s, x, 4.300, 2.089, 0.94, { fill: r[1] });
+    box(s, x, 5.071, 2.089, 0.175, { fill: r[1] });
+    [0.19, 1.29].forEach(function (o) {
+      box(s, x + o, 4.961, 0.594, 0.594, { shape: 'ellipse', fill: C.ink });
+      box(s, x + o + 0.162, 5.123, 0.271, 0.271, { shape: 'ellipse', fill: C.grey });
+      box(s, x + o + 0.236, 5.196, 0.124, 0.125, { shape: 'ellipse', fill: C.white });
+    });
+  });
+}
+
+// 5 - two pumpkins with a central value bubble
+function slide05(p) {
+  const s = newSlide(p, 'Option 24', 5);
+  title(s, 3.164, 0.905, 7.005, 0.909, 48, 'center', 'Food ', 'Infographic.');
+  bd(s, 3.806, 1.864, 5.721, 0.572, T.w4, { sz: 14, al: 'center' });
+
+  pumpkin(s, 3.510, 3.600, 2.670, 2.490);
+  pumpkin(s, 7.170, 3.600, 2.650, 2.490);
+
+  hd(s, 0.990, 4.691, 2.079, 0.309, T.s1, { c: C.gold, al: 'right' });
+  bd(s, 1.010, 5.104, 2.019, 0.543, T.w1, { al: 'right' });
+  icon(s, 2.266, 3.572, 0.802, C.gold, 'martini');
+  hd(s, 10.479, 4.691, 2.079, 0.309, T.s1, { c: C.sand });
+  bd(s, 10.500, 5.104, 2.019, 0.543, T.w1);
+  icon(s, 10.479, 3.570, 0.802, C.sand, 'flame');
+
+  bubble(s, 5.694, 2.697, 1.740, 1.613, '95%', 'Value');
+}
+
+// 6 - doughnut split of vegetable / fruit
+function slide06(p) {
+  const s = newSlide(p, 'Option 31', 6);
+  title(s, 1.140, 0.797, 7.005, 0.909, 48, 'left', 'Food ', 'Infographic.');
+  bd(s, 7.436, 1.974, 4.917, 0.808,
+    'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy with.', { sz: 14 });
+
+  s.addChart(p.ChartType.doughnut, [{ name: 'Split', labels: ['Vegetable', 'Fruit'], values: [50, 50] }], {
+    x: 1.990, y: 2.090, w: 3.860, h: 3.870, holeSize: 42, showLegend: false, showValue: false,
+    chartColors: [C.gold, C.sand], dataBorder: { pt: 2, color: C.page }, firstSliceAng: 0,
+  });
+  pumpkin(s, 3.32, 3.35, 0.80, 0.90);
+  banana(s, 3.55, 3.55, 0.85, 0.85);
+  carrot(s, 3.95, 3.40, 0.55, 0.95);
+
+  [[7.436, 3.391, C.gold, 'martini', '93', 9.381, 3.315, 9.425, 3.727, 8.488, 3.581],
+   [7.436, 4.868, C.sand, 'flame', '34', 9.354, 4.792, 9.397, 5.204, 8.488, 5.052]].forEach(function (c) {
+    icon(s, c[0], c[1], 0.802, c[2], c[3]);
+    hd(s, c[5], c[6], 2.316, 0.309, T.s1, { c: c[2] });
+    bd(s, c[7], c[8], 2.808, 0.543, T.w1);
+    pct(s, c[9], c[10], 0.937, 0.439, c[4], { c: c[2], big: 24, small: 14 });
+  });
+
+  bubble(s, 1.218, 1.866, 1.673, 1.551, '50%', 'Vegetable');
+  bubble(s, 5.267, 5.052, 1.427, 1.323, '50%', 'Fruit', { big: 24, small: 11 });
+}
+
+// 7 - carrot & pumpkin beside four progress bars
+function slide07(p) {
+  const s = newSlide(p, 'Option 18', 7);
+  title(s, 5.740, 1.332, 5.986, 0.842, 44, 'left', 'Food ', 'Infographic.');
+  bd(s, 5.740, 2.158, 5.721, 0.808, T.w5, { sz: 14 });
+
+  pumpkin(s, 1.060, 3.300, 2.500, 2.800);
+  carrot(s, 2.950, 1.200, 1.600, 4.500);
+
+  [[5.804, 3.437, C.gold, '46%', 1.516, 1.483, 'D6D8D8'],
+   [5.804, 4.816, C.sand, '78%', 1.321, 1.825, 'D6D8D8'],
+   [9.433, 3.450, C.navy, '55%', 1.321, 1.483, 'D8D8D8'],
+   [9.433, 4.842, C.mist, '83%', 1.321, 2.181, 'D6D8D8']].forEach(function (c) {
+    hd(s, c[0], c[1], 2.079, 0.309, T.s1, { c: c[2] });
+    box(s, c[0], c[1] + 0.42, c[4] + c[5], 0.245, { fill: c[6] });
+    box(s, c[0] + c[4] + c[5] - 1.483, c[1] + 0.42, 1.483, 0.245, { fill: c[2] });
+    bd(s, c[0] + 2.072, c[1] + 0.40, 0.907, 0.303, c[3], { sz: 11, c: C.white, al: 'center', f: F.head });
+    bd(s, c[0], c[1] + 0.743, 2.804, 0.543, T.w0);
+  });
+}
+
+// 8 - bananas with two callouts and a footnote
+function slide08(p) {
+  const s = newSlide(p, 'Option 18', 8);
+  title(s, 0.957, 0.893, 5.986, 0.842, 44, 'left', 'Food ', 'Infographic.');
+  bd(s, 0.957, 1.751, 5.721, 0.572, T.w4, { sz: 14 });
+
+  banana(s, 5.220, 2.270, 4.180, 3.930);
+
+  hd(s, 8.455, 2.312, 2.660, 0.309, T.s1, { c: C.sand });
+  bd(s, 8.505, 2.724, 3.109, 0.732, T.w2);
+  icon(s, 7.447, 2.483, 0.802, C.sand, 'flame');
+  hd(s, 1.237, 4.161, 2.568, 0.309, T.s1, { c: C.gold, al: 'right' });
+  bd(s, 0.755, 4.574, 3.002, 0.732, T.w2, { al: 'right' });
+  icon(s, 4.022, 4.332, 0.802, C.gold, 'martini');
+
+  bd(s, 10.012, 5.648, 2.132, 0.344, T.wp, { sz: 14, f: F.med, b: true, al: 'right', v: 'middle', line: 1.1 });
+  noteChev(s, 12.220, 5.704, 0.232, true);
+  bd(s, 9.237, 6.021, 2.906, 0.505, T.w2, { al: 'right' });
+}
+
+// 9 - cooking pot with two proportion bars
+function slide09(p) {
+  const s = newSlide(p, 'Option 12', 9);
+  title(s, 6.383, 1.638, 5.986, 0.842, 44, 'left', 'Food ', 'Infographic.');
+  // produce sitting on the hob behind the pot
+  [2.41, 2.62, 2.85].forEach(function (o) { box(s, o, 1.39, 0.16, 1.03, { shape: 'trapezoid', fill: FC.skin, rot: 180 }); });
+  box(s, 2.28, 2.33, 0.95, 0.69, { shape: 'trapezoid', fill: FC.husk, rot: 180 });
+  box(s, 3.64, 1.95, 1.28, 1.40, { shape: 'ellipse', fill: C.sand, rot: 26 });
+  box(s, 3.91, 3.09, 0.76, 0.67, { shape: 'ellipse', fill: C.gold });
+  pot(s, 1.650, 3.230, 3.740, 2.900);
+
+  hd(s, 6.401, 2.802, 3.220, 0.433, T.iy);
+  bd(s, 6.440, 3.235, 5.091, 0.853, T.w5);
+  [['Vegetable', 4.239, 4.529, 2.569, '68%'], ['Fruit', 5.026, 5.316, 3.053, '79%']].forEach(function (r) {
+    bd(s, 6.440, r[1], 1.40, 0.281, r[0], { sz: 12, f: F.head, v: 'bottom' });
+    bar(s, 6.516, r[2], 4.328, 0.339, r[3], C.gold, r[4], 9.932);
+  });
+}
+
+// 10 - four coloured cards around a cutlery medallion
+function slide10(p) {
+  const s = newSlide(p, 'Option 19', 10);
+  title(s, 3.293, 0.900, 6.748, 0.909, 48, 'center', 'Food ', 'Infographic.');
+
+  [[1.561, 2.403, C.navy, 2.690, 'left'], [1.563, 4.370, C.grey, 2.690, 'left'],
+   [7.550, 2.380, C.gold, 8.312, 'right'], [7.552, 4.347, C.sand, 8.312, 'right']].forEach(function (c) {
+    box(s, c[0], c[1], 4.179, 1.800, { shape: 'roundRect', fill: c[2], rad: 0.06 });
+    hd(s, c[3], c[1] + 0.365, 2.079, 0.309, T.s1, { c: C.white, al: c[4] });
+    bd(s, c[4] === 'left' ? c[3] + 0.039 : c[3] - 0.390, c[1] + 0.778, 2.430, 0.732, T.w2, { c: C.white, al: c[4] });
+  });
+
+  carrot(s, 1.680, 1.520, 0.900, 2.770);
+  tomato(s, 1.210, 4.450, 1.320, 1.490);
+  bread(s, 10.620, 2.660, 1.570, 1.180);
+  sausage(s, 10.900, 4.030, 1.180, 2.070);
+
+  box(s, 5.078, 2.844, 3.178, 2.947, { shape: 'ellipse', fill: C.white });
+  utensil(s, 6.169, 3.146, 0.394, 2.345, C.track, 'knife');
+  utensil(s, 6.672, 3.197, 0.492, 2.294, C.track, 'fork');
+}
+
+// 11 - kitchen scale with two white callout cards
+function slide11(p) {
+  const s = newSlide(p, 'Option 1', 11);
+  title(s, 0.892, 0.769, 5.986, 0.842, 44, 'left', 'Food ', 'Infographic.');
+  bd(s, 0.892, 1.611, 5.721, 0.572, T.w4, { sz: 14 });
+
+  lettuce(s, 4.510, 1.730, 3.100, 2.900);
+  scale(s, 4.700, 4.703, 3.902, 1.341, '2.5');
+
+  [[1.331, 4.062, 4.579, 4.011, 68.5, 1.973, 4.407, 'left', C.clay],
+   [7.925, 1.700, 11.172, 1.649, 68.5, 9.187, 2.042, 'right', C.tan]].forEach(function (c) {
+    box(s, c[0], c[1], 3.201, 1.800, { shape: 'roundRect', fill: C.white, rad: 0.06 });
+    box(s, c[2], c[3], 0.435, 0.783, { shape: 'triangle', fill: C.white, rot: c[4] });
+    hd(s, c[5], c[6], 2.079, 0.309, T.s1, { c: c[8], al: c[7] });
+    bd(s, c[7] === 'left' ? c[5] + 0.04 : c[5] - 0.391, c[6] + 0.413, 2.430, 0.732, T.w2, { al: c[7] });
+  });
+
+  carrot(s, 1.290, 4.450, 0.500, 1.840);
+  sausage(s, 11.283, 2.575, 0.630, 1.301);
+  pill(s, 10.157, 5.904, 'A wonderful text');
+}
+
+// 12 - three product cards under kiwi / smoothie / bread
+function slide12(p) {
+  const s = newSlide(p, 'Option 23', 12);
+  title(s, 2.944, 0.663, 7.446, 0.909, 48, 'center', 'Food ', 'Infographic.');
+
+  kiwi(s, 1.840, 2.260, 1.870, 2.170);
+  glass(s, 5.910, 1.790, 1.460, 2.630);
+  bread(s, 9.400, 2.750, 2.220, 1.670);
+
+  [[1.030, C.gold, '93', 1.401, 2.214], [4.898, C.tan, '72', 5.269, 6.082], [8.766, C.sand, '51', 9.136, 9.949]]
+    .forEach(function (c) {
+      box(s, c[0], 4.697, 3.486, 1.970, { fill: c[1] });
+      pct(s, c[3], 4.974, 1.030, 0.493, c[2], { c: C.white, big: 28, small: 16 });
+      hd(s, c[4], 5.115, 1.942, 0.352, T.s1, { c: C.white });
+      bd(s, c[3], 5.562, 2.756, 0.857, T.w3, { c: C.white });
+    });
+}
+
+// 13 - two stacked photo cards plus icon list
+function slide13(p) {
+  const s = newSlide(p, 'Option 20', 13);
+  title(s, 7.399, 1.580, 5.107, 1.582, 44, 'left', 'Healthy Food ', 'Infographic.');
+
+  [[0.884, C.gold, '52'], [4.174, C.grey, '37']].forEach(function (c) {
+    box(s, 1.605, c[0], 5.222, 2.760, { shape: 'roundRect', fill: c[1], rad: 0.05 });
+    pct(s, 3.807, c[0] + 0.475, 1.144, 0.638, c[2], { c: C.white, big: 36, small: 20 });
+    hd(s, 3.807, c[0] + 1.165, 2.458, 0.352, T.it, { c: C.white });
+    bd(s, 3.807, c[0] + 1.569, 2.756, 0.857, T.w3, { c: C.white });
+  });
+  basket(s, 1.020, 0.630, 2.580, 3.020);
+  hand(s, 0.970, 4.170, 2.530, 2.950);
+
+  [[3.649, C.navy, 'flame'], [5.061, C.sand, 'cloche']].forEach(function (c) {
+    hd(s, 8.407, c[0], 2.622, 0.309, T.t1, { c: c[1] });
+    bd(s, 8.456, c[0] + 0.412, 3.064, 0.732, T.w2);
+    icon(s, 7.399, c[0] + 0.076, 0.802, c[1], c[2]);
+  });
+}
+
+// 14 - three tall colour cards
+function slide14(p) {
+  const s = newSlide(p, 'Option 21', 14);
+  title(s, 3.448, 0.781, 6.438, 0.909, 48, 'center', 'Food ', 'Infographic.');
+
+  [[0.894, C.navy, 'flame', 1.401], [4.559, C.gold, 'cloche', 5.066], [8.225, C.sand, 'martini', 8.732]]
+    .forEach(function (c) {
+    box(s, c[0], 2.573, 4.066, 3.052, { shape: 'roundRect', fill: c[1], rot: 90, rad: 0.05 });
+    hd(s, c[3] + 0.297, 4.175, 2.458, 0.352, T.s1, { c: C.white, al: 'center' });
+    bd(s, c[3] + 0.148, 4.579, 2.756, 0.857, T.w3, { c: C.white, al: 'center' });
+    icon(s, c[3] + 1.29, 5.50, 0.47, c[1], c[2]);
+  });
+  tomato(s, 2.330, 2.330, 1.140, 1.280);
+  eggplant(s, 5.643, 2.186, 0.906, 1.278);
+  carrot(s, 9.890, 2.170, 0.730, 1.630);
+}
+
+// 15 - cooking pot with intro copy and two bars
+function slide15(p) {
+  const s = newSlide(p, 'Option 28', 15);
+  title(s, 1.309, 0.909, 5.107, 1.582, 44, 'left', 'Healthy Food ', 'Infographic.');
+  pot(s, 7.230, 3.010, 4.250, 3.130);
+  [[8.35, 0.85, 0.34], [9.00, 1.30, 0.24], [9.60, 0.95, 0.20], [8.70, 1.75, 0.18]].forEach(function (b) {
+    box(s, b[0], b[1], b[2], b[2], { shape: 'ellipse', fill: FC.blue });
+  });
+  [[7.75, 0.80, 0.34], [8.55, 1.30, 0.24], [9.10, 0.95, 0.20], [8.10, 1.75, 0.18]].forEach(function (b) {
+    box(s, b[0], b[1], b[2], b[2], { shape: 'ellipse', fill: FC.blue });
+  });
+
+  hd(s, 1.309, 2.636, 3.220, 0.433, T.iy);
+  bd(s, 1.309, 3.069, 5.107, 0.853, T.w5);
+  [[4.040, 4.330, 3.216, C.navy, '79%'], [4.764, 5.054, 1.673, C.gold, '30%']].forEach(function (r) {
+    bd(s, 1.309, r[0], 1.30, 0.281, 'Text here', { sz: 12, f: F.head, v: 'bottom' });
+    bar(s, 1.408, r[1], 4.258, 0.339, r[2], r[3], r[4], 4.769);
+  });
+  box(s, 1.408, 5.798, 1.373, 0.426, { line: C.black, lw: 0.75 });
+  bd(s, 1.408, 5.798, 1.373, 0.426, 'More option', { sz: 12, c: C.black, al: 'center', v: 'middle', f: F.head, b: true });
+}
+
+// 16 - shopping basket flanked by four stats
+function slide16(p) {
+  const s = newSlide(p, 'Option 31', 16);
+  title(s, 2.879, 0.803, 7.576, 0.909, 48, 'center', 'Food ', 'Infographic.');
+  basket(s, 5.000, 2.050, 3.360, 3.940);
+
+  [[3.672, 2.914, C.navy, 'flame', 0.750, 2.838, 0.771, 3.251, 2.790, '47', 'right'],
+   [3.672, 4.792, C.gold, 'cloche', 0.775, 4.716, 0.726, 5.128, 2.790, '83', 'right'],
+   [8.707, 2.914, C.grey, 'martini', 10.352, 2.838, 10.391, 3.251, 9.709, '94', 'left'],
+   [8.707, 4.792, C.sand, 'bottle', 10.327, 4.716, 10.366, 5.128, 9.709, '32', 'left']].forEach(function (c) {
+    const label = c[2] === C.grey ? C.grey2 : c[2];
+    icon(s, c[0], c[1], 0.802, c[2], c[3]);
+    hd(s, c[4], c[5], 2.079, 0.309, T.s1, { c: label, al: c[10] });
+    bd(s, c[6], c[7], 2.060, 0.543, T.w1, { al: c[10] });
+    pct(s, c[8], c[1] + 0.224, 0.800, 0.439, c[9], { c: label, al: c[10] });
+  });
+}
+
+// 17 - two white cards with swatch strips
+function slide17(p) {
+  const s = newSlide(p, 'Option 31', 17);
+  title(s, 2.523, 0.797, 8.288, 0.909, 48, 'center', 'Food ', 'Infographic.');
+  bd(s, 3.806, 1.676, 5.721, 0.572, T.w4, { sz: 14, al: 'center' });
+
+  [[1.169, 3.535, 1.671, 3, C.clay, 'EAE5E3', 1.560, 3.360, 'pumpkin', '30'],
+   [6.899, 9.206, 7.401, 5, C.sand, 'F9F6F1', 7.260, 3.210, 'banana', '70']].forEach(function (c) {
+    box(s, c[0], 2.605, 5.392, 3.621, { shape: 'roundRect', fill: C.white, rad: 0.04 });
+    swatches(s, c[2], 5.378, 0.540, 0.296, 0.122, 7, c[3], c[4], c[5]);
+    pct(s, c[1], 3.065, 1.144, 0.638, c[9], { c: C.ink, big: 36, small: 20 });
+    hd(s, c[1], 3.755, 2.458, 0.352, T.it);
+    bd(s, c[1], 4.160, 2.756, 0.857, T.w3);
+  });
+  pumpkin(s, 1.560, 3.360, 1.730, 1.580);
+  banana(s, 7.260, 3.210, 1.730, 1.720);
+}
+
+// 18 - three eggs above stat blocks
+function slide18(p) {
+  const s = newSlide(p, 'Option 8', 18);
+  title(s, 3.448, 0.781, 6.438, 0.909, 48, 'center', 'Food ', 'Infographic.');
+  [[1.920, C.sand, C.navy, '98', 1.657, 2.504, 1.691],
+   [5.521, 'EDE5D6', C.gold, '53', 5.257, 6.104, 5.291],
+   [9.121, 'F3EDE3', C.sand, '21', 8.857, 9.704, 8.891]].forEach(function (c) {
+    egg(s, c[0], 2.037, 2.262, 2.804, c[1]);
+    pct(s, c[4], 5.071, 0.925, 0.493, c[3], { c: c[2], big: 28, small: 16, al: 'center' });
+    hd(s, c[5], 5.212, 1.942, 0.352, T.s1, { c: c[2], al: 'center' });
+    bd(s, c[6], 5.660, 2.756, 0.570, T.w2, { al: 'center' });
+  });
+}
+
+// 19 - segmented food wheel with four legend rows
+function slide19(p) {
+  const s = newSlide(p, 'Slide 5', 19);
+  s.addChart(p.ChartType.doughnut, [{ name: 'Wheel', labels: ['1', '2', '3', '4', '5', '6'], values: [1, 1, 1, 1, 1, 1] }], {
+    x: 1.000, y: 1.030, w: 5.400, h: 5.380, holeSize: 38, showLegend: false, showValue: false,
+    chartColors: [C.sand, C.tan, C.gold, C.mist, 'EDE5D6', C.grey],
+    dataBorder: { pt: 3, color: C.page },
+  });
+  box(s, 2.170, 3.200, 2.060, 2.060, { shape: 'ellipse', fill: C.white });
+  title(s, 2.309, 3.488, 2.160, 0.707, 18, 'center', 'Food ', 'Infographic.');
+  tomato(s, 1.300, 1.350, 1.400, 1.400);
+  cherry(s, 3.500, 4.550, 1.800, 1.550);
+  sausage(s, 4.050, 1.550, 1.550, 1.150);
+  tomato(s, 1.200, 4.250, 1.400, 1.400);
+
+  [[0.932, C.grey, 'flame', 7.174, 1.038, 8.357], [2.421, C.sand, 'cloche', 8.001, 2.527, 9.228],
+   [4.144, C.gold, 'martini', 8.001, 4.228, 9.228], [5.633, C.tan, 'bottle', 7.174, 5.717, 8.357]]
+    .forEach(function (c) {
+      const label = c[1] === C.grey ? C.grey2 : c[1];
+      hd(s, c[5], c[0], 2.079, 0.412, T.s1, { c: label });
+      bd(s, c[5], c[0] + 0.412, 3.130, 0.559, T.w2);
+      icon(s, c[3], c[4], 0.802, c[1], c[2]);
+    });
+}
+
+// 20 - vegetable cluster with four side notes
+function slide20(p) {
+  const s = newSlide(p, 'Option 2', 20);
+  title(s, 2.879, 0.803, 7.576, 0.909, 48, 'center', 'Food ', 'Infographic.');
+
+  tomato(s, 4.920, 2.900, 1.400, 1.400);
+  eggplant(s, 4.930, 3.700, 1.700, 1.940);
+  carrot(s, 6.300, 2.480, 1.100, 3.100);
+  sausage(s, 7.100, 3.700, 1.320, 1.940);
+
+  [[9.311, 2.585, 2.663, C.gold, 'left', 8.997, 2.661, 9.311],
+   [9.311, 5.202, 2.663, C.sand, 'left', 8.997, 5.277, 9.311],
+   [1.359, 2.585, 2.352, C.navy, 'right', 3.729, 2.661, 1.293],
+   [1.359, 5.202, 2.406, C.grey, 'right', 3.729, 5.277, 1.239]].forEach(function (c) {
+    const label = c[3] === C.grey ? C.grey2 : c[3];
+    hd(s, c[0], c[1], 2.285 + (c[4] === 'left' ? 0.126 : 0), 0.343, T.s2, { sz: 16, c: label, al: c[4], b: false, line: 0.9 });
+    bd(s, c[7], c[1] + 0.342, c[2], 0.505, T.w1, { al: c[4] });
+    chevDot(s, c[5], c[6], 0.229, c[3], c[4] === 'right');
+  });
+}
+
+// 21 - three white stat cards under food shots
+function slide21(p) {
+  const s = newSlide(p, 'Option 12', 21);
+  title(s, 2.879, 0.803, 7.576, 0.909, 48, 'center', 'Food ', 'Infographic.');
+
+  [[0.397, C.navy, '49', 1.077], [4.685, C.gold, '71', 5.289], [8.974, C.sand, '95', 9.583]].forEach(function (c) {
+    box(s, c[0], 4.512, 3.962, 1.800, { shape: 'roundRect', fill: C.white, rad: 0.05 });
+    pct(s, c[3], 4.783, 1.144, 0.638, c[2], { c: c[1], big: 36, small: 20 });
+    bd(s, c[3], 5.518, 2.756, 0.631, T.w2);
+  });
+
+  box(s, 1.050, 3.200, 2.700, 0.500, { shape: 'ellipse', fill: C.ink });
+  box(s, 1.130, 3.100, 2.540, 0.420, { shape: 'ellipse', fill: C.grey });
+  bread(s, 1.400, 2.310, 1.700, 1.000);
+  egg(s, 5.871, 2.074, 1.655, 2.051, C.sand);
+  carrot(s, 10.420, 1.960, 0.800, 1.700);
+  cherry(s, 10.800, 2.600, 1.030, 1.420);
+}
+
+// 22 - carrots beside a bar, a quote and two swatch cards
+function slide22(p) {
+  const s = newSlide(p, 'Option 19', 22);
+  title(s, 5.415, 1.382, 6.445, 0.909, 48, 'left', 'Food ', 'Infographic.');
+  carrot(s, 1.400, 1.230, 1.500, 5.100);
+  carrot(s, 2.400, 1.500, 1.600, 5.100);
+
+  bd(s, 5.475, 2.442, 1.60, 0.281, T.s1, { sz: 12, f: F.head, v: 'bottom' });
+  bar(s, 5.546, 2.768, 3.181, 0.339, 1.990, C.navy, '55%', 8.056);
+  pct(s, 5.365, 3.313, 1.368, 0.638, '55', { big: 40, small: 24 });
+  bd(s, 6.734, 3.364, 3.851, 0.702,
+    'I am alone, and feel the charm of existence in this spot, which was created for the bliss of souls like mine.');
+
+  [[5.104, C.navy, 5.423, 5.512, 5, 'DAE2E8'], [8.312, C.gold, 8.604, 8.693, 4, 'F4EFE4']].forEach(function (c) {
+    box(s, c[0], 4.525, 2.859, 1.593, { shape: 'roundRect', fill: C.white, rad: 0.05 });
+    hd(s, c[2], 4.721, 2.079, 0.412, T.s1, { c: c[1] });
+    bd(s, c[2], 5.133, 2.300, 0.388, 'A wonderful serenity.');
+    swatches(s, c[3], 5.694, 0.209, 0.148, 0.047, 7, c[4], c[1], c[5]);
+  });
+}
+
+// 23 - three circular food medallions
+function slide23(p) {
+  const s = newSlide(p, 'Option 31', 23);
+  title(s, 2.879, 0.803, 7.576, 0.909, 48, 'center', 'Food ', 'Infographic.');
+
+  [[1.660, C.navy, 1.900, 1.512, 'bread'], [5.350, C.gold, 5.618, 5.230, 'pot'], [9.200, C.sand, 9.469, 9.081, 'hand']]
+    .forEach(function (c) {
+      box(s, c[0], 2.315, 2.610, 2.610, { shape: 'ellipse', fill: 'E7E6E6' });
+      hd(s, c[2], 5.263, 2.079, 0.309, T.s1, { c: c[1], al: 'center' });
+      bd(s, c[3], 5.675, 2.855, 0.612, T.w2, { al: 'center' });
+    });
+  bread(s, 2.080, 3.000, 1.800, 1.200);
+  [6.34, 6.44, 6.55].forEach(function (o) { box(s, o, 2.52, 0.08, 0.50, { shape: 'trapezoid', fill: FC.skin, rot: 180 }); });
+  pot(s, 5.970, 3.000, 1.460, 1.400);
+  tomato(s, 9.500, 3.100, 1.000, 1.000);
+  sausage(s, 10.200, 3.200, 1.200, 1.100);
+
+  bubble(s, 1.077, 1.674, 1.323, 1.227, '99%', 'Protein');
+}
+
+// 24 - smoothie glass with two white callouts
+function slide24(p) {
+  const s = newSlide(p, 'Option 30', 24);
+  title(s, 7.625, 1.081, 4.870, 1.582, 44, 'right', 'Healthy Food ', 'Infographic.');
+  glass(s, 5.410, 1.920, 2.500, 4.500);
+
+  [[1.132, 1.911, 4.379, 2.689, 1.397, 2.866, 3.008, 2.132, '75'],
+   [8.132, 4.495, 11.379, 4.444, 9.056, 5.491, 9.056, 4.757, '88']].forEach(function (c) {
+    box(s, c[0], c[1], 3.201, 1.800, { shape: 'roundRect', fill: C.white, rad: 0.06 });
+    box(s, c[2], c[3], 0.435, 0.783, { shape: 'triangle', fill: C.white, rot: 68.5 });
+    bd(s, c[4], c[5], 2.756, 0.631, T.w2);
+    pct(s, c[6], c[7], 1.144, 0.638, c[8], { c: C.navy, big: 36, small: 20 });
+  });
+
+  tomato(s, 0.880, 1.700, 0.890, 1.010);
+  peanut(s, 10.850, 3.960, 1.230, 1.560);
+
+  bd(s, 1.246, 5.648, 2.132, 0.344, T.wp, { sz: 14, f: F.med, b: true, v: 'middle', line: 1.1 });
+  noteChev(s, 0.817, 5.704, 0.232);
+  bd(s, 1.246, 6.021, 2.906, 0.505, T.w2);
+}
+
+// 25 - two diagonal-corner cards, kitchen scale and pot
+function slide25(p) {
+  const s = newSlide(p, 'Option 23', 25);
+  box(s, 3.414, 4.110, 6.002, 2.246, { shape: 'round2DiagRect', fill: C.white, rad: 0.06 });
+  box(s, 3.208, 1.593, 5.609, 2.246, { shape: 'round2DiagRect', fill: C.white, rad: 0.06 });
+
+  lettuce(s, 8.330, 1.070, 2.700, 1.550);
+  scale(s, 8.477, 2.805, 3.006, 1.033, '2.5');
+  [1.94, 2.06, 2.19].forEach(function (o) { box(s, o, 3.44, 0.09, 0.60, { shape: 'trapezoid', fill: FC.skin, rot: 180 }); });
+  box(s, 1.88, 3.98, 0.55, 0.40, { shape: 'trapezoid', fill: FC.husk, rot: 180 });
+  box(s, 2.68, 3.76, 0.75, 0.82, { shape: 'ellipse', fill: C.sand, rot: 26 });
+  box(s, 2.84, 4.28, 0.44, 0.39, { shape: 'ellipse', fill: C.gold });
+  pot(s, 1.440, 4.480, 2.180, 1.750);
+
+  pct(s, 3.615, 2.050, 1.144, 0.638, '70', { c: C.gold, big: 36, small: 20 });
+  hd(s, 4.771, 2.050, 2.458, 0.352, T.it, { c: C.gold });
+  bd(s, 4.771, 2.500, 2.897, 0.857, T.w3);
+  pct(s, 7.668, 4.689, 1.144, 0.638, '80', { c: C.grey2, big: 36, small: 20 });
+  hd(s, 5.101, 4.689, 2.458, 0.352, T.it, { c: C.grey2, al: 'right' });
+  bd(s, 4.682, 5.140, 2.877, 0.857, T.w3, { al: 'right' });
+
+  pill(s, 10.038, 5.064, 'A wonderful text');
+}
+
+// 26 - large steak with three tittle callouts
+function slide26(p) {
+  const s = newSlide(p, 'Option 25', 26);
+  title(s, 0.892, 0.769, 5.986, 0.842, 44, 'left', 'Food ', 'Infographic.');
+  bd(s, 0.892, 1.603, 5.721, 0.572, T.w4, { sz: 14 });
+  steak(s, 4.380, 2.120, 4.740, 3.560);
+
+  [[8.573, 2.002, C.navy, 'flame', 10.267, 1.925, 10.287, 2.338, 9.504, 2.225, 'left'],
+   [7.614, 5.172, C.gold, 'martini', 9.308, 5.096, 9.347, 5.508, 8.573, 5.396, 'left'],
+   [3.944, 3.389, C.grey, 'cloche', 0.890, 3.236, 0.910, 3.649, 2.930, 3.536, 'right']].forEach(function (c) {
+    const label = c[2] === C.grey ? C.grey2 : c[2];
+    icon(s, c[0], c[1], 0.802, c[2], c[3]);
+    hd(s, c[4], c[5], 2.079, 0.309, T.t2, { c: label, al: c[10] });
+    bd(s, c[6], c[7], 2.019, 0.543, T.w1, { al: c[10] });
+    pct(s, c[8], c[9], 0.800, 0.439, '73', { c: label, al: c[10] });
+  });
+
+  bd(s, 1.387, 5.386, 2.132, 0.344, T.wp, { sz: 14, f: F.med, b: true, v: 'middle', line: 1.1 });
+  noteChev(s, 0.959, 5.442, 0.232);
+  bd(s, 1.387, 5.759, 2.906, 0.505, T.w2);
+}
+
+// 27 - four top-rounded panels around a cutlery medallion
+function slide27(p) {
+  const s = newSlide(p, 'Option 26', 27);
+  title(s, 2.879, 0.803, 7.576, 0.909, 48, 'center', 'Food ', 'Infographic.');
+
+  [[1.952, 1.021, 270], [1.932, 3.415, 270], [9.471, 1.004, 90], [9.508, 3.420, 90]].forEach(function (c) {
+    box(s, c[0], c[1], 1.748, 4.281, { shape: 'round2SameRect', fill: C.white, rot: c[2], rad: 0.05 });
+  });
+
+  pot(s, 3.650, 2.660, 1.740, 1.400);
+  lettuce(s, 3.400, 4.510, 2.130, 1.700);
+  basket(s, 7.980, 1.900, 1.780, 2.080);
+  hand(s, 7.880, 4.620, 1.750, 2.030);
+
+  box(s, 5.753, 3.370, 2.089, 1.937, { shape: 'ellipse', fill: C.white });
+  utensil(s, 6.470, 3.568, 0.259, 1.541, C.track, 'knife');
+  utensil(s, 6.801, 3.602, 0.323, 1.507, C.track, 'fork');
+
+  [[2.302, 2.517, 0.691, 3.252, C.navy, '65', 'left'], [2.302, 4.853, 0.691, 5.587, C.gold, '75', 'left'],
+   [9.749, 2.466, 9.749, 3.200, C.sand, '85', 'left'], [9.749, 4.869, 9.749, 5.603, C.grey2, '95', 'left']]
+    .forEach(function (c) {
+      pct(s, c[0], c[1], 1.144, 0.638, c[5], { c: c[4], big: 36, small: 20 });
+      bd(s, c[2], c[3], 2.756, 0.631, T.w2);
+    });
+}
+
+// 28 - banana bunch with two diagonal cards and swatches
+function slide28(p) {
+  const s = newSlide(p, 'Option 31', 28);
+  title(s, 2.879, 0.803, 7.576, 0.909, 48, 'center', 'Food ', 'Infographic.');
+  hand(s, 1.980, 2.540, 3.330, 3.880);
+
+  [[2.355, C.navy, 3.635, 6, 'DAE2E8', 2.515, 2.965], [4.461, C.grey2, 5.857, 3, C.mist, 4.728, 5.179]]
+    .forEach(function (c) {
+      box(s, 6.310, c[0], 4.978, 1.837, { shape: 'round2DiagRect', fill: C.white, rad: 0.06 });
+      swatches(s, 6.876, c[2], 0.209, 0.148, 0.047, 7, c[3], c[1] === C.grey2 ? C.grey : c[1], c[4]);
+      hd(s, 6.731, c[5], 2.458, 0.352, 'Insert tittle here', { c: c[1] });
+      bd(s, 6.731, c[6], 3.972, 0.525, T.w3);
+    });
+
+  bubble(s, 1.543, 2.148, 1.323, 1.227, '80%', 'Value');
+}
+
+// 29 - basket and pot with four subtitle chips
+function slide29(p) {
+  const s = newSlide(p, 'Option 28', 29);
+  title(s, 2.879, 0.949, 7.576, 0.909, 48, 'center', 'Food ', 'Infographic.');
+  bd(s, 3.806, 1.823, 5.721, 0.572, T.w4, { sz: 14, al: 'center' });
+
+  pot(s, 4.250, 4.190, 2.080, 1.800);
+  basket(s, 6.970, 3.170, 2.220, 2.800);
+
+  [[9.969, 3.158, 9.969, 2.148, C.gold, 9.655, 3.233, 'left'],
+   [10.247, 5.108, 10.247, 2.148, C.sand, 9.933, 5.183, 'left'],
+   [1.306, 3.158, 1.249, 2.001, C.navy, 3.334, 3.233, 'right'],
+   [1.014, 5.108, 0.911, 2.047, C.grey, 3.043, 5.183, 'right']].forEach(function (c) {
+    const label = c[4] === C.grey ? C.grey2 : c[4];
+    hd(s, c[0], c[1], 1.944, 0.343, T.s2, { sz: 16, c: label, al: c[7], b: false, line: 0.9 });
+    bd(s, c[2], c[1] + 0.342, c[3], 0.505, T.w1, { al: c[7] });
+    chevDot(s, c[5], c[6], 0.229, c[4], c[7] === 'right');
+  });
+}
+
+// 30 - carrot & cherries with two value bubbles
+function slide30(p) {
+  const s = newSlide(p, 'Option 26', 30);
+  title(s, 2.879, 0.803, 7.576, 0.909, 48, 'center', 'Food ', 'Infographic.');
+  carrot(s, 5.410, 2.100, 1.500, 3.600);
+  cherry(s, 6.100, 3.700, 2.180, 2.590);
+
+  [[2.087, C.clay, 1.444], [9.797, C.gold, 9.106]].forEach(function (c) {
+    hd(s, c[0], 4.930, 2.079, 0.309, T.t2, { c: c[1] });
+    bd(s, c[0] + 0.02, 5.343, 2.019, 0.543, T.w1);
+    pct(s, c[2], 5.230, 0.735, 0.439, '50', { c: c[1], al: 'center' });
+  });
+
+  bubble(s, 3.608, 2.114, 1.516, 1.405, '50%', 'Carrot');
+  bubble(s, 8.816, 2.812, 1.516, 1.405, '50%', 'Cherry');
+}
+
+// 31 - lettuce with legend, bar and two icon rows
+function slide31(p) {
+  const s = newSlide(p, 'Option 18', 31);
+  title(s, 0.848, 1.471, 5.107, 1.582, 44, 'left', 'Healthy Food ', 'Infographic.');
+  lettuce(s, 4.400, 2.100, 4.200, 3.700);
+
+  hd(s, 0.848, 3.316, 3.220, 0.433, T.iy);
+  bd(s, 0.848, 3.749, 3.962, 0.853, T.w5);
+  bd(s, 0.848, 4.532, 1.60, 0.281, T.s1, { sz: 12, f: F.head, v: 'bottom' });
+  bar(s, 0.936, 4.899, 3.181, 0.339, 1.990, C.navy, '55%', 3.447);
+  box(s, 0.945, 5.471, 1.435, 0.399, { line: C.black, lw: 0.75 });
+  bd(s, 0.945, 5.471, 1.435, 0.399, 'More option', { sz: 12, c: C.black, al: 'center', v: 'middle', f: F.head, b: true });
+
+  [['DESCRIPTION ONE', 1.333, C.sand], ['DESCRIPTION TWO', 1.666, C.grey], ['DESCRIPTION THREE', 2.045, C.navy]]
+    .forEach(function (r) {
+      bd(s, 9.137, r[1], 3.298, 0.337, r[0], { sz: 14, c: '0C0C0C', f: F.head, b: true });
+      box(s, 8.403, r[1] + 0.123, 0.491, 0.103, { fill: r[2] });
+    });
+
+  [[3.332, C.navy, 'flame', 3.502], [4.744, C.sand, 'cloche', 4.915]].forEach(function (c) {
+    hd(s, 9.714, c[0], 2.079, 0.309, T.t1, { c: c[1] });
+    bd(s, 9.753, c[0] + 0.412, 2.626, 0.732, T.w2);
+    icon(s, 8.621, c[3], 0.802, c[1], c[2]);
+  });
+}
+
+/* ------------------------------------------------------------------- build */
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'WIDE', width: 13.333, height: 7.5 });
+  pptx.layout = 'WIDE';
+  pptx.author = 'pptxgenjs';
+  pptx.title = 'Food Infographic Presentation';
+
+  [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08,
+    slide09, slide10, slide11, slide12, slide13, slide14, slide15, slide16,
+    slide17, slide18, slide19, slide20, slide21, slide22, slide23, slide24,
+    slide25, slide26, slide27, slide28, slide29, slide30, slide31].forEach(function (fn) { fn(pptx); });
+
+  return pptx.writeFile({ fileName: path.join(__dirname, '17f9f748-18ac-49bb-9e5b-ead470867e9a_grok_final.pptx') });
+}
+
+build().then(function (f) { console.log('wrote ' + f); }, function (e) { console.error(e); process.exit(1); });
