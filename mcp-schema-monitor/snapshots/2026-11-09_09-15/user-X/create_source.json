@@ -1,0 +1,22 @@
+{
+  "description": "Creates a persistent RTMP/RTMPS ingest point for the authenticated user. Push an encoder to `rtmps_url` with the returned `stream_key`. This is the only response that includes the stream key; read it later with GET /2/sources/:id/stream_key.",
+  "inputSchema": {
+    "properties": {
+      "name": {
+        "description": "Label for the source.",
+        "type": "string"
+      },
+      "region": {
+        "description": "Ingest region, as returned by GET /2/region. us-west-1 and us-west-2 ingest in US West; us-east-1...",
+        "type": "string"
+      }
+    },
+    "required": [
+      "name",
+      "region"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "create_source"
+}

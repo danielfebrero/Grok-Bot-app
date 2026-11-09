@@ -1,0 +1,10 @@
+{
+  "description": "Check whether the organization is in AgentMail Labs, which offers features still in preview, such as Agent Armor, and whether Labs is offered in this deployment. Calendar left Labs and works without it. Needs organization-level access.",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {},
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_labs"
+}

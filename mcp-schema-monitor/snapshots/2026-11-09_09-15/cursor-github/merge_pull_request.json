@@ -1,0 +1,48 @@
+{
+  "description": "PUT /repos/{owner}/{repo}/pulls/{pull_number}/merge. Irreversible: check the pull request's mergeable state and its checks first, and confirm with the user when the merge was not explicitly requested. GitHub answers 405 when the PR is not mergeable and 409 when the head SHA does not match.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "additionalProperties": false,
+    "properties": {
+      "commit_message": {
+        "type": "string"
+      },
+      "commit_title": {
+        "type": "string"
+      },
+      "merge_method": {
+        "enum": [
+          "merge",
+          "squash",
+          "rebase"
+        ],
+        "type": "string"
+      },
+      "owner": {
+        "description": "Repository owner (user or org login).",
+        "type": "string"
+      },
+      "pull_number": {
+        "description": "Pull request number.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "repo": {
+        "description": "Repository name.",
+        "type": "string"
+      },
+      "sha": {
+        "description": "Head SHA the merge must apply to; refused if the head moved.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "repo",
+      "pull_number"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "merge_pull_request"
+}

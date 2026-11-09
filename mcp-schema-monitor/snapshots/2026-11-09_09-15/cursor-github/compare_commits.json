@@ -1,0 +1,45 @@
+{
+  "description": "GET /repos/{owner}/{repo}/compare/{base}...{head}: how `head` differs from `base` (`status`, `ahead_by`, `behind_by`), one page of the commits between them, and the files changed with their patches. Pass `base` and `head` as separate arguments, not GitHub REST's single `basehead` path parameter. Both are branches, tags, or SHAs; `head` may be `owner:branch` for a fork.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "additionalProperties": false,
+    "properties": {
+      "base": {
+        "description": "Base branch, tag, or commit SHA.",
+        "type": "string"
+      },
+      "head": {
+        "description": "Head branch, tag, or commit SHA.",
+        "type": "string"
+      },
+      "owner": {
+        "description": "Repository owner (user or org login).",
+        "type": "string"
+      },
+      "page": {
+        "description": "1-based page number.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "per_page": {
+        "description": "Results per page (GitHub's default is 30, max 100).",
+        "maximum": 100,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "repo": {
+        "description": "Repository name.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "repo",
+      "base",
+      "head"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "compare_commits"
+}
