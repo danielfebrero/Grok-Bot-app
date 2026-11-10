@@ -1,0 +1,65 @@
+{
+  "description": "Create a file-level, single-line, or line-range inline comment, optionally against a specific pull request version.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "anchor": {
+        "properties": {
+          "endLine": {
+            "description": "Inclusive last line. Required for range; omit otherwise",
+            "type": "number"
+          },
+          "kind": {
+            "description": "file, line, or range",
+            "type": "string"
+          },
+          "path": {
+            "description": "Diff path. Deleted path for deletions; head path otherwise",
+            "type": "string"
+          },
+          "side": {
+            "description": "left or right. Required for line and range; omit for file",
+            "type": "string"
+          },
+          "startLine": {
+            "description": "1-based first line. Required for line and range",
+            "type": "number"
+          }
+        },
+        "required": [
+          "kind",
+          "path"
+        ],
+        "type": "object"
+      },
+      "body": {
+        "type": "string"
+      },
+      "name": {
+        "description": "Origin repository name within that namespace",
+        "type": "string"
+      },
+      "number": {
+        "type": "number"
+      },
+      "owner": {
+        "description": "Origin namespace (owner) slug, taken from list_namespaces or an earlier Origin result. A GitHub owner or org name is not an Origin namespace unless list_namespaces returns it.",
+        "type": "string"
+      },
+      "versionNumber": {
+        "description": "Pull request version. Omit or 0 for latest",
+        "type": "number"
+      }
+    },
+    "required": [
+      "owner",
+      "name",
+      "number",
+      "body",
+      "anchor"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "create_pull_request_inline_comment"
+}

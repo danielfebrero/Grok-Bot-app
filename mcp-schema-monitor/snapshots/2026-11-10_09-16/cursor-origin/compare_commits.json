@@ -1,0 +1,44 @@
+{
+  "description": "Compare two refs of an Origin-hosted repository relative to their merge base. Choose a single view: summary or files. view defaults to summary. Files pages the paths that differ between head and the merge base, including per-file patches. Continuation calls must resend base and head with pageToken; an omitted view still pages files.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "base": {
+        "description": "Ref the comparison starts from",
+        "type": "string"
+      },
+      "head": {
+        "description": "Ref compared against the base",
+        "type": "string"
+      },
+      "name": {
+        "description": "Origin repository name within that namespace",
+        "type": "string"
+      },
+      "owner": {
+        "description": "Origin namespace (owner) slug, taken from list_namespaces or an earlier Origin result. A GitHub owner or org name is not an Origin namespace unless list_namespaces returns it.",
+        "type": "string"
+      },
+      "pageSize": {
+        "type": "number"
+      },
+      "pageToken": {
+        "type": "string"
+      },
+      "view": {
+        "default": "summary",
+        "description": "summary (default) or files",
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "name",
+      "base",
+      "head"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "compare_commits"
+}

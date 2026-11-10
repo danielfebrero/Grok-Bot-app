@@ -1,0 +1,20 @@
+{
+  "description": "Removes a Post from the authenticated user's Bookmarks by its ID.",
+  "inputSchema": {
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "tweet_id": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "tweet_id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "delete_users_bookmark"
+}

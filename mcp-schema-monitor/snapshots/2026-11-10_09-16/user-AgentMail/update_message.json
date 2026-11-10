@@ -1,0 +1,37 @@
+{
+  "description": "Add or remove labels on one message, for example remove unread to mark it read. System labels such as received and sent cannot be changed. Returns the message's labels after the change.",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "addLabels": {
+        "description": "Labels to add to the message, e.g. unread or your own",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "inboxId": {
+        "description": "Inbox ID: the inbox's email address, from list_inboxes",
+        "type": "string"
+      },
+      "messageId": {
+        "description": "Message ID with its angle brackets, from list_messages, search_messages, or get_thread",
+        "type": "string"
+      },
+      "removeLabels": {
+        "description": "Labels to remove from the message, e.g. unread to mark it read",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "inboxId",
+      "messageId"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "update_message"
+}
