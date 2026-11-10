@@ -1,0 +1,667 @@
+#!/usr/bin/env node
+/**
+ * Insurance Agency - Business Presentation Template (30 slides, 20 x 11.25 in).
+ * Rebuilt from the reference deck with pptxgenjs only.
+ * Raster images of the original are replaced by flat colour placeholders.
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ tokens */
+const W = 20, H = 11.25;
+
+const BLUE = '0649CB';      // brand blue
+const STEEL = '2E75B6';     // secondary blue
+const NAVY = '223152';
+const ICE = 'E2F2FF';
+const CHECK = '2199F7';
+const WHITE = 'FFFFFF';
+const BLACK = '000000';
+const GRAY15 = '262626';    // tx1 lumMod 85%
+const GRAY35 = '595959';    // tx1 lumMod 65%
+const GRAY50 = '808080';    // tx1 lumMod 50%
+const BG95 = 'F2F2F2';      // bg1 lumMod 95%
+const BG85 = 'D9D9D9';      // bg1 lumMod 85%
+const BG75 = 'BFBFBF';      // bg1 lumMod 75%
+
+const DISPLAY = 'Playfair Display Bold';
+const HEAVY = 'Playfair Display Black';
+const BODY = 'Exo 2';
+const MED = 'Exo 2 Medium';
+const BOLD = 'Exo 2 Bold';
+const LIGHT = 'Exo 2 Light';
+
+/* PowerPoint text-box insets used all over the deck: [left, right, bottom, top] in pt */
+const INSET = [7.2, 7.2, 3.6, 3.6];
+
+/* ------------------------------------------------------- lorem ipsum parts */
+const P1 = 'Lorem Ipsum\u00A0is simply dummy text of the printing and typesetting industry.';
+const P2 = "Lorem Ipsum has been the industry's standard dummy text ever since the 1500s";
+const P3 = ', when an unknown printer took a galley';
+const P4 = ' of type and scrambled it to make a type specimen book. ';
+
+const LOREM_FULL = P1 + ' ' + P2 + P3 + P4;          // spaced, complete
+const LOREM_FULL_T = P1 + P2 + P3 + P4;              // tight, complete
+const LOREM_MID = P1 + ' ' + P2 + P3;                // spaced, up to "galley"
+const LOREM_MID_T = P1 + P2 + P3;                    // tight, up to "galley"
+const LOREM_SHORT = P1 + P2;                         // tight, up to "1500s"
+const LOREM_STD = P1 + "Lorem Ipsum has been the industry's standard";
+const LOREM_SWOT = LOREM_FULL + P2 + ',';
+const LOREM_TINY = 'Lorem Ipsum\u00A0is simply dummy text of the printing andty pesetting industry. Lorem Ipsum has been the industry.';
+const LOREM_4LINES = [
+	P1,
+	"Lorem Ipsum has been the industry's standard dummy text ever since the",
+	'1500s, when an unknown printer took a galley of type and scrambled it to',
+	'make a type specimen book. '
+];
+
+/* ----------------------------------------------------------- tiny helpers */
+const noLine = { type: 'none' };
+
+/** soft drop shadow used by every card in the deck (blur given in points) */
+function shadow(blur, color, angle) {
+	return { type: 'outer', angle: angle || 90, blur: blur, offset: 3, color: color || GRAY50, opacity: 0.4 };
+}
+
+/** text box with the deck's standard insets */
+function tx(slide, text, opts) {
+	slide.addText(text, Object.assign({ valign: 'top', margin: INSET, fit: 'resize', fontFace: BODY, color: BLACK }, opts));
+}
+
+/** paragraph-per-entry text box (keeps the reference's manual line breaks) */
+function txLines(slide, lines, opts) {
+	tx(slide, lines.map(function (l, i) {
+		return { text: l, options: { breakLine: i < lines.length - 1 } };
+	}), opts);
+}
+
+function rect(slide, x, y, w, h, color, opts) {
+	slide.addShape('rect', Object.assign({ x: x, y: y, w: w, h: h, fill: { color: color }, line: noLine }, opts));
+}
+
+/** rounded rectangle - the deck always uses the default 16.67% corner radius */
+function roundRect(slide, x, y, w, h, o) {
+	slide.addShape('roundRect', Object.assign({
+		x: x, y: y, w: w, h: h, rectRadius: 0.1667 * Math.min(w, h),
+		fill: { color: o.fill }, line: o.line || noLine
+	}, o.extra));
+}
+
+function poly(slide, x, y, w, h, points, o) {
+	slide.addShape('custGeom', Object.assign({
+		x: x, y: y, w: w, h: h, points: points,
+		fill: { color: o.color, transparency: o.transparency }, line: noLine
+	}, o.extra));
+}
+
+/** placeholder for a photograph in the original deck */
+function photo(slide, x, y, w, h, o) {
+	slide.addShape(o.shape || 'rect', { x: x, y: y, w: w, h: h, fill: { color: o.color }, line: noLine });
+	tx(slide, '[image]', { x: x + 0.14, y: y + 0.12, w: 1.4, h: 0.34, fontSize: 12, color: GRAY50 });
+}
+
+/** placeholder for a small pictogram: outlined on dark art, filled on light art */
+function icon(slide, x, y, w, h, o) {
+	o = o || {};
+	slide.addShape(o.round ? 'ellipse' : 'roundRect', {
+		x: x, y: y, w: w, h: h, rectRadius: 0.12 * Math.min(w, h),
+		fill: o.fill ? { color: o.fill } : { type: 'none' },
+		line: o.stroke ? { color: o.stroke, width: o.width || 1 } : noLine
+	});
+}
+
+/* ------------------------------------------------- recurring deck elements */
+
+/** dark plate + skewed blue tab + caption ("Make an Appointment" / "Get Started") */
+function button(slide, x, y, w, cap) {
+	const bw = w * 0.9836;                       // blue tab is slightly narrower
+	rect(slide, x, y, w, 0.883, BLACK);
+	poly(slide, x + 0.018, y + 0.008, bw, 0.894, [
+		{ x: 0, y: 0 }, { x: bw, y: 0 }, { x: bw * 0.8656, y: 0.803 }, { x: 0, y: 0.894 }, { close: true }
+	], { color: BLUE });
+	tx(slide, cap.t, {
+		x: x + cap.dx, y: y + (cap.dy || 0.244), w: cap.w, h: 0.404,
+		fontSize: 18, fontFace: MED, color: WHITE, align: cap.align, wrap: false
+	});
+}
+
+/** white card holding two labelled progress bars */
+const BARS = [
+	{ label: 'Gaps In Capabilities', lw: 3.312, value: '85%', vw: 0.901 },
+	{ label: 'Reputation', lw: 1.967, value: '90%', vw: 0.917 }
+];
+function progressCard(slide, o) {
+	rect(slide, o.x, o.y, o.w, 2.818, WHITE, { shadow: shadow(16) });
+	BARS.forEach(function (b, i) {
+		const y = o.bar[i];
+		rect(slide, o.x + 0.336, y, o.track, 0.255, BG85);
+		rect(slide, o.x + 0.336, y, o.track * 0.7575, 0.255, BLUE);
+		tx(slide, b.label, { x: o.lx[i], y: o.ly[i], w: b.lw, h: 0.505, fontSize: 24, fontFace: BOLD, wrap: false });
+		tx(slide, b.value, { x: o.vx[i], y: o.vy[i], w: b.vw, h: 0.505, fontSize: 24, fontFace: BOLD, wrap: false });
+	});
+}
+
+/** name + job title + four social pictograms (team slides) */
+const SOCIAL = [[0.153, 1.115, 0.297], [0.655, 1.101, 0.325], [1.158, 1.119, 0.357], [1.759, 1.142, 0.243]];
+function teamCard(slide, x, y) {
+	tx(slide, 'YOUR NAME ', { x: x, y: y, w: 2.272, h: 0.522, fontSize: 25, fontFace: BOLD, color: BLUE, wrap: false });
+	tx(slide, 'Job Position Here', { x: x, y: y + 0.388, w: 2.369, h: 0.493, fontSize: 18, color: GRAY50, lineSpacingMultiple: 1.5 });
+	SOCIAL.forEach(function (s) { icon(slide, x + s[0], y + s[1], s[2], s[2], { stroke: GRAY35 }); });
+}
+
+/** big figure + caption pair used on the "statistics" strips */
+function stat(slide, s) {
+	tx(slide, s.big, { x: s.x, y: s.y, w: s.bw, h: 0.606, fontSize: 30, bold: true, fontFace: BOLD, align: 'center', wrap: false });
+	tx(slide, s.cap, { x: s.cx, y: s.cy, w: s.cw, h: 0.631, fontSize: s.sz || 21, fontFace: LIGHT, align: 'center', lineSpacingMultiple: 1.5 });
+}
+
+/** SWOT slides 21-24 share the same headline block */
+function swotHead(slide, o) {
+	tx(slide, 'INSURANCE AGENCY', { x: o.kx, y: o.ky, w: 2.781, h: 0.438, fontSize: 20, fontFace: MED, wrap: false });
+	tx(slide, [
+		{ text: o.title, options: { breakLine: true } },
+		{ text: 'AGENCY ' },
+		{ text: 'ANALYSIS SWOT', options: { color: BLUE } }
+	], { x: o.x, y: o.y, w: 8.897, h: 1.784, fontSize: 50, bold: true, fontFace: DISPLAY, wrap: false });
+	tx(slide, LOREM_SWOT, { x: o.x, y: o.by, w: 8.764, h: 2.373, fontSize: 18, lineSpacingMultiple: 1.5 });
+}
+
+/** the giant S / W / O / T letter */
+function swotLetter(slide, letter, x, y, w, wrap) {
+	tx(slide, letter, { x: x, y: y, w: w, h: 8.516, fontSize: 500, bold: true, fontFace: DISPLAY, color: WHITE, wrap: wrap });
+}
+
+/* leaf silhouette behind the W / T letters (a teardrop with a flat top-left corner) */
+function leaf(w, h) {
+	return [
+		{ x: 0, y: 0 }, { x: w * 0.5, y: 0 }, { x: w * 0.5149, y: 0 }, { x: w * 0.5149, y: h * 0.0004 },
+		{ x: w * 0.5258, y: h * 0.0006 },
+		{ x: w, y: h * 0.5 , curve: { type: 'cubic', x1: w * 0.79, y1: h * 0.0141, x2: w, y2: h * 0.2325 } },
+		{ x: w * 0.5, y: h, curve: { type: 'cubic', x1: w, y1: h * 0.7762, x2: w * 0.7761, y2: h } },
+		{ x: w * 0.0026, y: h * 0.5511, curve: { type: 'cubic', x1: w * 0.2411, y1: h, x2: w * 0.0282, y2: h * 0.8033 } },
+		{ x: w * 0.0011, y: h * 0.5318 }, { x: 0, y: h * 0.5318 }, { close: true }
+	];
+}
+
+/* ------------------------------------------------------------------ slides */
+const slides = [];
+
+/* 1 - cover ---------------------------------------------------------------- */
+slides.push(function (s) {
+	poly(s, 0, 0, 20, 5.976, [
+		{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 5.542 },
+		{ x: 0, y: 5.542, curve: { type: 'cubic', x1: 15.497, y1: 7.269, x2: 6.939, y2: 3.123 } },
+		{ x: 0, y: 0 }, { close: true }
+	], { color: BLUE, transparency: 12, extra: { shadow: shadow(40, BLACK) } });
+	icon(s, 9.412, 0.981, 1.175, 1.031, { stroke: WHITE, width: 2, round: true });
+	tx(s, 'INSURANCE AGENCY', { x: 5.54, y: 2.191, w: 8.92, h: 1.111, fontSize: 60, bold: true, fontFace: HEAVY, color: WHITE, wrap: false });
+	tx(s, 'Insurance Business Presentation Template', {
+		x: 3.733, y: 3.204, w: 12.535, h: 0.622, fontSize: 24, fontFace: MED, color: WHITE,
+		align: 'center', charSpacing: 3, lineSpacingMultiple: 1.5
+	});
+});
+
+/* 2 - welcome -------------------------------------------------------------- */
+slides.push(function (s) {
+	tx(s, [
+		{ text: 'WELCOME TO OUR ', options: { breakLine: true } },
+		{ text: 'INSURANCE COMPANY', options: { color: BLUE } }
+	], { x: 10.724, y: 2.198, w: 7.989, h: 1.784, fontSize: 50, bold: true, fontFace: DISPLAY, wrap: false });
+	txLines(s, LOREM_4LINES, { x: 10.74, y: 4.073, w: 8.792, h: 1.919, fontSize: 18, color: GRAY35, lineSpacingMultiple: 1.5 });
+	icon(s, 10.932, 6.532, 0.727, 0.727, { stroke: GRAY15 });
+	txLines(s, ['Full Protection', 'insurance'], { x: 11.812, y: 6.475, w: 2.26, h: 0.841, fontSize: 22, fontFace: MED, wrap: false });
+	icon(s, 14.974, 6.532, 0.785, 0.785, { stroke: GRAY15 });
+	tx(s, [
+		{ text: '780+', options: { bold: true, breakLine: true } },
+		{ text: 'Employees Worldwide' }
+	], { x: 15.917, y: 6.475, w: 3.357, h: 0.841, fontSize: 22, fontFace: MED, wrap: false });
+	button(s, 10.932, 8.081, 3.642, { t: 'Make an Appointment', dx: 0.244, w: 2.737 });
+});
+
+/* 3 - CEO ------------------------------------------------------------------ */
+slides.push(function (s) {
+	rect(s, 0, 0, 0.838, 11.25, BLUE);
+	rect(s, 3.527, 9.0, 5.41, 1.6, WHITE);
+	tx(s, 'THE COMPANY CEO AND FOUNDER', { x: 8.937, y: 1.041, w: 9.805, h: 2.457, fontSize: 70, bold: true, fontFace: DISPLAY });
+	tx(s, LOREM_FULL_T, { x: 8.91, y: 3.799, w: 9.308, h: 1.919, fontSize: 18, fontFace: MED, color: GRAY15, lineSpacingMultiple: 1.5 });
+	tx(s, 'Michael Smith', { x: 4.148, y: 9.405, w: 3.026, h: 0.606, fontSize: 30, fontFace: BOLD, wrap: false });
+	tx(s, 'Directur', { x: 4.148, y: 10.011, w: 1.142, h: 0.404, fontSize: 18, fontFace: MED, color: GRAY35, wrap: false });
+	progressCard(s, {
+		x: 9.109, y: 6.436, w: 9.782, track: 9.109, bar: [7.268, 8.529],
+		lx: [9.364, 9.412], ly: [6.663, 7.909], vx: [17.767, 17.816], vy: [6.713, 7.959]
+	});
+});
+
+/* 4 - protection ----------------------------------------------------------- */
+slides.push(function (s) {
+	s.background = { color: BLUE };
+	rect(s, 0, 0, 20, 11.25, WHITE, { fill: { color: WHITE, transparency: 33 } });
+	s.addShape('flowChartDelay', { x: 0, y: 0, w: 9.551, h: 11.25, fill: { color: BLUE }, line: noLine });
+	rect(s, 10.0, 6.738, 4.672, 2.77, WHITE, { shadow: shadow(22, GRAY35) });
+	rect(s, 14.894, 6.733, 4.672, 2.77, WHITE, { shadow: shadow(22, GRAY35) });
+	tx(s, [
+		{ text: 'INSURANCE PROVIDE', options: { breakLine: true } },
+		{ text: 'PROTECTION YOUR LIFE', options: { color: BLUE } }
+	], { x: 9.863, y: 1.861, w: 8.732, h: 1.784, fontSize: 50, bold: true, fontFace: DISPLAY, wrap: false });
+	txLines(s, LOREM_4LINES, { x: 9.863, y: 3.909, w: 8.792, h: 1.919, fontSize: 18, color: GRAY35, lineSpacingMultiple: 1.5 });
+	[['INTRODUCING', 10.361, 2.221], ['ABOUT OUR COMPANY', 15.23, 3.428]].forEach(function (c) {
+		tx(s, c[0], { x: c[1], y: 7.005, w: c[2], h: 0.471, fontSize: 22, fontFace: BOLD, wrap: false });
+		tx(s, LOREM_TINY, { x: c[1], y: 7.558, w: 4.0, h: 1.818, fontSize: 17, color: GRAY35, lineSpacingMultiple: 1.5 });
+	});
+});
+
+/* 5 - vision & mission ----------------------------------------------------- */
+slides.push(function (s) {
+	s.addShape('teardrop', { x: 1.215, y: 1.058, w: 9.673, h: 9.425, rotate: 42.507, fill: { color: BLUE, transparency: 14 }, line: noLine });
+	s.addShape('teardrop', { x: 13.691, y: 0.787, w: 4.737, h: 4.737, rotate: 180, fill: { color: BLUE, transparency: 10 }, line: noLine });
+	s.addShape('teardrop', { x: 13.691, y: 6.078, w: 4.737, h: 4.737, rotate: 270, fill: { color: BLUE, transparency: 10 }, line: noLine });
+	txLines(s, ['OUR COMPANY ', 'VISION AND MISSION'], { x: 2.637, y: 3.77, w: 7.572, h: 1.784, fontSize: 50, bold: true, fontFace: DISPLAY, color: WHITE, wrap: false });
+	tx(s, LOREM_FULL, { x: 2.631, y: 5.864, w: 7.774, h: 1.856, fontSize: 18, color: WHITE, lineSpacingMultiple: 1.5 });
+	[['COMPANY VISION', 1.812, 2.365, 2.726], ['COMPANY MISSION', 7.103, 7.656, 2.989]].forEach(function (c) {
+		tx(s, c[0], { x: 14.382, y: c[1], w: c[3], h: 0.471, fontSize: 22, fontFace: BOLD, color: WHITE, wrap: false });
+		tx(s, LOREM_TINY, { x: 14.382, y: c[2], w: 3.673, h: 1.919, fontSize: 18, fontFace: LIGHT, color: WHITE, lineSpacingMultiple: 1.5 });
+	});
+});
+
+/* 6 - market targets ------------------------------------------------------- */
+slides.push(function (s) {
+	photo(s, 0, 0, 20, 11.25, { color: 'FAFAFA' });
+	poly(s, 9.199, 0.002, 10.799, 9.347, [
+		{ x: 5.878, y: 0 }, { x: 10.779, y: 0 },
+		{ x: 10.799, y: 5.0, curve: { type: 'cubic', x1: 10.786, y1: 1.667, x2: 10.793, y2: 3.333 } },
+		{ x: 0, y: 9.347 }, { x: 5.878, y: 0 }, { close: true }
+	], { color: BG95 });
+	[8.429, 14.061].forEach(function (x) {
+		roundRect(s, x, 5.143, 5.28, 5.225, { fill: WHITE, extra: { shadow: shadow(38) } });
+	});
+	[9.394, 15.098].forEach(function (x, i) {
+		tx(s, 'Your Text Here', { x: x, y: 6.047, w: 3.349, h: 0.64, fontSize: 32, fontFace: BOLD, wrap: false });
+		tx(s, LOREM_SHORT, { x: [8.908, 14.613][i], y: 6.686, w: 4.32, h: 3.029, fontSize: 18, fontFace: MED, align: 'center', lineSpacingMultiple: 2 });
+	});
+	txLines(s, ['Insurance Agency Will', 'Mark Market Targets.'], { x: 8.696, y: 1.709, w: 10.024, h: 2.289, fontSize: 65, bold: true, fontFace: DISPLAY, color: BLUE });
+});
+
+/* 7 - better insurance ----------------------------------------------------- */
+slides.push(function (s) {
+	rect(s, 0.16, 0, 8.218, 11.25, BLUE);
+	rect(s, 0, 0, 8.218, 11.25, BLUE, { shadow: shadow(52, BLACK) });
+	txLines(s, ['BETTER INSURANCE ', 'FOR EVERYONE'], { x: 0.656, y: 3.328, w: 6.651, h: 1.616, fontSize: 45, bold: true, fontFace: DISPLAY, color: WHITE, wrap: false });
+	txLines(s, [P1 + ' ' + P2 + ', when an unknown printer took a galley of type and scrambled it to', 'make a type specimen book. '],
+		{ x: 0.656, y: 5.319, w: 6.926, h: 2.373, fontSize: 18, color: WHITE, lineSpacingMultiple: 1.5 });
+	[['RESPECT FOR ALL PEOPLE', 0.964, 3.906], ['SPEED IN SERVICING', 4.6, 3.112], ['INSURANCE PROTECION', 8.109, 3.612]].forEach(function (c) {
+		tx(s, c[0], { x: 9.309, y: c[1], w: c[2], h: 0.471, fontSize: 22, fontFace: BOLD, wrap: false });
+		tx(s, LOREM_TINY, { x: 9.309, y: c[1] + 0.523, w: 5.691, h: 1.388, fontSize: 18, color: GRAY35, lineSpacingMultiple: 1.5 });
+	});
+});
+
+/* 8 - best services -------------------------------------------------------- */
+slides.push(function (s) {
+	rect(s, 9.255, 0, 10.745, 11.25, WHITE, { fill: { color: WHITE, transparency: 63 } });
+	rect(s, 0, 0, 9.255, 11.25, BLUE, { fill: { color: BLUE, transparency: 24 } });
+	tx(s, 'OUR BEST SERVICES', { x: 0.583, y: 3.088, w: 5.32, h: 2.121, fontSize: 60, bold: true, fontFace: DISPLAY, color: WHITE });
+	tx(s, LOREM_MID, { x: 0.55, y: 5.401, w: 7.062, h: 1.919, fontSize: 18, fontFace: MED, color: WHITE, lineSpacingMultiple: 1.5 });
+	[['LIFE INSURANCE', 1.225, 2.87], ['CAR INSURANCE', 4.607, 2.846], ['HOME INSURANCE', 7.989, 3.189]].forEach(function (c) {
+		tx(s, c[0], { x: 11.182, y: c[1], w: c[2], h: 0.522, fontSize: 25, fontFace: BOLD, wrap: false });
+		tx(s, LOREM_MID_T, { x: 11.182, y: c[1] + 0.522, w: 8.143, h: 1.723, fontSize: 17, fontFace: MED, lineSpacingMultiple: 2 });
+	});
+});
+
+/* 9 - service cards -------------------------------------------------------- */
+slides.push(function (s) {
+	const cards = [
+		{ x: 3.636, y: 3.182, title: 'CAR INSURANCE', tw: 2.527, tx: 4.582, ty: 3.858 },
+		{ x: 12.6, y: 3.182, title: 'HOME INSURANCE', tw: 2.828, tx: 13.567, ty: 3.858 },
+		{ x: 3.636, y: 7.2, title: 'HEALTH INSURANCE', tw: 3.1, tx: 4.604, ty: 8.003 },
+		{ x: 12.6, y: 7.2, title: 'LIFE INSURANCE', tw: 2.551, tx: 13.589, ty: 8.003 }
+	];
+	cards.forEach(function (c) { rect(s, c.x, c.y, 5.818, 3.455, WHITE, { shadow: shadow(22, GRAY35, 157) }); });
+	rect(s, 18.418, 3.182, 0.164, 3.455, BLUE);
+	tx(s, 'OUR BEST SERVICES', { x: 6.042, y: 0.792, w: 6.555, h: 0.858, fontSize: 45, bold: true, fontFace: DISPLAY, color: BLUE, wrap: false });
+	tx(s, LOREM_MID, { x: 3.378, y: 1.757, w: 13.245, h: 1.01, fontSize: 18, fontFace: LIGHT, align: 'center', lineSpacingMultiple: 1.5 });
+	cards.forEach(function (c) {
+		tx(s, c.title, { x: c.tx, y: c.ty, w: c.tw, h: 0.471, fontSize: 22, fontFace: BOLD, wrap: false });
+		tx(s, LOREM_TINY, { x: c.tx, y: c.ty + 0.544, w: 4.582, h: 1.464, fontSize: 18, fontFace: LIGHT, lineSpacingMultiple: 1.5 });
+	});
+});
+
+/* 10 - we serve the best services ------------------------------------------ */
+slides.push(function (s) {
+	photo(s, 0, 0, 20, 11.25, { color: 'F4F4F4' });
+	rect(s, 0, 0, 20, 11.25, WHITE, { fill: { color: WHITE, transparency: 45 } });
+	poly(s, 0.17, 0, 10.566, 7.925, [
+		{ x: 0, y: 0.019 }, { x: 10.566, y: 0 }, { x: 7.698, y: 7.925 }, { x: 0.019, y: 7.83 },
+		{ x: 0, y: 0.019, curve: { type: 'cubic', x1: 0.013, y1: 5.226, x2: 0.006, y2: 2.623 } }, { close: true }
+	], { color: BLUE, extra: { shadow: shadow(24) } });
+	[[0, 5.028], [4.962, 4.925], [9.754, 4.925], [14.621, 4.925]].forEach(function (c) {
+		const w = c[1];
+		poly(s, c[0], 6.679, w, 4.214, [
+			{ x: w * 0.0233, y: 0 }, { x: w, y: 0 }, { x: w, y: 4.214 }, { x: w * 0.0909, y: 4.214 },
+			{ x: 0, y: 3.915, curve: { type: 'cubic', x1: w * 0.0081, y1: 4.214, x2: 0, y2: 4.08 } },
+			{ x: 0, y: 0.299 },
+			{ x: w * 0.0182, y: 0, curve: { type: 'cubic', x1: 0, y1: 0.134, x2: w * 0.0081, y2: 0 } },
+			{ x: w * 0.0233, y: 0 }, { close: true }
+		], { color: WHITE, extra: { rotate: 180, shadow: shadow(28) } });
+	});
+	txLines(s, ['WE SERVE THE', 'BEST SERVICES'], { x: 10.638, y: 1.781, w: 8.944, h: 1.952, fontSize: 55, bold: true, fontFace: DISPLAY });
+	tx(s, LOREM_MID, { x: 10.638, y: 3.922, w: 8.774, h: 1.464, fontSize: 18, fontFace: LIGHT, lineSpacingMultiple: 1.5 });
+	[[1.127, 0.332], [5.948, 5.153], [10.795, 10.0], [15.655, 14.859]].forEach(function (c) {
+		tx(s, 'Your Text Here', { x: c[0], y: 7.623, w: 2.66, h: 0.522, fontSize: 25, fontFace: BOLD, align: 'center', wrap: false });
+		tx(s, LOREM_TINY, { x: c[1], y: 8.22, w: 4.299, h: 1.919, fontSize: 18, fontFace: LIGHT, align: 'center', lineSpacingMultiple: 1.5 });
+	});
+});
+
+/* 11 - ideas to best life -------------------------------------------------- */
+slides.push(function (s) {
+	s.addShape('flowChartDelay', { x: 9.782, y: 0, w: 10.218, h: 11.25, rotate: 180, fill: { color: BLUE }, line: noLine, shadow: shadow(22) });
+	s.addShape('flowChartDelay', { x: 8.583, y: 1.218, w: 10.218, h: 9.109, fill: { color: WHITE }, line: noLine, shadow: shadow(22) });
+	txLines(s, ['WE BRING YOUR', 'IDEAS TO BEST LIFE'], { x: 9.339, y: 2.747, w: 7.191, h: 1.784, fontSize: 50, bold: true, fontFace: DISPLAY, wrap: false });
+	tx(s, P1 + ' ' + P2 + ', ', { x: 9.339, y: 4.957, w: 8.025, h: 1.401, fontSize: 18, color: GRAY35, lineSpacingMultiple: 1.5 });
+	s.addShape('flowChartDelay', { x: 9.384, y: 7.001, w: 1.286, h: 1.286, fill: { color: BLUE }, line: noLine });
+	icon(s, 9.58, 7.255, 0.818, 0.818, { stroke: WHITE, width: 2, round: true });
+	tx(s, 'INSURANCE PROTECION', { x: 11.068, y: 6.965, w: 3.71, h: 0.471, fontSize: 22, fontFace: BOLD });
+	tx(s, P1 + ' Lorem Ipsum has been the', { x: 11.05, y: 7.436, w: 7.336, h: 1.01, fontSize: 18, color: GRAY35, lineSpacingMultiple: 1.5 });
+});
+
+/* 12 - meet our best team -------------------------------------------------- */
+slides.push(function (s) {
+	[0.909, 5.655, 10.4, 15.146].forEach(function (x) {
+		roundRect(s, x, 7.236, 4.017, 2.836, { fill: BG95, line: { color: WHITE, width: 3.25 }, extra: { shadow: shadow(32) } });
+	});
+	tx(s, 'MEET OUR BEST TEAM', { x: 6.042, y: 0.792, w: 7.26, h: 0.858, fontSize: 45, bold: true, fontFace: DISPLAY, color: BLUE, wrap: false });
+	tx(s, LOREM_MID, { x: 3.378, y: 1.757, w: 13.245, h: 1.01, fontSize: 18, fontFace: LIGHT, align: 'center', lineSpacingMultiple: 1.5 });
+	[[1.743, 8.173], [6.483, 8.198], [11.222, 8.198], [15.976, 8.211]].forEach(function (c) { teamCard(s, c[0], c[1]); });
+});
+
+/* 13 - professional team --------------------------------------------------- */
+slides.push(function (s) {
+	photo(s, 0, 0, 20, 11.25, { color: 'F4F4F4' });
+	[0.237, 4.019, 7.764].forEach(function (y) {
+		poly(s, 1.345, y, 7.527, 3.145, [
+			{ x: 0, y: 0 }, { x: 7.527, y: 0 }, { x: 7.012, y: 3.145 }, { x: 0, y: 3.127 }, { close: true }
+		], { color: WHITE, extra: { shadow: shadow(18) } });
+	});
+	photo(s, 10.727, 0, 9.273, 9.636, { shape: 'teardrop', color: 'C6D2DB' });
+	[1.155, 4.936, 8.682].forEach(function (y) { teamCard(s, 5.307, y); });
+	txLines(s, ['OUR COMPANY', 'PROFESSIONAL TEAM'], { x: 9.784, y: 2.943, w: 9.304, h: 2.121, fontSize: 60, bold: true, fontFace: DISPLAY, wrap: false });
+	tx(s, LOREM_FULL_T, { x: 9.784, y: 5.446, w: 9.304, h: 1.818, fontSize: 17, lineSpacingMultiple: 1.5 });
+	tx(s, P1 + P2 + ', ', { x: 9.784, y: 7.406, w: 9.304, h: 0.959, fontSize: 17, lineSpacingMultiple: 1.5 });
+});
+
+/* 14 - protection + numbers ------------------------------------------------ */
+slides.push(function (s) {
+	rect(s, 11.375, 7.412, 8.619, 2.455, WHITE);
+	rect(s, 11.375, 7.412, 2.908, 2.455, BG95);
+	rect(s, 17.108, 7.41, 2.892, 2.455, BG95);
+	tx(s, [
+		{ text: 'INSURANCE PROVIDE', options: { breakLine: true } },
+		{ text: 'PROTECTION YOUR LIFE', options: { color: BLUE } }
+	], { x: 11.239, y: 2.822, w: 7.875, h: 1.616, fontSize: 45, bold: true, fontFace: DISPLAY, wrap: false });
+	tx(s, LOREM_FULL, { x: 11.239, y: 4.678, w: 7.875, h: 1.856, fontSize: 18, color: GRAY35, lineSpacingMultiple: 1.5 });
+	[{ big: 'Over $700', x: 11.688, bw: 2.223, y: 8.203, cap: 'SAVINGS', cx: 12.198, cw: 1.378, cy: 8.691 },
+	{ big: '27 million+', x: 14.624, bw: 2.358, y: 8.171, cap: 'PEOPLE SAVED', cx: 14.685, cw: 2.297, cy: 8.659 },
+	{ big: '1290', x: 18.059, bw: 1.138, y: 8.169, cap: 'HAPPY CLIENT', cx: 17.626, cw: 2.181, cy: 8.679 }].forEach(function (d) { stat(s, d); });
+});
+
+/* 15 - price bubbles ------------------------------------------------------- */
+slides.push(function (s) {
+	rect(s, 0, 0, 20, 11.25, WHITE, { fill: { color: WHITE, transparency: 47 } });
+	s.addShape('ellipse', { x: 10.633, y: 2.49, w: 6, h: 6, fill: { color: BLUE }, line: noLine });
+	s.addShape('ellipse', { x: 15.02, y: 1.327, w: 4.163, h: 4.163, fill: { color: NAVY }, line: { color: WHITE, width: 4.75 } });
+	s.addShape('ellipse', { x: 14.061, y: 6.813, w: 3.041, h: 3.041, fill: { color: ICE }, line: { color: WHITE, width: 4.75 } });
+	txLines(s, ['What affects the', 'Price of your  car', 'Insurance?'], { x: 1.535, y: 2.408, w: 8.944, h: 2.878, fontSize: 55, bold: true, fontFace: DISPLAY });
+	tx(s, LOREM_FULL, { x: 1.535, y: 5.545, w: 7.465, h: 2.373, fontSize: 18, color: GRAY35, lineSpacingMultiple: 1.5 });
+	tx(s, '18 year olds', { x: 12.202, y: 4.661, w: 2.872, h: 0.69, fontSize: 35, fontFace: MED, color: WHITE, wrap: false });
+	tx(s, '$1,419', { x: 12.332, y: 5.286, w: 2.558, h: 1.111, fontSize: 60, bold: true, fontFace: MED, color: WHITE, wrap: false });
+	tx(s, '30 year olds', { x: 16.022, y: 2.686, w: 2.16, h: 0.522, fontSize: 25, fontFace: MED, color: WHITE, wrap: false });
+	tx(s, '$750', { x: 16.298, y: 3.224, w: 1.608, h: 0.858, fontSize: 45, bold: true, fontFace: MED, color: WHITE, wrap: false });
+	tx(s, '69 year olds', { x: 14.699, y: 7.8, w: 1.766, h: 0.438, fontSize: 20, fontFace: MED, wrap: false });
+	tx(s, '$316', { x: 14.973, y: 8.186, w: 1.233, h: 0.69, fontSize: 35, bold: true, fontFace: MED, wrap: false });
+	button(s, 1.583, 8.434, 3.642, { t: 'Make an Appointment', dx: 0.244, w: 2.737 });
+});
+
+/* 16 - financial loss ------------------------------------------------------ */
+slides.push(function (s) {
+	photo(s, 0, 0, 20, 11.25, { color: 'E9ECEF' });
+	roundRect(s, 12.98, 5.653, 6.55, 5.191, { fill: BLUE, extra: { shadow: shadow(43) } });
+	rect(s, 0, 7.702, 10.959, 2.114, BG95, { shadow: shadow(22) });
+	tx(s, 'Financial Loss', { x: 14.498, y: 6.249, w: 3.475, h: 0.69, fontSize: 35, bold: true, fontFace: BOLD, color: WHITE, align: 'center', wrap: false });
+	tx(s, LOREM_MID_T, { x: 13.499, y: 6.94, w: 5.472, h: 3.13, fontSize: 18, fontFace: MED, color: WHITE, align: 'center', lineSpacingMultiple: 2 });
+	txLines(s, ['Financial Loss', 'Protection Method'], { x: 1.468, y: 1.462, w: 8.944, h: 1.952, fontSize: 55, bold: true, fontFace: DISPLAY });
+	tx(s, LOREM_FULL_T, { x: 1.48, y: 3.758, w: 9.304, h: 1.855, fontSize: 18, fontFace: MED, lineSpacingMultiple: 1.5 });
+	tx(s, P1 + P2 + ', ', { x: 1.443, y: 5.957, w: 9.304, h: 1.401, fontSize: 18, fontFace: MED, lineSpacingMultiple: 1.5 });
+	[{ big: 'Over $700', x: 1.313, bw: 2.223, y: 8.191, cap: 'SAVINGS', cx: 1.802, cw: 1.378, cy: 8.679, sz: 20 },
+	{ big: '27 million+', x: 4.248, bw: 2.358, y: 8.158, cap: 'PEOPLE SAVED', cx: 4.29, cw: 2.118, cy: 8.646, sz: 20 },
+	{ big: '1290', x: 7.765, bw: 1.138, y: 8.157, cap: 'HAPPY CLIENT', cx: 7.312, cw: 2.001, cy: 8.646, sz: 20 }].forEach(function (d) { stat(s, d); });
+	[3.75, 6.872].forEach(function (x, i) {
+		s.addShape('line', { x: x, y: [8.0, 8.072][i], w: 0, h: 1.449, line: { color: BG85, width: 1 } });
+	});
+});
+
+/* 17 - company insurance provider ------------------------------------------ */
+slides.push(function (s) {
+	rect(s, -0.015, 0, 3.587, 11.25, BG95);
+	roundRect(s, 13.286, 4.704, 6.224, 6.223, { fill: BLUE, line: { color: WHITE, width: 5 } });
+	txLines(s, ['Company', 'Insurance', 'Provider'], { x: 1.05, y: 2.464, w: 7.582, h: 3.635, fontSize: 70, bold: true, fontFace: DISPLAY });
+	tx(s, LOREM_FULL_T, { x: 1.05, y: 6.285, w: 6.74, h: 3.029, fontSize: 18, fontFace: MED, lineSpacingMultiple: 2 });
+	tx(s, 'CAR INSURANCE', { x: 14.555, y: 6.145, w: 3.591, h: 0.64, fontSize: 32, fontFace: BOLD, color: WHITE, wrap: false });
+	tx(s, LOREM_MID_T, { x: 13.826, y: 6.852, w: 5.472, h: 3.13, fontSize: 18, fontFace: MED, color: WHITE, align: 'center', lineSpacingMultiple: 2 });
+});
+
+/* 18 - three insurances ---------------------------------------------------- */
+slides.push(function (s) {
+	poly(s, 0, 0, 20, 6.054, [
+		{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 5.109 },
+		{ x: 0, y: 5.109, curve: { type: 'cubic', x1: 14.241, y1: 6.186, x2: 6.682, y2: 6.54 } },
+		{ x: 0, y: 0 }, { close: true }
+	], { color: BLUE, transparency: 16 });
+	txLines(s, ['BETTER INSURANCE', 'FOR EVERYONE'], { x: 4.983, y: 0.829, w: 9.931, h: 1.784, fontSize: 50, bold: true, fontFace: HEAVY, color: WHITE, align: 'center' });
+	[['Car INSURANCE', 2.531, 1.29, 2.739], ['LIFE INSURANCE', 8.513, 7.454, 2.87], ['House INSURANCE', 14.617, 13.617, 3.221]].forEach(function (c, i) {
+		tx(s, c[0], { x: c[1], y: 7.781, w: c[3], h: 0.522, fontSize: 25, fontFace: BOLD, align: 'center', wrap: false });
+		tx(s, LOREM_STD + ' dummy', { x: c[2], y: 8.303, w: i === 2 ? 5.279 : 5.22, h: 1.818, fontSize: 17, fontFace: MED, align: 'center', lineSpacingMultiple: 2 });
+	});
+});
+
+/* 19 - vision & mission (light) -------------------------------------------- */
+slides.push(function (s) {
+	rect(s, 0, 0, 20, 11.25, WHITE, { fill: { color: WHITE, transparency: 51 } });
+	rect(s, 0.5, 7.836, 8.845, 3.0, WHITE, { shadow: shadow(28) });
+	rect(s, 9.645, 7.836, 8.864, 3.0, WHITE, { shadow: shadow(28) });
+	txLines(s, ['OUR COMPANY ', 'VISION AND MISSION'], { x: 0.89, y: 1.697, w: 7.572, h: 1.784, fontSize: 50, bold: true, fontFace: DISPLAY, wrap: false });
+	tx(s, LOREM_FULL, { x: 0.883, y: 3.79, w: 7.774, h: 1.919, fontSize: 18, lineSpacingMultiple: 1.5 });
+	[['COMPANY VISION', 4.078, 4.045, 2.726], ['COMPANY Mission', 13.279, 13.264, 2.882]].forEach(function (c) {
+		tx(s, c[0], { x: c[1], y: 8.428, w: c[3], h: 0.471, fontSize: 22, fontFace: BOLD, wrap: false });
+		tx(s, LOREM_TINY, { x: c[2], y: 8.844, w: 5.068, h: 1.464, fontSize: 18, fontFace: LIGHT, lineSpacingMultiple: 1.5 });
+	});
+});
+
+/* 20 - break time ---------------------------------------------------------- */
+slides.push(function (s) {
+	rect(s, 0, 2.959, 20, 4.612, BLUE, { fill: { color: BLUE, transparency: 28 }, shadow: shadow(33, BLACK) });
+	tx(s, 'BREAK TIME', { x: 4.838, y: 3.818, w: 9.931, h: 1.447, fontSize: 80, bold: true, fontFace: HEAVY, color: WHITE, align: 'center' });
+	tx(s, LOREM_FULL, { x: 3.554, y: 5.265, w: 13.341, h: 1.464, fontSize: 18, color: WHITE, align: 'center', lineSpacingMultiple: 1.5 });
+});
+
+/* 21 - SWOT: strength ------------------------------------------------------ */
+slides.push(function (s) {
+	s.addShape('teardrop', { x: 10.385, y: 0.292, w: 9.354, h: 9.352, fill: { color: BLUE, transparency: 12 }, line: noLine });
+	swotLetter(s, 'S', 13.132, 0.551, 1.086, true);
+	swotHead(s, { x: 0.5, y: 2.661, by: 4.986, kx: 0.627, ky: 2.147, title: 'STRENGTH INSURANCE' });
+	button(s, 0.5, 8.443, 2.336, { t: 'Choose Us', dx: 0.469, dy: 0.24, w: 1.398 });
+});
+
+/* 22 - SWOT: weakness ------------------------------------------------------ */
+slides.push(function (s) {
+	poly(s, 0.2, 0.273, 9.373, 9.436, leaf(9.373, 9.436), { color: BLUE, transparency: 12 });
+	swotLetter(s, 'W', 1.178, 0.985, 6.988, false);
+	swotHead(s, { x: 10.551, y: 2.188, by: 4.514, kx: 10.642, ky: 1.638, title: 'WEAKNES INSURANCE' });
+	progressCard(s, {
+		x: 10.551, y: 7.374, w: 8.658, track: 8.063, bar: [8.223, 9.484],
+		lx: [10.806, 10.854], ly: [7.619, 8.865], vx: [18.049, 18.054], vy: [7.661, 8.92]
+	});
+});
+
+/* 23 - SWOT: opportunity --------------------------------------------------- */
+slides.push(function (s) {
+	s.addShape('teardrop', { x: 10.385, y: 0.292, w: 9.354, h: 9.352, fill: { color: BLUE, transparency: 12 }, line: noLine });
+	swotLetter(s, 'O', 12.378, 0.71, 5.763, false);
+	swotHead(s, { x: 0.664, y: 2.043, by: 4.259, kx: 0.791, ky: 1.528, title: 'OPORTUNTY INSURANCE' });
+	[[0.791, 1.071, 8.267], [5.621, 5.989, 8.332]].forEach(function (c) {
+		rect(s, c[0], 7.382, 4.561, 3.073, WHITE, { shadow: shadow(32, BLACK) });
+		tx(s, 'Text Here', { x: c[1], y: 7.844, w: 1.618, h: 0.471, fontSize: 22, fontFace: BOLD, wrap: false });
+		tx(s, LOREM_TINY, { x: c[1], y: c[2], w: 4.008, h: 1.759, fontSize: 17, fontFace: LIGHT, lineSpacingMultiple: 1.5 });
+	});
+});
+
+/* 24 - SWOT: threat -------------------------------------------------------- */
+slides.push(function (s) {
+	poly(s, 0.2, 0.273, 9.373, 9.436, leaf(9.373, 9.436), { color: BLUE, transparency: 12 });
+	swotLetter(s, 'T', 2.178, 0.606, 4.886, false);
+	swotHead(s, { x: 10.336, y: 1.934, by: 4.15, kx: 10.464, ky: 1.419, title: 'THREAT INSURANCE' });
+	[{ card: 10.464, cy: 6.982, bar: 10.705, label: 'Target', lw: 1.05, lx: 10.605, ly: 7.326, pct: 13.211, py: 7.306, body: 10.643 },
+	{ card: 14.785, cy: 6.956, bar: 15.153, label: 'Growth', lw: 1.156, lx: 15.091, ly: 7.341, pct: 17.697, py: 7.322, body: 15.091 }].forEach(function (c) {
+		rect(s, c.card, c.cy, 3.942, 3.373, WHITE, { shadow: shadow(25, BLACK) });
+		rect(s, c.bar, 7.902, 3.28, 0.291, BG85);
+		rect(s, c.bar, 7.911, 2.67, 0.291, BLUE);
+		tx(s, c.label, { x: c.lx, y: c.ly, w: c.lw, h: 0.438, fontSize: 20, fontFace: MED, wrap: false });
+		tx(s, '85%', { x: c.pct, y: c.py, w: 0.773, h: 0.438, fontSize: 20, fontFace: MED, wrap: false });
+		tx(s, 'Lorem Ipsum\u00A0is simply dummy text of the printing andty pesetting industry. ',
+			{ x: c.body, y: 8.405, w: 3.557, h: 1.329, fontSize: 17, fontFace: MED, lineSpacingMultiple: 1.5 });
+	});
+});
+
+/* 25 - portfolio ----------------------------------------------------------- */
+slides.push(function (s) {
+	rect(s, 0, 0, 20, 11.25, WHITE, { fill: { color: WHITE, transparency: 37 } });
+	tx(s, [
+		{ text: 'OUR INSURANCE', options: { breakLine: true } },
+		{ text: 'PORTFOLIO', options: { color: BLUE } }
+	], { x: 0.904, y: 1.757, w: 5.954, h: 1.784, fontSize: 50, bold: true, fontFace: DISPLAY, wrap: false });
+	tx(s, LOREM_FULL, { x: 0.904, y: 3.921, w: 8.606, h: 1.818, fontSize: 17, fontFace: MED, lineSpacingMultiple: 1.5 });
+	rect(s, 0.968, 6.647, 8.478, 3.073, BLUE, { shadow: shadow(32, BLACK) });
+	tx(s, '25 Year of Experiences', { x: 1.348, y: 7.263, w: 3.806, h: 0.505, fontSize: 24, fontFace: BOLD, color: WHITE, wrap: false });
+	tx(s, P1 + ' ' + P2 + ', when an unknown printer took', { x: 1.267, y: 7.799, w: 7.631, h: 1.388, fontSize: 17, fontFace: MED, color: WHITE, lineSpacingMultiple: 1.5 });
+});
+
+/* 26 - infographic (teardrops) --------------------------------------------- */
+slides.push(function (s) {
+	[[6.062, 2.143, 225.751, BLUE], [10.327, 2.108, 37.283, STEEL], [10.433, 6.143, 31.052, BLUE], [6.062, 6.235, 225.751, STEEL]]
+		.forEach(function (t) {
+			s.addShape('teardrop', {
+				x: t[0], y: t[1], w: 3.912, h: 3.912, rotate: t[2],
+				fill: { color: t[3] }, line: { color: WHITE, width: 5 }, shadow: shadow(31, BLACK)
+			});
+		});
+	[[7.104, 2.799, 1.827, 2.323], [11.487, 2.948, 1.593, 2.025], [7.138, 7.08, 1.76, 2.237], [11.425, 7.134, 2.278, 1.931]]
+		.forEach(function (i) { icon(s, i[0], i[1], i[2], i[3], { stroke: WHITE, width: 2 }); });
+	tx(s, 'OUR INFOGRAPHIC', { x: 6.613, y: 0.687, w: 7.09, h: 0.942, fontSize: 50, bold: true, fontFace: HEAVY, wrap: false });
+	[{ hx: 0.696, hy: 2.308, bx: 0.685, by: 2.909 }, { hx: 0.707, hy: 6.805, bx: 0.696, by: 7.405 }].forEach(function (c) {
+		tx(s, 'Your Text Here', { x: c.hx, y: c.hy, w: 3.349, h: 0.64, fontSize: 32, fontFace: BOLD });
+		tx(s, LOREM_SHORT, { x: c.bx, y: c.by, w: 4.215, h: 2.31, fontSize: 18, fontFace: MED, lineSpacingMultiple: 1.5 });
+	});
+	[{ hx: 16.093, hy: 2.347, bx: 15.231, by: 2.948 }, { hx: 16.098, hy: 6.865, bx: 15.236, by: 7.466 }].forEach(function (c) {
+		tx(s, 'Your Text Here', { x: c.hx, y: c.hy, w: 3.349, h: 0.64, fontSize: 32, fontFace: BOLD, align: 'justify' });
+		tx(s, LOREM_SHORT, { x: c.bx, y: c.by, w: 4.215, h: 2.31, fontSize: 18, fontFace: MED, align: 'right', lineSpacingMultiple: 1.5 });
+	});
+});
+
+/* 27 - infographic (triangles) --------------------------------------------- */
+slides.push(function (s) {
+	rect(s, 0, 0, 20, 2.058, BLUE, { shadow: shadow(27, BLACK) });
+	const tri = [{ x: 0, y: 0 }, { x: 4.551, y: 0 }, { x: 2.082, y: 2.469 }, { x: 0, y: 4.551 }, { close: true }];
+	[[0.907, 3.153, STEEL, 180], [6.057, 5.962, BLUE, 0], [9.571, 3.153, STEEL, 180], [14.777, 6.208, BLUE, 0]]
+		.forEach(function (t) {
+			poly(s, t[0], t[1], 4.551, 4.551, tri, { color: t[2], extra: { rotate: t[3], shadow: shadow(45, BLACK) } });
+		});
+	[[3.5, 5.394, 1.429, 1.817], [6.542, 6.476, 1.46, 1.856], [11.999, 5.432, 1.49, 1.894], [15.207, 6.511, 2.278, 1.931]]
+		.forEach(function (i) { icon(s, i[0], i[1], i[2], i[3], { stroke: WHITE, width: 2 }); });
+	tx(s, 'OUR INFOGRAPHIC', { x: 6.455, y: 0.553, w: 7.09, h: 0.942, fontSize: 50, bold: true, fontFace: HEAVY, color: WHITE, wrap: false });
+	[{ hx: 0.816, hy: 8.083, bx: 0.866, by: 8.648 }, { hx: 6.014, hy: 3.194, bx: 6.057, by: 3.822 },
+	{ hx: 9.476, hy: 8.013, bx: 9.477, by: 8.648 }, { hx: 14.672, hy: 3.27, bx: 14.777, by: 3.91 }].forEach(function (c) {
+		tx(s, 'Your Text Here', { x: c.hx, y: c.hy, w: 3.349, h: 0.64, fontSize: 32, fontFace: BOLD });
+		tx(s, LOREM_STD, { x: c.bx, y: c.by, w: 4.215, h: 1.855, fontSize: 18, fontFace: MED, lineSpacingMultiple: 1.5 });
+	});
+});
+
+/* 28 - pricing ------------------------------------------------------------- */
+slides.push(function (s) {
+	const FEATURES = ['Fixed for entire policy term', 'De Will be transferred', 'Documents for verification', 'Entire policy trem'];
+	const plans = [
+		{
+			frame: [1.184, 2.219], head: [1.02, 2.424], headFill: BG85, outline: true,
+			name: 'Basic', nx: 2.908, ny: 2.728, nw: 1.707, nc: GRAY15,
+			price: [2.497, 3.168], pc: BLACK, list: [2.32, 5.242], ic: [2.021, 5.498],
+			btn: [1.935, 8.285], cap: { t: 'Get Started', dx: 0.791, dy: 0.266, w: 1.513 }
+		},
+		{
+			frame: [7.469, 2.995], head: [7.291, 3.143], headFill: BLUE, outline: false,
+			name: 'Professional', nx: 8.623, ny: 3.403, nw: 2.671, nc: BG85,
+			price: [8.739, 3.856], pc: WHITE, list: [8.731, 5.769], ic: [8.431, 6.025],
+			btn: [8.375, 8.937], cap: { t: 'Get Started', dx: 0.856, w: 1.513, align: 'center' }
+		},
+		{
+			frame: [13.592, 2.424], head: [13.325, 2.571], headFill: BG85, outline: true,
+			name: 'Business', nx: 15.173, ny: 2.89, nw: 2.024, nc: GRAY15,
+			price: [14.957, 3.316], pc: BLACK, list: [14.799, 5.296], ic: [14.499, 5.553],
+			btn: [14.395, 8.298], cap: { t: 'Get Started', dx: 0.857, w: 1.513, align: 'center' }
+		}
+	];
+	plans.forEach(function (p) {
+		s.addShape('rect', {
+			x: p.frame[0], y: p.frame[1], w: 5.347, h: 7.74,
+			fill: p.outline ? { type: 'none' } : { color: BG85 },
+			line: p.outline ? { color: BG75, width: 3.25 } : noLine
+		});
+		rect(s, p.head[0], p.head[1], 5.367, 2.041, p.headFill);
+		tx(s, p.name, { x: p.nx, y: p.ny, w: p.nw, h: 0.606, fontSize: 30, fontFace: MED, color: p.nc, align: 'center' });
+		tx(s, '$58.99', { x: p.price[0], y: p.price[1], w: 2.498, h: 0.942, fontSize: 50, fontFace: BOLD, color: p.pc });
+		txLines(s, FEATURES, { x: p.list[0], y: p.list[1], w: 3.557, h: 2.524, fontSize: 18, fontFace: MED, lineSpacingMultiple: 2 });
+		[0, 0.59, 1.194, 1.814].forEach(function (dy, i) {
+			icon(s, p.ic[0] - (i === 0 ? 0 : i === 1 ? 0.061 : 0.079), p.ic[1] + dy, 0.297, 0.297, { fill: CHECK });
+		});
+		button(s, p.btn[0], p.btn[1], 3.642, p.cap);
+	});
+	tx(s, 'PROFESINAL PRICING', { x: 6.126, y: 0.704, w: 8.035, h: 0.942, fontSize: 50, bold: true, fontFace: HEAVY, wrap: false });
+});
+
+/* 29 - contact ------------------------------------------------------------- */
+slides.push(function (s) {
+	rect(s, 11.015, 7.241, 8.567, 3.774, BG95);
+	tx(s, 'CONTACT US', { x: 1.083, y: 6.298, w: 4.841, h: 0.942, fontSize: 50, bold: true, fontFace: HEAVY, wrap: false });
+	[[1.083, 7.95], [1.083, 9.735], [5.516, 7.95], [5.516, 9.735]].forEach(function (o) {
+		s.addShape('ellipse', { x: o[0], y: o[1], w: 0.863, h: 0.863, fill: { color: BLUE }, line: noLine });
+	});
+	[[1.301, 8.214, 0.427], [5.738, 8.172, 0.419], [1.304, 9.927, 0.497], [5.738, 9.97, 0.419]]
+		.forEach(function (i) { icon(s, i[0], i[1], i[2], i[2], { stroke: WHITE, width: 2, round: true }); });
+	tx(s, '75 South park Avenue, Melboume Australia', { x: 2.01, y: 7.867, w: 3.215, h: 1.111, fontSize: 20, fontFace: MED, lineSpacingMultiple: 1.5 });
+	tx(s, '+62 123 4567 1234 567', { x: 1.991, y: 10.146, w: 3.051, h: 0.438, fontSize: 20, fontFace: MED, align: 'center' });
+	tx(s, '+62 123 4567 1234 567', { x: 2.01, y: 9.675, w: 3.051, h: 0.438, fontSize: 20, fontFace: MED, align: 'center' });
+	tx(s, 'youremail@gmail.com', { x: 6.584, y: 8.41, w: 3.286, h: 0.438, fontSize: 20, fontFace: MED, align: 'center' });
+	tx(s, 'youremail@gmail.com', { x: 6.757, y: 7.944, w: 3.015, h: 0.438, fontSize: 20, fontFace: MED, align: 'center' });
+	tx(s, 'www.example.com', { x: 6.76, y: 9.893, w: 3.189, h: 0.438, fontSize: 20, fontFace: MED });
+	tx(s, LOREM_SWOT, { x: 11.568, y: 7.867, w: 7.761, h: 2.827, fontSize: 18, lineSpacingMultiple: 1.5 });
+});
+
+/* 30 - thank you ----------------------------------------------------------- */
+slides.push(function (s) {
+	poly(s, 0, 5.97, 20, 5.28, [
+		{ x: 0, y: 0.184 },
+		{ x: 20, y: 0.184, curve: { type: 'cubic', x1: 6.405, y1: -0.862, x2: 13.579, y2: 3.015 } },
+		{ x: 20, y: 5.28 }, { x: 0, y: 5.28 }, { x: 0, y: 0.184 }, { close: true }
+	], { color: BLUE, transparency: 4, extra: { shadow: shadow(4, BLACK) } });
+	tx(s, 'THANK YOU', { x: 6.481, y: 8.178, w: 7.039, h: 1.447, fontSize: 80, bold: true, fontFace: HEAVY, color: WHITE, wrap: false });
+	tx(s, LOREM_STD, { x: 3.733, y: 9.505, w: 12.535, h: 1.01, fontSize: 18, fontFace: MED, color: WHITE, align: 'center', lineSpacingMultiple: 1.5 });
+});
+
+/* ------------------------------------------------------------------- build */
+const pres = new PptxGenJS();
+pres.defineLayout({ name: 'CUSTOM', width: W, height: H });
+pres.layout = 'CUSTOM';
+pres.title = 'Insurance Agency - Insurance Business Presentation Template';
+
+slides.forEach(function (build) { build(pres.addSlide()); });
+
+pres.writeFile({ fileName: path.join(__dirname, '04c7dd83-7f15-4da3-8d4d-021222a92890_grok_final.pptx') })
+	.then(function (f) { console.log('wrote ' + f); })
+	.catch(function (e) { console.error(e); process.exit(1); });
