@@ -1,0 +1,769 @@
+#!/usr/bin/env node
+/**
+ * "Lucas Bruckmen" personal-CV deck -- 30 slides, 13.333in x 7.5in -- rebuilt with pptxgenjs.
+ *
+ * The source deck's raster artwork (flat purple icon PNGs and device photographs) is
+ * redrawn here from native pptxgenjs shapes and glyphs; nothing is embedded as image data.
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ palette */
+const PURPLE = '5800FF';
+const BLUE = '0096FF';
+const INK = '262626';
+const BLACK = '000000';
+const WHITE = 'FFFFFF';
+const TRACK = 'BFBFBF';
+const GOLD = 'FFC000';
+
+/* -------------------------------------------------------------------- fonts */
+const SEMI = 'Poppins SemiBold';
+const REG = 'Poppins';
+const GLYPH = 'DejaVu Sans';
+
+/* ---------------------------------------------------------------- effects
+ * pptxgenjs rewrites the shadow object it is handed in place, so every shape
+ * must receive its own copy -- hence factory functions rather than constants.
+ */
+const NO_LINE = { type: 'none' };
+const cardShadow = () => ({ type: 'outer', blur: 14, offset: 5, angle: 45, color: BLACK, opacity: 0.1 });
+const railShadow = () => ({ type: 'outer', blur: 10, offset: 0, angle: 45, color: BLACK, opacity: 0.2 });
+const chipShadow = () => ({ type: 'outer', blur: 8, offset: 2, angle: 45, color: BLACK, opacity: 0.3 });
+const dropShadow = () => ({ type: 'outer', blur: 10, offset: 3, angle: 90, color: BLACK, opacity: 0.2 });
+
+/* --------------------------------------------------------------- body copy */
+const A = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Maecenas vel quam scelerisque, molestie quam';
+const B = A + ' vitae, maximus sem.';
+const C = B + ' Nulla sagittis, tellus ac lobortis tincidunt, tortor augue dapibus mi';
+const D = C + ', ac egestas velit arcu id mi. In erat magna, commodo sit amet';
+const LOREM = {
+  short: A + '.',
+  twoLine: B,
+  nulla: B + ' Nulla.',
+  lobortis: B + ' Nulla sagittis, tellus ac lobortis.',
+  tincidunt: B + ' Nulla sagittis, tellus ac lobortis tincidunt.',
+  tortor: B + ' Nulla sagittis, tellus ac lobortis tincidunt, tortor.',
+  dapibus: C + '.',
+  egestas: C + ', ac egestas.',
+  velit: C + ', ac egestas velit.',
+  commodo: D + '.',
+  commod: C + ', ac egestas velit arcu id mi. In erat magna, commod..',
+  full: D + ' mauris sollicitudin, maximus viverra justo.',
+  praesent: D + ' mauris sollicitudin, maximus viverra justo. Praesent ullamcorper congue nulla et pretium.',
+  award: 'Lorem ipsum dolor sit amet, consecr adipiscing elit. Maecenas vel quam',
+  biodata: 'Sit amet consectetur adipiscing elit duis. Cursus eget nunc scelerisque viverra mauris in aliquam ' +
+    'sem fringilla. Lorem donec massa sapien faucibus et. Vel orci porta non pulvinar neque.'
+};
+
+const PHONE_NO = '+214-704-76532';
+const EMAIL = 'example@yourdomain.com';
+const ROLE = 'Agile Project Manager';
+const NAME = 'Lucas Bruckmen';
+const HELLO = 'Hello, I\u2019am';
+
+/* ==================================================================
+ * primitives
+ * ================================================================== */
+let deck, slide;
+
+function newSlide() { slide = deck.addSlide(); }
+
+function shape(type, o) {
+  slide.addShape(type, Object.assign({ line: NO_LINE }, o));
+}
+
+function rect(x, y, w, h, fill, extra) {
+  shape('rect', Object.assign({ x, y, w, h, fill }, extra));
+}
+
+/** rounded card carrying the deck's signature soft drop shadow */
+function card(x, y, w, h, fill) {
+  shape('roundRect', { x, y, w, h, fill: fill || WHITE, shadow: cardShadow() });
+}
+
+/** every text frame in the source deck is zero-inset and top-anchored */
+function text(str, o) {
+  slide.addText(str, Object.assign({ margin: 0, valign: 'top', isTextBox: true }, o));
+}
+
+/* ---------------------------------------------------------------- text roles */
+const eyebrow = (x, y, str, w) =>
+  text(str, { x, y, w, h: 0.303, fontSize: 18, fontFace: REG, color: INK });
+
+const heading = (x, y, str, w, size) =>
+  text(str, { x, y, w, h: (size || 40) >= 44 ? 0.808 : 0.673, fontSize: size || 40, fontFace: SEMI, color: INK });
+
+const para = (x, y, w, h, str, color, align) =>
+  text(str, { x, y, w, h, fontSize: 11, fontFace: REG, color: color || BLACK, lineSpacingMultiple: 1.5, align: align || 'left' });
+
+const label = (x, y, w, str, size, opt) =>
+  text(str, Object.assign({
+    x, y, w, h: size >= 20 ? 0.337 : size >= 16 ? 0.269 : 0.236,
+    fontSize: size, fontFace: SEMI, color: INK
+  }, opt));
+
+/** purple pill button with a centred white caption */
+function pill(x, y, w, h, caption, size) {
+  shape('roundRect', { x, y, w, h, fill: PURPLE });
+  text(caption, { x: x + 0.186, y: y + (h - 0.3) / 2, w: w - 0.372, h: 0.3, fontSize: size, fontFace: SEMI, color: WHITE, align: 'center' });
+}
+
+/* ==================================================================
+ * icon library -- each source icon redrawn from primitives placed in a
+ * 0..1 unit box; `o` means outline-only with that stroke weight.
+ * ================================================================== */
+const ICONS = {
+  /* ink-splash logo: a blobby core with flung-out arms and stray droplets */
+  splat: [
+    { s: 'ellipse', x: 0.24, y: 0.26, w: 0.36, h: 0.34 },
+    { s: 'ellipse', x: 0.42, y: 0.36, w: 0.28, h: 0.30 },
+    { s: 'ellipse', x: 0.30, y: 0.50, w: 0.26, h: 0.26 },
+    { s: 'ellipse', x: 0.14, y: 0.10, w: 0.26, h: 0.36, rot: 20 },
+    { s: 'ellipse', x: 0.50, y: 0.06, w: 0.16, h: 0.30, rot: 340 },
+    { s: 'ellipse', x: 0.02, y: 0.34, w: 0.30, h: 0.18, rot: 15 },
+    { s: 'ellipse', x: 0.52, y: 0.52, w: 0.36, h: 0.20, rot: 35 },
+    { s: 'ellipse', x: 0.20, y: 0.62, w: 0.18, h: 0.30, rot: 20 },
+    { s: 'ellipse', x: 0.60, y: 0.24, w: 0.22, h: 0.16, rot: 330 },
+    { s: 'ellipse', x: 0.83, y: 0.08, w: 0.15, h: 0.15 },
+    { s: 'ellipse', x: 0.86, y: 0.50, w: 0.09, h: 0.09 },
+    { s: 'ellipse', x: 0.42, y: 0.88, w: 0.11, h: 0.11 },
+    { s: 'ellipse', x: 0.03, y: 0.66, w: 0.08, h: 0.08 },
+    { s: 'ellipse', x: 0.66, y: 0.78, w: 0.07, h: 0.07 }
+  ],
+  phone: [
+    { s: 'blockArc', x: 0.12, y: 0.12, w: 0.72, h: 0.72, rot: 225 },
+    { s: 'roundRect', x: 0.09, y: 0.14, w: 0.26, h: 0.3, rot: 315 },
+    { s: 'roundRect', x: 0.62, y: 0.56, w: 0.26, h: 0.3, rot: 315 }
+  ],
+  mail: [
+    { s: 'roundRect', x: 0.1, y: 0.26, w: 0.8, h: 0.5, rr: 0.02 },
+    { s: 'triangle', x: 0.15, y: 0.3, w: 0.7, h: 0.3, flipV: true, hole: true }
+  ],
+  quote: [{ t: '\u201C', fs: 1.8, dy: 0.32 }],
+  calendar: [
+    { s: 'rect', x: 0.26, y: 0.02, w: 0.07, h: 0.15 }, { s: 'rect', x: 0.67, y: 0.02, w: 0.07, h: 0.15 },
+    { s: 'rect', x: 0.05, y: 0.1, w: 0.9, h: 0.15 },
+    { s: 'rect', x: 0.05, y: 0.25, w: 0.9, h: 0.71, o: 0.065 },
+    { s: 'rect', x: 0.19, y: 0.4, w: 0.12, h: 0.12 }, { s: 'rect', x: 0.44, y: 0.4, w: 0.12, h: 0.12 },
+    { s: 'rect', x: 0.69, y: 0.4, w: 0.12, h: 0.12 }, { s: 'rect', x: 0.19, y: 0.64, w: 0.12, h: 0.12 },
+    { s: 'rect', x: 0.44, y: 0.64, w: 0.12, h: 0.12 }
+  ],
+  stopwatch: [
+    { s: 'rect', x: 0.37, y: 0.0, w: 0.26, h: 0.07 },
+    { s: 'rect', x: 0.44, y: 0.05, w: 0.12, h: 0.13 },
+    { s: 'ellipse', x: 0.05, y: 0.17, w: 0.9, h: 0.83, o: 0.065 },
+    { s: 'rect', x: 0.47, y: 0.36, w: 0.06, h: 0.25 },
+    { s: 'rect', x: 0.5, y: 0.55, w: 0.18, h: 0.055 }
+  ],
+  team: [
+    { s: 'ellipse', x: 0.03, y: 0.24, w: 0.24, h: 0.24 },
+    { s: 'ellipse', x: 0.36, y: 0.14, w: 0.28, h: 0.28 },
+    { s: 'ellipse', x: 0.73, y: 0.24, w: 0.24, h: 0.24 },
+    { s: 'round2SameRect', x: 0.0, y: 0.52, w: 0.32, h: 0.34 },
+    { s: 'round2SameRect', x: 0.68, y: 0.52, w: 0.32, h: 0.34 },
+    { s: 'round2SameRect', x: 0.26, y: 0.44, w: 0.48, h: 0.42 }
+  ],
+  board: [
+    { s: 'rect', x: 0.05, y: 0.05, w: 0.9, h: 0.55, o: 0.065 },
+    { s: 'rect', x: 0.17, y: 0.17, w: 0.1, h: 0.1 }, { s: 'rect', x: 0.35, y: 0.19, w: 0.42, h: 0.06 },
+    { s: 'rect', x: 0.17, y: 0.37, w: 0.1, h: 0.1 }, { s: 'rect', x: 0.35, y: 0.39, w: 0.42, h: 0.06 },
+    { s: 'rect', x: 0.47, y: 0.6, w: 0.06, h: 0.16 },
+    { s: 'rect', x: 0.14, y: 0.85, w: 0.42, h: 0.055, rot: 335 },
+    { s: 'rect', x: 0.44, y: 0.85, w: 0.42, h: 0.055, rot: 25 }
+  ],
+  handshake: [
+    { s: 'roundRect', x: -0.02, y: 0.34, w: 0.48, h: 0.2, rr: 0.06, rot: 14 },
+    { s: 'roundRect', x: 0.54, y: 0.34, w: 0.48, h: 0.2, rr: 0.06, rot: 346 },
+    { s: 'roundRect', x: 0.3, y: 0.26, w: 0.4, h: 0.36, rr: 0.14 },
+    { s: 'roundRect', x: 0.0, y: 0.54, w: 0.3, h: 0.16, rr: 0.05, rot: 6 },
+    { s: 'roundRect', x: 0.7, y: 0.54, w: 0.3, h: 0.16, rr: 0.05, rot: 354 }
+  ],
+  target: [
+    { s: 'ellipse', x: 0.02, y: 0.1, w: 0.86, h: 0.86, o: 0.07 },
+    { s: 'ellipse', x: 0.22, y: 0.3, w: 0.46, h: 0.46, o: 0.07 },
+    { s: 'ellipse', x: 0.38, y: 0.46, w: 0.14, h: 0.14 },
+    { s: 'rect', x: 0.5, y: 0.22, w: 0.44, h: 0.055, rot: 315 },
+    { s: 'triangle', x: 0.82, y: 0.0, w: 0.18, h: 0.18, rot: 45 }
+  ],
+  gear: [
+    { s: 'gear9', x: 0, y: 0.02, w: 1, h: 0.96 },
+    { s: 'ellipse', x: 0.36, y: 0.36, w: 0.28, h: 0.28, hole: true }
+  ],
+  bulb: [
+    { s: 'ellipse', x: 0.2, y: 0.0, w: 0.6, h: 0.6, o: 0.07 },
+    { s: 'trapezoid', x: 0.36, y: 0.5, w: 0.28, h: 0.18 },
+    { s: 'rect', x: 0.36, y: 0.74, w: 0.28, h: 0.06 },
+    { s: 'rect', x: 0.36, y: 0.87, w: 0.28, h: 0.06 }
+  ],
+  rosette: [
+    { s: 'parallelogram', x: 0.24, y: 0.58, w: 0.2, h: 0.42 },
+    { s: 'parallelogram', x: 0.56, y: 0.58, w: 0.2, h: 0.42, flipH: true },
+    { s: 'star16', x: 0.08, y: 0.0, w: 0.84, h: 0.84 },
+    { s: 'ellipse', x: 0.3, y: 0.22, w: 0.4, h: 0.4, hole: true },
+    { s: 'ellipse', x: 0.38, y: 0.3, w: 0.24, h: 0.24 }
+  ],
+  medal: [
+    { s: 'parallelogram', x: 0.1, y: 0.0, w: 0.26, h: 0.46 },
+    { s: 'parallelogram', x: 0.64, y: 0.0, w: 0.26, h: 0.46, flipH: true },
+    { s: 'ellipse', x: 0.24, y: 0.42, w: 0.52, h: 0.52, o: 0.08 },
+    { s: 'ellipse', x: 0.4, y: 0.58, w: 0.2, h: 0.2 }
+  ],
+  certificate: [
+    { s: 'rect', x: 0.02, y: 0.16, w: 0.96, h: 0.66, o: 0.065 },
+    { s: 'rect', x: 0.13, y: 0.34, w: 0.48, h: 0.055 },
+    { s: 'rect', x: 0.13, y: 0.47, w: 0.38, h: 0.055 },
+    { s: 'sun', x: 0.6, y: 0.44, w: 0.26, h: 0.26 }
+  ],
+  trophy: [
+    { s: 'ellipse', x: 0.0, y: 0.06, w: 0.28, h: 0.3, o: 0.07 },
+    { s: 'ellipse', x: 0.72, y: 0.06, w: 0.28, h: 0.3, o: 0.07 },
+    { s: 'trapezoid', x: 0.16, y: 0.02, w: 0.68, h: 0.52, flipV: true },
+    { s: 'rect', x: 0.44, y: 0.52, w: 0.12, h: 0.2 },
+    { s: 'rect', x: 0.28, y: 0.7, w: 0.44, h: 0.1 },
+    { s: 'rect', x: 0.16, y: 0.85, w: 0.68, h: 0.13 }
+  ]
+};
+
+/** stamp ICONS[name] into the box (x,y,w,h) in colour `col` */
+function icon(name, x, y, w, h, col, bg) {
+  ICONS[name].forEach(p => {
+    if (p.t) {
+      text(p.t, {
+        x, y: y + (p.dy || 0) * h, w, h, fontSize: Math.round(p.fs * h * 72), fontFace: p.font || GLYPH,
+        color: col, align: 'center', valign: 'middle'
+      });
+      return;
+    }
+    const o = { x: x + p.x * w, y: y + p.y * h, w: p.w * w, h: p.h * h, line: NO_LINE };
+    if (p.rot) o.rotate = p.rot;
+    if (p.rr !== undefined) o.rectRadius = p.rr * h;
+    if (p.flipH) o.flipH = true;
+    if (p.flipV) o.flipV = true;
+    if (p.o) { o.fill = { type: 'none' }; o.line = { color: col, width: p.o * h * 72 }; }
+    else o.fill = p.hole ? (bg || WHITE) : col;
+    slide.addShape(p.s, o);
+  });
+}
+
+/* ==================================================================
+ * left rail: white pill card, logo mark, five page numbers
+ * ================================================================== */
+const NAV_X = [0.339, 0.379, 0.375, 0.375, 0.371];
+const NAV_W = [0.448, 0.369, 0.369, 0.369, 0.369];
+/* the active number is 18pt, so its taller box pushes the rows beneath it down */
+const NAV_ABOVE = [5.359, 5.652, 5.991, 6.33, 6.668];
+const NAV_BELOW = [5.291, 5.702, 6.046, 6.39, 6.733];
+const NAV_ON = [5.291, 5.652, 5.991, 6.33, 6.668];
+
+function rail(pageNo) {
+  const active = (pageNo - 1) % 5;
+  const first = pageNo - active;
+  shape('roundRect', { x: 0.241, y: 0.375, w: 0.646, h: 6.75, fill: WHITE, shadow: railShadow() });
+  icon('splat', 0.339, 0.49, 0.448, 0.448, PURPLE);
+  for (let i = 0; i < 5; i++) {
+    const on = i === active;
+    text(String(first + i).padStart(2, '0'), {
+      x: NAV_X[i], w: NAV_W[i], h: on ? 0.303 : 0.202,
+      y: on ? NAV_ON[i] : i < active ? NAV_ABOVE[i] : NAV_BELOW[i],
+      fontSize: on ? 18 : 12, fontFace: SEMI, color: on ? PURPLE : INK, align: 'center', margin: 0, valign: 'top'
+    });
+  }
+}
+
+/** phone + mail chips, used on the cover, the summary card and the closer */
+function contactRow(x, y, chipFill, textColor) {
+  const fill = chipFill || PURPLE;
+  [[0, 'phone', PHONE_NO, 1.438], [2.296, 'mail', EMAIL, 2.343]].forEach(c => {
+    const cx = x + c[0];
+    shape('roundRect', { x: cx, y, w: 0.426, h: 0.426, fill });
+    icon(c[1], cx + 0.083, y + 0.083, 0.26, 0.26, WHITE, fill);
+    text(c[2], { x: cx + 0.577, y: y + 0.111, w: c[3], h: 0.202, fontSize: 12, fontFace: REG, color: textColor || BLACK });
+  });
+}
+
+/** grey track + purple progress + caption + right-aligned percentage */
+function skillBar(x, y, full, done, name, pct) {
+  shape('line', { x, y, w: full, h: 0, line: { color: TRACK, width: 8 } });
+  shape('line', { x, y, w: done, h: 0, line: { color: PURPLE, width: 8 } });
+  label(x - 0.062, y - 0.408, 2.3, name, 14);
+  label(x + 2.957, y - 0.408, 0.472, pct, 14, { align: 'right' });
+}
+
+/** "01." + blurb card, shared by the Professional and Personal Skills slides */
+function numberCard(x, y, num) {
+  card(x, y, 5.646, 1.053);
+  text(num, { x: x + 0.266, y: y + 0.19, w: 0.851, h: 0.673, fontSize: 40, fontFace: SEMI, color: PURPLE });
+  para(x + 1.318, y + 0.262, 4.067, 0.529, LOREM.short);
+}
+
+/** hollow bezel drawn as four bars, so whatever sits behind shows through the glass */
+function screenFrame(x, y, w, h, top, side, bottom, color) {
+  rect(x, y, w, top, color);
+  rect(x, y + h - bottom, w, bottom, color);
+  rect(x, y + top, side, h - top - bottom, color);
+  rect(x + w - side, y + top, side, h - top - bottom, color);
+}
+
+/** phone / tablet body: grey rim, black shell, darker glass, side buttons */
+function deviceMock(x, y, w, h, radius) {
+  shape('roundRect', { x, y, w, h, fill: '9A9A9A', rectRadius: radius + 0.03 });
+  rect(x + w - 0.025, y + h * 0.26, 0.05, h * 0.09, '8C8C8C');
+  rect(x - 0.025, y + h * 0.2, 0.05, h * 0.06, '8C8C8C');
+  rect(x - 0.025, y + h * 0.29, 0.05, h * 0.06, '8C8C8C');
+  shape('roundRect', { x: x + 0.025, y: y + 0.025, w: w - 0.05, h: h - 0.05, fill: '111111', rectRadius: radius + 0.02 });
+  shape('roundRect', { x: x + 0.06, y: y + 0.06, w: w - 0.12, h: h - 0.12, fill: BLACK, rectRadius: radius });
+  shape('roundRect', { x: x + w / 2 - 0.28, y: y + 0.045, w: 0.56, h: 0.06, fill: '1C1C1C', rectRadius: 0.03 });
+}
+
+/* ==================================================================
+ * slide builders
+ * ================================================================== */
+
+/* 1 -- cover */
+function slide01() {
+  newSlide();
+  rect(0, 0, 3.982, 7.5, BLUE);
+  shape('round2SameRect', { x: 1.297, y: 0.75, w: 5.37, h: 6.75, fill: PURPLE });
+  rail(1);
+  eyebrow(7.444, 1.883, HELLO, 1.523);
+  text('Lucas', { x: 7.444, y: 2.186, w: 3.176, h: 1.111, fontSize: 66, fontFace: SEMI, color: INK });
+  text('Bruckmen', { x: 7.444, y: 3.081, w: 5.076, h: 1.111, fontSize: 66, fontFace: SEMI, color: INK });
+  shape('roundRect', { x: 7.444, y: 4.428, w: 3.712, h: 0.582, fill: PURPLE });
+  text(ROLE, { x: 7.65, y: 4.55, w: 3.299, h: 0.337, fontSize: 20, fontFace: SEMI, color: WHITE, align: 'center' });
+  contactRow(7.444, 6.521);
+}
+
+/* 2 -- biodata */
+const BIODATA = [
+  ['Name', NAME], ['Birth', '26 November 1995'], ['Address', 'Koyambed Street 019 Agassiz City'],
+  ['Phone', PHONE_NO], ['Email', EMAIL]
+];
+
+function slide02() {
+  newSlide();
+  rect(9.352, 0, 3.982, 7.5, PURPLE);
+  rail(2);
+  eyebrow(1.587, 1.096, ROLE, 3.024);
+  heading(1.587, 1.399, NAME, 4.946);
+  label(1.587, 2.562, 1.6, 'Biodata', 18);
+  para(1.587, 2.919, 5.08, 0.807, LOREM.biodata, INK);
+  BIODATA.forEach((r, i) => {
+    const y = 4.256 + i * 0.469;
+    text(r[0], { x: 1.587, y, w: 1.3, h: 0.269, fontSize: 16, fontFace: SEMI, color: INK });
+    text(':  ' + r[1], { x: 3.026, y, w: 3.9, h: 0.269, fontSize: 16, fontFace: REG, color: INK, wrap: false });
+  });
+}
+
+/* 3 -- quote */
+function slide03() {
+  newSlide();
+  rect(10.552, 0, 2.781, 7.5, BLUE);
+  shape('round2SameRect', { x: 8.324, y: 0, w: 4.453, h: 4.708, fill: PURPLE, flipV: true });
+  rail(3);
+  shape('roundRect', { x: 1.592, y: 1.804, w: 0.907, h: 0.907, fill: PURPLE });
+  icon('quote', 1.648, 1.86, 0.794, 0.794, WHITE);
+  ['Choose a job you love', 'and you will never to', 'work a day in your life'].forEach((line, i) =>
+    text(line, { x: 1.592, y: 2.891 + i * 0.6055, w: 5.9, h: 0.606, fontSize: 36, fontFace: SEMI, color: INK }));
+  text(NAME, { x: 1.592, y: 5.292, w: 3.242, h: 0.404, fontSize: 24, fontFace: SEMI, color: INK, italic: true });
+}
+
+/* 4 -- about, portrait to the left */
+function slide04() {
+  newSlide();
+  rect(0, 0, 1.191, 7.5, PURPLE);
+  rail(4);
+  eyebrow(7.433, 1.395, HELLO, 1.559);
+  heading(7.433, 1.698, NAME, 4.946);
+  pill(7.433, 2.549, 3.299, 0.455, ROLE, 16);
+  para(7.433, 3.647, 5.08, 1.64, LOREM.praesent);
+  para(7.433, 5.576, 5.08, 0.529, LOREM.twoLine);
+}
+
+/* 5 -- hello, a little about my personal */
+function slide05() {
+  newSlide();
+  rect(10.635, 0, 2.698, 7.5, PURPLE);
+  rail(5);
+  eyebrow(1.571, 1.433, 'About Me', 1.404);
+  heading(1.571, 1.736, 'Hello, a Little About', 5.604);
+  heading(1.571, 2.375, 'My Personal', 3.747);
+  para(1.571, 3.62, 5.08, 1.362, LOREM.full);
+  shape('roundRect', { x: 1.571, y: 5.361, w: 0.499, h: 0.499, fill: PURPLE });
+  icon('quote', 1.602, 5.392, 0.437, 0.437, WHITE);
+  para(2.413, 5.26, 4.238, 0.807, LOREM.tincidunt);
+}
+
+/* 6 -- big statement */
+function slide06() {
+  newSlide();
+  rect(10.303, 0, 2.326, 7.5, PURPLE);
+  rail(6);
+  eyebrow(1.599, 1.449, 'About Me', 1.377);
+  ['Life is 10 percent', 'what happens to you', 'and 90 percent how', 'you reach to it']
+    .forEach((line, i) => heading(1.599, 1.751 + i * 0.6505, line, 6.3));
+  para(1.599, 4.967, 5.999, 1.085, LOREM.full);
+}
+
+/* 7 -- professional summary card */
+function slide07() {
+  newSlide();
+  shape('roundRect', { x: 5.675, y: 3.371, w: 7.283, h: 3.564, fill: PURPLE, shadow: cardShadow() });
+  rail(7);
+  eyebrow(6.805, 1.276, 'About Me', 1.377);
+  heading(6.805, 1.579, 'Professional', 4.299, 48);
+  heading(6.805, 2.239, 'Summary', 3.57, 48);
+  text(ROLE, { x: 6.398, y: 3.755, w: 2.615, h: 0.269, fontSize: 16, fontFace: REG, color: WHITE });
+  text(NAME, { x: 6.398, y: 4.024, w: 4.469, h: 0.606, fontSize: 36, fontFace: SEMI, color: WHITE });
+  para(6.398, 4.814, 5.838, 0.807, LOREM.egestas, WHITE);
+  contactRow(6.398, 6.126, BLUE, WHITE);
+}
+
+/* 8 -- work experience */
+const JOBS = [{ year: '2016', period: 'Present \u2013 Mei 2016', y: 0.859 }, { year: '2020', period: 'Present \u2013 Oct 2020', y: 4.245 }];
+
+function slide08() {
+  newSlide();
+  rail(8);
+  eyebrow(1.558, 1.859, 'About Me', 1.377);
+  heading(1.558, 2.162, 'Work Experience', 5.109);
+  para(1.571, 3.263, 5.08, 1.362, LOREM.full);
+  para(1.571, 4.834, 5.109, 0.807, LOREM.tincidunt, INK);
+  JOBS.forEach(j => {
+    text(j.year, { x: 9.98, y: j.y, w: 1.585, h: 0.673, fontSize: 40, fontFace: SEMI, color: INK });
+    pill(9.98, j.y + 0.752, 2.75, 0.426, j.period, 16);
+    label(9.98, j.y + 1.459, 1.85, 'Company Name', 14, { italic: true });
+    label(9.992, j.y + 1.752, 2.175, '(XYZ) Key Facilitator', 14);
+    text('Country, State', { x: 9.98, y: j.y + 2.211, w: 1.343, h: 0.185, fontSize: 11, fontFace: REG, color: INK });
+  });
+}
+
+/* 9 -- key skills grid */
+const KEY_SKILLS = [
+  { col: 0, row: 0, art: 'calendar', caption: 'Sceduleing, Planing, & Prioritizing', on: true },
+  { col: 1, row: 0, art: 'stopwatch', caption: 'Project, Organizing, & Time Management' },
+  { col: 2, row: 0, art: 'team', caption: 'Team Leadership' },
+  { col: 0, row: 1, art: 'board', caption: 'Strategic Planning' },
+  { col: 1, row: 1, art: 'handshake', caption: 'Team Collaboration' },
+  { col: 2, row: 1, art: 'target', caption: 'Project Budget Planning & Administration' }
+];
+
+function slide09() {
+  newSlide();
+  rail(9);
+  eyebrow(1.654, 0.772, 'About Me', 1.377);
+  heading(1.654, 1.075, 'Key Skills', 3.39, 48);
+  para(7.497, 0.948, 5.125, 0.807, LOREM.dapibus);
+  KEY_SKILLS.forEach(s => {
+    const x = 1.654 + s.col * 3.966;
+    const y = 2.353 + s.row * 2.331;
+    const fg = s.on ? WHITE : PURPLE;
+    card(x, y, 3.037, 2.042, s.on ? PURPLE : WHITE);
+    icon(s.art, x + 1.164, y + 0.394, 0.709, 0.709, fg, s.on ? PURPLE : WHITE);
+    const wraps = s.caption.length > 22;
+    text(s.caption, {
+      x: x + 0.3, y: y + (wraps ? 1.261 : 1.404), w: 2.437, h: wraps ? 0.471 : 0.236,
+      fontSize: 14, fontFace: SEMI, color: s.on ? WHITE : INK, align: 'center'
+    });
+  });
+}
+
+/* 10 -- professional skills, numbered cards right */
+function slide10() {
+  newSlide();
+  rect(2.785, 0, 2.326, 7.5, PURPLE);
+  rail(10);
+  eyebrow(7.052, 1.136, 'About Me', 1.377);
+  heading(7.052, 1.439, 'Professional Skills', 5.294);
+  ['01.', '02.', '03.'].forEach((n, i) => numberCard(7.052, 2.415 + i * 1.448, n));
+}
+
+/* 11 -- software skills; each Office logo is four stacked colour bands + a letter chip */
+const OFFICE_APPS = [
+  { y: 2.396, letter: 'W', chip: '185ABD', bands: ['41A5EE', '2B7CD3', '185ABD', '103F91'], name: 'Microsoft Word', pct: '76%', done: 2.449 },
+  { y: 3.887, letter: 'P', chip: 'CB4F2E', bands: ['FF8F6B', 'ED6C47', 'D35230', 'D35230'], name: 'Microsoft Powerpoint', pct: '86%', done: 2.692 },
+  { y: 5.379, letter: 'X', chip: '107C41', bands: ['33C481', '21A366', '107C41', '185C37'], name: 'Microsoft Excel', pct: '90%', done: 2.957 }
+];
+
+function slide11() {
+  newSlide();
+  rail(11);
+  eyebrow(1.494, 1.068, 'About Me', 1.377);
+  heading(1.494, 1.371, 'Software Skills', 4.441);
+  OFFICE_APPS.forEach(app => {
+    card(1.494, app.y, 5.173, 1.053);
+    app.bands.forEach((c, i) => rect(1.899, app.y + 0.254 + i * 0.1355, 0.524, 0.136, c));
+    shape('roundRect', { x: 1.777, y: app.y + 0.462, w: 0.243, h: 0.247, fill: app.chip, rectRadius: 0.024, shadow: chipShadow() });
+    text(app.letter, { x: 1.777, y: app.y + 0.462, w: 0.243, h: 0.247, fontSize: 16, fontFace: REG, color: WHITE, align: 'center', valign: 'middle' });
+    skillBar(2.871, app.y + 0.73, 3.454, app.done, app.name, app.pct);
+  });
+}
+
+/* 12 -- personal skills */
+function slide12() {
+  newSlide();
+  rect(7.509, 0, 2.326, 7.5, PURPLE);
+  rail(12);
+  eyebrow(1.494, 1.102, 'About Me', 1.377);
+  heading(1.494, 1.405, 'Personal Skills', 4.441);
+  ['01.', '02.', '03.'].forEach((n, i) => numberCard(1.498, 2.449 + i * 1.448, n));
+}
+
+/* 13 -- education & certification */
+const EDUCATION = [
+  { x: 1.494, y: 2.381, year: '2015', title: 'Bachelor Of Business Administration (BBA)' },
+  { x: 4.264, y: 4.716, year: '2018', title: 'Certified Of Quality Assurance Testing' }
+];
+
+function slide13() {
+  newSlide();
+  rect(5.403, 3.337, 7.931, 4.163, PURPLE);
+  rail(13);
+  eyebrow(1.494, 1.102, 'About Me', 1.377);
+  heading(1.494, 1.405, 'Education & Certification', 7.427);
+  EDUCATION.forEach(e => {
+    card(e.x, e.y, 8.443, 2.081);
+    text(e.year, { x: e.x + 0.478, y: e.y + 0.34, w: 1.585, h: 0.673, fontSize: 40, fontFace: SEMI, color: PURPLE });
+    label(e.x + 2.063, e.y + 0.427, 4.4, e.title, 14, { italic: true });
+    text('University Of America', { x: e.x + 2.063, y: e.y + 0.721, w: 2.249, h: 0.236, fontSize: 14, fontFace: REG, color: INK });
+    para(e.x + 0.478, e.y + 1.212, 7.488, 0.529, LOREM.dapibus);
+  });
+}
+
+/* 14 -- professional skills with progress bars */
+function slide14() {
+  newSlide();
+  rail(14);
+  eyebrow(7.316, 1.045, 'About Me', 1.377);
+  heading(7.316, 1.348, 'Professional Skills', 5.294);
+  para(7.316, 2.459, 5.08, 1.362, LOREM.full);
+  ['Comunication Skill', 'Team Leadership', 'Analytical Thingking'].forEach((n, i) =>
+    skillBar(7.378, 4.666 + i * 0.8945, 3.454, 2.957, n, '90%'));
+  text(NAME, { x: 1.363, y: 5.219, w: 4.946, h: 0.673, fontSize: 40, fontFace: SEMI, color: INK, align: 'center' });
+  pill(2.186, 6.07, 3.299, 0.455, ROLE, 16);
+}
+
+/* 15 & 16 -- process cards */
+function processCard(x, y, title, titleW) {
+  card(x, y, 5.096, 2.556);
+  label(x + 0.539, y + 0.355, titleW, title, 20);
+  para(x + 0.539, y + 0.84, 4.018, 1.362, LOREM.commodo);
+}
+
+function slide15() {
+  newSlide();
+  rail(15);
+  eyebrow(1.571, 1.433, 'About Me', 1.404);
+  heading(1.571, 1.736, 'How The Process', 5.096);
+  heading(1.571, 2.375, 'Of Work', 2.825);
+  processCard(1.571, 4.112, 'Research', 1.445);
+  processCard(7.607, 4.112, 'Briefing', 1.445);
+  shape('ellipse', { x: 6.967, y: 5.221, w: 0.34, h: 0.34, fill: PURPLE });
+}
+
+function slide16() {
+  newSlide();
+  rail(16);
+  processCard(7.843, 0.784, 'Development', 2.154);
+  processCard(1.571, 4.159, 'Final Product', 2.031);
+  shape('ellipse', { x: 7.083, y: 1.893, w: 0.34, h: 0.34, fill: PURPLE });
+  shape('ellipse', { x: 7.083, y: 5.221, w: 0.34, h: 0.34, fill: PURPLE });
+}
+
+/* 17 -- core competencies */
+const COMPETENCIES = [
+  { x: 1.654, y: 3.316, art: 'gear', artX: 2.672, artY: 3.651, artW: 1.0, caption: 'Technical Project', capX: 2.128, capW: 2.088, blurbX: 2.037, blurbY: 5.219 },
+  { x: 5.622, y: 3.318, art: 'bulb', artX: 6.686, artY: 3.698, artW: 0.907, caption: 'Process Improvment', capX: 5.971, capW: 2.337, blurbX: 6.005, blurbY: 5.229, on: true },
+  { x: 9.586, y: 3.316, art: 'handshake', artX: 10.604, artY: 3.651, artW: 1.0, caption: 'Business Intelligence', capX: 9.884, capW: 2.44, blurbX: 9.969, blurbY: 5.235 }
+];
+
+function slide17() {
+  newSlide();
+  rail(17);
+  eyebrow(1.571, 1.186, 'About Me', 1.404);
+  heading(1.571, 1.489, 'Core Competentcies/', 6.507);
+  heading(1.571, 2.129, 'Area Of Practice', 4.988);
+  COMPETENCIES.forEach(c => {
+    const fg = c.on ? WHITE : PURPLE;
+    card(c.x, c.y, 3.037, 3.619, c.on ? PURPLE : WHITE);
+    icon(c.art, c.artX, c.artY, c.artW, c.artW, fg, c.on ? PURPLE : WHITE);
+    text(c.caption, { x: c.capX, y: 4.89, w: c.capW, h: 0.236, fontSize: 14, fontFace: SEMI, color: c.on ? WHITE : INK, align: 'center' });
+    para(c.blurbX, c.blurbY, 2.27, 1.362, LOREM.nulla, c.on ? WHITE : BLACK, 'center');
+  });
+}
+
+/* 18 -- achievements & rewards */
+const AWARDS = [
+  { x: 1.571, y: 2.559, year: '2020', art: 'rosette', on: true, tail: '' },
+  { x: 1.571, y: 5.047, year: '2021', art: 'medal', tail: '.' },
+  { x: 7.587, y: 2.559, year: '2022', art: 'certificate', tail: '' },
+  { x: 7.587, y: 5.047, year: '2023', art: 'trophy', tail: '.' }
+];
+
+function slide18() {
+  newSlide();
+  rail(18);
+  eyebrow(1.571, 1.016, 'About Me', 1.404);
+  heading(1.571, 1.319, 'Achievment & Reward', 6.689);
+  AWARDS.forEach(a => {
+    card(a.x, a.y, 2.088, 2.042, a.on ? PURPLE : WHITE);
+    icon(a.art, a.x + 0.402, a.y + 0.38, 1.283, 1.283, a.on ? WHITE : PURPLE, a.on ? PURPLE : WHITE);
+    const tx = a.x + 2.373;
+    text(a.year, { x: tx, y: a.y + 0.24, w: 1.69, h: 0.74, fontSize: 44, fontFace: SEMI, color: PURPLE });
+    label(tx, a.y + 0.986, 1.448, 'Award One', 16);
+    para(tx, a.y + 1.273, 2.906, 0.529, LOREM.award + a.tail);
+  });
+}
+
+/* 19 -- testimonial */
+function slide19() {
+  newSlide();
+  rail(19);
+  eyebrow(1.571, 0.953, 'Testimonial', 1.663);
+  heading(1.571, 1.256, 'Testimonial', 4.247, 48);
+  para(1.571, 2.461, 5.096, 1.085, LOREM.commod);
+  card(1.571, 4.059, 6.572, 2.488);
+  label(3.809, 4.499, 2.009, 'James Hunk', 20, { italic: true });
+  text('Project Manager The ABAS Group', { x: 3.809, y: 4.836, w: 3.297, h: 0.236, fontSize: 14, fontFace: REG, color: INK });
+  para(3.809, 5.3, 4.012, 0.807, LOREM.lobortis);
+}
+
+/* 20 -- what our client says */
+function slide20() {
+  newSlide();
+  rail(20);
+  eyebrow(1.571, 0.953, 'Testimonial', 1.663);
+  heading(1.571, 1.256, 'What Our Client Says', 7.701, 48);
+  label(5.018, 3.129, 2.009, 'James Hunk', 20, { italic: true });
+  text('Project Manager The ABAS Group', { x: 5.018, y: 3.465, w: 3.297, h: 0.236, fontSize: 14, fontFace: REG, color: INK });
+  for (let i = 0; i < 5; i++) shape('star5', { x: 5.018 + i * 0.3673, y: 3.969, w: 0.312, h: 0.301, fill: GOLD });
+  shape('roundRect', { x: 5.018, y: 4.594, w: 0.544, h: 0.544, fill: PURPLE });
+  icon('quote', 5.052, 4.628, 0.476, 0.476, WHITE);
+  para(5.018, 5.192, 5.491, 0.807, LOREM.velit);
+}
+
+/* 21-25 -- portfolio */
+function slide21() {
+  newSlide();
+  rail(21);
+  eyebrow(1.571, 0.953, 'Portfolio', 1.247);
+  heading(1.571, 1.256, 'Our Portfolio', 4.424, 48);
+}
+
+function slide22() {
+  newSlide();
+  rail(22);
+  eyebrow(1.571, 1.669, 'Portfolio', 1.247);
+  heading(1.571, 1.972, 'Our Portfolio', 4.424, 48);
+  label(1.587, 3.278, 1.778, 'Project Tittle', 18);
+  para(1.587, 3.636, 3.184, 2.195, LOREM.full);
+}
+
+function slide23() {
+  newSlide();
+  rail(23);
+  text('Project Tittle', { x: 5.667, y: 5.299, w: 3.05, h: 0.471, fontSize: 28, fontFace: SEMI, color: INK, align: 'center' });
+  para(2.592, 5.906, 9.201, 0.807, LOREM.full, BLACK, 'center');
+}
+
+function slide24() {
+  newSlide();
+  rail(24);
+  eyebrow(1.571, 5.497, 'Portfolio', 1.247);
+  heading(1.571, 5.8, 'Our Portfolio', 4.424, 48);
+  label(7.92, 5.442, 1.778, 'Project Tittle', 18);
+  para(7.92, 5.8, 4.683, 0.807, LOREM.tortor);
+}
+
+function slide25() {
+  newSlide();
+  rail(25);
+  eyebrow(8.317, 5.219, 'Portfolio', 1.247);
+  heading(8.317, 5.522, 'Our Portfolio', 4.424, 48);
+}
+
+/* 26 -- app design: tablet + phone on a purple panel */
+function slide26() {
+  newSlide();
+  rect(0, 0, 7.74, 7.5, PURPLE);
+  deviceMock(1.929, 0.742, 3.128, 6.015, 0.26);
+  deviceMock(4.175, 2.056, 2.445, 4.702, 0.2);
+  rail(26);
+  eyebrow(8.771, 1.669, 'Mockup', 1.247);
+  heading(8.771, 1.972, 'App Design', 4.184, 48);
+  label(8.787, 3.278, 1.778, 'Project Tittle', 18);
+  para(8.787, 3.636, 3.184, 2.195, LOREM.full);
+}
+
+/* 27 -- all-in-one desktop: hollow bezel, light chin, tapered neck, oval foot */
+function slide27() {
+  newSlide();
+  rect(2.571, 0, 3.784, 7.5, PURPLE);
+  rail(27);
+  screenFrame(1.794, 1.52, 5.331, 3.194, 0.217, 0.205, 0.228, '0B0B0B');
+  rect(1.794, 4.714, 5.331, 0.49, 'D3D3D3');
+  shape('trapezoid', { x: 1.9, y: 5.204, w: 5.12, h: 0.06, fill: 'C4C4C4' });
+  shape('trapezoid', { x: 3.86, y: 5.264, w: 1.2, h: 0.6, fill: 'B4B4B4', flipV: true });
+  shape('ellipse', { x: 3.51, y: 5.79, w: 1.9, h: 0.2, fill: 'E8E8E8' });
+  eyebrow(8.039, 2.086, 'Mockup', 1.247);
+  heading(8.039, 2.389, 'Our Mockup', 4.322, 48);
+  label(8.054, 3.694, 1.778, 'Project Tittle', 18);
+  para(8.054, 4.052, 4.821, 1.362, LOREM.full);
+}
+
+/* 28 -- single phone mock-up */
+function slide28() {
+  newSlide();
+  rail(28);
+  eyebrow(1.56, 1.075, 'Mockup', 1.247);
+  heading(1.56, 1.378, 'Our Mock-Up Design', 7.493, 48);
+  deviceMock(5.969, 2.751, 2.083, 4.007, 0.17);
+}
+
+/* 29 -- laptop mock-up bleeding off the right edge */
+function slide29() {
+  newSlide();
+  rect(9.55, 0, 3.784, 7.5, PURPLE);
+  rail(29);
+  eyebrow(1.622, 2.086, 'Mockup', 1.247);
+  heading(1.622, 2.389, 'Our Mockup', 4.322, 48);
+  label(1.638, 3.694, 1.778, 'Project Tittle', 18);
+  para(1.638, 4.052, 4.821, 1.362, LOREM.full);
+  screenFrame(7.759, 1.263, 7.148, 4.699, 0.188, 0.143, 0.1, '0A0A0A');
+  shape('roundRect', { x: 7.322, y: 5.955, w: 8.022, h: 0.26, fill: '272727', rectRadius: 0.1, shadow: dropShadow() });
+  shape('roundRect', { x: 10.2, y: 6.05, w: 1.0, h: 0.07, fill: '4A4A4A', rectRadius: 0.035 });
+}
+
+/* 30 -- thank you */
+function slide30() {
+  newSlide();
+  shape('round2SameRect', { x: 1.297, y: 0, w: 5.37, h: 6.75, fill: PURPLE, flipV: true });
+  rail(30);
+  eyebrow(7.444, 2.067, HELLO, 1.523);
+  text('Thank You', { x: 7.444, y: 2.37, w: 5.217, h: 1.111, fontSize: 66, fontFace: SEMI, color: INK });
+  shape('roundRect', { x: 7.444, y: 3.747, w: 3.712, h: 0.582, fill: PURPLE });
+  text(ROLE, { x: 7.65, y: 3.87, w: 3.299, h: 0.337, fontSize: 20, fontFace: SEMI, color: WHITE, align: 'center' });
+  contactRow(7.444, 5.007);
+}
+
+/* ==================================================================
+ * build
+ * ================================================================== */
+const BUILDERS = [
+  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
+  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
+  slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29, slide30
+];
+
+deck = new PptxGenJS();
+deck.defineLayout({ name: 'WIDE', width: 13.333, height: 7.5 });
+deck.layout = 'WIDE';
+deck.author = 'Lucas Bruckmen';
+deck.title = 'Lucas Bruckmen - Personal CV';
+
+BUILDERS.forEach(build => build());
+
+deck.writeFile({ fileName: path.join(__dirname, '058f8b11-ee29-4ee0-8eab-a8159d777efe_grok_final.pptx') })
+  .then(f => console.log('wrote ' + f));
