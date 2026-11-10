@@ -9,6 +9,15 @@ packages confondus. Entrées les plus récentes en haut. Heures de Paris
 
 <!-- NOUVELLES-ENTREES-ICI -->
 
+## 2026-11-10 17:57 (Paris) — `2026-11-10_02-03` → `2026-11-10_17-57`
+
+Changement de surface RPC détecté : **23 méthode(s) ajoutée(s)**.
+
+Ajoutées : `AiService.TestTeamInferenceHookDecisionRules`, `AnalyticsService.LogStatsigExposures`, `BackgroundComposerService.ListPluginConsentGrants`, `BackgroundComposerService.RevokePluginConsentGrant`, `BackgroundComposerService.SetEnvironmentVmAccess`, `DashboardService.DeleteTeamGrokBotIdpConnection`, `DashboardService.GetBitbucketForgeInstallationGrants`, `DashboardService.GetTeamGrokBotIdpConnection`, `DashboardService.GrantBitbucketForgeInstallation`, `DashboardService.ListMcpAllowlistRuleMatches`, `DashboardService.ListTeamPluginsTable`, `DashboardService.RecordConnectorPolicyBlocked`, `DashboardService.RevokeBitbucketForgeInstallation`, `DashboardService.UpdateTeamGrokBotIdpConnection`, `DashboardService.UploadOAuthApplicationLogo`, `GrokBotService.ConfirmGrokBotMessagingPhoneCode`, `GrokBotService.GetGrokBotMessagingPrompt`, `GrokBotService.GetTeamSandSetupTest`, `GrokBotService.LeaveGrokBotMessagingGroup`, `GrokBotService.MarkGrokBotMessagingPromptSeen`, `GrokBotService.SendGrokBotMessagingPhoneCode`, `GrokBotService.StartTeamSandSetupTest`, `GrokBotService.StopTeamSandSetupTest`
+
+Rapport : [reports/2026-11-10_17-57.md](reports/2026-11-10_17-57.md).
+
+
 ## 2026-11-10 02:03 (Paris) — `2026-11-09_18-09` → `2026-11-10_02-03`
 
 Changement de surface RPC détecté : **3 méthode(s) ajoutée(s)**.
