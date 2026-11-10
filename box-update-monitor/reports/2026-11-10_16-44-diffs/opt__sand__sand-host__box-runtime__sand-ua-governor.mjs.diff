@@ -1,0 +1,145 @@
+--- 2026-11-10_11-49:/opt/sand/sand-host/box-runtime/sand-ua-governor.mjs
++++ 2026-11-10_16-44:/opt/sand/sand-host/box-runtime/sand-ua-governor.mjs
+@@ -22,6 +22,7 @@
+   BOX_EXPERIMENTS_READY_MARKER_PATH,
+   BROWSER_ACCEPT_LANGUAGE_EN_US_MARKER_PATH,
+   BOX_BROWSER_COHERENT_FINGERPRINT_MARKER_PATH,
++  BOX_BROWSER_DEVICE_PERSONA_MARKER_PATH,
+   BOX_BROWSER_FINGERPRINT_LOG_SITES_PATH,
+   SAND_BOX_CDP_PORT_BASE,
+   BROWSER_EGRESS_TIMEZONE_MARKER_PATH,
+@@ -41,7 +42,10 @@
+   buildUserAgentOverride,
+   coherentHardwareProfile,
+   configuredAcceptLanguage,
++  cpuCountFromAllowedList,
++  devicePersonaFromSeed,
+   normalizeGpuMode,
++  parseDeviceSeed,
+   verifyCoherentWebgl,
+ } from "./sand-fingerprint-profiles.mjs";
+ import {
+@@ -426,9 +430,34 @@
+   }
+ }
+ 
+-export function coherentProfileForBrowser(browser, resolve = resolveBoxBrowserGpuMode) {
++export function readDevicePersonaSeed(markerPath = BOX_BROWSER_DEVICE_PERSONA_MARKER_PATH) {
++  let fd;
++  try {
++    fd = openSync(markerPath, constants.O_RDONLY | constants.O_NOFOLLOW);
++    return parseDeviceSeed(readFileSync(fd, "utf8"));
++  } catch (error) {
++    if (error?.code !== "ENOENT") {
++      reportOnce(`device persona marker read failed: ${errorClass(error)}`);
++    }
++    return null;
++  } finally {
++    if (fd !== undefined) closeSync(fd);
++  }
++}
++
++export function coherentProfileForBrowser(
++  browser,
++  resolve = resolveBoxBrowserGpuMode,
++  readSeed = readDevicePersonaSeed,
++  readCpuCount = readBrowserCpuCount,
++) {
+   if (browser.coherentProfile == null) {
+-    browser.coherentProfile = coherentHardwareProfile(resolve({ port: browser.port }));
++    browser.devicePersonaSeed = readSeed();
++    const coreCount = browser.devicePersonaSeed == null ? null : readCpuCount(browser.port);
++    const persona =
++      coreCount == null ? null : devicePersonaFromSeed(browser.devicePersonaSeed, { coreCount });
++    browser.devicePersonaApplied = persona !== null;
++    browser.coherentProfile = coherentHardwareProfile(resolve({ port: browser.port }), persona);
+   }
+   return browser.coherentProfile;
+ }
+@@ -447,7 +476,7 @@
+   }
+   const check = verifyCoherentWebgl(profile, gpu);
+   console.error(
+-    `coherent hardware profile port=${browser.port} gpu-mode=${profile.gpuMode} webgl=${check.claimed} observed=${check.observed} ${check.verdict}`,
++    `coherent hardware profile port=${browser.port} gpu-mode=${profile.gpuMode} webgl=${check.claimed} observed=${check.observed} ${check.verdict} persona=${browser.devicePersonaApplied === true ? "on" : "off"} hardware-concurrency=${profile.hardwareConcurrency}`,
+   );
+   return check;
+ }
+@@ -514,12 +543,12 @@
+   return Number.isSafeInteger(ticks) ? ticks : Number.POSITIVE_INFINITY;
+ }
+ 
+-export function readLaunchAcceptLanguage(port, procRoot = "/proc") {
++function findBrowserProcess(port, procRoot) {
+   let entries;
+   try {
+     entries = readdirSync(procRoot);
+   } catch (error) {
+-    reportOnce(`accept-language launch flag read failed: ${errorClass(error)}`);
++    reportOnce(`browser process lookup failed: ${errorClass(error)}`);
+     return null;
+   }
+   const portFlag = `--remote-debugging-port=${port}`;
+@@ -530,12 +559,28 @@
+     if (args === undefined || !args.includes(portFlag)) continue;
+     if (args.some((arg) => arg.startsWith("--type="))) continue;
+     const startTicks = processStartTicks(procRoot, entry);
+-    if (browser === null || startTicks < browser.startTicks) browser = { args, startTicks };
++    if (browser === null || startTicks < browser.startTicks) {
++      browser = { pid: entry, args, startTicks };
++    }
+   }
+-  const flag = browser?.args.findLast((arg) => arg.startsWith(ACCEPT_LANG_FLAG));
++  return browser;
++}
++
++export function readLaunchAcceptLanguage(port, procRoot = "/proc") {
++  const flag = findBrowserProcess(port, procRoot)?.args.findLast((arg) =>
++    arg.startsWith(ACCEPT_LANG_FLAG),
++  );
+   return flag === undefined ? null : flag.slice(ACCEPT_LANG_FLAG.length);
+ }
+ 
++// Cpus_allowed_list is the affinity mask Chrome's hardwareConcurrency counts: https://man7.org/linux/man-pages/man5/proc_pid_status.5.html
++export function readBrowserCpuCount(port, procRoot = "/proc") {
++  const browser = findBrowserProcess(port, procRoot);
++  if (browser === null) return null;
++  const status = readProcFile(`${procRoot}/${browser.pid}/status`);
++  return cpuCountFromAllowedList(/^Cpus_allowed_list:\s*(\S+)$/m.exec(status ?? "")?.[1]);
++}
++
+ function launchFlagMatches(browser) {
+   if (!acceptLanguageEnUsEnabledForBrowser(browser)) return false;
+   if (browser.launchAcceptLanguage === undefined) {
+@@ -1586,11 +1631,13 @@
+   readAcceptLanguage = readAcceptLanguageEnUsMarker,
+   resolveEgressGate = resolveEgressTimeZoneGate,
+   readFingerprintMarker = readFingerprintMarkerCandidate,
++  readDevicePersona = readDevicePersonaSeed,
+ } = {}) {
+   const fingerprintRaw = readFingerprintMarker();
+   const fingerprintConfig = fingerprintRaw == null ? null : parseFingerprintMarker(fingerprintRaw);
+   return {
+     coherentHardwareProfile: resolveCoherentHardwareProfile() === true,
++    devicePersonaSeed: readDevicePersona(),
+     acceptLanguage: readAcceptLanguage(),
+     egressTimeZone: resolveEgressGate(),
+     fingerprintLogConfigDigest:
+@@ -1610,6 +1657,17 @@
+     const after = onOff(settings.coherentHardwareProfile);
+     if (before !== after) changes.push(`coherent-hardware-profile ${before}->${after}`);
+   }
++  if (has("devicePersonaSeed")) {
++    const before = browser.devicePersonaSeed ?? null;
++    const after = settings.devicePersonaSeed ?? null;
++    if (before !== after) {
++      changes.push(
++        before == null || after == null
++          ? `device-persona ${onOff(before != null)}->${onOff(after != null)}`
++          : "device-persona value",
++      );
++    }
++  }
+   if (has("acceptLanguageEnUsEnabled")) {
+     const enabled = browser.acceptLanguageEnUsEnabled === true;
+     const wanted = settings.acceptLanguage != null;

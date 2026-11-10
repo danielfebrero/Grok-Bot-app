@@ -1,0 +1,10 @@
+--- 2026-11-10_11-49:/opt/sand/sand-host/box-scripts/sand-wallpaper-tone.mjs
++++ 2026-11-10_16-44:/opt/sand/sand-host/box-scripts/sand-wallpaper-tone.mjs
+@@ -27,6 +27,7 @@
+ export function isSupportedTimeZone(timeZone) {
+   if (typeof timeZone !== "string" || timeZone === "") return false;
+   try {
++    // oxlint-disable-next-line no-new -- constructing the formatter is the check, because it throws a RangeError for an unknown time zone (https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/DateTimeFormat/DateTimeFormat#exceptions).
+     new Intl.DateTimeFormat("en-US", { timeZone });
+     return true;
+   } catch {

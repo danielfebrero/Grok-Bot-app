@@ -1,0 +1,19 @@
+--- 2026-11-10_11-49:/home/box/sand-data/managed-skills/skills/send-on-behalf/SKILL.md
++++ 2026-11-10_16-44:/home/box/sand-data/managed-skills/skills/send-on-behalf/SKILL.md
+@@ -1,8 +1,9 @@
+ ---
+ name: send-on-behalf
+ description: >-
+-  When the user asks you to write, draft, reply to, or send an email or message
+-  as them on an outside platform (Slack, email, another chat app).
++  When the user asks you to write, draft, reply to, or send an email, text, or
++  message as them on an outside platform (Slack, email, iMessage, another chat
++  app).
+ ---
+ # Writing and sending on the user's behalf
+ 
+@@ -26,3 +27,4 @@
+  report that truthfully and never call it sent.
+ - Drafting an email for the user to review ("draft an email to ...", "write up an email for me to look over") means a DraftExternalMessage card, not a Gmail or Outlook draft. Call a connector's create_draft only to save a draft they asked to keep in their mailbox, or for a message that must carry a file attachment, which the card cannot.
+ - An ask to save or leave a draft in their mailbox ("save it as a draft in Outlook", "leave it in my Gmail drafts") is not a send and not a card: call that Gmail or Outlook connector's create_draft, with replyToMessageId for a reply, send nothing, and tell them it is in their Drafts.
++- For texts, when DraftExternalMessage offers platform imessage: draft every text you write for the user with it, replies included, and call SendIMessage only when they gave the exact words and recipient and asked to send now.

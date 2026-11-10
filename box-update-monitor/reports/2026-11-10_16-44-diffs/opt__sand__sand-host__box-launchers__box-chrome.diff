@@ -1,0 +1,124 @@
+--- 2026-11-10_11-49:/opt/sand/sand-host/box-launchers/box-chrome
++++ 2026-11-10_16-44:/opt/sand/sand-host/box-launchers/box-chrome
+@@ -253,9 +253,10 @@
+ 	[ ! -f "${SAND_NO_SWIFTSHADER_FILE}" ] || read -r SAND_NO_SWIFTSHADER_MODE 2>/dev/null <"${SAND_NO_SWIFTSHADER_FILE}" || true
+ fi
+ if [ "${SAND_BOX_BROWSER_NO_SWIFTSHADER}" = "1" ] && [ -n "${SAND_SWIFTSHADER_FLAG:-}" ]; then
+-	unset 'CHROME_FLAGS[SAND_SWIFTSHADER_FLAG]'
+-	BOX_CHROME_GPU_MODE=stock
+ 	if [ "${SAND_NO_SWIFTSHADER_MODE}" = llvmpipe ]; then
++		# --enable-unsafe-swiftshader stays: when ANGLE's GL display can't start (no
++		# GLX on the X server, no Mesa driver) Chrome falls back to SwiftShader WebGL
++		# instead of blocklisting WebGL, while a working llvmpipe still wins.
+ 		CHROME_FLAGS+=(
+ 			--use-gl=angle
+ 			--use-angle=gl
+@@ -264,6 +265,9 @@
+ 			--disable-accelerated-2d-canvas
+ 		)
+ 		BOX_CHROME_GPU_MODE=llvmpipe
++	else
++		unset 'CHROME_FLAGS[SAND_SWIFTSHADER_FLAG]'
++		BOX_CHROME_GPU_MODE=stock
+ 	fi
+ fi
+ sand_box_chrome_extra_flag_allowed() {
+@@ -503,6 +507,9 @@
+ 
+ SAND_BROWSER_EXIT_LOCALE_FILE="${SAND_BROWSER_EXIT_LOCALE_FILE:-/tmp/sand-browser-exit-locale}"
+ SAND_EXIT_LOCALE_WAIT_S="${SAND_EXIT_LOCALE_WAIT_S:-8}"
++SAND_EXIT_LOCALE_OUTCOME=""
++SAND_EXIT_LOCALE_LOOKUP_MS=""
++SAND_EXIT_LOCALE_LANGUAGE=""
+ exit_locale_script() {
+ 	local bundled="${0%/box-launchers/box-chrome}/box-scripts/sand-egress-timezone.mjs"
+ 	case "$0" in
+@@ -521,17 +528,29 @@
+ # governor reads the zone back from --sand-exit-geo. A lookup that fails or
+ # runs out of time leaves the launch as it was.
+ apply_exit_locale() {
+-	local script line zone list provider source i as_box=()
+-	[ -e "${SAND_BROWSER_EXIT_LOCALE_FILE}" ] && [ -n "${SAND_EGRESS_PROXY_ADDR}" ] || return 0
++	local script line zone list provider source i started status=0 as_box=()
++	SAND_EXIT_LOCALE_OUTCOME="" SAND_EXIT_LOCALE_LOOKUP_MS="" SAND_EXIT_LOCALE_LANGUAGE=""
++	[ -e "${SAND_BROWSER_EXIT_LOCALE_FILE}" ] || return 0
++	SAND_EXIT_LOCALE_OUTCOME=skipped
++	[ -n "${SAND_EGRESS_PROXY_ADDR}" ] || return 0
+ 	[ "${#SAND_TAILNET_SUFFIXES[@]}" -eq 0 ] || return 0
+ 	script="$(exit_locale_script)"
+ 	[ -x "${SAND_COOKIE_NODE}" ] && [ -r "${script}" ] || return 0
+ 	[ "$(id -u)" -ne 0 ] || as_box=(runuser -u box --)
++	started="$(date +%s%3N)"
+ 	line="$(timeout "${SAND_EXIT_LOCALE_WAIT_S}" "${as_box[@]}" "${SAND_COOKIE_NODE}" "${script}" \
+-		--exit-locale "http://${SAND_EGRESS_PROXY_ADDR}" "${SAND_ACCEPT_LANGUAGE_LIST}" </dev/null 2>/dev/null 9>&-)" || return 0
++		--exit-locale "http://${SAND_EGRESS_PROXY_ADDR}" "${SAND_ACCEPT_LANGUAGE_LIST}" </dev/null 2>/dev/null 9>&-)" || status=$?
++	SAND_EXIT_LOCALE_LOOKUP_MS=$(($(date +%s%3N) - started))
++	[ "${SAND_EXIT_LOCALE_LOOKUP_MS}" -ge 0 ] || SAND_EXIT_LOCALE_LOOKUP_MS=0
++	case "${status}" in
++	0) SAND_EXIT_LOCALE_OUTCOME=failed ;;
++	124) SAND_EXIT_LOCALE_OUTCOME=timeout; return 0 ;;
++	*) SAND_EXIT_LOCALE_OUTCOME=failed; return 0 ;;
++	esac
+ 	IFS=$'\t' read -r zone list provider source <<<"${line}" || true
+ 	case "${zone}" in
+-	'' | - | */ | /* | *..* | *[!A-Za-z0-9_+/-]*) return 0 ;;
++	-) SAND_EXIT_LOCALE_OUTCOME=no_zone; return 0 ;;
++	'' | */ | /* | *..* | *[!A-Za-z0-9_+/-]*) return 0 ;;
+ 	esac
+ 	[ -f "/usr/share/zoneinfo/${zone}" ] || return 0
+ 	case "${provider},${source}" in
+@@ -539,13 +558,35 @@
+ 	esac
+ 	CHROME_ENV+=(TZ="${zone}")
+ 	CHROME_FLAGS+=(--sand-exit-geo="${zone},${provider},${source}")
++	SAND_EXIT_LOCALE_OUTCOME=applied
++	SAND_EXIT_LOCALE_LANGUAGE=false
+ 	if [ "${SAND_ACCEPT_LANGUAGE_FLAGGED}" = 1 ] && sand_accept_language_valid "${list}"; then
+ 		for i in "${!CHROME_FLAGS[@]}"; do
+ 			case "${CHROME_FLAGS[i]}" in --accept-lang=*) CHROME_FLAGS[i]="--accept-lang=${list}" ;; esac
+ 		done
++		[ "${list}" = "${SAND_ACCEPT_LANGUAGE_LIST}" ] || SAND_EXIT_LOCALE_LANGUAGE=true
+ 	fi
+ }
+ 
++mark_exit_locale_held() {
++	SAND_EXIT_LOCALE_OUTCOME="" SAND_EXIT_LOCALE_LOOKUP_MS="" SAND_EXIT_LOCALE_LANGUAGE=""
++	[ ! -e "${SAND_BROWSER_EXIT_LOCALE_FILE}" ] || SAND_EXIT_LOCALE_OUTCOME=held
++}
++
++exit_locale_row_fields() {
++	case "${SAND_EXIT_LOCALE_OUTCOME}" in
++	applied | no_zone | timeout | failed | skipped | held) printf ',"exitLocale":"%s"' "${SAND_EXIT_LOCALE_OUTCOME}" ;;
++	*) return 0 ;;
++	esac
++	case "${SAND_EXIT_LOCALE_LOOKUP_MS}" in
++	'' | *[!0-9]*) ;;
++	*) printf ',"exitLocaleLookupMs":%s' "${SAND_EXIT_LOCALE_LOOKUP_MS}" ;;
++	esac
++	case "${SAND_EXIT_LOCALE_LANGUAGE}" in
++	true | false) printf ',"exitLocaleLanguage":%s' "${SAND_EXIT_LOCALE_LANGUAGE}" ;;
++	esac
++}
++
+ BOX_BROWSER_CGROUP_ENTER=/usr/local/bin/box-browser-cgroup-enter.sh
+ launch_chrome() {
+ 	local flags=("${CHROME_FLAGS[@]}") env=("${CHROME_ENV[@]}") leaf=()
+@@ -829,6 +870,7 @@
+ 		reset_chrome_tmpdir
+ 		launch_chrome --no-startup-window
+ 	else
++		mark_exit_locale_held
+ 		use_running_browser
+ 	fi
+ 	if ! wait_for_chrome 0; then
+@@ -861,6 +903,10 @@
+ 		launcher_fields+=",\"webrtcProxyOnly\":${BOX_CHROME_WEBRTC_PROXY_ONLY},\"gatesReady\":${BOX_CHROME_GATES_READY}"
+ 		;;
+ 	esac
++	case "${BOX_CHROME_GPU_MODE:-}" in
++	swiftshader | legacy | stock | llvmpipe) launcher_fields+=",\"gpuMode\":\"${BOX_CHROME_GPU_MODE}\"" ;;
++	esac
++	launcher_fields+="$(exit_locale_row_fields)"
+ 	printf '{"kind":"chrome_launch","display":%s,"mode":"%s","attempt":%s,"outcome":"%s","durationMs":%s%s}\n' \
+ 		"${BOX_DISPLAY_NUM:-1}" "${mode}" "${attempt}" "${outcome}" "${duration_ms}" "${launcher_fields}" \
+ 		2>/dev/null >>"${SAND_BOX_TELEMETRY_LOG:-/tmp/sand-box-telemetry.log}" || true

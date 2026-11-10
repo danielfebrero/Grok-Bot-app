@@ -1,0 +1,11 @@
+--- 2026-11-10_11-49:/opt/sand/sand-host/box-scripts/sand-cookie-persist.mjs
++++ 2026-11-10_16-44:/opt/sand/sand-host/box-scripts/sand-cookie-persist.mjs
+@@ -494,7 +494,7 @@
+       const before = seen.get(port);
+       return before !== undefined && before.get(key) !== cookieFingerprint(jar.get(key));
+     })
+-    .map(({ port, jar }) => jar.get(key));
++    .map(({ jar }) => jar.get(key));
+ }
+ 
+ function mergeJars(live, saved, seen, { keepUnseen }) {

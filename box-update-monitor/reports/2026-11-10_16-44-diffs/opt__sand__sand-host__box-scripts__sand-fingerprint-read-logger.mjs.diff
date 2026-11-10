@@ -1,0 +1,11 @@
+--- 2026-11-10_11-49:/opt/sand/sand-host/box-scripts/sand-fingerprint-read-logger.mjs
++++ 2026-11-10_16-44:/opt/sand/sand-host/box-scripts/sand-fingerprint-read-logger.mjs
+@@ -11,7 +11,7 @@
+ const MAX_HOSTS = 64;
+ const MAX_HOST_LENGTH = 253;
+ const MAX_SCRIPT_URL_LENGTH = 512;
+-const MAX_ARGS_SUMMARY_LENGTH = 96;
++
+ const MAX_BATCH_RECORDS = 256;
+ const MAX_BATCH_BYTES = 48 * 1024;
+ const MAX_READS = 1_000_000;

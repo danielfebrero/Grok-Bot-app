@@ -1,0 +1,200 @@
+--- 2026-11-10_11-49:/opt/sand/sand-host/box-scripts/sand-web-bot-auth.mjs
++++ 2026-11-10_16-44:/opt/sand/sand-host/box-scripts/sand-web-bot-auth.mjs
+@@ -16,6 +16,9 @@
+   GROK_BOT_BOX_HOST_ATTESTATION_HEADER,
+   GROK_BOT_BOX_HOST_ATTESTATION_INFERENCE_CREDENTIAL_SURFACE,
+   GROK_BOT_BOX_HOST_ATTESTATION_SOCKET_PATH,
++  GROK_BOT_BOX_INFERENCE_RENEWAL_FALLBACK_HEADER,
++  SAND_BOX_HOST_ATTESTED_INFERENCE_RENEWAL_ENV,
++  SAND_BOX_HOST_ATTESTED_INFERENCE_RENEWAL_ON_VALUE,
+   SAND_BOX_TAILNET_CHROME_CDP_PORT,
+   WEB_BOT_AUTH_SIGNATURE_SOURCES,
+   WEB_BOT_AUTH_SIGNED_CACHE_PATH,
+@@ -287,14 +290,14 @@
+   }
+ }
+ 
++const BACKEND_REQUEST_TIMED_OUT = "web bot auth backend request timed out";
++
+ async function fetchWithTimeout(fetchImpl, url, init, timeoutMs, readBody) {
+   const signal = AbortSignal.timeout(timeoutMs);
+   const timeout = new Promise((_, reject) => {
+-    signal.addEventListener(
+-      "abort",
+-      () => reject(new Error("web bot auth backend request timed out")),
+-      { once: true },
+-    );
++    signal.addEventListener("abort", () => reject(new Error(BACKEND_REQUEST_TIMED_OUT)), {
++      once: true,
++    });
+   });
+   const request = (async () => {
+     const response = await fetchImpl(url, { ...init, signal });
+@@ -304,6 +307,15 @@
+   return await Promise.race([request, timeout]);
+ }
+ 
++function unansweredRenewalFallbackReason(error) {
++  if (error?.message === BACKEND_REQUEST_TIMED_OUT) return "timeout";
++  return error instanceof SyntaxError ? "malformed_response" : "unreachable";
++}
++
++function refusedRenewalFallbackReason(status) {
++  return status === 200 ? "malformed_response" : `status_${status}`;
++}
++
+ function unexpiredAccessToken(cached, nowMs) {
+   return cached != null && nowMs < cached.expiresAtMs ? cached.accessToken : null;
+ }
+@@ -328,8 +340,10 @@
+     random = Math.random,
+     timeoutMs = OFF_HOT_PATH_RENEWAL_TIMEOUT_MS,
+     getHostAttestation = async () => undefined,
++    hostAttestedRenewal = false,
+   }) {
+     this.credential = credential;
++    this.hostAttestedRenewal = hostAttestedRenewal;
+     this.renewalEndpoint = renewalEndpoint;
+     this.fetchImpl = fetchImpl;
+     this.now = now;
+@@ -367,6 +381,7 @@
+ 
+   async renew() {
+     let status = null;
++    let answeredToAttestationAlone = false;
+     try {
+       let hostAttestation;
+       try {
+@@ -374,35 +389,38 @@
+       } catch (_hostAttestationUnavailable) {
+         hostAttestation = undefined;
+       }
+-      const { response, body } = await fetchWithTimeout(
+-        this.fetchImpl,
+-        this.renewalEndpoint,
+-        {
+-          method: "POST",
+-          redirect: "error",
+-          headers: {
+-            "content-type": "application/json",
+-            ...(hostAttestation == null
+-              ? {}
+-              : { [GROK_BOT_BOX_HOST_ATTESTATION_HEADER]: `Bearer ${hostAttestation}` }),
+-          },
+-          body: JSON.stringify({ credential: this.credential }),
+-        },
+-        this.timeoutMs,
+-        async (res) => (res.status === 200 ? await res.json() : null),
+-      );
+-      status = response.status;
+-      const accessToken = typeof body?.accessToken === "string" ? body.accessToken : "";
+-      if (status !== 200 || accessToken === "") throw new Error();
+-      const expiresAtMs =
+-        typeof body.expiresAtMs === "number" && Number.isFinite(body.expiresAtMs)
+-          ? body.expiresAtMs
+-          : (parseJwtExpiryMs(accessToken) ?? this.now() + TOKEN_FALLBACK_TTL_MS);
+-      this.cached = { accessToken, expiresAtMs };
++      let exchange;
++      if (!this.hostAttestedRenewal) {
++        exchange = await this.exchange({ credential: this.credential, hostAttestation });
++      } else {
++        const attested =
++          hostAttestation == null
++            ? { fallbackReason: "no_assertion" }
++            : await this.exchange({ hostAttestation }).catch((error) => ({
++                fallbackReason: unansweredRenewalFallbackReason(error),
++              }));
++        if (attested.accessToken != null || this.credential === "") {
++          exchange = attested;
++          answeredToAttestationAlone = true;
++        } else {
++          const fallbackReason =
++            attested.fallbackReason ?? refusedRenewalFallbackReason(attested.status);
++          log(`session token renewal fell back to the box credential: ${fallbackReason}`);
++          exchange = await this.exchange({
++            credential: this.credential,
++            hostAttestation,
++            fallbackReason,
++          });
++        }
++      }
++      status = exchange.status ?? null;
++      if (exchange.accessToken == null) throw new Error();
++      this.cached = { accessToken: exchange.accessToken, expiresAtMs: exchange.expiresAtMs };
+       this.consecutiveFailures = { accessLapsed: 0, otherFailure: 0 };
+-      return accessToken;
++      return exchange.accessToken;
+     } catch {
+-      const kind = status === 401 ? "accessLapsed" : "otherFailure";
++      const credentialRefused = status === 401 && !answeredToAttestationAlone;
++      const kind = credentialRefused ? "accessLapsed" : "otherFailure";
+       this.consecutiveFailures[kind] += 1;
+       const { firstStepMs, capMs } = RENEWAL_BACKOFF[kind];
+       const stepMs = Math.min(capMs, firstStepMs * 2 ** (this.consecutiveFailures[kind] - 1));
+@@ -410,6 +428,37 @@
+       return null;
+     }
+   }
++
++  async exchange({ credential, hostAttestation, fallbackReason }) {
++    const { response, body } = await fetchWithTimeout(
++      this.fetchImpl,
++      this.renewalEndpoint,
++      {
++        method: "POST",
++        redirect: "error",
++        headers: {
++          "content-type": "application/json",
++          ...(hostAttestation == null
++            ? {}
++            : { [GROK_BOT_BOX_HOST_ATTESTATION_HEADER]: `Bearer ${hostAttestation}` }),
++          ...(fallbackReason == null
++            ? {}
++            : { [GROK_BOT_BOX_INFERENCE_RENEWAL_FALLBACK_HEADER]: fallbackReason }),
++        },
++        body: JSON.stringify(credential == null ? {} : { credential }),
++      },
++      this.timeoutMs,
++      async (res) => (res.status === 200 ? await res.json() : null),
++    );
++    const status = response.status;
++    const accessToken = typeof body?.accessToken === "string" ? body.accessToken : "";
++    if (status !== 200 || accessToken === "") return { status };
++    const expiresAtMs =
++      typeof body.expiresAtMs === "number" && Number.isFinite(body.expiresAtMs)
++        ? body.expiresAtMs
++        : (parseJwtExpiryMs(accessToken) ?? this.now() + TOKEN_FALLBACK_TTL_MS);
++    return { status, accessToken, expiresAtMs };
++  }
+ }
+ 
+ export function createBoxHostAttestationReader({
+@@ -484,9 +533,6 @@
+ 
+ export function resolveWebBotAuthConfig(env = process.env) {
+   const credential = env.SAND_INFERENCE_RENEWAL_CREDENTIAL?.trim() ?? "";
+-  if (credential === "") return null;
+-  const base = env.SAND_BACKEND_URL ?? env.CURSOR_API_BASE_URL ?? DEFAULT_BACKEND_URL;
+-  if (!URL.canParse(SIGN_PATH, base)) return null;
+   const rawIdentitySocketPath = env[CURSOR_AGENT_SOCKET_ENV_VAR]?.trim();
+   const anyrunIdentitySocketPath =
+     rawIdentitySocketPath == null ||
+@@ -494,11 +540,18 @@
+     resolve(rawIdentitySocketPath) === resolve(GROK_BOT_BOX_IDENTITY_SOCKET_PATH)
+       ? undefined
+       : rawIdentitySocketPath;
++  const hostAttestedRenewal =
++    env[SAND_BOX_HOST_ATTESTED_INFERENCE_RENEWAL_ENV] ===
++      SAND_BOX_HOST_ATTESTED_INFERENCE_RENEWAL_ON_VALUE && anyrunIdentitySocketPath != null;
++  if (credential === "" && !hostAttestedRenewal) return null;
++  const base = env.SAND_BACKEND_URL ?? env.CURSOR_API_BASE_URL ?? DEFAULT_BACKEND_URL;
++  if (!URL.canParse(SIGN_PATH, base)) return null;
+   return {
+     credential,
+     endpoint: new URL(SIGN_PATH, base).toString(),
+     renewalEndpoint: new URL(RENEWAL_PATH, base).toString(),
+     ...(anyrunIdentitySocketPath ? { anyrunIdentitySocketPath } : {}),
++    ...(hostAttestedRenewal ? { hostAttestedRenewal } : {}),
+   };
+ }
+ 

@@ -1,0 +1,10 @@
+--- 2026-11-10_11-49:/opt/sand/sand-host/box-runtime/sand-locale-match.mjs
++++ 2026-11-10_16-44:/opt/sand/sand-host/box-runtime/sand-locale-match.mjs
+@@ -158,6 +158,7 @@
+     return false;
+   }
+   try {
++    // oxlint-disable-next-line no-new -- constructing the formatter is the check, because it throws a RangeError for an unknown time zone (https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/DateTimeFormat/DateTimeFormat#exceptions).
+     new Intl.DateTimeFormat("en-US", { timeZone });
+   } catch (error) {
+     if (error instanceof RangeError) return false;
