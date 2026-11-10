@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# Chrome resolves /etc/opt/chrome/policies/managed per policy key with the
+# lexicographically last file winning the whole key
+# (https://chromium.googlesource.com/chromium/src/+/151.0.7922.169/components/policy/core/common/config_dir_policy_loader.cc),
+# uninstalls a force-installed extension that leaves the effective
+# ExtensionInstallForcelist
+# (https://chromium.googlesource.com/chromium/src/+/151.0.7922.169/components/policy/resources/templates/policy_definitions/Extensions/ExtensionInstallForcelist.yaml),
+# and folds forcelist entries into the same per-extension map as
+# ExtensionSettings
+# (https://chromium.googlesource.com/chromium/src/+/151.0.7922.169/chrome/browser/extensions/extension_management.cc),
+# so this file writes the whole ExtensionSettings map: every Sand extension
+# entry lives in this one file.
+set -u
+
+policy_file="${SAND_WEBAUTHN_POLICY_FILE:-/etc/opt/chrome/policies/managed/sand-webauthn.json}"
+id_file="${SAND_WEBAUTHN_ID_FILE:-/usr/local/share/sand-webauthn-proxy.id}"
+marker="${SAND_WEBAUTHN_MARKER_FILE:-/home/box/.sand-webauthn-proxy-enabled}"
+update_xml="${SAND_WEBAUTHN_UPDATE_XML:-/usr/local/share/sand-webauthn-proxy-update.xml}"
+onepassword_dir="${SAND_ONEPASSWORD_DIR:-/opt/sand/onepassword-extension}"
+if [ ! -r "${onepassword_dir}/sand-onepassword-extension.id" ]; then
+	onepassword_dir=/usr/local/share
+fi
+onepassword_id_file="${SAND_ONEPASSWORD_ID_FILE:-${onepassword_dir}/sand-onepassword-extension.id}"
+onepassword_marker="${SAND_ONEPASSWORD_MARKER_FILE:-/home/box/.sand-onepassword-extension-enabled}"
+onepassword_update_xml="${SAND_ONEPASSWORD_UPDATE_XML:-${onepassword_dir}/sand-onepassword-extension-update.xml}"
+
+case "${SAND_WEBAUTHN_PROXY:-}" in
+	1) : >"${marker}" 2>/dev/null || true ;;
+	0) rm -f "${marker}" 2>/dev/null || true ;;
+esac
+case "${SAND_ONEPASSWORD_EXTENSION:-}" in
+	1) : >"${onepassword_marker}" 2>/dev/null || true ;;
+	0) rm -f "${onepassword_marker}" 2>/dev/null || true ;;
+esac
+
+if [ ! -w "${policy_file}" ]; then
+	exit 0
+fi
+
+entries=""
+onepassword_entry=""
+if [ -f "${marker}" ] && [ -r "${id_file}" ]; then
+	entries="$(printf '"%s":{"installation_mode":"force_installed","update_url":"file://%s"}' \
+		"$(cat "${id_file}")" "${update_xml}")"
+fi
+if [ -f "${onepassword_marker}" ] && [ -r "${onepassword_id_file}" ]; then
+	onepassword_entry="$(printf '"%s":{"installation_mode":"force_installed","update_url":"file://%s"}' \
+		"$(cat "${onepassword_id_file}")" "${onepassword_update_xml}")"
+	entries="${entries:+${entries},}${onepassword_entry}"
+fi
+
+# The host drives the 1Password extension's agenticAutofill.v1 over CDP on its
+# background worker, and the default DeveloperToolsAvailability (0) refuses
+# DevTools on policy-installed extensions, so every call would hang until its
+# deadline. The key is written only while that extension is armed:
+# https://chromeenterprise.google/policies/#DeveloperToolsAvailability
+devtools=""
+if [ -n "${onepassword_entry}" ]; then
+	devtools=',"DeveloperToolsAvailability":1'
+fi
+
+if [ -n "${entries}" ]; then
+	printf '{"ExtensionSettings":{%s}%s}\n' "${entries}" "${devtools}" >"${policy_file}"
+else
+	printf '{}\n' >"${policy_file}"
+fi
