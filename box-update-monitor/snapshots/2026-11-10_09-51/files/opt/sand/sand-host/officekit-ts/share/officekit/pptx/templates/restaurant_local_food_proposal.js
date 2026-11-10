@@ -1,0 +1,814 @@
+/**
+ * Nimbel — "Foodies" restaurant proposal deck (30 slides, 13.333 x 7.5 in).
+ * Standalone pptxgenjs recreation of the reference presentation.
+ * Photographs in the original are redrawn here as labelled placeholder panels.
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ---------------------------------------------------------------- palette */
+const INK     = '000000';   // body copy / headlines
+const WHITE   = 'FFFFFF';
+const PAPER   = 'E4E4E4';   // slide background (from the master)
+const ORANGE  = 'DD7B53';   // primary accent panels
+const OLIVE   = '615935';   // secondary accent panels
+const OLIVE_L = '8C7954';   // progress-bar remainder
+const GOLD    = 'FFC000';   // rating stars
+const RULE    = 'AEA599';   // hairline separators
+const GRAY    = '595959';   // small "explore more" dot
+const PHOTO   = 'E7A78D';   // placeholder panel (average tone of the source photos)
+
+/* ------------------------------------------------------------------ fonts */
+const SANS      = 'Open Sans';
+const SANS_M    = 'Open Sans Medium';
+const OSWALD    = 'Oswald';
+const SARABUN   = 'Sarabun';
+const POPPINS   = 'Poppins';
+const BEBAS     = 'Bebas Neue';
+const RIGHTEOUS = 'Righteous';
+
+/* ------------------------------------------------------------- primitives */
+// Solid rectangle.
+function box(s, x, y, w, h, fill) {
+  s.addShape('rect', { x, y, w, h, fill: { color: fill }, line: { type: 'none' } });
+}
+
+// Solid ellipse.
+function oval(s, x, y, w, h, fill) {
+  s.addShape('ellipse', { x, y, w, h, fill: { color: fill }, line: { type: 'none' } });
+}
+
+// Five-point star (rating glyph).
+function star(s, x, y, size, fill) {
+  s.addShape('star5', { x, y, w: size, h: size, fill: { color: fill }, line: { type: 'none' } });
+}
+
+// Straight connector; w or h may be 0 for a pure horizontal / vertical rule.
+function rule(s, x, y, w, h, color, pt) {
+  s.addShape('line', { x, y, w, h, line: { color, width: pt || 0.75 } });
+}
+
+/**
+ * Text box. `body` is either a plain string or an array of [text, opts] run
+ * tuples; `o` carries the box-level formatting (size in pt, ls = line-spacing
+ * multiple, spc = letter-spacing in pt, margin in pt, wrap, valign, align, fill).
+ */
+function txt(s, body, x, y, w, h, o) {
+  o = o || {};
+  const opts = {
+    x, y, w, h,
+    fontFace: o.font || SANS,
+    fontSize: o.size || 12,
+    color: o.color || INK,
+    bold: !!o.bold,
+    italic: !!o.italic,
+    // PowerPoint auto-sizes non-wrapping boxes around their text, so those are
+    // centred in the (wider) stored frame rather than flush left.
+    align: o.align || (o.wrap === false ? 'center' : 'left'),
+    valign: o.valign || 'top',
+    margin: o.margin === undefined ? [7.2, 7.2, 3.6, 3.6] : o.margin, // [left, right, bottom, top] pt
+    wrap: o.wrap !== false,
+    isTextBox: true,
+  };
+  if (o.ls) opts.lineSpacingMultiple = o.ls;
+  if (o.spc) opts.charSpacing = o.spc;
+  if (o.fill) opts.fill = { color: o.fill };
+  if (typeof body === 'string') {
+    s.addText(body, opts);
+  } else {
+    s.addText(body.map(function (run) {
+      const ro = run[1] || {};
+      const options = {};
+      if (ro.bold !== undefined) options.bold = ro.bold;
+      if (ro.size) options.fontSize = ro.size;
+      if (ro.color) options.color = ro.color;
+      if (ro.br) options.breakLine = true;
+      return { text: run[0], options };
+    }), opts);
+  }
+}
+
+/* --------------------------------------------------- recurring furniture */
+
+// Photo placeholder: tinted panel with a caption, standing in for a raster image.
+function photo(s, x, y, w, h) {
+  box(s, x, y, w, h, PHOTO);
+  txt(s, '[image]', x, y + 0.12, w, 0.3, { size: 12, align: 'center', color: INK });
+}
+
+// "N (Nimbel) ®" wordmark used in the top-left corner of nearly every slide.
+function logo(s, x, y) {
+  x = x === undefined ? 0.559 : x;
+  y = y === undefined ? 0.239 : y;
+  txt(s, 'Nimbel', x + 0.212, y, 0.844, 0.404, { size: 18, font: OSWALD, bold: true, wrap: false });
+  txt(s, 'N', x, y + 0.035, 0.305, 0.337, { size: 14, font: OSWALD, bold: true });
+  s.addShape('ellipse', { x: x + 0.016, y: y + 0.086, w: 0.272, h: 0.217,
+    fill: { type: 'none' }, line: { color: INK, width: 0.75 } });
+  txt(s, '\u00AE', x + 0.93, y + 0.046, 0.29, 0.219, { size: 7, font: OSWALD, wrap: false });
+}
+
+// "Foodies Presentation template" strap line, top right.
+function tagline(s, x, y) {
+  txt(s, [['Foodies', { bold: true }], [' Presentation template']],
+      x, y, 2.682, 0.309, { size: 10, valign: 'middle', margin: 5.62 });
+}
+
+// "© 2020 Nimbelcompany" footer, bottom left.
+function copyright(s) {
+  txt(s, [['\u00A9 2020'], ['Nimbelcompany', { bold: true }]],
+      0.531, 6.991, 1.083, 0.213, { size: 6, valign: 'middle', wrap: false, margin: 4.03 });
+}
+
+// Grey dot + chevron + "Explore more" call to action.
+function exploreMore(s, x, y) {
+  oval(s, x, y, 0.122, 0.122, GRAY);
+  txt(s, '>', x + 0.038, y + 0.001, 0.056, 0.118, { size: 7, bold: true, color: WHITE, wrap: false, margin: 0 });
+  txt(s, 'Explore more', x + 0.182, y - 0.003, 0.75, 0.135, { size: 8, bold: true, wrap: false, margin: 0 });
+}
+
+// Muted strap line "natural healthy food from the local prepared by the chef".
+// mode: undefined = single unwrapped line, 'wrap' = wrap inside the box,
+// 'split' = hard break before "prepared by the chef".
+function note(s, x, y, w, h, mode) {
+  const head = 'natural healthy food from the local ';
+  const tail = 'prepared by the chef';
+  const o = { size: 9, color: GRAY, valign: 'middle', margin: 5.62, wrap: mode !== undefined };
+  if (mode === 'split') txt(s, [[head, { br: true }], [tail]], x, y, w, h, o);
+  else txt(s, head + tail, x, y, w, h, o);
+}
+
+// Award rosette on the "Award and Achievement" slide: a scalloped medal over two
+// ribbon tails, assembled from outline shapes.
+function ribbonIcon(s, x, y, w, h) {
+  const medal = w * 0.82;
+  const outline = { fill: { color: ORANGE }, line: { color: INK, width: 0.75 } };
+  s.addShape('rect', Object.assign({ x: x + w * 0.2, y: y + h * 0.5, w: w * 0.22, h: h * 0.45, rotate: 12 }, outline));
+  s.addShape('rect', Object.assign({ x: x + w * 0.58, y: y + h * 0.5, w: w * 0.22, h: h * 0.45, rotate: -12 }, outline));
+  s.addShape('star12', Object.assign({ x: x + (w - medal) / 2, y, w: medal, h: medal }, outline));
+  s.addShape('ellipse', Object.assign({ x: x + (w - medal * 0.52) / 2, y: y + medal * 0.24, w: medal * 0.52, h: medal * 0.52 },
+    outline, { fill: { type: 'none' } }));
+}
+
+/* ---- slide 1 ---- */
+function slide01(s) {
+  box(s, 0, 1.27, 6.241, 6.23, ORANGE);
+  box(s, 10.296, 0, 3.037, 7.54, OLIVE);
+  txt(s, 'Nimbel', 0.381, 2.265, 5.612, 2.289, { size: 130, font: OSWALD, bold: true, spc: 3, wrap: false });
+  logo(s);
+  tagline(s, 7.356, 0.302);
+  txt(s, 'PLACEHOLDER', 2.48, 5.371, 3.309, 0.978, { ls: 1.5 });
+  txt(s, 'Food Restaurant Proposal Presentation ', 0.488, 5.446, 1.686, 0.606, { size: 10, bold: true });
+  photo(s, 7.47, 1.307, 5.134, 5.042);
+}
+
+/* ---- slide 2 ---- */
+function slide02(s) {
+  txt(s, 'Table of Contents', 6.871, 1.847, 6.066, 1.212, { size: 66, font: OSWALD, wrap: false });
+  txt(s, 'ABOUT US', 6.871, 3.297, 3.568, 0.642, { size: 32, font: OSWALD, spc: -2.46, ls: 0.9, valign: 'middle', margin: 5.62 });
+  txt(s, 'WHO WE ARE', 6.871, 5.021, 3.568, 0.642, { size: 32, font: OSWALD, spc: -2.46, ls: 0.9, valign: 'middle', margin: 5.62 });
+  txt(s, 'OUR STORY', 11.007, 3.294, 2.237, 0.642, { size: 32, font: OSWALD, spc: -2.46, ls: 0.9, valign: 'middle', margin: 5.62 });
+  txt(s, 'GREETING', 11.042, 5.021, 2.343, 0.642, { size: 32, font: OSWALD, spc: -2.46, ls: 0.9, valign: 'middle', margin: 5.62 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do', 6.871, 3.782, 3.309, 0.675, { font: SANS_M, ls: 1.5 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur ', 11.042, 3.782, 2.202, 0.675, { font: SANS_M, ls: 1.5 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do', 6.871, 5.493, 3.309, 0.675, { font: SANS_M, ls: 1.5 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur.', 11.042, 5.493, 2.202, 0.675, { font: SANS_M, ls: 1.5 });
+  tagline(s, 10.652, 0.303);
+  logo(s);
+  exploreMore(s, 11.837, 7.033);
+  copyright(s);
+  photo(s, 0.564, 2.058, 5.133, 4.065);
+}
+
+/* ---- slide 3 ---- */
+function slide03(s) {
+  box(s, 0.523, 5.109, 4.989, 1.944, OLIVE);
+  txt(s, 'About us', 0.461, 1.145, 4.45, 1.717, { size: 96, font: OSWALD, wrap: false });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore asmagna gia aliqua. Neque as egestas congue quisque egestas doma intera', 0.461, 2.729, 5.36, 0.978, { ls: 1.5 });
+  txt(s, 'Urna asiba molestie at elementum eu facilisis. Neque nonk basil sodales ut etiam sit nascetur ridiculus muser', 0.461, 3.93, 5.224, 0.675, { ls: 1.5 });
+  txt(s, 'HEALTHY FOOD', 0.723, 5.586, 1.795, 0.286, { size: 11, bold: true, color: WHITE });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.', 0.723, 5.872, 2.295, 0.471, { size: 11, color: WHITE });
+  txt(s, 'LOCAL', 3.095, 5.586, 1.263, 0.286, { size: 11, bold: true, color: WHITE });
+  txt(s, 'Lorem ipsum dolor sit amet diefa, consectetur adipiscing elit, sed do eiusmod tempor', 3.095, 5.842, 2.366, 0.656, { size: 11, color: WHITE });
+  box(s, 7.78, 1.081, 4.989, 5.972, ORANGE);
+  txt(s, 'Fresh', 10.524, 4.382, 0.667, 0.303, { bold: true, wrap: false });
+  txt(s, 'Restaurant', 10.524, 1.583, 1.145, 0.303, { bold: true, wrap: false });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.', 10.524, 1.931, 2.049, 0.829, { size: 10, ls: 1.5 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, ', 10.524, 2.878, 2.049, 0.576, { size: 10, ls: 1.5 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.', 10.524, 4.726, 2.049, 0.829, { size: 10, ls: 1.5 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, ', 10.524, 5.673, 2.049, 0.576, { size: 10, ls: 1.5 });
+  logo(s, 0.559, 0.267);
+  tagline(s, 10.652, 0.303);
+  photo(s, 8.231, 1.618, 2.127, 2.074);
+  photo(s, 8.231, 4.434, 2.127, 2.074);
+}
+
+/* ---- slide 4 ---- */
+function slide04(s) {
+  box(s, 7.241, 3.244, 5.528, 3.386, ORANGE);
+  oval(s, 10.859, 3.621, 1.074, 1.074, OLIVE);
+  txt(s, 'Who we Are', 0.418, 1.297, 5.026, 1.447, { size: 80, font: OSWALD, wrap: false });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore asmagna gia aliqua. Neque as egestas sar congue quisque egestas doma intera', 9.506, 1.695, 3.47, 0.774, { size: 10 });
+  txt(s, 'THE RESTAURANT', 7.241, 2.058, 1.497, 0.269, { size: 10, bold: true });
+  txt(s, 'Vel turpis nunc eget lorem dolor sed viverra ipsum laoreet suspendisse interdum lora consectetur libero id faucibus nisl tincidunt.', 8.442, 4.742, 3.491, 0.877, { ls: 1.5, margin: 0 });
+  txt(s, 'Local Food', 8.442, 4.227, 4.26, 0.458, { size: 20, ls: 1.5, margin: 0 });
+  txt(s, 'FRESH & HEALTH', 11.095, 4.003, 0.593, 0.353, { size: 10.5, color: WHITE, margin: 0 });
+  tagline(s, 10.652, 0.303);
+  logo(s);
+  photo(s, 0.564, 3.244, 6.102, 3.386);
+}
+
+/* ---- slide 5 ---- */
+function slide05(s) {
+  txt(s, 'Our Story', 0.426, 1.355, 4.846, 1.717, { size: 96, font: OSWALD, wrap: false });
+  box(s, 0.002, 4.614, 5.665, 2.353, ORANGE);
+  txt(s, 'ESTABLISHED', 0.518, 1.342, 1.497, 0.236, { size: 8, bold: true });
+  txt(s, '1990', 4.815, 1.355, 1.497, 0.236, { size: 8, bold: true });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore eta dolore asmagna gia aliqua. Neque as egestas sarida vieda feras tiama congue.', 0.481, 3.309, 4.997, 1.01, { ls: 1.5 });
+  rule(s, 0.647, 5.606, 4.168, 0, INK, 1.75);
+  txt(s, '2025   - ', 0.647, 5.653, 1.839, 0.64, { size: 32, wrap: false });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur ferade adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore.', 2.608, 5.72, 2.406, 0.505, { size: 8 });
+  tagline(s, 10.652, 0.303);
+  txt(s, 'We Build Brand', 2.623, 5.213, 1.618, 0.337, { size: 14, wrap: false });
+  txt(s, '1990', 0.868, 5.213, 0.651, 0.337, { size: 14, wrap: false });
+  logo(s);
+  photo(s, 6.667, 1.342, 6.102, 5.625);
+}
+
+/* ---- slide 6 ---- */
+function slide06(s) {
+  txt(s, 'Greeting', 8.122, 1.119, 4.912, 1.582, { size: 88, font: OSWALD, wrap: false });
+  txt(s, 'Lorem ipsum dolor sit am, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. urna porttitor rhoncus salio nedava holawe dolor.', 8.214, 3.855, 4.75, 0.974, { ls: 1.5 });
+  txt(s, 'Mark Jeanu', 8.214, 3.173, 2.565, 0.64, { size: 32, wrap: false });
+  txt(s, 'Leadership', 8.303, 5.118, 2.257, 0.314, { valign: 'middle', margin: 4.03 });
+  box(s, 8.303, 5.489, 3.022, 0.04, ORANGE);
+  txt(s, 'Employee Treatment', 8.303, 5.746, 2.257, 0.314, { valign: 'middle', margin: 4.03 });
+  box(s, 8.303, 6.117, 3.022, 0.04, ORANGE);
+  box(s, 10.999, 5.489, 0.326, 0.04, OLIVE_L);
+  box(s, 11.162, 6.117, 0.163, 0.04, OLIVE_L);
+  txt(s, '92%', 10.844, 5.128, 0.635, 0.314, { valign: 'middle', margin: 4.03 });
+  txt(s, '96%', 10.852, 5.766, 0.635, 0.314, { valign: 'middle', margin: 4.03 });
+  tagline(s, 10.652, 0.303);
+  logo(s);
+  exploreMore(s, 8.297, 6.473);
+  photo(s, 0.579, 1.148, 6.102, 5.625);
+}
+
+/* ---- slide 7 ---- */
+function slide07(s) {
+  box(s, 0, 2.842, 5.093, 3.12, ORANGE);
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna gia.', 1.501, 3.75, 2.533, 0.909, { font: SARABUN });
+  txt(s, '22-25', 0.498, 3.746, 1.282, 0.37, { size: 16, font: SARABUN, bold: true, italic: true });
+  txt(s, '© 2025 NimbelCo.', 2.967, 5.273, 0.924, 0.23, { size: 7, font: SARABUN, valign: 'middle', wrap: false, margin: 4.03 });
+  txt(s, 'Our Team', 0.442, 0.916, 4.872, 1.717, { size: 96, font: OSWALD, wrap: false });
+  txt(s, 'Urna asiba molestie at elementum eu facilisis. Neque nonk basil sodales ueda etiam sit. Nacetur ridiculus mus mauris vitae any ultricies leo integer desana.', 6.627, 1.58, 6.289, 0.707, { ls: 1.5 });
+  tagline(s, 10.652, 0.303);
+  txt(s, 'STEVE DARMAN', 10.621, 6.025, 1.885, 0.303, { bold: true });
+  txt(s, 'Chef de Partie', 10.621, 6.247, 1.588, 0.278, { size: 10.5 });
+  txt(s, 'JERRY YAN', 5.093, 6.02, 1.885, 0.303, { bold: true });
+  txt(s, 'Chef de Cuisine', 7.815, 6.247, 1.552, 0.278, { size: 10.5 });
+  txt(s, 'Executive Chef', 5.092, 6.247, 1.342, 0.278, { size: 10.5 });
+  txt(s, 'DEREC MAX ', 7.815, 6.013, 1.448, 0.303, { bold: true });
+  logo(s);
+  exploreMore(s, 11.837, 7.033);
+  copyright(s);
+  photo(s, 5.177, 2.842, 2.638, 3.12);
+  photo(s, 7.899, 2.842, 2.638, 3.12);
+  photo(s, 10.621, 2.842, 2.638, 3.12);
+}
+
+/* ---- slide 8 ---- */
+function slide08(s) {
+  box(s, 5.22, 1.605, 3.266, 4.533, ORANGE);
+  txt(s, 'VISION 002', 5.572, 1.895, 1.557, 0.337, { size: 14, bold: true });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, dorega berin sepbe sed.', 0.49, 4.986, 2.431, 0.975, { ls: 1.5 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt.', 5.572, 2.303, 2.723, 0.978, { ls: 1.5 });
+  txt(s, 'VISION 001', 0.49, 4.703, 1.557, 0.337, { size: 14, bold: true });
+  txt(s, 'Our Vision', 8.446, 1.455, 4.845, 1.481, { size: 82, font: OSWALD });
+  txt(s, 'EXPLANATION', 8.6, 4.367, 2.268, 0.337, { size: 14, bold: true });
+  txt(s, 'Urna asiba molestie at elementum eu facilisis. Neque nonk basil sodales ueda etiam sit. Nascetur ridiculus mus mauris vitae any ultricies leo integer malesuada belegona fikune montella hikome vidune gerashi.', 8.6, 4.683, 4.446, 1.28, { ls: 1.5 });
+  tagline(s, 10.652, 0.303);
+  logo(s);
+  exploreMore(s, 11.837, 7.033);
+  copyright(s);
+  photo(s, 0.564, 1.605, 4.542, 2.917);
+  photo(s, 5.675, 3.431, 2.313, 2.372);
+}
+
+/* ---- slide 9 ---- */
+function slide09(s) {
+  box(s, 3.318, 3.989, 2.482, 2.338, ORANGE);
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed', 3.661, 5.215, 2.185, 0.707);
+  txt(s, 'MISSION 001', 3.676, 4.913, 1.805, 0.303, { bold: true });
+  txt(s, 'MISSION 002', 6.492, 4.923, 1.805, 0.303, { bold: true });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna gia.', 6.492, 5.225, 2.859, 0.909);
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt.', 10.298, 5.225, 2.71, 0.707);
+  txt(s, 'MISSION 003', 10.313, 4.923, 1.805, 0.303, { bold: true });
+  txt(s, 'Our Mission', 6.488, 1.14, 6.456, 1.582, { size: 88, font: OSWALD });
+  txt(s, 'EXPLANATION', 6.485, 2.676, 2.268, 0.337, { size: 14, bold: true });
+  txt(s, 'Urna asiba molestie at elementum eu facilisis. Neque nonk basil sodales ueda etiam sit. Nascetur ridiculus mus mauris vitae any ultricies leo integer malesuada belegona fikune montella hikome vidune gerashi bedon us nunc.', 6.485, 3.062, 6.282, 0.976, { ls: 1.5 });
+  tagline(s, 10.652, 0.303);
+  logo(s);
+  exploreMore(s, 11.837, 7.033);
+  copyright(s);
+  photo(s, 3.286, 1.344, 2.514, 2.372);
+  photo(s, 0.564, 1.344, 2.514, 2.372);
+  photo(s, 0.564, 3.949, 2.514, 2.372);
+}
+
+/* ---- slide 10 ---- */
+function slide10(s) {
+  box(s, 0, 4.673, 13.333, 2.338, ORANGE);
+  txt(s, 'Restaurant', 0.446, 1.189, 3.709, 1.111, { size: 60, font: OSWALD });
+  txt(s, 'Branding', 0.446, 2.034, 3.709, 1.111, { size: 60, font: OSWALD });
+  txt(s, 'Breakfast Club', 0.523, 5.237, 1.618, 0.297, { size: 10.5, bold: true, valign: 'middle', margin: 4.03 });
+  txt(s, 'Local', 3.047, 5.237, 1.618, 0.297, { size: 10.5, bold: true, valign: 'middle', margin: 4.03 });
+  txt(s, 'Year', 5.296, 5.254, 1.618, 0.297, { size: 10.5, bold: true, valign: 'middle', margin: 4.03 });
+  txt(s, 'Lorem ipsum dolor  amet, consectetur adipiscing elit, sed', 0.483, 5.576, 2.005, 1.01, { ls: 1.5 });
+  txt(s, 'Lorem ipsum dolor  guanian.', 3.019, 5.576, 1.471, 0.675, { ls: 1.5 });
+  txt(s, '2022', 5.259, 5.593, 1.618, 0.369, { ls: 1.5 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. urna porttitor rhoncus dolor sapien faucibus et molestie.', 7.342, 5.528, 5.158, 1.01, { ls: 1.5 });
+  txt(s, 'We Share Happiness', 7.389, 5.258, 2.327, 0.289, { size: 10.5, bold: true, valign: 'middle', margin: 4.03 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. urna', 0.446, 3.401, 5.57, 0.671, { ls: 1.5 });
+  txt(s, 'Explanation', 0.465, 3.061, 2.325, 0.375, { bold: true, ls: 1.5 });
+  rule(s, 6.667, 5.065, 0, 1.609, INK, 1.25);
+  tagline(s, 10.652, 0.303);
+  logo(s);
+  photo(s, 7.435, 1.245, 5.334, 2.828);
+}
+
+/* ---- slide 11 ---- */
+function slide11(s) {
+  box(s, 0.564, 0.918, 6.371, 5.888, ORANGE);
+  txt(s, 'The Concept', 1.69, 4.757, 2.791, 0.337, { size: 14, bold: true });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua', 1.69, 5.097, 4.552, 0.579, { size: 10, ls: 1.5 });
+  txt(s, '(2022-2025)', 4.605, 4.757, 1.637, 0.337, { size: 14, bold: true });
+  txt(s, 'Restaurant', 7.778, 1.224, 4.862, 1.313, { size: 72, font: OSWALD });
+  txt(s, 'Concept', 7.778, 2.186, 4.862, 1.313, { size: 72, font: OSWALD });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.', 7.807, 3.943, 5.57, 0.671, { ls: 1.5 });
+  txt(s, [['Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua', { br: true }], ['urna porttitor rhoncus dolor sapien faucibus et molestie.']], 7.778, 4.72, 5.57, 1.01, { ls: 1.5 });
+  note(s, 7.807, 6.265, 3.457, 0.309);
+  tagline(s, 10.652, 0.303);
+  logo(s);
+  exploreMore(s, 11.837, 7.033);
+  copyright(s);
+  photo(s, 1.773, 1.827, 3.954, 2.563);
+}
+
+/* ---- slide 12 ---- */
+function slide12(s) {
+  box(s, 0.564, 4.057, 5.336, 2.631, ORANGE);
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit sedise dibianca febriomasti.', 0.871, 5.048, 2.396, 1.01, { ls: 1.5 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit sedise.', 3.573, 5.048, 2.216, 0.978, { ls: 1.5 });
+  txt(s, 'Delicious Food', 0.871, 4.644, 2.038, 0.372, { bold: true, ls: 1.5 });
+  txt(s, 'Fresh  Food Stuff', 3.543, 4.644, 2.356, 0.404, { bold: true, ls: 1.5 });
+  txt(s, 'Breakfast', 7.481, 1.423, 4.146, 1.447, { size: 80, font: OSWALD, wrap: false });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. urna porttitor rhoncus dolor sapien faucibus et molestie.', 7.501, 3.053, 5.57, 1.01, { ls: 1.5 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ', 7.492, 4.334, 5.538, 0.682, { ls: 1.5 });
+  tagline(s, 10.652, 0.303);
+  note(s, 7.536, 5.561, 3.457, 0.309);
+  logo(s);
+  exploreMore(s, 7.591, 6.245);
+  photo(s, 0.564, 1.184, 5.336, 2.713);
+}
+
+/* ---- slide 13 ---- */
+function slide13(s) {
+  oval(s, 11.917, 5.357, 0.894, 0.894, OLIVE);
+  box(s, 3.65, 1.487, 2.829, 4.805, ORANGE);
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit sedise.', 4.169, 2.601, 1.837, 0.978, { ls: 1.5 });
+  txt(s, 'Fresh', 4.169, 2.174, 2.038, 0.462, { size: 16, bold: true, ls: 1.5 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit sedise.', 4.169, 4.627, 1.837, 0.978, { ls: 1.5 });
+  txt(s, 'Organic', 4.169, 4.2, 2.038, 0.462, { size: 16, bold: true, ls: 1.5 });
+  txt(s, 'Material Selection', 6.667, 1.322, 6.315, 1.212, { size: 66, font: OSWALD, wrap: false });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod asai tempor incididunt ut labore eta dolore asmagna gia aliqua. Neque as egestas sarida bere congue quisque egestas doma intera soliva delatos foma gia.', 6.667, 2.636, 6.315, 0.978, { ls: 1.5 });
+  txt(s, '33+', 9.228, 5.34, 1.817, 1.01, { size: 60, margin: 0 });
+  txt(s, [['Local', { br: true }], ['Materials']], 11.464, 5.669, 1.788, 0.353, { size: 10.5, color: WHITE, align: 'center', margin: 0 });
+  tagline(s, 10.652, 0.303);
+  note(s, 6.737, 5.498, 1.619, 0.612, 'split');
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod asai tempor incididunt ut labore eta dolore asmagna gia aliqua. Neque as egestas.', 6.667, 3.89, 6.315, 0.675, { ls: 1.5 });
+  logo(s);
+  exploreMore(s, 11.837, 7.033);
+  copyright(s);
+  photo(s, 0.564, 1.487, 2.829, 4.805);
+}
+
+/* ---- slide 14 ---- */
+function slide14(s) {
+  box(s, 0.591, 4.984, 4.661, 1.637, ORANGE);
+  box(s, 0.591, 1.168, 4.661, 1.637, ORANGE);
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.', 1.232, 1.891, 3.674, 0.675, { ls: 1.5 });
+  txt(s, 'SELECTED', 1.232, 1.476, 1.877, 0.375, { bold: true, ls: 1.5 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.', 1.232, 5.618, 3.674, 0.675, { ls: 1.5 });
+  txt(s, 'FRESH DELIVERY', 1.232, 5.203, 1.877, 0.375, { bold: true, ls: 1.5 });
+  txt(s, 'Our Supplier', 7.734, 2.277, 4.395, 1.212, { size: 66, font: OSWALD, wrap: false });
+  txt(s, 'EXPLANATION', 7.745, 3.995, 2.268, 0.337, { size: 14, bold: true });
+  txt(s, 'Urna asiba molestie at elementum eu facilisis. Neque nonk basil sodales ueda etiam sit. Nascetur ridiculus mus mauris vitae any ultricies leo integer malesuada belegona fikune montella hikome vidune gerashi.', 7.745, 4.311, 4.446, 1.28, { ls: 1.5 });
+  tagline(s, 10.652, 0.303);
+  logo(s);
+  exploreMore(s, 11.837, 7.033);
+  copyright(s);
+  note(s, 7.745, 6.006, 3.457, 0.309);
+  photo(s, 0.578, 2.91, 2.232, 1.965);
+  photo(s, 2.932, 2.91, 2.34, 1.965);
+}
+
+/* ---- slide 15 ---- */
+function slide15(s) {
+  box(s, 10.028, 1.275, 2.741, 3.053, ORANGE);
+  txt(s, 'Best local food taste', 0.579, 6.549, 1.212, 0.539, { size: 16, bold: true, margin: 0 });
+  ribbonIcon(s, 10.317, 1.543, 0.383, 0.467);
+  txt(s, 'Award and', 0.462, 1.057, 4.816, 1.313, { size: 72, font: OSWALD, spc: -3 });
+  txt(s, 'Achievement', 4.198, 1.052, 5.39, 1.313, { size: 72, font: OSWALD, spc: -3 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. urna porttitor rhoncus dolor sapien faucibus et molestie.', 0.472, 2.706, 5.57, 1.01, { ls: 1.5 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ', 0.462, 3.987, 5.538, 0.682, { ls: 1.5 });
+  note(s, 0.519, 5.133, 3.457, 0.309);
+  box(s, 7.287, 4.328, 2.741, 3.172, OLIVE);
+  tagline(s, 10.652, 0.303);
+  txt(s, '35+', 0.567, 5.687, 1.817, 1.01, { size: 60, margin: 0 });
+  txt(s, [['certified ', { br: true }], ['achievement']], 10.243, 3.049, 1.46, 0.539, { size: 16, bold: true, wrap: false, margin: 0 });
+  txt(s, 'By resto federation', 10.243, 3.615, 1.315, 0.177, { size: 10.5, wrap: false, margin: 0 });
+  logo(s);
+  photo(s, 7.599, 4.698, 2.116, 2.432);
+  photo(s, 10.028, 4.328, 2.741, 3.172);
+}
+
+/* ---- slide 16 ---- */
+function slide16(s) {
+  box(s, 0.591, 4.108, 2.943, 2.795, ORANGE);
+  txt(s, 'Our Menu', 8.748, 1.554, 4.915, 1.447, { size: 80, font: OSWALD });
+  txt(s, [['A selection of our special menus ', { br: true }], ['can be found here']], 8.843, 3.145, 2.949, 0.505, { bold: true, wrap: false });
+  txt(s, 'Chicken Salad', 9.396, 4.256, 3.17, 0.505, { size: 28, color: OLIVE, ls: 0.8, valign: 'middle', margin: 4.03 });
+  txt(s, 'Veggie Corn', 9.396, 4.992, 3.17, 0.496, { size: 28, color: OLIVE, ls: 0.8, valign: 'middle', margin: 4.03 });
+  txt(s, 'Garlic Pasta', 9.396, 5.747, 3.17, 0.505, { size: 28, color: OLIVE, ls: 0.8, valign: 'middle', margin: 4.03 });
+  txt(s, '01', 8.857, 4.159, 0.409, 0.415, { size: 18, bold: true, valign: 'middle', margin: 4.03 });
+  txt(s, '02', 8.843, 4.925, 0.553, 0.415, { size: 18, bold: true, valign: 'middle', margin: 4.03 });
+  txt(s, '03', 8.843, 5.641, 0.553, 0.415, { size: 18, bold: true, valign: 'middle', margin: 4.03 });
+  rule(s, 8.857, 6.292, 4.477, 0, INK);
+  rule(s, 8.857, 5.563, 4.477, 0, INK);
+  rule(s, 8.857, 4.834, 4.477, 0, INK);
+  rule(s, 8.857, 4.105, 4.477, 0, INK);
+  tagline(s, 10.652, 0.303);
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore', 0.864, 4.7, 2.509, 1.28, { ls: 1.5 });
+  note(s, 0.881, 6.079, 2.363, 0.461, 'wrap');
+  txt(s, 'TASTE', 0.881, 4.374, 0.998, 0.37, { size: 16, font: OSWALD });
+  logo(s);
+  exploreMore(s, 11.837, 7.033);
+  photo(s, 0.591, 1.091, 2.943, 2.795);
+  photo(s, 3.801, 1.091, 2.943, 2.795);
+  photo(s, 3.801, 4.108, 2.943, 2.795);
+}
+
+/* ---- slide 17 ---- */
+function slide17(s) {
+  box(s, 3.616, 3.787, 3.01, 3.713, OLIVE);
+  box(s, 3.616, 0, 3.01, 3.79, ORANGE);
+  txt(s, 'SALAD', 3.986, 0.418, 1.928, 1.279, { size: 72, font: BEBAS, spc: -2.46, ls: 0.9, valign: 'middle', wrap: false, margin: 5.62 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna', 3.986, 1.414, 2.412, 1.919, { font: POPPINS, ls: 1.5 });
+  txt(s, 'PASTA', 3.986, 4.01, 1.928, 1.279, { size: 72, font: BEBAS, color: WHITE, spc: -2.46, ls: 0.9, valign: 'middle', wrap: false, margin: 5.62 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna', 3.986, 5.006, 2.412, 1.919, { font: POPPINS, color: WHITE, ls: 1.5 });
+  txt(s, 'Other Menu', 7.512, 1.697, 6.513, 1.582, { size: 88, font: OSWALD });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.', 7.551, 3.496, 5.57, 0.675, { ls: 1.5 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. urna porttitor rhoncus dolor sapien faucibus et molestie.', 7.521, 4.528, 5.57, 1.01, { ls: 1.5 });
+  logo(s, 11.748, 0.267);
+  note(s, 7.536, 5.965, 3.457, 0.309);
+  exploreMore(s, 11.837, 7.033);
+  photo(s, 0, 0, 3.616, 7.5);
+}
+
+/* ---- slide 18 ---- */
+function slide18(s) {
+  rule(s, 0.564, 4.672, 3.422, 0, INK);
+  rule(s, 4.916, 4.672, 3.422, 0, INK);
+  rule(s, 9.347, 4.672, 3.422, 0, INK);
+  txt(s, 'Preparation', 0.451, 4.741, 2.262, 0.404, { size: 18, bold: true, color: ORANGE });
+  txt(s, 'Sauce Making', 4.816, 4.792, 3.812, 0.404, { size: 18, bold: true, color: ORANGE });
+  txt(s, 'steamed', 9.347, 4.792, 1.709, 0.404, { size: 18, bold: true, color: ORANGE });
+  txt(s, 'Kitchen Workflow', 0.451, 1.351, 6.513, 1.212, { size: 66, font: OSWALD });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit sedise dibianca febriomasti.', 0.451, 5.265, 2.396, 1.01, { ls: 1.5 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit sedise.', 4.817, 5.265, 2.216, 0.978, { ls: 1.5 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit sedise dibianca febriomasti.', 9.333, 5.197, 2.396, 1.01, { ls: 1.5 });
+  tagline(s, 10.652, 0.361);
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. urna porttitor rhoncus dolor sapien faucibus et molestie.', 0.472, 2.706, 5.57, 1.01, { ls: 1.5 });
+  logo(s);
+  exploreMore(s, 11.837, 7.033);
+  copyright(s);
+  photo(s, 7.471, 1.306, 5.298, 2.694);
+}
+
+/* ---- slide 19 ---- */
+function slide19(s) {
+  box(s, 0.575, 4.185, 6.831, 2.743, ORANGE);
+  box(s, 0.575, 1.324, 6.831, 2.743, ORANGE);
+  txt(s, 'Chef Collaboration', 7.851, 1.79, 6.842, 2.524, { size: 72, font: OSWALD });
+  txt(s, 'Yearly Activation', 7.94, 5.129, 1.885, 0.303, { bold: true });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna gia.', 7.94, 5.443, 2.807, 0.909);
+  txt(s, 'CHEF/YEAR', 11.362, 5.811, 0.762, 0.539, { size: 16, bold: true, margin: 0 });
+  txt(s, '02+', 11.28, 4.901, 1.817, 1.01, { size: 60, margin: 0 });
+  tagline(s, 10.652, 0.361);
+  txt(s, 'Cook with Chef 01', 0.864, 1.583, 1.885, 0.269, { size: 10 });
+  txt(s, 'Lorem ipsum dolor sit amet, rebise consectetur adipiscing', 0.864, 1.897, 1.885, 0.606, { size: 10, bold: true });
+  txt(s, 'Lorem ipsum dolor sit amet, rebise consectetur adipiscing elit, sed do', 0.864, 2.555, 2.165, 0.37, { size: 8 });
+  txt(s, 'JURNAL', 0.864, 3.232, 0.859, 0.269, { size: 10 });
+  txt(s, 'Explore more for information', 0.864, 3.413, 1.627, 0.202, { size: 6 });
+  txt(s, 'Cook with Chef 02', 0.804, 4.486, 1.885, 0.269, { size: 10 });
+  txt(s, 'Lorem ipsum dolor sit amet, rebise consectetur adipiscing', 0.804, 4.8, 1.885, 0.606, { size: 10, bold: true });
+  txt(s, 'Lorem ipsum dolor sit amet, rebise consectetur adipiscing elit, sed do', 0.804, 5.457, 2.165, 0.37, { size: 8 });
+  txt(s, 'JURNAL', 0.804, 6.134, 0.859, 0.269, { size: 10 });
+  txt(s, 'Explore more for information', 0.804, 6.316, 1.627, 0.202, { size: 6 });
+  box(s, 3.359, 1.897, 0.712, 1.516, OLIVE);
+  box(s, 3.359, 4.885, 0.712, 1.516, OLIVE);
+  txt(s, [['Spicy salad', { br: true }], ['session']], 3.369, 2.319, 0.898, 0.606, { size: 10, bold: true, color: WHITE });
+  txt(s, 'Fish steam session', 3.369, 5.34, 0.898, 0.606, { size: 10, bold: true, color: WHITE });
+  logo(s);
+  photo(s, 4.318, 1.525, 2.853, 2.325);
+  photo(s, 4.318, 4.394, 2.853, 2.325);
+}
+
+/* ---- slide 20 ---- */
+function slide20(s) {
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.', 5.044, 2.428, 3.66, 0.978, { ls: 1.5 });
+  box(s, 0.564, 4.146, 8.14, 1.833, ORANGE);
+  txt(s, 'MARKETING  1.0', 1.114, 4.599, 1.931, 0.337, { size: 14, bold: true });
+  txt(s, 'lorem ipsum dolor sit amet, consectetur adipiscing elit, ', 1.114, 4.94, 2.177, 0.582, { size: 10, ls: 1.5 });
+  txt(s, 'lorem ipsum dolor sit amet, consectetur adipiscing elit, ', 5.758, 4.951, 2.177, 0.582, { size: 10, ls: 1.5 });
+  rule(s, 4.534, 4.606, 0, 0.915, INK, 1);
+  txt(s, 'MARKETING  2.0', 5.758, 4.599, 1.931, 0.337, { size: 14, bold: true });
+  txt(s, 'Marketing', 8.811, 1.719, 4.829, 1.38, { size: 76, font: OSWALD });
+  txt(s, 'Concept', 8.811, 2.697, 4.829, 1.38, { size: 76, font: OSWALD });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur  hibasen adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.', 8.826, 4.599, 4.065, 1.01, { ls: 1.5 });
+  tagline(s, 10.652, 0.361);
+  logo(s);
+  txt(s, 'Online Marketing', 5.044, 2.091, 1.931, 0.303, { bold: true });
+  exploreMore(s, 11.837, 7.033);
+  copyright(s);
+  photo(s, 0.564, 1.623, 4.372, 2.325);
+}
+
+/* ---- slide 21 ---- */
+function slide21(s) {
+  txt(s, 'Our Branch', 0.499, 1.671, 4.829, 1.313, { size: 72, font: OSWALD });
+  box(s, 7.137, 3.479, 2.789, 3.483, ORANGE);
+  txt(s, 'AAA RESTO', 7.512, 4.032, 1.818, 0.337, { size: 14, bold: true });
+  txt(s, 'BBB RESTO', 7.495, 5.597, 1.818, 0.337, { size: 14, bold: true });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do', 7.495, 5.913, 2.215, 0.707);
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do', 7.495, 4.343, 2.215, 0.707);
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur giane adipiscing elit, sed do eiusmod tempor', 0.499, 5.238, 4.829, 0.675, { ls: 1.5 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur gia sit adipiscing elit, sed do eiusmod temporio siquaty incididunt ut labore et dolore magna.', 0.499, 4.086, 4.829, 1.01, { ls: 1.5 });
+  txt(s, 'Two Branch Resto', 0.499, 3.661, 2.163, 0.4, { size: 16, bold: true, ls: 0.9, valign: 'middle', wrap: false, margin: 5.62 });
+  note(s, 0.539, 6.554, 3.457, 0.309);
+  tagline(s, 10.652, 0.361);
+  logo(s);
+  photo(s, 7.137, 0, 2.789, 3.481);
+  photo(s, 9.926, 3.481, 2.789, 3.481);
+}
+
+/* ---- slide 22 ---- */
+function slide22(s) {
+  box(s, 0.564, 1.228, 7.065, 5.123, ORANGE);
+  txt(s, 'DEREC WIRA', 5.419, 5.158, 1.885, 0.269, { size: 10, bold: true });
+  txt(s, 'Lorem ipsum dolor sit amet, rebise consectetur adipiscing', 5.419, 5.428, 1.885, 0.606, { size: 10 });
+  star(s, 5.501, 4.778, 0.204, GOLD);
+  star(s, 5.74, 4.778, 0.204, GOLD);
+  star(s, 5.985, 4.778, 0.204, GOLD);
+  star(s, 6.224, 4.778, 0.204, GOLD);
+  star(s, 6.469, 4.778, 0.204, OLIVE);
+  txt(s, 'Good', 5.397, 1.517, 1.229, 0.438, { size: 20, bold: true });
+  txt(s, 'Taste', 5.397, 1.831, 1.229, 0.438, { size: 20, bold: true });
+  txt(s, 'Customer', 8.672, 1.239, 4.829, 1.447, { size: 80, font: OSWALD });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna gia.', 8.723, 4.917, 4.016, 1.313, { size: 18 });
+  txt(s, 'Testimony', 8.672, 2.268, 4.829, 1.447, { size: 80, font: OSWALD });
+  txt(s, 'AUTHENTIC FOOD', 8.723, 4.476, 1.885, 0.286, { size: 11, bold: true });
+  tagline(s, 10.652, 0.361);
+  logo(s);
+  exploreMore(s, 11.837, 7.033);
+  copyright(s);
+  photo(s, 0.882, 1.582, 4.138, 4.451);
+}
+
+/* ---- slide 23 ---- */
+function slide23(s) {
+  txt(s, 'A Tasty Treat', 0.477, 1.222, 6.544, 1.447, { size: 80, font: OSWALD });
+  txt(s, '9.7/10', 0.959, 6.145, 1.242, 0.269, { size: 16, margin: 0 });
+  star(s, 2.937, 6.138, 0.24, ORANGE);
+  star(s, 3.391, 6.138, 0.24, ORANGE);
+  star(s, 3.849, 6.126, 0.24, ORANGE);
+  star(s, 4.305, 6.126, 0.24, ORANGE);
+  star(s, 4.76, 6.131, 0.24, ORANGE);
+  txt(s, 'Laoreet suspendisse interdum consectetur libero id faucibus nisl tincidunt. Arcu risus quis varius quam quisque id diam vel. Laoreet suspendisse interdum consectetur libero id', 0.574, 3.074, 5.272, 0.909, { ls: 1.5, margin: 0 });
+  txt(s, '“Laoreet suspendisse interdum consectetur libero id faucibus nisl tincidunt. Arcu risus quis varius quam quisque.”', 2.496, 4.281, 3.384, 1.372, { size: 14, italic: true, ls: 1.5, margin: 0 });
+  box(s, 7.565, 2.969, 5.217, 3.445, ORANGE);
+  oval(s, 6.949, 2.748, 0.975, 0.975, OLIVE);
+  txt(s, 'Good Services', 8.243, 3.862, 1.368, 0.202, { bold: true, margin: 0 });
+  txt(s, 'Turpis nunc eget lorem dolor sed viverra ipsum. Laoreet suspendisse interdum consectetur libero.', 8.243, 4.144, 3.936, 0.476, { size: 10, ls: 1.5, margin: 0 });
+  txt(s, 'Delicious Food', 8.243, 4.98, 1.766, 0.202, { bold: true, margin: 0 });
+  txt(s, 'Turpis nunc eget lorem dolor sed viverra ipsum. Laoreet suspendisse interdum consectetur libero.', 8.243, 5.245, 3.936, 0.476, { size: 10, ls: 1.5, margin: 0 });
+  oval(s, 8.021, 5.039, 0.074, 0.074, INK);
+  txt(s, 'Users', 7.141, 2.893, 0.745, 0.406, { size: 16, color: WHITE, ls: 1.5, margin: 0 });
+  txt(s, '120+', 7.203, 3.206, 0.739, 0.269, { size: 16, color: WHITE, margin: 0 });
+  oval(s, 8.021, 3.926, 0.074, 0.074, INK);
+  txt(s, [['Ingredient ', { br: true }], ['Production']], 7.565, 1.946, 0.952, 0.404, { bold: true, color: OLIVE, wrap: false, margin: 0 });
+  txt(s, 'The Spice', 7.565, 1.615, 0.459, 0.118, { size: 7, bold: true, color: OLIVE, wrap: false, margin: 0 });
+  txt(s, 'Laoreet suspendisse interdum consectetur libero id faucibus nisl tincidunt. Arcu risus quis varius quam quisque id diam vel. ', 8.927, 1.472, 3.455, 0.877, { ls: 1.5, margin: 0 });
+  tagline(s, 10.652, 0.361);
+  logo(s);
+  exploreMore(s, 11.837, 7.033);
+  copyright(s);
+  photo(s, 0.574, 4.369, 1.435, 1.487);
+}
+
+/* ---- slide 24 ---- */
+function slide24(s) {
+  box(s, 6.627, 4.113, 6.142, 2.787, OLIVE);
+  box(s, 6.627, 0.972, 6.142, 2.787, ORANGE);
+  txt(s, 'Our Offer', 0.424, 1.673, 4.829, 1.582, { size: 88, font: OSWALD });
+  txt(s, 'GOOD INVESTMENT', 6.999, 5.253, 2.676, 0.303, { bold: true, color: WHITE });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor dias incididunt ut labore et dolore.', 6.999, 5.554, 2.676, 0.909, { color: WHITE });
+  txt(s, '62.000%', 7.046, 4.479, 1.769, 0.539, { size: 32, color: WHITE, wrap: false, margin: 0 });
+  txt(s, '72.000%', 10.65, 1.356, 1.769, 0.539, { size: 32, wrap: false, margin: 0 });
+  txt(s, 'Long term investment intended for product development.', 10.571, 2.063, 1.885, 0.606, { size: 10, bold: true });
+  txt(s, 'Lorem ipsum dolor sit amet, rebise consectetur adipiscing elit, sed do', 10.571, 2.77, 2.165, 0.37, { size: 8 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur lazig ger adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.', 0.475, 3.532, 4.04, 0.978, { ls: 1.5 });
+  txt(s, '001', 7.265, 1.457, 1.885, 1.313, { size: 72, font: RIGHTEOUS });
+  txt(s, '002', 10.434, 4.85, 2.619, 1.313, { size: 72, font: RIGHTEOUS, color: WHITE });
+  txt(s, 'Enterprise', 7.336, 2.577, 2.676, 0.303, { bold: true });
+  txt(s, 'Essentials', 10.446, 6.051, 2.676, 0.303, { bold: true, color: WHITE });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur giane adipiscing elit, sed do eiusmod tempor liquada', 0.507, 4.662, 4.007, 0.675, { ls: 1.5 });
+  tagline(s, 10.652, 0.361);
+  logo(s);
+  note(s, 0.468, 5.791, 3.457, 0.309);
+}
+
+/* ---- slide 25 ---- */
+function slide25(s) {
+  box(s, 3.737, 1.491, 9.032, 3.96, ORANGE);
+  box(s, 8.417, 5.925, 4.152, 0.093, ORANGE);
+  box(s, 8.417, 5.925, 2.421, 0.093, OLIVE);
+  txt(s, '2022', 8.417, 5.618, 0.394, 0.202, { wrap: false, margin: 0 });
+  txt(s, '75%', 12.248, 5.618, 0.331, 0.202, { wrap: false, margin: 0 });
+  box(s, 8.417, 6.645, 4.152, 0.093, ORANGE);
+  box(s, 8.417, 6.645, 3.915, 0.093, OLIVE);
+  txt(s, '2025', 8.417, 6.338, 0.386, 0.202, { wrap: false, margin: 0 });
+  txt(s, '90%', 12.248, 6.338, 0.338, 0.202, { wrap: false, margin: 0 });
+  txt(s, 'EXPLANATION', 8.776, 2.646, 2.268, 0.337, { size: 14, bold: true });
+  txt(s, 'Urna asiba molestie at elementum eu facilisis neque nonk basil sodales ueda etiam sit. Nascetur ridiculus mus mauris vitae any ultricies leo integer malesuada belegona', 8.776, 2.962, 3.793, 1.28, { ls: 1.5 });
+  txt(s, 'Yearly', 4.896, 5.61, 1.885, 0.303, { bold: true });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna gia.', 4.896, 5.924, 2.807, 0.909);
+  txt(s, '140 +', 0.398, 5.984, 2.433, 0.707, { size: 36, color: ORANGE });
+  txt(s, 'Target Revenue', 0.605, 6.547, 1.356, 0.269, { size: 10 });
+  txt(s, 'Income', 4.444, 3.227, 4.38, 1.447, { size: 80, font: OSWALD, spc: -3 });
+  txt(s, 'Target', 4.35, 2.28, 4.38, 1.447, { size: 80, font: OSWALD, spc: -3 });
+  tagline(s, 10.652, 0.361);
+  logo(s);
+  photo(s, 0.564, 1.511, 3.021, 3.936);
+}
+
+/* ---- slide 26 ---- */
+function slide26(s) {
+  txt(s, 'Target Market', 6.878, 1.373, 7.284, 1.447, { size: 80, font: OSWALD });
+  box(s, 6.959, 3.014, 5.81, 1.833, ORANGE);
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ', 6.898, 5.228, 5.57, 0.675, { ls: 1.5 });
+  txt(s, 'Behaviour Market', 9.788, 3.429, 1.885, 0.286, { size: 10.5, bold: true });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna gia.', 9.788, 3.743, 2.807, 0.808, { size: 10.5 });
+  txt(s, '270+', 7.421, 3.238, 2.807, 1.01, { size: 54 });
+  txt(s, 'Young Healthy  Market', 7.421, 4.298, 2.807, 0.286, { size: 10.5 });
+  tagline(s, 10.652, 0.361);
+  logo(s);
+  copyright(s);
+  exploreMore(s, 11.837, 7.033);
+  photo(s, 0.575, 1.447, 6.052, 4.65);
+}
+
+/* ---- slide 27 ---- */
+function slide27(s) {
+  rule(s, 0.564, 4.659, 5.192, 0, RULE);
+  rule(s, 0.564, 3.889, 5.192, 0, RULE);
+  rule(s, 0.564, 3.118, 5.192, 0, RULE);
+  rule(s, 0.564, 2.379, 5.192, 0, RULE);
+  box(s, 1.33, 3.22, 0.172, 2.055, ORANGE);
+  box(s, 1.614, 2.504, 0.178, 2.771, OLIVE);
+  box(s, 2.449, 2.9, 0.178, 2.375, ORANGE);
+  box(s, 2.738, 3.297, 0.165, 1.979, OLIVE);
+  box(s, 3.599, 3.092, 0.178, 2.183, ORANGE);
+  box(s, 3.887, 2.317, 0.178, 2.96, OLIVE);
+  box(s, 4.763, 2.584, 0.178, 2.691, ORANGE);
+  box(s, 5.052, 3.785, 0.178, 1.49, OLIVE);
+  txt(s, 'APR', 1.407, 5.545, 0.287, 0.186, { size: 11, wrap: false, margin: 0 });
+  txt(s, 'MAY', 2.525, 5.545, 0.326, 0.186, { size: 11, wrap: false, margin: 0 });
+  txt(s, 'JUN', 3.692, 5.545, 0.27, 0.186, { size: 11, wrap: false, margin: 0 });
+  txt(s, 'JUL', 4.922, 5.545, 0.236, 0.186, { size: 11, wrap: false, margin: 0 });
+  txt(s, '$40', 0.572, 2.229, 0.263, 0.186, { size: 11, wrap: false, margin: 0 });
+  txt(s, '$30', 0.572, 2.947, 0.263, 0.186, { size: 11, wrap: false, margin: 0 });
+  txt(s, '$20', 0.572, 3.732, 0.263, 0.186, { size: 11, wrap: false, margin: 0 });
+  txt(s, '$10', 0.572, 4.497, 0.263, 0.186, { size: 11, wrap: false, margin: 0 });
+  txt(s, '$0', 0.572, 5.148, 0.175, 0.186, { size: 11, wrap: false, margin: 0 });
+  rule(s, 0.564, 5.395, 5.192, 0, RULE);
+  txt(s, 'Café Based in Nimbel Food Restaurant Emphasizing Chicken Salad', 6.217, 4.837, 2.378, 0.606, { margin: 0 });
+  txt(s, '24+', 6.105, 2.039, 1.443, 1.01, { size: 54, spc: -3 });
+  txt(s, 'Customer/day', 6.144, 2.92, 1.841, 0.269, { size: 10 });
+  txt(s, 'After Sales', 8.648, 1.984, 4.869, 1.313, { size: 72, font: OSWALD });
+  txt(s, 'Chart', 8.648, 2.906, 4.672, 1.313, { size: 72, font: OSWALD });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna gia.', 8.705, 4.683, 4.016, 0.808, { size: 14 });
+  tagline(s, 10.652, 0.361);
+  logo(s);
+  copyright(s);
+  exploreMore(s, 11.837, 7.033);
+}
+
+/* ---- slide 28 ---- */
+function slide28(s) {
+  txt(s, '$320.4M', 0.458, 1.219, 4.114, 1.01, { size: 54, font: OSWALD, color: ORANGE });
+  txt(s, '14%', 0.458, 2.707, 4.114, 1.01, { size: 54, font: OSWALD, color: ORANGE });
+  txt(s, '14%', 0.458, 5.748, 4.114, 1.01, { size: 54, font: OSWALD, color: ORANGE });
+  txt(s, '$21.6M', 0.458, 4.227, 4.114, 1.01, { size: 54, font: OSWALD, color: ORANGE });
+  rule(s, 0.564, 2.42, 6.319, 0, RULE, 1);
+  rule(s, 0.564, 3.96, 6.319, 0, RULE, 1);
+  rule(s, 0.564, 5.52, 6.319, 0, RULE, 1);
+  txt(s, [['Annual Income', { br: true }], ['From all outlets.']], 4.242, 1.353, 2.005, 0.505);
+  txt(s, 'The number of customers increased significantly in the past year.', 4.242, 2.837, 2.303, 0.707);
+  txt(s, 'The number of customers increased significantly in the past year.', 4.242, 5.911, 2.303, 0.707);
+  txt(s, [['Annual Income', { br: true }], ['From one outlet.']], 4.242, 4.482, 2.005, 0.505);
+  txt(s, 'Increase Sales', 7.941, 2.531, 5.392, 1.212, { size: 66, font: OSWALD });
+  txt(s, 'Best Selling', 8.079, 3.759, 1.329, 0.269, { size: 16, bold: true, wrap: false, margin: 0 });
+  txt(s, 'Product', 8.079, 4.04, 0.91, 0.269, { size: 16, bold: true, wrap: false, margin: 0 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna gia.', 7.99, 4.53, 4.016, 0.707);
+  tagline(s, 10.652, 0.361);
+  logo(s);
+}
+
+/* ---- slide 29 ---- */
+function slide29(s) {
+  txt(s, 'Contact', 0.4, 1.297, 5.684, 2.423, { size: 138, font: OSWALD, wrap: false });
+  txt(s, [['Fifth Avenue Abbey', { br: true }], ['2398 - Brighton']], 0.475, 5.288, 1.831, 0.555, { size: 10.5, ls: 1, margin: 7.2 });
+  txt(s, 'www.nimbel.com', 0.495, 5.945, 1.81, 0.379, { size: 10.5, ls: 1, margin: 7.2 });
+  txt(s, '@nimbel-company', 0.475, 5.644, 1.831, 0.379, { size: 10.5, ls: 1, margin: 7.2 });
+  txt(s, 'Nimbel Co.', 0.516, 5.109, 1.415, 0.289, { size: 10.5, bold: true, valign: 'middle', margin: 4.03 });
+  txt(s, 'Please feel free to visit our restaurant to taste the various dishes that we prepare and we will be happy to meet you.', 0.495, 3.518, 3.563, 0.707);
+  logo(s);
+  photo(s, 6.627, 0, 6.707, 7.5);
+}
+
+/* ---- slide 30 ---- */
+function slide30(s) {
+  box(s, 3.737, 1.81, 9.032, 3.96, ORANGE);
+  txt(s, 'Thank you', 4.631, 2.243, 7.244, 2.423, { size: 138, font: OSWALD, wrap: false });
+  txt(s, [['Fifth Avenue Abbey', { br: true }], ['2398 - Brighton']], 4.934, 4.429, 1.831, 0.555, { size: 10.5, ls: 1, margin: 7.2 });
+  txt(s, 'www.nimbel.com', 4.955, 5.086, 1.81, 0.379, { size: 10.5, ls: 1, margin: 7.2 });
+  txt(s, '@nimbel-company', 4.934, 4.785, 1.831, 0.379, { size: 10.5, ls: 1, margin: 7.2 });
+  txt(s, 'Nimbel Co.', 4.976, 4.25, 1.415, 0.289, { size: 10.5, bold: true, valign: 'middle', margin: 4.03 });
+  tagline(s, 10.652, 0.361);
+  logo(s);
+  copyright(s);
+  exploreMore(s, 11.837, 7.033);
+  photo(s, 0, 1.81, 3.732, 3.96);
+}
+
+/* ------------------------------------------------------------------ build */
+const BUILDERS = [
+  slide01,
+  slide02,
+  slide03,
+  slide04,
+  slide05,
+  slide06,
+  slide07,
+  slide08,
+  slide09,
+  slide10,
+  slide11,
+  slide12,
+  slide13,
+  slide14,
+  slide15,
+  slide16,
+  slide17,
+  slide18,
+  slide19,
+  slide20,
+  slide21,
+  slide22,
+  slide23,
+  slide24,
+  slide25,
+  slide26,
+  slide27,
+  slide28,
+  slide29,
+  slide30
+];
+
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'WIDE', width: 13.333, height: 7.5 });
+pptx.layout = 'WIDE';
+pptx.author = 'Nimbel';
+pptx.title = 'Foodies Presentation Template';
+
+BUILDERS.forEach(function (build) {
+  const s = pptx.addSlide();
+  s.background = { color: PAPER };
+  build(s);
+});
+
+pptx.writeFile({ fileName: path.join(__dirname, '0409790b-8a3a-4ae5-941f-bc2c3ce8793a_grok_final.pptx') })
+  .then(function (f) { console.log('wrote ' + f); });
