@@ -1,0 +1,28 @@
+{
+  "description": "Retrieves Posts in a specific Bookmark folder by its ID for the authenticated user. Each returned post includes a `url` deeplinking to it on x.com.",
+  "inputSchema": {
+    "properties": {
+      "folder_id": {
+        "type": "string"
+      },
+      "id": {
+        "description": "The authenticated user's numeric ID, not `me`: the `id` from Get My User (`GET /2/users/me`).",
+        "type": "string"
+      },
+      "max_results": {
+        "type": "integer"
+      },
+      "pagination_token": {
+        "description": "A base32hex-encoded pagination token.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "folder_id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_users_bookmarks_by_folder_id"
+}

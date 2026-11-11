@@ -1,0 +1,35 @@
+{
+  "description": "Uploads a media file in one request and returns its id. Send the file base64-encoded in media (raw bytes in multipart bodies). For a Post, set media_category to tweet_image (JPG, PNG, GIF or WEBP, up to 5 MB) or tweet_gif, then pass the returned id in media.media_ids on Create or Edit Post. DM media uses dm_image or dm_gif. Use the chunked upload endpoints for video.",
+  "inputSchema": {
+    "properties": {
+      "additional_owners": {
+        "description": "Comma-separated list of user IDs who can use this media.",
+        "type": "string"
+      },
+      "media": {
+        "description": "The media file to upload: base64-encoded in JSON bodies, raw bytes in multipart bodies.",
+        "type": "string"
+      },
+      "media_category": {
+        "description": "The category of the media being uploaded.",
+        "enum": [
+          "tweet_image",
+          "tweet_video",
+          "tweet_gif",
+          "dm_image",
+          "dm_video",
+          "dm_gif",
+          "subtitles"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "media",
+      "media_category"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "media_upload"
+}

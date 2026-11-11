@@ -1,0 +1,24 @@
+{
+  "description": "Retrieves a list of Bookmark folders created by the authenticated user.",
+  "inputSchema": {
+    "properties": {
+      "id": {
+        "description": "The authenticated user's numeric ID, not `me`: the `id` from Get My User (`GET /2/users/me`).",
+        "type": "string"
+      },
+      "max_results": {
+        "type": "integer"
+      },
+      "pagination_token": {
+        "description": "A base32hex-encoded pagination token.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_users_bookmark_folders"
+}

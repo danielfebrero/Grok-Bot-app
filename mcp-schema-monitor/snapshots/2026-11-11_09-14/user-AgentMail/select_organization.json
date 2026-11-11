@@ -1,0 +1,18 @@
+{
+  "description": "Choose which organization your AgentMail operations target (for users who belong to multiple orgs). Accepts an organization name or ID. The choice persists across unpinned sessions until you change it; a session already pinned to an organization by OAuth must be reconnected to change it. OAuth sessions only -- API-key requests return an error explaining that organization selection does not apply to API-key authentication.",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "organization": {
+        "description": "Organization name or ID (see `list_organizations`)",
+        "type": "string"
+      }
+    },
+    "required": [
+      "organization"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "select_organization"
+}

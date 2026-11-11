@@ -1,0 +1,19 @@
+{
+  "description": "Open one email attachment by the attachment_id that ReadEmailThread listed. Do not invent attachment ids.\nText-like attachments (plain text, CSV, JSON, calendar files) come back as text, cut off at 32 KB.\nAnything else (PDFs, images, spreadsheets, archives) is saved into your attachments folder on the box and the result gives you its path; read it there with the box Read tool or Shell, or attach it to a message by that path.\nImages pasted into a message body are listed as inline attachments and open the same way.\nAn attachment marked skipped was too large to store and cannot be opened.",
+  "inputSchema": {
+    "properties": {
+      "attachment_id": {
+        "description": "An attachment_id listed by ReadEmailThread.",
+        "maxLength": 32,
+        "minLength": 1,
+        "type": "string"
+      }
+    },
+    "required": [
+      "attachment_id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "ReadEmailAttachment"
+}

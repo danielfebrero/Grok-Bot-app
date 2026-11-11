@@ -1,0 +1,17 @@
+{
+  "description": "Accepts the other user's pending message request in a 1:1 Chat conversation, which moves to the authenticated user's inbox. Without a pending request, including after a successful accept, the response is 404. Replying to a request does not accept it.",
+  "inputSchema": {
+    "properties": {
+      "id": {
+        "description": "The other user's ID, or both user IDs joined by a hyphen.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "accept_chat_message_request"
+}

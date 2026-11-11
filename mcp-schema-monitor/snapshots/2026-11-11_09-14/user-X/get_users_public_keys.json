@@ -1,0 +1,21 @@
+{
+  "description": "Returns the public keys that up to 100 users registered for X Chat encryption, looked up by numeric user ID. Each key carries the user_id of the user it belongs to. Every key field is returned by default, so public_key.fields can be left out. It takes public_key, signing_public_key, identity_public_key_signature, public_key_version, juicebox_config and user_id.",
+  "inputSchema": {
+    "properties": {
+      "ids": {
+        "description": "Comma-separated numeric user IDs (1-100), not @usernames.",
+        "type": "string"
+      },
+      "public_key.fields": {
+        "description": "A comma separated list of PublicKey fields to display.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "ids"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_users_public_keys"
+}

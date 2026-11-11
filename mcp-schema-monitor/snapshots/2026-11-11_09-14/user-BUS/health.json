@@ -1,0 +1,11 @@
+{
+  "description": "État du bus. Rien à écrire. Répond ok, le contrat, et si la poussée des hooks est armée.",
+  "inputSchema": {
+    "additionalProperties": false,
+    "properties": {},
+    "required": [],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "health"
+}

@@ -1,0 +1,43 @@
+{
+  "description": "Retrieves a list of Spaces matching the specified search query.",
+  "inputSchema": {
+    "properties": {
+      "expansions": {
+        "description": "A comma separated list of fields to expand.",
+        "type": "string"
+      },
+      "max_results": {
+        "type": "integer"
+      },
+      "query": {
+        "type": "string"
+      },
+      "space.fields": {
+        "description": "A comma separated list of Space fields to display.",
+        "type": "string"
+      },
+      "state": {
+        "enum": [
+          "live",
+          "scheduled",
+          "all"
+        ],
+        "type": "string"
+      },
+      "topic.fields": {
+        "description": "A comma separated list of Topic fields to display.",
+        "type": "string"
+      },
+      "user.fields": {
+        "description": "A comma separated list of User fields to display.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "search_spaces"
+}

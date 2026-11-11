@@ -1,0 +1,34 @@
+{
+  "description": "Retrieves trending topics for a specific location identified by its WOEID. Each returned trend includes a `url` deeplinking to its x.com search.",
+  "inputSchema": {
+    "properties": {
+      "max_trends": {
+        "default": 20,
+        "maximum": 50,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "trend.fields": {
+        "description": "A comma separated list of Trend fields to display.",
+        "items": {
+          "enum": [
+            "trend_name",
+            "tweet_count"
+          ],
+          "type": "string"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "woeid": {
+        "type": "integer"
+      }
+    },
+    "required": [
+      "woeid"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_trends_by_woeid"
+}

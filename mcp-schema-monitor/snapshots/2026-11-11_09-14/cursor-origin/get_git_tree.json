@@ -1,0 +1,32 @@
+{
+  "description": "List a git tree in an Origin-hosted repository at a tree SHA, commit SHA, branch, tag, or HEAD. sha defaults to HEAD. Immediate children by default, or the full walk with recursive true. Each entry is path, mode, type (blob, tree, or commit), sha, and size for blobs. Entries past the cap are dropped and truncated is set; list subtrees non-recursively to see more. get_file_contents reads one blob.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "name": {
+        "description": "Origin repository name within that namespace",
+        "type": "string"
+      },
+      "owner": {
+        "description": "Origin namespace (owner) slug, taken from list_namespaces or an earlier Origin result. A GitHub owner or org name is not an Origin namespace unless list_namespaces returns it.",
+        "type": "string"
+      },
+      "recursive": {
+        "description": "True walks the whole tree; omit for immediate children only",
+        "type": "boolean"
+      },
+      "sha": {
+        "default": "HEAD",
+        "description": "Tree SHA, commit SHA, branch, tag, or HEAD. Omit for HEAD.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "name"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_git_tree"
+}

@@ -1,0 +1,106 @@
+{
+  "description": "Adds (initializes or rotates) the encryption keys for a Chat conversation. Call this before sending messages in a new 1:1 conversation, and again with a newer key version to rotate the conversation key. For 1:1 conversations, provide the recipient's user ID as the conversation id; the server constructs the canonical conversation ID from the authenticated user and recipient. The request body must contain the conversation key version and participant keys (the conversation key encrypted for each participant using their public key).",
+  "inputSchema": {
+    "properties": {
+      "action_signatures": {
+        "description": "Signatures for this action, forwarded in the order they are sent.",
+        "items": {
+          "properties": {
+            "encoded_message_event_detail": {
+              "description": "Base64-encoded Thrift MessageEventDetail for the signed action.",
+              "type": "string"
+            },
+            "message_event_signature": {
+              "properties": {
+                "message_signing_key_info_list": {
+                  "description": "List of signing key information for message verification.",
+                  "items": {
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "public_key_version": {
+                  "description": "The version of the public key used for signing.",
+                  "type": "string"
+                },
+                "signature": {
+                  "description": "The signature of the message event.",
+                  "type": "string"
+                },
+                "signature_version": {
+                  "description": "The version of the signature algorithm.",
+                  "type": "string"
+                },
+                "signing_public_key": {
+                  "description": "The public key used for signing.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "signature",
+                "public_key_version",
+                "signature_version"
+              ],
+              "type": "object"
+            },
+            "message_id": {
+              "description": "Client-generated ID of the message being signed.",
+              "type": "string"
+            },
+            "signature_payload": {
+              "description": "Payload string the client signed; used only in server-side failure logs.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "message_id",
+            "encoded_message_event_detail",
+            "message_event_signature"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "base64_encoded_key_rotation": {
+        "description": "Base64-encoded key rotation payload for ratchet tree key management.",
+        "type": "string"
+      },
+      "conversation_key_version": {
+        "description": "Version of the conversation encryption key (typically a timestamp in milliseconds).",
+        "type": "string"
+      },
+      "conversation_participant_keys": {
+        "description": "Encrypted conversation keys for each participant.",
+        "items": {
+          "properties": {
+            "encrypted_conversation_key": {
+              "description": "Conversation key encrypted with this participant's public key.",
+              "type": "string"
+            },
+            "public_key_version": {
+              "description": "Version of the participant's public key used for encryption.",
+              "type": "string"
+            },
+            "user_id": {
+              "description": "Participant user ID.",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "id": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "conversation_key_version",
+      "conversation_participant_keys"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "add_conversation_keys"
+}

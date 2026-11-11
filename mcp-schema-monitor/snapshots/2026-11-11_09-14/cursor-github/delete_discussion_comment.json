@@ -1,0 +1,30 @@
+{
+  "description": "Delete a discussion comment (GraphQL `deleteDiscussionComment`). Irreversible; confirm with the user when not explicitly asked.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "additionalProperties": false,
+    "properties": {
+      "comment_id": {
+        "description": "The comment's node id (`id`, e.g. DC_kwDO...), from get_discussion_comments.",
+        "minLength": 1,
+        "type": "string"
+      },
+      "owner": {
+        "description": "Repository owner (user or org login).",
+        "type": "string"
+      },
+      "repo": {
+        "description": "Repository name.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "repo",
+      "comment_id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "delete_discussion_comment"
+}
