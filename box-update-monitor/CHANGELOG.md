@@ -9,6 +9,12 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-11-11 08:54 (Paris) — snapshot `2026-11-11_07-50` → `2026-11-11_08-54`
+
+**Rebuild/bump agent-store-fuse** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `f34bc1e32050284c08d379080e0d0df842e5ed32` → `17606520a8b9f92161f7853fbcef053373e3c190` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`). **Nouveau fichier** `/opt/sand/onepassword-extension/sand-onepassword-extension.offered` (0 octet, créé 08:12 Paris) — marqueur d'offre de l'extension 1Password déjà présente dans l'image (crx/id depuis 2026-10-21 ; pas une nouvelle extension). Toutes les autres versions plateforme inchangées (image `fcbae14`, box-scripts `fcbae14`, sand-host `ea9a45e` (supervisor `upgrade-ea9a45e`, `pendingUpgradeVersion` = None), exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7). Fichiers : +1 / −0 / ~1.
+
+Rapport : [reports/2026-11-11_08-54.md](reports/2026-11-11_08-54.md).
+
 ## 2026-11-11 07:50 (Paris) — snapshot `2026-11-11_06-52` → `2026-11-11_07-50`
 
 **Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `9a9642e9aaf7bdeed39a9795aae72417fb40a74d` → `f34bc1e32050284c08d379080e0d0df842e5ed32` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`). Toutes les autres versions plateforme inchangées (image `fcbae14`, box-scripts `fcbae14`, sand-host `ea9a45e` (supervisor `upgrade-ea9a45e`, `pendingUpgradeVersion` = None), exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7). Fichiers : +0 / −0 / ~1.
