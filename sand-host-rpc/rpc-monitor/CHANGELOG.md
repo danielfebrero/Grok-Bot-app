@@ -9,6 +9,17 @@ packages confondus. Entrées les plus récentes en haut. Heures de Paris
 
 <!-- NOUVELLES-ENTREES-ICI -->
 
+## 2026-11-11 17:58 (Paris) — `2026-11-10_17-57` → `2026-11-11_17-58`
+
+Changement de surface RPC détecté : **19 méthode(s) ajoutée(s)**, **8 supprimée(s)**.
+
+Ajoutées : `DashboardService.CreateTeamGrokBotScimToken`, `DashboardService.DeleteTeamGrokBotScimBot`, `DashboardService.DisableTeamGrokBotScimDirectory`, `DashboardService.EnableTeamGrokBotScimDirectory`, `DashboardService.GetTeamGrokBotRoiPreview`, `DashboardService.GetTeamGrokBotScimDirectory`, `DashboardService.ListAuthorizedApplications`, `DashboardService.ListOrganizationRemoteControlDevices`, `DashboardService.ListTeamGrokBotScimBots`, `DashboardService.ListTeamRemoteControlDevices`, `DashboardService.RevokeAuthorizedApplication`, `DashboardService.RevokeOrganizationRemoteControlDevice`, `DashboardService.RevokeTeamGrokBotScimToken`, `DashboardService.RevokeTeamRemoteControlDevice`, `DashboardService.SendTestPushNotificationInternal`, `DashboardService.SetTeamGrokBotAgentTeamApproved`, `DashboardService.UpdateTeamGrokBotScimIpAllowlist`, `GrokBotService.PresignXaiConnectorIconUploadInternal`, `GrokBotService.StartGrokBotLocalPitman`
+
+Supprimées : `BackgroundComposerService.AdminDeleteNamedAgent`, `BackgroundComposerService.AdminListTeamNamedAgents`, `BackgroundComposerService.AdminSettleInteraction`, `BackgroundComposerService.AdminUnparkFollowups`, `BackgroundComposerService.ProvisionSyntheticsServiceAccounts`, `BackgroundComposerService.StartCloudAgentLoadTest`, `DashboardService.GetSyncedClientSettings`, `DashboardService.UpdateSyncedClientSettings`
+
+Rapport : [reports/2026-11-11_17-58.md](reports/2026-11-11_17-58.md).
+
+
 ## 2026-11-10 17:57 (Paris) — `2026-11-10_02-03` → `2026-11-10_17-57`
 
 Changement de surface RPC détecté : **23 méthode(s) ajoutée(s)**.
