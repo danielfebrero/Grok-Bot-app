@@ -1,0 +1,237 @@
+--- 2026-11-11_19-52:/opt/sand/sand-host/box-runtime/sand-web-bot-auth.mjs
++++ 2026-11-11_21-49:/opt/sand/sand-host/box-runtime/sand-web-bot-auth.mjs
+@@ -13,9 +13,11 @@
+ import {
+   CURSOR_AGENT_SOCKET_ENV_VAR,
+   GROK_BOT_BOX_IDENTITY_SOCKET_PATH,
++  GROK_BOT_BOX_HOST_ATTESTATION_FAILURE_HEADER,
+   GROK_BOT_BOX_HOST_ATTESTATION_HEADER,
+   GROK_BOT_BOX_HOST_ATTESTATION_INFERENCE_CREDENTIAL_SURFACE,
+   GROK_BOT_BOX_HOST_ATTESTATION_SOCKET_PATH,
++  GROK_BOT_BOX_INFERENCE_RENEWAL_CALLER_HEADER,
+   GROK_BOT_BOX_INFERENCE_RENEWAL_FALLBACK_HEADER,
+   SAND_BOX_HOST_ATTESTED_INFERENCE_RENEWAL_ENV,
+   SAND_BOX_HOST_ATTESTED_INFERENCE_RENEWAL_ON_VALUE,
+@@ -329,6 +331,18 @@
+   return lowMs + (highMs - lowMs) * random();
+ }
+ 
++function elapsedMsSince(startedAtMs) {
++  return Math.round(performance.now() - startedAtMs);
++}
++
++function describeHostAttestationFailedReads(reads) {
++  if (reads.length === 0) return "";
++  const described = reads.map(
++    (read, index) => `read ${index + 1} ${read.failure} ${read.elapsedMs}ms`,
++  );
++  return ` (${described.join(", ")})`;
++}
++
+ function unexpiredAccessToken(cached, nowMs) {
+   return cached != null && nowMs < cached.expiresAtMs ? cached.accessToken : null;
+ }
+@@ -362,10 +376,16 @@
+     this.now = now;
+     this.random = random;
+     this.timeoutMs = timeoutMs;
+-    this.getHostAttestation = getHostAttestation ?? (async () => undefined);
++    this.getHostAttestation =
++      getHostAttestation ??
++      (async (_onRetryAfter, onFailure) => {
++        onFailure?.("not_configured", 0);
++        return undefined;
++      });
+     this.hostAttestationRetryDelaysMs =
+       hostAttestedRenewal && getHostAttestation != null ? BOX_HOST_ATTESTATION_RETRY_DELAYS_MS : [];
+     this.hostAttestationMisses = 0;
++    this.hostAttestationFailedReads = [];
+     this.consecutiveFailures = { accessLapsed: 0, otherFailure: 0 };
+     this.cached = null;
+     this.nextRenewalAtMs = 0;
+@@ -411,12 +431,19 @@
+     try {
+       let hostAttestation;
+       let retryAfterMs;
++      let attestationFailure;
++      const readStartedAtMs = performance.now();
++      const reportFailure = (failure, elapsedMs) => {
++        attestationFailure = failure;
++        this.hostAttestationFailedReads.push({ failure, elapsedMs });
++      };
+       try {
+         hostAttestation = await this.getHostAttestation((hintMs) => {
+           retryAfterMs = hintMs;
+-        });
++        }, reportFailure);
+       } catch (_hostAttestationUnavailable) {
+         hostAttestation = undefined;
++        reportFailure("client_error", elapsedMsSince(readStartedAtMs));
+       }
+       if (hostAttestation == null) {
+         const retryWaitMs = this.hostAttestationRetryWaitMs(retryAfterMs);
+@@ -425,11 +452,22 @@
+           this.nextRenewalAtMs = this.now() + retryWaitMs;
+           return null;
+         }
++      } else {
++        attestationFailure = undefined;
+       }
+       this.hostAttestationMisses = 0;
++      const failedReads =
++        hostAttestation == null
++          ? describeHostAttestationFailedReads(this.hostAttestationFailedReads)
++          : "";
++      this.hostAttestationFailedReads = [];
+       let exchange;
+       if (!this.hostAttestedRenewal) {
+-        exchange = await this.exchange({ credential: this.credential, hostAttestation });
++        exchange = await this.exchange({
++          credential: this.credential,
++          hostAttestation,
++          attestationFailure,
++        });
+       } else {
+         const attested =
+           hostAttestation == null
+@@ -438,15 +476,21 @@
+                 fallbackReason: unansweredRenewalFallbackReason(error),
+               }));
+         if (attested.accessToken != null || this.credential === "") {
++          if (hostAttestation == null) {
++            log(`session token renewal got no host attestation${failedReads}`);
++          }
+           exchange = attested;
+           answeredToAttestationAlone = true;
+         } else {
+           const fallbackReason =
+             attested.fallbackReason ?? refusedRenewalFallbackReason(attested.status);
+-          log(`session token renewal fell back to the box credential: ${fallbackReason}`);
++          log(
++            `session token renewal fell back to the box credential: ${fallbackReason}${failedReads}`,
++          );
+           exchange = await this.exchange({
+             credential: this.credential,
+             hostAttestation,
++            attestationFailure,
+             fallbackReason,
+           });
+         }
+@@ -467,7 +511,7 @@
+     }
+   }
+ 
+-  async exchange({ credential, hostAttestation, fallbackReason }) {
++  async exchange({ credential, hostAttestation, attestationFailure, fallbackReason }) {
+     const { response, body } = await fetchWithTimeout(
+       this.fetchImpl,
+       this.renewalEndpoint,
+@@ -480,9 +524,13 @@
+           ...(hostAttestation == null
+             ? {}
+             : { [GROK_BOT_BOX_HOST_ATTESTATION_HEADER]: `Bearer ${hostAttestation}` }),
++          ...(attestationFailure == null
++            ? {}
++            : { [GROK_BOT_BOX_HOST_ATTESTATION_FAILURE_HEADER]: attestationFailure }),
+           ...(fallbackReason == null
+             ? {}
+             : { [GROK_BOT_BOX_INFERENCE_RENEWAL_FALLBACK_HEADER]: fallbackReason }),
++          [GROK_BOT_BOX_INFERENCE_RENEWAL_CALLER_HEADER]: "signer",
+         },
+         body: JSON.stringify(credential == null ? {} : { credential }),
+       },
+@@ -500,6 +548,20 @@
+   }
+ }
+ 
++function hostAttestationSocketFailure(error) {
++  switch (error?.code) {
++    case "ENOENT":
++      return "socket_missing";
++    case "ECONNREFUSED":
++      return "socket_refused";
++    case "ECONNRESET":
++    case "EPIPE":
++      return "socket_closed";
++    default:
++      return "socket_error";
++  }
++}
++
+ export function createBoxHostAttestationReader({
+   socketPath,
+   requestImpl = http.request,
+@@ -509,14 +571,21 @@
+   const payload = JSON.stringify({
+     surface: GROK_BOT_BOX_HOST_ATTESTATION_INFERENCE_CREDENTIAL_SURFACE,
+   });
+-  return async (onRetryAfter) =>
++  return async (onRetryAfter, onFailure) =>
+     await new Promise((resolve) => {
++      const startedAtMs = performance.now();
+       let settled = false;
+       const finish = (assertion) => {
+         if (settled) return;
+         settled = true;
+         resolve(assertion);
+       };
++      const fail = (failure) => {
++        if (settled) return;
++        settled = true;
++        onFailure?.(failure, elapsedMsSince(startedAtMs));
++        resolve(undefined);
++      };
+       const req = requestImpl(
+         {
+           socketPath,
+@@ -537,7 +606,7 @@
+                 : null;
+             if (retryAfterMs != null) onRetryAfter?.(retryAfterMs);
+             res.resume();
+-            finish(undefined);
++            fail(`status_${res.statusCode}`);
+             return;
+           }
+           const chunks = [];
+@@ -547,7 +616,7 @@
+             total += chunk.byteLength;
+             if (total > BOX_HOST_ATTESTATION_MAX_RESPONSE_BYTES) {
+               res.destroy();
+-              finish(undefined);
++              fail("malformed_response");
+               return;
+             }
+             chunks.push(chunk);
+@@ -556,23 +625,23 @@
+             if (settled) return;
+             try {
+               const parsed = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+-              finish(
+-                typeof parsed?.assertion === "string" && parsed.assertion.length > 0
+-                  ? parsed.assertion
+-                  : undefined,
+-              );
++              if (typeof parsed?.assertion === "string" && parsed.assertion.length > 0) {
++                finish(parsed.assertion);
++              } else {
++                fail("malformed_response");
++              }
+             } catch {
+-              finish(undefined);
++              fail("malformed_response");
+             }
+           });
+-          res.on("error", () => finish(undefined));
++          res.on("error", (error) => fail(hostAttestationSocketFailure(error)));
+         },
+       );
+       req.on("timeout", () => {
+         req.destroy();
+-        finish(undefined);
++        fail("timeout");
+       });
+-      req.on("error", () => finish(undefined));
++      req.on("error", (error) => fail(hostAttestationSocketFailure(error)));
+       req.end(payload);
+     });
+ }

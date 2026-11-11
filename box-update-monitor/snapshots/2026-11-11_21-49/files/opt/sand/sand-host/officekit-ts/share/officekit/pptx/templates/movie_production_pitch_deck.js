@@ -1,0 +1,574 @@
+/**
+ * "Mavies" Movie Pitch Deck — recreated with pptxgenjs.
+ *
+ * Slide size 13.333 x 7.5 in (16:9). Fonts: Anton (display) + Heebo (text).
+ * Raster icons of the original are re-drawn here with native shapes.
+ */
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ palette */
+
+const NAVY = '181832'; // dk2 – primary dark
+const NAVY_SOFT = '25254F'; // navy tint used for rules / swatches
+const RED = 'E72629'; // accent1
+const RED_DARK = 'B51416'; // shaded red used inside film bands
+const WHITE = 'FFFFFF';
+const LILAC = 'DFDFF2'; // hairline borders on white cards
+const GREY = '7F7F7F'; // body copy on light backgrounds
+const GREY_LT = 'D8D8D8'; // body copy on dark backgrounds
+
+const HEAD = 'Anton';
+const BODY = 'Heebo';
+
+const NO_LINE = { type: 'none' };
+const HAIRLINE = { color: LILAC, width: 1.25 };
+
+/* ------------------------------------------------------------------ helpers */
+
+/** Filled rectangle (optionally rotated / outlined). */
+function box(slide, x, y, w, h, fill, opts) {
+	slide.addShape('rect', Object.assign({ x, y, w, h, fill: { color: fill }, line: NO_LINE }, opts));
+}
+
+/** Text block. The reference always top-anchors its text frames. */
+function text(slide, content, opts) {
+	slide.addText(content, Object.assign({ valign: 'top', fontFace: BODY, wrap: true }, opts));
+}
+
+/** Small bold label (14pt Heebo). */
+function label(slide, str, x, y, w, h, color, opts) {
+	text(slide, str, Object.assign({ x, y, w, h, fontSize: 14, bold: true, color }, opts));
+}
+
+/** 12pt paragraph with the deck's 150% leading. */
+function para(slide, content, x, y, w, h, color, opts) {
+	text(slide, content, Object.assign({ x, y, w, h, fontSize: 12, color, lineSpacingMultiple: 1.5 }, opts));
+}
+
+/** "MAVIES." wordmark in the top-left corner. */
+function wordmark(slide, color, x) {
+	text(slide, 'MAVIES.', { x: x === undefined ? 0.561 : x, y: 0.277, w: 0.791, h: 0.337, fontFace: HEAD, fontSize: 14, color });
+}
+
+/** Three 0.154" swatches in the top-right corner. */
+function swatches(slide, colors) {
+	colors.forEach((c, i) => box(slide, 12.113 + i * 0.2, 0.375, 0.154, 0.154, c));
+}
+
+/**
+ * A strip of 35mm film: an optional coloured band plus a ladder of
+ * perforations, the whole thing rotated about its own centre.
+ *
+ * cx/cy      centre of the strip, in inches
+ * rot        clockwise rotation in degrees
+ * band       [w, h, colour] of the backing rectangle (omit for holes only)
+ * holes      { n, w, h, y0, step, color } perforations, y0 relative to centre
+ */
+function filmStrip(slide, cx, cy, rot, band, holes) {
+	const rad = (rot * Math.PI) / 180;
+	const cos = Math.cos(rad);
+	const sin = Math.sin(rad);
+	const place = (w, h, dx, dy, fill) => {
+		const px = cx + dx * cos - dy * sin;
+		const py = cy + dx * sin + dy * cos;
+		box(slide, px - w / 2, py - h / 2, w, h, fill, { rotate: rot });
+	};
+	if (band) place(band[0], band[1], 0, 0, band[2]);
+	for (let i = 0; i < holes.n; i++) {
+		place(holes.w, holes.h, 0, holes.y0 + i * holes.step, holes.color);
+	}
+}
+
+/**
+ * A horizontal film band: solid bar plus one or more rows of perforations.
+ * Rows drift slightly downwards, exactly as in the source deck.
+ */
+function filmBand(slide, band, rows) {
+	box(slide, band.cx - band.w / 2, band.cy - band.h / 2, band.w, band.h, band.color, { rotate: 89.743 });
+	rows.forEach(row => {
+		for (let i = 0; i < row.n; i++) {
+			const cx = row.x0 + i * row.dx;
+			const cy = row.y0 + i * row.dy;
+			box(slide, cx - row.w / 2, cy - row.h / 2, row.w, row.h, row.color || RED, { rotate: 89.743 });
+		}
+		(row.extra || []).forEach(e => box(slide, e[0] - row.w / 2, e[1] - e[2] / 2, row.w, e[2], row.color || RED, { rotate: 89.743 }));
+	});
+}
+
+/** The deck's "↗" glyph, drawn as custom geometry (points are 0..1 of the box). */
+const ARROW_PATH = [
+	[0.506, 0.0], [0.409, 0.084], [0.771, 0.44], [0.0, 0.44],
+	[0.0, 0.559], [0.771, 0.559], [0.409, 0.903], [0.506, 0.999],
+	[0.999, 0.499], [0.506, 0.0],
+];
+function arrowGlyph(slide, x, y, w, h, color) {
+	slide.addShape('custGeom', {
+		x, y, w, h, rotate: 315, fill: { color }, line: NO_LINE,
+		points: ARROW_PATH.map(p => ({ x: p[0] * w, y: p[1] * h })),
+	});
+}
+
+/** Five rating stars on a 0.144" grid, 0.2508" apart. The star5 preset draws
+ *  smaller than its box, so it is inflated slightly to match the source icons. */
+function stars(slide, x, y, colors) {
+	const grow = 0.028;
+	colors.forEach((c, i) => slide.addShape('star5', {
+		x: x + i * 0.2508 - grow / 2, y: y - grow / 2, w: 0.144 + grow, h: 0.144 + grow,
+		fill: { color: c }, line: NO_LINE,
+	}));
+}
+
+/** Thin rule (the deck uses straight connectors). */
+function rule(slide, x, y, w, color) {
+	slide.addShape('line', { x, y, w, h: 0, line: { color, width: 1.25 } });
+}
+
+/* ------------------------------------------------- icon glyph placeholders  */
+/* The original deck ships these as small PNGs; they are re-drawn from native
+   shapes so that no raster data has to be embedded.  Every glyph is described
+   in fractions of its bounding box so the same code serves every size.       */
+
+/** oval / rounded-rect / rect helpers working in 0..1 box fractions. */
+function glyph(slide, x, y, w, h, color, parts) {
+	parts.forEach(p => {
+		const [kind, fx, fy, fw, fh, opt] = p;
+		const o = Object.assign({
+			x: x + fx * w, y: y + fy * h, w: fw * w, h: fh * h,
+			fill: { color: (opt && opt.color) || color }, line: NO_LINE,
+		}, opt && opt.rotate ? { rotate: opt.rotate } : {}, opt && opt.rectRadius ? { rectRadius: opt.rectRadius } : {});
+		slide.addShape(kind, o);
+	});
+}
+
+/** Reading glasses: two flat-topped lenses, a nose bridge and swept temples. */
+function iconGlasses(slide, x, y, s, color) {
+	glyph(slide, x, y, s, s, color, [
+		['roundRect', 0.14, -0.02, 0.09, 0.6, { rectRadius: 0.02, rotate: 20 }],
+		['roundRect', 0.77, -0.02, 0.09, 0.6, { rectRadius: 0.02, rotate: -20 }],
+		['rect', 0.0, 0.54, 0.44, 0.2], ['ellipse', 0.0, 0.55, 0.44, 0.45],
+		['rect', 0.56, 0.54, 0.44, 0.2], ['ellipse', 0.56, 0.55, 0.44, 0.45],
+		['rect', 0.3, 0.54, 0.4, 0.1],   // brow bar across the bridge
+		['rect', 0.44, 0.6, 0.12, 0.26], // nose bridge
+	]);
+}
+
+function iconCard(slide, x, y, s, badge) {
+	glyph(slide, x, y, s, s, WHITE, [
+		['roundRect', 0.0, 0.1, 0.13, 0.72, { rectRadius: 0.015 }], // spine
+		['roundRect', 0.2, 0.06, 0.16, 0.76, { rectRadius: 0.015 }],
+		['roundRect', 0.42, 0.0, 0.58, 0.46, { rectRadius: 0.015 }], // ID panel
+		['rect', 0.49, 0.06, 0.44, 0.34, { color: badge }],
+		['ellipse', 0.63, 0.09, 0.16, 0.13],                         // avatar
+		['roundRect', 0.59, 0.25, 0.24, 0.12, { rectRadius: 0.02 }],
+		['roundRect', 0.26, 0.44, 0.74, 0.56, { rectRadius: 0.04 }], // card body
+	]);
+}
+
+/** Invoice card with a "$", two ruled lines and a pen. */
+function iconMoney(slide, x, y, s, badge) {
+	glyph(slide, x, y, s, s, WHITE, [
+		['roundRect', 0.0, 0.0, 0.88, 0.88, { rectRadius: 0.04 }],
+		['donut', 0.09, 0.2, 0.3, 0.36, { color: badge }],   // the "$" glyph
+		['rect', 0.21, 0.13, 0.07, 0.5, { color: badge }],
+		['rect', 0.5, 0.2, 0.3, 0.11, { color: badge }],     // ruled lines
+		['rect', 0.5, 0.42, 0.3, 0.11, { color: badge }],
+		['roundRect', 0.5, 0.55, 0.62, 0.2, { rectRadius: 0.02, rotate: -42 }], // pen
+	]);
+}
+
+/** Group of three people. */
+function iconPeople(slide, x, y, w, h, color) {
+	glyph(slide, x, y, w, h, color, [
+		['ellipse', 0.05, 0.143, 0.2, 0.286],                          // side heads
+		['ellipse', 0.75, 0.143, 0.2, 0.286],
+		['roundRect', 0.0, 0.5, 0.27, 0.286, { rectRadius: 0.03 }],    // side shoulders
+		['roundRect', 0.73, 0.5, 0.27, 0.286, { rectRadius: 0.03 }],
+		['ellipse', 0.325, 0.0, 0.35, 0.5],                            // front figure
+		['roundRect', 0.2, 0.571, 0.6, 0.429, { rectRadius: 0.05 }],
+	]);
+}
+
+function iconWallet(slide, x, y, w, h, color) {
+	glyph(slide, x, y, w, h, color, [
+		['roundRect', 0.0, 0.0, 1.0, 1.0, { rectRadius: 0.045 }],
+		['rect', 0.15, 0.143, 0.79, 0.072, { color: WHITE }],   // flap slot
+		['ellipse', 0.75, 0.536, 0.125, 0.143, { color: WHITE }], // clasp
+	]);
+}
+
+function iconUpload(slide, x, y, w, h, color) {
+	glyph(slide, x, y, w, h, color, [
+		['triangle', 0.204, 0.0, 0.62, 0.376],
+		['rect', 0.375, 0.3, 0.25, 0.45],
+		['roundRect', 0.0, 0.689, 1.0, 0.311, { rectRadius: 0.03 }],
+		['rect', 0.3, 0.66, 0.4, 0.08, { color: WHITE }],       // notch around the shaft
+		['rect', 0.375, 0.3, 0.25, 0.45],
+		['ellipse', 0.681, 0.869, 0.078, 0.079, { color: WHITE }], // status lights
+		['ellipse', 0.806, 0.869, 0.078, 0.079, { color: WHITE }],
+	]);
+}
+
+/** Two people plus a settings cog — slide 9's fourth milestone. */
+function iconGear(slide, x, y, w, h, color) {
+	glyph(slide, x, y, w, h, color, [
+		['ellipse', 0.05, 0.143, 0.2, 0.286],                        // side figure
+		['roundRect', 0.0, 0.5, 0.27, 0.286, { rectRadius: 0.03 }],
+		['ellipse', 0.326, 0.0, 0.35, 0.5],                          // front figure
+		['roundRect', 0.2, 0.571, 0.475, 0.429, { rectRadius: 0.05 }],
+		['gear6', 0.544, 0.304, 0.458, 0.68],
+		['ellipse', 0.697, 0.535, 0.152, 0.217, { color: WHITE }],
+	]);
+}
+
+function iconPhone(slide, x, y, s, color) {
+	glyph(slide, x, y, s, s, color, [
+		['roundRect', 0.0, 0.04, 0.36, 0.36, { rectRadius: 0.03, rotate: 45 }],
+		['roundRect', 0.62, 0.6, 0.36, 0.36, { rectRadius: 0.03, rotate: 45 }],
+		['rect', 0.18, 0.42, 0.62, 0.15, { rotate: 44 }],
+	]);
+}
+
+function iconEnvelope(slide, x, y, w, h, badge) {
+	glyph(slide, x, y, w, h, WHITE, [
+		['rect', 0.0, 0.0, 1.0, 1.0],
+		['triangle', 0.06, 0.06, 0.88, 0.52, { color: badge, rotate: 180 }],
+	]);
+}
+
+/* ------------------------------------------------------------- slide 1 ---- */
+
+function slideTitle(pptx) {
+	const s = pptx.addSlide();
+	s.background = { color: NAVY };
+
+	filmStrip(s, 1.3867, 4.3792, 335.313, [0.6224, 10.5, NAVY_SOFT], { n: 14, w: 0.4195, h: 0.5813, y0: -4.8299, step: 0.74376, color: NAVY });
+	wordmark(s, WHITE);
+	filmStrip(s, 13.3349, 6.6969, 38.768, [0.5012, 5.6529, RED], { n: 10, w: 0.3162, h: 0.4381, y0: -2.5488, step: 0.56641, color: NAVY });
+	filmStrip(s, 11.7797, 5.448, 38.768, [0.5012, 5.6529, RED], { n: 10, w: 0.3162, h: 0.4381, y0: -2.5488, step: 0.56641, color: NAVY });
+	box(s, 11.81, 3.246, 1.494, 5.653, RED, { rotate: 38.77 });
+	filmStrip(s, 1.3387, 2.1673, 41.172, [0.6224, 10.5, RED], { n: 14, w: 0.4195, h: 0.5813, y0: -4.8299, step: 0.7437, color: NAVY });
+
+	text(s, [{ text: 'M', options: { color: RED } }, { text: 'OVIE', options: { color: WHITE } }],
+		{ x: 4.63, y: 1.747, w: 4.073, h: 2.036, fontFace: HEAD, fontSize: 115, align: 'center' });
+	text(s, 'PITCH DECK', { x: 3.069, y: 3.471, w: 7.194, h: 2.036, fontFace: HEAD, fontSize: 115, color: WHITE, align: 'center' });
+
+	text(s, [{ text: 'Mavies ', options: { bold: true } }, { text: 'Present' }],
+		{ x: 5.932, y: 1.23, w: 1.572, h: 0.337, fontSize: 14, color: WHITE });
+	box(s, 5.817, 1.342, 0.074, 0.074, RED);
+
+	box(s, 4.804, 5.604, 1.927, 0.649, RED);
+	para(s, 'Start Your Journey', 4.828, 5.702, 1.879, 0.368, WHITE, { bold: true, align: 'center' });
+	box(s, 6.896, 5.604, 1.633, 0.649, WHITE);
+	para(s, 'Explore More', 6.943, 5.706, 1.37, 0.375, NAVY, { bold: true, align: 'center' });
+	arrowGlyph(s, 8.188, 5.859, 0.14, 0.141, RED);
+
+	swatches(s, [WHITE, NAVY_SOFT, RED]);
+}
+
+/* ------------------------------------------------------------- slide 2 ---- */
+
+function slideStory(pptx) {
+	const s = pptx.addSlide();
+
+	box(s, 9.277, -1.5, 3.644, 10.5, RED, { rotate: 22.74 });
+	wordmark(s, NAVY);
+	text(s, 'DISCOVER OUR PRODUCTION STORY', { x: 0.767, y: 1.12, w: 5.573, h: 1.919, fontFace: HEAD, fontSize: 54, color: NAVY });
+
+	const perfs = { n: 14, w: 0.4195, h: 0.5813, y0: -4.8342, step: 0.74372, color: WHITE };
+	filmStrip(s, 12.4713, 4.3299, 22.743, null, perfs);
+	filmStrip(s, 9.7237, 3.1782, 22.743, null, perfs);
+
+	para(s, 'Lorem ipsum dolor sit amet, Fusce pos, mi sedo pulvi min eliti purused am  pulvinar sed. Lorem ipsum minimum purus maecenas adip.',
+		0.776, 3.554, 5.501, 0.682, GREY);
+	label(s, 'Our Best Vision', 0.776, 3.244, 1.731, 0.337, NAVY, { lineSpacingMultiple: 1.0 });
+
+	// Two "Company Mission" rows: red badge then outlined badge.
+	[
+		{ y: 4.631, title: 'Company Mission 01', badge: RED, glyph: WHITE, border: null },
+		{ y: 5.816, title: 'Company Mission 02', badge: WHITE, glyph: NAVY, border: HAIRLINE },
+	].forEach(row => {
+		box(s, 0.891, row.y, 0.588, 0.588, row.badge, row.border ? { line: row.border } : {});
+		iconGlasses(s, 1.075, row.y + 0.185, 0.22, row.glyph);
+		label(s, row.title, 1.738, row.y - 0.048, 2.648, 0.337, NAVY, { lineSpacingMultiple: 1.0 });
+		para(s, 'Lorem ipsum dolor sit amet, Fusce pos, mi sedolore ame', 1.738, row.y + 0.255, 4.497, 0.379, GREY);
+	});
+
+	// "Established Since" callout card.
+	box(s, 7.282, 1.95, 3.715, 0.986, WHITE, { line: HAIRLINE });
+	para(s, 'Lorem ipsum dolor sit, consectet', 8.242, 2.388, 2.721, 0.379, GREY);
+	label(s, 'Established Since', 8.242, 2.049, 2.418, 0.425, NAVY, { lineSpacingMultiple: 1.5 });
+	text(s, [{ text: '19', options: { color: NAVY } }, { text: '98', options: { color: RED } }],
+		{ x: 7.421, y: 2.097, w: 0.806, h: 0.644, fontFace: HEAD, fontSize: 24, lineSpacingMultiple: 1.5 });
+}
+
+/* ------------------------------------------------------------- slide 3 ---- */
+
+function slideProblem(pptx) {
+	const s = pptx.addSlide();
+	s.background = { color: RED };
+
+	wordmark(s, WHITE, 0.573);
+	filmBand(s,
+		{ cx: 6.6652, cy: 6.0367, w: 2.9279, h: 13.3336, color: RED_DARK },
+		[
+			{ n: 18, w: 0.4195, h: 0.4997, x0: 0.3537, y0: 7.2072, dx: 0.74349, dy: -0.002553 },
+			{ n: 18, w: 0.4195, h: 0.4997, x0: 0.3402, y0: 4.9097, dx: 0.74349, dy: -0.002559 },
+		]);
+
+	text(s, 'CORE PROBLEM EXPLAINED', { x: 7.777, y: 1.168, w: 4.455, h: 1.919, fontFace: HEAD, fontSize: 54, color: WHITE });
+	para(s, 'Lorem ipsum dolor sit amet, Fusce pos, mi sedo pulvi min eliti purused am  pulvinar sed. Lorem ipsum',
+		7.786, 3.182, 4.446, 0.682, GREY_LT);
+
+	[
+		{ x: 1.101, title: 'Challenges 01', badge: RED },
+		{ x: 4.343, title: 'Challenges 02', badge: NAVY },
+	].forEach(card => {
+		box(s, card.x, 1.132, 2.899, 2.745, WHITE);
+		box(s, card.x + 1.146, 1.49, 0.608, 0.608, card.badge);
+		iconMoney(s, card.x + 1.335, 1.679, 0.229, card.badge);
+		label(s, card.title, card.x + 0.33, 2.314, 2.239, 0.337, NAVY, { align: 'center' });
+		para(s, 'Lorem ipsum dolor sit, cointos adipisicing elitist, sedolores minimum ame.',
+			card.x + 0.183, 2.639, 2.532, 0.985, GREY, { align: 'center' });
+	});
+
+	swatches(s, [WHITE, NAVY_SOFT, RED_DARK]);
+}
+
+/* ------------------------------------------------------------- slide 4 ---- */
+
+function slideMarket(pptx) {
+	const s = pptx.addSlide();
+	s.background = { color: NAVY };
+
+	wordmark(s, WHITE);
+	text(s, 'GLOBAL MARKET SIZE ANALYSIS', { x: 0.551, y: 1.882, w: 3.778, h: 2.827, fontFace: HEAD, fontSize: 54, color: WHITE });
+	para(s, 'Lorem ipsum dolor sit amet, Fusce pos, mi sedo pulvi min eliti purused am pulvinar sed. Lore ipsum minimum purs amet.',
+		0.559, 4.792, 3.769, 0.985, GREY_LT);
+
+	box(s, 5.161, -1.484, 3.434, 10.5, RED, { rotate: 359.74 });
+	const perfs = { n: 14, w: 0.4195, h: 0.5813, y0: -4.8342, step: 0.74371, color: NAVY };
+	filmStrip(s, 8.2654, 3.7634, 359.743, null, perfs);
+	filmStrip(s, 5.4915, 3.7767, 359.743, null, perfs);
+
+	// Two stat rows plus one icon row, separated by hairlines.
+	[
+		{ y: 1.186, num: '985' },
+		{ y: 5.33, num: '745' },
+	].forEach(stat => {
+		text(s, [{ text: stat.num, options: { color: WHITE } }, { text: 'K', options: { color: RED } }],
+			{ x: 9.465, y: stat.y, w: 0.974, h: 0.644, fontFace: HEAD, fontSize: 24, lineSpacingMultiple: 1.5 });
+		label(s, 'A Market', 9.467, stat.y + 0.564, 1.15, 0.425, WHITE, { lineSpacingMultiple: 1.5 });
+		para(s, 'Lorem ipsum dolor sit amet, Fusce pos, mi sedolore.', 10.762, stat.y + 0.031, 1.963, 0.985, GREY_LT);
+	});
+
+	box(s, 9.549, 3.406, 0.588, 0.588, WHITE);
+	iconGlasses(s, 9.733, 3.59, 0.22, NAVY);
+	para(s, 'Lorem ipsum dolor sit amet, Fusce pos, mi sedolore', 10.439, 3.311, 2.286, 0.682, GREY_LT);
+
+	rule(s, 9.549, 2.653, 3.176, NAVY_SOFT);
+	rule(s, 9.549, 4.778, 3.176, NAVY_SOFT);
+
+	swatches(s, [WHITE, NAVY_SOFT, RED]);
+}
+
+/* ------------------------------------------------------------- slide 5 ---- */
+
+function slideTeam(pptx) {
+	const s = pptx.addSlide();
+
+	const perfs = { n: 14, w: 0.4195, h: 0.5813, y0: -4.8298, step: 0.74373, color: WHITE };
+	filmStrip(s, 1.4748, 1.5409, 43.431, [0.6611, 10.5, RED], perfs);
+	filmStrip(s, 12.4286, 6.2094, 43.431, [0.6611, 10.5, RED], perfs);
+
+	wordmark(s, NAVY);
+
+	[
+		{ x: 0.667, y: 4.753, name: 'James Charles', role: 'Project Manager', fill: WHITE, ink: NAVY, sub: GREY, border: HAIRLINE },
+		{ x: 3.273, y: 1.558, name: 'Marianna Jean', role: 'Company Founder', fill: RED, ink: WHITE, sub: WHITE, border: null },
+		{ x: 5.88, y: 4.753, name: 'Mike Smith', role: 'Finance Manager', fill: WHITE, ink: NAVY, sub: GREY, border: HAIRLINE },
+	].forEach(m => {
+		box(s, m.x, m.y, 2.206, 1.206, m.fill, m.border ? { line: m.border } : {});
+		para(s, m.name, m.x + 0.083, m.y + 0.185, 2.04, 0.471, m.ink, { fontSize: 16, bold: true, align: 'center' });
+		para(s, m.role, m.x + 0.135, m.y + 0.534, 1.936, 0.379, m.sub, { align: 'center' });
+	});
+
+	text(s, 'MEET THE VISIONARY TEAM', { x: 8.994, y: 1.803, w: 3.116, h: 2.827, fontFace: HEAD, fontSize: 54, color: NAVY });
+	para(s, 'Lorem ipsum dolor sit amet, Fusce po mi sedo pulvi min eliti purused am pulvinar sed.',
+		9.003, 4.713, 3.107, 0.985, GREY);
+
+	swatches(s, [LILAC, NAVY_SOFT, RED]);
+}
+
+/* ------------------------------------------------------------- slide 6 ---- */
+
+function slideServices(pptx) {
+	const s = pptx.addSlide();
+	s.background = { color: RED };
+
+	wordmark(s, WHITE);
+	text(s, 'FILM DEVELOPMENT SERVICE SUITE', { x: 0.712, y: 1.294, w: 5.746, h: 1.919, fontFace: HEAD, fontSize: 54, color: WHITE });
+	para(s, 'Lorem ipsum dolor sit amet, Fusce pos, mi sedo pulvi min eliti purused am  pulvinar sed. Lorem ipsum Lorem ipsum dolor sit amet, Fusce pos.',
+		0.72, 3.309, 5.737, 0.682, GREY_LT);
+
+	filmBand(s,
+		{ cx: 10.5611, cy: 2.6222, w: 3.2195, h: 5.5394, color: RED_DARK },
+		[
+			{ n: 7, w: 0.4195, h: 0.4997, x0: 8.6389, y0: 3.9186, dx: 0.743733, dy: -0.003333, extra: [[7.9707, 3.9217, 0.349]] },
+			{ n: 7, w: 0.4195, h: 0.4997, x0: 8.6257, y0: 1.3296, dx: 0.743733, dy: -0.003333, extra: [[7.9568, 1.3326, 0.3498]] },
+		]);
+
+	[
+		{ x: 0.818, title: 'Company Services 01', badge: NAVY },
+		{ x: 4.827, title: 'Company Services 02', badge: RED },
+		{ x: 8.836, title: 'Company Services 03', badge: NAVY },
+	].forEach(card => {
+		box(s, card.x, 4.947, 3.831, 1.56, WHITE);
+		box(s, card.x + 0.245, 5.396, 0.661, 0.661, card.badge);
+		iconCard(s, card.x + 0.445, 5.593, 0.262, card.badge);
+		label(s, card.title, card.x + 1.064, 5.168, 2.418, 0.425, NAVY, { lineSpacingMultiple: 1.5 });
+		para(s, 'Lorem ipsum dolor sit, consectet adipisicing minim elitos met.', card.x + 1.064, 5.528, 2.649, 0.682, GREY);
+	});
+
+	swatches(s, [WHITE, NAVY_SOFT, RED_DARK]);
+}
+
+/* ------------------------------------------------------------- slide 7 ---- */
+
+function slideProjects(pptx) {
+	const s = pptx.addSlide();
+	s.background = { color: NAVY };
+
+	filmStrip(s, 12.1235, 6.3879, 227.627, [0.6611, 10.5, RED], { n: 14, w: 0.4195, h: 0.5813, y0: -4.831, step: 0.74374, color: NAVY });
+
+	[
+		{ x: 0.672, y: 1.058, score: '5.0', rating: [RED, RED, RED, RED, RED] },
+		{ x: 0.672, y: 4.074, score: '3.0', rating: [RED, RED, RED, WHITE, WHITE] },
+		{ x: 9.864, y: 1.058, score: '4.0', rating: [RED, RED, RED, RED, WHITE] },
+	].forEach((p, i) => {
+		label(s, 'Best Product 0' + (i + 1), p.x, p.y, 2.408, 0.337, WHITE, { lineSpacingMultiple: 1.0 });
+		para(s, 'Lorem ipsum dolor sit amet, Fus pos, mi sedo pulvi min eliti purused pulvinar elit.', p.x, p.y + 0.368, 2.68, 0.974, GREY_LT);
+		rule(s, p.x + 0.102, p.y + 1.702, 2.477, NAVY_SOFT);
+		stars(s, p.x + 0.102, p.y + 2.241, p.rating);
+		text(s, p.score, { x: p.x + 1.332, y: p.y + 2.182, w: 0.477, h: 0.303, fontFace: HEAD, fontSize: 12, color: WHITE });
+		arrowGlyph(s, p.x + 2.403, p.y + 2.249, 0.15, 0.138, WHITE);
+	});
+
+	text(s, 'PROJECT DETAILS SHOWCASE', { x: 6.999, y: 4.428, w: 5.083, h: 1.919, fontFace: HEAD, fontSize: 54, color: WHITE });
+	swatches(s, [WHITE, NAVY_SOFT, RED]);
+}
+
+/* ------------------------------------------------------------- slide 8 ---- */
+
+function slideReviews(pptx) {
+	const s = pptx.addSlide();
+
+	wordmark(s, NAVY);
+	filmStrip(s, 13.0132, 3.75, 359.743, [0.6611, 10.5, RED], { n: 14, w: 0.4195, h: 0.5813, y0: -4.8298, step: 0.74371, color: WHITE });
+
+	[
+		{ x: 7.084, y: 1.125, name: 'Sarah Jonah', fill: WHITE, ink: NAVY, sub: GREY, border: HAIRLINE, ruleColor: LILAC, rating: [RED, RED, RED, RED, NAVY] },
+		{ x: 7.788, y: 3.033, name: 'Johan White', fill: RED, ink: WHITE, sub: WHITE, border: null, ruleColor: WHITE, rating: [WHITE, WHITE, WHITE, WHITE, WHITE] },
+		{ x: 7.084, y: 4.941, name: 'Justin Greenwood', fill: WHITE, ink: NAVY, sub: GREY, border: HAIRLINE, ruleColor: LILAC, rating: [RED, RED, RED, NAVY, NAVY] },
+	].forEach(card => {
+		box(s, card.x, card.y, 3.917, 1.433, card.fill, card.border ? { line: card.border } : {});
+		label(s, card.name, card.x + 0.232, card.y + 0.101, 1.807, 0.425, card.ink, { lineSpacingMultiple: 1.5 });
+		para(s, '\u201CLorem ipsum dolor sit, consectetur puruso\u201D', card.x + 0.232, card.y + 0.506, 3.495, 0.379, card.sub);
+		rule(s, card.x + 0.379, card.y + 1.087, 1.802, card.ruleColor);
+		stars(s, card.x + 2.485, card.y + 1.001, card.rating);
+	});
+
+	text(s, 'REVIEWS FROM INDUSTRY EXPERTS', { x: 0.689, y: 1.151, w: 5.415, h: 1.919, fontFace: HEAD, fontSize: 54, color: NAVY });
+	para(s, 'Lorem ipsum dolor sit amet, Fusce pos, mi sedo pulvi min eliti pu am  pulvinar sed. Lorem ipsum Lorem ipsum dolor',
+		0.689, 3.165, 5.053, 0.682, GREY);
+
+	box(s, 0.811, 4.433, 0.588, 0.588, RED);
+	iconGlasses(s, 0.995, 4.617, 0.22, WHITE);
+	label(s, 'Our Best Showcase ', 1.658, 4.138, 2.648, 0.425, NAVY, { lineSpacingMultiple: 1.5 });
+	para(s, 'Lorem ipsum dolor sit amet, Fusce pos, mi sedolore amet. Lorem ipsum dolor sit am, posu.', 1.658, 4.561, 4.083, 0.682, GREY);
+
+	text(s, [{ text: '958', options: { color: NAVY } }, { text: 'K', options: { color: RED } }],
+		{ x: 0.718, y: 5.799, w: 0.901, h: 0.505, fontFace: HEAD, fontSize: 24 });
+	para(s, 'Lorem ipsum dolor sit amet, Fus pos, mi sedo pulvi min elitos pulvin elit. Lorem ipsum dolor.', 1.713, 5.668, 4.029, 0.682, GREY);
+}
+
+/* ------------------------------------------------------------- slide 9 ---- */
+
+function slidePlan(pptx) {
+	const s = pptx.addSlide();
+	s.background = { color: RED };
+
+	wordmark(s, WHITE);
+	text(s, 'FILM PRODUCTION PLAN', { x: 3.273, y: 1.053, w: 6.788, h: 1.01, fontFace: HEAD, fontSize: 54, color: WHITE, align: 'center' });
+
+	[3.803, 6.439, 9.094].forEach(x =>
+		s.addShape('chevron', { x, y: 3.433, w: 0.455, h: 0.335, fill: { color: WHITE }, line: NO_LINE }));
+
+	// Four milestone cards. The source deck nudges each caption slightly, so the
+	// per-column offsets are kept verbatim rather than derived from a grid.
+	[
+		{ x: 1.899, title: 'First Target', titleX: 1.909, titleY: 4.766, descX: 1.505, descY: 5.119, yearX: 1.910, yearY: 3.715, icon: () => iconPeople(s, 2.356, 3.120, 0.731, 0.511, NAVY) },
+		{ x: 4.594, title: 'Second Target', titleX: 4.604, titleY: 4.808, descX: 4.199, descY: 5.161, yearX: 4.604, yearY: 3.671, icon: () => iconWallet(s, 5.163, 3.164, 0.500, 0.438, RED) },
+		{ x: 7.290, title: 'Third Target', titleX: 7.299, titleY: 4.843, descX: 6.894, descY: 5.196, yearX: 7.298, yearY: 3.720, icon: () => iconUpload(s, 7.860, 3.116, 0.500, 0.499, NAVY) },
+		{ x: 9.831, title: 'Fours Target', titleX: 9.825, titleY: 4.876, descX: 9.420, descY: 5.197, yearX: 9.820, yearY: 3.697, icon: () => iconGear(s, 10.356, 3.139, 0.624, 0.436, RED) },
+	].forEach(col => {
+		para(s, 'Lorem ipsum dolor sit amet, elit, sed do eiusmod', col.descX, col.descY, 2.467, 0.707, WHITE, { align: 'center' });
+		label(s, col.title, col.titleX, col.titleY, 1.659, 0.337, WHITE, { align: 'center' });
+		box(s, col.x, 2.778, 1.646, 1.646, WHITE);
+		text(s, '2020', { x: col.yearX, y: col.yearY, w: 1.668, h: 0.505, fontSize: 24, bold: true, color: NAVY, align: 'center' });
+		col.icon();
+	});
+
+	filmBand(s,
+		{ cx: 6.6702, cy: 7.1617, w: 0.6779, h: 13.3336, color: RED_DARK },
+		[{ n: 18, w: 0.4195, h: 0.4997, x0: 0.3537, y0: 7.1834, dx: 0.74349, dy: -0.002553 }]);
+
+	swatches(s, [WHITE, NAVY_SOFT, RED_DARK]);
+}
+
+/* ------------------------------------------------------------ slide 10 ---- */
+
+function slideThanks(pptx) {
+	const s = pptx.addSlide();
+	s.background = { color: NAVY };
+
+	wordmark(s, WHITE, 5.554);
+	box(s, 0.49, -1.482, 4.127, 10.5, RED, { rotate: 359.74 });
+	const perfs = { n: 14, w: 0.4195, h: 0.5813, y0: -4.8342, step: 0.74371, color: NAVY };
+	filmStrip(s, 4.2869, 3.7634, 359.743, null, perfs);
+	filmStrip(s, 0.825, 3.7768, 359.743, null, perfs);
+
+	text(s, [{ text: 'W', options: { color: RED } }, { text: 'E\u2019RE GRATEFUL FOR YOUR WORTHY ATTENTION', options: { color: WHITE } }],
+		{ x: 5.554, y: 1.152, w: 6.41, h: 3.433, fontFace: HEAD, fontSize: 66 });
+	para(s, 'Lorem ipsum dolor sit amet, Fusce pos, mi sedo pulvi min eliti minit purused am pulvinar sed. Lore ipsum minimum purs amet minimum elit dol.',
+		5.563, 4.655, 6.165, 0.682, GREY_LT);
+
+	box(s, 8.522, 5.888, 0.6, 0.601, RED);
+	iconEnvelope(s, 8.701, 6.085, 0.243, 0.207, RED);
+	box(s, 5.662, 5.893, 0.6, 0.601, WHITE);
+	iconPhone(s, 5.846, 6.077, 0.233, NAVY);
+
+	label(s, 'Phone Number', 6.412, 5.766, 1.604, 0.425, WHITE, { lineSpacingMultiple: 1.5 });
+	text(s, '+123 456 7890', { x: 6.412, y: 6.211, w: 1.547, h: 0.303, fontSize: 12, color: GREY_LT });
+	label(s, 'Email - Address', 9.271, 5.761, 2.237, 0.425, WHITE, { lineSpacingMultiple: 1.5 });
+	text(s, 'yourmail@website.com', { x: 9.313, y: 6.207, w: 2.415, h: 0.303, fontSize: 12, color: GREY_LT });
+
+	filmStrip(s, 12.6111, 6.6579, 47.627, [0.6224, 10.5, NAVY_SOFT], { n: 14, w: 0.4195, h: 0.5813, y0: -4.8298, step: 0.74367, color: NAVY });
+}
+
+/* --------------------------------------------------------------- assemble -- */
+
+function build() {
+	const pptx = new PptxGenJS();
+	pptx.layout = 'LAYOUT_WIDE'; // 13.333 x 7.5 in
+	pptx.author = 'Mavies';
+	pptx.title = 'Movie Pitch Deck';
+
+	[slideTitle, slideStory, slideProblem, slideMarket, slideTeam,
+		slideServices, slideProjects, slideReviews, slidePlan, slideThanks].forEach(fn => fn(pptx));
+
+	return pptx.writeFile({ fileName: path.join(__dirname, '0e57d00f-6c1f-45a8-81d6-4e6dbe51c88a_grok_final.pptx') });
+}
+
+build().then(f => console.log('wrote', f)).catch(err => { console.error(err); process.exit(1); });

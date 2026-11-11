@@ -1,0 +1,1903 @@
+--- 2026-11-11_19-52:/opt/sand/sand-host/host-main.cjs
++++ 2026-11-11_21-49:/opt/sand/sand-host/host-main.cjs
+@@ -199979,7 +199979,7 @@
+ 
+       static $() {
+ 
+-        return ["GetTeamAdminSettingsResponse|1 allowed_models 9*|2 blocked_models 9*|3 auto_run_controls #0|4 cursor_ignore_controls #1|5 dot_cursor_protection 8|6 allowed_mcp_configuration #2?|7 background_agent_settings #3?|8 cli_settings #4?|9 mcp_controls #5?|10 prompt_deeplink_controls #6?|11 command_deeplink_controls #7?|12 deeplink_controls #8?|13 github_integration_settings #9?|14 slack_integration_settings #10?|15 linear_integration_settings #11?|16 workspace_trust_controls #12?|17 gitlab_integration_settings #13?|18 browser_features 8?|23 browser_origin_allowlist 9*|19 byok_disabled 8?|20 dashboard_analytics_requires_admin 8?|21 shared_conversation_settings #14?|22 allowed_extensions 9?|24 disable_conversation_insights 8?|25 cursor_blame_settings #15?|26 network_denylist 9*|27 network_allowlist 9*|28 extension_signing_settings #16?|29 enforce_invite_domain_on_accept 8?|30 first_party_plugin_configuration #17?|31 attribution_controls #18?|32 allow_third_party_plugin_imports 8?|44 allow_user_local_plugin_imports 8?|33 glass_settings #19?|34 new_chat_model_reset_settings #20?|35 model_allowlist #21?|36 jira_integration_settings #22?|37 pull_request_preferences #23?|38 browser_settings #24?|39 cloud_agent_egress_allowlist 9*|40 mirror_sandbox_allowlist_for_egress 8?|49 auto_review #25|60 local_tool_controls #26?|64 sand_network_controls #27?|61 sand_action_audit_settings #28?|41 remote_permissions_file_path 9?|46 remote_permissions_file_paths 9*|45 local_permissions_file_path 9*|47 permissions_file_overrides_auto_run 8?|42 shared_canvas_settings #29?|43 invite_link_max_ttl_seconds 5?|48 extension_install_cooldown_settings #30?|50 public_profile_settings #31?|51 bitbucket_integration_settings #32?|52 marketplace_leaderboard_disabled 8?|53 new_chat_nudge_all_to_smart_auto 8?|54 models_auto_only 8?|55 new_chat_nudge_all_to_smart_auto_optimize_for 9?|56 restrict_invites_to_admins 8?|57 viewer_can_invite_members 8?|58 enforce_hooks_readiness 8?|59 llm_gateway #33?|62 sand_onboarding #34?|63 origin_disabled 8?|65 user_agent_store_skills_sync_settings #35?|66 auto_review_run_mode_reset #36|67 enterprise_grok_bot_trial_available 8?|68 sand_group_access_mode #37|69 sand_auto_review_controls #38?|71 remote_control_v2_policy #39|72 sand_local_egress_controls #40?|74 projects_settings #41?|75 allow_skills_cli_installs 8?|76 grok_bot_agent_email_controls #42?|77 sand_box_sudo_controls #43?|78 sand_box_restart #44?|79 origin_allow_public_repos 8?|80 cloud_agent_group_access_mode #45?|81 allow_unlisted_plugins_and_mcp_servers 8?|82 team_list_enforced 8?|83 grok_bot_secret_forwarding_controls #46?|84 grok_bot_meetings_controls #47?|85 team_list_available 8?|86 grok_bot_pages_sharing_controls #48?|87 grok_bot_bot_messaging_controls #49?|88 member_slack_managed_workspaces #50*|89 member_slack_managed_workspaces_unreadable 8|90 apps_settings #51?|94 grok_bot_team_bot_sharing_controls #52?|91 grok_bot_sharing_admin_controls_available 8?|92 viewer_may_share_team_bots 8?|95 computer_use 8?|96 grok_bot_delegated_auth_controls #53?|97 grok_bot_delegated_auth_controls_available 8?|98 personal_api_key_creation_disabled 8?|99 cloud_agent_mcp_allowlist_applied 8?|100 grok_bot_texting_controls #54?|101 grok_bot_wall_snapshot_controls #55?|102 sand_box_sudo_not_applied_box_count 13?|103 can_control_model_access 8?|104 voice_chat_disabled 8?|105 mcp_allowlist_enabled 8?|106 mcp_servers_surfaces #56?|107 user_mcp_extensions_surfaces #56?|109 grok_bot_proactivity_controls #57?|110 off_mcp_server_rules_allowed 8?", AutoRunControls, CursorIgnoreControls, AllowedMCPConfiguration, BackgroundAgentSettings, CliSettings, MCPControls, PromptDeeplinkControls, CommandDeeplinkControls, DeeplinkControls, GithubIntegrationSettings, SlackIntegrationSettings, LinearIntegrationSettings, WorkspaceTrustControls, GitlabIntegrationSettings, SharedConversationSettings, CursorBlameSettings, ExtensionSigningSettings, FirstPartyPluginConfiguration, AttributionControls, GlassSettings, TeamAdminNewChatModelResetSettings, ModelAllowlist, JiraIntegrationSettings, PullRequestPreferences, BrowserSettings, AutoReviewInstructions, LocalToolControls, SandNetworkControls, SandActionAuditSettings, SharedCanvasSettings, ExtensionInstallCooldownSettings, PublicProfileSettings, BitbucketIntegrationSettings, LlmGatewaySettings, SandOnboardingState, UserAgentStoreSkillsSyncSettings, AutoReviewRunModeReset, SandGroupAccessMode, SandAutoReviewControls, RemoteControlV2Policy, SandLocalEgressControls, ProjectsSettings, GrokBotAgentEmailControls, SandBoxSudoControls, SandBoxRestart, CloudAgentGroupAccessMode, GrokBotSecretForwardingControls, GrokBotMeetingsControls, GrokBotPagesSharingControls, GrokBotBotMessagingControls, SlackManagedWorkspaces, AppsSettings, GrokBotTeamBotSharingControls, GrokBotDelegatedAuthControls, GrokBotTextingControls, GrokBotWallSnapshotControls, McpServerAppliesTo, GrokBotProactivityControls];
++        return ["GetTeamAdminSettingsResponse|1 allowed_models 9*|2 blocked_models 9*|3 auto_run_controls #0|4 cursor_ignore_controls #1|5 dot_cursor_protection 8|6 allowed_mcp_configuration #2?|7 background_agent_settings #3?|8 cli_settings #4?|9 mcp_controls #5?|10 prompt_deeplink_controls #6?|11 command_deeplink_controls #7?|12 deeplink_controls #8?|13 github_integration_settings #9?|14 slack_integration_settings #10?|15 linear_integration_settings #11?|16 workspace_trust_controls #12?|17 gitlab_integration_settings #13?|18 browser_features 8?|23 browser_origin_allowlist 9*|19 byok_disabled 8?|20 dashboard_analytics_requires_admin 8?|21 shared_conversation_settings #14?|22 allowed_extensions 9?|24 disable_conversation_insights 8?|25 cursor_blame_settings #15?|26 network_denylist 9*|27 network_allowlist 9*|28 extension_signing_settings #16?|29 enforce_invite_domain_on_accept 8?|30 first_party_plugin_configuration #17?|31 attribution_controls #18?|32 allow_third_party_plugin_imports 8?|44 allow_user_local_plugin_imports 8?|33 glass_settings #19?|34 new_chat_model_reset_settings #20?|35 model_allowlist #21?|36 jira_integration_settings #22?|37 pull_request_preferences #23?|38 browser_settings #24?|39 cloud_agent_egress_allowlist 9*|40 mirror_sandbox_allowlist_for_egress 8?|49 auto_review #25|60 local_tool_controls #26?|64 sand_network_controls #27?|61 sand_action_audit_settings #28?|41 remote_permissions_file_path 9?|46 remote_permissions_file_paths 9*|45 local_permissions_file_path 9*|47 permissions_file_overrides_auto_run 8?|42 shared_canvas_settings #29?|43 invite_link_max_ttl_seconds 5?|48 extension_install_cooldown_settings #30?|50 public_profile_settings #31?|51 bitbucket_integration_settings #32?|52 marketplace_leaderboard_disabled 8?|53 new_chat_nudge_all_to_smart_auto 8?|54 models_auto_only 8?|55 new_chat_nudge_all_to_smart_auto_optimize_for 9?|56 restrict_invites_to_admins 8?|57 viewer_can_invite_members 8?|58 enforce_hooks_readiness 8?|59 llm_gateway #33?|62 sand_onboarding #34?|63 origin_disabled 8?|65 user_agent_store_skills_sync_settings #35?|66 auto_review_run_mode_reset #36|67 enterprise_grok_bot_trial_available 8?|68 sand_group_access_mode #37|69 sand_auto_review_controls #38?|71 remote_control_v2_policy #39|72 sand_local_egress_controls #40?|74 projects_settings #41?|75 allow_skills_cli_installs 8?|76 grok_bot_agent_email_controls #42?|77 sand_box_sudo_controls #43?|78 sand_box_restart #44?|79 origin_allow_public_repos 8?|80 cloud_agent_group_access_mode #45?|81 allow_unlisted_plugins_and_mcp_servers 8?|82 team_list_enforced 8?|83 grok_bot_secret_forwarding_controls #46?|84 grok_bot_meetings_controls #47?|85 team_list_available 8?|86 grok_bot_pages_sharing_controls #48?|87 grok_bot_bot_messaging_controls #49?|88 member_slack_managed_workspaces #50*|89 member_slack_managed_workspaces_unreadable 8|90 apps_settings #51?|94 grok_bot_team_bot_sharing_controls #52?|91 grok_bot_sharing_admin_controls_available 8?|92 viewer_may_share_team_bots 8?|95 computer_use 8?|96 grok_bot_delegated_auth_controls #53?|97 grok_bot_delegated_auth_controls_available 8?|98 personal_api_key_creation_disabled 8?|99 cloud_agent_mcp_allowlist_applied 8?|100 grok_bot_texting_controls #54?|101 grok_bot_wall_snapshot_controls #55?|102 sand_box_sudo_not_applied_box_count 13?|103 can_control_model_access 8?|104 voice_chat_disabled 8?|105 mcp_allowlist_enabled 8?|106 mcp_servers_surfaces #56?|107 user_mcp_extensions_surfaces #56?|109 grok_bot_proactivity_controls #57?|110 off_mcp_server_rules_allowed 8?|111 legacy_model_allowlist #21?", AutoRunControls, CursorIgnoreControls, AllowedMCPConfiguration, BackgroundAgentSettings, CliSettings, MCPControls, PromptDeeplinkControls, CommandDeeplinkControls, DeeplinkControls, GithubIntegrationSettings, SlackIntegrationSettings, LinearIntegrationSettings, WorkspaceTrustControls, GitlabIntegrationSettings, SharedConversationSettings, CursorBlameSettings, ExtensionSigningSettings, FirstPartyPluginConfiguration, AttributionControls, GlassSettings, TeamAdminNewChatModelResetSettings, ModelAllowlist, JiraIntegrationSettings, PullRequestPreferences, BrowserSettings, AutoReviewInstructions, LocalToolControls, SandNetworkControls, SandActionAuditSettings, SharedCanvasSettings, ExtensionInstallCooldownSettings, PublicProfileSettings, BitbucketIntegrationSettings, LlmGatewaySettings, SandOnboardingState, UserAgentStoreSkillsSyncSettings, AutoReviewRunModeReset, SandGroupAccessMode, SandAutoReviewControls, RemoteControlV2Policy, SandLocalEgressControls, ProjectsSettings, GrokBotAgentEmailControls, SandBoxSudoControls, SandBoxRestart, CloudAgentGroupAccessMode, GrokBotSecretForwardingControls, GrokBotMeetingsControls, GrokBotPagesSharingControls, GrokBotBotMessagingControls, SlackManagedWorkspaces, AppsSettings, GrokBotTeamBotSharingControls, GrokBotDelegatedAuthControls, GrokBotTextingControls, GrokBotWallSnapshotControls, McpServerAppliesTo, GrokBotProactivityControls];
+ 
+       }
+ 
+@@ -320167,7 +320167,7 @@
+ 
+ 
+ // ../packages/constants/dist/cloud-agent-identity.js
+-var CURSOR_AGENT_SOCKET_ENV_VAR, CURSOR_AGENT_OIDC_TOKEN_PATH, CLOUD_AGENT_IDENTITY_GROK_BOT_BOX_TOKEN_PATH, GROK_BOT_BOX_HOST_ATTESTATION_HEADER, GROK_BOT_BOX_INFERENCE_RENEWAL_FALLBACK_HEADER, SAND_BOX_HOST_ATTESTED_INFERENCE_RENEWAL_ENV, SAND_BOX_HOST_ATTESTED_INFERENCE_RENEWAL_ON_VALUE, GROK_BOT_BOX_IDENTITY_SOCKET_PATH, GROK_BOT_BOX_HOST_ATTESTATION_SOCKET_PATH, GROK_BOT_BOX_HOST_ATTESTATION_IDENTITY_TOKEN_SURFACE, GROK_BOT_BOX_HOST_ATTESTATION_INFERENCE_CREDENTIAL_SURFACE;
++var CURSOR_AGENT_SOCKET_ENV_VAR, CURSOR_AGENT_OIDC_TOKEN_PATH, CLOUD_AGENT_IDENTITY_GROK_BOT_BOX_TOKEN_PATH, GROK_BOT_BOX_HOST_ATTESTATION_HEADER, GROK_BOT_BOX_INFERENCE_RENEWAL_FALLBACK_HEADER, GROK_BOT_BOX_INFERENCE_RENEWAL_CALLER_HEADER, GROK_BOT_BOX_HOST_ATTESTATION_FAILURE_HEADER, SAND_BOX_HOST_ATTESTED_INFERENCE_RENEWAL_ENV, SAND_BOX_HOST_ATTESTED_INFERENCE_RENEWAL_ON_VALUE, GROK_BOT_BOX_IDENTITY_SOCKET_PATH, GROK_BOT_BOX_HOST_ATTESTATION_SOCKET_PATH, GROK_BOT_BOX_HOST_ATTESTATION_IDENTITY_TOKEN_SURFACE, GROK_BOT_BOX_HOST_ATTESTATION_INFERENCE_CREDENTIAL_SURFACE;
+ 
+ var init_cloud_agent_identity = __esm({
+ 
+@@ -320185,6 +320185,10 @@
+ 
+     GROK_BOT_BOX_INFERENCE_RENEWAL_FALLBACK_HEADER = "x-cursor-box-renewal-fallback";
+ 
++    GROK_BOT_BOX_INFERENCE_RENEWAL_CALLER_HEADER = "x-cursor-box-renewal-caller";
++
++    GROK_BOT_BOX_HOST_ATTESTATION_FAILURE_HEADER = "x-cursor-box-host-attestation-failure";
++
+     SAND_BOX_HOST_ATTESTED_INFERENCE_RENEWAL_ENV = "SAND_BOX_HOST_ATTESTED_INFERENCE_RENEWAL";
+ 
+     SAND_BOX_HOST_ATTESTED_INFERENCE_RENEWAL_ON_VALUE = "1";
+@@ -388659,7 +388663,7 @@
+ function sandClientBaseVersionOf(clientAppVersion) {
+ 
+   return stampedVersionBaseOf(clientAppVersion) ?? stampedVersionBaseOf(
+-    true ? "1.1.0-pre.97" : void 0
++    true ? "1.1.0-pre.98" : void 0
+   ) ?? SAND_CLIENT_FALLBACK_BASE_VERSION;
+ 
+ }
+@@ -490261,9 +490265,9 @@
+ // ../node_modules/.pnpm/@opentelemetry+api@1.9.0/node_modules/@opentelemetry/api/build/esm/diag/ComponentLogger.js
+ function logProxy(funcName, namespace, args) {
+ 
+-  var logger171 = getGlobal("diag");
++  var logger172 = getGlobal("diag");
+ 
+-  if (!logger171) {
++  if (!logger172) {
+ 
+     return;
+ 
+@@ -490271,7 +490275,7 @@
+ 
+   args.unshift(namespace);
+ 
+-  return logger171[funcName].apply(logger171, __spreadArray([], __read(args), false));
++  return logger172[funcName].apply(logger172, __spreadArray([], __read(args), false));
+ 
+ }
+ 
+@@ -490484,7 +490488,7 @@
+ 
+ 
+ // ../node_modules/.pnpm/@opentelemetry+api@1.9.0/node_modules/@opentelemetry/api/build/esm/diag/internal/logLevelLogger.js
+-function createLogLevelDiagLogger(maxLevel, logger171) {
++function createLogLevelDiagLogger(maxLevel, logger172) {
+ 
+   if (maxLevel < DiagLogLevel.NONE) {
+ 
+@@ -490497,17 +490501,17 @@
+ 
+   }
+ 
+-  logger171 = logger171 || {
++  logger172 = logger172 || {
+ }
+ ;
+ 
+   function _filterFunc(funcName, theLevel) {
+ 
+-    var theFunc = logger171[funcName];
++    var theFunc = logger172[funcName];
+ 
+     if (typeof theFunc === "function" && maxLevel >= theLevel) {
+ 
+-      return theFunc.bind(logger171);
++      return theFunc.bind(logger172);
+ 
+     }
+ 
+@@ -490639,12 +490643,12 @@
+ 
+             }
+ 
+-            var logger171 = getGlobal("diag");
++            var logger172 = getGlobal("diag");
+ 
+-            if (!logger171)
++            if (!logger172)
+               return;
+ 
+-            return logger171[funcName].apply(logger171, __spreadArray2([], __read2(args), false));
++            return logger172[funcName].apply(logger172, __spreadArray2([], __read2(args), false));
+ 
+           }
+ ;
+@@ -490653,7 +490657,7 @@
+ 
+         var self2 = this;
+ 
+-        var setLogger = function(logger171, optionsOrLogLevel) {
++        var setLogger = function(logger172, optionsOrLogLevel) {
+ 
+           var _a18, _b2, _c;
+ 
+@@ -490665,7 +490669,7 @@
+ 
+           }
+ 
+-          if (logger171 === self2) {
++          if (logger172 === self2) {
+ 
+             var err = new Error("Cannot use diag as the logger for itself. Please use a DiagLogger implementation like ConsoleDiagLogger or a custom implementation");
+ 
+@@ -490687,7 +490691,7 @@
+ 
+           var oldLogger = getGlobal("diag");
+ 
+-          var newLogger = createLogLevelDiagLogger((_b2 = optionsOrLogLevel.logLevel) !== null && _b2 !== void 0 ? _b2 : DiagLogLevel.INFO, logger171);
++          var newLogger = createLogLevelDiagLogger((_b2 = optionsOrLogLevel.logLevel) !== null && _b2 !== void 0 ? _b2 : DiagLogLevel.INFO, logger172);
+ 
+           if (oldLogger && !optionsOrLogLevel.suppressOverrideMessage) {
+ 
+@@ -507601,9 +507605,9 @@
+ 
+     const timestamp3 = /* @__PURE__ */ new Date();
+ 
+-    const logger171 = getLoggerBackend(ctx);
++    const logger172 = getLoggerBackend(ctx);
+ 
+-    logger171.log(ctx, {
++    logger172.log(ctx, {
+  ...entry, timestamp: timestamp3, logger: name18 }
+ );
+ 
+@@ -646584,7 +646588,7 @@
+ 
+       }
+ ,
+-      _enqueueDiagnosticsEvent(user, logger171, sdk, options2) {
++      _enqueueDiagnosticsEvent(user, logger172, sdk, options2) {
+ 
+         const markers = exports2.Diagnostics._getMarkers(sdk);
+ 
+@@ -646606,7 +646610,7 @@
+         }
+ );
+ 
+-        logger171.enqueue(event);
++        logger172.enqueue(event);
+ 
+         return overallInitDuration;
+ 
+@@ -648389,9 +648393,9 @@
+ 
+         const intervalId = setInterval(() => {
+ 
+-          const logger171 = EVENT_LOGGER_MAP[this._sdkKey];
++          const logger172 = EVENT_LOGGER_MAP[this._sdkKey];
+ 
+-          if (!logger171 || logger171._flushIntervalId !== intervalId) {
++          if (!logger172 || logger172._flushIntervalId !== intervalId) {
+ 
+             clearInterval(intervalId);
+ 
+@@ -671173,7 +671177,7 @@
+ 
+     var CharSetProber = require_charsetprober();
+ 
+-    var logger171 = require_logger();
++    var logger172 = require_logger();
+ 
+     function CharSetGroupProber() {
+ 
+@@ -671309,7 +671313,7 @@
+ 
+           if (!prober.active) {
+ 
+-            logger171.log(prober.getCharsetName() + " not active\n");
++            logger172.log(prober.getCharsetName() + " not active\n");
+ 
+             continue;
+ 
+@@ -671317,7 +671321,7 @@
+ 
+           var cf = prober.getConfidence();
+ 
+-          logger171.log(prober.getCharsetName() + " confidence = " + cf + "\n");
++          logger172.log(prober.getCharsetName() + " confidence = " + cf + "\n");
+ 
+           if (bestConf < cf) {
+ 
+@@ -671436,7 +671440,7 @@
+ 
+     var constants28 = require_constants4();
+ 
+-    var logger171 = require_logger();
++    var logger172 = require_logger();
+ 
+     function MultiByteCharSetProber() {
+ 
+@@ -671492,7 +671496,7 @@
+ 
+           if (codingState == constants28.error) {
+ 
+-            logger171.log(this.getCharsetName() + " prober hit error at byte " + i + "\n");
++            logger172.log(this.getCharsetName() + " prober hit error at byte " + i + "\n");
+ 
+             this._mState = constants28.notMe;
+ 
+@@ -719366,7 +719370,7 @@
+ 
+     var constants28 = require_constants4();
+ 
+-    var logger171 = require_logger();
++    var logger172 = require_logger();
+ 
+     function SJISProber() {
+ 
+@@ -719414,7 +719418,7 @@
+ 
+           if (codingState == constants28.error) {
+ 
+-            logger171.log(this.getCharsetName() + " prober hit error at byte " + i + "\n");
++            logger172.log(this.getCharsetName() + " prober hit error at byte " + i + "\n");
+ 
+             this._mState = constants28.notMe;
+ 
+@@ -719876,7 +719880,7 @@
+ 
+     var constants28 = require_constants4();
+ 
+-    var logger171 = require_logger();
++    var logger172 = require_logger();
+ 
+     function EUCJPProber() {
+ 
+@@ -719924,7 +719928,7 @@
+ 
+           if (codingState == constants28.error) {
+ 
+-            logger171.log(this.getCharsetName() + " prober hit error at byte " + i + "\n");
++            logger172.log(this.getCharsetName() + " prober hit error at byte " + i + "\n");
+ 
+             this._mState = constants28.notMe;
+ 
+@@ -721307,7 +721311,7 @@
+ 
+     var constants28 = require_constants4();
+ 
+-    var logger171 = require_logger();
++    var logger172 = require_logger();
+ 
+     function SingleByteCharSetProber(model, reversed, nameProber) {
+ 
+@@ -721443,12 +721447,12 @@
+ 
+             if (cf > POSITIVE_SHORTCUT_THRESHOLD) {
+ 
+-              logger171.log(this._mModel.charsetName + " confidence = " + cf + ", we have a winner\n");
++              logger172.log(this._mModel.charsetName + " confidence = " + cf + ", we have a winner\n");
+ 
+             }
+  else if (cf < NEGATIVE_SHORTCUT_THRESHOLD) {
+ 
+-              logger171.log(this._mModel.charsetName + " confidence = " + cf + ", below negative shortcut threshhold " + NEGATIVE_SHORTCUT_THRESHOLD + "\n");
++              logger172.log(this._mModel.charsetName + " confidence = " + cf + ", below negative shortcut threshhold " + NEGATIVE_SHORTCUT_THRESHOLD + "\n");
+ 
+               this._mState = constants28.notMe;
+ 
+@@ -752594,7 +752598,7 @@
+ 
+     var EscCharSetProber = require_escprober();
+ 
+-    var logger171 = require_logger();
++    var logger172 = require_logger();
+ 
+     var supportedEncodings = (function() {
+ 
+@@ -752933,7 +752937,7 @@
+ 
+         if (this._mBOM.length === 0) {
+ 
+-          logger171.log("no data received!\n");
++          logger172.log("no data received!\n");
+ 
+           return;
+ 
+@@ -752943,7 +752947,7 @@
+ 
+         if (this._mInputState == _state.pureAscii && canDetectEncoding("ascii")) {
+ 
+-          logger171.log("pure ascii");
++          logger172.log("pure ascii");
+ 
+           this.result = {
+  "encoding": "ascii", "confidence": 1 }
+@@ -752992,7 +752996,7 @@
+ 
+             }
+ 
+-            logger171.log(prober.getCharsetName() + " confidence " + confidence);
++            logger172.log(prober.getCharsetName() + " confidence " + confidence);
+ 
+           }
+ 
+@@ -753031,9 +753035,9 @@
+ 
+         }
+ 
+-        if (logger171.enabled) {
++        if (logger172.enabled) {
+ 
+-          logger171.log("no probers hit minimum threshhold\n");
++          logger172.log("no probers hit minimum threshhold\n");
+ 
+           for (var i = 0, prober;
+  prober = this._mCharsetProbers[i];
+@@ -753041,7 +753045,7 @@
+ 
+             if (!prober || !canDetectEncoding(prober.getCharsetName())) continue;
+ 
+-            logger171.log(prober.getCharsetName() + " confidence = " + prober.getConfidence() + "\n");
++            logger172.log(prober.getCharsetName() + " confidence = " + prober.getConfidence() + "\n");
+ 
+           }
+ 
+@@ -767285,16 +767289,16 @@
+  }
+ ;
+ 
+-    function getLogger(logger171) {
++    function getLogger(logger172) {
+ 
+-      if (logger171 === false)
++      if (logger172 === false)
+         return noLogs;
+ 
+-      if (logger171 === void 0)
++      if (logger172 === void 0)
+         return console;
+ 
+-      if (logger171.log && logger171.warn && logger171.error)
+-        return logger171;
++      if (logger172.log && logger172.warn && logger172.error)
++        return logger172;
+ 
+       throw new Error("logger must implement log, warn and error methods");
+ 
+@@ -882066,21 +882070,80 @@
+ 
+ var MAX_RESPONSE_BODY_BYTES = 8 * 1024;
+ 
+-async function getBestEffortGrokBotBoxHostAttestation(getHostAttestation, surface, onRetryAfter) {
++function describeGrokBotBoxHostAttestationFailedReads(reads) {
++
++  if (reads.length === 0) return "";
++
++  const described2 = reads.map(
++    (read2, index) => `read ${
++index + 1}
++ ${
++read2.failure}
++ ${
++read2.elapsedMs}
++ms`
++  );
++
++  return ` (${
++described2.join(", ")}
++)`;
++
++}
++
++function elapsedMsSince(startedAtMs) {
++
++  return Math.round(performance.now() - startedAtMs);
++
++}
++
++async function getBestEffortGrokBotBoxHostAttestation(getHostAttestation, surface, onRetryAfter, onFailure) {
++
++  if (getHostAttestation === void 0) {
++
++    onFailure?.("not_configured", 0);
++
++    return void 0;
++
++  }
++
++  const startedAtMs = performance.now();
+ 
+   try {
+ 
+-    return await getHostAttestation?.(surface, onRetryAfter);
++    return await getHostAttestation(surface, onRetryAfter, onFailure);
+ 
+   }
+  catch (_hostAttestationUnavailable) {
+ 
++    onFailure?.("client_error", elapsedMsSince(startedAtMs));
++
+     return void 0;
+ 
+   }
+ 
+ }
+ 
++function socketFailure(error64) {
++
++  switch (error64.code) {
++
++    case "ENOENT":
++      return "socket_missing";
++
++    case "ECONNREFUSED":
++      return "socket_refused";
++
++    case "ECONNRESET":
++    case "EPIPE":
++      return "socket_closed";
++
++    default:
++      return "socket_error";
++
++  }
++
++}
++
+ var BOX_HOST_ATTESTATION_READ_ATTEMPTS = 3;
+ 
+ var BOX_HOST_ATTESTATION_RETRY_FIRST_DELAY_MS = 250;
+@@ -882093,7 +882156,13 @@
+ }
+ ) {
+ 
+-  if (getHostAttestation === void 0) return void 0;
++  if (getHostAttestation === void 0) {
++
++    options2.onFailure?.("not_configured", 0);
++
++    return void 0;
++
++  }
+ 
+   const retry2 = createRetryPolicy({
+ 
+@@ -882133,7 +882202,8 @@
+         hint.retryAfterMs = retryAfterMs;
+ 
+       }
+-
++,
++      options2.onFailure
+     );
+ 
+     if (assertion !== void 0 || attempt2 >= BOX_HOST_ATTESTATION_READ_ATTEMPTS) {
+@@ -882171,12 +882241,14 @@
+ 
+ }
+ 
+-function requestHostAttestation(socketPath, surface, onRetryAfter) {
++function requestHostAttestation(socketPath, surface, onRetryAfter, onFailure) {
+ 
+   const payload = JSON.stringify({
+  surface }
+ );
+ 
++  const startedAtMs = performance.now();
++
+   return new Promise((resolve35) => {
+ 
+     let settled = false;
+@@ -882192,6 +882264,19 @@
+     }
+ ;
+ 
++    const fail3 = (failure4) => {
++
++      if (settled) return;
++
++      settled = true;
++
++      onFailure?.(failure4, elapsedMsSince(startedAtMs));
++
++      resolve35(void 0);
++
++    }
++;
++
+     const req = import_node_http.default.request(
+       {
+ 
+@@ -882217,7 +882302,9 @@
+ 
+           res.resume();
+ 
+-          finish(void 0);
++          fail3(`status_${
++res.statusCode ?? 0}
++`);
+ 
+           return;
+ 
+@@ -882237,7 +882324,7 @@
+ 
+             res.destroy();
+ 
+-            finish(void 0);
++            fail3("malformed_response");
+ 
+             return;
+ 
+@@ -882258,19 +882345,21 @@
+ 
+             const assertion = parsed2 !== null && typeof parsed2 === "object" && !Array.isArray(parsed2) && "assertion" in parsed2 && typeof parsed2.assertion === "string" ? parsed2.assertion : "";
+ 
+-            finish(assertion.length > 0 ? assertion : void 0);
++            if (assertion.length > 0) finish(assertion);
++
++            else fail3("malformed_response");
+ 
+           }
+  catch {
+ 
+-            finish(void 0);
++            fail3("malformed_response");
+ 
+           }
+ 
+         }
+ );
+ 
+-        res.on("error", () => finish(void 0));
++        res.on("error", (error64) => fail3(socketFailure(error64)));
+ 
+       }
+ 
+@@ -882280,12 +882369,12 @@
+ 
+       req.destroy();
+ 
+-      finish(void 0);
++      fail3("timeout");
+ 
+     }
+ );
+ 
+-    req.on("error", () => finish(void 0));
++    req.on("error", (error64) => fail3(socketFailure(error64)));
+ 
+     req.end(payload);
+ 
+@@ -882296,15 +882385,19 @@
+ 
+ function createGrokBotBoxHostAttestationClient(options2) {
+ 
+-  return async (surface, onRetryAfter) => {
++  return async (surface, onRetryAfter, onFailure) => {
++
++    const startedAtMs = performance.now();
+ 
+     try {
+ 
+-      return await requestHostAttestation(options2.socketPath, surface, onRetryAfter);
++      return await requestHostAttestation(options2.socketPath, surface, onRetryAfter, onFailure);
+ 
+     }
+  catch (_hostAttestationUnavailable) {
+ 
++      onFailure?.("client_error", elapsedMsSince(startedAtMs));
++
+       return void 0;
+ 
+     }
+@@ -882447,16 +882540,37 @@
+ 
+ async function exchangeRenewalCredential(args, signal) {
+ 
++  const failedReads = [];
++
++  const reportFailure = (failure4, elapsedMs3) => {
++
++    failedReads.push({
++ failure: failure4, elapsedMs: elapsedMs3 }
++);
++
++  }
++;
++
+   if (args.hostAttestedRenewal !== true) {
+ 
+     const hostAttestation2 = await getBestEffortGrokBotBoxHostAttestation(
+       args.getHostAttestation,
+-      GROK_BOT_BOX_HOST_ATTESTATION_INFERENCE_CREDENTIAL_SURFACE
++      GROK_BOT_BOX_HOST_ATTESTATION_INFERENCE_CREDENTIAL_SURFACE,
++      void 0,
++      reportFailure
+     );
+ 
+-    return postRenewal(args, {
+- credential: args.credential, hostAttestation: hostAttestation2 }
+-, signal);
++    return postRenewal(
++      args,
++      {
++
++        credential: args.credential,
++        hostAttestation: hostAttestation2,
++        attestationFailure: hostAttestation2 === void 0 ? failedReads.at(-1)?.failure : void 0
++      }
++,
++      signal
++    );
+ 
+   }
+ 
+@@ -882466,12 +882580,15 @@
+ 
+   const hostAttestation = callerOwnsRetries ? await getBestEffortGrokBotBoxHostAttestation(
+     args.getHostAttestation,
+-    GROK_BOT_BOX_HOST_ATTESTATION_INFERENCE_CREDENTIAL_SURFACE
++    GROK_BOT_BOX_HOST_ATTESTATION_INFERENCE_CREDENTIAL_SURFACE,
++    void 0,
++    reportFailure
+   ) : await getGrokBotBoxHostAttestationWithRetry(
+     args.getHostAttestation,
+     GROK_BOT_BOX_HOST_ATTESTATION_INFERENCE_CREDENTIAL_SURFACE,
+     {
+ 
++      onFailure: reportFailure,
+       ...args.clock !== void 0 ? {
+  clock: args.clock }
+  : {
+@@ -882486,6 +882603,8 @@
+ 
+   );
+ 
++  const attestationFailure = hostAttestation === void 0 ? failedReads.at(-1)?.failure : void 0;
++
+   let fallbackReason;
+ 
+   if (hostAttestation === void 0) {
+@@ -882493,7 +882612,9 @@
+     if (!hasFallback) {
+ 
+       throw new SandCredentialRenewalError(
+-        "Sand inference-credential renewal got no host attestation."
++        `Sand inference-credential renewal got no host attestation${
++describeGrokBotBoxHostAttestationFailedReads(failedReads)}
++.`
+       );
+ 
+     }
+@@ -882534,12 +882655,12 @@
+ 
+   }
+ 
+-  args.onHostAttestedFallback?.(fallbackReason);
++  args.onHostAttestedFallback?.(fallbackReason, hostAttestation === void 0 ? failedReads : []);
+ 
+   return postRenewal(
+     args,
+     {
+- credential: args.credential, hostAttestation, fallbackReason }
++ credential: args.credential, hostAttestation, attestationFailure, fallbackReason }
+ ,
+     signal
+   );
+@@ -882579,11 +882700,21 @@
+  : {
+ }
+ ,
++      ...request5.attestationFailure !== void 0 ? {
++ [GROK_BOT_BOX_HOST_ATTESTATION_FAILURE_HEADER]: request5.attestationFailure }
++ : {
++}
++,
+       ...request5.fallbackReason !== void 0 ? {
+  [GROK_BOT_BOX_INFERENCE_RENEWAL_FALLBACK_HEADER]: request5.fallbackReason }
+  : {
+ }
+ ,
++      ...args.caller !== void 0 ? {
++ [GROK_BOT_BOX_INFERENCE_RENEWAL_CALLER_HEADER]: args.caller }
++ : {
++}
++,
+       ...getSandBackendClientHeaders(args.backend)
+     }
+ ,
+@@ -882689,6 +882820,8 @@
+ 
+   interruptWait;
+ 
++  immediateRenewalRequested = false;
++
+   onDemandRenewal;
+ 
+   start() {
+@@ -882723,6 +882856,8 @@
+ 
+     this.onDemandRenewal = renewal;
+ 
++    this.immediateRenewalRequested = true;
++
+     interrupt();
+ 
+     return renewal.promise.then(() => true);
+@@ -882764,10 +882899,26 @@
+ 
+   }
+ 
++  takeCaller() {
++
++    const requested = this.immediateRenewalRequested;
++
++    this.immediateRenewalRequested = false;
++
++    if (requested) return "on_demand";
++
++    if (this.consecutiveFailures > 0) return "retry";
++
++    return this.adopted === void 0 ? "host_start" : "timer";
++
++  }
++
+   async cycle() {
+ 
+     const cycleStartedAtMs = Date.now();
+ 
++    const caller = this.takeCaller();
++
+     try {
+ 
+       const credential = this.options.getCredential();
+@@ -882780,7 +882931,7 @@
+ 
+       }
+ 
+-      const renewed = await this.options.renew(credential);
++      const renewed = await this.options.renew(credential, caller);
+ 
+       if (this.abort.signal.aborted) return null;
+ 
+@@ -883161,6 +883312,10 @@
+ 
+ var SAND_ANTIBOT_MARKERS = ["none", "challenge_header", "vendor_429"];
+ 
++var SAND_DOC_STATUS_CLASSES = ["2xx", "403", "429", "4xx_other", "5xx"];
++
++var SAND_CONTENT_STATES = ["ok", "blank", "empty_results", "spinner_stalled"];
++
+ 
+ // ../packages/sand-playwright-runtime/dist/wall-detectors/matchers.js
+ function matchesHost(criteria, hostname4) {
+@@ -884710,6 +884865,39 @@
+ );
+ 
+ 
++// ../packages/sand-playwright-runtime/dist/wall-detectors/page-health.js
++init_zod();
++
++var PAGE_HEALTH_CONTENT_CHECKS = [...SAND_CONTENT_STATES, "pending", "unmeasured"];
++
++var PAGE_HEALTH_ARMED_TTL_MS = 10 * 6e4;
++
++var PAGE_HEALTH_MAX_PAGES = 16;
++
++var PAGE_HEALTH_CHECK_DELAY_MS = 5e3;
++
++var PAGE_HEALTH_CHECK_BUDGET_MS = 750;
++
++var PAGE_HEALTH_FILE = external_exports.object({
++
++  writerPid: external_exports.number().int().nonnegative(),
++  pages: external_exports.array(external_exports.object({
++
++    pageId: external_exports.string().regex(/^[A-Za-z0-9-]{
++1,64}
++$/),
++    urlHash: external_exports.string().regex(/^[0-9a-f]{
++16}
++$/),
++    atMs: external_exports.number().int().nonnegative(),
++    docStatusClass: external_exports.enum(SAND_DOC_STATUS_CLASSES).optional(),
++    content: external_exports.enum(PAGE_HEALTH_CONTENT_CHECKS)
++  }
++)).max(PAGE_HEALTH_MAX_PAGES)
++}
++);
++
++
+ // ../packages/sand-playwright-runtime/dist/wall-detectors/detect.js
+ var MAX_WALL_CHALLENGES = 8;
+ 
+@@ -884995,6 +885183,7 @@
+   network: "grok_bot_wall_evidence_network",
+   detail: "grok_bot_wall_detail_telemetry",
+   antibotVendors: "grok_bot_antibot_vendor_telemetry",
++  pageHealth: "grok_bot_page_health_telemetry",
+   boxRecorders: "sand_box_wall_evidence_recorders"
+ }
+ ;
+@@ -885531,6 +885720,7 @@
+   network: false,
+   detail: false,
+   antibotVendors: false,
++  pageHealth: false,
+   controlSampleRate: 0,
+   triggerWindowMs: WALL_EVIDENCE_DEFAULT_TRIGGER_WINDOW_MS
+ }
+@@ -893841,6 +894031,19 @@
+     default: false
+   }
+ ,
++  // Drive mode: turns a repo's web UI into a Google-Drive-style folder viewer
++  // (browse, preview, download, drag-and-drop upload to the default branch via
++  // Git LFS) and hides the code-review surfaces. Read by the Drive RPCs on the
++  // backend and by the portal to render the UI;
++ `client: true` so the portal's
++  // SSR bootstrap carries it. OFF = ordinary code browser, every Drive RPC
++  // answers NotFound.
++  origin_drive_mode: {
++
++    client: true,
++    default: false
++  }
++,
+   // Sand Auto-review enforce rollout (Shell/MCP/Computer).
+   // Settings-on default is shadow for every reviewed surface. When this gate
+   // is ON, those surfaces escalate to enforce. When OFF (default), they stay
+@@ -894241,6 +894444,21 @@
+     default: false
+   }
+ ,
++  // Observe-only switch for the encoding slice counters in the client's local
++  // executors. ON: the text an executor returns (file reads, grep, MCP, hooks,
++  // web fetch, terminal context) and the text of a result about to be encoded
++  // for the wire are classified for badly decoded text, and one counter is
++  // incremented with fixed-set labels only. Nothing an executor returns changes
++  // either way. OFF (the default, and whenever the gate cannot be read) runs no
++  // classifier and emits nothing. Read on each call from the client's last
++  // decision;
++ nothing waits for it at startup.
++  local_exec_encoding_slices: {
++
++    client: true,
++    default: false
++  }
++,
+   file_watcher_metrics: {
+ 
+     client: true,
+@@ -895008,6 +895226,17 @@
+     default: false
+   }
+ ,
++  // Apps as a product. The other Apps gates target users who pass this one;
++
++  // the server reads it for audiences, such as the App Builder in-app ad, and
++  // the Glass empty-state "Build an App" tray reads it, without exposure, as
++  // shared eligibility for cloud_agent_new_project_presend_deploy_tray.
++  cloud_agent_apps: {
++
++    client: true,
++    default: false
++  }
++,
+   // Apps for Cursor Projects: a repoless Project coordinator starts workers
+   // from scratch that build and publish web apps, ListProjectPublishState,
+   // and the Apps surfaces on Project chats in Glass and on the web. Needs
+@@ -895599,6 +895828,15 @@
+     default: false
+   }
+ ,
++  // A promoted side chat keeps its parent's visibility, team or private, when
++  // the copy has the parent's owner and team. Off keeps every promoted copy
++  // owner-only. Read on the user's promote request.
++  glass_projects_side_chat_promotion: {
++
++    client: true,
++    default: false
++  }
++,
+   // New Project creates an unnamed no-repo Project at once, on New Agent's
+   // cloud model, instead of opening the Create Project dialog. The agent names
+   // it on the first request. Off keeps the dialog.
+@@ -897206,6 +897444,17 @@
+     default: false
+   }
+ ,
++  // Team-owned canonical groups in team marketplace access. The backend
++  // evaluates it for the marketplace's team (teamID unit) when validating
++  // GROUP access grants;
++ the dashboard and IDE pickers read it to offer team
++  // groups. Enforcement never reads it, so grants saved while on keep working.
++  team_marketplace_team_group_access: {
++
++    client: true,
++    default: false
++  }
++,
+   // Per-user gate for the Atlas surface (generated per-directory codebase
+   // maps): the read RPCs, the cold-start bootstrap, and the portal UI, which
+   // reads the same gate so ungated users never issue a request the RPCs would
+@@ -901213,6 +901462,21 @@
+ 
+   }
+ ,
++  cloud_agent_new_project_presend_deploy_tray: {
++
++    client: true,
++    fallbackValues: {
++
++      enabled: false
++    }
++,
++    parseValue: {
++
++      enabled: parseBoolean
++    }
++
++  }
++,
+   glass_account_menu_grok_bot: {
+ 
+     client: true,
+@@ -904034,6 +904298,16 @@
+     publishAgainPrompt: string2().min(1).max(1e3)
+   }
+ ),
++  // Text the Glass Apps growth surfaces put in front of the agent.
++  // `buildAndDeployPrompt` is the opening the empty state's "Build an App" tray
++  // puts at the start of a Start from scratch draft's prompt;
++ the user's
++  // description of the app finishes it.
++  glass_apps_growth_config: object({
++
++    buildAndDeployPrompt: string2().min(1).max(1e3)
++  }
++),
+   // Copy + destinations for the contextual Grok Bot banner, shared by both
+   // the v1 and v2 experiments. Split from them so copy and the download link
+   // can be retuned without a client release or a re-ramp.
+@@ -906689,6 +906963,16 @@
+ 
+   }
+ ,
++  glass_apps_growth_config: {
++
++    client: true,
++    fallbackValues: {
++
++      buildAndDeployPrompt: "Build an app that does: "
++    }
++
++  }
++,
+   // Copy + destinations for the contextual Grok Bot banner. `downloadUrl` is
+   // the unified marketing landing page (it picks the right installer per
+   // platform);
+@@ -910302,7 +910586,7 @@
+ // src/host/extensions/telemetry/structured-log-telemetry.ts
+ function getHostBuiltAtMs() {
+ 
+-  return true ? "1794409025000" : void 0;
++  return true ? "1794413962000" : void 0;
+ 
+ }
+ 
+@@ -910429,7 +910713,7 @@
+         "client.type": SAND_CLIENT_TYPE,
+         client_version: brandedVersion(options2.backend.clientVersion),
+         app_version: brandedVersion(
+-          options2.appVersion ?? (true ? "1.1.0-pre.97" : void 0)
++          options2.appVersion ?? (true ? "1.1.0-pre.98" : void 0)
+         ) ?? "unknown",
+         arch: process.arch,
+         platform: process.platform,
+@@ -940128,11 +940412,14 @@
+ 
+       backend,
+       credential,
++      caller: "copy_in",
+       hostAttestedRenewal,
+       retriedByCaller: true,
+-      onHostAttestedFallback: (reason) => log5(`copy-in inference credential fell back to the box credential: ${
++      onHostAttestedFallback: (reason, failedReads) => log5(
++        `copy-in inference credential fell back to the box credential: ${
+ reason}
+-`),
++` + describeGrokBotBoxHostAttestationFailedReads(failedReads)
++      ),
+       ...getHostAttestation !== void 0 ? {
+  getHostAttestation }
+  : {
+@@ -1032147,7 +1032434,7 @@
+ }
+ ;
+ 
+-function transformToolMatcher(matcher, logger171 = noopLogger) {
++function transformToolMatcher(matcher, logger172 = noopLogger) {
+ 
+   if (!matcher || matcher === "*") {
+ 
+@@ -1032218,7 +1032505,7 @@
+ 
+   for (const warning of warnings) {
+ 
+-    logger171.warn(warning);
++    logger172.warn(warning);
+ 
+   }
+ 
+@@ -1032238,7 +1032525,7 @@
+ 
+ }
+ 
+-function resolveCommandHookCommand(claudeScript, logger171) {
++function resolveCommandHookCommand(claudeScript, logger172) {
+ 
+   const command = claudeScript.command;
+ 
+@@ -1032254,7 +1032541,7 @@
+ 
+     if (claudeScript.shell !== void 0) {
+ 
+-      logger171.warn(`Hook "${
++      logger172.warn(`Hook "${
+ command}
+ " sets shell "${
+ claudeScript.shell}
+@@ -1032269,7 +1032556,7 @@
+ 
+   if (!isStringArray2(args)) {
+ 
+-    logger171.warn(`Hook "${
++    logger172.warn(`Hook "${
+ command}
+ " has invalid "args" (expected an array of strings), skipping`);
+ 
+@@ -1032281,7 +1032568,7 @@
+ 
+ }
+ 
+-function transformHookScript(claudeScript, matcher, logger171 = noopLogger) {
++function transformHookScript(claudeScript, matcher, logger172 = noopLogger) {
+ 
+   const base2 = {
+ 
+@@ -1032320,7 +1032607,7 @@
+ 
+   }
+ 
+-  const command = resolveCommandHookCommand(claudeScript, logger171);
++  const command = resolveCommandHookCommand(claudeScript, logger172);
+ 
+   if (command === null) {
+ 
+@@ -1032338,7 +1032625,7 @@
+ 
+ }
+ 
+-function transformHookEntry(entry, event, logger171 = noopLogger) {
++function transformHookEntry(entry, event, logger172 = noopLogger) {
+ 
+   const result = [];
+ 
+@@ -1032348,11 +1032635,11 @@
+ 
+   if (usesToolMatcher) {
+ 
+-    const transformed = transformToolMatcher(entry.matcher, logger171);
++    const transformed = transformToolMatcher(entry.matcher, logger172);
+ 
+     if (transformed === null) {
+ 
+-      logger171.warn(`All tools in matcher "${
++      logger172.warn(`All tools in matcher "${
+ entry.matcher}
+ " are unsupported, skipping hooks`);
+ 
+@@ -1032368,7 +1032655,7 @@
+     if (entry.matcher && entry.matcher !== "*" && entry.matcher !== "" && // Check if it's a trigger-specific matcher
+     (event === "SessionStart" ? ["startup", "resume", "clear", "compact"].includes(entry.matcher) : ["manual", "auto"].includes(entry.matcher))) {
+ 
+-      logger171.warn(`${
++      logger172.warn(`${
+ event}
+  trigger matcher "${
+ entry.matcher}
+@@ -1032387,7 +1032674,7 @@
+ 
+   for (const claudeScript of entry.hooks) {
+ 
+-    const transformed = transformHookScript(claudeScript, effectiveMatcher, logger171);
++    const transformed = transformHookScript(claudeScript, effectiveMatcher, logger172);
+ 
+     if (transformed) {
+ 
+@@ -1032401,7 +1032688,7 @@
+ 
+ }
+ 
+-function transformClaudeHooksToConfig(claudeHooks, logger171 = noopLogger) {
++function transformClaudeHooksToConfig(claudeHooks, logger172 = noopLogger) {
+ 
+   const cursorHooks = {
+ }
+@@ -1032411,7 +1032698,7 @@
+ 
+     if (!isClaudeCodeHookEvent(event)) {
+ 
+-      logger171.warn(`Unknown Claude Code event "${
++      logger172.warn(`Unknown Claude Code event "${
+ event}
+ ", skipping`);
+ 
+@@ -1032421,7 +1032708,7 @@
+ 
+     if (UNSUPPORTED_CLAUDE_EVENTS.includes(event)) {
+ 
+-      logger171.warn(`Claude Code event "${
++      logger172.warn(`Claude Code event "${
+ event}
+ " is not supported in Cursor and will be ignored`);
+ 
+@@ -1032433,7 +1032720,7 @@
+ 
+     if (!cursorStep) {
+ 
+-      logger171.warn(`Unknown Claude Code event "${
++      logger172.warn(`Unknown Claude Code event "${
+ event}
+ ", skipping`);
+ 
+@@ -1032447,7 +1032734,7 @@
+ 
+       for (const entry of entries) {
+ 
+-        const transformedScripts = transformHookEntry(entry, event, logger171);
++        const transformedScripts = transformHookEntry(entry, event, logger172);
+ 
+         scripts.push(...transformedScripts);
+ 
+@@ -1032456,7 +1032743,7 @@
+     }
+  else if (entries !== void 0) {
+ 
+-      logger171.warn(`Claude Code event "${
++      logger172.warn(`Claude Code event "${
+ event}
+ " has invalid value (expected array), skipping`);
+ 
+@@ -1109185,6 +1109472,18 @@
+ }
+ ;
+ 
++var JSON_ERROR_POSITION = /(?:in|after) JSON at position (\d+)/;
++
++var JSON_ERROR_KINDS = [
++  ["bad_control_character", /^Bad control character/],
++  ["bad_escape", /^Bad (escaped character|Unicode escape)/],
++  ["expected_separator", /^Expected ',' or '[\]}
++]'/],
++  ["expected_property_name", /^Expected (double-quoted )?property name/],
++  ["trailing_content", /^Unexpected non-whitespace character after JSON/],
++  ["unexpected_token", /^Unexpected token/]
++];
++
+ var diagnose = (text5) => {
+ 
+   if (namesAKeyTwice(text5)) {
+@@ -1109218,7 +1109517,7 @@
+ 
+     const message = error64 instanceof Error ? error64.message : "";
+ 
+-    const errorPosition = /in JSON at position (\d+)/.exec(message)?.[1];
++    const errorPosition = JSON_ERROR_POSITION.exec(message)?.[1];
+ 
+     if (/Unexpected end of (JSON input|data)/.test(message) || errorPosition !== void 0 && Number(errorPosition) >= text5.length) {
+ 
+@@ -1109288,6 +1109587,38 @@
+ }
+ ;
+ 
++var corruptionShape = (text5) => {
++
++  let message = "";
++
++  try {
++
++    JSON.parse(text5);
++
++  }
++ catch (error64) {
++
++    message = error64 instanceof Error ? error64.message : "";
++
++  }
++
++  const errorAt = JSON_ERROR_POSITION.exec(message)?.[1];
++
++  return {
++
++    chars: text5.length,
++    shim_json_error: JSON_ERROR_KINDS.find(([, pattern]) => pattern.test(message))?.[0] ?? "other",
++    ...errorAt === void 0 ? {
++}
++ : {
++ error_at: Number(errorAt) }
++
++  }
++;
++
++}
++;
++
+ var decodeLeadingJsonArray = (blob) => {
+ 
+   const start = blob.indexOf("[");
+@@ -1109445,9 +1109776,23 @@
+ 
+   const reason = diagnose(trimmed);
+ 
+-  return reason === "truncated" ? {
++  if (reason === "truncated") {
++
++    return {
+  ok: false, reason, log: truncationShape(trimmed) }
+- : {
++;
++
++  }
++
++  if (reason === "corrupt_json") {
++
++    return {
++ ok: false, reason, log: corruptionShape(trimmed) }
++;
++
++  }
++
++  return {
+  ok: false, reason }
+ ;
+ 
+@@ -1171706,6 +1172051,18 @@
+ init_unknown_record();
+ 
+ 
++// ../packages/grok-bot-harness/src/runner/action-audit/page-health-probe.ts
++init_scheduling();
++
++init_errors();
++
++var WRITE_SLACK_MS = 400;
++
++var PAGE_HEALTH_FOLLOW_UP_MAX_WAIT_MS = PAGE_HEALTH_CHECK_DELAY_MS + PAGE_HEALTH_CHECK_BUDGET_MS + WRITE_SLACK_MS;
++
++var CONTENT_STATES = new Set(SAND_CONTENT_STATES);
++
++
+ // ../packages/grok-bot-harness/src/runner/action-audit/navigation-tab-closed.ts
+ init_dist5();
+ 
+@@ -1215329,15 +1215686,16 @@
+     getCredential: isDevTokenFile ? () => devTokenFile : () => canRenewFromBox ? boxIdentityCredential : null,
+     renew: isDevTokenFile ? () => readDevInferenceCredentialFile({
+  path: devTokenFile }
+-) : (credential) => renewSandBoxInferenceCredential({
++) : (credential, caller) => renewSandBoxInferenceCredential({
+ 
+       backend: options2.backend,
+       credential,
++      caller,
+       hostAttestedRenewal,
+-      onHostAttestedFallback: (reason) => options2.log(
++      onHostAttestedFallback: (reason, failedReads) => options2.log(
+         `inference-credential renewal fell back to the box credential: ${
+ reason}
+-`
++` + describeGrokBotBoxHostAttestationFailedReads(failedReads)
+       ),
+       ...options2.getHostAttestation !== void 0 ? {
+  getHostAttestation: options2.getHostAttestation }
+@@ -1217860,6 +1218218,8 @@
+ 
+     this.fromAddresses = [];
+ 
++    this.subjectContains = [];
++
+     proto3.util.initPartial(data2, this);
+ 
+   }
+@@ -1217890,7 +1218250,7 @@
+ 
+   static $() {
+ 
+-    return ["EmailReceivedTrigger|1 inbox_email 9|2 from_addresses 9*|3 require_auth_pass 8?"];
++    return ["EmailReceivedTrigger|1 inbox_email 9|2 from_addresses 9*|3 require_auth_pass 8?|4 has_attachment 8?|5 is_reply 8?|6 subject_contains 9*"];
+ 
+   }
+ 
+@@ -1250432,7 +1250792,7 @@
+ 
+ 
+ // ../packages/codebase-telemetry/dist/logging.js
+-function createNonThrowingLogger(logger171) {
++function createNonThrowingLogger(logger172) {
+ 
+   return {
+ 
+@@ -1250440,7 +1250800,7 @@
+ 
+       try {
+ 
+-        logger171.error(message, error64);
++        logger172.error(message, error64);
+ 
+       }
+  catch {
+@@ -1250453,7 +1250813,7 @@
+ 
+       try {
+ 
+-        logger171.warn(message, error64);
++        logger172.warn(message, error64);
+ 
+       }
+  catch {
+@@ -1250466,7 +1250826,7 @@
+ 
+       try {
+ 
+-        logger171.info(message, error64);
++        logger172.info(message, error64);
+ 
+       }
+  catch {
+@@ -1250479,7 +1250839,7 @@
+ 
+       try {
+ 
+-        logger171.debug(message, error64);
++        logger172.debug(message, error64);
+ 
+       }
+  catch {
+@@ -1250493,7 +1250853,7 @@
+ 
+ }
+ 
+-function scopeLogger(logger171, component) {
++function scopeLogger(logger172, component) {
+ 
+   const prefix = `[${
+ component}
+@@ -1250501,22 +1250861,22 @@
+ 
+   return {
+ 
+-    error: (message, error64) => logger171.error(`${
++    error: (message, error64) => logger172.error(`${
+ prefix}
+  ${
+ message}
+ `, error64),
+-    warn: (message, error64) => logger171.warn(`${
++    warn: (message, error64) => logger172.warn(`${
+ prefix}
+  ${
+ message}
+ `, error64),
+-    info: (message, error64) => logger171.info(`${
++    info: (message, error64) => logger172.info(`${
+ prefix}
+  ${
+ message}
+ `, error64),
+-    debug: (message, error64) => logger171.debug(`${
++    debug: (message, error64) => logger172.debug(`${
+ prefix}
+  ${
+ message}
+@@ -1250884,7 +1251244,7 @@
+    * acquired resources before rejecting.
+    */
+   static async open({
+- credentials, host, logger: logger171, signal }
++ credentials, host, logger: logger172, signal }
+ ) {
+ 
+     signal.throwIfAborted();
+@@ -1250902,7 +1251262,7 @@
+         authId: credentials.authId,
+         host,
+         adapter,
+-        logger: logger171
++        logger: logger172
+       }
+ );
+ 
+@@ -1250974,7 +1251334,7 @@
+    * handles cleanup if it fails.
+    */
+   constructor({
+- authId, host, adapter, logger: logger171 }
++ authId, host, adapter, logger: logger172 }
+ ) {
+ 
+     this.disposables = new DisposableStore();
+@@ -1250989,7 +1251349,7 @@
+ 
+     this.adapter = adapter;
+ 
+-    this.logger = logger171;
++    this.logger = logger172;
+ 
+     this.terminalFailure = adapter.terminalFailure;
+ 
+@@ -1252380,7 +1252740,7 @@
+ }
+ ;
+ 
+-function createNonThrowingMetrics(metrics2, logger171) {
++function createNonThrowingMetrics(metrics2, logger172) {
+ 
+   if (metrics2 === void 0) {
+ 
+@@ -1252399,7 +1252759,7 @@
+       }
+  catch (error64) {
+ 
+-        logger171.debug("Failed to emit codebase telemetry counter", error64);
++        logger172.debug("Failed to emit codebase telemetry counter", error64);
+ 
+       }
+ 
+@@ -1252412,11 +1252772,11 @@
+ 
+ var SessionSubgateController = class {
+ 
+-  constructor(host, logger171, session) {
++  constructor(host, logger172, session) {
+ 
+     this.host = host;
+ 
+-    this.logger = logger171;
++    this.logger = logger172;
+ 
+     this.session = session;
+ 
+@@ -1252534,7 +1252894,7 @@
+ 
+ }
+ 
+-async function tryCheckFeatureGate(host, logger171, gate) {
++async function tryCheckFeatureGate(host, logger172, gate) {
+ 
+   try {
+ 
+@@ -1252543,7 +1252903,7 @@
+   }
+  catch (err) {
+ 
+-    logger171.warn(`Failed to evaluate feature gate ${
++    logger172.warn(`Failed to evaluate feature gate ${
+ gate}
+ `, err);
+ 
+@@ -1252619,7 +1252979,7 @@
+     spawnCsnaps: spawnCsnaps2,
+     uploadPolling,
+     createUploadCredentials,
+-    logger: logger171,
++    logger: logger172,
+     signal
+   }
+ ) {
+@@ -1252709,7 +1253069,7 @@
+         initialState,
+         uploadPolling,
+         createUploadCredentials,
+-        logger: logger171
++        logger: logger172
+       }
+ );
+ 
+@@ -1252746,7 +1253106,7 @@
+     initialState,
+     uploadPolling,
+     createUploadCredentials,
+-    logger: logger171
++    logger: logger172
+   }
+ ) {
+ 
+@@ -1252754,7 +1253114,7 @@
+ 
+     this.authId = authId;
+ 
+-    this.logger = logger171;
++    this.logger = logger172;
+ 
+     this.uploadPollingPolicy = uploadPolling;
+ 
+@@ -1252763,7 +1253123,7 @@
+     [this.stateSender, this.state] = createWatchChannel({
+ 
+       initialValue: toAdapterState(authId, initialState),
+-      onSubscriberError: (error64) => logger171.error("Adapter state subscriber failed", error64)
++      onSubscriberError: (error64) => logger172.error("Adapter state subscriber failed", error64)
+     }
+ );
+ 
+@@ -1253123,12 +1253483,12 @@
+   nextFailureLogAt = 1;
+ 
+   constructor({
+- getSession, logger: logger171 }
++ getSession, logger: logger172 }
+ ) {
+ 
+     this.getSession = getSession;
+ 
+-    this.logger = logger171;
++    this.logger = logger172;
+ 
+   }
+ 
+@@ -1253225,14 +1253585,14 @@
+   auth: auth2,
+   privacyMode,
+   createAdapter,
+-  logger: logger171
++  logger: logger172
+ }
+ ) {
+ 
+   const disposables = new DisposableStore();
+ 
+   const authSource = disposables.add(createAuthSource({
+- auth: auth2, logger: logger171 }
++ auth: auth2, logger: logger172 }
+ ));
+ 
+   const privacyModeSource = createPrivacyModeSource(authSource.receiver, privacyMode);
+@@ -1253293,7 +1253653,7 @@
+ 
+   return {
+ 
+-    logger: logger171,
++    logger: logger172,
+     auth: authSource.receiver,
+     privacyMode: privacyModeSource,
+     featureGates,
+@@ -1253313,14 +1253673,14 @@
+ function createAuthSource({
+ 
+   auth: auth2,
+-  logger: logger171
++  logger: logger172
+ }
+ ) {
+ 
+   const [sender, receiver] = createWatchChannel({
+ 
+     initialValue: void 0,
+-    onSubscriberError: (error64) => logger171.error("Authentication subscriber failed", error64)
++    onSubscriberError: (error64) => logger172.error("Authentication subscriber failed", error64)
+   }
+ );
+ 
+@@ -1253355,7 +1253715,7 @@
+ 
+     if (authId === void 0 || authId.length === 0) {
+ 
+-      logger171.warn("Credential has no usable subject claim");
++      logger172.warn("Credential has no usable subject claim");
+ 
+       clearCredential();
+ 
+@@ -1253484,7 +1253844,7 @@
+   createAdapter,
+   privacyMode,
+   policies: policies2,
+-  logger: logger171
++  logger: logger172
+ }
+ ) {
+ 
+@@ -1253514,7 +1253874,7 @@
+ 
+     }
+ ,
+-    logger: logger171
++    logger: logger172
+   }
+ );
+ 
+@@ -1253525,7 +1253885,7 @@
+   const snapshotTrigger = new CodebaseSnapshotTrigger({
+ 
+     getSession: () => controller.session,
+-    logger: logger171
++    logger: logger172
+   }
+ );
+ 
+@@ -1253599,7 +1253959,7 @@
+ 
+     void restartPromise.catch((error64) => {
+ 
+-      logger171.error("Failed to restart Codebase Telemetry after adapter failure", error64);
++      logger172.error("Failed to restart Codebase Telemetry after adapter failure", error64);
+ 
+     }
+ );
+@@ -1253671,7 +1254031,7 @@
+ 
+           }
+ 
+-          logger171.warn("Controller shutdown exceeded its deadline", error64);
++          logger172.warn("Controller shutdown exceeded its deadline", error64);
+ 
+         }
+  finally {
+@@ -1254921,7 +1255281,7 @@
+   dependencies: [HostExtensions.Auth, HostExtensions.PrivacyMode],
+   start: (context2) => {
+ 
+-    const logger171 = createSandCodebaseTelemetryLogger(context2.host.log);
++    const logger172 = createSandCodebaseTelemetryLogger(context2.host.log);
+ 
+     const service = createCodebaseTelemetryService({
+ 
+@@ -1254973,7 +1255333,7 @@
+ 
+           }
+ ,
+-          logger: logger171,
++          logger: logger172,
+           signal
+         }
+ );
+@@ -1254999,7 +1255359,7 @@
+ )
+       }
+ ,
+-      logger: logger171
++      logger: logger172
+     }
+ );
+ 
+@@ -1299012,18 +1299372,18 @@
+ 
+     if (mcpSchemaId !== void 0) {
+ 
+-      const logger171 = options2?.log ?? noopPluginMetricsLogger;
++      const logger172 = options2?.log ?? noopPluginMetricsLogger;
+ 
+       if (resolveSchemaVersion(mcpSchemaId).kind === "unsupported") {
+ 
+-        logger171.log("debug", `mcp.json declares an unrecognized $schema, loading anyway: ${
++        logger172.log("debug", `mcp.json declares an unrecognized $schema, loading anyway: ${
+ mcpSchemaId}
+ `);
+ 
+       }
+  else if (schemaVersionsDisagree(options2?.pluginSchemaId, mcpSchemaId)) {
+ 
+-        logger171.log("debug", `mcp.json $schema ${
++        logger172.log("debug", `mcp.json $schema ${
+ mcpSchemaId}
+  disagrees with plugin.json $schema ${
+ options2?.pluginSchemaId}
+@@ -1388917,7 +1389277,7 @@
+   load: load2,
+   policies: policies2,
+   clock: clock2,
+-  logger: logger171
++  logger: logger172
+ }
+ ) {
+ 
+@@ -1388935,7 +1389295,7 @@
+       authId: null
+     }
+ ,
+-    onSubscriberError: (error64) => logger171.error("Privacy mode subscriber failed", error64)
++    onSubscriberError: (error64) => logger172.error("Privacy mode subscriber failed", error64)
+   }
+ );
+ 
+@@ -1389025,7 +1389385,7 @@
+ 
+     }
+ ,
+-    installFailure: (error64) => logger171.warn("Privacy mode lookup failed", error64)
++    installFailure: (error64) => logger172.warn("Privacy mode lookup failed", error64)
+   }
+ );
+ 
+@@ -1389033,7 +1389393,7 @@
+ 
+   const reconcileAuth = () => {
+ 
+-    const nextAuth = readAuth(auth2.peekAccessToken(), logger171);
++    const nextAuth = readAuth(auth2.peekAccessToken(), logger172);
+ 
+     if (nextAuth?.authId === activeAuth?.authId && nextAuth?.authToken === activeAuth?.authToken) {
+ 
+@@ -1389155,7 +1389515,7 @@
+ 
+ }
+ 
+-function readAuth(accessToken, logger171) {
++function readAuth(accessToken, logger172) {
+ 
+   if (accessToken === null || accessToken.length === 0) {
+ 
+@@ -1389167,7 +1389527,7 @@
+ 
+   if (authId === void 0 || authId.length === 0) {
+ 
+-    logger171.warn("Credential has no usable subject claim");
++    logger172.warn("Credential has no usable subject claim");
+ 
+     return void 0;
+ 
+@@ -1505205,31 +1505565,6 @@
+ }
+ 
+ 
+-// ../packages/grok-bot-harness/src/runner/tools/browser/browser-report-status.ts
+-var BROWSER_REPORT_BLOCKERS = [
+-  "bank_verification",
+-  "needs_code",
+-  "needs_sign_in",
+-  "missing_detail",
+-  "address_rejected",
+-  "card_field_unfillable",
+-  "card_declined",
+-  "out_of_stock",
+-  "price_changed",
+-  "captcha",
+-  "bot_wall",
+-  "site_error",
+-  "time_budget",
+-  "other"
+-];
+-
+-function browserReportPromptBlockers(botWall) {
+-
+-  return botWall ? BROWSER_REPORT_BLOCKERS : BROWSER_REPORT_BLOCKERS.filter((blocker) => blocker !== "bot_wall");
+-
+-}
+-
+-
+ // ../packages/grok-bot-harness/src/runner/subagents/combined-computer-prompt.ts
+ var BOX_DRIVER_WALL_REPORT_LINE = `- Report bot protection with ${
+ GROK_BOT_TOOL_NAMES.ReportBotChallenge}
+@@ -1621869,10 +1622204,14 @@
+ 
+ 
+ // ../packages/grok-bot-harness/src/runner/tools/ts-agent/ts-agent-turn-session.ts
++init_dist5();
++
+ init_scheduling();
+ 
+ init_dist6();
+ 
++init_errors();
++
+ 
+ // ../packages/grok-bot-harness/src/runner/tools/ts-agent/ts-agent-subagents.ts
+ init_dist6();
+@@ -1621951,22 +1622290,6 @@
+  waitMs: WAIT_MS }
+ ).optional();
+ 
+-var BLOCKER_TYPE = browserReportPromptBlockers(false).map((blocker) => JSON.stringify(blocker)).join(" | ");
+-
+-var BROWSER_REPORT_DECLARATION = `/** A computerUse report's \`Status\` line, its \`Blocker\` when it has one, and whether it names an order. */
+-export interface BrowserReport {
+-
+-  status: "done" | "partial" | "blocked" | "none";
+-
+-  blocker?: ${
+-BLOCKER_TYPE}
+-;
+-
+-  orderConfirmed?: boolean;
+-
+-}
+-`;
+-
+ 
+ // ../packages/grok-bot-harness/src/runner/tools/ts-agent/typed-results.ts
+ init_read_tool_pb();
+@@ -1622323,6 +1622646,8 @@
+ }
+ );
+ 
++var logger163 = createLogger("sand:ts-agent");
++
+ 
+ // ../packages/grok-bot-harness/src/runner/external-send/draft-nudges.ts
+ init_dist6();
+@@ -1622766,7 +1623091,7 @@
+ // ../packages/grok-bot-harness/src/frozen-prompts/frozen-prompt-tools.ts
+ init_dist5();
+ 
+-var logger163 = createLogger("sand:frozen-prompt-tools");
++var logger164 = createLogger("sand:frozen-prompt-tools");
+ 
+ 
+ // ../packages/grok-bot-harness/src/runner/automation-completion-middleware.ts
+@@ -1622774,7 +1623099,7 @@
+ 
+ init_errors();
+ 
+-var logger164 = createLogger("sand:automation-completion-middleware");
++var logger165 = createLogger("sand:automation-completion-middleware");
+ 
+ 
+ // ../packages/grok-bot-harness/src/runner/frozen-tool-descriptions-middleware.ts
+@@ -1622848,7 +1623173,7 @@
+ // ../packages/grok-bot-harness/src/runner/start-of-turn-ack-reminder-middleware.ts
+ init_dist5();
+ 
+-var logger165 = createLogger("sand:start-of-turn-ack-reminder-middleware");
++var logger166 = createLogger("sand:start-of-turn-ack-reminder-middleware");
+ 
+ var startOfTurnAckReminder = defineShim({
+  name: "start_of_turn_ack_reminder" }
+@@ -1622872,7 +1623197,7 @@
+ // ../packages/grok-bot-harness/src/runner/step-effort/first-step-ack-reminder.ts
+ init_dist5();
+ 
+-var logger166 = createLogger("sand:first-step-ack-reminder");
++var logger167 = createLogger("sand:first-step-ack-reminder");
+ 
+ 
+ // ../packages/grok-bot-harness/src/runner/turn-budget/step-cap.ts
+@@ -1622910,7 +1623235,7 @@
+ // ../packages/grok-bot-harness/src/runner/tools/hotels/hotel-reserve-turns.ts
+ init_dist5();
+ 
+-var logger167 = createLogger("sand:hotels");
++var logger168 = createLogger("sand:hotels");
+ 
+ 
+ // ../packages/grok-bot-harness/src/runner/prompt-inputs/user-info-input-paths.ts
+@@ -1623085,7 +1623410,7 @@
+ 
+ init_errors();
+ 
+-var logger168 = createLogger("sand:error-free-step");
++var logger169 = createLogger("sand:error-free-step");
+ 
+ var GROK_BOT_ERROR_FREE_STEP_METRIC = "grok_bot.turn.error_free_step";
+ 
+@@ -1623103,7 +1623428,7 @@
+ 
+ init_errors();
+ 
+-var logger169 = createLogger("sand:prompt-cache-keepalive");
++var logger170 = createLogger("sand:prompt-cache-keepalive");
+ 
+ var PROVIDER_PROMPT_CACHE_TTL_MS = 5 * 6e4;
+ 
+@@ -1623383,7 +1623708,7 @@
+ 
+ init_errors();
+ 
+-var logger170 = createLogger("sand:turn-setup-laps");
++var logger171 = createLogger("sand:turn-setup-laps");
+ 
+ var setupLapMs = createHistogram("grok_bot.turn.setup_lap_ms", {
+ 
+@@ -1631534,7 +1631859,7 @@
+     const hostUpgrade = this.hostUpgrade;
+ 
+     const hostBundleVersion = await hostUpgrade.resolveHostBundleIdentityVersion(
+-      (true ? "fd39889" : null) ?? "unknown"
++      (true ? "c6871ea" : null) ?? "unknown"
+     );
+ 
+     let resolvedBoxStoreId;

@@ -1,0 +1,2157 @@
+--- 2026-11-11_19-52:/opt/sand/sand-host/sand-eval-runner.cjs
++++ 2026-11-11_21-49:/opt/sand/sand-host/sand-eval-runner.cjs
+@@ -43063,9 +43063,9 @@
+ // ../node_modules/.pnpm/@opentelemetry+api@1.9.0/node_modules/@opentelemetry/api/build/esm/diag/ComponentLogger.js
+ function logProxy(funcName, namespace, args) {
+ 
+-  var logger171 = getGlobal("diag");
++  var logger172 = getGlobal("diag");
+ 
+-  if (!logger171) {
++  if (!logger172) {
+ 
+     return;
+ 
+@@ -43073,7 +43073,7 @@
+ 
+   args.unshift(namespace);
+ 
+-  return logger171[funcName].apply(logger171, __spreadArray([], __read(args), false));
++  return logger172[funcName].apply(logger172, __spreadArray([], __read(args), false));
+ 
+ }
+ 
+@@ -43286,7 +43286,7 @@
+ 
+ 
+ // ../node_modules/.pnpm/@opentelemetry+api@1.9.0/node_modules/@opentelemetry/api/build/esm/diag/internal/logLevelLogger.js
+-function createLogLevelDiagLogger(maxLevel, logger171) {
++function createLogLevelDiagLogger(maxLevel, logger172) {
+ 
+   if (maxLevel < DiagLogLevel.NONE) {
+ 
+@@ -43299,17 +43299,17 @@
+ 
+   }
+ 
+-  logger171 = logger171 || {
++  logger172 = logger172 || {
+ }
+ ;
+ 
+   function _filterFunc(funcName, theLevel) {
+ 
+-    var theFunc = logger171[funcName];
++    var theFunc = logger172[funcName];
+ 
+     if (typeof theFunc === "function" && maxLevel >= theLevel) {
+ 
+-      return theFunc.bind(logger171);
++      return theFunc.bind(logger172);
+ 
+     }
+ 
+@@ -43441,12 +43441,12 @@
+ 
+             }
+ 
+-            var logger171 = getGlobal("diag");
++            var logger172 = getGlobal("diag");
+ 
+-            if (!logger171)
++            if (!logger172)
+               return;
+ 
+-            return logger171[funcName].apply(logger171, __spreadArray2([], __read2(args), false));
++            return logger172[funcName].apply(logger172, __spreadArray2([], __read2(args), false));
+ 
+           }
+ ;
+@@ -43455,7 +43455,7 @@
+ 
+         var self2 = this;
+ 
+-        var setLogger = function(logger171, optionsOrLogLevel) {
++        var setLogger = function(logger172, optionsOrLogLevel) {
+ 
+           var _a19, _b2, _c;
+ 
+@@ -43467,7 +43467,7 @@
+ 
+           }
+ 
+-          if (logger171 === self2) {
++          if (logger172 === self2) {
+ 
+             var err = new Error("Cannot use diag as the logger for itself. Please use a DiagLogger implementation like ConsoleDiagLogger or a custom implementation");
+ 
+@@ -43489,7 +43489,7 @@
+ 
+           var oldLogger = getGlobal("diag");
+ 
+-          var newLogger = createLogLevelDiagLogger((_b2 = optionsOrLogLevel.logLevel) !== null && _b2 !== void 0 ? _b2 : DiagLogLevel.INFO, logger171);
++          var newLogger = createLogLevelDiagLogger((_b2 = optionsOrLogLevel.logLevel) !== null && _b2 !== void 0 ? _b2 : DiagLogLevel.INFO, logger172);
+ 
+           if (oldLogger && !optionsOrLogLevel.suppressOverrideMessage) {
+ 
+@@ -47225,9 +47225,9 @@
+ 
+     const timestamp2 = /* @__PURE__ */ new Date();
+ 
+-    const logger171 = getLoggerBackend(ctx);
++    const logger172 = getLoggerBackend(ctx);
+ 
+-    logger171.log(ctx, {
++    logger172.log(ctx, {
+  ...entry, timestamp: timestamp2, logger: name18 }
+ );
+ 
+@@ -246100,7 +246100,7 @@
+ 
+     var CharSetProber = require_charsetprober();
+ 
+-    var logger171 = require_logger();
++    var logger172 = require_logger();
+ 
+     function CharSetGroupProber() {
+ 
+@@ -246236,7 +246236,7 @@
+ 
+           if (!prober.active) {
+ 
+-            logger171.log(prober.getCharsetName() + " not active\n");
++            logger172.log(prober.getCharsetName() + " not active\n");
+ 
+             continue;
+ 
+@@ -246244,7 +246244,7 @@
+ 
+           var cf = prober.getConfidence();
+ 
+-          logger171.log(prober.getCharsetName() + " confidence = " + cf + "\n");
++          logger172.log(prober.getCharsetName() + " confidence = " + cf + "\n");
+ 
+           if (bestConf < cf) {
+ 
+@@ -246363,7 +246363,7 @@
+ 
+     var constants8 = require_constants4();
+ 
+-    var logger171 = require_logger();
++    var logger172 = require_logger();
+ 
+     function MultiByteCharSetProber() {
+ 
+@@ -246419,7 +246419,7 @@
+ 
+           if (codingState == constants8.error) {
+ 
+-            logger171.log(this.getCharsetName() + " prober hit error at byte " + i + "\n");
++            logger172.log(this.getCharsetName() + " prober hit error at byte " + i + "\n");
+ 
+             this._mState = constants8.notMe;
+ 
+@@ -294293,7 +294293,7 @@
+ 
+     var constants8 = require_constants4();
+ 
+-    var logger171 = require_logger();
++    var logger172 = require_logger();
+ 
+     function SJISProber() {
+ 
+@@ -294341,7 +294341,7 @@
+ 
+           if (codingState == constants8.error) {
+ 
+-            logger171.log(this.getCharsetName() + " prober hit error at byte " + i + "\n");
++            logger172.log(this.getCharsetName() + " prober hit error at byte " + i + "\n");
+ 
+             this._mState = constants8.notMe;
+ 
+@@ -294803,7 +294803,7 @@
+ 
+     var constants8 = require_constants4();
+ 
+-    var logger171 = require_logger();
++    var logger172 = require_logger();
+ 
+     function EUCJPProber() {
+ 
+@@ -294851,7 +294851,7 @@
+ 
+           if (codingState == constants8.error) {
+ 
+-            logger171.log(this.getCharsetName() + " prober hit error at byte " + i + "\n");
++            logger172.log(this.getCharsetName() + " prober hit error at byte " + i + "\n");
+ 
+             this._mState = constants8.notMe;
+ 
+@@ -296234,7 +296234,7 @@
+ 
+     var constants8 = require_constants4();
+ 
+-    var logger171 = require_logger();
++    var logger172 = require_logger();
+ 
+     function SingleByteCharSetProber(model, reversed, nameProber) {
+ 
+@@ -296370,12 +296370,12 @@
+ 
+             if (cf > POSITIVE_SHORTCUT_THRESHOLD) {
+ 
+-              logger171.log(this._mModel.charsetName + " confidence = " + cf + ", we have a winner\n");
++              logger172.log(this._mModel.charsetName + " confidence = " + cf + ", we have a winner\n");
+ 
+             }
+  else if (cf < NEGATIVE_SHORTCUT_THRESHOLD) {
+ 
+-              logger171.log(this._mModel.charsetName + " confidence = " + cf + ", below negative shortcut threshhold " + NEGATIVE_SHORTCUT_THRESHOLD + "\n");
++              logger172.log(this._mModel.charsetName + " confidence = " + cf + ", below negative shortcut threshhold " + NEGATIVE_SHORTCUT_THRESHOLD + "\n");
+ 
+               this._mState = constants8.notMe;
+ 
+@@ -327521,7 +327521,7 @@
+ 
+     var EscCharSetProber = require_escprober();
+ 
+-    var logger171 = require_logger();
++    var logger172 = require_logger();
+ 
+     var supportedEncodings = (function() {
+ 
+@@ -327860,7 +327860,7 @@
+ 
+         if (this._mBOM.length === 0) {
+ 
+-          logger171.log("no data received!\n");
++          logger172.log("no data received!\n");
+ 
+           return;
+ 
+@@ -327870,7 +327870,7 @@
+ 
+         if (this._mInputState == _state.pureAscii && canDetectEncoding("ascii")) {
+ 
+-          logger171.log("pure ascii");
++          logger172.log("pure ascii");
+ 
+           this.result = {
+  "encoding": "ascii", "confidence": 1 }
+@@ -327919,7 +327919,7 @@
+ 
+             }
+ 
+-            logger171.log(prober.getCharsetName() + " confidence " + confidence);
++            logger172.log(prober.getCharsetName() + " confidence " + confidence);
+ 
+           }
+ 
+@@ -327958,9 +327958,9 @@
+ 
+         }
+ 
+-        if (logger171.enabled) {
++        if (logger172.enabled) {
+ 
+-          logger171.log("no probers hit minimum threshhold\n");
++          logger172.log("no probers hit minimum threshhold\n");
+ 
+           for (var i = 0, prober;
+  prober = this._mCharsetProbers[i];
+@@ -327968,7 +327968,7 @@
+ 
+             if (!prober || !canDetectEncoding(prober.getCharsetName())) continue;
+ 
+-            logger171.log(prober.getCharsetName() + " confidence = " + prober.getConfidence() + "\n");
++            logger172.log(prober.getCharsetName() + " confidence = " + prober.getConfidence() + "\n");
+ 
+           }
+ 
+@@ -342212,16 +342212,16 @@
+  }
+ ;
+ 
+-    function getLogger(logger171) {
++    function getLogger(logger172) {
+ 
+-      if (logger171 === false)
++      if (logger172 === false)
+         return noLogs;
+ 
+-      if (logger171 === void 0)
++      if (logger172 === void 0)
+         return console;
+ 
+-      if (logger171.log && logger171.warn && logger171.error)
+-        return logger171;
++      if (logger172.log && logger172.warn && logger172.error)
++        return logger172;
+ 
+       throw new Error("logger must implement log, warn and error methods");
+ 
+@@ -349747,14 +349747,14 @@
+ function logMcpHttpExchangeSuccess(args) {
+ 
+   const {
+- logger: logger171, response }
++ logger: logger172, response }
+  = args;
+ 
+   const logMetadata = buildMcpHttpExchangeSuccessMetadata(args);
+ 
+   if (response.ok) {
+ 
+-    logger171.info?.("MCP HTTP exchange completed", logMetadata);
++    logger172.info?.("MCP HTTP exchange completed", logMetadata);
+ 
+   }
+  else if (isUnauthenticatedAuthChallenge({
+@@ -349766,12 +349766,12 @@
+   }
+ )) {
+ 
+-    logger171.debug?.("MCP HTTP exchange completed", logMetadata);
++    logger172.debug?.("MCP HTTP exchange completed", logMetadata);
+ 
+   }
+  else {
+ 
+-    logger171.warn?.("MCP HTTP exchange completed", logMetadata);
++    logger172.warn?.("MCP HTTP exchange completed", logMetadata);
+ 
+   }
+ 
+@@ -349786,10 +349786,10 @@
+ function logMcpHttpExchangeFailure(args) {
+ 
+   const {
+- logger: logger171 }
++ logger: logger172 }
+  = args;
+ 
+-  logger171.warn?.("MCP HTTP exchange failed", buildMcpHttpExchangeFailureMetadata(args));
++  logger172.warn?.("MCP HTTP exchange failed", buildMcpHttpExchangeFailureMetadata(args));
+ 
+ }
+ 
+@@ -349898,7 +349898,7 @@
+ 
+ }
+ 
+-function safelyLogExchange(action, logger171, phase) {
++function safelyLogExchange(action, logger172, phase) {
+ 
+   try {
+ 
+@@ -349907,7 +349907,7 @@
+   }
+  catch {
+ 
+-    logger171.warn?.("MCP HTTP exchange logging failed", {
++    logger172.warn?.("MCP HTTP exchange logging failed", {
+ 
+       event: "mcp_http_exchange_logging_failure",
+       phase
+@@ -349938,7 +349938,7 @@
+ 
+ }
+ 
+-function redactingExchangeLogger(logger171, redact) {
++function redactingExchangeLogger(logger172, redact) {
+ 
+   const redacted = (metadata2) => {
+ 
+@@ -349951,9 +349951,9 @@
+ 
+   return {
+ 
+-    debug: (message, metadata2) => logger171.debug?.(message, redacted(metadata2)),
+-    info: (message, metadata2) => logger171.info?.(message, redacted(metadata2)),
+-    warn: (message, metadata2) => logger171.warn?.(message, redacted(metadata2))
++    debug: (message, metadata2) => logger172.debug?.(message, redacted(metadata2)),
++    info: (message, metadata2) => logger172.info?.(message, redacted(metadata2)),
++    warn: (message, metadata2) => logger172.warn?.(message, redacted(metadata2))
+   }
+ ;
+ 
+@@ -349965,7 +349965,7 @@
+  fetch: fetch2, logSuccessfulExchanges = true, redactLogText }
+  = options2;
+ 
+-  const logger171 = redactLogText === void 0 ? options2.logger : redactingExchangeLogger(options2.logger, redactLogText);
++  const logger172 = redactLogText === void 0 ? options2.logger : redactingExchangeLogger(options2.logger, redactLogText);
+ 
+   return async (input2, init) => {
+ 
+@@ -349996,7 +349996,7 @@
+ 
+           logMcpHttpExchangeSuccess({
+ 
+-            logger: logger171,
++            logger: logger172,
+             input: input2,
+             init,
+             response,
+@@ -350008,7 +350008,7 @@
+ );
+ 
+         }
+-, logger171, "success");
++, logger172, "success");
+ 
+       }
+ 
+@@ -350036,7 +350036,7 @@
+ 
+         logMcpHttpExchangeFailure({
+ 
+-          logger: logger171,
++          logger: logger172,
+           input: input2,
+           init,
+           error: error63,
+@@ -350050,7 +350050,7 @@
+ );
+ 
+       }
+-, logger171, "failure");
++, logger172, "failure");
+ 
+       throw error63;
+ 
+@@ -355409,7 +355409,7 @@
+ 
+   const connectorName = options2.connectorName ?? policy?.displayName ?? options2.accountKey;
+ 
+-  const logger171 = getMcpCoreLogger(options2.accountKey);
++  const logger172 = getMcpCoreLogger(options2.accountKey);
+ 
+   let signInInFlight;
+ 
+@@ -355432,7 +355432,7 @@
+ 
+   const log5 = (event, fields3) => {
+ 
+-    logger171.info(`MCP OAuth scope step-up: ${
++    logger172.info(`MCP OAuth scope step-up: ${
+ event}
+ `, {
+ 
+@@ -381873,7 +381873,7 @@
+ 
+     function createMessageConnection2(messageReader, messageWriter, _logger4, options2) {
+ 
+-      const logger171 = _logger4 !== void 0 ? _logger4 : exports2.NullLogger;
++      const logger172 = _logger4 !== void 0 ? _logger4 : exports2.NullLogger;
+ 
+       let sequenceNumber = 0;
+ 
+@@ -382099,7 +382099,7 @@
+           }
+  catch (error63) {
+ 
+-            logger171.error(`Processing message queue failed: ${
++            logger172.error(`Processing message queue failed: ${
+ error63.toString()}
+ `);
+ 
+@@ -382117,7 +382117,7 @@
+               }
+ ).catch((error63) => {
+ 
+-                logger171.error(`Processing message queue failed: ${
++                logger172.error(`Processing message queue failed: ${
+ error63.toString()}
+ `);
+ 
+@@ -382193,7 +382193,7 @@
+ 
+                 traceSendingResponse(response, message.method, Date.now());
+ 
+-                messageWriter.write(response).catch(() => logger171.error(`Sending response for canceled message failed.`));
++                messageWriter.write(response).catch(() => logger172.error(`Sending response for canceled message failed.`));
+ 
+                 return;
+ 
+@@ -382432,7 +382432,7 @@
+ 
+           if (responseMessage.error) {
+ 
+-            logger171.error(`Received response message without id: Error is: 
++            logger172.error(`Received response message without id: Error is: 
+ ${
+ JSON.stringify(responseMessage.error, void 0, 4)}
+ `);
+@@ -382440,7 +382440,7 @@
+           }
+  else {
+ 
+-            logger171.error(`Received response message without id. No further error information provided.`);
++            logger172.error(`Received response message without id. No further error information provided.`);
+ 
+           }
+ 
+@@ -382482,7 +382482,7 @@
+ 
+               if (error63.message) {
+ 
+-                logger171.error(`Response handler '${
++                logger172.error(`Response handler '${
+ responsePromise.method}
+ ' failed with message: ${
+ error63.message}
+@@ -382491,7 +382491,7 @@
+               }
+  else {
+ 
+-                logger171.error(`Response handler '${
++                logger172.error(`Response handler '${
+ responsePromise.method}
+ ' failed unexpectedly.`);
+ 
+@@ -382556,7 +382556,7 @@
+ 
+                   if (type2.numberOfParams !== 0 && type2.parameterStructures !== messages_1.ParameterStructures.byName) {
+ 
+-                    logger171.error(`Notification ${
++                    logger172.error(`Notification ${
+ message.method}
+  defines ${
+ type2.numberOfParams}
+@@ -382586,7 +382586,7 @@
+ 
+                     if (type2.parameterStructures === messages_1.ParameterStructures.byName) {
+ 
+-                      logger171.error(`Notification ${
++                      logger172.error(`Notification ${
+ message.method}
+  defines parameters by name but received parameters by position`);
+ 
+@@ -382594,7 +382594,7 @@
+ 
+                     if (type2.numberOfParams !== message.params.length) {
+ 
+-                      logger171.error(`Notification ${
++                      logger172.error(`Notification ${
+ message.method}
+  defines ${
+ type2.numberOfParams}
+@@ -382615,7 +382615,7 @@
+ 
+                 if (type2 !== void 0 && type2.parameterStructures === messages_1.ParameterStructures.byPosition) {
+ 
+-                  logger171.error(`Notification ${
++                  logger172.error(`Notification ${
+ message.method}
+  defines parameters by position but received parameters by name`);
+ 
+@@ -382637,7 +382637,7 @@
+ 
+             if (error63.message) {
+ 
+-              logger171.error(`Notification handler '${
++              logger172.error(`Notification handler '${
+ message.method}
+ ' failed with message: ${
+ error63.message}
+@@ -382646,7 +382646,7 @@
+             }
+  else {
+ 
+-              logger171.error(`Notification handler '${
++              logger172.error(`Notification handler '${
+ message.method}
+ ' failed unexpectedly.`);
+ 
+@@ -382667,13 +382667,13 @@
+ 
+         if (!message) {
+ 
+-          logger171.error("Received empty message.");
++          logger172.error("Received empty message.");
+ 
+           return;
+ 
+         }
+ 
+-        logger171.error(`Received message which is neither a response nor a notification message:
++        logger172.error(`Received message which is neither a response nor a notification message:
+ ${
+ JSON.stringify(message, null, 4)}
+ `);
+@@ -383267,7 +383267,7 @@
+ 
+           return messageWriter.write(notificationMessage).catch((error63) => {
+ 
+-            logger171.error(`Sending notification failed.`);
++            logger172.error(`Sending notification failed.`);
+ 
+             throw error63;
+ 
+@@ -383386,7 +383386,7 @@
+ 
+             if (p2 === void 0) {
+ 
+-              logger171.log(`Received no promise from cancellation strategy when cancelling id ${
++              logger172.log(`Received no promise from cancellation strategy when cancelling id ${
+ id2}
+ `);
+ 
+@@ -383395,7 +383395,7 @@
+ 
+               p2.catch(() => {
+ 
+-                logger171.log(`Sending cancellation messages for id ${
++                logger172.log(`Sending cancellation messages for id ${
+ id2}
+  failed.`);
+ 
+@@ -383576,7 +383576,7 @@
+ 
+               responsePromise.reject(new messages_1.ResponseError(messages_1.ErrorCodes.MessageWriteError, error63.message ? error63.message : "Unknown reason"));
+ 
+-              logger171.error(`Sending request failed.`);
++              logger172.error(`Sending request failed.`);
+ 
+               throw error63;
+ 
+@@ -385383,11 +385383,11 @@
+ 
+     }
+ 
+-    function createMessageConnection2(input2, output2, logger171, options2) {
++    function createMessageConnection2(input2, output2, logger172, options2) {
+ 
+-      if (!logger171) {
++      if (!logger172) {
+ 
+-        logger171 = api_1.NullLogger;
++        logger172 = api_1.NullLogger;
+ 
+       }
+ 
+@@ -385403,7 +385403,7 @@
+ 
+       }
+ 
+-      return (0, api_1.createMessageConnection)(reader, writer, logger171, options2);
++      return (0, api_1.createMessageConnection)(reader, writer, logger172, options2);
+ 
+     }
+ 
+@@ -386485,7 +386485,7 @@
+ function sandClientBaseVersionOf(clientAppVersion) {
+ 
+   return stampedVersionBaseOf(clientAppVersion) ?? stampedVersionBaseOf(
+-    true ? "1.1.0-pre.97" : void 0
++    true ? "1.1.0-pre.98" : void 0
+   ) ?? SAND_CLIENT_FALLBACK_BASE_VERSION;
+ 
+ }
+@@ -603993,7 +603993,7 @@
+ 
+   static $() {
+ 
+-    return ["GetTeamAdminSettingsResponse|1 allowed_models 9*|2 blocked_models 9*|3 auto_run_controls #0|4 cursor_ignore_controls #1|5 dot_cursor_protection 8|6 allowed_mcp_configuration #2?|7 background_agent_settings #3?|8 cli_settings #4?|9 mcp_controls #5?|10 prompt_deeplink_controls #6?|11 command_deeplink_controls #7?|12 deeplink_controls #8?|13 github_integration_settings #9?|14 slack_integration_settings #10?|15 linear_integration_settings #11?|16 workspace_trust_controls #12?|17 gitlab_integration_settings #13?|18 browser_features 8?|23 browser_origin_allowlist 9*|19 byok_disabled 8?|20 dashboard_analytics_requires_admin 8?|21 shared_conversation_settings #14?|22 allowed_extensions 9?|24 disable_conversation_insights 8?|25 cursor_blame_settings #15?|26 network_denylist 9*|27 network_allowlist 9*|28 extension_signing_settings #16?|29 enforce_invite_domain_on_accept 8?|30 first_party_plugin_configuration #17?|31 attribution_controls #18?|32 allow_third_party_plugin_imports 8?|44 allow_user_local_plugin_imports 8?|33 glass_settings #19?|34 new_chat_model_reset_settings #20?|35 model_allowlist #21?|36 jira_integration_settings #22?|37 pull_request_preferences #23?|38 browser_settings #24?|39 cloud_agent_egress_allowlist 9*|40 mirror_sandbox_allowlist_for_egress 8?|49 auto_review #25|60 local_tool_controls #26?|64 sand_network_controls #27?|61 sand_action_audit_settings #28?|41 remote_permissions_file_path 9?|46 remote_permissions_file_paths 9*|45 local_permissions_file_path 9*|47 permissions_file_overrides_auto_run 8?|42 shared_canvas_settings #29?|43 invite_link_max_ttl_seconds 5?|48 extension_install_cooldown_settings #30?|50 public_profile_settings #31?|51 bitbucket_integration_settings #32?|52 marketplace_leaderboard_disabled 8?|53 new_chat_nudge_all_to_smart_auto 8?|54 models_auto_only 8?|55 new_chat_nudge_all_to_smart_auto_optimize_for 9?|56 restrict_invites_to_admins 8?|57 viewer_can_invite_members 8?|58 enforce_hooks_readiness 8?|59 llm_gateway #33?|62 sand_onboarding #34?|63 origin_disabled 8?|65 user_agent_store_skills_sync_settings #35?|66 auto_review_run_mode_reset #36|67 enterprise_grok_bot_trial_available 8?|68 sand_group_access_mode #37|69 sand_auto_review_controls #38?|71 remote_control_v2_policy #39|72 sand_local_egress_controls #40?|74 projects_settings #41?|75 allow_skills_cli_installs 8?|76 grok_bot_agent_email_controls #42?|77 sand_box_sudo_controls #43?|78 sand_box_restart #44?|79 origin_allow_public_repos 8?|80 cloud_agent_group_access_mode #45?|81 allow_unlisted_plugins_and_mcp_servers 8?|82 team_list_enforced 8?|83 grok_bot_secret_forwarding_controls #46?|84 grok_bot_meetings_controls #47?|85 team_list_available 8?|86 grok_bot_pages_sharing_controls #48?|87 grok_bot_bot_messaging_controls #49?|88 member_slack_managed_workspaces #50*|89 member_slack_managed_workspaces_unreadable 8|90 apps_settings #51?|94 grok_bot_team_bot_sharing_controls #52?|91 grok_bot_sharing_admin_controls_available 8?|92 viewer_may_share_team_bots 8?|95 computer_use 8?|96 grok_bot_delegated_auth_controls #53?|97 grok_bot_delegated_auth_controls_available 8?|98 personal_api_key_creation_disabled 8?|99 cloud_agent_mcp_allowlist_applied 8?|100 grok_bot_texting_controls #54?|101 grok_bot_wall_snapshot_controls #55?|102 sand_box_sudo_not_applied_box_count 13?|103 can_control_model_access 8?|104 voice_chat_disabled 8?|105 mcp_allowlist_enabled 8?|106 mcp_servers_surfaces #56?|107 user_mcp_extensions_surfaces #56?|109 grok_bot_proactivity_controls #57?|110 off_mcp_server_rules_allowed 8?", AutoRunControls, CursorIgnoreControls, AllowedMCPConfiguration, BackgroundAgentSettings, CliSettings, MCPControls, PromptDeeplinkControls, CommandDeeplinkControls, DeeplinkControls, GithubIntegrationSettings, SlackIntegrationSettings, LinearIntegrationSettings, WorkspaceTrustControls, GitlabIntegrationSettings, SharedConversationSettings, CursorBlameSettings, ExtensionSigningSettings, FirstPartyPluginConfiguration, AttributionControls, GlassSettings, TeamAdminNewChatModelResetSettings, ModelAllowlist, JiraIntegrationSettings, PullRequestPreferences, BrowserSettings, AutoReviewInstructions, LocalToolControls, SandNetworkControls, SandActionAuditSettings, SharedCanvasSettings, ExtensionInstallCooldownSettings, PublicProfileSettings, BitbucketIntegrationSettings, LlmGatewaySettings, SandOnboardingState, UserAgentStoreSkillsSyncSettings, AutoReviewRunModeReset, SandGroupAccessMode, SandAutoReviewControls, RemoteControlV2Policy, SandLocalEgressControls, ProjectsSettings, GrokBotAgentEmailControls, SandBoxSudoControls, SandBoxRestart, CloudAgentGroupAccessMode, GrokBotSecretForwardingControls, GrokBotMeetingsControls, GrokBotPagesSharingControls, GrokBotBotMessagingControls, SlackManagedWorkspaces, AppsSettings, GrokBotTeamBotSharingControls, GrokBotDelegatedAuthControls, GrokBotTextingControls, GrokBotWallSnapshotControls, McpServerAppliesTo, GrokBotProactivityControls];
++    return ["GetTeamAdminSettingsResponse|1 allowed_models 9*|2 blocked_models 9*|3 auto_run_controls #0|4 cursor_ignore_controls #1|5 dot_cursor_protection 8|6 allowed_mcp_configuration #2?|7 background_agent_settings #3?|8 cli_settings #4?|9 mcp_controls #5?|10 prompt_deeplink_controls #6?|11 command_deeplink_controls #7?|12 deeplink_controls #8?|13 github_integration_settings #9?|14 slack_integration_settings #10?|15 linear_integration_settings #11?|16 workspace_trust_controls #12?|17 gitlab_integration_settings #13?|18 browser_features 8?|23 browser_origin_allowlist 9*|19 byok_disabled 8?|20 dashboard_analytics_requires_admin 8?|21 shared_conversation_settings #14?|22 allowed_extensions 9?|24 disable_conversation_insights 8?|25 cursor_blame_settings #15?|26 network_denylist 9*|27 network_allowlist 9*|28 extension_signing_settings #16?|29 enforce_invite_domain_on_accept 8?|30 first_party_plugin_configuration #17?|31 attribution_controls #18?|32 allow_third_party_plugin_imports 8?|44 allow_user_local_plugin_imports 8?|33 glass_settings #19?|34 new_chat_model_reset_settings #20?|35 model_allowlist #21?|36 jira_integration_settings #22?|37 pull_request_preferences #23?|38 browser_settings #24?|39 cloud_agent_egress_allowlist 9*|40 mirror_sandbox_allowlist_for_egress 8?|49 auto_review #25|60 local_tool_controls #26?|64 sand_network_controls #27?|61 sand_action_audit_settings #28?|41 remote_permissions_file_path 9?|46 remote_permissions_file_paths 9*|45 local_permissions_file_path 9*|47 permissions_file_overrides_auto_run 8?|42 shared_canvas_settings #29?|43 invite_link_max_ttl_seconds 5?|48 extension_install_cooldown_settings #30?|50 public_profile_settings #31?|51 bitbucket_integration_settings #32?|52 marketplace_leaderboard_disabled 8?|53 new_chat_nudge_all_to_smart_auto 8?|54 models_auto_only 8?|55 new_chat_nudge_all_to_smart_auto_optimize_for 9?|56 restrict_invites_to_admins 8?|57 viewer_can_invite_members 8?|58 enforce_hooks_readiness 8?|59 llm_gateway #33?|62 sand_onboarding #34?|63 origin_disabled 8?|65 user_agent_store_skills_sync_settings #35?|66 auto_review_run_mode_reset #36|67 enterprise_grok_bot_trial_available 8?|68 sand_group_access_mode #37|69 sand_auto_review_controls #38?|71 remote_control_v2_policy #39|72 sand_local_egress_controls #40?|74 projects_settings #41?|75 allow_skills_cli_installs 8?|76 grok_bot_agent_email_controls #42?|77 sand_box_sudo_controls #43?|78 sand_box_restart #44?|79 origin_allow_public_repos 8?|80 cloud_agent_group_access_mode #45?|81 allow_unlisted_plugins_and_mcp_servers 8?|82 team_list_enforced 8?|83 grok_bot_secret_forwarding_controls #46?|84 grok_bot_meetings_controls #47?|85 team_list_available 8?|86 grok_bot_pages_sharing_controls #48?|87 grok_bot_bot_messaging_controls #49?|88 member_slack_managed_workspaces #50*|89 member_slack_managed_workspaces_unreadable 8|90 apps_settings #51?|94 grok_bot_team_bot_sharing_controls #52?|91 grok_bot_sharing_admin_controls_available 8?|92 viewer_may_share_team_bots 8?|95 computer_use 8?|96 grok_bot_delegated_auth_controls #53?|97 grok_bot_delegated_auth_controls_available 8?|98 personal_api_key_creation_disabled 8?|99 cloud_agent_mcp_allowlist_applied 8?|100 grok_bot_texting_controls #54?|101 grok_bot_wall_snapshot_controls #55?|102 sand_box_sudo_not_applied_box_count 13?|103 can_control_model_access 8?|104 voice_chat_disabled 8?|105 mcp_allowlist_enabled 8?|106 mcp_servers_surfaces #56?|107 user_mcp_extensions_surfaces #56?|109 grok_bot_proactivity_controls #57?|110 off_mcp_server_rules_allowed 8?|111 legacy_model_allowlist #21?", AutoRunControls, CursorIgnoreControls, AllowedMCPConfiguration, BackgroundAgentSettings, CliSettings, MCPControls, PromptDeeplinkControls, CommandDeeplinkControls, DeeplinkControls, GithubIntegrationSettings, SlackIntegrationSettings, LinearIntegrationSettings, WorkspaceTrustControls, GitlabIntegrationSettings, SharedConversationSettings, CursorBlameSettings, ExtensionSigningSettings, FirstPartyPluginConfiguration, AttributionControls, GlassSettings, TeamAdminNewChatModelResetSettings, ModelAllowlist, JiraIntegrationSettings, PullRequestPreferences, BrowserSettings, AutoReviewInstructions, LocalToolControls, SandNetworkControls, SandActionAuditSettings, SharedCanvasSettings, ExtensionInstallCooldownSettings, PublicProfileSettings, BitbucketIntegrationSettings, LlmGatewaySettings, SandOnboardingState, UserAgentStoreSkillsSyncSettings, AutoReviewRunModeReset, SandGroupAccessMode, SandAutoReviewControls, RemoteControlV2Policy, SandLocalEgressControls, ProjectsSettings, GrokBotAgentEmailControls, SandBoxSudoControls, SandBoxRestart, CloudAgentGroupAccessMode, GrokBotSecretForwardingControls, GrokBotMeetingsControls, GrokBotPagesSharingControls, GrokBotBotMessagingControls, SlackManagedWorkspaces, AppsSettings, GrokBotTeamBotSharingControls, GrokBotDelegatedAuthControls, GrokBotTextingControls, GrokBotWallSnapshotControls, McpServerAppliesTo, GrokBotProactivityControls];
+ 
+   }
+ 
+@@ -888428,6 +888428,18 @@
+ }
+ ;
+ 
++var JSON_ERROR_POSITION = /(?:in|after) JSON at position (\d+)/;
++
++var JSON_ERROR_KINDS = [
++  ["bad_control_character", /^Bad control character/],
++  ["bad_escape", /^Bad (escaped character|Unicode escape)/],
++  ["expected_separator", /^Expected ',' or '[\]}
++]'/],
++  ["expected_property_name", /^Expected (double-quoted )?property name/],
++  ["trailing_content", /^Unexpected non-whitespace character after JSON/],
++  ["unexpected_token", /^Unexpected token/]
++];
++
+ var diagnose = (text6) => {
+ 
+   if (namesAKeyTwice(text6)) {
+@@ -888461,7 +888473,7 @@
+ 
+     const message = error63 instanceof Error ? error63.message : "";
+ 
+-    const errorPosition = /in JSON at position (\d+)/.exec(message)?.[1];
++    const errorPosition = JSON_ERROR_POSITION.exec(message)?.[1];
+ 
+     if (/Unexpected end of (JSON input|data)/.test(message) || errorPosition !== void 0 && Number(errorPosition) >= text6.length) {
+ 
+@@ -888531,6 +888543,38 @@
+ }
+ ;
+ 
++var corruptionShape = (text6) => {
++
++  let message = "";
++
++  try {
++
++    JSON.parse(text6);
++
++  }
++ catch (error63) {
++
++    message = error63 instanceof Error ? error63.message : "";
++
++  }
++
++  const errorAt = JSON_ERROR_POSITION.exec(message)?.[1];
++
++  return {
++
++    chars: text6.length,
++    shim_json_error: JSON_ERROR_KINDS.find(([, pattern]) => pattern.test(message))?.[0] ?? "other",
++    ...errorAt === void 0 ? {
++}
++ : {
++ error_at: Number(errorAt) }
++
++  }
++;
++
++}
++;
++
+ var decodeLeadingJsonArray = (blob) => {
+ 
+   const start = blob.indexOf("[");
+@@ -888688,9 +888732,23 @@
+ 
+   const reason = diagnose(trimmed);
+ 
+-  return reason === "truncated" ? {
++  if (reason === "truncated") {
++
++    return {
+  ok: false, reason, log: truncationShape(trimmed) }
+- : {
++;
++
++  }
++
++  if (reason === "corrupt_json") {
++
++    return {
++ ok: false, reason, log: corruptionShape(trimmed) }
++;
++
++  }
++
++  return {
+  ok: false, reason }
+ ;
+ 
+@@ -982640,9 +982698,9 @@
+ 
+   }
+ 
+-  setInputEventLogger(logger171) {
++  setInputEventLogger(logger172) {
+ 
+-    this.inputEventLogger = logger171;
++    this.inputEventLogger = logger172;
+ 
+   }
+ 
+@@ -983626,9 +983684,9 @@
+    * Set the InputEventLogger to use for recording.
+    * Pass undefined to disable event logging.
+    */
+-  setInputEventLogger(logger171) {
++  setInputEventLogger(logger172) {
+ 
+-    this.inputEventLogger = logger171;
++    this.inputEventLogger = logger172;
+ 
+   }
+ 
+@@ -984621,13 +984679,13 @@
+    * Set the InputEventLogger on the underlying executors.
+    * Used for recording polished video preprocessing data.
+    */
+-  setInputEventLogger(logger171) {
++  setInputEventLogger(logger172) {
+ 
+-    this.inputEventLogger = logger171;
++    this.inputEventLogger = logger172;
+ 
+-    this.executor.setInputEventLogger(logger171);
++    this.executor.setInputEventLogger(logger172);
+ 
+-    this.driver?.setInputEventLogger(logger171);
++    this.driver?.setInputEventLogger(logger172);
+ 
+   }
+ 
+@@ -1007143,24 +1007201,24 @@
+ function structuredLoggerToMcpOAuthLifecycleLogger(args) {
+ 
+   const {
+- logger: logger171, ctx }
++ logger: logger172, ctx }
+  = args;
+ 
+   return {
+ 
+-    debug: (message, metadata2) => logger171.debug(ctx, message, metadata2),
+-    info: (message, metadata2) => logger171.info(ctx, message, metadata2),
+-    warn: (message, metadata2) => logger171.warn(ctx, message, metadata2),
+-    error: (message, error63, metadata2) => logger171.error(ctx, message, error63, metadata2)
++    debug: (message, metadata2) => logger172.debug(ctx, message, metadata2),
++    info: (message, metadata2) => logger172.info(ctx, message, metadata2),
++    warn: (message, metadata2) => logger172.warn(ctx, message, metadata2),
++    error: (message, error63, metadata2) => logger172.error(ctx, message, error63, metadata2)
+   }
+ ;
+ 
+ }
+ 
+-function createContextStructuredLifecycleLogger(ctx, logger171) {
++function createContextStructuredLifecycleLogger(ctx, logger172) {
+ 
+   return structuredLoggerToMcpOAuthLifecycleLogger({
+- ctx, logger: logger171 }
++ ctx, logger: logger172 }
+ );
+ 
+ }
+@@ -1029530,6 +1029588,10 @@
+ 
+ var SAND_ANTIBOT_MARKERS = ["none", "challenge_header", "vendor_429"];
+ 
++var SAND_DOC_STATUS_CLASSES = ["2xx", "403", "429", "4xx_other", "5xx"];
++
++var SAND_CONTENT_STATES = ["ok", "blank", "empty_results", "spinner_stalled"];
++
+ 
+ // ../packages/sand-playwright-runtime/dist/wall-detectors/matchers.js
+ function matchesHost(criteria, hostname3) {
+@@ -1031112,6 +1031174,71 @@
+ }
+ 
+ 
++// ../packages/sand-playwright-runtime/dist/wall-detectors/page-health.js
++init_zod();
++
++var PAGE_HEALTH_CONTENT_CHECKS = [...SAND_CONTENT_STATES, "pending", "unmeasured"];
++
++var PAGE_HEALTH_ARMED_PATH = "/tmp/sand-page-health-armed";
++
++var PAGE_HEALTH_ARMED_TTL_MS = 10 * 6e4;
++
++var PAGE_HEALTH_MAX_PAGES = 16;
++
++var PAGE_HEALTH_MAX_BYTES = 4096;
++
++var PAGE_HEALTH_CHECK_DELAY_MS = 5e3;
++
++var PAGE_HEALTH_CHECK_BUDGET_MS = 750;
++
++function pageHealthPath(cdpPort) {
++
++  return `/tmp/sand-page-health-${
++String(cdpPort)}
++.json`;
++
++}
++
++var PAGE_HEALTH_FILE = external_exports.object({
++
++  writerPid: external_exports.number().int().nonnegative(),
++  pages: external_exports.array(external_exports.object({
++
++    pageId: external_exports.string().regex(/^[A-Za-z0-9-]{
++1,64}
++$/),
++    urlHash: external_exports.string().regex(/^[0-9a-f]{
++16}
++$/),
++    atMs: external_exports.number().int().nonnegative(),
++    docStatusClass: external_exports.enum(SAND_DOC_STATUS_CLASSES).optional(),
++    content: external_exports.enum(PAGE_HEALTH_CONTENT_CHECKS)
++  }
++)).max(PAGE_HEALTH_MAX_PAGES)
++}
++);
++
++function parsePageHealthFile(value) {
++
++  const parsed = PAGE_HEALTH_FILE.safeParse(value);
++
++  if (!parsed.success)
++    return void 0;
++
++  return {
++
++    writerPid: parsed.data.writerPid,
++    pages: parsed.data.pages.map(({
++ docStatusClass, ...page }
++) => docStatusClass === void 0 ? page : {
++ ...page, docStatusClass }
++)
++  }
++;
++
++}
++
++
+ // ../packages/sand-playwright-runtime/dist/wall-detectors/detect.js
+ var MAX_WALL_CHALLENGES = 8;
+ 
+@@ -1031397,6 +1031524,7 @@
+   network: "grok_bot_wall_evidence_network",
+   detail: "grok_bot_wall_detail_telemetry",
+   antibotVendors: "grok_bot_antibot_vendor_telemetry",
++  pageHealth: "grok_bot_page_health_telemetry",
+   boxRecorders: "sand_box_wall_evidence_recorders"
+ }
+ ;
+@@ -1032004,6 +1032132,7 @@
+   network: false,
+   detail: false,
+   antibotVendors: false,
++  pageHealth: false,
+   controlSampleRate: 0,
+   triggerWindowMs: WALL_EVIDENCE_DEFAULT_TRIGGER_WINDOW_MS
+ }
+@@ -1060683,6 +1060812,8 @@
+ // ../packages/grok-bot-harness/src/runner/action-audit/probe-fields.ts
+ var ABSENT_FILE_FIELD = "-";
+ 
++var READ_TIMEOUT_SECONDS = 1;
++
+ var BASE64 = /^[A-Za-z0-9+/]*={
+ 0,2}
+ $/;
+@@ -1060717,41 +1060848,43 @@
+ 
+ }
+ 
++function seatFileReadCommand(args) {
+ 
+-// ../packages/grok-bot-harness/src/runner/action-audit/antibot-probe.ts
+-var ANTIBOT_PROBE_LINE = "SAND_ANTIBOT_PAGES";
+-
+-var READ_TIMEOUT_SECONDS = 1;
+-
+-function antibotProbeCommand(port, policy) {
++  const file2 = shellQuote(args.path);
+ 
+-  if (!policy.antibotVendors) return void 0;
++  const format2 = args.lead === void 0 ? "%s %s" : "%s %s %s";
+ 
+-  const file2 = shellQuote(antibotPagesPath(port));
++  const lead = args.lead === void 0 ? "" : ` ${
++args.lead}
++`;
+ 
+   return [
+-    `touch -- ${
+-shellQuote(ANTIBOT_PAGES_ARMED_PATH)}
+- 2>/dev/null;
+-`,
+     `if [ -f ${
+ file2}
+  ] && [ ! -L ${
+ file2}
+  ];
+  then`,
+-    `printf '\\n%s %s\\n' ${
+-ANTIBOT_PROBE_LINE}
++    `printf '\\n${
++format2}
++\\n' ${
++args.line}
++${
++lead}
+  "$(timeout ${
+ READ_TIMEOUT_SECONDS}
+  head -c ${
+-ANTIBOT_PAGES_MAX_BYTES + 1}
++args.maxBytes + 1}
+  -- ${
+ file2}
+  2>/dev/null | base64 -w0)";
+ `,
+-    `else printf '\\n%s %s\\n' ${
+-ANTIBOT_PROBE_LINE}
++    `else printf '\\n${
++format2}
++\\n' ${
++args.line}
++${
++lead}
+  ${
+ ABSENT_FILE_FIELD}
+ ;
+@@ -1060760,6 +1060893,31 @@
+ 
+ }
+ 
++
++// ../packages/grok-bot-harness/src/runner/action-audit/antibot-probe.ts
++var ANTIBOT_PROBE_LINE = "SAND_ANTIBOT_PAGES";
++
++function antibotProbeCommand(port, policy) {
++
++  if (!policy.antibotVendors) return void 0;
++
++  const read2 = seatFileReadCommand({
++
++    line: ANTIBOT_PROBE_LINE,
++    path: antibotPagesPath(port),
++    maxBytes: ANTIBOT_PAGES_MAX_BYTES
++  }
++);
++
++  return `touch -- ${
++shellQuote(ANTIBOT_PAGES_ARMED_PATH)}
++ 2>/dev/null;
++ ${
++read2}
++`;
++
++}
++
+ function parseAntibotProbe(stdout, policy) {
+ 
+   if (!policy.antibotVendors) return {
+@@ -1060813,6 +1060971,273 @@
+ }
+ 
+ 
++// ../packages/grok-bot-harness/src/runner/action-audit/page-health-probe.ts
++var PAGE_HEALTH_PROBE_LINE = "SAND_PAGE_HEALTH";
++
++var BOX_NOW = /^[0-9]{
++1,15}
++$/;
++
++var WRITE_SLACK_MS = 400;
++
++var PAGE_HEALTH_FOLLOW_UP_MAX_WAIT_MS = PAGE_HEALTH_CHECK_DELAY_MS + PAGE_HEALTH_CHECK_BUDGET_MS + WRITE_SLACK_MS;
++
++var PAGE_HEALTH_FOLLOW_UP_READ_MS = 2e3;
++
++function pageHealthReadCommand(port) {
++
++  return seatFileReadCommand({
++
++    line: PAGE_HEALTH_PROBE_LINE,
++    path: pageHealthPath(port),
++    maxBytes: PAGE_HEALTH_MAX_BYTES,
++    lead: '"$(date +%s%3N)"'
++  }
++);
++
++}
++
++function pageHealthProbeCommand(port, policy) {
++
++  if (!policy.pageHealth) return void 0;
++
++  return `touch -- ${
++shellQuote(PAGE_HEALTH_ARMED_PATH)}
++ 2>/dev/null;
++ ${
++pageHealthReadCommand(port)}
++`;
++
++}
++
++function parsePageHealthProbe(stdout, policy) {
++
++  if (!policy.pageHealth) return {
++ kind: "off" }
++;
++
++  const [boxNow, field2, ...extra] = lastProbeLine(stdout, PAGE_HEALTH_PROBE_LINE)?.trim().split(" ") ?? [];
++
++  if (boxNow === void 0 || field2 === void 0 || extra.length > 0 || !BOX_NOW.test(boxNow)) {
++
++    return {
++ kind: "unreadable" }
++;
++
++  }
++
++  if (field2 === ABSENT_FILE_FIELD) return {
++ kind: "no_file" }
++;
++
++  const file2 = parsePageHealthFile(decodeJson(field2, PAGE_HEALTH_MAX_BYTES));
++
++  if (file2 === void 0) return {
++ kind: "unreadable" }
++;
++
++  return {
++
++    kind: "read",
++    boxNowMs: Number(boxNow),
++    pages: new Map(file2.pages.map((page) => [page.pageId, page]))
++  }
++;
++
++}
++
++var CONTENT_STATES = new Set(SAND_CONTENT_STATES);
++
++function isContentState(content) {
++
++  return CONTENT_STATES.has(content);
++
++}
++
++function healthOf(record6) {
++
++  return {
++
++    ...record6.docStatusClass === void 0 ? {
++}
++ : {
++ docStatusClass: record6.docStatusClass }
++,
++    ...isContentState(record6.content) ? {
++ contentState: record6.content }
++ : {
++}
++
++  }
++;
++
++}
++
++function pageHealthForNavigation(read2, page) {
++
++  if (read2?.kind !== "read") return void 0;
++
++  const record6 = read2.pages.get(page.pageId);
++
++  if (record6 === void 0 || record6.urlHash !== mainFrameUrlHash(page.url)) return void 0;
++
++  const health = healthOf(record6);
++
++  const load2 = {
++ health, urlHash: record6.urlHash, atMs: record6.atMs }
++;
++
++  if (record6.content !== "pending") return load2;
++
++  const dueMs = record6.atMs + PAGE_HEALTH_CHECK_DELAY_MS + PAGE_HEALTH_CHECK_BUDGET_MS;
++
++  const pendingMs = Math.min(
++    Math.max(dueMs - read2.boxNowMs + WRITE_SLACK_MS, 0),
++    PAGE_HEALTH_FOLLOW_UP_MAX_WAIT_MS
++  );
++
++  return {
++ ...load2, pendingMs }
++;
++
++}
++
++function createPageHealthFollowUps(deps = {
++}
++) {
++
++  const clock2 = deps.clock ?? realClock;
++
++  const readDeadline = createDeadlinePolicy({
++
++    name: "page-health-follow-up-read",
++    timeoutMs: PAGE_HEALTH_FOLLOW_UP_READ_MS,
++    clock: clock2
++  }
++);
++
++  const pending = /* @__PURE__ */ new Set();
++
++  let reads = 0;
++
++  const finish = (entry, health) => {
++
++    if (!pending.delete(entry)) return;
++
++    entry.timer?.dispose();
++
++    entry.resolve(health);
++
++  }
++;
++
++  const startRead = (seat) => {
++
++    const startedRead = ++reads;
++
++    return (read2) => {
++
++      if (read2.kind !== "read") return;
++
++      for (const entry of [...pending]) {
++
++        if (entry.seat !== seat || startedRead <= entry.createdAfterRead) continue;
++
++        const record6 = read2.pages.get(entry.pageId);
++
++        if (record6 === void 0 || record6.urlHash !== entry.urlHash || record6.atMs !== entry.atMs) {
++
++          finish(entry, entry.health);
++
++        }
++ else if (record6.content !== "pending") {
++
++          finish(entry, healthOf(record6));
++
++        }
++
++      }
++
++    }
++;
++
++  }
++;
++
++  const readNow = (entry, read2) => {
++
++    entry.timer = void 0;
++
++    const offer = startRead(entry.seat);
++
++    void readDeadline.run(() => read2()).then(
++      (landed) => {
++
++        if (landed !== void 0) offer(landed);
++
++      }
++,
++      (error63) => {
++
++        process.stderr.write(
++          `sand.turn.page_health_follow_up_failed error_class=${
++errorLogTag(error63)}
++
++`
++        );
++
++      }
++
++    ).finally(() => finish(entry, entry.health));
++
++  }
++;
++
++  return {
++
++    follow: (page, join48, read2) => {
++
++      const waitMs = join48.pendingMs;
++
++      if (waitMs === void 0) return void 0;
++
++      return new Promise((resolve19) => {
++
++        const entry = {
++
++          seat: page.seat,
++          pageId: page.pageId,
++          urlHash: join48.urlHash,
++          atMs: join48.atMs,
++          health: join48.health,
++          resolve: resolve19,
++          createdAfterRead: reads,
++          timer: void 0
++        }
++;
++
++        entry.timer = clock2.schedule(waitMs, () => readNow(entry, read2));
++
++        pending.add(entry);
++
++      }
++);
++
++    }
++,
++    startRead,
++    settle: () => {
++
++      for (const entry of [...pending]) finish(entry, entry.health);
++
++    }
++
++  }
++;
++
++}
++
++
+ // ../packages/grok-bot-harness/src/runner/action-audit/navigation-tab-closed.ts
+ init_dist();
+ 
+@@ -1074538,6 +1074963,8 @@
+ 
+   const antibot = antibotProbeCommand(port, wallEvidencePolicy);
+ 
++  const pageHealth = pageHealthProbeCommand(port, wallEvidencePolicy);
++
+   const cmdline = `"/proc/$(cat /tmp/.sand-playwright-no-runtime-enable-${
+ port}
+  2>/dev/null)/cmdline"`;
+@@ -1074602,6 +1075029,11 @@
+ antibot}
+ ;
+ `}
++${
++pageHealth === void 0 ? "" : ` ${
++pageHealth}
++;
++`}
+  }
+ `;
+ 
+@@ -1075372,6 +1075804,8 @@
+ 
+   let reportGeneration = 0;
+ 
++  const pageHealthFollowUps = createPageHealthFollowUps();
++
+   const settleOpenTabs = (ctx, displayNumber, openPageIds) => {
+ 
+     const {
+@@ -1075410,6 +1075844,28 @@
+   }
+ ;
+ 
++  const readPageHealth = async (ctx, remoteAccessor, displayNumber) => {
++
++    const result = await remoteAccessor.get(shellExecutorResource).execute(
++      ctx,
++      deps.buildShellArgs({
++
++        command: pageHealthReadCommand(seatCdpPort(displayNumber)),
++        name: "curl",
++        workingDirectory: "/workspace",
++        toolCallId: "sand-navigation-probe",
++        timeoutMs: PAGE_HEALTH_FOLLOW_UP_READ_MS
++      }
++)
++    );
++
++    if (result.result.case !== "success" || result.result.value.exitCode !== 0) return void 0;
++
++    return parsePageHealthProbe(result.result.value.stdout, wallEvidencePolicy);
++
++  }
++;
++
+   const runProbe = async (ctx, remoteAccessor, displayNumber, mode, generation, onlyPageId, endpoint) => {
+ 
+     if (!Number.isInteger(displayNumber) || displayNumber < 0) return;
+@@ -1075418,6 +1075874,8 @@
+ 
+     const shell = remoteAccessor.get(shellExecutorResource);
+ 
++    const offerPageHealth = pageHealthFollowUps.startRead(displayNumber);
++
+     const probeStartedAtMs = now();
+ 
+     const result = await shell.execute(
+@@ -1075476,6 +1075934,10 @@
+ 
+     const antibot = endpoint === void 0 ? parseAntibotProbe(stdout, wallEvidencePolicy) : void 0;
+ 
++    const pageHealth = endpoint === void 0 ? parsePageHealthProbe(stdout, wallEvidencePolicy) : void 0;
++
++    if (pageHealth !== void 0) offerPageHealth(pageHealth);
++
+     const warmupTargetIds = warmupTargetIdsOf(stdout);
+ 
+     const warmupBusy = stdout.split("\n").includes(WARMUP_BUSY_PROBE_LINE);
+@@ -1075619,6 +1076081,16 @@
+ 
+       const pageAntibot = antibotForNavigation(antibot, page);
+ 
++      const pageHealthJoin = pageHealthForNavigation(pageHealth, page);
++
++      const pageHealthLanded = pageHealthJoin === void 0 ? void 0 : pageHealthFollowUps.follow(
++        {
++ seat: displayNumber, pageId: page.pageId }
++,
++        pageHealthJoin,
++        () => readPageHealth(ctx.withDetached(), remoteAccessor, displayNumber)
++      );
++
+       deps.auditor.record({
+ 
+         agentId: deps.agentId,
+@@ -1075676,6 +1076148,16 @@
+ }
+  : {
+  antibot: pageAntibot }
++,
++          ...pageHealthJoin === void 0 ? {
++}
++ : {
++ pageHealth: pageHealthJoin.health }
++,
++          ...pageHealthLanded === void 0 ? {
++}
++ : {
++ pageHealthLanded }
+ 
+         }
+ 
+@@ -1076013,6 +1076495,8 @@
+ 
+     reportGeneration++;
+ 
++    pageHealthFollowUps.settle();
++
+   }
+ ;
+ 
+@@ -1106567,7 +1107051,7 @@
+ 
+ 
+ // ../packages/grok-bot-harness/src/frozen-prompts/frozen-prompt.ts
+-var import_yaml3 = __toESM(require_dist2(), 1);
++var import_yaml3 = __toESM(require_dist2());
+ 
+ init_v4();
+ 
+@@ -1130820,6 +1131304,58 @@
+ 
+ `;
+ 
++var GLOBALS_SUMMARY = [
++  "const cells: readonly string[];
++",
++  "var console: Console;
++ // log, info, debug, dir, warn, error, assert, table, time, timeLog, timeEnd",
++  "var performance: {
++ now(): number;
++ readonly timeOrigin: number }
++;
++",
++  "var crypto: {
++ getRandomValues<T extends Uint8Array>(array: T): T;
++ randomUUID(): string }
++;
++ // no crypto.subtle",
++  "function structuredClone<T>(value: T): T;
++",
++  "class URLSearchParams {
++ constructor(init?: string | Record<string, string>);
++ }
++ // as the WHATWG URL standard defines it",
++  "class URL {
++ constructor(url: string | URL, base?: string | URL);
++ }
++ // as the WHATWG URL standard defines it",
++  "class TextEncoder {
++ encode(input?: string): Uint8Array<ArrayBuffer>;
++ }
++",
++  'class TextDecoder {
++ constructor(label?: "utf-8", options?: {
++ fatal?: boolean }
++);
++ decode(input?: ArrayBuffer | ArrayBufferView): string;
++ }
++',
++  "function btoa(data: string): string;
++ // base64 of a string whose characters are all 0-255",
++  "function atob(data: string): string;
++ // the string, one character per byte, that base64 data encodes",
++  "function setTimeout(handler: () => void, delay?: number): number;
++",
++  "function clearTimeout(id: number | undefined): void;
++",
++  "function setInterval(handler: () => void, delay?: number): number;
++ // one left running ends the cell at its wall-time limit",
++  "function clearInterval(id: number | undefined): void;
++",
++  "function queueMicrotask(callback: () => void): void;
++"
++];
++
+ function tsconfig(files) {
+ 
+   return JSON.stringify({
+@@ -1133273,15 +1133809,7 @@
+ 
+     }
+ 
+-    if (SERVER_NAME_CODES.has(code)) {
+-
+-      return `Cannot find name '${
+-name18}
+-'. Cells run without Node's globals (Buffer, process, require): use Uint8Array for bytes, TextEncoder and TextDecoder for UTF-8, and btoa and atob for base64.`;
+-
+-    }
+-
+-    return LIB_ADVICE_CODES.has(code) ? `Cannot find name '${
++    return SERVER_NAME_CODES.has(code) || LIB_ADVICE_CODES.has(code) ? `Cannot find name '${
+ name18}
+ '.` : message;
+ 
+@@ -1135362,6 +1135890,11 @@
+  : {
+  heapMb: options2.typeCheckerHeapMb }
+ ,
++        ...options2.onLog === void 0 ? {
++}
++ : {
++ onLog: options2.onLog }
++,
+         ...options2.onTypeCheck === void 0 ? {
+ }
+  : {
+@@ -1135698,11 +1136231,50 @@
+ 
+ }
+ 
++function declarationsKey(module3, functions) {
++
++  return JSON.stringify([
++    module3.describedTypes ?? [],
++    functions.map((fn) => [
++      fn.name,
++      fn.signature,
++      fn.paging?.signature,
++      fn.input?.type,
++      fn.input?.fields,
++      fn.output?.type,
++      fn.output?.fields
++    ])
++  ]);
++
++}
++
++function sameDeclarationsEntry(module3, functions, declared, declaredLevel) {
++
++  const pointer2 = `// ${
++module3.summary}
++
++declare module ${
++JSON.stringify(module3.specifier)}
++ {
++ /* the same declarations as ${
++JSON.stringify(declared)}
++, for this server */ }
++`;
++
++  if (declaredLevel !== "named")
++    return pointer2;
++
++  const named2 = moduleEntry(module3, functions, "named");
++
++  return named2.length <= pointer2.length ? named2 : pointer2;
++
++}
++
+ function globalDeclarations(asks) {
+ 
+   const lines2 = [
+-    "const cells: readonly string[];
+-",
++    "// What a cell has beside ES2025, in brief. It has none of Node's globals, such as Buffer, process or require.",
++    ...GLOBALS_SUMMARY,
+     ...asks ? [`type ${
+ ASKS_OWNER}
+ <T> = Promise<T>;
+@@ -1135734,7 +1136306,12 @@
+   const render3 = (index2) => describeTsTool(options2, listed2, visible, index2);
+ 
+   if (listed2.length === 0)
+-    return render3(NO_MODULES);
++    return render3(`${
++NO_MODULES}
++
++${
++globalDeclarations(false)}
++`);
+ 
+   const globals = globalDeclarations(modules.some((module3) => visible(module3).some((fn) => fn.asksOwner === true)));
+ 
+@@ -1135742,7 +1136319,49 @@
+ 
+   const levels = new Map(modules.map((module3) => [module3.specifier, module3.onDemand === true ? "named" : "full"]));
+ 
+-  const entry = (module3) => moduleEntry(module3, visible(module3), levels.get(module3.specifier) ?? "full");
++  const connectors = modules.filter((module3) => isConnectorModule(module3.specifier));
++
++  const others = modules.filter((module3) => !isConnectorModule(module3.specifier) && module3.specifier !== LSP_SPECIFIER);
++
++  const declaredBy = /* @__PURE__ */ new Map();
++
++  const pointers = /* @__PURE__ */ new Map();
++
++  const firstDeclaring = /* @__PURE__ */ new Map();
++
++  for (const module3 of connectors) {
++
++    const functions = visible(module3);
++
++    if (module3.onDemand === true || functions.length === 0)
++      continue;
++
++    const key = declarationsKey(module3, functions);
++
++    const first = firstDeclaring.get(key);
++
++    if (first === void 0) {
++
++      firstDeclaring.set(key, module3.specifier);
++
++      continue;
++
++    }
++
++    declaredBy.set(module3.specifier, first);
++
++    pointers.set(first, [...pointers.get(first) ?? [], module3]);
++
++  }
++
++  const entry = (module3) => {
++
++    const declared = declaredBy.get(module3.specifier);
++
++    return declared === void 0 ? moduleEntry(module3, visible(module3), levels.get(module3.specifier) ?? "full") : sameDeclarationsEntry(module3, visible(module3), declared, levels.get(declared) ?? "full");
++
++  }
++;
+ 
+   const lengths = new Map(modules.map((module3) => [module3.specifier, entry(module3).length]));
+ 
+@@ -1135759,7 +1136378,7 @@
+ 
+     for (const module3 of candidates) {
+ 
+-      if (levels.get(module3.specifier) === "named")
++      if (levels.get(module3.specifier) === "named" || declaredBy.has(module3.specifier))
+         continue;
+ 
+       const size = lengths.get(module3.specifier) ?? 0;
+@@ -1135774,10 +1136393,6 @@
+   }
+ ;
+ 
+-  const connectors = modules.filter((module3) => isConnectorModule(module3.specifier));
+-
+-  const others = modules.filter((module3) => !isConnectorModule(module3.specifier) && module3.specifier !== LSP_SPECIFIER);
+-
+   for (;
+  ;
+  ) {
+@@ -1135794,13 +1136409,17 @@
+ 
+     levels.set(largest.specifier, LEVELS[LEVELS.indexOf(level) + 1] ?? "named");
+ 
+-    const before = lengths.get(largest.specifier) ?? 0;
++    for (const module3 of [largest, ...pointers.get(largest.specifier) ?? []]) {
++
++      const before = lengths.get(module3.specifier) ?? 0;
++
++      const after = entry(module3).length;
+ 
+-    const after = entry(largest).length;
++      lengths.set(module3.specifier, after);
+ 
+-    lengths.set(largest.specifier, after);
++      indexed += after - before;
+ 
+-    indexed += after - before;
++    }
+ 
+   }
+ 
+@@ -1172911,6 +1173530,11 @@
+  : {
+ }
+ ,
++        ...record7.action.kind === "browserNavigation" && record7.action.pageHealth !== void 0 ? {
++ pageHealth: record7.action.pageHealth }
++ : {
++}
++,
+         ...record7.action.kind === "browserNavigation" ? {
+ 
+           wallClassification: navigationWallClassification({
+@@ -1172930,9 +1173554,22 @@
+ 
+       const visited = record7.action.kind === "browserNavigation" ? visitedReport(report, record7.action, visit3) : report;
+ 
++      const landed = record7.action.kind === "browserNavigation" ? record7.action.pageHealthLanded : void 0;
++
++      const reportSiteVisited = (row) => {
++
++        if (landed === void 0) telemetry.reportSiteVisited(row);
++
++        else telemetry.reportSiteVisited(row, {
++ pageHealth: landed }
++);
++
++      }
++;
++
+       if (siteNavigation === void 0 || record7.action.kind !== "browserNavigation") {
+ 
+-        telemetry.reportSiteVisited(visited);
++        reportSiteVisited(visited);
+ 
+       }
+  else {
+@@ -1172943,11 +1173580,9 @@
+ 
+         const settleBotBlock = takeHeldBotBlock(record7);
+ 
+-        const emit = (navigation) => telemetry.reportSiteVisited(
+-          navigation === void 0 ? visited : {
++        const emit = (navigation) => reportSiteVisited(navigation === void 0 ? visited : {
+  ...visited, navigation }
+-
+-        );
++);
+ 
+         const facts = siteNavigation.visitFacts({
+ 
+@@ -1359768,6 +1360403,10 @@
+ 
+ 
+ // ../packages/grok-bot-harness/src/runner/tools/ts-agent/ts-agent-turn-session.ts
++init_dist3();
++
++init_dist();
++
+ init_dist5();
+ 
+ 
+@@ -1359911,8 +1360550,6 @@
+ 
+ }
+ 
+-var BLOCKER_TYPE = browserReportPromptBlockers(false).map((blocker) => JSON.stringify(blocker)).join(" | ");
+-
+ var subagentResultDeclaration = () => `/**
+  * What a subagent came to: its final report, why it failed or was stopped, or that it is still working past the wait.
+  * A start waits up to ${
+@@ -1359947,13 +1360584,17 @@
+ ;
+ `;
+ 
+-var BROWSER_REPORT_DECLARATION = `/** A computerUse report's \`Status\` line, its \`Blocker\` when it has one, and whether it names an order. */
++function browserReportDeclaration(botWall) {
++
++  const blockers = browserReportPromptBlockers(botWall).map((blocker) => JSON.stringify(blocker)).join(" | ");
++
++  return `/** A computerUse report's \`Status\` line, its \`Blocker\` when it has one, and whether it names an order. */
+ export interface BrowserReport {
+ 
+   status: "done" | "partial" | "blocked" | "none";
+ 
+   blocker?: ${
+-BLOCKER_TYPE}
++blockers}
+ ;
+ 
+   orderConfirmed?: boolean;
+@@ -1359961,6 +1360602,8 @@
+ }
+ `;
+ 
++}
++
+ var BROWSER_RESULT_DECLARATION = "export type BrowserSubagentResult = SubagentResult & {
+  report?: BrowserReport }
+ ;
+@@ -1360113,6 +1360756,24 @@
+ var AUTOMATION_BROWSER_REPORT_NOTE = "A computerUse result's `report` comes from its Status and Blocker lines. done: use what it found. partial: resume it once, and only with something it didn't have, such as a new URL, a value from your instructions or a different site;
+  for site_error or time_budget, resume it once with no new input. blocked: don't resume it or start another for the same goal. needs_sign_in, needs_code, bank_verification, captcha, missing_detail, address_rejected and card_field_unfillable need the owner: hand off with `wakeParent()`, naming what is needed and the exact URL the report gives, so the parent can ask them. Report card_declined, out_of_stock and price_changed the same way, without resuming. Any other blocker: hand off with `wakeParent()`, saying what the report says is needed. If the one resume still doesn't get it done, hand off with `wakeParent()` saying what happened rather than retrying or working around the box. Follow a checkout up with `resume(agentId)`, never a new subagent, which would reload the page.";
+ 
++var OTHER_BLOCKER_RULE = " Any other blocker:";
++
++var BOT_WALL_REPORT_RULE = " bot_wall: don't resume it;
++ hand off with `wakeParent()`, saying the store is refusing the bot, that a handoff in the same browser would likely be refused too and, at a checkout, that you can't confirm whether the order went through.";
++
++function automationBrowserReportNote(botWall) {
++
++  return botWall ? AUTOMATION_BROWSER_REPORT_NOTE.replace(
++    OTHER_BLOCKER_RULE,
++    `${
++BOT_WALL_REPORT_RULE}
++${
++OTHER_BLOCKER_RULE}
++`
++  ) : AUTOMATION_BROWSER_REPORT_NOTE;
++
++}
++
+ function launchDoc(entry, offers, browser) {
+ 
+   const remote = offers.browser ? ' `browser: "remote"` asks for a remote browser instead, which has none of the box\'s logins, cart or saved cards.' : "";
+@@ -1360176,10 +1360837,12 @@
+ 
+     const resultDeclaration = subagentResultDeclaration();
+ 
++    const browserDeclarations = browsers ? [browserReportDeclaration(this.botWall()), BROWSER_RESULT_DECLARATION] : [];
++
+     const declarations = [
+       ...declareImage ? [IMAGE_DECLARATION] : [],
+       resultDeclaration,
+-      ...browsers ? [BROWSER_REPORT_DECLARATION, BROWSER_RESULT_DECLARATION] : []
++      ...browserDeclarations
+     ];
+ 
+     return {
+@@ -1360189,7 +1360852,7 @@
+       describedTypes: [
+         ...declareImage ? [IMAGE_DESCRIBED_TYPE] : [],
+         described2(resultDeclaration),
+-        ...browsers ? [described2(BROWSER_REPORT_DECLARATION), described2(BROWSER_RESULT_DECLARATION)] : []
++        ...browserDeclarations.map(described2)
+       ],
+       functions: [
+         ...launchable.map((entry) => this.launchFunction(entry, offers, args)),
+@@ -1360230,7 +1360893,7 @@
+ 
+     const notes = read2.some(
+       (completion) => isComputerUseSubagentType(completion.subagentType)
+-    ) ? [AUTOMATION_BROWSER_REPORT_NOTE] : [];
++    ) ? [automationBrowserReportNote(this.botWall())] : [];
+ 
+     if (delivered.length > 0) {
+ 
+@@ -1360319,6 +1360982,12 @@
+ 
+   }
+ 
++  botWall() {
++
++    return this.options.blockerBotWall?.() === true;
++
++  }
++
+   waitedThisCell() {
+ 
+     return this.waited;
+@@ -1361717,6 +1362386,18 @@
+ }
+ );
+ 
++var logger163 = createLogger("sand:ts-agent");
++
++var TS_AGENT_LOG_LINES_PER_TURN = 100;
++
++var TS_AGENT_LOG_MAX_CHARS = 2e3;
++
++function logText(text6) {
++
++  return truncateUtf16(text6, TS_AGENT_LOG_MAX_CHARS);
++
++}
++
+ function pauseHeld(result) {
+ 
+   const {
+@@ -1361874,6 +1362555,8 @@
+ 
+   subagents;
+ 
++  loggedLines = 0;
++
+   get scope() {
+ 
+     return this.running;
+@@ -1362025,6 +1362708,8 @@
+ 
+       if (this.open === open5) this.open = void 0;
+ 
++      this.logHarnessError(ctx, "start", error63);
++
+       throw error63;
+ 
+     }
+@@ -1362048,6 +1362733,8 @@
+ 
+       const result = await session.run(code, AbortSignal.any([ctx.signal, pastWall.signal])).catch((error63) => {
+ 
++        this.logHarnessError(ctx, "run", error63);
++
+         this.subagents?.cellEnded(ctx, runCompletedByCall(ctx));
+ 
+         this.replaceSession(open5);
+@@ -1362099,6 +1362786,17 @@
+  outcome: result.outcome }
+ );
+ 
++        logger163.warn(ctx, "grok_bot.ts_agent.vm_lost", {
++
++          outcome: result.outcome,
++          ...result.outcome === "crashed" && result.error !== void 0 ? {
++ error: logText(result.error) }
++ : {
++}
++
++        }
++);
++
+         this.replaceSession(open5);
+ 
+         notes.push(VM_LOST_NOTE);
+@@ -1362205,6 +1362903,7 @@
+         limits: this.limits,
+         readOnly: this.readOnly,
+         onCall: (event) => this.observeCall(event),
++        onLog: (line2) => this.logRuntimeLine(line2),
+         onTypeCheck: (event) => this.observeTypeCheck(event),
+         ...vm.typeCheckerHeapMb === void 0 ? {
+ }
+@@ -1362241,6 +1362940,48 @@
+ 
+   }
+ 
++  get runningCellCtx() {
++
++    return this.running?.ctx ?? this.ctx;
++
++  }
++
++  logRuntimeLine(line2) {
++
++    this.loggedLines += 1;
++
++    if (this.loggedLines <= TS_AGENT_LOG_LINES_PER_TURN) {
++
++      logger163.warn(this.runningCellCtx, "grok_bot.ts_agent.runtime_log", {
++ line: logText(line2) }
++);
++
++    }
++ else if (this.loggedLines === TS_AGENT_LOG_LINES_PER_TURN + 1) {
++
++      logger163.warn(this.runningCellCtx, "grok_bot.ts_agent.runtime_log_capped", {
++
++        cap: TS_AGENT_LOG_LINES_PER_TURN
++      }
++);
++
++    }
++
++  }
++
++  logHarnessError(ctx, stage, error63) {
++
++    if (ctx.signal.aborted) return;
++
++    logger163.warn(ctx, "grok_bot.ts_agent.harness_error", {
++
++      stage,
++      error: logText(errorMessage(error63))
++    }
++);
++
++  }
++
+   observeTypeCheck(event) {
+ 
+     if (event.type === "restart") {
+@@ -1362249,6 +1362990,13 @@
+  reason: event.reason }
+ );
+ 
++      logger163.warn(this.runningCellCtx, "grok_bot.ts_agent.type_checker_restart", {
++
++        reason: event.reason,
++        error: logText(event.message)
++      }
++);
++
+       return;
+ 
+     }
+@@ -1376926,7 +1377674,7 @@
+ 
+ }
+ 
+-var logger163 = createLogger("sand:frozen-prompt-tools");
++var logger164 = createLogger("sand:frozen-prompt-tools");
+ 
+ var FrozenPromptToolsMiddleware = class extends BaseMiddleware {
+ 
+@@ -1376961,7 +1377709,7 @@
+ 
+       this.logged.add(key);
+ 
+-      logger163.info(ctx, "[sand-frozen-prompt] fitted a frozen tool to the live harness", {
++      logger164.info(ctx, "[sand-frozen-prompt] fitted a frozen tool to the live harness", {
+ 
+         frozenPromptId: this.frozenPromptId,
+         tool,
+@@ -1377119,7 +1377867,7 @@
+ 
+ 
+ // ../packages/grok-bot-harness/src/runner/automation-completion-middleware.ts
+-var logger164 = createLogger("sand:automation-completion-middleware");
++var logger165 = createLogger("sand:automation-completion-middleware");
+ 
+ var SAND_AUTOMATION_COMPLETION_PROMPT_TAG = "sandAutomationCompletionId";
+ 
+@@ -1377190,7 +1377938,7 @@
+     }
+  catch (error63) {
+ 
+-      logger164.warn(ctx, "Failed to drain automation completion inbox", {
++      logger165.warn(ctx, "Failed to drain automation completion inbox", {
+ 
+         error: errorLogTag(error63)
+       }
+@@ -1378589,7 +1379337,7 @@
+ // ../packages/grok-bot-harness/src/runner/start-of-turn-ack-reminder-middleware.ts
+ init_dist();
+ 
+-var logger165 = createLogger("sand:start-of-turn-ack-reminder-middleware");
++var logger166 = createLogger("sand:start-of-turn-ack-reminder-middleware");
+ 
+ var startOfTurnAckReminder = defineShim({
+  name: "start_of_turn_ack_reminder" }
+@@ -1378757,7 +1379505,7 @@
+ 
+     }
+ 
+-    logger165.info(ctx, "[sand-start-of-turn-ack] injecting reminder", {
++    logger166.info(ctx, "[sand-start-of-turn-ack] injecting reminder", {
+ 
+       toolCallsSinceLastSend,
+       threshold: this.threshold,
+@@ -1378845,7 +1379593,7 @@
+ 
+ 
+ // ../packages/grok-bot-harness/src/runner/step-effort/first-step-ack-reminder.ts
+-var logger166 = createLogger("sand:first-step-ack-reminder");
++var logger167 = createLogger("sand:first-step-ack-reminder");
+ 
+ function firstStepAckReminder(effort, options2 = {
+ }
+@@ -1378885,7 +1379633,7 @@
+ 
+     if (outputEffort !== void 0 && outputEffort !== outputEffortInForce(this.innerExecutor.getMessages())) {
+ 
+-      logger166.info(ctx, "[sand-first-step-output-effort] moving the turn's effort", {
++      logger167.info(ctx, "[sand-first-step-output-effort] moving the turn's effort", {
+ 
+         outputEffort
+       }
+@@ -1378905,7 +1379653,7 @@
+ 
+       const createTask = !softened && this.options.createTask?.() === true;
+ 
+-      logger166.info(ctx, "[sand-first-step-ack-reminder] applying to the first step", {
++      logger167.info(ctx, "[sand-first-step-ack-reminder] applying to the first step", {
+ 
+         effort,
+         softened,
+@@ -1380749,7 +1381497,7 @@
+ 
+ var STORED_TURNS_READ = 4;
+ 
+-var logger167 = createLogger("sand:hotels");
++var logger168 = createLogger("sand:hotels");
+ 
+ function turnUserTexts(prompt, action) {
+ 
+@@ -1380811,7 +1381559,7 @@
+   }
+  catch (error63) {
+ 
+-    logger167.warn(stored.ctx, "Stored turns unreadable;
++    logger168.warn(stored.ctx, "Stored turns unreadable;
+  the Reserve claim guard stays off", {
+ 
+       error: error63
+@@ -1381514,7 +1382262,8 @@
+       subagents: {
+ 
+         runtime: host.subagents,
+-        turnDeadlineAtMs: host.turnBudget?.deadlineAtMs
++        turnDeadlineAtMs: host.turnBudget?.deadlineAtMs,
++        blockerBotWall: () => turnToolHost.gates.blockerBotWall()
+       }
+ 
+     }
+@@ -1383469,7 +1384218,7 @@
+ 
+ init_dist5();
+ 
+-var logger168 = createLogger("sand:error-free-step");
++var logger169 = createLogger("sand:error-free-step");
+ 
+ var GROK_BOT_ERROR_FREE_STEP_METRIC = "grok_bot.turn.error_free_step";
+ 
+@@ -1383578,7 +1384327,7 @@
+     }
+  catch (error63) {
+ 
+-      logger168.warn(host.ctx, `Error free step observation failed (${
++      logger169.warn(host.ctx, `Error free step observation failed (${
+ errorLogTag(error63)}
+ )`);
+ 
+@@ -1383754,7 +1384503,7 @@
+ 
+ init_dist5();
+ 
+-var logger169 = createLogger("sand:prompt-cache-keepalive");
++var logger170 = createLogger("sand:prompt-cache-keepalive");
+ 
+ var PROVIDER_PROMPT_CACHE_TTL_MS = 5 * 6e4;
+ 
+@@ -1383844,7 +1384593,7 @@
+     }
+  catch (error63) {
+ 
+-      logger169.warn(ctx, `Prompt cache keepalive cap read failed (${
++      logger170.warn(ctx, `Prompt cache keepalive cap read failed (${
+ errorLogTag(error63)}
+ )`);
+ 
+@@ -1383900,7 +1384649,7 @@
+ 
+       if (outcome === "error") {
+ 
+-        logger169.warn(ctx, `Prompt cache keepalive failed (${
++        logger170.warn(ctx, `Prompt cache keepalive failed (${
+ errorLogTag(error63)}
+ )`);
+ 
+@@ -1387868,7 +1388617,7 @@
+ 
+ 
+ // ../packages/grok-bot-harness/src/runner/turn-latency/turn-setup-laps.ts
+-var logger170 = createLogger("sand:turn-setup-laps");
++var logger171 = createLogger("sand:turn-setup-laps");
+ 
+ var setupLapMs = createHistogram("grok_bot.turn.setup_lap_ms", {
+ 
+@@ -1387924,7 +1388673,7 @@
+       }
+  catch (error63) {
+ 
+-        logger170.warn(args.ctx, `Turn setup laps observation failed (${
++        logger171.warn(args.ctx, `Turn setup laps observation failed (${
+ errorLogTag(error63)}
+ )`);
+ 

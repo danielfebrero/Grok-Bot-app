@@ -1,0 +1,17 @@
+--- 2026-11-11_19-52:/opt/sand/sand-host/box-scripts/box-contract.generated.mjs
++++ 2026-11-11_21-49:/opt/sand/sand-host/box-scripts/box-contract.generated.mjs
+@@ -1,11 +1,13 @@
+-// @generated SignedSource<<ff6fd90d604ea60580a81ea3b4a81536b4f3007ecf41852fbccf75950baa5c6d>>
++// @generated SignedSource<<7294723ac18f9a35fe43d3ba990f207f525d5479392020482f1f2278ff8c0630>>
+ // Emitted by scripts/gen-box-contract.mts from sand/src/shared/box/box-contract.ts;
+ // regenerate with `pnpm --filter sand run gen:box-contract`.
+ export const CURSOR_AGENT_SOCKET_ENV_VAR = "CURSOR_AGENT_SOCKET";
+ export const GROK_BOT_BOX_IDENTITY_SOCKET_PATH = "/tmp/sand-identity.sock";
++export const GROK_BOT_BOX_HOST_ATTESTATION_FAILURE_HEADER = "x-cursor-box-host-attestation-failure";
+ export const GROK_BOT_BOX_HOST_ATTESTATION_HEADER = "x-cursor-box-host-attestation";
+ export const GROK_BOT_BOX_HOST_ATTESTATION_INFERENCE_CREDENTIAL_SURFACE = "inference_credential";
+ export const GROK_BOT_BOX_HOST_ATTESTATION_SOCKET_PATH = "/v1/attestations/sand-box-credential-use";
++export const GROK_BOT_BOX_INFERENCE_RENEWAL_CALLER_HEADER = "x-cursor-box-renewal-caller";
+ export const GROK_BOT_BOX_INFERENCE_RENEWAL_FALLBACK_HEADER = "x-cursor-box-renewal-fallback";
+ export const SAND_BOX_HOST_ATTESTED_INFERENCE_RENEWAL_ENV = "SAND_BOX_HOST_ATTESTED_INFERENCE_RENEWAL";
+ export const SAND_BOX_HOST_ATTESTED_INFERENCE_RENEWAL_ON_VALUE = "1";
