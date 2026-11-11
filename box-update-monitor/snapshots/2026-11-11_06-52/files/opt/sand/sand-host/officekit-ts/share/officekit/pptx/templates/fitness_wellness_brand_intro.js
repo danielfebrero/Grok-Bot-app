@@ -1,0 +1,850 @@
+/**
+ * "Jugeo Presentation" — 42-slide deck rebuilt with pptxgenjs.
+ *
+ * Raster photos in the source deck are replaced by flat colour placeholders
+ * (see `photo()`); everything else is native pptxgenjs geometry and text.
+ *
+ * Run: node 00dcd58e-3940-46e8-a68a-1e0c5a807986_grok_final.js
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ *
+ * Theme
+ * ------------------------------------------------------------------ */
+const RED = 'BF5C5C';      // theme tx1 - dusty red (also the default text colour)
+const TEAL = '256B75';     // theme accent2
+const OLIVE = '6B6D50';    // theme accent4
+const PINK = 'F5E7E7';     // theme accent1
+const ICE = 'E2F4F6';      // theme accent3
+const CREAM = 'EFEFE9';    // theme accent5
+const WHITE = 'FFFFFF';
+const INK = '262626';
+const GRAY = '808080';
+const GRAY6 = '595959';
+const GRAY4 = '404040';
+const SILVER = 'F2F2F2';
+
+const H_FONT = 'Montserrat';        // headlines
+const B_FONT = 'Source Sans Pro';   // body copy
+
+/* Stand-in colours for the deck's stock photography */
+const PH_RED = 'D42827';    // "upload your images here" red plate
+const PH_BLUE = '1F557D';   // "upload your images here" blue plate
+const PH_TABLET = '1A1A1A';
+const PH_WATCH = '2E2E2E';
+
+/* Strings used on many slides */
+const WWW = 'W   W   W   .   J   U   G   E   O   .   C   O   M';
+const LOREM_PRED = 'Predominate extensible testing with procedures for reliable good uniquely matrix sound good product.';
+const LOREM_CAP = 'Capitalize on low hanging fruit to identify a ballpark value content in provide a robust known printer took.';
+const LOREM_CAP2 = 'Capitalize on low hanging fruit to identify ballpark value content in provide good.';
+const LOREM_PROA = 'Proactively envisioned multimedia based expertise and cross-media growth with strategies. ';
+const LOREM_PROA2 = 'Proactively envisioned multimedia based expertise and cross-media growth with strategies visualize.';
+const LOREM_SWOT = 'Proactively envisioned multimedia based expertise and cross-media growth strategies quality Make a type specimen book unknown printer took type and good scrambled.';
+const LOREM_LEV = 'Leverage agile frameworks to provide a robust synopsis for high level views.';
+const LOREM_TEAM = 'Leverage agile frameworks to provide a robust synopsis for high level views new normal that for the new project.';
+const LOREM_EMP = 'Collaboratively administrate empower markets via plug-and-play networks dynamic procrastinate B2C users.';
+const LOREM_COLLAB = 'Collaboratively administrate empowered with markets via plug and play networks. Dynamic procrastinate B2C user installed base.';
+const LOREM_SYN = 'Synergistically evolve 2.0 technologies rather than just in time initiatives. Quickly deploy strategic networks with compelling credibly pontificate highly efficient.';
+const LOREM_BRING = 'Bring to the table win-win survival strategies to ensure proactive domination. At the end of the day, going forward, a new normal that has evolved from generation X is on the runway heading';
+const LOREM_ENER = 'Collaboratively administrate empowered markets via plug and play networks. Standards in web-readiness. Energistically scale future-proof core competencies impactful experiences frameworks to provide';
+
+/* ------------------------------------------------------------------ *
+ * Drawing helpers
+ * ------------------------------------------------------------------ */
+function rect(s, x, y, w, h, fill, opt) {
+  s.addShape('rect', Object.assign({ x, y, w, h, fill: { color: fill } }, opt));
+}
+
+/** Semi-transparent scrim laid over a photo so white text stays legible. */
+function scrim(s, x, y, w, h, color, transparency) {
+  s.addShape('rect', { x, y, w, h, fill: { color, transparency } });
+}
+
+function ell(s, x, y, w, h, fill, opt) {
+  s.addShape('ellipse', Object.assign({ x, y, w, h, fill: { color: fill } }, opt));
+}
+
+function tri(s, x, y, w, h, fill, opt) {
+  s.addShape('triangle', Object.assign({ x, y, w, h, fill: { color: fill } }, opt));
+}
+
+/** Straight connector. `w`/`h` are the run of the line (h = 0 -> horizontal). */
+function line(s, x, y, w, h, color, width, opt) {
+  s.addShape('line', Object.assign({
+    x, y, w, h, line: { color, width: width || 1 },
+  }, opt));
+}
+
+/** Body copy: 10pt Source Sans Pro, grey, top-anchored, no inset. */
+function txt(s, x, y, w, h, text, opt) {
+  s.addText(text, Object.assign({
+    x, y, w, h, fontFace: B_FONT, fontSize: 10, color: GRAY,
+    margin: 0, valign: 'top', wrap: true,
+  }, opt));
+}
+
+/** Headline: bold Montserrat 28pt, middle-anchored. */
+function head(s, x, y, w, h, text, opt) {
+  s.addText(text, Object.assign({
+    x, y, w, h, fontFace: H_FONT, fontSize: 28, bold: true, color: INK,
+    lineSpacing: 30, margin: 0, valign: 'middle', wrap: true,
+  }, opt));
+}
+
+/** The site address strip that appears on most slides. */
+function www(s, x, y, w, color, opt) {
+  txt(s, x, y, w, 0.151, WWW, Object.assign({ fontSize: 9, color: color || GRAY }, opt));
+}
+
+/** Placeholder standing in for a photograph in the original deck. */
+function photo(s, x, y, w, h, tone) {
+  rect(s, x, y, w, h, tone || PH_RED);
+  s.addText('[image]', {
+    x, y, w, h, fontFace: B_FONT, fontSize: 11, color: WHITE,
+    align: 'center', valign: 'middle', margin: 0, transparency: 35,
+  });
+}
+
+/** Draw a table of [shape, x, y, w, h, color] rows — used for illustrations. */
+function drawParts(s, parts) {
+  parts.forEach(([kind, x, y, w, h, c]) => s.addShape(kind, { x, y, w, h, fill: { color: c } }));
+}
+
+/**
+ * Free-form polygon. `pts` are 0..1 coordinates inside the box (x,y,w,h),
+ * which keeps the map outlines below readable as plain number tables.
+ */
+function poly(s, x, y, w, h, color, pts) {
+  s.addShape('custGeom', {
+    x, y, w, h, fill: { color },
+    points: pts.map(([px, py], i) => ({ x: +(px * w).toFixed(3), y: +(py * h).toFixed(3), moveTo: i === 0 }))
+      .concat([{ close: true }]),
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Slides
+ * ------------------------------------------------------------------ */
+const build = [];
+
+// 1 — title
+build.push(s => {
+  rect(s, 0, 0, 13.333, 7.5, RED);
+  photo(s, 6, 1.6, 6.333, 4.9, PH_RED);
+  rect(s, 0, 0, 1.6, 1.6, TEAL);
+  rect(s, 11.029, 5.195, 2.305, 2.305, TEAL);
+  head(s, 1.6, 3.194, 7.864, 0.729, 'Jugeo Presentation', { fontSize: 48, lineSpacing: 52, color: WHITE });
+  txt(s, 1.6, 5.517, 2.8, 0.983,
+    'Globally incubate standards compliant channels before scalable benefits with extensible testing fruit to identify B2C users with whereas dramatic visualize good customers.',
+    { color: WHITE, lineSpacingMultiple: 1.5 });
+});
+
+// 2 — hello / we are jugeo
+build.push(s => {
+  rect(s, 8.42, 3.246, 4.913, 4.254, TEAL);
+  photo(s, 0.8, 0.799, 2.546, 3.522, PH_BLUE);
+  photo(s, 8.42, 1.81, 3.42, 4.844, PH_RED);
+  head(s, 4.173, 1.81, 4.247, 0.982, 'Hello,\nWe Are Jugeo!', { fontSize: 32, lineSpacing: 35 });
+  txt(s, 0.8, 5.167, 4.867, 1.487,
+    LOREM_SYN + '\n\nObjectively integrate emerging core competencies before process-centric without communities. Dramatically evisculate holistic innovation rather than client centric data progressively maintain extensive objectively.',
+    { lineSpacingMultiple: 1.5 });
+  www(s, 11.237, 5.228, 2.7, WHITE, { rotate: 270 });
+});
+
+// 3 — celebrate inspiration
+build.push(s => {
+  rect(s, 0, 0, 10.894, 7.5, OLIVE);
+  rect(s, 9.681, 2.275, 3.652, 5.225, RED);
+  photo(s, 9.155, 1.38, 3.478, 5.42, PH_BLUE);
+  head(s, 0.7, 2.358, 4.88, 0.841, 'Celebrate inspiration, celebrate health', { color: WHITE });
+  txt(s, 0.7, 3.469, 4.88, 1.236,
+    LOREM_COLLAB + '\n\nInteractively coordinate proactive via process centric outside  envisioned with multimedia based expertise and cross-media growth strategies.',
+    { color: WHITE, lineSpacingMultiple: 1.5 });
+  txt(s, 5.928, 5.514, 5.273, 0.606,
+    '\u201C Every time you smile at someone, it is an action of love, a gift to that person, a beautiful thing.\u201D',
+    { fontSize: 18, color: WHITE, bold: true, italic: true });
+  www(s, 5.455, 1.38, 3, WHITE, { fontSize: 10, align: 'right' });
+});
+
+// 4 — exercise the body
+build.push(s => {
+  rect(s, 6.667, 0, 6.667, 7.5, RED);
+  rect(s, 0, 0, 6.667, 7.5, TEAL);
+  photo(s, 4.486, 2, 4.362, 5.5, PH_RED);
+  txt(s, 0.839, 1.168, 2.808, 1.992,
+    LOREM_COLLAB + '\n\nInteractively coordinate proactive via process centric outside. Proactively envisioned with multimedia based expertise and cross-media growth strategies visualize quality.',
+    { color: WHITE, lineSpacingMultiple: 1.5 });
+  txt(s, 7.819, 0.758, 4.362, 0.478,
+    'Collaboratively administrate empowered with markets via plug and play networks. Dynamic procrastinate B2C user installed base special.',
+    { color: WHITE, lineSpacingMultiple: 1.5 });
+  head(s, 7.819, 4.333, 4.362, 0.841, 'Exercise the body, exercise the mind', { color: WHITE });
+  www(s, -0.336, 5.006, 2.5, WHITE, { rotate: 270 });
+});
+
+// 5 — content in details (two numbered notes)
+build.push(s => {
+  rect(s, 0, 4.71, 6, 2.79, TEAL);
+  photo(s, 0, 3.348, 3.2, 3.203, PH_BLUE);
+  photo(s, 7.623, 0.529, 5.71, 3.29, PH_RED);
+  head(s, 1.227, 1.011, 4.478, 0.471, 'Content In Details', { valign: 'top' });
+  txt(s, 1.227, 1.606, 4.478, 0.73,
+    'Proactively envisioned multimedia based expertise and cross-media growth strategies. Seamlessly visualize quality intellectual capital without superior collaboration and idea-sharing interactively.',
+    { lineSpacingMultiple: 1.5 });
+  [['01', 5.639, 6.603, 5.805], ['02', 8.976, 9.94, 9.142]].forEach(([n, cx, tx, nx]) => {
+    ell(s, cx, 5.297, 0.731, 0.731, RED);
+    txt(s, nx, 5.528, 0.4, 0.269, n, { fontSize: 16, color: WHITE, bold: true, align: 'center' });
+    txt(s, tx, 5.298, 2.069, 0.73, LOREM_PROA, { lineSpacingMultiple: 1.5 });
+  });
+});
+
+// 6 — the commitment of fitness
+build.push(s => {
+  rect(s, 6.667, 0.696, 6.667, 6.804, RED);
+  rect(s, 0, 0, 1.4, 1.4, TEAL);
+  photo(s, 4.906, 2.359, 3.522, 3.507, PH_BLUE);
+  head(s, 0.653, 3.692, 3.985, 0.841, 'The commitment of fitness');
+  txt(s, 9.389, 2.359, 2.982, 1.993,
+    'Globally incubate standards compliant to channels before scalable benefits extensible testing fruit for identify ballpark value B2C users after.\n\nInteractively coordinate proactive e-commerce via process-centric outside the box  thinking pursue scalable customer service through empowered markets networks pursue intellectual.',
+    { color: WHITE, lineSpacingMultiple: 1.5 });
+  www(s, 9.389, 5.713, 2.4, WHITE);
+});
+
+// 7 — you must be too fit to quit
+build.push(s => {
+  rect(s, 7.399, 0, 5.934, 7.5, OLIVE);
+  photo(s, 0, 0, 7.4, 4.362, PH_RED);
+  rect(s, 0, 4.362, 3.7, 3.138, RED);
+  rect(s, 3.7, 4.362, 3.7, 3.138, TEAL);
+  head(s, 8.698, 1.95, 3.336, 0.841, 'You must be too fit to quit', { color: WHITE });
+  txt(s, 8.698, 3.105, 3.336, 1.993,
+    LOREM_SYN + '\n\nObjectively integrate emerging core competencies before process-centric communities. Dramatically evisculate holistic innovation rather than client-centric data. Progressively maintain extensive.',
+    { color: WHITE, lineSpacingMultiple: 1.5 });
+  [['01', 0.433, 1.154], ['02', 4.133, 4.854]].forEach(([n, nx, tx]) => {
+    txt(s, nx, 5.44, 0.616, 0.561, n, { fontSize: 36, color: WHITE, bold: true, fontFace: 'PT Sans' });
+    txt(s, tx, 5.44, 2.113, 0.983,
+      'Proactively envisioned multimedia based expertise and cross-media growth strategies. Seamlessly visualize quality.',
+      { color: WHITE, lineSpacingMultiple: 1.5, fontFace: 'PT Sans' });
+  });
+  www(s, 8.698, 5.405, 3.336, WHITE);
+});
+
+// 8 — timelines layout option (5 alternating milestones)
+build.push(s => {
+  const MILE = [
+    // label, bar colour, dot colour, up?, x of bar
+    ['01', TEAL, TEAL, true, 0.761],
+    ['02', OLIVE, OLIVE, false, 3.123],
+    ['03', RED, RED, true, 5.486],
+    ['04', OLIVE, OLIVE, false, 7.848],
+    ['05', TEAL, TEAL, true, 10.21],
+  ];
+  head(s, 3.7, 0.885, 5.933, 0.431, 'Timelines Layout Option', { align: 'center' });
+  txt(s, 3.7, 1.452, 5.933, 0.478,
+    'Bring the table win-win survival strategies ensure proactive dominan. At the end of the day, going forward, for new normal that has evolved from runway heading to our solution administrate.',
+    { lineSpacingMultiple: 1.5, align: 'center' });
+  MILE.forEach(([n, barCol, dotCol, up, bx]) => {
+    const cx = bx + 1.181;           // bar centre
+    rect(s, bx, 4.155, 2.362, 0.613, barCol);
+    txt(s, bx + 0.329, 4.344, 1.7, 0.236, 'Your Title Here',
+      { fontSize: 14, color: WHITE, bold: true, align: 'center' });
+    line(s, cx, up ? 3.329 : 5.11, 0, 0.483, up ? dotCol : ICE, 1);
+    ell(s, cx - 0.386, up ? 2.698 : 5.453, 0.773, 0.773, dotCol);
+    txt(s, cx - 0.2, up ? 2.905 : 5.659, 0.4, 0.36, n,
+      { fontSize: 18, color: WHITE, bold: true, align: 'center' });
+    // blurb always sits on the opposite side of the bar from its dot
+    txt(s, cx - 0.955, up ? 5.11 : 2.83, 1.909, 0.983, LOREM_CAP,
+      { lineSpacingMultiple: 1.5, align: 'center' });
+  });
+  www(s, 5.317, 6.787, 2.7, GRAY, { align: 'center' });
+});
+
+// 9 — our content in details (3 icon rows)
+build.push(s => {
+  rect(s, 0, 0, 7.101, 7.5, OLIVE);
+  rect(s, 6.493, 1.735, 5.634, 5.765, RED);
+  head(s, 1.01, 0.657, 5.483, 0.421, 'Our Content In Details', { color: WHITE });
+  txt(s, 1.01, 2.917, 2.86, 2.75,
+    'Interactively procrastinate high-payoff content without backward-compatible data quickly cultivate optimal tactical\n\nGlobally incubate standards compliant channels before scalable benefits. Quickly disseminate superior whereas web-enabled good.\n\nContinually reintermediate integrated processes through technically sound intellectual capital holistically foster superior methodologies.',
+    { color: WHITE, lineSpacingMultiple: 1.5 });
+  photo(s, 4.879, 2.373, 3.232, 4.489, PH_BLUE);
+  [3.074, 4.227, 5.386].forEach(y => {
+    ell(s, 7.856, y, 0.691, 0.691, RED);            // icon disc
+    rect(s, 8.08, y + 0.23, 0.24, 0.23, WHITE);     // glyph inside it
+    txt(s, 8.769, y, 2.604, 0.236, 'Your Title Goes Here',
+      { fontSize: 14, color: WHITE, bold: true });
+    txt(s, 8.769, y + 0.297, 2.604, 0.478, LOREM_CAP2,
+      { color: WHITE, lineSpacingMultiple: 1.5 });
+  });
+  www(s, 9.416, 0.792, 2.711, GRAY, { align: 'right' });
+});
+
+// 10 — not able to find a way
+build.push(s => {
+  rect(s, 0, 0, 13.333, 4.594, TEAL);
+  photo(s, 0.792, 0.833, 7.034, 3.761, PH_RED);
+  photo(s, 8.618, 2.714, 3.924, 3.92, PH_BLUE);
+  txt(s, 8.618, 0.866, 3.924, 0.983,
+    'Interactively procrastinate high-payoff content without backward compatible data. Quickly cultivate optimal processes tactical quickly disseminate superior deliverables whereas web-enabled applications. Quickly drive clicks-and-mortar catalysts.',
+    { color: WHITE, lineSpacingMultiple: 1.5 });
+  head(s, 0.792, 5.626, 4.745, 0.841, 'Not able to find a way? Make one then');
+});
+
+// 11 — only a healthy body
+build.push(s => {
+  rect(s, 6.667, 2.232, 6.667, 5.268, OLIVE);
+  rect(s, 0, 0, 6.667, 5.159, CREAM);
+  [1.808, 5.503, 9.199].forEach(x => {
+    txt(s, x, 0.735, 2.327, 0.236, 'Your Content Name', { fontSize: 14, color: GRAY6, bold: true });
+    txt(s, x, 1.018, 2.327, 0.478, LOREM_LEV, { lineSpacingMultiple: 1.5 });
+  });
+  txt(s, 1.074, 3.042, 3.207, 0.983,
+    'Collaboratively administrate empowered markets via plug and play networks. Dynamic procrastinate B2C users after installed base benefits dramatic visualize extensible testing procedures for reliable.',
+    { lineSpacingMultiple: 1.5 });
+  photo(s, 5.355, 2.811, 4.036, 4.689, PH_BLUE);
+  head(s, 8.464, 4.307, 3.062, 1.683, 'Only a healthy body creates a healthy mind and soul', { color: WHITE });
+  www(s, 1.074, 6.254, 2.6);
+});
+
+// 12 — charles steven williams (skill bars)
+build.push(s => {
+  rect(s, 0, 0, 3.754, 7.5, TEAL);
+  rect(s, 3.754, 3.348, 9.58, 4.152, OLIVE);
+  photo(s, 2.145, 1.116, 3.971, 5.261, PH_RED);
+  head(s, 7.636, 1.116, 4.177, 0.841, 'Charles\nSteven Williams', { valign: 'top' });
+  [['Team Work', '95%', 4.336, 4.625, 3.196, 11.071, 4.541],
+   ['Leaders Team', '100%', 4.739, 5.024, 3.501, 11.36, 4.936]].forEach(
+    ([label, pct, ly, by, bw, px, py]) => {
+      txt(s, 7.636, ly, 2.952, 0.185, label, { fontSize: 11, color: WHITE });
+      line(s, 7.66, by, bw, 0, RED, 6);
+      txt(s, px, py, 0.453, 0.177, pct, { fontSize: 10.5, color: WHITE });
+    });
+  txt(s, 7.636, 5.782, 4.177, 0.73,
+    'Collaboratively administrate empowered markets via plug-and-play networks. Dynamic procrastinate B2C users after installed base benefits dramatic visualize standards in web-readiness.',
+    { color: WHITE, lineSpacingMultiple: 1.5 });
+  www(s, -0.278, 3.674, 2.7, WHITE, { align: 'center', rotate: 270 });
+});
+
+// 13 — our team profile (single instructor)
+build.push(s => {
+  rect(s, 0, 2.565, 13.333, 4.964, OLIVE);
+  rect(s, 9.58, 0, 3.754, 6.26, RED);
+  photo(s, 7.565, 1.652, 3.539, 4.608, PH_BLUE);
+  txt(s, 3.083, 3.776, 3.2, 0.269, 'Lynn Josefina Nichols',
+    { fontSize: 16, color: WHITE, bold: true, align: 'right' });
+  txt(s, 3.083, 4.086, 3.2, 0.202, 'Gym Instructor', { fontSize: 12, color: WHITE, align: 'right' });
+  txt(s, 1.283, 4.541, 5, 0.478,
+    'Interactively coordinate proactive e-commerce via process-centric outside the box  thinking pursue scalable customer service through collaboratively administrate.',
+    { color: WHITE, lineSpacingMultiple: 1.5, align: 'right' });
+  line(s, 2.071, 5.732, 4.212, 0, RED, 5);
+  line(s, 2.776, 6.167, 3.506, 0, TEAL, 5);
+  txt(s, 4.258, 5.461, 2.025, 0.185, 'Technique', { fontSize: 11, color: WHITE, align: 'right' });
+  txt(s, 1.396, 5.639, 0.45, 0.185, '100%', { fontSize: 11, color: WHITE, align: 'right' });
+  txt(s, 4.258, 5.881, 2.025, 0.185, 'Identification', { fontSize: 11, color: WHITE, align: 'right' });
+  txt(s, 2.131, 6.075, 0.45, 0.185, '80%', { fontSize: 11, color: WHITE, align: 'right' });
+  head(s, 10.161, 3.482, 4.08, 0.421, 'Our Team Profile', { color: WHITE, align: 'right', rotate: 270 });
+  www(s, 1.283, 1.192, 2.7);
+});
+
+// 14 — our team profile (two members)
+build.push(s => {
+  head(s, 1.168, 2.458, 3.809, 0.432, 'Our Team Profile');
+  txt(s, 1.168, 3.05, 3.808, 1.992,
+    'Interactively coordinate proactive e-commerce via process centric "outside the box" thinking. Completely pursue scalable customer service special good time.\n\n' +
+    LOREM_ENER.replace('frameworks to provide', 'frameworks to provide a robust synopsis .'),
+    { lineSpacingMultiple: 1.5 });
+  [['Gladise Hilton', 6.145], ['Morientez Gillian', 9.44]].forEach(([name, x]) => {
+    txt(s, x, 1.404, 2.63, 0.236, name, { fontSize: 14, color: GRAY6, bold: true });
+    txt(s, x, 1.747, 2.63, 0.735, LOREM_TEAM, { lineSpacingMultiple: 1.5 });
+    photo(s, x, 3.009, 3.09, 3.087, x < 8 ? PH_RED : PH_BLUE);
+  });
+});
+
+// 15 — our price table
+build.push(s => {
+  const PACKS = [
+    { x: 5.242, tx: 5.585, title: 'Healthy Pack', price: '$299 / Mo', head: RED, soft: PINK, badge: '40%', bx: 7.692 },
+    { x: 9.078, tx: 9.421, title: 'Super Fit Pack', price: '$399 / Mo', head: TEAL, soft: ICE, badge: '50%', bx: 11.528 },
+  ];
+  head(s, 0.907, 2.05, 3.428, 0.432, 'Our Price Table');
+  txt(s, 0.907, 2.894, 3.427, 1.992,
+    'Interactively coordinate proactive e-commerce via process centric "outside the box" thinking. Completely pursue scalable customer service.\n\n' + LOREM_ENER + '.',
+    { lineSpacingMultiple: 1.5 });
+  PACKS.forEach(p => {
+    rect(s, p.x, 1.768, 2.9, 0.93, p.head);
+    txt(s, p.tx, 2.065, 2.215, 0.337, p.title,
+      { fontSize: 20, color: WHITE, bold: true, align: 'center' });
+    for (let i = 0; i < 5; i++) {                       // 5 alternating feature rows
+      const y = 2.703 + i * 0.5;
+      rect(s, p.x, y, 2.9, 0.5, i % 2 ? p.soft : SILVER);
+      txt(s, p.tx, y + 0.133, 2.215, 0.236, 'Your Content Pack',
+        { fontSize: 14, color: GRAY6, align: 'center' });
+    }
+    rect(s, p.x, 5.203, 2.9, 0.78, p.soft);
+    rect(s, p.x, 5.984, 2.9, 0.2, p.head);
+    txt(s, p.tx, 5.425, 2.215, 0.337, p.price,
+      { fontSize: 20, color: GRAY6, bold: true, align: 'center' });
+    ell(s, p.bx, 1.316, 0.9, 0.9, p.head, { line: { color: WHITE, width: 3 } });
+    txt(s, p.bx + 0.2, 1.631, 0.5, 0.269, p.badge,
+      { fontSize: 16, color: WHITE, bold: true, align: 'center' });
+  });
+  www(s, 0.907, 5.298, 2.596);
+});
+
+// 16 — break slide
+build.push(s => {
+  rect(s, 0, 0, 7.208, 7.5, TEAL);
+  photo(s, 0.498, 0.486, 6.22, 4.505, PH_RED);
+  txt(s, 0.498, 5.88, 6.22, 0.73,
+    'Collaboratively administrate empowered with markets via plug and play networks dynamic procrastinate B2C user installed base. Interactively coordinate proactive via process centric outside. Proactively with envisioned with multimedia based expertise and cross-media.',
+    { color: WHITE, lineSpacingMultiple: 1.5 });
+  head(s, 8.281, 2.009, 3.979, 1.459, 'This Is\nBreak Slide', { fontSize: 48, lineSpacing: 52 });
+  www(s, 9.55, 6.459, 2.711, GRAY, { align: 'right' });
+});
+
+// 17 — content in details (three numbered notes)
+build.push(s => {
+  rect(s, 10.304, 4.551, 3.029, 2.949, RED);
+  rect(s, 0, 0, 5.375, 2.949, TEAL);
+  photo(s, 0.9, 0.9, 4.475, 2.556, PH_BLUE);
+  photo(s, 10.304, 3.75, 2.167, 2.85, PH_RED);
+  head(s, 7.056, 1.197, 4.585, 0.433, 'Content In Details');
+  txt(s, 7.056, 1.817, 4.585, 0.73,
+    'Proactively envisioned multimedia based expertise and cross media growth strategies visualize quality collaboration. Leverage agile frameworks to provide a robust. Seamlessly visualize quality intellectual capital.',
+    { lineSpacingMultiple: 1.5 });
+  ['01', '02', '03'].forEach((n, i) => {
+    const x = 0.9 + i * 3.016;
+    txt(s, x, 4.93, 2.472, 0.269, n + '. Your Content Here', { fontSize: 16, color: GRAY6 });
+    txt(s, x, 5.296, 2.472, 0.73, LOREM_PROA2, { lineSpacingMultiple: 1.5 });
+  });
+});
+
+// 18 — a push that your body needs
+build.push(s => {
+  rect(s, 5.174, 0, 8.159, 4.087, OLIVE);
+  photo(s, 5.174, 4.087, 8.159, 3.413, PH_RED);
+  txt(s, 6.124, 1.552, 6.26, 0.983,
+    'Collaboratively administrate empowered with markets via plug and play networks. Dynamic procrastinate B2C user installed base. Interactively coordinate proactive via process centric outside envisioned. Synergistically evolve 2.0 technologies rather than just in time initiatives deploy strategic networks dynamically target pursue diverse catalysts for change for in meta services. ',
+    { color: WHITE, lineSpacingMultiple: 1.5 });
+  head(s, 1.359, 1.412, 2.865, 1.262, 'A push that your body needs');
+  www(s, 1.359, 5.926, 2.455, GRAY, { fontSize: 10 });
+});
+
+// 19 — shape it up or shut up
+build.push(s => {
+  rect(s, 0, 0.522, 3.153, 2.494, PINK);
+  rect(s, 9.122, 1.047, 4.211, 6.453, RED);
+  photo(s, 1.535, 1.047, 3.237, 3.968, PH_BLUE);
+  photo(s, 10.18, 3.333, 3.153, 4.164, PH_RED);
+  head(s, 1.535, 6.033, 5.364, 0.433, 'Shape it up or shut up');
+  txt(s, 5.713, 2.754, 2.468, 1.992,
+    'Synergistically evolve 2.0 technologies rather than just in time initiatives deploy strategic networks dynamically target.\n\nHigh-payoff intellectual capital Pursue diverse catalysts for change for in meta services. Proactively fabricate one to one materials via effective e-business.',
+    { lineSpacingMultiple: 1.5 });
+  txt(s, 10.18, 1.511, 2.278, 0.269, 'Your Content Here', { fontSize: 16, color: WHITE });
+  txt(s, 10.18, 1.828, 2.278, 0.73,
+    'PLACEHOLDER',
+    { color: WHITE, lineSpacingMultiple: 1.5 });
+  www(s, -0.583, 2.955, 2.7, GRAY, { align: 'center', rotate: 270 });
+});
+
+// 20 — take care of your body
+build.push(s => {
+  rect(s, 0, 0, 13.333, 7.5, OLIVE);
+  rect(s, 5.739, 0, 7.594, 3.872, TEAL);
+  photo(s, 8.536, 0, 3.912, 6.195, PH_BLUE);
+  head(s, 6.658, 1.305, 4.14, 1.262, 'Take care of your body, you have to live in it forever', { color: WHITE });
+  txt(s, 0.914, 3.142, 3.912, 0.73,
+    'Collaboratively administrate empowered with markets via plug and play networks. Dynamic procrastinate B2C user installed base interactively coordinate proactive via process centric.',
+    { color: WHITE, lineSpacingMultiple: 1.5 });
+  [['01', 0.849, 0.981, 1.747], ['02', 4.308, 4.44, 5.206]].forEach(([n, ox, nx, tx]) => {
+    ell(s, ox, 5.53, 0.665, 0.665, TEAL);
+    txt(s, nx, 5.728, 0.4, 0.269, n, { fontSize: 16, color: WHITE, bold: true, align: 'center' });
+    txt(s, tx, 5.53, 2.07, 0.73, LOREM_PROA, { color: WHITE, lineSpacingMultiple: 1.5 });
+  });
+  www(s, 0.914, 1.305, 2.711, WHITE);
+});
+
+// 21 — S.W.O.T analysis (stacked 3-D funnel)
+build.push(s => {
+  const BANDS = [
+    { label: 'Strengths', title: 'Strengths Analysis', letter: 'S', top: '93D4DD', left: '1C5058', right: '5DBECC', foot: TEAL, ink: TEAL },
+    { label: 'Weaknesses', title: 'Weaknesses Analysis', letter: 'W', top: 'E5BEBE', left: '983C3C', right: 'D99D9D', foot: RED, ink: RED },
+    { label: 'Opportunities', title: 'Opportunities Analysis', letter: 'O', top: '93D4DD', left: '1C5058', right: '5DBECC', foot: TEAL, ink: TEAL },
+    { label: 'Threats', title: 'Threats Analysis', letter: 'T', top: 'E5BEBE', left: '983C3C', right: 'D99D9D', foot: RED, ink: RED },
+  ];
+  head(s, 1.684, 0.833, 6.203, 0.433, 'S.W.O.T Analysis Slide');
+  txt(s, 1.684, 1.409, 6.203, 0.478, LOREM_BRING + '.', { lineSpacingMultiple: 1.5 });
+  // 3-D slabs first, then every label, so the text always sits on top
+  BANDS.forEach((b, i) => {
+    const y = 2.727 + i * 0.8515;
+    poly(s, 1.684, y, 2.7, 1.023, b.top,                 // top hexagonal face
+      [[0, 0.5], [0.25, 0], [0.75, 0], [1, 0.5], [0.75, 1], [0.25, 1]]);
+    poly(s, 1.684, y + 0.511, 0.675, 0.858, b.left,      // lower-left extrusion
+      [[0, 0], [1, 0.596], [1, 1], [0, 0.404]]);
+    poly(s, 3.709, y + 0.511, 0.675, 0.858, b.right,     // lower-right extrusion
+      [[1, 0], [0, 0.596], [0, 1], [1, 0.404]]);
+    rect(s, 2.36, y + 1.023, 1.349, 0.347, b.foot);      // front face of the prism
+  });
+  BANDS.forEach((b, i) => {
+    const y = 2.727 + i * 0.8515;
+    txt(s, 2.289, y + 0.627, 1.491, 0.269, b.label,
+      { fontSize: 16, color: GRAY4, bold: true, align: 'center' });
+    line(s, 4.75, y + 0.511, 0.709, 0, b.ink, 1.5, { line: { color: b.ink, width: 1.5, endArrowType: 'oval' } });
+    txt(s, 5.824, y + 0.112, 0.375, 0.536, b.letter, { fontSize: 32, color: b.ink, bold: true });
+    txt(s, 6.565, y + 0.112, 5.084, 0.269, b.title, { fontSize: 16, color: b.ink, bold: true });
+    txt(s, 6.565, y + 0.431, 5.084, 0.478, LOREM_SWOT, { lineSpacingMultiple: 1.5 });
+  });
+  www(s, 8.489, 1.288, 3.16, GRAY, { align: 'right' });
+});
+
+// 22 — facts in numbers
+build.push(s => {
+  const CARDS = [
+    ['1000+', 'Customers', 5.971, 1.214, 6.447, 1.596, 'camera'],
+    ['1520+', 'Special Products', 9.301, 1.214, 9.777, 1.593, 'dumbbell'],
+    ['2500+', 'Products', 5.971, 3.99, 6.447, 4.372, 'bag'],
+    ['500+', 'Employee', 9.301, 3.99, 9.777, 4.372, 'screen'],
+  ];
+  rect(s, 0, 0, 7.398, 7.5, OLIVE);
+  rect(s, 7.398, 0, 5.936, 7.5, RED);
+  head(s, 0.986, 2.253, 3.999, 0.421, 'Facts In Numbers', { color: WHITE });
+  txt(s, 0.986, 3.141, 3.997, 1.488,
+    'Interactively coordinate proactive e-commerce via process centric "outside the box" thinking completely pursue scalable c.\n\n' +
+    'Collaboratively administrate empowered markets via plug and play networks. Standards in web-readiness. Energistically scale future-proof core competencies impactful experiences.',
+    { color: WHITE, lineSpacingMultiple: 1.5 });
+  const ICON = {
+    camera: [['rect', 0, 0.2, 1, 0.8], ['rect', 0.3, 0, 0.3, 0.2], ['ellipse', 0.32, 0.36, 0.36, 0.4, TEAL]],
+    dumbbell: [['rect', 0, 0.3, 0.16, 0.7], ['rect', 0.28, 0.1, 0.16, 0.9], ['rect', 0.56, 0.1, 0.16, 0.9], ['rect', 0.84, 0.3, 0.16, 0.7], ['rect', 0, 0, 1, 0.12]],
+    bag: [['rect', 0, 0.26, 1, 0.74], ['rect', 0.3, 0, 0.4, 0.2], ['rect', 0.42, 0.44, 0.16, 0.22, TEAL]],
+    screen: [['rect', 0, 0, 1, 0.66], ['rect', 0.12, 0.12, 0.76, 0.4, TEAL], ['rect', 0.24, 0.8, 0.52, 0.2]],
+  };
+  CARDS.forEach(([big, small, cx, cy, tx, iy, kind]) => {
+    rect(s, cx, cy, 2.854, 2.296, TEAL);
+    ICON[kind].forEach(([shp, px, py, pw, ph, col]) =>
+      s.addShape(shp, { x: tx + px * 0.525, y: iy + py * 0.527, w: pw * 0.525, h: ph * 0.527, fill: { color: col || WHITE } }));
+    txt(s, tx, cy + 0.909, 1.901, 0.805, big,
+      { fontSize: 44, color: WHITE, bold: true, lineSpacing: 60 });
+    txt(s, tx, cy + 1.611, 1.901, 0.303, small, { fontSize: 18, color: WHITE });
+  });
+  www(s, 0.986, 5.096, 3.028, WHITE);
+});
+
+// 23 — infographic slide (rocket + laptop illustration)
+build.push(s => {
+  const ART = [
+    ['rect', 1.145, 4.107, 2.378, 0.243, '354D5D'], ['rect', 3.405, 4.107, 1.822, 0.243, '2E4452'],
+    ['rect', 1.931, 4.107, 0.804, 0.082, '486780'], ['rect', 2.556, 2.52, 3.065, 1.64, '3D586B'],
+    ['rect', 5.017, 2.52, 0.712, 1.64, '2E4452'], ['rect', 2.674, 2.618, 2.83, 1.444, '2E4452'],
+    ['rect', 2.714, 2.784, 2.738, 1.278, 'E2F4F6'], ['rect', 3.114, 2.647, 2.382, 0.136, 'BCBEC0'],
+    ['ellipse', 3.2, 2.675, 0.082, 0.082, RED], ['ellipse', 5.193, 2.675, 0.083, 0.083, RED],
+    ['ellipse', 5.33, 2.675, 0.082, 0.083, TEAL],
+    ['rect', 3.065, 2.897, 0.568, 0.438, OLIVE], ['rect', 2.898, 3.463, 0.566, 0.44, OLIVE],
+    ['rect', 3.731, 2.897, 1.535, 0.079, OLIVE], ['rect', 3.689, 3.039, 1.534, 0.079, OLIVE],
+    ['rect', 3.646, 3.181, 1.533, 0.079, OLIVE], ['rect', 3.604, 3.322, 1.531, 0.079, OLIVE],
+    ['rect', 3.501, 3.463, 1.59, 0.282, OLIVE], ['rect', 3.462, 3.799, 1.525, 0.079, OLIVE],
+    ['ellipse', 1.435, 2.219, 2.815, 1.891, PINK], ['ellipse', 1.572, 3.156, 2.527, 0.953, PINK],
+    ['ellipse', 2.554, 1.151, 0.756, 1.006, 'E7C5C5'], ['ellipse', 3.09, 1.151, 0.22, 1.006, 'EBEBEB'],
+    ['ellipse', 2.67, 1.289, 0.482, 0.482, 'EBEBEB'], ['ellipse', 2.689, 1.307, 0.445, 0.445, 'FF7D70'],
+    ['ellipse', 2.743, 1.364, 0.304, 0.304, PINK],
+    ['triangle', 2.352, 1.813, 0.268, 0.538, RED], ['triangle', 3.229, 1.84, 0.241, 0.511, RED],
+    ['triangle', 2.672, 0.696, 0.438, 0.415, 'A84646'], ['triangle', 2.648, 0.793, 0.526, 0.358, RED],
+    ['rect', 2.846, 1.861, 0.099, 0.484, RED], ['rect', 2.902, 1.85, 0.062, 0.505, 'D99D9D'],
+  ];
+  const NOTES = [['01', RED, 7.173, 0.885], ['02', TEAL, 9.955, 0.884],
+                 ['03', TEAL, 7.173, 2.747], ['04', RED, 9.955, 2.748]];
+  rect(s, 0, 5.047, 13.333, 2.453, OLIVE);
+  drawParts(s, ART);
+  NOTES.forEach(([n, c, x, y]) => {
+    txt(s, x, y, 0.616, 0.404, n, { fontSize: 24, color: c, bold: true });
+    txt(s, x, y + 0.458, 2.233, 0.236, 'Your Title Here', { fontSize: 14, color: GRAY6, bold: true });
+    txt(s, x, y + 0.755, 2.233, 0.726, LOREM_PRED, { lineSpacingMultiple: 1.5 });
+  });
+  head(s, 1.145, 6.063, 3.535, 0.421, 'Infographic Slide', { color: WHITE });
+  txt(s, 6.155, 5.908, 6.034, 0.73,
+    'Collaboratively administrate empowered markets via plug-and-play networks. Dynamic procrastinate B2C users after installed base benefits dramatic visualize. Standards in web readiness. Energistically scale future-proof core competencies vis-a-vis impactful experiences dramatically.',
+    { color: WHITE, lineSpacingMultiple: 1.5 });
+});
+
+// 24 — our product in your tablet
+build.push(s => {
+  rect(s, 0, 0, 13.333, 2.507, TEAL);
+  rect(s, 0, 2.507, 13.333, 4.993, OLIVE);
+  rect(s, 8.497, 1.05, 3.804, 5.401, PH_TABLET, { rectRadius: 0.1 });   // tablet body
+  photo(s, 8.706, 1.534, 3.352, 4.441, PH_RED);                          // screen contents
+  head(s, 0.937, 1.038, 6.89, 0.421, 'Our Product In Your Tablet', { color: WHITE });
+  [['32+ Products', 0.937, 1.598, 2.1], ['16+ Main Sponsor', 4.381, 5.043, 2.422]].forEach(
+    ([label, ix, tx, tw]) => {
+      rect(s, ix, 3.74, 0.45, 0.316, WHITE);              // little briefcase pictogram
+      rect(s, ix + 0.15, 3.629, 0.15, 0.11, WHITE);
+      rect(s, ix + 0.19, 3.86, 0.07, 0.08, OLIVE);
+      txt(s, tx, 3.72, tw, 0.36, label, { fontSize: 18, color: WHITE, bold: true });
+      txt(s, tx, 4.22, 2.422, 0.726, LOREM_EMP, { color: WHITE, lineSpacingMultiple: 1.5 });
+    });
+  txt(s, 0.937, 5.764, 6.528, 0.726,
+    'Interactively procrastinate high-payoff content without backward compatible data. Quickly cultivate optimal processes and tactical architectures completely iterate. Globally incubate standards compliant channels before scalable benefits disseminate superior deliverables whereas dramatic visualize testing.',
+    { color: WHITE, lineSpacingMultiple: 1.5 });
+});
+
+// 25 — our product in your smart watch
+build.push(s => {
+  ell(s, 6.784, 1.583, 4.335, 4.334, TEAL);
+  rect(s, 8.14, 1.134, 1.63, 1.4, '3A3A3A', { rectRadius: 0.25 });      // upper strap
+  rect(s, 8.14, 4.96, 1.63, 1.405, '3A3A3A', { rectRadius: 0.25 });     // lower strap
+  s.addShape('roundRect', {                                             // watch case
+    x: 7.476, y: 2.2, w: 2.952, h: 3.1, rectRadius: 0.22, fill: { color: PH_WATCH },
+  });
+  photo(s, 7.852, 2.432, 2.138, 2.631, PH_BLUE);                        // watch face
+  head(s, 0.815, 1.903, 5.153, 0.841, 'Our Product\nIn Your Smart Watch');
+  txt(s, 0.815, 2.934, 5.153, 0.731,
+    'Proactively envisioned multimedia based expertise and cross media growth strategies seamlessly visualize quality intellectual. Collaboration. Leverage agile frameworks to provide a robust with seamlessly visualize quality intellectual.',
+    { lineSpacingMultiple: 1.5 });
+  [['01', TEAL, 0.815], ['02', RED, 3.328]].forEach(([n, c, x]) => {
+    txt(s, x, 4.115, 0.616, 0.404, n, { fontSize: 24, color: c, bold: true });
+    txt(s, x, 4.574, 2.233, 0.236, 'Your Product Name', { fontSize: 14, color: GRAY6, bold: true });
+    txt(s, x, 4.871, 2.233, 0.726, LOREM_PRED, { lineSpacingMultiple: 1.5 });
+  });
+  txt(s, 10.58, 2.545, 3.293, 0.471,
+    '\u201C There is no perfection, only beautiful versions of brokenness.\u201C',
+    { fontSize: 14, color: GRAY4, bold: true, italic: true, align: 'right', rotate: 270 });
+});
+
+// 26 — our location (world map)
+build.push(s => {
+  const GREY = 'BFBFBF';
+  // Simplified continent outlines, drawn as polygons in the group's box.
+  const LAND = [
+    // North America
+    [3.7, 2.731, 2.6, 1.981, GREY,
+      [[0.00, 0.12], [0.22, 0.02], [0.46, 0.10], [0.70, 0.00], [0.98, 0.08], [0.90, 0.24],
+       [0.72, 0.30], [0.68, 0.46], [0.58, 0.60], [0.56, 0.84], [0.48, 1.00], [0.42, 0.78],
+       [0.36, 0.56], [0.22, 0.44], [0.10, 0.30]]],
+    // Asia
+    [6.929, 2.803, 2.644, 2.238, GREY,
+      [[0.00, 0.16], [0.20, 0.04], [0.52, 0.00], [0.82, 0.08], [1.00, 0.24], [0.90, 0.38],
+       [0.94, 0.52], [0.80, 0.60], [0.72, 0.78], [0.62, 0.62], [0.52, 0.80], [0.44, 0.60],
+       [0.30, 0.66], [0.22, 0.48], [0.08, 0.36]]],
+    // Africa
+    [6.153, 4.039, 1.261, 1.527, GREY,
+      [[0.06, 0.02], [0.46, 0.00], [0.86, 0.06], [1.00, 0.22], [0.78, 0.34], [0.66, 0.56],
+       [0.56, 0.84], [0.44, 1.00], [0.32, 0.72], [0.20, 0.46], [0.04, 0.28], [0.00, 0.12]]],
+    // Europe (highlighted)
+    [6.085, 2.85, 1.065, 1.217, RED,
+      [[0.10, 0.10], [0.38, 0.00], [0.60, 0.12], [0.86, 0.06], [1.00, 0.28], [0.82, 0.42],
+       [0.86, 0.62], [0.66, 0.72], [0.56, 0.94], [0.42, 0.74], [0.24, 0.66], [0.16, 0.44],
+       [0.00, 0.30]]],
+    // South America (highlighted)
+    [5.014, 4.626, 0.856, 1.48, TEAL,
+      [[0.14, 0.00], [0.62, 0.04], [1.00, 0.18], [0.86, 0.34], [0.78, 0.52], [0.62, 0.74],
+       [0.52, 1.00], [0.38, 0.76], [0.32, 0.50], [0.14, 0.32], [0.00, 0.12]]],
+    // Australia (highlighted)
+    [8.506, 4.854, 1.128, 0.992, RED,
+      [[0.10, 0.28], [0.34, 0.06], [0.62, 0.14], [0.84, 0.02], [1.00, 0.30], [0.88, 0.56],
+       [0.68, 0.78], [0.44, 0.84], [0.22, 0.66], [0.02, 0.48]]],
+  ];
+  photo(s, 0.408, 0.417, 12.517, 6.667, PH_RED);
+  scrim(s, 0.656, 0.628, 12.517, 6.667, '0D0D0D', 18);
+  head(s, 3.028, 1.067, 7.276, 0.432, 'Our Location', { color: WHITE, align: 'center' });
+  txt(s, 3.028, 1.6, 7.276, 0.478,
+    LOREM_BRING + ' towa solution user generated content.',
+    { color: WHITE, lineSpacingMultiple: 1.5, align: 'center' });
+  LAND.forEach(a => poly(s, a[0], a[1], a[2], a[3], a[4], a[5]));
+  line(s, 3.143, 3.364, 3.562, 0.012, RED, 1, { line: { color: RED, width: 1, endArrowType: 'oval' } });
+  line(s, 4, 5.042, 1.142, 0.003, TEAL, 1, { line: { color: TEAL, width: 1, endArrowType: 'oval' } });
+  line(s, 9.034, 4.261, 0.997, 0.917, RED, 1, { flipH: true, line: { color: RED, width: 1, endArrowType: 'oval' } });
+  txt(s, 1.08, 3.258, 2.063, 0.236, 'Continental Europe',
+    { fontSize: 14, color: WHITE, bold: true, align: 'right' });
+  txt(s, 1.08, 3.609, 2.063, 0.73,
+    'Make a type specimen book amet unknown printer took a galley dolor it to great.',
+    { color: WHITE, lineSpacingMultiple: 1.5, align: 'right' });
+  txt(s, 1.08, 4.928, 2.92, 0.236, 'Continental South American',
+    { fontSize: 14, color: WHITE, bold: true, align: 'right' });
+  txt(s, 1.08, 5.19, 2.92, 0.73,
+    'Globally incubate standards compliant channels before scalable benefits extensible testing fruit to identify a ballpark value.',
+    { color: WHITE, lineSpacingMultiple: 1.5, align: 'right' });
+  txt(s, 10.031, 4.144, 2.214, 0.236, 'Continental Australian',
+    { fontSize: 14, color: WHITE, bold: true });
+  txt(s, 10.031, 4.495, 2.214, 0.73,
+    'PLACEHOLDER',
+    { color: WHITE, lineSpacingMultiple: 1.5 });
+  www(s, 4.767, 6.469, 3.8, WHITE, { align: 'center' });
+});
+
+// 27 — our location (UK map + pie chart)
+build.push(s => {
+  photo(s, 7.146, 0, 6.188, 7.5, PH_BLUE);
+  scrim(s, 7.315, 0.143, 6.188, 7.5, '0D0D0D', 20);
+  // Simplified British Isles: Scotland, England, N. Ireland, Wales
+  poly(s, 8.92, 0.82, 2.174, 2.9, OLIVE,
+    [[0.28, 0.00], [0.44, 0.10], [0.58, 0.02], [0.66, 0.18], [0.86, 0.14], [0.96, 0.34],
+     [0.80, 0.44], [0.90, 0.58], [0.74, 0.70], [0.78, 0.88], [0.58, 1.00], [0.44, 0.86],
+     [0.30, 0.90], [0.24, 0.70], [0.10, 0.58], [0.20, 0.40], [0.06, 0.26], [0.16, 0.12]]);
+  poly(s, 9.426, 3.558, 2.681, 2.969, RED,
+    [[0.20, 0.00], [0.40, 0.06], [0.56, 0.00], [0.70, 0.14], [0.84, 0.34], [1.00, 0.48],
+     [0.88, 0.62], [0.72, 0.66], [0.66, 0.84], [0.52, 1.00], [0.42, 0.82], [0.30, 0.88],
+     [0.22, 0.70], [0.06, 0.60], [0.14, 0.44], [0.00, 0.30], [0.10, 0.14]]);
+  poly(s, 8.545, 3.857, 0.974, 0.637, TEAL,
+    [[0.18, 0.06], [0.52, 0.00], [0.82, 0.12], [1.00, 0.42], [0.84, 0.74], [0.56, 1.00],
+     [0.24, 0.84], [0.00, 0.46], [0.06, 0.22]]);
+  poly(s, 9.575, 4.856, 0.941, 0.98, TEAL,
+    [[0.28, 0.00], [0.62, 0.08], [0.90, 0.24], [1.00, 0.52], [0.78, 0.76], [0.50, 0.94],
+     [0.24, 1.00], [0.06, 0.72], [0.00, 0.40], [0.10, 0.16]]);
+  head(s, 1.276, 1.434, 4.593, 0.433, 'Our Location');
+  txt(s, 1.276, 2.152, 4.593, 0.236, '27% Profit Sales Every Month',
+    { fontSize: 14, color: GRAY6, bold: true });
+  txt(s, 1.276, 2.642, 4.593, 0.73,
+    'Collaboratively administrate empowered markets via plug and play networks. Dynamic procrastinate B2C users after installed base benefits dramatic visualize extensible our solution administrate.',
+    { lineSpacingMultiple: 1.5 });
+  s.addChart('doughnut', [{
+    name: 'Sales 2017',
+    labels: ['Rival Company One', 'Rival Company Two', 'Our Company'],
+    values: [703, 659, 982],
+  }], {
+    x: 1.276, y: 3.893, w: 2.174, h: 2.174,
+    chartColors: [OLIVE, TEAL, RED], holeSize: 61,
+    showLegend: false, showValue: true, dataLabelColor: WHITE,
+    dataLabelFontFace: 'Lato', dataLabelFontSize: 10, dataLabelFontBold: true,
+    dataBorder: { pt: 0, color: WHITE },
+  });
+  txt(s, 2.028, 4.889, 0.67, 0.202, '2021', { fontSize: 12, color: GRAY6, bold: true, align: 'center' });
+  txt(s, 3.69, 3.996, 2.174, 0.73,
+    'Administrate empowered markets via plug-and-play networks users after installed base.',
+    { lineSpacingMultiple: 1.5 });
+  [['Hard Gym', RED, 4.947], ['Middle Gym', OLIVE, 5.354], ['Easy Gym', TEAL, 5.761]].forEach(
+    ([label, c, y]) => {
+      rect(s, 3.69, y + 0.002, 0.2, 0.2, c);
+      txt(s, 4.057, y, 1.4, 0.185, label, { fontSize: 11, color: GRAY6 });
+    });
+});
+
+// 28 — gallery image slide
+build.push(s => {
+  rect(s, 0, 0, 11.275, 7.5, OLIVE);
+  photo(s, 0.478, 0.96, 2.452, 5.58, PH_BLUE);
+  photo(s, 3.157, 0.96, 3.62, 2.715, PH_BLUE);
+  photo(s, 3.157, 3.825, 3.62, 2.715, PH_RED);
+  photo(s, 7.003, 0.96, 3.406, 5.58, PH_RED);
+  rect(s, 9.217, 2.557, 4.116, 2.386, TEAL);
+  head(s, 9.897, 3.259, 2.959, 0.982, 'Gallery Image Slide',
+    { fontSize: 32, lineSpacing: 35, color: WHITE });
+});
+
+// 29 — keep in touch
+build.push(s => {
+  const CONTACT = [
+    ['20 WEST AVENUE, NY 1610, USA', OLIVE, 1.284, 4.895, 0.227, 0.324, 4.963],
+    ['+ 1234 567 8910 | + 4567 890 777', TEAL, 1.236, 5.486, 0.324, 0.324, 5.554],
+    ['gym.treatment@jugeo.com', RED, 1.252, 6.077, 0.292, 0.292, 6.128],
+  ];
+  photo(s, 5.797, 1.128, 7.536, 5.245, PH_RED);
+  head(s, 3.256, 2.724, 5.889, 0.729, 'Keep In Touch', { fontSize: 48, lineSpacing: 52 });
+  CONTACT.forEach(([text, c, ix, iy, iw, ih, ty]) => {
+    ell(s, ix, iy, iw, ih, c);
+    txt(s, 1.875, ty, 2.516, 0.196, text, { fontSize: 12, lineSpacing: 14 });
+  });
+  www(s, 1.236, 1.131, 2.6);
+});
+
+// 30 — thanks for watching
+build.push(s => {
+  rect(s, 6.667, 0, 6.667, 7.5, OLIVE);
+  photo(s, 1.442, 1.217, 3.783, 5.065, PH_BLUE);
+  head(s, 8, 1.217, 4.377, 1.052, 'Thanks', { fontSize: 66, lineSpacing: 75, color: WHITE });
+  head(s, 8, 2.097, 4.377, 0.673, 'For Watching', { fontSize: 40, color: WHITE });
+  txt(s, 9.305, 4.909, 2.695, 0.269, 'Your Message Here', { fontSize: 16, color: WHITE, bold: true });
+  txt(s, 9.305, 5.299, 2.695, 0.983,
+    'Make a type specimen book unknown printer took type and good scrambled it to make a type specimen book agile frameworks with globally incubate standards good.',
+    { color: WHITE, lineSpacingMultiple: 1.5 });
+  www(s, 4.546, 4.798, 2.8, GRAY, { fontSize: 10, rotate: 270 });
+});
+
+/* ------------------------------------------------------------------ *
+ * 31-42 — icon library sheets.
+ * Each sheet is a 10-column grid of small dark pictograms. The source
+ * draws ~70 hand-traced freeforms per sheet; here each cell is composed
+ * from one or two native shapes by the recipes below.
+ * ------------------------------------------------------------------ */
+const GLYPH_INK = INK;
+
+/**
+ * Icon recipes. Each entry lists the parts of one pictogram as
+ * [shape, x, y, w, h] in 0..1 cell coordinates; a 6th value 'W' punches
+ * a white detail out of the body (screens, dials, keyholes...).
+ */
+const GLYPHS = [
+  [['ellipse', 0, 0, 1, 1], ['ellipse', 0.3, 0.3, 0.4, 0.4, 'W']],           // ring
+  [['roundRect', 0.05, 0.15, 0.9, 0.7], ['rect', 0.2, 0.32, 0.6, 0.1, 'W'], ['rect', 0.2, 0.5, 0.45, 0.1, 'W']], // card
+  [['rect', 0.1, 0.1, 0.8, 0.62], ['rect', 0, 0.78, 1, 0.14]],               // monitor
+  [['triangle', 0, 0.1, 1, 0.9], ['rect', 0.42, 0.4, 0.16, 0.3, 'W']],       // warning
+  [['ellipse', 0.05, 0.05, 0.9, 0.9], ['rect', 0.46, 0.2, 0.08, 0.34, 'W'], ['rect', 0.46, 0.48, 0.3, 0.08, 'W']], // clock
+  [['chevron', 0.15, 0.05, 0.7, 0.9]],                                       // chevron
+  [['ellipse', 0.25, 0.02, 0.5, 0.5], ['pie', 0.05, 0.45, 0.9, 0.62]],       // person
+  [['star5', 0, 0, 1, 1]],                                                   // star
+  [['rect', 0.08, 0.24, 0.84, 0.6], ['rect', 0.34, 0.06, 0.32, 0.2]],        // briefcase
+  [['plus', 0.05, 0.05, 0.9, 0.9]],                                          // plus
+  [['octagon', 0, 0, 1, 1], ['rect', 0.24, 0.44, 0.52, 0.12, 'W']],          // stop
+  [['heart', 0, 0.05, 1, 0.9]],                                              // heart
+  [['trapezoid', 0.02, 0.2, 0.96, 0.6], ['rect', 0.4, 0.02, 0.2, 0.2]],      // bag
+  [['moon', 0.15, 0, 0.7, 1]],                                               // moon
+  [['sun', 0, 0, 1, 1]],                                                     // sun
+  [['donut', 0, 0, 1, 1]],                                                   // donut
+  [['rightArrow', 0, 0.2, 1, 0.6]],                                          // forward
+  [['leftArrow', 0, 0.2, 1, 0.6]],                                           // back
+  [['upArrow', 0.2, 0, 0.6, 1]],                                             // upload
+  [['downArrow', 0.2, 0, 0.6, 1]],                                           // download
+  [['cloud', 0, 0.1, 1, 0.8]],                                               // cloud
+  [['can', 0.2, 0, 0.6, 1]],                                                 // battery
+  [['cube', 0.05, 0.05, 0.9, 0.9]],                                          // box
+  [['flowChartConnector', 0, 0, 1, 1], ['rect', 0.3, 0.3, 0.4, 0.4, 'W']],   // target
+  [['roundRect', 0.22, 0, 0.56, 1], ['rect', 0.32, 0.14, 0.36, 0.6, 'W']],   // phone
+  [['rect', 0.06, 0.3, 0.88, 0.5], ['ellipse', 0.38, 0.16, 0.24, 0.24, 'W'], ['ellipse', 0.4, 0.44, 0.2, 0.2, 'W']], // camera
+  [['ellipse', 0.05, 0.05, 0.9, 0.9], ['rect', 0.2, 0.44, 0.6, 0.12, 'W'], ['rect', 0.44, 0.2, 0.12, 0.6, 'W']],     // add
+  [['rect', 0.1, 0.05, 0.8, 0.9], ['rect', 0.24, 0.22, 0.52, 0.1, 'W'], ['rect', 0.24, 0.42, 0.52, 0.1, 'W'], ['rect', 0.24, 0.62, 0.32, 0.1, 'W']], // document
+  [['pie', 0, 0, 1, 1]],                                                     // chart slice
+  [['diamond', 0, 0, 1, 1]],                                                 // diamond
+  [['hexagon', 0, 0.1, 1, 0.8]],                                             // hex
+  [['rect', 0.05, 0.55, 0.22, 0.45], ['rect', 0.39, 0.3, 0.22, 0.7], ['rect', 0.73, 0.05, 0.22, 0.95]], // bars
+];
+
+function iconSheet(seed, rows, lastRowCount) {
+  return s => {
+    let k = 0;
+    for (let r = 0; r < rows; r++) {
+      const cols = (r === rows - 1 && lastRowCount) ? lastRowCount : 10;
+      for (let c = 0; c < cols; c++) {
+        const size = 0.36 + ((k * 7 + seed) % 5) * 0.025;           // 0.36"-0.46", as in the source
+        const gx = 1.362 + c * 1.177 - size / 2;
+        const gy = 0.9 + r * (rows > 7 ? 0.813 : 0.9495) - size / 2;
+        GLYPHS[(k * 3 + r + seed * 5) % GLYPHS.length].forEach(([kind, px, py, pw, ph, cut]) => {
+          s.addShape(kind, {
+            x: gx + px * size, y: gy + py * size, w: pw * size, h: ph * size,
+            fill: { color: cut ? WHITE : GLYPH_INK },
+          });
+        });
+        k++;
+      }
+    }
+  };
+}
+
+for (let i = 31; i <= 42; i++) {
+  if (i === 39) build.push(iconSheet(i, 8));            // 80 glyphs on a tighter grid
+  else if (i === 42) build.push(iconSheet(i, 7, 7));    // last sheet stops at 67 glyphs
+  else build.push(iconSheet(i, 7));
+}
+
+/* ------------------------------------------------------------------ *
+ * Render
+ * ------------------------------------------------------------------ */
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'JUGEO_16x9', width: 13.333, height: 7.5 });
+pptx.layout = 'JUGEO_16x9';
+pptx.title = 'Jugeo Presentation';
+
+build.forEach(fn => fn(pptx.addSlide()));
+
+pptx.writeFile({
+  fileName: path.join(__dirname, '00dcd58e-3940-46e8-a68a-1e0c5a807986_grok_final.pptx'),
+}).then(f => console.log('wrote', f));
