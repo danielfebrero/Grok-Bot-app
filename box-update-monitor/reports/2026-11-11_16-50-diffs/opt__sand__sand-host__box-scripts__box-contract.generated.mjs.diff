@@ -1,0 +1,20 @@
+--- 2026-11-11_08-54:/opt/sand/sand-host/box-scripts/box-contract.generated.mjs
++++ 2026-11-11_16-50:/opt/sand/sand-host/box-scripts/box-contract.generated.mjs
+@@ -1,4 +1,4 @@
+-// @generated SignedSource<<9182f8292951be728dae510d87dad9758778d49725800d1a9ccf434e6d8829cd>>
++// @generated SignedSource<<ff6fd90d604ea60580a81ea3b4a81536b4f3007ecf41852fbccf75950baa5c6d>>
+ // Emitted by scripts/gen-box-contract.mts from sand/src/shared/box/box-contract.ts;
+ // regenerate with `pnpm --filter sand run gen:box-contract`.
+ export const CURSOR_AGENT_SOCKET_ENV_VAR = "CURSOR_AGENT_SOCKET";
+@@ -26,6 +26,11 @@
+ export const BOX_BROWSER_RUNNING_PATH_PREFIX = "/tmp/sand-box-browser-running";
+ export const BOX_BROWSER_GPU_MODE_PATH_PREFIX = "/tmp/sand-box-browser-gpu-mode";
+ export const BOX_BROWSER_GPU_MODES = ["swiftshader","angle-gl","legacy","stock","llvmpipe"];
++export const BOX_BROWSER_WEBGL_BACKEND_CLASSES = ["swiftshader","angle-opengl","angle-opengles","angle-vulkan","angle-other","none","unknown"];
++export const BOX_BROWSER_WEBGL_RENDERER_CLASSES = ["swiftshader","llvmpipe","other_software","other","none","unknown"];
++export const BOX_BROWSER_ACCEPT_LANGUAGE_CLASSES = ["chrome_default","fleet_default","en_only","en_mixed","non_en_first"];
++export const BOX_BROWSER_WEBGL_VERDICTS = ["match","mismatch","unverified"];
++export const BOX_BROWSER_PERSONA_BUCKETS = 16;
+ export const BROWSER_ACCEPT_LANGUAGE_EN_US_MARKER_PATH = "/tmp/sand-browser-accept-language-en-us";
+ export const BOX_BROWSER_ACCEPT_LANGUAGE_PATH_PREFIX = "/tmp/sand-box-browser-accept-language";
+ export const BROWSER_EGRESS_TIMEZONE_MARKER_PATH = "/tmp/sand-browser-egress-timezone";

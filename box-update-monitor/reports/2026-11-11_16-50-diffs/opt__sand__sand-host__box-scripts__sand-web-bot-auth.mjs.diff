@@ -1,0 +1,129 @@
+--- 2026-11-11_08-54:/opt/sand/sand-host/box-scripts/sand-web-bot-auth.mjs
++++ 2026-11-11_16-50:/opt/sand/sand-host/box-scripts/sand-web-bot-auth.mjs
+@@ -189,9 +189,11 @@
+ const RENEWAL_PATH = "/sand-box/inference-credential";
+ const DEFAULT_BACKEND_URL = "https://api2.cursor.sh";
+ export const BOX_HOST_ATTESTATION_TIMEOUT_MS = 250;
++export const BOX_HOST_ATTESTATION_RETRY_DELAYS_MS = [250, 750];
++export const BOX_HOST_ATTESTATION_RETRY_WAIT_LIMIT_MS = 1_500;
+ const BOX_HOST_ATTESTATION_MAX_RESPONSE_BYTES = 8 * 1024;
+ const REQUEST_TIMEOUT_MS = 1_000;
+-const OFF_HOT_PATH_RENEWAL_TIMEOUT_MS = 2_000;
++const OFF_HOT_PATH_RENEWAL_TIMEOUT_MS = 5_000;
+ const RENEWAL_BACKOFF = {
+   accessLapsed: { firstStepMs: 60_000, capMs: 30 * 60_000 },
+   otherFailure: { firstStepMs: 5_000, capMs: 5 * 60_000 },
+@@ -316,6 +318,17 @@
+   return status === 200 ? "malformed_response" : `status_${status}`;
+ }
+ 
++function jitteredHostAttestationRetryWaitMs(delayMs, retryAfterMs, random) {
++  const floorMs = retryAfterMs ?? 0;
++  if (floorMs > BOX_HOST_ATTESTATION_RETRY_WAIT_LIMIT_MS) return null;
++  const lowMs = Math.max(delayMs / 2, floorMs);
++  const highMs = Math.min(
++    BOX_HOST_ATTESTATION_RETRY_WAIT_LIMIT_MS,
++    Math.max(delayMs, floorMs * 1.5),
++  );
++  return lowMs + (highMs - lowMs) * random();
++}
++
+ function unexpiredAccessToken(cached, nowMs) {
+   return cached != null && nowMs < cached.expiresAtMs ? cached.accessToken : null;
+ }
+@@ -339,7 +352,7 @@
+     now = Date.now,
+     random = Math.random,
+     timeoutMs = OFF_HOT_PATH_RENEWAL_TIMEOUT_MS,
+-    getHostAttestation = async () => undefined,
++    getHostAttestation,
+     hostAttestedRenewal = false,
+   }) {
+     this.credential = credential;
+@@ -349,7 +362,10 @@
+     this.now = now;
+     this.random = random;
+     this.timeoutMs = timeoutMs;
+-    this.getHostAttestation = getHostAttestation;
++    this.getHostAttestation = getHostAttestation ?? (async () => undefined);
++    this.hostAttestationRetryDelaysMs =
++      hostAttestedRenewal && getHostAttestation != null ? BOX_HOST_ATTESTATION_RETRY_DELAYS_MS : [];
++    this.hostAttestationMisses = 0;
+     this.consecutiveFailures = { accessLapsed: 0, otherFailure: 0 };
+     this.cached = null;
+     this.nextRenewalAtMs = 0;
+@@ -379,16 +395,38 @@
+     return (await this.renewalInFlight) ?? unexpiredAccessToken(this.cached, this.now());
+   }
+ 
++  hostAttestationRetryWaitMs(retryAfterMs) {
++    const delayMs = this.hostAttestationRetryDelaysMs[this.hostAttestationMisses];
++    if (delayMs == null) return null;
++    const waitMs = jitteredHostAttestationRetryWaitMs(delayMs, retryAfterMs, this.random);
++    if (waitMs == null) return null;
++    const leavesCallerWithoutToken =
++      this.credential !== "" && unexpiredAccessToken(this.cached, this.now() + waitMs) == null;
++    return leavesCallerWithoutToken ? null : waitMs;
++  }
++
+   async renew() {
+     let status = null;
+     let answeredToAttestationAlone = false;
+     try {
+       let hostAttestation;
++      let retryAfterMs;
+       try {
+-        hostAttestation = await this.getHostAttestation();
++        hostAttestation = await this.getHostAttestation((hintMs) => {
++          retryAfterMs = hintMs;
++        });
+       } catch (_hostAttestationUnavailable) {
+         hostAttestation = undefined;
+       }
++      if (hostAttestation == null) {
++        const retryWaitMs = this.hostAttestationRetryWaitMs(retryAfterMs);
++        if (retryWaitMs != null) {
++          this.hostAttestationMisses += 1;
++          this.nextRenewalAtMs = this.now() + retryWaitMs;
++          return null;
++        }
++      }
++      this.hostAttestationMisses = 0;
+       let exchange;
+       if (!this.hostAttestedRenewal) {
+         exchange = await this.exchange({ credential: this.credential, hostAttestation });
+@@ -437,6 +475,7 @@
+         method: "POST",
+         redirect: "error",
+         headers: {
++          connection: "close",
+           "content-type": "application/json",
+           ...(hostAttestation == null
+             ? {}
+@@ -465,11 +504,12 @@
+   socketPath,
+   requestImpl = http.request,
+   timeoutMs = BOX_HOST_ATTESTATION_TIMEOUT_MS,
++  now = Date.now,
+ }) {
+   const payload = JSON.stringify({
+     surface: GROK_BOT_BOX_HOST_ATTESTATION_INFERENCE_CREDENTIAL_SURFACE,
+   });
+-  return async () =>
++  return async (onRetryAfter) =>
+     await new Promise((resolve) => {
+       let settled = false;
+       const finish = (assertion) => {
+@@ -490,6 +530,12 @@
+         },
+         (res) => {
+           if (res.statusCode !== 200) {
++            const retryAfter = res.headers?.["retry-after"];
++            const retryAfterMs =
++              typeof retryAfter === "string" && retryAfter.trim() !== ""
++                ? parseRetryAfterMs(retryAfter, now())
++                : null;
++            if (retryAfterMs != null) onRetryAfter?.(retryAfterMs);
+             res.resume();
+             finish(undefined);
+             return;

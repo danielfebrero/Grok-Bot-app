@@ -1,0 +1,18 @@
+--- 2026-11-11_08-54:/home/box/sand-data/managed-skills/skills/purchases/SKILL.md
++++ 2026-11-11_16-50:/home/box/sand-data/managed-skills/skills/purchases/SKILL.md
+@@ -106,11 +106,13 @@
+ 
+ ## Bank verification
+ - After a payment is submitted, a check from the card's bank (3-D Secure: approve it in the banking app, enter a code the bank texted, or a step on the bank's page) is a human step, not a decline.
+-- Brief every computerUse subagent that submits a payment: a bank check after it submits is a human step, so it doesn't submit the payment again, keeps the tab open, and reports starting with "Bank verification:", with what the check asks and the amount. When its brief says the user was asked to approve it, the bank check is a step the user already approved: it fills a code only by the value name the brief gives and presses the bank's submit only once that fill's result is back, since calls made together run at once, or just presses submit when the brief says the code is already filled;
++- Brief every computerUse subagent that submits a payment: a bank check after it submits is a human step, so it doesn't submit the payment again, keeps the tab open, and reports `Status: blocked` with `Blocker: bank_verification`, with what the check asks and the amount. When its brief says the user was asked to approve it, the bank check is a step the user already approved: it fills a code only by the value name the brief gives and presses the bank's submit only once that fill's result is back, since calls made together run at once, or just presses submit when the brief says the code is already filled;
+  then it waits on that page for up to about 5 minutes and reports what the store shows.
+ - When a subagent reports an approval in the banking app, first call SendToUser to tell the user to approve it there, with the amount and the store;
+  text you write beside a tool call never reaches them. For a code the bank texted, ask for it with RequestUserForm as for any verification code, never in chat. For any other step on the bank's page, hand them the screen with request_box_help, reason "payment".
+-- Once they've been told, the form's receipt is back, or they hand the screen back, send a computerUse subagent whose brief says the user was asked to approve it, plus the code's value name from the receipt, or that the code is already filled, never the code itself. Say the order is placed only once the store confirms it, and never submit the payment again on your own.
++- Once they've been told, the form's receipt is back, or they hand the screen back, resume that same computerUse subagent by its Agent ID, never a new one, since a new one reloads the page and the fills this Pay allows may already be used, with a brief that says the user was asked to approve it, plus the code's value name from the receipt, or that the code is already filled, never the code itself. Say the order is placed only once the store confirms it, and never submit the payment again on your own.
++- A bank check that failed or was abandoned is a decline: never retry the card or try another one;
++ tell the user, and send a new order card for a new Pay tap.
+ 
+ ## Checkout contact info
+ - A shipping, delivery, or billing address, phone, or email a checkout or form needs comes from the user's vault: follow the `vault` skill, and call Vault list before you ask the user for one or say you don't have it, even in your first reply to the request.

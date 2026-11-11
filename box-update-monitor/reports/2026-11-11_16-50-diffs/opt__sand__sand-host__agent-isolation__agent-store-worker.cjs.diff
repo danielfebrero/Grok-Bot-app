@@ -1,0 +1,63 @@
+--- 2026-11-11_08-54:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
++++ 2026-11-11_16-50:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
+@@ -7487,6 +7487,7 @@
+     this.serverIdentifier = "";
+     this.symbolicPathArguments = [];
+     this.argumentsRepaired = false;
++    this.refuseSavedSecrets = false;
+     proto3.util.initPartial(data, this);
+   }
+   static fromBinary(bytes, options) {
+@@ -7502,7 +7503,7 @@
+     return proto3.util.equals(_McpArgs, a, b);
+   }
+   static $() {
+-    return ["McpArgs|1 name 9|2 args 9,#0|3 tool_call_id 9|4 provider_identifier 9|5 tool_name 9|6 smart_mode_approval #1?|7 smart_mode_approval_only 8|8 skip_approval 8|9 server_identifier 9|10 symbolic_path_arguments #2*|11 arguments_repaired 8", Value, SmartModeApproval, McpSymbolicPathArgument];
++    return ["McpArgs|1 name 9|2 args 9,#0|3 tool_call_id 9|4 provider_identifier 9|5 tool_name 9|6 smart_mode_approval #1?|7 smart_mode_approval_only 8|8 skip_approval 8|9 server_identifier 9|10 symbolic_path_arguments #2*|11 arguments_repaired 8|12 refuse_saved_secrets 8", Value, SmartModeApproval, McpSymbolicPathArgument];
+   }
+ };
+ var McpSymbolicPathArgument = class _McpSymbolicPathArgument extends __protoMessage320 {
+@@ -11957,7 +11958,7 @@
+     return proto3.util.equals(_McpAuthArgs, a, b);
+   }
+   static $() {
+-    return ["McpAuthArgs|1 server_identifier 9|2 tool_call_id 9"];
++    return ["McpAuthArgs|1 server_identifier 9|2 tool_call_id 9|3 plugin_id 9?"];
+   }
+ };
+ var McpAuthResult = class _McpAuthResult extends __protoMessage347 {
+@@ -20012,7 +20013,7 @@
+     return proto3.util.equals(_SubscriptionEventDisplay, a, b);
+   }
+   static $() {
+-    return ["SubscriptionEventDisplay|1 display_label 9?|2 resource_url 9?|3 subscription_id 9?"];
++    return ["SubscriptionEventDisplay|1 display_label 9?|2 resource_url 9?|3 subscription_id 9?|5 headline_action 9?|6 headline_subject 9?"];
+   }
+ };
+ var ExecutePlanInfo = class _ExecutePlanInfo extends __protoMessage374 {
+@@ -21379,6 +21380,11 @@
+ function getMetricsBackend(ctx) {
+   return ctx.get(metricsKey);
+ }
++function dropRejection(result) {
++  if (result instanceof Promise)
++    result.catch(() => {
++    });
++}
+ function createCounter(name, options) {
+   const handle = {
+     name,
+@@ -21389,11 +21395,11 @@
+   return {
+     increment: (ctx, value, labels) => {
+       const backend = getMetricsBackend(ctx);
+-      backend.increment(ctx, handle, value ?? 1, labels);
++      dropRejection(backend.increment(ctx, handle, value ?? 1, labels));
+     },
+     record: (ctx, value, labels) => {
+       const backend = getMetricsBackend(ctx);
+-      backend.record(ctx, handle, value, labels);
++      dropRejection(backend.record(ctx, handle, value, labels));
+     }
+   };
+ }

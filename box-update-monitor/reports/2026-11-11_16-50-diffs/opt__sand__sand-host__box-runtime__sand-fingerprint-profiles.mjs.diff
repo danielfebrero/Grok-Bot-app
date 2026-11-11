@@ -1,0 +1,112 @@
+--- 2026-11-11_08-54:/opt/sand/sand-host/box-runtime/sand-fingerprint-profiles.mjs
++++ 2026-11-11_16-50:/opt/sand/sand-host/box-runtime/sand-fingerprint-profiles.mjs
+@@ -1,4 +1,10 @@
+-import { BOX_BROWSER_GPU_MODES } from "./box-contract.generated.mjs";
++import {
++  BOX_BROWSER_GPU_MODES,
++  BOX_BROWSER_PERSONA_BUCKETS,
++  BOX_BROWSER_WEBGL_BACKEND_CLASSES,
++  BOX_BROWSER_WEBGL_VERDICTS,
++  SAND_BOX_CDP_PORT_BASE,
++} from "./box-contract.generated.mjs";
+ 
+ /*
+ The coherent profile claims only what the launched browser backs. Stock
+@@ -68,10 +74,14 @@
+ 
+ const ANGLE_BACKEND_RE = /\bangle=([a-z0-9-]+)/;
+ 
++function webglStatusOff(status) {
++  return /^(?:disabled|unavailable)_off/.test(status);
++}
++
+ export function observedWebglFromGpuInfo(gpu) {
+   const status = gpu?.featureStatus?.webgl;
+   if (typeof status !== "string") return "unknown";
+-  if (status.startsWith("disabled")) return "none";
++  if (webglStatusOff(status)) return "none";
+   const parts = gpu?.auxAttributes?.glImplementationParts;
+   const backend = typeof parts === "string" ? ANGLE_BACKEND_RE.exec(parts)?.[1] : undefined;
+   if (backend === "swiftshader") return "swiftshader";
+@@ -90,6 +100,72 @@
+   };
+ }
+ 
++export function personaBucketFromSeed(seed) {
++  return Number.parseInt(seed.slice(-8), 16) % BOX_BROWSER_PERSONA_BUCKETS;
++}
++
++function closedClass(value, allowed, fallback) {
++  return allowed.includes(value) ? value : fallback;
++}
++
++export function webglBackendClass(observed) {
++  return closedClass(observed, BOX_BROWSER_WEBGL_BACKEND_CLASSES, "angle-other");
++}
++
++export function webglRendererFromGpuInfo(gpu) {
++  const status = gpu?.featureStatus?.webgl;
++  if (typeof status === "string" && webglStatusOff(status)) return "none";
++  const renderer = [
++    gpu?.auxAttributes?.glRenderer,
++    ...(Array.isArray(gpu?.devices) ? gpu.devices.map((device) => device?.deviceString) : []),
++  ].find((value) => typeof value === "string" && value.trim() !== "");
++  if (renderer === undefined) return "unknown";
++  if (/swiftshader/i.test(renderer)) return "swiftshader";
++  if (/llvmpipe/i.test(renderer)) return "llvmpipe";
++  if (/softpipe|lavapipe/i.test(renderer)) return "other_software";
++  return "other";
++}
++
++export function displayFromCdpPort(port) {
++  const display = port - SAND_BOX_CDP_PORT_BASE;
++  return display >= 1 && display <= 256 ? display : 0;
++}
++
++export function chromeFingerprintRow({
++  port,
++  profile,
++  check,
++  gpu,
++  personaSeed,
++  acceptLanguageList,
++}) {
++  return {
++    kind: "chrome_fingerprint",
++    display: displayFromCdpPort(port),
++    gpuMode: profile.gpuMode,
++    webglBackend: webglBackendClass(check.observed),
++    webglRenderer: webglRendererFromGpuInfo(gpu),
++    webglVerdict: closedClass(check.verdict, BOX_BROWSER_WEBGL_VERDICTS, "unverified"),
++    hardwareConcurrency: profile.hardwareConcurrency,
++    acceptLanguage: acceptLanguageClass(acceptLanguageList),
++    ...(personaSeed == null
++      ? { persona: false }
++      : { persona: true, personaBucket: personaBucketFromSeed(personaSeed) }),
++  };
++}
++
++const FLEET_ACCEPT_LANGUAGE = "en-US,en-GB,en";
++
++export function acceptLanguageClass(list) {
++  if (list == null) return "chrome_default";
++  if (list === FLEET_ACCEPT_LANGUAGE) return "fleet_default";
++  const english = String(list ?? "")
++    .split(",")
++    .map((tag) => tag.split("-")[0].toLowerCase() === "en");
++  if (english.every(Boolean)) return "en_only";
++  return english[0] ? "en_mixed" : "non_en_first";
++}
++
+ // Chromium seeds the GREASE brand, its version, and the brand order with the major version (https://chromium.googlesource.com/chromium/src/+/refs/tags/154.0.8037.57/components/embedder_support/user_agent_utils.cc).
+ const GREASE_CHARS = [" ", "(", ":", "-", ".", "/", ")", ";", "=", "?", "_"];
+ const GREASE_VERSIONS = ["8", "99", "24"];
+@@ -162,7 +238,7 @@
+ export function configuredAcceptLanguage(value) {
+   return typeof value === "string" && value.length <= 128 && ACCEPT_LANGUAGE_LIST_RE.test(value)
+     ? value
+-    : "en-US,en-GB,en";
++    : FLEET_ACCEPT_LANGUAGE;
+ }
+ 
+ function overrideAcceptLanguage(acceptLanguageEnUs, acceptLanguage, fromChrome, overridden) {

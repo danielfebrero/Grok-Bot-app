@@ -1,0 +1,53 @@
+--- 2026-11-11_08-54:/opt/sand/sand-host/box-scripts/sand-ua-governor.mjs
++++ 2026-11-11_16-50:/opt/sand/sand-host/box-scripts/sand-ua-governor.mjs
+@@ -40,6 +40,7 @@
+   ACCEPT_LANGUAGE_EXTENSION_NAME,
+   buildAcceptLanguageExtension,
+   buildUserAgentOverride,
++  chromeFingerprintRow,
+   coherentHardwareProfile,
+   configuredAcceptLanguage,
+   cpuCountFromAllowedList,
+@@ -462,7 +463,7 @@
+   return browser.coherentProfile;
+ }
+ 
+-export async function verifyCoherentProfile(browser) {
++export async function verifyCoherentProfile(browser, { report = appendBoxTelemetry } = {}) {
+   const profile = coherentProfileForBrowser(browser);
+   let gpu;
+   try {
+@@ -478,9 +479,33 @@
+   console.error(
+     `coherent hardware profile port=${browser.port} gpu-mode=${profile.gpuMode} webgl=${check.claimed} observed=${check.observed} ${check.verdict} persona=${browser.devicePersonaApplied === true ? "on" : "off"} hardware-concurrency=${profile.hardwareConcurrency}`,
+   );
++  reportChromeFingerprint({ browser, profile, check, gpu, report });
+   return check;
+ }
+ 
++const chromeFingerprintReported = new WeakSet();
++
++function reportChromeFingerprint({ browser, profile, check, gpu, report }) {
++  if (chromeFingerprintReported.has(browser)) return;
++  chromeFingerprintReported.add(browser);
++  try {
++    report(
++      chromeFingerprintRow({
++        port: browser.port,
++        profile,
++        check,
++        gpu,
++        personaSeed: browser.devicePersonaApplied === true ? browser.devicePersonaSeed : null,
++        acceptLanguageList: acceptLanguageEnUsEnabledForBrowser(browser)
++          ? browserLanguageList(browser)
++          : null,
++      }),
++    );
++  } catch (error) {
++    console.error(`chrome fingerprint telemetry failed port=${browser.port}: ${errorClass(error)}`);
++  }
++}
++
+ function applyCoherentHardwareToTarget(browser, sessionId) {
+   return browser.send(
+     "Emulation.setHardwareConcurrencyOverride",

@@ -1,0 +1,46 @@
+--- 2026-11-11_08-54:/opt/sand/sand-host/box-launchers/box-chrome
++++ 2026-11-11_16-50:/opt/sand/sand-host/box-launchers/box-chrome
+@@ -239,7 +239,8 @@
+ 	CHROME_FLAGS+=("--host-resolver-rules=MAP * ~NOTFOUND , EXCLUDE localhost , EXCLUDE 127.0.0.1 , EXCLUDE ::1") # pragma: allowlist secret
+ fi
+ SAND_CHROME_DISABLE_QUIC="${SAND_CHROME_DISABLE_QUIC:-0}"
+-if [ -e "${SAND_CHROME_DISABLE_QUIC_FILE:-/tmp/sand-chrome-disable-quic}" ]; then
++if [ -e "${SAND_CHROME_DISABLE_QUIC_FILE:-/tmp/sand-chrome-disable-quic}" ] ||
++	[ ! -e "${SAND_BOX_EXPERIMENTS_READY_FILE:-/tmp/sand-box-experiments-ready}" ]; then
+ 	SAND_CHROME_DISABLE_QUIC=1
+ fi
+ if [ "${SAND_CHROME_DISABLE_QUIC}" = "1" ]; then
+@@ -330,6 +331,14 @@
+ 	fi
+ 	;;
+ esac
++apply_box_chrome_policy() {
++	if [ "${BOX_CHROME_GATES_READY}" = false ] && [ "${BOX_CHROME_WEBRTC_PROXY_ONLY}" = false ] &&
++		SAND_BOX_BROWSER_WEBRTC_PROXY_ONLY=1 "${box_chrome_policy}"; then
++		BOX_CHROME_WEBRTC_PROXY_ONLY=true
++		return 0
++	fi
++	"${box_chrome_policy}"
++}
+ BOX_CHROME_GATES_READY=false
+ [ ! -e "${SAND_BOX_EXPERIMENTS_READY_FILE:-/tmp/sand-box-experiments-ready}" ] || BOX_CHROME_GATES_READY=true
+ BOX_CHROME_WEBRTC_PROXY_ONLY=false
+@@ -338,7 +347,7 @@
+ 	[ -L "${SAND_BOX_BROWSER_WEBRTC_PROXY_ONLY_FILE:-/tmp/sand-box-browser-webrtc-proxy-only}" ]; then
+ 	BOX_CHROME_WEBRTC_PROXY_ONLY=true
+ fi
+-"${box_chrome_policy}" || policy_status=$?
++apply_box_chrome_policy || policy_status=$?
+ SAND_WEBAUTHN_ID_FILE=/usr/local/share/sand-webauthn-proxy.id
+ SAND_WEBAUTHN_MARKER=/home/box/.sand-webauthn-proxy-enabled
+ CHROME_LOG="/tmp/chrome${DISPLAY:-:1}.log"
+@@ -651,8 +660,7 @@
+ 	marker_gate_on "${SAND_BOX_BROWSER_COHERENT_FINGERPRINT:-}" \
+ 		"${SAND_BOX_BROWSER_COHERENT_FINGERPRINT_FILE:-/tmp/sand-box-browser-coherent-fingerprint}" 1 &&
+ 		markers+=(coherent_fingerprint)
+-	[ -e "${SAND_BOX_BROWSER_WEBRTC_PROXY_ONLY_FILE:-/tmp/sand-box-browser-webrtc-proxy-only}" ] &&
+-		markers+=(webrtc_proxy_only)
++	[ "${BOX_CHROME_WEBRTC_PROXY_ONLY}" = true ] && markers+=(webrtc_proxy_only)
+ 	[ "${SAND_BOX_BROWSER_NO_LOCAL_DNS}" = "1" ] && [ -n "${SAND_EGRESS_PROXY_BYPASS_FLAG:-}" ] &&
+ 		markers+=(no_local_dns)
+ 	[ "${SAND_CHROME_DISABLE_QUIC}" = "1" ] && markers+=(disable_quic)
