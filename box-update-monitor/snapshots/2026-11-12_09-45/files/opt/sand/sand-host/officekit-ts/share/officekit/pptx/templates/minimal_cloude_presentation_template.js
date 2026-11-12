@@ -1,0 +1,574 @@
+/*
+ * "CLOUDE - Minimal Presentation Template" - 30 slides, 13.333 x 7.5 in.
+ * Rebuilt with pptxgenjs only. Raster device mock-ups from the original deck
+ * are redrawn with native shapes; empty picture frames stay empty, as in the source.
+ */
+const path = require('path');
+const pptxgen = require('pptxgenjs');
+
+/* ---------------------------------------------------------------- palette */
+const INK = '262626'; // headings
+const BODY = '404040'; // body copy
+const SOFT = '3B3838'; // subtitle on cover
+const BLUSH = 'F0DDD5'; // signature blush blocks
+const PANEL = 'F2F2F2'; // wide light panels (from layouts)
+const CHIP = 'D9D9D9'; // icon discs / price chips
+const ICON = '808080'; // icon glyph strokes
+const HAIR = 'A6A6A6'; // layout hair-lines
+const HAIR2 = 'BFBFBF'; // slightly lighter hair-lines (slide 2)
+const WHITE = 'FFFFFF';
+const SCREEN = '3E3E3E'; // device screens
+
+// PowerPoint's default text-box insets, in points: [left, right, bottom, top].
+const TXT_INSET = [7.2, 7.2, 3.6, 3.6];
+
+const F_TITLE = 'Montserrat SemiBold';
+const F_UI = 'Montserrat';
+const F_TEXT = 'Lato';
+
+/* ------------------------------------------------------- shared lorem copy */
+const S = 'netus nibh aliquet, porttitor ligula justo libero vivamus porttitor dolor, conubia mollit.';
+const L3 = S + ' ';
+const L4 = S + ' Sapien nam suspendisse, tincidunt eget ante';
+const L1 = L4 + ' tincidunt, eros in auctor';
+const L7 = L1 + ' fringilla';
+const L8 = L1 + ' fringilla praesent at diam. ';
+const L2 = L1 + ' fringilla praesent at diam. In et quam est eget mi. Pellentesque';
+const L5 = L1 + ' fringilla praesent at diam. In et quam est';
+const L6 = S + ' Sapien';
+const L9 = 'In et quam est eget mi. Pellentesque nunc orci eu enim, eget in fringilla vitae, ' +
+  'et eros praesent dolor porttitor. Lacinia lectus nonummy, accumsan mauris in sed justo magnis, dictum justo lorem ac';
+const QUOTE = '\u201Cnetus nibh aliquet, porttitor ligula justo libero vivamus porttitor dolor, conubia mollit. ' +
+  'Sapien nam suspendisse, tincidunt eget ante tincidunt, eros in auctor fringilla praesent at diam.  ' +
+  'In et quam est t in fringilla vitae, et eros praesent dolor porttitor\u201D';
+
+/* -------------------------------------------------------------- primitives */
+// Layout hair-line (0.5pt) or in-slide rule (3pt). w/h of 0 means straight.
+function line(s, x, y, w, h, color, width, flipV) {
+  s.addShape('line', { x: x, y: y, w: w, h: h, flipV: !!flipV, line: { color: color, width: width } });
+}
+
+function guides(s, list) {
+  list.forEach(function (g) { line(s, g[0], g[1], g[2], g[3], g[4] || HAIR, 0.5); });
+}
+
+function rules(s, list) {
+  list.forEach(function (r) { line(s, r[0], r[1], r[2], r[3], r[4] || INK, r[5] || 3); });
+}
+
+// Flat colour block (blush bands, light panels, translucent cards, icon discs).
+function bands(s, list) {
+  list.forEach(function (b) {
+    var fill = { color: b[4] || BLUSH };
+    if (b[5]) fill.transparency = b[5];
+    s.addShape(b[6] || 'rect', { x: b[0], y: b[1], w: b[2], h: b[3], fill: fill, line: { type: 'none' } });
+  });
+}
+
+// 36pt section heading, 90% leading, top aligned.
+function title(s, t) {
+  s.addText(t[0], {
+    x: t[1], y: t[2], w: t[3], h: t[4],
+    fontFace: F_TITLE, fontSize: 36, bold: true, color: INK,
+    align: t[5] || 'left', valign: 'top', lineSpacingMultiple: 0.9, margin: TXT_INSET,
+    rotate: t[6] || 0
+  });
+}
+
+// 10pt Lato paragraph at 150% leading (the deck's standard body block).
+function copy(s, c) {
+  var o = c[5] || {};
+  s.addText(o.runs || c[0], {
+    x: c[1], y: c[2], w: c[3], h: c[4],
+    fontFace: F_TEXT, fontSize: o.size || 10, color: o.color || BODY, italic: !!o.italic,
+    align: o.align || 'left', valign: 'top', lineSpacingMultiple: 1.5, margin: TXT_INSET
+  });
+}
+
+// Small bold Montserrat label (names, prices, captions).
+function label(s, t, x, y, w, h, size, align, font) {
+  s.addText(t, {
+    x: x, y: y, w: w, h: h,
+    fontFace: font || F_TITLE, fontSize: size, bold: font !== F_UI, color: INK,
+    align: align || 'left', valign: 'top', margin: TXT_INSET
+  });
+}
+
+// White square badge with a centred step number (slides 19 & 20).
+function stepBadge(s, n, x, y) {
+  s.addShape('rect', { x: x, y: y, w: 0.643, h: 0.643, fill: { color: WHITE }, line: { type: 'none' } });
+  s.addText(String(n), {
+    x: x, y: y, w: 0.643, h: 0.643, fontFace: F_TITLE, fontSize: 18, color: INK,
+    align: 'center', valign: 'middle', margin: 0
+  });
+}
+
+/* ------------------------------------------- Instagram / Behance / Pinterest */
+function instagram(s, x, y, d) {
+  s.addShape('roundRect', { x: x, y: y, w: d, h: d, rectRadius: d * 0.18, fill: { color: BODY }, line: { type: 'none' } });
+  s.addShape('ellipse', {
+    x: x + d * 0.26, y: y + d * 0.26, w: d * 0.48, h: d * 0.48,
+    fill: { type: 'none' }, line: { color: WHITE, width: d * 6.5 }
+  });
+  s.addShape('rect', { x: x + d * 0.69, y: y + d * 0.16, w: d * 0.16, h: d * 0.16, fill: { color: WHITE }, line: { type: 'none' } });
+}
+
+function behance(s, x, y, w, h) {
+  s.addText('B\u0113', {
+    x: x - 0.02, y: y - h * 0.30, w: w + 0.04, h: h * 1.6,
+    fontFace: F_TEXT, fontSize: 13, bold: true, color: BODY,
+    align: 'center', valign: 'middle', margin: 0
+  });
+}
+
+function pinterest(s, x, y, d) {
+  s.addShape('ellipse', { x: x, y: y, w: d, h: d, fill: { color: BODY }, line: { type: 'none' } });
+  s.addText('p', {
+    x: x, y: y - d * 0.12, w: d, h: d, fontFace: F_TEXT, fontSize: 10, bold: true, color: WHITE,
+    align: 'center', valign: 'middle', margin: 0
+  });
+}
+
+// The three social glyphs, laid out horizontally (0.853 x 0.165) or vertically (0.255 x 0.918).
+function social(s, dir, x, y) {
+  if (dir === 'row') {
+    instagram(s, x, y, 0.165);
+    behance(s, x + 0.299, y, 0.255, 0.163);
+    pinterest(s, x + 0.688, y, 0.164);
+  } else {
+    instagram(s, x + 0.045, y, 0.165);
+    behance(s, x, y + 0.389, 0.255, 0.163);
+    pinterest(s, x + 0.046, y + 0.756, 0.164);
+  }
+}
+
+/* ------------------------------------------------------- device mock-ups */
+/*
+ * The source deck places two iPhone photos and a MacBook photo on its layouts.
+ * They are redrawn here from native shapes; every number is the feature's
+ * position as a fraction of the original photo's frame, so the frames keep
+ * the exact x/y/w/h the layouts used.
+ */
+const PHONES = {
+  // rose gold, front view                            black / space grey
+  rose: { body: 'F6EDED', edge: 'C9C8E0', trim: '1A1A1A', ring: 'C7B4C0',
+          bx: 0.160, by: 0.056, bw: 0.670, bh: 0.888,
+          sx: 0.198, sy: 0.161, sw: 0.595, sh: 0.676,
+          camx: 0.487, camy: 0.079, camw: 0.024, camh: 0.014,
+          slitx: 0.440, slity: 0.106, slitw: 0.111, slith: 0.011,
+          senx: 0.378, seny: 0.106, senw: 0.022, senh: 0.014,
+          hx: 0.427, hy: 0.852, hw: 0.116, hh: 0.075 },
+  black: { body: '060606', edge: '4A4B4F', trim: '55565A', ring: '6E6F73',
+          bx: 0.149, by: 0.070, bw: 0.723, bh: 0.855,
+          sx: 0.193, sy: 0.171, sw: 0.639, sh: 0.651,
+          camx: 0.390, camy: 0.120, camw: 0.019, camh: 0.011,
+          slitx: 0.455, slity: 0.123, slitw: 0.113, slith: 0.006,
+          senx: null, seny: 0, senw: 0, senh: 0,
+          hx: 0.451, hy: 0.842, hw: 0.120, hh: 0.064 }
+};
+
+function phone(s, kind, x, y, w, h) {
+  const p = PHONES[kind];
+  const bw = w * p.bw, bh = h * p.bh;
+  s.addShape('roundRect', {
+    x: x + w * p.bx, y: y + h * p.by, w: bw, h: bh, rectRadius: Math.min(bw, bh) * 0.085,
+    fill: { color: p.body }, line: { color: p.edge, width: 1.25 }
+  });
+  s.addShape('rect', {
+    x: x + w * p.sx, y: y + h * p.sy, w: w * p.sw, h: h * p.sh,
+    fill: { color: SCREEN }, line: { type: 'none' }
+  });
+  s.addShape('roundRect', { // ear-speaker slit
+    x: x + w * p.slitx, y: y + h * p.slity, w: w * p.slitw, h: h * p.slith,
+    rectRadius: h * p.slith * 0.5, fill: { color: p.trim }, line: { type: 'none' }
+  });
+  s.addShape('ellipse', { // front camera
+    x: x + w * p.camx, y: y + h * p.camy, w: w * p.camw, h: h * p.camh,
+    fill: { color: p.trim }, line: { type: 'none' }
+  });
+  if (p.senx !== null) {
+    s.addShape('ellipse', { // proximity sensor (rose gold model only)
+      x: x + w * p.senx, y: y + h * p.seny, w: w * p.senw, h: h * p.senh,
+      fill: { color: p.trim }, line: { type: 'none' }
+    });
+  }
+  s.addShape('ellipse', { // home button ring
+    x: x + w * p.hx, y: y + h * p.hy, w: w * p.hw, h: h * p.hh,
+    fill: { type: 'none' }, line: { color: p.ring, width: 1.5 }
+  });
+}
+
+// Open laptop seen head-on: silver lid rim, black bezel, tapered base.
+function laptop(s, x, y, w, h) {
+  s.addShape('rect', {
+    x: x + w * 0.114, y: y, w: w * 0.774, h: h * 0.939,
+    fill: { color: 'C6C8CA' }, line: { type: 'none' }
+  });
+  s.addShape('rect', {
+    x: x + w * 0.121, y: y + h * 0.011, w: w * 0.758, h: h * 0.928,
+    fill: { color: '090909' }, line: { type: 'none' }
+  });
+  s.addShape('round2SameRect', {
+    x: x, y: y + h * 0.939, w: w, h: h * 0.061, rectRadius: h * 0.022,
+    fill: { color: 'D6D7D9' }, line: { type: 'none' }, flipV: true
+  });
+  s.addShape('roundRect', { // thumb groove in the front edge
+    x: x + w * 0.42, y: y + h * 0.944, w: w * 0.16, h: h * 0.014,
+    rectRadius: h * 0.007, fill: { color: 'BCBEC0' }, line: { type: 'none' }
+  });
+}
+
+/* ----------------------------------------------------------- slide extras */
+// Slide 9: three grey discs holding a gear / clock / target glyph.
+function featureIcon(s, kind, cx, cy) {
+  s.addShape('ellipse', { x: cx - 0.416, y: cy - 0.416, w: 0.832, h: 0.832, fill: { color: CHIP }, line: { type: 'none' } });
+  if (kind === 'gear') {
+    s.addShape('gear6', { x: cx - 0.196, y: cy - 0.194, w: 0.391, h: 0.388, fill: { color: ICON }, line: { type: 'none' } });
+    s.addShape('ellipse', { x: cx - 0.075, y: cy - 0.075, w: 0.15, h: 0.15, fill: { color: CHIP }, line: { type: 'none' } });
+  } else if (kind === 'clock') {
+    s.addShape('ellipse', { x: cx - 0.199, y: cy - 0.199, w: 0.398, h: 0.398, fill: { type: 'none' }, line: { color: ICON, width: 1.75 } });
+    line(s, cx, cy - 0.115, 0, 0.115, ICON, 1.5);
+    line(s, cx, cy, 0.078, 0.062, ICON, 1.5);
+  } else {
+    s.addShape('ellipse', { x: cx - 0.199, y: cy - 0.199, w: 0.398, h: 0.398, fill: { type: 'none' }, line: { color: ICON, width: 1.75 } });
+    line(s, cx, cy - 0.199, 0, 0.11, ICON, 1.75);
+    line(s, cx, cy + 0.089, 0, 0.11, ICON, 1.75);
+    line(s, cx - 0.199, cy, 0.11, 0, ICON, 1.75);
+    line(s, cx + 0.089, cy, 0.11, 0, ICON, 1.75);
+  }
+}
+
+// Slide 10: thin "<" / ">" carousel arrows.
+function arrow(s, x, y, dir) {
+  var d = 0.508;
+  if (dir === 'right') {
+    line(s, x, y, d, d / 2, HAIR, 1);
+    line(s, x, y + d / 2, d, d / 2, HAIR, 1, true);
+  } else {
+    line(s, x, y, d, d / 2, HAIR, 1, true);
+    line(s, x, y + d / 2, d, d / 2, HAIR, 1);
+  }
+}
+
+/* ------------------------------------------------------------- slide data */
+// Each entry: layout hair-lines, blush/panel blocks, heading, body copy,
+// 3pt rule, social cluster, plus a builder for anything slide-specific.
+const SLIDES = [
+  { n: 1,
+    copy: [[ 'MINIMAL PRESENTATION TEMPLATE', 4.944, 4.202, 3.444, 0.404, { align: 'center', size: 12, color: SOFT } ]],
+    extra: function (s) {
+      s.addText('CLOUDE', {
+        x: 4.057, y: 2.928, w: 5.219, h: 1.645, fontFace: F_TITLE, fontSize: 88,
+        color: INK, charSpacing: -3, align: 'center', valign: 'top', margin: TXT_INSET, lineSpacingMultiple: 1.0
+      });
+    } },
+
+  { n: 2,
+    guides: [[5.486, 0, 0, 4.796, HAIR2], [5.326, 1.821, 0, 5.179, HAIR2], [4.935, 6.589, 7.764, 0, HAIR2]],
+    bands: [[0, 0, 1.018, 7.5]],
+    title: ['Hello', 1.206, 2.262, 1.638, 0.666],
+    rules: [[1.346, 2.928, 0.832, 0]],
+    copy: [[L2, 1.206, 3.433, 3.038, 1.363, { align: 'justify' }]],
+    social: ['col', 12.444, 5.171] },
+
+  { n: 3,
+    guides: [[1.467, 1.125, 9.168, 0], [9.177, 0.494, 0, 6.067]],
+    bands: [[1.056, 6.439, 7.722, 1.061]],
+    title: ['Top Idea 2018', 9.542, 2.325, 2.68, 1.171],
+    rules: [[9.654, 3.496, 1.729, 0]],
+    copy: [[L2, 9.542, 4.357, 2.42, 1.868, { align: 'justify' }]],
+    social: ['col', 0.45, 4.918] },
+
+  { n: 4,
+    guides: [[7.692, 0, 0, 7.5], [11.98, 0, 0, 7.5], [7.692, 1.355, 3.02, 0], [8.668, 6.094, 3.312, 0]],
+    bands: [[12.328, 0, 1.018, 7.5]],
+    title: ['New Collection', 8.43, 1.858, 2.878, 1.171],
+    rules: [[8.542, 3.029, 1.729, 0]],
+    copy: [[L2, 8.43, 3.89, 2.42, 1.868, { align: 'justify' }]],
+    social: ['col', 0.609, 5.516] },
+
+  { n: 5,
+    guides: [[7.228, 0, 0, 2.739], [6.622, 1.854, 6.712, 0], [8.038, 1.037, 0, 6.463]],
+    bands: [[11.923, 1.869, 1.411, 5.631]],
+    title: ['New Arrival', 8.644, 2.282, 1.908, 1.072],
+    rules: [[8.728, 3.596, 2.308, 0]],
+    copy: [[L2, 8.644, 4.102, 3.038, 1.363, { align: 'justify' }],
+           [L6, 1.166, 5.781, 3.038, 0.573, { align: 'right' }]],
+    social: ['row', 8.872, 5.771] },
+
+  { n: 6,
+    guides: [[0, 1.329, 4.137, 0], [0, 5.838, 6.127, 0]],
+    bands: [[0, 6.385, 13.333, 1.115]],
+    title: ['Best Concept', 1.745, 1.826, 2.584, 1.072],
+    rules: [[1.829, 3.141, 2.308, 0]],
+    copy: [[L2, 1.745, 3.646, 3.038, 1.363, { align: 'justify' }]],
+    social: ['row', 1.829, 5.283] },
+
+  { n: 7,
+    guides: [[10.582, 6.569, 2.751, 0], [9.513, 0.778, 3.821, 0]],
+    bands: [[0, 0, 3.281, 7.5]],
+    title: ['Popular Product', 9.429, 2.041, 2.584, 1.072],
+    rules: [[9.513, 3.356, 2.308, 0]],
+    copy: [[L2, 9.429, 3.861, 3.038, 1.363, { align: 'justify' }]],
+    social: ['row', 9.513, 5.498] },
+
+  { n: 8,
+    guides: [[0.789, 3.199, 0, 4.333], [0, 6.244, 4.533, 0], [8.633, 1.267, 4.7, 0]],
+    bands: [[1.211, 6.211, 8.622, 1.289]],
+    title: ['Get it now!', 10.357, 1.86, 1.687, 1.072],
+    rules: [[10.495, 3.167, 0.925, 0]],
+    copy: [[L7, 10.357, 3.771, 2.301, 1.363, { align: 'justify' }]],
+    social: ['row', 10.567, 5.365] },
+
+  { n: 9,
+    guides: [[4.766, 2.833, 0, 3.727], [8.606, 2.833, 0, 3.727]],
+    title: ['The Key Features', 5.375, 0.662, 2.584, 1.072, 'center'],
+    copy: [[L3, 2.036, 4.889, 2.142, 0.825, { align: 'center' }],
+           [L3, 5.578, 4.889, 2.142, 0.825, { align: 'center' }],
+           [L3, 9.12, 4.889, 2.142, 0.825, { align: 'center' }]],
+    extra: function (s) {
+      featureIcon(s, 'gear', 3.143, 3.857);
+      featureIcon(s, 'clock', 6.667, 3.857);
+      featureIcon(s, 'target', 10.191, 3.857);
+      label(s, 'Support', 2.529, 4.46, 1.227, 0.346, 14, 'center');
+      label(s, 'On Time', 6.053, 4.46, 1.227, 0.346, 14, 'center');
+      label(s, 'Target', 9.697, 4.49, 0.988, 0.279, 14, 'center');
+    } },
+
+  { n: 10,
+    bands: [[2.343, 4.861, 2.611, 0.528, PANEL], [5.361, 4.861, 2.611, 0.528, PANEL],
+            [8.38, 4.861, 2.611, 0.528, PANEL], [0, 6.439, 13.333, 1.061]],
+    title: ['Some Product', 5.375, 0.662, 2.584, 1.072, 'center'],
+    extra: function (s) {
+      [[2.343, '$ 350', 4.138], [5.361, '$ 220', 7.135], [8.38, '$ 250', 10.132]].forEach(function (col) {
+        label(s, 'Your Product', col[0], 4.898, 1.068, 0.47, 10, 'left', F_UI);
+        label(s, col[1], col[2], 4.983, 0.672, 0.284, 12);
+      });
+      arrow(s, 0.817, 3.514, 'left');
+      arrow(s, 12.008, 3.514, 'right');
+    } },
+
+  { n: 11,
+    guides: [[6.989, 0, 0, 4.696], [3.422, 3.861, 0, 3.639]],
+    bands: [[7.207, 1.333, 3.255, 4.833, WHITE, 15], [7.144, 6.41, 6.189, 1.09]],
+    title: ['Living room', 7.788, 1.86, 1.834, 1.072],
+    rules: [[7.926, 3.167, 0.925, 0]],
+    copy: [[L1, 7.788, 3.654, 2.001, 1.616]],
+    social: ['row', 7.926, 5.757] },
+
+  { n: 12,
+    guides: [[4.449, 1.523, 2.327, 0], [4.785, 0.916, 0, 3.935]],
+    bands: [[0, 0, 1.018, 7.5], [5.498, 2.514, 1.698, 1.698, CHIP, 0, 'ellipse'],
+            [1.517, 5.577, 1.215, 0.391, CHIP]],
+    title: ['Sofa Carnaby Set', 1.42, 1.86, 2.52, 1.616],
+    rules: [[1.558, 3.749, 0.925, 0]],
+    copy: [[L1, 1.42, 4.021, 2.296, 1.363]],
+    social: ['row', 1.517, 6.198],
+    extra: function (s) {
+      s.addText('30% OFF', {
+        x: 5.653, y: 2.901, w: 1.389, h: 0.923, fontFace: F_TITLE, fontSize: 28, bold: true,
+        color: INK, align: 'center', valign: 'top', lineSpacingMultiple: 0.9, margin: TXT_INSET
+      });
+      label(s, '$ 350', 1.788, 5.631, 0.672, 0.284, 12);
+    } },
+
+  { n: 13,
+    guides: [[7.299, 0, 0, 7.5], [11.167, 0, 0, 7.5]],
+    bands: [[0, 3.185, 5.415, 4.315]],
+    title: ['Dream Living Room', 8.033, 2.0, 2.52, 1.616],
+    rules: [[8.171, 3.889, 0.925, 0]],
+    copy: [[L1, 8.033, 4.161, 2.296, 1.363]],
+    social: ['row', 8.102, 5.849] },
+
+  { n: 14,
+    guides: [[12.722, 2.114, 0, 3.753], [10.658, 5.038, 2.675, 0]],
+    bands: [[1.122, 1.167, 3.255, 3.455, WHITE, 15], [0, 5.165, 4.908, 2.335]],
+    title: ['Top Product', 1.631, 2.376, 2.634, 1.072],
+    rules: [[1.769, 3.683, 0.925, 0]],
+    copy: [[null, 5.155, 4.933, 4.497, 1.868, { align: 'justify', color: INK,
+      runs: [{ text: L8, options: { breakLine: true } }, { text: '', options: { breakLine: true } }, { text: L9 }] }]],
+    social: ['row', 1.769, 4.226] },
+
+  { n: 15,
+    guides: [[8.075, 1.083, 0, 3.066], [11.727, 3.35, 0, 3.066]],
+    bands: [[0, 1.083, 13.333, 5.333, PANEL], [0, 0, 1.018, 7.5]],
+    title: ['Best Seller', 2.839, 1.86, 1.834, 1.072],
+    rules: [[2.977, 3.167, 0.925, 0]],
+    copy: [[L1, 2.839, 3.654, 2.351, 1.363]],
+    social: ['row', 2.977, 5.339] },
+
+  { n: 16,
+    guides: [[7.157, 1.318, 4.411, 0], [7.925, 0, 0, 7.5], [9.981, 6.28, 3.352, 0]],
+    bands: [[11.769, 1.267, 1.564, 4.379]],
+    title: ['New In Store', 8.671, 1.86, 2.236, 1.072],
+    rules: [[8.808, 3.167, 0.925, 0]],
+    copy: [[L1, 8.671, 3.654, 2.351, 1.363]],
+    social: ['row', 8.808, 5.339] },
+
+  { n: 17,
+    guides: [[2.066, 1.355, 3.846, 0], [0.794, 3.167, 0, 4.336], [5.327, 0, 0, 2.178]],
+    bands: [[0, 0, 1.018, 7.5]],
+    title: ['Best Seller', 1.53, 1.86, 2.236, 1.072],
+    rules: [[1.668, 3.167, 0.925, 0]],
+    copy: [[L1, 1.53, 3.654, 2.236, 1.363, { align: 'justify' }],
+           [L1, 3.25, 4.942, 2.236, 1.363, { align: 'justify' }]],
+    social: ['row', 1.668, 5.339] },
+
+  { n: 18,
+    guides: [[9.458, 0, 0, 5.502], [6.017, 1.998, 0, 5.502]],
+    bands: [[0, 0, 4.262, 7.5]],
+    title: ['Founder', 6.667, 1.86, 2.333, 0.682],
+    rules: [[6.804, 2.541, 1.504, 0]],
+    copy: [[L1, 6.667, 3.85, 2.236, 1.363, { align: 'justify' }]],
+    social: ['row', 6.804, 5.339],
+    extra: function (s) { label(s, 'Natali', 6.667, 2.624, 0.99, 0.32, 18); } },
+
+  { n: 19,
+    guides: [[11.299, 0.794, 2.034, 0], [7.99, 6.494, 2.034, 0]],
+    bands: [[0, 0, 1.018, 7.5]],
+    title: ['Marketing Team', 8.713, 1.344, 2.913, 1.084],
+    rules: [[8.851, 2.541, 1.504, 0]],
+    copy: [[L1, 8.713, 3.573, 2.236, 1.363, { align: 'justify' }]],
+    social: ['row', 8.851, 5.339],
+    extra: function (s) {
+      label(s, 'Victoria & Pamela', 8.713, 2.624, 2.735, 0.32, 18);
+      stepBadge(s, 1, 0.977, 0.701);
+      stepBadge(s, 2, 7.387, 3.335);
+    } },
+
+  { n: 20,
+    guides: [[7.202, 0.486, 6.131, 0], [11.797, 6.111, 1.537, 0]],
+    bands: [[0, 5.4, 10.524, 2.1]],
+    title: ['Our Staff', 9.893, 1.73, 1.903, 1.084],
+    rules: [[10.031, 2.927, 1.504, 0]],
+    copy: [[L1, 9.956, 3.217, 2.236, 1.363, { align: 'justify' }]],
+    social: ['row', 10.094, 4.983],
+    extra: function (s) {
+      stepBadge(s, 1, 1.127, 0.661);
+      stepBadge(s, 2, 4.456, 4.547);
+      stepBadge(s, 3, 7.72, 2.751);
+    } },
+
+  { n: 21,
+    guides: [[2.621, 6.654, 3.787, 0], [1.403, 4.092, 2.629, 0]],
+    bands: [[0, 0, 1.018, 7.5]],
+    title: ['Our Portfolio', 6.962, 0.882, 2.584, 1.072],
+    rules: [[7.045, 2.197, 2.308, 0]],
+    copy: [[L2, 1.297, 4.373, 2.376, 1.868, { align: 'justify' }],
+           [L5, 4.032, 4.3, 2.376, 1.616, { align: 'justify' }]],
+    social: ['row', 5.137, 6.271] },
+
+  { n: 22,
+    guides: [[0, 6.701, 9.491, 0], [12.645, 0, 0, 6.15]],
+    bands: [[0, 6.711, 9.491, 0.789]],
+    title: ['Our Portfolio', 9.887, 2.462, 2.584, 1.072],
+    rules: [[9.97, 3.776, 1.506, 0]],
+    copy: [[L1, 9.97, 4.498, 2.236, 1.363, { align: 'justify' }]],
+    social: ['row', 8.529, 6.292] },
+
+  { n: 23,
+    guides: [[1.486, 4.598, 1.561, 0], [11.181, 4.812, 1.561, 0], [0, 1.126, 1.561, 0]],
+    bands: [[0, 4.908, 3.046, 2.592]],
+    rules: [[12.089, 2.009, 0, 1.432]],
+    copy: [[L5, 0.688, 1.629, 1.876, 2.121, { align: 'justify' }],
+           [L3, 5.975, 4.179, 1.68, 1.078],
+           [L3, 11.53, 5.114, 1.68, 1.078]],
+    social: ['row', 11.663, 6.546],
+    extra: function (s) {
+      // Heading rotated 270 deg, hugging the right edge.
+      title(s, ['Our Portfolio', 10.17, 1.595, 2.456, 1.235, 'left', 270]);
+    } },
+
+  { n: 24,
+    bands: [[1.054, 0.902, 3.462, 5.696, WHITE, 10]],
+    title: ['Our Portfolio', 1.599, 1.958, 2.584, 1.072],
+    rules: [[1.682, 3.272, 1.318, 0]],
+    copy: [[L1, 1.682, 3.994, 2.236, 1.363, { align: 'justify' }]],
+    social: ['row', 1.682, 5.813] },
+
+  { n: 25,
+    guides: [[1.215, 0, 0, 5.187], [0, 3.763, 6.316, 0]],
+    bands: [[0, 0, 1.018, 7.5]],
+    title: ['Mockup Slide ', 1.889, 2.173, 2.458, 1.156],
+    rules: [[2.026, 3.441, 0.925, 0]],
+    copy: [[L4, 1.889, 4.076, 2.351, 1.111, { align: 'justify' }],
+           [L1, 4.431, 4.076, 2.351, 1.363, { align: 'justify' }]],
+    social: ['row', 1.889, 5.657],
+    device: function (s) { phone(s, 'rose', 7.433, 0.402, 8.247, 12.9); } },
+
+  { n: 26,
+    guides: [[10.922, 2.925, 2.411, 0], [9.756, 4.923, 2.411, 0]],
+    bands: [[0, 0, 3.28, 7.5]],
+    title: ['Mockup Slide ', 0.821, 2.447, 2.458, 1.156],
+    rules: [[0.959, 3.715, 0.925, 0]],
+    copy: [[L4, 10.125, 3.414, 2.351, 1.111, { align: 'justify' }]],
+    social: ['row', 10.282, 5.416],
+    device: function (s) {
+      phone(s, 'rose', 2.869, 0.517, 4.234, 6.651);
+      phone(s, 'black', 6.391, 0.378, 3.879, 6.947);
+    } },
+
+  { n: 27,
+    guides: [[9.392, 2.733, 2.633, 0], [1.655, 6.067, 2.633, 0], [10.7, 5.867, 2.633, 0]],
+    bands: [[0, 0, 1.018, 7.5]],
+    title: ['Mockup Slide ', 1.655, 3.947, 2.458, 1.156],
+    rules: [[1.792, 5.215, 0.925, 0]],
+    copy: [[L4, 10.125, 3.414, 2.351, 1.111, { align: 'justify' }]],
+    social: ['row', 10.282, 4.766],
+    device: function (s) { phone(s, 'black', 3.233, 0.133, 7.105, 12.724); } },
+
+  { n: 28,
+    guides: [[9.747, 0, 0, 5.477], [12.722, 5.477, 0, 2.023]],
+    bands: [[10.196, 0, 3.137, 3.892]],
+    title: ['Mockup Slide ', 7.078, 2.211, 2.458, 1.156],
+    rules: [[7.216, 3.479, 0.925, 0]],
+    copy: [[L4, 7.078, 4.114, 2.351, 1.111, { align: 'justify' }],
+           [L1, 10.038, 4.114, 2.351, 1.363, { align: 'justify' }]],
+    social: ['row', 7.078, 5.695],
+    device: function (s) {
+      laptop(s, -3.468, 0.684, 10.859, 6.133);
+      s.addShape('rect', { x: -1.894, y: 1.069, w: 7.662, h: 4.975, fill: { color: '595959' }, line: { type: 'none' } });
+    } },
+
+  { n: 29,
+    bands: [[0, 0, 1.018, 7.5]],
+    title: ['Custumers Say About Us', 3.915, 0.854, 5.503, 1.156, 'center'],
+    copy: [[QUOTE, 3.051, 4.976, 7.231, 1.01, { align: 'center', size: 12, italic: true, color: INK }]],
+    social: ['row', 6.24, 4.208],
+    extra: function (s) { label(s, 'Alexander', 5.974, 3.917, 1.386, 0.283, 14, 'center'); } },
+
+  { n: 30,
+    rules: [[0, 4.506, 6.45, 0, HAIR, 1.5], [6.883, 2.917, 6.45, 0, HAIR, 1.5]],
+    extra: function (s) {
+      s.addText('THANK YOU', {
+        x: 2.9, y: 2.928, w: 7.533, h: 1.645, fontFace: F_TITLE, fontSize: 88,
+        color: INK, charSpacing: -3, align: 'center', valign: 'top', margin: TXT_INSET, lineSpacingMultiple: 1.0
+      });
+    } }
+];
+
+/* -------------------------------------------------------------- assembly */
+function build() {
+  const deck = new pptxgen();
+  deck.defineLayout({ name: 'CLOUDE', width: 13.333, height: 7.5 });
+  deck.layout = 'CLOUDE';
+  deck.author = 'CLOUDE';
+  deck.title = 'CLOUDE - Minimal Presentation Template';
+
+  SLIDES.forEach(function (d) {
+    const s = deck.addSlide();
+    s.background = { color: WHITE };
+    if (d.device) d.device(s);        // device mock-ups sit lowest, like the layout art
+    if (d.bands) bands(s, d.bands);
+    if (d.guides) guides(s, d.guides);
+    if (d.title) title(s, d.title);
+    if (d.rules) rules(s, d.rules);
+    if (d.copy) d.copy.forEach(function (c) { copy(s, c); });
+    if (d.social) social(s, d.social[0], d.social[1], d.social[2]);
+    if (d.extra) d.extra(s);
+  });
+
+  return deck.writeFile({ fileName: path.join(__dirname, '0286b6d5-3265-432e-a45f-8dba29e10be3_grok_final.pptx') });
+}
+
+build().then(function (f) { console.log('wrote ' + f); }).catch(function (e) { console.error(e); process.exit(1); });
