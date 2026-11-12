@@ -1,0 +1,29 @@
+{
+  "description": "One tag by name: GET /repos/{owner}/{repo}/git/ref/tags/{tag}, and when it is an annotated tag, GET /git/tags/{sha} for the tag object (tagger, message, and the commit it points at). The reply is `{ref, tag}`; `tag` is null for a lightweight tag, whose `ref.object` is the commit itself.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "additionalProperties": false,
+    "properties": {
+      "owner": {
+        "description": "Repository owner (user or org login).",
+        "type": "string"
+      },
+      "repo": {
+        "description": "Repository name.",
+        "type": "string"
+      },
+      "tag": {
+        "description": "Tag name, e.g. v1.2.0.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "repo",
+      "tag"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_tag"
+}

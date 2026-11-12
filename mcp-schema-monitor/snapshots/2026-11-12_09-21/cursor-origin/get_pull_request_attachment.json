@@ -1,0 +1,32 @@
+{
+  "description": "Fetch one image, recording, or file attached to an Origin-hosted pull request. url is a media URL exactly as pull_request_read returns it in the description, a review, or a comment: a cursor.com user-attachments URL, a legacy upload-bucket URL, a cloud agent artifact share link (cursor.com/artifacts/c/art-…), a cloud agent's artifact page (cursor.com/agents/<agent id>/artifacts?path=…, the way an agent links its screen recordings), or a cloud agent's media URL (cursor.com/api/origin-cereal/graphite/background-agents/<owner>/<repo>/cursor/<agent id>/artifact-content?absolutePath=…, the way an agent embeds its screenshots, naming a file under its artifacts directory or in an agent store it mounts), which must name this pull request's repository. Only those shapes are accepted, and the URL must appear in that pull request's text; no other URL is ever fetched. A share link is served while its share stands; an agent's artifact page or media URL is served only to a user who may view that agent, for an agent that worked in this repository. An image of at most 3 MiB is returned as an image content block beside the JSON summary (delivery inline, with contentType and byteLength). A larger image, a recording, or another file is answered with delivery url: fetchUrl serves the bytes without further credentials, until expiresAt when the URL is signed, and reason says why (video, too_large, or not_an_image); hand a recording's fetchUrl to whatever watches video for you. kind is image, video, or file.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "name": {
+        "description": "Origin repository name within that namespace",
+        "type": "string"
+      },
+      "number": {
+        "type": "number"
+      },
+      "owner": {
+        "description": "Origin namespace (owner) slug, taken from list_namespaces or an earlier Origin result. A GitHub owner or org name is not an Origin namespace unless list_namespaces returns it.",
+        "type": "string"
+      },
+      "url": {
+        "description": "Attachment URL exactly as pull_request_read returns it in the description, a review, or a comment of this pull request",
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "name",
+      "number",
+      "url"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_pull_request_attachment"
+}

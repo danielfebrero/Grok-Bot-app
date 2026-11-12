@@ -1,0 +1,18 @@
+{
+  "description": "Get one inbox by its inboxId: its email address, display name, metadata, and when it was created and last updated.",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "inboxId": {
+        "description": "Inbox ID: the inbox's email address, from list_inboxes",
+        "type": "string"
+      }
+    },
+    "required": [
+      "inboxId"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_inbox"
+}

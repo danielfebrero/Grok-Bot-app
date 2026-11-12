@@ -1,0 +1,39 @@
+{
+  "description": "Read what an open Origin-hosted pull request needs before it can merge, as Origin evaluates it at headSha. Each requirement has a stable id, a status (satisfied, unsatisfied, pending or unknown) and a reason; owner rules also say whether a human approval is required. actors pages the users and bots who can clear each open requirement, and excludedFrom says why someone cannot, such as being the author. Policies name users by @handle and group rosters by user_ id, so one person can appear once each way. completeness is complete, partial or pending, and incomplete says what is missing. Pass expectedHeadSha to be refused if the head has moved. Call it once per pull request in a stack.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "expectedHeadSha": {
+        "description": "Refuse with a conflict unless Origin evaluated this head commit",
+        "type": "string"
+      },
+      "name": {
+        "description": "Origin repository name within that namespace",
+        "type": "string"
+      },
+      "number": {
+        "description": "Pull request number",
+        "type": "number"
+      },
+      "owner": {
+        "description": "Origin namespace (owner) slug, taken from list_namespaces or an earlier Origin result. A GitHub owner or org name is not an Origin namespace unless list_namespaces returns it.",
+        "type": "string"
+      },
+      "pageSize": {
+        "description": "Actors per page",
+        "type": "number"
+      },
+      "pageToken": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "name",
+      "number"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_pull_request_requirements"
+}

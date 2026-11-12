@@ -1,0 +1,52 @@
+{
+  "description": "One page of a repository's discussions (GraphQL `repository.discussions`), optionally within one category (`category_id` from list_discussion_categories) and ordered by creation or last update.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "additionalProperties": false,
+    "properties": {
+      "after": {
+        "description": "`pageInfo.endCursor` from the previous page.",
+        "type": "string"
+      },
+      "category_id": {
+        "type": "string"
+      },
+      "direction": {
+        "description": "Default DESC.",
+        "enum": [
+          "ASC",
+          "DESC"
+        ],
+        "type": "string"
+      },
+      "first": {
+        "description": "Page size (default 30, max 100).",
+        "maximum": 100,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "order_by": {
+        "enum": [
+          "CREATED_AT",
+          "UPDATED_AT"
+        ],
+        "type": "string"
+      },
+      "owner": {
+        "description": "Repository owner (user or org login).",
+        "type": "string"
+      },
+      "repo": {
+        "description": "Repository name.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "repo"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "list_discussions"
+}
