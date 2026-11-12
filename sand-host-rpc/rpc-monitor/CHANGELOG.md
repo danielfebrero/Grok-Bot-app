@@ -9,6 +9,15 @@ packages confondus. Entrées les plus récentes en haut. Heures de Paris
 
 <!-- NOUVELLES-ENTREES-ICI -->
 
+## 2026-11-12 09:56 (Paris) — `2026-11-11_17-58` → `2026-11-12_09-56`
+
+Changement de surface RPC détecté : **19 méthode(s) ajoutée(s)**.
+
+Ajoutées : `AppPublishService.KeepApp`, `AppPublishService.RecordAppVisit`, `BackgroundComposerService.CreatePrivateWorkerPoolTrust`, `BackgroundComposerService.DeletePrivateWorkerPoolTrust`, `BackgroundComposerService.ListPrivateWorkerPoolTrusts`, `DashboardService.CommitOrganizationNetworkBlocklistUpload`, `DashboardService.CreateOrganizationNetworkBlocklistExport`, `DashboardService.CreateOrganizationNetworkBlocklistUpload`, `DashboardService.GetOrganizationNetworkBlocklist`, `DashboardService.LookupGrokAccountsByXUserInternal`, `DashboardService.RetryTeamXaiMembershipHold`, `DashboardService.SaveTeamPluginServerSettings`, `DashboardService.SetOrganizationNetworkBlocklistEnabled`, `GrokBotService.ConfirmGrokBotAccountPhoneCode`, `GrokBotService.GetGrokBotAccountPhoneStatus`, `GrokBotService.ListGrokBotOutcomes`, `GrokBotService.ListGrokBotUpdates`, `GrokBotService.MintSandBoxPluginSyncGitToken`, `GrokBotService.SendGrokBotAccountPhoneCode`
+
+Rapport : [reports/2026-11-12_09-56.md](reports/2026-11-12_09-56.md).
+
+
 ## 2026-11-11 17:58 (Paris) — `2026-11-10_17-57` → `2026-11-11_17-58`
 
 Changement de surface RPC détecté : **19 méthode(s) ajoutée(s)**, **8 supprimée(s)**.
