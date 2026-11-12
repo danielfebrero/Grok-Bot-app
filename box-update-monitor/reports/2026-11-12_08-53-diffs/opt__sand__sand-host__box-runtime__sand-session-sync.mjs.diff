@@ -1,0 +1,64 @@
+--- 2026-11-12_07-48:/opt/sand/sand-host/box-runtime/sand-session-sync.mjs
++++ 2026-11-12_08-53:/opt/sand/sand-host/box-runtime/sand-session-sync.mjs
+@@ -16,6 +16,7 @@
+   BOX_WALL_EVIDENCE_RECORDERS_MARKER_PATH,
+   WALL_EVIDENCE_COOKIE_COUNT_MAX,
+   WALL_EVIDENCE_COOKIE_FACT_DOMAINS,
++  WALL_EVIDENCE_COOKIE_FACT_DOMAINS_FINGERPRINT as domainsFingerprint,
+   WALL_EVIDENCE_COOKIE_FACTS_MAX_BYTES,
+   WALL_EVIDENCE_COOKIE_FLAGS,
+   wallEvidenceCookieFactsPath,
+@@ -374,20 +375,18 @@
+ }
+ 
+ // Chrome keeps an in-memory list of all cookies and reads the backing store only until it has fetched them all (https://chromium.googlesource.com/chromium/src/+/refs/tags/151.0.7922.169/net/cookies/cookie_monster.h), and the DevTools IndexedDB domain has no method that writes an entry (https://chromedevtools.github.io/devtools-protocol/tot/IndexedDB/).
+-export function cookieFactsFromJar(cookies, observedAtMs) {
+-  const facts = Object.fromEntries(
+-    WALL_EVIDENCE_COOKIE_FACT_DOMAINS.map((domain) => [
+-      domain,
+-      { count: 0, flags: 0, observedAtMs },
+-    ]),
+-  );
++export function cookieFactsFromJar(cookies, observedAtMs, firstReadKeys = null) {
++  const facts = { "*": { observedAtMs, domainsFingerprint } };
++  const empty = firstReadKeys == null ? {} : { newCount: 0 };
+   for (const cookie of cookies) {
+     const flag = WALL_EVIDENCE_COOKIE_FLAGS.indexOf(cookie.name);
++    const isNew = firstReadKeys != null && !firstReadKeys.has(cookieKey(cookie));
+     for (const domain of WALL_EVIDENCE_COOKIE_FACT_DOMAINS) {
+       if (!hostMatchesCookieDomain(cookie.domain, domain)) continue;
+-      const fact = facts[domain];
++      const fact = (facts[domain] ??= { count: 0, flags: 0, observedAtMs, ...empty });
+       fact.count = Math.min(fact.count + 1, WALL_EVIDENCE_COOKIE_COUNT_MAX);
+       if (flag >= 0) fact.flags |= 1 << flag;
++      if (isNew) fact.newCount = Math.min(fact.newCount + 1, WALL_EVIDENCE_COOKIE_COUNT_MAX);
+     }
+   }
+   return facts;
+@@ -422,6 +421,7 @@
+     this.wallEvidenceMarkerPath = wallEvidenceMarkerPath;
+     this.cookieFactsPath = cookieFactsPath;
+     this.cookieFactsFailedPorts = new Set();
++    this.firstReadKeys = null;
+     this.wallEvidenceMarkerUnreadable = false;
+     this.loadLedger();
+   }
+@@ -529,7 +529,7 @@
+ 
+   writeCookieFacts(port, cookies) {
+     try {
+-      const text = JSON.stringify(cookieFactsFromJar(cookies, this.now()));
++      const text = JSON.stringify(cookieFactsFromJar(cookies, this.now(), this.firstReadKeys));
+       if (Buffer.byteLength(text) > WALL_EVIDENCE_COOKIE_FACTS_MAX_BYTES) {
+         this.cookieFactsWriteFailed(port, "over_size_cap");
+         return;
+@@ -602,6 +602,9 @@
+ 
+   async syncCookies(live, { afterPause = false } = {}) {
+     const reads = await this.readJars(live);
++    if (this.firstReadKeys == null && reads.size > 0) {
++      this.firstReadKeys = new Set([...reads.values()].flatMap((read) => [...read.jar.keys()]));
++    }
+     for (const [port, read] of reads) {
+       if (this.cookieViews.get(port)?.browserId !== read.browserId) {
+         this.cookieViews.set(port, { browserId: read.browserId, jar: null, sent: new Map() });

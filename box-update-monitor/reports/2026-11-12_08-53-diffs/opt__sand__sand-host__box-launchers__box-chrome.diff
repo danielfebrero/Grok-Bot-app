@@ -1,0 +1,146 @@
+--- 2026-11-12_07-48:/opt/sand/sand-host/box-launchers/box-chrome
++++ 2026-11-12_08-53:/opt/sand/sand-host/box-launchers/box-chrome
+@@ -2,6 +2,24 @@
+ # >>> box-chrome port table (from sand/src/shared/box/box-contract.ts; regenerate: pnpm --filter sand run gen:box-ports) >>>
+ SAND_BOX_CDP_PORT_BASE=9222
+ # <<< box-chrome port table <<<
++box_chrome_launcher_commit() {
++	local commit="" version size
++	case "$1" in
++	/*/box-launchers/box-chrome) version="${1%/box-launchers/box-chrome}/version" ;;
++	*) return 0 ;;
++	esac
++	if [ ! -f "${version}" ] || [ -L "${version}" ]; then
++		return 0
++	fi
++	size="$(stat -c %s -- "${version}" 2>/dev/null)"
++	[ "${size}" -le 41 ] 2>/dev/null || return 0
++	IFS= read -r commit 2>/dev/null <"${version}" || true
++	case "${commit}" in
++	"" | *[!0-9a-f]*) return 0 ;;
++	esac
++	[ "${#commit}" -lt 7 ] || [ "${#commit}" -gt 40 ] || printf '%s' "${commit}"
++}
++BOX_CHROME_LAUNCHER_COMMIT="$(box_chrome_launcher_commit "$0")"
+ /usr/local/bin/ensure-machine-id || true
+ 
+ if [ -n "${CURSOR_MCP_BROWSER_OPEN_LOG:-}" ]; then
+@@ -332,13 +350,25 @@
+ 	;;
+ esac
+ apply_box_chrome_policy() {
+-	if [ "${BOX_CHROME_GATES_READY}" = false ] && [ "${BOX_CHROME_WEBRTC_PROXY_ONLY}" = false ] &&
+-		SAND_BOX_BROWSER_WEBRTC_PROXY_ONLY=1 "${box_chrome_policy}"; then
+-		BOX_CHROME_WEBRTC_PROXY_ONLY=true
+-		return 0
++	local forced=0
++	if [ "${BOX_CHROME_GATES_READY}" = false ] && [ "${BOX_CHROME_WEBRTC_PROXY_ONLY}" = false ]; then
++		SAND_BOX_BROWSER_WEBRTC_PROXY_ONLY=1 "${box_chrome_policy}" || forced=$?
++		BOX_CHROME_WEBRTC_FALLBACK="$(box_chrome_policy_outcome "${forced}")"
++		if [ "${forced}" = 0 ]; then
++			BOX_CHROME_WEBRTC_PROXY_ONLY=true
++			return 0
++		fi
+ 	fi
+ 	"${box_chrome_policy}"
+ }
++box_chrome_policy_outcome() {
++	case "$1" in
++	0) printf ok ;;
++	3) printf unwritable ;;
++	*) printf failed ;;
++	esac
++}
++BOX_CHROME_WEBRTC_FALLBACK=""
+ BOX_CHROME_GATES_READY=false
+ [ ! -e "${SAND_BOX_EXPERIMENTS_READY_FILE:-/tmp/sand-box-experiments-ready}" ] || BOX_CHROME_GATES_READY=true
+ BOX_CHROME_WEBRTC_PROXY_ONLY=false
+@@ -348,6 +378,7 @@
+ 	BOX_CHROME_WEBRTC_PROXY_ONLY=true
+ fi
+ apply_box_chrome_policy || policy_status=$?
++BOX_CHROME_POLICY_RUN="$(box_chrome_policy_outcome "${policy_status}")"
+ SAND_WEBAUTHN_ID_FILE=/usr/local/share/sand-webauthn-proxy.id
+ SAND_WEBAUTHN_MARKER=/home/box/.sand-webauthn-proxy-enabled
+ CHROME_LOG="/tmp/chrome${DISPLAY:-:1}.log"
+@@ -787,6 +818,47 @@
+ 	done
+ }
+ 
++display_up() {
++	DISPLAY="${DISPLAY:-:1}" timeout 2 xdotool getdisplaygeometry >/dev/null 2>&1
++}
++
++# curl sends a plain http request through the proxy that http_proxy, all_proxy
++# or ALL_PROXY names unless no_proxy covers the host
++# (https://curl.se/docs/manpage.html#ENVIRONMENT), so with one of them set the
++# readiness probe may never have reached this box's own CDP port.
++cdp_proxy_named() {
++	[ -n "${http_proxy:-}${all_proxy:-}${ALL_PROXY:-}" ]
++}
++
++cdp_answers_past_proxy() {
++	curl --noproxy '*' --max-time 1 -fsS "http://$1:${CHROME_DEBUG_PORT}/json/version" >/dev/null 2>&1
++}
++
++cdp_timeout_state() {
++	local pid
++	if [ "${CHROME_PORT_HELD}" -ne 0 ]; then
++		printf held
++	elif pid="$(profile_browser_pid)" && process_running "${pid}"; then
++		if cdp_proxy_named && cdp_answers_past_proxy 127.0.0.1; then
++			if chrome_ready; then
++				printf listening
++			else
++				printf proxied
++			fi
++		elif cdp_answers_past_proxy '[::1]'; then
++			printf ipv6_only
++		elif cdp_port_listening; then
++			printf listening
++		else
++			printf silent
++		fi
++	elif display_up; then
++		printf exited
++	else
++		printf no_display
++	fi
++}
++
+ next_launch_attempt() {
+ 	local counter="${CHROME_PROFILE}/.sand-launch-count" boot="$1"
+ 	local recorded_boot="" count=0
+@@ -861,6 +933,7 @@
+ 
+ start_chrome() {
+ 	local mode="$1" visible=1 started_ms attempt outcome duration_ms cdp_ready_ms launcher_fields shown boot
++	local cdp_state=""
+ 	shift
+ 	[ "${mode}" = window ] || visible=0
+ 	boot="$(box_boot_id)"
+@@ -911,10 +984,24 @@
+ 		launcher_fields+=",\"webrtcProxyOnly\":${BOX_CHROME_WEBRTC_PROXY_ONLY},\"gatesReady\":${BOX_CHROME_GATES_READY}"
+ 		;;
+ 	esac
++	case "${BOX_CHROME_POLICY_RUN:-}" in
++	ok | unwritable | failed) launcher_fields+=",\"policyRun\":\"${BOX_CHROME_POLICY_RUN}\"" ;;
++	esac
++	case "${BOX_CHROME_WEBRTC_FALLBACK:-}" in
++	ok | unwritable | failed) launcher_fields+=",\"webrtcFallback\":\"${BOX_CHROME_WEBRTC_FALLBACK}\"" ;;
++	esac
++	[ -z "${BOX_CHROME_LAUNCHER_COMMIT:-}" ] ||
++		launcher_fields+=",\"launcherCommit\":\"${BOX_CHROME_LAUNCHER_COMMIT}\""
+ 	case "${BOX_CHROME_GPU_MODE:-}" in
+ 	swiftshader | legacy | stock | llvmpipe) launcher_fields+=",\"gpuMode\":\"${BOX_CHROME_GPU_MODE}\"" ;;
+ 	esac
+ 	launcher_fields+="$(exit_locale_row_fields)"
++	[ "${outcome:-}" != cdp_timeout ] || cdp_state="$(cdp_timeout_state)"
++	case "${cdp_state:-}" in
++	held | no_display | exited | ipv6_only | silent | proxied | listening)
++		launcher_fields+=",\"cdpTimeoutState\":\"${cdp_state}\""
++		;;
++	esac
+ 	printf '{"kind":"chrome_launch","display":%s,"mode":"%s","attempt":%s,"outcome":"%s","durationMs":%s%s}\n' \
+ 		"${BOX_DISPLAY_NUM:-1}" "${mode}" "${attempt}" "${outcome}" "${duration_ms}" "${launcher_fields}" \
+ 		2>/dev/null >>"${SAND_BOX_TELEMETRY_LOG:-/tmp/sand-box-telemetry.log}" || true

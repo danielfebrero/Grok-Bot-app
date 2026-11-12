@@ -1,0 +1,80 @@
+--- 2026-11-12_07-48:/home/box/sand-data/managed-skills/skills/site-playbooks-jetblue/SKILL.md
++++ 2026-11-12_08-53:/home/box/sand-data/managed-skills/skills/site-playbooks-jetblue/SKILL.md
+@@ -1,9 +1,9 @@
+ ---
+ name: site-playbooks-jetblue
+ description: >-
+-  JetBlue site playbook: fares or booking a flight;
+- not check-in, changes, or
+-  awards.
++  JetBlue site playbook: fares, flight status, or booking;
++ not check-in,
++  changes, or awards.
+ ---
+ # Site playbook: JetBlue
+ 
+@@ -16,7 +16,11 @@
+ 
+ ### When to use
+ 
+-The user wants JetBlue's cash fares and schedules for a route and date. The parent needs origin and destination IATA codes, dates, adult, child, and lap infant counts, and cabin. The user gets each outbound flight's times, duration, stops, flight numbers, and the price in each fare column, Mint included. Multi-carrier fare shopping belongs in the Google Flights playbook.
++The user wants JetBlue's cash fares and schedules for a route and date, or what a fare tier includes. The parent needs origin and destination IATA codes, dates, adult, child, and lap infant counts, and cabin. The user gets each flight's times, duration, stops, flight numbers, and the price in each fare column, Mint included, plus the tier cards when asked. Multi-carrier fare shopping belongs in the Google Flights playbook.
++
++Other JetBlue reads take no snippet;
++ give the subagent the URL and what to read. Flight status: `https://www.jetblue.com/flight-tracker-and-status`, By route or By flight number, then Check status, lists each flight number with its status (`/flight-tracker` is a 404);
++ From can start filled with an airport near the browser, so check it first. JetBlue's own low fare calendar: on `https://www.jetblue.com/` set the Flights form's trip type, From, and To, then open the Depart date picker, which shows each day's lowest fare once its prices load. Bags: every fare includes a carry-on, and checked bag fees are on `https://www.jetblue.com/at-the-airport/baggage-information`.
+ 
+ ### Fastest path
+ 
+@@ -59,26 +63,31 @@
+ 
+ ```
+ Open https://www.jetblue.com/booking/flights?from=<ORIGIN>&to=<DEST>&depart=<YYYY-MM-DD>&return=<RETURN or omit>&isMultiCity=false&noOfRoute=1&adults=<ADULTS>&children=<CHILDREN>&infants=<LAP INFANTS>&sharedMarket=false&roundTripFaresFlag=false&usePoints=false
+-Wait 4 s, then snapshot. Check the page shows <ORIGIN>, <DEST>, the dates, and the passenger counts. If it shows a form or a field differs, fix it once and search once.
+-Wait until flight rows with prices appear (up to 10 s), then snapshot. Read the fare column names off the page header, usually Main, EvenMore, and Mint, and include every column shown.
+-For each outbound row read depart and arrive times (+1 = next day), duration, stops with connecting airports, flight numbers (B6 nnnn), and the price in each column. A sold-out or missing cell is not available.
+-If the page says no flights match, report an empty result. If the grid stays empty after the wait, report empty_grid with the URL and stop.
+-Return a table sorted by price plus the page URL and one screenshot path. Read only. Never click a fare or Continue.
+-If you see Access Denied, a Client Challenge, a captcha, sign-in or password, 2FA, or payment wall, stop and report the URL.
++Rows often take 10 to 20 s to fill. Wait until flight rows with prices appear or the page says no flights match (up to 30 s);
++ if neither, reload once and wait up to 30 s more. Then snapshot.
++Check the header shows <ORIGIN>, <DEST>, the dates, and the traveler count. If one differs, fix it in the search form once, search once, and wait for the new rows the same way.
++If a "more flights" button shows under the rows, press it once. Take the fare column names from the rows, usually Main, EvenMore, and Mint, and include every column shown.
++For each row read depart and arrive times (+1 = next day), duration, stops with connecting airports, flight numbers, and the price in each column. A sold-out or missing cell is not available.
++For fare tiers, carry-on, or change rules, click the cheapest row's Main cell: tier cards open in place with each tier's price and what it includes. Read them. Never press Select or Continue.
++Round trip: rows are outbound only. For the return, open the link again with from and to swapped, depart=<RETURN>, and return left out, and read it the same way.
++If the page says no flights match, report no_results with its words. If rows never appear after the reload, report results_timeout with the heading shown, status partial.
++The header's Sign in link is not a wall. Stop with status blocked only on Access Denied, a Client Challenge or captcha, or a sign-in or payment page in place of the results, and report the URL.
++Return a table sorted by price plus the page URL and one screenshot path.
+ Ground rules for this Task. A Timeout or a net::ERR_* code from browser_navigate means the box cannot reach that host. Do not retry it, even if the tool result says to, and do not run DNS or connectivity checks. Move to the next source this Task names, or report the code and URL. An HTTP block (403, 419, 429, 503) follows this Task's own rule. Work in the tab you start in. Do not open a second tab, and switch tabs only when a tool result names a page you did not intend. In-page tabs are part of the page. A page script is an async (page) => function: run it with browser_run_code if you hold it. Without it, read rendered text from browser_snapshot or browser_find, read a <script> tag from the HTML that curl fetches in the box shell, and report a field neither yields as unreadable, never visible text in its place. Name the read you used. Snapshot a page state once. After a click, a scroll, or a wait this Task calls for, take one new snapshot. Do not snapshot the same state twice. Report as soon as the stop rule above is met, one line per item, only the fields asked for, no page dumps.
+ ```
+ 
+ ### Read the result
+ 
+ On the routes checked, the columns were Main (standard seat), EvenMore (extra legroom), and Mint (lie-flat, on some routes);
+- take the names from the header. Each cell shows the cheapest fare in its column. Clicking a cell opens tier cards, which this search does not open;
+- the Main column opened Main Base, Main, and Main Flex. Prices are one-way per person, round trips included. Round trip pages show outbound rows first;
+- return rows render only after an outbound is picked, which this search must not do.
++ United-operated rows show Economy and Business/First prices instead. Each cell shows the cheapest tier in its column. Its tier cards, for Main: Main Base, Main, and Main Flex, give each tier's price, carry-on, seat choice, and change and cancel terms. Prices are one-way per person with taxes and fees, round trips included. A strip above the rows gives each nearby day's lowest fare.
+ 
+ ### When blocked
+ 
+-- jetblue.com runs a client challenge. A browser that exposes automation gets a "Client Challenge" page that says "Enter the characters seen in the image". That was a live check from a residential connection, not yet from a box. Other tells are Access Denied or a results page that never fills.
+-- After a block or `empty_grid`, do not dispatch the deep link again. Hand the route to the Google Flights playbook and read JetBlue's rows there.
++- jetblue.com can answer with a "Client Challenge" page that says "Enter the characters seen in the image", or with Access Denied. Those are walls. The header's Sign in link and a slow results page are not.
++- This page access was checked only from a test browser outside Grok Bot's production network, not from the box, so the box may meet a challenge or block that never appeared there.
++- After a wall, do not dispatch to jetblue.com again for the rest of the chat;
++ read JetBlue's rows through the Google Flights playbook unless it already blocked this turn. After `results_timeout`, use Google Flights for that search;
++ a later search can still use jetblue.com. After `no_results`, say JetBlue shows no flights that day.
+ - If the page asks for a password, 2FA code, captcha, or payment, stop. Do not solve or bypass. Report which wall appeared and the URL it was on.
+ 
+ ## JetBlue booking a picked flight
+@@ -102,7 +111,7 @@
+ If <CHECKOUT LINK> is a jetblue.com link, open it and dismiss any cookie banner. On a trip summary with flights <B6 flight numbers> and a fare in the <fare column> column already selected, go to the summary-page line below. On a jetblue.com search form or results, stay there and skip the Open line. On anything else, also report checkout_link_failed with its URL.
+ Open https://www.jetblue.com/booking/flights?from=<ORIGIN>&to=<DEST>&depart=<YYYY-MM-DD>&return=<RETURN or omit>&isMultiCity=false&noOfRoute=1&adults=<ADULTS>&children=<CHILDREN>&infants=<LAP INFANTS>&sharedMarket=false&roundTripFaresFlag=false&usePoints=false
+ Wait 4 s, then snapshot. Check the route, dates, and the <ADULTS> adult, <CHILDREN> child, and <LAP INFANTS> lap infant counts. If one differs, fix it in the search form once and search once;
+- if it won't take the children or lap infants, report children_not_set with the URL and stop. Wait for flight rows (up to 10 s).
++ if it won't take the children or lap infants, report children_not_set with the URL and stop. Wait for flight rows (up to 30 s).
+ If the outbound row for <B6 flight numbers> at <HH:MM> is missing or its <fare column> cell is sold out, report fare_not_available with the URL and stop.
+ Click that cell;
+  if tier cards open, select the cheapest and report its name. Pick a return row the same way.
