@@ -1,0 +1,1530 @@
+--- 2026-11-12_15-51:/opt/sand/sand-host/sand-eval-runner.cjs
++++ 2026-11-12_16-49:/opt/sand/sand-host/sand-eval-runner.cjs
+@@ -385264,7 +385264,7 @@
+ function sandClientBaseVersionOf(clientAppVersion) {
+ 
+   return stampedVersionBaseOf(clientAppVersion) ?? stampedVersionBaseOf(
+-    true ? "1.1.0-pre.104" : void 0
++    true ? "1.1.0-pre.106" : void 0
+   ) ?? SAND_CLIENT_FALLBACK_BASE_VERSION;
+ 
+ }
+@@ -476898,13 +476898,13 @@
+ }
+ 
+ 
+-// ../node_modules/.pnpm/@connectrpc+connect-node@1.6.1_patch_hash=5c0d4a8691d1ed59ba1b82651fc08eec3cb4cd82e8a47_8875d028e361efa93a583ae9204dfa3b/node_modules/@connectrpc/connect-node/dist/esm/compression.js
++// ../node_modules/.pnpm/@connectrpc+connect-node@1.6.1_patch_hash=f54b024a489a1bd2b6230fbde243a5d3bbbcd6180e88e_8a49a1448f7110f11ff70516c94c8172/node_modules/@connectrpc/connect-node/dist/esm/compression.js
+ var zlib = __toESM(require("zlib"), 1);
+ 
+ var import_util12 = require("util");
+ 
+ 
+-// ../node_modules/.pnpm/@connectrpc+connect-node@1.6.1_patch_hash=5c0d4a8691d1ed59ba1b82651fc08eec3cb4cd82e8a47_8875d028e361efa93a583ae9204dfa3b/node_modules/@connectrpc/connect-node/dist/esm/node-error.js
++// ../node_modules/.pnpm/@connectrpc+connect-node@1.6.1_patch_hash=f54b024a489a1bd2b6230fbde243a5d3bbbcd6180e88e_8a49a1448f7110f11ff70516c94c8172/node_modules/@connectrpc/connect-node/dist/esm/node-error.js
+ function connectErrorFromNodeReason(reason) {
+ 
+   let code = Code.Internal;
+@@ -477099,7 +477099,7 @@
+ ));
+ 
+ 
+-// ../node_modules/.pnpm/@connectrpc+connect-node@1.6.1_patch_hash=5c0d4a8691d1ed59ba1b82651fc08eec3cb4cd82e8a47_8875d028e361efa93a583ae9204dfa3b/node_modules/@connectrpc/connect-node/dist/esm/compression.js
++// ../node_modules/.pnpm/@connectrpc+connect-node@1.6.1_patch_hash=f54b024a489a1bd2b6230fbde243a5d3bbbcd6180e88e_8a49a1448f7110f11ff70516c94c8172/node_modules/@connectrpc/connect-node/dist/esm/compression.js
+ var gzip2 = (0, import_util12.promisify)(zlib.gzip);
+ 
+ var gunzip2 = (0, import_util12.promisify)(zlib.gunzip);
+@@ -477214,13 +477214,13 @@
+ }
+ 
+ 
+-// ../node_modules/.pnpm/@connectrpc+connect-node@1.6.1_patch_hash=5c0d4a8691d1ed59ba1b82651fc08eec3cb4cd82e8a47_8875d028e361efa93a583ae9204dfa3b/node_modules/@connectrpc/connect-node/dist/esm/node-universal-client.js
++// ../node_modules/.pnpm/@connectrpc+connect-node@1.6.1_patch_hash=f54b024a489a1bd2b6230fbde243a5d3bbbcd6180e88e_8a49a1448f7110f11ff70516c94c8172/node_modules/@connectrpc/connect-node/dist/esm/node-universal-client.js
+ var http = __toESM(require("http"), 1);
+ 
+ var https = __toESM(require("https"), 1);
+ 
+ 
+-// ../node_modules/.pnpm/@connectrpc+connect-node@1.6.1_patch_hash=5c0d4a8691d1ed59ba1b82651fc08eec3cb4cd82e8a47_8875d028e361efa93a583ae9204dfa3b/node_modules/@connectrpc/connect-node/dist/esm/node-universal-header.js
++// ../node_modules/.pnpm/@connectrpc+connect-node@1.6.1_patch_hash=f54b024a489a1bd2b6230fbde243a5d3bbbcd6180e88e_8a49a1448f7110f11ff70516c94c8172/node_modules/@connectrpc/connect-node/dist/esm/node-universal-header.js
+ function nodeHeaderToWebHeader(nodeHeaders) {
+ 
+   const header = new Headers();
+@@ -477360,7 +477360,7 @@
+ }
+ 
+ 
+-// ../node_modules/.pnpm/@connectrpc+connect-node@1.6.1_patch_hash=5c0d4a8691d1ed59ba1b82651fc08eec3cb4cd82e8a47_8875d028e361efa93a583ae9204dfa3b/node_modules/@connectrpc/connect-node/dist/esm/http2-session-manager.js
++// ../node_modules/.pnpm/@connectrpc+connect-node@1.6.1_patch_hash=f54b024a489a1bd2b6230fbde243a5d3bbbcd6180e88e_8a49a1448f7110f11ff70516c94c8172/node_modules/@connectrpc/connect-node/dist/esm/http2-session-manager.js
+ var http2 = __toESM(require("http2"), 1);
+ 
+ var Http2SessionManager = class {
+@@ -477709,11 +477709,30 @@
+       case "connecting":
+         state.conn.then((value) => {
+ 
++          if (this.s !== state) {
++
++            value.on("error", () => {
++
++            }
++);
++
++            value.destroy();
++
++            return;
++
++          }
++
+           this.setState(ready(value, this.options));
+ 
+         }
+ , (reason) => {
+ 
++          if (this.s !== state) {
++
++            return;
++
++          }
++
+           this.setState(closedOrError(reason));
+ 
+         }
+@@ -478400,7 +478419,7 @@
+ }
+ 
+ 
+-// ../node_modules/.pnpm/@connectrpc+connect-node@1.6.1_patch_hash=5c0d4a8691d1ed59ba1b82651fc08eec3cb4cd82e8a47_8875d028e361efa93a583ae9204dfa3b/node_modules/@connectrpc/connect-node/dist/esm/node-universal-client.js
++// ../node_modules/.pnpm/@connectrpc+connect-node@1.6.1_patch_hash=f54b024a489a1bd2b6230fbde243a5d3bbbcd6180e88e_8a49a1448f7110f11ff70516c94c8172/node_modules/@connectrpc/connect-node/dist/esm/node-universal-client.js
+ function createNodeHttpClient(options2) {
+ 
+   var _a19;
+@@ -547671,10 +547690,6 @@
+ 
+ var AppSecretState = /* @__PURE__ */ enumType2(proto3, __protoPackage137, "AppSecretState", [[0, "UNSPECIFIED"], [1, "REQUESTED"], [2, "SET"]], 1);
+ 
+-var PublishProposalStatus = /* @__PURE__ */ enumType2(proto3, __protoPackage137, "PublishProposalStatus", [[0, "UNSPECIFIED"], [1, "PENDING"], [2, "PUBLISHED"], [3, "DISMISSED"], [4, "CONFIRMING"]], 1);
+-
+-var PublishReviewState = /* @__PURE__ */ enumType2(proto3, __protoPackage137, "PublishReviewState", [[0, "UNSPECIFIED"], [1, "REVIEWING"], [2, "PASSED"], [3, "WARNINGS"], [4, "BLOCKED"], [5, "FAILED"]], 1);
+-
+ var PublishReviewOverrideState = /* @__PURE__ */ enumType2(proto3, __protoPackage137, "PublishReviewOverrideState", [[0, "UNSPECIFIED"], [1, "REQUESTED"], [2, "APPROVED"], [3, "DENIED"], [4, "REVOKED"], [5, "EXPIRED"]], 1);
+ 
+ var AppPublishStatus = /* @__PURE__ */ enumType2(proto3, __protoPackage137, "AppPublishStatus", [[0, "UNSPECIFIED"], [1, "QUEUED"], [2, "BUILDING"], [3, "READY"], [4, "ERROR"], [5, "CANCELED"]], 1);
+@@ -550017,6 +550032,8 @@
+ 
+     this.connectedAccountCount = 0;
+ 
++    this.listsReposWithOwnAccount = false;
++
+     proto3.util.initPartial(data2, this);
+ 
+   }
+@@ -550047,7 +550064,7 @@
+ 
+   static $() {
+ 
+-    return ["ListBitbucketServerInstancesResponse.BitbucketServerInstance|1 uuid 9|2 hostname 9|3 external_host 9|4 can_delete 8|5 service_account_token_configured 8|6 browser_base_url 9|7 outbound_base_url 9|8 oauth_app_configured 8|9 current_user_connected 8|10 members_can_link 8|11 current_user_reconnect_required 8|12 connected_account_count 5"];
++    return ["ListBitbucketServerInstancesResponse.BitbucketServerInstance|1 uuid 9|2 hostname 9|3 external_host 9|4 can_delete 8|5 service_account_token_configured 8|6 browser_base_url 9|7 outbound_base_url 9|8 oauth_app_configured 8|9 current_user_connected 8|10 members_can_link 8|11 current_user_reconnect_required 8|12 connected_account_count 5|13 lists_repos_with_own_account 8"];
+ 
+   }
+ 
+@@ -711830,6 +711847,8 @@
+ 
+     this.assistantTurnCount = 0;
+ 
++    this.workerLines = [];
++
+     proto3.util.initPartial(data2, this);
+ 
+   }
+@@ -711860,7 +711879,7 @@
+ 
+   static $() {
+ 
+-    return ["CloudAgentVoiceCall|1 call_id 9|2 anchor_line_id 9|3 anchor_server_line_id 9?|4 started_at_ms 3|5 connected_at_ms 3?|6 ended_at_ms 3?|7 turns #0*|8 user_turn_count 13|9 assistant_turn_count 13|10 last_heard_at_ms 3?|11 reads_utterances 8?|12 hold #1?", CloudAgentVoiceCall_Turn, CloudAgentVoiceCall_Hold];
++    return ["CloudAgentVoiceCall|1 call_id 9|2 anchor_line_id 9|3 anchor_server_line_id 9?|4 started_at_ms 3|5 connected_at_ms 3?|6 ended_at_ms 3?|7 turns #0*|8 user_turn_count 13|9 assistant_turn_count 13|10 last_heard_at_ms 3?|11 reads_utterances 8?|12 hold #1?|13 worker_lines #2*", CloudAgentVoiceCall_Turn, CloudAgentVoiceCall_Hold, CloudAgentVoiceCall_WorkerLine];
+ 
+   }
+ 
+@@ -711969,6 +711988,57 @@
+ 
+ var CloudAgentVoiceCall_Hold_DeviceKind = /* @__PURE__ */ enumType2(proto3, __protoPackage142, "CloudAgentVoiceCall.Hold.DeviceKind", [[0, "UNSPECIFIED"], [1, "DESKTOP"], [2, "WEB"], [3, "PHONE"]], 1);
+ 
++var CloudAgentVoiceCall_WorkerLine = class _CloudAgentVoiceCall_WorkerLine extends __protoMessage3133 {
++
++  constructor(data2) {
++
++    super();
++
++    this.id = "";
++
++    this.workerBcId = "";
++
++    this.workerName = "";
++
++    this.text = "";
++
++    proto3.util.initPartial(data2, this);
++
++  }
++
++  static fromBinary(bytes, options2) {
++
++    return new _CloudAgentVoiceCall_WorkerLine().fromBinary(bytes, options2);
++
++  }
++
++  static fromJson(jsonValue2, options2) {
++
++    return new _CloudAgentVoiceCall_WorkerLine().fromJson(jsonValue2, options2);
++
++  }
++
++  static fromJsonString(jsonString, options2) {
++
++    return new _CloudAgentVoiceCall_WorkerLine().fromJsonString(jsonString, options2);
++
++  }
++
++  static equals(a, b2) {
++
++    return proto3.util.equals(_CloudAgentVoiceCall_WorkerLine, a, b2);
++
++  }
++
++  static $() {
++
++    return ["CloudAgentVoiceCall.WorkerLine|1 id 9|2 worker_bc_id 9|3 worker_name 9|4 text 9"];
++
++  }
++
++}
++;
++
+ var SaveCloudAgentVoiceCallRequest = class _SaveCloudAgentVoiceCallRequest extends __protoMessage3133 {
+ 
+   constructor(data2) {
+@@ -869031,10 +869101,6 @@
+ }
+ 
+ 
+-// ../packages/agent/dist/voice-call-answers.js
+-init_dist3();
+-
+-
+ // ../packages/agent/dist/tools/meta/send-to-call.js
+ init_dist();
+ 
+@@ -870064,40 +870130,6 @@
+ 
+ }
+ 
+-function isWorkerDispatchSendToAgent(sendToAgent) {
+-
+-  const result = sendToAgent.result?.result;
+-
+-  if (result?.case !== "success" || result.value.recipient !== void 0) {
+-
+-    return false;
+-
+-  }
+-
+-  const target = sendToAgent.args?.agentId.trim();
+-
+-  const workerBcId = result.value.workerBcId.trim();
+-
+-  if (target === "parent" || target === "cursor" || target === MAIN_BOT_AGENT_TOKEN || workerBcId === "cursor" || workerBcId === MAIN_BOT_AGENT_TOKEN) {
+-
+-    return false;
+-
+-  }
+-
+-  const msg = result.value.message;
+-
+-  const text6 = (typeof msg === "string" ? msg : msg.unwrap(PrivacyCapability.UNSAFE_ALWAYS_ALLOWED)).trim();
+-
+-  if (text6.startsWith("Message delivered to your parent ") || text6.includes("it is not one of your workers, so you are not notified when its turn finishes.") || text6.includes("The Project answers in this chat under its own name.") || text6.includes("It is not a Project, so its answer stays in its own chat.")) {
+-
+-    return false;
+-
+-  }
+-
+-  return Boolean(workerBcId || target);
+-
+-}
+-
+ function backgroundTaskIdsFromToolCall(toolCallId, toolCall2) {
+ 
+   const tool = toolCall2.tool;
+@@ -870131,7 +870163,6 @@
+ 
+     }
+ 
+-    case "createAgentToolCall":
+     case "createProjectToolCall": {
+ 
+       const result = tool.value.result?.result;
+@@ -870148,22 +870179,6 @@
+ 
+     }
+ 
+-    case "sendToAgentToolCall": {
+-
+-      const result = tool.value.result?.result;
+-
+-      if (!isWorkerDispatchSendToAgent(tool.value) || result?.case !== "success") {
+-
+-        return [];
+-
+-      }
+-
+-      agentId = result.value.workerBcId.trim() || tool.value.args?.agentId.trim();
+-
+-      break;
+-
+-    }
+-
+     default:
+       return [];
+ 
+@@ -1020980,6 +1020995,10 @@
+ }
+ 
+ 
++// ../packages/grok-bot-harness/src/mcp/mcp-state-executor.ts
++init_dist3();
++
++
+ // src/shared/parse/key-of.ts
+ function isKeyOf(table, key) {
+ 
+@@ -1021145,15 +1021164,9 @@
+ 
+ var MAX_UNTRUSTED_MARKUP_SCAN_LENGTH = 16384;
+ 
+-function stripMarkupAndBoundConnectorError(raw) {
+-
+-  const collapsed2 = raw.slice(0, MAX_UNTRUSTED_MARKUP_SCAN_LENGTH).replace(/<(script|style)\b[^<>]*>[\s\S]*?(?:<\/\1>|$)/gi, " ").replace(/<[^<>]*>/g, " ").replace(/\s+/g, " ").trim();
++function stripConnectorErrorMarkup(raw) {
+ 
+-  if (collapsed2.length === 0) return "";
+-
+-  return collapsed2.length > MAX_CONNECTOR_ERROR_LENGTH ? `${
+-collapsed2.slice(0, MAX_CONNECTOR_ERROR_LENGTH - 1).trimEnd()}
+-\u2026` : collapsed2;
++  return raw.slice(0, MAX_UNTRUSTED_MARKUP_SCAN_LENGTH).replace(/<(script|style)\b[^<>]*>[\s\S]*?(?:<\/\1>|$)/gi, " ").replace(/<[^<>]*>/g, " ").replace(/\s+/g, " ").trim();
+ 
+ }
+ 
+@@ -1021217,6 +1021230,69 @@
+ 
+ var LOADS_ON_REQUEST_STATUS = "loading";
+ 
++var REDACTED = "[redacted]";
++
++var MAX_CONNECTOR_ERROR_SCAN_LENGTH = 16384;
++
++var MAX_LISTED_CONNECTOR_ERROR_LENGTH = 1024;
++
++var MAX_SCAN_PAST_CUT_LENGTH = 724;
++
++var MAX_STEPS_BACK_WITHIN_CUT_TOKEN = 16;
++
++var END_OF_HEX_RUN = "-";
++
++var END_OF_URL_USERINFO = "@";
++
++var CUT_MARK = "\u2026";
++
++var URL_USERINFO = /\b([a-z][a-z0-9+.-]*:\/\/)[^\s/@]+@/gi;
++
++var AUTH_SCHEME_CREDENTIAL = /\b(bearer|basic)\s+([A-Za-z0-9._~+/=-]{
++8,}
++)/gi;
++
++var SECRET_ASSIGNMENT = /\b([A-Za-z0-9_-]*(?:secret|token|password|passwd|api[_-]?key|access[_-]?key|private[_-]?key|credentials?|signature)[A-Za-z0-9_-]*)(["']?\s*[:=]\s*["']?)([^\s"',;
++&]+)/gi;
++
++var AWS_ACCESS_KEY_ID = /\b(?:AKIA|ASIA|ABIA|ACCA)[A-Z0-9]{
++16}
++\b/g;
++
++var LONG_HEX = /\b[0-9a-f]{
++32,}
++\b/gi;
++
++var TOKEN_SHAPED_RUN = /[A-Za-z0-9+/=_-]{
++20,}
++/g;
++
++var VALUE_THAT_SAYS_NONE_WAS_SET = /^(?:undefined|null|none|nil|missing|empty|unset)$/i;
++
++var OAUTH_ERROR_CODES = /* @__PURE__ */ new Set([
++  "access_denied",
++  "account_selection_required",
++  "authorization_pending",
++  "consent_required",
++  "expired_token",
++  "insufficient_scope",
++  "interaction_required",
++  "invalid_client",
++  "invalid_grant",
++  "invalid_request",
++  "invalid_scope",
++  "invalid_target",
++  "invalid_token",
++  "login_required",
++  "server_error",
++  "slow_down",
++  "temporarily_unavailable",
++  "unauthorized_client",
++  "unsupported_grant_type",
++  "unsupported_response_type",
++  "unsupported_token_type"
++]);
++
+ var NEEDS_GRANT_INSTRUCTIONS = `This MCP server is installed but not allowed yet;
+  call ${
+ GROK_BOT_TOOL_NAMES.AuthenticateMcpServer}
+@@ -1021406,6 +1021482,161 @@
+ 
+ }
+ 
++function boundConnectorErrorOutsideSecrets(raw) {
++
++  return cutOutsideSecrets(stripMarkupWithinScanLength(raw), MAX_CONNECTOR_ERROR_LENGTH);
++
++}
++
++function redactListedConnectorError(detail) {
++
++  return redactConnectorErrorSecrets(cutOutsideSecrets(detail, MAX_LISTED_CONNECTOR_ERROR_LENGTH));
++
++}
++
++function cutOutsideSecrets(text6, maxLength) {
++
++  if (text6.length <= maxLength) return text6;
++
++  const cut = maxLength - 1;
++
++  const redactedThroughCutToken = redactConnectorErrorSecrets(throughTokenAt(text6, cut));
++
++  let kept2 = truncateUtf16(text6, cut).trimEnd();
++
++  for (let steps = 0;
++ kept2.length > 0;
++ steps++) {
++
++    const redactedKept = redactConnectorErrorSecrets(kept2);
++
++    if (redactedThroughCutToken.startsWith(redactedKept)) break;
++
++    kept2 = steps < MAX_STEPS_BACK_WITHIN_CUT_TOKEN ? backToAgreement(kept2, redactedKept, redactedThroughCutToken) : kept2.slice(0, Math.max(kept2.search(/\s\S*$/), 0));
++
++  }
++
++  return `${
++kept2}
++${
++CUT_MARK}
++`;
++
++}
++
++function throughTokenAt(text6, cut) {
++
++  const scanEnd = cut + MAX_SCAN_PAST_CUT_LENGTH;
++
++  const restOfToken = text6.slice(cut, scanEnd).search(/\s/);
++
++  if (restOfToken >= 0) return text6.slice(0, cut + restOfToken);
++
++  if (text6.length <= scanEnd) return text6;
++
++  const unscannedRun = /^[A-Za-z0-9+/=_-]*/.exec(text6.slice(scanEnd))?.[0] ?? "";
++
++  const caseAndDigitKindsInIt = [/[A-Z]/, /[a-z]/, /[0-9]/].map((kind) => kind.exec(unscannedRun)?.[0] ?? "").join("");
++
++  return `${
++text6.slice(0, scanEnd)}
++${
++END_OF_HEX_RUN}
++${
++caseAndDigitKindsInIt}
++${
++END_OF_URL_USERINFO}
++`;
++
++}
++
++function backToAgreement(kept2, redactedKept, redactedFurther) {
++
++  let agreed = 0;
++
++  while (agreed < redactedKept.length && redactedKept[agreed] === redactedFurther[agreed]) {
++
++    agreed++;
++
++  }
++
++  const afterAgreed = redactedKept.slice(agreed);
++
++  if (kept2.endsWith(afterAgreed)) return truncateUtf16(kept2, kept2.length - afterAgreed.length);
++
++  const beforeLastWord = kept2.replace(/[A-Za-z0-9]+[^A-Za-z0-9]*$/, "");
++
++  return beforeLastWord.length < kept2.length ? beforeLastWord : "";
++
++}
++
++function stripMarkupWithinScanLength(raw) {
++
++  const collapsed2 = stripConnectorErrorMarkup(raw);
++
++  if (raw.length <= MAX_UNTRUSTED_MARKUP_SCAN_LENGTH || collapsed2.length > MAX_CONNECTOR_ERROR_LENGTH + MAX_SCAN_PAST_CUT_LENGTH || /[\s<]/.test(raw.charAt(MAX_UNTRUSTED_MARKUP_SCAN_LENGTH))) {
++
++    return collapsed2;
++
++  }
++
++  const lastSpace = collapsed2.lastIndexOf(" ");
++
++  const lastToken = lastSpace < 0 ? collapsed2 : collapsed2.slice(lastSpace + 1);
++
++  const scanLimitCutIt = lastToken.length > 0 && raw.startsWith(lastToken, MAX_UNTRUSTED_MARKUP_SCAN_LENGTH - lastToken.length);
++
++  return scanLimitCutIt ? collapsed2.slice(0, Math.max(lastSpace, 0)) : collapsed2;
++
++}
++
++function redactConnectorErrorSecrets(raw) {
++
++  return raw.slice(0, MAX_CONNECTOR_ERROR_SCAN_LENGTH).replace(URL_USERINFO, `$1${
++REDACTED}
++@`).replace(
++    AUTH_SCHEME_CREDENTIAL,
++    (match2, scheme, credential) => /[0-9+/=]/.test(credential) ? `${
++scheme}
++ ${
++REDACTED}
++` : match2
++  ).replace(
++    SECRET_ASSIGNMENT,
++    (match2, key, separator, value) => looksLikeSecretValue(value) ? `${
++key}
++${
++separator}
++${
++REDACTED}
++${
++value.endsWith(CUT_MARK) ? CUT_MARK : ""}
++` : match2
++  ).replace(AWS_ACCESS_KEY_ID, REDACTED).replace(LONG_HEX, REDACTED).replace(TOKEN_SHAPED_RUN, (run) => mixesCaseAndDigits(run) ? REDACTED : run);
++
++}
++
++function looksLikeSecretValue(value) {
++
++  const word = value.replace(/[.)\]}
++…]+$/, "");
++
++  if (value === REDACTED || VALUE_THAT_SAYS_NONE_WAS_SET.test(word) || OAUTH_ERROR_CODES.has(word)) {
++
++    return false;
++
++  }
++
++  return value.length >= 8 || /[^A-Za-z]/.test(value);
++
++}
++
++function mixesCaseAndDigits(run) {
++
++  return /[A-Z]/.test(run) && /[a-z]/.test(run) && /[0-9]/.test(run);
++
++}
++
+ function statusForCatalog(status, listsTools) {
+ 
+   if (status === LOADS_ON_REQUEST_STATUS && !listsTools) return status;
+@@ -1031790,17 +1032021,24 @@
+ 
+ var DONE_ORDER_STEP = " A done report's `Order:` line is the order number for your purchase reply.";
+ 
+-var FINER_BLOCKER_STEPS = " needs_approval: ask the user, then resume with their answer. policy_refused: don't resume;
+- tell the user what was refused. page_unusable: hand over the screen for that step. order_unconfirmed: don't resume, and don't dispatch another subagent for that checkout, since submitting again could charge the user twice;
++var FINER_BLOCKER_STEPS_BEFORE_ORDER_UNCONFIRMED = " needs_approval: ask the user, then resume with their answer. policy_refused: don't resume;
++ tell the user what was refused. page_unusable: hand over the screen for that step.";
++
++var ORDER_UNCONFIRMED_STEP = " order_unconfirmed: don't resume, and don't dispatch another subagent for that checkout, since submitting again could charge the user twice;
+  tell the user the order was submitted without a confirmation, and that their email or the store's order history shows whether it went through.";
+ 
+-function withFinerBlockerSteps(steps, finerLabels) {
++function withFinerBlockerSteps(steps, shown) {
++
++  const added = [
++    shown.finerLabels === true ? FINER_BLOCKER_STEPS_BEFORE_ORDER_UNCONFIRMED : "",
++    shown.finerLabels === true || shown.orderUnconfirmedReported === true ? ORDER_UNCONFIRMED_STEP : ""
++  ].join("");
+ 
+-  return finerLabels ? steps.replace(DONE_ORDER_STEP, `${
+-FINER_BLOCKER_STEPS}
++  return added === "" ? steps : steps.replace(DONE_ORDER_STEP, `${
++added}
+ ${
+ DONE_ORDER_STEP}
+-`) : steps;
++`);
+ 
+ }
+ 
+@@ -1031812,12 +1032050,11 @@
+   "security_code_rejected",
+   "address_rejected",
+   "out_of_stock",
+-  "price_changed"
++  "price_changed",
++  "order_unconfirmed"
+ ]);
+ 
+-var PAID_CHECKOUT_BLOCKER_WITH_FINER_LABELS = "order_unconfirmed";
+-
+-function revivesPaidCheckout(completions, finerLabels) {
++function revivesPaidCheckout(completions) {
+ 
+   return completions.some((completion) => {
+ 
+@@ -1031827,16 +1032064,22 @@
+ 
+     }
+ 
+-    const blocker = browserReportBlockerOf(completion.result);
+-
+-    return PAID_CHECKOUT_BLOCKERS.has(blocker) || finerLabels && blocker === PAID_CHECKOUT_BLOCKER_WITH_FINER_LABELS || browserReportOrderOf(completion.result) !== void 0;
++    return PAID_CHECKOUT_BLOCKERS.has(browserReportBlockerOf(completion.result)) || browserReportOrderOf(completion.result) !== void 0;
+ 
+   }
+ );
+ 
+ }
+ 
+-function computerUseRedispatchCap(codeSignIn, checkoutRecovery = false, blockerBotWall = false, options2 = {
++function reportsOrderUnconfirmed(completions) {
++
++  return completions.some(
++    (completion) => isComputerUseSubagentType(completion.subagentType) && completion.status === "completed" && browserReportBlockerOf(completion.result) === "order_unconfirmed"
++  );
++
++}
++
++function computerUseRedispatchCap(codeSignIn, checkoutRecovery = false, blockerBotWall = false, finerBlockerSteps = {
+ }
+ ) {
+ 
+@@ -1031847,7 +1032090,7 @@
+       checkoutRecovery ? CHECKOUT_RECOVERY_BLOCKER_STEPS : PAID_CHECKOUT_BLOCKER_STEPS,
+       blockerBotWall
+     ),
+-    options2.finerLabels === true
++    finerBlockerSteps
+   );
+ 
+   return `A computerUse report opens with its Status. \`Status: done\`: relay what it found. ${
+@@ -1032029,10 +1032272,13 @@
+     ...redispatchCap ? [
+       computerUseRedispatchCap(
+         context2.codeSignIn === true,
+-        context2.checkoutRecovery === true && revivesPaidCheckout(completions, context2.blockerFinerLabels === true),
++        context2.checkoutRecovery === true && revivesPaidCheckout(completions),
+         context2.blockerBotWall === true,
+         {
+- finerLabels: context2.blockerFinerLabels === true }
++
++          finerLabels: context2.blockerFinerLabels === true,
++          orderUnconfirmedReported: reportsOrderUnconfirmed(completions)
++        }
+ 
+       )
+     ] : [],
+@@ -1039414,6 +1039660,7 @@
+ 
+               family: episode2.hit.family,
+               blockedHost: episode2.hit.blockedHost,
++              blockedUrl: episode2.hit.blockedUrl,
+               durationMs,
+               wallEpisodeId: episode2.episodeId,
+               resolutionKind: resolutionKindFor({
+@@ -1152514,7 +1152761,7 @@
+ }
+ ;
+ 
+-var REDACTED = {
++var REDACTED2 = {
+ 
+   item: (path41) => `${
+ path41}
+@@ -1153214,7 +1153461,7 @@
+ function redactedShapeMismatch(shape2, value, path41, defs = NO_DEFS) {
+ 
+   return checked(shape2, value, path41, defs, {
+- input: false, wording: REDACTED }
++ input: false, wording: REDACTED2 }
+ );
+ 
+ }
+@@ -1197441,6 +1197688,7 @@
+           conversationId: record7.agentId,
+           family: resolution.family,
+           blockedHost: resolution.blockedHost,
++          egressPath: dimensionsForHostname(resolution.blockedUrl).egressPath,
+           durationMs: resolution.durationMs,
+           wallEpisodeId: resolution.wallEpisodeId,
+           resolutionKind: resolution.resolutionKind,
+@@ -1198163,8 +1198411,8 @@
+ var RESY_DISPATCH_NOTES = "Resy notes, for checking open tables or booking on Resy. Skip them for any other job, and follow the task above where it says otherwise. The URL the task gives sets the date and party size, so read the times on that page. Use the page's date or party controls only if it shows something else, and only once. Never build other Resy URLs. The times load after the page itself, so wait once for them, then take one snapshot;
+  do not snapshot a loading page again and again. If no time appears, report what the page shows instead, such as a sold-out message or a Notify option. If the tab crashes or goes blank without an error code, open the same URL once more. Access Denied or a bot check will not clear on reload, so stop and report it with the URL. On an availability check, do not click a time or Notify. A page that asks for a password, a code, or a card number ends the task, so report its URL. On an availability check, report as soon as the times are on screen.";
+ 
+-var TAILNET_DISPATCH_NOTES = "Tailnet notes, for pages on the person's tailnet: hosts under their tailnet's MagicDNS name, such as a .ts.net address. Skip them for any other job. Your regular browser cannot load those pages, so a proxy error there is expected and not worth retrying. Open the page from Shell with `box-tailnet-chrome '<url>'`. It starts a separate Chrome window on your display whose profile lives in ~/tailnet, a RAM-only folder that is wiped when the computer restarts, so you will sign in again after a restart. Drive that window with Computer, since the browser tools stay attached to your regular browser. Save anything you download from those pages under ~/tailnet and never copy it into /workspace, ~/outputs or another folder;
+- report what the task needs in your reply instead. If `box-tailnet-chrome` exits with code 75, tailnet browsing is off on this computer, so stop and report that.";
++var TAILNET_DISPATCH_NOTES = "Tailnet notes, for pages on the person's tailnet: hosts under their tailnet's MagicDNS name, such as a .ts.net address. Skip them for any other job. Your regular browser cannot load those pages, so a proxy error there is expected and not worth retrying. Open the page from Shell with `box-tailnet-chrome '<url>'`. It starts a separate Chrome window on your display whose profile lives in ~/tailnet, a RAM-only folder that is wiped when the computer restarts, so you will sign in again after a restart. Drive that window with Computer, since the browser tools stay attached to your regular browser. Use the device's full MagicDNS name in the URL. Neither browser routes a 100.x address or a short name to the tailnet, so if a page given that way does not load, stop and report that the full name is needed. Save anything you download from those pages under ~/tailnet and never copy it into /workspace, ~/outputs or another folder;
++ report what the task needs in your reply instead. If `box-tailnet-chrome` exits with code 75, the tailnet browser did not start. Read the message it printed and go by that message, not a guess. Run the command once more if the message says the folder is not mounted right now, or if it is an older computer's line that says only that ~/tailnet is not a RAM-only folder on this box. If it exits with code 75 again, or the message is another one, stop and report the message as printed. Do not change the computer to get around it, and leave any files in ~/tailnet where they are, since the person decides what happens to them. That older line, and a message that the computer started without a tailnet host list, most often mean that the computer was already running when the tailnet was connected and has not been updated since, or that no tailnet is connected, so report those as the likely causes. Waking from sleep is not an update: a computer that has slept and woken still has only the tailnets it started with. For the first cause, report too that Grok Bot can update the computer before the person's next message runs, so a later try may work, and that Settings offers Update Bot's Computer for a new version of the computer, not for a waiting tailnet, so it may not be there to run.";
+ 
+ var SITE_DISPATCH_NOTES = [
+   {
+@@ -1200139,7 +1200387,7 @@
+ 
+       return servers.map((server) => {
+ 
+-        const statusDetail = stripMarkupAndBoundConnectorError(server.errorMessage ?? "");
++        const statusDetail = boundConnectorErrorOutsideSecrets(server.errorMessage ?? "");
+ 
+         if (server.status === "error" && onServerFailed !== void 0) {
+ 
+@@ -1203850,6 +1204098,12 @@
+ var AUTOMATION_USER_COMPUTERS_OUT_OF_REACH_LINE = "- The user's own computers are out of reach in this run: no tool here reads or runs anything on them. Report a task that needs one as blocked so the parent agent, which can reach their computers, handles it;
+  don't search for a way in or ask the user to paste anything.";
+ 
++var USER_COMPUTERS_READ_ONLY_LINE = `- This run can only read from the user's registered computers: call ${
++GROK_BOT_TOOL_NAMES.ListMachines}
++ to choose one, then pass its machineId to ${
++GROK_BOT_TOOL_NAMES.Read}
++ to read a file there, and omit machineId for a box path. It can't run a command on one or copy a file to or from one, so report a task that needs either as blocked instead of searching for a way in.`;
++
+ var DESTINATION_URL_LINE = "When you know the destination URL, whether one the user pasted or one you can construct (a site's search/filter URL like `https://www.amazon.com/s?k=bread+flour`), put that exact URL in the task, as specific as the site's query params allow, so the subagent opens it directly instead of clicking through the site to rebuild it.";
+ 
+ function sitePlaybookDispatchLine(desktopExecutor, skillAccess = "read") {
+@@ -1204027,7 +1204281,14 @@
+ 
+   id: "remote_box",
+   section: "remote_box",
+-  flags: ["can_use_user_computer", "subagent_runner", "parent_mediated", "shell_user_computer"],
++  flags: [
++    "can_use_user_computer",
++    "reads_user_computer_only",
++    "target_line_in_base",
++    "subagent_runner",
++    "parent_mediated",
++    "shell_user_computer"
++  ],
+   slots: ["desktop_line"],
+   render: ({
+  flags, slots }
+@@ -1204035,7 +1204296,9 @@
+ }
+ );
+ 
+-function renderRemoteBoxSection(host, canUseUserComputer) {
++function renderRemoteBoxSection(host, canUseUserComputer, userComputer = {
++}
++) {
+ 
+   if (host.isComputerUseSubagent) {
+ 
+@@ -1204073,7 +1204336,7 @@
+ desktopLine}
+ `;
+ 
+-    if (host.isSubagentRunner) {
++    if (host.isSubagentRunner && userComputer.targetLineInBase !== true) {
+ 
+       toolTargetLines = [
+         `- ${
+@@ -1204099,6 +1204362,11 @@
+     ];
+ 
+   }
++ else if (userComputer.readsOnly === true) {
++
++    toolTargetLines = [USER_COMPUTERS_READ_ONLY_LINE];
++
++  }
+  else if (offersShellUserComputer(host)) {
+ 
+     toolTargetLines = [
+@@ -1204423,7 +1204691,7 @@
+ desktopLine}
+ `;
+ 
+-    if (flags.subagent_runner) {
++    if (flags.subagent_runner && !flags.target_line_in_base) {
+ 
+       toolTargetLines = [
+         `- ${
+@@ -1204449,6 +1204717,11 @@
+     ];
+ 
+   }
++ else if (flags.reads_user_computer_only) {
++
++    toolTargetLines = [USER_COMPUTERS_READ_ONLY_LINE];
++
++  }
+  else if (flags.shell_user_computer) {
+ 
+     toolTargetLines = [
+@@ -1218382,7 +1218655,7 @@
+   return `${
+ name18}
+  can't be connected right now, so there is no sign-in link to send. Reason (detail="${
+-detail}
++redactListedConnectorError(detail)}
+ "). Tell the user that reason plainly, with what they need to do, and do not retry ${
+ GROK_BOT_TOOL_NAMES.AuthenticateMcpServer}
+  for ${
+@@ -1219626,14 +1219899,12 @@
+ 
+   }
+ 
+-  if (server.statusDetail != null && server.statusDetail.length > 0) {
++  const detail = redactListedConnectorError(server.statusDetail ?? "");
+ 
+-    parts.push(`detail="${
+-server.statusDetail}
++  if (detail.length > 0) parts.push(`detail="${
++detail}
+ "`);
+ 
+-  }
+-
+   const signedOut = signOutNote?.(server);
+ 
+   if (signedOut !== void 0) {
+@@ -1226621,17 +1226892,18 @@
+ 
+   }
+ 
+-  function getRemoteBoxSection(canUseUserComputer, inputs) {
++  function getRemoteBoxSection(canUseUserComputer, userComputer, inputs) {
+ 
+     inputs.recordSectionInput({
+ 
+       canUseUserComputer,
++      ...userComputer,
+       offersShellUserComputer: offersShellUserComputer(host),
+       boxHandBackActor: host.boxHandBackActor?.()
+     }
+ );
+ 
+-    return renderRemoteBoxSection(host, canUseUserComputer);
++    return renderRemoteBoxSection(host, canUseUserComputer, userComputer);
+ 
+   }
+ 
+@@ -1233730,9 +1234002,11 @@
+ 
+ }
+ 
+-function isTableTool(toolName2) {
++function executorCellToolId(toolName2) {
++
++  const toolId = GROK_BOT_TOOL_ID_BY_MODEL_NAME.get(toolName2);
+ 
+-  return Object.hasOwn(EXECUTOR_TOOL_TABLE, toolName2);
++  return toolId !== void 0 && Object.hasOwn(EXECUTOR_TOOL_TABLE, toolId) ? toolId : void 0;
+ 
+ }
+ 
+@@ -1233750,7 +1234024,9 @@
+ 
+ function executorToolPlacement(toolName2) {
+ 
+-  const entry = isTableTool(toolName2) ? EXECUTOR_TOOL_TABLE[toolName2] : void 0;
++  const toolId = executorCellToolId(toolName2);
++
++  const entry = toolId === void 0 ? void 0 : EXECUTOR_TOOL_TABLE[toolId];
+ 
+   if (entry === void 0) return void 0;
+ 
+@@ -1255090,7 +1255366,7 @@
+ 
+ 
+ // ../packages/grok-bot-harness/src/runner/tool-policy/mounted-turn-tools.ts
+-function sandMountedTurnTools(tools) {
++function sandMountedTurnTools(tools, calledFromCells) {
+ 
+   const {
+  modelVisibleTools, additionalExecutableTools }
+@@ -1255106,8 +1255382,12 @@
+ 
+   }
+ 
++  const runsCells = calledFromCells !== void 0 && mounted.has("TS");
++
+   return {
+- has: (toolId) => mounted.has(toolId) }
++
++    has: (toolId) => mounted.has(toolId) || runsCells && calledFromCells(toolId)
++  }
+ ;
+ 
+ }
+@@ -1275039,6 +1275319,52 @@
+ 
+ }
+ 
++var CARD_CHANGE_ASK = /\b(?:updat|chang|replac|fix|correct|edit|swap|switch|reissu|renew)\w*|\b(?:set|new|wrong|save|store|instead|should\s+be)\b|(?:\bis|'s)\s+now\b/i;
++
++var ONE_TIME_USE = /\b(?:orders?|checkout|check\s+out|purchase|payment|pay|paying|buy|buying|cart|booking|this\s+time|for\s+now|one[-\s]?time|just\s+for|only\s+for)\b/i;
++
++var CARD_NUMBER_WORD = /\b(?:card|number|visa|mastercard|amex|discover)\b/i;
++
++var SECURITY_CODE_WORD = /\b(?:cvv2?|cvc2?|cid|csc|(?<!\b(?:zip|postal|post|area|promo|coupon|discount|gift|verification|confirmation|access|login|country)\s)code)\b/i;
++
++var NO_WORDS = new RegExp("^\\P{
++L}
++*$", "u");
++
++function asksToChange(line2, field2) {
++
++  return CARD_CHANGE_ASK.test(line2) && field2.test(line2) && !ONE_TIME_USE.test(line2);
++
++}
++
++function askedWithValue(lines2, field2, typesValue) {
++
++  return lines2.some((line2) => asksToChange(line2, field2)) && lines2.some((line2) => (asksToChange(line2, field2) || NO_WORDS.test(line2)) && typesValue(line2));
++
++}
++
++function ownerAskedForCardSecretChange(linesThisTurn, edit) {
++
++  const number6 = edit.cardNumber?.replace(/[\s-]/g, "");
++
++  const code = edit.securityCode?.trim();
++
++  return (number6 === void 0 || !/^\d+$/.test(number6) || askedWithValue(
++    linesThisTurn,
++    CARD_NUMBER_WORD,
++    (line2) => new RegExp(`(?<!\\d)${
++number6.split("").join("[ -]?")}
++(?!\\d)`).test(line2)
++  )) && (code === void 0 || !CVC_PATTERN.test(code) || askedWithValue(
++    linesThisTurn,
++    SECURITY_CODE_WORD,
++    (line2) => new RegExp(`(?<!\\d[ -]?)${
++code}
++(?![ -]?\\d)`).test(line2)
++  ));
++
++}
++
+ var nonEmpty5 = string2().min(1);
+ 
+ var storedDisplay = object({
+@@ -1275439,6 +1275765,86 @@
+ 
+ }
+ 
++function agoPhrase(ms2) {
++
++  const minutes = Math.round(ms2 / 6e4);
++
++  if (minutes < 1) return "less than a minute ago";
++
++  return minutes === 1 ? "a minute ago" : `${
++minutes}
++ minutes ago`;
++
++}
++
++var ANSWER_WHERE = "Their answer is a message they write themselves in this app or in their texted chat with you, or their answer to a question card you send them there. A Pay or Cancel on an order card, or a line in Slack, Teams, a meeting or a group room, is not an answer.";
++
++async function orderCardHoldRefusalOf(order, check2) {
++
++  const hold = await check2?.holdFor(order);
++
++  if (hold === void 0) return void 0;
++
++  const placed = `Order ${
++hold.placedOrderId}
++ at this store was reported placed ${
++agoPhrase(hold.placedAgoMs)}
++`;
++
++  const sameTotal = hold.totalMatchesPlacedOrder ? " This card has the total of an order already placed there." : "";
++
++  switch (hold.kind) {
++
++    case "until_person_acts":
++      return sendToUserRefusal(
++        `${
++placed}
++ and the user has not written since, so nothing was sent: this card would ask them to pay ${
++order.site}
++ again without their asking.${
++sameTotal}
++ A purchase that is placed gets no second order card and is not reported on a second order. If you are not sure it went through, check the store's confirmation and tell the user what you found. If the user asked for more from this store, or may want to buy again, ask them in a message, and send the card after they answer. ${
++ANSWER_WHERE}
++`,
++        "order_already_placed"
++      );
++
++    case "until_person_asks":
++      return sendToUserRefusal(
++        `${
++placed}
++, and the user did not start this turn, so nothing was sent: this card would ask them to pay ${
++order.site}
++ again without their asking.${
++sameTotal}
++ A purchase that is placed gets no second order card and is not reported on a second order. Do not drop this silently: tell the user in a message that an order is already placed at this store, and ask whether they want this one too. Send the card on the turn their answer starts. ${
++ANSWER_WHERE}
++`,
++        "order_already_placed"
++      );
++
++    case "once_per_turn":
++      return sendToUserRefusal(
++        `${
++placed}
++, so nothing was sent yet.${
++sameTotal}
++ If the user has asked since then for the purchase on this card, send the same card again now. If you can't tell whether they asked for it, do not drop it silently: tell the user an order is already placed at this store and ask whether they want this one too. If this card is for the purchase already placed, do not send it: tell the user where the placed order stands.`,
++        "order_repeat_unconfirmed"
++      );
++
++    default: {
++
++      const _exhaustive = hold.kind;
++
++      return _exhaustive;
++
++    }
++
++  }
++
++}
++
+ function createBulkShipsNothingHold() {
+ 
+   let held2 = false;
+@@ -1279939,6 +1280345,14 @@
+ 
+     );
+ 
++    if (message.type === "widget" && message.widget.order !== void 0) {
++
++      const refusal4 = await orderCardHoldRefusalOf(message.widget.order, deps.orderCardCheck);
++
++      if (refusal4 !== void 0) throw refusal4;
++
++    }
++
+     const deliverTo = rawArgs.to;
+ 
+     let args = encodeSendMessage(message, encodeOptions);
+@@ -1280877,6 +1281291,11 @@
+     );
+ 
+   }
++ else if (host.readsUserComputerOnly) {
++
++    lines2.push(USER_COMPUTERS_READ_ONLY_LINE);
++
++  }
+  else if (offersShellUserComputer(host.deps)) {
+ 
+     lines2.push(AUTOMATION_USER_COMPUTERS_OUT_OF_REACH_LINE);
+@@ -1282820,13 +1283239,26 @@
+ 
+   }
+ 
+-  function remoteBoxSection(leanExecutorFacts, canUseUserComputer) {
++  function remoteBoxSection(leanExecutorFacts, canUseUserComputer, userComputer) {
+ 
+-    if (leanRun) return boxSection({
+- canUseUserComputer, deps, toolDecisions }
++    if (leanRun) {
++
++      return boxSection({
++
++        canUseUserComputer,
++        readsUserComputerOnly: userComputer.readsOnly,
++        deps,
++        toolDecisions
++      }
+ );
+ 
+-    if (leanExecutorFacts === void 0) return deps.remoteBoxSection(canUseUserComputer);
++    }
++
++    if (leanExecutorFacts === void 0) {
++
++      return deps.remoteBoxSection(canUseUserComputer, userComputer);
++
++    }
+ 
+     return renderSandExecutorLeanBoxSection({
+ 
+@@ -1282857,7 +1283289,11 @@
+ 
+   function renderSections(profileSnapshot, sendToUserEndTurnEnabled = false, skillPointers = usesBuiltinSkillPointers(), baseOverride = readBaseSystemPromptOverride(), leanExecutorFacts = readLeanExecutorFacts(), hostSectionsInBase = deps.systemPromptIsComplete === true, mountedTools) {
+ 
+-    const canUseUserComputer = offersShellUserComputer(deps) && (mountedTools === void 0 || mountedTools.has("ListMachines") && mountedTools.has("CopyToBox"));
++    const listsUserComputers = offersShellUserComputer(deps) && (mountedTools === void 0 || mountedTools.has("ListMachines"));
++
++    const canUseUserComputer = listsUserComputers && (mountedTools === void 0 || mountedTools.has("CopyToBox"));
++
++    const readsUserComputerOnly = listsUserComputers && !canUseUserComputer && mountedTools?.has("Read") === true && !mountedTools.has("Shell");
+ 
+     const basePrompt2 = getBaseSystemPrompt({
+ 
+@@ -1282957,7 +1283393,12 @@
+ 
+     push(
+       "remote_box",
+-      hostSectionsInBase ? null : remoteBoxSection(leanExecutorFacts, canUseUserComputer)
++      hostSectionsInBase ? null : remoteBoxSection(leanExecutorFacts, canUseUserComputer, {
++
++        readsOnly: readsUserComputerOnly,
++        targetLineInBase: deps.isParentMediatedAutomationSubagent && !deps.isSystemPromptOverridden && baseOverride === void 0
++      }
++)
+     );
+ 
+     push(
+@@ -1283048,7 +1283489,8 @@
+     profileSnapshot,
+     profilePromptSnapshots,
+     sendToUserEndTurnEnabled = () => false,
+-    sharedPrefixFirst = () => false
++    sharedPrefixFirst = () => false,
++    calledFromCells
+   }
+ ) {
+ 
+@@ -1283081,7 +1283523,7 @@
+           baseOverride,
+           leanExecutorFacts,
+           void 0,
+-          tools === void 0 ? void 0 : sandMountedTurnTools(tools)
++          tools === void 0 ? void 0 : sandMountedTurnTools(tools, calledFromCells)
+         );
+ 
+       }
+@@ -1307445,7 +1307887,15 @@
+ // ../packages/grok-bot-harness/src/runner/secure-values/vault-entry-details.ts
+ var VAULT_ENTRY_AGENT_EDITABLE_DETAILS = {
+ 
+-  card: ["nickname", "hint", "holderName", "expiry", "billingAddressId"],
++  card: [
++    "nickname",
++    "hint",
++    "holderName",
++    "expiry",
++    "billingAddressId",
++    "cardNumber",
++    "securityCode"
++  ],
+   login: ["nickname", "hint"],
+   contact: ["nickname", "hint"]
+ }
+@@ -1307463,7 +1307913,9 @@
+   hint: '"When to use" hint',
+   holderName: "name on card",
+   expiry: "expiry",
+-  billingAddressId: "billing address"
++  billingAddressId: "billing address",
++  cardNumber: "card number",
++  securityCode: "security code"
+ }
+ ;
+ 
+@@ -1307583,20 +1308035,14 @@
+ 
+ }
+ 
+-function secretsOnlyInSettings(cards) {
++var LOGIN_SECRETS_ONLY_IN_SETTINGS = "Login secrets change only in Settings \u203A Vault.";
+ 
+-  return `${
+-cards ? "Card numbers, security codes, and login secrets" : "Login secrets"}
+- change only in Settings \u203A Vault.`;
+-
+-}
+-
+-var DETAILS_HOW = "To change an entry's non-secret details, call update with its kind, id, and details.";
++var DETAILS_HOW = "To change an entry's details, call update with its kind, id, and details.";
+ 
+ var SETTINGS_ONLY = `${
+ DETAILS_HOW}
+  ${
+-secretsOnlyInSettings(true)}
++LOGIN_SECRETS_ONLY_IN_SETTINGS}
+ `;
+ 
+ var REMOVED_ONLY_IN_SETTINGS = "Cards and logins are removed only in Settings \u203A Vault, by the user.";
+@@ -1307610,9 +1308056,9 @@
+ var NEW_PASSWORD_TIMING = "only when the sign-up page rejected its password before the account exists;
+  never once the sign-up went through, and when unsure, ask the user";
+ 
+-function settingsOnly(cards, generatedLogins) {
++function settingsOnly(generatedLogins) {
+ 
+-  const secrets = secretsOnlyInSettings(cards);
++  const secrets = LOGIN_SECRETS_ONLY_IN_SETTINGS;
+ 
+   if (!generatedLogins) return secrets;
+ 
+@@ -1307653,7 +1308099,7 @@
+       `- save kind "login": a new login for a sign-up where the user let you pick the password;
+  the vault generates the password, and you never see it.`
+     ] : [],
+-    "- update: a contact info id with only the fields that change, or kind, id, and details.",
++    cards ? "- update: a contact info id with only the fields that change, or kind, id, and details. A card also takes card_number and security_code: set them when asked, no form." : "- update: a contact info id with only the fields that change, or kind, id, and details.",
+     ...generatedLogins ? [
+       `- update kind "login": the id of a sign-up login an agent saved gets a new generated password under the page's rules, ${
+ NEW_PASSWORD_TIMING}
+@@ -1307664,8 +1308110,8 @@
+     `Contact info changes apply at once;
+  the result says what changed. ${
+ generatedLogins ? `${
+-secretsOnlyInSettings(cards).replace(/\.$/, "")}
+-, except through update kind "login" above.` : settingsOnly(cards, false)}
++LOGIN_SECRETS_ONLY_IN_SETTINGS.replace(/\.$/, "")}
++, except through update kind "login" above.` : settingsOnly(false)}
+ `
+   ].join("\n");
+ 
+@@ -1308117,7 +1308563,7 @@
+  to remove one, call delete with its id. ${
+ DETAILS_HOW}
+  ${
+-settingsOnly(deps.cards, deps.generatedLogins === true)}
++settingsOnly(deps.generatedLogins === true)}
+  ${
+ deps.cards && values.vaultCardRefusal === void 0 ? "To pay or sign in with a saved card or login" : "To sign in with a saved login"}
+ , dispatch computerUse with the page and its fill references.`
+@@ -1308465,7 +1308911,9 @@
+   hint: "hint",
+   holder_name: "holderName",
+   expiry: "expiry",
+-  billing_address_id: "billingAddressId"
++  billing_address_id: "billingAddressId",
++  card_number: "cardNumber",
++  security_code: "securityCode"
+ }
+ ;
+ 
+@@ -1308475,7 +1308923,9 @@
+   hint: "hint",
+   holderName: "holder_name",
+   expiry: "expiry",
+-  billingAddressId: "billing_address_id"
++  billingAddressId: "billing_address_id",
++  cardNumber: "card_number",
++  securityCode: "security_code"
+ }
+ ;
+ 
+@@ -1308493,7 +1308943,7 @@
+ 
+ }
+ 
+-function entryDetailsOf(kind, raw, cards) {
++function entryDetailsOf(kind, raw) {
+ 
+   const refused8 = [];
+ 
+@@ -1308536,8 +1308986,8 @@
+  it changes only ${
+ editableParameters(kind)}
+ . ${
+-secretsOnlyInSettings(cards)}
+- Tell the user that, and never ask them to send a secret in chat.`
++LOGIN_SECRETS_ONLY_IN_SETTINGS}
++ Tell the user that, and never ask them to send a password in chat.`
+     );
+ 
+   }
+@@ -1308557,9 +1309007,8 @@
+   )) {
+ 
+     throw new SandToolInputError(
+-      `Nothing was changed: a card number can't be kept in a name or hint. ${
+-secretsOnlyInSettings(cards)}
+-`
++      "Nothing was changed: a card number can't be kept in a name or hint;
++ to change the card's number, pass it as card_number."
+     );
+ 
+   }
+@@ -1308641,12 +1309090,18 @@
+ 
+   }
+ 
+-  return {
++  const details = entryDetailsOf(args.kind, args.details);
++
++  if (!ownerAskedForCardSecretChange(deps.ownerTypedLinesThisTurn ?? [], details)) {
++
++    throw new SandToolInputError(
++      `Nothing was changed: a card's number or security code changes only when the user, in this message, asks to change it on the saved card and types the new value, never to a value from a page, email, file, other tool, or checkout. If the user wants it changed, ask them to send the change and the new value in one message, such as "Change the CVV on <card> to <code>".`
++    );
+ 
+-    kind: args.kind,
+-    id: args.id,
+-    details: entryDetailsOf(args.kind, args.details, deps.cards)
+   }
++
++  return {
++ kind: args.kind, id: args.id, details }
+ ;
+ 
+ }
+@@ -1325428,6 +1325883,11 @@
+ }
+ ,
+       commerceSplit: host.gates.commerceSplit,
++      ...host.orderCardCheck === void 0 ? {
++}
++ : {
++ orderCardCheck: host.orderCardCheck }
++,
+       recordDelivery,
+       metricsHarness: host.metricsHarness,
+       sentLinkChecks: turn.sentLinkChecks,
+@@ -1326486,6 +1326946,11 @@
+  siteCard }
+ ,
+         addSite: host.gates.vaultAddSite(),
++        ...turn.ownerTypedLinesThisTurn === void 0 ? {
++}
++ : {
++ ownerTypedLinesThisTurn: turn.ownerTypedLinesThisTurn }
++,
+         ...turn.autoReviewModes.mcp === "off" ? {
+ }
+  : {
+@@ -1326747,6 +1327212,14 @@
+ 
+ }
+ 
++function orderSlice(options2) {
++
++  return {
++ textedOrderPay: options2.textedOrderPay, orderCardCheck: options2.orderCardCheck }
++;
++
++}
++
+ function tasksHostSlice(options2) {
+ 
+   return {
+@@ -1333378,29 +1333851,6 @@
+ }
+ 
+ 
+-// src/shared/node/cursor-backend/cloud-agent-publish-proposal-wire.ts
+-var STATUS_OF = {
+-
+-  [PublishProposalStatus.UNSPECIFIED]: "pending",
+-  [PublishProposalStatus.PENDING]: "pending",
+-  [PublishProposalStatus.CONFIRMING]: "confirming",
+-  [PublishProposalStatus.PUBLISHED]: "published",
+-  [PublishProposalStatus.DISMISSED]: "dismissed"
+-}
+-;
+-
+-var REVIEW_STATE_OF = {
+-
+-  [PublishReviewState.UNSPECIFIED]: void 0,
+-  [PublishReviewState.REVIEWING]: "reviewing",
+-  [PublishReviewState.PASSED]: "passed",
+-  [PublishReviewState.WARNINGS]: "warnings",
+-  [PublishReviewState.BLOCKED]: "blocked",
+-  [PublishReviewState.FAILED]: "failed"
+-}
+-;
+-
+-
+ // ../packages/grok-bot-harness/src/cloud-agents/project-membership-client.ts
+ var REFUSAL_CODES2 = /* @__PURE__ */ new Set([
+   Code.InvalidArgument,
+@@ -1384849,6 +1385299,14 @@
+ 
+ }
+ 
++function reportsOrderUnconfirmed2(completion) {
++
++  const result = resultOfCompletion(completion);
++
++  return result.status === "completed" && result.report?.blocker === "order_unconfirmed";
++
++}
++
+ var DesktopBusyError = class extends NotRunError {
+ 
+   constructor(message) {
+@@ -1384953,27 +1385411,29 @@
+ GROK_BOT_TOOL_NAMES.WakeParent}
+ , saying the store is refusing the bot, that a handoff in the same browser would likely be refused too and, at a checkout, that you can't confirm whether the order went through.`;
+ 
+-var FINER_REPORT_RULES = ` needs_approval: hand off with ${
++var FINER_REPORT_RULES_BEFORE_ORDER_UNCONFIRMED = ` needs_approval: hand off with ${
+ GROK_BOT_TOOL_NAMES.WakeParent}
+ , naming the step that waits for the owner's yes. policy_refused: don't resume it;
+  hand off with ${
+ GROK_BOT_TOOL_NAMES.WakeParent}
+ , saying what was refused. page_unusable: hand off with ${
+ GROK_BOT_TOOL_NAMES.WakeParent}
+-, naming the control that would not work and the exact URL the report gives. order_unconfirmed: don't resume it or start another for that checkout, since submitting again could charge twice;
++, naming the control that would not work and the exact URL the report gives.`;
++
++var ORDER_UNCONFIRMED_REPORT_RULE = ` order_unconfirmed: don't resume it or start another for that checkout, since submitting again could charge twice;
+  hand off with ${
+ GROK_BOT_TOOL_NAMES.WakeParent}
+ , saying the order was submitted without a confirmation.`;
+ 
+ function automationBrowserReportNote({
+  botWall, finerLabels }
+-) {
++, orderUnconfirmedReported) {
+ 
+-  const added = `${
+-botWall ? BOT_WALL_REPORT_RULE : ""}
+-${
+-finerLabels ? FINER_REPORT_RULES : ""}
+-`;
++  const added = [
++    botWall ? BOT_WALL_REPORT_RULE : "",
++    finerLabels ? FINER_REPORT_RULES_BEFORE_ORDER_UNCONFIRMED : "",
++    finerLabels || orderUnconfirmedReported ? ORDER_UNCONFIRMED_REPORT_RULE : ""
++  ].join("");
+ 
+   return added === "" ? AUTOMATION_BROWSER_REPORT_NOTE : AUTOMATION_BROWSER_REPORT_NOTE.replace(OTHER_BLOCKER_RULE, `${
+ added}
+@@ -1385114,7 +1385574,7 @@
+ 
+     const notes = read2.some(
+       (completion) => isComputerUseSubagentType(completion.subagentType)
+-    ) ? [automationBrowserReportNote(this.offeredBlockers())] : [];
++    ) ? [automationBrowserReportNote(this.offeredBlockers(), read2.some(reportsOrderUnconfirmed2))] : [];
+ 
+     if (delivered.length > 0) {
+ 
+@@ -1386065,6 +1386525,23 @@
+ 
+ }
+ 
++function executorCellToolIds(tools, options2) {
++
++  return tools.filter(callable).flatMap((tool) => {
++
++    const toolId = executorCellToolId(tool.name);
++
++    if (toolId === void 0) return [];
++
++    if (options2.readOnly && executorToolPlacement(tool.name)?.effect !== "read") return [];
++
++    return [toolId];
++
++  }
++);
++
++}
++
+ async function callResult(ctx, result, options2) {
+ 
+   const texts = [];
+@@ -1386549,6 +1387026,8 @@
+ 
+   executorTools;
+ 
++  cellTools = /* @__PURE__ */ new Set();
++
+   executorRenewed = false;
+ 
+   current;
+@@ -1386579,6 +1387058,12 @@
+ 
+   }
+ 
++  hasCellTool(toolId) {
++
++    return this.cellTools.has(toolId);
++
++  }
++
+   renewExecutor() {
+ 
+     this.executorRenewed = true;
+@@ -1386597,6 +1387082,12 @@
+ 
+       this.executorTools = tools;
+ 
++      this.cellTools = new Set(
++        executorCellToolIds(turn.tools, {
++ readOnly: this.options.readOnly }
++)
++      );
++
+       const {
+  subagents }
+  = this.options;
+@@ -1387061,6 +1387552,12 @@
+ 
+   }
+ 
++  hasCellTool(toolId) {
++
++    return this.moduleSet.hasCellTool(toolId);
++
++  }
++
+   continueTurn() {
+ 
+     this.moduleSet.renewExecutor();
+@@ -1408240,7 +1408737,12 @@
+         gates: turnToolHost.gates,
+         modelId: () => sessions.agent.getModelId()
+       }
+-)
++),
++      ...tsAgentSession === void 0 ? {
++}
++ : {
++ calledFromCells: (toolId) => tsAgentSession.hasCellTool(toolId) }
++
+     }
+ ) : () => minimalHarness.systemPrompt;
+ 
+@@ -1418178,7 +1418680,7 @@
+       }
+ ),
+       mcpCustomInstructionsSection: () => this.promptGlue.getMcpCustomInstructionsSection(),
+-      remoteBoxSection: (canUseUserComputer) => this.promptGlue.getRemoteBoxSection(canUseUserComputer, promptPrefixInputs),
++      remoteBoxSection: (canUseUserComputer, userComputer) => this.promptGlue.getRemoteBoxSection(canUseUserComputer, userComputer, promptPrefixInputs),
+       computerSection: (skillPointers, skillAccess) => this.promptGlue.getComputerSection(skillPointers, skillAccess),
+       leanAutomationPrompt: this.isParentMediatedAutomationSubagent && options2.automationLeanPrompt === true,
+       ...this.executorLeanPrompt === void 0 ? {
+@@ -1418492,7 +1418994,7 @@
+ }
+ ,
+       virtualCard: this.virtualCard,
+-      textedOrderPay: options2.textedOrderPay,
++      ...orderSlice(options2),
+       textedPoll: options2.textedPoll,
+       connectorFiles: this.connectorFiles,
+       ...options2.botFileCopy === void 0 ? {

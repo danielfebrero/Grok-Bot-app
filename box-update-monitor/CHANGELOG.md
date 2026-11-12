@@ -9,6 +9,20 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-11-12 16:49 (Paris) — snapshot `2026-11-12_15-51` → `2026-11-12_16-49`
+
+**Hot-update sand-host `4728816` → `656edf6`** (supervisor `upgrade-656edf6`, `pendingUpgradeVersion` = None) + bump agent-store-fuse + rafraîchissement de la skill `shopping-connectors`. Image `fcbae14`, box-scripts `fcbae14`, exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7 inchangés. Fichiers : +0 / −0 / ~6.
+
+- **Features (commerce)** : nouvelle gate client `grok_bot_desktop_topup_presets` (boutons preset du dialogue « Buy credits » desktop ; `amounts_cents` max 4, liste vide en fallback = multiples du minimum wallet).
+- **Features (voix / proto)** : `CloudAgentVoiceCall.worker_lines` (`WorkerLine` : `id`, `worker_bc_id`, `worker_name`, `text`) — lignes d'un worker pendant un appel voix.
+- **Change (Bitbucket Server)** : champ `lists_repos_with_own_account` sur `ListBitbucketServerInstancesResponse.BitbucketServerInstance`.
+- **Change (client)** : base sand `1.1.0-pre.104` → `1.1.0-pre.106`.
+- **Bugfix (connect-node / HTTP2)** : patch `@connectrpc/connect-node@1.6.1` — si la session HTTP/2 se résout après un changement d'état, la connexion est détruite au lieu d'être adoptée (course connecting→ready).
+- **Autre-infra** : `host-main.cjs` (35 089 868 → 35 108 357 o), `sand-eval-runner.cjs` (29 845 842 → 29 860 046 o). Host healthy après le swap (`post-swap watch disarmed`, up 63 156 ms sur `656edf6`), relance 16:25 Paris. agent-store-fuse `279bad4e824c2a97cb276e740df66ffe2805f28c` → `c91db9b3c1fdce4b8f8bb479ab6cfec5279ef41c`.
+- **Skills gérées** : `shopping-connectors` (Gopuff) — une option X Money sur le quote ne peut pas payer une commande connecteur : ne jamais l'offrir, la recommander ou la choisir, ni envoyer une order card `payment.method "x_money"`, même si X Money est connecté ou est le moyen de paiement par défaut ; si l'utilisateur demande à payer avec X Money, dire que ce n'est pas encore possible ici et proposer les autres moyens du quote.
+
+Rapport : [reports/2026-11-12_16-49.md](reports/2026-11-12_16-49.md).
+
 ## 2026-11-12 15:51 (Paris) — snapshot `2026-11-12_13-47` → `2026-11-12_15-51`
 
 **Rebuild/bump agent-store-fuse uniquement** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` commit `bcd232921840c5a0ab3561b019014a546bcf7bf0` → `279bad4e824c2a97cb276e740df66ffe2805f28c` (tarball S3 `agent-store-fuse-x64-…-bk.tar.gz`). Toutes les autres versions plateforme inchangées (image `fcbae14`, box-scripts `fcbae14`, sand-host `4728816` (supervisor `upgrade-4728816`, `pendingUpgradeVersion` = None), exec-daemon (buildTimestamp `2026-10-18T14:07:39Z`), orbitd, canvas-sdk, Chrome 155.0.8059.84, Node 22.23.3/20.19.2, Python 3.13.5, Debian 13.7). Fichiers : +0 / −0 / ~1.
