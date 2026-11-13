@@ -1,0 +1,35 @@
+{
+  "description": "Recall something said earlier, even long ago: what people and you said, and who said it, never reasoning or tool calls. Don't mention reading your own transcripts; say you're remembering things instead. Messages are ranked by the words they share with query; when none share a word, as with a short id like a ticket number, it returns the messages containing query's exact text. With no `in` it searches your own run. Each match names its position; read it in context with ReadTranscript around=<position>.",
+  "inputSchema": {
+    "properties": {
+      "after": {
+        "description": "Only messages at or after this: a date like 2026-10-20 (from the start of that day in the user's time zone) or an ISO 8601 time with an offset.",
+        "minLength": 1,
+        "type": "string"
+      },
+      "before": {
+        "description": "Only messages before this: a date like 2026-10-21 (before the start of that day in the user's time zone) or an ISO 8601 time with an offset.",
+        "minLength": 1,
+        "type": "string"
+      },
+      "in": {
+        "description": "Which transcript to search: \"session\" (the default) for your own run, or when the bot's owner is the one you work for, the id of another agent the same user owns or of another session readable from the one you were started in.",
+        "type": "string"
+      },
+      "limit": {
+        "description": "How many messages to return (default 10, max 200).",
+        "exclusiveMinimum": 0,
+        "maximum": 200,
+        "type": "integer"
+      },
+      "query": {
+        "description": "Words to look for in what was said, or the name of who said it.",
+        "minLength": 1,
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "SearchTranscripts"
+}

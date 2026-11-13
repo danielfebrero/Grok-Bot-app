@@ -1,0 +1,30 @@
+{
+  "description": "Read a transcript: every message, reasoning, and each tool call with its input and result, one JSON object per line, oldest first. With no in it reads your own run, including what was compacted out of your context. When the bot's owner is the one you work for, in=<id> reads another agent the same user owns or another session readable from the one you were started in (none from the main chat); anywhere else only your own run is readable. Don't mention reading your own transcripts; say you're remembering things instead. Returns the newest messages first; page back with `before`. To read a SearchTranscripts match in context, pass around=<position> with the in that match names.",
+  "inputSchema": {
+    "properties": {
+      "around": {
+        "description": "Read the messages said around this position, such as a position from a SearchTranscripts result.",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "before": {
+        "description": "Page back: return messages that come before this position. Use the `before` value from the previous result.",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "in": {
+        "description": "Which transcript to read: \"session\" (the default) for your own run, or when the bot's owner is the one you work for, the id of another agent the same user owns or of another session readable from the one you were started in.",
+        "type": "string"
+      },
+      "limit": {
+        "description": "How many of the newest messages to return (default 30, max 200).",
+        "exclusiveMinimum": 0,
+        "maximum": 200,
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "ReadTranscript"
+}

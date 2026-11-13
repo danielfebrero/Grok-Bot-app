@@ -1,0 +1,29 @@
+{
+  "description": "Search your durable memory for facts that are not in the memory section of your prompt: older journal entries, notes that have aged out of the recent slice, and shared user facts recorded by any of this user's assistants.\nRead-only. Results list each fact with its date, memory type and, for shared facts, which assistant learned it.\nPrefer this tool over grepping memory folders.",
+  "inputSchema": {
+    "properties": {
+      "limit": {
+        "description": "Maximum facts to return (default 20, max 50).",
+        "maximum": 50,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "query": {
+        "description": "What to look for. Facts sharing the most distinctive words with the query rank first; when nothing overlaps (short identifiers like a ticket id or an acronym) a literal case-insensitive substring match is used instead.",
+        "minLength": 1,
+        "type": "string"
+      },
+      "within": {
+        "description": "Search only this memory type, such as profile.",
+        "minLength": 1,
+        "type": "string"
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "RecallMemory"
+}

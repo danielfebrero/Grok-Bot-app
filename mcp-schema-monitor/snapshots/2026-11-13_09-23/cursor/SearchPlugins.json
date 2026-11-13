@@ -1,0 +1,14 @@
+{
+  "description": "Search the plugins the user could install (or already has): marketplace plugins bundling connectors and skills. Say what you're looking for in natural language and results come back ranked by relevance, each with its STABLE plugin id, install state, and what it includes. Use this to discover a capability (Linear, Notion, writing Word documents, …) that GetDynamicTools does not already list, or to check whether a plugin is installed. Using a connector GetDynamicTools already lists needs no search: it has the connector's identifier, status, and tools. Inspect one result with GetPlugin. If the requested plugin remains uninstalled, relay its listed add link; if absent or unmatched, relay the Connect Apps fallback. Never invent a URL. This is read-only and never needs the user's permission.",
+  "inputSchema": {
+    "properties": {
+      "query": {
+        "description": "Optional. What you're looking for, in natural language (e.g. \"manage linear issues\" or \"write word documents\"). Results come back ranked by relevance. Omit to list the whole catalog.",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "SearchPlugins"
+}

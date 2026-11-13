@@ -1,0 +1,33 @@
+{
+  "description": "List branch names and tip commit SHAs for an Origin-hosted repository. Optional prefix filters each page after pagination.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "name": {
+        "description": "Origin repository name within that namespace",
+        "type": "string"
+      },
+      "owner": {
+        "description": "Origin namespace (owner) slug, taken from list_namespaces or an earlier Origin result. A GitHub owner or org name is not an Origin namespace unless list_namespaces returns it.",
+        "type": "string"
+      },
+      "pageSize": {
+        "type": "number"
+      },
+      "pageToken": {
+        "type": "string"
+      },
+      "prefix": {
+        "description": "Case-sensitive branch name prefix. Applied per page after pagination; keep following nextPageToken even when a page has no matches.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "name"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "list_branches"
+}

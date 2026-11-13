@@ -1,0 +1,29 @@
+{
+  "description": "One discussion by number (GraphQL `repository.discussion`): title, body, category, labels, the accepted answer if any, and counts.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "additionalProperties": false,
+    "properties": {
+      "discussion_number": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "owner": {
+        "description": "Repository owner (user or org login).",
+        "type": "string"
+      },
+      "repo": {
+        "description": "Repository name.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "repo",
+      "discussion_number"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_discussion"
+}

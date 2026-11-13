@@ -1,0 +1,49 @@
+{
+  "description": "Update an existing Gmail draft with new content. Replaces the draft's recipients, subject, and body. Use this tool when the user wants to modify a draft they previously created. The draft_id should come from gmail_create_draft or gmail_list_drafts. Note: This completely replaces the draft content, INCLUDING removing any attachments added with gmail_write_attachment. Provide all fields, not just the changed ones, and update the draft before attaching files, then re-attach if you must update after.",
+  "inputSchema": {
+    "properties": {
+      "bcc": {
+        "description": "Updated BCC recipients (optional)",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "body": {
+        "description": "Updated plain text body of the email",
+        "type": "string"
+      },
+      "cc": {
+        "description": "Updated CC recipients (optional)",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "draft_id": {
+        "description": "The draft ID to update (from gmail_create_draft or gmail_list_drafts)",
+        "type": "string"
+      },
+      "subject": {
+        "description": "Updated email subject line",
+        "type": "string"
+      },
+      "to": {
+        "description": "Updated list of recipient email addresses (To field)",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "draft_id",
+      "to",
+      "subject",
+      "body"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "update_draft"
+}

@@ -1,0 +1,23 @@
+{
+  "description": "Get one Origin repository by owner and name, including default branch, mirror state, visibility, and merge settings.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "name": {
+        "description": "Origin repository name within that namespace",
+        "type": "string"
+      },
+      "owner": {
+        "description": "Origin namespace (owner) slug, taken from list_namespaces or an earlier Origin result. A GitHub owner or org name is not an Origin namespace unless list_namespaces returns it.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "name"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_repository"
+}

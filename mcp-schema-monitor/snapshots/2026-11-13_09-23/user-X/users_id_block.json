@@ -1,0 +1,20 @@
+{
+  "description": "Causes the source User to block the target User. A block also removes any follow between the two Users, in both directions, and unblocking does not restore it. Each call blocks one account: block only accounts the authenticated User named or approved, because finding or reviewing accounts is not approval to block them.",
+  "inputSchema": {
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "target_user_id": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "target_user_id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "users_id_block"
+}
