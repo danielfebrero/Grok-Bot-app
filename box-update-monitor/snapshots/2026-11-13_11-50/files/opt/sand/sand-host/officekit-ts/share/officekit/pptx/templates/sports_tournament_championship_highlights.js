@@ -1,0 +1,538 @@
+/**
+ * Sport Tournament deck (20 slides) — rebuilt with pptxgenjs.
+ *
+ * Slide size 13.333 x 7.5 in (16:9). Every slide is defined by a builder
+ * function below; shared look-and-feel lives in the constants + helpers.
+ *
+ * The source deck's picture placeholders are all empty (it ships no artwork),
+ * so nothing is drawn for them. The only real graphics are slide 5's four
+ * pictograms, which are reconstructed from native shapes in ICON_ART.
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ theme */
+
+const BG = '0D0D0D';          // master background: black lightened 5%
+const WHITE = 'FFFFFF';
+const BLACK = '000000';
+const RED = 'BA181B';         // theme accent1
+const YELLOW = 'FFBA08';      // theme accent2
+
+const F_HEAD = 'Poppins SemiBold';
+const F_BODY = 'Poppins Light';
+const F_PLAIN = 'Poppins';
+
+const SZ_HEAD = 44;
+const SZ_BODY = 12;
+
+// Rounded-corner adjust values (fraction of the shape's shorter side).
+const ADJ_PILL = 0.5;         // fully rounded ends
+const ADJ_TILE = 0.17659;     // icon tiles / stat pills
+const ADJ_CARD = 0.26249;     // name cards / year badge
+
+// Corner radii (inches) of the half-rounded background blocks.
+const R_BLOCK = 0.508;        // 3.046" wide title/section blocks
+const R_BAR = 0.352;          // 1.514" wide stat + score bars
+const R_CAP = 0.325;          // 1.396" tall score cap
+const R_FOOT = 0.465;         // 0.929" tall footer block
+
+/* ------------------------------------------------------------- filler copy */
+
+const L_SHORT = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.';
+const L_LONG = L_SHORT + ' Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.';
+const L_TINY = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. ';
+const L_TWO_PARA = L_LONG + ' \n\n' + L_SHORT;
+
+/* ----------------------------------------------------------------- helpers */
+
+// Every slide inherits the master's near-black background.
+function newSlide(pptx) {
+    const s = pptx.addSlide({ masterName: 'MAIN' });
+    s.background = { color: BG };
+    return s;
+}
+
+// Reference text boxes are top-anchored, auto-fit rectangles with no fill.
+function text(slide, str, opts) {
+    slide.addText(str, Object.assign({ valign: 'top', color: WHITE, margin: [7.2, 7.2, 3.6, 3.6] }, opts));
+}
+
+function heading(slide, str, box, opts) {
+    text(slide, str, Object.assign({}, box, { fontFace: F_HEAD, fontSize: SZ_HEAD }, opts));
+}
+
+function body(slide, str, box, opts) {
+    text(slide, str, Object.assign({}, box, { fontFace: F_BODY, fontSize: SZ_BODY }, opts));
+}
+
+// Rounded rectangle; `adj` is the corner radius as a fraction of the short side.
+function roundRect(slide, box, color, adj, opts) {
+    slide.addShape('roundRect', Object.assign({
+        fill: { color: color },
+        line: { type: 'none' },
+        rectRadius: (adj === undefined ? ADJ_TILE : adj) * Math.min(box.w, box.h)
+    }, box, opts));
+}
+
+// The deck's signature block: a rectangle rounded on ONE side only.
+// Built as a fully rounded rect plus a plain rect that squares off the
+// opposite side — this gives exact control over the corner radius, which
+// `round2SameRect` alone does not expose.
+function halfRoundRect(slide, box, color, radius, side) {
+    const solid = { fill: { color: color }, line: { type: 'none' } };
+    slide.addShape('roundRect', Object.assign({ rectRadius: radius }, box, solid));
+    const cover = {
+        top: { x: box.x, y: box.y + radius, w: box.w, h: box.h - radius },
+        bottom: { x: box.x, y: box.y, w: box.w, h: box.h - radius },
+        left: { x: box.x + radius, y: box.y, w: box.w - radius, h: box.h },
+        right: { x: box.x, y: box.y, w: box.w - radius, h: box.h }
+    }[side];
+    slide.addShape('rect', Object.assign({}, cover, solid));
+}
+
+function arrow(slide, box, color, width) {
+    slide.addShape('line', Object.assign({
+        line: { color: color, width: width, endArrowType: 'arrow' }
+    }, box));
+}
+
+// Slide 5's four pictograms, redrawn from native shapes instead of embedding
+// the original artwork. Each part is [shape, x, y, w, h, extra] in unit
+// coordinates inside the icon's square box; `extra.hole` paints in the tile
+// colour to punch a hole, `extra.rot` rotates the part.
+const ICON_ART = {
+    scales: [                                            // fair competition
+        ['ellipse', 0.42, 0.03, 0.16, 0.16],
+        ['rect', 0.46, 0.12, 0.08, 0.72],
+        ['rect', 0.08, 0.17, 0.84, 0.06],
+        ['rect', 0.34, 0.78, 0.32, 0.08],
+        ['rect', 0.26, 0.86, 0.48, 0.10],
+        ['triangle', 0.05, 0.25, 0.29, 0.26],              // left pan sling
+        ['triangle', 0.10, 0.32, 0.19, 0.22, { hole: true }],
+        ['triangle', 0.66, 0.25, 0.29, 0.26],              // right pan sling
+        ['triangle', 0.71, 0.32, 0.19, 0.22, { hole: true }],
+        ['rect', 0.02, 0.49, 0.35, 0.05],
+        ['rect', 0.63, 0.49, 0.35, 0.05]
+    ],
+    lifter: [                                            // sportsmanship
+        ['rect', 0.08, 0.05, 0.84, 0.07],
+        ['rect', 0.01, 0.00, 0.07, 0.17], ['rect', 0.92, 0.00, 0.07, 0.17],
+        ['ellipse', 0.39, 0.12, 0.22, 0.22],
+        ['rect', 0.10, 0.14, 0.36, 0.10, { rot: 33 }],     // left arm
+        ['rect', 0.54, 0.14, 0.36, 0.10, { rot: 327 }],    // right arm
+        ['rect', 0.36, 0.30, 0.28, 0.32],                  // torso
+        ['rect', 0.18, 0.55, 0.30, 0.12, { rot: 32 }],     // left thigh
+        ['rect', 0.52, 0.55, 0.30, 0.12, { rot: 328 }],    // right thigh
+        ['rect', 0.14, 0.70, 0.12, 0.30], ['rect', 0.74, 0.70, 0.12, 0.30]
+    ],
+    cross: [                                             // safety
+        ['ellipse', 0.00, 0.00, 1.00, 1.00],
+        ['ellipse', 0.11, 0.11, 0.78, 0.78, { hole: true }],
+        ['rect', 0.41, 0.24, 0.18, 0.52],
+        ['rect', 0.24, 0.41, 0.52, 0.18]
+    ],
+    hands: [                                             // organizational efficiency
+        ['rect', 0.00, 0.20, 0.22, 0.17, { rot: 14 }],     // left cuff
+        ['rect', 0.78, 0.20, 0.22, 0.17, { rot: 346 }],    // right cuff
+        ['rect', 0.16, 0.27, 0.28, 0.14, { rot: 14 }],     // left forearm
+        ['rect', 0.56, 0.27, 0.28, 0.14, { rot: 346 }],    // right forearm
+        ['roundRect', 0.36, 0.36, 0.30, 0.20, { rot: 12 }],// clasped fists
+        ['roundRect', 0.26, 0.50, 0.30, 0.09, { rot: 14 }],// fingers
+        ['roundRect', 0.26, 0.60, 0.27, 0.09, { rot: 14 }],
+        ['roundRect', 0.27, 0.70, 0.24, 0.09, { rot: 14 }]
+    ]
+};
+
+function icon(slide, art, x, y, size, ink, tile) {
+    ICON_ART[art].forEach(function (part) {
+        const extra = part[5] || {};
+        slide.addShape(part[0], {
+            x: x + part[1] * size, y: y + part[2] * size,
+            w: part[3] * size, h: part[4] * size,
+            fill: { color: extra.hole ? tile : ink }, line: { type: 'none' },
+            flipV: extra.flipV === true, rotate: extra.rot || 0,
+            rectRadius: 0.03 * size
+        });
+    });
+}
+
+function pageNumber(slide) {
+    slide.slideNumber = {
+        x: 12.091, y: 6.722, w: 0.884, h: 0.404,
+        align: 'right', fontFace: F_HEAD, fontSize: 18, color: WHITE
+    };
+}
+
+/* ------------------------------------------------------------ slide 1 — title */
+
+function slide01(pptx) {
+    const s = newSlide(pptx);
+    // layout artwork: two tall blocks, each rounded on the outward-facing side
+    halfRoundRect(s, { x: 3.621, y: 0.0, w: 3.046, h: 3.4 }, YELLOW, R_BLOCK, 'bottom');
+    halfRoundRect(s, { x: 0.262, y: 4.159, w: 3.046, h: 3.341 }, RED, R_BLOCK, 'top');
+
+    heading(s, 'Sport\nTournament', { x: 7.472, y: 1.548, w: 4.889, h: 1.582 });
+    body(s, L_SHORT + ' ', { x: 7.472, y: 3.595, w: 4.671, h: 0.707 });
+
+    roundRect(s, { x: 7.472, y: 5.389, w: 2.429, h: 0.563 }, WHITE, ADJ_PILL);
+    text(s, 'LEARN MORE', {
+        x: 7.605, y: 5.462, w: 1.817, h: 0.404,
+        fontFace: F_BODY, fontSize: 18, color: BLACK
+    });
+    arrow(s, { x: 9.276, y: 5.649, w: 0.465, h: 0 }, BLACK, 1.5);
+    pageNumber(s);
+    return s;
+}
+
+/* -------------------------------------------- slide 2 — championship glory */
+
+function slide02(pptx) {
+    const s = newSlide(pptx);
+    halfRoundRect(s, { x: 9.693, y: 6.571, w: 3.444, h: 0.929 }, RED, R_FOOT, 'top');
+
+    heading(s, 'Championship Glory Highlight', { x: 0.446, y: 1.75, w: 5.06, h: 1.582 });
+    body(s, L_LONG, { x: 0.446, y: 3.797, w: 4.843, h: 1.111 });
+    body(s, L_SHORT + ' ', { x: 0.446, y: 5.043, w: 4.843, h: 0.707 });
+    return s;
+}
+
+/* ---------------------------------------------- slide 3 — the annual sport */
+
+function slide03(pptx) {
+    const s = newSlide(pptx);
+    halfRoundRect(s, { x: 0.446, y: 2.132, w: 6.22, h: 3.046 }, YELLOW, R_BLOCK, 'left');
+    halfRoundRect(s, { x: 6.667, y: 2.132, w: 6.22, h: 3.046 }, RED, R_BLOCK, 'right');
+
+    heading(s, 'The Annual Sport Tournament', { x: 1.534, y: 0.717, w: 10.266, h: 0.841 }, { align: 'center' });
+    body(s, L_LONG, { x: 4.421, y: 5.848, w: 4.492, h: 1.111 }, { align: 'center' });
+    pageNumber(s);
+    return s;
+}
+
+/* ------------------------------------------------- slide 4 — audience stat */
+
+function slide04(pptx) {
+    const s = newSlide(pptx);
+    // two bars running off the left edge, rounded on the right
+    halfRoundRect(s, { x: 0.0, y: 0.403, w: 6.354, h: 1.514 }, RED, R_BAR, 'right');
+    halfRoundRect(s, { x: 0.0, y: 2.236, w: 6.354, h: 1.514 }, YELLOW, R_BAR, 'right');
+
+    body(s, L_SHORT, { x: 0.455, y: 0.705, w: 3.324, h: 0.909 });
+    text(s, '36k', { x: 4.083, y: 0.511, w: 2.238, h: 1.313, fontFace: F_HEAD, fontSize: 72 });
+    body(s, L_SHORT, { x: 0.455, y: 2.516, w: 3.324, h: 0.909 }, { color: BLACK });
+    text(s, '40%', { x: 3.938, y: 2.343, w: 2.405, h: 1.313, fontFace: F_HEAD, fontSize: 72, color: BLACK });
+
+    heading(s, 'Increase In Audience Numbers.', { x: 0.446, y: 3.912, w: 6.22, h: 2.322 });
+    text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt.', {
+        x: 0.458, y: 6.358, w: 5.8, h: 0.707,
+        fontFace: F_PLAIN, fontSize: SZ_BODY, lineSpacingMultiple: 1.5
+    });
+    return s;
+}
+
+/* ------------------------------------------------ slide 5 — four principles */
+
+const PRINCIPLES = [
+    // tile y, text-block y, tile colour, and the icon drawn on top of it
+    { title: 'Fair Competition', tile: 0.403, textY: 0.449, color: RED, art: 'scales', ink: WHITE, ix: 6.279, iy: 0.691, isize: 0.776 },
+    { title: 'Sportsmanship', tile: 2.141, textY: 2.150, color: YELLOW, art: 'lifter', ink: BLACK, ix: 6.324, iy: 2.465, isize: 0.685 },
+    { title: 'Safety', tile: 3.920, textY: 3.907, color: RED, art: 'cross', ink: WHITE, ix: 6.324, iy: 4.258, isize: 0.673 },
+    { title: 'Organizational Efficiency', tile: 5.698, textY: 5.692, color: YELLOW, art: 'hands', ink: BLACK, ix: 6.236, iy: 5.948, isize: 0.862 }
+];
+
+function slide05(pptx) {
+    const s = newSlide(pptx);
+    heading(s, 'Four\nPrinciple', { x: 0.446, y: 0.421, w: 5.369, h: 1.582 });
+    body(s, L_LONG, { x: 0.446, y: 2.141, w: 5.062, h: 1.111 });
+
+    PRINCIPLES.forEach(function (p) {
+        roundRect(s, { x: 5.987, y: p.tile, w: 1.359, h: 1.359 }, p.color, ADJ_TILE);
+        icon(s, p.art, p.ix, p.iy, p.isize, p.ink, p.color);
+        text(s, p.title, { x: 7.567, y: p.textY, w: 5.062, h: 0.505, fontFace: F_HEAD, fontSize: 24 });
+        body(s, L_SHORT, { x: 7.567, y: p.textY + 0.533, w: 5.062, h: 0.707 });
+    });
+    pageNumber(s);
+    return s;
+}
+
+/* ------------------------------------------- slide 6 — highlights and stats */
+
+function slide06(pptx) {
+    const s = newSlide(pptx);
+    halfRoundRect(s, { x: 11.373, y: 1.708, w: 1.514, h: 5.792 }, RED, R_BAR, 'top');
+    halfRoundRect(s, { x: 11.373, y: 0.0, w: 1.514, h: 1.396 }, YELLOW, R_CAP, 'bottom');
+
+    heading(s, 'Tournament Highlights and Stats', { x: 0.462, y: 0.421, w: 6.205, h: 2.322 });
+    body(s, L_LONG + '\n ', { x: 0.462, y: 2.808, w: 5.847, h: 1.111 });
+
+    text(s, 'a. Lorem ipsum dolor sit amet, consectetur adipiscing elit,', {
+        x: 0.482, y: 4.798, w: 5.847, h: 0.303, fontFace: F_HEAD, fontSize: SZ_BODY
+    });
+    body(s, L_SHORT + ' ', { x: 0.478, y: 5.187, w: 5.847, h: 0.505 });
+    text(s, 'b. Lorem ipsum dolor sit amet, consectetur adipiscing elit,', {
+        x: 0.466, y: 5.973, w: 5.847, h: 0.303, fontFace: F_HEAD, fontSize: SZ_BODY
+    });
+    body(s, L_SHORT + ' Ut enim ad minim veniam.', { x: 0.462, y: 6.361, w: 5.847, h: 0.707 });
+
+    text(s, 'SCORE', { x: 11.373, y: 1.875, w: 1.514, h: 0.438, fontFace: F_HEAD, fontSize: 20, align: 'center' });
+    text(s, '4-1', { x: 11.561, y: 2.313, w: 1.138, h: 0.64, fontFace: F_HEAD, fontSize: 32, align: 'center' });
+    return s;
+}
+
+/* ----------------------------------------------- slide 7 — contestant stat */
+
+function slide07(pptx) {
+    const s = newSlide(pptx);
+    roundRect(s, { x: 7.035, y: 1.237, w: 5.852, h: 1.359 }, RED, ADJ_TILE);
+    roundRect(s, { x: 7.035, y: 2.975, w: 2.997, h: 1.359 }, YELLOW, ADJ_TILE);
+
+    arrow(s, { x: 7.614, y: 1.657, w: 0, h: 0.459, flipV: true }, WHITE, 2);
+    text(s, '2.000.000.000', { x: 8.107, y: 1.503, w: 4.662, h: 0.841, fontFace: F_HEAD, fontSize: SZ_HEAD });
+    text(s, '400%/year', { x: 7.175, y: 3.33, w: 2.716, h: 0.64, fontFace: F_HEAD, fontSize: 32, align: 'center', color: BLACK });
+    body(s, L_SHORT, { x: 10.238, y: 3.11, w: 2.649, h: 1.111 });
+    body(s, L_LONG, { x: 6.683, y: 5.388, w: 6.205, h: 0.909 });
+
+    heading(s, 'Increase In Contestant Numbers.', { x: 0.446, y: 4.737, w: 6.22, h: 2.322 });
+    pageNumber(s);
+    return s;
+}
+
+/* -------------------------------------------------- slide 8 — choose sport */
+
+const SPORTS = [
+    { name: 'Basketball', x: 0.696, y: 5.836 },
+    { name: 'Football', x: 3.529, y: 5.836 },
+    { name: 'Volleyball', x: 6.363, y: 5.829 }
+];
+
+function slide08(pptx) {
+    const s = newSlide(pptx);
+    heading(s, 'Choose\nThe Game', { x: 9.175, y: 1.294, w: 3.697, h: 1.582 });
+    body(s, L_LONG + ' ', { x: 9.175, y: 3.094, w: 3.697, h: 1.313 });
+
+    SPORTS.forEach(function (sport) {
+        text(s, sport.name, { x: sport.x, y: sport.y, w: 2.086, h: 0.438, fontFace: F_HEAD, fontSize: 20 });
+        body(s, L_TINY, { x: sport.x, y: sport.y + 0.506, w: 2.086, h: 0.707 });
+    });
+    pageNumber(s);
+    return s;
+}
+
+/* ------------------------------------------------ slide 9 — inside / video */
+
+function slide09(pptx) {
+    const s = newSlide(pptx);
+    heading(s, 'Inside the Sport Tournament', { x: 0.456, y: 0.405, w: 6.22, h: 1.582 });
+
+    // grouped video teaser: play tile + red highlight bar + caption
+    roundRect(s, { x: 5.028, y: 3.962, w: 1.417, h: 1.359 }, YELLOW, ADJ_TILE);
+    s.addShape('triangle', {
+        x: 5.499, y: 4.408, w: 0.601, h: 0.518,
+        fill: { color: BLACK }, line: { type: 'none' }, rotate: 90
+    });
+    body(s, L_LONG + ' ', { x: 0.592, y: 4.01, w: 4.09, h: 1.313 });
+    roundRect(s, { x: 0.592, y: 5.578, w: 5.852, h: 1.359 }, RED, ADJ_TILE);
+
+    heading(s, 'HIGHLIGHT', { x: 0.668, y: 5.838, w: 6.22, h: 0.841 });
+    arrow(s, { x: 4.521, y: 6.199, w: 1.468, h: 0 }, WHITE, 2);
+    return s;
+}
+
+/* ----------------------------------------------- slide 10 — a look at 2026 */
+
+function slide10(pptx) {
+    const s = newSlide(pptx);
+    heading(s, 'A Look at the \n2026\nTournament', { x: 0.599, y: 4.199, w: 5.894, h: 2.322 });
+    arrow(s, { x: 2.377, y: 5.36, w: 3.793, h: 0 }, YELLOW, 3.25);
+    body(s, L_LONG + ' \n\n' + L_LONG + ' ', { x: 6.667, y: 4.492, w: 6.219, h: 1.919 });
+    pageNumber(s);
+    return s;
+}
+
+/* ------------------------------------------ slide 11 — recap bar chart */
+
+// month, value label, bar top y, bar height, bar colour
+const RECAP_BARS = [
+    { month: 'Jan', pct: '80%', x: 6.667, y: 3.990, h: 2.506, color: YELLOW },
+    { month: 'Feb', pct: '70%', x: 7.381, y: 4.344, h: 2.152, color: RED },
+    { month: 'Mar', pct: '90%', x: 8.094, y: 3.546, h: 2.950, color: YELLOW },
+    { month: 'Apr', pct: '60%', x: 8.806, y: 4.704, h: 1.791, color: RED },
+    { month: 'May', pct: '70%', x: 9.519, y: 4.355, h: 2.141, color: YELLOW },
+    { month: 'Jun', pct: '75%', x: 10.231, y: 4.181, h: 2.315, color: YELLOW },
+    { month: 'Jul', pct: '90%', x: 10.944, y: 3.546, h: 2.950, color: YELLOW },
+    { month: 'Aug', pct: '90%', x: 11.656, y: 3.546, h: 2.950, color: YELLOW },
+    { month: 'Sep', pct: '100%', x: 12.369, y: 3.185, h: 3.311, color: YELLOW }
+];
+
+function slide11(pptx) {
+    const s = newSlide(pptx);
+    heading(s, 'Championship\nRecapitulation', { x: 0.46, y: 1.094, w: 6.22, h: 1.582 });
+    body(s, L_LONG + ' ', { x: 6.685, y: 1.447, w: 6.219, h: 0.909 });
+
+    RECAP_BARS.forEach(function (bar) {
+        roundRect(s, { x: bar.x, y: bar.y, w: 0.518, h: bar.h }, bar.color, ADJ_TILE);
+        const wide = bar.pct === '100%';
+        text(s, bar.pct, {
+            x: bar.x - (wide ? 0.138 : 0.082), y: bar.y - 0.37, w: wide ? 0.794 : 0.682, h: 0.37,
+            fontFace: F_HEAD, fontSize: 16, align: 'center'
+        });
+        text(s, bar.month, {
+            x: bar.x - 0.082, y: 6.688, w: 0.682, h: 0.37,
+            fontFace: F_HEAD, fontSize: bar.month === 'May' ? 14 : 16, align: 'center'
+        });
+    });
+    return s;
+}
+
+/* ------------------------------------------------- slide 12 — schedule row */
+
+const SCHEDULE = [
+    { day: 'Mon', time: '11:00\nAM' },
+    { day: 'Tue', time: '12:00\nPM' },
+    { day: 'Wed', time: '13:00\nPM' },
+    { day: 'Thu', time: '14:00\nPM' },
+    { day: 'Fri', time: '15:00\nPM' },
+    { day: 'Sat', time: '16:00\nPM' },
+    { day: 'Sun', time: '17:00\nPM' }
+];
+
+function slide12(pptx) {
+    const s = newSlide(pptx);
+    heading(s, 'Tournament Schedule', { x: 1.674, y: 0.411, w: 9.985, h: 0.841 }, { align: 'center' });
+
+    SCHEDULE.forEach(function (col, i) {
+        const x = 0.446 + i * 1.865;
+        text(s, col.day, { x: x, y: 1.623, w: 1.25, h: 0.572, fontFace: F_PLAIN, fontSize: 28, bold: true, align: 'center' });
+        text(s, col.time, { x: x, y: 2.364, w: 1.25, h: 1.043, fontFace: F_PLAIN, fontSize: 28, align: 'center' });
+    });
+    return s;
+}
+
+/* --------------------------------------------------- slide 13 — recap 2025 */
+
+function slide13(pptx) {
+    const s = newSlide(pptx);
+    heading(s, 'Tournament Recap: Key Moments and Highlights', { x: 0.46, y: 1.094, w: 6.22, h: 3.063 });
+    body(s, L_TWO_PARA, { x: 0.467, y: 4.538, w: 5.81, h: 1.515 });
+
+    roundRect(s, { x: 10.354, y: 4.938, w: 2.533, h: 1.149 }, RED, ADJ_CARD);
+    text(s, '2025', { x: 10.716, y: 5.092, w: 1.808, h: 0.841, fontFace: F_HEAD, fontSize: SZ_HEAD, align: 'center' });
+    pageNumber(s);
+    return s;
+}
+
+/* ------------------------------------------------- slide 14 — let's join us */
+
+function slide14(pptx) {
+    const s = newSlide(pptx);
+    heading(s, 'Let\u2019s Join\nWith Us!', { x: 0.446, y: 0.411, w: 4.824, h: 1.582 });
+    body(s, L_TWO_PARA, { x: 6.677, y: 0.411, w: 5.81, h: 1.515 });
+    return s;
+}
+
+/* ----------------------------------------------- slide 15 — guest stars */
+
+const GUESTS = [
+    { x: 4.803, name: 'Jeremiah Diddy', nameX: 4.919, role: 'CHAIRMAN OF\nTOURNAMENT', roleX: 4.916, nameY: 4.671, roleY: 5.066 },
+    { x: 7.585, name: 'Isaiah Jason', nameX: 7.698, role: 'VICE CHAIRMAN OF\nTOURNAMENT', roleX: 7.698, nameY: 4.662, roleY: 5.075 },
+    { x: 10.367, name: 'Max Zechariah', nameX: 10.483, role: 'ACTOR &\nMOVIE DIRECTOR', roleX: 10.483, nameY: 4.671, roleY: 5.066 }
+];
+
+function slide15(pptx) {
+    const s = newSlide(pptx);
+    heading(s, 'Meet Our\nGuest Stars', { x: 0.46, y: 1.637, w: 6.22, h: 1.582 });
+    body(s, L_TWO_PARA, { x: 0.46, y: 3.339, w: 3.333, h: 2.524 });
+
+    GUESTS.forEach(function (g) {
+        roundRect(s, { x: g.x, y: 4.539, w: 2.523, h: 1.149 }, YELLOW, ADJ_CARD);
+        text(s, g.name, { x: g.nameX, y: g.nameY, w: 2.291, h: 0.404, fontFace: F_HEAD, fontSize: 18, color: BLACK, align: 'center' });
+        text(s, g.role, { x: g.roleX, y: g.roleY, w: 2.291, h: 0.505, fontFace: F_HEAD, fontSize: SZ_BODY, color: BLACK, align: 'center' });
+    });
+    pageNumber(s);
+    return s;
+}
+
+/* ---------------------------------------------- slide 16 — victory awaits */
+
+function slide16(pptx) {
+    const s = newSlide(pptx);
+    heading(s, 'Victory Awaits: Sport Tournament Champion', { x: 8.794, y: 1.088, w: 4.079, h: 3.803 });
+    body(s, L_LONG + ' ', { x: 8.912, y: 5.1, w: 3.975, h: 1.313 });
+    pageNumber(s);
+    return s;
+}
+
+/* -------------------------------------------------- slide 17 — 200K members */
+
+function slide17(pptx) {
+    const s = newSlide(pptx);
+    heading(s, 'How do I join the livestream?', { x: 6.667, y: 0.406, w: 6.22, h: 1.582 });
+    body(s, L_LONG + ' ', { x: 6.683, y: 2.398, w: 6.205, h: 0.909 });
+    text(s, '200K', { x: 0.462, y: 4.121, w: 6.22, h: 2.423, fontFace: F_HEAD, fontSize: 138 });
+    heading(s, 'Members', { x: 0.462, y: 6.224, w: 6.22, h: 0.841 });
+    return s;
+}
+
+/* ------------------------------------------------- slide 18 — the champion */
+
+function slide18(pptx) {
+    const s = newSlide(pptx);
+    roundRect(s, { x: 1.494, y: 2.388, w: 2.533, h: 1.149 }, YELLOW, ADJ_CARD, { rotate: 90 });
+    roundRect(s, { x: 9.306, y: 2.388, w: 2.533, h: 1.149 }, RED, ADJ_CARD, { rotate: 90 });
+
+    heading(s, 'Alan Ricardo', { x: 3.548, y: 5.962, w: 6.22, h: 0.841 }, { align: 'center' });
+    text(s, [
+        { text: '1' },
+        { text: 'st', options: { superscript: true } },
+        { text: ' Champion of Sport Tournament 2026' }
+    ], {
+        x: 3.564, y: 6.63, w: 6.205, h: 0.438,
+        fontFace: F_BODY, fontSize: 20, align: 'center', valign: 'top', color: WHITE
+    });
+    pageNumber(s);
+    return s;
+}
+
+/* -------------------------------------------------- slide 19 — from all of us */
+
+function slide19(pptx) {
+    const s = newSlide(pptx);
+    heading(s, 'From All of Us at Tournament!', { x: 1.866, y: 0.867, w: 9.601, h: 0.841 }, { align: 'center' });
+    body(s, L_SHORT + ' Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.',
+        { x: 1.787, y: 1.937, w: 9.76, h: 0.505 }, { align: 'center' });
+    return s;
+}
+
+/* ------------------------------------------------------ slide 20 — thank you */
+
+function slide20(pptx) {
+    const s = newSlide(pptx);
+    heading(s, 'Together We Make History \u2013 Thank You!', { x: 1.183, y: 4.914, w: 7.023, h: 1.582 });
+    return s;
+}
+
+/* -------------------------------------------------------------------- build */
+
+const BUILDERS = [
+    slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
+    slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20
+];
+
+function build() {
+    const pptx = new PptxGenJS();
+    pptx.defineLayout({ name: 'WIDE_16x9', width: 13.333333333, height: 7.5 });
+    pptx.layout = 'WIDE_16x9';
+    pptx.title = 'Sport Tournament';
+    pptx.defineSlideMaster({ title: 'MAIN', background: { color: BG } });
+
+    BUILDERS.forEach(function (make) { make(pptx); });
+    return pptx;
+}
+
+const pptx = build();
+pptx.writeFile({ fileName: path.join(__dirname, '06bc2871-9e3a-4e21-8689-6b6a6b790c6e_grok_final.pptx') })
+    .then(function (f) { console.log('wrote ' + f); })
+    .catch(function (e) { console.error(e); process.exit(1); });
