@@ -1,0 +1,1089 @@
+/**
+ * Recreation of "Alternative / Dark Template" (36 slides, 13.333 x 7.5 in)
+ * using pptxgenjs only.  Raster artwork in the source deck (photo placeholders,
+ * the dark stone background texture and the vector world-map illustrations) is
+ * redrawn here as flat coloured placeholder shapes.
+ *
+ *   node 00ff856f-7799-410c-95f7-7dfefd172236_grok_final.js
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ theme */
+
+const C = {
+  dark:      '333333',   // theme dk1 / dk2
+  darkTex:   '242427',   // flat stand-in for the stone photo background
+  white:     'FFFFFF',
+  offWhite:  'FFFCFF',
+  ink:       '262626',
+  red:       'D41616',   // accent2
+  maroon:    '860000',   // accent1
+  salmon:    'F99973',   // accent3
+  amber:     'FFC000',   // accent4
+  lime:      'E9E783',   // accent5
+  blush:     'F3DCCF',   // accent6
+  deep:      '640000',
+  deeper:    '430000',
+  brick:     '9F1010',
+  wine:      '6A0B0B',
+  clay:      'BB7356',
+  grey:      'BFBFBF',
+  grey99:    '999999',
+  greyF2:    'F2F2F2',
+  panel:     '1A1A1A',
+  axis:      '999999',
+  phFill:    'EAEAEA',   // photo-placeholder body
+  phText:    '9B9B9B',   // photo-placeholder caption
+};
+
+const HEAD = 'OSWALD';      // theme major font
+const BODY = 'Montserrat';  // theme minor font
+
+/* ------------------------------------------------------------- primitives */
+
+/** Solid rectangle. */
+function rect(s, x, y, w, h, fill, extra) {
+  s.addShape('rect', Object.assign({ x, y, w, h, fill: { color: fill } }, extra || {}));
+}
+
+/** Text box.  Zero insets everywhere - the source deck uses lIns/tIns = 0. */
+function text(s, runs, o) {
+  s.addText(runs, Object.assign({ inset: 0, fontFace: BODY, margin: 0 }, o));
+}
+
+/** Head-line style helper (Oswald, bold). */
+function headline(s, runs, o) {
+  text(s, runs, Object.assign({ fontFace: HEAD, bold: true }, o));
+}
+
+/**
+ * Big hollow "ghost" lettering: no fill, coloured outline.
+ * The deck stacks several of these rotated -90 deg down the slide edges.
+ */
+function ghost(s, str, o) {
+  text(s, str, Object.assign({
+    fontFace: HEAD, bold: true, color: 'FFFFFF', transparency: 100,
+    outline: { size: 1, color: o.outlineColor || C.white },
+    lineSpacing: 90, valign: 'bottom', align: 'left',
+  }, o));
+}
+
+/** Vertical (rotated -90 deg) ghost title.  x/y/w/h are the raw, unrotated box. */
+function ghostV(s, str, x, y, w, h, size, outlineColor, valign) {
+  ghost(s, str, {
+    x, y, w, h, rotate: 270, fontSize: size, outlineColor,
+    valign: valign || 'bottom',
+  });
+}
+
+/**
+ * Photo placeholder: flat panel + the "INSERT YOUR IMAGE" caption that is baked
+ * into the source bitmap.  `cropX`/`cropY` are the fractions trimmed off *each*
+ * side by the original srcRect, which is what makes the caption scale.
+ */
+function photo(s, x, y, w, h, cropX, cropY) {
+  const visX = 1 - 2 * (cropX || 0), visY = 1 - 2 * (cropY || 0);
+  const size = 4.31 * w / visX;                       // caption is 40.9% of image width
+  const cy = y + h * ((0.6215 - (cropY || 0)) / visY); // caption centre inside the bitmap
+  const logo = 0.13 * w / visX;
+  const ly = y + h * ((0.4450 - (cropY || 0)) / visY);
+  rect(s, x, y, w, h, C.phFill);
+  s.addShape('ellipse', {
+    x: x + w / 2 - logo / 2, y: ly - logo / 2, w: logo, h: logo,
+    fill: { color: C.phFill }, line: { color: C.phText, width: 1.5 },
+  });
+  text(s, 'INSERT YOUR\nIMAGE', {
+    x, y: cy - size / 72, w, h: 2 * size / 72, align: 'center', valign: 'middle',
+    fontSize: size, color: C.phText, lineSpacing: size * 1.21,
+  });
+}
+
+/**
+ * Vector world-map placeholder.  The source deck uses detailed freeform maps;
+ * here each map is an occupancy grid of [col, row, width, height] cells (see
+ * MAPS below) so the silhouette stays readable in the code.
+ */
+const MAP_COLS = 32, MAP_ROWS = 26;
+function mapArt(s, x, y, w, h, land, hi, landColor) {
+  const cw = w / MAP_COLS, ch = h / MAP_ROWS;
+  const paint = function (cells, color) {
+    cells.forEach(function (c) {
+      rect(s, x + c[0] * cw, y + c[1] * ch, c[2] * cw, c[3] * ch, color);
+    });
+  };
+  paint(land, landColor || 'E0E0E0');
+  paint(hi, C.maroon);
+}
+
+/* Approximate per-character advance widths (em) for Montserrat, used to lay
+ * text out along a circle - PowerPoint does this with a textCircle warp. */
+const EM_WIDE = 'mMW', EM_NARROW = "iljtIf.,;:'!| ", EM_MED = 'rvxysz-1';
+function charEm(ch) {
+  if (EM_WIDE.indexOf(ch) >= 0) return 0.98;
+  if (EM_NARROW.indexOf(ch) >= 0) return 0.26;
+  if (EM_MED.indexOf(ch) >= 0) return 0.48;
+  if (ch >= 'A' && ch <= 'Z') return 0.72;
+  return 0.62;
+}
+
+/** Lay `runs` out clockwise along a circle, one text box per character. */
+function arcText(s, runs, o) {
+  const chars = [];
+  runs.forEach(function (r) {
+    for (const ch of r.text) chars.push({ ch: ch, color: r.color });
+  });
+  const total = chars.reduce(function (a, c) { return a + charEm(c.ch); }, 0);
+  let ang = o.start;
+  chars.forEach(function (c) {
+    const step = o.sweep * charEm(c.ch) / total;
+    const mid = (ang + step / 2) * Math.PI / 180;
+    const cx = o.cx + o.r * Math.sin(mid), cy = o.cy - o.r * Math.cos(mid);
+    if (c.ch !== ' ') {
+      s.addText(c.ch, {
+        x: cx - 0.2, y: cy - 0.1, w: 0.4, h: 0.2, align: 'center', valign: 'middle',
+        fontFace: BODY, fontSize: o.fontSize, color: c.color, inset: 0, margin: 0,
+        rotate: (ang + step / 2 + 360) % 360,
+      });
+    }
+    ang += step;
+  });
+}
+
+/* ------------------------------------------------ recurring slide "chrome" */
+
+/** Full-bleed dark stone background (replaces the master's photo fill). */
+function darkBg(s) { rect(s, 0, 0, 13.333, 7.5, C.darkTex); }
+
+/** Master furniture: web address, handle and social icons. */
+function chrome(s, onDark) {
+  headline(s, 'www.yourwebsite.com', {
+    x: 0.667, y: 0.25, w: 2.5, h: 0.333, fontSize: 14, bold: false, color: C.red,
+  });
+  headline(s, '@yourcompany', {
+    x: 9.25, y: 0.3, w: 3.417, h: 0.28, fontSize: 14, bold: false,
+    color: C.red, align: 'right', valign: 'bottom',
+  });
+  [10.72, 10.97, 11.22].forEach(function (x) {
+    s.addShape('roundRect', {
+      x, y: 0.4, w: 0.16, h: 0.16, rectRadius: 0.03,
+      fill: { color: onDark ? C.white : C.ink },
+    });
+  });
+}
+
+/** 0.25" accent strip along the bottom edge (present on most light layouts). */
+function bottomBar(s, color) { rect(s, 0, 7.25, 13.333, 0.25, color || C.maroon); }
+
+/** The ring of small type that curls around a corner of the photo frames. */
+function arcCaption(s, x, y, color, start) {
+  arcText(s, [
+    { text: 'Donec nisi nibh, dignissim mollis ', color: color },
+    { text: 'egestas non  graph non', color: C.red },
+  ], { cx: x + 0.962, cy: y + 0.962, r: 0.94, fontSize: 12,
+       start: start === undefined ? -62 : start, sweep: 278 });
+}
+
+/* --------------------------------------------------------- shared strings */
+
+const L_SHORT = 'Donec nisi nibh, dignissim mollis egestas non, egestas ac orci. ' +
+  'Suspendisse condimentum felis ut faucibus ullamcorper. Ut efficitur neque ut ante feugiat mattis. ';
+const L_TWICE = 'Donec nisi nibh, dignissim mollis egestas non, egestas ac orci. ' +
+  'Suspendisse condimentum felis ut faucibus ullamcorper. Donec nisi nibh, dignissim mollis ' +
+  'egestas non, egestas ac orci. Suspendisse condimentum felis ut faucibus ullamcorper. ';
+const L_TAIL = 'egestas ac orci. Suspendisse condimentum felis ut faucibus ullamcorper ' +
+  'Condimentum felis ut faucibus ullamcorper';
+const L_LONG = L_SHORT + 'Donec nisi nibh, dignissim mollis egestas non, egestas ac orci. ' +
+  'Suspendisse condimentum felis.';
+const L_SWOT_B = 'Donec ac orci. Suspendisse condimentum felis ut faucibus ullamcorper. ' +
+  'Ut efficitur neque ut ante feugiat mattis. Donec nisi nibh, dignissim mollis egestas non, ' +
+  'egestas ac orci. Suspendisse condimentum felis.';
+const L_ONE = 'Donec nisi nibh, dignissim mollis egestas non, egestas ac orci. Suspendisse.';
+const L_TITLE3 = 'THREE LINES SAMPLE TITLE';
+const L_TITLE2 = 'TWO LINES SAMPLE';
+const PRES_TPL = 'Presentation template';
+
+/* ------------------------------------------------------------- map shapes */
+/* Land masses and the highlighted country, on the MAP_COLS x MAP_ROWS grid. */
+const MAPS = {
+  asia: {
+    land: [
+      [6,0,2,1],[5,1,5,1],[1,2,11,1],[17,2,1,1],[0,3,23,1],[0,4,13,1],[14,4,9,1],[2,5,9,2],
+      [14,5,8,1],[16,6,5,1],[30,6,2,1],[2,7,8,1],[26,7,1,1],[2,8,7,1],[25,8,1,1],[30,8,1,1],
+      [4,9,6,2],[26,9,1,1],[29,9,1,1],[27,10,2,1],[5,11,6,1],[5,12,7,1],[15,12,1,1],
+      [5,13,12,1],[7,14,10,1],[8,15,5,1],[15,15,5,1],[8,16,4,1],[15,16,4,1],[9,17,2,3],
+      [16,17,4,1],[17,18,3,1],[25,20,1,1],[16,21,2,1],[22,21,1,1],[17,22,1,1],[20,22,3,1],
+      [17,23,2,1],[20,23,4,1],[29,23,1,1],[18,24,1,1],[29,24,2,1],[20,25,1,1]],
+    hi: [
+      [24,1,1,1],[24,2,2,1],[23,3,4,1],[12,4,2,1],[23,4,5,1],[11,5,4,1],[22,5,6,1],[11,6,5,1],
+      [21,6,6,1],[10,7,16,1],[9,8,14,1],[9,9,15,1],[10,10,14,2],[12,12,12,1],[17,13,7,1],
+      [17,14,6,1]],
+  },
+  europe: {
+    land: [
+      [13,0,4,1],[18,0,14,1],[12,1,20,1],[11,2,6,1],[18,2,14,1],[11,3,21,2],[0,5,2,1],
+      [10,5,22,1],[0,6,3,1],[9,6,4,4],[14,6,18,2],[15,8,17,2],[5,9,1,2],[11,10,2,1],
+      [14,10,18,2],[4,11,2,1],[10,11,2,1],[3,12,4,1],[10,12,1,1],[13,12,19,1],[3,13,1,1],
+      [5,13,2,2],[9,13,23,1],[8,14,20,2],[29,14,3,2],[9,16,8,1],[18,16,10,1],[31,16,1,1],
+      [9,17,7,1],[18,17,1,1],[23,17,6,1],[9,18,2,1],[12,18,4,1],[25,18,5,1],[2,19,1,1],
+      [12,19,7,1],[24,19,6,1],[0,20,5,1],[13,20,6,1],[21,20,7,1],[0,21,7,1],[15,21,12,1],
+      [1,22,5,2],[15,22,2,1],[19,22,6,1],[16,23,2,2],[19,23,4,1],[0,24,5,1],[0,25,3,1]],
+    hi: [
+      [7,15,1,1],[5,16,4,1],[17,16,1,1],[5,17,5,1],[16,17,3,1],[5,18,4,3],[15,18,4,1],
+      [16,19,2,1]],
+  },
+  northAmerica: {
+    land: [
+      [23,0,6,1],[20,1,8,1],[18,2,1,1],[20,2,6,1],[13,3,1,1],[20,3,1,1],[22,3,3,1],[14,4,3,1],
+      [19,4,1,1],[21,4,3,1],[12,5,3,1],[16,5,1,1],[18,5,7,1],[3,6,1,1],[14,6,4,1],[20,6,1,1],
+      [22,6,5,1],[1,7,17,1],[19,7,3,1],[23,7,1,1],[25,7,3,1],[1,8,23,2],[26,8,3,2],
+      [1,10,20,1],[25,10,2,1],[2,11,2,1],[9,11,12,1],[25,11,4,1],[10,12,13,1],[25,12,5,1],
+      [11,13,20,1],[11,14,18,1],[30,14,1,1],[23,15,4,1],[28,15,1,1],[24,16,1,1],[15,20,4,1],
+      [16,21,4,1],[17,22,3,1],[18,23,4,1],[22,24,1,1]],
+    hi: [
+      [12,15,10,1],[27,15,1,1],[12,16,11,1],[25,16,2,1],[12,17,14,1],[13,18,12,1],
+      [14,19,10,1],[19,20,1,1],[23,20,1,1]],
+  },
+  india: {
+    land: [
+      [6,0,4,1],[7,1,7,2],[7,3,6,1],[8,4,4,1],[7,5,6,1],[6,6,8,1],[5,7,9,1],[28,7,4,1],
+      [2,8,14,1],[22,8,1,1],[26,8,6,1],[3,9,18,1],[22,9,8,1],[3,10,20,1],[24,10,6,1],
+      [0,11,23,1],[26,11,3,1],[1,12,22,2],[27,12,1,1],[5,14,1,1],[13,14,8,1],[11,15,1,1],
+      [14,15,6,1],[10,16,8,1],[8,17,9,1],[6,18,10,1],[6,19,7,2],[6,21,6,1],[7,22,3,1],
+      [8,23,1,2]],
+    hi: [
+      [6,14,8,1],[5,15,9,1],[5,16,5,1],[5,17,4,1],[5,18,1,1],[11,21,2,1],[9,22,4,2],
+      [9,24,3,1],[9,25,1,1]],
+  },
+  usa: {
+    land: [
+      [3,0,1,1],[30,0,1,1],[1,1,8,1],[30,1,2,2],[1,2,18,2],[20,3,1,1],[28,3,3,1],[1,4,22,1],
+      [27,4,4,2],[1,5,20,1],[22,5,1,1],[0,6,21,3],[22,6,2,2],[26,6,5,1],[25,7,5,1],[22,8,7,1],
+      [0,9,29,2],[1,11,28,4],[2,15,10,1],[14,15,14,2],[3,16,9,2],[15,17,12,1],[5,18,7,1],
+      [18,18,9,3],[6,19,6,1],[18,21,3,1],[26,21,1,1],[26,22,2,2],[27,24,1,1]],
+    hi: [
+      [12,15,2,2],[12,17,3,1],[12,18,6,2],[10,19,1,1],[10,20,9,1],[11,21,7,1],[13,22,5,1],
+      [14,23,2,2],[15,25,1,1]],
+  },
+};
+
+/* ------------------------------------------------------- reusable blocks */
+
+/** kicker (red, Oswald 18) + paragraph (Montserrat 12, 150% leading). */
+function kickerAndBody(s, o) {
+  headline(s, o.kicker || PRES_TPL, {
+    x: o.x, y: o.ky, w: o.w, h: 0.375, fontSize: 18, color: C.red,
+    align: o.align || 'left', lineSpacingMultiple: 1.5, paraSpaceBefore: 10,
+  });
+  text(s, o.body, {
+    x: o.x, y: o.by, w: o.w, h: o.bh, fontSize: 12, color: o.bodyColor,
+    align: o.align || 'left', lineSpacingMultiple: 1.5, paraSpaceBefore: 10,
+  });
+}
+
+/** 80pt three-tone headline: "<a><red b><c>". */
+function tricolorTitle(s, a, b, c, o) {
+  headline(s, [
+    { text: a, options: { color: o.color } },
+    { text: b, options: { color: C.red } },
+    { text: c, options: { color: o.color } },
+  ], {
+    x: o.x, y: o.y, w: o.w, h: o.h, fontSize: o.fontSize || 80,
+    lineSpacing: 80, valign: 'bottom', paraSpaceBefore: 10,
+  });
+}
+
+/**
+ * SWOT slides (11, 12, 14, 15): a 287pt outlined word bleeding off the slide,
+ * a two-column paragraph, a caption and a boxed initial.
+ */
+function swotSlide(s, ghostWord, caption, initial) {
+  darkBg(s); chrome(s, true);
+  rect(s, 10.674, 5.117, 2.15, 1.723, C.maroon);   // 90 deg rotated bars -> plain rects
+  rect(s, 10.222, 5.117, 0.333, 1.723, C.maroon);
+  ghost(s, ghostWord, {
+    x: 0.496, y: 1.10, w: 16.535, h: 3.2, fontSize: 287, wrap: false, valign: 'bottom',
+  });
+  headline(s, caption, {
+    x: 0.7, y: 4.562, w: 5.967, h: 0.605, fontSize: 24, color: C.white,
+    lineSpacingMultiple: 1.5, paraSpaceBefore: 10,
+  });
+  [[0.7, L_LONG + ' '], [5.674, L_SWOT_B]].forEach(function (col) {
+    text(s, col[1], {
+      x: col[0], y: 5.19, w: 4.66, h: 1.499, fontSize: 12, color: C.white,
+      lineSpacingMultiple: 1.5, paraSpaceBefore: 10,
+    });
+  });
+  headline(s, initial, {
+    x: 11.634, y: 5.167, w: 1.0, h: 1.522, fontSize: 88, color: C.white,
+    valign: 'middle', margin: [0, 0, 11.34, 0],
+  });
+}
+
+/** Big picture + right-hand copy block used by slides 6, 13, 19. */
+function pictureAndCopySlide(s, o) {
+  if (o.dark) { darkBg(s); } else { rect(s, 0, 0, 13.333, 7.5, C.white); }
+  chrome(s, o.dark);
+  rect(s, o.barX, 2.624, 0.5, 2.25, o.barColor);
+  photo(s, o.picX, 0.749, 5.3, 6.001, 0.0771, 0);
+  tricolorTitle(s, o.t1, o.t2, o.t3, { x: o.tx, y: 0.774, w: 5.52, h: 3.823, color: o.titleColor });
+  kickerAndBody(s, {
+    x: o.tx + 0.014, ky: 4.809, by: 5.333, bh: 1.392, w: 5.23,
+    body: L_SHORT, bodyColor: o.titleColor,
+  });
+  ghostV(s, 'VERTICAL TITLE', o.ghostX, 3.175, 6.001, 1.148, 66, o.ghostColor);
+  arcCaption(s, o.capX, 0.25, o.titleColor, o.capRot);
+  bottomBar(s, o.dark ? C.maroon : C.maroon);
+}
+
+/* ------------------------------------------------------------ chart specs */
+
+const BAR_SERIES = [
+  { name: 'Direct',   labels: ['Jan', 'Feb', 'Mar'], values: [4.3, 2.5, 1.2] },
+  { name: 'Indirect', labels: ['Jan', 'Feb', 'Mar'], values: [2.4, 4.4, 1.3] },
+  { name: 'Shared',   labels: ['Jan', 'Feb', 'Mar'], values: [3.1, 4.2, 0.8] },
+];
+
+function barChartOpts(fontSize, axisColor) {
+  return {
+    barDir: 'col', barGapWidthPct: 143, barOverlapPct: -24,
+    chartColors: [C.maroon, C.red, C.salmon],
+    showLegend: false, showValue: false,
+    catAxisLabelColor: axisColor, catAxisLabelFontFace: BODY, catAxisLabelFontSize: fontSize,
+    valAxisLabelColor: axisColor, valAxisLabelFontFace: BODY, valAxisLabelFontSize: fontSize,
+    catAxisLineShow: false, valAxisLineShow: false,
+    valGridLine: { style: 'solid', size: 0.75, color: axisColor },
+    catGridLine: { style: 'none' },
+    valAxisMaxVal: 5, valAxisMajorUnit: 0.5,
+  };
+}
+
+/* =============================================================== slides == */
+
+const build = {};
+
+/* 1 - cover */
+build[1] = function (s) {
+  photo(s, 0, 0, 13.333, 7.5, 0, 0.2063);
+  s.addShape('rect', { x: 0, y: 0, w: 13.333, h: 7.5, fill: { color: C.dark, transparency: 29 } });
+  headline(s, 'ALTERNATIVE', {
+    x: 3.813, y: 1.835, w: 6.011, h: 1.38, fontSize: 80, color: C.white,
+    lineSpacing: 80, valign: 'bottom',
+  });
+  headline(s, 'PRESENTATION TEMPLATE', {
+    x: 3.903, y: 3.25, w: 5.989, h: 0.375, fontSize: 18, color: C.red,
+    lineSpacingMultiple: 1.5, paraSpaceBefore: 10,
+  });
+  text(s, [{ text: L_TWICE }, { text: L_TAIL, options: { breakLine: true } }], {
+    x: 3.903, y: 3.774, w: 5.989, h: 1.726, fontSize: 12, color: C.white,
+    lineSpacingMultiple: 1.5, paraSpaceBefore: 10,
+  });
+  [[-0.969, C.red], [-0.245, C.white], [0.479, C.red], [1.203, C.white]].forEach(function (col) {
+    ghostV(s, 'DARK TEMPLATE', col[0], 3.334, 3.995, 0.724, 40, col[1]);
+  });
+  rect(s, 0, 2.624, 0.261, 2.25, C.maroon);
+};
+
+/* 2 - paragraph slide */
+build[2] = function (s) {
+  rect(s, 0, 0, 13.333, 7.5, C.white);
+  bottomBar(s, C.maroon);
+  rect(s, 5.795, 0, 1.723, 0.181, C.red);                     // top notch
+  headline(s, 'PARAGRAPH SLIDE', {
+    x: 3.292, y: 2.083, w: 6.75, h: 0.806, fontSize: 44, color: C.dark,
+    align: 'center', valign: 'bottom', lineSpacingMultiple: 1.0,
+  });
+  kickerAndBody(s, {
+    x: 3.345, ky: 2.889, by: 3.5, bh: 1.667, w: 6.75, align: 'center',
+    kicker: 'SUBTITLE SAMPLE HERE', bodyColor: C.ink,
+    body: 'Donec nisi nibh, dignissim mollis egestas non, egestas ac orci. Suspendisse ' +
+      'condimentum felis ut faucibus ullamcorper. Ut efficitur neque ut ante feugiat mattis. ' +
+      'Donec nisi nibh, dignissim mollis egestas non, egestas ac orci. Suspendisse condimentum ' +
+      'felis ut faucibus ullamcorper. Ut ef ullamcorper. Ut efficitur neque ficitur neque ut ' +
+      'ante feugiat mattis. ',
+  });
+};
+
+/* 3 - introduction */
+build[3] = function (s) {
+  darkBg(s); chrome(s, true);
+  photo(s, 2.417, 0.667, 5.967, 6.347, 0.0498, 0);
+  headline(s, 'INTRODUCTION', {
+    x: 6.667, y: 2.944, w: 5.967, h: 0.444, fontSize: 24, color: C.white,
+    lineSpacingMultiple: 1.5, paraSpaceBefore: 10,
+  });
+  text(s, L_TWICE, {
+    x: 6.667, y: 3.563, w: 5.967, h: 1.461, fontSize: 12, color: C.white,
+    lineSpacingMultiple: 1.5, paraSpaceBefore: 10,
+  });
+  ghostV(s, 'INTRODUCTION', -0.493, 3.462, 5.444, 0.791, 60, C.white, 'middle');
+  ghostV(s, 'INTRO', -1.394, 3.551, 5.444, 0.611, 44, C.maroon, 'middle');
+  ghostV(s, 'INTRO', 0.310, 3.473, 5.444, 0.791, 60, C.maroon, 'middle');
+};
+
+/* 4 - three lines + column chart (dark left, white right) */
+build[4] = function (s) {
+  darkBg(s); chrome(s, true);
+  rect(s, 6.667, 0, 6.667, 7.5, C.white);
+  headline(s, L_TITLE3, {
+    x: 0.653, y: 1.111, w: 4.514, h: 3.069, fontSize: 60, color: C.white,
+    lineSpacingMultiple: 1.0, valign: 'bottom', paraSpaceBefore: 10,
+  });
+  kickerAndBody(s, { x: 0.706, ky: 4.181, by: 4.792, bh: 1.833, w: 4.514, body: L_SHORT, bodyColor: C.white });
+  s.addChart('bar', BAR_SERIES, Object.assign(
+    { x: 7.417, y: 0.75, w: 5.264, h: 6.0 }, barChartOpts(14, C.axis)));
+};
+
+/* 5 - modern / elegant / functional */
+build[5] = function (s) {
+  darkBg(s); chrome(s, true);
+  rect(s, 7.167, 2.624, 0.5, 2.25, C.maroon);
+  photo(s, 7.417, 1.415, 5.23, 4.75, 0, 0.0259);
+  tricolorTitle(s, 'MODERN ', 'ELEGANT', ' FUNCTIONAL',
+    { x: 0.686, y: 1.75, w: 5.98, h: 3.583, color: C.white });
+  kickerAndBody(s, { x: 0.746, ky: 1.361, by: 5.578, bh: 1.148, w: 5.417, body: L_SHORT, bodyColor: C.white });
+  ghost(s, 'SAMPLE TEXT', { x: 6.583, y: 5.602, w: 6.083, h: 1.148, fontSize: 66 });
+  arcCaption(s, 6.436, 0.453, C.white);
+  bottomBar(s, C.maroon);
+};
+
+/* 6 - right title sample slide (light) */
+build[6] = function (s) {
+  pictureAndCopySlide(s, {
+    dark: false, barX: 6.417, barColor: C.ink, picX: 1.367, tx: 7.397,
+    t1: 'RIGHT TITLE ', t2: 'SAMPLE', t3: ' SLIDE',
+    titleColor: C.ink, ghostX: -1.74, ghostColor: C.grey, capX: 4.96,
+  });
+};
+
+/* 7 - two images description */
+build[7] = function (s) {
+  darkBg(s); chrome(s, true);
+  rect(s, 7.177, 1.917, 0.5, 2.25, C.maroon);
+  photo(s, 7.422, 0.749, 2.5, 4.495, 0.2337, 0);
+  photo(s, 10.167, 0.749, 2.5, 4.495, 0.2337, 0);
+  tricolorTitle(s, 'TWO IMAGES ', 'DESRIPTION ', 'SLIDE',
+    { x: 0.653, y: 0.774, w: 6.014, h: 3.919, color: C.white });
+  kickerAndBody(s, { x: 0.706, ky: 4.869, by: 5.419, bh: 1.296, w: 5.991, body: L_SHORT, bodyColor: C.white });
+  ghostV(s, 'ELEGANT', 5.68, 3.201, 6.001, 1.148, 66, C.white);
+  ghostV(s, 'SIMPLE', 8.416, 3.201, 6.001, 1.148, 66, C.white);
+  bottomBar(s, C.maroon);
+};
+
+/* 8 - Asia map (light) */
+build[8] = function (s) {
+  rect(s, 0, 0, 13.333, 7.5, C.white);
+  bottomBar(s, C.maroon);
+  mapArt(s, 0.609, 0.583, 7.087, 5.878, MAPS.asia.land, MAPS.asia.hi);
+  headline(s, L_TITLE3, {
+    x: 8.147, y: 1.111, w: 4.514, h: 3.069, fontSize: 60, color: C.dark,
+    lineSpacingMultiple: 1.0, valign: 'bottom', paraSpaceBefore: 10,
+  });
+  kickerAndBody(s, { x: 8.2, ky: 4.181, by: 4.792, bh: 1.833, w: 4.514, body: L_SHORT, bodyColor: C.ink });
+};
+
+/* 9 - know our team */
+build[9] = function (s) {
+  darkBg(s); chrome(s, true);
+  [1.664, 4.384, 7.046, 9.790].forEach(function (x) { rect(s, x, 5.75, 1.723, 0.481, C.maroon); });
+  [[1.266, 'PAOLA', 0.170], [4.010, 'SANTIAGO', 2.906],
+   [6.755, 'MICHAEL', 5.660], [9.500, 'ELENA', 8.405]].forEach(function (col) {
+    photo(s, col[0], 1.917, 2.5, 4.077, 0.2063, 0);
+    ghostV(s, col[1], col[2], 3.954, 4.495, 1.148, 48, C.grey, 'top');
+  });
+  headline(s, 'KNOW OUR TEAM', {
+    x: 2.167, y: 0.78, w: 8.23, h: 0.605, fontSize: 24, color: C.white,
+    align: 'center', lineSpacingMultiple: 1.5, paraSpaceBefore: 10,
+  });
+  text(s, L_ONE.replace('Suspendisse.', 'Suspendiss.'), {
+    x: 2.167, y: 1.408, w: 8.23, h: 0.399, fontSize: 12, color: C.white,
+    align: 'center', lineSpacingMultiple: 1.5, paraSpaceBefore: 10,
+  });
+  bottomBar(s, C.maroon);
+};
+
+/* 10 - wide image with three ghost titles */
+build[10] = function (s) {
+  darkBg(s); chrome(s, true);
+  rect(s, 2.083, 3.375, 0.5, 2.25, C.maroon);
+  photo(s, 2.333, 2.583, 10.314, 4.167, 0, 0.2891);
+  headline(s, 'TITLE SAMPLE HERE', {
+    x: 4.417, y: 0.78, w: 8.23, h: 0.605, fontSize: 24, color: C.white,
+    lineSpacingMultiple: 1.5, paraSpaceBefore: 10,
+  });
+  text(s, L_LONG, {
+    x: 4.417, y: 1.408, w: 8.23, h: 0.955, fontSize: 12, color: C.white,
+    lineSpacingMultiple: 1.5, paraSpaceBefore: 10,
+  });
+  [-1.76, -0.612, 0.556].forEach(function (x) {
+    ghostV(s, 'VERTICAL TITLE', x, 3.175, 6.001, 1.148, 66, C.white);
+  });
+  arcCaption(s, 11.167, 3.758, C.white);
+  bottomBar(s, C.maroon);
+};
+
+/* 11, 12, 14, 15 - SWOT */
+build[11] = function (s) { swotSlide(s, 'STRENGTH', 'STRENGTHS', 'S'); };
+build[12] = function (s) { swotSlide(s, 'WEAKNE', 'WEAKNESSES', 'W'); };
+build[14] = function (s) { swotSlide(s, 'OPORTUN', 'OPPORTUNITIES', 'O'); };
+build[15] = function (s) { swotSlide(s, 'THREATS', 'THREATS', 'T'); };
+
+/* 13 - left title sample slide (light, mirrored) */
+build[13] = function (s) {
+  pictureAndCopySlide(s, {
+    dark: false, barX: 6.514, barColor: C.ink, picX: 6.790, tx: 0.703,
+    t1: 'LEFT TITLE ', t2: 'SAMPLE', t3: ' SLIDE',
+    titleColor: C.ink, ghostX: 9.074, ghostColor: C.grey, capX: 6.167, capRot: 180,
+  });
+};
+
+/* 16 - two puzzle rings */
+build[16] = function (s) {
+  darkBg(s); chrome(s, true);
+  headline(s, 'TITLE SAMPLE SLIDE', {
+    x: 0.7, y: 0.78, w: 5.967, h: 0.605, fontSize: 24, color: C.white,
+    lineSpacingMultiple: 1.5, paraSpaceBefore: 10,
+  });
+  text(s, L_SHORT, {
+    x: 0.7, y: 1.408, w: 5.967, h: 0.955, fontSize: 12, color: C.white,
+    lineSpacingMultiple: 1.5, paraSpaceBefore: 10,
+  });
+  const quarters = [[270, 0, C.red], [0, 90, C.maroon], [90, 180, C.wine], [180, 270, C.red]];
+  [2.09, 6.42].forEach(function (cx, i) {
+    quarters.forEach(function (q) {
+      s.addShape('pie', {
+        x: cx - 1.41, y: 4.265 - 1.41, w: 2.82, h: 2.82,
+        angleRange: [q[0], q[1]], fill: { color: q[2] },
+      });
+    });
+    s.addShape('ellipse', { x: cx - 0.75, y: 4.265 - 0.75, w: 1.5, h: 1.5, fill: { color: C.darkTex } });
+    text(s, '202X', {
+      x: cx - 0.6, y: 3.97, w: 1.2, h: 0.59, align: 'center', valign: 'middle',
+      fontSize: 28, fontFace: HEAD, color: C.white,
+    });
+    text(s, L_ONE, {
+      x: [0.7, 5.013][i], y: 5.991, w: [2.961, 2.902][i], h: 1.176, fontSize: 12,
+      color: C.white, align: 'center', lineSpacingMultiple: 1.5, paraSpaceBefore: 10,
+    });
+  });
+  [[6.743, 'VERTICAL SLIDE'], [7.891, 'OPTIONAL TITLE'], [9.059, 'MODERN DESIGN']].forEach(function (g) {
+    ghostV(s, g[1], g[0], 3.175, 6.001, 1.148, 60, C.white);
+  });
+};
+
+/* 17 - Europe map + horizontal bars */
+build[17] = function (s) {
+  rect(s, 0, 0, 13.333, 7.5, C.white);
+  bottomBar(s, C.maroon);
+  rect(s, 5.795, 0, 1.723, 0.181, C.red);
+  mapArt(s, 5.592, 0.42, 7.741, 5.476, MAPS.europe.land, MAPS.europe.hi);
+  headline(s, L_TITLE2, {
+    x: 0.647, y: 0.321, w: 4.514, h: 1.681, fontSize: 44, color: C.dark,
+    align: 'center', valign: 'bottom', lineSpacingMultiple: 1.0,
+  });
+  kickerAndBody(s, { x: 0.7, ky: 2.001, by: 2.613, bh: 1.263, w: 4.514, align: 'center', body: L_SHORT, bodyColor: C.ink });
+  const bars = [
+    { label: 'FIRST SERVICE',   ly: 4.361, y: 4.716, w: 4.291, track: [3.763, 2.582], color: C.maroon, pct: '82%', px: 5.253, py: 4.672, tw: 2.26, tx: 4.085 },
+    { label: 'SECOND  SERVICE', ly: 5.174, y: 5.482, w: 4.166, color: C.red,    pct: '80%', px: 5.190, py: 5.395, tw: 2.26, tx: 4.085 },
+    { label: 'THIRD SERVICE',   ly: 6.000, y: 6.303, w: 3.181, color: C.salmon, pct: '60%', px: 4.120, py: 6.237, tw: 2.582, tx: 3.763 },
+  ];
+  bars.forEach(function (b) {
+    text(s, b.label, { x: 0.737, y: b.ly, w: 2.0, h: 0.25, fontSize: 12, bold: true, color: C.grey99 });
+    rect(s, b.tx, b.y, b.tw, 0.351, C.greyF2);
+    rect(s, 0.737, b.y, b.w, 0.351, b.color);
+    text(s, b.pct, { x: b.px, y: b.py, w: 0.867, h: 0.438, fontSize: 16, bold: true, color: '3F3F3F' });
+  });
+};
+
+/* 18 - five overlapping circles */
+build[18] = function (s) {
+  darkBg(s); chrome(s, true);
+  headline(s, 'TITLE SAMPLE SLIDE', {
+    x: 2.167, y: 0.78, w: 8.23, h: 0.605, fontSize: 24, color: C.white,
+    align: 'center', lineSpacingMultiple: 1.5, paraSpaceBefore: 10,
+  });
+  text(s, L_SHORT, {
+    x: 2.167, y: 1.408, w: 8.23, h: 0.399, fontSize: 12, color: C.white,
+    align: 'center', lineSpacingMultiple: 1.5, paraSpaceBefore: 10,
+  });
+  const disks = [
+    { x: 1.682, fill: C.deep,   alpha: 20 },   // accent1 lumMod 75%
+    { x: 3.665, fill: C.maroon, alpha: 0 },    // accent1
+    { x: 5.673, fill: C.red,    alpha: 20 },   // accent2
+    { x: 7.666, fill: 'F5591C', alpha: 20 },   // accent3 lumMod 75%
+  ];
+  disks.forEach(function (d) {
+    s.addShape('ellipse', { x: d.x, y: 2.662, w: 4.0, h: 4.005, fill: { color: d.fill, transparency: d.alpha } });
+  });
+  const cards = [
+    { x: 1.921, icon: 2.484, title: 'Photography' },
+    { x: 3.926, icon: 4.482, title: 'Video' },
+    { x: 5.890, icon: 6.477, title: 'Social Network' },
+    { x: 7.928, icon: 8.473, title: 'Marketing' },
+    { x: 9.794, icon: 10.350, title: 'Research' },
+  ];
+  cards.forEach(function (c) {
+    s.addShape('roundRect', { x: c.icon, y: 4.01, w: 0.39, h: 0.35, rectRadius: 0.06, fill: { color: C.white } });
+    text(s, c.title, { x: c.x, y: 4.509, w: 1.51, h: 0.206, fontSize: 12, bold: true, color: C.white, align: 'center' });
+    text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.', {
+      x: c.x, y: 4.865, w: 1.494, h: 0.748, fontSize: 14, color: C.white, align: 'center',
+    });
+  });
+};
+
+/* 19 - left title sample slide (dark) */
+build[19] = function (s) {
+  pictureAndCopySlide(s, {
+    dark: true, barX: 6.417, barColor: C.maroon, picX: 1.367, tx: 7.397,
+    t1: 'LEFT TITLE ', t2: 'SAMPLE', t3: ' SLIDE',
+    titleColor: C.white, ghostX: -1.74, ghostColor: C.white, capX: 4.96,
+  });
+};
+
+/* 20 - India map + two arrow callouts */
+build[20] = function (s) {
+  rect(s, 0, 0, 13.333, 7.5, C.white);
+  bottomBar(s, C.maroon);
+  rect(s, 5.795, 0, 1.723, 0.181, C.red);
+  mapArt(s, 6.666, 0.5, 6.208, 6.167, MAPS.india.land, MAPS.india.hi);
+  headline(s, L_TITLE2, {
+    x: 0.648, y: 0.667, w: 4.514, h: 1.681, fontSize: 44, color: C.dark,
+    align: 'center', valign: 'bottom', lineSpacingMultiple: 1.0,
+  });
+  kickerAndBody(s, { x: 0.7, ky: 2.347, by: 2.958, bh: 1.273, w: 4.514, align: 'center', body: L_SHORT, bodyColor: C.ink });
+  [[4.625, C.maroon, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.', 4.815, 5.142],
+   [5.720, C.red,    'Lorem ipsum dolor sit amet, consectetur adipiscing',      5.898, 6.243]].forEach(function (a) {
+    s.addShape('rightArrow', { x: 0, y: a[0], w: 5.917, h: 0.87, fill: { color: a[1] } });
+    text(s, 'Subtitle in this area', { x: 0.667, y: a[3], w: 4.289, h: 0.269, fontSize: 18, bold: true, fontFace: HEAD, color: 'FFFEFE' });
+    text(s, a[2], { x: 0.667, y: a[4], w: 4.742, h: 0.26, fontSize: 12, color: 'FFFEFE', lineSpacingMultiple: 1.2 });
+  });
+};
+
+/* 21 - five-step arrow process */
+build[21] = function (s) {
+  darkBg(s); chrome(s, true);
+  headline(s, 'TITLE SAMPLE SLIDE', {
+    x: 2.167, y: 0.78, w: 8.23, h: 0.605, fontSize: 24, color: C.white,
+    align: 'center', lineSpacingMultiple: 1.5, paraSpaceBefore: 10,
+  });
+  text(s, L_SHORT, {
+    x: 2.167, y: 1.408, w: 8.23, h: 0.399, fontSize: 12, color: C.white,
+    align: 'center', lineSpacingMultiple: 1.5, paraSpaceBefore: 10,
+  });
+  const steps = [
+    { x: 1.418, fill: C.deep,   label: 'First Process',  lx: 1.714, lw: 1.645, above: true },
+    { x: 3.253, fill: C.maroon, label: 'Second Process', lx: 3.876, lw: 1.363, above: false },
+    { x: 5.195, fill: C.brick,  label: 'Third Process',  lx: 5.756, lw: 1.363, above: true },
+    { x: 7.119, fill: C.red,    label: 'Fourt Process',  lx: 7.653, lw: 1.363, above: false },
+    { x: 9.061, fill: C.salmon, label: 'Final Process',  lx: 9.622, lw: 1.363, above: true },
+  ];
+  steps.slice().reverse().forEach(function (st) {
+    s.addShape('rightArrow', { x: st.x, y: 4.012, w: 2.366, h: 0.586, fill: { color: st.fill } });
+  });
+  steps.forEach(function (st) {
+    text(s, st.label, {
+      x: st.lx, y: 4.144, w: st.lw, h: 0.324, fontSize: 14, bold: true,
+      color: C.white, fontFace: 'Lato', valign: 'middle',
+    });
+  });
+  s.addShape('ellipse', { x: 0.667, y: 3.803, w: 0.966, h: 0.989, fill: { color: C.deeper } });
+  s.addShape('ellipse', { x: 11.678, y: 3.803, w: 0.989, h: 0.989, fill: { color: C.salmon } });
+  s.addShape('roundRect', { x: 0.931, y: 4.105, w: 0.425, h: 0.348, rectRadius: 0.05, fill: { color: C.white } });
+  s.addShape('roundRect', { x: 11.964, y: 4.084, w: 0.425, h: 0.448, rectRadius: 0.05, fill: { color: C.white } });
+  [[1.515, 2.778], [3.537, 4.871], [5.275, 2.778], [7.453, 4.871], [9.342, 2.778]].forEach(function (p) {
+    text(s, 'Your title', {
+      x: p[0], y: p[1], w: 2.058, h: 0.404, fontSize: 18, bold: true, color: C.white, align: 'center',
+    });
+    text(s, 'Donec nisi nibh, dig nissim mollis egestas.', {
+      x: p[0], y: p[1] + 0.315, w: 2.058, h: 0.657, fontSize: 12, color: C.white,
+      align: 'center', lineSpacingMultiple: 1.5,
+    });
+  });
+};
+
+/* 22 - North America map (light) */
+build[22] = function (s) {
+  rect(s, 0, 0, 13.333, 7.5, C.white);
+  bottomBar(s, C.maroon);
+  mapArt(s, 5.652, 0.587, 5.966, 6.019, MAPS.northAmerica.land, MAPS.northAmerica.hi, C.grey);
+  headline(s, L_TITLE3, {
+    x: 0.653, y: 1.111, w: 4.514, h: 3.069, fontSize: 60, color: C.dark,
+    lineSpacingMultiple: 1.0, valign: 'bottom', paraSpaceBefore: 10,
+  });
+  kickerAndBody(s, { x: 0.706, ky: 4.181, by: 4.792, bh: 1.833, w: 4.514, body: L_SHORT, bodyColor: C.ink });
+};
+
+/* 23 - break */
+build[23] = function (s) {
+  darkBg(s); chrome(s, true);
+  ghost(s, 'BREAK', { x: 0.496, y: 2.28, w: 16.535, h: 3.2, fontSize: 287, wrap: false, valign: 'bottom' });
+  rect(s, -0.033, 3.531, 13.333, 0.317, C.maroon);
+  headline(s, 'DRAG A COFFEE', {
+    x: 1.083, y: 2.554, w: 8.5, h: 2.126, fontSize: 88, color: C.white,
+    lineSpacingMultiple: 1.5, paraSpaceBefore: 10,
+  });
+};
+
+/* 24 - waterfall (emulated with a stacked column chart) */
+build[24] = function (s) {
+  darkBg(s); chrome(s, true);
+  rect(s, 0, 0, 7.417, 7.5, C.white);
+  const cats = ['Category 1', 'Category 2', 'Category 3', 'Category 4',
+                'Category 5', 'Category 6', 'Category 7', 'Category 8'];
+  const waterfall = [
+    { name: 'base',     labels: cats, values: [0, 100, 120, 130, 0, 70, 70, 0] },
+    { name: 'Increase', labels: cats, values: [0, 20, 50, 0, 0, 0, 70, 0] },
+    { name: 'Decrease', labels: cats, values: [0, 0, 0, 40, 0, 60, 0, 0] },
+    { name: 'Total',    labels: cats, values: [100, 0, 0, 0, 130, 0, 0, 140] },
+  ];
+  s.addChart('bar', waterfall, {
+    x: 0.25, y: 0.95, w: 6.417, h: 5.75,
+    barDir: 'col', barGrouping: 'stacked', barGapWidthPct: 60,
+    chartColors: ['transparent', C.maroon, C.red, C.salmon],
+    showLegend: false, showValue: false,
+    valAxisMaxVal: 180, valAxisMinVal: 0, valAxisMajorUnit: 20,
+    catAxisLabelColor: '7A7A7A', catAxisLabelFontFace: BODY, catAxisLabelFontSize: 12,
+    valAxisLabelColor: '7A7A7A', valAxisLabelFontFace: BODY, valAxisLabelFontSize: 12,
+    catAxisLineShow: false, valAxisLineShow: false,
+    valGridLine: { style: 'solid', size: 0.75, color: 'D9D9D9' },
+    catGridLine: { style: 'none' },
+  });
+  // hand-built legend + value labels (chartEx waterfall has no pptxgenjs equivalent)
+  [['Increase', C.maroon, 1.55], ['Decrease', C.red, 2.66], ['Total', C.salmon, 3.79]].forEach(function (lg) {
+    rect(s, lg[2], 0.72, 0.11, 0.11, lg[1]);
+    text(s, lg[0], { x: lg[2] + 0.17, y: 0.62, w: 1.1, h: 0.3, fontSize: 12, color: '7A7A7A' });
+  });
+  const marks = [[0.42, 2.68, '100'], [1.19, 2.42, '20'], [1.97, 1.95, '50'],
+                 [2.74, 3.05, '-40'], [3.51, 2.28, '130'], [4.29, 3.75, '-60'],
+                 [5.06, 2.13, '70'], [5.84, 1.98, '140']];
+  marks.forEach(function (m) {
+    text(s, m[2], { x: m[0], y: m[1], w: 0.7, h: 0.25, fontSize: 11, color: '7A7A7A', align: 'center' });
+  });
+};
+
+/* 25 - vertical photo + description */
+build[25] = function (s) {
+  darkBg(s); chrome(s, true);
+  rect(s, 3.475, 2.417, 0.417, 2.25, C.maroon);
+  photo(s, 3.667, 0, 4.5, 7.5, 0.2127, 0);
+  headline(s, 'TITLE SAMPLE HERE', {
+    x: 8.917, y: 2.25, w: 3.717, h: 0.444, fontSize: 24, color: C.white,
+    lineSpacingMultiple: 1.5, paraSpaceBefore: 10,
+  });
+  text(s, L_LONG, {
+    x: 8.917, y: 2.869, w: 3.717, h: 2.381, fontSize: 12, color: C.white,
+    lineSpacingMultiple: 1.5, paraSpaceBefore: 10,
+  });
+  ghostV(s, 'DESCRIPTION', 2.110, 3.355, 6.0, 0.791, 60, C.white, 'middle');
+  ghostV(s, 'DESCRIPTION', 1.209, 3.444, 6.0, 0.611, 44, C.maroon, 'middle');
+  ghostV(s, 'VERTICAL PHOTO', 2.913, 3.366, 6.0, 0.791, 60, C.maroon, 'middle');
+};
+
+/* 26 - pie chart */
+build[26] = function (s) {
+  rect(s, 0, 0, 13.333, 7.5, C.white);
+  bottomBar(s, C.maroon);
+  s.addChart('pie', [{
+    name: 'Sales',
+    labels: ['Refering Sites', 'Search Engines', 'Direct Traffic', 'Other'],
+    values: [70, 25, 18, 3],
+  }], {
+    x: 1.273, y: 0.958, w: 5.892, h: 5.583,
+    chartColors: [C.maroon, C.salmon, C.lime, C.maroon],
+    showLegend: true, legendPos: 'b', legendColor: C.axis,
+    legendFontFace: BODY, legendFontSize: 12, showValue: false,
+  });
+  headline(s, L_TITLE2, {
+    x: 8.161, y: 1.458, w: 4.514, h: 1.681, fontSize: 44, color: C.dark,
+    lineSpacingMultiple: 1.0, valign: 'bottom', paraSpaceBefore: 10,
+  });
+  kickerAndBody(s, { x: 8.214, ky: 3.139, by: 3.75, bh: 1.833, w: 4.514, body: L_SHORT, bodyColor: C.ink });
+};
+
+/* 27 - four-step timeline */
+build[27] = function (s) {
+  darkBg(s); chrome(s, true);
+  const items = [
+    { x: 1.472, barY: 2.477, dotY: 1.460, fill: C.deep,   year: '201X', name: 'One',   title: 'Winner Plan',
+      titleY: 3.568, bodyY: 3.902, body: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer mollis vehicula ligula ut faucibus.' },
+    { x: 4.120, barY: 2.679, dotY: 3.729, fill: C.maroon, year: '202X', name: 'Two',   title: 'Photo Edition',
+      titleY: 4.912, bodyY: 5.209, body: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer mollis vehicula ligula.' },
+    { x: 6.740, barY: 2.477, dotY: 1.460, fill: C.brick,  year: '202X', name: 'Three', title: 'Mail Senders',
+      titleY: 3.618, bodyY: 3.945, body: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer mollis vehicula ligula ut faucibus.' },
+    { x: 9.388, barY: 2.679, dotY: 3.729, fill: C.red,    year: '202X', name: 'Four',  title: 'Social Solutions',
+      titleY: 4.912, bodyY: 5.241, body: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer mollis vehicula ligula.' },
+  ];
+  items.forEach(function (it) {
+    const pointUp = it.dotY < it.barY;
+    rect(s, it.x, it.barY, 2.473, 0.91, it.fill);
+    s.addShape('triangle', {
+      x: it.x + 0.28, y: pointUp ? it.barY - 0.18 : it.barY + 0.91, w: 0.34, h: 0.19,
+      rotate: pointUp ? 0 : 180, fill: { color: it.fill },
+    });
+    s.addShape('ellipse', { x: it.x, y: it.dotY, w: 0.877, h: 0.877, fill: { color: it.fill } });
+    text(s, it.year, { x: it.x, y: it.dotY + 0.3, w: 0.877, h: 0.27, fontSize: 14, color: C.white, align: 'center' });
+    text(s, [{ text: it.name }, { text: ' | Ocean Blue' }], {
+      x: it.x + 0.1, y: it.barY + 0.33, w: 2.27, h: 0.36, fontSize: 12, color: C.white, align: 'center',
+    });
+    text(s, it.title, { x: it.x + 0.09, y: it.titleY, w: 2.35, h: 0.273, fontSize: 12, bold: true, color: C.white });
+    text(s, it.body, {
+      x: it.x + 0.1, y: it.bodyY, w: 2.35, h: 1.598, fontSize: 12, color: C.white, lineSpacingMultiple: 1.5,
+    });
+  });
+};
+
+/* 28 - four step cards + vertical photo */
+build[28] = function (s) {
+  darkBg(s); chrome(s, true);
+  photo(s, 6.667, 0, 6.667, 7.5, 0.0743, 0);
+  bottomBar(s, C.maroon);
+  const steps = [
+    { y: 1.105, icon: C.deep,   label: 'Step 1' },
+    { y: 2.498, icon: C.maroon, label: 'Step 2' },
+    { y: 3.926, icon: C.brick,  label: 'Step 3' },
+    { y: 5.232, icon: C.red,    label: 'Step 4' },
+  ];
+  steps.forEach(function (st) {
+    rect(s, 0, st.y, 5.02, 1.036, C.panel);
+    rect(s, 5.0, st.y, 0.9, 1.036, st.icon);
+    s.addShape('roundRect', { x: 5.245, y: st.y + 0.29, w: 0.41, h: 0.41, rectRadius: 0.07, fill: { color: C.white } });
+    text(s, st.label, { x: 0.85, y: st.y + 0.11, w: 2.6, h: 0.279, fontSize: 16, bold: true, color: C.red });
+    text(s, 'Lorem ipsum dolor sit amet, consec tetur text editable here design  adipiscing elit.', {
+      x: 0.85, y: st.y + 0.385, w: 3.95, h: 0.553, fontSize: 12, color: C.white, lineSpacingMultiple: 1.2,
+    });
+  });
+  ghostV(s, 'VERTICAL PHOTO', 9.247, 3.366, 6.0, 0.791, 60, C.maroon, 'middle');
+  ghostV(s, 'DESCRIPTION', 8.443, 3.355, 6.0, 0.791, 60, C.white, 'middle');
+  ghostV(s, 'DESCRIPTION', 7.543, 3.444, 6.0, 0.611, 44, C.maroon, 'middle');
+};
+
+/* 29 - US map + numbered notes */
+build[29] = function (s) {
+  rect(s, 0, 0, 13.333, 7.5, C.white);
+  bottomBar(s, C.maroon);
+  mapArt(s, 0.703, 1.236, 7.233, 4.403, MAPS.usa.land, MAPS.usa.hi);
+  headline(s, L_TITLE2, {
+    x: 8.161, y: 0.583, w: 4.514, h: 1.681, fontSize: 44, color: C.dark,
+    lineSpacingMultiple: 1.0, valign: 'bottom', paraSpaceBefore: 10,
+  });
+  kickerAndBody(s, { x: 8.214, ky: 2.264, by: 2.875, bh: 1.258, w: 4.514, body: L_SHORT, bodyColor: C.ink });
+  [[4.542, '1', C.red], [5.703, '2', C.salmon]].forEach(function (n, i) {
+    s.addShape('ellipse', { x: 8.175, y: n[0], w: 0.586, h: 0.586, fill: { color: n[2] } });
+    text(s, n[1], { x: 8.175, y: n[0], w: 0.586, h: 0.586, fontSize: 12, bold: true, color: C.white, align: 'center', valign: 'middle' });
+    text(s, L_ONE, {
+      x: 9.069, y: n[0] - 0.042, w: 3.429, h: 0.67, fontSize: 12, color: C.ink,
+      lineSpacingMultiple: 1.5, paraSpaceBefore: 10,
+    });
+  });
+};
+
+/* 30 - circular three-step diagram */
+build[30] = function (s) {
+  darkBg(s); chrome(s, true);
+  bottomBar(s, C.maroon);
+  tricolorTitle(s, 'TWO IMAGES ', 'DESRIPTION ', 'SLIDE',
+    { x: 0.653, y: 0.774, w: 6.014, h: 3.919, color: C.white });
+  kickerAndBody(s, { x: 0.706, ky: 4.869, by: 5.419, bh: 1.296, w: 5.991, body: L_SHORT, bodyColor: C.white });
+  const ring = { x: 7.26, y: 1.07, w: 5.33, h: 4.5 };
+  [[150, 262, C.maroon], [272, 22, C.red], [32, 140, C.salmon]].forEach(function (a) {
+    s.addShape('blockArc', {
+      x: ring.x, y: ring.y, w: ring.w, h: ring.h,
+      angleRange: [a[0], a[1]], arcThicknessRatio: 0.42, fill: { color: a[2] },
+    });
+  });
+  s.addShape('triangle', { x: 10.023, y: 4.879, w: 1.708, h: 1.472, rotate: 225, fill: { color: C.salmon } });
+  const steps = [
+    { sx: 7.512, sy: 3.177, nx: 7.631, nw: 0.473, n: '01' },
+    { sx: 9.567, sy: 1.176, nx: 9.665, nw: 0.536, n: '02' },
+    { sx: 11.593, sy: 3.177, nx: 11.691, nw: 0.536, n: '03' },
+  ];
+  steps.forEach(function (st) {
+    text(s, 'STEP', { x: st.sx, y: st.sy, w: 0.759, h: 0.359, fontSize: 12, bold: true, color: C.white, align: 'center', valign: 'middle' });
+    text(s, st.n, { x: st.nx, y: st.sy + 0.304, w: st.nw, h: 0.606, fontSize: 36, bold: true, fontFace: HEAD, color: C.white, align: 'center', valign: 'middle' });
+  });
+  text(s, '2023', { x: 9.295, y: 3.087, w: 1.208, h: 0.497, fontSize: 24, bold: true, color: C.white, align: 'center' });
+  text(s, 'Your title here', { x: 8.886, y: 3.51, w: 2.026, h: 0.404, fontSize: 18, bold: true, color: C.white, align: 'center' });
+  text(s, 'Donec nisi nibh, dignissim.', {
+    x: 8.886, y: 3.927, w: 2.026, h: 0.661, fontSize: 12, color: C.white,
+    align: 'center', lineSpacingMultiple: 1.5,
+  });
+};
+
+/* 31 - doughnut chart */
+build[31] = function (s) {
+  darkBg(s); chrome(s, true);
+  bottomBar(s, C.maroon);
+  s.addChart('doughnut', [{
+    name: 'Sales',
+    labels: ['1st Qtr', '2nd Qtr', '3rd Qtr', '4th Qtr'],
+    values: [8.2, 3.2, 1.4, 1.2],
+  }], {
+    x: 0.387, y: 0.787, w: 6.221, h: 5.926, holeSize: 75,
+    chartColors: [C.maroon, C.salmon, C.lime, C.maroon],
+    showLegend: true, legendPos: 'b', legendColor: C.white,
+    legendFontFace: BODY, legendFontSize: 14, showValue: false,
+  });
+  tricolorTitle(s, 'TWO IMAGES ', 'DESRIPTION ', 'SLIDE',
+    { x: 6.647, y: 0.774, w: 6.014, h: 3.919, color: C.white });
+  kickerAndBody(s, { x: 6.7, ky: 4.869, by: 5.419, bh: 1.296, w: 5.991, body: L_SHORT, bodyColor: C.white });
+};
+
+/* 32 - numbered steps + vertical photo (photo right) */
+build[32] = function (s) {
+  darkBg(s); chrome(s, true);
+  photo(s, 6.667, 0, 6.667, 7.5, 0.0743, 0);
+  bottomBar(s, C.maroon);
+  headline(s, 'TITLE SAMPLE HERE', {
+    x: 0.7, y: 0.75, w: 5.217, h: 0.444, fontSize: 24, color: C.white,
+    lineSpacingMultiple: 1.5, paraSpaceBefore: 10,
+  });
+  text(s, L_LONG, {
+    x: 0.7, y: 1.369, w: 5.217, h: 1.461, fontSize: 12, color: C.white,
+    lineSpacingMultiple: 1.5, paraSpaceBefore: 10,
+  });
+  [['01', 3.164], ['02', 4.170], ['03', 5.199], ['04', 6.158]].forEach(function (st) {
+    text(s, 'STEP', { x: 0.187, y: 3.28 + (st[1] - 3.164), w: 0.759, h: 0.359, fontSize: 12, bold: true, color: C.greyF2, rotate: 270, align: 'center', valign: 'middle' });
+    text(s, st[0], { x: 0.88, y: st[1], w: 0.69, h: 0.606, fontSize: 36, bold: true, color: C.greyF2, align: 'center', valign: 'middle' });
+    text(s, 'Donec nisi nibh, dignissim mollis egestas non, egestas ac orci. Suspendisse condimentum', {
+      x: 1.748, y: st[1] + 0.012, w: 4.277, h: 0.663, fontSize: 12, color: C.greyF2, lineSpacingMultiple: 1.5,
+    });
+  });
+  ghostV(s, 'VERTICAL PHOTO', 9.247, 3.366, 6.0, 0.791, 60, C.maroon, 'middle');
+  ghostV(s, 'DESCRIPTION', 8.443, 3.355, 6.0, 0.791, 60, C.white, 'middle');
+  ghostV(s, 'DESCRIPTION', 7.543, 3.444, 6.0, 0.611, 44, C.maroon, 'middle');
+};
+
+/* 33 - vertical photo left + column chart right */
+build[33] = function (s) {
+  darkBg(s); chrome(s, true);
+  photo(s, 0, 0, 6.667, 7.5, 0.0743, 0);
+  rect(s, 6.667, 7.25, 6.666, 0.25, C.maroon);
+  headline(s, 'TITLE SAMPLE HERE', {
+    x: 7.417, y: 0.75, w: 5.217, h: 0.444, fontSize: 24, color: C.white,
+    lineSpacingMultiple: 1.5, paraSpaceBefore: 10,
+  });
+  text(s, L_LONG, {
+    x: 7.417, y: 1.369, w: 5.217, h: 1.461, fontSize: 12, color: C.white,
+    lineSpacingMultiple: 1.5, paraSpaceBefore: 10,
+  });
+  s.addChart('bar', BAR_SERIES, Object.assign(
+    { x: 7.417, y: 3.25, w: 5.264, h: 3.5 }, barChartOpts(12, C.axis)));
+  ghostV(s, 'DESCRIPTION', -1.557, 3.355, 6.0, 0.791, 60, C.white, 'middle');
+  ghostV(s, 'DESCRIPTION', -2.458, 3.444, 6.0, 0.611, 44, C.maroon, 'middle');
+  ghostV(s, 'VERTICAL PHOTO', -0.753, 3.366, 6.0, 0.791, 60, C.maroon, 'middle');
+};
+
+/* 34 - vertical photo left + five numbered notes */
+build[34] = function (s) {
+  darkBg(s); chrome(s, true);
+  photo(s, 0, 0, 6.667, 7.5, 0.0743, 0);
+  rect(s, 6.667, 7.25, 6.666, 0.25, C.maroon);
+  [[1.495, '1', C.deeper], [2.497, '2', C.wine], [3.527, '3', C.brick],
+   [4.503, '4', C.brick], [5.478, '5', C.red]].forEach(function (n) {
+    s.addShape('ellipse', { x: 7.379, y: n[0], w: 0.586, h: 0.586, fill: { color: n[2] } });
+    text(s, n[1], { x: 7.379, y: n[0], w: 0.586, h: 0.586, fontSize: 18, bold: true, color: C.white, align: 'center', valign: 'middle' });
+    text(s, L_ONE, {
+      x: 8.249, y: n[0] + 0.02, w: 4.018, h: 0.586, fontSize: 12, color: C.greyF2,
+      lineSpacingMultiple: 1.5, paraSpaceBefore: 10,
+    });
+  });
+  ghostV(s, 'DESCRIPTION', -1.557, 3.355, 6.0, 0.791, 60, C.white, 'middle');
+  ghostV(s, 'VERTICAL PHOTO', -2.458, 3.444, 6.0, 0.611, 44, C.maroon, 'middle');
+  ghostV(s, 'DESCRIPTION', -0.753, 3.366, 6.0, 0.791, 60, C.maroon, 'middle');
+};
+
+/* 35 - mind map */
+build[35] = function (s) {
+  rect(s, 0, 0, 13.333, 7.5, C.white);
+  bottomBar(s, C.maroon);
+  rect(s, 5.795, 0, 1.723, 0.181, C.red);
+  headline(s, L_TITLE2, {
+    x: 0.647, y: 0.321, w: 4.514, h: 1.681, fontSize: 44, color: C.dark,
+    align: 'center', valign: 'bottom', lineSpacingMultiple: 1.0,
+  });
+  kickerAndBody(s, { x: 0.7, ky: 2.001, by: 2.613, bh: 1.263, w: 4.514, align: 'center', body: L_SHORT, bodyColor: C.ink });
+
+  const hub = { x: 8.874, y: 2.912, d: 1.652 };
+  const cx = hub.x + hub.d / 2, cy = hub.y + hub.d / 2;
+  const spokes = [
+    { x: 8.977,  y: 1.060, color: C.maroon },
+    { x: 10.663, y: 2.034, color: C.amber },
+    { x: 10.638, y: 3.968, color: C.lime },
+    { x: 9.026,  y: 4.869, color: C.blush },
+    { x: 7.340,  y: 3.896, color: C.salmon },
+    { x: 7.371,  y: 2.082, color: C.red },
+  ];
+  spokes.forEach(function (sp) {
+    s.addShape('line', {
+      x: cx, y: cy, w: sp.x + 0.723 - cx, h: sp.y + 0.723 - cy,
+      line: { color: 'ADADAD', width: 1.75 },
+      flipH: sp.x + 0.723 < cx, flipV: sp.y + 0.723 < cy,
+    });
+  });
+  spokes.forEach(function (sp) {
+    s.addShape('ellipse', { x: sp.x, y: sp.y, w: 1.446, h: 1.446, fill: { color: sp.color } });
+    s.addShape('roundRect', {
+      x: sp.x + 0.53, y: sp.y + 0.55, w: 0.39, h: 0.35, rectRadius: 0.06, fill: { color: C.offWhite },
+    });
+  });
+  s.addShape('ellipse', { x: hub.x, y: hub.y, w: hub.d, h: hub.d, fill: { color: '7A7A7A' } });
+  text(s, 'Main Idea', {
+    x: hub.x, y: hub.y, w: hub.d, h: hub.d, align: 'center', valign: 'middle',
+    fontSize: 18, color: C.white,
+  });
+
+  const legend = [
+    ['First Item',  C.maroon, 0.760, 1.254, 4.333],
+    ['Second Item', C.red,    0.760, 1.254, 5.035],
+    ['Third Item',  C.salmon, 0.760, 1.254, 5.741],
+    ['Fourth Item', C.amber,  3.912, 4.389, 4.333],
+    ['Fifth Item',  C.lime,   3.912, 4.389, 5.035],
+    ['Sixth Item',  C.blush,  3.912, 4.389, 5.741],
+  ];
+  legend.forEach(function (lg) {
+    rect(s, lg[2], lg[4], 0.35, 0.352, lg[1]);
+    text(s, lg[0], { x: lg[3], y: lg[4] + 0.034, w: 2.3, h: 0.269, fontSize: 16, color: C.grey99, valign: 'middle' });
+  });
+};
+
+/* 36 - thank you */
+build[36] = function (s) {
+  photo(s, 0, 0, 13.333, 7.5, 0, 0.2063);
+  s.addShape('rect', { x: 0, y: 0, w: 13.333, h: 7.5, fill: { color: C.dark, transparency: 29 } });
+  headline(s, 'THANK YOU', {
+    x: 2.905, y: 1.835, w: 6.011, h: 1.38, fontSize: 80, color: C.white,
+    lineSpacing: 80, valign: 'bottom',
+  });
+  headline(s, 'PRESENTATION TEMPLATE', {
+    x: 2.996, y: 3.25, w: 5.989, h: 0.375, fontSize: 18, color: C.red,
+    lineSpacingMultiple: 1.5, paraSpaceBefore: 10,
+  });
+  text(s, [{ text: L_TWICE }, { text: L_TAIL, options: { breakLine: true } }], {
+    x: 2.996, y: 3.774, w: 5.989, h: 1.726, fontSize: 12, color: C.white,
+    lineSpacingMultiple: 1.5, paraSpaceBefore: 10,
+  });
+  [[7.535, 'LAST SLIDE / 90', C.white], [8.259, 'THANK YOU / 23', C.red],
+   [8.983, 'LAST SLIDE / 90', C.white], [9.707, 'THANK YOU / 23', C.red],
+   [10.447, 'LAST SLIDE / 90', C.white], [11.171, 'THANK YOU / 23', C.red]].forEach(function (g) {
+    ghostV(s, g[1], g[0], 3.334, 3.995, 0.724, 40, g[2]);
+  });
+  rect(s, 0, 2.624, 0.261, 2.25, C.maroon);
+};
+
+/* ================================================================= main == */
+
+function main() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'DECK', width: 13.333, height: 7.5 });
+  pptx.layout = 'DECK';
+  pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
+
+  for (let n = 1; n <= 36; n++) build[n](pptx.addSlide());
+
+  const out = path.join(__dirname, '00ff856f-7799-410c-95f7-7dfefd172236_grok_final.pptx');
+  return pptx.writeFile({ fileName: out }).then(function () { console.log('wrote', out); });
+}
+
+main().catch(function (e) { console.error(e); process.exit(1); });
