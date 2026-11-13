@@ -1,0 +1,101 @@
+--- 2026-11-13_15-49:/opt/sand/sand-host/box-launchers/box-chrome
++++ 2026-11-13_16-49:/opt/sand/sand-host/box-launchers/box-chrome
+@@ -234,8 +234,8 @@
+ 		printf chrome
+ 	fi
+ }
++UNGOOGLED_ONLY_FEATURE_FLAGS=("--enable-features=ReducedSystemInfo,SpoofWebGLInfo,SetIpv6ProbeFalse")
+ UNGOOGLED_CHROMIUM_FLAGS=(
+-	"--enable-features=ReducedSystemInfo,SpoofWebGLInfo,SetIpv6ProbeFalse"
+ 	"--disable-features=OptimizationGuideModelDownloading,OptimizationHintsFetching,OptimizationTargetPrediction,OptimizationHints,EnforcePrivacySandboxAttestations,Translate,MediaRouter,DialMediaRouteProvider,CalculateNativeWinOcclusion,InterestFeedContentSuggestions,CertificateTransparencyComponentUpdater,AutofillServerCommunication,PrivacySandboxSettings4,AutomationControlled,HttpsUpgrades"
+ 	--webrtc-ip-handling-policy=disable_non_proxied_udp
+ )
+@@ -386,6 +386,10 @@
+ BOX_WALL_EVIDENCE_WRITER_VERSION=2
+ CHROME_FLAGS+=(--sand-box-chrome-launcher="${BOX_CHROME_LAUNCHER_VERSION}")
+ CHROME_LAUNCH_WAIT_S=20
++BOX_BROWSER_FIREWALL_LIB=/usr/local/bin/box-browser-firewall.sh
++BOX_BROWSER_FIREWALL_STATE=/tmp/sand-browser-firewall
++BOX_BROWSER_FIREWALL_READ_S=2
++BOX_PROC_ROOT=/proc
+ CHROME_RELEASE_GRACE_S=10
+ CHROME_PORT_WAIT_S=10
+ CHROME_COOKIE_RESTORE_WAIT_S=5
+@@ -630,7 +634,9 @@
+ BOX_BROWSER_CGROUP_ENTER=/usr/local/bin/box-browser-cgroup-enter.sh
+ launch_chrome() {
+ 	local flags=("${CHROME_FLAGS[@]}") env=("${CHROME_ENV[@]}") leaf=()
+-	if [ "${CHROME_BIN}" = "${UNGOOGLED_CHROMIUM}" ] || [ "${SAND_UNGOOGLED_FLAGS_ON}" = 1 ]; then
++	if [ "${CHROME_BIN}" = "${UNGOOGLED_CHROMIUM}" ]; then
++		flags+=("${UNGOOGLED_ONLY_FEATURE_FLAGS[@]}" "${UNGOOGLED_CHROMIUM_FLAGS[@]}")
++	elif [ "${SAND_UNGOOGLED_FLAGS_ON}" = 1 ]; then
+ 		flags+=("${UNGOOGLED_CHROMIUM_FLAGS[@]}")
+ 	fi
+ 	merge_disable_features flags
+@@ -859,6 +865,36 @@
+ 	fi
+ }
+ 
++# Reads the leaf the firewall armed with the firewall's own reader, in a child
++# shell so sourcing it changes nothing here, and the browser's cgroup as the
++# kernel lists it (https://docs.kernel.org/admin-guide/cgroup-v2.html#processes).
++# The child is handed the state path, so a path the launcher's environment
++# names is not read. Each read is capped, so a state file that never answers
++# reads unknown. Prints nothing on an image that has no browser firewall.
++browser_firewall_state() {
++	local leaf pid membership status=0
++	[ -r "${BOX_BROWSER_FIREWALL_LIB:-}" ] || return 0
++	# shellcheck disable=SC2016
++	leaf="$(SAND_BROWSER_FIREWALL_STATE="${BOX_BROWSER_FIREWALL_STATE}" \
++		timeout "${BOX_BROWSER_FIREWALL_READ_S}" bash -c \
++		'. "$1" >/dev/null 2>&1 && sand_browser_firewall_armed_leaf 2>/dev/null' \
++		_ "${BOX_BROWSER_FIREWALL_LIB}")" || status=$?
++	if [ "${status}" -ge 124 ]; then
++		printf unknown
++	elif [ -z "${leaf}" ]; then
++		printf not_armed
++	elif pid="$(profile_browser_pid)" &&
++		membership="$(timeout "${BOX_BROWSER_FIREWALL_READ_S}" cat "${BOX_PROC_ROOT}/${pid}/cgroup" 2>/dev/null)"; then
++		if printf '%s\n' "${membership}" | grep -Eq "^0::/${leaf}(/|$)"; then
++			printf armed
++		else
++			printf not_joined
++		fi
++	else
++		printf unknown
++	fi
++}
++
+ next_launch_attempt() {
+ 	local counter="${CHROME_PROFILE}/.sand-launch-count" boot="$1"
+ 	local recorded_boot="" count=0
+@@ -933,7 +969,7 @@
+ 
+ start_chrome() {
+ 	local mode="$1" visible=1 started_ms attempt outcome duration_ms cdp_ready_ms launcher_fields shown boot
+-	local cdp_state=""
++	local cdp_state="" firewall=""
+ 	shift
+ 	[ "${mode}" = window ] || visible=0
+ 	boot="$(box_boot_id)"
+@@ -945,6 +981,9 @@
+ 			echo "box-chrome: sand_box_browser_webrtc_proxy_only is on but its managed policy could not be written; not launching" >&2
+ 			exit 1
+ 		fi
++		if [ "${SAND_UNGOOGLED_FLAGS_ON}" = 1 ] && [ "${CHROME_BIN}" != "${UNGOOGLED_CHROMIUM}" ]; then
++			echo "box-chrome: sand_box_browser_ungoogled_flags is on but ${CHROME_BIN} has no ReducedSystemInfo, SpoofWebGLInfo or SetIpv6ProbeFalse; launching without them" >&2
++		fi
+ 		apply_exit_locale
+ 		record_box_browser
+ 		drop_sync_store_for_ungoogled
+@@ -996,6 +1035,10 @@
+ 	swiftshader | legacy | stock | llvmpipe) launcher_fields+=",\"gpuMode\":\"${BOX_CHROME_GPU_MODE}\"" ;;
+ 	esac
+ 	launcher_fields+="$(exit_locale_row_fields)"
++	firewall="$(browser_firewall_state)"
++	case "${firewall}" in
++	armed | not_joined | not_armed | unknown) launcher_fields+=",\"browserFirewall\":\"${firewall}\"" ;;
++	esac
+ 	[ "${outcome:-}" != cdp_timeout ] || cdp_state="$(cdp_timeout_state)"
+ 	case "${cdp_state:-}" in
+ 	held | no_display | exited | ipv6_only | silent | proxied | listening)

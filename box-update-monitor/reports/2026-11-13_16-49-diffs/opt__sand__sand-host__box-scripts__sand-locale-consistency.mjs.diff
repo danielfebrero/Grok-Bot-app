@@ -1,0 +1,34 @@
+--- 2026-11-13_15-49:/opt/sand/sand-host/box-scripts/sand-locale-consistency.mjs
++++ 2026-11-13_16-49:/opt/sand/sand-host/box-scripts/sand-locale-consistency.mjs
+@@ -1,4 +1,4 @@
+-import { existsSync, renameSync, rmSync, writeFileSync } from "node:fs";
++import { existsSync, rmSync } from "node:fs";
+ 
+ import {
+   BOX_WALL_EVIDENCE_RECORDERS_MARKER_PATH,
+@@ -16,6 +16,7 @@
+   readZoneLinks,
+   readZonesByCountry,
+   requestText,
++  writeAtomically,
+ } from "./sand-egress-timezone.mjs";
+ import { isKnownTimeZone, likelyLanguage } from "./sand-locale-match.mjs";
+ 
+@@ -182,17 +183,6 @@
+     .join(" ")}\n`;
+ }
+ 
+-function writeAtomically(path, text) {
+-  const tmp = `${path}.${process.pid}.tmp`;
+-  try {
+-    writeFileSync(tmp, text, { encoding: "utf8", mode: 0o644 });
+-    renameSync(tmp, path);
+-  } catch (error) {
+-    rmSync(tmp, { force: true });
+-    throw error;
+-  }
+-}
+-
+ export function removeLocaleConsistency(port, remove = rmSync) {
+   try {
+     remove(browserLocaleConsistencyPath(port), { force: true });

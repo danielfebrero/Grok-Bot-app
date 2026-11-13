@@ -1,0 +1,20 @@
+--- 2026-11-13_15-49:/opt/sand/sand-host/box-runtime/manifest.json
++++ 2026-11-13_16-49:/opt/sand/sand-host/box-runtime/manifest.json
+@@ -18,7 +18,7 @@
+     },
+     {
+       "name": "sand-egress-timezone.mjs",
+-      "sha256": "71296d88739b4e38d149c5f204b10c4f845fbac4f2414d1939b321fdfdcc7b79"
++      "sha256": "dfa389d5090bf8e3721db43ea8c9fbed7467325e5c3dcac32f158fbdf39adb43"
+     },
+     {
+       "name": "sand-egress-tunnel",
+@@ -30,7 +30,7 @@
+     },
+     {
+       "name": "sand-locale-consistency.mjs",
+-      "sha256": "f3e7c9703afc99a1184f68d107deab373b73739168f7f5be22d4b683eb7b5f4f"
++      "sha256": "5034f566c579a901d8c488b9503a40ce971beb39611fbd9470877f3bf9d3dd89"
+     },
+     {
+       "name": "sand-locale-match.mjs",

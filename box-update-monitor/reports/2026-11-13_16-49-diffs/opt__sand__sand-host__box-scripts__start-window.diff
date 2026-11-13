@@ -1,0 +1,29 @@
+--- 2026-11-13_15-49:/opt/sand/sand-host/box-scripts/start-window
++++ 2026-11-13_16-49:/opt/sand/sand-host/box-scripts/start-window
+@@ -116,8 +116,15 @@
+ 			DBUS_SESSION_BUS_ADDRESS="unix:path=/tmp/xdg-runtime-box-${DISPLAY_NUM}/bus"
+ 		)
+ 	fi
++	# Encoding counters, on the primary daemon's terms: this daemon is told where to
++	# report them, and reports them only for a request whose caller asks. A
++	# customer-hosted worker is told nothing.
++	ENCODING_REPORT_ARGS=()
++	if [ "${SAND_DISABLE_TELEMETRY:-}" != "1" ] && [ -z "${GROK_BOT_WORKER_POOL:-}" ] && [ -z "${GROK_BOT_WORKER_AUTH_TOKEN_FILE:-}" ]; then
++		ENCODING_REPORT_ARGS=(--metrics-endpoint-when-asked "${SAND_BACKEND_URL:-${CURSOR_API_BASE_URL:-https://api2.cursor.sh}}" --metrics-host sand_box)
++	fi
+ 	DISPLAY="${DISP}" \
+-		env -u SAND_GATEWAY_TOKEN -u SAND_EGRESS_TUNNEL_BEARER -u SAND_DESKTOP_UNIT "${DAEMON_BUS_ENV[@]}" \
++		env -u SAND_GATEWAY_TOKEN -u SAND_INFERENCE_RENEWAL_CREDENTIAL -u SAND_EGRESS_TUNNEL_BEARER -u SAND_DESKTOP_UNIT "${DAEMON_BUS_ENV[@]}" \
+ 		setsid nohup /exec-daemon/exec-daemon serve \
+ 		--port "${EXEC_DAEMON_PORT}" \
+ 		--pty-websocket-port "${PTY_PORT}" \
+@@ -129,8 +136,8 @@
+ 		--computer-use-api-width "${COMPUTER_USE_API_WIDTH}" \
+ 		--computer-use-api-height "${COMPUTER_USE_API_HEIGHT}" \
+ 		--mcp-meta-tool-enabled \
+-		--origin-cli-enabled \
+ 		--orbitd-proxy-socket /run/orbitd-proxy/rpc.sock \
++		"${ENCODING_REPORT_ARGS[@]}" \
+ 		>"${LOG_DIR}/exec-daemon.log" 2>&1 &
+ fi
+ 

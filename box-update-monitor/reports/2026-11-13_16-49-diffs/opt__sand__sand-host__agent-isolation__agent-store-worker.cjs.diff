@@ -1,0 +1,698 @@
+--- 2026-11-13_15-49:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
++++ 2026-11-13_16-49:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
+@@ -20217,7 +20217,7 @@
+     return proto3.util.equals(_ThinkingMessage, a, b);
+   }
+   static $() {
+-    return ["ThinkingMessage|1 text 9|2 duration_ms 13|3 started_at_ms 4?|4 completed_at_ms 4?"];
++    return ["ThinkingMessage|1 text 9|2 duration_ms 13|3 started_at_ms 4?|4 completed_at_ms 4?|5 narration 8?"];
+   }
+ };
+ var ShellCommand = class _ShellCommand extends __protoMessage374 {
+@@ -21051,430 +21051,6 @@
+   }
+ };
+ 
+-// ../packages/context/dist/core.js
+-function createKey(name, defaultValue) {
+-  return { symbol: name, defaultValue };
+-}
+-
+-// ../packages/context/dist/logger.js
+-var DEFAULT_INDENT = 2;
+-var DEFAULT_MAX_DEPTH = 6;
+-var DEFAULT_MAX_ENTRIES = 50;
+-var DEFAULT_MAX_ARRAY_LENGTH = 40;
+-var DEFAULT_MAX_STRING_LENGTH = 200;
+-function shouldUseColors(useColors) {
+-  if (typeof useColors === "boolean") {
+-    return useColors;
+-  }
+-  if (typeof process === "undefined") {
+-    return false;
+-  }
+-  const env = process.env ?? {};
+-  if ("NO_COLOR" in env) {
+-    return false;
+-  }
+-  if (env.TERM === "dumb") {
+-    return false;
+-  }
+-  const forceColor = env.FORCE_COLOR;
+-  if (forceColor === "1" || forceColor === "true") {
+-    return true;
+-  }
+-  if (forceColor === "0") {
+-    return false;
+-  }
+-  return process.stdout?.isTTY ?? false;
+-}
+-function createColorPalette(enabled) {
+-  const reset = "\x1B[0m";
+-  const withCodes = (codes) => (value) => enabled ? `\x1B[${codes.join(";")}m${value}${reset}` : value;
+-  const dim = withCodes([2]);
+-  const gray = withCodes([90]);
+-  const red = withCodes([31]);
+-  const green = withCodes([32]);
+-  const yellow = withCodes([33]);
+-  const blue = withCodes([34]);
+-  const magenta = withCodes([35]);
+-  const cyan = withCodes([36]);
+-  const bold = withCodes([1]);
+-  const boldRed = withCodes([1, 31]);
+-  return {
+-    dim,
+-    gray,
+-    red,
+-    green,
+-    yellow,
+-    blue,
+-    magenta,
+-    cyan,
+-    bold,
+-    level: (level, value) => {
+-      switch (level) {
+-        case "debug":
+-          return magenta(value);
+-        case "info":
+-          return blue(value);
+-        case "warn":
+-          return yellow(value);
+-        case "error":
+-          return boldRed(value);
+-        default: {
+-          const _exhaustiveCheck = level;
+-          return _exhaustiveCheck;
+-        }
+-      }
+-    }
+-  };
+-}
+-function resolveRenderOptions(options) {
+-  return {
+-    indent: " ".repeat(options.indent ?? DEFAULT_INDENT),
+-    maxDepth: options.maxDepth ?? DEFAULT_MAX_DEPTH,
+-    maxEntries: options.maxEntries ?? DEFAULT_MAX_ENTRIES,
+-    maxArrayLength: options.maxArrayLength ?? DEFAULT_MAX_ARRAY_LENGTH,
+-    maxStringLength: options.maxStringLength ?? DEFAULT_MAX_STRING_LENGTH,
+-    includeTimestamp: options.includeTimestamp ?? true,
+-    includeContextPath: options.includeContextPath ?? true,
+-    inlineSerializer: options.inlineSerializer
+-  };
+-}
+-function formatTimestamp(timestamp) {
+-  return timestamp.toISOString().slice(11, 23);
+-}
+-function isContext(value) {
+-  return typeof value === "object" && value !== null && "getPath" in value && typeof value.getPath === "function";
+-}
+-function isErrorLike(value) {
+-  if (typeof value !== "object" || value === null) {
+-    return false;
+-  }
+-  return "message" in value || "stack" in value || "name" in value || "cause" in value;
+-}
+-function isInlineSummary(value) {
+-  return typeof value === "object" && value !== null && "kind" in value && value.kind === "summary" && "summary" in value && typeof value.summary === "string";
+-}
+-function truncateString(value, maxLength) {
+-  if (value.length <= maxLength) {
+-    return value;
+-  }
+-  return `${value.slice(0, maxLength)}...`;
+-}
+-function applyInlineSerializer(value, options, path, depth) {
+-  if (!options.inlineSerializer) {
+-    return value;
+-  }
+-  try {
+-    const serialized = options.inlineSerializer(value, { path, depth });
+-    return serialized === void 0 ? value : serialized;
+-  } catch {
+-    return value;
+-  }
+-}
+-function formatInlineValue(value, options, colors, depth, seen, path) {
+-  const serialized = applyInlineSerializer(value, options, path, depth);
+-  if (isInlineSummary(serialized)) {
+-    return colors.dim(`<${serialized.summary}>`);
+-  }
+-  value = serialized;
+-  if (value === null) {
+-    return colors.gray("null");
+-  }
+-  if (value === void 0) {
+-    return colors.gray("undefined");
+-  }
+-  if (typeof value === "string") {
+-    const truncated = truncateString(value, options.maxStringLength);
+-    return colors.green(JSON.stringify(truncated));
+-  }
+-  if (typeof value === "number") {
+-    return colors.yellow(String(value));
+-  }
+-  if (typeof value === "boolean") {
+-    return colors.magenta(String(value));
+-  }
+-  if (typeof value === "bigint") {
+-    return colors.yellow(`${value}n`);
+-  }
+-  if (typeof value === "symbol") {
+-    return colors.cyan(value.toString());
+-  }
+-  if (typeof value === "function") {
+-    const name = value.name ? ` ${value.name}` : "";
+-    return colors.dim(`[Function${name}]`);
+-  }
+-  if (value instanceof Date) {
+-    const iso = Number.isNaN(value.getTime()) ? "Invalid Date" : value.toISOString();
+-    return colors.green(iso);
+-  }
+-  if (value instanceof RegExp) {
+-    return colors.cyan(value.toString());
+-  }
+-  if (isErrorLike(value)) {
+-    return formatErrorSummary(value, options, colors, depth, seen, path);
+-  }
+-  if (Array.isArray(value)) {
+-    return formatInlineArray(value, options, colors, depth, seen, path);
+-  }
+-  if (typeof ArrayBuffer !== "undefined" && value instanceof ArrayBuffer) {
+-    return colors.dim(`ArrayBuffer(${value.byteLength})`);
+-  }
+-  if (typeof ArrayBuffer !== "undefined" && typeof ArrayBuffer.isView === "function" && ArrayBuffer.isView(value)) {
+-    const typedArray = value;
+-    const label = typedArray.constructor?.name ?? "TypedArray";
+-    return colors.dim(`${label}(${typedArray.byteLength})`);
+-  }
+-  if (value instanceof Map) {
+-    return formatInlineMap(value, options, colors, depth, seen, path);
+-  }
+-  if (value instanceof Set) {
+-    return formatInlineArray(Array.from(value.values()), options, colors, depth, seen, path);
+-  }
+-  return typeof value === "object" ? formatInlineObject(value, options, colors, depth, seen, path) : colors.dim(`[${typeof value}]`);
+-}
+-function formatErrorSummary(error, options, colors, depth, seen, path) {
+-  if (seen.has(error)) {
+-    return colors.dim("[Circular]");
+-  }
+-  seen.add(error);
+-  const name = typeof error.name === "string" ? error.name : "Error";
+-  const message = typeof error.message === "string" ? error.message : "";
+-  const summary = message ? `${name}: ${message}` : name;
+-  let result = colors.red(summary);
+-  if ("cause" in error && error.cause !== void 0) {
+-    const causeValue = formatInlineValue(error.cause, options, colors, depth + 1, seen, path.concat("cause"));
+-    result = `${result} ${colors.dim("cause=")}${causeValue}`;
+-  }
+-  seen.delete(error);
+-  return result;
+-}
+-function formatInlineArray(value, options, colors, depth, seen, path) {
+-  if (depth >= options.maxDepth) {
+-    return colors.dim(`[Array(${value.length})]`);
+-  }
+-  if (seen.has(value)) {
+-    return colors.dim("[Circular]");
+-  }
+-  seen.add(value);
+-  if (value.length === 0) {
+-    const empty = colors.dim("[]");
+-    seen.delete(value);
+-    return empty;
+-  }
+-  const limit = Math.min(value.length, options.maxArrayLength);
+-  const items = value.slice(0, limit).map((entry, index) => formatInlineValue(entry, options, colors, depth + 1, seen, path.concat(index)));
+-  if (value.length > limit) {
+-    items.push(colors.dim(`... ${value.length - limit} more`));
+-  }
+-  const separator = colors.dim(", ");
+-  const result = `${colors.dim("[")}${items.join(separator)}${colors.dim("]")}`;
+-  seen.delete(value);
+-  return result;
+-}
+-function formatInlineMap(value, options, colors, depth, seen, path) {
+-  if (depth >= options.maxDepth) {
+-    return colors.dim(`Map(${value.size})`);
+-  }
+-  if (seen.has(value)) {
+-    return colors.dim("[Circular]");
+-  }
+-  seen.add(value);
+-  const entries = Array.from(value.entries());
+-  const limit = Math.min(entries.length, options.maxEntries);
+-  const items = entries.slice(0, limit).map(([key, entryValue]) => {
+-    const keyValue = formatInlineValue(key, options, colors, depth + 1, seen, path.concat("<key>"));
+-    const renderedValue = formatInlineValue(entryValue, options, colors, depth + 1, seen, path.concat(String(key)));
+-    return `${keyValue} ${colors.dim("=>")} ${renderedValue}`;
+-  });
+-  if (entries.length > limit) {
+-    items.push(colors.dim(`... ${entries.length - limit} more`));
+-  }
+-  const separator = colors.dim(", ");
+-  const result = `${colors.dim("Map{")}${items.join(separator)}${colors.dim("}")}`;
+-  seen.delete(value);
+-  return result;
+-}
+-function formatInlineObject(value, options, colors, depth, seen, path) {
+-  if (depth >= options.maxDepth) {
+-    const label = value?.constructor?.name ?? "Object";
+-    return colors.dim(`[${label}]`);
+-  }
+-  if (seen.has(value)) {
+-    return colors.dim("[Circular]");
+-  }
+-  seen.add(value);
+-  const entries = Object.entries(value);
+-  if (entries.length === 0) {
+-    const empty = colors.dim("{}");
+-    seen.delete(value);
+-    return empty;
+-  }
+-  const limit = Math.min(entries.length, options.maxEntries);
+-  const items = entries.slice(0, limit).map(([key, entryValue]) => {
+-    const renderedValue = formatInlineValue(entryValue, options, colors, depth + 1, seen, path.concat(key));
+-    return `${colors.cyan(key)}: ${renderedValue}`;
+-  });
+-  if (entries.length > limit) {
+-    items.push(colors.dim(`... ${entries.length - limit} more`));
+-  }
+-  const separator = colors.dim(", ");
+-  const result = `${colors.dim("{")}${items.join(separator)}${colors.dim("}")}`;
+-  seen.delete(value);
+-  return result;
+-}
+-function createPrettyTerminalLoggerBackend(options = {}) {
+-  const renderOptions = resolveRenderOptions(options);
+-  const colors = createColorPalette(shouldUseColors(options.useColors));
+-  const outputConsole = options.console ?? console;
+-  return {
+-    log: (_ctx, entry) => {
+-      const parts = [];
+-      if (renderOptions.includeTimestamp) {
+-        parts.push(colors.dim(formatTimestamp(entry.timestamp)));
+-      }
+-      const levelLabel = entry.level.toUpperCase().padEnd(5);
+-      parts.push(colors.level(entry.level, levelLabel));
+-      const message = entry.level === "error" ? colors.bold(entry.message) : entry.message;
+-      parts.push(message);
+-      if (renderOptions.includeContextPath && isContext(entry.context)) {
+-        const path = entry.context.getPath();
+-        if (path.length > 0) {
+-          parts.push(colors.dim(`ctx=${path.join("/")}`));
+-        }
+-      }
+-      const seen = /* @__PURE__ */ new WeakSet();
+-      if (!isContext(entry.context) && entry.context && Object.keys(entry.context).length > 0) {
+-        const contextValue = formatInlineValue(entry.context, renderOptions, colors, 0, seen, [
+-          "context"
+-        ]);
+-        parts.push(`${colors.dim("context=")}${contextValue}`);
+-      }
+-      if (entry.metadata && Object.keys(entry.metadata).length > 0) {
+-        const metaValue = formatInlineValue(entry.metadata, renderOptions, colors, 0, seen, [
+-          "metadata"
+-        ]);
+-        parts.push(`${colors.dim("meta=")}${metaValue}`);
+-      }
+-      const outputLines = [parts.join(" ")];
+-      if (entry.error !== void 0) {
+-        const errorValue = isErrorLike(entry.error) ? formatErrorSummary(entry.error, renderOptions, colors, 0, seen, ["error"]) : formatInlineValue(entry.error, renderOptions, colors, 0, seen, ["error"]);
+-        outputLines[0] = `${outputLines[0]} ${colors.dim("error=")}${errorValue}`;
+-        if (isErrorLike(entry.error) && typeof entry.error.stack === "string") {
+-          const stackLines = entry.error.stack.split("\n").slice(1);
+-          for (const line of stackLines) {
+-            const trimmed = line.trim();
+-            if (trimmed) {
+-              outputLines.push(`${renderOptions.indent}${colors.dim(trimmed)}`);
+-            }
+-          }
+-        }
+-      }
+-      const output = outputLines.join("\n");
+-      switch (entry.level) {
+-        case "debug":
+-        case "info":
+-          outputConsole.log(output);
+-          break;
+-        case "warn":
+-          outputConsole.warn(output);
+-          break;
+-        case "error":
+-          outputConsole.error(output);
+-          break;
+-        default: {
+-          const _exhaustiveCheck = entry.level;
+-          throw new Error(`Unhandled log level: ${String(_exhaustiveCheck)}`);
+-        }
+-      }
+-    }
+-  };
+-}
+-var defaultLoggerBackendImpl = createPrettyTerminalLoggerBackend();
+-var defaultLoggerBackend = {
+-  log: (ctx, entry) => defaultLoggerBackendImpl.log(ctx, entry)
+-};
+-var loggerKey = createKey(/* @__PURE__ */ Symbol("loggerBackend"), defaultLoggerBackend);
+-function getLoggerBackend(ctx) {
+-  return ctx.get(loggerKey);
+-}
+-function createLogger(name) {
+-  function log(ctx, entry) {
+-    const timestamp = /* @__PURE__ */ new Date();
+-    const logger7 = getLoggerBackend(ctx);
+-    logger7.log(ctx, { ...entry, timestamp, logger: name });
+-  }
+-  return {
+-    debug: (ctx, message, metadata) => {
+-      log(ctx, { level: "debug", message, context: ctx, metadata });
+-    },
+-    info: (ctx, message, metadata) => {
+-      log(ctx, { level: "info", message, context: ctx, metadata });
+-    },
+-    warn: (ctx, message, metadata) => {
+-      log(ctx, { level: "warn", message, context: ctx, metadata });
+-    },
+-    error: (ctx, message, error, metadata) => {
+-      log(ctx, { level: "error", message, context: ctx, error, metadata });
+-    }
+-  };
+-}
+-
+-// ../packages/metrics/dist/index.js
+-var defaultMetricsBackend = {
+-  record: () => {
+-  },
+-  increment: () => {
+-  },
+-  gauge: () => {
+-  },
+-  histogram: () => {
+-  }
+-};
+-var metricsKey = createKey(/* @__PURE__ */ Symbol("metricsBackend"), defaultMetricsBackend);
+-function getMetricsBackend(ctx) {
+-  return ctx.get(metricsKey);
+-}
+-function dropRejection(result) {
+-  if (result instanceof Promise)
+-    result.catch(() => {
+-    });
+-}
+-function createCounter(name, options) {
+-  const handle = {
+-    name,
+-    type: "counter",
+-    description: options?.description,
+-    labelNames: options?.labelNames
+-  };
+-  return {
+-    increment: (ctx, value, labels) => {
+-      const backend = getMetricsBackend(ctx);
+-      dropRejection(backend.increment(ctx, handle, value ?? 1, labels));
+-    },
+-    record: (ctx, value, labels) => {
+-      const backend = getMetricsBackend(ctx);
+-      dropRejection(backend.record(ctx, handle, value, labels));
+-    }
+-  };
+-}
+-function createHistogram(name, options) {
+-  const handle = {
+-    name,
+-    type: "histogram",
+-    description: options?.description,
+-    labelNames: options?.labelNames
+-  };
+-  return {
+-    histogram: (ctx, value, labels) => {
+-      const backend = getMetricsBackend(ctx);
+-      dropRejection(backend.histogram(ctx, handle, value, labels));
+-    },
+-    record: (ctx, value, labels) => {
+-      const backend = getMetricsBackend(ctx);
+-      dropRejection(backend.record(ctx, handle, value, labels));
+-    }
+-  };
+-}
+-
+ // ../packages/agent-kv/dist/serde.js
+ var decoder = new TextDecoder();
+ var encoder = new TextEncoder();
+@@ -21490,20 +21066,6 @@
+   }
+ };
+ var utf8Serde = new Utf8Serde();
+-var ProtoSerde = class {
+-  constructor(proto) {
+-    this.proto = proto;
+-  }
+-  serialize(value) {
+-    return value.toBinary();
+-  }
+-  deserialize(blob) {
+-    return this.proto.fromBinary(blob);
+-  }
+-  getBlobType() {
+-    return { kind: "proto", typeName: this.proto.typeName };
+-  }
+-};
+ var HEX_LUT = Array.from({ length: 256 }, (_, i) => i.toString(16).padStart(2, "0"));
+ var NATIVE_HEX_MIN_CHARS = 64;
+ function fromHexNative(clean) {
+@@ -21534,234 +21096,6 @@
+   return out;
+ }
+ 
+-// ../packages/agent-kv/dist/blob-store.js
+-function toUint8Array(b) {
+-  const buffer = b.buffer;
+-  if (buffer instanceof ArrayBuffer)
+-    return new Uint8Array(buffer, b.byteOffset, b.byteLength);
+-  return new Uint8Array(b);
+-}
+-var inMemoryGetBlobLatency = createHistogram("agent_kv.in_memory.get_blob.duration_ms", {
+-  description: "Duration of InMemoryBlobStore getBlob operations in milliseconds"
+-});
+-var inMemorySetBlobLatency = createHistogram("agent_kv.in_memory.set_blob.duration_ms", {
+-  description: "Duration of InMemoryBlobStore setBlob operations in milliseconds"
+-});
+-
+-// ../packages/agent-kv/dist/subagent-states.js
+-var logger = createLogger("@anysphere/agent-kv:subagent-states");
+-var subagentStateRefMissingBlob = createCounter("agent_kv.subagent_state_ref.missing_blob", {
+-  description: "Subagent state refs whose blob was missing, counted per read until a checkpoint rewrites the ref. fallback=inline kept the entry saved beside the ref (usually a transcript-free summary), dropped omitted the subagent, superseded kept a newer in-memory state.",
+-  labelNames: ["reader", "fallback"]
+-});
+-
+-// ../packages/agent-kv/dist/agent-store.js
+-var AgentModes = ["default", "plan", "debug", "search"];
+-var ApprovalModeSettings = ["allowlist", "unrestricted", "auto-review"];
+-var agentModeSet = new Set(AgentModes);
+-var approvalModeSettingSet = new Set(ApprovalModeSettings);
+-var todoItemSerde = new ProtoSerde(TodoItem);
+-var userMessageSerde = new ProtoSerde(UserMessage);
+-var conversationStepSerde = new ProtoSerde(ConversationStep);
+-var conversationTurnStructureSerde = new ProtoSerde(ConversationTurnStructure);
+-var conversationSummarySerde = new ProtoSerde(ConversationSummary);
+-var shellCommandSerde = new ProtoSerde(ShellCommand);
+-var shellOutputSerde = new ProtoSerde(ShellOutput);
+-
+-// ../packages/agent-kv/dist/blob-read-kind.js
+-var BLOB_READ_KIND_KEY = createKey(/* @__PURE__ */ Symbol("blob-read-kind"), void 0);
+-
+-// ../packages/agent-kv/dist/cached-blob-store.js
+-var logger2 = createLogger("@anysphere/agent-kv");
+-var cachedGetBlobLatency = createHistogram("agent_kv.cached.get_blob.duration_ms", {
+-  description: "Duration of CachedBlobStore getBlob operations in milliseconds"
+-});
+-var cachedSetBlobLatency = createHistogram("agent_kv.cached.set_blob.duration_ms", {
+-  description: "Duration of CachedBlobStore setBlob operations in milliseconds"
+-});
+-var cachedFlushLatency = createHistogram("agent_kv.cached.flush.duration_ms", {
+-  description: "Duration of CachedBlobStore flush operations in milliseconds"
+-});
+-var cachedCacheBytes = createHistogram("agent_kv.cached.cache_bytes", {
+-  description: "Resident bytes held in the CachedBlobStore in-memory cache, sampled on flush"
+-});
+-var cachedGetBlobResults = createCounter("agent_kv.cached.get_blob.results", {
+-  description: "Number of CachedBlobStore getBlob operations by cache result type",
+-  labelNames: ["cache_type"]
+-});
+-var cachedNearbyDecryptErrors = createCounter("agent_kv.nearby.decrypt_errors", {
+-  description: "Number of nearby blob reads that found ciphertext but failed to decrypt it (wrong encryption key)"
+-});
+-var cachedNearbyDecryptFallbackSuccess = createCounter("agent_kv.nearby.decrypt_fallback_success", {
+-  description: "Number of nearby blob reads where the primary encryption key failed but the fallback key decrypted the blob"
+-});
+-var encryptedGetBlobLatency = createHistogram("agent_kv.encrypted.get_blob.duration_ms", {
+-  description: "Duration of EncryptedBlobStore getBlob operations in milliseconds"
+-});
+-var encryptedSetBlobLatency = createHistogram("agent_kv.encrypted.set_blob.duration_ms", {
+-  description: "Duration of EncryptedBlobStore setBlob operations in milliseconds"
+-});
+-var NearbyBlobDecryptError = class extends Error {
+-  constructor(cause) {
+-    super("Failed to decrypt nearby blob (encryption key mismatch)", {
+-      cause
+-    });
+-    this.name = "NearbyBlobDecryptError";
+-  }
+-};
+-var EncryptedBlobStore = class _EncryptedBlobStore {
+-  /**
+-   * @param fallbackDecryptKeyStr Decrypt-only fallback tried when the primary
+-   * key fails on a read (see CachedBlobStoreOptions.nearbyFallbackDecryptKey).
+-   * Never used for writes.
+-   */
+-  constructor(blobStore, encryptionKeyStr, fallbackDecryptKeyStr = null) {
+-    this.blobStore = blobStore;
+-    this.encryptionKeyStr = encryptionKeyStr;
+-    this.fallbackDecryptKeyStr = fallbackDecryptKeyStr;
+-  }
+-  static async deriveKey(keyStr) {
+-    const encoder2 = new TextEncoder();
+-    const keyMaterial = encoder2.encode(keyStr);
+-    const keyHash = await crypto.subtle.digest("SHA-256", keyMaterial);
+-    return crypto.subtle.importKey("raw", keyHash, { name: _EncryptedBlobStore.ALGORITHM, length: 256 }, true, ["encrypt", "decrypt"]);
+-  }
+-  async getEncryptionKey() {
+-    if (this.encryptionKey === void 0) {
+-      this.encryptionKey = await _EncryptedBlobStore.deriveKey(this.encryptionKeyStr);
+-    }
+-    return this.encryptionKey;
+-  }
+-  async getFallbackDecryptKey() {
+-    if (this.fallbackDecryptKeyStr === null) {
+-      return null;
+-    }
+-    if (this.fallbackDecryptKey === void 0) {
+-      this.fallbackDecryptKey = await _EncryptedBlobStore.deriveKey(this.fallbackDecryptKeyStr);
+-    }
+-    return this.fallbackDecryptKey;
+-  }
+-  async getBlob(ctx, blobId) {
+-    const startTime = performance.now();
+-    try {
+-      const encryptedValue = await this.blobStore.getBlob(ctx, blobId);
+-      if (encryptedValue === void 0) {
+-        return void 0;
+-      }
+-      const iv = encryptedValue.slice(0, _EncryptedBlobStore.IV_LENGTH);
+-      const ciphertext = encryptedValue.slice(_EncryptedBlobStore.IV_LENGTH);
+-      let decryptedValue;
+-      try {
+-        decryptedValue = await crypto.subtle.decrypt({ name: _EncryptedBlobStore.ALGORITHM, iv }, await this.getEncryptionKey(), ciphertext);
+-      } catch (primaryError) {
+-        const fallbackKey = await this.getFallbackDecryptKey();
+-        if (fallbackKey === null) {
+-          throw new NearbyBlobDecryptError(primaryError);
+-        }
+-        try {
+-          decryptedValue = await crypto.subtle.decrypt({ name: _EncryptedBlobStore.ALGORITHM, iv }, fallbackKey, ciphertext);
+-          cachedNearbyDecryptFallbackSuccess.increment(ctx, 1);
+-        } catch {
+-          throw new NearbyBlobDecryptError(primaryError);
+-        }
+-      }
+-      return new Uint8Array(decryptedValue);
+-    } finally {
+-      const duration = performance.now() - startTime;
+-      encryptedGetBlobLatency.histogram(ctx, duration);
+-    }
+-  }
+-  async encryptBlob(blobData) {
+-    const iv = crypto.getRandomValues(new Uint8Array(_EncryptedBlobStore.IV_LENGTH));
+-    const encryptedValue = await crypto.subtle.encrypt({ name: _EncryptedBlobStore.ALGORITHM, iv }, await this.getEncryptionKey(), toUint8Array(blobData));
+-    const combined = new Uint8Array(iv.length + encryptedValue.byteLength);
+-    combined.set(iv, 0);
+-    combined.set(new Uint8Array(encryptedValue), iv.length);
+-    return combined;
+-  }
+-  async setBlob(ctx, blobId, blobData) {
+-    const startTime = performance.now();
+-    try {
+-      const encryptedBlob = await this.encryptBlob(blobData);
+-      await this.blobStore.setBlob(ctx, blobId, encryptedBlob);
+-    } finally {
+-      const duration = performance.now() - startTime;
+-      encryptedSetBlobLatency.histogram(ctx, duration);
+-    }
+-  }
+-  async setBlobLocallyOnly(ctx, blobId, blobData) {
+-    const startTime = performance.now();
+-    try {
+-      const encryptedBlob = await this.encryptBlob(blobData);
+-      await this.blobStore.setBlobLocallyOnly(ctx, blobId, encryptedBlob);
+-    } finally {
+-      const duration = performance.now() - startTime;
+-      encryptedSetBlobLatency.histogram(ctx, duration);
+-    }
+-  }
+-  async flush(ctx) {
+-    return await this.blobStore.flush(ctx);
+-  }
+-};
+-EncryptedBlobStore.ALGORITHM = "AES-GCM";
+-EncryptedBlobStore.IV_LENGTH = 12;
+-
+-// ../packages/agent-kv/dist/controlled.js
+-var logger3 = createLogger("ControlledKvManager");
+-var controlledGetBlobLatency = createHistogram("agent_kv.controlled.get_blob.duration_ms", {
+-  description: "Duration of ControlledKvManager getBlob operations in milliseconds"
+-});
+-var controlledSetBlobLatency = createHistogram("agent_kv.controlled.set_blob.duration_ms", {
+-  description: "Duration of ControlledKvManager setBlob operations in milliseconds"
+-});
+-
+-// ../packages/agent-kv/dist/writethrough-middleware.js
+-var logger4 = createLogger("@anysphere/agent-kv");
+-var writethroughGetBlobLatency = createHistogram("agent_kv.writethrough.get_blob.duration_ms", {
+-  description: "Duration of WritethroughBlobStore getBlob operations in milliseconds"
+-});
+-var writethroughSetBlobLatency = createHistogram("agent_kv.writethrough.set_blob.duration_ms", {
+-  description: "Duration of WritethroughBlobStore setBlob operations in milliseconds"
+-});
+-var writethroughFlushLatency = createHistogram("agent_kv.writethrough.flush.duration_ms", {
+-  description: "Duration of WritethroughBlobStore flush operations in milliseconds"
+-});
+-
+-// ../packages/agent-kv/dist/reference.js
+-var logger5 = createLogger("@anysphere/agent-kv:reference");
+-var LARGE_LAZY_REFERENCE_BLOB_BYTES = 512 * 1024;
+-var lazyReferenceCacheMiss = createCounter("agent_kv.lazy_reference.cache_miss", {
+-  description: "Number of large or slow LazyReference cache misses that require loading and deserializing a blob",
+-  labelNames: ["blob_type"]
+-});
+-var lazyReferenceDeserializeBytes = createHistogram("agent_kv.lazy_reference.deserialize_bytes", {
+-  description: "Blob byte size loaded on a large or slow LazyReference deserialize cache miss",
+-  labelNames: ["blob_type"]
+-});
+-var lazyReferenceDeserializeDuration = createHistogram("agent_kv.lazy_reference.deserialize_ms", {
+-  description: "Time spent deserializing a blob on a large or slow LazyReference cache miss",
+-  labelNames: ["blob_type"]
+-});
+-
+-// ../packages/agent-kv/dist/retry-blob-store.js
+-var logger6 = createLogger("RetryBlobStore");
+-var retryAttempts = createCounter("agent_kv.retry.retries", {
+-  description: "Number of RetryBlobStore retry attempts (one per re-issued operation, not counting the first try)",
+-  labelNames: ["operation", "outcome"]
+-});
+-var retryGetBlobLatency = createHistogram("agent_kv.retry.get_blob.duration_ms", {
+-  description: "Duration of RetryBlobStore getBlob operations in milliseconds"
+-});
+-var retrySetBlobLatency = createHistogram("agent_kv.retry.set_blob.duration_ms", {
+-  description: "Duration of RetryBlobStore setBlob operations in milliseconds"
+-});
+-var retrySetBlobLocallyOnlyLatency = createHistogram("agent_kv.retry.set_blob_locally_only.duration_ms", {
+-  description: "Duration of RetryBlobStore setBlobLocallyOnly operations in milliseconds"
+-});
+-var retryFlushLatency = createHistogram("agent_kv.retry.flush.duration_ms", {
+-  description: "Duration of RetryBlobStore flush operations in milliseconds"
+-});
+-
+ // ../packages/proto/dist/generated/agent/v1/blob_reference_metadata.js
+ var BLOB_REFERENCE_METADATA_BY_MESSAGE_ID = {
+   "agent.v1.AgentConversationTurnStructure": {

@@ -13,6 +13,7 @@ TARGET="${1:-$DIR}"
 [[ -e "$TARGET" ]] || { echo "cible introuvable : $TARGET" >&2; exit 2; }
 exec python3 - "$DIR" "$TARGET" "$REDACT" <<'PY'
 import json, os, re, subprocess, sys
+from pathlib import Path
 mon, target, redact = sys.argv[1], sys.argv[2], sys.argv[3] == "1"
 rg = ["rg", "-z", "-i", "--hidden", "--no-require-git", "-n", "--max-columns", "220", "--max-columns-preview",
       "-g", "!.pii-denylist", "-g", "!.git/"]
@@ -80,7 +81,20 @@ def walk(o, p):
 for f in ["box-secrets.json", "host-secrets.json", "gateway.json", "teach-queue-key.json", "settings.json"]:
     try: walk(json.load(open("/home/box/sand-data/" + f)), "sand-data/" + f)
     except Exception: pass
+# Public IANA TZ ids (files under /usr/share/zoneinfo, e.g. a city zone) are
+# not secrets: vendor bundles may use them as cron/doc examples, and they
+# collide with settings.json.userTimeZone. Skip those values only.
+def is_public_iana_tz(s):
+    if not isinstance(s, str) or ".." in s or s.startswith("/") or "\x00" in s:
+        return False
+    z = Path("/usr/share/zoneinfo") / s
+    try:
+        return z.exists() and not z.is_dir()
+    except Exception:
+        return False
 for name, val in cands.items():
+    if is_public_iana_tz(val):
+        continue
     r = subprocess.run([x for x in rg if x not in ("-i", "-n")] + ["-l", "-F", "--", val, target], capture_output=True, text=True)
     show(f"valeur secrète {name} (valeur masquée)", r.stdout)
 env_names = [os.path.join(dp, f) for dp, _, fs in os.walk(target) for f in fs if f == "env-var-names.txt"]

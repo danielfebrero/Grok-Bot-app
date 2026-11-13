@@ -1,0 +1,38 @@
+--- 2026-11-13_15-49:/opt/sand/sand-host/box-runtime/sand-egress-timezone.mjs
++++ 2026-11-13_16-49:/opt/sand/sand-host/box-runtime/sand-egress-timezone.mjs
+@@ -376,6 +376,17 @@
+     : { exitGeo, provider: cached.provider };
+ }
+ 
++export function writeAtomically(path, text) {
++  const tmp = `${path}.${process.pid}.tmp`;
++  try {
++    writeFileSync(tmp, text, { encoding: "utf8", mode: 0o644 });
++    renameSync(tmp, path);
++  } catch (error) {
++    rmSync(tmp, { force: true });
++    throw error;
++  }
++}
++
+ export function writeExitGeoCache({
+   path = EXIT_LOCALE_CACHE_PATH,
+   proxyServer,
+@@ -383,16 +394,7 @@
+   provider,
+   now = Date.now,
+ }) {
+-  const scratch = `${path}.${process.pid}`;
+-  try {
+-    writeFileSync(scratch, JSON.stringify({ proxyServer, at: now(), exitGeo, provider }), {
+-      mode: 0o644,
+-    });
+-    renameSync(scratch, path);
+-  } catch (error) {
+-    rmSync(scratch, { force: true });
+-    throw error;
+-  }
++  writeAtomically(path, JSON.stringify({ proxyServer, at: now(), exitGeo, provider }));
+ }
+ 
+ export async function resolveExitLocale({

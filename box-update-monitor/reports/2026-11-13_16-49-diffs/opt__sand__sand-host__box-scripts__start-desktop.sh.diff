@@ -1,0 +1,15 @@
+--- 2026-11-13_15-49:/opt/sand/sand-host/box-scripts/start-desktop.sh
++++ 2026-11-13_16-49:/opt/sand/sand-host/box-scripts/start-desktop.sh
+@@ -229,6 +229,12 @@
+ 	-forever
+ 	-noxdamage
+ 	-norc
++	# x11vnc's own help for -sb: "Time in seconds after NO activity (e.g.
++	# screen blank) to really throttle down the screen polls (i.e. sleep
++	# for about 1.5 secs). Use 0 to disable. Default: 60"
++	# (printed by x11vnc -help in the box, under -sb).
++	# A throttled x11vnc holds back a new viewer's first frame.
++	-sb 0
+ 	-rfbport "${VNC_PORT}"
+ 	-quiet
+ )
