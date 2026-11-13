@@ -9,6 +9,17 @@ packages confondus. Entrées les plus récentes en haut. Heures de Paris
 
 <!-- NOUVELLES-ENTREES-ICI -->
 
+## 2026-11-13 18:00 (Paris) — `2026-11-12_09-56` → `2026-11-13_18-00`
+
+Changement de surface RPC détecté : **50 méthode(s) ajoutée(s)**, **2 supprimée(s)**.
+
+Ajoutées : `AppPublishService.GetAppsEligibility`, `AppPublishService.StartFormLinkOwnerCode`, `AppPublishService.SubmitTextedFormLink`, `BackgroundComposerService.ListPrivateWorkerSetupManifests`, `DashboardService.CancelGrokBatch`, `DashboardService.CreateGrokBatch`, `DashboardService.DeleteTeamGrokBotScimIdpIdentity`, `DashboardService.GenerateTeamGrokBotScimIdpSigningKey`, `DashboardService.GetEnterpriseGrokBotTeamTrialInternal`, `DashboardService.GetGrokBatch`, `DashboardService.GetGrokBatchRequestResult`, `DashboardService.GetTeamGrokBotScimIdpIdentity`, `DashboardService.ListGrokBatchRequests`, `DashboardService.ListGrokBatches`, `DashboardService.SetEnterpriseGrokBotTeamTrialExpirationInternal`, `DashboardService.UpdateTeamGrokBotScimIdpIdentity`, `DashboardService.UpdateTeamTailnetExitNode`, `GrokBotService.DeleteGrokBotFactory`, `GrokBotService.GetGrokBotPurchaseAutoApprove`, `GrokBotService.ListGrokBotFactories`, `GrokBotService.RunGrokBotFactory`, `GrokBotService.SaveGrokBotFactory`, `GrokBotService.SetGrokBotPurchaseAutoApprove`, `GrokBotService.SetGrokBotPurchaseSpendLimit`, `UnifiedDashboardService.AddUser` …
+
+Supprimées : `DashboardService.GetPullRequestDraftPreference`, `DashboardService.SetPullRequestDraftPreference`
+
+Rapport : [reports/2026-11-13_18-00.md](reports/2026-11-13_18-00.md).
+
+
 ## 2026-11-12 09:56 (Paris) — `2026-11-11_17-58` → `2026-11-12_09-56`
 
 Changement de surface RPC détecté : **19 méthode(s) ajoutée(s)**.
