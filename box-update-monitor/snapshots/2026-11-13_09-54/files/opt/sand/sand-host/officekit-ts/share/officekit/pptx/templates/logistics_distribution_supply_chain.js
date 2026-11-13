@@ -1,0 +1,734 @@
+/**
+ * "Logistics Distribution" deck - rebuilt with pptxgenjs.
+ * Run: node 1872ba4a-e0c5-409e-a2bf-3e36f5655b84_grok_final.js
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ *
+ * Theme
+ * ------------------------------------------------------------------ */
+
+const C = {
+  navy: '000943', // accent1
+  navyLight: '0018B2', // accent1 lumMod 75% / lumOff 25%
+  yellow: 'FFC302', // accent2
+  green: '00B46F', // accent3
+  teal: '19525B', // accent4
+  white: 'FFFFFF',
+  black: '000000',
+  gray: '666666',
+  imgFill: 'D9D9D9', // stand-in colour for every raster picture placeholder
+  softGray: 'E7E6E6',
+  hairline: 'D9D9D9',
+  quoteGray: 'BFBFBF',
+  phone: '111111',
+};
+
+const FONT_TITLE = 'Plus Jakarta Sans SemiBold'; // theme major font
+const FONT_BODY = 'Poppins Light'; // theme minor font
+
+const SHADOW = { type: 'outer', angle: 90, blur: 55, offset: 3, color: C.black, opacity: 0.4 };
+const CARD_SHADOW = { type: 'outer', angle: 50, blur: 35, offset: 10, color: C.black, opacity: 0.1 };
+
+const L = {
+  full: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus',
+  noPen: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque',
+  toMassa: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. ',
+  toSociis: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis',
+  oneLine: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. ',
+  noDot: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit',
+  eget: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget',
+  ligula: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula',
+  adipiscing: 'Lorem ipsum dolor sit amet, consectetuer adipiscing',
+  tempor: 'Lorem ipsum dolor sit amet  sed do eiusmod tempor',
+  magna: 'Lorem ipsum dolor sit amet  sed do eiusmod tempor incididunt ut labore et dolore magna',
+  aliqua: 'Lorem ipsum dolor sit amet  sed do eiusmod tempor incididunt ut labore et dolore magna aliquaLorem ipsum',
+  elitFirst: 'Lorem ipsum dolor sit amet, elit consectetuer adipiscing elit. Aenean',
+  showcase: 'Lorem elit ipsum dolor sit amet, consectetuer',
+  quote: '\u201CLorem ipsum dolor sit amet, consectetuer\u201D',
+};
+
+/* ------------------------------------------------------------------ *
+ * Small helpers
+ * ------------------------------------------------------------------ */
+
+const NO_LINE = { type: 'none' };
+
+/** Plain text box: top-anchored like the source deck (PowerPoint default). */
+function tx(slide, str, o) {
+  slide.addText(str, Object.assign(
+    { fontFace: FONT_BODY, fontSize: 12, color: C.black, valign: 'top', isTextBox: true },
+    o
+  ));
+}
+
+/** Headline / numeric text set in the theme's major font. */
+function txMajor(slide, str, o) {
+  tx(slide, str, Object.assign({ fontFace: FONT_TITLE }, o));
+}
+
+function rect(slide, x, y, w, h, color, extra) {
+  slide.addShape('rect', Object.assign({ x, y, w, h, fill: { color }, line: NO_LINE }, extra));
+}
+
+function roundRect(slide, x, y, w, h, color, radius, extra) {
+  slide.addShape('roundRect', Object.assign(
+    { x, y, w, h, fill: { color }, line: NO_LINE, rectRadius: radius },
+    extra
+  ));
+}
+
+/** Every bitmap in the source deck is replaced by a flat colour block. */
+function imageBox(slide, x, y, w, h, color) {
+  rect(slide, x, y, w, h, color || C.imgFill);
+}
+
+function roundedImageBox(slide, x, y, w, h, radius, color) {
+  roundRect(slide, x, y, w, h, color || C.imgFill, radius);
+}
+
+/**
+ * Logistics pictograms drawn from native shapes; they replace the deck's
+ * embedded PNG/SVG icon art. `s` is the icon's bounding-box size in inches.
+ */
+const ICONS = {
+  // Cube ringed by two rotation arrows.
+  package(slide, x, y, s, color) {
+    const solid = { fill: { color }, line: { type: 'none' } };
+    [[196, 330], [16, 150]].forEach((angleRange) => slide.addShape('blockArc', Object.assign(
+      { x, y, w: s, h: s, angleRange, arcThicknessRatio: 0.14 }, solid)));
+    slide.addShape('triangle', Object.assign(
+      { x: x + s * 0.76, y: y + s * 0.06, w: s * 0.26, h: s * 0.24, rotate: 115 }, solid));
+    slide.addShape('triangle', Object.assign(
+      { x: x - s * 0.02, y: y + s * 0.7, w: s * 0.26, h: s * 0.24, rotate: 295 }, solid));
+    slide.addShape('cube', Object.assign(
+      { x: x + s * 0.24, y: y + s * 0.24, w: s * 0.5, h: s * 0.5 }, solid));
+  },
+  // Box van seen from the side: cargo box with a lid tab, cab and two wheels.
+  truck(slide, x, y, s, color) {
+    const solid = { fill: { color }, line: { type: 'none' } };
+    slide.addShape('rect', Object.assign({ x: x + s * 0.02, y: y + s * 0.3, w: s * 0.54, h: s * 0.33 }, solid));
+    slide.addShape('rect', Object.assign({ x: x + s * 0.02, y: y + s * 0.16, w: s * 0.18, h: s * 0.14 }, solid));
+    slide.addShape('rect', Object.assign({ x: x + s * 0.38, y: y + s * 0.16, w: s * 0.18, h: s * 0.14 }, solid));
+    slide.addShape('snip1Rect', Object.assign(
+      { x: x + s * 0.6, y: y + s * 0.34, w: s * 0.38, h: s * 0.29 }, solid));
+    [0.1, 0.63].forEach((f) => slide.addShape('ellipse',
+      Object.assign({ x: x + s * f, y: y + s * 0.62, w: s * 0.2, h: s * 0.2 }, solid)));
+  },
+  // Forklift: sloped cab, mast and a stack of boxes on the fork.
+  forklift(slide, x, y, s, color) {
+    const solid = { fill: { color }, line: { type: 'none' } };
+    slide.addShape('snip1Rect', Object.assign(
+      { x: x + s * 0.02, y: y + s * 0.28, w: s * 0.44, h: s * 0.36, rotate: 270 }, solid));
+    slide.addShape('rect', Object.assign({ x: x + s * 0.5, y: y + s * 0.16, w: s * 0.06, h: s * 0.48 }, solid));
+    slide.addShape('rect', Object.assign({ x: x + s * 0.5, y: y + s * 0.58, w: s * 0.3, h: s * 0.06 }, solid));
+    slide.addShape('rect', Object.assign({ x: x + s * 0.62, y: y + s * 0.16, w: s * 0.34, h: s * 0.18 }, solid));
+    slide.addShape('rect', Object.assign({ x: x + s * 0.62, y: y + s * 0.37, w: s * 0.34, h: s * 0.18 }, solid));
+    [0.04, 0.28].forEach((f) => slide.addShape('ellipse',
+      Object.assign({ x: x + s * f, y: y + s * 0.62, w: s * 0.19, h: s * 0.19 }, solid)));
+  },
+  // Cube with arrows pushing out of all four corners.
+  expand(slide, x, y, s, color) {
+    [[0.02, 0.02, 0], [0.72, 0.02, 90], [0.02, 0.72, 270], [0.72, 0.72, 180]].forEach(([fx, fy, rot]) => {
+      slide.addShape('line', {
+        x: x + s * fx, y: y + s * fy, w: s * 0.26, h: s * 0.26,
+        flipH: rot === 90 || rot === 180, flipV: rot === 270 || rot === 180,
+        line: { color, width: 1.6, beginArrowType: 'triangle' },
+      });
+    });
+    slide.addShape('cube', {
+      x: x + s * 0.26, y: y + s * 0.26, w: s * 0.48, h: s * 0.48,
+      fill: { color }, line: { type: 'none' },
+    });
+  },
+};
+
+function icon(slide, kind, x, y, size, color) {
+  ICONS[kind](slide, x, y, size, color);
+}
+
+function hairline(slide, y, color) {
+  slide.addShape('line', { x: 0, y, w: 13.333, h: 0, line: { color, width: 1 } });
+}
+
+function mix(hexA, hexB, t) {
+  const ch = (h, i) => parseInt(h.substr(i * 2, 2), 16);
+  let out = '';
+  for (let i = 0; i < 3; i++) {
+    const v = Math.round(ch(hexA, i) * (1 - t) + ch(hexB, i) * t);
+    out += v.toString(16).padStart(2, '0');
+  }
+  return out.toUpperCase();
+}
+
+/**
+ * The source fades a solid colour out to nothing (towards black) on top of the
+ * flat grey photo blocks. pptxgenjs has no gradient fill, so paint the
+ * composite as stacked bands.
+ *
+ * @param over  colour that is opaque at the start of the run
+ * @param base  colour showing through once the fade completes
+ * @param flip  true = opaque end at the bottom instead of the top
+ */
+function fadeBands(slide, { x, y, w, h, over, base, flip = false, steps = 44 }) {
+  const band = h / steps;
+  for (let i = 0; i < steps; i++) {
+    const t = flip ? 1 - (i + 0.5) / steps : (i + 0.5) / steps;
+    rect(slide, x, y + i * band, w, band + 0.012, mix(base, mix(over, C.black, t), 1 - t));
+  }
+}
+
+/** "Storage / 927+" statistic pair used on slides 5, 6 and 8. */
+function statBlock(slide, x, y, label, value, color) {
+  tx(slide, label, { x, y, w: 1.135, h: 0.386, fontSize: 14, color, lineSpacingMultiple: 1.3 });
+  txMajor(slide, value, { x, y: y + 0.296, w: 2.049, h: 0.909, fontSize: 48, color });
+}
+
+/** Icon + "Your Title Here" + paragraph column used on slides 4, 6 and 8. */
+function featureBlock(slide, { x, iconX, iconKind, y, bodyW, color, body }) {
+  icon(slide, iconKind, iconX === undefined ? x : iconX, y, 0.542, color);
+  txMajor(slide, 'Your Title Here', {
+    x: x + 0.604, y: y + 0.117, w: 2.161, h: 0.411, fontSize: 16, color, lineSpacingMultiple: 1.3,
+  });
+  tx(slide, body, {
+    x, y: y + 0.632, w: bodyW, h: 1.395, color, align: 'justify', lineSpacingMultiple: 1.3,
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Custom geometries lifted from the source freeforms
+ * ------------------------------------------------------------------ */
+
+// Slide 3 - navy panel with a small arrow notch cut into its left edge.
+const NOTCHED_PANEL = [
+  { x: 0, y: 0, moveTo: true }, { x: 7.125, y: 0 }, { x: 7.125, y: 7.5 }, { x: 0, y: 7.5 },
+  { x: 0, y: 3.21 }, { x: 0.938, y: 2.667 }, { x: 0, y: 2.123 }, { close: true },
+];
+
+// Slide 8 - navy arch behind the portrait.
+const ARCH = [
+  { x: 4.075, y: 0, moveTo: true },
+  { x: 8.151, y: 4.075, curve: { type: 'cubic', x1: 6.326, y1: 0, x2: 8.151, y2: 1.825 } },
+  { x: 8.13, y: 4.492, curve: { type: 'cubic', x1: 8.151, y1: 4.216, x2: 8.144, y2: 4.355 } },
+  { x: 8.119, y: 4.573 }, { x: 0.031, y: 4.573 }, { x: 0.021, y: 4.492 },
+  { x: 0, y: 4.075, curve: { type: 'cubic', x1: 0.007, y1: 4.355, x2: 0, y2: 4.216 } },
+  { x: 4.075, y: 0, curve: { type: 'cubic', x1: 0, y1: 1.825, x2: 1.825, y2: 0 } },
+  { close: true },
+];
+
+// Slide 10 - eight-pointed asterisk marker (0.574" square).
+const ASTERISK = [
+  { x: 0.259, y: 0, moveTo: true }, { x: 0.314, y: 0 }, { x: 0.314, y: 0.22 },
+  { x: 0.47, y: 0.065 }, { x: 0.509, y: 0.103 }, { x: 0.353, y: 0.259 }, { x: 0.574, y: 0.259 },
+  { x: 0.574, y: 0.314 }, { x: 0.353, y: 0.314 }, { x: 0.509, y: 0.47 }, { x: 0.47, y: 0.509 },
+  { x: 0.314, y: 0.353 }, { x: 0.314, y: 0.574 }, { x: 0.259, y: 0.574 }, { x: 0.259, y: 0.353 },
+  { x: 0.103, y: 0.509 }, { x: 0.065, y: 0.47 }, { x: 0.22, y: 0.314 }, { x: 0, y: 0.314 },
+  { x: 0, y: 0.259 }, { x: 0.22, y: 0.259 }, { x: 0.065, y: 0.103 }, { x: 0.103, y: 0.065 },
+  { x: 0.259, y: 0.22 }, { close: true },
+];
+
+// Slide 13 - four curved arrows fanning out of one root, plus two shading wedges.
+const FAN = {
+  leftTall: { x: 4.103, y: 2.333, w: 2.761, h: 5.167, color: C.yellow, points: [
+    { x: 0.769, y: 0, moveTo: true }, { x: 0, y: 0.752 }, { x: 0.769, y: 1.761 }, { x: 0.769, y: 1.314 },
+    { x: 1.95, y: 2.992, curve: { type: 'cubic', x1: 1.462, y1: 1.61, x2: 1.907, y2: 2.269 } },
+    { x: 1.952, y: 5.167 }, { x: 2.761, y: 5.167 }, { x: 2.761, y: 3.112 }, { x: 2.761, y: 2.99 },
+    { x: 0.769, y: 0.456, curve: { type: 'cubic', x1: 2.712, y1: 1.825, x2: 1.926, y2: 0.791 } },
+    { x: 0.769, y: 0 }, { close: true },
+  ] },
+  shadeTall: { x: 6.472, y: 4.287, w: 0.392, h: 2.932, color: mix(C.yellow, C.black, 0.2), points: [
+    { x: 0.141, y: 0, moveTo: true }, { x: 0.223, y: 0.196 },
+    { x: 0.392, y: 1.036, curve: { type: 'cubic', x1: 0.321, y1: 0.462, x2: 0.38, y2: 0.745 } },
+    { x: 0.391, y: 1.158 }, { x: 0.392, y: 1.158 }, { x: 0.392, y: 2.932 }, { x: 0, y: 2.932 },
+    { x: 0, y: 0.878 }, { x: 0, y: 0.755 },
+    { x: 0.103, y: 0.118, curve: { type: 'cubic', x1: 0.009, y1: 0.537, x2: 0.044, y2: 0.323 } },
+    { close: true },
+  ] },
+  rightTall: { x: 6.472, y: 2.333, w: 2.758, h: 5.167, color: C.green, points: [
+    { x: 1.989, y: 0, moveTo: true }, { x: 2.758, y: 0.752 }, { x: 1.989, y: 1.761 }, { x: 1.989, y: 1.314 },
+    { x: 0.81, y: 2.992, curve: { type: 'cubic', x1: 1.298, y1: 1.61, x2: 0.853, y2: 2.269 } },
+    { x: 0.808, y: 5.167 }, { x: 0, y: 5.167 }, { x: 0, y: 3.112 }, { x: 0, y: 2.99 },
+    { x: 1.989, y: 0.456, curve: { type: 'cubic', x1: 0.049, y1: 1.825, x2: 0.834, y2: 0.791 } },
+    { x: 1.989, y: 0 }, { close: true },
+  ] },
+  shadeRoot: { x: 6.047, y: 5.255, w: 1.242, h: 1.965, color: mix(C.green, C.black, 0.2), points: [
+    { x: 0, y: 0, moveTo: true }, { x: 0.1, y: 0.102 },
+    { x: 0.361, y: 0.436, curve: { type: 'cubic', x1: 0.196, y1: 0.207, x2: 0.283, y2: 0.319 } },
+    { x: 0.426, y: 0.543 }, { x: 0.471, y: 0.617 }, { x: 0.567, y: 0.806 }, { x: 0.622, y: 0.938 },
+    { x: 0.676, y: 0.806 },
+    { x: 1.142, y: 0.102, curve: { type: 'cubic', x1: 0.795, y1: 0.549, x2: 0.952, y2: 0.312 } },
+    { x: 1.242, y: 0 }, { x: 1.236, y: 0.07 }, { x: 1.234, y: 1.965 }, { x: 0.426, y: 1.965 },
+    { x: 0.009, y: 1.965 }, { x: 0.007, y: 0.07 }, { close: true },
+  ] },
+  leftShort: { x: 4.103, y: 4.388, w: 2.761, h: 3.112, color: C.navy, points: [
+    { x: 0.769, y: 0, moveTo: true }, { x: 0, y: 0.752 }, { x: 0.769, y: 1.761 }, { x: 0.769, y: 1.314 },
+    { x: 1.95, y: 2.992, curve: { type: 'cubic', x1: 1.462, y1: 1.61, x2: 1.907, y2: 2.269 } },
+    { x: 1.952, y: 3.112 }, { x: 2.761, y: 3.112 }, { x: 2.761, y: 2.99 },
+    { x: 0.769, y: 0.456, curve: { type: 'cubic', x1: 2.712, y1: 1.825, x2: 1.926, y2: 0.791 } },
+    { close: true },
+  ] },
+  rightShort: { x: 6.472, y: 4.388, w: 2.758, h: 3.112, color: C.teal, points: [
+    { x: 1.989, y: 0, moveTo: true }, { x: 2.758, y: 0.752 }, { x: 1.989, y: 1.761 }, { x: 1.989, y: 1.314 },
+    { x: 0.81, y: 2.992, curve: { type: 'cubic', x1: 1.298, y1: 1.61, x2: 0.853, y2: 2.269 } },
+    { x: 0.808, y: 3.112 }, { x: 0, y: 3.112 }, { x: 0, y: 2.99 },
+    { x: 1.989, y: 0.456, curve: { type: 'cubic', x1: 0.049, y1: 1.825, x2: 0.834, y2: 0.791 } },
+    { close: true },
+  ] },
+};
+
+// Slide 14 - stacked funnel: four face slices plus three darker side slices.
+const FUNNEL = [
+  { x: 4.643, y: 2.67, w: 4.485, h: 1.731, color: '000732', points: [
+    { x: 0.383, y: 1.731, moveTo: true },
+    { x: 4.083, y: 0.639, curve: { type: 'cubic', x1: 1.578, y1: 1.168, x2: 2.819, y2: 0.805 } },
+    { x: 4.485, y: 0, curve: { type: 'cubic', x1: 4.214, y1: 0.424, x2: 4.348, y2: 0.21 } },
+    { x: 0, y: 0.983, curve: { type: 'cubic', x1: 2.961, y1: 0.057, x2: 1.455, y2: 0.383 } },
+    { x: 0.383, y: 1.731, curve: { type: 'cubic', x1: 0.129, y1: 1.23, x2: 0.258, y2: 1.481 } },
+    { close: true },
+  ] },
+  { x: 5.238, y: 3.692, w: 3.264, h: 1.88, color: 'C19300', points: [
+    { x: 0.349, y: 1.88, moveTo: true },
+    { x: 2.89, y: 0.677, curve: { type: 'cubic', x1: 1.164, y1: 1.369, x2: 2.014, y2: 0.968 } },
+    { x: 3.264, y: 0, curve: { type: 'cubic', x1: 3.012, y1: 0.449, x2: 3.137, y2: 0.223 } },
+    { x: 0, y: 1.139, curve: { type: 'cubic', x1: 2.145, y1: 0.219, x2: 1.052, y2: 0.597 } },
+    { x: 0.349, y: 1.88, curve: { type: 'cubic', x1: 0.12, y1: 1.385, x2: 0.235, y2: 1.631 } },
+    { close: true },
+  ] },
+  { x: 5.781, y: 4.772, w: 2.14, h: 1.973, color: '008753', points: [
+    { x: 0.32, y: 1.973, moveTo: true },
+    { x: 1.796, y: 0.712, curve: { type: 'cubic', x1: 0.789, y1: 1.506, x2: 1.28, y2: 1.086 } },
+    { x: 2.14, y: 0, curve: { type: 'cubic', x1: 1.906, y1: 0.472, x2: 2.022, y2: 0.235 } },
+    { x: 0, y: 1.23, curve: { type: 'cubic', x1: 1.398, y1: 0.329, x2: 0.684, y2: 0.737 } },
+    { x: 0.32, y: 1.973, curve: { type: 'cubic', x1: 0.108, y1: 1.476, x2: 0.215, y2: 1.725 } },
+    { close: true },
+  ] },
+  { x: 3.997, y: 2.249, w: 5.131, h: 1.058, color: C.navy, points: [
+    { x: 0, y: 0.214, moveTo: true },
+    { x: 0.415, y: 0.967, curve: { type: 'cubic', x1: 0.14, y1: 0.463, x2: 0.278, y2: 0.714 } },
+    { x: 4.73, y: 1.058, curve: { type: 'cubic', x1: 1.853, y1: 0.794, x2: 3.297, y2: 0.823 } },
+    { x: 5.131, y: 0.42, curve: { type: 'cubic', x1: 4.86, y1: 0.844, x2: 4.995, y2: 0.629 } },
+    { x: 0, y: 0.214, curve: { type: 'cubic', x1: 3.433, y1: 0.071, x2: 1.711, y2: 0 } },
+    { close: true },
+  ] },
+  { x: 4.643, y: 3.5, w: 3.859, h: 0.901, color: C.yellow, points: [
+    { x: 3.485, y: 0.869, moveTo: true },
+    { x: 3.859, y: 0.192, curve: { type: 'cubic', x1: 3.606, y1: 0.641, x2: 3.732, y2: 0.415 } },
+    { x: 0, y: 0.153, curve: { type: 'cubic', x1: 2.575, y1: 0.014, x2: 1.286, y2: 0 } },
+    { x: 0.383, y: 0.901, curve: { type: 'cubic', x1: 0.129, y1: 0.399, x2: 0.258, y2: 0.65 } },
+    { x: 3.485, y: 0.869, curve: { type: 'cubic', x1: 1.415, y1: 0.78, x2: 2.452, y2: 0.769 } },
+    { close: true },
+  ] },
+  { x: 5.781, y: 5.907, w: 1.604, h: 0.838, color: C.teal, points: [
+    { x: 0, y: 0.094, moveTo: true },
+    { x: 0.32, y: 0.838, curve: { type: 'cubic', x1: 0.108, y1: 0.34, x2: 0.215, y2: 0.589 } },
+    { x: 1.288, y: 0.756, curve: { type: 'cubic', x1: 0.641, y1: 0.799, x2: 0.965, y2: 0.772 } },
+    { x: 1.604, y: 0, curve: { type: 'cubic', x1: 1.391, y1: 0.5, x2: 1.495, y2: 0.249 } },
+    { x: 0, y: 0.094, curve: { type: 'cubic', x1: 1.069, y1: 0, x2: 0.533, y2: 0.032 } },
+    { close: true },
+  ] },
+  { x: 5.238, y: 4.709, w: 2.683, h: 0.863, color: C.green, points: [
+    { x: 2.339, y: 0.774, moveTo: true },
+    { x: 2.683, y: 0.064, curve: { type: 'cubic', x1: 2.449, y1: 0.535, x2: 2.565, y2: 0.298 } },
+    { x: 0, y: 0.123, curve: { type: 'cubic', x1: 1.788, y1: 0, x2: 0.893, y2: 0.02 } },
+    { x: 0.349, y: 0.863, curve: { type: 'cubic', x1: 0.12, y1: 0.369, x2: 0.235, y2: 0.615 } },
+    { x: 2.339, y: 0.774, curve: { type: 'cubic', x1: 1.011, y1: 0.786, x2: 1.674, y2: 0.756 } },
+    { close: true },
+  ] },
+];
+
+function freeform(slide, spec) {
+  slide.addShape('custGeom', {
+    x: spec.x, y: spec.y, w: spec.w, h: spec.h,
+    points: spec.points, fill: { color: spec.color }, line: NO_LINE,
+  });
+}
+
+/**
+ * Slide 15 - the "foldedCorner" preset, redrawn by hand because pptxgenjs
+ * does not expose it: card with a clipped bottom-right corner plus the
+ * darker triangular flap that the preset paints over it.
+ */
+function foldedCornerCard(slide, x, y, w, h, fold, color) {
+  slide.addShape('custGeom', {
+    x, y, w, h, fill: { color }, line: NO_LINE,
+    points: [
+      { x: 0, y: 0, moveTo: true }, { x: w, y: 0 }, { x: w, y: h - fold },
+      { x: w - fold, y: h }, { x: 0, y: h }, { close: true },
+    ],
+  });
+  const lip = fold / 5;
+  slide.addShape('custGeom', {
+    x: x + w - fold, y: y + h - fold, w: fold, h: fold,
+    fill: { color: mix(color, C.black, 0.2) }, line: NO_LINE,
+    points: [
+      { x: 0, y: fold, moveTo: true }, { x: lip, y: lip }, { x: fold, y: 0 }, { close: true },
+    ],
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Slides
+ * ------------------------------------------------------------------ */
+
+// 1 - Cover
+function slide01(pres) {
+  const s = pres.addSlide();
+  imageBox(s, 0, 0, 13.333, 7.5);
+  txMajor(s, 'Logistics Distribution', { x: 1.052, y: 0.739, w: 11.998, h: 1.414, fontSize: 78, color: C.white });
+  rect(s, 0, 5.083, 6.375, 1.333, C.navy);
+  tx(s, L.noPen, { x: 0.514, y: 5.446, w: 5.622, h: 0.608, color: C.white, lineSpacingMultiple: 1.3 });
+  txMajor(s, 'Enhancing Efficiency from Warehouse to Customer',
+    { x: 7.24, y: 2.122, w: 5.156, h: 0.372, fontSize: 14, color: C.white, lineSpacingMultiple: 1.3 });
+}
+
+// 2 - Introduction, with the 01 / 02 stat columns
+function slide02(pres) {
+  const s = pres.addSlide();
+  imageBox(s, 0, 1.875, 8.5, 5.625);
+  rect(s, 10.484, 3.75, 1.984, 3.75, C.navyLight);
+  txMajor(s, '02', { x: 9.648, y: 4.047, w: 2.51, h: 2.036, fontSize: 115, color: C.white, align: 'center' });
+  txMajor(s, 'Introduction to Our Logistics Framework', { x: 0.839, y: 0.739, w: 7.594, h: 1.717, fontSize: 48 });
+  rect(s, 8.5, 4.431, 1.984, 3.069, C.navy);
+  tx(s, L.full, { x: 8.5, y: 1.031, w: 3.729, h: 1.133, align: 'justify', lineSpacingMultiple: 1.3 });
+  txMajor(s, '80%', { x: 8.703, y: 3.3, w: 1.578, h: 0.774, fontSize: 40, align: 'center' });
+  txMajor(s, '85%', { x: 10.688, y: 2.737, w: 1.578, h: 0.774, fontSize: 40, align: 'center' });
+  roundRect(s, 2.648, 5.594, 5.156, 0.521, C.navy, 0.26, { shadow: SHADOW });
+  s.addShape('line', { x: 2.99, y: 5.854, w: 0.677, h: 0, line: { color: C.white, width: 1.75, endArrowType: 'triangle' } });
+  txMajor(s, 'An Insight into Our Distribution System',
+    { x: 3.742, y: 5.643, w: 3.883, h: 0.383, fontSize: 14, color: C.white, lineSpacingMultiple: 1.3 });
+  txMajor(s, '01', { x: 7.805, y: 4.776, w: 2.057, h: 2.036, fontSize: 115, color: C.white, align: 'center' });
+}
+
+// 3 - Supply chain network, right hand navy panel
+function slide03(pres) {
+  const s = pres.addSlide();
+  imageBox(s, 0.042, 0, 5.656, 5.594, C.yellow);
+  s.addShape('custGeom', {
+    x: 6.208, y: 0, w: 7.125, h: 7.5, points: NOTCHED_PANEL,
+    fill: { color: C.navy }, line: NO_LINE,
+  });
+  imageBox(s, 0, 0, 9.333, 7.5);
+  txMajor(s, 'End-to-End Supply Chain Network',
+    { x: 7.766, y: 0.773, w: 4.943, h: 2.524, fontSize: 48, color: C.white, align: 'right' });
+  tx(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. '
+    + 'Aenean massa. Cum commodo ligula eget dolor. Aenean massa. Cum sociis natoque sociis natoque penatibus',
+    { x: 7.625, y: 5.595, w: 5.083, h: 1.133, color: C.white, align: 'right', lineSpacingMultiple: 1.3 });
+  roundRect(s, 1.052, 3.229, 3.997, 0.846, C.navy, 0.423, { shadow: SHADOW });
+  txMajor(s, 'Overview of Our Warehousing and Delivery Infrastructure',
+    { x: 2.146, y: 3.354, w: 2.903, h: 0.596, color: C.white, lineSpacingMultiple: 1.3 });
+  icon(s, 'truck', 1.413, 3.381, 0.542, C.white);
+}
+
+// 4 - Three distribution channels
+function slide04(pres) {
+  const s = pres.addSlide();
+  imageBox(s, 0, 0, 13.333, 3.958);
+  s.addShape('snip1Rect', { x: 0, y: 2.389, w: 9.609, h: 1.24, fill: { color: C.white }, line: NO_LINE });
+  txMajor(s, 'Core Distribution Channels', { x: 0.357, y: 2.555, w: 8.896, h: 0.909, fontSize: 48 });
+  [[1.204, 1.204, 'package'], [5.169, 5.304, 'forklift'], [9.218, 9.274, 'truck']]
+    .forEach(([x, iconX, iconKind]) => {
+      featureBlock(s, { x, iconX, iconKind, y: 4.567, bodyW: 2.827, color: C.black, body: L.full });
+    });
+  rect(s, 0, 1.774, 4.792, 0.615, C.navy);
+  txMajor(s, 'How We Move Goods Quickly and Reliably',
+    { x: 0.357, y: 1.896, w: 4.171, h: 0.372, fontSize: 14, color: C.white, lineSpacingMultiple: 1.3 });
+}
+
+// 5 - Inventory & fulfillment: navy fades up over the photo
+function slide05(pres) {
+  const s = pres.addSlide();
+  imageBox(s, 0, 0, 13.333, 7.5);
+  fadeBands(s, { x: 0, y: 0, w: 13.333, h: 7.5, over: C.navy, base: C.imgFill, flip: true });
+  txMajor(s, 'Inventory & Fulfillment Operations',
+    { x: 0.701, y: 5.269, w: 11.247, h: 0.909, fontSize: 48, color: C.white });
+  hairline(s, 6.542, C.white);
+  tx(s, L.full, { x: 0.701, y: 0.824, w: 4.928, h: 0.87, color: C.white, lineSpacingMultiple: 1.3 });
+  statBlock(s, 7.204, 0.72, 'Storage', '927+', C.white);
+  statBlock(s, 9.708, 0.72, 'Delivery', '927+', C.white);
+}
+
+// 6 - Technology in logistics
+function slide06(pres) {
+  const s = pres.addSlide();
+  rect(s, 0, 0, 3.663, 7.5, C.navy);
+  imageBox(s, 0.698, 0.568, 5.354, 6.365);
+  txMajor(s, 'Technology in Logistics', { x: 6.521, y: 0.568, w: 4.06, h: 1.717, fontSize: 48 });
+  rect(s, 5.177, 3.426, 5.031, 3.323, C.navy);
+  statBlock(s, 10.727, 3.426, 'Storage', '927+', C.black);
+  statBlock(s, 10.727, 4.88, 'Delivery', '927+', C.black);
+  txMajor(s, 'Tools & Systems Powering Our Distribution Process',
+    { x: 5.553, y: 3.797, w: 3.508, h: 0.64, fontSize: 16, color: C.white });
+  featureBlock(s, { x: 5.553, y: 4.614, iconKind: 'package', bodyW: 4.279, color: C.white, body: L.full });
+  tx(s, L.toMassa, { x: 6.521, y: 2.482, w: 4.928, h: 0.608, lineSpacingMultiple: 1.3 });
+}
+
+// 7 - Delivery performance: three gradient cards
+function slide07(pres) {
+  const s = pres.addSlide();
+  rect(s, 8.24, 0, 5.094, 3.51, C.yellow);
+  rect(s, 0, 4.792, 4.948, 2.708, C.navy);
+  const cards = [
+    { x: 2.729, numX: 2.789, numW: 1.045, num: '01' },
+    { x: 5.842, numX: 5.958, numW: 1.313, num: '02' },
+    { x: 8.953, numX: 9.19, numW: 1.313, num: '03' },
+  ];
+  cards.forEach((c) => {
+    imageBox(s, c.x, 2.708, 3.036, 4.115);
+    fadeBands(s, { x: c.x, y: 2.708, w: 3.036, h: 4.115, over: C.navy, base: C.imgFill, steps: 36 });
+  });
+  txMajor(s, 'Delivery Performance & Reliability', { x: 0.802, y: 0.677, w: 7.583, h: 1.717, fontSize: 48 });
+  tx(s, L.toSociis, { x: 8.784, y: 1.1, w: 3.747, h: 0.87, align: 'justify', lineSpacingMultiple: 1.3 });
+  cards.forEach((c) => {
+    txMajor(s, c.num, { x: c.numX, y: 2.841, w: c.numW, h: 0.909, fontSize: 48, color: C.white });
+    tx(s, L.oneLine, { x: c.numX, y: 3.75, w: 2.721, h: 0.608, color: C.white, lineSpacingMultiple: 1.3 });
+  });
+  rect(s, 6.468, 5.713, 4.792, 0.615, C.white);
+  txMajor(s, 'How We Move Goods Quickly and Reliably',
+    { x: 6.825, y: 5.834, w: 4.171, h: 0.372, fontSize: 14, lineSpacingMultiple: 1.3 });
+}
+
+// 8 - Leadership portrait with a rating strip
+function slide08(pres) {
+  const s = pres.addSlide();
+  s.addShape('custGeom', {
+    x: 2.591, y: 2.927, w: 8.151, h: 4.573, points: ARCH, fill: { color: C.navy }, line: NO_LINE,
+  });
+  imageBox(s, 3.068, 0, 7.198, 7.5);
+  txMajor(s, 'Meet Our Logistics Leadership', { x: 0.802, y: 0.912, w: 7.583, h: 1.717, fontSize: 48 });
+  featureBlock(s, { x: 9.329, y: 0.912, iconKind: 'package', bodyW: 2.827, color: C.black, body: L.full });
+  rect(s, 6.552, 3.54, 4.792, 0.615, C.white, { shadow: CARD_SHADOW });
+  txMajor(s, 'Maria Davina ', { x: 6.752, y: 3.661, w: 1.776, h: 0.411, fontSize: 16, lineSpacingMultiple: 1.3 });
+  [C.navy, C.navy, C.navy, C.navy, C.softGray].forEach((color, i) => {
+    s.addShape('star5', {
+      x: 8.452 + i * 0.3572, y: 3.716, w: 0.262, h: 0.262, fill: { color }, line: NO_LINE,
+    });
+  });
+  txMajor(s, '4,0', { x: 10.238, y: 3.661, w: 0.679, h: 0.411, fontSize: 16, italic: true, lineSpacingMultiple: 1.3 });
+  txMajor(s, '927+', { x: 0.802, y: 3.262, w: 2.049, h: 0.909, fontSize: 48 });
+  tx(s, 'Your Storage', { x: 0.802, y: 2.966, w: 1.675, h: 0.386, fontSize: 14, lineSpacingMultiple: 1.3 });
+  tx(s, L.elitFirst, { x: 0.802, y: 4.155, w: 2.266, h: 0.87, align: 'justify', lineSpacingMultiple: 1.3 });
+}
+
+// 9 - Product showcase on two phone mock-ups
+function slide09(pres) {
+  const s = pres.addSlide();
+  txMajor(s, 'Visual Showcase of Our Distribution Tools', { x: 0.802, y: 0.912, w: 7.583, h: 1.717, fontSize: 48 });
+  // Two handsets lying on their side; the reference rotates the same mock-up 90deg.
+  roundRect(s, 8.386, 0.65, 6.0, 2.967, C.phone, 0.65);
+  roundRect(s, 3.862, 3.804, 6.0, 2.967, C.phone, 0.65);
+  const stats = [
+    { x: 0.794, valueX: 0.794, title: 'Risk Assessment', bodyW: 2.165, value: '+82M', color: C.yellow },
+    { x: 10.152, valueX: 10.209, title: 'Trend Analysis', bodyW: 2.202, value: '+75M', color: C.navy },
+  ];
+  stats.forEach((st) => {
+    txMajor(st.value === '+82M' ? s : s, st.value,
+      { x: st.valueX, y: 4.395, w: 1.995, h: 0.767, fontSize: 44, color: st.color, lineSpacingMultiple: 0.9 });
+    txMajor(s, st.title, { x: st.x, y: 5.167, w: 2.352, h: 0.411, fontSize: 16, lineSpacingMultiple: 1.3 });
+    tx(s, L.showcase, { x: st.x, y: 5.57, w: st.bodyW, h: 0.608, align: 'justify', lineSpacingMultiple: 1.3 });
+  });
+  tx(s, L.toSociis, { x: 0.794, y: 2.781, w: 5.529, h: 0.608, align: 'justify', lineSpacingMultiple: 1.3 });
+  roundedImageBox(s, 8.573, 0.856, 4.76, 2.556, 0.24); // screens sit on top of the frames
+  roundedImageBox(s, 4.049, 4.009, 5.625, 2.556, 0.24);
+}
+
+// 10 - Distribution flowchart: three stacked panels
+function slide10(pres) {
+  const s = pres.addSlide();
+  rect(s, 4.708, 3.058, 3.917, 4.442, C.navy);
+  rect(s, 0.792, 3.928, 3.917, 3.572, C.yellow);
+  rect(s, 8.625, 3.919, 3.917, 3.572, C.yellow);
+  tx(s, L.ligula, { x: 8.405, y: 1.458, w: 4.227, h: 0.608, align: 'right', lineSpacingMultiple: 1.3 });
+  txMajor(s, 'Strategic Matrics',
+    { x: 10.156, y: 0.984, w: 2.476, h: 0.45, fontSize: 18, align: 'right', lineSpacingMultiple: 1.3 });
+  const panels = [
+    { x: 4.938, num: '01', numY: 3.27, title: 'User Activity', color: C.white, star: 7.712, starY: 3.398, starColor: C.yellow },
+    { x: 8.891, num: '02', numY: 4.18, title: 'Profit Margin', color: C.black, star: 11.665, starY: 4.307, starColor: C.navy },
+    { x: 1.058, num: '03', numY: 4.18, title: 'Market Share', color: C.black, star: 3.832, starY: 4.307, starColor: C.navy },
+  ];
+  panels.forEach((p) => {
+    s.addShape('custGeom', {
+      x: p.star, y: p.starY, w: 0.574, h: 0.574, points: ASTERISK,
+      fill: { color: p.starColor }, line: NO_LINE,
+    });
+    txMajor(s, p.title, { x: p.x, y: 5.184, w: 3.26, h: 0.45, fontSize: 18, color: p.color, lineSpacingMultiple: 1.3 });
+    tx(s, L.eget, { x: p.x, y: 5.607, w: 3.26, h: 0.87, color: p.color, lineSpacingMultiple: 1.3 });
+    txMajor(s, p.num, { x: p.x, y: p.numY, w: 1.364, h: 0.828, fontSize: 48, color: p.color, lineSpacingMultiple: 0.9 });
+  });
+  txMajor(s, 'Distribution Flowchart', { x: 0.702, y: 0.667, w: 4.736, h: 1.717, fontSize: 48 });
+}
+
+// 11 - Warehouse coverage: three ascending performance cards
+function slide11(pres) {
+  const s = pres.addSlide();
+  const cards = [
+    { x: 0.971, y: 4.558, fill: C.navy, textY: 4.779, label: 'Performance 01', value: '78%', color: C.white, bodyW: 3.039 },
+    { x: 4.873, y: 3.166, fill: C.teal, textY: 3.38, label: 'Performance 02', value: '80%', color: C.white, bodyW: 2.95 },
+    { x: 8.774, y: 1.845, fill: C.yellow, textY: 2.051, label: 'Performance 03', value: '97%', color: C.black, bodyW: 2.95 },
+  ];
+  cards.forEach((c) => roundRect(s, c.x, c.y, 3.565, 2.032, c.fill, 0.035));
+  cards.forEach((c) => {
+    const tX = c.x + 0.308;
+    txMajor(s, c.value, { x: tX, y: c.textY, w: 2.008, h: 0.707, fontSize: 40, color: c.color, lineSpacingMultiple: 0.9, charSpacing: 0 });
+    txMajor(s, c.label, { x: tX, y: c.textY + 0.671, w: 2.008, h: 0.37, fontSize: 16, color: c.color });
+    tx(s, L.tempor, { x: tX, y: c.textY + 0.997, w: c.bodyW, h: 0.692, fontSize: 14, color: c.color, lineSpacingMultiple: 1.3 });
+  });
+  txMajor(s, 'Warehouse Locations & Coverage Map', { x: 0.971, y: 0.688, w: 7.654, h: 1.717, fontSize: 48 });
+  tx(s, L.magna, { x: 0.971, y: 2.487, w: 3.175, h: 0.87, lineSpacingMultiple: 1.3 });
+  txMajor(s, '2025', { x: 9.925, y: 4.858, w: 2.351, h: 0.919, fontSize: 54, align: 'right', lineSpacingMultiple: 0.9 });
+  tx(s, L.aliqua, { x: 8.532, y: 5.777, w: 3.744, h: 0.87, align: 'right', lineSpacingMultiple: 1.3 });
+}
+
+// 12 - Four arrow steps
+function slide12(pres) {
+  const s = pres.addSlide();
+  const steps = [
+    { y: 0.755, titleY: 0.935, bodyY: 1.319, color: C.navy, num: '01', icon: 'truck' },
+    { y: 2.318, titleY: 2.46, bodyY: 2.844, color: C.teal, num: '02', icon: 'forklift' },
+    { y: 3.88, titleY: 3.964, bodyY: 4.348, color: C.yellow, num: '03', icon: 'package' },
+    { y: 5.443, titleY: 5.489, bodyY: 5.873, color: C.green, num: '04', icon: 'expand' },
+  ];
+  steps.forEach((st) => s.addShape('rightArrow', {
+    x: 6.573, y: st.y, w: 2.021, h: 1.302, fill: { color: st.color }, line: NO_LINE,
+  }));
+  steps.forEach((st) => {
+    txMajor(s, st.num, { x: 7.142, y: st.y + 0.449, w: 0.883, h: 0.404, fontSize: 18, bold: true, color: C.white, align: 'center' });
+    icon(s, st.icon, 6.703, st.y + 0.414, 0.475, C.white);
+    txMajor(s, 'Your Title Here', { x: 9.125, y: st.titleY, w: 2.509, h: 0.426, fontSize: 16 });
+    tx(s, L.oneLine, { x: 9.125, y: st.bodyY, w: 3.04, h: 0.608, lineSpacingMultiple: 1.3 });
+  });
+  txMajor(s, 'Logistics Performance Metrics', { x: 0.865, y: 0.821, w: 4.817, h: 2.524, fontSize: 48 });
+  txMajor(s, '40,214', { x: 0.865, y: 4.494, w: 3.01, h: 0.818, fontSize: 36, color: C.navy, lineSpacingMultiple: 1.3 });
+  tx(s, L.full, { x: 0.865, y: 5.39, w: 4.582, h: 0.87, lineSpacingMultiple: 1.3 });
+}
+
+// 13 - Cost optimisation: four curved arrows
+function slide13(pres) {
+  const s = pres.addSlide();
+  txMajor(s, 'Cost Optimization Strategies',
+    { x: 1.849, y: 0.6, w: 9.636, h: 0.828, fontSize: 48, align: 'center', lineSpacingMultiple: 0.9 });
+  ['leftTall', 'shadeTall', 'rightTall', 'shadeRoot', 'leftShort', 'rightShort']
+    .forEach((k) => freeform(s, FAN[k]));
+  const labels = [
+    { title: 'Define Vision', tx: 9.565, tw: 1.788, ty: 2.62, bx: 9.565, by: 2.992, align: 'left' },
+    { title: 'Analyze Market', tx: 9.565, tw: 2.129, ty: 4.852, bx: 9.565, by: 5.225, align: 'left' },
+    { title: 'Set Objectives', tx: 1.642, tw: 2.126, ty: 2.627, bx: 1.119, by: 2.999, align: 'right' },
+    { title: 'Plan Execution', tx: 1.699, tw: 2.069, ty: 4.859, bx: 1.119, by: 5.232, align: 'right' },
+  ];
+  labels.forEach((lb) => {
+    txMajor(s, lb.title, { x: lb.tx, y: lb.ty, w: lb.tw, h: 0.37, fontSize: 16, align: lb.align });
+    tx(s, L.noDot, { x: lb.bx, y: lb.by, w: 2.649, h: 0.608, align: lb.align, lineSpacingMultiple: 1.3 });
+  });
+  [[4.523, 5.028, 'expand'], [4.523, 2.957, 'package'], [8.302, 2.957, 'forklift'], [8.302, 5.028, 'truck']]
+    .forEach(([x, y, kind]) => icon(s, kind, x, y, 0.439, C.white));
+}
+
+// 14 - Growth funnel
+function slide14(pres) {
+  const s = pres.addSlide();
+  FUNNEL.forEach((slice) => freeform(s, slice));
+  [['2023', 5.596, 2.519], ['2022', 5.668, 3.719], ['2021', 5.689, 4.955], ['2020', 5.668, 6.141]]
+    .forEach(([year, x, y]) => txMajor(s, year,
+      { x, y, w: 1.788, h: 0.37, fontSize: 16, color: C.white, align: 'center' }));
+  rect(s, 9.628, 2.179, 2.778, 2.626, C.white, { shadow: CARD_SHADOW });
+  txMajor(s, 'Prototype Design', { x: 9.548, y: 5.159, w: 2.5, h: 0.37, fontSize: 16 });
+  tx(s, L.noDot, { x: 9.548, y: 5.519, w: 2.649, h: 0.608, color: C.gray, lineSpacingMultiple: 1.3 });
+  txMajor(s, 'Testing Phase', { x: 1.65, y: 3.133, w: 1.927, h: 0.37, fontSize: 16, align: 'right' });
+  txMajor(s, 'Launch & Promote', { x: 1.124, y: 5.13, w: 2.452, h: 0.37, fontSize: 16, align: 'right' });
+  txMajor(s, 'Market Research', { x: 9.986, y: 3.335, w: 2.062, h: 0.37, fontSize: 16, align: 'center' });
+  tx(s, L.adipiscing, { x: 9.849, y: 3.669, w: 2.336, h: 0.87, color: C.gray, align: 'center', lineSpacingMultiple: 1.3 });
+  txMajor(s, '137K', { x: 10.123, y: 2.445, w: 1.788, h: 0.841, fontSize: 44, align: 'center' });
+  txMajor(s, 'Future Expansion & Growth Plan',
+    { x: 1.305, y: 0.6, w: 10.724, h: 0.828, fontSize: 48, align: 'center', lineSpacingMultiple: 0.9 });
+  tx(s, L.noDot, { x: 0.928, y: 3.492, w: 2.649, h: 0.608, align: 'right', lineSpacingMultiple: 1.3 });
+  tx(s, L.noDot, { x: 0.928, y: 5.49, w: 2.649, h: 0.608, align: 'right', lineSpacingMultiple: 1.3 });
+}
+
+// 15 - Testimonials
+function slide15(pres) {
+  const s = pres.addSlide();
+  rect(s, 0, 0.596, 13.333, 3.166, C.navy);
+  rect(s, 0.63, 4.442, 3.641, 1.606, C.navy);
+  s.addShape('rect', {
+    x: 4.716, y: 4.442, w: 3.641, h: 1.606, fill: { color: C.white }, line: { color: C.hairline, width: 0.25 },
+  });
+  foldedCornerCard(s, 8.802, 4.442, 3.901, 1.606, 0.524, C.yellow);
+  const cards = [
+    { x: 1.868, nameX: 3.136, nameW: 0.911, name: 'Samuel', color: C.white },
+    { x: 5.928, nameX: 7.402, nameW: 0.758, name: 'Darren', color: C.black },
+    { x: 10.012, nameX: 11.483, nameW: 0.758, name: 'Elleon', color: C.white },
+  ];
+  cards.forEach((c) => {
+    tx(s, L.quote, { x: c.x, y: 4.761, w: 2.232, h: 0.608, color: c.color, lineSpacingMultiple: 1.3 });
+    txMajor(s, c.name, { x: c.nameX, y: 5.426, w: c.nameW, h: 0.303, color: c.color, align: 'right' });
+  });
+  tx(s, '\u201C', { x: 11.518, y: 3.252, w: 1.369, h: 3.45, fontSize: 199, fontFace: 'Archivo', color: C.quoteGray });
+  txMajor(s, 'Partner & Client Testimonials',
+    { x: 1.646, y: 1.399, w: 10.041, h: 0.828, fontSize: 48, color: C.white, align: 'center', lineSpacingMultiple: 0.9 });
+  tx(s, L.full, { x: 3.347, y: 2.353, w: 6.64, h: 0.608, color: C.white, align: 'center', lineSpacingMultiple: 1.3 });
+  hairline(s, 6.542, C.navy);
+  [0.762, 4.878, 8.955].forEach((x) => imageBox(s, x, 4.762, 1.031, 0.965));
+}
+
+// 16 - Thank you / contact card
+function slide16(pres) {
+  const s = pres.addSlide();
+  imageBox(s, 0, 0, 13.333, 7.5);
+  txMajor(s, 'Thank You!', { x: 0.768, y: 3.75, w: 6.374, h: 1.282, fontSize: 78, color: C.white, lineSpacingMultiple: 0.9 });
+  hairline(s, 6.542, C.white);
+  tx(s, L.full, { x: 0.768, y: 5.148, w: 4.895, h: 0.87, color: C.white, lineSpacingMultiple: 1.3 });
+  rect(s, 8.765, 0.958, 3.673, 2.792, C.navy);
+  const rows = [
+    { y: 1.477, textY: 1.508, label: '+123 456 7890', glyph: 'phone' },
+    { y: 2.128, textY: 2.158, label: 'www.Beauty.com', glyph: 'globe' },
+    { y: 2.752, textY: 2.781, label: '12 Your Street Name', glyph: 'pin' },
+  ];
+  rows.forEach((r) => {
+    s.addShape('ellipse', { x: 8.976, y: r.y, w: 0.479, h: 0.479, fill: { color: C.white }, line: NO_LINE });
+    contactGlyph(s, r.glyph, 8.976 + 0.2395, r.y + 0.2395);
+    tx(s, r.label, { x: 9.799, y: r.textY, w: 2.429, h: 0.421, fontSize: 14, color: C.white, lineSpacingMultiple: 1.5 });
+  });
+}
+
+/** Navy line-art marks standing in for the phone / globe / location icons. */
+function contactGlyph(slide, kind, cx, cy) {
+  const stroke = { color: C.navy, width: 1.5 };
+  const at = (w, h, extra) => Object.assign(
+    { x: cx - w / 2, y: cy - h / 2, w, h, fill: { type: 'none' }, line: stroke }, extra
+  );
+  if (kind === 'globe') {
+    slide.addShape('ellipse', at(0.2, 0.2));
+    slide.addShape('ellipse', at(0.085, 0.2));
+    slide.addShape('line', Object.assign(at(0.2, 0), { h: 0 }));
+  } else if (kind === 'pin') {
+    slide.addShape('teardrop', at(0.17, 0.17, { rotate: 225 }));
+    slide.addShape('ellipse', at(0.06, 0.06, { y: cy - 0.055 }));
+  } else {
+    slide.addShape('roundRect', at(0.11, 0.19, { rotate: 25, rectRadius: 0.035, fill: { color: C.navy } }));
+    slide.addShape('arc', at(0.24, 0.24, { x: cx - 0.04, angleRange: [300, 60], line: stroke }));
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Build
+ * ------------------------------------------------------------------ */
+
+function build() {
+  const pres = new PptxGenJS();
+  pres.defineLayout({ name: 'WIDE_13x75', width: 13.333, height: 7.5 });
+  pres.layout = 'WIDE_13x75';
+  pres.theme = { headFontFace: FONT_TITLE, bodyFontFace: FONT_BODY };
+  pres.title = 'Logistics Distribution';
+
+  [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08,
+    slide09, slide10, slide11, slide12, slide13, slide14, slide15, slide16]
+    .forEach((fn) => fn(pres));
+
+  return pres.writeFile({
+    fileName: path.join(__dirname, '1872ba4a-e0c5-409e-a2bf-3e36f5655b84_grok_final.pptx'),
+  });
+}
+
+build().then((f) => console.log('wrote', f)).catch((e) => { console.error(e); process.exit(1); });
