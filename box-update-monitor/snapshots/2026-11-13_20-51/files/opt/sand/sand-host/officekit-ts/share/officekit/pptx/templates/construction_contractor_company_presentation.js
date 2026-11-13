@@ -1,0 +1,795 @@
+/**
+ * "The Contractor" — construction & heavy-equipment pitch deck (30 slides, 16:9).
+ *
+ * Rebuilt from scratch with pptxgenjs only. Every position is in inches on a
+ * 13.333 x 7.5 canvas and mirrors the original deck's geometry.
+ *
+ * The source deck used raster/SVG gear artwork and photo placeholders; both are
+ * re-drawn here with native pptxgenjs shapes (gear6 / gear9 / pie wedges) so the
+ * script stays self-contained.
+ *
+ *   node 04c0cc55-ee83-4fd3-9c9a-b0775d439208_grok_final.js
+ */
+
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+const pptx = new PptxGenJS();
+const S = pptx.ShapeType;
+
+// ---------------------------------------------------------------- design tokens
+const C = {
+  orange: 'DC5F00', // brand accent
+  dark:   '373A40', // panels + dark headings
+  light:  'EEEEEE', // page background + text on dark panels
+  yellow: 'FFC000', // the thin word-spacer runs inside titles
+  gray:   '404040', // theme tx1 @ 75% luminance
+};
+
+const F = {
+  reg:   'Montserrat',
+  semi:  'Montserrat SemiBold',
+  black: 'Montserrat Black',
+};
+
+const BULLET = { code: '2022' };
+
+// ---------------------------------------------------------------- text helpers
+/**
+ * `content` is either a plain string ('\n' starts a new paragraph) or an array
+ * of compact runs: { t, color, size, face, bullet, br }.
+ */
+function txt(s, b, content, o) {
+  o = o || {};
+  const face = o.face || F.reg;
+  const size = o.size || 18;
+  const color = o.color || C.dark;
+  const opts = {
+    x: b[0], y: b[1], w: b[2], h: b[3],
+    fontFace: face, fontSize: size, color: color,
+    bold: !!o.bold, italic: !!o.italic,
+    align: o.align || 'left', valign: o.valign || 'top',
+  };
+  if (o.ls) opts.lineSpacingMultiple = 1.5;
+  if (o.bulletIndent) opts.bullet = { code: BULLET.code, indent: o.bulletIndent };
+
+  let arg = content;
+  if (typeof content === 'string') {
+    // one run per line so a trailing '\n' still yields an empty last paragraph
+    const lines = content.split('\n');
+    arg = lines.map(function (t, i) {
+      return { text: t, options: { breakLine: i < lines.length - 1 } };
+    });
+  } else if (Array.isArray(content)) {
+    arg = content.map(function (r) {
+      const ro = {
+        fontFace: r.face || face,
+        fontSize: r.size || size,
+        color: r.color || color,
+        breakLine: !!r.br,
+      };
+      if (r.bullet) ro.bullet = { code: BULLET.code, indent: o.bulletIndent || 22.5 };
+      return { text: r.t, options: ro };
+    });
+  }
+  s.addText(arg, opts);
+}
+
+const preset = (defaults) => (s, b, content, color, o) =>
+  txt(s, b, content, Object.assign({}, defaults, { color: color }, o));
+
+const body  = preset({ face: F.reg,   size: 10, ls: true });                 // running copy
+const head  = preset({ face: F.semi,  size: 18 });                           // sub-headings
+const quote = preset({ face: F.semi,  size: 14, italic: true, ls: true });   // pull quotes
+const title = preset({ face: F.black, size: 40 });                           // slide titles
+
+// --------------------------------------------------------------- shape helpers
+const NOFILL = { type: 'none' };
+
+function rect(s, b, fill) {
+  s.addShape(S.rect, { x: b[0], y: b[1], w: b[2], h: b[3], fill: { color: fill } });
+}
+function orect(s, b, lineColor) {
+  s.addShape(S.rect, { x: b[0], y: b[1], w: b[2], h: b[3], fill: NOFILL,
+    line: { color: lineColor, width: 1 } });
+}
+function dot(s, x, y, d, fill) {
+  s.addShape(S.ellipse, { x: x, y: y, w: d, h: d, fill: { color: fill } });
+}
+function ring(s, x, y, d, lineColor, width) {
+  s.addShape(S.ellipse, { x: x, y: y, w: d, h: d, fill: NOFILL,
+    line: { color: lineColor, width: width } });
+}
+function line(s, b, lineColor, width) {
+  s.addShape(S.line, { x: b[0], y: b[1], w: b[2], h: b[3],
+    line: { color: lineColor, width: width } });
+}
+function crossCircle(s, x, y, d) {
+  s.addShape(S.flowChartSummingJunction, { x: x, y: y, w: d, h: d, fill: NOFILL,
+    line: { color: C.orange, width: 1 } });
+}
+function wedge(s, b, angles, fill, lineColor) {
+  s.addShape(S.pie, { x: b[0], y: b[1], w: b[2], h: b[3], angleRange: angles,
+    fill: fill ? { color: fill } : NOFILL,
+    line: lineColor ? { color: lineColor, width: 1 } : { type: 'none' } });
+}
+
+// ------------------------------------------------------------------- gear art
+// The deck's gear icons, rebuilt from pptxgenjs' native gear6 / gear9 outlines
+// plus a background-coloured centre hole. `hole` is a fraction of the diameter.
+const GEARS = {
+  ring13:  { teeth: 'gear9', outline: C.orange, hole: 0.62 }, // big open gear
+  gear13o: { teeth: 'gear9', fill: C.orange,    hole: 0.64 },
+  gear13d: { teeth: 'gear9', fill: C.dark,      hole: 0.64 },
+  gear6o:  { teeth: 'gear6', fill: C.orange,    hole: 0.47 },
+  gear6d:  { teeth: 'gear6', fill: C.dark,      hole: 0.47 },
+  hub:     { spokes: 6,      fill: C.dark,      hole: 0.44 }, // segmented wheel
+};
+
+function gear(s, kind, b) {
+  const g = GEARS[kind];
+  const x = b[0], y = b[1], w = b[2], h = b[3];
+  if (g.spokes) {
+    const step = 360 / g.spokes;
+    for (let i = 0; i < g.spokes; i++) wedge(s, b, [i * step + 4, (i + 1) * step - 4], g.fill, null);
+  } else {
+    s.addShape(S[g.teeth], { x: x, y: y, w: w, h: h,
+      fill: g.fill ? { color: g.fill } : NOFILL,
+      line: g.outline ? { color: g.outline, width: 2 } : { type: 'none' } });
+  }
+  const hw = w * g.hole, hh = h * g.hole;
+  s.addShape(S.ellipse, { x: x + (w - hw) / 2, y: y + (h - hh) / 2, w: hw, h: hh,
+    fill: g.outline ? NOFILL : { color: C.light },
+    line: g.outline ? { color: g.outline, width: 2 } : { type: 'none' } });
+}
+
+// Social glyphs sit inside the orange circles: Instagram gets a camera outline,
+// the rest are drawn as white letterforms.
+function social(s, glyph, b, ink) {
+  const cx = b[0] + b[2] / 2, cy = b[1] + b[3] / 2;
+  if (glyph === 'ig') {
+    const d = 0.26;
+    s.addShape(S.roundRect, { x: cx - d / 2, y: cy - d / 2, w: d, h: d, rectRadius: 0.07,
+      fill: NOFILL, line: { color: ink, width: 1.5 } });
+    ring(s, cx - d / 4, cy - d / 4, d / 2, ink, 1.5);
+    return;
+  }
+  txt(s, [cx - 0.3, cy - 0.16, 0.6, 0.32], glyph,
+    { face: F.black, size: 14, color: ink, align: 'center', valign: 'middle' });
+}
+
+// -------------------------------------------------------------- world map art
+// Slide 29's continents, painted as a coarse pixel grid ('#' land, 'o' network).
+const WORLD_MAP = [
+  '..........................####......######..............................................................',
+  '.......................######################...........................................................',
+  '.....................########.##############...........#...................##...........................',
+  '..................##.######.###############.........###.....................###.........................',
+  '..............#......#.###..###############..........#........................#.........................',
+  '...............###.#######.....############......................###......#######.......##..............',
+  '.............##......#.##.......###########......................#.......########.......................',
+  '............###############......#########......................#....#.###############...###............',
+  '..####.........####..#.######....#########.............###..........###########################.........',
+  '.##################.###.#..###...########............#######...######################################...',
+  '.########################..####..######..............##################################################.',
+  '#########################.####....###.....###.......###.#############################################.#.',
+  '.#####################....####....###..............###.#############################################....',
+  '.#####################....###......#..............####.#######################################.###......',
+  '...#.....#############....#####................#....##.###################################....##........',
+  '..........##############..#####................##..##..#################################.....###........',
+  '...........##############.#######.............#.#.########################################....#.........',
+  '............#####################...............##########################################..............',
+  '.............#################..#...............#########################################...............',
+  '.............##################.................#########.#####.########################................',
+  '.............################.................#####.#####...###.########################.#..............',
+  '.............##############...................###....##########.######################...#..............',
+  '.............##############...................###.##.....##########################..#..#...............',
+  '..............############.....................#####.......##########oo############....##...............',
+  '...............##########.....................######################ooo#############....................',
+  '................#####....#...................######################ooo##############....................',
+  '.................####.......................#######################oo##############.....................',
+  '..................###.......................#########oo####.######...#############......................',
+  '..................#####.....................#########ooo#########.....###..####.........................',
+  '....................####....................#########ooo####.###......##....####...#....................',
+  '.......................##...................#########oo#######........##.....###........................',
+  '........................#.##ooo..............########oo########........#............#...................',
+  '..........................###oo##.............###.#############..............#....#.....................',
+  '..........................###o####..................##oooo####...............#...##.....................',
+  '.........................###########...............##oooo####................##.####....................',
+  '.........................#############..............#oooo###..................#..#.#...###..............',
+  '.........................##############.............##ooo###............................###.............',
+  '..........................############...............##oo###............................................',
+  '...........................###########..............#########.#......................ooo.o..............',
+  '............................##########..............########.##.....................ooooooo.............',
+  '............................#########................######..##...................ooooooooo.............',
+  '............................########.................######..#...................ooooooooooo............',
+  '............................#######..................#####.......................oooooooooooo...........',
+  '............................######....................####.......................oooooooooooo...........',
+  '............................######....................###.........................ooo..oooooo...........',
+  '...........................#####........................................................oooo............',
+  '...........................#####.........................................................oo........#....',
+  '...........................###............................................................o.......#.....',
+  '...........................###...................................................................#......',
+  '...........................###..........................................................................',
+  '...........................##...........................................................................',
+  '...........................##...........................................................................',
+  '............................#...........................................................................'
+];
+
+function worldMap(s, x, y, w, h) {
+  const cw = w / WORLD_MAP[0].length;
+  const rh = h / WORLD_MAP.length;
+  WORLD_MAP.forEach(function (row, r) {
+    let c = 0;
+    while (c < row.length) {
+      const ch = row[c];
+      if (ch === '.') { c++; continue; }
+      let e = c;
+      while (e < row.length && row[e] === ch) e++;
+      // rows overlap by a hair so the renderer leaves no seams between them
+      s.addShape(S.rect, { x: x + c * cw, y: y + r * rh, w: (e - c) * cw, h: rh * 1.35,
+        fill: { color: ch === 'o' ? C.orange : C.dark }, line: { type: 'none' } });
+      c = e;
+    }
+  });
+}
+
+// ------------------------------------------------------------- repeated chrome
+// Six outlined parallelograms + a double rule along the bottom of every slide.
+// "Narrow" slides (the title/section pages) keep the rule clear of the artwork.
+const NARROW = [1, 4, 8, 15, 21, 25, 30];
+
+function chrome(s, page) {
+  for (let i = 0; i < 6; i++) {
+    s.addShape(S.flowChartInputOutput, { x: 8.314 + i * 0.792, y: 6.975, w: 0.894, h: 0.338,
+      fill: NOFILL, line: { color: C.orange, width: 1 } });
+  }
+  if (NARROW.indexOf(page) >= 0) {
+    line(s, [3.802, 7.314, 4.411, 0], C.orange, 0.5);
+    line(s, [3.842, 7.236, 4.435, 0], C.orange, 0.5);
+  } else {
+    line(s, [0.628, 7.314, 7.54, 0], C.orange, 0.5);
+    line(s, [0.695, 7.236, 7.582, 0], C.orange, 0.5);
+    gear(s, 'gear13d', [0.127, 6.916, 0.457, 0.457]);
+    ring(s, 0.265, 7.053, 0.181, C.orange, 3);
+  }
+  txt(s, [11.974, 0.186, 1.01, 0.236], 'Page ' + String(page).padStart(2, '0'),
+    { face: F.semi, size: 8, color: C.orange, align: 'right' });
+}
+
+// The bottom-left gear pile shared by the cover (1) and the closing slide (30).
+function gearCluster(s) {
+  ring(s, 0.057, 3.983, 3.486, C.dark, 0.5);
+  gear(s, 'ring13',  [0.437, 4.335, 2.782, 2.782]);
+  gear(s, 'gear6o',  [0.179, 6.778, 0.516, 0.556]);
+  gear(s, 'hub',     [1.027, 4.925, 1.602, 1.602]);
+  ring(s, 1.612, 5.51, 0.431, C.orange, 3);
+  gear(s, 'gear13o', [3.267, 5.726, 1.523, 1.523]);
+  ring(s, 3.735, 6.196, 0.249, C.dark, 3);
+  ring(s, 4.073, 6.196, 0.249, C.dark, 3);
+  ring(s, 4.073, 6.529, 0.249, C.dark, 3);
+  ring(s, 3.738, 6.529, 0.249, C.dark, 3);
+  ring(s, 3.606, 6.064, 0.846, C.orange, 1);
+  gear(s, 'gear13d', [2.182, 3.317, 1.085, 1.085]);
+  ring(s, 2.509, 3.643, 0.431, C.orange, 3);
+  gear(s, 'gear6d',  [0.857, 3.132, 0.516, 0.556]);
+  crossCircle(s, 4.683, 5.018, 0.608);
+  gear(s, 'ring13',  [4.322, 4.658, 1.329, 1.329]);
+  gear(s, 'gear6d',  [3.569, 4.66, 0.516, 0.556]);
+  ring(s, 2.07, 3.205, 1.312, C.orange, 1);
+}
+
+// ------------------------------------------------------------- section pages
+// Slides 4 / 8 / 15 / 21 / 25 share one layout: dark panel on the right, a huge
+// outlined number on the left and the same standing blurb.
+const SECTION_BLURB = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod ' +
+  'tempor incididunt ut labore et dolore magna aliqua. Varius morbi enim nunc faucibus a ' +
+  'pellentesque sit amet porttitor. ';
+
+const DIVIDERS = [
+  ['Introduction', '01.', 6.29],
+  ['Service & Product', '02.', 6.29],
+  ['After-Sales Services', '03.', 6.29],
+  ['Infographic & Analysis', '04.', 7.194],
+  ['Our Best Team', '05.', 7.194]
+];
+
+function divider(s, spec) {
+  const heading = spec[0], number = spec[1], titleW = spec[2];
+  rect(s, [3.69, 0, 9.643, 7.5], C.dark);
+  title(s, [4.39, 1.944, titleW, 0.774], heading, C.orange);
+  head(s, [4.39, 4.662, 6.417, 0.404], 'Construction & Heavy Equipment Company', C.orange);
+  body(s, [4.39, 5.189, 5.839, 0.83], SECTION_BLURB, C.light);
+  txt(s, [0.878, 1.283, 2.812, 1.717], number, { face: F.black, size: 96, color: C.dark });
+  ring(s, 2.168, 7.111, 0.249, C.orange, 3);
+  ring(s, 0.153, 5.146, 0.249, C.orange, 3);
+  crossCircle(s, 0.703, 5.772, 1.019);
+  gear(s, 'ring13',  [0.099, 5.168, 2.228, 2.228]);
+  gear(s, 'gear6d',  [0.277, 4.511, 0.516, 0.556]);
+  gear(s, 'gear13d', [2.436, 6.151, 1.085, 1.085]);
+  ring(s, 2.763, 6.476, 0.431, C.orange, 3);
+}
+
+// --------------------------------------------------------------- slide 1
+function slide1(s) {
+  gearCluster(s);
+  gear(s, 'gear6d', [4.987, 6.098, 0.516, 0.556]);
+  line(s, [0.397, 0.861, 0.04, 4.461], C.orange, 3);
+  line(s, [0.507, 0.861, 0, 4.461], C.dark, 0.5);
+  txt(s, [1.003, 0.962, 9.687, 1.447], [{ t: 'The', color: C.orange }, { t: ' ', color: C.yellow }, { t: 'Contractor' }], { face: F.black, size: 80, color: C.dark });
+  body(s, [7.1, 5.313, 5.277, 0.83], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Varius morbi enim nunc faucibus a pellentesque sit amet porttitor.', C.dark, { align: 'right' });
+  head(s, [6.761, 4.741, 5.616, 0.404], 'Project Presentation', C.orange, { align: 'right' });
+}
+
+// --------------------------------------------------------------- slide 2
+function slide2(s) {
+  rect(s, [0, 3.331, 13.333, 3.364], C.dark);
+  title(s, [0.782, 0.962, 4.276, 0.774], [{ t: 'Hi, ', color: C.orange }, { t: 'Welcome' }], C.dark);
+  body(s, [0.782, 2.119, 5.307, 0.83], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Varius morbi enim nunc faucibus a pellentesque sit amet porttitor. Lorem ipsum dolor', C.dark);
+  head(s, [0.782, 3.812, 3.204, 0.404], 'Greeting!', C.orange, { bold: true });
+  body(s, [0.782, 4.233, 5.161, 0.577], 'Massa tempor nec feugiat nisl pretium fusce id. Pellentesque habitant morbi tristique senectus et netus et malesuada fames.', C.light);
+  head(s, [0.782, 5.228, 3.204, 0.404], 'How Are You Today?', C.orange, { bold: true });
+  body(s, [0.782, 5.634, 5.161, 0.577], 'Egestas purus viverra accumsan in nisl nisi. Feugiat in ante metus dictum at tempor commodo ullamcorper. ', C.light);
+  // empty picture placeholder [6.667, 0.962, 5.884, 5.367]
+}
+
+// --------------------------------------------------------------- slide 3
+function slide3(s) {
+  gear(s, 'gear6d', [10.995, 6.16, 0.516, 0.556]);
+  gear(s, 'gear6d', [1.082, 2.368, 0.296, 0.319]);
+  gear(s, 'gear6d', [1.082, 3.704, 0.296, 0.319]);
+  gear(s, 'gear6d', [1.082, 5.04, 0.296, 0.319]);
+  gear(s, 'gear6d', [7.401, 2.368, 0.296, 0.319]);
+  gear(s, 'gear6d', [7.401, 3.704, 0.296, 0.319]);
+  gear(s, 'ring13', [11.585, 5.324, 1.562, 1.562]);
+  gear(s, 'hub', [11.916, 5.655, 0.9, 0.9]);
+  head(s, [1.59, 2.326, 4.667, 0.404], '01.  Introduction', C.orange);
+  title(s, [0.782, 0.784, 6.29, 0.774], [{ t: 'Table', color: C.orange }, { t: ' ', color: C.yellow }, { t: 'of Content' }], C.dark);
+  body(s, [1.557, 2.744, 4.7, 0.673], 'Massa tempor nec feugiat nisl pretium fusce id. Pellentesque habitant morbi tristique senectus et', C.dark, { size: 12 });
+  body(s, [7.912, 2.744, 4.7, 0.673], 'Urna duis convallis convallis tellus id interdum velit. Amet commodo nulla facilisi nullam. Pharetra diam', C.dark, { size: 12 });
+  body(s, [1.557, 4.08, 4.7, 0.673], 'Ac orci phasellus egestas tellus rutrum tellus pellentesque eu tincidunt. Ac auctor augue mauris', C.dark, { size: 12 });
+  body(s, [7.912, 4.08, 4.7, 0.673], 'In massa tempor nec feugiat nisl pretium fusce. Interdum velit euismod in pellentesque massa', C.dark, { size: 12 });
+  body(s, [1.557, 5.416, 4.7, 0.673], 'Elit pellentesque habitant morbi tristique senectus et netus et malesuada. Turpis massa tincidunt dui ut', C.dark, { size: 12 });
+  head(s, [1.59, 3.662, 4.667, 0.404], '02.  Service & Product', C.orange);
+  head(s, [1.59, 4.998, 4.667, 0.404], '03.  After-sales Services', C.orange);
+  head(s, [7.944, 2.326, 4.667, 0.404], '04.  Infographic', C.orange);
+  head(s, [7.944, 3.662, 4.667, 0.404], '05.  Team', C.orange);
+  ring(s, 12.245, 5.984, 0.242, C.orange, 3);
+}
+
+// --------------------------------------------------------------- slide 5
+function slide5(s) {
+  rect(s, [0, 1.961, 13.333, 2.23], C.dark);
+  title(s, [0.913, 0.784, 5, 0.774], [{ t: 'Let’s, ', color: C.orange }, { t: 'Know us !' }], C.dark);
+  body(s, [5.978, 2.445, 6.442, 1.082], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do incididunt ut labore etthe dolore magna aliqua. pellentesque sit amet porttitor. Lorem ipsum dolor sit amet, every consectetur adipiscing elit, sed do eiusmod tempor incididunt magna Varius morbi enim nunc faucibus a pellentesque sit amet porttitor. ', C.light);
+  head(s, [5.978, 4.406, 2.691, 0.404], 'A Little story', C.orange, { bold: true });
+  body(s, [5.978, 4.92, 2.945, 1.587], 'Egestas purus viverra accumsan in nisl nisi.in ante metus dictum at tempor commodo ullamcorper. \n\nTincidunt massa eget egestas purus. pellentesque sit amet porttitor. ', C.dark);
+  head(s, [9.475, 4.406, 2.691, 0.404], 'About us', C.orange, { bold: true });
+  body(s, [9.475, 4.92, 2.945, 1.587], 'Egestas purus viverra accumsan in nisl nisi. Feugiat in ante metus dictum at tempor commodo ullamcorper. \n\nTincidunt ornare massa eget egestas purus. pellentesque sit amet porttitor. ', C.dark);
+  // empty picture placeholder [0.913, 2.445, 4.629, 4.062]
+}
+
+// --------------------------------------------------------------- slide 6
+function slide6(s) {
+  rect(s, [0, 4.379, 13.333, 2.23], C.dark);
+  title(s, [0.695, 0.784, 7.789, 0.774], [{ t: 'About Our ' }, { t: 'Company', color: C.dark }], C.orange);
+  body(s, [4.794, 1.849, 7.582, 2.092], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Varius morbi enim nunc faucibus a pellentesque sit amet porttitor. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Varius morbi enim nunc faucibus a pellentesque sit amet porttitor. \n\nLorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Varius morbi enim nunc faucibus a pellentesque sit amet porttitor. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ', C.dark);
+  head(s, [4.794, 4.619, 3.334, 0.404], 'Construction Service', C.orange, { bold: true });
+  body(s, [8.933, 5.206, 3.143, 0.83], 'Egestas purus viverra accumsan in nisl nisi. Feugiat in ante metus dictum at tempor commodo ullamcorper. ', C.light);
+  head(s, [8.933, 4.623, 3.306, 0.404], 'Heavy Equipment Rent', C.orange, { bold: true });
+  body(s, [4.794, 5.2, 3.483, 0.83], 'Egestas purus viverra accumsan in ullamcorper. Tincidunt ornare massa eget egestas purus. amet porttitor. ', C.light);
+  // empty picture placeholder [0, 1.865, 4.138, 4.274]
+}
+
+// --------------------------------------------------------------- slide 7
+function slide7(s) {
+  gear(s, 'gear13d', [0.897, 4.59, 0.792, 0.792]);
+  gear(s, 'gear13d', [7.14, 4.586, 0.792, 0.792]);
+  title(s, [0.782, 0.784, 3.801, 1.447], [{ t: 'Why', color: C.orange }, { t: ' ', color: C.yellow }, { t: 'Choose Us?' }], C.dark);
+  body(s, [0.782, 2.966, 5.151, 1.082], 'Lorem ipsum dolor sit amet, consectetur eiusmod tempor incididunt ut labore et dolore magna aliqua. Varius morbi enim nunc faucibus a pellentesque sit amet porttitor. consectetur incididunt ut magna the aliqua. Varius morbi enim nunc faucibus a', C.dark);
+  body(s, [1.986, 5.243, 3.947, 1.082], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Varius morbi enim faucibus a pellentesque sit amet porttitor. ', C.dark);
+  head(s, [1.986, 4.784, 4.857, 0.404], 'Reliable & Trustworthy', C.orange);
+  head(s, [0.952, 4.784, 0.655, 0.404], '01', C.orange, { align: 'center' });
+  head(s, [8.229, 4.785, 4.857, 0.404], [{ t: 'Experienced & Professional' }, { t: ' ', size: 10 }], C.orange);
+  head(s, [7.195, 4.785, 0.655, 0.404], '02', C.orange, { align: 'center' });
+  body(s, [8.229, 5.243, 3.947, 1.082], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Varius morbi enim faucibus a pellentesque sit amet porttitor. ', C.dark);
+  // empty picture placeholder [7.14, 0.784, 6.193, 3.23]
+}
+
+// --------------------------------------------------------------- slide 9
+function slide9(s) {
+  title(s, [0.782, 0.784, 7.131, 0.774], [{ t: 'Our', color: C.orange }, { t: ' ', color: C.yellow }, { t: 'Service & Product' }], C.dark);
+  rect(s, [0.913, 1.875, 3.656, 2.264], C.orange);
+  txt(s, [1.349, 2.656, 2.825, 0.404], 'High Rise Building', { face: F.black, size: 18, color: C.dark, bold: true });
+  title(s, [1.349, 1.975, 0.928, 0.774], '01', C.dark);
+  txt(s, [1.349, 3.107, 2.789, 0.768], [{ t: 'Building Services', bullet: true, br: true }, { t: 'Renovation Services', bullet: true }], { face: F.semi, size: 14, color: C.light, ls: true, bulletIndent: 22.5 });
+  rect(s, [0.913, 4.35, 3.656, 2.264], C.dark);
+  rect(s, [8.764, 4.338, 3.656, 2.264], C.dark);
+  rect(s, [4.838, 4.35, 3.656, 2.264], C.dark);
+  body(s, [5.205, 2.967, 7.171, 0.83], 'Lorem ipsum dolor sit amet, adipiscing elit, sed do eiusmod tempor incididunt ut labore et magna aliqua. Varius morbi enim nunc faucibus a pellentesque sit amet porttitor. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut', C.dark);
+  quote(s, [5.205, 1.819, 7.215, 0.768], '“ Lorem ipsum dolor sit amet, consectetur adipiscing elit, eiusmod tempor incididunt ut labore et dolore magna aliqua.”', C.dark);
+  txt(s, [5.288, 5.132, 2.825, 0.404], 'All Infrastructure', { face: F.black, size: 18, color: C.orange, bold: true });
+  title(s, [5.288, 4.451, 0.928, 0.774], '03', C.orange);
+  txt(s, [5.288, 5.582, 2.789, 0.768], [{ t: 'Building Services', bullet: true, br: true }, { t: 'Renovation Services', bullet: true }], { face: F.semi, size: 14, color: C.light, ls: true, bulletIndent: 22.5 });
+  txt(s, [9.145, 5.132, 2.825, 0.404], 'Heavy Equipment', { face: F.black, size: 18, color: C.orange, bold: true });
+  title(s, [9.145, 4.451, 1.063, 0.774], '04', C.orange);
+  txt(s, [9.145, 5.582, 2.789, 0.768], [{ t: 'Unit Sale', bullet: true, br: true }, { t: 'Unit Rental', bullet: true }], { face: F.semi, size: 14, color: C.light, ls: true, bulletIndent: 22.5 });
+  txt(s, [1.291, 5.119, 2.825, 0.404], 'Real Estate', { face: F.black, size: 18, color: C.orange, bold: true });
+  title(s, [1.291, 4.438, 0.928, 0.774], '02', C.orange);
+  txt(s, [1.291, 5.57, 2.789, 0.768], [{ t: 'Building Services', bullet: true, br: true }, { t: 'Renovation Services', bullet: true }], { face: F.semi, size: 14, color: C.light, ls: true, bulletIndent: 22.5 });
+}
+
+// --------------------------------------------------------------- slide 10
+function slide10(s) {
+  rect(s, [0.027, 1.798, 13.347, 2.863], C.dark);
+  title(s, [0.782, 5.026, 3.874, 1.447], [{ t: 'High Rise ' }, { t: 'Building', color: C.dark }], C.orange);
+  body(s, [5.802, 5.104, 6.609, 1.335], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Varius morbi enim nunc faucibus a pellentesque sit amet porttitor. Lorem ipsum dolor sit amet, Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Varius morbi enim nunc faucibus a pellentesque sit amet porttitor. Lorem ipsum dolor sit amet, ', C.dark);
+  body(s, [3.757, 2.204, 2.384, 2.092], 'Egestas purus metus dictum at ullamcorper. Tincidunt massa eget egestas purus. pellentesque sit amet\n\nEgestas accumsan in nisl nisi.in ante metus dictum at tempor commodo ullamcorper. ', C.light);
+  head(s, [3.975, 0.843, 2.166, 0.707], 'Building Services', C.orange);
+  dot(s, 3.757, 0.964, 0.162, C.gray);
+  head(s, [10.14, 0.843, 2.331, 0.707], 'Renovation Services', C.orange);
+  dot(s, 9.922, 0.964, 0.162, C.gray);
+  body(s, [9.891, 2.204, 2.384, 2.092], 'Egestas purus metus dictum at ullamcorper. Tincidunt massa eget egestas purus. pellentesque sit amet\n\nEgestas accumsan in nisl nisi.in ante metus dictum at tempor commodo ullamcorper. ', C.light);
+  // empty picture placeholder [0.782, 0.554, 2.546, 3.632]
+  // empty picture placeholder [6.894, 0.556, 2.546, 3.632]
+}
+
+// --------------------------------------------------------------- slide 11
+function slide11(s) {
+  rect(s, [8.008, 2.001, 5.325, 4.205], C.dark);
+  title(s, [0.782, 0.784, 4.408, 0.774], [{ t: 'Real', color: C.orange }, { t: ' ', color: C.yellow }, { t: 'Estate' }], C.dark);
+  title(s, [0.784, 5.432, 0.928, 0.774], '01', C.orange);
+  title(s, [4.397, 5.432, 0.928, 0.774], '02', C.orange);
+  body(s, [8.91, 2.931, 3.466, 2.344], 'Lorem ipsum dolor sit amet, consectetur sed do eiusmod tempor ut labore et dolore magna aliqua. Varius morbi enim nunc faucibus a pellentesque sit amet porttitor. \n\nLorem ipsum dolor sit amet, \\adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore pellentesque sit amet porttitor. Lorem ipsum dolor sit amet, consectetur', C.light);
+  head(s, [2.008, 5.5, 1.342, 0.707], 'Building Services', C.dark);
+  head(s, [5.685, 5.5, 1.71, 0.707], 'Renovation Services', C.dark);
+  // empty picture placeholder [0.784, 2.001, 3.145, 2.948]
+  // empty picture placeholder [4.397, 2.001, 3.145, 2.948]
+}
+
+// --------------------------------------------------------------- slide 12
+function slide12(s) {
+  rect(s, [0, 2.938, 13.333, 3.179], C.dark);
+  title(s, [0.782, 0.784, 5.595, 0.774], [{ t: 'All', color: C.orange }, { t: ' ', color: C.gray }, { t: 'Infrastructure' }], C.dark);
+  body(s, [0.782, 1.758, 5.595, 0.83], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, tempor incididunt ut labore et dolore magna aliqua. Varius morbi enim nunc pellentesque amet porttitor. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do', C.gray);
+  head(s, [1, 3.16, 3.007, 0.404], 'Building Services', C.orange);
+  head(s, [1, 4.619, 3.007, 0.404], 'Repair Services', C.orange);
+  dot(s, 0.782, 3.28, 0.162, C.orange);
+  dot(s, 0.782, 4.74, 0.162, C.orange);
+  body(s, [0.782, 3.563, 5.595, 0.83], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed  eiusmod tempor incididunt ut labore et dolore magna aliqua. Varius morbi enim faucibus a pellentesque sit amet porttitor. ', C.light);
+  body(s, [0.782, 5.023, 5.595, 0.83], 'Lorem ipsum dolor sit amet, adipiscing elit, sed do eiusmod tempor eiusmod tempor incididunt  incididunt ut labore et dolore magna aliqua. Varius morbi enim nunc faucibus a pellentesque sit amet porttitor. ', C.light);
+  // empty picture placeholder [7.091, 0.891, 5.46, 5.717]
+}
+
+// --------------------------------------------------------------- slide 13
+function slide13(s) {
+  rect(s, [0, 4.654, 13.333, 1.856], C.dark);
+  body(s, [0.799, 5.038, 4.529, 1.082], 'Lorem ipsum dolor sit amet, adipiscing elit, sed do eiusmod tempor incididunt ut labore et magna aliqua. Varius morbi enim nunc faucibus a pellentesque sit amet porttitor. enim nunc faucibus a pellentesque sit amet porttitor. ', C.light);
+  title(s, [0.782, 0.784, 4.615, 2.121], [{ t: 'Heavy Equipment ' }, { t: 'Sales', color: C.dark }], C.orange);
+  head(s, [6.264, 4.844, 2.331, 0.404], 'New Unit Sale', C.orange);
+  head(s, [9.454, 4.838, 2.52, 0.404], 'Second Unit Sale', C.orange);
+  quote(s, [0.782, 3.294, 4.537, 1.121], '“ Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna”', C.gray);
+  body(s, [6.264, 5.308, 2.704, 0.83], 'Lorem ipsum dolor adipiscing elit, sed do eiusmod tempor incididunt ut labore et magna aliqua. Varius', C.light);
+  body(s, [9.454, 5.308, 2.704, 0.83], 'Lorem ipsum dolor adipiscing elit, sed do eiusmod tempor incididunt ut labore et magna aliqua. Varius', C.light);
+  // empty picture placeholder [6.264, 0.784, 2.968, 3.632]
+  // empty picture placeholder [9.567, 0.784, 2.984, 3.632]
+}
+
+// --------------------------------------------------------------- slide 14
+function slide14(s) {
+  rect(s, [0, 4.462, 13.333, 2.112], C.dark);
+  title(s, [0.782, 0.784, 7.732, 0.774], [{ t: 'Heavy Equipment ' }, { t: 'Rental', color: C.dark }], C.orange);
+  head(s, [1, 4.786, 3.007, 0.404], 'Long Term Lease', C.orange);
+  dot(s, 0.782, 4.907, 0.162, C.orange);
+  body(s, [1.005, 5.368, 3.608, 0.83], 'Lorem ipsum dolor sit amet, adipiscing elit, sed do eiusmod tempor incididunt ut dolore Varius morbi enim nunc faucibus a pellentesque sit', C.light);
+  head(s, [8.732, 4.786, 3.007, 0.404], 'Short Term Rental', C.orange);
+  dot(s, 8.514, 4.907, 0.162, C.orange);
+  body(s, [8.733, 5.368, 3.818, 0.83], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed incididunt ut labore et dolore Varius morbi enim nunc faucibus a pellentesque sit amet', C.light);
+  quote(s, [0.782, 2.281, 3.901, 1.475], '“ Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna”', C.gray);
+  // empty picture placeholder [5.008, 1.968, 3.007, 4.23]
+  // empty picture placeholder [8.31, 1.968, 4.241, 2.321]
+}
+
+// --------------------------------------------------------------- slide 16
+function slide16(s) {
+  rect(s, [0, 1.757, 13.333, 3.098], C.dark);
+  body(s, [0.782, 5.674, 7.804, 0.83], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Varius morbi enim nunc faucibus a pellentesque sit amet porttitor. mod tempor incididunt ut labore et dolore magna aliqua. enim nunc faucibus a pellentesque sit amet', C.dark);
+  title(s, [0.782, 0.784, 7.319, 0.774], [{ t: 'High Rise ' }, { t: 'Building', color: C.dark }], C.orange);
+  head(s, [0.782, 5.164, 3.007, 0.404], 'How to claim ?', C.orange);
+  body(s, [0.782, 3.423, 3.505, 0.83], 'Lorem ipsum dolor sit amet, adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ', C.light);
+  head(s, [0.782, 3.02, 3.489, 0.404], 'Workmanship guarantee', C.orange);
+  title(s, [0.782, 2.211, 1.275, 0.774], '01.', C.orange);
+  body(s, [5.081, 3.423, 3.505, 0.83], 'Lorem ipsum dolor sit amet, adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ', C.light);
+  head(s, [5.081, 3.02, 3.39, 0.404], 'Term maintenance', C.orange);
+  title(s, [5.081, 2.211, 1.275, 0.774], '02.', C.orange);
+  // empty picture placeholder [0.861, 1.757, 3.981, 3.501]
+}
+
+// --------------------------------------------------------------- slide 17
+function slide17(s) {
+  rect(s, [0, 2.316, 13.169, 2.293], C.dark);
+  body(s, [6.923, 3.252, 5.352, 0.83], 'Lorem ipsum dolor sit amet, consectetur adipiscing incididunt ut labore et dolore magna aliqua. Varius morbi enim nunc faucibus a pellentesque sit amet porttitor. Lorem ipsum dolor sit amet, ', C.light);
+  title(s, [0.782, 0.784, 7.319, 0.774], [{ t: 'Real', color: C.orange }, { t: ' ', color: C.yellow }, { t: 'Estate' }], C.dark);
+  body(s, [0.782, 5.625, 5.534, 0.83], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Varius morbi enim nunc faucibus a', C.dark);
+  head(s, [1.986, 5.054, 4.857, 0.404], 'Workmanship Guarantee', C.orange);
+  head(s, [8.127, 5.055, 4.301, 0.404], 'Maintenance', C.orange);
+  body(s, [6.923, 5.644, 5.534, 0.83], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Varius morbi enim nunc faucibus a', C.dark);
+  title(s, [0.782, 4.744, 1.086, 0.774], '01.', C.orange);
+  title(s, [6.923, 4.759, 1.126, 0.774], '02.', C.orange);
+  head(s, [6.923, 2.699, 3.326, 0.404], 'How to claim ?', C.orange);
+  // empty picture placeholder [0.877, 1.752, 4.957, 2.515]
+}
+
+// --------------------------------------------------------------- slide 18
+function slide18(s) {
+  title(s, [0.782, 0.784, 7.319, 0.774], [{ t: 'All', color: C.orange }, { t: ' ', color: C.yellow }, { t: 'Infrastructure' }], C.dark);
+  rect(s, [0, 3.945, 13.333, 2.483], C.dark);
+  body(s, [8.644, 5.24, 3.33, 0.83], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, eiusmod tempor incididunt ut labore et dolore magna aliqua. ', C.light);
+  head(s, [8.644, 4.836, 3.39, 0.404], 'Term maintenance', C.orange);
+  title(s, [8.644, 4.064, 1.275, 0.774], '02.', C.orange);
+  body(s, [8.666, 1.968, 3.807, 1.587], 'Lorem ipsum dolor sit amet, adipiscing elit, sed do Lorem ipsum dolor sit amet, consectetur, \n\nLorem ipsum dolor sit amet, consectetur adipiscing elit, eiusmod tempor incididunt ut labore et dolore magna aliqua', C.dark);
+  quote(s, [0.854, 1.968, 3.595, 1.475], '“ Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do labore et dolore magna aliqua. Varius morbi enim ”', C.dark);
+  body(s, [0.839, 5.235, 3.33, 0.83], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ', C.light);
+  head(s, [0.839, 4.831, 3.473, 0.404], 'Workmanship Guarantee', C.orange);
+  title(s, [0.839, 4.059, 1.275, 0.774], '01.', C.orange);
+  // empty picture placeholder [5.08, 1.757, 3.173, 4.308]
+}
+
+// --------------------------------------------------------------- slide 19
+function slide19(s) {
+  rect(s, [0, 1.689, 13.333, 2.531], C.dark);
+  title(s, [0.782, 0.784, 7.732, 0.774], [{ t: 'Heavy Equipment ' }, { t: 'Sales', color: C.dark }], C.orange);
+  head(s, [2.056, 2.18, 3.252, 0.404], 'Periodic Maintenance', C.light);
+  title(s, [0.782, 1.885, 1.275, 0.774], '01.', C.orange);
+  head(s, [0.782, 5.592, 3.007, 0.404], 'How to claim ?', C.orange);
+  body(s, [0.782, 5.995, 5.247, 0.577], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed incididunt ut labore et dolore Varius morbi enim nunc a pellentesque', C.dark);
+  head(s, [7.084, 5.592, 3.007, 0.404], 'Service & Spare Parts', C.orange);
+  body(s, [7.084, 5.995, 5.247, 0.577], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed incididunt ut labore et dolore Varius morbi enim', C.dark);
+  head(s, [8.314, 2.18, 3.659, 0.404], 'Machine & Part Guarantee', C.light);
+  title(s, [7.041, 1.885, 1.275, 0.774], '02.', C.orange);
+  // empty picture placeholder [0.783, 2.847, 5.398, 2.469]
+  // empty picture placeholder [7.152, 2.806, 5.398, 2.469]
+}
+
+// --------------------------------------------------------------- slide 20
+function slide20(s) {
+  rect(s, [0, 4.399, 13.333, 2.286], C.dark);
+  title(s, [0.782, 0.784, 7.732, 0.774], [{ t: 'Heavy Equipment ' }, { t: 'Rent', color: C.dark }], C.orange);
+  quote(s, [0.854, 2.019, 3.479, 1.828], '“ Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Varius morbi enim ”', C.dark);
+  body(s, [0.854, 5.411, 5.363, 1.082], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut\n', C.light);
+  head(s, [2.089, 4.907, 3.473, 0.404], 'Periodic Maintenance', C.orange);
+  title(s, [0.854, 4.594, 1.275, 0.774], '01.', C.orange);
+  head(s, [8.456, 4.907, 3.473, 0.404], 'Replacement Unit', C.orange);
+  title(s, [7.122, 4.632, 1.275, 0.774], '02.', C.orange);
+  body(s, [7.072, 5.411, 5.363, 1.082], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut\n', C.light);
+  // empty picture placeholder [4.824, 1.872, 3.686, 2.286]
+  // empty picture placeholder [8.729, 1.872, 3.686, 2.286]
+}
+
+// --------------------------------------------------------------- slide 22
+function slide22(s) {
+  rect(s, [9.675, 4.072, 2.744, 2.362], C.orange);
+  rect(s, [0.913, 4.072, 2.744, 2.362], C.dark);
+  rect(s, [6.754, 4.072, 2.744, 2.362], C.dark);
+  rect(s, [3.834, 4.072, 2.744, 2.362], C.dark);
+  title(s, [0.782, 0.784, 7.732, 0.774], [{ t: 'Consumer' }, { t: ' ', color: C.yellow }, { t: 'Data', color: C.dark }], C.orange);
+  head(s, [0.994, 2.144, 2.581, 0.404], 'Data 01', C.orange, { align: 'center' });
+  body(s, [1.079, 2.759, 2.416, 1.082], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed incididunt dolore Varius morbi enim nunc a pellentesque sit', C.dark, { align: 'center' });
+  head(s, [3.905, 2.144, 2.581, 0.404], 'Data 02', C.orange, { align: 'center' });
+  body(s, [3.971, 2.759, 2.416, 1.082], 'Lorem ipsum dolor sit amet, consectetur incididunt ut labore et dolore Varius morbi enim nunc a pellentesque sit', C.dark, { align: 'center' });
+  head(s, [6.815, 2.144, 2.581, 0.404], 'Data 03', C.orange, { align: 'center' });
+  body(s, [6.864, 2.759, 2.416, 1.082], 'Lorem ipsum dolor sit amet,, sed incididunt ut labore et dolore Varius morbi enim nunc a pellentesque sit', C.dark, { align: 'center' });
+  head(s, [9.725, 2.144, 2.581, 0.404], 'Data 04', C.orange, { align: 'center' });
+  body(s, [9.756, 2.759, 2.518, 1.082], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed incididunt ut labore et dolore pellentesque sit', C.dark, { align: 'center' });
+  head(s, [1.159, 4.449, 2.253, 0.404], 'March 2022', C.orange, { align: 'center' });
+  head(s, [4.08, 4.449, 2.253, 0.404], 'April 2022', C.orange, { align: 'center' });
+  head(s, [7.001, 4.449, 2.253, 0.404], 'May 2022', C.orange, { align: 'center' });
+  head(s, [9.922, 4.444, 2.253, 0.404], 'June 2022', C.dark, { align: 'center' });
+  quote(s, [1.079, 4.964, 2.416, 1.121], '“ Lorem ipsum dolor sit amet, consectetur Varius enim ”', C.light, { align: 'center' });
+  quote(s, [3.971, 4.964, 2.416, 1.121], '“ Lorem ipsum dolor sit amet, consectetur Varius morbi enim ”', C.light, { align: 'center' });
+  quote(s, [6.864, 4.964, 2.416, 1.121], '“ Lorem ipsum dolor sit amet, Varius morbi enim ”', C.light, { align: 'center' });
+  quote(s, [9.756, 4.964, 2.581, 1.121], '“ Lorem ipsum amet, consectetur Varius morbi enim ”', C.light, { align: 'center' });
+}
+
+// --------------------------------------------------------------- slide 23
+function slide23(s) {
+  title(s, [0.782, 0.784, 7.732, 0.774], [{ t: 'Consumer' }, { t: ' ', color: C.yellow }, { t: 'Chart', color: C.dark }], C.orange);
+  body(s, [0.851, 5.486, 3.579, 0.83], 'Volutpat lacus laoreet non curabitur gravida. quam elementum pulvinar etiam non quam lacus suspendisse. Urna duis convallis', C.gray);
+  rect(s, [0.848, 4.826, 3.501, 0.46], C.orange);
+  txt(s, [1.054, 4.905, 2.159, 0.337], 'Data 01', { face: F.semi, size: 14, color: C.dark, bold: true });
+  body(s, [4.791, 5.459, 3.579, 0.83], 'Varius sit amet mattis vulputate enim nulla aliquet. Habitant morbi tristique senectus et netus et malesuada fames ac. ', C.gray);
+  rect(s, [4.791, 4.799, 3.501, 0.46], C.dark);
+  txt(s, [4.997, 4.878, 2.159, 0.337], 'Data 02', { face: F.semi, size: 14, color: C.orange, bold: true });
+  body(s, [8.73, 5.486, 3.579, 0.83], 'Volutpat lacus laoreet non curabitur gravida. quam elementum etiam non quam lacus suspendisse. Urna duis convallis', C.gray);
+  orect(s, [8.773, 4.826, 3.501, 0.46], C.dark);
+  txt(s, [8.979, 4.905, 2.159, 0.337], 'Data 03', { face: F.semi, size: 14, color: C.dark, bold: true });
+  quote(s, [0.854, 1.968, 6.754, 1.121], '“ Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Varius morbi enim ”', C.gray);
+  body(s, [0.848, 3.535, 6.76, 0.577], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Varius morbi enim nunc faucibus a pellentesque', C.dark);
+  // donut-less pie built from three `pie` wedges (angles clockwise from 3 o'clock)
+  wedge(s, [8.612, 0.94, 3.287, 3.287], [35, 261], C.orange, null);
+  wedge(s, [8.642, 0.784, 3.287, 3.287], [261, 304], null, C.dark);
+  wedge(s, [8.642, 0.904, 3.287, 3.287], [304, 35], C.dark, null);
+}
+
+// --------------------------------------------------------------- slide 24
+function slide24(s) {
+  gear(s, 'gear13o', [2.08, 4.136, 0.9, 0.9]);
+  gear(s, 'gear13o', [3.633, 3.277, 0.9, 0.9]);
+  gear(s, 'gear13d', [5.175, 4.993, 0.9, 0.9]);
+  title(s, [0.782, 0.784, 9.101, 0.774], [{ t: 'Consumer Satisfaction ' }, { t: 'Chart', color: C.dark }], C.orange);
+  head(s, [7.662, 2.09, 4.186, 0.404], '01. Very Satisfied', C.orange);
+  body(s, [7.636, 2.494, 4.493, 0.577], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna', C.dark);
+  head(s, [7.662, 3.708, 3.996, 0.404], '02. Satisfied', C.orange);
+  body(s, [7.636, 4.112, 4.493, 0.577], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna', C.dark);
+  head(s, [7.662, 5.327, 3.996, 0.404], '03. Not Satisfied', C.orange);
+  body(s, [7.636, 5.731, 4.493, 0.577], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna', C.dark);
+  line(s, [1.468, 2.156, 5.156, 0], C.dark, 0.5);
+  line(s, [1.468, 2.856, 5.156, 0], C.dark, 0.5);
+  line(s, [1.468, 3.556, 5.156, 0], C.dark, 0.5);
+  line(s, [1.468, 4.257, 5.156, 0], C.dark, 0.5);
+  line(s, [1.468, 4.957, 5.156, 0], C.dark, 0.5);
+  line(s, [1.468, 5.657, 5.156, 0], C.dark, 0.5);
+  line(s, [1.468, 6.357, 5.156, 0], C.dark, 0.5);
+  line(s, [2.499, 2.732, 0, 3.18], C.dark, 0.5);
+  line(s, [4.06, 2.486, 0, 3.18], C.dark, 0.5);
+  line(s, [5.622, 3.02, 0, 3.18], C.dark, 0.5);
+  txt(s, [0.993, 6.171, 0.41, 0.337], '0', { face: F.semi, size: 14, color: C.orange, align: 'center' });
+  txt(s, [0.937, 5.469, 0.466, 0.337], '10', { face: F.semi, size: 14, color: C.orange, align: 'center' });
+  txt(s, [0.8, 4.762, 0.603, 0.337], '20', { face: F.semi, size: 14, color: C.orange, align: 'center' });
+  txt(s, [0.8, 4.062, 0.603, 0.337], '30', { face: F.semi, size: 14, color: C.orange, align: 'center' });
+  txt(s, [0.8, 3.367, 0.603, 0.337], '40', { face: F.semi, size: 14, color: C.orange, align: 'center' });
+  txt(s, [0.8, 2.666, 0.603, 0.337], '50', { face: F.semi, size: 14, color: C.orange, align: 'center' });
+  txt(s, [0.8, 1.946, 0.603, 0.337], '60', { face: F.semi, size: 14, color: C.orange, align: 'center' });
+  dot(s, 2.281, 4.333, 0.495, C.orange);
+  head(s, [2.215, 4.393, 0.603, 0.404], '01', C.light, { align: 'center' });
+  dot(s, 3.833, 3.475, 0.495, C.orange);
+  head(s, [3.765, 3.517, 0.603, 0.404], '02', C.light, { align: 'center' });
+  dot(s, 5.376, 5.191, 0.495, C.dark);
+  head(s, [5.322, 5.232, 0.603, 0.404], '03', C.light, { align: 'center' });
+}
+
+// --------------------------------------------------------------- slide 26
+function slide26(s) {
+  rect(s, [0, 4.08, 13.333, 2.497], C.dark);
+  title(s, [0.782, 0.784, 7.319, 0.774], [{ t: 'CEO', color: C.orange }, { t: ' ', color: C.yellow }, { t: 'Founder' }], C.dark);
+  body(s, [5.503, 5.263, 6.907, 0.83], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ', C.light);
+  title(s, [5.503, 4.31, 5.207, 0.774], 'Edward Collins', C.orange);
+  body(s, [5.503, 1.757, 6.907, 1.84], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Varius morbi enim nunc faucibus a porttitor. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et magna aliqua. Varius morbi enim nunc faucibus a pellentesque sit amet porttitor. \n\nLorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Varius morbi enim nunc fa', C.dark);
+  dot(s, 1.277, 5.53, 0.619, C.orange);
+  dot(s, 2.114, 5.53, 0.619, C.orange);
+  dot(s, 2.95, 5.53, 0.619, C.orange);
+  dot(s, 3.787, 5.53, 0.619, C.orange);
+  social(s, 'f', [1.495, 5.706, 0.136, 0.273], C.dark);
+  social(s, 'ig', [2.291, 5.707, 0.25, 0.25], C.dark);
+  social(s, 't', [3.103, 5.708, 0.305, 0.249], C.dark);
+  social(s, 'in', [3.949, 5.656, 0.295, 0.295], C.dark);
+  // empty picture placeholder [0.861, 1.757, 3.981, 3.501]
+}
+
+// --------------------------------------------------------------- slide 27
+function slide27(s) {
+  rect(s, [9.885, 4.476, 2.586, 2.015], C.dark);
+  title(s, [0.782, 0.784, 7.319, 0.774], [{ t: 'Meet With ' }, { t: 'Officer', color: C.dark }], C.orange);
+  rect(s, [7.12, 4.476, 2.586, 2.015], C.dark);
+  body(s, [7.123, 5.267, 2.567, 0.83], 'Lorem ipsum dolor sit amet, consectetur, eiusmod tempor incididunt labore et dolore', C.light, { align: 'center' });
+  head(s, [7.123, 4.796, 2.567, 0.404], 'Teddy John', C.orange, { align: 'center' });
+  body(s, [9.887, 5.267, 2.567, 0.83], 'Lorem ipsum dolor sit amet, consectetur, sed do eiusmod tempor incididunt ut labore et', C.light, { align: 'center' });
+  head(s, [9.887, 4.796, 2.567, 0.404], 'Michele Vanya', C.orange, { align: 'center' });
+  body(s, [0.782, 1.799, 5.428, 2.092], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et aliqua. morbi enim nunc faucibus aLorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna\n\nLorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et aliqua. morbi enim nunc faucibus aLorem ipsum dolor sit amet, consectetur adipiscing elit, ', C.dark);
+  head(s, [0.808, 4.476, 1.612, 0.404], 'Visit us', C.orange);
+  body(s, [0.782, 4.88, 5.428, 0.577], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna', C.dark);
+  dot(s, 0.863, 5.868, 0.619, C.orange);
+  dot(s, 1.699, 5.868, 0.619, C.orange);
+  dot(s, 2.536, 5.868, 0.619, C.orange);
+  dot(s, 3.372, 5.868, 0.619, C.orange);
+  social(s, 'f', [1.08, 6.045, 0.136, 0.273], C.light);
+  social(s, 'ig', [1.876, 6.046, 0.25, 0.25], C.light);
+  social(s, 't', [2.689, 6.047, 0.305, 0.249], C.light);
+  social(s, 'in', [3.534, 5.995, 0.295, 0.295], C.light);
+  // empty picture placeholder [7.123, 1.828, 2.567, 2.533]
+  // empty picture placeholder [9.887, 1.828, 2.567, 2.533]
+}
+
+// --------------------------------------------------------------- slide 28
+function slide28(s) {
+  rect(s, [0, 3.348, 13.333, 3.075], C.dark);
+  title(s, [0.782, 0.784, 7.319, 0.774], [{ t: 'Best', color: C.orange }, { t: ' ', color: C.yellow }, { t: 'Field Team' }], C.gray);
+  body(s, [0.695, 5.145, 2.29, 0.83], [{ t: 'Lorem ipsum consectetur', bullet: true, br: true }, { t: ' adipiscing elit, eiusmod', bullet: true, br: true }, { t: ' tempor incididunt ut', bullet: true }], C.light, { bulletIndent: 13.5 });
+  head(s, [0.695, 4.678, 2.539, 0.404], 'Michael Davies', C.orange);
+  body(s, [3.887, 5.145, 2.29, 0.83], [{ t: 'Lorem ipsum consectetur', bullet: true, br: true }, { t: ' adipiscing elit, eiusmod', bullet: true, br: true }, { t: ' tempor incididunt ut', bullet: true }], C.light, { bulletIndent: 13.5 });
+  head(s, [3.887, 4.678, 2.539, 0.404], 'Jonathan Paul', C.orange);
+  body(s, [6.99, 5.145, 2.29, 0.83], [{ t: 'Lorem ipsum consectetur', bullet: true, br: true }, { t: ' adipiscing elit, eiusmod', bullet: true, br: true }, { t: ' tempor incididunt ut', bullet: true }], C.light, { bulletIndent: 13.5 });
+  head(s, [6.99, 4.678, 2.539, 0.404], 'Ray Ferdinand', C.orange);
+  body(s, [10.1, 5.145, 2.29, 0.83], [{ t: 'Lorem ipsum consectetur', bullet: true, br: true }, { t: ' adipiscing elit, eiusmod', bullet: true, br: true }, { t: ' tempor incididunt ut', bullet: true }], C.light, { bulletIndent: 13.5 });
+  head(s, [10.1, 4.678, 2.539, 0.404], 'Mathew Elder', C.orange);
+  // empty picture placeholder [0.783, 1.974, 2.491, 2.577]
+  // empty picture placeholder [3.846, 1.974, 2.491, 2.577]
+  // empty picture placeholder [6.99, 1.974, 2.451, 2.577]
+  // empty picture placeholder [10.094, 1.974, 2.451, 2.577]
+}
+
+// --------------------------------------------------------------- slide 29
+function slide29(s) {
+  title(s, [0.782, 0.784, 5.884, 0.774], [{ t: 'Keep in ' }, { t: 'Touch', color: C.dark }], C.orange);
+  head(s, [2.828, 5.891, 2.149, 0.404], 'Our Network', C.orange, { align: 'center' });
+  rect(s, [9.209, 4.222, 3.144, 0.46], C.dark);
+  rect(s, [9.205, 2.017, 3.144, 0.46], C.dark);
+  head(s, [9.877, 2.05, 1.831, 0.404], 'Call us', C.orange, { align: 'center' });
+  quote(s, [9.699, 2.666, 2.211, 0.415], '+123 4567 8900', C.gray, { align: 'center' });
+  quote(s, [9.699, 3.078, 2.211, 0.415], '+123 0987 6543', C.gray, { align: 'center' });
+  head(s, [10.001, 4.252, 1.612, 0.404], 'Visit us', C.orange, { align: 'center' });
+  quote(s, [9.698, 4.83, 2.217, 0.415], '@yourid.co', C.gray, { align: 'center' });
+  dot(s, 9.209, 5.676, 0.619, C.orange);
+  dot(s, 10.045, 5.676, 0.619, C.orange);
+  dot(s, 10.882, 5.676, 0.619, C.orange);
+  dot(s, 11.718, 5.676, 0.619, C.orange);
+  social(s, 'f', [9.426, 5.852, 0.136, 0.273], C.light);
+  social(s, 'ig', [10.223, 5.854, 0.25, 0.25], C.light);
+  social(s, 't', [11.035, 5.854, 0.305, 0.249], C.light);
+  social(s, 'in', [11.88, 5.803, 0.295, 0.295], C.light);
+  worldMap(s, 0.782, 2.004, 7.189, 3.667);
+}
+
+// --------------------------------------------------------------- slide 30
+function slide30(s) {
+  gearCluster(s);
+  gear(s, 'gear13d', [5.57, 5.648, 1.085, 1.085]);
+  gear(s, 'gear6o', [5.02, 6.551, 0.516, 0.556]);
+  line(s, [0.397, 1.608, 0, 3.714], C.orange, 3);
+  line(s, [0.507, 1.608, 0, 3.714], C.dark, 0.5);
+  ring(s, 5.897, 5.973, 0.431, C.orange, 3);
+  txt(s, [4.545, 1.096, 7.729, 1.447], [{ t: 'Thank' }, { t: ' ', color: C.yellow }, { t: 'You', color: C.dark }], { face: F.black, size: 80, color: C.orange, align: 'right' });
+}
+
+
+// ------------------------------------------------------------------ assembly
+const DECK = [
+  slide1,
+  slide2,
+  slide3,
+  (s) => divider(s, DIVIDERS[0]),
+  slide5,
+  slide6,
+  slide7,
+  (s) => divider(s, DIVIDERS[1]),
+  slide9,
+  slide10,
+  slide11,
+  slide12,
+  slide13,
+  slide14,
+  (s) => divider(s, DIVIDERS[2]),
+  slide16,
+  slide17,
+  slide18,
+  slide19,
+  slide20,
+  (s) => divider(s, DIVIDERS[3]),
+  slide22,
+  slide23,
+  slide24,
+  (s) => divider(s, DIVIDERS[4]),
+  slide26,
+  slide27,
+  slide28,
+  slide29,
+  slide30,
+];
+
+pptx.defineLayout({ name: 'WIDE', width: 13.333, height: 7.5 });
+pptx.layout = 'WIDE';
+pptx.author = 'The Contractor';
+pptx.title = 'The Contractor — Project Presentation';
+
+DECK.forEach(function (build, i) {
+  const s = pptx.addSlide();
+  s.background = { color: C.light };
+  build(s);
+  chrome(s, i + 1);
+});
+
+pptx.writeFile({ fileName: path.join(__dirname, '04c0cc55-ee83-4fd3-9c9a-b0775d439208_grok_final.pptx') })
+  .then(function (f) { console.log('wrote ' + f); })
+  .catch(function (e) { console.error(e); process.exit(1); });
