@@ -1,0 +1,773 @@
+/**
+ * "PRODUCT LAUNCH" deck — rebuilt with pptxgenjs.
+ * Slide canvas: 10 x 5.625 in (16:9). Photographs in the original are replaced
+ * by programmatic "[image]" placeholder cards of the same size/position.
+ */
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ *
+ * Design tokens
+ * ------------------------------------------------------------------ */
+
+const LIME = 'CDF505';   // accent1
+const INK = '060800';    // accent2 / page background
+const WHITE = 'FFFFFF';
+const BLACK = '000000';
+const RING = '4D4F49';   // unfilled part of the donut gauges
+const TRACK = 'D0CECE';  // unfilled part of the progress bars
+const PILL = '95B203';   // "SIGN UP" outline on dark slides
+const PHOTO = 'FFFFFF';  // placeholder card colour
+const DISC = 'F2F2F2';   // light disc inside the gauges
+const CAPTION = '9A9A9A';
+
+const DISPLAY = 'Bricolage Grotesque';
+const BODY = 'Inter';
+
+const PAD = [5.4, 5.4, 2.7, 2.7]; // text inset [l, r, b, t] in points
+const NONE = { type: 'none' };
+
+/* ------------------------------------------------------------------ *
+ * Primitive helpers
+ * ------------------------------------------------------------------ */
+
+// runs: string or [{ text, options }]
+function text (slide, x, y, w, h, runs, o) {
+  o = o || {};
+  slide.addText(runs, {
+    x: x,
+    y: y,
+    w: w,
+    h: h,
+    fontFace: o.face || BODY,
+    fontSize: o.size || 9,
+    color: o.color || WHITE,
+    bold: o.bold || false,
+    italic: o.italic || false,
+    align: o.align || 'left',
+    valign: o.valign || 'top',
+    lineSpacingMultiple: o.lh,
+    margin: o.margin === undefined ? PAD : o.margin,
+    rotate: o.rotate,
+    wrap: true
+  });
+}
+
+function box (slide, shape, x, y, w, h, o) {
+  o = o || {};
+  slide.addShape(shape, {
+    x: x,
+    y: y,
+    w: w,
+    h: h,
+    fill: o.fill ? { color: o.fill, transparency: o.alpha } : NONE,
+    line: o.line ? { color: o.line, width: o.lw || 1 } : NONE,
+    rectRadius: o.r,
+    rotate: o.rotate,
+    flipH: o.flipH,
+    angleRange: o.angleRange
+  });
+}
+
+function rule (slide, x, y, len, color, width, o) {
+  o = o || {};
+  slide.addShape('line', {
+    x: x,
+    y: y,
+    w: o.vertical ? 0 : len,
+    h: o.vertical ? len : 0,
+    line: {
+      color: color,
+      width: width,
+      transparency: o.alpha,
+      beginArrowType: o.head,
+      endArrowType: o.tail
+    }
+  });
+}
+
+// White (or tinted) card standing in for a photograph.
+function photo (slide, x, y, w, h, radius, o) {
+  o = o || {};
+  slide.addShape('roundRect', {
+    x: x, y: y, w: w, h: h,
+    rectRadius: radius,
+    fill: { color: o.fill || PHOTO },
+    line: NONE,
+    rotate: o.rotate
+  });
+  text(slide, x, y + h / 2 - 0.13, w, 0.26, '[image]', {
+    size: 8, color: o.label || CAPTION, align: 'center', valign: 'middle',
+    margin: 0, rotate: o.rotate
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Decorative motifs
+ * ------------------------------------------------------------------ */
+
+// Four-pointed sparkle, drawn from the original custom outline (normalised).
+const STAR_PATH = [
+  [0.499, 1.000], [0.555, 0.719, 0.720, 0.555, 1.000, 0.498],
+  [0.723, 0.441, 0.557, 0.280, 0.499, 0.000],
+  [0.443, 0.280, 0.275, 0.441, 0.000, 0.498],
+  [0.280, 0.555, 0.442, 0.719, 0.499, 1.000]
+];
+
+function sparkle (slide, x, y, w, h, color) {
+  const pts = [{ x: STAR_PATH[0][0] * w, y: STAR_PATH[0][1] * h }];
+  for (let i = 1; i < STAR_PATH.length; i++) {
+    const c = STAR_PATH[i];
+    pts.push({
+      x: c[4] * w,
+      y: c[5] * h,
+      curve: { type: 'cubic', x1: c[0] * w, y1: c[1] * h, x2: c[2] * w, y2: c[3] * h }
+    });
+  }
+  pts.push({ close: true });
+  slide.addShape('custGeom', { x: x, y: y, w: w, h: h, fill: { color: color }, line: NONE, points: pts });
+}
+
+// Wire-frame orb: three ellipses across the long axis + one flattened ring,
+// with a sparkle in the middle. `a` is the long axis, `b` the short one.
+const ORB_RINGS = [[1, 1], [0.788, 1], [0.446, 0.999], [1, 0.626]];
+const ORB_STAR = [0.295, 0.394];
+
+function orb (slide, cx, cy, a, b, color, starColor, vertical) {
+  ORB_RINGS.concat([ORB_STAR]).forEach(function (ratio, i) {
+    const ea = a * ratio[0];
+    const eb = b * ratio[1];
+    const w = vertical ? eb : ea;
+    const h = vertical ? ea : eb;
+    if (i < ORB_RINGS.length) {
+      box(slide, 'ellipse', cx - w / 2, cy - h / 2, w, h, { line: color, lw: 0.75 });
+    } else {
+      sparkle(slide, cx - w / 2, cy - h / 2, w, h, starColor);
+    }
+  });
+}
+
+// Circular gauge: grey track, coloured progress arc, hole, light disc + label.
+function gauge (slide, x, y, size, sweepEnd, color, label) {
+  box(slide, 'pie', x, y, size, size, { fill: RING, angleRange: [125.7, 270.3] });
+  box(slide, 'pie', x, y, size, size, { fill: color, angleRange: [269.7, sweepEnd] });
+  const hole = size * 0.815;
+  box(slide, 'ellipse', x + (size - hole) / 2, y + (size - hole) / 2, hole, hole, { fill: INK });
+  const disc = size * 0.479;
+  box(slide, 'ellipse', x + (size - disc) / 2, y + (size - disc) / 2, disc, disc, { fill: DISC });
+  text(slide, x, y + size / 2 - 0.14, size, 0.28, label,
+    { face: DISPLAY, size: 12, color: BLACK, align: 'center', valign: 'middle', margin: 0 });
+}
+
+// Thin outlined arrow (original custom outline, normalised) — used on the CTA slide.
+const ARROW_PATH = [
+  [1.000, 0.500], [0.471, 0.000], [0.435, 0.033], [0.906, 0.478], [0.000, 0.478],
+  [0.000, 0.525], [0.903, 0.525], [0.435, 0.967], [0.471, 1.000], [1.000, 0.501]
+];
+
+function arrowGlyph (slide, x, y, w, h, color, rotate) {
+  const pts = ARROW_PATH.map(function (p) { return { x: p[0] * w, y: p[1] * h }; });
+  pts.push({ close: true });
+  slide.addShape('custGeom', {
+    x: x, y: y, w: w, h: h, rotate: rotate, fill: { color: color }, line: NONE, points: pts
+  });
+}
+
+// Small check-mark box used on the timeline.
+function tickBox (slide, x, y, size) {
+  box(slide, 'rect', x, y, size, size, { fill: INK });
+  slide.addShape('line', {
+    x: x + 0.050, y: y + 0.120, w: 0.052, h: 0.028,
+    line: { color: LIME, width: 1.25 }
+  });
+  slide.addShape('line', {
+    x: x + 0.102, y: y + 0.087, w: 0.086, h: 0.061,
+    line: { color: LIME, width: 1.25 }, flipV: true
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Site-style navigation bar (repeated on every slide)
+ * ------------------------------------------------------------------ */
+
+const NAV_LINKS = [
+  ['HOME', 2.715, 0.947], ['ABOUT', 3.679, 1.077],
+  ['SERVICE', 4.754, 1.217], ['CONTACT', 5.856, 1.429]
+];
+
+function navBar (slide, dark) {
+  const linkColor = dark ? WHITE : INK;
+  text(slide, 0.424, 0.135, 1.269, 0.227, 'YOUR LOGO',
+    { face: DISPLAY, size: 9, color: dark ? LIME : INK });
+  NAV_LINKS.forEach(function (l) {
+    text(slide, l[1], 0.145, l[2], 0.227, l[0],
+      { face: DISPLAY, size: 9, color: linkColor, align: 'center' });
+  });
+  box(slide, 'roundRect', 8.635, 0.135, 0.865, 0.227, { line: dark ? PILL : INK, r: 0.1135 });
+  text(slide, 8.666, 0.135, 0.803, 0.227, 'SIGN UP',
+    { face: DISPLAY, size: 9, color: linkColor, align: 'center' });
+}
+
+/* ------------------------------------------------------------------ *
+ * Repeated text blocks
+ * ------------------------------------------------------------------ */
+
+const LOREM_LONG = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin bibendum ' +
+  'risus sit amet venen atis tristique. Morbi tortor justo, p eget consequat ac, semper sit';
+const LOREM_MED = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin bibendum ' +
+  'risus sit amet venen atis tristique. Morbi tortor justo, p eget.';
+const LOREM_A = 'Lorem ipsum dolor sit amet, consectetur adipis';
+const LOREM_B = 'cing elit. Proin bibendum risus sit amet venen atis tristique. Morbi tortor justo, p eget.';
+const LOREM_SHORT = 'Lorem ipsum dolor sit amet, consectetur';
+const LOREM_CARD = ['Lorem ipsum dolor sit ', 'amet, consectetur adiisci', 'ng elit, sed do eiusmod tempor incididunt'];
+const LOREM_TILE = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor';
+
+// Two-tone display headline: first run lime, second run white (or given colours).
+function headline (slide, x, y, w, h, first, second, o) {
+  o = o || {};
+  const runs = [{ text: first, options: { color: o.c1 || LIME } }];
+  if (second) runs.push({ text: second, options: { color: o.c2 || WHITE } });
+  text(slide, x, y, w, h, runs,
+    { face: DISPLAY, size: o.size || 41, bold: o.bold !== false, lh: o.lh, color: o.c1 || LIME });
+}
+
+// Paragraphs stacked inside one text box.
+function paras (slide, x, y, w, h, lines, o) {
+  o = o || {};
+  const runs = lines.map(function (line, i) {
+    return { text: line, options: { breakLine: i < lines.length - 1, bullet: o.bullet } };
+  });
+  text(slide, x, y, w, h, runs, o);
+}
+
+// "eyebrow" label above a paragraph, used on most content slides.
+function kicker (slide, x, y, w, label, color) {
+  text(slide, x, y, w, 0.303, label, { face: DISPLAY, size: 14, color: color });
+}
+
+// Big number + small percent sign, e.g. "44,3 %".
+function bigStat (slide, x, y, w, h, value, color) {
+  text(slide, x, y, w, h, [
+    { text: value, options: { fontSize: 30 } },
+    { text: '%', options: { fontSize: 21 } }
+  ], { face: DISPLAY, size: 30, color: color });
+}
+
+// Price + delta + outlined "LEARN MORE" button (slides 7 and 13).
+function priceBlock (slide, x, y, color, buttonLine) {
+  text(slide, x, y, 1.466, 0.454, '$22,600.00',
+    { face: DISPLAY, size: 15, bold: true, color: color, lh: 1.5 });
+  text(slide, x, y + 0.409, 1.413, 0.284, 'Lorem ipsum  – 12,70%',
+    { size: 8, color: color, lh: 1.5 });
+  box(slide, 'roundRect', x + 0.068, y + 0.739, 1.267, 0.34, { line: buttonLine, r: 0.17 });
+  text(slide, x + 0.068, y + 0.739, 1.267, 0.34, 'LEARN MORE',
+    { face: DISPLAY, size: 11, color: color, align: 'center', valign: 'middle' });
+}
+
+/* ------------------------------------------------------------------ *
+ * Slides
+ * ------------------------------------------------------------------ */
+
+function slide01 (s) {
+  navBar(s, true);
+  photo(s, 0.5, 0.892, 3.524, 4.071, 0.238);
+  headline(s, 4.34, 0.973, 4.6, 1.853, 'PRODUCT ', 'LAUNCH', { size: 66, lh: 0.8 });
+  text(s, 4.34, 2.958, 2.621, 0.429, 'Presentation', { face: DISPLAY, size: 21, color: LIME });
+  kicker(s, 4.34, 3.83, 3.11, 'COMPUTING FOR BUSINESSES', LIME);
+  text(s, 4.34, 4.161, 3.633, 0.647, LOREM_LONG, { lh: 1.3 });
+  orb(s, 8.816, 3.925, 1.768, 1.307, LIME, WHITE, true);
+}
+
+function slide02 (s) {
+  navBar(s, true);
+  photo(s, 2.621, 0.892, 3.35, 4.071, 0.275);
+  text(s, 5.012, 1.087, 4.696, 2.121, [
+    { text: 'WELCOME ', options: { color: WHITE, breakLine: true } },
+    { text: 'TO THE', options: { color: WHITE } },
+    { text: ' LAUNCH OF PRODUCT', options: { color: LIME } }
+  ], { face: DISPLAY, size: 41, bold: true });
+  kicker(s, 6.323, 3.596, 2.704, 'WE\u2019RE THRILLED TO UNVEIL', LIME);
+  paras(s, 6.323, 3.927, 3.177, 0.647, [LOREM_A, LOREM_B], { lh: 1.3 });
+  [1.087, 3.059].forEach(function (y) {
+    bigStat(s, 0.442, y, 1.434, 0.581, '44,3 ', LIME);
+    text(s, 0.442, y + 0.607, 1.327, 0.278, 'ITEM 01 SALE', { face: DISPLAY, size: 12 });
+    text(s, 0.442, y + 0.879, 1.956, 0.606,
+      'Lorem ipsum dolor sit amet, consectetur adiiscing elit, sed do eiusmod tempor.', { lh: 1.2 });
+  });
+  sparkle(s, 8.272, 1.202, 0.656, 0.466, LIME);
+}
+
+function slide03 (s) {
+  navBar(s, false);
+  text(s, 0.392, 0.827, 7.997, 0.833, 'LAUNCH EVENT AGENDA',
+    { face: DISPLAY, size: 45, bold: true, color: INK });
+  text(s, 0.424, 1.751, 2.951, 0.303, 'We\u2019ll cover product insights :',
+    { face: DISPLAY, size: 14, color: BLACK });
+  const agenda = [['DESIGN PHILOSOPHY', 2.337, 3.0], ['CORE FEATURES', 3.182, 3.845],
+    ['MARKET STRATEGIES', 4.009, 4.69]];
+  agenda.forEach(function (row) {
+    text(s, 0.392, row[1], 5.579, 0.581, row[0], { face: DISPLAY, size: 30, bold: true, color: BLACK });
+    rule(s, 0.5, row[2], 9.0, INK, 1, { alpha: 70 });
+  });
+  sparkle(s, 8.635, 1.011, 0.656, 0.466, LIME);
+  photo(s, 6.947, 2.352, 2.131, 2.184, 0.169, { rotate: -15.7 });
+}
+
+function slide04 (s) {
+  box(s, 'roundRect', -0.6, 0.469, 4.458, 4.688, { fill: LIME, r: 0.259 });
+  navBar(s, true);
+  photo(s, 0.52, 0.788, 3.35, 4.0, 0.224);
+  headline(s, 4.333, 0.636, 2.911, 2.121, 'MEET THE ', 'PRODUCT');
+  orb(s, 8.088, 1.385, 2.825, 1.212, LIME, WHITE, false);
+  const gauges = [
+    [4.451, 2.913, 233.9, LIME, '90%', LIME],
+    [6.273, 2.913, 165.7, WHITE, '60%', WHITE],
+    [8.074, 2.935, 201.5, LIME, '80%', LIME]
+  ];
+  gauges.forEach(function (g, i) {
+    gauge(s, g[0], g[1], 1.111, g[2], g[3], g[4]);
+    const lx = [4.409, 6.285, 8.074][i];
+    text(s, lx, 4.156, 1.378, 0.278, 'FEATURE 0' + (i + 1), { face: DISPLAY, size: 12, color: g[5] });
+    text(s, lx, 4.396, 1.569, 0.424, LOREM_SHORT, { lh: 1.2 });
+  });
+}
+
+function slide05 (s) {
+  navBar(s, true);
+  headline(s, 0.433, 0.686, 4.567, 1.439, 'THE PROBLEM WE\'RE', ' SOLVING');
+  kicker(s, 0.433, 3.596, 1.861, 'WE\u2019RE THRILLED', LIME);
+  text(s, 0.433, 3.927, 2.631, 0.844, LOREM_MED, { lh: 1.3 });
+  sparkle(s, 0.5, 2.236, 0.656, 0.466, LIME);
+  photo(s, 5.468, 0.686, 1.863, 2.126, 0.204);
+  photo(s, 3.297, 2.812, 1.863, 2.126, 0.204);
+  photo(s, 7.639, 2.812, 1.863, 2.126, 0.204);
+  // lime "FORMULA 01" tile
+  box(s, 'roundRect', 5.469, 2.812, 1.861, 2.15, { fill: LIME, r: 0.161 });
+  text(s, 5.644, 3.011, 1.253, 0.278, 'FORMULA 01', { face: DISPLAY, size: 12, color: INK });
+  paras(s, 5.644, 3.444, 1.511, 0.728, LOREM_CARD, { size: 8, color: INK, lh: 1.2 });
+  bigStat(s, 5.682, 4.277, 1.434, 0.581, '44,3 ', INK);
+  // "proposed initiative" note with its outlined icon
+  text(s, 7.61, 0.92, 1.368, 0.581, 'PROPOSED INITIATIVE', { face: DISPLAY, size: 15, color: LIME });
+  paras(s, 7.624, 1.546, 1.793, 0.788,
+    ['Lorem ipsum dolor sit met. ', 'Qui sint neque a Non exerc',
+      'itationem reiciendis qui con', 'sequatur repudianda'], { lh: 1.2 });
+  box(s, 'roundRect', 9.012, 1.002, 0.295, 0.295, { line: LIME, lw: 1.25, r: 0.075 });
+  // descending two-stroke "trend" glyph inside the icon frame
+  s.addShape('line', { x: 9.169, y: 1.096, w: 0.072, h: 0.062, line: { color: LIME, width: 1.25 }, flipH: true });
+  s.addShape('line', { x: 9.081, y: 1.140, w: 0.088, h: 0.070, line: { color: LIME, width: 1.25 }, flipH: true });
+}
+
+function slide06 (s) {
+  navBar(s, false);
+  text(s, 0.401, 0.831, 5.352, 1.439, 'INNOVATION FOR REAL IMPACT',
+    { face: DISPLAY, size: 41, bold: true, color: BLACK });
+  kicker(s, 6.323, 0.951, 2.704, 'WE\u2019RE THRILLED TO UNVEIL', BLACK);
+  paras(s, 6.323, 1.283, 3.177, 0.647, [LOREM_A, LOREM_B], { lh: 1.3, color: BLACK });
+  const cards = [
+    [0.5, 4.333, 'OUR VISION', 0.823, 4.217,
+      LOREM_MED + ' Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin bibendum ' +
+      'risus sit amet venen atis tristique. Morbi tortor justo, p eget Proin bibendum risus sit amet..'],
+    [5.167, 4.312, 'OUR MISSION', 5.498, 8.927,
+      LOREM_MED + ' Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin bibendum ' +
+      'risus sit amet venen atis tristique. Morbi tortor justo, p eget Proin bibendum risus sit amet.']
+  ];
+  cards.forEach(function (c, i) {
+    box(s, 'roundRect', c[0], 2.729, c[1], 2.234, { fill: INK, r: 0.193 });
+    text(s, c[3], 3.083, 1.585, 0.328, c[2], { face: DISPLAY, size: 15, color: LIME });
+    text(s, c[3], 3.694, 3.679, 0.961, c[5], { size: 8, lh: 1.3 });
+    // small outlined icon in the card's top-right corner
+    box(s, 'roundRect', c[4], 3.0, 0.281, 0.286, { line: LIME, lw: 1, r: 0.055 });
+    if (i === 0) {
+      rule(s, c[4] + 0.075, 3.143, 0.13, LIME, 1);
+      rule(s, c[4] + 0.14, 3.078, 0.13, LIME, 1, { vertical: true });
+    } else {
+      rule(s, c[4] + 0.078, 3.083, 0.125, LIME, 1);
+      rule(s, c[4] + 0.078, 3.145, 0.078, LIME, 1);
+    }
+  });
+}
+
+function slide07 (s) {
+  navBar(s, true);
+  photo(s, 0.5, 0.939, 4.109, 3.903, 0.224);
+  headline(s, 4.917, 0.937, 3.125, 1.439, 'DESIGNED FOR', ' YOU');
+  sparkle(s, 7.747, 1.7, 0.656, 0.466, LIME);
+  box(s, 'roundRect', 3.661, 2.89, 5.639, 1.466, { fill: LIME, r: 0.126 });
+  kicker(s, 3.952, 3.135, 2.793, 'WE\u2019RE THRILLED TO UNVEIL', INK);
+  paras(s, 3.952, 3.452, 3.098, 0.647, [LOREM_A, LOREM_B], { lh: 1.3, color: INK });
+  priceBlock(s, 7.539, 3.047, INK, BLACK);
+}
+
+// Bar chart on slide 8, drawn from plain shapes like the original.
+// Value levels 0..7 from the baseline upwards.
+const CHART8_ROWS = [4.683, 4.49, 4.293, 4.1, 3.906, 3.711, 3.516, 3.323];
+const CHART8_BARS = [
+  ['Jan', 0.917, 3.847, 0.837], ['Feb', 1.714, 4.197, 0.487], ['Mar', 2.51, 4.005, 0.679],
+  ['Apr', 3.308, 3.394, 1.29], ['May', 4.102, 3.438, 1.246]
+];
+
+function slide08 (s) {
+  navBar(s, true);
+  photo(s, 0.5, 0.939, 4.5, 1.874, 0.205);
+  headline(s, 5.374, 0.939, 3.786, 1.439, 'DEEP DIVE: ', '[FEATURE A]');
+  box(s, 'roundRect', 5.0, 2.812, 4.312, 2.15, { fill: LIME, r: 0.185 });
+  text(s, 5.284, 3.066, 2.728, 0.328, 'ENHANCES YOUR DAILY',
+    { face: DISPLAY, size: 15, color: BLACK });
+  paras(s, 5.374, 3.532, 3.62, 1.141, [
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin bibendum risus sit amet venen atis tristique. Morbi tortor ',
+    'justo, p eget. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin bibendum ',
+    'risus sit amet venen atis tristique. Morbi tortor justo, p eget Proin bibendum risus sit amet.'
+  ], { size: 8, color: INK, lh: 1.3, bullet: { characterCode: '2022', indent: 10 } });
+
+  CHART8_ROWS.forEach(function (y, i) {
+    if (i > 0) rule(s, 0.637, y, 0.038, '898989', 0.75);
+    rule(s, 0.679, y, 4.002, '595959', 0.75);
+    text(s, 0.3, y - 0.137, 0.318, 0.227, String(i), { size: 7, align: 'right', margin: 4 });
+  });
+  rule(s, 0.678, 3.319, 1.364, '898989', 0.75, { vertical: true });
+  CHART8_BARS.forEach(function (b) {
+    box(s, 'rect', b[1], b[2], 0.318, b[3], { fill: LIME });
+    text(s, b[1] - 0.071, 4.71, 0.46, 0.227, b[0], { size: 7, align: 'center', margin: 4 });
+  });
+}
+
+const FEATURES9 = [
+  ['FEATURE A', 0.5, '+44 ', WHITE], ['FEATURE B', 2.777, '+21 ', LIME],
+  ['FEATURE C', 5.097, '+26 ', WHITE], ['FEATURE D', 7.418, '+76 ', LIME]
+];
+
+function slide09 (s) {
+  navBar(s, false);
+  text(s, 0.427, 0.756, 4.655, 1.439, 'WHAT MAKES IT POWERFUL',
+    { face: DISPLAY, size: 41, bold: true, color: INK });
+  kicker(s, 6.323, 0.951, 2.704, 'WE\u2019RE THRILLED TO UNVEIL', INK);
+  paras(s, 6.323, 1.283, 3.177, 0.647, [LOREM_A, LOREM_B], { lh: 1.3, color: INK });
+  FEATURES9.forEach(function (f) {
+    const x = f[1];
+    box(s, 'roundRect', x, 2.812, 2.082, 2.15, { fill: INK, r: 0.18 });
+    text(s, x + 0.235, 3.011, 1.402, 0.278, f[0], { face: DISPLAY, size: 12, color: f[3] });
+    paras(s, x + 0.235, 3.444, 1.691, 0.728, LOREM_CARD, { size: 8, lh: 1.2 });
+    bigStat(s, x + 0.278, 4.277, 1.605, 0.581, f[2], f[3]);
+  });
+}
+
+function slide10 (s) {
+  navBar(s, true);
+  photo(s, 0.5, 0.939, 4.669, 1.728, 0.099);
+  photo(s, 0.5, 3.081, 4.669, 1.728, 0.099);
+  headline(s, 5.622, 0.932, 3.76, 1.439, 'SMART AND ', 'EFFICIENT');
+  kicker(s, 5.622, 3.83, 3.11, 'COMPUTING FOR BUSINESSES', LIME);
+  text(s, 5.622, 4.161, 3.633, 0.647, LOREM_LONG, { lh: 1.3 });
+  box(s, 'roundRect', 1.499, 2.157, 3.67, 1.466, { fill: LIME, r: 0.126 });
+  kicker(s, 1.801, 2.402, 2.898, 'WE\u2019RE THRILLED TO UNVEIL', INK);
+  paras(s, 1.801, 2.719, 3.053, 0.647,
+    [LOREM_A, 'cing elit. Proin bibendum risus sit amet venen ', 'atis tristique. Morbi tortor justo, p eget.'],
+    { lh: 1.3, color: INK });
+  sparkle(s, 5.726, 2.424, 0.656, 0.466, LIME);
+}
+
+function slide11 (s) {
+  navBar(s, true);
+  headline(s, 0.397, 0.853, 2.936, 2.121, 'ELEGANT ', 'INSIDE AND OUT');
+  sparkle(s, 2.553, 1.681, 0.656, 0.466, LIME);
+  kicker(s, 0.433, 3.596, 1.861, 'WE\u2019RE THRILLED', LIME);
+  text(s, 0.433, 3.927, 2.631, 0.844, LOREM_MED, { lh: 1.3 });
+  photo(s, 3.854, 0.907, 3.281, 3.864, 0.189);
+  photo(s, 7.406, 0.907, 2.118, 3.864, 0.122);
+}
+
+// Pointy-top hexagon with softened corners (slide 12). Vertices are given as
+// fractions of the bounding box; every corner becomes a quadratic fillet.
+const HEX_VERTS = [[0.5, -0.024], [1, 0.232], [1, 0.768], [0.5, 1.024], [0, 0.768], [0, 0.232]];
+const HEX_FILLET = 0.13; // inches of edge consumed on each side of a corner
+
+function hexagon (s, x, y, w, h, fill) {
+  const v = HEX_VERTS.map(function (p) { return [p[0] * w, p[1] * h]; });
+  const pts = [];
+  v.forEach(function (cur, i) {
+    const prev = v[(i + v.length - 1) % v.length];
+    const next = v[(i + 1) % v.length];
+    const toward = function (other) {
+      const dx = other[0] - cur[0];
+      const dy = other[1] - cur[1];
+      const k = HEX_FILLET / Math.sqrt(dx * dx + dy * dy);
+      return { x: cur[0] + dx * k, y: cur[1] + dy * k };
+    };
+    const a = toward(prev);
+    const b = toward(next);
+    if (i === 0) pts.push(a); else pts.push({ x: a.x, y: a.y });
+    pts.push({ x: b.x, y: b.y, curve: { type: 'quadratic', x1: cur[0], y1: cur[1] } });
+  });
+  pts.push({ close: true });
+  s.addShape('custGeom', { x: x, y: y, w: w, h: h, fill: { color: fill }, line: NONE, points: pts });
+}
+
+function slide12 (s) {
+  navBar(s, true);
+  headline(s, 0.5, 0.819, 9.0, 1.439, 'TECHNOLOGY THAT POWERS ', 'THE PRODUCT');
+  hexagon(s, 3.625, 3.552, 1.26, 1.416, LIME);
+  hexagon(s, 4.957, 3.552, 1.26, 1.416, LIME);
+  hexagon(s, 4.287, 2.403, 1.26, 1.416, WHITE);
+  hexagon(s, 5.627, 2.403, 1.26, 1.416, WHITE);
+  const cells = [
+    ['700', 'Option Text', 3.729, 3.961, 11], ['207', 'Option text', 4.391, 2.813, 9],
+    ['67', 'Option text', 5.061, 3.961, 9]
+  ];
+  cells.forEach(function (c) {
+    text(s, c[2] + 0.108, c[3], 0.835, 0.365, c[0],
+      { face: DISPLAY, size: 30, color: BLACK, align: 'center', valign: 'middle', margin: 0 });
+    text(s, c[2], c[3] + 0.339, 1.051, 0.264, c[1],
+      { size: c[4], color: BLACK, align: 'center', valign: 'middle', margin: 0 });
+  });
+  photo(s, 5.893, 2.718, 0.744, 0.744, 0.02, { label: '8A96A2' });
+  const labels = [
+    ['SECURITY', WHITE, 1.602, 2.612, 1.01, 2.861, 2.487, 'right'],
+    ['RELIABILITY', LIME, 1.018, 3.839, 0.713, 4.096, 2.193, 'right'],
+    ['SPEED', WHITE, 7.537, 2.625, 7.537, 2.861, 2.115, 'left'],
+    ['POWERS', LIME, 6.946, 3.839, 6.946, 4.096, 2.115, 'left']
+  ];
+  labels.forEach(function (l) {
+    text(s, l[2], l[3], 1.895, 0.303, l[0],
+      { face: DISPLAY, size: 14, bold: true, color: l[1], align: l[7] });
+    text(s, l[4], l[5], l[6], 0.647, LOREM_TILE, { lh: 1.3, align: l[7] });
+  });
+  rule(s, 3.706, 3.133, 0.33, LIME, 1.5, { tail: 'stealth' });
+  rule(s, 3.076, 4.326, 0.33, LIME, 1.5, { tail: 'stealth' });
+  rule(s, 6.486, 4.299, 0.33, LIME, 1.5, { head: 'stealth' });
+  rule(s, 7.112, 3.133, 0.33, LIME, 1.5, { head: 'stealth' });
+}
+
+function slide13 (s) {
+  navBar(s, false);
+  text(s, 0.393, 0.802, 8.75, 0.757, 'PERSONALIZED JUST FOR YOU',
+    { face: DISPLAY, size: 41, bold: true, color: INK });
+  const rows = [[1.824, 'USERS TO TAILOR THE EXPERIENCE'], [3.406, 'ENSURING A WORKFLOW']];
+  rows.forEach(function (r) {
+    box(s, 'roundRect', 0.5, r[0], 5.639, 1.368, { fill: INK, r: 0.118 });
+    kicker(s, 0.79, r[0] + 0.196, 3.442, r[1], WHITE);
+    paras(s, 0.79, r[0] + 0.513, 3.098, 0.647, [LOREM_A, LOREM_B], { lh: 1.3 });
+    priceBlock(s, 4.479, r[0] + 0.085, WHITE, LIME);
+    photo(s, 6.139, r[0], 3.361, 1.368, 0.157);
+  });
+}
+
+function slide14 (s) {
+  navBar(s, true);
+  headline(s, 0.398, 0.77, 5.0, 1.439, 'HOW WE STAND ', 'APART');
+  box(s, 'pie', 5.465, 1.069, 3.486, 3.486, { fill: WHITE, angleRange: [229.9, 91.0], flipH: true });
+  box(s, 'pie', 5.29, 0.885, 3.835, 3.835, { fill: LIME, angleRange: [74.1, 270], flipH: true });
+  text(s, 5.721, 2.127, 1.282, 0.682,
+    [{ text: '35', options: { fontSize: 36 } }, { text: '%', options: { fontSize: 30 } }],
+    { face: DISPLAY, size: 36, color: INK, align: 'right' });
+  text(s, 7.517, 2.127, 1.213, 0.682,
+    [{ text: '65', options: { fontSize: 36 } }, { text: '%', options: { fontSize: 30 } }],
+    { face: DISPLAY, size: 36, color: INK });
+  text(s, 5.833, 2.802, 1.17, 0.606, LOREM_SHORT, { color: INK, align: 'right', lh: 1.2 });
+  text(s, 7.542, 2.812, 1.223, 0.606, LOREM_SHORT, { color: INK, lh: 1.2 });
+  const bars = [
+    [2.812, 3.208, 'OUR INCOME', '65%', 2.208, LIME, 3.35, 'Lorem ipsum dolor sit amet. Qui sint neque a'],
+    [3.759, 4.155, 'OTHER INCOME', '35%', 1.214, WHITE, 4.316, 'Lorem ipsum dolor sit amet. Qui sint neque a v']
+  ];
+  bars.forEach(function (b) {
+    text(s, 0.441, b[0] + 0.012, 2.118, 0.379, b[2], { face: DISPLAY, size: 12, lh: 1.5 });
+    text(s, 3.314, b[0], 0.659, 0.379, b[3], { face: DISPLAY, size: 12, align: 'right', lh: 1.5 });
+    box(s, 'roundRect', 0.579, b[1], 3.285, 0.063, { fill: TRACK, alpha: 70, r: 0.0315 });
+    box(s, 'roundRect', 0.5, b[1], b[4], 0.063, { fill: b[5], r: 0.0315 });
+    text(s, 0.441, b[6], 3.865, 0.27, b[7], { size: 11, lh: 1.2 });
+  });
+}
+
+function slide15 (s) {
+  navBar(s, true);
+  photo(s, 0.5, 0.907, 4.125, 3.78, 0.237);
+  headline(s, 5.06, 0.786, 4.043, 2.121, 'WHAT EARLY USERS ', 'ARE SAYING');
+  sparkle(s, 7.667, 2.283, 0.656, 0.466, LIME);
+  text(s, 5.06, 3.812, 4.043, 1.035,
+    '\u201CLorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor\u201D',
+    { face: DISPLAY, size: 15, italic: true, lh: 1.3 });
+  box(s, 'roundRect', 1.708, 3.958, 2.917, 0.729, { fill: LIME, r: 0.234 });
+  text(s, 1.928, 4.06, 1.93, 0.303, 'YOUR NAME HERE', { face: DISPLAY, size: 14, color: BLACK });
+  text(s, 1.928, 4.311, 2.572, 0.254, LOREM_SHORT, { color: INK, lh: 1.3 });
+}
+
+// Column chart on slide 16.
+const CHART16_BARS = [
+  ['Jan', 4.721, 5.577, 2.785, 1.611], ['Feb', 5.562, 6.445, 3.458, 0.937],
+  ['Mar', 6.397, 7.282, 3.081, 1.315], ['Apr', 7.231, 8.124, 1.635, 2.761],
+  ['May', 8.069, 8.982, 1.763, 2.632]
+];
+const CHART16_TICKS = [1.595, 1.952, 2.311, 2.667, 3.024, 3.38, 3.739, 4.098, 4.398];
+
+function slide16 (s) {
+  navBar(s, true);
+  headline(s, 0.413, 0.849, 3.955, 1.439, 'WHY NOW IS ', 'THE TIME');
+  sparkle(s, 0.5, 2.424, 0.656, 0.466, LIME);
+  kicker(s, 0.413, 3.63, 3.11, 'COMPUTING FOR BUSINESSES', LIME);
+  text(s, 0.413, 3.961, 3.633, 0.647, LOREM_LONG, { lh: 1.3 });
+
+  [5.741, 6.581, 7.415, 8.249, 9.087].forEach(function (x) {
+    rule(s, x, 1.593, 2.861, 'F2F2F2', 0.75, { vertical: true });
+  });
+  [6.164, 6.998, 7.832, 8.672, 9.493].forEach(function (x) {
+    rule(s, x, 1.593, 2.931, 'F2F2F2', 0.75, { vertical: true });
+  });
+  rule(s, 5.324, 1.593, 2.931, 'D9D9D9', 0.75, { vertical: true });
+  CHART16_TICKS.forEach(function (y, i) {
+    rule(s, 5.231, y, 0.093, 'D9D9D9', 0.75);
+    text(s, 4.913, y - 0.15, 0.33, 0.227, String(8 - i), { face: DISPLAY, align: 'right' });
+  });
+  rule(s, 5.231, 4.398, 4.279, 'D9D9D9', 0.75);
+  CHART16_BARS.forEach(function (b) {
+    box(s, 'rect', b[2], b[3], 0.296, b[4], { fill: LIME });
+    text(s, b[1], 4.405, 1.89, 0.298, b[0], { face: DISPLAY, align: 'center', lh: 1.3 });
+  });
+
+  // "TRENDING" speech callout above the chart
+  box(s, 'rect', 6.552, 0.85, 1.396, 0.752, { fill: LIME });
+  slide16Tail(s);
+  text(s, 6.69, 1.0, 1.143, 0.303, 'TRENDING', { face: DISPLAY, size: 14, color: INK });
+  text(s, 6.703, 1.249, 0.993, 0.215, 'Your Text Here', { size: 8, color: INK });
+}
+
+function slide16Tail (s) {
+  s.addShape('custGeom', {
+    x: 7.930, y: 1.278, w: 0.292, h: 0.194, fill: { color: LIME }, line: NONE,
+    points: [{ x: 0, y: 0 }, { x: 0.292, y: 0.184 }, { x: 0, y: 0.194 }, { close: true }]
+  });
+}
+
+const TIMELINE = [
+  [0.5, 0.442, 'STEP 1', 'PLAN', 3.275, 0.606,
+    'Lorem ipsum dolor sit amet, consectetur sed do adipiscing elit, sed do'],
+  [2.887, 2.823, 'STEP 2', 'DESIGN', 3.271, 0.788,
+    'Lorem ipsum dolor sit amet, consectetur sed do adipiscing elit, sed do eiusmod tempor'],
+  [5.4, 5.347, 'STEP 3', 'DEVELOP', 3.271, 0.788,
+    'Lorem ipsum dolor sit amet, consectetur sed do adipiscing elit, sed do eiusmod tempor'],
+  [7.757, 7.696, 'STEP 4', 'DEPLOY', 3.271, 0.606,
+    'Lorem ipsum dolor sit amet, consectetur sed do adipiscing elit, sed do']
+];
+
+function slide17 (s) {
+  navBar(s, false);
+  text(s, 0.406, 0.828, 6.083, 0.757, 'LAUNCH TIMELINE',
+    { face: DISPLAY, size: 41, bold: true, color: INK });
+  text(s, 0.433, 1.554, 5.769, 0.451, LOREM_MED, { color: INK, lh: 1.3 });
+  sparkle(s, 8.296, 0.973, 0.656, 0.466, INK);
+  rule(s, 0.5, 2.821, 9.0, '3F3F3F', 1.25);
+  TIMELINE.forEach(function (t) {
+    tickBox(s, t[0], 2.698, 0.241);
+    text(s, t[1], t[4], 1.632, 0.278, t[2], { size: 12, color: INK });
+    text(s, t[1], 3.697, 1.446, 0.328, t[3], { face: DISPLAY, size: 15, color: INK });
+    text(s, t[1], 4.055, 1.857, t[5], t[6], { color: INK, lh: 1.2 });
+  });
+}
+
+const PLANS = [
+  { x: 0.485, card: LIME, border: INK, price: '$299', name: 'Family', ink: BLACK, pillText: WHITE, tx: 0.75, pw: 1.572 },
+  { x: 2.876, card: WHITE, border: null, price: '$99', name: 'Solo', ink: INK, pillText: LIME, tx: 3.147, pw: 1.56 }
+];
+
+function slide18 (s) {
+  navBar(s, true);
+  headline(s, 5.622, 0.895, 3.436, 2.121, 'CHOOSE WHAT ', 'FITS YOU');
+  sparkle(s, 7.11, 2.424, 0.656, 0.466, LIME);
+  kicker(s, 5.622, 3.83, 3.11, 'COMPUTING FOR BUSINESSES', LIME);
+  text(s, 5.622, 4.161, 3.633, 0.647, LOREM_LONG, { lh: 1.3 });
+  PLANS.forEach(function (p) {
+    box(s, 'roundRect', p.x, 1.065, 2.104, 3.738,
+      { fill: p.card, line: p.border, lw: 1, r: 0.175 });
+    text(s, p.x + 0.285, 1.664, 1.551, 0.682, p.price,
+      { face: DISPLAY, size: 36, color: p.ink, align: 'center' });
+    text(s, p.x + 0.444, 2.403, 1.232, 0.431, p.name,
+      { face: DISPLAY, size: 21, color: p.ink, align: 'center' });
+    paras(s, p.x + 0.139, 3.029, 1.825, 0.852, [
+      'Lorem ipsum dolor sit amce', 'Lorem ipsum dolor sit amet',
+      'Lorem ipsum dolor sit amet ', 'Lorem ipsum dolor sit amet'
+    ], { size: 8, color: p.ink, lh: 1.5, align: 'center', bullet: { characterCode: '2714', indent: 10 } });
+    box(s, 'roundRect', p.tx, 4.235, p.pw, 0.354, { fill: INK, r: 0.177 });
+    text(s, p.tx, 4.235, p.pw, 0.354, 'Subcribe now',
+      { face: DISPLAY, size: 11, color: p.pillText, valign: 'middle', margin: [12, 5.4, 2.7, 2.7] });
+    box(s, 'ellipse', p.tx + 1.262, 4.276, 0.266, 0.27, { fill: WHITE });
+    rule(s, p.tx + 1.323, 4.411, 0.148, BLACK, 1.25, { tail: 'triangle' });
+  });
+}
+
+function slide19 (s) {
+  navBar(s, true);
+  headline(s, 5.669, 0.998, 2.54, 1.439, 'CALL TO ', 'ACTION');
+  kicker(s, 5.669, 3.648, 3.11, 'COMPUTING FOR BUSINESSES', LIME);
+  text(s, 5.669, 3.98, 3.633, 0.647, LOREM_LONG, { lh: 1.3 });
+  orb(s, 8.809, 1.853, 1.439, 1.064, LIME, WHITE, true);
+  const bands = [
+    [1.2245, LIME, 1.361, 'PRE-ORDER NOW', 2.95, 1.323],
+    [3.1885, LIME, 3.352, 'JOIN THE WAITLIST', 2.95, 3.286],
+    [3.9515, WHITE, 4.102, 'JOIN WITH US NOW', 3.269, 4.053]
+  ];
+  bands.forEach(function (b) {
+    box(s, 'roundRect', 0.4995, b[0], 4.5, 0.609, { fill: b[1], r: 0.105 });
+    text(s, 0.644, b[2], b[4], 0.303, b[3], { face: DISPLAY, size: 14, color: BLACK });
+    arrowGlyph(s, 4.424, b[5], 0.382, 0.405, INK, 90);
+  });
+  paras(s, 0.576, 1.968, 4.424, 1.041, [
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin bibend',
+    'um risus sit amet venen atis tristique. Morbi tortor justo, p eget consequat ac, semper sit',
+    'consectetur adipiscing elit. Proin bibendum risus sit amet venen atis tristique. Morbi tortor'
+  ], { lh: 1.3, bullet: { characterCode: '2022', indent: 10 } });
+}
+
+function slide20 (s) {
+  navBar(s, false);
+  text(s, 0.407, 0.97, 8.278, 2.02, [
+    { text: 'THANK YOU ', options: { fontSize: 50, breakLine: true } },
+    { text: 'FOR WATCHING', options: { fontSize: 66 } }
+  ], { face: DISPLAY, size: 50, color: INK });
+  orb(s, 8.686, 1.853, 1.439, 1.064, INK, INK, true);
+  photo(s, 0.5, 3.19, 4.143, 1.477, 0.159);
+  text(s, 5.003, 3.196, 4.393, 0.451, LOREM_MED, { color: INK, lh: 1.3 });
+  text(s, 5.577, 3.97, 4.027, 0.513,
+    'Main Street 233, Building A, 4th Floor, Suite 405, Near City Park, Florida, 32801, United States',
+    { size: 11, color: INK, lh: 1.3 });
+  signpost(s, 5.104, 4.027, 0.388, 0.399);
+}
+
+// Signpost pictogram next to the address on the closing slide:
+// a vertical post with one board pointing right and one pointing left.
+function signpost (s, x, y, w, h) {
+  box(s, 'rect', x + w * 0.45, y, w * 0.1, h, { fill: INK });
+  box(s, 'roundRect', x + w * 0.14, y + h * 0.14, w * 0.72, h * 0.26,
+    { fill: LIME, line: INK, lw: 2, r: 0.05 });
+  box(s, 'roundRect', x + w * 0.06, y + h * 0.52, w * 0.72, h * 0.26,
+    { fill: LIME, line: INK, lw: 2, r: 0.05 });
+}
+
+/* ------------------------------------------------------------------ *
+ * Assemble
+ * ------------------------------------------------------------------ */
+
+const SLIDES = [
+  [slide01, INK], [slide02, INK], [slide03, LIME], [slide04, INK], [slide05, INK],
+  [slide06, LIME], [slide07, INK], [slide08, INK], [slide09, LIME], [slide10, INK],
+  [slide11, INK], [slide12, INK], [slide13, LIME], [slide14, INK], [slide15, INK],
+  [slide16, INK], [slide17, LIME], [slide18, INK], [slide19, INK], [slide20, LIME]
+];
+
+function build () {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'WIDE_10', width: 10, height: 5.625 });
+  pptx.layout = 'WIDE_10';
+  pptx.author = 'pptxgenjs';
+  pptx.title = 'Product Launch';
+
+  SLIDES.forEach(function (entry) {
+    const slide = pptx.addSlide();
+    slide.background = { color: entry[1] };
+    entry[0](slide);
+  });
+
+  return pptx.writeFile({
+    fileName: path.join(__dirname, '0c12df68-39cb-4cf8-878c-33a3985cd6f2_grok_final.pptx')
+  });
+}
+
+build().then(function (f) { console.log('wrote ' + f); });
