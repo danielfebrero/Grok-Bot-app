@@ -1,0 +1,476 @@
+#!/usr/bin/python3
+
+import argparse
+import json
+import math
+import os
+import re
+import sys
+import time
+import urllib.request
+from collections import namedtuple
+from enum import Enum
+
+# >>> box port table (from sand/src/shared/box/box-contract.ts; regenerate: pnpm --filter sand run gen:box-ports) >>>
+SAND_BOX_CDP_PORT_BASE = 9222
+# <<< box port table <<<
+
+INTERVAL_S_ENV = "SAND_MEMORY_WATCH_INTERVAL_S"
+INITIAL_DELAY_S_ENV = "SAND_MEMORY_WATCH_INITIAL_DELAY_S"
+DEFAULT_INTERVAL_S = 60
+DEFAULT_INITIAL_DELAY_S = 5
+MIN_INTERVAL_S = 0.1
+MAX_TELEMETRY_LOG_BYTES = 8 * 1024 * 1024
+CDP_TIMEOUT_S = 1.0
+MAX_DISPLAY = 256
+PPID_WALK_LIMIT = 32
+CLOCK_TICKS_PER_S = os.sysconf("SC_CLK_TCK")
+
+
+class Bucket(Enum):
+    CHROME_BROWSER = "chrome_browser"
+    CHROME_RENDERER = "chrome_renderer"
+    CHROME_GPU = "chrome_gpu"
+    CHROME_UTILITY = "chrome_utility"
+    CHROME_OTHER = "chrome_other"
+    HOST = "host"
+    DESKTOP = "desktop"
+    OTHER = "other"
+
+
+CHROME_BUCKETS = frozenset(
+    [
+        Bucket.CHROME_BROWSER,
+        Bucket.CHROME_RENDERER,
+        Bucket.CHROME_GPU,
+        Bucket.CHROME_UTILITY,
+        Bucket.CHROME_OTHER,
+    ]
+)
+
+CHROME_TYPE_BUCKETS = {
+    None: Bucket.CHROME_BROWSER,
+    "renderer": Bucket.CHROME_RENDERER,
+    "gpu-process": Bucket.CHROME_GPU,
+    "utility": Bucket.CHROME_UTILITY,
+}
+
+HOST_COMMS = frozenset(["node", "exec-daemon"])
+
+DESKTOP_COMMS = frozenset(
+    [
+        "xvfb",
+        "xfwm4",
+        "picom",
+        "x11vnc",
+        "websockify",
+        "plank",
+        "thunar",
+        "xfce4-terminal",
+    ]
+)
+
+PSS_FIELDS = {
+    Bucket.CHROME_BROWSER: "chromeBrowserPssKb",
+    Bucket.CHROME_RENDERER: "chromeRendererPssKb",
+    Bucket.CHROME_GPU: "chromeGpuPssKb",
+    Bucket.CHROME_UTILITY: "chromeUtilityPssKb",
+    Bucket.CHROME_OTHER: "chromeOtherPssKb",
+    Bucket.HOST: "hostPssKb",
+    Bucket.DESKTOP: "desktopPssKb",
+    Bucket.OTHER: "otherPssKb",
+}
+
+KB_LINE = re.compile(r"^(\w+):\s+(\d+) kB$", re.MULTILINE)
+
+CpuStat = namedtuple("CpuStat", ["ticks", "start_time"])
+
+Process = namedtuple(
+    "Process",
+    ["pid", "ppid", "bucket", "pss_kb", "pss_fallback", "argv", "cpu"],
+)
+
+# The default opener routes every request through any http_proxy in the
+# environment (https://docs.python.org/3/library/urllib.request.html#urllib.request.ProxyHandler),
+# which would carry a loopback CDP probe off-box; an empty ProxyHandler pins it
+# to the direct connection.
+CDP_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
+def log(line):
+    print("[sand-memory-watch] %s" % line, file=sys.stderr, flush=True)
+
+
+def argv_flag(argv, name):
+    prefix = name + "="
+    value = None
+    for arg in argv:
+        if arg.startswith(prefix):
+            value = arg[len(prefix) :]
+    return value
+
+
+def classify(comm, argv):
+    # chrome_crashpad_handler (comm truncated to chrome_crashpad) and
+    # chrome-sandbox carry no --type= flag
+    # (https://chromium.googlesource.com/crashpad/crashpad/+/main/handler/crashpad_handler.md),
+    # so only the exact comm "chrome" is bucketed by that flag. A zombie has an
+    # empty cmdline and is no browser.
+    if comm == "chrome" and argv:
+        return CHROME_TYPE_BUCKETS.get(argv_flag(argv, "--type"), Bucket.CHROME_OTHER)
+    if comm.startswith("chrome"):
+        return Bucket.CHROME_OTHER
+    if comm in HOST_COMMS:
+        return Bucket.HOST
+    if comm.lower() in DESKTOP_COMMS:
+        return Bucket.DESKTOP
+    return Bucket.OTHER
+
+
+def remote_debugging_port(argv):
+    value = argv_flag(argv, "--remote-debugging-port")
+    if value is not None and value.isdigit() and 0 < int(value) < 65536:
+        return int(value)
+    return None
+
+
+def user_data_dir(argv):
+    return argv_flag(argv, "--user-data-dir")
+
+
+def display_of(port):
+    if port is None:
+        return 0
+    display = port - SAND_BOX_CDP_PORT_BASE
+    return display if 1 <= display <= MAX_DISPLAY else 0
+
+
+def parse_kb_fields(text):
+    return {name: int(value) for name, value in KB_LINE.findall(text)}
+
+
+def parse_meminfo(text):
+    fields = parse_kb_fields(text)
+    return fields.get("MemTotal", 0), fields.get("MemAvailable", 0)
+
+
+def parse_pss_kb(smaps_rollup_text):
+    return parse_kb_fields(smaps_rollup_text).get("Pss")
+
+
+def parse_status(text):
+    comm = ""
+    ppid = 0
+    for line in text.splitlines():
+        if line.startswith("Name:"):
+            comm = line[len("Name:") :].strip()
+        elif line.startswith("PPid:"):
+            ppid = int(line[len("PPid:") :].strip() or 0)
+    return comm, ppid, parse_kb_fields(text).get("VmRSS")
+
+
+def parse_stat(text):
+    # The comm in field 2 may hold spaces and parens, so the numeric fields
+    # start after the last ')'. utime, stime, cutime, and cstime are fields
+    # 14-17 and starttime is field 22
+    # (https://man7.org/linux/man-pages/man5/proc_pid_stat.5.html); the
+    # reaped-children pair keeps a renderer's CPU in its zygote's total after
+    # the renderer exits, so tree sums stay monotonic between samples, and
+    # starttime tells a reused pid apart from the process it replaced.
+    fields = text[text.rfind(")") + 1 :].split()
+    try:
+        return CpuStat(
+            sum(int(fields[index]) for index in (11, 12, 13, 14)), int(fields[19])
+        )
+    except (IndexError, ValueError):
+        return None
+
+
+def parse_cmdline(text):
+    # Every Chrome child process rewrites its title over the argv area with
+    # setproctitle, which leaves /proc/<pid>/cmdline as one space-joined
+    # string with a single trailing NUL
+    # (https://chromium.googlesource.com/chromium/src/+/HEAD/base/process/set_process_title_linux.cc),
+    # so a lone element is split on spaces to recover the --type= flag.
+    argv = [arg for arg in text.split("\0") if arg]
+    if len(argv) == 1:
+        return argv[0].split(" ")
+    return argv
+
+
+def count_page_targets(json_text):
+    targets = json.loads(json_text)
+    if not isinstance(targets, list):
+        return 0
+    return sum(
+        1
+        for target in targets
+        if isinstance(target, dict) and target.get("type") == "page"
+    )
+
+
+def probe_tabs(port):
+    try:
+        with CDP_OPENER.open(
+            "http://127.0.0.1:%d/json/list" % port, timeout=CDP_TIMEOUT_S
+        ) as response:
+            return count_page_targets(response.read().decode("utf-8", "replace"))
+    except Exception:
+        return None
+
+
+def read_text(path):
+    with open(path, "rb") as handle:
+        return handle.read().decode("utf-8", "replace")
+
+
+def read_process(proc_root, pid):
+    pid_dir = os.path.join(proc_root, pid)
+    try:
+        comm, ppid, vmrss_kb = parse_status(read_text(os.path.join(pid_dir, "status")))
+        argv = parse_cmdline(read_text(os.path.join(pid_dir, "cmdline")))
+    except OSError:
+        return None
+    try:
+        pss_kb = parse_pss_kb(read_text(os.path.join(pid_dir, "smaps_rollup")))
+    except OSError:
+        pss_kb = None
+    try:
+        cpu = parse_stat(read_text(os.path.join(pid_dir, "stat")))
+    except OSError:
+        cpu = None
+    bucket = classify(comm, argv)
+    if pss_kb is not None:
+        return Process(int(pid), ppid, bucket, pss_kb, False, argv, cpu)
+    if vmrss_kb is None:
+        return Process(int(pid), ppid, bucket, 0, False, argv, cpu)
+    return Process(int(pid), ppid, bucket, vmrss_kb, True, argv, cpu)
+
+
+def demote_forked_browsers(processes):
+    # A child the browser has just forked still shows the browser's argv until
+    # it execs or retitles itself
+    # (https://chromium.googlesource.com/chromium/src/+/HEAD/base/process/launch_posix.cc),
+    # so a "browser" whose parent is itself a Chrome process is a transient
+    # child, not a second profile.
+    chrome_pids = {p.pid for p in processes if p.bucket in CHROME_BUCKETS}
+    return [
+        p._replace(bucket=Bucket.CHROME_OTHER)
+        if p.bucket is Bucket.CHROME_BROWSER and p.ppid in chrome_pids
+        else p
+        for p in processes
+    ]
+
+
+def owning_browser(process, by_pid, browser_pids):
+    pid = process.pid
+    for _ in range(PPID_WALK_LIMIT):
+        if pid in browser_pids:
+            return pid
+        current = by_pid.get(pid)
+        if current is None or current.bucket not in CHROME_BUCKETS:
+            return None
+        pid = current.ppid
+    return None
+
+
+def profile_trees(processes):
+    by_pid = {p.pid: p for p in processes}
+    browser_pids = {p.pid for p in processes if p.bucket is Bucket.CHROME_BROWSER}
+    trees = {pid: [] for pid in browser_pids}
+    for process in processes:
+        if process.bucket in CHROME_BUCKETS:
+            owner = owning_browser(process, by_pid, browser_pids)
+            if owner is not None:
+                trees[owner].append(process)
+    return trees
+
+
+def cpu_key(browser):
+    return (browser.pid, None if browser.cpu is None else browser.cpu.start_time)
+
+
+def tree_cpu_ticks(tree):
+    ticks = [p.cpu.ticks for p in tree if p.cpu is not None]
+    return sum(ticks) if len(ticks) == len(tree) else None
+
+
+class CpuBaseline:
+    def __init__(self):
+        self.seen = {}
+
+    def millicores(self, key, cpu_ticks, now):
+        if cpu_ticks is None:
+            return None
+        previous = self.seen.get(key)
+        self.seen[key] = (cpu_ticks, now)
+        if previous is None:
+            return None
+        previous_ticks, previous_at = previous
+        elapsed_s = now - previous_at
+        if cpu_ticks < previous_ticks or elapsed_s <= 0:
+            return None
+        return round(
+            (cpu_ticks - previous_ticks) * 1000 / (CLOCK_TICKS_PER_S * elapsed_s)
+        )
+
+    def forget_except(self, keys):
+        self.seen = {
+            key: seen
+            for key, seen in self.seen.items()
+            if key in keys or (key[0], None) in keys
+        }
+
+
+def profile_record(browser, tree, tabs, cpu_millicores):
+    renderer_pss_kb = [p.pss_kb for p in tree if p.bucket is Bucket.CHROME_RENDERER]
+    record = {
+        "kind": "chrome_profile_sample",
+        "display": display_of(remote_debugging_port(browser.argv)),
+        "processes": len(tree),
+        "renderers": len(renderer_pss_kb),
+        "pssKb": sum(p.pss_kb for p in tree),
+        "rendererMaxPssKb": max(renderer_pss_kb, default=0),
+    }
+    if tabs is not None:
+        record["tabs"] = tabs
+    if cpu_millicores is not None:
+        record["cpuMillicores"] = cpu_millicores
+    return record
+
+
+def sample(proc_root, probe_tabs, cpu_baseline, clock=time.monotonic):
+    mem_total_kb, mem_available_kb = parse_meminfo(
+        read_text(os.path.join(proc_root, "meminfo"))
+    )
+    processes = []
+    for name in os.listdir(proc_root):
+        if name.isdigit():
+            process = read_process(proc_root, name)
+            if process is not None:
+                processes.append(process)
+    walked_at = clock()
+    processes = demote_forked_browsers(processes)
+    pss_kb = {bucket: 0 for bucket in Bucket}
+    for process in processes:
+        pss_kb[process.bucket] += process.pss_kb
+    browsers = sorted(
+        (p for p in processes if p.bucket is Bucket.CHROME_BROWSER),
+        key=lambda p: p.pid,
+    )
+    renderer_pss_kb = [
+        p.pss_kb for p in processes if p.bucket is Bucket.CHROME_RENDERER
+    ]
+    unclaimed_tabs = {}
+    for port in sorted({remote_debugging_port(b.argv) for b in browsers} - {None}):
+        count = probe_tabs(port)
+        if count is not None:
+            unclaimed_tabs[port] = count
+    tab_counts = {}
+    for browser in browsers:
+        count = unclaimed_tabs.pop(remote_debugging_port(browser.argv), None)
+        if count is not None:
+            tab_counts[browser.pid] = count
+    record = {
+        "kind": "memory_sample",
+        "memTotalKb": mem_total_kb,
+        "memAvailableKb": mem_available_kb,
+        "processes": len(processes),
+        "pssFallbackProcesses": sum(1 for p in processes if p.pss_fallback),
+        "chromeProcesses": sum(1 for p in processes if p.bucket in CHROME_BUCKETS),
+        "chromeProfiles": len({user_data_dir(b.argv) for b in browsers}),
+        "chromeRenderers": len(renderer_pss_kb),
+        "chromeTabs": sum(tab_counts.values()),
+        "chromeTabsProbedProfiles": len(tab_counts),
+        "chromeRendererMaxPssKb": max(renderer_pss_kb, default=0),
+    }
+    for bucket, field in PSS_FIELDS.items():
+        record[field] = pss_kb[bucket]
+    trees = profile_trees(processes)
+    cpu_baseline.forget_except({cpu_key(b) for b in browsers})
+    rows = [record]
+    for browser in browsers:
+        tree = trees[browser.pid]
+        cpu_millicores = cpu_baseline.millicores(
+            cpu_key(browser), tree_cpu_ticks(tree), walked_at
+        )
+        rows.append(
+            profile_record(browser, tree, tab_counts.get(browser.pid), cpu_millicores)
+        )
+    return rows
+
+
+def print_record(record):
+    print(json.dumps(record, sort_keys=True), flush=True)
+
+
+class TelemetryLog:
+    def __init__(self, path):
+        self.path = path
+        self.full_reported = False
+
+    def append(self, record):
+        try:
+            try:
+                size = os.stat(self.path).st_size
+            except FileNotFoundError:
+                size = 0
+            if size > MAX_TELEMETRY_LOG_BYTES:
+                if not self.full_reported:
+                    self.full_reported = True
+                    log("telemetry log over size cap; dropping memory samples")
+                return
+            with open(self.path, "a", encoding="utf-8") as handle:
+                handle.write(json.dumps(record, sort_keys=True) + "\n")
+        except Exception as error:
+            log("memory sample append failed: %r" % (error,))
+
+
+def parse_args(argv):
+    parser = argparse.ArgumentParser(prog="sand-memory-watch")
+    parser.add_argument("--telemetry-log")
+    parser.add_argument("--proc-root", default="/proc")
+    parser.add_argument("--once", action="store_true")
+    parser.add_argument("--stdout", action="store_true")
+    args = parser.parse_args(argv[1:])
+    if args.telemetry_log is None and not args.stdout:
+        parser.error("--telemetry-log PATH is required unless --stdout is given")
+    return args
+
+
+def env_seconds(env, name, default, minimum):
+    try:
+        value = float(env.get(name, ""))
+    except ValueError:
+        return default
+    if not math.isfinite(value) or value < minimum:
+        return default
+    return value
+
+
+def emit_sample(emit, proc_root, cpu_baseline):
+    for record in sample(proc_root, probe_tabs, cpu_baseline):
+        emit(record)
+
+
+def main():
+    args = parse_args(sys.argv)
+    emit = print_record if args.stdout else TelemetryLog(args.telemetry_log).append
+    cpu_baseline = CpuBaseline()
+    if args.once:
+        emit_sample(emit, args.proc_root, cpu_baseline)
+        return
+    time.sleep(env_seconds(os.environ, INITIAL_DELAY_S_ENV, DEFAULT_INITIAL_DELAY_S, 0))
+    interval_s = env_seconds(
+        os.environ, INTERVAL_S_ENV, DEFAULT_INTERVAL_S, MIN_INTERVAL_S
+    )
+    while True:
+        try:
+            emit_sample(emit, args.proc_root, cpu_baseline)
+        except Exception as error:
+            log("sample failed: %r" % (error,))
+        time.sleep(interval_s)
+
+
+if __name__ == "__main__":
+    main()
