@@ -1,0 +1,855 @@
+#!/usr/bin/env node
+/**
+ * "Fundraising Charity" presentation template — rebuilt with pptxgenjs.
+ * 20 slides, 16:9 (10" x 5.625").
+ *
+ * The source theme is an inverted scheme (dk1 = white, lt1 = black), so
+ * headings are white on the dark slides and black on the light ones.
+ * Raster images are replaced with flat "[image]" placeholder blocks.
+ */
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ *
+ * Palette / typography
+ * ------------------------------------------------------------------ */
+
+const C = {
+  orange: 'FE6100',      // accent1 — the deck's signature colour
+  amber: 'FCAB35',       // accent2 — gradient partner / secondary accent
+  white: 'FFFFFF',
+  offWhite: 'FEFEFE',
+  black: '000000',
+  ink: '0C0C0C',
+  grey: '363636',        // chart gridlines
+  scrim: '3C3C3C',       // 75%-black wash over the slide-3 photo
+  panel: '545454',       // 65%-black wash over the slide-10 photo
+  photo: 'F2F2F2',       // placeholder block for photographs
+  photoInk: 'BFBFBF',
+};
+
+// Every gradient in the deck runs between accent1 and accent2; only the
+// direction changes. These two presets are [topColour, bottomColour].
+const G_AMBER_TOP = [C.amber, C.orange];
+const G_ORANGE_TOP = [C.orange, C.amber];
+
+const HEAD = 'Parkinsans';   // display face
+const BODY = 'Open Sans';    // running text
+
+/* ------------------------------------------------------------------ *
+ * Geometry / colour helpers
+ * ------------------------------------------------------------------ */
+
+// Normalised outline of the deck's signature "V" chevron, apex pointing up.
+const CHEVRON = [
+  [0.41841, 0], [0.58159, 0], [1, 1], [0.82298, 1],
+  [0.5, 0.22806], [0.17702, 1], [0, 1],
+];
+
+/** Rotate normalised points a quarter turn at a time inside the unit square. */
+function orient(pts, dir) {
+  const turn = { up: p => p, down: ([x, y]) => [1 - x, 1 - y],
+                 right: ([x, y]) => [1 - y, x], left: ([x, y]) => [y, 1 - x] };
+  return pts.map(turn[dir]);
+}
+
+/** Clip a polygon to the horizontal strip y0..y1 (Sutherland–Hodgman). */
+function clipStrip(poly, y0, y1) {
+  const half = (pts, keep, cut) => {
+    const out = [];
+    pts.forEach((p, i) => {
+      const q = pts[(i + 1) % pts.length];
+      const pIn = keep(p), qIn = keep(q);
+      if (pIn) out.push(p);
+      if (pIn !== qIn) out.push(cut(p, q));
+    });
+    return out;
+  };
+  const at = (p, q, y) => [p[0] + (q[0] - p[0]) * ((y - p[1]) / (q[1] - p[1])), y];
+  let r = half(poly, p => p[1] >= y0, (p, q) => at(p, q, y0));
+  if (!r.length) return r;
+  return half(r, p => p[1] <= y1, (p, q) => at(p, q, y1));
+}
+
+/** Blend two hex colours; t = 0 gives `a`, t = 1 gives `b`. */
+function mix(a, b, t) {
+  let out = '';
+  for (let i = 0; i < 6; i += 2) {
+    const va = parseInt(a.substr(i, 2), 16), vb = parseInt(b.substr(i, 2), 16);
+    out += Math.round(va + (vb - va) * t).toString(16).padStart(2, '0');
+  }
+  return out.toUpperCase();
+}
+
+const BANDS = 12;  // horizontal slices used to fake a linear gradient
+
+/**
+ * Draw a normalised polygon into the box (x, y, w, h). A `grad` pair is
+ * rendered as BANDS horizontal slices; a plain colour draws one shape.
+ */
+function polyShape(slide, poly, o) {
+  const emit = (pts, color) => slide.addShape('custGeom', {
+    x: o.x, y: o.y, w: o.w, h: o.h,
+    points: pts.map(([px, py]) => ({ x: px * o.w, y: py * o.h })).concat([{ close: true }]),
+    fill: { color: color }, line: { type: 'none' },
+  });
+  if (!o.grad) { emit(poly, o.color); return; }
+  for (let i = 0; i < BANDS; i++) {
+    const y0 = i / BANDS, y1 = (i + 1) / BANDS;
+    // Overlap adjacent bands slightly so no hairline seams show through.
+    const slice = clipStrip(poly, y0, Math.min(1, y1 + 0.004));
+    if (slice.length > 2) emit(slice, mix(o.grad[0], o.grad[1], (i + 0.5) / BANDS));
+  }
+}
+
+/** One chevron. `dir` = 'up' | 'down' | 'left' | 'right'. */
+function chevron(slide, o) {
+  polyShape(slide, orient(CHEVRON, o.dir || 'up'), o);
+}
+
+/** A row (dx) or column (dy) of identical chevrons. */
+function chevrons(slide, o) {
+  for (let i = 0; i < o.count; i++) {
+    chevron(slide, Object.assign({}, o, { x: o.x + (o.dx || 0) * i, y: o.y + (o.dy || 0) * i }));
+  }
+}
+
+/** Gradient-filled rectangle (the slide-18 columns). */
+function gradRect(slide, o) {
+  polyShape(slide, [[0, 0], [1, 0], [1, 1], [0, 1]], o);
+}
+
+/* ------------------------------------------------------------------ *
+ * Text / line helpers
+ * ------------------------------------------------------------------ */
+
+/** Text box using the source deck's Google-Slides insets. */
+function text(slide, runs, o) {
+  slide.addText(runs, {
+    x: o.x, y: o.y, w: o.w, h: o.h,
+    align: o.align || 'left',
+    valign: 'top',
+    margin: [5.4, 5.4, 2.7, 2.7],
+    fontFace: o.font || HEAD,
+    fontSize: o.size,
+    color: o.color,
+    lineSpacingMultiple: o.line,
+    wrap: true,
+  });
+}
+
+/** Single-run text box. */
+function label(slide, str, o) {
+  text(slide, [{ text: str }], o);
+}
+
+/** Two-tone heading: neutral first half, orange second half. */
+function heading(slide, first, second, o) {
+  text(slide, [
+    { text: first, options: { color: o.color, fontSize: o.size, fontFace: HEAD } },
+    { text: second, options: { color: C.orange, fontSize: o.size2 || o.size, fontFace: HEAD } },
+  ], o);
+}
+
+/** Horizontal (or vertical, when w = 0) rule. */
+function rule(slide, o) {
+  slide.addShape('line', {
+    x: o.x, y: o.y, w: o.w, h: o.h || 0,
+    line: { color: o.color, width: o.width || 0.75 },
+  });
+}
+
+/** Flat stand-in for a photograph. */
+function photoBlock(slide, o) {
+  slide.addShape('rect', {
+    x: o.x, y: o.y, w: o.w, h: o.h,
+    fill: { color: o.color || C.photo }, line: { type: 'none' },
+  });
+  slide.addText('[image]', {
+    x: o.x, y: o.y + o.h / 2 - 0.16, w: o.w, h: 0.32,
+    align: 'center', valign: 'middle',
+    fontFace: BODY, fontSize: o.captionSize || 11, color: o.captionColor || C.photoInk,
+  });
+}
+
+/** Pill button ("Learn More"). */
+function pill(slide, o) {
+  slide.addShape('roundRect', {
+    x: o.x, y: o.y, w: o.w, h: o.h, rectRadius: o.h / 2,
+    fill: { color: C.orange }, line: { type: 'none' },
+  });
+  slide.addText('Learn More', {
+    x: o.x, y: o.y, w: o.w, h: o.h,
+    align: 'center', valign: 'middle',
+    fontFace: HEAD, fontSize: 11, color: o.color || C.offWhite,
+  });
+}
+
+/**
+ * Page number, bottom-right. It lives on the slide master, so every slide
+ * except the title carries it — invisible where the background is black.
+ */
+function pageNumber(slide, n) {
+  slide.addText(String(n), {
+    x: 9.1822, y: 5.0816, w: 0.3144, h: 0.2146,
+    align: 'left', valign: 'top', margin: [5.4, 5.4, 2.7, 2.7],
+    fontFace: HEAD, fontSize: 8, color: C.ink,
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Per-slide builders
+ * ------------------------------------------------------------------ */
+
+// 1 — Title
+function slide01(s) {
+  photoBlock(s, { x: 0, y: 0, w: 3.6823, h: 5.625, captionSize: 14 });
+  chevrons(s, { x: 2.7442, y: 0.8167, w: 1.5929, h: 1.3231, dy: 1.3216, count: 3, dir: 'down', grad: G_ORANGE_TOP });
+  heading(s, 'Fundraising ', 'Charity', {
+    x: 4.4879, y: 1.254, w: 6.0288, h: 1.9135, size: 60, size2: 72, color: C.ink, line: 0.8,
+  });
+  label(s, 'Presentation Template', { x: 4.4879, y: 3.598, w: 2.9871, h: 0.3029, size: 14, color: C.ink });
+  label(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa sociis natoque. ',
+    { x: 4.4879, y: 3.9191, w: 4.6621, h: 0.4529, size: 9, color: C.ink, font: BODY, line: 1.3 });
+}
+
+// 2 — Index of table
+const S2_ITEMS = [
+  ['01.', 'Our Fundraising Journey'],
+  ['02.', 'Fundraising That Matters'],
+  ['03.', 'A Fundraising Mission '],
+  ['04.', 'The Power of Your Contribution'],
+];
+
+function slide02(s) {
+  s.background = { color: C.black };
+  heading(s, 'Indeks Of ', 'Table', { x: 5.14, y: 0.9783, w: 4.5522, h: 1.4503, size: 50, color: C.white, line: 0.8 });
+  label(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Donec quam felis, ultricies nec.',
+    { x: 5.2412, y: 2.5866, w: 4.0341, h: 0.8467, size: 9, color: C.offWhite, font: BODY, line: 1.3 });
+  chevrons(s, { x: 5.341, y: 3.8524, w: 1.0263, h: 0.9629, dx: 0.962, count: 3, dir: 'right', color: C.orange });
+
+  // Each row drifts 0.006" left and 0.915" down from the one above.
+  S2_ITEMS.forEach(([num, title], i) => {
+    const dx = -i * 0.0063, y = 1.1677 + i * 0.9149;
+    s.addShape('ellipse', {
+      x: 0.5469 + dx, y: y, w: 0.3105, h: 0.3105,
+      fill: { color: i === 3 ? C.amber : C.orange }, line: { type: 'none' },
+    });
+    label(s, num, { x: 0.5308 + dx, y: y + 0.0417, w: 0.3428, h: 0.2272, size: 9, color: C.offWhite, align: 'center' });
+    label(s, title, { x: 0.9676 + dx, y: y + 0.0038, w: 1.8415, h: 0.5301, size: 14, color: C.white });
+    label(s, 'Lorem ipsum dolor sit consectetuer adipiscing elit enean commodo.',
+      { x: 2.8842 + dx, y: y - 0.0707, w: 2.1026, h: 0.6498, size: 9, color: C.offWhite, font: BODY, line: 1.3 });
+    if (i < 3) rule(s, { x: 0.5376 + dx, y: 1.8216 + i * 0.9212, w: 4.4297, color: C.orange });
+  });
+  pageNumber(s, 2);
+}
+
+// 3 — Our Fundraising Journey (photo backdrop under a 75% black scrim)
+function slide03(s) {
+  s.addShape('rect', { x: 0, y: 0, w: 10, h: 5.625, fill: { color: C.photo }, line: { type: 'none' } });
+  s.addShape('rect', { x: 0, y: 0, w: 10, h: 5.625, fill: { color: C.scrim }, line: { type: 'none' } });
+  s.addText('[image]', { x: 4.3, y: 2.4, w: 1.4, h: 0.32, align: 'center', fontFace: BODY, fontSize: 11, color: '6E6E6E' });
+
+  chevrons(s, { x: 8.2629, y: 0.6365, w: 1.091, h: 1.0888, dy: 1.0877, count: 4, dir: 'up', grad: G_AMBER_TOP });
+  chevrons(s, { x: 0.5202, y: 0.6365, w: 1.091, h: 1.0888, dy: 1.0877, count: 4, dir: 'down', grad: G_AMBER_TOP });
+
+  heading(s, 'Our Fundraising ', 'Journey', {
+    x: 2.5764, y: 0.8175, w: 4.8472, h: 1.4389, size: 41, color: C.white, align: 'center',
+  });
+  label(s, 'Brief Overview of Major Developments',
+    { x: 3.0602, y: 2.7308, w: 3.8795, h: 0.3029, size: 14, color: C.orange, align: 'center' });
+  label(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur.',
+    { x: 2.3003, y: 3.0888, w: 5.3994, h: 0.6488, size: 9, color: C.white, font: BODY, line: 1.3, align: 'center' });
+  label(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa cum sociis.',
+    { x: 2.3003, y: 3.8014, w: 5.3994, h: 0.4519, size: 9, color: C.white, font: BODY, line: 1.3, align: 'center' });
+  pill(s, { x: 4.3994, y: 4.5699, w: 1.2012, h: 0.3081 });
+  pageNumber(s, 3);
+}
+
+// 4 — Charity Fundraising Presentation
+const S4_STATS = [
+  { pct: '73%', title: 'Progress Project Company A', y: 0.7252 },
+  { pct: '92%', title: 'Progress Project Company B', y: 2.9411 },
+];
+
+function slide04(s) {
+  s.background = { color: C.black };
+  heading(s, 'Charity ', 'Fundraising Presentation',
+    { x: 0.5117, y: 0.8078, w: 5.2758, h: 2.4017, size: 41, color: C.white, line: 1.15 });
+  label(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor aenean dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor aenean..',
+    { x: 0.5117, y: 3.6073, w: 3.9383, h: 0.6498, size: 9, color: C.white, font: BODY, line: 1.3 });
+
+  S4_STATS.forEach(st => {
+    label(s, st.pct, { x: 5.2203, y: st.y, w: 1.8703, h: 0.9845, size: 54, color: C.orange });
+    label(s, st.title, { x: 5.2203, y: st.y + 1.1504, w: 2.8474, h: 0.3029, size: 14, color: C.white });
+    label(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. ',
+      { x: 5.2203, y: st.y + 1.5069, w: 3.8794, h: 0.4519, size: 9, color: C.offWhite, font: BODY, line: 1.3 });
+  });
+  chevrons(s, { x: 8.9834, y: 1.2928, w: 1.3044, h: 0.9391, dy: 0.9382, count: 3, dir: 'up', grad: G_AMBER_TOP });
+  pageNumber(s, 4);
+}
+
+// 5 — Impact Through Giving
+const S5_ROWS = [
+  { pct: '50%', pctW: 1.6845, y: 2.7176, title: 'Impact Giving 01', ty: 2.7948, th: 0.3029, by: 2.7673 },
+  { pct: '78%', pctW: 1.5347, y: 3.9504, title: 'Impact Giving 02', ty: 4.0609, th: 0.5301, by: 4.0334 },
+];
+
+function slide05(s) {
+  photoBlock(s, { x: 0, y: 2.8125, w: 3.2, h: 2.8125 });
+  heading(s, 'Impact Through ', 'Giving',
+    { x: 1.251, y: 0.7656, w: 7.4979, h: 0.834, size: 41, color: C.black, align: 'center', line: 1.15 });
+  label(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. ',
+    { x: 1.4932, y: 1.7815, w: 7.0421, h: 0.4529, size: 9, color: C.ink, font: BODY, line: 1.3, align: 'center' });
+
+  S5_ROWS.forEach(r => {
+    label(s, r.pct, { x: 3.6467, y: r.y, w: r.pctW, h: 0.8331, size: 45, color: C.orange });
+    label(s, r.title, { x: 5.319, y: r.ty, w: 1.7911, h: r.th, size: 14, color: C.ink });
+    label(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo.',
+      { x: 7.1101, y: r.by, w: 2.4916, h: 0.6498, size: 9, color: C.ink, font: BODY, line: 1.3 });
+  });
+  rule(s, { x: 3.7289, y: 3.8263, w: 5.7594, color: C.black });
+  chevrons(s, { x: 2.6937, y: 3.0621, w: 0.9305, h: 0.7115, dy: 0.7108, count: 3, dir: 'up', grad: G_AMBER_TOP });
+  pageNumber(s, 5);
+}
+
+// 6 — Empowering Communities: hand-drawn column chart
+const S6_AXIS = ['5', '4,5', '4', '3,5', '3', '2,5', '2', '1,5', '1', '0,5', '0'];
+const S6_BARS = [
+  { x: 1.1692, y: 1.5454, h: 3.2387, color: C.orange },
+  { x: 1.5442, y: 2.9458, h: 1.8382, color: C.black },
+  { x: 1.9542, y: 3.2771, h: 1.507, color: C.amber },
+  { x: 2.9165, y: 2.9118, h: 1.8722, color: C.orange },
+  { x: 3.2915, y: 1.4594, h: 3.3247, color: C.black },
+  { x: 3.7014, y: 3.2771, h: 1.507, color: C.amber },
+];
+const S6_TOTALS = [
+  { value: '77,5K', title: 'Value Product Growth A', x: 4.4915, tw: 2.6368 },
+  { value: '56,8K', title: 'Value Product Growth B', x: 7.1283, tw: 3.0118 },
+];
+
+function slide06(s) {
+  heading(s, 'Empowering Communities ', 'Through Charity',
+    { x: 4.4417, y: 0.8222, w: 5.0466, h: 2.1205, size: 41, color: C.black });
+
+  S6_AXIS.forEach((t, i) => {
+    label(s, t, { x: 0.3659, y: 0.8937 + i * 0.3767, w: 0.3944, h: 0.256, size: 9, color: C.black, font: BODY, align: 'right' });
+  });
+  for (let i = 0; i < 10; i++) rule(s, { x: 0.8014, y: 1.0212 + i * 0.3762, w: 3.5169, color: C.grey });
+  rule(s, { x: 0.8014, y: 4.7833, w: 3.5169, color: C.black });
+
+  S6_BARS.forEach(b => s.addShape('rect', { x: b.x, y: b.y, w: 0.313, h: b.h, fill: { color: b.color }, line: { type: 'none' } }));
+  S6_TOTALS.forEach(t => {
+    label(s, t.value, { x: t.x, y: 3.4393, w: 2.3834, h: 0.9845, size: 54, color: C.orange });
+    label(s, t.title, { x: t.x, y: 4.4256, w: t.tw, h: 0.3029, size: 14, color: C.ink });
+  });
+  chevrons(s, { x: 9.4883, y: 0.4911, w: 1.0075, h: 0.7309, dy: 0.7302, count: 3, dir: 'up', grad: G_AMBER_TOP });
+  pageNumber(s, 6);
+}
+
+// 7 — Together We Change Lives
+const S7_STATS = [
+  { value: '4912+', x: 0.5117, w: 2.7869, lw: 3.2618 },
+  { value: '5432K', x: 4.3751, w: 2.8976, lw: 3.1712 },
+];
+
+function slide07(s) {
+  s.background = { color: C.black };
+  heading(s, 'Together We Change ', 'Lives',
+    { x: 0.4132, y: 0.6504, w: 7.1299, h: 1.4389, size: 41, color: C.white });
+  label(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. ',
+    { x: 0.4132, y: 2.1398, w: 6.452, h: 0.4529, size: 9, color: C.white, font: BODY, line: 1.3 });
+
+  S7_STATS.forEach(st => {
+    label(s, st.value, { x: st.x, y: 2.8537, w: st.w, h: 0.9088, size: 50, color: C.orange });
+    label(s, 'Tracking Success and Challenges', { x: st.x, y: 3.8425, w: st.lw, h: 0.2777, size: 12, color: C.white });
+    label(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa.',
+      { x: st.x, y: 4.2228, w: 3.4559, h: 0.4529, size: 9, color: C.white, font: BODY, line: 1.3 });
+  });
+  chevrons(s, { x: 8.4326, y: 0.3469, w: 2.1113, h: 1.5108, dy: 1.5093, count: 3, dir: 'up', grad: G_AMBER_TOP });
+  pageNumber(s, 7);
+}
+
+// 8 — One Donation At A Time
+const S8_ROWS = [
+  { value: '7549+', vx: 3.8286, vy: 2.8125, ty: 2.917 },
+  { value: '99,5K', vx: 3.8739, vy: 4.0319, ty: 4.0366 },
+];
+
+function slide08(s) {
+  s.background = { color: C.black };
+  heading(s, 'One Donation ', 'At A Time',
+    { x: 0.5136, y: 0.9414, w: 4.5119, h: 1.4389, size: 41, color: C.white });
+  label(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor aenean dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor aenean..',
+    { x: 5.1367, y: 1.2073, w: 3.9383, h: 0.6498, size: 9, color: C.offWhite, font: BODY, line: 1.3 });
+
+  chevrons(s, { x: 0.746, y: 3.0583, w: 1.3099, h: 0.7113, dx: 0.7106, count: 3, dir: 'left', grad: G_ORANGE_TOP });
+  chevrons(s, { x: 0.746, y: 4.0593, w: 1.3099, h: 0.7113, dx: 0.7106, count: 3, dir: 'right', grad: G_AMBER_TOP });
+
+  S8_ROWS.forEach(r => {
+    label(s, r.value, { x: r.vx, y: r.vy, w: 2.3031, h: 0.8331, size: 45, color: C.orange });
+    label(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor aenean.',
+      { x: 6.2154, y: r.ty, w: 3.0781, h: 0.6498, size: 9, color: C.offWhite, font: BODY, line: 1.3 });
+  });
+  rule(s, { x: 3.8739, y: 3.9145, w: 5.4196, color: C.orange });
+  pageNumber(s, 8);
+}
+
+// 9 — Giving Back With Purpose And Impact
+const S9_STATS = [
+  { value: '78%', title: 'Performance Growth A', x: 0.6063, tw: 2.4149 },
+  { value: '85%', title: 'Performance Growth B', x: 3.2941, tw: 2.8442 },
+];
+
+function slide09(s) {
+  photoBlock(s, { x: 6.075, y: 2.8125, w: 3.925, h: 2.8125 });
+  heading(s, 'Giving Back With ', 'Purpose And Impact',
+    { x: 0.4453, y: 0.5677, w: 5.0, h: 2.1205, size: 41, color: C.black });
+  label(s, 'Update on Key Giving Back', { x: 5.9622, y: 1.0119, w: 3.0524, h: 0.3029, size: 14, color: C.black });
+  label(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. ',
+    { x: 5.9622, y: 1.333, w: 3.3008, h: 0.6498, size: 9, color: C.black, font: BODY, line: 1.3 });
+  pill(s, { x: 6.0155, y: 2.1565, w: 1.2095, h: 0.3081, color: C.white });
+
+  rule(s, { x: 3.0212, y: 3.2943, w: 0, h: 1.4022, color: C.orange });
+  S9_STATS.forEach(st => {
+    label(s, st.value, { x: st.x, y: 3.2943, w: 1.8097, h: 0.9845, size: 54, color: C.orange });
+    label(s, st.title, { x: st.x, y: 4.3936, w: st.tw, h: 0.3029, size: 14, color: C.black });
+  });
+  chevrons(s, { x: 5.6669, y: 3.2665, w: 0.8173, h: 0.5848, dy: 0.5842, count: 3, dir: 'up', grad: G_AMBER_TOP });
+  pageNumber(s, 9);
+}
+
+// 10 — A Cause Worth Supporting
+const S10_STATS = [
+  { value: '76%', vx: 0.5117, vy: 0.5677, vw: 1.4464, lx: 1.9394, lw: 0.6501, ly: 0.7362,
+    tx: 2.5895, ty: 0.5793, tw: 1.7715, th: 0.4529, body: 'Lorem ipsum dolor sit amet consectetuer.' },
+  { value: '7.3M', vx: 2.2645, vy: 1.7665, vw: 1.7127, lx: 3.8859, lw: 0.4751, ly: 1.8905,
+    tx: 4.361, ty: 1.7335, tw: 1.4464, th: 0.6498, body: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. ' },
+  { value: '91%', vx: 0.5117, vy: 3.0313, vw: 1.4464, lx: 1.9581, lw: 0.6501, ly: 3.1883,
+    tx: 2.6083, ty: 3.0313, tw: 1.5667, th: 0.6498, body: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. ' },
+  { value: '9.2M', vx: 2.2645, vy: 4.2632, vw: 1.6782, lx: 3.8859, lw: 0.4751, ly: 4.4201,
+    tx: 4.361, ty: 4.2632, tw: 1.5686, th: 0.6498, body: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. ' },
+];
+
+function slide10(s) {
+  s.background = { color: C.white };
+  s.addShape('rect', { x: 5.9297, y: 0, w: 4.0703, h: 5.625, fill: { color: C.photo }, line: { type: 'none' } });
+  s.addShape('rect', { x: 5.9297, y: 0, w: 4.0703, h: 5.625, fill: { color: C.panel }, line: { type: 'none' } });
+  s.addText('[image]', { x: 7.3, y: 2.5, w: 1.4, h: 0.32, align: 'center', fontFace: BODY, fontSize: 11, color: '8A8A8A' });
+
+  S10_STATS.forEach(r => {
+    label(s, r.value, { x: r.vx, y: r.vy, w: r.vw, h: 0.8331, size: 45, color: C.ink });
+    rule(s, { x: r.lx, y: r.ly, w: r.lw, color: C.orange });
+    label(s, r.body, { x: r.tx, y: r.ty, w: r.tw, h: r.th, size: 9, color: C.ink, font: BODY, line: 1.3 });
+  });
+  chevron(s, { x: 1.8445, y: 2.0449, w: 0.3316, h: 0.2373, dir: 'right', color: C.orange });
+  chevron(s, { x: 1.8445, y: 4.561, w: 0.3316, h: 0.2373, dir: 'left', color: C.orange });
+
+  heading(s, 'A Cause Worth ', 'Supporting',
+    { x: 6.1913, y: 0.692, w: 4.0703, h: 2.1205, size: 41, color: C.white });
+  label(s, 'Executive Summary', { x: 6.2291, y: 3.0266, w: 2.2959, h: 0.3029, size: 14, color: C.black });
+  label(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean.',
+    { x: 6.2291, y: 3.3734, w: 3.2604, h: 0.4529, size: 9, color: C.white, font: BODY, line: 1.3 });
+  chevrons(s, { x: 6.2666, y: 4.3516, w: 0.9982, h: 0.7643, dx: 0.7643, count: 3, dir: 'right', grad: G_ORANGE_TOP });
+  pageNumber(s, 10);
+}
+
+// 11 — Fundraising That Matters
+const S11_ROWS = [
+  { value: '5642+', y: 3.2207, ty: 3.3719 },
+  { value: '7124+', y: 4.2412, ty: 4.3027 },
+];
+
+function slide11(s) {
+  photoBlock(s, { x: 0, y: 0, w: 2.9875, h: 5.625, captionSize: 13 });
+  heading(s, 'Fundraising ', 'That Matters',
+    { x: 3.4804, y: 0.6888, w: 6.809, h: 1.4389, size: 41, color: C.black });
+  label(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Donec quam felis, ultricies nec.',
+    { x: 3.4804, y: 2.1828, w: 5.6571, h: 0.6498, size: 9, color: C.ink, font: BODY, line: 1.3 });
+
+  S11_ROWS.forEach(r => {
+    label(s, r.value, { x: 3.8697, y: r.y, w: 2.3031, h: 0.8331, size: 45, color: C.orange });
+    label(s, 'Lorem ipsum dolor amet, consectetuer adipiscing elit. Aenean commodo.',
+      { x: 6.19, y: r.ty, w: 2.6453, h: 0.4519, size: 9, color: C.ink, font: BODY, line: 1.3 });
+  });
+  rule(s, { x: 3.9291, y: 4.1207, w: 4.5812, color: C.black });
+  chevrons(s, { x: 2.3331, y: 3.1061, w: 1.0583, h: 0.7573, dy: 0.7565, count: 3, dir: 'up', grad: G_AMBER_TOP });
+  pageNumber(s, 11);
+}
+
+// 12 — Our 2025 Charity Drive
+const S12_CELLS = [
+  { value: '6834+', vx: 0.5703, vw: 2.7734, y: 2.3646, tx: 3.0484, tw: 1.6889, title: 'Charity Drive A' },
+  { value: '5932+', vx: 5.548, vw: 2.6864, y: 2.3646, tx: 7.9271, tw: 1.6729, title: 'Charity Drive B' },
+  { value: '7223+', vx: 0.5703, vw: 2.7734, y: 3.8569, tx: 3.0484, tw: 1.6889, title: 'Charity Drive C' },
+  { value: '8739+', vx: 5.5365, vw: 2.6864, y: 3.8569, tx: 7.9844, tw: 1.6156, title: 'Charity Drive D' },
+];
+
+function slide12(s) {
+  heading(s, 'Our 2025 ', 'Charity Drive',
+    { x: 1.3125, y: 0.6771, w: 7.375, h: 0.834, size: 41, color: C.black, align: 'center', line: 1.15 });
+  label(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. ',
+    { x: 1.4932, y: 1.6815, w: 7.0421, h: 0.4529, size: 9, color: C.ink, font: BODY, line: 1.3, align: 'center' });
+
+  S12_CELLS.forEach(c => {
+    label(s, c.value, { x: c.vx, y: c.y, w: c.vw, h: 0.9088, size: 50, color: C.orange });
+    label(s, c.title, { x: c.tx, y: c.y + 0.3786, w: c.tw, h: 0.3029, size: 14, color: C.ink });
+  });
+  rule(s, { x: 0.5703, y: 3.6415, w: 8.8594, color: C.black });
+  chevron(s, { x: 4.8119, y: 2.866, w: 0.3763, h: 0.2693, dir: 'left', grad: G_AMBER_TOP });
+  chevron(s, { x: 4.8119, y: 4.3659, w: 0.3763, h: 0.2693, dir: 'right', grad: G_AMBER_TOP });
+  pageNumber(s, 12);
+}
+
+// 13 — A Fundraising Mission
+const S13_ROWS = [
+  { pct: '55%', y: 0.8207, title: 'Startegy Performance A', tw: 1.9091 },
+  { pct: '88%', y: 2.8957, title: 'Startegy Performance B', tw: 1.8395 },
+];
+
+function slide13(s) {
+  s.background = { color: C.black };
+  S13_ROWS.forEach(r => {
+    label(s, r.pct, { x: 0.5933, y: r.y, w: 2.2306, h: 1.1865, size: 66, color: C.orange });
+    label(s, r.title, { x: 2.5909, y: r.y + 0.4621, w: r.tw, h: 0.5301, size: 14, color: C.orange });
+    rule(s, { x: 0.6714, y: r.y + 1.1865, w: 3.4608, color: C.white });
+    label(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis.',
+      { x: 0.5933, y: r.y + 1.2837, w: 3.714, h: 0.6498, size: 9, color: C.white, font: BODY, line: 1.3 });
+  });
+  heading(s, 'A Fundraising ', 'Mission ',
+    { x: 4.9299, y: 0.8218, w: 4.5584, h: 1.4389, size: 41, color: C.white });
+  chevrons(s, { x: 4.884, y: 2.9285, w: 1.6132, h: 1.3811, dx: 1.3797, count: 3, dir: 'right', grad: G_ORANGE_TOP });
+  pageNumber(s, 13);
+}
+
+// 14 — Our Best Team
+const S14_TEAM = [
+  { name: 'Generyodan Russel', role: 'Volunteers 01', nx: 0.4397, rx: 0.9107, qx: 0.2939, px: 1.0203 },
+  { name: 'Selena Martyanda', role: 'Volunteers 02', nx: 3.8677, rx: 4.3387, qx: 3.7219, px: 4.4361 },
+  { name: 'Oliver Conrad', role: 'Volunteers 03', nx: 7.2712, rx: 7.7422, qx: 7.1254, px: 7.8518 },
+];
+
+function slide14(s) {
+  s.background = { color: C.black };
+  heading(s, 'Our Best ', 'Team',
+    { x: 1.9959, y: 0.6586, w: 6.013, h: 0.6551, size: 41, color: C.white, align: 'center', line: 0.8 });
+  label(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. ',
+    { x: 1.4912, y: 1.4723, w: 7.0421, h: 0.4529, size: 9, color: C.offWhite, font: BODY, line: 1.3, align: 'center' });
+
+  S14_TEAM.forEach(m => {
+    s.addShape('ellipse', { x: m.px, y: 2.2486, w: 1.1279, h: 1.1279, fill: { color: C.photo }, line: { type: 'none' } });
+    s.addText('[image]', {
+      x: m.px, y: 2.6646, w: 1.1279, h: 0.2959,
+      align: 'center', valign: 'middle', fontFace: BODY, fontSize: 8, color: C.photoInk,
+    });
+    label(s, m.name, { x: m.nx, y: 3.6998, w: 2.2892, h: 0.3029, size: 14, color: C.orange, align: 'center' });
+    label(s, m.role, { x: m.rx, y: 3.9734, w: 1.3112, h: 0.2272, size: 9, color: C.offWhite, font: BODY, align: 'center' });
+    label(s, '\u201CLorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo.\u201D',
+      { x: m.qx, y: 4.2763, w: 2.5807, h: 0.6498, size: 9, color: C.offWhite, font: BODY, line: 1.3, align: 'center' });
+  });
+  pageNumber(s, 14);
+}
+
+// 15 — The Power Of Your Contribution (two phone mock-ups)
+function phoneMockup(s, o) {
+  s.addShape('roundRect', {
+    x: o.x, y: o.y, w: o.w, h: o.h, rectRadius: o.w * 0.13,
+    fill: { color: C.ink }, line: { type: 'none' },
+  });
+  s.addShape('roundRect', {
+    x: o.x + o.w * 0.045, y: o.y + o.h * 0.022, w: o.w * 0.91, h: o.h * 0.956, rectRadius: o.w * 0.1,
+    fill: { color: C.photo }, line: { type: 'none' },
+  });
+  s.addShape('roundRect', {
+    x: o.x + o.w * 0.34, y: o.y + o.h * 0.045, w: o.w * 0.32, h: o.h * 0.032, rectRadius: o.h * 0.016,
+    fill: { color: C.ink }, line: { type: 'none' },
+  });
+  s.addText('[image]', {
+    x: o.x, y: o.y + o.h / 2 - 0.16, w: o.w, h: 0.32,
+    align: 'center', valign: 'middle', fontFace: BODY, fontSize: 10, color: C.photoInk,
+  });
+}
+
+const S15_ROWS = [
+  { value: '6533+', vx: 4.6666, vy: 2.602, ty: 2.645 },
+  { value: '93,5K', vx: 4.7119, vy: 3.8214, ty: 3.8592 },
+];
+
+function slide15(s) {
+  phoneMockup(s, { x: 0.7377, y: 0.5833, w: 2.093, h: 4.082 });
+  phoneMockup(s, { x: 2.4932, y: 0.6406, w: 1.777, h: 4.4778 });
+
+  heading(s, 'The Power Of ', 'Your Contribution',
+    { x: 4.6666, y: 0.9001, w: 5.1422, h: 1.4389, size: 41, color: C.ink });
+  chevrons(s, { x: 3.7451, y: 1.3957, w: 0.6917, h: 0.4949, dy: 0.4945, count: 3, dir: 'up', grad: G_AMBER_TOP });
+
+  S15_ROWS.forEach(r => {
+    label(s, r.value, { x: r.vx, y: r.vy, w: 2.3031, h: 0.8331, size: 45, color: C.orange });
+    label(s, 'Lorem ipsum dolor sit consectetuer adipiscing elit enean commodo.',
+      { x: 7.039, y: r.ty, w: 2.1159, h: 0.6498, size: 9, color: C.ink, font: BODY, line: 1.3 });
+  });
+  rule(s, { x: 4.7119, y: 3.6013, w: 4.4157, color: C.black });
+  pageNumber(s, 15);
+}
+
+// 16 — Where Every Dollar Counts: revenue line chart
+const S16_XLABELS = [
+  ['$0', 0.1019, 0.3717], ['$100', 1.3509, 0.3717], ['$200', 2.5853, 0.401],
+  ['$300', 3.8197, 0.4303], ['$400', 5.0833, 0.401], ['$500', 6.321, 0.4238],
+  ['$600', 7.5716, 0.4206], ['$700', 8.832, 0.3978],
+];
+// Vertices of the plotted revenue curve, in inches.
+const S16_CURVE = [
+  [1.9877, 5.0326], [4.0201, 3.5539], [6.5687, 2.8156],
+  [8.0159, 1.898], [9.3672, 0.4569], [9.9907, 0.3841],
+];
+
+function slide16(s) {
+  s.background = { color: C.white };
+  heading(s, 'Where Every Dollar ', 'Counts',
+    { x: 0.4045, y: 0.6146, w: 5.5, h: 1.6178, size: 41, color: C.black, line: 1.15 });
+  label(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa sociis natoque. ',
+    { x: 0.4672, y: 2.466, w: 4.4773, h: 0.4529, size: 9, color: C.black, font: BODY, line: 1.3 });
+
+  rule(s, { x: 0, y: 5.0263, w: 10, color: C.black });
+  for (let i = 0; i < 8; i++) rule(s, { x: 0.2878 + i * 1.249, y: 5.0052, w: 0, h: 0.0422, color: C.black });
+  S16_XLABELS.forEach(([t, x, w]) => {
+    label(s, t, { x: x, y: 5.1065, w: w, h: 0.1893, size: 7, color: C.black, align: 'center' });
+  });
+
+  // Curve: one line segment between each pair of vertices, plus a dot at each vertex.
+  for (let i = 0; i < S16_CURVE.length - 1; i++) {
+    const [x1, y1] = S16_CURVE[i], [x2, y2] = S16_CURVE[i + 1];
+    s.addShape('line', {
+      x: Math.min(x1, x2), y: Math.min(y1, y2), w: Math.abs(x2 - x1), h: Math.abs(y2 - y1),
+      flipV: (x2 - x1) * (y2 - y1) > 0,
+      line: { color: C.black, width: 2.25 },
+    });
+  }
+  S16_CURVE.forEach(([x, y]) => {
+    s.addShape('ellipse', { x: x - 0.0148, y: y - 0.0148, w: 0.0295, h: 0.0295, fill: { color: C.black }, line: { type: 'none' } });
+  });
+  s.addShape('ellipse', { x: 3.9961, y: 3.5241, w: 0.0774, h: 0.0774, fill: { color: C.white }, line: { type: 'none' } });
+
+  label(s, '$524.000', { x: 5.0833, y: 3.6433, w: 2.8192, h: 0.7573, size: 41, color: C.orange });
+  label(s, 'Revenue Performance Growth', { x: 5.0833, y: 4.4486, w: 3.2223, h: 0.3029, size: 14, color: C.black });
+  chevrons(s, { x: 8.8964, y: 0.6707, w: 2.011, h: 1.3816, dy: 1.3802, count: 3, dir: 'up', grad: G_AMBER_TOP });
+  pageNumber(s, 16);
+}
+
+// 17 — Fundraising For Specific Cause: table of donations by cause
+const S17_ROWLABELS = ['Fundraising A', 'Fundraising B', 'Fundraising C', 'Fundraising D'];
+const S17_COLS = [
+  { x: 3.1152, head: 'Specific Couse 01', hy: 2.4904, dy: 3.0973, values: ['$273.000', '$530.000', '$829.000', '$301.000'] },
+  { x: 5.371, head: 'Specific Couse 02', hy: 2.4636, dy: 3.0881, values: ['$927.000', '$435.000', '$643.000', '$583.000'] },
+  { x: 7.5447, head: 'Specific Couse 03', hy: 2.4636, dy: 3.0973, values: ['$534.000', '$325.000', '$735.000', '$832.000'] },
+];
+
+function slide17(s) {
+  heading(s, 'Fundraising For Specific ', 'Cause',
+    { x: 1.5352, y: 0.6389, w: 6.9297, h: 1.6178, size: 41, color: C.black, align: 'center', line: 1.15 });
+  for (let i = 0; i < 5; i++) rule(s, { x: 0.7536, y: 2.9958 + i * 0.4784, w: 8.0512, color: C.orange });
+
+  S17_ROWLABELS.forEach((t, i) => {
+    label(s, t, { x: 0.7536, y: 3.0835 + i * 0.4822, w: 1.7297, h: 0.3029, size: 14, color: C.black });
+  });
+  S17_COLS.forEach(col => {
+    label(s, col.head, { x: col.x, y: col.hy, w: 1.4848, h: 0.5301, size: 14, color: C.black });
+    col.values.forEach((v, i) => {
+      label(s, v, { x: col.x, y: col.dy + i * 0.4864, w: 0.9356, h: 0.2777, size: 12, color: C.black, font: BODY });
+    });
+  });
+  chevrons(s, { x: 8.8964, y: 1.7188, w: 1.5021, h: 1.032, dy: 1.031, count: 3, dir: 'up', grad: G_AMBER_TOP });
+  pageNumber(s, 17);
+}
+
+// 18 — Real People, Real Impact: column chart
+const S18_BARS = [
+  { x: 5.5641, y: 2.7034, h: 2.2174, label: '80%', lx: 5.5462, ly: 2.4005, lw: 0.6449 },
+  { x: 6.529, y: 2.2985, h: 2.6224, label: '80%', lx: 6.5097, ly: 1.9955, lw: 0.7206 },
+  { x: 7.4938, y: 3.4925, h: 1.4284, label: '50%', lx: 7.4707, ly: 3.1895, lw: 0.7099 },
+  { x: 8.4587, y: 2.9339, h: 1.987, label: '65%', lx: 8.4242, ly: 2.6309, lw: 0.779 },
+];
+
+function slide18(s) {
+  heading(s, 'Real People, Real ', 'Impact',
+    { x: 0.6329, y: 0.9147, w: 5.5829, h: 1.5904, size: 45, color: C.black });
+  label(s, '$557.000', { x: 0.6808, y: 2.6872, w: 3.753, h: 0.9845, size: 54, color: C.black });
+  rule(s, { x: 0.8269, y: 3.777, w: 3.4608, color: C.orange });
+  label(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis.',
+    { x: 0.6808, y: 3.8823, w: 4.0807, h: 0.4529, size: 9, color: C.black, font: BODY, line: 1.3 });
+
+  S18_BARS.forEach(b => {
+    gradRect(s, { x: b.x, y: b.y, w: 0.6709, h: b.h, grad: G_AMBER_TOP });
+    label(s, b.label, { x: b.lx, y: b.ly, w: b.lw, h: 0.3029, size: 14, color: C.black, align: 'center' });
+  });
+  rule(s, { x: 5.2933, y: 4.9208, w: 4.1071, color: C.orange, width: 1 });
+  pageNumber(s, 18);
+}
+
+// 19 — World map infographic. The map is a dot raster: '#' = one dot.
+const S19_MAP = [
+  '...............................................................##.#.##........#.#.##....###.##........................................................',
+  '..........................................................#.###..##..........##.#.............##..#.#..#..............................................',
+  '.....................................................###.########...................................#.................................................',
+  '......................................................############..........................#####....##..###..........................................',
+  '.............................................#####.################........................##....###...##.####........................................',
+  '.............................................#.#########.#########...............#.........##....##...########........................................',
+  '........................................#.#####.##########..####...............#################...#########..####....................................',
+  '.........................................#####..#...#########.................#######.########..##########..#####.##..................................',
+  '......................................#####.........#.#########.............############.....###########..########.##....#............................',
+  '....................................#.##..............#####.....####....................###############.########..######.#............................',
+  '..................................#....######.##.....#..........##........##########################..#########.#######.#####.........................',
+  '..................................#..#.#.##.##..#...#####..............#...######################..##########..######..#####.##.#.....................',
+  '..............................##...#.#...##.####......##.............##.......##############.....#########...######..######.#####.....................',
+  '..............................###..###.##..#####.....##....................##########.......############..########.#############.##...................',
+  '..............................#.#.#..#####..#.........................##.............################...#########.######.######.####..................',
+  '...........................#.#.######.###......#.....................#.###########################...#########..#######.#####..########...............',
+  '............................###.######...####..........................#.####################....###########..#######..#####.###########..............',
+  '.........................#######..###..#..#######........................###########.........############...#######..######.#####.####...#............',
+  '.......................##..#######.......#..#####......................###..........##################...########..#############.##########...........',
+  '........................#####.#####......###..###.......................##########################....#########..#######.#####..##########.#..........',
+  '.....................#########.####.....######....#.....................#.#.##.#.###########.....###########...#######..#####.....#..####.####........',
+  '.....................###########.######..########..........................................##############...########..######.#......#.#######.........',
+  '.................####.#####.#####..#####.#..##.#.##..................####.....##.####################....########...######.######....#######.#........',
+  '..............###.####.#####.######..#######...#.....................###.....#...##.############.....##########..#######.######......#.#..#..###......',
+  '............#.####.###########.######..########.........................#####......#.#..........###########...########.######..###....#...............',
+  '...........###.####.#####.######.######...#...........................................#################....########..#######.######...###.............',
+  '...........####.####.#####..#####..#######...........................########...........###########....#########...#######..#####........#............',
+  '........###.####..##########.######..#######........................###########..####.######.......##########...########..####...........#............',
+  '........####.#....#####.#####..######..#....................................................##############...########...######.#...#....#.............',
+  '......##.####.......####..#####..######............................###########################.######.....#########..######...........##..............',
+  '......###.#.........######..#####..#####...........................############################......###########...#######...#.....#..#...............',
+  '.....#####..........#.######.######...##.........................................................##########.....#######...###.#....#..................',
+  '.....###.#...........##.#####..#######............................################################....#....##########..#####....#.###.....#...........',
+  '.....#.............#####..#####...####.......###.................################################......##########....#######....###...####............',
+  '.......#............######.#######..#..................##.##...........###############...........##.....######...########...#...#..######.............',
+  '......#............##.#####..#######........####.................######...............#############.....#.....#########..####........##.#.............',
+  '....................##..#####......##......####..................#####################.############......######.###....######..........###............',
+  '...................#####..######...###................##............###############.######................#####....########..#.......######..##.......',
+  '...###................####..#....................................###......................#######..................#####...#.####.....#.#....###......',
+  '.####..................#####.......###....##............##.......################.############.............##......##....##..............#####.##.....',
+  '..####...............#..#####.....#.#.##.........................###############.############.............###........####..........#...#.####.###.....',
+  '.......................#...##.#......###.#.............#...#.................................####...........#........####.....#.#........#...#####....',
+  '###...................#..##....##..#...............................############.###############..............#........#..#.....#...##.......####..#...',
+  '........................####....##.#.................................#.##..####.#############.##..............#.........###........###...#.##...####..',
+  '.........................#######......................................................................................#.###....##.#.#..........####...',
+  '........................#...######....######................................##.############.####.......................#........##...............#.##.',
+  '................................#....#....#####..............................#.###########.###..........................#..........##......####....#..',
+  '.................................#...#####....##............................##.#####..................................###........#####......#.#.......',
+  '...............................#....#####.####......................................####.####..........................##......#.##.......#.#..#......',
+  '.................................#.#....####.#####...........................#.########.####..................................##........#....####.....',
+  '....................................####....###.###............................########.##.............................###..###...#..........###......',
+  '...................................#########......#####...................................##............................###....##.....................',
+  '.......................................##########...............................######.#####................................#####.....................',
+  '..................................###.#...#########.###.........................#####.#######...........................#.###.###..#..................',
+  '.................................#######.#.....#####.###.........................................................................###...#..............',
+  '....................................######.####.....#.#.........................#####.######.....#.......................#......#.#...................',
+  '..................................##....####.#######...........................#####.#######.#.##..........................#.##......##..##...........',
+  '.................................#.#####....##.######..........................#####.###.....................................##.................#.....',
+  '..................................##.#######.....####...................................###....##........................#.........#......#####.......',
+  '.................................#...#.########.#..............................#####.######....##......................#.........#........####..#.....',
+  '..................................###.....######.####...........................###.######.....#.........................#####...#............##.#....',
+  '...................................#####.#...####.###...........................................#.........................###.#.........##..##..#.....',
+  '....................................#.###.###...................................###.#####......#........................##.#...#..#...#...##.#.....#..',
+  '......................................####.#######..............................###.#####..............................................#####.#........',
+  '.....................................#...##.#####.................................#.####..................................#.........###.####..#.......',
+  '.....................................####.....##..........................................................................#........#######..####......',
+  '....................................#.######.#...................................#.#####..........................................#####...######......',
+  '.....................................#.######.##....................................#............................................####..#####.##.##....',
+  '....................................#....#####.......................................................................................##.#####..###....',
+  '.....................................##.#...#.....................................................................................##.#####...#####....',
+  '.....................................###.###........................................................................................####..######.#.#..',
+  '....................................####.###........................................................................................##..####.###..###.',
+  '.......................................##.#...........................................................................................###..##...#####.',
+  '....................................###.......#.....................................................................................#........######.#.',
+  '....................................#####....................................................................................................###.##..#',
+  '...................................#.###.......#..............................................................................................###..###',
+  '...................................#.###.....##..................................................................................................####.',
+  '......................................##......##.#.............................................................................................####.#.',
+  '...................................#.#................................................................................................................',
+  '...................................##.#....#..........................................................................................................',
+  '...................................##.................................................................................................................',
+  '....................................#.#...............................................................................................................',
+];
+const S19_GRID = { x: -0.6987, y: 0.99, stepX: 0.045, stepY: 0.0454, dotW: 0.0283, dotH: 0.0402 };
+const S19_PINS = [
+  [0.591, 1.88], [1.257, 2.8227], [1.8814, 1.0931], [2.7146, 2.098],
+  [3.2822, 2.759], [3.5158, 1.4294], [4.6045, 1.7784], [4.9827, 3.0927],
+];
+
+function slide19(s) {
+  const g = S19_GRID;
+  S19_MAP.forEach((row, r) => {
+    for (let c = 0; c < row.length; c++) {
+      if (row[c] !== '#') continue;
+      s.addShape('ellipse', {
+        x: g.x + c * g.stepX - g.dotW / 2, y: g.y + r * g.stepY - g.dotH / 2,
+        w: g.dotW, h: g.dotH,
+        fill: { color: C.amber }, line: { type: 'none' },
+      });
+    }
+  });
+  S19_PINS.forEach(([x, y]) => {
+    s.addShape('teardrop', {
+      x: x, y: y, w: 0.2239, h: 0.2239, rotate: 138,
+      fill: { color: C.black }, line: { type: 'none' },
+    });
+    s.addShape('ellipse', {
+      x: x + 0.0483, y: y + 0.0483, w: 0.1273, h: 0.1273,
+      fill: { color: C.orange }, line: { type: 'none' },
+    });
+  });
+
+  heading(s, 'Fundraising ', 'Charity',
+    { x: 6.0254, y: 0.7279, w: 5.0443, h: 1.2004, size: 41, color: C.black, line: 0.8 });
+  label(s, 'World Maps Infographic', { x: 6.0254, y: 2.0634, w: 2.8189, h: 0.3029, size: 14, color: C.orange });
+  label(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. ',
+    { x: 6.0254, y: 2.4864, w: 3.7246, h: 0.4529, size: 9, color: C.black, font: BODY, line: 1.3 });
+  label(s, '46,8K', { x: 6.0254, y: 3.3592, w: 2.3834, h: 0.8331, size: 45, color: C.amber });
+  label(s, 'Volunteers Growth ', { x: 6.0254, y: 4.1922, w: 2.4841, h: 0.3029, size: 14, color: C.black });
+  pageNumber(s, 19);
+}
+
+// 20 — Thank You
+function slide20(s) {
+  s.background = { color: C.black };
+  chevrons(s, { x: 0.6597, y: 1.2688, w: 1.4392, h: 1.0298, dy: 1.0288, count: 3, dir: 'down', grad: G_AMBER_TOP });
+  chevrons(s, { x: 2.1088, y: 1.2688, w: 1.4392, h: 1.0298, dy: 1.0288, count: 3, dir: 'up', grad: G_ORANGE_TOP });
+
+  label(s, 'Thank You', { x: 3.823, y: 1.2165, w: 5.6653, h: 1.1057, size: 72, color: C.white, line: 0.8 });
+  label(s, 'For Your Attention', { x: 3.823, y: 2.5289, w: 5.4952, h: 0.4191, size: 24, color: C.amber, line: 0.8 });
+  label(s, 'Get in Touch With Us', { x: 3.823, y: 3.3316, w: 2.135, h: 0.3029, size: 14, color: C.offWhite });
+  label(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus et magnis dis parturient.',
+    { x: 3.823, y: 3.7074, w: 3.7842, h: 0.6488, size: 9, color: C.offWhite, font: BODY, line: 1.3 });
+  pageNumber(s, 20);
+}
+
+/* ------------------------------------------------------------------ *
+ * Assemble
+ * ------------------------------------------------------------------ */
+
+const BUILDERS = [
+  slide01, slide02, slide03, slide04, slide05, slide06, slide07,
+  slide08, slide09, slide10, slide11, slide12, slide13, slide14,
+  slide15, slide16, slide17, slide18, slide19, slide20,
+];
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'DECK_16x9', width: 10, height: 5.625 });
+  pptx.layout = 'DECK_16x9';
+  pptx.title = 'Fundraising Charity';
+  pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
+
+  BUILDERS.forEach(fn => {
+    const s = pptx.addSlide();
+    s.background = { color: C.white };
+    fn(s);
+  });
+
+  return pptx.writeFile({ fileName: path.join(__dirname, '17140661-d50a-4f22-9f58-779af8339e3c_grok_final.pptx') });
+}
+
+build().then(f => console.log('wrote', f)).catch(err => { console.error(err); process.exit(1); });
