@@ -1,0 +1,14 @@
+{
+	"manifest_version": 3,
+	"name": "Grok Bot WebAuthn proxy",
+	"version": "0.1.14",
+	"description": "Runs the box browser's security-key ceremonies on the machine the key is plugged into.",
+	"permissions": [
+		"webAuthenticationProxy",
+		"nativeMessaging",
+		"tabs"
+	],
+	"background": {
+		"service_worker": "background.js"
+	}
+}

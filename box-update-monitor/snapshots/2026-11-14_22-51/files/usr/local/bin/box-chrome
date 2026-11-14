@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+shopt -s execfail
+if [ -x /opt/sand/sand-host/box-launchers/box-chrome ]; then
+	SAND_BOX_CHROME_LAUNCHER_SOURCE=bundle exec /opt/sand/sand-host/box-launchers/box-chrome "$@"
+fi
+SAND_BOX_CHROME_LAUNCHER_SOURCE=image exec /usr/local/libexec/sand/box-chrome "$@"

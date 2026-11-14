@@ -1,0 +1,1106 @@
+/**
+ * Stancy – Online Course Presentation Template
+ * Standalone pptxgenjs re-creation of the 43-slide reference deck.
+ *
+ * Raster images in the original deck are replaced by flat "[image]" placeholder
+ * rectangles that keep the original position / size.
+ *
+ *   node <thisfile>.js   ->  writes the .pptx next to the script
+ */
+
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ *
+ * Design tokens
+ * ------------------------------------------------------------------ */
+
+const SLIDE_W = 26.6614;
+const SLIDE_H = 15.0;
+
+const C = {
+  orange: 'F97C44',
+  navy: '232878',
+  blue: '393FDB',
+  red: 'E63A42',
+  yellow: 'F9AE35',
+  white: 'FFFFFF',
+  black: '000000',
+  body: '7F7F7F',      // tx1 @ 50% – all running copy
+  grey: 'D9D9D9',      // hairlines / rings
+  lilac: 'D7D9F8',     // accent3 tint
+  peach: 'FDE9DC',     // accent1 tint
+  wave: 'DFE1DD',      // decorative wave ribbons (tx2 @16%)
+  imgFill: 'FDF1EB',   // image placeholder body
+  imgLine: 'F8DCCB',   // image placeholder border
+  imgText: 'C08A6A'
+};
+
+const F = { head: 'Jost', body: 'Varela Round', ui: 'Roboto', icon: 'DejaVu Sans' };
+
+const CARD_SHADOW = { type: 'outer', color: '000000', opacity: 0.13, blur: 67, offset: 3, angle: 45 };
+
+const pres = new PptxGenJS();
+pres.defineLayout({ name: 'STANCY', width: SLIDE_W, height: SLIDE_H });
+pres.layout = 'STANCY';
+pres.author = 'Stancy';
+pres.title = 'Online Course Presentation Template';
+
+const S = pres.ShapeType;
+
+/* ------------------------------------------------------------------ *
+ * Primitive helpers
+ * ------------------------------------------------------------------ */
+
+/** Text box. Defaults mirror the deck: top aligned, grey body copy, 24pt. */
+function txt(slide, text, o) {
+  slide.addText(text, {
+    x: o.x, y: o.y, w: o.w, h: o.h === undefined ? 0.6 : o.h,
+    align: o.align || 'left', valign: o.valign || 'top',
+    fontFace: o.font || F.body, fontSize: o.size || 24,
+    bold: !!o.bold, italic: !!o.italic,
+    color: o.color || C.body,
+    charSpacing: o.spc, lineSpacingMultiple: o.ls,
+    margin: o.margin === undefined ? 0 : o.margin
+  });
+}
+
+function shape(slide, kind, o) { slide.addShape(kind, o); }
+
+function rect(slide, x, y, w, h, fill, extra) {
+  slide.addShape(S.rect, Object.assign({ x, y, w, h, fill: { color: fill } }, extra || {}));
+}
+
+function roundRect(slide, x, y, w, h, fill, radius, extra) {
+  slide.addShape(S.roundRect, Object.assign(
+    { x, y, w, h, fill: { color: fill }, rectRadius: radius }, extra || {}));
+}
+
+function circle(slide, x, y, d, fill, extra) {
+  slide.addShape(S.ellipse, Object.assign({ x, y, w: d, h: d, fill: { color: fill } }, extra || {}));
+}
+
+function line(slide, x, y, w, color, width) {
+  slide.addShape(S.line, { x, y, w, h: 0, line: { color: color || C.grey, width: width || 1 } });
+}
+
+/** White card with the soft drop shadow used all over the deck. */
+function card(slide, x, y, w, h, radius) {
+  if (radius) roundRect(slide, x, y, w, h, C.white, radius, { shadow: CARD_SHADOW });
+  else rect(slide, x, y, w, h, C.white, { shadow: CARD_SHADOW });
+}
+
+/** Replacement for a raster image / picture placeholder. */
+function imageBox(slide, x, y, w, h, o) {
+  o = o || {};
+  slide.addShape(o.shape || S.rect, {
+    x, y, w, h, rotate: o.rotate,
+    fill: { color: o.fill || C.imgFill },
+    line: { color: o.line || C.imgLine, width: 0.75 },
+    rectRadius: o.rectRadius
+  });
+  if (o.label !== false) {
+    slide.addText('[image]', {
+      x, y, w, h, rotate: o.rotate, align: 'center', valign: 'middle',
+      fontFace: F.body, fontSize: o.labelSize || 20, color: C.imgText
+    });
+  }
+}
+
+/* The nine faint ribbons that sweep across the lower half of most slides.
+ * WAVE_Y holds each ribbon's height (inches) sampled every 2" across the
+ * slide; they pinch together near x = 4" and fan out to either side.       */
+const WAVE_X_STEP = 2;
+const WAVE_TOP = 4.02, WAVE_BOTTOM = 13.38;
+const WAVE_Y = [
+  [5.45, 5.47, 6.23, 8.29, 10.86, 12.01, 11.37, 10.22, 9.03, 8.08, 7.52, 7.43, 7.78, 8.53],
+  [5.91, 5.91, 6.47, 8.21, 10.52, 11.86, 11.67, 10.73, 9.50, 8.33, 7.50, 7.16, 7.34, 8.01],
+  [6.36, 6.36, 6.73, 8.17, 10.21, 11.65, 11.90, 11.23, 10.00, 8.65, 7.54, 6.95, 6.94, 7.51],
+  [7.42, 6.85, 7.00, 8.16, 9.94, 11.40, 12.03, 11.68, 10.53, 9.02, 7.64, 6.77, 6.54, 6.99],
+  [7.25, 7.25, 7.26, 8.14, 9.65, 11.11, 12.02, 12.06, 11.05, 9.42, 7.79, 6.62, 6.16, 6.49],
+  [7.63, 7.63, 7.53, 8.12, 9.38, 10.78, 11.93, 12.37, 11.56, 9.88, 7.99, 6.51, 5.82, 5.99],
+  [7.99, 7.99, 7.81, 8.12, 9.12, 10.44, 11.74, 12.61, 12.06, 10.38, 8.26, 6.46, 5.48, 5.49],
+  [8.19, 8.19, 8.09, 8.12, 8.87, 10.09, 11.50, 12.74, 12.54, 10.92, 8.60, 6.46, 5.17, 5.00],
+  [8.22, 8.22, 8.22, 8.22, 8.44, 9.39, 10.87, 12.71, 13.34, 12.10, 9.51, 6.66, 4.65, 4.03]
+];
+
+/** Catmull-Rom interpolation of a WAVE_Y row at fractional index t. */
+function waveAt(row, t) {
+  const i = Math.max(0, Math.min(row.length - 2, Math.floor(t)));
+  const u = t - i;
+  const p0 = row[Math.max(0, i - 1)], p1 = row[i], p2 = row[i + 1];
+  const p3 = row[Math.min(row.length - 1, i + 2)];
+  return 0.5 * ((2 * p1) + (-p0 + p2) * u +
+    (2 * p0 - 5 * p1 + 4 * p2 - p3) * u * u +
+    (-p0 + 3 * p1 - 3 * p2 + p3) * u * u * u);
+}
+
+/** Draw the ribbon family scaled into an arbitrary box. */
+function waveBand(slide, x, y, w, h) {
+  const cols = WAVE_Y[0].length;
+  const sx = w / ((cols - 1) * WAVE_X_STEP);
+  const sy = h / (WAVE_BOTTOM - WAVE_TOP);
+  const STEPS = 56;
+  WAVE_Y.forEach(function (row) {
+    const pts = [];
+    for (let i = 0; i <= STEPS; i++) {
+      const t = (i / STEPS) * (cols - 1);
+      pts.push({ x: t * WAVE_X_STEP * sx, y: (waveAt(row, t) - WAVE_TOP) * sy });
+    }
+    slide.addShape('custGeom', { x, y, w, h, points: pts, line: { color: C.wave, width: 0.75 } });
+  });
+}
+
+/** Full-width ribbon family; yTop is where the band begins. */
+function waves(slide, yTop) {
+  waveBand(slide, 0, yTop === undefined ? WAVE_TOP : yTop, SLIDE_W, WAVE_BOTTOM - WAVE_TOP);
+}
+
+/** 10x10 grid of small dots used as a decorative accent. */
+function dotGrid(slide, x, y, color, cols, rows, size) {
+  cols = cols || 10; rows = rows || 10; size = size || 0.154;
+  const step = 0.333;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      circle(slide, x + c * step, y + r * step, size, color);
+    }
+  }
+}
+
+/** Small "stancy" wordmark: navy book glyph + two-tone text. */
+function logo(slide, x, y, scale) {
+  const k = scale || 1;
+  roundRect(slide, x, y, 0.52 * k, 0.64 * k, C.navy, 0.1 * k);
+  rect(slide, x + 0.16 * k, y + 0.22 * k, 0.2 * k, 0.2 * k, C.orange);
+  slide.addText(
+    [{ text: 'stan', options: { color: C.black } }, { text: 'cy', options: { color: C.orange } }],
+    { x: x + 0.72 * k, y: y - 0.02 * k, w: 1.9 * k, h: 0.68 * k,
+      fontFace: F.head, fontSize: 30 * k, bold: true, valign: 'middle', margin: 0 });
+}
+
+/** Eyebrow label + oversized section title (the deck's standard header). */
+function heading(slide, o) {
+  const ew = o.ew || 5.17;
+  txt(slide, o.eyebrow, {
+    x: o.align === 'center' ? o.x + (o.w - ew) / 2 : o.x,
+    y: o.y, w: ew, h: 0.44, size: 20, bold: true,
+    color: o.eyebrowColor || C.orange, align: o.align
+  });
+  txt(slide, o.title, {
+    x: o.x, y: o.y + 0.63, w: o.w, h: o.th || 1.45, size: o.size || 80, bold: true,
+    font: F.head, color: o.titleColor || C.navy, align: o.align
+  });
+}
+
+/** Five-pointed rating stars. */
+function stars(slide, x, y, filled, size, gap) {
+  size = size || 0.37; gap = gap === undefined ? 0.68 : gap;
+  for (let i = 0; i < 5; i++) {
+    shape(slide, S.star5, {
+      x: x + i * gap, y, w: size, h: size,
+      fill: { color: i < filled ? C.yellow : '3B3B3B' }
+    });
+  }
+}
+
+/** Circular progress ring (grey disc + coloured arc + % label). */
+function progressRing(slide, x, y, d, endAngle, color, label) {
+  circle(slide, x, y, d, C.grey);
+  shape(slide, S.arc, {
+    x: x + 0.04, y: y + 0.04, w: d - 0.08, h: d - 0.08,
+    angleRange: [270, endAngle], line: { color, width: 9.75 }
+  });
+  // endAngle is measured clockwise from 3 o'clock; the arc starts at 12 o'clock.
+  txt(slide, label, { x: x + 0.23, y: y + 0.59, w: 1.01, h: 0.44, size: 20, bold: true,
+    font: F.head, color, align: 'center' });
+}
+
+/** Horizontal skill bar. */
+function skillBar(slide, x, y, w, pct) {
+  roundRect(slide, x, y, w, 0.16, C.grey, 0.08);
+  roundRect(slide, x, y, w * pct, 0.16, C.orange, 0.08);
+}
+
+/** Pill button. */
+function button(slide, x, y, w, h, fill, label, o) {
+  o = o || {};
+  roundRect(slide, x, y, w, h, fill, o.radius === undefined ? 0.087 : o.radius);
+  txt(slide, label, { x, y, w, h, size: o.size || 20, bold: true, font: F.head,
+    color: o.color || C.white, align: 'center', valign: 'middle' });
+}
+
+/** Full-height panel whose left edge is a wide arc (title slide 1). */
+function arcPanel(slide, x, w, h, color, rotate) {
+  slide.addShape('custGeom', {
+    x, y: 0, w, h, rotate, fill: { color },
+    points: [
+      { x: 3.96, y: 0 }, { x: w, y: 0 }, { x: w, y: h }, { x: 2.47, y: h }, { x: 2.45, y: h - 0.02 },
+      { curve: { type: 'cubic', x1: 0.95, y1: h - 1.7, x2: 0, y2: h - 4.14 }, x: 0, y: 8.15 },
+      { curve: { type: 'cubic', x1: 0, y1: 4.64, x2: 1.59, y2: 1.59 }, x: 3.92, y: 0.03 },
+      { close: true }
+    ]
+  });
+}
+
+/** Trapezoid band (market-analysis pyramid). */
+function trapezoid(slide, x, y, w, h, topW, color) {
+  const inset = (w - topW) / 2;
+  slide.addShape('custGeom', {
+    x, y, w, h, fill: { color },
+    points: [{ x: inset, y: 0 }, { x: w - inset, y: 0 }, { x: w, y: h }, { x: 0, y: h }, { close: true }]
+  });
+}
+
+/** Circle badge with a glyph, used for check marks / play buttons / icons. */
+function badge(slide, x, y, d, fill, glyph, glyphSize, glyphColor) {
+  circle(slide, x, y, d, fill);
+  if (glyph) {
+    txt(slide, glyph, { x, y, w: d, h: d, size: glyphSize || Math.round(d * 34),
+      color: glyphColor || C.white, font: F.icon, align: 'center', valign: 'middle' });
+  }
+}
+
+/** Magnifying-glass drawn from primitives (no reliable glyph for it). */
+function magnifier(slide, x, y, d, color) {
+  circle(slide, x, y, d, null, { fill: { type: 'none' }, line: { color, width: 2 } });
+  slide.addShape(S.line, { x: x + d * 0.78, y: y + d * 0.78, w: d * 0.36, h: d * 0.36,
+    line: { color, width: 2.5 } });
+}
+
+/** Feature icon tile (orange square + white glyph). */
+function iconTile(slide, x, y, w, h, glyph, fill, glyphColor) {
+  rect(slide, x, y, w, h, fill || C.orange);
+  txt(slide, glyph, { x, y, w, h, size: 34, color: glyphColor || C.white,
+    font: F.icon, align: 'center', valign: 'middle' });
+}
+
+/* ------------------------------------------------------------------ *
+ * Shared copy
+ * ------------------------------------------------------------------ */
+
+const LOREM_SHORT = 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc.';
+const LOREM_MED = 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. Donec euismod scelerisque ligula. Maecenas eu varius risus, eu aliquet arcu. Curabitur fermentum .';
+const LOREM_LONG = 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. Donec euismod scelerisque ligula. Maecenas eu varius risus, eu aliquet arcu. Curabitur fermentum suscipit est, tincidunt mattis lorem luctus id. ';
+const LOREM_P2 = 'Donec eget massa a diam condimentum pretium. Aliquam erat volutpat. Integer ut tincidunt orci. Etiam tristique, elit ut consectetur iaculis, metus lectus mattis justo, vel mollis eros neque quis augue. ';
+const LOREM_TINY = 'Fusce vehicula dolor arcu, sitilim amet .';
+const LOREM_CARD = 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, ';
+const TAGLINE = 'ONLINE COURSE PRESENTATION TEMPLATE';
+
+/* ------------------------------------------------------------------ *
+ * Slides
+ * ------------------------------------------------------------------ */
+
+// 1 – Title: "More than 1200 Online Courses"
+function slide01() {
+  const s = pres.addSlide();
+  arcPanel(s, 18.82, 6.88, 14.99, C.peach, 352.4);
+  arcPanel(s, 19.78, 6.88, 15.0, C.orange);
+  logo(s, 1.32, 0.96);
+  txt(s, 'More than 1200 Online Courses', { x: 1.81, y: 4.19, w: 10.61, h: 3.33,
+    size: 96, bold: true, font: F.head, color: C.navy });
+  txt(s, TAGLINE, { x: 1.81, y: 8.22, w: 12.31, h: 0.57, size: 28, bold: true, spc: 6, color: C.orange });
+  // search field
+  rect(s, 1.81, 9.79, 9.05, 1.23, C.white, { shadow: CARD_SHADOW });
+  txt(s, 'Search Courses', { x: 2.41, y: 10.15, w: 2.81, h: 0.5, color: C.body });
+  rect(s, 9.66, 10.02, 0.97, 0.78, C.navy);
+  magnifier(s, 9.95, 10.2, 0.3, C.white);
+  // yellow megaphone bubble
+  badge(s, 15.43, 8.28, 1.71, C.yellow, '\u25B6', 30);
+  // "increase visitors" gauge card
+  card(s, 21.04, 2.95, 4.14, 3.63, 0.2);
+  txt(s, 'Increase visitors', { x: 21.63, y: 3.37, w: 2.78, h: 0.5, font: F.ui });
+  shape(s, S.arc, { x: 21.93, y: 4.22, w: 2.36, h: 2.36, angleRange: [184, 356], line: { color: C.grey, width: 12 } });
+  shape(s, S.arc, { x: 21.93, y: 4.22, w: 2.36, h: 2.36, angleRange: [186, 299], line: { color: C.blue, width: 12 } });
+  txt(s, '125k', { x: 22.24, y: 4.93, w: 1.73, h: 0.84, size: 44, bold: true, color: C.navy, align: 'center' });
+  txt(s, '0%', { x: 21.65, y: 5.56, w: 0.62, h: 0.34, size: 14, font: F.ui, align: 'center' });
+  txt(s, '65%', { x: 24.04, y: 5.56, w: 0.56, h: 0.34, size: 14, font: F.ui, align: 'center' });
+}
+
+// 2 – Title: "Online Learning Now In Your Hand"
+function slide02() {
+  const s = pres.addSlide();
+  waves(s, 4.6);
+  circle(s, 14.07, 3.28, 10.19, C.grey);
+  logo(s, 0.84, 1.1);
+  txt(s, 'Online Learning Now In Your Hand', { x: 2.0, y: 4.13, w: 10.96, h: 3.06,
+    size: 88, bold: true, font: F.head, color: C.navy });
+  txt(s, TAGLINE, { x: 2.0, y: 7.46, w: 12.07, h: 0.57, size: 28, bold: true, spc: 6, color: C.orange });
+  roundRect(s, 2.0, 9.75, 3.81, 1.23, C.orange, 0.2);
+  txt(s, 'Try it now', { x: 2.38, y: 10.11, w: 2.05, h: 0.5, bold: true, font: F.ui, color: C.white });
+  txt(s, '\u2192', { x: 4.6, y: 10.05, w: 0.8, h: 0.6, size: 26, color: C.white, align: 'center' });
+  rect(s, 6.66, 9.77, 3.81, 1.23, C.white, { shadow: CARD_SHADOW });
+  circle(s, 6.96, 10.15, 0.45, C.white, { line: { color: C.navy, width: 1.5 } });
+  txt(s, '\u203A', { x: 6.96, y: 10.09, w: 0.45, h: 0.45, size: 18, color: C.navy, align: 'center', valign: 'middle' });
+  txt(s, 'Try it now', { x: 7.73, y: 10.13, w: 2.05, h: 0.5, bold: true, font: F.ui, color: C.navy });
+  dotGrid(s, 21.57, 10.46, C.grey);
+  shape(s, S.donut, { x: -1.18, y: 13.45, w: 2.57, h: 2.57, fill: { color: C.red, transparency: 14 } });
+  txt(s, '\u2716', { x: 12.8, y: 2.3, w: 0.7, h: 0.7, size: 20, color: C.yellow, font: F.icon, align: 'center' });
+  badge(s, 22.74, 2.5, 1.02, C.red, '\u2713', 22);
+  circle(s, 9.61, 12.83, 0.34, C.blue);
+  circle(s, 25.06, 5.14, 0.34, C.blue);
+}
+
+// 3 – "Welcome To Stancy"
+function slide03() {
+  const s = pres.addSlide();
+  waves(s, 4.4);
+  imageBox(s, 1.84, 2.4, 9.85, 11.12);
+  dotGrid(s, 9.43, 1.57, C.lilac);
+  heading(s, { x: 13.77, y: 2.96, w: 10.83, eyebrow: 'Introduced About Stancy', title: 'Welcome To Stancy' });
+  txt(s, LOREM_LONG, { x: 13.77, y: 5.86, w: 10.83, h: 2.8, ls: 1.5 });
+  txt(s, LOREM_P2, { x: 13.77, y: 9.46, w: 10.83, h: 2.2, ls: 1.5 });
+}
+
+// 4 – Quote slide (Yeats)
+function slide04() {
+  const s = pres.addSlide();
+  imageBox(s, 0, 0, 23.96, 9.71);
+  roundRect(s, 1.87, 5.67, 19.1, 7.83, C.white, 0.35, { shadow: CARD_SHADOW });
+  waveBand(s, 1.91, 7.07, 19.06, 6.14);
+  imageBox(s, 4.01, 6.97, 2.58, 2.58);
+  badge(s, 5.8, 6.82, 1.02, C.red, '\u2713', 22);
+  txt(s, '\u201C', { x: 8.3, y: 6.2, w: 1.4, h: 1.4, size: 96, bold: true, color: C.orange, font: F.head });
+  txt(s, 'Education is not the filling of a pail, but the lighting of a fire.', {
+    x: 8.43, y: 7.87, w: 10.83, h: 3.74, size: 72, bold: true, font: F.head, color: C.navy });
+  txt(s, 'William Butler Yeats', { x: 2.95, y: 10.02, w: 4.71, h: 0.65, color: C.orange, align: 'center', ls: 1.5 });
+}
+
+// 5 – "About Our Course"
+function slide05() {
+  const s = pres.addSlide();
+  waves(s, 4.6);
+  imageBox(s, 16.93, 2.16, 8.32, 8.34);
+  imageBox(s, 13.33, 6.17, 8.32, 7.08);
+  circle(s, 18.77, 4.79, 4.26, C.white);
+  circle(s, 18.96, 4.5, 4.26, C.orange);
+  txt(s, '50', { x: 20.1, y: 5.38, w: 1.97, h: 1.72, size: 96, bold: true, font: F.head, color: C.white, align: 'center' });
+  txt(s, 'Year of experience', { x: 19.81, y: 7.02, w: 2.55, h: 0.91, size: 24, bold: true,
+    font: F.head, color: C.white, align: 'center' });
+  heading(s, { x: 1.51, y: 2.7, w: 10.07, eyebrow: 'About Us', title: 'About Our Course' });
+  txt(s, LOREM_SHORT, { x: 1.51, y: 5.05, w: 10.07, h: 1.86, ls: 1.5 });
+  [['Professional & Expert', 7.51, C.red, '\u2691'], ['Job Placement Support', 10.12, C.blue, '\u2698']]
+    .forEach(function (row) {
+      circle(s, 1.51, row[1], 1.15, row[2]);
+      txt(s, row[3], { x: 1.51, y: row[1], w: 1.15, h: 1.15, size: 26, color: C.white,
+        font: F.icon, align: 'center', valign: 'middle' });
+      txt(s, row[0], { x: 3.1, y: row[1] + 0.21, w: 5.07, h: 0.57, size: 28, bold: true, font: F.head, color: C.navy });
+      txt(s, 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec donec viverra .',
+        { x: 3.1, y: row[1] + 0.87, w: 8.03, h: 1.26, ls: 1.5 });
+    });
+}
+
+// 6 – "Find the perfect teacher"
+function slide06() {
+  const s = pres.addSlide();
+  waves(s, 4.6);
+  imageBox(s, 1.89, 2.25, 10.69, 10.69);
+  badge(s, 9.8, 2.88, 1.71, C.blue, '\u25B6', 30);
+  heading(s, { x: 14.23, y: 2.25, w: 10.07, th: 2.79, eyebrow: 'About Us', title: 'Find the perfect teacher' });
+  txt(s, LOREM_SHORT, { x: 14.23, y: 6.31, w: 10.54, h: 1.86, ls: 1.5 });
+  txt(s, '\u201CThere is nothing noble in being superior to your fellow man, true nobility is being superior to your former self.\u201D',
+    { x: 14.19, y: 8.81, w: 10.11, h: 0.91, size: 24, bold: true, font: F.head, color: C.orange });
+  imageBox(s, 14.23, 10.36, 1.57, 1.57, { labelSize: 11 });
+  txt(s, 'Georgio Frederic', { x: 16.23, y: 10.58, w: 5.07, h: 0.57, size: 28, bold: true, font: F.head, color: C.navy });
+  txt(s, 'Director/Producer', { x: 16.23, y: 11.29, w: 4.51, h: 0.5 });
+}
+
+// 7 – "Set your own course schedule"
+function slide07() {
+  const s = pres.addSlide();
+  waves(s, 4.6);
+  imageBox(s, 13.33, 0, 13.33, 7.48);
+  imageBox(s, 0, 8.65, 8.9, 6.35);
+  heading(s, { x: 1.7, y: 1.5, w: 10.07, th: 2.79, eyebrow: 'About Us', title: 'Set your own course schedule' });
+  txt(s, LOREM_SHORT, { x: 1.7, y: 5.62, w: 10.54, h: 1.86, ls: 1.5 });
+  const items = [
+    ['01. Prepare Daily Agenda', 10.15, 8.66], ['02. Prepare Daily Agenda', 10.15, 11.64],
+    ['03.Making Learning Targets', 18.18, 8.66], ['04. Discipline and Consistency', 18.18, 11.64]
+  ];
+  items.forEach(function (it) {
+    txt(s, it[0], { x: it[1], y: it[2], w: 6.38, h: 0.57, size: 28, bold: true, font: F.head, color: C.navy });
+    txt(s, 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis .',
+      { x: it[1], y: it[2] + 0.66, w: 5.88, h: 1.26, ls: 1.5 });
+  });
+}
+
+// 8 – "In stancy discover new experiences"
+function slide08() {
+  const s = pres.addSlide();
+  waves(s, 4.6);
+  imageBox(s, 1.92, 2.54, 11.41, 10.07);
+  heading(s, { x: 14.91, y: 2.54, w: 9.83, th: 2.79, eyebrow: 'About Us', title: 'In stancy discover new experiences' });
+  txt(s, LOREM_MED, { x: 14.91, y: 6.68, w: 9.61, h: 3.07, ls: 1.5 });
+  [['15.000', 'Video Tutorial', 14.91], ['3.000', 'Online Courses', 19.84]].forEach(function (m) {
+    txt(s, m[0], { x: m[2], y: 10.93, w: 3.3, h: 1.01, size: 54, bold: true, font: F.head, color: C.orange });
+    txt(s, m[1], { x: m[2], y: 12.04, w: 3.62, h: 0.57, size: 28, bold: true, font: F.head, color: C.navy });
+  });
+  circle(s, 2.67, 10.37, 1.7, C.lilac);
+  badge(s, 2.8, 10.54, 1.4, C.red, '\u25B6', 26);
+  txt(s, 'Play Video', { x: 4.71, y: 10.76, w: 1.54, h: 0.91, size: 24, bold: true, font: F.head, color: C.white });
+}
+
+// 9 – "Institute Goals"
+function slide09() {
+  const s = pres.addSlide();
+  waves(s, 4.6);
+  imageBox(s, 13.62, 0, 10.38, 15.0);
+  roundRect(s, 1.94, 1.97, 14.31, 11.21, C.white, 0.45, { shadow: CARD_SHADOW });
+  heading(s, { x: 3.93, y: 3.37, w: 9.08, ew: 4.66, eyebrow: 'About Us', title: 'Institute Goals' });
+  txt(s, 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. ',
+    { x: 3.93, y: 6.07, w: 10.53, h: 1.86, ls: 1.5 });
+  [['Enginering Studies', 3.86, 195, C.orange, '83%'], ['General & Other Studies', 7.7, 152, C.blue, '79%'],
+   ['People Worldwide', 11.55, 124, C.red, '60%']].forEach(function (g) {
+    progressRing(s, g[1], 8.78, 1.6, g[2], g[3], g[4]);
+    txt(s, g[0], { x: g[1], y: 11.02, w: 3.05, h: 1.04, size: 28, bold: true, font: F.head, color: C.navy });
+  });
+}
+
+// 10 – "Expert Instructors" (4 teacher cards)
+function slide10() {
+  const s = pres.addSlide();
+  waves(s, 4.6);
+  heading(s, { x: 8.48, y: 1.49, w: 9.7, ew: 4.66, align: 'center',
+    eyebrow: ' Team Members ', title: 'Expert Instructors' });
+  const people = [
+    ['Somal D Rock', 'Math Teacher', '750+ Courses', 1.54],
+    ['David Warner', 'English Teacher', '3850+ Courses', 7.53],
+    ['Xavi Toni Crusse', 'Instructor', '632+ Courses', 13.53],
+    ['Shaine Watson', 'Math Teacher', '750+ Courses', 19.53]
+  ];
+  people.forEach(function (p) {
+    const x = p[3];
+    imageBox(s, x, 4.56, 5.51, 5.08);
+    rect(s, x, 9.62, 5.51, 4.26, C.white, { line: { color: C.grey, width: 0.75 } });
+    iconTile(s, x + 4.26, 9.28, 0.67, 0.72, '+');
+    txt(s, p[0], { x: x + 0.61, y: 10.48, w: 4.32, h: 0.57, size: 28, bold: true, font: F.head, color: C.navy });
+    txt(s, p[1], { x: x + 0.61, y: 11.2, w: 4.32, h: 0.5 });
+    line(s, x + 0.62, 12.05, 4.27, C.grey);
+    txt(s, '\u25A4', { x: x + 0.61, y: 12.45, w: 0.4, h: 0.5, size: 18, color: C.orange, font: F.icon });
+    txt(s, p[2], { x: x + 1.07, y: 12.45, w: 3.28, h: 0.5 });
+  });
+}
+
+// 11 – "Best Instructors" (two testimonial cards)
+function slide11() {
+  const s = pres.addSlide();
+  waves(s, 4.6);
+  roundRect(s, -6.45, 0, 12.9, 15.0, C.orange, 0.7);   // slab bleeding off the left edge
+  dotGrid(s, 2.55, 4.64, C.grey);
+  heading(s, { x: 8.48, y: 1.39, w: 9.7, ew: 3.11, align: 'center', eyebrow: ' Team', title: 'Best Instructors' });
+  [['Helen Namiku', 'International Programs', 3, 3.58, 9.04],
+   ['Tamy Chapman', 'Teacher Trainer ', 4, 14.51, 19.97]].forEach(function (p) {
+    const x = p[3];
+    roundRect(s, x, 5.43, 8.16, 7.94, C.white, 0.5, { shadow: CARD_SHADOW });
+    txt(s, p[0], { x: x + 1.07, y: 6.38, w: 3.4, h: 0.57, size: 28, bold: true, font: F.head, color: C.navy });
+    txt(s, p[1], { x: x + 1.07, y: 7.1, w: 4.21, h: 0.5 });
+    stars(s, x + 1.31, 8.02, p[2]);
+    line(s, x + 1.07, 8.92, 6.02, C.grey);
+    txt(s, LOREM_CARD, { x: x + 1.19, y: 9.59, w: 5.9, h: 1.86, ls: 1.5 });
+    imageBox(s, p[4], 4.04, 3.93, 3.93);
+  });
+}
+
+// 12 – "About Me"
+function slide12() {
+  const s = pres.addSlide();
+  waves(s, 4.6);
+  shape(s, S.parallelogram, { x: 13.43, y: 1.96, w: 5.32, h: 4.96, fill: { color: C.orange } });
+  imageBox(s, 13.21, 2.19, 10.73, 10.43);
+  heading(s, { x: 1.8, y: 2.43, w: 8.49, ew: 1.87, eyebrow: 'Team', title: 'About Me' });
+  txt(s, 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. ',
+    { x: 1.8, y: 4.7, w: 9.59, h: 1.86, ls: 1.5 });
+  txt(s, 'EDUCATIONS', { x: 1.8, y: 7.19, w: 3.27, h: 0.57, size: 28, bold: true, font: F.head, color: C.navy });
+  [['World University', 1.8], ['USA University', 7.5]].forEach(function (u) {
+    txt(s, u[0], { x: u[1], y: 8.19, w: 5.21, h: 0.57, size: 28, bold: true, font: F.head, color: C.orange });
+    txt(s, 'Fusce vehicula dolor arcu, sit amet blandit .', { x: u[1], y: 8.84, w: 4.63, h: 1.26, ls: 1.5 });
+  });
+  txt(s, 'Web Developer', { x: 1.8, y: 10.96, w: 3.74, h: 0.57, size: 28, bold: true, font: F.head, color: C.navy });
+  txt(s, '90%', { x: 10.29, y: 10.96, w: 1.25, h: 0.57, size: 28, bold: true, font: F.head, color: C.navy, align: 'right' });
+  skillBar(s, 1.8, 11.94, 9.59, 0.79);
+  // teacher business card
+  rect(s, 18.65, 10.03, 6.42, 3.77, C.white, { shadow: CARD_SHADOW });
+  txt(s, 'Lisa Megan Lauren', { x: 19.7, y: 10.65, w: 4.32, h: 0.57, size: 28, bold: true, font: F.head, color: C.navy });
+  txt(s, 'Math Teacher', { x: 19.7, y: 11.37, w: 4.32, h: 0.5 });
+  line(s, 19.7, 12.22, 4.27, C.grey);
+  txt(s, '\u25A4', { x: 19.7, y: 12.61, w: 0.4, h: 0.5, size: 18, color: C.orange, font: F.icon });
+  txt(s, '750+ Courses', { x: 20.16, y: 12.61, w: 3.28, h: 0.5 });
+}
+
+// 13 – "Our Service" (4 floating cards over a photo)
+function slide13() {
+  const s = pres.addSlide();
+  waves(s, 4.6);
+  imageBox(s, 0, 0, 11.29, 15.06);
+  heading(s, { x: 11.89, y: 1.87, w: 6.91, ew: 1.87, eyebrow: 'Service', title: 'Our Service' });
+  [['Learn Anything', 9.1, 5.14, '\u25A3'], ['Flexible Learning', 17.99, 5.14, '\u21C4'],
+   ['Learn With Experts', 9.1, 9.74, '\u270E'], ['Lifetime Access', 17.99, 9.74, '\u263A']]
+    .forEach(function (cd) {
+      rect(s, cd[1], cd[2], 6.49, 3.51, C.white, { shadow: CARD_SHADOW });
+      iconTile(s, cd[1] - 0.84, cd[2] + 0.49, 1.47, 1.77, cd[3]);
+      txt(s, cd[0], { x: cd[1] + 0.93, y: cd[2] + 0.85, w: 3.74, h: 0.57, size: 28, bold: true, font: F.head, color: C.navy });
+      txt(s, LOREM_TINY, { x: cd[1] + 0.95, y: cd[2] + 1.53, w: 4.74, h: 1.26, ls: 1.5 });
+    });
+}
+
+// 14 – "Our Service" (wide orange band, two numbered columns)
+function slide14() {
+  const s = pres.addSlide();
+  waves(s, 0.2);
+  imageBox(s, 0, 3.71, 26.66, 7.26);
+  heading(s, { x: 8.48, y: 1.01, w: 9.7, ew: 3.11, align: 'center', eyebrow: ' Service', title: 'Our Service' });
+  rect(s, 3.46, 9.52, 19.73, 4.37, C.orange);
+  s.addShape(S.line, { x: 13.33, y: 10.33, w: 0, h: 2.76, line: { color: C.white, width: 1 } });
+  [['01', 4.57, 5.65], ['02', 14.4, 15.48]].forEach(function (c) {
+    txt(s, c[0], { x: c[1], y: 10.62, w: 1.06, h: 0.64, size: 32, bold: true, font: F.head, color: C.white });
+    txt(s, 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum',
+      { x: c[2], y: 10.53, w: 6.61, h: 2.47, color: C.white, ls: 1.5 });
+  });
+}
+
+// 15 – "Best Our Service" (three cards, middle one orange)
+function slide15() {
+  const s = pres.addSlide();
+  waves(s, 4.6);
+  imageBox(s, 12.79, 1.49, 12.27, 6.83);
+  heading(s, { x: 1.55, y: 1.85, w: 8.99, ew: 1.87, eyebrow: 'Service', title: 'Best Our Service' });
+  txt(s, LOREM_MED, { x: 1.55, y: 4.43, w: 9.61, h: 3.07, ls: 1.5 });
+  [['Learn Anything', 1.55, C.white, C.navy, C.body, C.orange, '\u25A3'],
+   ['Flexible Learning', 9.59, C.orange, C.white, C.white, C.white, '\u21C4'],
+   ['Learn With Experts', 17.58, C.white, C.navy, C.body, C.orange, '\u270E']]
+    .forEach(function (cd) {
+      rect(s, cd[1], 9.55, 7.48, 3.95, cd[2], cd[2] === C.white ? { shadow: CARD_SHADOW } : null);
+      txt(s, cd[6], { x: cd[1] + 0.85, y: 10.63, w: 0.73, h: 0.73, size: 30, color: cd[5],
+        font: F.icon, align: 'center', valign: 'middle' });
+      txt(s, cd[0], { x: cd[1] + 1.91, y: 10.63, w: 4.5, h: 0.57, size: 28, bold: true, font: F.head, color: cd[3] });
+      txt(s, LOREM_TINY, { x: cd[1] + 1.93, y: 11.3, w: 5.21, h: 1.26, ls: 1.5, color: cd[4] });
+    });
+}
+
+// 16 – "Popular Class Stancy" (3 course cards)
+function slide16() {
+  const s = pres.addSlide();
+  waves(s, 0.2);
+  heading(s, { x: 7.26, y: 1.3, w: 12.15, ew: 4.66, align: 'center',
+    eyebrow: ' Poppular', title: 'Popular Class Stancy' });
+  [['Best courses for learning english courses', 'Djoko Elvermen', '$12.00', 4, 1.57],
+   ['The mind is flat the shocking shallowness', 'Alexandria', '$14.00', 5, 9.56],
+   ['Creative problem solvin design thinking in health', 'Iman Usman', '$10.00', 4, 17.55]]
+    .forEach(function (cd) {
+      const x = cd[4];
+      imageBox(s, x, 4.09, 7.54, 3.33);
+      rect(s, x, 7.26, 7.54, 6.43, C.white, { shadow: CARD_SHADOW });
+      txt(s, cd[0], { x: x + 1.01, y: 8.02, w: 5.44, h: 1.04, size: 28, bold: true, font: F.head, color: C.navy });
+      imageBox(s, x + 1.01, 9.48, 1.24, 1.24, { labelSize: 9 });
+      txt(s, cd[1], { x: x + 2.55, y: 9.56, w: 2.9, h: 0.44, size: 20, bold: true, color: C.orange });
+      stars(s, x + 2.55, 10.21, cd[3], 0.25, 0.45);
+      line(s, x, 11.3, 7.54, C.grey);
+      txt(s, cd[2], { x: x + 0.78, y: 12.11, w: 2.02, h: 0.71, size: 36, bold: true, font: F.head, color: C.navy });
+      button(s, x + 3.45, 11.98, 3.67, 1.02, C.orange, 'GET ENROLLED');
+    });
+}
+
+// 17 – "Latest Class" (2 wide course cards + descriptions)
+function slide17() {
+  const s = pres.addSlide();
+  waves(s, 0.2);
+  heading(s, { x: 9.81, y: 1.6, w: 7.04, ew: 4.66, align: 'center', eyebrow: ' Poppular', title: 'Latest Class' });
+  [['Introduce Movie & Photo For Beginners', '$20.00', 4, 1.92],
+   ['How To Improve Medical Studies For Beginners', '$22.00', 4, 13.98]].forEach(function (cd) {
+    const x = cd[3];
+    rect(s, x, 4.51, 10.74, 4.84, C.white, { shadow: CARD_SHADOW });
+    imageBox(s, x + 0.27, 4.84, 3.73, 4.24, { labelSize: 14 });
+    txt(s, cd[0], { x: x + 4.66, y: 5.13, w: 5.44, h: 1.04, size: 28, bold: true, font: F.head, color: C.navy });
+    stars(s, x + 4.66, 6.68, cd[2], 0.25, 0.45);
+    txt(s, cd[1], { x: x + 4.66, y: 7.79, w: 2.02, h: 0.71, size: 36, bold: true, font: F.head, color: C.orange });
+    button(s, x + 7.19, 7.64, 2.98, 1.02, C.orange, 'GET ENROLLED', { size: 18 });
+    txt(s, 'DESCRIPTION', { x: x, y: 10.22, w: 3.66, h: 0.57, size: 28, bold: true, font: F.head, color: C.navy });
+    txt(s, 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices',
+      { x: x, y: 10.93, w: 9.8, h: 1.86, ls: 1.5 });
+  });
+}
+
+// 18 – "Most Students Enroll"
+function slide18() {
+  const s = pres.addSlide();
+  waves(s, 0.2);
+  heading(s, { x: 7.26, y: 1.07, w: 12.15, ew: 4.66, align: 'center',
+    eyebrow: ' Poppular', title: 'Most Students Enroll' });
+  imageBox(s, 9.45, 4.15, 7.94, 4.34);
+  rect(s, 9.45, 8.44, 7.94, 5.26, C.orange);
+  txt(s, '\u25A4', { x: 10.31, y: 9.2, w: 0.4, h: 0.5, size: 20, color: C.white, font: F.icon });
+  txt(s, '70 lessons', { x: 10.73, y: 9.2, w: 2.3, h: 0.5, color: C.white });
+  txt(s, '\u26AB', { x: 13.66, y: 9.2, w: 0.4, h: 0.5, size: 16, color: C.white, font: F.icon });
+  txt(s, '63 students', { x: 14.1, y: 9.2, w: 2.3, h: 0.5, color: C.white });
+  txt(s, 'Best courses for learning english courses', { x: 10.2, y: 10.16, w: 6.01, h: 1.04,
+    size: 28, bold: true, font: F.head, color: C.white });
+  line(s, 9.45, 11.74, 7.94, C.white);
+  s.addText('$20.00', { x: 10.4, y: 12.27, w: 2.41, h: 0.71, fontSize: 36, fontFace: F.body,
+    color: C.white, strike: 'sngStrike', margin: 0 });
+  txt(s, '\u2192', { x: 12.65, y: 12.3, w: 0.9, h: 0.6, size: 28, color: C.white, align: 'center' });
+  txt(s, 'Free', { x: 14.94, y: 12.27, w: 1.55, h: 0.71, size: 36, bold: true, font: F.head, color: C.white });
+  [['A SHORT DESCRIPTION', 1.44], ['COURSE DESCRIPTION', 18.66]].forEach(function (col) {
+    txt(s, col[0], { x: col[1], y: 4.45, w: 5.27, h: 0.57, size: 28, bold: true, font: F.head, color: C.navy });
+    txt(s, LOREM_MED, { x: col[1], y: 5.18, w: 6.72, h: 4.89, ls: 1.5 });
+  });
+  button(s, 1.44, 10.92, 2.42, 1.02, C.orange, 'ENROLL');
+}
+
+// 19 – "The Prodigious eLearning Courses for you"
+function slide19() {
+  const s = pres.addSlide();
+  imageBox(s, 0, 0, SLIDE_W, SLIDE_H, { label: false });
+  roundRect(s, 1.09, 1.07, 24.48, 12.85, C.white, 0.4, { shadow: CARD_SHADOW });
+  heading(s, { x: 2.38, y: 2.4, w: 13.75, ew: 3.9, th: 2.79,
+    eyebrow: 'Course Description', title: 'The Prodigious eLearning Courses for you' });
+  txt(s, LOREM_LONG, { x: 2.38, y: 6.14, w: 21.82, h: 1.86, ls: 1.5 });
+  txt(s, "What you'll learn", { x: 2.38, y: 8.71, w: 3.67, h: 0.57, size: 28, bold: true, font: F.head, color: C.navy });
+  [['Become a UI/UX designer.', 2.38, 9.8], ['You will be able to start earning money skills.', 2.38, 10.79],
+   ['Build a UI project from beginning to end.', 2.38, 11.78], ['Work with colors & fonts.', 13.33, 9.8],
+   ['You will create your own UI Kit.', 13.33, 10.79], ['Build & test a complete mobile app.', 13.33, 11.78]]
+    .forEach(function (it) {
+      badge(s, it[1], it[2], 0.57, C.orange, '\u2713', 14);
+      txt(s, it[0], { x: it[1] + 0.93, y: it[2] - 0.03, w: 7.76, h: 0.65, ls: 1.5 });
+    });
+}
+
+// 20 – Plain text page (course + short description)
+function slide20() {
+  const s = pres.addSlide();
+  waves(s, 4.6);
+  txt(s, 'Course Description', { x: 1.8, y: 1.26, w: 4.33, h: 0.57, size: 28, bold: true, font: F.head, color: C.navy });
+  txt(s, 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. ',
+    { x: 1.8, y: 2.14, w: 18.27, h: 0.65, ls: 1.5 });
+  txt(s, 'Sed sollicitudin ipsum quis nunc sollicitudin ultrices. Donec euismod scelerisque ligula. Maecenas eu varius risus, eu aliquet arcu. Curabitur fermentum suscipit est, tincidunt mattis lorem luctus id. Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. Donec euismod scelerisque ligula. Maecenas eu varius risus, eu aliquet arcu. Curabitur fermentum suscipit est, tincidunt mattis lorem luctus id',
+    { x: 1.8, y: 3.5, w: 21.53, h: 2.47, ls: 1.5 });
+  txt(s, 'A Short Description', { x: 1.8, y: 6.84, w: 4.33, h: 0.57, size: 28, bold: true, font: F.head, color: C.navy });
+  txt(s, LOREM_LONG, { x: 1.8, y: 7.73, w: 21.53, h: 1.4, ls: 1.5 });
+  txt(s, LOREM_P2, { x: 1.8, y: 10.13, w: 21.53, h: 1.4, ls: 1.5 });
+}
+
+// 21 – "Our Gallery"
+function slide21() {
+  const s = pres.addSlide();
+  waves(s, 5.6);
+  imageBox(s, 1.66, 2.21, 12.69, 6.9);
+  imageBox(s, 1.66, 9.29, 6.24, 4.44);
+  imageBox(s, 8.1, 9.29, 6.24, 4.44);
+  heading(s, { x: 16.15, y: 3.5, w: 8.74, ew: 1.87, eyebrow: 'Portfolio', title: 'Our Gallery' });
+  txt(s, LOREM_MED, { x: 16.15, y: 6.11, w: 8.74, h: 3.68, ls: 1.5 });
+  button(s, 16.15, 11.0, 2.42, 1.02, C.orange, 'READ MORE');
+}
+
+// 22 – "Our Portfolio"
+function slide22() {
+  const s = pres.addSlide();
+  waves(s, 4.6);
+  imageBox(s, 1.74, 1.61, 6.72, 5.59);
+  imageBox(s, 8.77, 1.61, 6.72, 5.59);
+  imageBox(s, 15.81, 1.61, 9.19, 12.0);
+  rect(s, 1.74, 7.5, 13.74, 6.11, C.orange);
+  heading(s, { x: 3.15, y: 8.56, w: 8.74, ew: 1.87, eyebrow: 'Portfolio', title: 'Our Portfolio',
+    eyebrowColor: C.white, titleColor: C.white });
+  txt(s, 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. ',
+    { x: 3.15, y: 10.83, w: 10.95, h: 1.86, color: C.white, ls: 1.5 });
+}
+
+// 23 – "Best Portfolio"
+function slide23() {
+  const s = pres.addSlide();
+  waves(s, 4.6);
+  imageBox(s, 1.58, 1.45, 6.74, 9.26);
+  imageBox(s, 8.9, 1.45, 6.74, 5.19);
+  // "749 Creative Events" tile
+  rect(s, 2.21, 9.24, 5.47, 4.43, 'F5F5F5');
+  txt(s, '\u25B6', { x: 3.7, y: 9.9, w: 2.49, h: 1.2, size: 56, color: C.orange, font: F.icon, align: 'center', valign: 'middle' });
+  txt(s, '749', { x: 3.7, y: 11.63, w: 2.51, h: 0.91, size: 48, bold: true, font: F.head, color: C.blue, align: 'center' });
+  txt(s, 'Creative Events', { x: 3.27, y: 12.61, w: 3.36, h: 0.57, size: 28, bold: true, font: F.head, color: C.navy, align: 'center' });
+  // "28k+ Online Courses" orange tile
+  s.addShape(S.rect, { x: 9.48, y: 4.27, w: 5.47, h: 4.3, fill: { color: C.orange, transparency: 20 } });
+  txt(s, '\u2617', { x: 10.97, y: 4.93, w: 2.49, h: 1.2, size: 56, color: C.white, font: F.icon, align: 'center', valign: 'middle' });
+  txt(s, '28k+', { x: 10.97, y: 6.54, w: 2.49, h: 0.91, size: 48, bold: true, font: F.head, color: C.white, align: 'center' });
+  txt(s, 'Online Courses', { x: 10.54, y: 7.52, w: 3.36, h: 0.57, size: 28, bold: true, font: F.head, color: C.white, align: 'center' });
+  [['Introduction LearnPress \u2013 LMS plugin', 9.24], ['learning English Online for FREE', 11.59]].forEach(function (r) {
+    rect(s, 9.48, r[1], 10.35, 2.08, C.white, { shadow: CARD_SHADOW });
+    badge(s, 10.12, r[1] + 0.47, 1.02, C.red, '\u2713', 22);
+    txt(s, r[0], { x: 11.44, y: r[1] + 0.47, w: 7.85, h: 0.57, size: 28, bold: true, font: F.head, color: C.navy });
+    txt(s, 'Fusce vehicula dolor arcu, sit amet', { x: 11.47, y: r[1] + 1.04, w: 6.05, h: 0.65, ls: 1.5 });
+  });
+  heading(s, { x: 17.12, y: 1.66, w: 8.74, ew: 1.87, eyebrow: 'Portfolio', title: 'Best Portfolio' });
+  txt(s, 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. Donec euismod scelerisque ligula. ',
+    { x: 17.12, y: 4.27, w: 7.96, h: 3.07, ls: 1.5 });
+}
+
+// 24 – "Chart Stancy Analysis Slide" (clustered column chart)
+function slide24() {
+  const s = pres.addSlide();
+  waves(s, 4.6);
+  heading(s, { x: 1.83, y: 2.17, w: 9.83, th: 2.79, eyebrow: 'Charts', title: 'Chart Stancy Analysis Slide' });
+  txt(s, LOREM_MED, { x: 1.83, y: 6.31, w: 11.01, h: 3.07, ls: 1.5 });
+  [['12k', 'Video Tutorial', 1.83], ['340+', 'Online Courses', 6.76]].forEach(function (m) {
+    txt(s, m[0], { x: m[2], y: 10.31, w: 3.3, h: 1.01, size: 54, bold: true, font: F.head, color: C.orange });
+    txt(s, m[1], { x: m[2], y: 11.42, w: 3.62, h: 0.57, size: 28, bold: true, font: F.head, color: C.navy });
+  });
+  const cats = ['Category 1', 'Category 2', 'Category 3'];
+  s.addChart(pres.ChartType.bar, [
+    { name: 'Series 1', labels: cats, values: [4.3, 2.5, 3.5] },
+    { name: 'Series 2', labels: cats, values: [2.4, 4.4, 1.8] },
+    { name: 'Series 3', labels: cats, values: [2, 2, 3] }
+  ], {
+    x: 14.14, y: 2.17, w: 10.69, h: 11.26,
+    barDir: 'col', barGapWidthPct: 219, barOverlapPct: -27,
+    chartColors: [C.orange, C.navy, C.blue],
+    showLegend: false, showValue: false,
+    catAxisLabelFontSize: 20, valAxisLabelFontSize: 20,
+    catAxisLabelFontFace: F.body, valAxisLabelFontFace: F.body,
+    catAxisLabelColor: C.body, valAxisLabelColor: C.body,
+    catAxisLineShow: false, valAxisLineShow: false,
+    valGridLine: { style: 'solid', color: 'E8E8E8', size: 0.75 },
+    catGridLine: { style: 'none' },
+    valAxisMaxVal: 5, valAxisMajorUnit: 0.5
+  });
+}
+
+// 25 – "Line Chart Stancy"
+function slide25() {
+  const s = pres.addSlide();
+  waves(s, 4.6);
+  heading(s, { x: 13.82, y: 2.26, w: 9.83, eyebrow: 'Charts', title: 'Line Chart Stancy' });
+  txt(s, 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. ',
+    { x: 13.82, y: 4.94, w: 11.01, h: 1.86, ls: 1.5 });
+  [['Enginering Studies', 7.83, 195, C.blue, '83%'], ['General & Other Studies', 10.21, 152, C.red, '79%']]
+    .forEach(function (g) {
+      progressRing(s, 13.82, g[1], 1.6, g[2], g[3], g[4]);
+      txt(s, g[0], { x: 15.98, y: g[1] - 0.02, w: 5.34, h: 0.57, size: 28, bold: true, font: F.head, color: C.navy });
+      txt(s, 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec',
+        { x: 15.98, y: g[1] + 0.7, w: 7.68, h: 1.26, ls: 1.5 });
+    });
+  const cats = ['Category 1', 'Category 2', 'Category 3', 'Category 4'];
+  s.addChart(pres.ChartType.line, [
+    { name: 'Series 1', labels: cats, values: [4, 7, 4, 8] },
+    { name: 'Series 2', labels: cats, values: [3, 4, 3, 5] }
+  ], {
+    x: 1.51, y: 1.58, w: 10.24, h: 11.33,
+    chartColors: [C.orange, C.navy], lineDataSymbol: 'none', lineSize: 3,
+    showLegend: false, showValue: false,
+    catAxisLabelFontSize: 20, valAxisLabelFontSize: 20,
+    catAxisLabelFontFace: F.body, valAxisLabelFontFace: F.body,
+    catAxisLabelColor: C.body, valAxisLabelColor: C.body,
+    catAxisLineShow: false, valAxisLineShow: false,
+    valGridLine: { style: 'solid', color: 'E8E8E8', size: 0.75 },
+    catGridLine: { style: 'none' },
+    valAxisMaxVal: 9, valAxisMajorUnit: 1
+  });
+}
+
+// 26 – "Categories Online Course" (five octagons)
+function slide26() {
+  const s = pres.addSlide();
+  waves(s, 4.6);
+  heading(s, { x: 7.26, y: 1.49, w: 12.15, ew: 4.66, th: 2.79, align: 'center',
+    eyebrow: ' Infographics', title: 'Categories Online Course' });
+  [['illustration', 2.02, C.orange, '\u270E'], ['Marketing', 6.7, C.navy, '\u25C8'],
+   ['Business', 11.37, C.blue, '\u2318'], ['Education', 16.05, C.red, '\u2630'],
+   ['Technology', 20.72, C.yellow, '\u2699']].forEach(function (cat) {
+    const x = cat[1];
+    shape(s, S.octagon, { x, y: 5.85, w: 3.81, h: 3.81, fill: { color: cat[2] } });
+    txt(s, cat[3], { x, y: 5.85, w: 3.81, h: 3.81, size: 44, color: C.white, font: F.icon, align: 'center', valign: 'middle' });
+    s.addShape(S.line, { x: x + 1.9, y: 9.85, w: 0, h: 2.73,
+      line: { color: C.orange, width: 1.5, dashType: 'dash', endArrowType: 'triangle' } });
+    circle(s, x + 1.78, 11.52, 0.24, C.orange);
+    txt(s, cat[0], { x: x - 0.01, y: 13.04, w: 3.85, h: 0.64, size: 32, bold: true,
+      font: F.head, color: C.navy, align: 'center' });
+  });
+}
+
+// 27 – "Market Analysis Slide" (pyramid)
+function slide27() {
+  const s = pres.addSlide();
+  waves(s, 4.6);
+  heading(s, { x: 5.69, y: 1.25, w: 15.27, ew: 3.64, th: 1.31, size: 72, align: 'center',
+    eyebrow: 'Infographics', title: 'Market Analysis Slide' });
+  trapezoid(s, 12.03, 3.91, 2.6, 2.25, 0.05, C.orange);
+  trapezoid(s, 10.62, 6.58, 5.43, 2.04, 2.6, C.navy);
+  trapezoid(s, 9.2, 9.03, 8.27, 2.03, 5.43, C.blue);
+  trapezoid(s, 7.66, 11.49, 11.34, 2.25, 8.27, C.red);
+  [['\u2637', 4.72], ['\u25CE', 7.05], ['\u2751', 9.48], ['\u2699', 12.0]].forEach(function (g) {
+    txt(s, g[0], { x: 12.5, y: g[1], w: 1.66, h: 0.9, size: 40, color: C.white, font: F.icon,
+      align: 'center', valign: 'middle' });
+  });
+  [['Creative', 1.79, 4.4, 'left', 7.4], ['Teamwork', 1.79, 8.4, 'left', 5.87],
+   ['Strategy', 19.97, 4.4, 'right', 7.4], ['Management', 19.97, 8.4, 'right', 6.12]]
+    .forEach(function (b) {
+      txt(s, b[0], { x: b[1], y: b[2], w: 4.89, h: 0.57, size: 28, bold: true,
+        font: F.head, color: C.navy, align: b[3] });
+      txt(s, 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. ',
+        { x: b[3] === 'left' ? b[1] : b[1] + 4.89 - b[4], y: b[2] + 0.65, w: b[4], h: 1.25,
+          ls: 1.5, align: b[3] });
+    });
+}
+
+// 28 – "Break Slide"
+function slide28() {
+  const s = pres.addSlide();
+  waves(s, 4.6);
+  rect(s, 11.2, 0, 13.54, 13.08, C.orange);
+  imageBox(s, 10.58, 0, 13.54, 13.08);
+  dotGrid(s, 2.05, 2.36, C.grey);
+  roundRect(s, 2.54, 2.89, 12.92, 8.07, C.white, 0.35, { shadow: CARD_SHADOW });
+  txt(s, 'Break Slide', { x: 5.05, y: 4.53, w: 7.9, h: 5.69, size: 166, bold: true, font: F.head, color: C.navy });
+  shape(s, S.donut, { x: -1.18, y: 13.45, w: 2.57, h: 2.57, fill: { color: C.red, transparency: 14 } });
+  txt(s, '\u2716', { x: 11.8, y: 3.7, w: 0.7, h: 0.7, size: 20, color: C.yellow, font: F.icon, align: 'center' });
+}
+
+// 29..32 – SWOT family (shared skeleton, letter tile on the picture side)
+function swotSlide(o) {
+  const s = pres.addSlide();
+  waves(s, 4.6);
+  const picX = o.mirror ? 3.42 : 14.23;
+  const txtX = o.mirror ? 14.47 : 1.83;
+  dotGrid(s, o.mirror ? 9.92 : 13.57, 1.0, C.grey);
+  imageBox(s, picX, 1.66, 9.03, 10.79);
+  shape(s, S.round2DiagRect, { x: o.mirror ? 2.44 : 18.97, y: 8.44, w: 6.32, h: 5.45,
+    fill: { color: C.orange }, rectRadius: 1.4, flipV: !!o.mirror });
+  txt(s, o.letter, { x: o.mirror ? 2.44 : 18.97, y: 8.44, w: 6.32, h: 5.45, size: 170, bold: true,
+    font: F.head, color: C.white, align: 'center', valign: 'middle' });
+  heading(s, { x: txtX, y: 2.17, w: 8.6, th: 2.79, eyebrow: 'Swot', title: o.title });
+  o.build(s, txtX);
+}
+
+function slide29() {
+  swotSlide({ letter: 'S', title: 'Strength Analysis Slide', build: function (s, x) {
+    txt(s, 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices',
+      { x: x, y: 5.98, w: 10.01, h: 1.86, ls: 1.5 });
+    [['100s of Online Courses', 8.62], ['Online Courses for FREE', 11.16]].forEach(function (b) {
+      badge(s, x, b[1], 0.81, C.orange, '\u2713', 18);
+      txt(s, b[0], { x: x + 1.1, y: b[1] + 0.12, w: 4.89, h: 0.57, size: 28, bold: true, font: F.head, color: C.navy });
+      txt(s, LOREM_CARD, { x: x + 1.1, y: b[1] + 0.7, w: 8.84, h: 1.26, ls: 1.5 });
+    });
+  } });
+}
+
+function slide30() {
+  swotSlide({ letter: 'W', title: 'Weakness Analysis Slide', mirror: true, build: function (s, x) {
+    txt(s, '100S OF ONLINE COURSES', { x: x, y: 6.64, w: 5.82, h: 0.57, size: 28, bold: true, font: F.head, color: C.navy });
+    txt(s, 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices',
+      { x: x, y: 7.41, w: 10.01, h: 1.86, ls: 1.5 });
+    txt(s, 'Learn With Experts', { x: x, y: 9.96, w: 3.74, h: 0.57, size: 28, bold: true, font: F.head, color: C.navy });
+    txt(s, '90%', { x: 22.97, y: 9.96, w: 1.25, h: 0.57, size: 28, bold: true, font: F.head, color: C.navy, align: 'right' });
+    skillBar(s, x, 10.93, 9.59, 0.9);
+  } });
+}
+
+function slide31() {
+  swotSlide({ letter: 'O', title: 'Opportunity Analysis Slide', build: function (s, x) {
+    txt(s, 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. Donec euismod scelerisque ligula. Maecenas eu varius risus, eu aliquet arcu. Curabitur .',
+      { x: x, y: 5.98, w: 10.01, h: 3.68, ls: 1.5 });
+    [['12k', 'Video Tutorial', 1.83], ['340+', 'Online Courses', 6.76]].forEach(function (m) {
+      txt(s, m[0], { x: m[2], y: 10.02, w: 3.3, h: 1.01, size: 54, bold: true, font: F.head, color: C.orange });
+      txt(s, m[1], { x: m[2], y: 11.13, w: 3.62, h: 0.57, size: 28, bold: true, font: F.head, color: C.navy });
+    });
+  } });
+}
+
+function slide32() {
+  swotSlide({ letter: 'T', title: 'Threat Analysis Slide', mirror: true, build: function (s, x) {
+    txt(s, 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. Donec euismod scelerisque ligula. Maecenas eu varius risus, eu aliquet arcu. Curabitur fermentum suscipit est',
+      { x: x, y: 6.41, w: 9.92, h: 3.07, ls: 1.5 });
+    button(s, x, 10.47, 3.25, 1.02, C.orange, 'READ MORE');
+  } });
+}
+
+// 33 – "Get Easy Order with Our Apps" (three tilted phone mockups)
+function slide33() {
+  const s = pres.addSlide();
+  waves(s, 4.6);
+  [[0.0, -1.76], [3.58, 9.15], [7.82, 2.14]].forEach(function (p) {
+    roundRect(s, p[0], p[1], 5.25, 10.52, '242628', 0.6, { rotate: 342 });
+    imageBox(s, p[0] + 0.3, p[1] + 0.23, 4.75, 10.06, { rotate: 342, rectRadius: 0.45 });
+  });
+  heading(s, { x: 16.27, y: 2.38, w: 8.39, th: 2.79, eyebrow: 'Mockup', title: 'Get Easy Order with Our Apps' });
+  txt(s, '100s of Online Courses', { x: 16.27, y: 6.87, w: 4.89, h: 0.57, size: 28, bold: true, font: F.head, color: C.navy });
+  txt(s, 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. ',
+    { x: 16.27, y: 7.73, w: 8.96, h: 1.86, ls: 1.5 });
+  txt(s, 'Donec euismod scelerisque ligula. Maecenas eu varius risus, eu aliquet arcu.',
+    { x: 16.27, y: 10.73, w: 8.96, h: 1.26, ls: 1.5 });
+}
+
+// 34 – "Get Easy order with ipad"
+function slide34() {
+  const s = pres.addSlide();
+  waves(s, 4.6);
+  roundRect(s, 17.13, 3.16, 6.55, 9.7, 'FAFAFA', 0.5, { line: { color: C.grey, width: 1 }, shadow: CARD_SHADOW });
+  circle(s, 20.35, 3.55, 0.1, '9A9A9A');
+  circle(s, 20.2, 12.2, 0.4, 'FFFFFF', { line: { color: C.grey, width: 1 } });
+  imageBox(s, 17.47, 4.1, 5.86, 8.0);
+  heading(s, { x: 2.22, y: 2.52, w: 8.39, th: 2.79, eyebrow: 'Mockup', title: 'Get Easy order with ipad' });
+  txt(s, 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. ',
+    { x: 2.22, y: 6.52, w: 9.94, h: 1.86, ls: 1.5 });
+  [['100s of Online Courses', 8.79], ['Online Courses for FREE', 11.33]].forEach(function (b) {
+    badge(s, 2.22, b[1], 0.81, C.orange, '\u2713', 18);
+    txt(s, b[0], { x: 3.33, y: b[1] + 0.12, w: 4.89, h: 0.57, size: 28, bold: true, font: F.head, color: C.navy });
+    txt(s, LOREM_CARD, { x: 3.33, y: b[1] + 0.7, w: 8.84, h: 1.26, ls: 1.5 });
+  });
+}
+
+// 35 – "Get Easy order with Our Site" (laptop mockup + gauge card)
+function slide35() {
+  const s = pres.addSlide();
+  waves(s, 4.6);
+  rect(s, 2.78, 4.85, 9.3, 6.13, '2B2D2F');
+  imageBox(s, 2.92, 5.12, 8.9, 5.64);
+  roundRect(s, 1.63, 10.98, 11.5, 0.46, 'B9BDC1', 0.1);
+  rect(s, 6.73, 10.97, 1.32, 0.17, '191B1C');
+  heading(s, { x: 15.09, y: 2.71, w: 8.39, th: 2.79, eyebrow: 'Mockup', title: 'Get Easy order with Our Site' });
+  txt(s, 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. Donec euismod scelerisque ligula. Maecenas eu varius risus, eu aliquet arcu. Curabitur fermentum suscipit est',
+    { x: 15.09, y: 6.43, w: 9.92, h: 3.07, ls: 1.5 });
+  button(s, 15.09, 10.49, 3.25, 1.02, C.orange, 'DOWNLOAD');
+  // registration gauge card
+  card(s, 9.39, 3.05, 4.14, 3.63, 0.2);
+  txt(s, 'Registration', { x: 9.98, y: 3.47, w: 2.78, h: 0.5, font: F.ui, align: 'center' });
+  shape(s, S.arc, { x: 10.28, y: 4.32, w: 2.36, h: 2.36, angleRange: [184, 356], line: { color: C.grey, width: 12 } });
+  shape(s, S.arc, { x: 10.28, y: 4.32, w: 2.36, h: 2.36, angleRange: [186, 299], line: { color: C.blue, width: 12 } });
+  txt(s, '25k', { x: 10.59, y: 5.03, w: 1.73, h: 0.84, size: 44, bold: true, color: C.navy, align: 'center' });
+  txt(s, '0%', { x: 10.0, y: 5.66, w: 0.62, h: 0.34, size: 14, font: F.ui, align: 'center' });
+  txt(s, '65%', { x: 12.39, y: 5.66, w: 0.56, h: 0.34, size: 14, font: F.ui, align: 'center' });
+}
+
+// 36 – "Pricing Plan" (three tiers)
+function slide36() {
+  const s = pres.addSlide();
+  waves(s, 4.6);
+  heading(s, { x: 8.48, y: 1.01, w: 9.7, ew: 3.11, align: 'center', eyebrow: ' Pricing', title: 'Pricing Plan' });
+  const plans = [
+    { name: 'Basic', price: 'Free', x: 3.27, y: 4.16, h: 9.68, btn: C.orange },
+    { name: 'Professional', price: '$ 599', x: 9.98, y: 3.55, h: 10.29, btn: C.navy, popular: true },
+    { name: 'Business', price: '$ 999', x: 16.69, y: 4.16, h: 9.68, btn: C.red }
+  ];
+  const features = ['One Listing', '30 Days Availability', 'Standard Listing', 'Limited Support'];
+  plans.forEach(function (p) {
+    const dy = p.y - 4.16;
+    rect(s, p.x, p.y, 6.71, p.h, C.white, { shadow: CARD_SHADOW });
+    txt(s, p.name, { x: p.x + 1.48, y: 4.91 + dy, w: 3.74, h: 0.57, size: 28, bold: true,
+      font: F.head, color: C.navy, align: 'center' });
+    txt(s, p.price, { x: p.x + 2.18, y: 5.55 + dy, w: 2.34, h: 0.77, size: 40, bold: true,
+      font: F.head, color: C.orange, align: 'center' });
+    txt(s, 'Standard listing submission, active for 30 days.',
+      { x: p.x + 0.65, y: 6.43 + dy, w: 5.39, h: 1.26, align: 'center', ls: 1.5 });
+    line(s, p.x + 0.86, 8.18 + dy, 4.98, C.grey);
+    features.forEach(function (f, i) {
+      txt(s, f, { x: p.x + 1.19, y: 8.67 + dy + i * 0.85, w: 4.32, h: 0.5, align: 'center' });
+    });
+    button(s, p.x + 1.43, 12.42, 3.85, 0.94, p.btn, 'GET STARTED', { size: 24, radius: 0.1 });
+  });
+  s.addShape('custGeom', { x: 13.65, y: 3.55, w: 3.04, h: 1.51, fill: { color: C.blue },
+    points: [{ x: 0, y: 0 }, { x: 3.04, y: 0 }, { x: 3.04, y: 1.51 }, { close: true }] });
+  txt(s, 'MOST POPULAR', { x: 14.66, y: 3.85, w: 2.03, h: 0.3, size: 12, bold: true,
+    font: F.head, color: C.white, align: 'center' });
+}
+
+// 37 – "Get in touch"
+function slide37() {
+  const s = pres.addSlide();
+  imageBox(s, 0, 0, 21.03, 10.87);
+  rect(s, 8.25, 5.61, 9.32, 8.03, C.white, { shadow: CARD_SHADOW });
+  rect(s, 17.57, 5.61, 7.63, 8.03, C.orange);
+  heading(s, { x: 9.4, y: 6.76, w: 8.49, ew: 1.87, eyebrow: 'Contact Us', title: 'Get in touch' });
+  txt(s, 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. ',
+    { x: 9.4, y: 9.03, w: 6.89, h: 1.86, ls: 1.5 });
+  [['\u2691', 'Address', 'PO Box 977 Baker st. 123, Los Angeles, California, US.', 6.45, 4.77],
+   ['\u260E', 'Phone Number', '(+08) 123 456 789\n(+08) 456 789 123', 8.71, 3.74],
+   ['\u2709', 'Email', 'help.stancy@gmail.com', 10.97, 4.77]].forEach(function (r) {
+    txt(s, r[0], { x: 18.52, y: r[3], w: 0.65, h: 0.63, size: 24, color: C.white, font: F.icon, valign: 'middle' });
+    txt(s, r[1], { x: 19.42, y: r[3], w: 3.74, h: 0.57, size: 28, bold: true, font: F.head, color: C.white });
+    txt(s, r[2], { x: 19.38, y: r[3] + 0.58, w: r[4], h: 1.26, color: C.white, ls: 1.5 });
+  });
+}
+
+// 38 – "Icon Slide" divider
+function slide38() {
+  const s = pres.addSlide();
+  waves(s, 4.6);
+  imageBox(s, 2.43, 2.93, 10.86, 10.33);
+  roundRect(s, 13.33, 2.93, 10.86, 10.33, C.white, 0.45, { shadow: CARD_SHADOW });
+  logo(s, 15.94, 4.39);
+  txt(s, 'Icon Slide', { x: 15.94, y: 5.93, w: 6.85, h: 5.69, size: 166, bold: true, font: F.head, color: C.navy });
+  shape(s, S.donut, { x: 3.23, y: -1.28, w: 2.57, h: 2.57, fill: { color: C.red, transparency: 14 } });
+  txt(s, '\u2716', { x: 21.9, y: 5.6, w: 0.7, h: 0.7, size: 20, color: C.yellow, font: F.icon, align: 'center' });
+}
+
+/* Icon library slides 39-42: 11 x 6 grids of monochrome glyphs. */
+const ICON_SETS = [
+  ('\u260E \u2706 \u2318 \u2691 \u2709 \u27A4 \u270E \u2712 \u2704 \u25AD \u21A9 ' +
+   '\u263A \u2637 \u21AA \u2139 \u2691 \u25A6 \u25C8 \u27A4 \u2295 \u26A0 \u2600 ' +
+   '\u2606 \u261D \u261F \u2139 \u2318 \u25A2 \u201D \u003F \u2302 \u25F0 \u2299 ' +
+   '\u2691 \u2699 \u2692 \u265C \u25B6 \u25A3 \u25C9 \u263D \u25D0 \u2740 \u266A ' +
+   '\u2630 \u25A5 \u2708 \u25CE \u25C9 \u25F4 \u2641 \u25A6 \u26A1 \u2601 \u25CF ' +
+   '\u25D4 \u0041 \u25CF \u26B7 \u25AC \u2615 \u266B \u25AD \u2610 \u2708 \u270F'),
+
+  ('\u267F \u2093 \u229E \u2715 \u2716 \u00A5 \u25B6 \u25B7 \u25B6 \u2295 \u2296 ' +
+   '\u26AB \u2299 \u25C1 \u25B7 \u26B7 \u25C0 \u2691 \u26A0 \u25B6 \u2691 \u25C9 ' +
+   '\u21A5 \u2602 \u25B2 \u21BA \u2717 \u2630 \u22EE \u25B2 \u2191 \u2195 \u267F ' +
+   '\u2612 \u25A5 \u0074 \u25C8 \u20BA \u265C \u0074 \u2726 \u25A5 \u2726 \u222A ' +
+   '\u2637 \u2630 \u00BB \u2026 \u261F \u261F \u261D \u261D \u25F4 \u25C8 \u25CF ' +
+   '\u2600 \u25B6 \u203A \u2013 \u25C6 \u2706 \u25A4 \u25A5 \u260E \u2195 \u2194'),
+
+  ('\u25CF \u25CC \u2637 \u2630 \u201C \u201D \u2606 \u2605 \u25C0 \u2695 \u00B2 ' +
+   '\u2708 \u2195 \u2193 \u263A \u2193 \u2193 \u2193 \u2193 \u25B2 \u25BC \u2193 ' +
+   '\u2699 \u21AA \u25B6 \u21AA \u271D \u2699 \u2582 \u21AA \u2637 \u2192 \u25C9 ' +
+   '\u276F \u21BB \u25C0 \u2295 \u2630 \u25C9 \u20B9 \u21BB \u25C9 \u26C1 \u2295 ' +
+   '\u003F \u25C9 \u2605 \u21BB \u2716 \u2297 \u262E \u21A9 \u21A9 \u2630 \u2199 ' +
+   '\u25B6 \u25B7 \u25AE \u2740 \u271A \u2295 \u2318 \u229E \u2637 \u229F \u003F'),
+
+  ('\u2691 \u2750 \u270E \u2016 \u2117 \u2117 \u25A3 \u25B6 \u25A6 \u2708 \u25B6 ' +
+   '\u2237 \u2630 \u25B0 \u25B1 \u25AD \u2610 \u2612 \u2610 \u2692 \u25A4 \u2704 ' +
+   '\u229F \u2328 \u006D \u2603 \u229F \u2706 \u2014 \u263D \u2725 \u260F \u266B ' +
+   '\u2691 \u2299 \u2639 \u2698 \u2698 \u229F \u25A4 \u2192 \u2296 \u2726 \u2423 ' +
+   '\u2460 \u26AD \u2698 \u2191 \u20BD \u2460 \u2630 \u2637 \u2630 \u2630 \u2190 ' +
+   '\u2139 \u25A3 \u25C0 \u2190 \u21E4 \u2692 \u25CB \u25B3 \u26A1 \u21B1 \u26A1')
+].map(function (row) { return row.split(' '); });
+
+/** One page of the icon library: 11 columns x 6 rows of glyphs. */
+function iconSlide(setIdx) {
+  const s = pres.addSlide();
+  waves(s, 4.6);
+  const glyphs = ICON_SETS[setIdx];
+  const x0 = 1.16, y0 = 1.62, dx = 2.25, dy = 2.03;
+  glyphs.forEach(function (g, i) {
+    txt(s, g, { x: x0 + (i % 11) * dx, y: y0 + Math.floor(i / 11) * dy, w: 2.0, h: 1.6,
+      size: 76, color: C.black, font: F.icon, align: 'center', valign: 'middle' });
+  });
+}
+
+function slide39() { iconSlide(0); }
+function slide40() { iconSlide(1); }
+function slide41() { iconSlide(2); }
+function slide42() { iconSlide(3); }
+
+// 43 – "Thank You"
+function slide43() {
+  const s = pres.addSlide();
+  rect(s, 2.83, 1.81, 21.0, 9.13, C.grey);
+  imageBox(s, 3.35, 1.26, 19.97, 9.13);
+  roundRect(s, 4.7, 7.5, 16.56, 6.23, C.white, 0.15, { shadow: CARD_SHADOW });
+  waveBand(s, 4.7, 7.65, 16.56, 5.44);
+  txt(s, 'Thank You', { x: 6.9, y: 9.21, w: 12.15, h: 2.89, size: 166, bold: true,
+    font: F.head, color: C.navy, align: 'center' });
+  shape(s, S.donut, { x: 25.06, y: 13.47, w: 2.57, h: 2.57, fill: { color: C.red, transparency: 14 } });
+  txt(s, '\u2716', { x: 18.55, y: 8.25, w: 0.7, h: 0.7, size: 20, color: C.yellow, font: F.icon, align: 'center' });
+  circle(s, 13.9, 12.83, 0.34, C.blue);
+  circle(s, 5.24, 10.33, 0.21, C.blue);
+}
+
+/* ------------------------------------------------------------------ *
+ * Build & save
+ * ------------------------------------------------------------------ */
+
+[slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
+ slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
+ slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29, slide30,
+ slide31, slide32, slide33, slide34, slide35, slide36, slide37, slide38, slide39, slide40,
+ slide41, slide42, slide43].forEach(function (build) { build(); });
+
+pres.writeFile({ fileName: path.join(__dirname, '0420aea1-3e13-4e73-b478-adfaa9be5e77_grok_final.pptx') })
+  .then(function (f) { console.log('wrote', f); })
+  .catch(function (e) { console.error(e); process.exit(1); });

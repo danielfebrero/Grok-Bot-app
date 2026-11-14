@@ -1,0 +1,713 @@
+#!/usr/bin/env node
+/**
+ * RICANBALL - American Football Presentation Template
+ * 28 slides, 13.333 x 7.5 in, rebuilt with pptxgenjs.
+ *
+ * Photographs in the original deck are replaced by flat placeholder rectangles.
+ */
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ── palette / typography ─────────────────────────────────────────────── */
+const NAVY = '1B2668';   // theme accent2
+const NAVY_DK = '0D1334';   // accent2, 50% luminance
+const GOLD = 'FFC000';   // theme accent3
+const WHITE = 'FFFFFF';
+const INK = '000000';   // theme tx1 (headings)
+const GREY75 = '404040';   // tx1 @ 75% lum
+const GREY65 = '595959';   // tx1 @ 65% lum
+const TRACK = 'D9D9D9';   // bg1 @ 85% lum (progress-bar track)
+const HEAD = 'Teko SemiBold';
+const BODY = 'Roboto';
+
+/* ── recurring copy ─────────────────────────────────────────────────────
+ * Every body paragraph in the template is a prefix of the same filler
+ * sentence, so they are derived from one base string. */
+const BASE = 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring';
+const L_TINY = 'A wonderful serenity has taken possession of my entire';
+const L_SHORT = BASE.replace(' mornings of spring', '');
+const L_MORN = BASE.replace(' of spring', '');
+const L_SPRING = BASE + ' which';
+const L_ENJOY = BASE + ' which I enjoy';
+const L_ENJOYW = BASE + ' which I enjoy with';
+const LOREM = BASE + ' which I enjoy with my whole heart.';
+const L_LONG = LOREM + ' I am alone, and feel the charm of existence in this spot, which was created for';
+const L_HALF = LOREM + ' I am alone, and feel the charm';
+const L_FEEL = LOREM + ' I am alone, and feel';
+const L_SPOT = LOREM + ' am alone, and feel the charm of existence in this spot';
+const L_MADE = L_SPOT + ', which was created. ';
+
+/* ── geometry helpers ─────────────────────────────────────────────────────
+ * pptxgenjs cannot set the adjust values of preset shapes, so every skewed
+ * shape this template is built from (parallelogram, pentagon, chevron,
+ * snipped-corner chip) is emitted as custom geometry from the same formulas
+ * PowerPoint uses: the offset is `adj/100000 * min(w,h)`.
+ */
+const mirror = (pts, w) => pts.map(([x, y]) => [w - x, y]);
+
+function poly(slide, pts, o) {
+  const p = (o.flipH ? mirror(pts, o.w) : pts).map(([x, y], i) => (i ? { x, y } : { x, y, moveTo: true }));
+  slide.addShape('custGeom', {
+    x: o.x, y: o.y, w: o.w, h: o.h, points: p.concat([{ close: true }]),
+    fill: o.fill, line: o.line || { type: 'none' }, shadow: o.shadow, rotate: o.rotate,
+  });
+}
+
+const scale = (npts, w, h) => npts.map(([a, b]) => [a * w, b * h]);
+
+function parallelogram(slide, o) {
+  const d = (Math.min(o.w, o.h) * o.adj) / 100000;
+  poly(slide, [[0, o.h], [d, 0], [o.w, 0], [o.w - d, o.h]], o);
+}
+
+function pentagon(slide, o) {              // "arrow: pentagon" / homePlate
+  const d = (Math.min(o.w, o.h) * o.adj) / 100000;
+  poly(slide, [[0, 0], [o.w - d, 0], [o.w, o.h / 2], [o.w - d, o.h], [0, o.h]], o);
+}
+
+function chevron(slide, o) {
+  const d = (Math.min(o.w, o.h) * o.adj) / 100000;
+  poly(slide, [[0, 0], [o.w - d, 0], [o.w, o.h / 2], [o.w - d, o.h], [0, o.h], [d, o.h / 2]], o);
+}
+
+function snipChip(slide, o) {              // number chip: two diagonal corners cut
+  const d = Math.min(o.w, o.h) / 2;
+  poly(slide, [[d, 0], [o.w, 0], [o.w, o.h - d], [o.w - d, o.h], [0, o.h], [0, d]], o);
+}
+
+/* Gradients are unavailable in pptxgenjs, so the template's soft colour fades
+ * are re-created by stacking many pre-blended bands. The original stops run
+ * `base` (92%) -> fully transparent white (8%), so the visible colour at
+ * fraction t is the faded shape composited over the slide backdrop. */
+const mix = (a, b, t) => [0, 2, 4].map(i => {
+  const v = Math.round(parseInt(a.substr(i, 2), 16) * (1 - t) + parseInt(b.substr(i, 2), 16) * t);
+  return v.toString(16).padStart(2, '0');
+}).join('').toUpperCase();
+
+const blend = (base, bg, t) => mix(mix(base, WHITE, t), bg, t);
+
+function fade(slide, o, build) {
+  const bands = o.bands || 64;
+  for (let i = 0; i < bands; i++) {
+    const y = o.y + (o.h * i) / bands;
+    const h = o.h / bands + 0.01;
+    let s = (i + 0.5) / bands;
+    if (o.reverse) s = 1 - s;
+    const t = Math.min(1, Math.max(0, (s - 0.08) / 0.84));
+    build(y, h, { color: blend(o.base, o.bg, t) });
+  }
+}
+
+function chevronFade(slide, o) {           // full-height chevron with a colour fade
+  const d = (Math.min(o.w, o.h) * o.adj) / 100000;
+  const edge = y => {                      // x of the left/right outline at height y
+    const k = y <= o.h / 2 ? y / (o.h / 2) : (o.h - y) / (o.h / 2);
+    return [d * k, o.w - d * (1 - k)];
+  };
+  fade(slide, o, (y, h, fill) => {
+    const [l0, r0] = edge(y - o.y);
+    const [l1, r1] = edge(Math.min(o.h, y + h - o.y));
+    poly(slide, [[l0, 0], [r0, 0], [r1, h], [l1, h]], { x: o.x, y, w: o.w, h, fill, flipH: o.flipH });
+  });
+}
+
+/* The stadium fact badges use an opaque navy -> gold gradient instead. */
+function parallelogramFade(slide, o) {
+  const d = (Math.min(o.w, o.h) * o.adj) / 100000;
+  const bands = 24;
+  for (let i = 0; i < bands; i++) {
+    const y = o.y + (o.h * i) / bands, h = o.h / bands + 0.012;
+    const t0 = (y - o.y) / o.h, t1 = Math.min(1, (y + h - o.y) / o.h);
+    poly(slide, [[d * (1 - t0), 0], [o.w - d * t0, 0], [o.w - d * t1, h], [d * (1 - t1), h]],
+      { x: o.x, y, w: o.w, h, fill: { color: mix(o.from, o.to, (i + 0.5) / bands) }, flipH: o.flipH });
+  }
+}
+
+/* ── text helpers ─────────────────────────────────────────────────────── */
+function heading(slide, x, y, w, lines, color) {
+  slide.addText(lines.map((t, i) => ({ text: t, options: { breakLine: i < lines.length - 1 } })), {
+    x, y, w, h: 0.724 * lines.length, fontFace: HEAD, fontSize: 40, color: color || INK, valign: 'top',
+  });
+}
+
+function body(slide, x, y, w, h, text, color) {
+  slide.addText(text, {
+    x, y, w, h, fontFace: BODY, fontSize: 11, color: color || GREY65,
+    lineSpacingMultiple: 1.5, valign: 'top',
+  });
+}
+
+function bold14(slide, x, y, w, text, color) {
+  slide.addText(text, { x, y, w, h: 0.337, fontFace: BODY, fontSize: 14, bold: true, color: color || GREY75, valign: 'top' });
+}
+
+/** small "— ABOUT US" kicker above every section heading */
+function eyebrow(slide, x, y, text, color) {
+  slide.addShape('line', { x, y: y + 0.169, w: 0.394, h: 0, line: { color: GOLD, width: 1 } });
+  slide.addText(text, { x: x + 0.437, y, w: 2.2, h: 0.337, fontFace: BODY, fontSize: 14, color: color || NAVY, valign: 'top' });
+}
+
+/** Full-bleed photo tints: the template darkens its cover art with a
+ * translucent navy wash; the picture frames themselves ship empty. */
+const wash = a => mix(WHITE, NAVY, a);
+
+/* ── recurring composites ─────────────────────────────────────────────── */
+/** gold/navy skewed tile with a big number and a caption ("800+ American Football") */
+function statTile(slide, o) {
+  parallelogram(slide, { x: o.x, y: o.y, w: 2.902, h: 1.503, adj: 54130, fill: { color: o.fill || GOLD }, shadow: o.shadow });
+  slide.addText(o.value, {
+    x: o.x + 0.601, y: o.y + 0.368, w: 1.701, h: 0.572, align: 'center', valign: 'top',
+    fontFace: BODY, fontSize: 28, bold: true, color: o.valueColor || NAVY,
+  });
+  slide.addText('American Football', {
+    x: o.x + 0.645, y: o.y + 0.964, w: 1.612, h: 0.269, align: 'center', valign: 'top',
+    fontFace: BODY, fontSize: 10, color: WHITE,
+  });
+}
+
+/** navy/gold chip with a two-digit step number */
+function stepChip(slide, x, y, n, fill) {
+  snipChip(slide, {
+    x, y, w: 0.646, h: 0.53, fill: { color: fill },
+    shadow: { type: 'outer', color: NAVY, opacity: 0.3, blur: 10, offset: 0, angle: 10 },
+  });
+  slide.addText(n, {
+    x, y: y + 0.101, w: 0.646, h: 0.337, align: 'center', valign: 'top',
+    fontFace: BODY, fontSize: 14, bold: true, color: WHITE,
+  });
+}
+
+/** hand-drawn check mark used on the history cards */
+function checkMark(slide, x, y, w, h, color) {
+  poly(slide, scale([[0, 0.5], [0.15, 0.34], [0.38, 0.6], [0.85, 0.04], [1, 0.2], [0.38, 0.95]], w, h),
+    { x, y, w, h, fill: { color } });
+}
+
+/** club crest stand-ins used on the fixtures / big-match slides.
+ * "Moster Club" is a wide helmet badge, "King Of Club" a tall crowned shield. */
+const CREST = { moster: { w: 1.005, h: 0.887 }, king: { w: 0.774, h: 1.048 } };
+const NAME = { moster: 'Moster Club', king: 'King Of Club' };
+
+function crest(slide, kind, x, y, s) {
+  const w = CREST[kind].w * (s || 1), h = CREST[kind].h * (s || 1);
+  const shield = [[0.08, 0.03], [0.92, 0.03], [0.92, 0.58], [0.5, 0.97], [0.08, 0.58]];
+  poly(slide, scale(shield, w, h), { x, y, w, h, fill: { color: kind === 'king' ? NAVY : WHITE }, line: { color: NAVY, width: 1.25 } });
+  if (kind === 'king') {
+    poly(slide, scale([[0.26, 0.28], [0.38, 0.14], [0.5, 0.24], [0.62, 0.14], [0.74, 0.28]], w, h), { x, y, w, h, fill: { color: GOLD } });
+    slide.addShape('ellipse', { x: x + w * 0.26, y: y + h * 0.36, w: w * 0.48, h: h * 0.34, fill: { color: WHITE } });
+    slide.addShape('ellipse', { x: x + w * 0.34, y: y + h * 0.42, w: w * 0.32, h: h * 0.22, fill: { color: NAVY } });
+  } else {
+    slide.addShape('ellipse', { x: x + w * 0.26, y: y + h * 0.18, w: w * 0.48, h: h * 0.34, fill: { color: NAVY } });
+    slide.addShape('ellipse', { x: x + w * 0.34, y: y + h * 0.25, w: w * 0.3, h: h * 0.2, fill: { color: WHITE } });
+    slide.addShape('rect', { x: x + w * 0.14, y: y + h * 0.54, w: w * 0.72, h: h * 0.1, fill: { color: NAVY } });
+  }
+}
+
+/** the deck's football icon: a tilted white lens with navy end panels + laces */
+function football(slide, x, y, w, h) {
+  const rot = -25;
+  slide.addShape('ellipse', { x, y, w, h, rotate: rot, fill: { color: WHITE } });
+  [0.14, 0.86].forEach(t => {                    // navy panels across the tips
+    slide.addShape('line', { x: x + w * t, y: y + h * 0.22, w: 0, h: h * 0.56, line: { color: NAVY, width: 2 }, rotate: rot });
+  });
+  slide.addShape('line', { x: x + w * 0.3, y: y + h * 0.5, w: w * 0.4, h: 0, line: { color: NAVY, width: 1.5 }, rotate: rot });
+  for (let i = 0; i < 4; i++) {                  // laces
+    slide.addShape('line', {
+      x: x + w * (0.34 + i * 0.11), y: y + h * 0.4, w: 0, h: h * 0.2,
+      line: { color: NAVY, width: 1.25 }, rotate: rot,
+    });
+  }
+}
+
+/* ══ slides ══════════════════════════════════════════════════════════════ */
+
+/** 1 - title */
+function slideTitle(slide) {
+  slide.addShape('rect', { x: 0, y: 0, w: 13.333, h: 7.5, fill: { color: wash(0.8) } });
+  parallelogram(slide, { x: 0.829, y: -0.005, w: 4.954, h: 3.693, adj: 77490, flipH: true, fill: { color: WHITE } });
+  parallelogram(slide, { x: 0.597, y: 3.75, w: 3.49, h: 3.225, adj: 77490, flipH: true, fill: { color: WHITE } });
+  slide.addText('RICANBALL', { x: 6.667, y: 2.471, w: 6.667, h: 1.717, fontFace: HEAD, fontSize: 96, italic: true, color: WHITE, valign: 'top' });
+  slide.addText('American Football Presentation Template', { x: 6.736, y: 4.002, w: 5.443, h: 0.37, fontFace: BODY, fontSize: 16, color: WHITE, valign: 'top' });
+  poly(slide, scale([[0, 0], [0.2601, 0], [1, 1], [0.62, 1], [0, 0.1621]], 8.079, 7.5),
+    { x: 0, y: 0, w: 8.079, h: 7.5, fill: { color: GOLD } });
+}
+
+/** 2 - welcome */
+function slideWelcome(slide) {
+  parallelogram(slide, { x: 0, y: 0.875, w: 5.095, h: 6.625, adj: 59258, fill: { color: GOLD } });
+  heading(slide, 7.371, 2.306, 4.807, ['WELCOME TO', 'AMERICAN FOOTBALL']);
+  eyebrow(slide, 7.462, 1.927, 'ABOUT US');
+  body(slide, 7.371, 3.96, 4.316, 1.181, L_LONG);
+  body(slide, 7.371, 5.258, 4.316, 0.903, L_HALF);
+  parallelogram(slide, {
+    x: 4.094, y: 3.757, w: 1.738, h: 1.184, adj: 47470, fill: { color: NAVY },
+    shadow: { type: 'outer', color: INK, opacity: 0.34, blur: 72, offset: 30, angle: 90 },
+  });
+  football(slide, 4.593, 4.132, 0.75, 0.434);
+}
+
+/** 3 - coach welcome */
+function slideCoach(slide) {
+  poly(slide, scale([[0.6781, 0], [1, 0], [1, 1], [0, 1]], 5.87, 7.5), { x: 7.464, y: 0, w: 5.87, h: 7.5, fill: { color: NAVY } });
+  heading(slide, 1.17, 2.303, 5.119, ['COACH WELCOME', 'AMERICAN FOOTBALL']);
+  eyebrow(slide, 1.261, 1.924, 'ABOUT US');
+  bold14(slide, 1.17, 4.056, 3.539, 'Subtitle American Football');
+  body(slide, 1.17, 4.42, 4.699, 1.459, L_MADE + BASE);
+  statTile(slide, {
+    x: 7.431, y: 5.122, value: '800+',
+    shadow: { type: 'outer', color: INK, opacity: 0.34, blur: 72, offset: 30, angle: 90 },
+  });
+}
+
+/** 4 - about club */
+function slideAboutClub(slide) {
+  parallelogram(slide, { x: 1.169, y: 1.405, w: 2.011, h: 3.359, adj: 45081, fill: { color: NAVY } });
+  parallelogram(slide, { x: 2.777, y: 3.75, w: 3.75, h: 3.75, adj: 27582, fill: { color: GOLD } });
+  heading(slide, 7.474, 2.303, 5.114, ['ABOUT CLUB', 'AMERICAN FOOTBALL']);
+  eyebrow(slide, 7.565, 1.924, 'ABOUT US');
+  body(slide, 7.474, 3.96, 4.316, 1.181, L_LONG);
+  body(slide, 7.474, 5.243, 4.316, 0.625, L_ENJOY);
+}
+
+/** 5 - history club (two bullet notes) */
+function slideHistory(slide) {
+  parallelogram(slide, { x: 1.001, y: 3.75, w: 2.327, h: 1.992, adj: 22311, flipH: true, fill: { color: GOLD } });
+  parallelogram(slide, { x: 3.191, y: 0.875, w: 2.549, h: 1.447, adj: 22311, flipH: true, fill: { color: NAVY } });
+  slide.addText('800+', { x: 3.589, y: 1.096, w: 1.701, h: 0.572, align: 'center', valign: 'top', fontFace: BODY, fontSize: 28, bold: true, color: WHITE });
+  slide.addText('American Football', { x: 3.633, y: 1.692, w: 1.612, h: 0.269, align: 'center', valign: 'top', fontFace: BODY, fontSize: 10, color: WHITE });
+  heading(slide, 7.413, 2.005, 5.114, ['HISTORY CLUB', 'AMERICAN FOOTBALL']);
+  eyebrow(slide, 7.503, 1.627, 'ABOUT US');
+  [[3.746, NAVY], [5.057, GOLD]].forEach(([y, color]) => {
+    slide.addShape('roundRect', {
+      x: 7.539, y: y + 0.058, w: 0.186, h: 0.186, rectRadius: 0.058, fill: { color },
+      shadow: { type: 'outer', color: '4472C4', opacity: 0.23, blur: 13, offset: 8, angle: 135 },
+    });
+    bold14(slide, 7.779, y, 2.54, 'Subtitle History 2025');
+    body(slide, 7.502, y + 0.404, 4.329, 0.625, L_SPRING);
+  });
+}
+
+/** 6 - history club (three cards) */
+function slideHistoryCards(slide) {
+  parallelogram(slide, { x: 0, y: 6.072, w: 12.179, h: 1.428, adj: 56786, fill: { color: NAVY } });
+  parallelogram(slide, { x: 7.206, y: 0.891, w: 4.429, h: 2.875, adj: 70848, fill: { color: GOLD } });
+  heading(slide, 1.169, 2.303, 5.497, ['HISTORY CLUB', 'AMERICAN FOOTBALL']);
+  eyebrow(slide, 1.259, 1.924, 'ABOUT US');
+  body(slide, 1.17, 3.945, 4.997, 0.625, LOREM);
+  [1.155, 4.622, 8.09].forEach(x => {
+    parallelogram(slide, {
+      x, y: 5.111, w: 4.089, h: 1.514, adj: 62678, fill: { color: WHITE },
+      shadow: { type: 'outer', color: INK, opacity: 0.34, blur: 72, offset: 30, angle: 90 },
+    });
+    checkMark(slide, x + 1.082, 5.462, 0.314, 0.216, NAVY);
+    bold14(slide, x + 1.472, 5.402, 1.654, 'History 2025');
+    body(slide, x + 0.796, 5.781, 2.329, 0.625, L_TINY);
+  });
+}
+
+/** 7 - our mission */
+function slideMission(slide) {
+  const arrow = [[0, 0], [1, 0], [1, 1], [0.3717, 1]];
+  poly(slide, scale(arrow, 2.817, 3.978), { x: 7.433, y: 3.522, w: 2.817, h: 3.978, fill: { color: NAVY } });
+  poly(slide, scale(arrow, 3.062, 3.978), { x: 7.286, y: 1.412, w: 3.062, h: 3.978, fill: { color: GOLD } });
+  heading(slide, 1.178, 2.105, 5.497, ['OUR MISSION', 'AMERICAN FOOTBALL']);
+  eyebrow(slide, 1.268, 1.726, 'ABOUT US');
+  body(slide, 1.169, 3.765, 5.083, 0.903, L_SPOT, GREY75);
+  [['Mission One', 1.169, 1.178], ['Mission Two', 3.898, 3.898]].forEach(([label, xa, xb]) => {
+    bold14(slide, xa, 4.966, 2.344, label);
+    body(slide, xb, 5.331, 2.352, 0.903, L_SHORT, GREY75);
+  });
+}
+
+/** 8 - our vision */
+function slideVision(slide) {
+  pentagon(slide, {
+    x: 1.809, y: 0.875, w: 11.525, h: 5.75, adj: 30765, flipH: true, fill: { color: NAVY },
+    shadow: { type: 'outer', color: INK, opacity: 0.45, blur: 43, offset: 35, angle: 90 },
+  });
+  pentagon(slide, {
+    x: 0, y: 1.655, w: 6.496, h: 4.97, adj: 31276, fill: { color: GOLD },
+    shadow: { type: 'outer', color: INK, opacity: 0.45, blur: 43, offset: 35, angle: 90 },
+  });
+  heading(slide, 7.459, 2.04, 5.497, ['OUR VISION', 'AMERICAN FOOTBALL'], WHITE);
+  eyebrow(slide, 7.549, 1.662, 'ABOUT US', WHITE);
+  bold14(slide, 7.466, 3.847, 3.539, 'Subtitle Vision Here', WHITE);
+  body(slide, 7.466, 4.212, 4.72, 1.459, L_MADE + L_MORN, WHITE);
+}
+
+/** 9 - ricanball goals */
+function slideGoals(slide) {
+  parallelogram(slide, { x: 9.457, y: 0.878, w: 3.113, h: 1.738, adj: 34293, flipH: true, fill: { color: NAVY } });
+  parallelogram(slide, { x: 6.594, y: 1.698, w: 4.452, h: 2.052, adj: 35961, flipH: true, fill: { color: GOLD } });
+  heading(slide, 1.169, 1.916, 4.976, ['RICANBALL GOALS']);
+  eyebrow(slide, 1.259, 1.537, 'ABOUT US');
+  body(slide, 1.169, 2.854, 4.772, 0.903, L_SPOT, GREY75);
+  [['01', 1.259, 1.274, 4.634, NAVY], ['02', 4.916, 4.931, 4.647, GOLD], ['03', 8.722, 8.737, 4.647, NAVY]]
+    .forEach(([n, cx, tx, cy, fill]) => {
+      stepChip(slide, cx, cy, n, fill);
+      bold14(slide, tx, cy + 0.704, 2.499, 'Description Here ', GREY65);
+      body(slide, tx, cy + 1.09, 2.984, 0.903, L_MORN);
+    });
+}
+
+/** 10 - flagship stadium */
+function slideStadium(slide) {
+  // two slanted bands; the upper one is 70% opaque gold, so it goes olive
+  // where it crosses the navy band below it
+  const blade = [[0, 0], [0.4067, 0], [1, 1], [0.5933, 1]];
+  poly(slide, scale(blade, 2.708, 3.75), { x: 7.463, y: 3.75, w: 2.708, h: 3.75, fill: { color: NAVY } });
+  poly(slide, scale(blade, 2.262, 3.073), { x: 7.671, y: 2.998, w: 2.262, h: 3.073, fill: { color: mix(WHITE, GOLD, 0.7) } });
+  poly(slide, [[0, 0], [0.565, 0], [1.56, 2.321], [1.014, 2.321]],
+    { x: 7.999, y: 3.75, w: 1.56, h: 2.321, fill: { color: mix(NAVY, GOLD, 0.7) } });
+  heading(slide, 1.169, 2.163, 5.497, ['OUR FLAGSHIP STADIUM', 'AMERICAN FOOTBALL']);
+  eyebrow(slide, 1.259, 1.785, 'ABOUT US');
+  body(slide, 1.176, 3.76, 5.083, 0.903, L_SPOT, GREY75);
+  const facts = [['CAPACITY', '95.00', 1.169], ['OPENED', '07.00 am', 3.05], ['SURFACE', 'Natural', 4.967]];
+  facts.forEach(([name, value, x]) => {
+    parallelogramFade(slide, {
+      x, y: 5.043, w: 1.917, h: 1.146, adj: 25000, flipH: true, from: NAVY, to: GOLD,
+    });
+    [[name, 0.015, 5.236, 1.886], [value, 0.32, 5.588, 1.28]].forEach(([t, dx, y, w]) => {
+      slide.addText(t, {
+        x: x + dx, y, w, h: 0.37, align: 'center', valign: 'top',
+        fontFace: BODY, fontSize: 12, charSpacing: 3, color: WHITE, lineSpacingMultiple: 1.5,
+      });
+    });
+  });
+}
+
+/** 11 - ricanball stadium */
+function slideStadium2(slide) {
+  heading(slide, 1.169, 4.798, 5.512, ['RICANBALL STADIUM']);
+  eyebrow(slide, 1.259, 4.42, 'ABOUT US');
+  body(slide, 1.169, 5.737, 5.11, 0.903, L_SPOT, GREY75);
+  [['01', 7.045, 7.06, NAVY], ['02', 9.823, 9.837, GOLD]].forEach(([n, cx, tx, fill]) => {
+    stepChip(slide, cx, 0.879, n, fill);
+    bold14(slide, tx, 1.582, 2.341, 'Description Here ');
+    body(slide, tx, 1.968, 2.341, 0.903, L_SHORT);
+  });
+}
+
+/** 12 - our coach club (skill bars) */
+function slideCoachClub(slide) {
+  heading(slide, 6.681, 1.996, 5.01, ['OUR COACH CLUB']);
+  eyebrow(slide, 6.772, 1.618, 'TEAM SLIDE');
+  bold14(slide, 6.681, 2.934, 4.375, 'Fernandes Smith');
+  body(slide, 6.681, 3.298, 4.835, 0.903, L_SPOT);
+  [[4.515, 2.362, '60%', NAVY], [5.117, 3.15, '80%', GOLD], [5.721, 1.969, '50%', NAVY_DK]]
+    .forEach(([y, w, pct, color]) => {
+      slide.addShape('roundRect', { x: 6.772, y: y + 0.278, w: 3.937, h: 0.079, rectRadius: 0.0395, fill: { color: TRACK } });
+      slide.addShape('roundRect', { x: 6.754, y: y + 0.28, w, h: 0.079, rectRadius: 0.0395, fill: { color } });
+      slide.addText('Frofessional Team Here', { x: 6.754, y, w: 2.36, h: 0.226, margin: 0, valign: 'middle', fontFace: BODY, fontSize: 9, color: GREY65 });
+      slide.addText(pct, { x: 10.923, y: y + 0.204, w: 0.594, h: 0.226, margin: 0, valign: 'middle', fontFace: BODY, fontSize: 9, color: GREY65 });
+    });
+}
+
+/** 13 - our ricanball team */
+function slideTeam(slide) {
+  const card = [[0.2079, 0], [1, 0], [0.7921, 1], [0, 1]];
+  [[1.168, 3.059, NAVY, 1.416, 2.646], [4.853, 3.044, GOLD, 5.101, 2.631], [8.775, 3.044, NAVY, 9.023, 2.631]]
+    .forEach(([x, y, fill, px, py], i) => {
+      parallelogram(slide, { x, y, w: 2.755, h: 1.996, adj: 28996, fill: { color: fill } });
+      const dy = i === 0 ? 0.014 : 0;
+      slide.addText('Member Name', { x: x + 0.312, y: 5.318 + dy, w: 2.131, h: 0.337, align: 'center', valign: 'top', fontFace: BODY, fontSize: 14, bold: true, color: GREY75 });
+      slide.addText('A wonderful serenity has', { x: x + 0.178, y: 5.651 + dy, w: 2.398, h: 0.325, align: 'center', valign: 'top', fontFace: BODY, fontSize: 10, bold: true, italic: true, color: GOLD, lineSpacingMultiple: 1.5 });
+      slide.addText(L_TINY, { x, y: 5.986 + dy, w: 2.755, h: 0.625, align: 'center', valign: 'top', fontFace: BODY, fontSize: 11, color: GREY65, lineSpacingMultiple: 1.5 });
+    });
+  slide.addText('OUR RICANBALL TEAM ', { x: 3.497, y: 1.389, w: 6.339, h: 0.774, align: 'center', valign: 'top', fontFace: HEAD, fontSize: 40, color: INK });
+  eyebrow(slide, 5.462, 1.011, 'TEAM SLIDE');
+}
+
+/** 14 - season schedule */
+function slideSchedule(slide) {
+  slide.addShape('rect', { x: 0, y: 1.417, w: 13.333, h: 5.208, fill: { color: wash(0.85) } });
+  heading(slide, 1.266, 2.468, 5.4, ['2024-2025 SCHEDULE'], WHITE);
+  eyebrow(slide, 1.356, 2.089, 'SCHEDULE SLIDE', WHITE);
+  body(slide, 1.175, 3.361, 5.494, 0.903, L_LONG + '. ', WHITE);
+  [['10/9', 'Away'], ['14/9', 'Home'], ['18/9', 'Away'], ['23/9', 'Home'], ['28/9', 'Away']]
+    .forEach(([date, side], i) => {
+      const x = 1.175 + i * 1.421;
+      slide.addText([{ text: 'BLUE UNITED ', options: { breakLine: true } }, { text: 'CLUB FC' }], {
+        x, y: 4.723, w: 1.175, h: 0.438, align: 'center', valign: 'top', fontFace: BODY, fontSize: 10, color: WHITE,
+      });
+      slide.addText(date, { x, y: 5.204, w: 1.175, h: 0.505, align: 'center', valign: 'top', fontFace: BODY, fontSize: 24, color: GOLD });
+      slide.addText(side, { x, y: 5.708, w: 1.175, h: 0.286, align: 'center', valign: 'top', fontFace: BODY, fontSize: 11, color: WHITE });
+    });
+}
+
+/** 15 - fixtures & result: two scoreboard bars */
+function slideFixtures(slide) {
+  const bar = (y, o) => {
+    const shTop = { type: 'outer', color: INK, opacity: 0.45, blur: 35, offset: 25, angle: 90 };
+    slide.addShape('rect', { x: 1.958, y: y + 0.006, w: 9.417, h: 1.662, fill: { color: NAVY }, shadow: shTop });
+    slide.addShape('rect', { x: 1.958, y: y + 1.237, w: 9.417, h: 0.435, fill: { color: WHITE }, shadow: { type: 'outer', color: INK, opacity: 0.23, blur: 66, offset: 31, angle: 225 } });
+    chevron(slide, { x: 3.371, y, w: 1.02, h: 1.667, adj: 68123, fill: { color: GOLD } });
+    pentagon(slide, { x: 1.958, y, w: 2.234, h: 1.673, adj: 42329, fill: { color: WHITE }, shadow: shTop });
+    chevron(slide, { x: 8.923, y: y + 0.011, w: 1.02, h: 1.662, adj: 68123, flipH: true, fill: { color: GOLD } });
+    pentagon(slide, { x: 9.141, y: y - 0.005, w: 2.234, h: 1.667, adj: 42329, flipH: true, fill: { color: WHITE }, shadow: shTop });
+    parallelogram(slide, { x: o.vsX, y, w: o.vsW, h: 1.237, adj: 25000, fill: { color: GOLD } });
+    slide.addText('vs', { x: o.vsX - 0.09, y: y + 0.113, w: 1.718, h: 1.111, align: 'center', valign: 'top', fontFace: HEAD, fontSize: 60, color: WHITE });
+    crest(slide, o.left, 2.442, y + (o.left === 'king' ? 0.109 : 0.191));
+    crest(slide, o.right, 10.031, y + (o.right === 'king' ? 0.109 : 0.191));
+    slide.addText(NAME[o.left], { x: 2.091, y: y + 1.167, w: 1.569, h: 0.303, align: 'center', valign: 'top', fontFace: BODY, fontSize: 12, bold: true, color: INK });
+    slide.addText(NAME[o.right], { x: 9.78, y: y + 1.167, w: 1.569, h: 0.303, align: 'center', valign: 'top', fontFace: BODY, fontSize: 12, bold: true, color: INK });
+    slide.addText(o.date, { x: 4.364, y: y + 1.324, w: 2.332, h: 0.286, valign: 'top', fontFace: BODY, fontSize: 11, color: INK });
+    slide.addText('Home', { x: 6.785, y: y + 1.324, w: 1.167, h: 0.286, align: 'right', valign: 'top', fontFace: BODY, fontSize: 11, color: INK });
+    slide.addText(o.tag, { x: 8.025, y: y + 1.324, w: 1.023, h: 0.286, align: 'right', valign: 'top', fontFace: BODY, fontSize: 11, color: INK });
+    if (o.score) {
+      slide.addText(o.score[0], { x: 4.404, y: y + 0.328, w: 1.243, h: 0.841, align: 'right', valign: 'top', fontFace: HEAD, fontSize: 44, color: WHITE });
+      slide.addText(o.score[1], { x: 7.639, y: y + 0.328, w: 1.243, h: 0.841, valign: 'top', fontFace: HEAD, fontSize: 44, color: WHITE });
+    }
+  };
+  slide.addText('FIXTURES & RESULT', { x: 3.497, y: 1.389, w: 6.339, h: 0.774, align: 'center', valign: 'top', fontFace: HEAD, fontSize: 40, color: INK });
+  eyebrow(slide, 5.462, 1.011, 'FIXTURES SLIDE');
+  bar(2.717, { left: 'moster', right: 'king', date: '10 Sep 2025, California', tag: 'Recap', score: ['24', '15'], vsX: 5.924, vsW: 1.486 });
+  bar(4.952, { left: 'king', right: 'moster', date: '18 Sep 2025, California', tag: 'Preview', vsX: 5.176, vsW: 3.005 });
+}
+
+/** 16 - big match */
+function slideBigMatch(slide) {
+  slide.background = { color: NAVY };
+  chevronFade(slide, { x: 0.592, y: 0, w: 5.049, h: 7.51, adj: 48670, base: GOLD, bg: NAVY });
+  chevronFade(slide, { x: 7.692, y: 0, w: 5.049, h: 7.5, adj: 48670, flipH: true, base: GOLD, bg: NAVY, reverse: true });
+  slide.addText('BIG MATCH', { x: 4.492, y: 1.389, w: 4.374, h: 0.774, align: 'center', valign: 'top', fontFace: HEAD, fontSize: 40, color: WHITE });
+  eyebrow(slide, 5.462, 1.011, 'FIXTURES SLIDE', WHITE);
+  // pennants: a pentagon rotated 90° so its point aims down
+  [[3.429, '2', 4.684, 'moster', 4.443, 4.725], [6.323, '0', 7.615, 'king', 7.36, 7.757]]
+    .forEach(([x, score, sx, kind, nx, cx]) => {
+      pentagon(slide, {
+        x, y: 3.976, w: 3.581, h: 1.629, adj: 50000, rotate: 90, fill: { color: GOLD },
+        shadow: { type: 'outer', color: INK, opacity: 0.45, blur: 43, offset: 35, angle: 90 },
+      });
+      crest(slide, kind, cx, 3.379);
+      slide.addText(NAME[kind], { x: nx, y: 4.454, w: 1.569, h: 0.303, align: 'center', valign: 'top', fontFace: BODY, fontSize: 12, bold: true, color: WHITE });
+      slide.addText(score, { x: sx, y: 4.811, w: 1.0, h: 1.313, align: 'center', valign: 'top', fontFace: HEAD, fontSize: 72, color: WHITE });
+    });
+  trophy(slide, 6.267, 4.451, 0.8, 0.8);
+}
+
+/** simple line-art trophy between the two big-match banners */
+function trophy(slide, x, y, w, h) {
+  const ln = { color: WHITE, width: 1.5 };
+  poly(slide, scale([[0.24, 0.05], [0.76, 0.05], [0.72, 0.42], [0.5, 0.6], [0.28, 0.42]], w, h), { x, y, w, h, fill: { type: 'none' }, line: ln });
+  [[0.24, -1], [0.76, 1]].forEach(([hx, dir]) => {           // side handles
+    poly(slide, scale([[hx, 0.1], [hx + dir * 0.2, 0.16], [hx + dir * 0.16, 0.3], [hx + dir * 0.02, 0.34]], w, h),
+      { x, y, w, h, fill: { type: 'none' }, line: ln });
+  });
+  slide.addShape('line', { x: x + w * 0.5, y: y + h * 0.6, w: 0, h: h * 0.22, line: ln });
+  slide.addShape('line', { x: x + w * 0.28, y: y + h * 0.9, w: w * 0.44, h: 0, line: ln });
+  slide.addShape('line', { x: x + w * 0.36, y: y + h * 0.82, w: w * 0.28, h: 0, line: ln });
+}
+
+/** 17 - best player */
+function slideBestPlayer(slide) {
+  chevronFade(slide, { x: 1.177, y: 0, w: 6.006, h: 7.5, adj: 45234, flipH: true, base: GOLD, bg: WHITE });
+  chevronFade(slide, { x: 4.867, y: 0, w: 6.006, h: 7.5, adj: 45234, flipH: true, base: NAVY, bg: WHITE, reverse: true });
+  heading(slide, 1.17, 2.303, 3.566, ['BEST PLAYER', 'THE GAME']);
+  eyebrow(slide, 1.261, 1.924, 'BEST PLAYER');
+  body(slide, 1.179, 4.004, 3.381, 2.014, L_MADE + BASE);
+  slide.addText('Nathan T joe', { x: 9.302, y: 2.545, w: 2.884, h: 0.64, valign: 'top', fontFace: HEAD, fontSize: 32, bold: true, color: GREY75 });
+  slide.addText('Offensive Guard', { x: 9.301, y: 3.098, w: 2.193, h: 0.337, valign: 'top', fontFace: BODY, fontSize: 14, color: GOLD });
+  const shBar = { type: 'outer', color: INK, opacity: 0.41, blur: 15, offset: 0, angle: 90 };
+  [[8.822, 3.762, '90', 'Passing Yards', 9.776, 3.996, 2.219], [8.606, 4.779, '85', 'Acceleration', 9.563, 5.045, 2.073], [8.377, 5.849, '65', 'Rushing Yards', 9.333, 6.087, 2.219]]
+    .forEach(([x, y, value, label, lx, ly, lw]) => {
+      parallelogram(slide, { x: x + 0.002, y: y + 0.006, w: 3.565, h: 0.79, adj: 25000, fill: { color: WHITE }, shadow: shBar });
+      parallelogram(slide, { x, y, w: 1.13, h: 0.796, adj: 25000, fill: { color: GOLD } });
+      slide.addText(value, { x: x + 0.14, y: y + 0.18, w: 0.8, h: 0.438, align: 'center', valign: 'top', fontFace: BODY, fontSize: 20, color: WHITE });
+      slide.addText(label, { x: lx, y: ly, w: lw, h: 0.337, align: 'right', valign: 'top', fontFace: BODY, fontSize: 14, charSpacing: 3, color: GREY75 });
+    });
+}
+
+/** 18 - ricanball players */
+function slidePlayers(slide) {
+  const card = [[0.2644, 0], [1, 0], [0.7356, 1], [0, 1]];
+  [0.734, 3.559, 6.384, 9.208].forEach((x, i) => {
+    parallelogram(slide, { x, y: 5.853 + (i === 0 ? 0.001 : 0), w: 2.865, h: 0.897, adj: 44780, flipH: true, fill: { color: NAVY } });
+    slide.addText('Member Name', { x: x + 0.268, y: 6.003, w: 2.33, h: 0.337, align: 'center', valign: 'top', fontFace: BODY, fontSize: 14, bold: true, color: WHITE });
+    slide.addText('Professional Players', { x: x + 0.321, y: 6.323, w: 2.224, h: 0.303, align: 'center', valign: 'top', fontFace: BODY, fontSize: 9, italic: true, color: WHITE, lineSpacingMultiple: 1.5 });
+  });
+  slide.addText('RICANBALL PLAYERS', { x: 3.497, y: 1.389, w: 6.339, h: 0.774, align: 'center', valign: 'top', fontFace: HEAD, fontSize: 40, color: INK });
+  eyebrow(slide, 5.462, 1.011, 'BEST PLAYER');
+}
+
+/** 19 - break slide */
+function slideBreak(slide) {
+  pentagon(slide, {
+    x: 0, y: 1.403, w: 8.232, h: 5.222, adj: 32260, fill: { color: NAVY },
+    shadow: { type: 'outer', color: INK, opacity: 0.45, blur: 43, offset: 35, angle: 90 },
+  });
+  slide.addText([{ text: 'BREAK', options: { breakLine: true } }, { text: 'SLIDE' }], {
+    x: 1.155, y: 2.242, w: 4.713, h: 3.332, fontFace: HEAD, fontSize: 96, italic: true, color: WHITE, valign: 'top',
+  });
+  slide.addText('American Football Presentation', { x: 1.155, y: 5.39, w: 4.287, h: 0.37, fontFace: BODY, fontSize: 16, color: WHITE, valign: 'top' });
+}
+
+/** 20 - portfolio (two notes, gold blade right) */
+function slidePortfolio1(slide) {
+  parallelogram(slide, { x: 7.238, y: 0, w: 4.468, h: 7.5, adj: 36480, fill: { color: GOLD } });
+  heading(slide, 1.171, 2.133, 4.69, ['OUR RICANBALL', 'PORTFOLIO']);
+  eyebrow(slide, 1.261, 1.754, 'PORTFOLIO SLIDE');
+  [3.858, 5.16].forEach(y => {
+    bold14(slide, 1.17, y, 3.539, 'Subtitle American Football');
+    body(slide, 1.17, y + 0.364, 3.996, 0.625, L_SPRING);
+  });
+}
+
+/** 21 - portfolio (three photos left) */
+function slidePortfolio2(slide) {
+  parallelogram(slide, { x: 2.206, y: 0.875, w: 4.284, h: 6.625, adj: 39716, flipH: true, fill: { color: GOLD } });
+  heading(slide, 8.466, 2.097, 4.341, ['OUR RICANBALL', 'PORTFOLIO']);
+  eyebrow(slide, 8.556, 1.719, 'PORTFOLIO SLIDE');
+  bold14(slide, 8.466, 3.762, 3.539, 'Subtitle American Football');
+  body(slide, 8.466, 4.156, 3.712, 1.736, L_MADE + L_SHORT);
+}
+
+/** 22 - portfolio (three photos right) */
+function slidePortfolio3(slide) {
+  heading(slide, 1.169, 2.097, 4.341, ['OUR RICANBALL', 'PORTFOLIO']);
+  eyebrow(slide, 1.259, 1.719, 'PORTFOLIO SLIDE');
+  bold14(slide, 1.169, 3.762, 3.539, 'Subtitle American Football');
+  body(slide, 1.169, 4.156, 3.712, 1.736, L_MADE + L_SHORT);
+}
+
+/** 23 - portfolio (navy, four angled photos) */
+function slidePortfolio4(slide) {
+  slide.background = { color: NAVY };
+  chevronFade(slide, { x: 1.177, y: 0, w: 5.49, h: 7.5, adj: 29966, flipH: true, base: GOLD, bg: NAVY });
+  chevronFade(slide, { x: 7.334, y: 0, w: 4.0, h: 7.5, adj: 40193, flipH: true, base: GOLD, bg: NAVY, reverse: true });
+  heading(slide, 1.177, 4.845, 4.341, ['OUR RICANBALL', 'PORTFOLIO'], WHITE);
+  eyebrow(slide, 1.267, 4.466, 'PORTFOLIO SLIDE', WHITE);
+}
+
+/** 24 - download app (phone mock-ups) */
+function slideApp(slide) {
+  parallelogram(slide, { x: 1.765, y: 0, w: 4.397, h: 7.5, adj: 29772, fill: { color: GOLD } });
+  [1.09, 4.07].forEach((x, i) => phone(slide, x, i ? 1.5 : 1.51, 2.44, 4.86));
+  heading(slide, 7.371, 2.465, 4.807, ['DOWLOAD OFFICIAL', 'APP STORE']);
+  eyebrow(slide, 7.462, 2.087, 'DEVICE SLIDE');
+  body(slide, 7.371, 4.075, 4.316, 0.903, L_HALF + ' ');
+  body(slide, 7.371, 5.067, 4.316, 0.903, L_HALF);
+}
+
+/** phone mock-up stand-in — the screen is left empty, as in the template */
+function phone(slide, x, y, w, h) {
+  const frame = (i, r, color) => slide.addShape('roundRect', {
+    x: x + i, y: y + i, w: w - 2 * i, h: h - 2 * i, rectRadius: r, fill: { type: 'none' },
+    line: { color, width: i ? 3 : 7 },
+  });
+  frame(0.04, 0.3, '2B2B2F');
+  frame(0.1, 0.26, '6E7480');
+  slide.addShape('roundRect', { x: x + w / 2 - 0.42, y: y + 0.12, w: 0.84, h: 0.2, rectRadius: 0.1, fill: { color: '2B2B2F' } });
+}
+
+/** 25 - update information (laptop + stats) */
+function slideWebsite(slide) {
+  laptop(slide, 1.34, 1.85, 5.16, 4.04);
+  heading(slide, 7.554, 2.305, 5.446, ['UPDATE INFORMATION', 'VIA WEBSITE']);
+  eyebrow(slide, 7.644, 1.927, 'DEVICE SLIDE');
+  body(slide, 7.554, 3.939, 4.621, 0.625, L_ENJOYW);
+  const shadow = { type: 'outer', color: INK, opacity: 0.34, blur: 72, offset: 30, angle: 90 };
+  [['800+', 4.302], ['5.6M', 6.788], ['90%', 9.273]].forEach(([value, x]) => statTile(slide, { x, y: 5.017, value, shadow }));
+}
+
+/** laptop mock-up stand-in: open lid over a wedge-shaped base */
+function laptop(slide, x, y, w, h) {
+  const lid = h * 0.93;
+  slide.addShape('roundRect', { x, y, w, h: lid, rectRadius: 0.06, fill: { color: '1F2126' } });
+  slide.addShape('rect', { x: x + 0.15, y: y + 0.21, w: w - 0.3, h: lid - 0.42, fill: { color: WHITE } });
+  poly(slide, [[0, h - lid], [0.59, 0], [w - 0.59, 0], [w, h - lid]],
+    { x: x - 0.59, y: y + lid, w: w + 1.18, h: h - lid, fill: { color: 'B7BCC6' } });
+}
+
+/** 26 - update information (numbered notes + monitor) */
+function slideWebsite2(slide) {
+  poly(slide, scale([[0.6781, 0], [1, 0], [1, 1], [0, 1]], 4.629, 7.5), { x: 8.704, y: 0, w: 4.629, h: 7.5, fill: { color: NAVY } });
+  monitor(slide, 7.23, 1.68, 4.78, 2.96);
+  heading(slide, 1.169, 2.303, 5.696, ['UPDATE INFORMATION', 'VIA WEBSITE']);
+  eyebrow(slide, 1.259, 1.924, 'DEVICE SLIDE');
+  [['01', 4.112, NAVY], ['02', 5.385, GOLD]].forEach(([n, y, fill]) => {
+    stepChip(slide, 1.259, y, n, fill);
+    bold14(slide, 2.094, y - 0.004, 2.499, 'Description Here ');
+    body(slide, 2.094, y + 0.382, 3.597, 0.625, L_MORN);
+  });
+}
+
+/** desktop monitor mock-up stand-in (bezel box given; stand + desk derived) */
+function monitor(slide, x, y, w, h) {
+  slide.addShape('rect', { x, y, w, h, fill: { color: '1F2126' } });
+  slide.addShape('rect', { x: x + 0.19, y: y + 0.23, w: w - 0.38, h: h - 0.41, fill: { color: WHITE } });
+  slide.addShape('rect', { x, y: y + h, w, h: 0.32, fill: { color: 'B7BCC6' } });
+  slide.addShape('rect', { x: x + w / 2 - 0.58, y: y + h + 0.32, w: 1.16, h: 0.64, fill: { color: 'C9CDD6' } });
+  poly(slide, [[0, 0.28], [0.55, 0], [2.09, 0], [2.64, 0.28]],
+    { x: x + w / 2 - 1.32, y: y + h + 0.96, w: 2.64, h: 0.28, fill: { color: 'B7BCC6' } });
+  slide.addShape('roundRect', { x: x + 1.05, y: y + h + 1.34, w: 2.63, h: 0.15, rectRadius: 0.05, fill: { color: 'D3D7DE' } });
+  slide.addShape('ellipse', { x: x + 4.1, y: y + h + 1.31, w: 0.34, h: 0.2, fill: { color: 'D3D7DE' } });
+}
+
+/** 27 - contact information */
+function slideContact(slide) {
+  const blade = [[0.6966, 0], [1, 0], [1, 1], [0, 1]];
+  poly(slide, scale(blade, 5.086, 7.5), { x: 8.024, y: 0, w: 5.086, h: 7.5, fill: { color: GOLD } });
+  poly(slide, scale(blade, 5.086, 7.5), { x: 8.247, y: 0, w: 5.086, h: 7.5, fill: { color: NAVY } });
+  heading(slide, 1.177, 1.76, 3.991, ['CONTACT ', 'INFORMATION']);
+  eyebrow(slide, 1.267, 1.381, 'CONTACT US');
+  body(slide, 1.155, 3.298, 4.429, 0.903, L_FEEL);
+  const rows = [['contact@website.com', 4.436, 'globe'], ['(000) 1234 5678 45', 5.013, 'phone'], ['500 Random street, States, 2290', 5.692, 'pin']];
+  rows.forEach(([text, y, icon]) => {
+    contactIcon(slide, icon, 1.249, y + 0.05, 0.29, 0.29);
+    slide.addText(text, { x: icon === 'pin' ? 1.636 : 1.65, y, w: 3.6, h: 0.382, fontFace: BODY, fontSize: 14, color: GREY75, valign: 'top' });
+  });
+}
+
+function contactIcon(slide, kind, x, y, w, h) {
+  const ln = { color: NAVY, width: 1.25 };
+  if (kind === 'globe') {
+    slide.addShape('ellipse', { x, y, w, h, fill: { type: 'none' }, line: ln });
+    slide.addShape('ellipse', { x: x + w * 0.3, y, w: w * 0.4, h, fill: { type: 'none' }, line: ln });
+    slide.addShape('line', { x, y: y + h / 2, w, h: 0, line: ln });
+  } else if (kind === 'phone') {
+    poly(slide, scale([[0.05, 0.1], [0.3, 0.05], [0.45, 0.35], [0.3, 0.5], [0.55, 0.8], [0.75, 0.62], [1, 0.82], [0.8, 1], [0.35, 0.85], [0.08, 0.4]], w, h),
+      { x, y, w, h, fill: { type: 'none' }, line: ln });
+  } else {                                  // teardrop map pin
+    slide.addShape('custGeom', {
+      x, y, w, h, fill: { type: 'none' }, line: ln,
+      points: [
+        { x: w * 0.5, y: h, moveTo: true },
+        { x: w * 0.06, y: h * 0.34, curve: { type: 'cubic', x1: w * 0.2, y1: h * 0.76, x2: w * 0.06, y2: h * 0.52 } },
+        { x: w * 0.94, y: h * 0.34, curve: { type: 'cubic', x1: w * 0.06, y1: 0, x2: w * 0.94, y2: 0 } },
+        { x: w * 0.5, y: h, curve: { type: 'cubic', x1: w * 0.94, y1: h * 0.52, x2: w * 0.8, y2: h * 0.76 } },
+        { close: true },
+      ],
+    });
+    slide.addShape('ellipse', { x: x + w * 0.33, y: y + h * 0.19, w: w * 0.34, h: h * 0.31, fill: { type: 'none' }, line: ln });
+  }
+}
+
+/** 28 - thank you */
+function slideThanks(slide) {
+  slide.addShape('rect', { x: 0, y: 0, w: 13.333, h: 7.5, fill: { color: wash(0.8) } });
+  slide.addText('THANK YOU', { x: 1.989, y: 2.732, w: 9.364, h: 2.036, align: 'center', valign: 'top', fontFace: HEAD, fontSize: 115, italic: true, color: WHITE });
+  slide.addText('American Football Presentation Template', { x: 3.838, y: 4.398, w: 5.443, h: 0.37, align: 'center', valign: 'top', fontFace: BODY, fontSize: 16, color: WHITE });
+}
+
+/* ── build ────────────────────────────────────────────────────────────── */
+const BUILDERS = [
+  slideTitle, slideWelcome, slideCoach, slideAboutClub, slideHistory, slideHistoryCards,
+  slideMission, slideVision, slideGoals, slideStadium, slideStadium2, slideCoachClub,
+  slideTeam, slideSchedule, slideFixtures, slideBigMatch, slideBestPlayer, slidePlayers,
+  slideBreak, slidePortfolio1, slidePortfolio2, slidePortfolio3, slidePortfolio4,
+  slideApp, slideWebsite, slideWebsite2, slideContact, slideThanks,
+];
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'RICANBALL', width: 13.333, height: 7.5 });
+  pptx.layout = 'RICANBALL';
+  pptx.title = 'RICANBALL - American Football Presentation Template';
+  pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
+  BUILDERS.forEach(fn => fn(pptx.addSlide()));
+  return pptx.writeFile({ fileName: path.join(__dirname, '1399cf89-3133-41cb-8dc9-e434e0e6fe47_grok_final.pptx') });
+}
+
+build().then(f => console.log('wrote', f)).catch(err => { console.error(err); process.exit(1); });

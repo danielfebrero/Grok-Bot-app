@@ -1,0 +1,652 @@
+/**
+ * Sweetz Bakery — 20-slide deck rebuilt with pptxgenjs.
+ * Run: node 0d86256f-0982-4c04-9128-73e5c9d83694_grok_final.js
+ *
+ * Raster photos in the source deck are "Image Here" picture placeholders;
+ * they are redrawn here as light framed rectangles labelled [image].
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+// ── Theme ───────────────────────────────────────────────────────────────────
+const BG = 'EAE4E4';       // page background / accent1
+const PEACH = 'FAD7A9';    // accent2
+const TEAL = '05454E';     // accent3
+const INK = '000000';      // tx1
+const GREY = '595959';     // tx1 @ 65% lum — body copy
+const CREAM = 'EAE4E4';    // light text on teal
+
+const SERIF = 'Playfair Display';   // major font
+const SANS = 'Lato';                // minor font
+const SANS_LIGHT = 'Lato Light';    // body copy
+
+// Text-box defaults matching the source: zero insets, no bullet, top anchored.
+const TB = { margin: 0, valign: 'top', bullet: false, wrap: true };
+
+// Common paragraph roles.
+// Master title style: Playfair at 90% line spacing.
+const title = (size) => ({ ...TB, fontFace: SERIF, fontSize: size, color: INK, align: 'left', lineSpacingMultiple: 0.9 });
+const body = (size = 10) => ({ ...TB, fontFace: SANS_LIGHT, fontSize: size, color: GREY, italic: true, lineSpacingMultiple: 1.5 });
+const heading = (size = 16) => ({ ...TB, fontFace: SANS, fontSize: size, color: INK, bold: true, lineSpacingMultiple: 1.5 });
+const micro = { ...TB, fontFace: SANS, fontSize: 10, bold: true, color: INK, lineSpacingMultiple: 1.5 };
+
+// ── Reusable furniture ──────────────────────────────────────────────────────
+
+// The bakery "b" logotype mark: a rounded square with a bite out of the side.
+const LOGO_MARK = [
+  [0.1335, 0], [0.2279, 0.0252, 0.1704, 0, 0.2038, 0.0096], [0.2412, 0.0355],
+  [0.27, 0.0298], [0.3382, 0.0253, 0.292, 0.0269, 0.3148, 0.0253],
+  [0.6763, 0.2429, 0.5249, 0.0253, 0.6763, 0.1227],
+  [0.6186, 0.3646, 0.6763, 0.288, 0.6551, 0.3298], [0.6164, 0.3663],
+  [0.6946, 0.3819], [1, 0.6783, 0.8741, 0.4307, 1, 0.5451],
+  [0.5, 1, 1, 0.856, 0.7761, 1], [0.3054, 0.9747, 0.431, 1, 0.3652, 0.991],
+  [0.25, 0.9554], [0.2442, 0.9621], [0.1335, 1, 0.2203, 0.985, 0.1796, 1],
+  [0.1335, 1], [0, 0.9141, 0.0598, 1, 0, 0.9615], [0, 0.0859],
+  [0.1335, 0, 0, 0.0385, 0.0598, 0],
+];
+
+// 8-pointed starburst that bleeds off a bottom corner of most slides.
+// Outer vertices sit on the diagonals/axes, inner vertices halfway between.
+const BURST = (() => {
+  const pts = [];
+  for (let i = 0; i < 16; i++) {
+    const a = ((-135 + i * 22.5) * Math.PI) / 180;
+    const r = i % 2 === 0 ? 0.5 : 0.1848;
+    pts.push([0.5 + r * Math.cos(a), 0.5 + r * Math.sin(a)]);
+  }
+  return pts;
+})();
+
+/**
+ * Draw a closed freeform. Rows are normalised 0..1 coordinates inside `box`,
+ * either [x,y] for a line segment or [x,y,cx1,cy1,cx2,cy2] for a cubic curve.
+ * custGeom points are measured from the shape's own top-left corner.
+ */
+function freeform(slide, box, rows, opts) {
+  const pts = rows.map((r, i) => {
+    const x = r[0] * box.w;
+    const y = r[1] * box.h;
+    if (r.length === 6) {
+      return { x, y, curve: { type: 'cubic', x1: r[2] * box.w, y1: r[3] * box.h, x2: r[4] * box.w, y2: r[5] * box.h } };
+    }
+    return i === 0 ? { x, y, moveTo: true } : { x, y };
+  });
+  pts.push({ close: true });
+  slide.addShape('custGeom', { ...box, ...opts, points: pts });
+}
+
+/**
+ * Build the run list for a multi-paragraph text box. pptxgenjs does not let
+ * paragraph-level options (notably `bullet`) fall through from the shape, so
+ * each paragraph repeats them.
+ */
+function paras(items, o = {}) {
+  return items.map((text, i) => ({
+    text,
+    options: { breakLine: i < items.length - 1, bullet: o.bullet ?? false, paraSpaceBefore: o.spaceBefore ?? 0 },
+  }));
+}
+
+/** Header logo: mark + two-line "Sweetz / Bakery" wordmark, top-left. */
+function logo(slide) {
+  freeform(slide, { x: 0.519, y: 0.4, w: 0.183, h: 0.296 }, LOGO_MARK, { fill: { color: TEAL }, line: { type: 'none' } });
+  slide.addText('Sweetz', { ...title(12), x: 0.747, y: 0.4, w: 0.536, h: 0.177, color: TEAL });
+  slide.addText('Bakery', { ...title(12), x: 0.747, y: 0.539, w: 0.536, h: 0.157, color: TEAL });
+}
+
+/** Peach starburst; sits bottom-left by default, bottom-right on slide 4. */
+function burst(slide, x = -0.386) {
+  freeform(slide, { x, y: 6.056, w: 1.811, h: 1.811 }, BURST, { fill: { color: PEACH }, line: { type: 'none' } });
+}
+
+/** Bottom-of-page captions present on every slide. */
+function footer(slide, leftColor = INK) {
+  slide.addText('Tempalate Presentation', { ...micro, x: 0.519, y: 6.863, w: 1.873, h: 0.237, color: leftColor });
+  slide.addText('Delicious Bakery', { ...micro, x: 10.941, y: 6.863, w: 1.873, h: 0.237, align: 'right' });
+}
+
+/** Standard slide chrome: background, starburst, logo, footer. */
+function base(pptx, opts = {}) {
+  const slide = pptx.addSlide();
+  slide.background = { color: BG };
+  burst(slide, opts.burstX);
+  logo(slide);
+  footer(slide, opts.footerColor);
+  return slide;
+}
+
+/** Two-line serif headline stacked at 44pt (the deck's default title block). */
+function headline(slide, lines, o = {}) {
+  const x = o.x ?? 1.667;
+  const w = o.w ?? 4.257;
+  const size = o.size ?? 44;
+  const h = o.h ?? (size >= 80 ? 0.912 : 0.582);
+  const step = o.step ?? (size >= 80 ? 0.962 : 0.582);
+  lines.forEach((t, i) => slide.addText(t, { ...title(size), x, y: (o.y ?? 1.519) + i * step, w, h }));
+}
+
+/** Hand-drawn "Home Made" oval stamp, rotated ~7° counter-clockwise. */
+function stamp(slide, x, y) {
+  slide.addShape('ellipse', { x, y, w: 1.937, h: 0.582, rotate: 352.788, fill: { type: 'none' }, line: { color: INK, width: 1 } });
+  slide.addText('Home Made', { ...title(18), x: x + 0.254, y: y + 0.162, w: 1.429, h: 0.259, rotate: 352.788, align: 'center' });
+}
+
+/** Teal "+12k" statistic tile (1.873" square) with caption underneath. */
+function statTile(slide, x, y) {
+  slide.addShape('rect', { x, y, w: 1.873, h: 1.873, fill: { color: TEAL }, line: { type: 'none' } });
+  slide.addText('+12k', { ...title(44), x: x + 0.25, y: y + 0.261, w: 1.374, h: 0.625, color: PEACH, align: 'center' });
+  slide.addText('Lorem ipsum dolor sit amet, consectetur adipiscing elit. ',
+    { ...body(), x: x + 0.329, y: y + 0.845, w: 1.216, h: 0.768, color: CREAM, align: 'center' });
+}
+
+/**
+ * Stand-in for a picture. The source deck leaves these as empty picture
+ * placeholders, which render as a small framed thumbnail glyph plus an
+ * "Image Here" prompt centred on the area the photo would fill.
+ */
+function imageBox(slide, x, y, w, h) {
+  const gx = x + w / 2 - 0.416;
+  const gy = y + h / 2 - 0.326;
+  const flat = { line: { type: 'none' } };
+  slide.addShape('rect', { x: gx, y: gy, w: 0.832, h: 0.653, fill: { color: 'FFFFFF' }, line: { color: '3C3C3C', width: 0.75 } });
+  slide.addShape('ellipse', { x: gx + 0.13, y: gy + 0.09, w: 0.14, h: 0.14, fill: { color: 'F0A93A' }, ...flat });
+  slide.addShape('triangle', { x: gx + 0.30, y: gy + 0.22, w: 0.53, h: 0.43, fill: { color: '7FB2E3' }, ...flat });
+  slide.addShape('triangle', { x: gx + 0.03, y: gy + 0.34, w: 0.44, h: 0.31, fill: { color: 'A9CCEE' }, ...flat });
+  slide.addText('Image Here', { ...TB, x, y: y + h / 2 - 0.14, w, h: 0.28, fontFace: SANS, fontSize: 16, color: '111111', align: 'center' });
+}
+
+/**
+ * Vertical fade used by the service cards: near-white and part-transparent at
+ * the top, settling into the page background at the bottom. Approximated with
+ * a stack of bands because pptxgenjs has no gradient fill.
+ */
+function fadePanel(slide, x, y, w, h, bands = 10) {
+  for (let i = 0; i < bands; i++) {
+    const t = i / (bands - 1);
+    const mix = (a, b) => Math.round(a + (b - a) * t).toString(16).padStart(2, '0');
+    slide.addShape('rect', {
+      x, y: y + (h * i) / bands, w, h: h / bands + 0.01,
+      fill: { color: (mix(0xf7, 0xea) + mix(0xf7, 0xe4) + mix(0xf7, 0xe4)).toUpperCase(), transparency: Math.round(61 * (1 - t)) },
+      line: { type: 'none' },
+    });
+  }
+}
+
+// ── Slides ──────────────────────────────────────────────────────────────────
+
+/** 1 — Title: "Sweetz Bakery" cover with credits and a stat tile. */
+function slide01(pptx) {
+  const s = base(pptx);
+  s.addShape('ellipse', { x: 4.482, y: 1.273, w: 1.378, h: 1.378, fill: { color: PEACH }, line: { type: 'none' } });
+  imageBox(s, 9.076, 0, 4.257, 5.981);
+  headline(s, ['Sweetz', 'Bakery'], { size: 80 });
+  s.addText('PLACEHOLDER',
+    { ...body(14), x: 1.667, y: 4.107, w: 3.814, h: 0.768 });
+  [['Created By: ', 'Hannah Morales', 5.075], ['Speaker: ', 'Marceline Anderson', 5.394]].forEach(([lbl, name, y]) => {
+    s.addText([{ text: lbl, options: { bold: true } }, { text: name, options: { bold: false } }],
+      { ...micro, x: 1.667, y, w: 1.873, h: 0.237, bold: false });
+  });
+  statTile(s, 7.203, 4.107);
+}
+
+/** 2 — Welcome Message: intro paragraph beside a stat tile. */
+function slide02(pptx) {
+  const s = base(pptx);
+  s.addShape('ellipse', { x: 6.761, y: 2.886, w: 1.378, h: 1.378, fill: { color: PEACH }, line: { type: 'none' } });
+  imageBox(s, 7.981, 0.722, 4.833, 4.833);
+  headline(s, ['Welcome', 'Message']);
+  s.addText('Quisque congue hendrerit dui vel maximus. Aenean consectetur gravida nunc eget condimentum. Integer bibendum tincidunt dui. Fusce et massa eu nunc vestibulum maximus id vitae erat. Nulla consequat, nisi in viverra laoreet, leo mauris commodo est, id laoreet lacus lorem blandit nulla. Cras mattis luctus nisi, quis efficitur erat iaculis id. Phasellus felis dui, mattis suscipit risus et, ultricies dictum risus.',
+    { ...body(), x: 1.667, y: 3.438, w: 4.203, h: 1.506 });
+  statTile(s, 7.203, 3.682);
+  stamp(s, 4.701, 5.972);
+}
+
+/** 3 — Table of Content: two columns of bulleted entries with numbers. */
+function slide03(pptx) {
+  const s = base(pptx);
+  s.addShape('ellipse', { x: 3.106, y: 1.014, w: 1.378, h: 1.378, fill: { color: PEACH }, line: { type: 'none' } });
+  imageBox(s, 6.089, 0, 7.245, 2.683);
+  headline(s, ['Table Of', 'Content']);
+  const entries = [
+    ['About Our Sweetz', '01'], ['Meet the Team', '05'],
+    ['Vision & Mission', '02'], ['Break Slide', '06'],
+    ['Sweetz Timeline', '03'], ['SWOT Analysis', '07'],
+    ['Sweetz Services', '04'], ['Gallery Sweetz', '08'],
+  ];
+  entries.forEach(([label, num], i) => {
+    const col = i % 2;                              // 0 = left column, 1 = right
+    const y = 3.835 + Math.floor(i / 2) * 0.5282;
+    const x = col ? 6.921 : 1.667;
+    s.addText(label, { ...micro, x, y, w: 2.681, h: 0.237, fontSize: 12, bullet: { indent: 13.5 } });
+    s.addText(num, { ...micro, x: x + 2.065, y, w: 2.681, h: 0.237, fontSize: 12, align: 'right' });
+  });
+}
+
+/** 4 — About Our Sweetz: two body columns, stat tile, stamp. */
+function slide04(pptx) {
+  const s = base(pptx, { burstX: 12.057, footerColor: CREAM });
+  s.addShape('ellipse', { x: 3.506, y: 0.986, w: 1.378, h: 1.378, fill: { color: PEACH }, line: { type: 'none' } });
+  imageBox(s, 0, 5.399, 8.899, 2.101);
+  headline(s, ['About Our', 'Sweetz']);
+  s.addText('Quisque congue hendrerit dui vel maximus. Aenean consectetur gravida nunc eget condimentum. Integer bibendum tincidunt dui. Fusce et massa eu nunc vestibulum maximus id vitae erat. Nulla consequat, nisi in viverra laoreet, leo mauris commodo est, id laoreet lacus lorem blandit nulla. ',
+    { ...body(), x: 1.667, y: 3.307, w: 4.515, h: 0.976 });
+  s.addText('Aliquam convallis mi at neque rhoncus, ac accumsan velit interdum. Ut mollis augue non luctus maximus. Integer sagittis eros et venenatis blandit. Aliquam erat volutpat. Donec euismod gravida mollis. In sit amet finibus libero, ac auctor velit. Nunc sagittis facilisis aliquet.',
+    { ...body(), x: 7.225, y: 3.307, w: 4.442, h: 0.976 });
+  statTile(s, 7.225, 4.99);
+  stamp(s, 10.091, 1.098);
+}
+
+// Slides 5 and 6 share one layout: a headline plus two labelled text columns,
+// flipped between the lower half (Mission) and the upper half (Vision).
+function twoColumnStatement(pptx, o) {
+  const s = base(pptx);
+  s.addShape('ellipse', { x: o.dotX, y: o.dotY, w: 1.378, h: 1.378, fill: { color: PEACH }, line: { type: 'none' } });
+  o.images.forEach((b) => imageBox(s, b[0], b[1], b[2], b[3]));
+  headline(s, o.headline, o.titleOpts);
+  s.addText(o.leftLabel, { ...heading(), x: o.leftX, y: o.labelY, w: 1.873, h: 0.331 });
+  s.addText('Quisque congue hendrerit dui vel maximus. Aenean consectetur gravida nunc eget condimentum. Integer bibendum tincidunt dui. Fusce et massa eu nunc vestibulum maximus id vitae erat. Nulla consequat, nisi in viverra laoreet, leo mauris commodo est, id laoreet lacus lorem blandit nulla. ',
+    { ...body(), x: o.leftX, y: o.textY, w: 3.583, h: 1.249 });
+  s.addText(o.rightLabel, { ...heading(), x: o.rightX, y: o.labelY, w: 1.873, h: 0.331 });
+  s.addText(paras([
+    'Aliquam quis magna convallis, gravida sem eu, varius turpis. Fusce blandit massa faucibus, rhoncus nisi non, interdum ipsum.',
+    'Pellentesque velit mi, varius ac mattis vel, porttitor id ex. In luctus ultricies sapien, eget vehicula nulla aliquet vitae. Curabitur porta vulputate pretium. ',
+  ], { bullet: { indent: 18 }, spaceBefore: 10 }), { ...body(), x: o.rightX, y: o.textY, w: 3.583, h: 1.614 });
+  return s;
+}
+
+/** 5 — Our Mission. */
+function slide05(pptx) {
+  twoColumnStatement(pptx, {
+    headline: ['Our', 'Mission'], dotX: 1.176, dotY: 2.123,
+    images: [[7.779, 0, 2.683, 2.683], [10.65, 0, 2.683, 2.683]],
+    leftX: 3.083, rightX: 7.779, labelY: 3.654, textY: 4.149,
+    leftLabel: 'Mission 1', rightLabel: 'Mission 2',
+  });
+}
+
+/** 6 — Our Vision: same block, headline moved below the columns at 60pt. */
+function slide06(pptx) {
+  twoColumnStatement(pptx, {
+    headline: ['Our', 'Vision'], dotX: 2.609, dotY: 3.643,
+    images: [[6.089, 3.75, 7.245, 2.683]],
+    titleOpts: { y: 3.75, size: 60, step: 0.722, w: 3.341 },
+    leftX: 1.425, rightX: 6.121, labelY: 1.159, textY: 1.654,
+    leftLabel: 'Vision 1', rightLabel: 'Vision 2',
+  });
+}
+
+// Slides 7 and 8 are the same timeline frame with different years/labels.
+const TIMELINE_COPY = 'Sed consequat est lacus, vulputate dapibus diam sodales a. Ut tellus lorem, sodales eget aliquet ut, feugiat sit amet urna. Duis euismod nisl in augue gravida, a eleifend dui faucibus. Ut varius, nibh in vehicula posuere, nulla ligula tristique nisi, at iaculis magna eros vel nisl.';
+
+function timeline(pptx, entries, rail) {
+  const s = base(pptx);
+  headline(s, ['Sweetz', 'Timeline']);
+  s.addShape('ellipse', { x: 6.031, y: 0.29, w: 1.378, h: 1.378, fill: { color: PEACH }, line: { type: 'none' } });
+  s.addShape('line', { x: rail.x, y: 5.699, w: rail.w, h: 0, line: { color: TEAL, width: 1 } });
+  entries.forEach(([year, label, x]) => {
+    s.addShape('line', { x: x + 0.577, y: 3.75, w: 0, h: 1.666, line: { color: TEAL, width: 1 } });
+    s.addShape('rect', { x, y: 5.416, w: 1.154, h: 0.565, fill: { color: TEAL }, line: { type: 'none' } });
+    s.addText(year, { ...heading(18), x: x + 0.112, y: 5.443, w: 0.93, h: 0.513, color: CREAM, align: 'center' });
+    s.addShape('ellipse', { x: x + 0.477, y: 3.594, w: 0.198, h: 0.198, fill: { color: TEAL }, line: { type: 'none' } });
+    s.addText(label, { ...heading(), x: x + 0.933, y: 3.461, w: 1.873, h: 0.331 });
+    s.addText(TIMELINE_COPY, { ...body(), x: x + 0.933, y: 3.957, w: 3.859, h: 0.992 });
+  });
+  stamp(s, 10.091, 1.098);
+}
+
+/** 7 — Sweetz Timeline 2018 / 2019, rail running off the right edge. */
+function slide07(pptx) {
+  timeline(pptx, [['2018', 'First Time', 1.667], ['2019', 'Second Time', 6.874]], { x: 2.821, w: 10.513 });
+}
+
+/** 8 — Sweetz Timeline 2020 / 2021, rail running off the left edge. */
+function slide08(pptx) {
+  timeline(pptx, [['2020', 'Third Time', 1.667], ['2021', 'Fourth Time', 6.874]], { x: 0, w: 8.028 });
+}
+
+/** 9 — Sweetz Services: three cards; each card is also a photo placeholder. */
+function slide09(pptx) {
+  const s = base(pptx);
+  s.addText('Sweetz Services', { ...title(44), x: 3.665, y: 1.519, w: 6.004, h: 0.582, align: 'center' });
+  const cards = [
+    ['Customized Bread Creations', 2.131, 2.489], ['Professional Baking Classes', 5.295, 2.489], ['Specialty Cake Orders', 8.46, 2.142],
+  ];
+  cards.forEach(([name, x, tw]) => {
+    imageBox(s, x, 2.949, 2.743, 3.032);
+    fadePanel(s, x, 2.949, 2.743, 3.032);
+    s.addText(name, { ...title(28), x: x + (2.743 - tw) / 2, y: 3.257, w: tw, h: 1.204, align: 'center' });
+    s.addText('Sed consequat est lacus, vulputate dapibus diam sodales a. Ut tellus lorem, sodales eget aliquet ut, feugiat sit amet urna. ',
+      { ...body(), x: x + 0.3, y: 4.626, w: 2.142, h: 0.937, align: 'center' });
+  });
+  stamp(s, 10.849, 0.519);
+}
+
+/** 10 — Meet The Team: three peach portrait cards. */
+function slide10(pptx) {
+  const s = base(pptx);
+  headline(s, ['Meet The', 'Team']);
+  imageBox(s, 6.089, 0, 7.245, 2.683);
+  s.addText('Quisque congue hendrerit dui vel maximus. Aenean consectetur gravida nunc eget condimentum. Integer bibendum tincidunt dui. Fusce et massa eu nunc vestibulum maximus id vitae erat. ',
+    { ...body(), x: 1.667, y: 3.99, w: 1.808, h: 1.755 });
+  [['Lorna Alvarado', 4.5, 4.737], ['Ketut Susilo', 6.968, 7.205], ['Kimberly Nguyen', 9.436, 9.659]].forEach(([name, x, imgX]) => {
+    s.addShape('rect', { x, y: 3.106, w: 2.231, h: 2.874, fill: { color: PEACH }, line: { type: 'none' } });
+    imageBox(s, imgX, 3.336, 1.757, 1.757);
+    s.addText(name, { ...heading(), x: x + 0.257, y: 5.209, w: 1.737, h: 0.331, align: 'center' });
+    s.addText('Pastry Chef', { ...body(), x: x + 0.752, y: 5.54, w: 0.747, h: 0.204, align: 'center' });
+  });
+}
+
+/** 11 — Meet The Leader: one large peach card beside a bio. */
+function slide11(pptx) {
+  const s = base(pptx);
+  s.addShape('rect', { x: 5.224, y: 2.342, w: 3.237, h: 3.527, fill: { color: PEACH }, line: { type: 'none' } });
+  imageBox(s, 6.968, 0, 4.699, 3.75);
+  imageBox(s, 5.964, 2.783, 1.757, 1.757);
+  headline(s, ['Meet The', 'Leader'], { x: 0.747, y: 2.201, size: 60, step: 0.807 });
+  s.addText('Lorna Alvarado', { ...heading(20), x: 5.647, y: 4.817, w: 2.353, h: 0.331, align: 'center' });
+  s.addText('Pastry Chef', { ...body(11), x: 6.173, y: 5.193, w: 1.301, h: 0.268, align: 'center' });
+  s.addText('Quisque congue hendrerit dui vel maximus. Aenean consectetur gravida nunc eget condimentum. Integer bibendum tincidunt dui. Fusce et massa eu nunc vestibulum maximus id vitae erat. ',
+    { ...body(), x: 9.219, y: 4.615, w: 2.447, h: 1.157 });
+}
+
+/** 12 — Break Slide: pull quote, stat tile and a peach disc bleeding off top-right. */
+function slide12(pptx) {
+  const s = base(pptx);
+  s.addShape('ellipse', { x: 11.667, y: -0.642, w: 2.361, h: 2.361, fill: { color: PEACH }, line: { type: 'none' } });
+  imageBox(s, 7.205, 1.519, 4.462, 4.462);
+  headline(s, ['Break', 'Slide'], { size: 80, w: 3.814 });
+  s.addText('"Life is like bread dough, the more often it is kneaded and processed well, the more beautiful it tastes."',
+    { ...body(14), x: 1.667, y: 4.2, w: 3.814, h: 1.018 });
+  statTile(s, 7.562, 4.107);
+  stamp(s, 5.846, 3.195);
+}
+
+/** 13 — SWOT Analysis: four teal discs, each capped with a peach letter badge. */
+function slide13(pptx) {
+  const s = base(pptx);
+  s.addShape('ellipse', { x: 2.846, y: 2.354, w: 1.378, h: 1.378, fill: { color: PEACH }, line: { type: 'none' } });
+  imageBox(s, 11.46, 0, 1.873, 6.505);
+  headline(s, ['SWOT', 'Analysis'], { w: 2.275 });
+  s.addText('Quisque congue hendrerit dui vel maximus. Aenean consectetur gravida nunc eget condimentum. ',
+    { ...body(), x: 1.667, y: 3.245, w: 2.111, h: 0.76 });
+  s.addText('Mauris condimentum urna eget ipsum venenatis scelerisque. Aenean erat quam, sodales sit amet arcu in, lobortis pharetra metus. In nec enim vitae tortor aliquet ullamcorper.',
+    { ...body(), x: 1.667, y: 4.17, w: 2.111, h: 1.218 });
+
+  const quadrants = [
+    ['S', 'Strengths', 5.095, 1.204], ['W', 'Weaknesses', 7.803, 1.204],
+    ['O', 'Opportunities', 5.095, 4.06], ['T', 'Threats', 7.803, 4.06],
+  ];
+  quadrants.forEach(([letter, label, x, y]) => {
+    s.addShape('ellipse', { x, y, w: 2.444, h: 2.444, fill: { color: TEAL }, line: { type: 'none' } });
+    s.addShape('ellipse', { x: x + 0.909, y: y - 0.209, w: 0.625, h: 0.625, fill: { color: PEACH }, line: { type: 'none' } });
+    s.addText(letter, { ...title(28), x: x + 0.909, y: y - 0.093, w: 0.625, h: 0.388, align: 'center' });
+    s.addText(label, { ...heading(), x: x + 0.262, y: y + 0.552, w: 1.919, h: 0.331, color: CREAM, align: 'center' });
+    s.addText('Sed consequat est lacus, vulputate dapibus diam sodales a. Ut tellus lorem, sodales eget aliquet ut.',
+      { ...body(), x: x + 0.262, y: y + 1.047, w: 1.919, h: 0.743, color: CREAM, align: 'center' });
+    s.addShape('line', { x: x + 0.983, y: y + 2.041, w: 0.478, h: 0, line: { color: PEACH, width: 1 } });
+  });
+}
+
+/** 14 — Gallery Sweetz: a row of three photo placeholders over two captions. */
+function slide14(pptx) {
+  const s = base(pptx);
+  s.addShape('ellipse', { x: 1.015, y: 1.867, w: 1.378, h: 1.378, fill: { color: PEACH }, line: { type: 'none' } });
+  headline(s, ['Gallery', 'Sweetz'], { w: 2.275 });
+  [5.083, 7.889, 10.694].forEach((x) => imageBox(s, x, 1.519, 2.639, 2.639));
+  const caption = 'Cras ex nunc, vehicula at tincidunt vitae, facilisis ac mi. Etiam lorem leo, pretium a congue sit amet, sodales rhoncus risus. Phasellus massa erat, dignissim euismod efficitur sit amet, mollis semper erat. Morbi elementum ullamcorper dui, at tempus ante auctor eget';
+  s.addText(caption, { ...body(), x: 1.667, y: 5.236, w: 5.806, h: 0.74 });
+  s.addText(caption, { ...body(), x: 7.889, y: 4.736, w: 3.569, h: 1.24 });
+  stamp(s, 3.948, 3.669);
+}
+
+/** 15 — Pricing List: three packages, each a heading + bullets + footnote. */
+function slide15(pptx) {
+  const s = base(pptx);
+  s.addShape('ellipse', { x: 4.176, y: 1.18, w: 1.378, h: 1.378, fill: { color: PEACH }, line: { type: 'none' } });
+  imageBox(s, 7.779, 0, 2.683, 2.683);
+  imageBox(s, 10.65, 0, 2.683, 2.683);
+  s.addText('Pricing List', { ...title(44), x: 1.667, y: 1.519, w: 4.722, h: 0.582 });
+  const packages = [
+    ['Paket Morning Delight - $15', 1.667, 1.873, ['1 Croissant', '1 Cup of Coffee or Tea', '2 Assorted Cookies']],
+    ['Paket Sweet Tooth - $25', 5.26, 2.377, ['2 Slices of Cake (Vanilla/Chocolate)', '2 Brownies', '4 Assorted Cupcakes']],
+    ['Paket Bakery Basics - $30', 8.854, 2.226, ['1 Loaf of Bread', '1 Box of Assorted Pastry (4 pieces)', '6 Assorted Cookies']],
+  ];
+  packages.forEach(([name, x, listW, items]) => {
+    s.addText(name, { ...heading(), x, y: 3.407, w: 2.812, h: 0.331 });
+    s.addText(paras(items, { bullet: { indent: 18 }, spaceBefore: 10 }), {
+      ...body(), x, y: 4.057, w: listW, h: 0.857, lineSpacingMultiple: 1.0,
+    });
+    s.addText('Quisque congue hendrerit dui vel maximus. Aenean consectetur gravida nunc eget condimentum. ',
+      { ...body(), x, y: 4.913, w: 2.812, h: 0.521 });
+  });
+  stamp(s, 5.846, 6.175);
+}
+
+// Slides 16 and 17 pair a device mockup with two labelled paragraphs.
+const MOCKUP_COPY = 'Curabitur id sem in felis blandit elementum. Mauris non accumsan neque, eget rutrum metus. Curabitur ac facilisis odio. ';
+
+function captionPair(slide, blocks) {
+  blocks.forEach(([label, x, y]) => {
+    slide.addText(label, { ...heading(), x, y, w: 2.684, h: 0.336 });
+    slide.addText(MOCKUP_COPY, { ...body(), x, y: y + 0.425, w: 2.684, h: 0.767 });
+  });
+}
+
+/**
+ * Laptop mockup. Both device screens in the source deck are cut-outs, so the
+ * frames are drawn as bezel bars and whatever sits behind shows through.
+ */
+function laptop(slide) {
+  const bezel = { fill: { color: '0E1218' }, line: { type: 'none' } };
+  const flat = { line: { type: 'none' } };
+  const [x, y, w] = [6.021, 0.403, 6.064];                   // lid outline
+  const [sx, sy, sw, sh] = [6.243, 0.667, 5.633, 3.527];     // screen cut-out
+  slide.addShape('rect', { x, y, w, h: sy - y, ...bezel });                    // top bezel
+  slide.addShape('rect', { x, y: sy + sh, w, h: 0.27, ...bezel });             // chin
+  slide.addShape('rect', { x, y: sy, w: sx - x, h: sh, ...bezel });            // left rail
+  slide.addShape('rect', { x: sx + sw, y: sy, w: x + w - sx - sw, h: sh, ...bezel });
+  slide.addShape('ellipse', { x: 9.03, y: 0.51, w: 0.05, h: 0.05, fill: { color: '3A3D40' }, ...flat });
+  // aluminium base: pale deck, mid-grey lip, then a dark shadow under the front
+  slide.addShape('roundRect', { x: 5.342, y: 4.46, w: 7.409, h: 0.16, rectRadius: 0.06, fill: { color: 'F0F0F1' }, ...flat });
+  slide.addShape('rect', { x: 8.05, y: 4.46, w: 1.0, h: 0.055, fill: { color: 'DBDBDD' }, ...flat });
+  slide.addShape('roundRect', { x: 5.383, y: 4.6, w: 7.327, h: 0.055, rectRadius: 0.025, fill: { color: '9EA0A3' }, ...flat });
+  slide.addShape('roundRect', { x: 5.494, y: 4.645, w: 7.104, h: 0.075, rectRadius: 0.03, fill: { color: '2C2D2F' }, ...flat });
+}
+
+/** Phone mockup, drawn as a frame so the peach disc behind shows in the screen. */
+function phone(slide) {
+  const bezel = { fill: { color: '111418' }, line: { type: 'none' } };
+  const [x, y, w] = [2.997, 0.833, 3.052];
+  const [sx, sy, sw, sh] = [3.233, 1.667, 2.58, 4.097];      // screen cut-out
+  slide.addShape('roundRect', { x, y, w, h: 0.6, rectRadius: 0.3, ...bezel });
+  slide.addShape('rect', { x, y: y + 0.5, w, h: sy - y - 0.5, ...bezel });
+  slide.addShape('rect', { x, y: sy, w: sx - x, h: sh, ...bezel });
+  slide.addShape('rect', { x: sx + sw, y: sy, w: x + w - sx - sw, h: sh, ...bezel });
+  slide.addShape('rect', { x, y: sy + sh, w, h: 0.35, ...bezel });
+  slide.addShape('roundRect', { x, y: 6.011, w, h: 0.6, rectRadius: 0.3, ...bezel });
+  slide.addShape('roundRect', { x: 4.13, y: 1.07, w: 0.6, h: 0.075, rectRadius: 0.035, fill: { color: '3C4046' }, line: { type: 'none' } });
+  slide.addShape('ellipse', { x: 3.87, y: 1.075, w: 0.07, h: 0.07, fill: { color: '3C4046' }, line: { type: 'none' } });
+  slide.addShape('roundRect', { x: 4.31, y: 6.03, w: 0.42, h: 0.39, rectRadius: 0.07, fill: { color: '2A2E33' }, line: { color: '5A5F66', width: 0.75 } });
+  [1.27, 1.61, 1.95].forEach((by) => slide.addShape('rect', { x: 2.94, y: by, w: 0.06, h: 0.22, fill: { color: '1B1E23' }, line: { type: 'none' } }));
+}
+
+/** 16 — Unique Mockup (desktop). */
+function slide16(pptx) {
+  const s = base(pptx);
+  s.addShape('ellipse', { x: 2.93, y: 1.134, w: 1.378, h: 1.378, fill: { color: PEACH }, line: { type: 'none' } });
+  headline(s, ['Unique', 'Mockup'], { w: 3.365 });
+  laptop(s);
+  imageBox(s, 8.05, 1.72, 1.9, 1.1);
+  captionPair(s, [['Website', 1.667, 3.152], ['Information', 1.667, 4.57]]);
+  stamp(s, 6.847, 5.765);
+}
+
+/** 17 — Unique Mockup (mobile). */
+function slide17(pptx) {
+  const s = base(pptx);
+  s.addShape('ellipse', { x: 4.227, y: 0.276, w: 2.879, h: 2.879, fill: { color: PEACH }, line: { type: 'none' } });
+  phone(s);
+  headline(s, ['Unique', 'Mockup'], { x: 6.642, y: 1.639, w: 3.365 });
+  imageBox(s, 3.6, 3.19, 1.8, 1.0);
+  captionPair(s, [['Mobile', 6.642, 4.569], ['Information', 9.904, 4.569]]);
+  stamp(s, 0.581, 3.459);
+}
+
+// ── US map geometry ─────────────────────────────────────────────────────────
+const US_STATES = [
+  [226,26,209,94,210,105,173,95,138,96,121,89,107,89,103,86,102,72,85,64,87,57,91,55,89,49,94,47,89,43,89,23,87,20,90,6,103,17,121,23,121,29,110,40,123,31,119,41,110,47,112,51,123,43,129,30,128,19,125,21,127,30,122,23,126,13,129,17,127,0,226,26],
+  [318,369,444,384,433,516,355,509,354,515,317,511,315,522,296,519,318,369],
+  [642,563,645,554,639,531,634,527,634,483,625,483,607,473,589,475,582,479,570,474,565,478,563,473,559,476,554,471,548,473,543,466,530,466,521,464,517,458,510,458,504,452,507,402,442,398,433,516,355,509,354,515,351,515,376,544,386,550,394,579,417,596,425,598,437,578,464,581,479,598,494,631,504,640,502,647,515,672,529,676,537,682,548,683,553,688,560,685,552,661,558,639,554,633,561,633,561,626,574,623,571,625,570,623,571,619,578,619,576,613,586,615,606,606,609,599,615,595,613,589,618,584,620,593,638,585,642,575,642,563],
+  [216,351,210,375,200,371,195,374,192,407,198,422,189,429,180,445,184,455,175,465,252,512,296,519,318,369,216,351],
+  [183,457,180,445,188,429,198,422,192,407,192,400,104,268,108,264,127,193,48,170,42,196,31,210,37,229,32,249,42,272,40,280,48,287,53,280,65,286,54,283,53,296,49,290,46,293,46,306,54,316,49,329,65,367,63,383,84,393,95,406,103,408,105,416,122,434,124,453,177,460,183,457],
+  [442,398,507,402,504,452,510,458,519,459,521,464,543,467,547,474,554,471,559,476,563,474,565,478,570,474,582,479,589,475,607,473,624,483,625,433,620,391,444,384,442,398],
+  [620,391,620,333,611,324,614,315,608,315,605,310,471,305,465,385,620,391],
+  [605,310,599,301,595,275,584,245,568,233,555,235,544,229,438,223,433,275,473,279,471,305,605,310],
+  [548,231,555,235,568,233,583,244,581,236,585,228,586,170,578,162,583,152,445,145,438,223,548,231],
+  [444,169,313,152,295,257,433,275,444,169],
+  [583,152,573,70,453,63,446,144,583,152],
+  [465,386,473,279,334,264,318,370,465,386],
+  [334,264,295,257,299,231,240,220,215,351,318,369,334,264],
+  [107,265,105,271,192,400,194,374,200,372,207,376,212,365,240,220,127,193,107,265],
+  [184,208,194,161,198,159,195,142,216,118,210,105,173,95,138,96,121,89,107,89,103,86,102,72,84,64,81,82,62,125,47,148,47,170,184,208],
+  [211,98,210,106,216,118,196,142,198,159,194,161,184,207,299,231,310,167,305,158,301,163,280,160,275,163,273,150,267,147,262,124,254,128,250,124,256,117,260,98,253,94,238,60,244,30,226,25,211,98],
+  [453,63,339,48,244,30,238,58,253,94,260,98,256,117,250,125,253,128,262,125,267,147,273,151,275,163,278,160,301,163,305,159,310,167,313,152,443,169,453,63],
+  [1078,169,1082,155,1086,155,1084,148,1088,145,1091,147,1089,143,1095,143,1095,137,1100,139,1102,122,1105,126,1110,122,1114,126,1113,120,1119,122,1120,115,1131,110,1133,105,1128,97,1125,97,1122,87,1114,87,1103,54,1093,47,1086,54,1074,51,1065,82,1063,108,1057,114,1072,163,1078,169],
+  [910,225,925,211,920,197,961,189,971,180,968,173,972,169,968,170,966,166,986,140,1017,130,1024,151,1021,157,1028,169,1033,188,1033,208,1038,229,1031,242,1060,226,1057,232,1068,227,1050,242,1033,246,1028,238,1011,233,1013,230,996,217,912,232,910,225],
+  [1017,137,1024,151,1021,157,1028,169,1033,188,1047,186,1045,161,1047,143,1053,139,1051,125,1049,122,1017,130,1017,137],
+  [1057,114,1051,115,1049,122,1053,139,1047,143,1047,186,1071,180,1077,175,1078,168,1072,163,1057,114],
+  [1035,221,1036,235,1049,225,1069,220,1065,202,1033,208,1035,221],
+  [1080,208,1072,199,1065,202,1069,219,1074,216,1075,207,1080,213,1080,208],
+  [1102,198,1096,191,1099,198,1091,201,1086,193,1078,189,1077,186,1083,180,1077,175,1071,180,1033,188,1033,208,1072,199,1083,211,1086,204,1089,208,1102,198],
+  [1089,213,1094,210,1090,209,1089,213],
+  [1029,242,1028,238,1011,233,1007,242,1007,253,1018,264,1005,280,1011,287,1022,289,1022,294,1029,284,1033,264,1031,253,1028,253,1029,242],
+  [1006,282,1007,276,1003,275,1000,279,1008,311,1022,309,1006,282],
+  [1003,275,1007,276,1018,263,1007,253,1007,239,1013,230,996,217,912,232,910,225,896,235,906,296,1000,279,1003,275],
+  [908,535,918,537,938,576,950,590,950,598,948,591,947,598,968,629,971,661,964,683,964,677,947,680,947,677,953,677,948,675,939,663,931,660,920,644,920,636,918,641,913,638,905,626,909,616,903,612,903,620,899,613,899,587,871,564,858,561,857,566,836,574,836,570,828,565,832,563,827,563,829,558,822,559,824,563,807,557,789,561,781,548,793,543,842,539,845,546,905,542,905,548,910,548,908,535],
+  [752,593,732,582,744,578,740,573,729,576,735,572,731,548,689,550,694,529,701,518,696,502,698,498,634,498,634,527,639,531,645,554,638,585,686,589,680,585,684,582,694,588,700,587,699,596,709,599,718,593,725,597,727,588,742,595,742,601,747,598,749,600,752,593],
+  [624,483,634,483,634,498,696,496,696,478,709,449,716,443,718,430,726,415,710,415,716,402,620,405,625,433,624,483],
+  [821,391,761,394,762,400,729,400,715,442,843,432,851,418,872,405,875,400,879,402,890,396,895,389,895,383,821,391],
+  [1021,382,1017,379,1016,385,1011,378,1000,385,998,373,1001,380,1011,376,1010,370,1015,371,1011,363,894,383,894,389,890,395,879,402,875,400,872,405,850,418,843,432,874,428,883,421,910,419,919,421,921,426,943,422,972,443,983,440,992,423,991,417,994,420,999,415,1011,413,1014,406,999,408,1006,405,1007,399,997,395,1005,396,1006,392,1008,395,1017,395,1021,382],
+  [926,499,914,479,867,436,874,428,817,434,830,488,840,505,836,510,837,531,845,546,905,543,905,548,910,548,908,535,917,537,916,530,921,522,921,512,924,511,921,508,925,508,922,505,926,504,926,499],
+  [929,379,1015,362,1011,354,999,343,1003,342,1000,338,990,331,1001,335,1000,328,977,321,978,307,966,299,961,302,951,296,950,306,944,316,940,315,936,326,929,323,921,352,894,366,883,359,878,367,871,370,867,379,853,387,929,379],
+  [921,426,916,419,885,421,867,436,914,479,927,499,927,496,932,495,929,490,935,492,935,486,942,485,939,482,946,481,945,476,958,468,961,463,958,460,972,443,943,422,921,426],
+  [786,556,781,546,842,539,837,531,836,518,838,511,836,510,839,505,830,488,818,442,817,434,821,434,761,438,760,535,764,561,770,563,774,554,776,565,788,561,786,556],
+  [760,535,761,438,715,442,696,478,698,491,696,502,701,513,689,550,731,548,731,558,735,570,742,564,764,561,760,535],
+  [1001,279,927,292,928,303,942,293,954,289,961,291,965,299,978,307,977,321,996,323,988,294,998,286,993,300,1001,307,997,314,1006,317,1010,328,1010,347,1017,320,1019,318,1019,324,1020,322,1020,309,1008,310,1001,279],
+  [883,359,894,366,921,352,929,323,936,326,940,315,944,316,950,306,951,296,961,302,966,299,961,291,954,289,942,293,931,303,927,292,906,296,901,271,898,300,888,307,869,337,873,349,883,359],
+  [860,383,867,379,871,370,878,367,882,361,873,349,870,336,861,328,857,332,848,330,844,333,828,322,821,322,822,331,809,335,800,355,796,356,791,350,788,359,781,358,777,362,772,359,760,361,756,365,757,372,750,376,751,382,740,380,735,383,737,395,728,398,728,401,762,400,761,394,853,387,860,383],
+  [728,400,737,395,736,382,731,385,727,368,709,355,712,340,709,336,702,338,700,336,700,331,683,312,684,299,678,294,597,295,608,315,614,315,611,324,620,333,620,404,716,402,710,415,726,414,728,400],
+  [656,152,663,148,663,132,683,112,708,96,683,92,673,96,647,83,653,83,633,85,620,81,615,73,608,73,613,63,609,60,606,70,573,70,579,133,584,146,584,154,578,161,586,170,584,217,684,216,681,203,654,183,656,163,652,160,656,152],
+  [697,134,722,121,733,108,741,106,744,107,738,109,733,119,732,116,731,124,742,122,753,130,767,133,773,125,793,121,796,126,809,128,818,138,824,136,823,139,805,139,803,141,805,146,826,155,832,162,834,181,825,199,829,201,841,187,851,196,855,224,850,224,840,249,775,255,784,236,783,222,775,208,778,178,789,164,789,173,792,173,793,161,800,156,797,153,804,146,800,142,791,139,776,144,768,153,769,147,764,151,761,148,751,168,748,155,742,149,724,146,697,134],
+  [750,162,742,149,725,146,693,133,689,134,689,124,672,133,663,132,663,148,656,152,652,160,656,164,654,183,685,208,689,236,699,242,753,238,750,219,752,199,763,163,746,185,751,171,750,162],
+  [893,238,862,257,839,249,814,253,821,322,828,322,844,333,848,330,857,332,861,328,869,337,874,332,877,320,882,320,888,307,899,296,903,271,896,235,893,238],
+  [760,365,760,361,767,359,777,362,781,358,788,359,791,350,796,356,800,355,809,335,822,331,814,253,774,255,762,260,763,326,767,340,757,358,760,365],
+  [739,380,751,382,750,376,757,372,757,358,767,340,763,326,763,260,753,238,698,240,708,255,701,269,691,272,694,282,684,294,683,312,697,327,699,336,703,339,709,336,712,340,709,356,727,369,731,386,739,380],
+  [685,295,694,282,691,272,701,269,708,255,697,244,697,239,689,236,685,216,584,218,585,206,584,228,580,238,591,263,597,295,678,294,684,300,685,295],
+  [111,698,117,703,110,705,114,712,107,715,106,720,104,716,100,726,94,726,100,722,95,714,99,710,103,715,101,708,107,709,109,700],
+  [20,658,22,666,13,662,18,660],
+  [1,603,16,617,10,618,6,610,0,610,1,603],
+  [102,520,105,527,109,524,119,528,123,534,135,533,138,539,164,536,175,542,193,671,204,668,219,683,227,672,235,673,266,705,282,710,283,726,281,728,278,723,277,727,272,725,264,714,260,714,268,721,272,731,269,729,268,734,261,727,257,728,261,725,260,721,256,723,258,711,251,718,249,709,254,702,251,698,245,706,248,717,239,704,237,707,227,692,223,693,213,683,206,682,203,675,168,677,169,672,159,671,148,677,158,667,154,662,145,663,140,678,134,678,133,682,118,689,123,668,126,665,136,666,126,661,116,668,112,679,102,687,104,697,83,711,82,716,68,722,63,729,47,734,47,737,39,731,35,738,11,741,15,734,24,734,37,726,47,728,73,708,80,692,71,692,72,688,70,688,65,695,56,686,45,689,46,666,40,670,30,663,29,657,39,657,40,655,30,651,27,643,41,624,51,627,56,622,65,622,63,611,67,606,56,609,54,606,37,603,34,595,39,592,29,586,49,579,55,580,57,587,65,588,73,583,66,579,66,574,58,572,58,564,46,552,50,545,65,545,69,536,75,531,87,525,96,525,102,520],
+  [446,690,468,698,475,711,481,713,474,723,458,726,454,735,445,728,445,714,440,708,447,701,446,690],
+  [410,667,416,673,413,674,410,669],
+  [422,664,430,669,435,667,442,676,429,679,428,671,422,671,422,666],
+  [403,659,420,662,416,664,403,660],
+  [377,643,387,649,388,656,383,653,377,655,371,650,371,645,375,644],
+  [313,630,311,639,308,638,311,632],
+  [330,624,339,624,338,635,330,633,326,626]
+];
+/**
+ * 18 — Simple Map: a filled outline of the contiguous US plus Alaska and
+ * Hawaii, drawn as one freeform per landmass. `US_STATES` holds the polygon
+ * rings in 1/200-inch units relative to MAP_ORIGIN.
+ */
+const MAP_ORIGIN = { x: 1.826, y: 1.897 };
+
+function slide18(pptx) {
+  const s = base(pptx);
+  headline(s, ['Simple', 'Map'], { x: 8.695, y: 1.897, w: 3.365 });
+  s.addText('Cras ex nunc, vehicula at tincidunt vitae, facilisis ac mi. Etiam lorem leo, pretium a congue sit amet, sodales rhoncus risus. Phasellus massa erat, dignissim euismod efficitur sit amet, mollis semper erat. Morbi elementum ullamcorper dui, at tempus ante auctor eget',
+    { ...body(), x: 8.695, y: 3.86, w: 2.652, h: 1.24 });
+
+  US_STATES.forEach((ring) => {
+    const xs = [];
+    const ys = [];
+    for (let i = 0; i < ring.length; i += 2) { xs.push(ring[i] / 200); ys.push(ring[i + 1] / 200); }
+    const x0 = Math.min(...xs);
+    const y0 = Math.min(...ys);
+    const w = Math.max(...xs) - x0;
+    const h = Math.max(...ys) - y0;
+    const pts = xs.map((vx, i) => ({ x: vx - x0, y: ys[i] - y0, ...(i === 0 ? { moveTo: true } : {}) }));
+    pts.push({ close: true });
+    s.addShape('custGeom', {
+      x: MAP_ORIGIN.x + x0, y: MAP_ORIGIN.y + y0, w: Math.max(w, 0.01), h: Math.max(h, 0.01),
+      fill: { color: INK }, line: { color: BG, width: 1.5 }, points: pts,
+    });
+  });
+}
+
+/** 19 — Client Testimonial: three teal quote cards with 5-star ratings. */
+function slide19(pptx) {
+  const s = base(pptx);
+  s.addShape('ellipse', { x: 2.93, y: 1.134, w: 1.378, h: 1.378, fill: { color: PEACH }, line: { type: 'none' } });
+  headline(s, ['Client', 'Testimonial'], { w: 3.365 });
+  const quote = '“ Curabitur id sem in felis blandit elementum. Mauris non accumsan neque, eget rutrum metus.“';
+  const cards = [
+    ['Greta Mae Evans', 6.778, 1.519, 9.486, 1.519],
+    ['Eleanor Fitzgerald', 1.667, 3.925, 4.375, 3.925],
+    ['Hae-won Jeon', 6.778, 3.925, 9.486, 3.925],
+  ];
+  cards.forEach(([name, x, y, imgX, imgY]) => {
+    s.addShape('rect', { x, y, w: 2.708, h: 2.056, fill: { color: TEAL }, line: { type: 'none' } });
+    s.addText(name, { ...heading(), x: x + 0.214, y: y + 0.369, w: 2.281, h: 0.336, color: CREAM });
+    s.addText(quote, { ...body(), x: x + 0.214, y: y + 0.836, w: 2.281, h: 0.732, color: CREAM });
+    for (let i = 0; i < 5; i++) {
+      s.addShape('star5', { x: x + 0.214 + i * 0.2139, y: y + 1.662, w: 0.138, h: 0.138, fill: { color: PEACH }, line: { type: 'none' } });
+    }
+    imageBox(s, imgX, imgY, 2.181, 2.056);
+  });
+}
+
+/** 20 — Thank You: closing headline, stat tile and a teal contact card. */
+function slide20(pptx) {
+  const s = base(pptx);
+  s.addShape('ellipse', { x: 3.79, y: 1.113, w: 1.378, h: 1.378, fill: { color: PEACH }, line: { type: 'none' } });
+  imageBox(s, 3.79, 4.107, 7.337, 3.393);
+  headline(s, ['Thank', 'You'], { size: 80, w: 3.792 });
+  statTile(s, 1.667, 4.107);
+  s.addText(MOCKUP_COPY, { ...body(), x: 7.263, y: 2.231, w: 4.404, h: 0.461 });
+
+  s.addShape('roundRect', { x: 7.263, y: 3.227, w: 4.404, h: 2.754, rectRadius: 0, fill: { color: TEAL }, line: { type: 'none' } });
+  s.addText('Get In Touch', { ...heading(18), x: 7.911, y: 3.648, w: 2.683, h: 0.447, color: PEACH });
+  const fields = [
+    ['Phone:', '+123-456-7890', 7.911, 4.273, 1.422],
+    ['Website:', 'www.yourwebsite.com', 9.683, 4.273, 1.335],
+  ];
+  fields.forEach(([label, value, x, y, w]) => {
+    s.addText(label, { ...micro, x: x + 0.004, y, w: 0.767, h: 0.199, color: PEACH, lineSpacingMultiple: 1.0 });
+    s.addText(value, { ...body(), x, y: y + 0.146, w, h: 0.259, color: CREAM });
+  });
+  s.addText('Address', { ...micro, x: 7.915, y: 4.825, w: 0.767, h: 0.199, color: PEACH, lineSpacingMultiple: 1.0 });
+  s.addText('+ABC Solutions Inc. 123 Main Street Suite 456 Cityville, State 78901 United States',
+    { ...body(), x: 7.911, y: 4.971, w: 3.101, h: 0.588, color: CREAM });
+}
+
+// ── Build ───────────────────────────────────────────────────────────────────
+const BUILDERS = [
+  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
+  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
+];
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'WIDE_16x9', width: 13.3333, height: 7.5 });
+  pptx.layout = 'WIDE_16x9';
+  pptx.theme = { headFontFace: SERIF, bodyFontFace: SANS };
+  pptx.title = 'Sweetz Bakery';
+  BUILDERS.forEach((fn) => fn(pptx));
+  return pptx.writeFile({ fileName: path.join(__dirname, '0d86256f-0982-4c04-9128-73e5c9d83694_grok_final.pptx') });
+}
+
+build().then((f) => console.log('wrote', f)).catch((e) => { console.error(e); process.exit(1); });
