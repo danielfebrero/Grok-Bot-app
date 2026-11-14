@@ -1,0 +1,76 @@
+--- 2026-11-14_14-49:/opt/sand/sand-host/box-launchers/box-chrome
++++ 2026-11-14_16-50:/opt/sand/sand-host/box-launchers/box-chrome
+@@ -453,8 +453,10 @@
+ 	CHROME_ENV=(runuser -u box -- "${CHROME_ENV[@]}")
+ fi
+ 
++# The shell that runs the launcher may name a proxy, and curl would send a
++# request for this box's own port to it (https://curl.se/docs/manpage.html#--noproxy).
+ chrome_ready() {
+-	curl --max-time 1 -fsS "http://127.0.0.1:${CHROME_DEBUG_PORT}/json/version" >/dev/null 2>&1
++	curl --noproxy '*' --max-time 1 -fsS "http://127.0.0.1:${CHROME_DEBUG_PORT}/json/version" >/dev/null 2>&1
+ }
+ 
+ # Headful Chrome serves CDP on 127.0.0.1:<port> and, when that is still held,
+@@ -469,7 +471,7 @@
+ # browser running past its last window, and starts a new one only once the old
+ # process is gone and the port is free.
+ chrome_on_ipv6_only() {
+-	curl --max-time 1 -fsS "http://[::1]:${CHROME_DEBUG_PORT}/json/version" >/dev/null 2>&1
++	curl --noproxy '*' --max-time 1 -fsS "http://[::1]:${CHROME_DEBUG_PORT}/json/version" >/dev/null 2>&1
+ }
+ 
+ process_running() {
+@@ -665,25 +667,26 @@
+ }
+ 
+ lowercase_trimmed() {
+-	printf '%s' "$1" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]'
++	local value="$1"
++	value="${value#"${value%%[![:space:]]*}"}"
++	value="${value%"${value##*[![:space:]]}"}"
++	printf '%s' "${value,,}"
+ }
+ 
+-# The UA governor's rule: a non-empty env value is on only for 1, on, or true;
+-# without one, the marker file is on, unless honor_contents and it says 0,
+-# off, or false.
++# The UA governor's rule: an env value of 1, on, true, or yes is on, and 0,
++# off, false, or no is off; with any other value the marker file is on,
++# unless honor_contents and it says 0, off, false, or no.
+ marker_gate_on() {
+-	local env_value="$1" path="$2" honor_contents="$3" contents=""
+-	if [ -n "$(lowercase_trimmed "${env_value}")" ]; then
+-		case "$(lowercase_trimmed "${env_value}")" in
+-		1 | on | true) return 0 ;;
+-		*) return 1 ;;
+-		esac
+-	fi
++	local path="$2" honor_contents="$3" contents=""
++	case "$(lowercase_trimmed "$1")" in
++	1 | on | true | yes) return 0 ;;
++	0 | off | false | no) return 1 ;;
++	esac
+ 	[ -e "${path}" ] || return 1
+ 	[ "${honor_contents}" = 1 ] || return 0
+ 	read -r contents 2>/dev/null <"${path}" || true
+ 	case "$(lowercase_trimmed "${contents}")" in
+-	0 | off | false) return 1 ;;
++	0 | off | false | no) return 1 ;;
+ 	esac
+ 	return 0
+ }
+@@ -830,8 +833,11 @@
+ 
+ # curl sends a plain http request through the proxy that http_proxy, all_proxy
+ # or ALL_PROXY names unless no_proxy covers the host
+-# (https://curl.se/docs/manpage.html#ENVIRONMENT), so with one of them set the
+-# readiness probe may never have reached this box's own CDP port.
++# (https://curl.se/docs/manpage.html#ENVIRONMENT). The readiness check goes past
++# that proxy as the read after the wait does, so with one of them set a launch
++# reads proxied only when the browser answers that read and not the readiness
++# check that follows it. A launcher whose readiness check went to the proxy
++# wrote proxied for a browser the check never reached.
+ cdp_proxy_named() {
+ 	[ -n "${http_proxy:-}${all_proxy:-}${ALL_PROXY:-}" ]
+ }

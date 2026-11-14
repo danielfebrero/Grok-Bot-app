@@ -1,0 +1,87 @@
+--- 2026-11-14_14-49:/opt/sand/sand-host/box-scripts/sand-cookie-persist.mjs
++++ 2026-11-14_16-50:/opt/sand/sand-host/box-scripts/sand-cookie-persist.mjs
+@@ -452,15 +452,46 @@
+   return [...suffixes];
+ }
+ 
+-export function isTailnetCookie(cookie, suffixes) {
++const FINGERPRINT_TEST_SITES = [
++  "fingerprint.com",
++  "fpjs.io",
++  "abrahamjuliot.github.io",
++  "sannysoft.com",
++  "deviceandbrowserinfo.com",
++  "pixelscan.net",
++  "cleantalk.org",
++  "browserleaks.com",
++  "peet.ws",
++];
++
++const CHALLENGE_VENDOR_DOMAINS = [
++  "challenges.cloudflare.com",
++  "captcha-delivery.com",
++  "perfdrive.com",
++  "hcaptcha.com",
++  "arkoselabs.com",
++  "funcaptcha.com",
++  "px-cloud.net",
++  "px-captcha.com",
++  "perimeterx.net",
++  "geetest.com",
++  "recaptcha.net",
++];
++
++const DETECTOR_COOKIE_DOMAINS = Object.freeze([
++  ...FINGERPRINT_TEST_SITES,
++  ...CHALLENGE_VENDOR_DOMAINS,
++]);
++
++function isCookieUnder(cookie, domains) {
+   if (typeof cookie?.domain !== "string") return false;
+   const host = bareDomain(cookie.domain);
+-  return suffixes.some((suffix) => host === suffix || host.endsWith(`.${suffix}`));
++  return domains.some((domain) => host === domain || host.endsWith(`.${domain}`));
+ }
+ 
+-export function withoutTailnetCookies(cookies, suffixes) {
+-  if (suffixes.length === 0) return cookies;
+-  return cookies.filter((c) => !isTailnetCookie(c, suffixes));
++function seedableCookies(cookies, tailnetSuffixes) {
++  const denied = [...tailnetSuffixes, ...DETECTOR_COOKIE_DOMAINS];
++  return cookies.filter((c) => !isCookieUnder(c, denied));
+ }
+ 
+ function tailnetSuffixes(deps) {
+@@ -700,9 +731,9 @@
+   }
+   const suffixes = tailnetSuffixes(deps);
+   const seedCookies = seed.kind === "ok" ? seed.cookies : [];
+-  const keptSeed = withoutTailnetCookies(seedCookies, suffixes);
++  const keptSeed = seedableCookies(seedCookies, suffixes);
+   const saved = new Map(keptSeed.map((c) => [cookieKey(c), c]));
+-  const cookies = withoutTailnetCookies(
++  const cookies = seedableCookies(
+     mergeJars(live, saved, state.seen, { keepUnseen: !fromPrimary }),
+     suffixes,
+   );
+@@ -877,7 +908,7 @@
+     return { injected: 0, missingAfter: 0, seedCount: 0, corrupt: true };
+   }
+   const signedOut = readSignedOutCopies(deps);
+-  const seedCookies = withoutTailnetCookies(
++  const seedCookies = seedableCookies(
+     seed.kind === "ok" ? seed.cookies : [],
+     tailnetSuffixes(deps),
+   ).filter((cookie) => !isSignedOutCopy(signedOut, cookieKey(cookie), cookie));
+@@ -1129,9 +1160,9 @@
+           return "paused";
+         }
+         const suffixes = tailnetSuffixes(deps);
+-        const keptSeed = withoutTailnetCookies(seed.cookies, suffixes);
++        const keptSeed = seedableCookies(seed.cookies, suffixes);
+         const saved = new Map(keptSeed.map((c) => [cookieKey(c), c]));
+-        const cookies = withoutTailnetCookies(
++        const cookies = seedableCookies(
+           mergeJars([{ port, jar }], saved, new Map(), { keepUnseen: true }),
+           suffixes,
+         );

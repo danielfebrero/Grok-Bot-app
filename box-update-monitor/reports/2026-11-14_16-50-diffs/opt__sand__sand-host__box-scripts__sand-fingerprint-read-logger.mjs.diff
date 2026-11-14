@@ -1,0 +1,146 @@
+--- 2026-11-14_14-49:/opt/sand/sand-host/box-scripts/sand-fingerprint-read-logger.mjs
++++ 2026-11-14_16-50:/opt/sand/sand-host/box-scripts/sand-fingerprint-read-logger.mjs
+@@ -1,22 +1,17 @@
+ import { randomBytes } from "node:crypto";
+-import { appendFileSync, closeSync, constants, fstatSync, openSync, readFileSync } from "node:fs";
++import { appendFileSync } from "node:fs";
+ 
+-export const FINGERPRINT_LOG_CONFIG_VERSION = 1;
+ export const FINGERPRINT_SAMPLE_BPS = 10_000;
+ export const FINGERPRINT_DOCUMENT_UNIQUE_CAP = 128;
+ export const FINGERPRINT_BROWSER_MINUTE_CAP = 240;
+ export const FINGERPRINT_DRAIN_INTERVAL_MS = 2_000;
+ 
+-const MAX_CONFIG_BYTES = 8 * 1024;
+-const MAX_HOSTS = 64;
+ const MAX_HOST_LENGTH = 253;
+ const MAX_SCRIPT_URL_LENGTH = 512;
+ 
+ const MAX_BATCH_RECORDS = 256;
+ const MAX_BATCH_BYTES = 48 * 1024;
+ const MAX_READS = 1_000_000;
+-const TOKEN_PATH_SEGMENT = /^(?:\d{5,}|[0-9a-f]{12,}|[A-Za-z0-9_-]{20,})$/;
+-const HOST_LABEL = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)$/;
+ const SCRIPT_URL_SENTINELS = new Set([
+   "<inline>",
+   "<eval>",
+@@ -127,119 +122,11 @@
+   "object:present",
+ ]);
+ 
+-function safeClose(fd) {
+-  if (fd !== undefined) closeSync(fd);
+-}
+-
+-function secureBoundedRead(path, maxBytes, deps = {}, requiredMode = null) {
+-  const open = deps.open ?? openSync;
+-  const stat = deps.stat ?? fstatSync;
+-  const read = deps.read ?? readFileSync;
+-  let fd;
+-  try {
+-    fd = open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+-    const metadata = stat(fd);
+-    if (!metadata.isFile() || metadata.size <= 0 || metadata.size > maxBytes) return null;
+-    const mode = metadata.mode & 0o777;
+-    if (requiredMode === null ? (mode & 0o077) !== 0 : mode !== requiredMode) return null;
+-    return String(read(fd, "utf8"));
+-  } catch {
+-    return null;
+-  } finally {
+-    safeClose(fd);
+-  }
+-}
+-
+-function canonicalHost(raw) {
+-  if (typeof raw !== "string" || raw.length === 0 || raw.length > MAX_HOST_LENGTH) return null;
+-  if (raw !== raw.trim() || raw.includes("*") || raw.includes("/") || raw.includes("@"))
+-    return null;
+-  let parsed;
+-  try {
+-    parsed = new URL(`https://${raw}`);
+-  } catch {
+-    return null;
+-  }
+-  if (
+-    parsed.username !== "" ||
+-    parsed.password !== "" ||
+-    parsed.pathname !== "/" ||
+-    parsed.search !== "" ||
+-    parsed.hash !== "" ||
+-    (parsed.port !== "" && parsed.port !== "443")
+-  ) {
+-    return null;
+-  }
+-  const host = parsed.hostname.toLowerCase().replace(/\.$/, "");
+-  if (host === "" || host.includes(":")) return null;
+-  const labels = host.split(".");
+-  if (labels.length < 2 || labels.some((label) => !HOST_LABEL.test(label))) return null;
+-  return host;
+-}
+-
+-export function parseFingerprintLogConfig(raw) {
+-  let parsed;
+-  try {
+-    parsed = JSON.parse(raw);
+-  } catch {
+-    return null;
+-  }
+-  if (parsed == null || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+-  if (
+-    Object.keys(parsed).some((key) => key !== "version" && key !== "hosts") ||
+-    parsed.version !== FINGERPRINT_LOG_CONFIG_VERSION ||
+-    !Array.isArray(parsed.hosts) ||
+-    parsed.hosts.length === 0 ||
+-    parsed.hosts.length > MAX_HOSTS
+-  ) {
+-    return null;
+-  }
+-  const hosts = [];
+-  const seen = new Set();
+-  for (const rawHost of parsed.hosts) {
+-    const host = canonicalHost(rawHost);
+-    if (host == null || host !== rawHost || seen.has(host)) return null;
+-    seen.add(host);
+-    hosts.push(host);
+-  }
+-  if (hosts.some((host, index) => index > 0 && hosts[index - 1] > host)) return null;
+-  return Object.freeze({
+-    version: FINGERPRINT_LOG_CONFIG_VERSION,
+-    hosts: Object.freeze(hosts),
+-  });
+-}
+-
+-export function readFingerprintLogConfig({ markerPath, open, stat, read } = {}) {
+-  if (typeof markerPath !== "string" || markerPath.length === 0) return null;
+-  const raw = secureBoundedRead(markerPath, MAX_CONFIG_BYTES, { open, stat, read }, 0o600);
+-  return raw == null ? null : parseFingerprintLogConfig(raw);
+-}
+-
+ export function windowIndexFromCdpPort(port, cdpPortBase) {
+   const index = port - cdpPortBase;
+   return Number.isInteger(index) && index >= 1 && index <= 256 ? index : null;
+ }
+ 
+-export function sanitizeScriptUrl(raw) {
+-  if (typeof raw !== "string" || raw.length === 0) return "<unknown>";
+-  if (SCRIPT_URL_SENTINELS.has(raw)) return raw;
+-  if (raw.startsWith("blob:")) return "<blob>";
+-  if (raw.startsWith("data:")) return "<data>";
+-  if (/^(?:chrome|moz|safari-web)-extension:/.test(raw)) return "<extension>";
+-  let parsed;
+-  try {
+-    parsed = new URL(raw.replace(/:\d+:\d+$/, ""));
+-  } catch {
+-    return raw.includes("eval at ") ? "<eval>" : "<unknown>";
+-  }
+-  if (parsed.protocol !== "https:") return "<unknown>";
+-  const segments = parsed.pathname
+-    .split("/")
+-    .map((segment) => (TOKEN_PATH_SEGMENT.test(segment) ? ":id" : segment.slice(0, 64)));
+-  const sanitized = `${parsed.protocol}//${parsed.hostname.toLowerCase()}${segments.join("/")}`;
+-  return sanitized.slice(0, MAX_SCRIPT_URL_LENGTH);
+-}
+-
+ function isSafeScriptUrl(value) {
+   if (typeof value !== "string" || value.length === 0 || value.length > MAX_SCRIPT_URL_LENGTH) {
+     return false;

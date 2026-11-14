@@ -1,0 +1,292 @@
+--- 2026-11-14_14-49:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
++++ 2026-11-14_16-50:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
+@@ -950,6 +950,25 @@
+ }
+ 
+ // src/host/agent-isolation/conversation-blob-db.ts
++function openWorkerDataVersionObserver(dbPath) {
++  refuseSandDataDatabaseLinksSync(dbPath);
++  const db = new import_node_sqlite3.DatabaseSync(dbPath, { readOnly: true });
++  try {
++    checkSandDataDatabaseSync(db, dbPath);
++    const statement = db.prepare("PRAGMA data_version");
++    return {
++      read: () => {
++        const value = statement.get()?.data_version;
++        if (typeof value !== "number") throw new TypeError("SQLite returned no data version");
++        return value;
++      },
++      close: () => db.close()
++    };
++  } catch (error) {
++    db.close();
++    throw error;
++  }
++}
+ var CONVERSATION_BLOB_SCHEMA = `
+ CREATE TABLE IF NOT EXISTS blobs (
+   id TEXT PRIMARY KEY,
+@@ -13450,7 +13469,7 @@
+     return proto3.util.equals(_SendMessageArgs, a, b);
+   }
+   static $() {
+-    return ["SendMessageArgs|1 text #0 message|2 attachment #1 message|3 reply_to 9?|4 replace_previous_message 8?|5 to_main_chat 8?", SendMessageText, SendMessageAttachment];
++    return ["SendMessageArgs|1 text #0 message|2 attachment #1 message|3 reply_to 9?|4 replace_previous_message 8?", SendMessageText, SendMessageAttachment];
+   }
+ };
+ var SendMessageSuccess = class _SendMessageSuccess extends __protoMessage357 {
+@@ -15787,7 +15806,7 @@
+     return proto3.util.equals(_TrackedTaskStatusView, a, b);
+   }
+   static $() {
+-    return ["TrackedTaskStatusView|1 id 9|2 label 9|3 category 9|4 task_count 13"];
++    return ["TrackedTaskStatusView|1 id 9|2 label 9|3 category 9|4 task_count 13|5 description 9?"];
+   }
+ };
+ var TrackedTaskTagView = class _TrackedTaskTagView extends __protoMessage364 {
+@@ -16482,7 +16501,7 @@
+     return proto3.util.equals(_TrackedTaskStatusInput, a, b);
+   }
+   static $() {
+-    return ["TrackedTaskStatusInput|1 id 9?|2 label 9|3 icon 9?|4 category 9"];
++    return ["TrackedTaskStatusInput|1 id 9?|2 label 9|3 icon 9?|4 category 9|5 description 9?"];
+   }
+ };
+ var UpdateTrackedTaskStatusesArgs = class _UpdateTrackedTaskStatusesArgs extends __protoMessage364 {
+@@ -20808,7 +20827,29 @@
+     return proto3.util.equals(_SubagentPersistedState, a, b);
+   }
+   static $() {
+-    return ["SubagentPersistedState|1 conversation_state #0|2 created_timestamp_ms 4|3 last_used_timestamp_ms 4|4 subagent_type #1|5 model_id 9?|6 environment #2|7 cloud_subagent #3?|8 first_class_bc_id 9?|9 cloud_requested_environment_build_id 9?|10 machine #4?", ConversationStateStructure, SubagentType, SubagentExecutionEnvironment, CloudSubagentReference, TargetMachine];
++    return ["SubagentPersistedState|1 conversation_state #0|2 created_timestamp_ms 4|3 last_used_timestamp_ms 4|4 subagent_type #1|5 model_id 9?|6 environment #2|7 cloud_subagent #3?|8 first_class_bc_id 9?|9 cloud_requested_environment_build_id 9?|10 machine #4?|11 attached_video_unavailable #5?", ConversationStateStructure, SubagentType, SubagentExecutionEnvironment, CloudSubagentReference, TargetMachine, AttachedVideoUnavailable];
++  }
++};
++var AttachedVideoUnavailable = class _AttachedVideoUnavailable extends __protoMessage374 {
++  constructor(data) {
++    super();
++    this.videoPaths = [];
++    proto3.util.initPartial(data, this);
++  }
++  static fromBinary(bytes, options) {
++    return new _AttachedVideoUnavailable().fromBinary(bytes, options);
++  }
++  static fromJson(jsonValue, options) {
++    return new _AttachedVideoUnavailable().fromJson(jsonValue, options);
++  }
++  static fromJsonString(jsonString, options) {
++    return new _AttachedVideoUnavailable().fromJsonString(jsonString, options);
++  }
++  static equals(a, b) {
++    return proto3.util.equals(_AttachedVideoUnavailable, a, b);
++  }
++  static $() {
++    return ["AttachedVideoUnavailable|1 video_paths 9*"];
+   }
+ };
+ var CloudSubagentReference = class _CloudSubagentReference extends __protoMessage374 {
+@@ -20902,7 +20943,7 @@
+     return proto3.util.equals(_ConversationStateStructure, a, b);
+   }
+   static $() {
+-    return ["ConversationStateStructure|1 root_prompt_messages_json 12*|8 turns 12*|3 todos 12*|4 pending_tool_calls 9*|5 token_details #0|6 summary 12?|7 plan 12?|9 previous_workspace_uris 9*|10 mode #1?|11 summary_archive 12?|12 file_states 9,12|15 file_states_v2 9,#2|13 summary_archives 12*|14 turn_timings #3*|16 subagent_states 9,#4|17 self_summary_count 13|18 read_paths 9*|19 active_branch_name 9?|20 plans 9,#5|21 tracked_git_repo_branches #6*|22 agent_type 9?|23 communicate_update_history #7*|24 subagent_threads 9,9|25 communicate_update_final_summary 9?|28 communicate_update_completed_subtitle 9?|29 communicate_update_states_by_parent_tool_call_id 9,#8|30 subagent_runs_by_parent_tool_call_id 9,#9|26 conversation_started_timestamp_ms 4?|27 conversation_started_time_zone 9?|31 subagent_state_refs 9,12|32 goal_state #10?|33 is_root_project_conversation 8?|34 completed_ask_question_tool_call_ids 9*|35 durable_skill_blocks 9*|36 durable_custom_mode_id 9?|37 message_count_at_last_compaction 13?|38 recent_user_message_ids 9*|39 recent_user_message_ids_older_turn_count 13?|40 turn_telemetry #11?|42 mentioned_agent_ids 9*|43 voice_call_utterances #12*|44 voice_call_pending_answer #13?|45 voice_call_time_task_ids 9*|46 writes_voice_call_utterances 8|47 voice_calls_read_utterances 8?|49 user_time_zone 9?|50 project_coordinator_system_section 9?|51 project_coordinator_system_section_communication_rules 8?|52 last_run #14?|53 thread_summaries 9,#15|54 recent_thread_replies #16*", ConversationTokenDetails, AgentMode, FileStateStructure, StepTiming, SubagentPersistedState, PlanRegistryEntry, TrackedGitRepo, CommunicateUpdateHistoryEntry, CommunicateUpdateTurnState, SubagentRunState, GoalState, TurnTelemetryState, VoiceCallUtterance, VoiceCallPendingAnswer, TurnRunRecord, ThreadSummary, ThreadReply];
++    return ["ConversationStateStructure|1 root_prompt_messages_json 12*|8 turns 12*|3 todos 12*|4 pending_tool_calls 9*|5 token_details #0|6 summary 12?|7 plan 12?|9 previous_workspace_uris 9*|10 mode #1?|11 summary_archive 12?|12 file_states 9,12|15 file_states_v2 9,#2|13 summary_archives 12*|14 turn_timings #3*|16 subagent_states 9,#4|17 self_summary_count 13|18 read_paths 9*|19 active_branch_name 9?|20 plans 9,#5|21 tracked_git_repo_branches #6*|22 agent_type 9?|23 communicate_update_history #7*|24 subagent_threads 9,9|25 communicate_update_final_summary 9?|28 communicate_update_completed_subtitle 9?|29 communicate_update_states_by_parent_tool_call_id 9,#8|30 subagent_runs_by_parent_tool_call_id 9,#9|26 conversation_started_timestamp_ms 4?|27 conversation_started_time_zone 9?|31 subagent_state_refs 9,12|32 goal_state #10?|33 is_root_project_conversation 8?|34 completed_ask_question_tool_call_ids 9*|35 durable_skill_blocks 9*|36 durable_custom_mode_id 9?|37 message_count_at_last_compaction 13?|38 recent_user_message_ids 9*|39 recent_user_message_ids_older_turn_count 13?|40 turn_telemetry #11?|42 mentioned_agent_ids 9*|43 voice_call_utterances #12*|44 voice_call_pending_answer #13?|45 voice_call_time_task_ids 9*|46 writes_voice_call_utterances 8|47 voice_calls_read_utterances 8?|49 user_time_zone 9?|50 project_coordinator_system_section 9?|51 project_coordinator_system_section_communication_rules 8?|52 last_run #14?|53 thread_summaries 9,#15|54 recent_thread_replies #16*|55 turns_cleared 8?", ConversationTokenDetails, AgentMode, FileStateStructure, StepTiming, SubagentPersistedState, PlanRegistryEntry, TrackedGitRepo, CommunicateUpdateHistoryEntry, CommunicateUpdateTurnState, SubagentRunState, GoalState, TurnTelemetryState, VoiceCallUtterance, VoiceCallPendingAnswer, TurnRunRecord, ThreadSummary, ThreadReply];
+   }
+ };
+ var ThreadReply = class _ThreadReply extends __protoMessage374 {
+@@ -21791,6 +21832,7 @@
+ };
+ 
+ // src/host/agent-isolation/agent-store-worker.ts
++var DEFAULT_MAX_DATA_VERSION_OBSERVERS = 1024;
+ function post(message, transfer = []) {
+   import_node_worker_threads.parentPort?.postMessage(message, transfer);
+ }
+@@ -21805,30 +21847,44 @@
+   const port = import_node_worker_threads.parentPort;
+   invariant(port != null, "agent-store-worker must run as a worker_thread");
+   const boot = import_node_worker_threads.workerData;
++  const maxDataVersionObservers = boot.role === "data-version-observers" ? boot.maxDataVersionObservers ?? DEFAULT_MAX_DATA_VERSION_OBSERVERS : DEFAULT_MAX_DATA_VERSION_OBSERVERS;
+   let store;
+-  try {
+-    store = new ConversationBlobStoreDb({
+-      agentId: boot.agentId,
+-      blobDbPath: boot.blobDbPath,
+-      busyTimeoutMs: boot.busyTimeoutMs ?? 5e3,
+-      ...boot.legacyBlobDbPath != null ? { legacyBlobDbPath: boot.legacyBlobDbPath } : {},
+-      log: (message) => void process.stderr.write(`${message}
++  if (boot.role !== "data-version-observers") {
++    try {
++      store = new ConversationBlobStoreDb({
++        agentId: boot.agentId,
++        blobDbPath: boot.blobDbPath,
++        busyTimeoutMs: boot.busyTimeoutMs ?? 5e3,
++        ...boot.legacyBlobDbPath != null ? { legacyBlobDbPath: boot.legacyBlobDbPath } : {},
++        log: (message) => void process.stderr.write(`${message}
+ `)
+-    });
+-  } catch (error) {
+-    let code = "error";
+-    if (error instanceof ConversationBlobRecoveryError) {
+-      code = error.code;
+-    } else if (typeof error === "object" && error !== null && "code" in error && typeof error.code === "string") {
+-      code = error.code;
+-    }
+-    const detail = error instanceof ConversationBlobRecoveryError ? ` detail=${error.message}` : "";
+-    console.error(
+-      `[agent-store-worker] failed to open blob db: agent=${boot.agentId} code=${code}${detail}`
+-    );
+-    process.exit(1);
+-    return;
++      });
++    } catch (error) {
++      let code = "error";
++      if (error instanceof ConversationBlobRecoveryError) {
++        code = error.code;
++      } else if (typeof error === "object" && error !== null && "code" in error && typeof error.code === "string") {
++        code = error.code;
++      }
++      const detail = error instanceof ConversationBlobRecoveryError ? ` detail=${error.message}` : "";
++      console.error(
++        `[agent-store-worker] failed to open blob db: agent=${boot.agentId} code=${code}${detail}`
++      );
++      process.exit(1);
++      return;
++    }
+   }
++  let nextDataVersionObserverInstance = 1;
++  const dataVersionObservers = /* @__PURE__ */ new Map();
++  const requireStore = () => {
++    invariant(store != null, "conversation blob request sent to the data-version worker");
++    return store;
++  };
++  const closeDataVersionObserver = (dbPath) => {
++    const entry = dataVersionObservers.get(dbPath);
++    dataVersionObservers.delete(dbPath);
++    entry?.observer.close();
++  };
+   port.on("message", (request) => {
+     try {
+       switch (request.kind) {
+@@ -21842,12 +21898,12 @@
+           return;
+         }
+         case "set-blob": {
+-          store.setBlob(request.blobId, request.blobData);
++          requireStore().setBlob(request.blobId, request.blobData);
+           post({ kind: "set-blob-ok", requestId: request.requestId });
+           return;
+         }
+         case "get-blob": {
+-          const blobData = store.getBlob(request.blobId);
++          const blobData = requireStore().getBlob(request.blobId);
+           if (blobData == null) {
+             post({
+               kind: "get-blob-ok",
+@@ -21872,12 +21928,12 @@
+           post({
+             kind: "find-latest-root-ok",
+             requestId: request.requestId,
+-            rootId: store.findLatestRootBlobId()
++            rootId: requireStore().findLatestRootBlobId()
+           });
+           return;
+         }
+         case "clear-blobs": {
+-          store.clearBlobs();
++          requireStore().clearBlobs();
+           post({ kind: "clear-blobs-ok", requestId: request.requestId });
+           return;
+         }
+@@ -21885,7 +21941,7 @@
+           post({
+             kind: "clear-stale-roots-ok",
+             requestId: request.requestId,
+-            deleted: store.clearStaleCheckpointRoots(request.retainedRootIdHex)
++            deleted: requireStore().clearStaleCheckpointRoots(request.retainedRootIdHex)
+           });
+           return;
+         }
+@@ -21893,7 +21949,7 @@
+           post({
+             kind: "collect-garbage-ok",
+             requestId: request.requestId,
+-            result: store.collectGarbage({
++            result: requireStore().collectGarbage({
+               retainedRootIdHex: request.retainedRootIdHex,
+               pendingWriteRetentionMs: request.pendingWriteRetentionMs
+             })
+@@ -21901,7 +21957,7 @@
+           return;
+         }
+         case "walk-export-closure": {
+-          const result = store.walkExportClosure(
++          const result = requireStore().walkExportClosure(
+             request.retainedRootIdHex,
+             {
+               maxClosureBytes: request.maxClosureBytes,
+@@ -21922,15 +21978,63 @@
+           return;
+         }
+         case "get-blobs": {
+-          const blobs = store.getBlobsByHexIds(request.blobIdsHex);
++          const blobs = requireStore().getBlobsByHexIds(request.blobIdsHex);
+           post(
+             { kind: "get-blobs-ok", requestId: request.requestId, blobs },
+             transferableBuffers(blobs)
+           );
+           return;
+         }
++        case "read-data-version": {
++          try {
++            let entry = dataVersionObservers.get(request.dbPath);
++            if (entry != null && entry.fileIdentity !== request.fileIdentity) {
++              closeDataVersionObserver(request.dbPath);
++              entry = void 0;
++            }
++            if (entry == null) {
++              entry = {
++                fileIdentity: request.fileIdentity,
++                observerInstance: nextDataVersionObserverInstance,
++                observer: openWorkerDataVersionObserver(request.dbPath)
++              };
++              nextDataVersionObserverInstance += 1;
++              dataVersionObservers.set(request.dbPath, entry);
++              if (dataVersionObservers.size > maxDataVersionObservers) {
++                const leastRecentlyUsedPath = dataVersionObservers.keys().next().value;
++                if (leastRecentlyUsedPath != null) {
++                  closeDataVersionObserver(leastRecentlyUsedPath);
++                }
++              }
++            } else {
++              dataVersionObservers.delete(request.dbPath);
++              dataVersionObservers.set(request.dbPath, entry);
++            }
++            post({
++              kind: "read-data-version-ok",
++              requestId: request.requestId,
++              observerInstance: entry.observerInstance,
++              dataVersion: entry.observer.read()
++            });
++          } catch (error) {
++            closeDataVersionObserver(request.dbPath);
++            throw error;
++          }
++          return;
++        }
++        case "close-data-version-observer": {
++          closeDataVersionObserver(request.dbPath);
++          post({
++            kind: "close-data-version-observer-ok",
++            requestId: request.requestId
++          });
++          return;
++        }
+         case "close": {
+-          store.close();
++          store?.close();
++          for (const dbPath of [...dataVersionObservers.keys()]) {
++            closeDataVersionObserver(dbPath);
++          }
+           post({ kind: "close-ok", requestId: request.requestId });
+           port.close();
+           return;

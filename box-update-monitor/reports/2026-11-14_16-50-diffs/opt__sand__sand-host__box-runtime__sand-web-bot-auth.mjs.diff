@@ -1,0 +1,355 @@
+--- 2026-11-14_14-49:/opt/sand/sand-host/box-runtime/sand-web-bot-auth.mjs
++++ 2026-11-14_16-50:/opt/sand/sand-host/box-runtime/sand-web-bot-auth.mjs
+@@ -1,14 +1,8 @@
+-import {
+-  appendFileSync,
+-  existsSync,
+-  readFileSync,
+-  renameSync,
+-  watch,
+-  writeFileSync,
+-} from "node:fs";
++import { createHash } from "node:crypto";
++import { appendFileSync, existsSync, readFileSync, watch } from "node:fs";
+ import http from "node:http";
+-import { basename, dirname, resolve } from "node:path";
+-import { pathToFileURL } from "node:url";
++import { basename, dirname, join, resolve } from "node:path";
++import { fileURLToPath, pathToFileURL } from "node:url";
+ 
+ import {
+   CURSOR_AGENT_SOCKET_ENV_VAR,
+@@ -34,6 +28,7 @@
+   discoverMonitorPorts,
+   isCdpTargetGone,
+ } from "./cdp-cookies.mjs";
++import { writeAtomically } from "./sand-egress-timezone.mjs";
+ 
+ export const WEB_BOT_AUTH_MARKER = "/tmp/sand-web-bot-auth";
+ export const TUNNEL_CLIENT_MARKER = "/tmp/sand-egress-tunnel-client";
+@@ -131,19 +126,13 @@
+   }
+ }
+ 
+-function writeSignedCacheFile(path, text) {
+-  const tmp = `${path}.${process.pid}.tmp`;
+-  writeFileSync(tmp, text);
+-  renameSync(tmp, path);
+-}
+-
+ export class WebBotAuthSignedOriginCache {
+   constructor({
+     path = WEB_BOT_AUTH_SIGNED_CACHE_PATH,
+     now = Date.now,
+     ttlMs = WEB_BOT_AUTH_SIGNED_TTL_MS,
+     maxEntries = WEB_BOT_AUTH_SIGNED_MAX_ENTRIES,
+-    writeFile = writeSignedCacheFile,
++    writeFile = writeAtomically,
+   } = {}) {
+     this.path = path;
+     this.now = now;
+@@ -213,6 +202,9 @@
+ const SIGNATURE_HEADER_NAMES_LOWER = new Set(
+   SIGNATURE_HEADER_NAMES.map((name) => name.toLowerCase()),
+ );
++export const AGENT_SESSION_ID_HEADER = "X-Agent-Session-Id";
++const AGENT_SESSION_ID_HEADER_LOWER = AGENT_SESSION_ID_HEADER.toLowerCase();
++const SENDABLE_AGENT_SESSION_ID = /^[A-Za-z0-9_-]{1,128}$/;
+ 
+ export const WEB_BOT_AUTH_FETCH_ENABLE_PATTERNS = [
+   { resourceType: "Document", requestStage: "Request" },
+@@ -262,6 +254,16 @@
+     if (typeof value[name] !== "string" || value[name].length === 0) return null;
+     parsed[name] = value[name];
+   }
++  const signedAgentSessionId = value[AGENT_SESSION_ID_HEADER];
++  if (signedAgentSessionId != null) {
++    if (
++      typeof signedAgentSessionId !== "string" ||
++      !SENDABLE_AGENT_SESSION_ID.test(signedAgentSessionId)
++    ) {
++      return null;
++    }
++    parsed[AGENT_SESSION_ID_HEADER] = signedAgentSessionId;
++  }
+   return parsed;
+ }
+ 
+@@ -764,7 +766,7 @@
+             authorization: `Bearer ${token}`,
+             "content-type": "application/json",
+           },
+-          body: JSON.stringify({ url: origin }),
++          body: JSON.stringify({ url: origin, supportsAgentSessionId: true }),
+         },
+         this.timeoutMs,
+         readSigningResponseBody,
+@@ -820,14 +822,20 @@
+ }
+ 
+ export function mergeRequestHeaders(requestHeaders, signatureHeaders) {
++  const signedAgentSessionId = signatureHeaders[AGENT_SESSION_ID_HEADER];
+   const headers = [];
+   for (const [name, value] of Object.entries(requestHeaders ?? {})) {
+-    if (SIGNATURE_HEADER_NAMES_LOWER.has(name.toLowerCase())) continue;
++    const lowerName = name.toLowerCase();
++    if (SIGNATURE_HEADER_NAMES_LOWER.has(lowerName)) continue;
++    if (signedAgentSessionId != null && lowerName === AGENT_SESSION_ID_HEADER_LOWER) continue;
+     headers.push({ name, value: String(value) });
+   }
+   for (const name of SIGNATURE_HEADER_NAMES) {
+     headers.push({ name, value: signatureHeaders[name] });
+   }
++  if (signedAgentSessionId != null) {
++    headers.push({ name: AGENT_SESSION_ID_HEADER, value: signedAgentSessionId });
++  }
+   return headers;
+ }
+ 
+@@ -874,12 +882,36 @@
+       source: headers != null ? signatureSource : undefined,
+     });
+   }
++  return headers != null;
++}
++
++export class WebBotAuthActivity {
++  constructor({ now = Date.now } = {}) {
++    this.now = now;
++    this.inFlight = 0;
++    this.lastSignedAtMs = null;
++  }
++
++  async track(request) {
++    this.inFlight += 1;
++    let signed = false;
++    try {
++      signed = (await request) === true;
++    } finally {
++      this.inFlight -= 1;
++      if (signed) this.lastSignedAtMs = this.now();
++    }
++  }
++
++  quietForMs() {
++    return this.lastSignedAtMs == null ? Infinity : this.now() - this.lastSignedAtMs;
++  }
+ }
+ 
+ export async function configureWebBotAuthBrowser(
+   browser,
+   signer,
+-  { isEnabled = () => false, signedOriginCache, failures, tailnetSuffixes = [] } = {},
++  { isEnabled = () => false, signedOriginCache, failures, tailnetSuffixes = [], activity } = {},
+ ) {
+   const topFrameBySession = new Map();
+   const enableFetch = async (sessionId) => {
+@@ -917,7 +949,7 @@
+       return;
+     }
+     if (message.method === "Fetch.requestPaused" && typeof sessionId === "string") {
+-      void continueWebBotAuthRequest({
++      const request = continueWebBotAuthRequest({
+         browser,
+         sessionId,
+         params: message.params,
+@@ -927,6 +959,7 @@
+         signedOriginCache,
+         tailnetSuffixes,
+       });
++      void (activity == null ? request : activity.track(request));
+     }
+   });
+   await browser.send("Target.setAutoAttach", {
+@@ -953,6 +986,7 @@
+     signedOriginCache,
+     failures,
+     tailnetSuffixes = readTailnetHostSuffixes(),
++    activity,
+   }) {
+     this.signer = signer;
+     this.discoverPorts = discoverPorts;
+@@ -962,6 +996,7 @@
+     this.signedOriginCache = signedOriginCache;
+     this.failures = failures;
+     this.tailnetSuffixes = tailnetSuffixes;
++    this.activity = activity;
+     this.browsers = new Map();
+   }
+ 
+@@ -1000,6 +1035,7 @@
+             signedOriginCache: this.signedOriginCache,
+             failures: this.failures,
+             tailnetSuffixes: this.tailnetSuffixes,
++            activity: this.activity,
+           });
+           this.browsers.set(port, browser);
+         } catch {
+@@ -1019,7 +1055,151 @@
+   }
+ }
+ 
++const DAEMON_DIR = dirname(fileURLToPath(import.meta.url));
++export const WEB_BOT_AUTH_ENTRY = "sand-web-bot-auth.mjs";
++const LOCAL_MODULE_SPECIFIER = /\b(?:from|import)\s*\(?\s*["']\.\/([\w.-]+\.mjs)["']/g;
++
++export function webBotAuthCodeFingerprint(dir = DAEMON_DIR, readFile = readFileSync) {
++  const sources = new Map();
++  const pending = [WEB_BOT_AUTH_ENTRY];
++  while (pending.length > 0) {
++    const name = pending.pop();
++    if (sources.has(name)) continue;
++    const source = String(readFile(join(dir, name), "utf8"));
++    sources.set(name, source);
++    for (const match of source.matchAll(LOCAL_MODULE_SPECIFIER)) pending.push(match[1]);
++  }
++  const modules = [...sources.keys()].sort();
++  const hash = createHash("sha256");
++  for (const name of modules) hash.update(`${name}\0${sources.get(name)}\0`);
++  return { fingerprint: hash.digest("hex"), modules };
++}
++
++const reported = new Set();
++function logOnce(message) {
++  if (reported.has(message)) return;
++  reported.add(message);
++  log(message);
++}
++
++function readCodeFingerprint(dir) {
++  try {
++    return webBotAuthCodeFingerprint(dir).fingerprint;
++  } catch (error) {
++    logOnce(`code unreadable: ${error?.code ?? error?.name ?? "error"}`);
++    return null;
++  }
++}
++
++export const WEB_BOT_AUTH_UPDATE_CHECK_INTERVAL_MS = 5_000;
++export const WEB_BOT_AUTH_RESTART_QUIET_MS = 30_000;
++const RESTART_TIMING_MIN_MS = 100;
++
++export function restartTimingMs(raw, fallbackMs) {
++  const parsed = Number.parseInt(raw ?? "", 10);
++  if (!Number.isInteger(parsed) || parsed <= 0) return fallbackMs;
++  return Math.max(RESTART_TIMING_MIN_MS, parsed);
++}
++
++export function createWebBotAuthCodeUpdateWatch({
++  dir = DAEMON_DIR,
++  intervalMs = WEB_BOT_AUTH_UPDATE_CHECK_INTERVAL_MS,
++  now = Date.now,
++  fingerprint = readCodeFingerprint,
++} = {}) {
++  const loaded = fingerprint(dir);
++  let checkedAtMs = now();
++  let lastSeen = loaded;
++  let settled = null;
++  return {
++    loaded,
++    poll() {
++      if (loaded == null || now() - checkedAtMs < intervalMs) return settled;
++      checkedAtMs = now();
++      const seen = fingerprint(dir);
++      settled = seen != null && seen === lastSeen && seen !== loaded ? seen : null;
++      lastSeen = seen;
++      return settled;
++    },
++  };
++}
++
++const DEFAULT_DESKTOP_DIR = "/tmp/sand-desktop";
++export const WEB_BOT_AUTH_DESKTOP_GROUP = "shared";
++export const WEB_BOT_AUTH_DESKTOP_NAME = "web-bot-auth";
++
++export function readWebBotAuthRegisteredPid({
++  desktopDir = process.env.SAND_DESKTOP_DIR || DEFAULT_DESKTOP_DIR,
++  readFile = readFileSync,
++} = {}) {
++  const groupDir = join(desktopDir, WEB_BOT_AUTH_DESKTOP_GROUP);
++  try {
++    const descriptor = JSON.parse(
++      String(readFile(join(groupDir, `${WEB_BOT_AUTH_DESKTOP_NAME}.json`), "utf8")),
++    );
++    const pidFile =
++      typeof descriptor?.pidFile === "string" && descriptor.pidFile.length > 0
++        ? descriptor.pidFile
++        : join(groupDir, `${WEB_BOT_AUTH_DESKTOP_NAME}.pid`);
++    const pid = Number.parseInt(String(readFile(pidFile, "utf8")).trim(), 10);
++    return Number.isInteger(pid) && pid > 0 ? pid : null;
++  } catch (error) {
++    if (error?.code !== "ENOENT") {
++      logOnce(`desktop registration unreadable: ${error?.code ?? error?.name ?? "error"}`);
++    }
++    return null;
++  }
++}
++
++export function planWebBotAuthRestart({ inFlight, quietForMs, quietNeededMs, supervised }) {
++  if (inFlight > 0) return "wait-for-requests";
++  if (quietForMs < quietNeededMs) return "wait-for-quiet";
++  return supervised() ? "restart" : "unsupervised";
++}
++
++function shortCode(fingerprint) {
++  return typeof fingerprint === "string" ? fingerprint.slice(0, 12) : "unknown";
++}
++
++function restartForCodeUpdate({ updates, activity, quietNeededMs }) {
++  const pending = updates.poll();
++  if (pending == null) return;
++  const update = `code update ${shortCode(updates.loaded)} -> ${shortCode(pending)}`;
++  const plan = planWebBotAuthRestart({
++    inFlight: activity.inFlight,
++    quietForMs: activity.quietForMs(),
++    quietNeededMs,
++    supervised: () => readWebBotAuthRegisteredPid() === process.pid,
++  });
++  if (plan === "wait-for-quiet") {
++    logOnce(`${update} pending; restarting once no request has been signed for ${quietNeededMs}ms`);
++  } else if (plan === "unsupervised") {
++    logOnce(
++      `${update} pending; this daemon is not under desktop supervision, so the new code loads on the next box start`,
++    );
++  } else if (plan === "restart") {
++    log(`${update}; exiting so the desktop supervisor relaunches the daemon on the new code`);
++    process.exit(0);
++  }
++}
++
+ async function main() {
++  const updates = createWebBotAuthCodeUpdateWatch({
++    intervalMs: restartTimingMs(
++      process.env.SAND_WEB_BOT_AUTH_UPDATE_CHECK_MS,
++      WEB_BOT_AUTH_UPDATE_CHECK_INTERVAL_MS,
++    ),
++  });
++  const quietNeededMs = restartTimingMs(
++    process.env.SAND_WEB_BOT_AUTH_RESTART_QUIET_MS,
++    WEB_BOT_AUTH_RESTART_QUIET_MS,
++  );
++  const activity = new WebBotAuthActivity();
++  process.once("SIGTERM", () => {
++    log(`pid=${process.pid} stopping on SIGTERM`);
++    process.exit(0);
++  });
++  log(`started pid=${process.pid} code=${shortCode(updates.loaded)}`);
+   const config = resolveWebBotAuthConfig();
+   let signer = null;
+   let tokenSource = null;
+@@ -1043,6 +1223,7 @@
+     prefetchToken: () => tokenSource?.getToken(),
+     signedOriginCache: new WebBotAuthSignedOriginCache(),
+     failures: new WebBotAuthFailureReporter(),
++    activity,
+   });
+   let wakeRequested = false;
+   let releaseSleep = null;
+@@ -1052,6 +1233,7 @@
+   });
+   for (;;) {
+     const enabled = await daemon.tick();
++    restartForCodeUpdate({ updates, activity, quietNeededMs });
+     const interval =
+       enabled || markerWatcher == null
+         ? BROWSER_ATTACH_POLL_INTERVAL_MS

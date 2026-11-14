@@ -1,0 +1,78 @@
+---
+name: microsoft-teams
+description: >-
+  When someone asks how Grok Bot works with Microsoft Teams: turning it on, the
+  admin roles it needs, bringing a bot in and its approval, adding it or linking
+  accounts, its permissions, or why a bot in Teams isn't set up or answering.
+---
+# Microsoft Teams
+
+A bot can be brought into Microsoft Teams as its own Teams app, named after it: a Team Bot works in 1:1 chats, group chats, and channels, and a personal bot in 1:1 chats with its owner. This is how that setup works end to end, for the admins and teammates who ask about it.
+
+This skill explains how the setup works, not where each control sits: screens and labels change often. Describe each step by what it does and who does it, and let the Grok Bot app, the Cursor dashboard, or Microsoft's admin centers show the way. For where something sits in the Grok Bot app, use the `app-ui-map` skill when it is in your catalog.
+
+## Who does what
+Three roles take part, and one person can hold more than one.
+
+- Turning Teams on for the organization, once per Cursor team: one person who is both an admin of the Cursor team and a Microsoft Teams Administrator or Global Administrator. Teams Administrator is the narrower role and the one to suggest. It starts in Cursor and ends with a Microsoft sign-in that approves Grok Bot for the whole Microsoft 365 organization. Neither the Cursor role nor the Microsoft role alone is enough, and the step can't be handed off halfway. If the organization uses Privileged Identity Management, the role has to be activated, not just eligible, before signing in.
+- Running Teams on the Microsoft side: a Global Administrator or a Teams Administrator. They allow custom apps for the organization, review each bot, and decide who can use it.
+- Bringing a bot to Teams and using it: the bot's owner brings it in, a manager can finish once the owner has connected, and anyone the bot is shared with adds it and chats with it.
+
+Microsoft ties the organization's approval to the account that gave it. If that account later loses its admin role, the approval stops counting and bots fall back to their owners' own Microsoft sign-ins. If the account is disabled, leaves, or Microsoft otherwise refuses the approval, a Cursor team admin has to revoke it and turn Teams on again. Suggest a dedicated admin account for that step when an organization is setting up.
+
+## How a bot gets into Teams
+1. The organization allows custom apps in Teams. Each bot arrives in Teams as a custom app built for that organization, not as a public store app, so the Teams app settings and any app permission policies have to let custom apps through for the people who will use it. Microsoft doesn't tell admins about new submissions by default; an admin can turn on alerts for app submissions, or let users request apps so they can ask rather than hit a dead end.
+2. The Cursor team admin turns Teams on, once. This links the Cursor team to one Microsoft 365 organization and approves Grok Bot's delegated permissions for everyone in it, so teammates never see a Microsoft consent prompt. Switching to another organization or admin account means turning it off and on again. Until it is on, an owner who hasn't already connected their own Microsoft account can't bring a Team Bot to Teams, and teammates can't link a Microsoft account. Owners who connected earlier keep using their own sign-in.
+3. A bot meant for the team is shared with the Cursor team first. A personal bot skips this step and step 2: it goes to Teams on its owner's own Microsoft sign-in as an app for 1:1 chats only, which can't be added to a team or a group chat.
+4. The owner connects the bot. They sign in with their own Microsoft work account, in the organization that was turned on for a Team Bot, and the bot is submitted to the organization's app catalog for review. The browser has to be signed in to the same Cursor account as the Grok Bot app, and if the owner belongs to several Microsoft organizations they pick the one the bot should go to. Since Microsoft doesn't notify admins, the owner tells their Teams admin it is waiting.
+5. A Teams admin reviews the bot and publishes it, then sets who it is available to if the organization manages access per app. They can reject it instead; the owner then changes the bot and submits it again. Turning Teams on lets no bot skip review: every bot, and every later update to one, waits for a Teams admin, including the admin's own bots.
+6. Teams finishes setting up the approved app. This usually takes minutes and can take up to about an hour; the Grok Bot app shows when the bot is ready to add and offers a link that opens it in Teams. Someone who adds the bot to a 1:1 chat before it is ready, for example by finding it in the Teams store too early, can get a 1:1 chat that stays silent for hours. Channels and group chats aren't affected, so steer people to wait for ready.
+7. People add the bot where they want it. The bot never adds itself to a team or chat.
+
+Step 1 happens once per Microsoft organization. Step 2 happens once per Cursor team, so a second Cursor team in the same Microsoft organization turns Teams on for itself. Steps 3 to 7 repeat for each bot.
+
+## Using a bot in Teams
+- A 1:1 chat works like messaging any colleague.
+- In a group chat, someone adds the bot to the chat and @mentions it to ask something.
+- In a channel, anyone in the team can add the bot to that team. The bot only receives channel messages that really @mention it, picked from Teams' mention list rather than typed as plain text, and it answers in the thread.
+- When added, the bot introduces itself, and while it works on a request Teams shows its progress until the answer replaces it.
+- A conversation that can include people outside the team, such as a shared channel or one with guests, doesn't get the team's memories or files.
+- A Team Bot answers people on the bot's Cursor team; a personal bot answers only its owner. Guest accounts in the Microsoft organization can't add the bot, and everyone who chats with it needs a Teams license in that organization.
+- The bot's own Teams app is separate from the Microsoft Teams plugin. The plugin's tools act as the Microsoft account of whoever connected it, while the bot's Teams app is the bot itself.
+
+## Linking accounts
+Linking tells Grok Bot who someone is on both sides. Each person does it for themselves; turning Teams on for the organization links nobody.
+
+- Cursor account, from Teams: the first time someone messages a Team Bot in Teams, the bot asks them to link their Cursor account, once, by signing in with the account they use in the Grok Bot app.
+- Microsoft account, from the Grok Bot app: people link their work account in the organization that was turned on, from the app's settings. This only works once Teams is on for their Cursor team, and an account in another Microsoft organization is refused.
+
+## Updates, removal, and turning Teams off
+- When a bot changes in a way Teams has to know about, such as its name or picture, the owner sends Teams a new version. It goes through the same admin review; the current version keeps working until it is approved, and a rejected update leaves the live one in place.
+- Removing a bot from Teams removes it from every team, chat, and person that added it. Deleting the bot does the same, and a Teams admin can also block or remove its app from Microsoft's side.
+- A person who disconnects their Microsoft account disconnects it from every bot they own in that organization. Bots already in Teams keep answering.
+- A Cursor team admin can turn Teams off for the team. Bots already in Teams keep working until they are removed. Later submissions, updates, and installs fall back to each owner's own Microsoft sign-in, so an owner who never connected one can't bring a bot in, and teammates can't link a Microsoft account. Withdrawing Microsoft's approval entirely also means removing Grok Bot's enterprise app in Microsoft Entra.
+
+## What an admin approves
+- The organization-wide approval grants delegated Microsoft Graph permissions only: Grok Bot acts as the signed-in person, within what that person can already do, and holds no application permissions in the organization. With it, Grok Bot can submit a bot or an update to the app catalog for review, find and remove a bot's own installs when the bot is removed or deleted, set up each bot's Microsoft Entra identity, keep people signed in, and identify which Microsoft account someone linked. It can't publish an app; a Teams admin still does that. Microsoft's consent screen lists the exact permissions at the time of approval.
+- A Team Bot's Teams app works in 1:1 chats, group chats, and channels. In a group chat it asks for permission to read that chat's messages, which covers only the chats it is added to and which the organization's resource-specific consent setting controls. In a channel it sees only messages that @mention it.
+- Grok Bot asks for no organization-wide access to mail, calendars, files, or Teams messages, and no way to publish an app without a Teams admin.
+
+## When something is wrong
+Match what the person sees to its cause; the message they quote usually names it.
+
+- Teams isn't on for the Cursor team, or only a team admin can turn it on: step 2 hasn't happened. A Cursor team admin who is also a Teams Administrator or Global Administrator does it.
+- Microsoft asks a teammate for admin approval, or an admin's sign-in isn't treated as an admin's: the organization-wide approval is missing, outdated, or was given without approving for the whole organization, or the admin role isn't active. The admin activates their role if needed. If an approval is already in place, a Cursor team admin revokes it first, since a standing approval can't be replaced, then turns Teams on again.
+- The team's Teams connection stopped working or needs attention: Microsoft no longer accepts the approval, usually because the account that gave it was disabled or Grok Bot's enterprise app was removed in Entra. A Cursor team admin revokes the approval, then one who is also a Teams Administrator or Global Administrator turns Teams on again.
+- Bots fall back to their owners' own sign-ins even though Teams is on: the account that gave the approval no longer holds an admin role. Restore the role, or revoke and turn Teams on again with an admin account.
+- A Team Bot can't be connected yet: it isn't shared with the Cursor team.
+- The bot sits waiting for approval: a Teams admin hasn't published it. They find it among the submitted custom apps in the Teams admin center.
+- Teams didn't accept the submission: the organization's settings don't allow custom apps to be submitted (step 1).
+- The bot was declined: talk to the Teams admin, change the bot, and submit it again.
+- The bot is blocked by policy, or Teams offers to request access instead of adding it: the app isn't available to that person yet. A Teams admin checks who it is available to and the app permission policy. Availability changes can take Microsoft up to a day to reach Teams; signing out of Teams and back in, and opening the bot from the Grok Bot app's link, help.
+- No welcome message, or silence in a 1:1 chat: the bot was likely added before Teams finished setting it up. Removing and re-adding it doesn't help; use it in a channel or group chat for now and try the 1:1 chat again later.
+- No answer in a channel: the message didn't really @mention the bot.
+- Signed in as a different Cursor account, the wrong Microsoft organization, or an expired sign-in link: start again with the right account; sign-in links are short-lived and work once.
+- A connection that keeps failing: the error page shows Microsoft's error code and trace and correlation ids; the person sends those to their Microsoft admin or Cursor support.
+
+## Answering
+Answer what was asked in a few plain sentences for the person's role, rather than walking through all of this: an admin wants their step and why it needs their role, a teammate wants how to add the bot or why it is quiet. When the question is about this bot's own setup and you have SetUpMicrosoftTeams, check its status first, and when the owner asks you to bring yourself to Teams, run it with start and follow what its result says.

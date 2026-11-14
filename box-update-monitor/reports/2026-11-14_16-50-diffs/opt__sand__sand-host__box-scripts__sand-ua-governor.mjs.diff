@@ -1,0 +1,77 @@
+--- 2026-11-14_14-49:/opt/sand/sand-host/box-scripts/sand-ua-governor.mjs
++++ 2026-11-14_16-50:/opt/sand/sand-host/box-scripts/sand-ua-governor.mjs
+@@ -8,7 +8,6 @@
+   openSync,
+   readdirSync,
+   readFileSync,
+-  renameSync,
+   rmSync,
+   writeFileSync,
+ } from "node:fs";
+@@ -56,6 +55,7 @@
+   isBoxClockUtc,
+   parseExitGeoFlag,
+   resolveEgressTimeZone,
++  writeAtomically,
+ } from "./sand-egress-timezone.mjs";
+ import {
+   lookupExitCountry,
+@@ -322,16 +322,27 @@
+   return WORKER_TARGET_TYPES.has(targetType);
+ }
+ 
+-const MARKER_GATE_ON = new Set(["1", "on", "true"]);
+-const MARKER_CONTENTS_OFF = new Set(["0", "off", "false"]);
++const MARKER_GATE_ON = new Set(["1", "on", "true", "yes"]);
++const MARKER_GATE_OFF = new Set(["0", "off", "false", "no"]);
+ 
+-function resolveMarkerGate({ label, envValue, markerPath, readFile, honorContents = false }) {
+-  if (envValue != null && String(envValue).trim() !== "") {
+-    return MARKER_GATE_ON.has(String(envValue).trim().toLowerCase());
++function markerGateEnvOverride(label, envValue) {
++  const value = String(envValue ?? "")
++    .trim()
++    .toLowerCase();
++  if (MARKER_GATE_ON.has(value)) return true;
++  if (MARKER_GATE_OFF.has(value)) return false;
++  if (value !== "") {
++    reportOnce(`${label} env override ignored: not 1, on, true, yes, 0, off, false, or no`);
+   }
++  return undefined;
++}
++
++function resolveMarkerGate({ label, envValue, markerPath, readFile, honorContents = false }) {
++  const override = markerGateEnvOverride(label, envValue);
++  if (override !== undefined) return override;
+   try {
+     const contents = readFile(markerPath, "utf8");
+-    return !honorContents || !MARKER_CONTENTS_OFF.has(String(contents).trim().toLowerCase());
++    return !honorContents || !MARKER_GATE_OFF.has(String(contents).trim().toLowerCase());
+   } catch (error) {
+     if (
+       error == null ||
+@@ -362,9 +373,8 @@
+ }
+ 
+ function resolveExperimentMarkerGate({ label, envValue, markerPath, readyMarkerPath, readFile }) {
+-  if (envValue != null && String(envValue).trim() !== "") {
+-    return MARKER_GATE_ON.has(String(envValue).trim().toLowerCase()) ? "on" : "off";
+-  }
++  const override = markerGateEnvOverride(label, envValue);
++  if (override !== undefined) return override ? "on" : "off";
+   if (resolveMarkerGate({ label, markerPath, readFile })) return "on";
+   const ready = resolveMarkerGate({
+     label: "experiments ready",
+@@ -1048,11 +1058,7 @@
+       ? "flag"
+       : "cdp";
+   try {
+-    const scratch = `${path}.${process.pid}`;
+-    writeFileSync(scratch, `${source} ${configuredAcceptLanguage(browser.acceptLanguage)}\n`, {
+-      mode: 0o644,
+-    });
+-    renameSync(scratch, path);
++    writeAtomically(path, `${source} ${configuredAcceptLanguage(browser.acceptLanguage)}\n`);
+   } catch (error) {
+     reportOnce(`accept-language record failed: ${errorClass(error)}`);
+   }
