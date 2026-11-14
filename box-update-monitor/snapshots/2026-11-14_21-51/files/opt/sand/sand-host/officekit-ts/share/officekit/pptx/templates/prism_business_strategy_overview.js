@@ -1,0 +1,720 @@
+/**
+ * PRISM BUSINESS deck — recreated with pptxgenjs.
+ * Slide size 13.333 x 7.5 in (16:9). Raster photos in the original are replaced
+ * by labelled "[image]" placeholder rectangles.
+ */
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+// ---------------------------------------------------------------- palette ---
+const RED = 'E2462F';
+const BLACK = '000000';
+const WHITE = 'FFFFFF';
+const GREY_BG = 'FBFBFB'; // slide background
+const PANEL = 'F2F2F2'; // light panel fill
+const BODY = '595959'; // body copy grey
+const SILVER = 'D9D9D9'; // contact detail text / map states
+const HEAD = 'Anton'; // major (display) typeface
+const TEXT = 'Lato Light'; // minor (body) typeface
+
+// Reusable copy blocks (the source deck uses the same lorem ipsum throughout).
+const LOREM_LONG =
+  'Vivamus luctus, ligula at viverra ullamcorper, ex libero pellentesque felis, quis tincidunt sem sapien at ' +
+  'enim. Integer vitae diam urna. Quisque vulputate, purus a interdum euismod, nunc nisl gravida purus, sit ' +
+  'amet maximus ipsum neque ut lacus. Cras non sagittis justo, a euismod ex. Morbi ornare placerat tristique.';
+const LOREM_MED =
+  'Morbi mattis commodo sem, vel auctor metus euismod et. Mauris pulvinar, ipsum in pulvinar ultrices, mauris ' +
+  'ante feugiat nibh, at tincidunt lectus erat et nisl. Ut auctor nibh sit amet elit tristique pretium. Donec ' +
+  'at molestie arcu. ';
+const LOREM_MED_FULL = LOREM_MED + 'Fusce vitae tristique risus. Suspendisse sed hendrerit odio.';
+const LOREM_SHORT = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec sed felis.';
+const LOREM_TINY = 'Lorem ipsum dolor sit amet, consectetur elit.';
+const LOREM_CARD =
+  'Vivamus luctus, ligula at viverra ullamcorper, ex libero pellentesque felis, quis tincidunt sem sapien at ' +
+  'enim. Integer vitae diam urna. Quisque vulputate, purus a interdum euismod.';
+const LOREM_STEP =
+  'Vivamus luctus, ligula at viverra ullamcorper, ex libero pellentesque felis, quis tincidunt sem sapien at ' +
+  'enim. Integer vitae diam urna. ';
+const LOREM_FOOT =
+  'Interdum et malesuada fames ac ante ipsum primis in faucibus. Maecenas nec tempus quam. Etiam sit amet ' +
+  'varius sem, sit amet fermentum neque. Nam sed dictum nulla, non tincidunt justo. Pellentesque ullamcorper ' +
+  'aliquet libero, eget molestie dui vulputate posuere. In hac habitasse platea dictumst.';
+const MOCKUP_COPY =
+  'Suspendisse egestas ipsum in mi dapibus tempor. Interdum et malesuada fames ac ante ipsum primis in ' +
+  'faucibus. Fusce metus ante.';
+const QUOTE_COPY =
+  '\u201C Suspendisse egestas ipsum in mi dapibus tempor. Interdum et malesuada fames ac ante ipsum primis in ' +
+  'faucibus. Fusce metus ante. \u201C';
+const BULLETS_GOALS = [
+  'Morbi mattis commodo sem, vel auctor me euismod et.',
+  'Mauris pulvinar, ipsum in pulvinar ultrices, mauris ante feugiat nibh, at tincidunt lectus erat et nisl.',
+  'Ut auctor nibh sit amet elit tristique pretium.',
+  'Donec at molestie arcu. Fusce vitae tristique risus. Suspendisse sed hendrerit odio.',
+];
+const BULLETS_PRICE = [
+  'Vivamus luctus, ligula at viverra ullamcorper.',
+  'Ex libero pellentesque felis, quis tincidunt sem sapien at enim.',
+];
+
+// ---------------------------------------------------------------- helpers ---
+// All text boxes in the deck have zero internal inset and top alignment.
+const TBOX = { margin: 0, valign: 'top', wrap: true };
+
+/** Display headline set in Anton (the deck's major font). */
+function head(slide, text, x, y, w, opt = {}) {
+  slide.addText(text, {
+    ...TBOX, x, y, w, h: opt.h || 0.4838,
+    fontFace: HEAD, fontSize: opt.size || 44, color: opt.color || BLACK,
+    align: opt.align || 'left', lineSpacingMultiple: 0.9,
+  });
+}
+
+/** Italic Lato Light body copy at 150% line spacing (the deck's default). */
+function body(slide, text, x, y, w, h, opt = {}) {
+  slide.addText(text, {
+    ...TBOX, x, y, w, h,
+    fontFace: TEXT, fontSize: opt.size || 10, italic: true,
+    color: opt.color || BODY, lineSpacingMultiple: opt.lsm || 1.5,
+  });
+}
+
+/** Bold Lato label (card titles, names). */
+function label(slide, text, x, y, w, h, opt = {}) {
+  slide.addText(text, {
+    ...TBOX, x, y, w, h,
+    fontFace: 'Lato', fontSize: opt.size || 14, bold: true,
+    color: opt.color || BLACK, lineSpacingMultiple: 1.0,
+  });
+}
+
+function rect(slide, x, y, w, h, fill) {
+  slide.addShape('rect', { x, y, w, h, fill: { color: fill }, line: { type: 'none' } });
+}
+
+/** Short accent rule that tops most cards. */
+function rule(slide, x, y, w, color, pt = 2.75) {
+  slide.addShape('line', { x, y, w, h: 0, line: { color, width: pt } });
+}
+
+/** Bulleted italic body list (marL/indent 171450 EMU = 13.5pt in the source). */
+function bulletList(slide, items, x, y, w, h, color) {
+  slide.addText(
+    items.map((t) => ({ text: t, options: { breakLine: true, bullet: { indent: 13.5 } } })),
+    {
+      ...TBOX, x, y, w, h,
+      fontFace: TEXT, fontSize: 10, italic: true, color,
+      lineSpacingMultiple: 1.5, paraSpaceBefore: 10,
+    }
+  );
+}
+
+/** Every slide carries this small kicker in the top-left corner. */
+function kicker(slide, color = BLACK) {
+  slide.addText('- Profitable Business', {
+    ...TBOX, x: 0.6287, y: 0.4679, w: 2.1146, h: 0.1496,
+    fontFace: 'Lato', fontSize: 10, bold: true, color, lineSpacingMultiple: 1.0,
+  });
+}
+
+/**
+ * Two-line Anton title in the left column, the deck's standard header block.
+ * Slides 1, 12 and 20 use the taller 80pt variant.
+ */
+function stackTitle(slide, line1, line2, opt = {}) {
+  const w = opt.w || 3.0102;
+  const big = opt.size === 80;
+  head(slide, line1, 0.6287, big ? 2.4481 : 2.3167, w, { size: opt.size, color: opt.color, h: big ? 0.8738 : 0.4838 });
+  head(slide, line2, 0.6287, big ? 3.5995 : 2.9844, w, { size: opt.size, color: opt.color, h: big ? 0.8738 : 0.4838 });
+}
+
+/**
+ * Stand-in for a photo in the source deck: a light rectangle at the original
+ * frame's position and size, captioned so the swap is obvious.
+ */
+function imagePlaceholder(slide, x, y, w, h, opt = {}) {
+  slide.addShape('rect', {
+    x, y, w, h,
+    fill: { color: opt.fill || 'F4F4F4' },
+    line: { color: opt.line || 'DDDDDD', width: 0.75, dashType: 'dash' },
+  });
+  slide.addText('[image]', {
+    x, y, w, h, margin: 0, align: 'center', valign: 'middle',
+    fontFace: 'Lato', fontSize: Math.min(11, Math.max(7, h * 5)), color: 'B0B0B0',
+  });
+}
+
+/** Statistic block: big Anton number over a one-line caption. */
+function statBlock(slide, x, y, value, color, opt = {}) {
+  head(slide, value, x, y, 1.3115, { size: 36, color, h: 0.4595 });
+  body(slide, opt.caption || LOREM_TINY, x, y + (opt.gap || 0.4987), 1.5303, opt.capH || 0.4344, {
+    color, align: opt.align,
+  });
+}
+
+/** Red/black square tile with a +12k style statistic centred inside it. */
+function statTile(slide, x, y, fill, value, caption) {
+  rect(slide, x, y, 2.0253, 2.0253, fill);
+  slide.addText(value, {
+    ...TBOX, x: x + 0.3569, y: y + 0.4359, w: 1.3115, h: 0.4595,
+    fontFace: HEAD, fontSize: 36, color: WHITE, align: 'center', lineSpacingMultiple: 0.9,
+  });
+  slide.addText(caption, {
+    ...TBOX, x: x + 0.2475, y: y + 0.9346, w: 1.5303, h: 0.6547,
+    fontFace: TEXT, fontSize: 10, italic: true, color: WHITE,
+    align: 'center', lineSpacingMultiple: 1.5,
+  });
+}
+
+// ------------------------------------------------------------ line icons ---
+// The original deck uses vector pictograms; these are rebuilt from primitives.
+
+const NOLINE = { type: 'none' };
+const stroke = (pt) => ({ color: BLACK, width: pt });
+
+/** Lens-shaped eye: two arcs meeting at the corners, with a ringed pupil. */
+function iconEye(s, x, y, w, h, color, hole) {
+  s.addShape('custGeom', {
+    x, y, w, h, fill: { color }, line: NOLINE,
+    points: [
+      { x: 0, y: h / 2 },
+      { x: w, y: h / 2, curve: { type: 'quadratic', x1: w / 2, y1: -h * 0.5 } },
+      { x: 0, y: h / 2, curve: { type: 'quadratic', x1: w / 2, y1: h * 1.5 } },
+      { close: true },
+    ],
+  });
+  s.addShape('ellipse', { x: x + w * 0.34, y: y + h * 0.05, w: w * 0.32, h: h * 0.9,
+    fill: { color: hole }, line: NOLINE });
+  s.addShape('ellipse', { x: x + w * 0.41, y: y + h * 0.24, w: w * 0.18, h: h * 0.52,
+    fill: { color }, line: NOLINE });
+}
+
+function iconTarget(s, x, y, d, color, hole) {
+  [[1.0, color], [0.74, hole], [0.56, color], [0.32, hole], [0.18, color]].forEach(([k, c]) => {
+    s.addShape('ellipse', { x: x + (d * (1 - k)) / 2, y: y + (d * (1 - k)) / 2, w: d * k, h: d * k,
+      fill: { color: c }, line: NOLINE });
+  });
+}
+
+/** Outlined pictograms sitting inside the timeline circles. */
+function timelineGlyph(s, kind, x, y, w, h) {
+  const outline = { line: stroke(1.1) };
+  const hline = (px, py, pw) => s.addShape('line', { x: x + w * px, y: y + h * py, w: w * pw, h: 0, line: stroke(1) });
+  if (kind === 'invoice') { // receipt with a $ column and ruled lines
+    s.addShape('rect', { x: x + w * 0.14, y, w: w * 0.68, h: h * 0.88, ...outline });
+    s.addText('$', { x: x + w * 0.16, y: y + h * 0.12, w: w * 0.24, h: h * 0.26, margin: 0,
+      fontFace: 'Lato', fontSize: 6, bold: true, color: BLACK, align: 'center', valign: 'middle' });
+    hline(0.5, 0.24, 0.24); hline(0.5, 0.42, 0.24); hline(0.24, 0.62, 0.48);
+    s.addShape('arc', { x: x + w * 0.5, y: y + h * 0.7, w: w * 0.46, h: h * 0.34,
+      angleRange: [0, 180], ...outline });
+  } else if (kind === 'wallet') { // wallet with a clasp and a note peeking out
+    s.addShape('rect', { x: x + w * 0.04, y: y + h * 0.06, w: w * 0.7, h: h * 0.32,
+      rotate: -14, ...outline });
+    s.addShape('roundRect', { x, y: y + h * 0.28, w: w * 0.86, h: h * 0.66, rectRadius: h * 0.1, ...outline });
+    s.addShape('roundRect', { x: x + w * 0.64, y: y + h * 0.48, w: w * 0.34, h: h * 0.28,
+      rectRadius: h * 0.07, ...outline });
+  } else if (kind === 'card') { // hand holding a bank card
+    s.addShape('roundRect', { x: x + w * 0.42, y, w: w * 0.5, h: h * 0.56, rectRadius: h * 0.06, ...outline });
+    hline(0.48, 0.16, 0.36);
+    s.addShape('roundRect', { x, y: y + h * 0.26, w: w * 0.56, h: h * 0.5, rectRadius: h * 0.12, ...outline });
+    s.addShape('roundRect', { x: x + w * 0.04, y: y + h * 0.72, w: w * 0.6, h: h * 0.28,
+      rectRadius: h * 0.12, ...outline });
+  } else if (kind === 'phone') { // hand holding a phone
+    s.addShape('roundRect', { x: x + w * 0.2, y, w: w * 0.56, h: h * 0.66, rectRadius: h * 0.08, ...outline });
+    s.addShape('rect', { x: x + w * 0.32, y: y + h * 0.14, w: w * 0.32, h: h * 0.34, ...outline });
+    s.addShape('roundRect', { x, y: y + h * 0.56, w: w * 0.72, h: h * 0.42, rectRadius: h * 0.14, ...outline });
+  } else if (kind === 'scan') { // phone paying a card terminal
+    s.addShape('roundRect', { x, y, w: w * 0.44, h, rectRadius: h * 0.09, ...outline });
+    s.addShape('rect', { x: x + w * 0.08, y: y + h * 0.14, w: w * 0.28, h: h * 0.56, ...outline });
+    s.addShape('roundRect', { x: x + w * 0.46, y: y + h * 0.3, w: w * 0.54, h: h * 0.36,
+      rectRadius: h * 0.06, ...outline });
+  } else { // stacked gold bars under falling coins
+    [[0.12, 0.0], [0.42, -0.06], [0.74, 0.04]].forEach(([k, dy]) =>
+      s.addShape('ellipse', { x: x + w * k, y: y + h * (0.02 + dy), w: w * 0.16, h: h * 0.2, ...outline }));
+    s.addShape('trapezoid', { x: x + w * 0.32, y: y + h * 0.4, w: w * 0.36, h: h * 0.26, ...outline });
+    [0.1, 0.54].forEach((k) =>
+      s.addShape('trapezoid', { x: x + w * k, y: y + h * 0.7, w: w * 0.36, h: h * 0.26, ...outline }));
+  }
+}
+
+/** White outline badges next to the contact details on the closing slide. */
+function contactGlyph(s, kind, x, y, w, h) {
+  const outline = { line: { color: WHITE, width: 0.9 } };
+  if (kind === 'globe') { // globe in a gear
+    s.addShape('ellipse', { x, y, w, h, ...outline });
+    s.addShape('line', { x, y: y + h / 2, w, h: 0, line: { color: WHITE, width: 0.6 } });
+    s.addShape('ellipse', { x: x + w * 0.3, y, w: w * 0.4, h, ...outline });
+  } else if (kind === 'pin') { // globe with a map pin
+    s.addShape('ellipse', { x, y: y + h * 0.18, w, h: h * 0.82, ...outline });
+    s.addShape('line', { x, y: y + h * 0.6, w, h: 0, line: { color: WHITE, width: 0.6 } });
+    s.addShape('teardrop', { x: x + w * 0.5, y, w: w * 0.42, h: h * 0.42, rotate: 225, ...outline });
+  } else { // headset with a speech bubble
+    s.addShape('ellipse', { x, y, w, h, ...outline });
+    s.addShape('ellipse', { x: x + w * 0.22, y: y + h * 0.22, w: w * 0.56, h: h * 0.5, ...outline });
+  }
+}
+
+/** Support-agent glyph in the corner of the contact card: head, headset, shoulders. */
+function supportGlyph(s, x, y, w, h) {
+  const outline = { line: { color: WHITE, width: 1 } };
+  s.addShape('ellipse', { x: x + w * 0.26, y: y + h * 0.04, w: w * 0.48, h: h * 0.4, ...outline });
+  s.addShape('arc', { x: x + w * 0.14, y, w: w * 0.72, h: h * 0.5,
+    angleRange: [180, 360], ...outline });
+  [0.06, 0.8].forEach((k) => s.addShape('roundRect', {
+    x: x + w * k, y: y + h * 0.18, w: w * 0.14, h: h * 0.2, rectRadius: w * 0.07, ...outline }));
+  s.addShape('line', { x: x + w * 0.5, y: y + h * 0.46, w: w * 0.2, h: 0, line: { color: WHITE, width: 0.75 } });
+  s.addShape('custGeom', {
+    x, y: y + h * 0.52, w, h: h * 0.48, line: { color: WHITE, width: 1 },
+    points: [
+      { x: 0, y: h * 0.48 }, { x: 0, y: h * 0.16 },
+      { x: w * 0.5, y: 0, curve: { type: 'quadratic', x1: w * 0.16, y1: 0 } },
+      { x: w, y: h * 0.16, curve: { type: 'quadratic', x1: w * 0.84, y1: 0 } },
+      { x: w, y: h * 0.48 }, { close: true },
+    ],
+  });
+}
+
+/** Laptop mockup on slide 16: dark lid with a white screen sitting on a light base. */
+function laptopMockup(s, x, y, w, h) {
+  s.addShape('rect', { x: x + w * 0.101, y: y + h * 0.006, w: w * 0.798, h: h * 0.932,
+    fill: { color: '141414' }, line: NOLINE });
+  s.addShape('rect', { x: x + w * 0.1245, y: y + h * 0.058, w: w * 0.7516, h: h * 0.822,
+    fill: { color: 'FDFDFD' }, line: NOLINE });
+  s.addShape('roundRect', { x: x + w * 0.006, y: y + h * 0.938, w: w * 0.984, h: h * 0.058,
+    rectRadius: h * 0.026, fill: { color: 'CFD1D3' }, line: NOLINE });
+  s.addShape('roundRect', { x: x + w * 0.44, y: y + h * 0.944, w: w * 0.12, h: h * 0.012,
+    rectRadius: h * 0.006, fill: { color: 'A7AAAC' }, line: NOLINE });
+}
+
+/** Phone mockup on slide 17: rounded black shell, white screen, speaker notch. */
+function phoneMockup(s, x, y, w, h) {
+  s.addShape('roundRect', { x: x + w * 0.011, y, w: w * 0.98, h, rectRadius: w * 0.11,
+    fill: { color: '141414' }, line: NOLINE });
+  s.addShape('roundRect', { x: x + w * 0.055, y: y + h * 0.019, w: w * 0.892, h: h * 0.962,
+    rectRadius: w * 0.09, fill: { color: 'FDFDFD' }, line: NOLINE });
+  s.addShape('roundRect', { x: x + w * 0.36, y: y + h * 0.026, w: w * 0.28, h: h * 0.022,
+    rectRadius: h * 0.011, fill: { color: '141414' }, line: NOLINE });
+}
+
+/** Draw a flat polygon from a [x0,y0,x1,y1,...] inch coordinate list. */
+function polygon(s, flat, color) {
+  const xs = [], ys = [];
+  for (let i = 0; i < flat.length; i += 2) { xs.push(flat[i]); ys.push(flat[i + 1]); }
+  const x0 = Math.min(...xs), y0 = Math.min(...ys);
+  const w = Math.max(...xs) - x0, h = Math.max(...ys) - y0;
+  if (w <= 0 || h <= 0) return;
+  const pts = xs.map((vx, i) => ({ x: vx - x0, y: ys[i] - y0 }));
+  pts.push({ close: true });
+  s.addShape('custGeom', { x: x0, y: y0, w, h, points: pts, fill: { color }, line: NOLINE });
+}
+
+// ------------------------------------------- simplified USA map outlines ---
+const USA_GRAY = [
+  [7.79,3.14,7.69,3.52,7.69,3.6,7.48,3.54,7.27,3.55,7.17,3.51,7.09,3.51,7.07,3.49,7.07,3.44,7.05,3.4,6.96,3.36,6.97,3.32,6.98,3.33,7,3.3,6.98,3.27,7.01,3.26,6.99,3.24,6.99,3.12,6.97,3.1,6.99,3.02,7.07,3.08,7.14,3.1,7.14,3.12,7.17,3.12,7.17,3.15,7.11,3.22,7.18,3.18,7.11,3.26,7.12,3.28,7.18,3.24,7.22,3.16,7.21,3.09,7.2,3.11,7.21,3.16,7.18,3.12,7.2,3.06,7.22,3.08,7.21,2.98,7.79,3.14],
+  [8.32,5.14,9.06,5.23,8.99,6,8.54,5.96,8.54,6,8.32,5.97,8.3,6.03,8.19,6.02,8.32,5.14],
+  [10.22,6.27,10.24,6.22,10.2,6.09,10.17,6.06,10.17,5.81,10.12,5.81,10.01,5.75,9.91,5.76,9.87,5.79,9.85,5.76,9.8,5.76,9.77,5.78,9.76,5.75,9.73,5.77,9.71,5.74,9.67,5.75,9.64,5.71,9.56,5.71,9.51,5.7,9.49,5.66,9.45,5.66,9.41,5.63,9.43,5.33,9.05,5.31,8.99,6,8.54,5.96,8.54,6,8.52,6,8.66,6.16,8.72,6.2,8.75,6.34,8.77,6.37,8.9,6.47,8.95,6.48,9.02,6.37,9.08,6.36,9.18,6.38,9.26,6.48,9.36,6.67,9.41,6.73,9.4,6.77,9.47,6.91,9.56,6.94,9.61,6.97,9.67,6.98,9.7,7.01,9.74,6.99,9.69,6.85,9.73,6.72,9.7,6.69,9.75,6.69,9.76,6.66,9.74,6.65,9.82,6.63,9.8,6.64,9.8,6.62,9.8,6.6,9.85,6.61,9.84,6.57,9.88,6.56,9.89,6.58,10.01,6.53,10.03,6.49,10.06,6.46,10.05,6.43,10.08,6.4,10.09,6.45,10.2,6.4,10.22,6.35,10.22,6.27],
+  [7.53,5.66,7.52,5.59,7.57,5.49,7.62,5.45,7.59,5.36,7.59,5.32,7.07,4.55,7.1,4.53,7.21,4.11,6.74,3.98,6.71,4.13,6.65,4.21,6.68,4.32,6.65,4.44,6.71,4.57,6.7,4.62,6.75,4.66,6.76,4.63,6.77,4.62,6.85,4.66,6.78,4.64,6.77,4.72,6.75,4.68,6.73,4.7,6.73,4.77,6.78,4.83,6.77,4.87,6.75,4.87,6.75,4.91,6.85,5.13,6.84,5.22,6.96,5.28,7.02,5.36,7.07,5.37,7.08,5.42,7.11,5.43,7.18,5.52,7.19,5.63,7.5,5.67,7.53,5.66],
+  [9.05,5.31,9.43,5.33,9.41,5.63,9.45,5.66,9.5,5.67,9.51,5.7,9.64,5.71,9.67,5.75,9.7,5.74,9.73,5.77,9.76,5.75,9.77,5.78,9.8,5.76,9.85,5.76,9.87,5.79,9.91,5.76,10.01,5.75,10.11,5.81,10.12,5.52,10.09,5.27,9.06,5.23,9.05,5.31],
+  [10.09,5.27,10.09,4.93,10.04,4.88,10.05,4.83,10.02,4.83,10,4.8,9.22,4.77,9.18,5.24,10.09,5.27],
+  [10,4.8,9.97,4.75,9.94,4.59,9.88,4.42,9.79,4.35,9.71,4.36,9.64,4.33,9.03,4.29,8.99,4.59,9.23,4.62,9.22,4.77,10,4.8],
+  [9.67,4.34,9.71,4.36,9.79,4.35,9.87,4.41,9.86,4.37,9.88,4.32,9.87,4.29,9.89,3.98,9.84,3.93,9.87,3.87,9.07,3.83,9.02,4.29,9.67,4.34],
+  [9.06,3.97,8.29,3.87,8.19,4.49,8.99,4.59,9.06,3.97],
+  [9.87,3.87,9.81,3.4,9.12,3.35,9.07,3.83,9.87,3.87],
+  [9.18,5.24,9.23,4.62,8.42,4.53,8.32,5.15,9.18,5.24],
+  [8.42,4.53,8.19,4.49,8.21,4.34,7.87,4.27,7.72,5.04,8.32,5.14,8.42,4.53],
+  [7.09,4.53,7.07,4.55,7.08,4.57,7.59,5.32,7.6,5.17,7.63,5.16,7.68,5.18,7.71,5.12,7.87,4.27,7.21,4.11,7.09,4.53],
+  [7.54,4.2,7.6,3.93,7.62,3.92,7.63,3.86,7.6,3.84,7.61,3.82,7.73,3.67,7.69,3.6,7.48,3.54,7.27,3.54,7.17,3.51,7.09,3.51,7.06,3.49,7.07,3.43,7.05,3.4,6.96,3.36,6.94,3.46,6.83,3.72,6.74,3.85,6.74,3.98,7.54,4.2],
+  [7.7,3.56,7.69,3.61,7.73,3.67,7.61,3.81,7.6,3.84,7.63,3.86,7.62,3.91,7.6,3.93,7.54,4.2,8.21,4.34,8.28,3.96,8.25,3.91,8.23,3.94,8.1,3.92,8.07,3.94,8.06,3.86,8.02,3.84,8,3.71,7.95,3.73,7.93,3.71,7.96,3.67,7.98,3.56,7.95,3.53,7.86,3.33,7.89,3.16,7.79,3.13,7.7,3.56],
+  [12.77,3.97,12.79,3.89,12.81,3.89,12.8,3.85,12.83,3.83,12.84,3.84,12.83,3.82,12.87,3.82,12.87,3.79,12.9,3.8,12.91,3.7,12.93,3.72,12.95,3.72,12.95,3.7,12.98,3.72,12.99,3.71,12.97,3.68,13.01,3.7,13.01,3.66,13.08,3.63,13.09,3.6,13.06,3.55,13.04,3.55,13.03,3.49,12.98,3.49,12.91,3.3,12.86,3.26,12.82,3.3,12.75,3.29,12.69,3.46,12.7,3.53,12.68,3.62,12.64,3.65,12.73,3.94,12.77,3.97],
+  [11.79,4.3,11.87,4.22,11.84,4.13,12.08,4.09,12.14,4.04,12.13,4,12.15,3.97,12.13,3.98,12.11,3.96,12.16,3.91,12.23,3.8,12.41,3.75,12.41,3.79,12.45,3.87,12.44,3.9,12.48,3.97,12.5,4.08,12.5,4.2,12.53,4.32,12.5,4.4,12.61,4.35,12.66,4.31,12.64,4.34,12.71,4.31,12.6,4.4,12.51,4.42,12.47,4.37,12.38,4.35,12.39,4.33,12.35,4.32,12.29,4.25,11.8,4.34,11.79,4.3],
+  [12.41,3.79,12.45,3.87,12.44,3.9,12.48,3.97,12.5,4.08,12.59,4.07,12.58,3.93,12.59,3.82,12.62,3.8,12.61,3.72,12.6,3.7,12.41,3.75,12.41,3.79],
+  [12.64,3.65,12.61,3.65,12.6,3.7,12.62,3.8,12.59,3.82,12.59,4.07,12.73,4.04,12.76,4.01,12.77,3.97,12.73,3.94,12.64,3.65],
+  [12.52,4.28,12.53,4.32,12.52,4.36,12.6,4.3,12.71,4.27,12.69,4.16,12.5,4.2,12.52,4.28],
+  [12.78,4.2,12.73,4.15,12.69,4.16,12.72,4.26,12.75,4.24,12.75,4.2,12.78,4.23,12.78,4.2],
+  [12.91,4.14,12.87,4.1,12.89,4.14,12.84,4.16,12.81,4.11,12.77,4.09,12.76,4.07,12.8,4.04,12.76,4.01,12.73,4.04,12.5,4.08,12.5,4.2,12.73,4.15,12.8,4.22,12.82,4.18,12.83,4.17,12.83,4.2,12.91,4.16,12.91,4.14],
+  [12.83,4.23,12.86,4.21,12.84,4.21,12.83,4.23],
+  [12.48,4.4,12.47,4.37,12.38,4.35,12.35,4.4,12.35,4.46,12.42,4.53,12.34,4.62,12.37,4.66,12.44,4.67,12.44,4.71,12.48,4.64,12.5,4.53,12.5,4.46,12.47,4.46,12.49,4.42,12.48,4.4],
+  [12.35,4.63,12.36,4.6,12.31,4.61,12.36,4.8,12.44,4.79,12.44,4.76,12.39,4.72,12.35,4.63],
+  [12.33,4.6,12.36,4.6,12.42,4.52,12.35,4.46,12.36,4.38,12.39,4.33,12.35,4.32,12.29,4.25,11.8,4.34,11.79,4.3,11.7,4.36,11.77,4.72,12.31,4.61,12.33,4.6],
+  [11.77,6.11,11.83,6.12,11.95,6.35,12.02,6.43,12.02,6.48,12.01,6.44,12,6.48,12.12,6.66,12.14,6.85,12.1,6.98,12.1,6.94,12,6.96,12,6.94,12.04,6.94,12.01,6.93,11.96,6.86,11.91,6.85,11.85,6.75,11.84,6.7,11.83,6.73,11.8,6.72,11.75,6.64,11.78,6.59,11.75,6.56,11.75,6.61,11.72,6.57,11.72,6.42,11.7,6.39,11.66,6.38,11.56,6.28,11.52,6.26,11.48,6.26,11.48,6.29,11.46,6.29,11.42,6.32,11.35,6.34,11.35,6.32,11.31,6.29,11.33,6.28,11.3,6.27,11.31,6.25,11.27,6.25,11.29,6.28,11.18,6.24,11.08,6.26,11.03,6.19,11.1,6.16,11.39,6.14,11.41,6.18,11.75,6.16,11.76,6.19,11.78,6.19,11.77,6.11],
+  [10.86,6.45,10.74,6.39,10.81,6.37,10.79,6.34,10.73,6.35,10.76,6.33,10.74,6.19,10.49,6.2,10.52,6.08,10.56,6.02,10.57,5.98,10.53,5.92,10.54,5.89,10.17,5.9,10.17,6.06,10.2,6.09,10.24,6.22,10.2,6.4,10.27,6.4,10.37,6.43,10.47,6.43,10.44,6.41,10.47,6.39,10.52,6.42,10.56,6.42,10.55,6.47,10.61,6.49,10.66,6.45,10.71,6.48,10.71,6.42,10.8,6.46,10.8,6.5,10.83,6.48,10.84,6.5,10.86,6.45],
+  [10.11,5.81,10.17,5.81,10.17,5.9,10.54,5.89,10.55,5.86,10.53,5.78,10.61,5.61,10.65,5.58,10.66,5.5,10.71,5.41,10.62,5.41,10.65,5.34,10.09,5.35,10.12,5.52,10.11,5.81],
+  [11.27,5.27,10.91,5.29,10.92,5.32,10.73,5.33,10.71,5.42,10.65,5.57,11.39,5.51,11.4,5.48,11.44,5.43,11.56,5.35,11.58,5.32,11.6,5.34,11.63,5.3,11.67,5.3,11.7,5.26,11.7,5.22,11.27,5.27],
+  [12.44,5.22,12.41,5.2,12.41,5.24,12.38,5.2,12.31,5.23,12.3,5.17,12.32,5.21,12.37,5.18,12.37,5.15,12.4,5.15,12.37,5.11,11.69,5.22,11.69,5.26,11.67,5.3,11.63,5.3,11.6,5.33,11.58,5.32,11.56,5.35,11.44,5.43,11.43,5.45,11.4,5.48,11.39,5.51,11.57,5.49,11.63,5.45,11.72,5.45,11.79,5.43,11.84,5.44,11.85,5.48,11.98,5.45,12.15,5.57,12.21,5.56,12.27,5.46,12.26,5.43,12.28,5.44,12.3,5.41,12.37,5.4,12.39,5.36,12.3,5.37,12.31,5.35,12.35,5.35,12.36,5.32,12.29,5.29,12.34,5.3,12.33,5.28,12.35,5.27,12.36,5.3,12.41,5.3,12.44,5.22],
+  [11.88,5.91,11.81,5.79,11.54,5.54,11.57,5.49,11.24,5.53,11.32,5.84,11.37,5.94,11.35,5.97,11.37,5.98,11.36,6.09,11.41,6.18,11.75,6.16,11.76,6.19,11.78,6.19,11.77,6.12,11.83,6.13,11.82,6.08,11.84,6.08,11.83,6.06,11.85,6.04,11.85,5.98,11.87,5.98,11.85,5.96,11.87,5.96,11.85,5.94,11.88,5.93,11.88,5.91],
+  [11.89,5.2,12.4,5.1,12.38,5.06,12.31,4.99,12.31,4.98,12.33,4.98,12.31,4.96,12.26,4.92,12.32,4.95,12.31,4.9,12.21,4.86,12.18,4.86,12.17,4.81,12.18,4.78,12.11,4.73,12.08,4.75,12.03,4.72,12.02,4.77,11.98,4.83,11.96,4.82,11.94,4.89,11.89,4.87,11.85,4.99,11.85,5.04,11.77,5.1,11.72,5.1,11.69,5.12,11.63,5.09,11.6,5.13,11.56,5.15,11.54,5.2,11.45,5.25,11.89,5.2],
+  [11.85,5.48,11.82,5.44,11.64,5.45,11.54,5.54,11.81,5.78,11.88,5.9,11.88,5.89,11.92,5.88,11.89,5.85,11.93,5.86,11.93,5.83,11.97,5.82,11.95,5.8,11.99,5.8,11.99,5.77,12.01,5.77,12.07,5.72,12.08,5.69,12.07,5.67,12.15,5.57,11.98,5.45,11.85,5.48],
+  [11.06,6.24,11.03,6.19,11.05,6.18,11.39,6.14,11.36,6.09,11.37,6.08,11.35,6.02,11.37,5.97,11.35,5.97,11.37,5.94,11.32,5.84,11.25,5.57,11.24,5.52,11.27,5.52,10.91,5.55,10.91,6.11,10.93,6.27,10.97,6.27,10.97,6.23,10.99,6.22,11,6.29,11.07,6.27,11.06,6.24],
+  [10.91,6.11,10.91,5.55,10.65,5.57,10.53,5.78,10.55,5.86,10.53,5.89,10.55,5.91,10.53,5.92,10.57,5.98,10.52,6.08,10.49,6.2,10.74,6.19,10.74,6.25,10.76,6.32,10.8,6.28,10.93,6.27,10.91,6.11],
+  [12.32,4.61,11.88,4.69,11.89,4.76,11.97,4.7,12.04,4.67,12.09,4.69,12.11,4.73,12.18,4.78,12.17,4.81,12.18,4.86,12.29,4.87,12.24,4.71,12.3,4.66,12.28,4.7,12.29,4.71,12.27,4.74,12.32,4.78,12.29,4.82,12.34,4.84,12.37,4.9,12.37,5.01,12.41,4.91,12.41,4.86,12.42,4.84,12.42,4.88,12.43,4.86,12.43,4.79,12.36,4.8,12.32,4.61],
+  [11.63,5.09,11.69,5.12,11.72,5.1,11.77,5.1,11.85,5.04,11.85,4.99,11.89,4.87,11.94,4.89,11.96,4.82,11.98,4.83,12.02,4.77,12.03,4.72,12.08,4.75,12.11,4.73,12.08,4.69,12.04,4.67,11.97,4.7,11.91,4.76,11.88,4.69,11.77,4.72,11.73,4.57,11.72,4.74,11.65,4.78,11.62,4.85,11.59,4.86,11.58,4.91,11.55,4.95,11.57,5.03,11.63,5.09],
+  [11.49,5.22,11.54,5.2,11.56,5.15,11.6,5.13,11.62,5.09,11.57,5.03,11.55,4.95,11.5,4.9,11.48,4.93,11.42,4.91,11.4,4.93,11.35,4.91,11.31,4.87,11.27,4.87,11.27,4.92,11.2,4.95,11.14,5.06,11.12,5.06,11.09,5.03,11.07,5.09,11.03,5.07,11.01,5.1,10.98,5.08,10.91,5.1,10.91,5.12,10.89,5.12,10.89,5.16,10.85,5.18,10.86,5.22,10.79,5.2,10.76,5.22,10.78,5.29,10.72,5.31,10.72,5.33,10.92,5.32,10.91,5.29,11.45,5.25,11.49,5.22],
+  [10.72,5.32,10.78,5.29,10.77,5.22,10.74,5.24,10.72,5.14,10.61,5.06,10.63,4.97,10.61,4.95,10.57,4.96,10.56,4.95,10.56,4.92,10.46,4.81,10.47,4.73,10.43,4.7,9.96,4.71,10.02,4.83,10.06,4.83,10.04,4.88,10.09,4.93,10.09,5.35,10.65,5.34,10.62,5.41,10.71,5.41,10.72,5.32],
+  [10.3,3.87,10.34,3.85,10.34,3.76,10.46,3.64,10.6,3.54,10.46,3.52,10.4,3.54,10.37,3.52,10.27,3.49,10.25,3.47,10.28,3.47,10.19,3.47,10.17,3.48,10.09,3.46,10.06,3.41,10.02,3.41,10.05,3.35,10.03,3.33,10.01,3.4,9.81,3.4,9.83,3.43,9.82,3.53,9.85,3.6,9.85,3.76,9.88,3.84,9.88,3.88,9.84,3.93,9.89,3.98,9.88,4.26,10.47,4.24,10.47,4.2,10.44,4.17,10.29,4.05,10.3,3.94,10.28,3.92,10.3,3.87],
+  [10.54,3.77,10.59,3.72,10.68,3.69,10.75,3.62,10.8,3.61,10.81,3.61,10.78,3.62,10.75,3.68,10.74,3.66,10.74,3.71,10.8,3.7,10.87,3.75,10.95,3.76,10.99,3.72,11.1,3.69,11.12,3.72,11.19,3.73,11.25,3.79,11.28,3.78,11.28,3.8,11.2,3.81,11.17,3.8,11.16,3.81,11.17,3.84,11.2,3.84,11.29,3.89,11.33,3.93,11.34,4.04,11.29,4.15,11.31,4.16,11.38,4.08,11.41,4.08,11.44,4.13,11.46,4.29,11.44,4.29,11.37,4.44,10.99,4.48,11.05,4.36,11.05,4.28,11,4.2,11.02,4.02,11.03,3.98,11.06,3.98,11.08,3.94,11.08,4,11.09,4,11.1,3.93,11.14,3.9,11.13,3.88,11.15,3.84,11.17,3.84,11.14,3.81,11.09,3.8,11.05,3.82,11,3.83,10.96,3.88,10.96,3.84,10.93,3.87,10.92,3.85,10.86,3.97,10.84,3.89,10.8,3.85,10.7,3.84,10.54,3.77],
+  [10.85,3.93,10.84,3.89,10.8,3.85,10.7,3.84,10.52,3.76,10.49,3.77,10.49,3.71,10.4,3.76,10.36,3.74,10.34,3.76,10.34,3.85,10.3,3.87,10.28,3.92,10.3,3.94,10.29,4.05,10.38,4.11,10.47,4.2,10.49,4.36,10.55,4.4,10.87,4.38,10.85,4.26,10.87,4.2,10.86,4.15,10.92,3.94,10.83,4.06,10.82,4.05,10.86,3.98,10.85,3.93],
+  [11.69,4.38,11.51,4.48,11.37,4.44,11.22,4.47,11.27,4.87,11.31,4.87,11.35,4.91,11.4,4.93,11.42,4.91,11.48,4.93,11.5,4.9,11.55,4.95,11.57,4.93,11.59,4.86,11.62,4.85,11.65,4.78,11.67,4.78,11.72,4.72,11.73,4.58,11.74,4.57,11.7,4.36,11.69,4.38],
+  [10.91,5.12,10.91,5.1,10.95,5.08,11.01,5.1,11.03,5.07,11.07,5.09,11.09,5.03,11.12,5.06,11.14,5.06,11.2,4.95,11.27,4.92,11.22,4.46,10.99,4.48,10.92,4.51,10.93,4.89,10.95,4.97,10.89,5.07,10.89,5.11,10.91,5.12],
+  [10.79,5.21,10.86,5.22,10.85,5.18,10.89,5.16,10.89,5.07,10.95,4.97,10.93,4.89,10.92,4.51,10.87,4.43,10.87,4.38,10.54,4.39,10.54,4.41,10.6,4.48,10.56,4.56,10.51,4.57,10.52,4.63,10.47,4.71,10.46,4.81,10.54,4.9,10.55,4.95,10.57,4.96,10.61,4.95,10.63,4.97,10.61,5.06,10.72,5.14,10.74,5.24,10.79,5.21],
+  [10.47,4.71,10.52,4.64,10.5,4.57,10.56,4.56,10.6,4.48,10.54,4.41,10.54,4.38,10.49,4.36,10.47,4.25,9.88,4.26,9.88,4.19,9.87,4.29,9.88,4.32,9.86,4.38,9.92,4.52,9.95,4.71,10.43,4.7,10.47,4.74,10.47,4.71],
+  [7.11,7.07,7.15,7.09,7.11,7.11,7.13,7.15,7.09,7.17,7.08,7.19,7.07,7.17,7.05,7.23,7.01,7.23,7.05,7.21,7.02,7.16,7.04,7.13,7.07,7.17,7.06,7.12,7.09,7.13,7.09,7.09,7.1,7.08,6.59,6.83,6.59,6.88,6.54,6.85,6.57,6.84,6.47,6.51,6.48,6.53,6.52,6.54,6.56,6.59,6.53,6.6,6.46,6.53,7.06,6.03,7.08,6.07,7.1,6.05,7.12,6.07,7.16,6.07,7.18,6.11,7.25,6.1,7.27,6.14,7.31,6.12,7.37,6.14,7.43,6.12,7.49,6.15,7.59,6.91,7.66,6.89,7.75,6.98,7.79,6.92,7.84,6.92,8.02,7.11,8.12,7.13,8.12,7.18,8.11,7.24,8.09,7.21,8.08,7.24,8.05,7.22,8.03,7.18,7.98,7.16,8.05,7.23,8.05,7.26,8.04,7.25,8.02,7.27,7.99,7.24,7.97,7.24,7.99,7.22,7.98,7.2,7.96,7.21,7.97,7.14,7.95,7.15,7.93,7.19,7.92,7.12,7.95,7.09,7.94,7.07,7.9,7.11,7.92,7.18,7.9,7.17,7.86,7.1,7.85,7.12,7.79,7.05,7.79,7.03,7.77,7.03,7.71,6.98,7.67,6.97,7.65,6.93,7.52,6.92,7.45,6.94,7.46,6.92,7.39,6.91,7.33,6.94,7.39,6.88,7.37,6.88,7.37,6.85,7.31,6.86,7.28,6.95,7.25,6.95,7.24,6.97,7.16,7.01,7.15,7,7.17,6.98,7.15,6.97,7.18,6.89,7.2,6.87,7.26,6.88,7.2,6.85,7.14,6.89,7.12,6.92,7.12,6.95,7.06,7,7.06,7.02,7.08,7.02,7.07,7.06,6.95,7.14,6.95,7.17,6.86,7.21,6.83,7.25,6.74,7.28,6.74,7.3,6.69,7.26,6.69,7.29,6.67,7.3,6.53,7.32,6.55,7.28,6.6,7.28,6.68,7.23,6.74,7.24,6.89,7.12,6.93,7.03,6.88,7.03,6.89,7.01,6.87,7.01,6.85,7.05,6.79,7,6.73,7.01,6.75,6.94,6.74,6.88,6.7,6.9,6.64,6.86,6.63,6.83,6.69,6.83,6.7,6.81,6.64,6.79,6.62,6.74,6.7,6.64,6.76,6.65,6.79,6.62,6.84,6.62,6.83,6.56,6.86,6.54,6.86,6.53,6.79,6.54,6.78,6.53,6.68,6.51,6.67,6.46,6.69,6.45,6.64,6.41,6.75,6.37,6.78,6.38,6.78,6.4,6.8,6.42,6.84,6.42,6.89,6.39,6.85,6.37,6.85,6.34,6.8,6.33,6.8,6.28,6.73,6.21,6.76,6.2,6.76,6.17,6.85,6.17,6.87,6.12,6.9,6.09,6.97,6.05,7.03,6.06,7.06,6.03],
+  [9.07,7.02,9.2,7.07,9.24,7.14,9.28,7.15,9.23,7.21,9.14,7.23,9.13,7.27,9.11,7.28,9.07,7.24,9.07,7.16,9.04,7.13,9.08,7.08,9.07,7.02,8.88,6.89,8.89,6.92,8.88,6.93,8.86,6.9,8.94,6.87,9.05,6.92,9.04,6.95,8.97,6.95,8.97,6.91,8.93,6.91,8.93,6.88,8.82,6.84,8.92,6.85,8.89,6.87,8.82,6.86,8.67,6.75,8.69,6.75,8.73,6.78,8.72,6.82,8.7,6.8,8.67,6.81,8.63,6.78,8.63,6.76,8.65,6.75,8.29,6.67,8.28,6.72,8.27,6.71,8.28,6.68,8.39,6.64,8.45,6.64,8.46,6.67,8.44,6.7,8.39,6.69,8.37,6.64]
+];
+const USA_RED = [
+  [7.73,5.04,7.69,5.18,7.63,5.16,7.6,5.17,7.59,5.36,7.63,5.45,7.57,5.49,7.52,5.59,7.52,5.63,7.54,5.64,7.49,5.7,7.94,5.98,8.2,6.02,8.32,5.14,7.73,5.04],
+  [9.12,3.35,8.45,3.27,7.89,3.16,7.86,3.32,7.95,3.53,7.98,3.56,7.96,3.67,7.93,3.71,7.95,3.74,8,3.71,8.02,3.85,8.06,3.86,8.07,3.94,8.09,3.92,8.23,3.94,8.25,3.91,8.28,3.96,8.29,3.87,9.06,3.97,9.12,3.35]
+];
+
+// ---------------------------------------------------------- slide builders ---
+
+function slide01(s) {
+  imagePlaceholder(s, 10.3291, 0, 3.0042, 7.5);
+  kicker(s);
+  stackTitle(s, 'PRISM', 'BUSINESS', { size: 80, w: 4.1181 });
+  body(s, 'Building Business Success: Strategy and Innovation in Facing Dynamic Global Market Challenges',
+    0.6287, 5.3698, 3.4852, 0.9975, { size: 14 });
+  s.addText([{ text: 'Created By: ', options: { bold: true } }, { text: ' Kimberly Nguyen' }],
+    { ...TBOX, x: 0.6287, y: 6.8824, w: 2.1146, h: 0.1496, fontFace: 'Lato', fontSize: 10, lineSpacingMultiple: 1 });
+  s.addText([{ text: 'Speaker: ', options: { bold: true } }, { text: ' Korina Villanueva' }],
+    { ...TBOX, x: 2.7908, y: 6.8824, w: 2.1146, h: 0.1496, fontFace: 'Lato', fontSize: 10, lineSpacingMultiple: 1 });
+  statTile(s, 10.8186, 4.8705, RED, '+12k', LOREM_SHORT);
+  body(s, LOREM_LONG, 6.4173, 4.9306, 3.4852, 1.4368);
+  imagePlaceholder(s, 6.4173, 2.4481, 2.0253, 2.0253);
+}
+
+function slide02(s) {
+  stackTitle(s, 'WELCOME', 'MESSAGE');
+  kicker(s);
+  body(s, LOREM_LONG, 0.6287, 4.9306, 3.0102, 1.4368);
+  statTile(s, 7.1078, 2.3167, RED, '+12k', LOREM_SHORT);
+  statTile(s, 7.1078, 4.342, BLACK, '+21k', LOREM_SHORT);
+  body(s, LOREM_MED_FULL, 4.4765, 3.906, 1.749, 2.4613);
+  imagePlaceholder(s, 9.1331, 0, 4.2002, 4.342);
+  imagePlaceholder(s, 9.1331, 4.342, 4.2002, 3.158);
+}
+
+// Table of contents: six numbered entries in two columns on a full-bleed red panel.
+const TOC_ITEMS = [
+  ['01', 'About Our Prism'], ['02', 'Vision & Mission'],
+  ['03', 'Prism Timeline'], ['04', 'Prism Services'],
+  ['05', 'Meet The Team'], ['06', 'Break Slide'],
+];
+
+function slide03(s) {
+  stackTitle(s, 'TABLE OF', 'CONTENT');
+  kicker(s);
+  rect(s, 4.6857, 2.276, 8.6477, 5.224, RED);
+  TOC_ITEMS.forEach(([num, title], i) => {
+    const numX = i % 2 === 0 ? 5.3414 : 9.2528;
+    const txtX = i % 2 === 0 ? 6.2305 : 10.1419;
+    const y = 3.064 + Math.floor(i / 2) * 1.434;
+    rule(s, numX, y - 0.2391, 0.2697, WHITE);
+    head(s, num, numX, y, 1.3115, { size: 36, color: WHITE, h: 0.4595 });
+    label(s, title, txtX, y - 0.076, 2.1146, 0.2128, { color: WHITE });
+    body(s, LOREM_SHORT, txtX, y + 0.1536, 2.214, 0.486, { color: WHITE });
+  });
+}
+
+function slide04(s) {
+  rect(s, 6.2976, 1.4286, 7.0357, 6.0714, PANEL);
+  rect(s, 0, 0, 4.443, 4.2152, RED);
+  stackTitle(s, 'ABOUT OUR', 'PRISM', { color: WHITE });
+  kicker(s, WHITE);
+  statTile(s, 5.285, 2.3167, RED, '+12k', LOREM_SHORT);
+  statTile(s, 5.285, 4.342, BLACK, '+21k', LOREM_SHORT);
+  body(s, LOREM_LONG, 7.9451, 3.1483, 4.2136, 1.1937);
+  body(s, LOREM_MED_FULL, 7.9451, 5.4154, 4.2136, 0.9519);
+  imagePlaceholder(s, 0, 4.2152, 4.443, 3.2848);
+}
+
+/** Slides 5 and 6 share one layout: two tall panels, an icon, a heading and copy. */
+function visionMission(s, word, opt) {
+  stackTitle(s, 'OUR GREAT', word);
+  kicker(s);
+  rect(s, 4.2761, 1.4286, 4.1309, 6.0714, opt.leftFill);
+  rect(s, 8.5737, 1.4286, 4.1309, 6.0714, opt.rightFill);
+  rule(s, 4.2761, 1.4286, 0.8243, opt.leftRule);
+  rule(s, 8.5737, 1.4286, 0.8243, RED);
+  iconEye(s, 4.8306, 2.2361, 0.3723, 0.2158, opt.eye, opt.leftFill);
+  iconTarget(s, 9.1283, 2.1604, 0.3696, RED, opt.rightFill);
+  label(s, word === 'VISION' ? 'Vision' : 'Mission', 4.8306, 2.9395, 2.1146, 0.2128, { color: opt.text });
+  label(s, 'Goals', 9.1283, 2.9395, 2.1146, 0.2128, { color: opt.text });
+  body(s, LOREM_LONG, 4.8306, 3.4682, 3.0218, 1.4455, { color: opt.text });
+  bulletList(s, BULLETS_GOALS, 9.1283, 3.4682, 3.0218, 2.1226, opt.text);
+  imagePlaceholder(s, 0.6287, 5.7146, 1.3175, 1.3175);
+}
+
+const slide05 = (s) => visionMission(s, 'VISION',
+  { leftFill: PANEL, rightFill: PANEL, leftRule: RED, eye: RED, text: BODY });
+const slide06 = (s) => visionMission(s, 'MISSION',
+  { leftFill: RED, rightFill: BLACK, leftRule: BLACK, eye: WHITE, text: WHITE });
+
+// Timeline slides 7 and 8: three milestones on a dashed rail.
+const TIMELINE_A = [['First Time', 'invoice'], ['Second Time', 'wallet'], ['Third Time', 'card']];
+const TIMELINE_B = [['Fourth Time', 'phone'], ['Fifth Time', 'scan'], ['Sixth Time', 'coins']];
+
+function timelineSlide(s, opt) {
+  rect(s, opt.panelX, 1.4444, 9.3831, 6.0556, PANEL);
+  s.addShape('line', { x: opt.railX, y: 4.8009, w: opt.railW, h: 0, line: { color: RED, width: 0.5, dashType: 'lgDash' } });
+  stackTitle(s, 'PRISM', 'TIMELINE');
+  kicker(s);
+  rect(s, 4.6857, 2.276, 8.6477, 1.474, RED);
+  body(s, LOREM_LONG, 5.1649, 2.6276, 6.5037, 0.7708, { color: WHITE });
+  opt.items.forEach(([title, glyph], i) => {
+    const x = opt.colX[i];
+    s.addShape('ellipse', {
+      x, y: 4.3785, w: 0.8448, h: 0.8448,
+      fill: { color: GREY_BG }, line: { color: RED, width: 1 },
+    });
+    timelineGlyph(s, glyph, x + 0.2224, 4.6, 0.4, 0.4);
+    label(s, title, x, 5.6389, 2.1146, 0.2128);
+    body(s, LOREM_STEP, x, 5.9904, 2.3143, 0.9505);
+  });
+  if (opt.aside) body(s, LOREM_MED, 9.9288, 5.5052, 2.4566, 1.4357);
+}
+
+const slide07 = (s) => timelineSlide(s,
+  { panelX: 3.9502, railX: 5.5305, railW: 7.8028, colX: [4.6857, 7.5457, 10.4057], items: TIMELINE_A });
+const slide08 = (s) => timelineSlide(s,
+  { panelX: 0, railX: 0, railW: 7.1936, colX: [0.6287, 3.4887, 6.3488], items: TIMELINE_B, aside: true });
+
+// Four-card grids (services / team / SWOT) all sit on the same 2x2 geometry.
+const CARD_W = 3.71, CARD_H = 2.5853;
+function cardGrid(s, originX, fills) {
+  const cells = [];
+  [0, 1].forEach((row) => [0, 1].forEach((col) => {
+    const x = originX + col * 3.9963;
+    const y = 1.55 + row * 2.8056;
+    const i = row * 2 + col;
+    rect(s, x, y, CARD_W, CARD_H, fills[i].fill);
+    rule(s, x, y, 0.8243, fills[i].rule);
+    cells.push({ x, y });
+  }));
+  return cells;
+}
+
+const SERVICES = [
+  ['01', 'Business Consulting Services'], ['02', 'Integrated IT Solutions'],
+  ['03', 'Digital Marketing Services'], ['04', 'HR Training and Development'],
+];
+
+function slide09(s) {
+  stackTitle(s, 'PRISM', 'SERVICES');
+  kicker(s);
+  const dark = { fill: RED, rule: BLACK }, lite = { fill: PANEL, rule: RED };
+  const cells = cardGrid(s, 4.9983, [lite, lite, dark, lite]);
+  body(s, LOREM_MED, 0.6287, 5.5052, 2.4566, 1.4357);
+  SERVICES.forEach(([num, title], i) => {
+    const { x, y } = cells[i];
+    const fg = i === 2 ? WHITE : BLACK;
+    label(s, title, x + 0.3832, y + 0.5333, 1.8129, 0.4461, { color: fg });
+    body(s, LOREM_CARD, x + 0.3832, y + 1.1398, 2.9437, 0.9685, { color: i === 2 ? WHITE : BODY });
+    head(s, num, x + 3.0776, y, 0.6324, { color: fg, align: 'right' });
+  });
+}
+
+const TEAM = [
+  ['Eleanor Fitzgerald', 6.9791, 3.2516], ['Richard Sanchez', 10.9754, 3.2516],
+  ['Rachelle Beaudry', 6.9791, 6.0572], ['Reese Miller', 10.9754, 6.0572],
+];
+
+function slide10(s) {
+  head(s, 'MEET', 0.6287, 2.3167, 1.9824);
+  head(s, 'THE', 0.6287, 2.9844, 1.9824);
+  head(s, 'TEAM', 0.6287, 3.6521, 1.9824);
+  kicker(s);
+  const lite = { fill: PANEL, rule: RED };
+  cardGrid(s, 4.9983, [lite, lite, lite, lite]);
+  TEAM.forEach(([name, x, y]) => {
+    label(s, name, x, y, 0.9689, 0.433);
+    body(s, 'Marketing', x, y + 0.4695, 0.6772, 0.2128, { color: RED });
+  });
+  body(s, LOREM_MED, 0.6287, 5.0, 1.7927, 1.9409);
+  statBlock(s, 2.9447, 6.0079, '+12k', RED, { capH: 0.4344 });
+  s.addText(LOREM_TINY, { ...TBOX, x: 2.9447, y: 6.5065, w: 1.5303, h: 0.4344,
+    fontFace: TEXT, fontSize: 10, italic: true, color: BLACK, lineSpacingMultiple: 1.5 });
+  [[4.9983, 1.9167], [8.9946, 1.9167], [8.9946, 4.7222], [4.9983, 4.7222]]
+    .forEach(([x, y]) => imagePlaceholder(s, x, y, 1.6944, 2.2187));
+}
+
+function slide11(s) {
+  rect(s, 9.3368, 1.1647, 2.6767, 4.8656, PANEL);
+  rule(s, 9.3368, 1.1647, 0.8243, RED);
+  label(s, 'Richard Sanchez', 9.8225, 4.9652, 0.9689, 0.433);
+  body(s, 'Founder', 9.8225, 5.4346, 0.9689, 0.2269, { color: RED });
+  head(s, 'MEET', 0.6287, 2.3167, 1.9824);
+  head(s, 'THE', 0.6287, 2.9844, 1.9824);
+  head(s, 'LEADER', 0.6287, 3.6521, 1.9824);
+  kicker(s);
+  body(s, LOREM_MED, 0.6287, 5.0, 2.2324, 1.5278);
+  head(s, '+12k', 5.1364, 5.2974, 1.3115, { size: 36, color: RED, h: 0.4595 });
+  s.addText(LOREM_TINY, { ...TBOX, x: 5.1364, y: 5.796, w: 1.5303, h: 0.4344,
+    fontFace: TEXT, fontSize: 10, italic: true, color: BLACK, lineSpacingMultiple: 1.5 });
+  body(s, LOREM_MED, 5.1364, 2.2558, 1.7927, 1.9409);
+  imagePlaceholder(s, 9.3368, 1.4697, 2.3771, 3.1126);
+}
+
+function slide12(s) {
+  imagePlaceholder(s, 4.3797, 2.3418, 5.1582, 5.1582);
+  rect(s, 7.7257, 0, 4.3298, 4.9789, PANEL);
+  stackTitle(s, 'BREAK', 'SLIDE', { size: 80, w: 4.1181 });
+  kicker(s);
+  body(s, LOREM_MED, 0.6287, 5.5052, 2.4566, 1.4357);
+  body(s, '"Success is not final, failure is not fatal: It is the courage to continue that counts."',
+    8.2996, 3.437, 3.0615, 0.626, { size: 12 });
+  body(s, '- Winston Churchill', 8.2996, 4.1807, 1.6088, 0.2652, { size: 12, color: RED });
+  rule(s, 10.5414, 4.9789, 1.5142, RED);
+  imagePlaceholder(s, 8.2996, 0.8008, 2.3195, 2.3195);
+}
+
+const SWOT = [['S', 'Strengths'], ['W', 'Weaknesses'], ['O', 'Opportunties'], ['T', 'Threats']];
+
+function slide13(s) {
+  rect(s, 9.2025, 0, 3.5021, 6.1899, RED);
+  kicker(s);
+  const lite = { fill: PANEL, rule: RED };
+  const cells = cardGrid(s, 0.6287, [lite, lite, lite, lite]);
+  SWOT.forEach(([letter, title], i) => {
+    const { x, y } = cells[i];
+    label(s, title, x + 0.3832, y + 0.7671, 1.8129, 0.2124);
+    body(s, LOREM_CARD, x + 0.3832, y + 1.1398, 2.9437, 0.9685);
+    head(s, letter, x + 3.0776, y, 0.6324, { align: 'right' });
+  });
+  head(s, 'SWOT', 9.654, 2.3167, 2.3237, { color: WHITE });
+  head(s, 'ANALYSIS', 9.654, 2.9844, 2.3237, { color: WHITE });
+  body(s, LOREM_MED, 9.654, 4.2126, 2.4566, 1.4357, { color: WHITE });
+}
+
+function slide14(s) {
+  rect(s, 7.1396, 0, 4.9789, 4.9789, PANEL);
+  imagePlaceholder(s, 8.9946, 4.1353, 3.71, 2.5853);
+  imagePlaceholder(s, 5.2846, 1.55, 3.71, 2.5853);
+  stackTitle(s, 'PORTFOLIO', 'PRISM', { w: 2.4979 });
+  kicker(s);
+  body(s, LOREM_MED, 9.3283, 2.3936, 2.4566, 1.4357);
+  statTile(s, 5.2846, 2.6661, RED, '+12k', LOREM_SHORT);
+  statTile(s, 7.3103, 4.6914, BLACK, '+21k', LOREM_SHORT);
+  body(s, LOREM_FOOT, 0.6287, 5.5052, 3.3126, 1.4357);
+}
+
+const PRICING = [['01', 'Basic', '$99.99'], ['02', 'Standart', '$199.99'], ['03', 'Premium', '$299.99']];
+
+function slide15(s) {
+  imagePlaceholder(s, 3.4684, 4.8228, 9.865, 2.6772);
+  [4.2761, 7.1476, 10.0191].forEach((x) => {
+    rect(s, x, 1.4286, 2.6855, 4.736, PANEL);
+    rect(s, x, 4.8871, 2.6855, 1.2774, WHITE);
+    rule(s, x, 1.4286, 0.7467, RED);
+  });
+  stackTitle(s, 'PRICING', 'LIST', { w: 2.4979 });
+  kicker(s);
+  body(s, LOREM_MED, 0.6287, 5.0, 1.7927, 1.9409);
+  PRICING.forEach(([num, plan, price], i) => {
+    const x = 4.6494 + i * 2.8716;
+    label(s, plan, x, 2.3498, 1.9388, 0.2124, { color: RED });
+    bulletList(s, BULLETS_PRICE, x, 2.7226, 1.9388, 1.1, BODY);
+    rect(s, x, 4.1545, 1.3159, 0.3897, BLACK);
+    s.addText('Book Now', { ...TBOX, x, y: 4.21, w: 1.3159, h: 0.2553,
+      fontFace: 'Lato', fontSize: 16, bold: true, color: WHITE, align: 'center', lineSpacingMultiple: 1 });
+    head(s, price, x, 5.266, 2.3122, { color: RED });
+    head(s, num, 6.3292 + i * 2.8756, 1.4286, 0.6324, { align: 'right' });
+  });
+}
+
+function slide16(s) {
+  rect(s, 0.2538, 1.7629, 6.7144, 4.4176, PANEL);
+  laptopMockup(s, 5.3434, 2.8005, 7.3613, 4.222);
+  imagePlaceholder(s, 6.2718, 3.0637, 5.5211, 3.4573);
+  stackTitle(s, 'UNIQUE', 'MOCKUP', { w: 2.4979 });
+  kicker(s);
+  body(s, MOCKUP_COPY, 0.6287, 5.03, 2.7948, 0.707);
+  label(s, 'Website', 0.6287, 4.7232, 2.3819, 0.205, { color: RED });
+  body(s, LOREM_MED, 7.3431, 1.7629, 4.4499, 0.711);
+}
+
+function slide17(s) {
+  rect(s, 0.2538, 4.2304, 10.0517, 1.875, RED);
+  phoneMockup(s, 8.9952, 1.3946, 2.4631, 4.7109);
+  imagePlaceholder(s, 9.131, 1.5013, 2.1854, 4.4974);
+  body(s, MOCKUP_COPY, 0.6287, 4.9549, 2.7948, 0.707, { color: WHITE });
+  label(s, 'Mobile Apps', 0.6287, 4.6481, 2.3819, 0.205, { color: WHITE });
+  stackTitle(s, 'UNIQUE', 'MOCKUP', { w: 2.4979 });
+  kicker(s);
+  statBlock(s, 4.5306, 4.7014, '+12K', WHITE, { capH: 0.4344 });
+  statBlock(s, 6.5862, 4.7014, '80%', WHITE, { capH: 0.4344 });
+}
+
+function slide18(s) {
+  USA_GRAY.forEach((poly) => polygon(s, poly, SILVER));
+  USA_RED.forEach((poly) => polygon(s, poly, RED));
+  stackTitle(s, 'UNIQUE', 'USA MAP', { w: 2.4979 });
+  kicker(s);
+  body(s, LOREM_MED, 0.6287, 5.0, 1.7927, 1.9409);
+  statBlock(s, 3.5329, 6.0079, '+12K', RED, { capH: 0.4344 });
+  s.addText(LOREM_TINY, { ...TBOX, x: 3.5329, y: 6.5065, w: 1.5303, h: 0.4344,
+    fontFace: TEXT, fontSize: 10, italic: true, color: BLACK, lineSpacingMultiple: 1.5 });
+}
+
+const TESTIMONIALS = [
+  ['Donna Stroupe', 9.9098, 2.3167], ['Henrietta Mitchell', 3.6349, 5.5588], ['Daniel Gallego', 9.9098, 5.5588],
+];
+
+function slide19(s) {
+  rect(s, 0, 0, 4.5794, 4.9789, PANEL);
+  stackTitle(s, 'CLIENT', 'TESTIMONIAL', { w: 3.0062 });
+  kicker(s);
+  head(s, '\u201C', 12.0, 0.4679, 0.7046, { size: 96, color: RED, align: 'right', h: 0.3658 });
+  TESTIMONIALS.forEach(([name, x, y]) => {
+    label(s, name, x, y, 2.3819, 0.205, { color: RED });
+    body(s, QUOTE_COPY, x, y + 0.4004, 2.7948, 0.707);
+    for (let i = 0; i < 5; i++) {
+      s.addShape('star5', { x: x + i * 0.2548, y: y + 1.2932, w: 0.1801, h: 0.1801,
+        fill: { color: BLACK }, line: { type: 'none' } });
+    }
+  });
+  [[0.6287, 4.4068], [6.9036, 4.4068], [6.9036, 1.1646]]
+    .forEach(([x, y]) => imagePlaceholder(s, x, y, 2.6253, 2.6253));
+}
+
+const CONTACTS = [
+  ['globe', 'www.yourwebsite.com', 3.5928, 1.7595, 9.8124, 3.6594, 0.1808, 0.1808],
+  ['pin', '123 Anywhere St., Any City, ST 12345', 3.9871, 2.1553, 9.8124, 4.0197, 0.1652, 0.2032],
+  ['chat', '123-456-7890', 4.3456, 2.1553, 9.8, 4.4024, 0.2017, 0.1808],
+];
+
+function slide20(s) {
+  rect(s, 7.5443, 1.1392, 5.789, 6.3608, PANEL);
+  stackTitle(s, 'THANK', 'YOU', { size: 80, w: 4.1181 });
+  kicker(s);
+  rect(s, 9.3786, 2.3721, 3.326, 2.6241, BLACK);
+  s.addText('Contact', { ...TBOX, x: 9.8, y: 2.6518, w: 0.9111, h: 0.3262,
+    fontFace: 'Lato', fontSize: 18, bold: true, color: WHITE, lineSpacingMultiple: 1.5 });
+  s.addText('- Us', { ...TBOX, x: 10.2597, y: 2.9, w: 0.4514, h: 0.3262,
+    fontFace: 'Lato', fontSize: 18, bold: true, color: WHITE, lineSpacingMultiple: 1.5 });
+  CONTACTS.forEach(([glyph, text, ty, tw, ix, iy, iw, ih]) => {
+    contactGlyph(s, glyph, ix, iy, iw, ih);
+    body(s, text, 10.1279, ty, tw, 0.231, { color: SILVER });
+  });
+  supportGlyph(s, 11.9614, 2.8118, 0.3218, 0.4144);
+  body(s, LOREM_FOOT, 0.6287, 5.5052, 3.3126, 1.4357);
+  imagePlaceholder(s, 4.7578, 2.3721, 4.6304, 3.6532);
+  imagePlaceholder(s, 10.2398, 4.9962, 2.4648, 1.9446);
+}
+
+// ------------------------------------------------------------------ main ---
+const BUILDERS = [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
+  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20];
+
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'PRISM_16x9', width: 13.333333, height: 7.5 });
+pptx.layout = 'PRISM_16x9';
+pptx.author = 'Kimberly Nguyen';
+pptx.title = 'PRISM BUSINESS';
+
+BUILDERS.forEach((build) => {
+  const slide = pptx.addSlide();
+  slide.background = { color: GREY_BG };
+  build(slide);
+});
+
+pptx.writeFile({ fileName: path.join(__dirname, '17c57374-69a1-4451-84b8-b371856833f8_grok_final.pptx') })
+  .then((f) => console.log('wrote', f));

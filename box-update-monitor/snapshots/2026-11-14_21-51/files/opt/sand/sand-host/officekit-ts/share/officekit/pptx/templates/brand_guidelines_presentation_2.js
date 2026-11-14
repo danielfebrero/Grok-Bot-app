@@ -1,0 +1,1067 @@
+/**
+ * "Brand Guidelines" — 20-slide deck rebuilt with pptxgenjs.
+ * Slide size 13.333 x 7.5 in (16:9). Fonts: Abril Fatface (display) / Poppins (text).
+ * Photographic content in the source is represented by labelled placeholder shapes.
+ */
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+// ---------------------------------------------------------------- palette ---
+const YELLOW = 'FECE00';
+const RED    = 'D5473E';
+const BLUE   = '1670FF';
+const DARK   = '1E1E1E';
+const WHITE  = 'FFFFFF';
+const BLACK  = '000000';
+
+const HEAD = 'Abril Fatface';   // theme major font
+const BODY = 'Poppins';         // theme minor font
+const BODY_MED = 'Poppins Medium';
+
+const SLIDE_W = 13.3333;
+const SLIDE_H = 7.5;
+
+// ---------------------------------------------------------------- helpers ---
+/** Text box. Defaults mirror PowerPoint text-box defaults (top anchored, Poppins).
+ *  Non-wrapping boxes in the source also carry "resize shape to fit text". */
+function T (slide, content, opts) {
+  const o = Object.assign({ fontFace: BODY, valign: 'top' }, opts);
+  if (o.wrap === false) o.fit = 'resize';
+  slide.addText(content, o);
+}
+
+/** Plain rectangle. */
+function rect (slide, opts) {
+  slide.addShape('rect', opts);
+}
+
+/** Rounded rectangle; `radius` defaults to a full "pill" (adj = 50%). */
+function pill (slide, opts) {
+  const r = opts.radius === undefined ? Math.min(opts.w, opts.h) / 2 : opts.radius;
+  slide.addShape('roundRect', Object.assign({ rectRadius: r }, opts));
+}
+
+/** Straight connector. */
+function line (slide, opts) {
+  slide.addShape('line', opts);
+}
+
+/** Double-headed dimension arrow. */
+function dimArrow (slide, x, y, w, h, color) {
+  slide.addShape('line', {
+    x: x, y: y, w: w, h: h,
+    line: { color: color, width: 1, beginArrowType: 'triangle', endArrowType: 'triangle' }
+  });
+}
+
+/** Full-bleed background colour. */
+function background (slide, color) {
+  rect(slide, { x: 0, y: 0, w: SLIDE_W, h: SLIDE_H, fill: { color: color } });
+}
+
+/** The three running-head captions repeated on every slide. */
+function topBar (slide, color) {
+  T(slide, 'BRAND  GUIDELINES', { x: 0.7195, y: 0.4707, w: 1.7567, h: 0.2693, fontSize: 10, color: color });
+  T(slide, 'PRESENTATION', { x: 5.8614, y: 0.4707, w: 1.6104, h: 0.2693, fontSize: 10, color: color, align: 'center' });
+  T(slide, 'TEMPLATE', { x: 11.931, y: 0.4707, w: 1.0181, h: 0.2693, fontSize: 10, color: color, align: 'right' });
+}
+
+/** Bottom-right page chip; yellow chips carry black text, all others white. */
+function pageTag (slide, label, color) {
+  rect(slide, { x: 12.0104, y: 6.8085, w: 1.3229, h: 0.4866, fill: { color: color } });
+  T(slide, 'Page - ' + label, {
+    x: 12.0104, y: 6.8835, w: 1.3229, h: 0.3366,
+    fontFace: HEAD, fontSize: 14, color: color === YELLOW ? BLACK : WHITE, align: 'center'
+  });
+}
+
+// The "A" brand mark: an outer chevron with a small triangular counter inside.
+// Coordinates come from the original freeform, normalised to a 623114 x 537167 box.
+const MARK_W = 623114;
+const MARK_H = 537167;
+const MARK_COUNTER = [[311557, 237219], [240038, 360529], [383077, 360529]];
+const MARK_OUTLINE = [[311557, 0], [623114, 537167], [485527, 537167], [393604, 378679],
+  [311558, 520138], [229511, 378678], [137587, 537167], [0, 537167]];
+
+function brandMark (slide, x, y, w, h, fillColor, lineColor) {
+  const pts = [];   // custGeom points are relative to the shape's own box
+  [MARK_COUNTER, MARK_OUTLINE].forEach(function (loop) {
+    loop.forEach(function (p, i) {
+      const pt = { x: w * p[0] / MARK_W, y: h * p[1] / MARK_H };
+      if (i === 0) pt.moveTo = true;
+      pts.push(pt);
+    });
+    pts.push({ close: true });
+  });
+  slide.addShape('custGeom', {
+    x: x, y: y, w: w, h: h, points: pts,
+    fill: { color: fillColor },
+    line: lineColor ? { color: lineColor, width: 0.75 } : { type: 'none' }
+  });
+}
+
+// The decorative "peanut" blob (two lobes joined by a pinched waist), taken from
+// the source artwork and normalised to a 218.2 x 82.5 box.
+const BLOB_W = 218.2;
+const BLOB_H = 82.5;
+const BLOB_PATH = [
+  ['M', 218.2, 39.1],
+  ['C', 216.7, 5.6, 177.3, -11.7, 150.8, 8.9],
+  ['L', 134.9, 21.3],
+  ['C', 119.7, 33, 98.5, 33, 83.4, 21.3],
+  ['L', 67.4, 8.9],
+  ['C', 41, -11.7, 1.6, 5.6, 0, 39.1],
+  ['C', 0, 39.8, 0, 40.6, 0, 41.3],
+  ['C', 0, 42, 0, 42.8, 0, 43.5],
+  ['C', 1.6, 76.9, 41, 94.2, 67.4, 73.6],
+  ['L', 83.3, 61.2],
+  ['C', 98.4, 49.4, 119.6, 49.4, 134.8, 61.2],
+  ['L', 150.7, 73.6],
+  ['C', 177.2, 94.2, 216.6, 76.9, 218.1, 43.4],
+  ['C', 218.1, 42.7, 218.1, 41.9, 218.1, 41.2],
+  ['C', 218.2, 40.5, 218.2, 39.8, 218.2, 39.1]
+];
+
+function blob (slide, x, y, w, h, color) {
+  const px = function (v) { return w * v / BLOB_W; };
+  const py = function (v) { return h * v / BLOB_H; };
+  const pts = BLOB_PATH.map(function (seg) {
+    if (seg[0] === 'M') return { x: px(seg[1]), y: py(seg[2]), moveTo: true };
+    if (seg[0] === 'L') return { x: px(seg[1]), y: py(seg[2]) };
+    return {
+      x: px(seg[5]), y: py(seg[6]),
+      curve: { type: 'cubic', x1: px(seg[1]), y1: py(seg[2]), x2: px(seg[3]), y2: py(seg[4]) }
+    };
+  });
+  pts.push({ close: true });
+  slide.addShape('custGeom', { x: x, y: y, w: w, h: h, points: pts, fill: { color: color }, rotate: 329 });
+}
+
+/** "Details" caption above a small justified paragraph — used on many slides. */
+const DETAILS_COPY = 'Lorem Ipsum\u00a0is simply dummy text of the printing and typesetting industry. ' +
+  "Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, " +
+  'when an unknown printer took a galley';
+
+function detailsBlock (slide, x, y, opts) {
+  const o = opts || {};
+  const w = o.w || 2.2071;
+  T(slide, 'Details', { x: x, y: y, w: 1.6191, h: 0.4039, fontSize: 18, color: o.labelColor || BLACK });
+  T(slide, DETAILS_COPY, {
+    x: x + 0.004, y: y + 0.4575, w: w, h: o.h || 1.342,
+    fontSize: 8, color: o.textColor || BLACK, lineSpacing: 15
+  });
+}
+
+/** "MINIMAL AND ..." kicker + "BEST EXPERIENCE" headline + two-line footnote. */
+const LOREM_2LINE = [
+  'Lorem Ipsum\u00a0is simply dummy text of the printing and ',
+  "typesetting industry. Lorem Ipsum has been the industry's standard dummy"
+];
+
+function bestExperience (slide, x, y, colors) {
+  const base = colors.base;
+  const accent = colors.accent;
+  T(slide, [
+    { text: 'MINIMAL AND ', options: { color: base } },
+    { text: 'SIMPLE DESIGN ', options: { bold: true, color: accent } },
+    { text: 'TO MAKE A ', options: { color: base } },
+    { text: 'AWESOME', options: { bold: true, color: accent } },
+    { text: ' PROJECT.', options: { color: base } }
+  ], { x: x, y: y, w: 1.2644, h: 0.6395, fontSize: 8, lineSpacingMultiple: 1 });
+
+  T(slide, 'BEST EXPERIENCE', {
+    x: x + 1.3217, y: y + 0.0674, w: 3.5742, h: 0.5048,
+    fontSize: 24, bold: true, color: colors.headline, margin: [7.2, 7.2, 3.6, 3.6]
+  });
+
+  T(slide, [
+    { text: LOREM_2LINE[0], options: { breakLine: true } },
+    { text: LOREM_2LINE[1], options: {} }
+  ], { x: x, y: y + 0.7654, w: 5.3261, h: 0.4777, fontSize: 8, color: base, lineSpacing: 14 });
+}
+
+/** Stand-in for a photo frame in the original deck. */
+function picturePlaceholder (slide, x, y, w, h) {
+  T(slide, 'Picture', { x: x, y: y, w: w, h: 0.35, fontSize: 16, color: DARK, align: 'center', fontFace: 'Open Sans' });
+  rect(slide, {
+    x: x + w / 2 - 0.425, y: y + h / 2 - 0.325, w: 0.85, h: 0.65,
+    fill: { color: 'F7F8FA' }, line: { color: '6E7A87', width: 1 }
+  });
+  T(slide, '[image]', {
+    x: x + w / 2 - 0.425, y: y + h / 2 - 0.11, w: 0.85, h: 0.22,
+    fontSize: 8, color: '5B6672', align: 'center'
+  });
+}
+
+/** Repeated body paragraph used across the deck ("Presentations are communication tools..."). */
+function presentationsCopy (times) {
+  const s = 'Presentations are communication tools that can be used as demonstrations, ' +
+    'lectures, speeches, reports, and more. ';
+  return s.repeat(times);
+}
+
+// ------------------------------------------------------------ slides 1-2 ---
+// Cover slide. Same layout twice: yellow/red on slide 1, dark/blue on slide 2.
+function coverSlide (slide, theme) {
+  background(slide, theme.bg);
+  topBar(slide, theme.head);
+
+  brandMark(slide, 7.7488, 1.5994, 0.6348, 0.5472, theme.accent, theme.accent);
+  pill(slide, { x: 8.7241, y: 1.5994, w: 2.213, h: 0.5472, fill: { type: 'none' }, line: { color: theme.accent, width: 1.25 } });
+  T(slide, 'AIMER BRAND', {
+    x: 8.9591, y: 1.699, w: 1.7429, h: 0.3702,
+    fontSize: 16, bold: true, color: theme.head, align: 'center', wrap: false
+  });
+
+  T(slide, [
+    { text: 'MINIMAL AND ', options: {} },
+    { text: 'SIMPLE DESIGN ', options: { bold: true } },
+    { text: 'TO MAKE A ', options: {} },
+    { text: 'AWESOME', options: { bold: true } },
+    { text: ' PROJECT.', options: {} }
+  ], { x: 7.6471, y: 3.8397, w: 1.2644, h: 0.6395, fontSize: 8, color: theme.head, lineSpacingMultiple: 1 });
+
+  T(slide, 'BEST EXPERIENCE', {
+    x: 8.9687, y: 3.907, w: 3.5742, h: 0.5048,
+    fontSize: 24, bold: true, color: theme.accent2, margin: [7.2, 7.2, 3.6, 3.6]
+  });
+
+  T(slide, [
+    { text: LOREM_2LINE[0], options: { breakLine: true } },
+    { text: LOREM_2LINE[1], options: {} }
+  ], { x: 7.6471, y: 4.605, w: 5.3261, h: 0.4777, fontSize: 8, color: theme.head, lineSpacing: 14 });
+
+  line(slide, { x: 7.6944, y: 5.2556, w: 5.6389, h: 0, line: { color: theme.accent3, width: 0.75 } });
+
+  T(slide, 'Lorem Ipsum simply dummy text dummy', {
+    x: 7.6471, y: 5.3587, w: 5.3261, h: 0.285, fontSize: 8, color: theme.head, lineSpacing: 14
+  });
+
+  T(slide, [
+    { text: 'Brand ', options: { color: theme.title1, breakLine: true } },
+    { text: '\t\tGuidelines', options: { color: theme.title2 } }
+  ], { x: 0.7195, y: 4.6824, w: 9.2851, h: 2.5066, fontFace: HEAD, fontSize: 88, lineSpacing: 85 });
+
+  blob(slide, 1.0889, 6.5414, 0.7775, 0.296, theme.accent);
+}
+
+function slide01 (slide) {
+  coverSlide(slide, {
+    bg: YELLOW, head: BLACK, accent: RED, accent2: BLACK, accent3: RED,
+    title1: BLACK, title2: BLACK
+  });
+  pageTag(slide, '01', RED);
+}
+
+function slide02 (slide) {
+  coverSlide(slide, {
+    bg: DARK, head: WHITE, accent: BLUE, accent2: YELLOW, accent3: YELLOW,
+    title1: YELLOW, title2: YELLOW
+  });
+  pageTag(slide, '02', BLUE);
+}
+
+// -------------------------------------------------------------- slide 03 ---
+// Centred logo lock-up with an introductory paragraph.
+function slide03 (slide) {
+  background(slide, RED);
+  topBar(slide, WHITE);
+
+  brandMark(slide, 5.805, 1.2107, 1.7234, 1.4857, WHITE, RED);
+
+  T(slide, 'Introduce Brand Guideline', {
+    x: 4.4822, y: 3.0808, w: 4.369, h: 0.5049,
+    fontFace: HEAD, fontSize: 24, color: WHITE, align: 'center', wrap: false
+  });
+  line(slide, { x: 4.0426, y: 3.5893, w: 5.2482, h: 0, line: { color: BLACK, width: 0.75 } });
+
+  T(slide, 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo libero ' +
+    'vivamus porttitor dolor, conubia mollit. Sapien nam suspendisse, tincidunt eget ante tincidunt, ' +
+    'eros in auctor fringilla praesent at diam. In et quam est eget mi. Pellentesque nunc orci eu enimd', {
+    x: 1.1072, y: 3.8208, w: 11.1188, h: 0.582,
+    fontSize: 10, color: WHITE, align: 'center', lineSpacingMultiple: 1.5
+  });
+
+  pageTag(slide, '03', DARK);
+}
+
+// -------------------------------------------------------------- slide 04 ---
+// Agenda: numbered content list plus a "CONTENT" pill running off the right edge.
+const CONTENT_LIST = ['Overview', 'Who we Are', 'Our Project', 'concept ', 'Typography',
+  'COLORS', 'MOODBOARD', 'Case Studies', 'Testimonial', 'Client Say'];
+
+const LOREP_2LINE = [
+  'Lorep  ipsum duis aute irure dolor in kauselih oilue epree',
+  'deriti vols esse cill inure dolorlaboru sit amet. Duis autelo irusitakus reprehenderi Voluptate lorem kuisais.'
+];
+
+const LOREP_LONG = 'Lorep  ipsum duis aute irure dolor in kauselih oilusioisduili reprehenderitisi voluptates ' +
+  'esse cill inure dolorlaborusita amet. Duis aute irusitaseiad dolorin repreheno dui lroeml';
+
+function slide04 (slide) {
+  background(slide, RED);
+  topBar(slide, WHITE);
+
+  T(slide, 'Content List', {
+    x: 0.7195, y: 1.5196, w: 5.4664, h: 1.2117, fontFace: HEAD, fontSize: 66, color: WHITE, wrap: false
+  });
+
+  T(slide, [
+    { text: LOREP_2LINE[0], options: { breakLine: true } },
+    { text: LOREP_2LINE[1], options: {} }
+  ], { x: 0.7195, y: 2.8231, w: 3.4456, h: 0.6878, fontSize: 8, color: WHITE, lineSpacingMultiple: 1.5 });
+
+  T(slide, CONTENT_LIST.map(function (label, i) {
+    return { text: label.toUpperCase(), options: i < CONTENT_LIST.length - 1 ? { breakLine: true } : {} };
+  }), { x: 3.3095, y: 4.2508, w: 2.7081, h: 3.0629, fontSize: 16, color: WHITE, margin: [7.2, 7.2, 3.6, 3.6] });
+
+  T(slide, CONTENT_LIST.map(function (_, i) {
+    const n = ('0' + (i + 1)).slice(-2);
+    return { text: n, options: i < CONTENT_LIST.length - 1 ? { breakLine: true } : {} };
+  }), { x: 5.5556, y: 4.2508, w: 0.9242, h: 2.7937, fontSize: 16, color: WHITE, align: 'right' });
+
+  pill(slide, { x: 9.0569, y: 2.0278, w: 6.5212, h: 1.0398, fill: { type: 'none' }, line: { color: DARK, width: 1.5 } });
+  T(slide, 'CONTENT', {
+    x: 9.459, y: 2.127, w: 5.5555, h: 0.8414,
+    fontSize: 44, bold: true, color: WHITE, lineSpacingMultiple: 1, margin: 3.6
+  });
+
+  blob(slide, 0.8623, 5.346, 1.585, 0.6034, DARK);
+  pageTag(slide, '04', DARK);
+}
+
+// -------------------------------------------------------------- slide 05 ---
+// Welcome message: pull quote, author card and a large display headline.
+function slide05 (slide) {
+  background(slide, YELLOW);
+  topBar(slide, BLACK);
+
+  detailsBlock(slide, 0.7195, 1.0416, {});
+
+  T(slide, [
+    { text: 'GOOD VISUAL COME', options: { breakLine: true } },
+    { text: 'FROM EXPERIENCE.', options: { breakLine: true } },
+    { text: 'EXPERIENCE COMES FROM MAKING BAD DESIGN.', options: {} }
+  ], { x: 4.4983, y: 1.0416, w: 6.5383, h: 1.9858, fontSize: 28, bold: true, color: RED, margin: [7.2, 7.2, 3.6, 3.6] });
+
+  T(slide, presentationsCopy(2) + 'Presentations are communication tools that can.', {
+    x: 0.7235, y: 3.5842, w: 6.096, h: 0.7068, fontSize: 8, color: RED, lineSpacingMultiple: 1.5, margin: 3.6
+  });
+
+  T(slide, 'Welcome Message', {
+    x: 0.7195, y: 5.0885, w: 7.8541, h: 1.2117, fontFace: HEAD, fontSize: 66, color: BLACK, wrap: false
+  });
+
+  // author card (grouped in the original, drawn here with absolute positions)
+  T(slide, 'Alexandra micel', { x: 8.9792, y: 4.8506, w: 2.599, h: 0.4376, fontFace: HEAD, fontSize: 20, color: RED });
+  T(slide, 'Your Title Here', { x: 9.0, y: 5.4772, w: 1.5417, h: 0.2533, fontSize: 12, color: BLACK, lineSpacing: 10 });
+  slide.addShape('ellipse', { x: 9.1027, y: 5.949, w: 0.0885, h: 0.0885, fill: { color: RED } });
+  T(slide, [
+    { text: 'Lorem Ipsum', options: { bold: true } },
+    { text: '\u00a0is simply dummy text of the printing and typesetting.', options: {} }
+  ], { x: 8.9954, y: 6.2083, w: 3.3597, h: 0.4593, fontSize: 10, color: BLACK, lineSpacing: 13 });
+
+  blob(slide, 2.5105, 6.5306, 1.0745, 0.4091, RED);
+  pageTag(slide, '05', RED);
+}
+
+// -------------------------------------------------------------- slide 06 ---
+// Brand history: three pill-labelled columns of copy.
+const HISTORY_COLUMNS = [
+  { x: 0.7347, w: 3.4021, label: 'BRAND CREATION', filled: false, labelColor: WHITE, copyH: 1.4641, repeats: 2, tail: 'Presentations are communication tools that can be used as demonstrations, ' },
+  { x: 4.884, w: 2.3049, label: 'OUR VALUE', filled: true, labelColor: YELLOW, copyH: 1.2369, repeats: 2, tail: '' },
+  { x: 8.8754, w: 2.3913, label: 'REBRANDING', filled: false, labelColor: WHITE, copyH: 1.0097, repeats: 1, tail: 'Presentations are communication tools that can be used as demonstrations, ' }
+];
+
+function slide06 (slide) {
+  background(slide, DARK);
+  topBar(slide, WHITE);
+
+  T(slide, 'Brand History', {
+    x: 0.7195, y: 1.5196, w: 6.2623, h: 1.2117, fontFace: HEAD, fontSize: 66, color: YELLOW, wrap: false
+  });
+
+  slide.addShape('ellipse', { x: 8.8991, y: 1.2262, w: 0.0885, h: 0.0885, fill: { color: WHITE } });
+  T(slide, [
+    { text: 'Lorem Ipsum', options: { bold: true } },
+    { text: '\u00a0is simply dummy text of the printing and typesetting.', options: {} }
+  ], { x: 8.7918, y: 1.4856, w: 2.6895, h: 0.4593, fontSize: 10, color: WHITE, lineSpacing: 13 });
+
+  line(slide, { x: -0.0386, y: 3.0195, w: 3.8164, h: 0, line: { color: YELLOW, width: 0.75 } });
+
+  T(slide, LOREP_LONG, { x: 0.7195, y: 3.3077, w: 5.6971, h: 0.4858, fontSize: 8, color: WHITE, lineSpacingMultiple: 1.5 });
+
+  HISTORY_COLUMNS.forEach(function (col) {
+    pill(slide, {
+      x: col.x, y: col.filled ? 4.6665 : 4.6571, w: col.w, h: 0.8372,
+      fill: col.filled ? { color: BLUE } : { type: 'none' }, line: { color: BLUE, width: 2 }
+    });
+    T(slide, col.label, {
+      x: col.x, y: 4.8569, w: col.w, h: 0.4375,
+      fontSize: 20, bold: col.filled, color: col.labelColor, align: 'center', margin: [7.2, 7.2, 3.6, 3.6]
+    });
+    T(slide, presentationsCopy(col.repeats) + col.tail, {
+      x: col.x, y: 5.7648, w: 3.56, h: col.copyH, fontSize: 9, color: WHITE, lineSpacingMultiple: 1.5, margin: 3.6
+    });
+  });
+
+  pageTag(slide, '06', BLUE);
+}
+
+// -------------------------------------------------------------- slide 07 ---
+// Brand overview: split display title, details column, mixed-colour statement.
+function slide07 (slide) {
+  background(slide, BLUE);
+  topBar(slide, WHITE);
+
+  T(slide, [
+    { text: 'Brand', options: { color: DARK, breakLine: true } },
+    { text: '\tOverview', options: { color: WHITE } }
+  ], { x: 0.7195, y: 1.5196, w: 4.9896, h: 2.1205, fontFace: HEAD, fontSize: 60, wrap: false });
+
+  T(slide, 'Details', { x: 6.0657, y: 1.3598, w: 1.6191, h: 0.4039, fontSize: 18, color: YELLOW });
+  T(slide, DETAILS_COPY, { x: 6.0697, y: 1.8173, w: 1.8718, h: 1.7627, fontSize: 8, color: WHITE, lineSpacing: 15 });
+
+  line(slide, { x: 0, y: 4.3889, w: 12.8611, h: 0, line: { color: YELLOW, width: 1 } });
+
+  T(slide, presentationsCopy(2) + 'Presentations are communication tools that can.', {
+    x: 0.7235, y: 4.6834, w: 6.096, h: 0.7068, fontSize: 8, color: WHITE, lineSpacingMultiple: 1.5, margin: 3.6
+  });
+
+  T(slide, [
+    { text: 'CREATE SOME ', options: { bold: true, color: BLACK, fontSize: 18 } },
+    { text: 'UNIQUE', options: { bold: true, color: YELLOW, breakLine: true } },
+    { text: 'CONCEPT & ', options: { bold: true, color: YELLOW } },
+    { text: 'BRAND', options: { bold: true, color: BLACK, fontSize: 18 } },
+    { text: ' ', options: { color: BLACK } },
+    { text: 'TO MAKE', options: { bold: true, color: YELLOW, breakLine: true } },
+    { text: 'A', options: { bold: true, color: YELLOW } },
+    { text: ' ', options: { color: YELLOW } },
+    { text: 'DIFFERENT', options: { bold: true, color: BLACK, fontSize: 18 } },
+    { text: ' ', options: { color: BLACK } },
+    { text: 'TREND STYLE ', options: { bold: true, color: YELLOW } }
+  ], { x: 3.2143, y: 5.618, w: 7.1188, h: 2.1205, fontSize: 40, margin: [7.2, 7.2, 3.6, 3.6] });
+
+  blob(slide, 0.9874, 6.401, 1.0991, 0.4185, YELLOW);
+  pageTag(slide, '07', YELLOW);
+}
+
+// -------------------------------------------------------------- slide 08 ---
+// Guideline: rotated "BRAND" pill on the left, big statement, two copy columns.
+function slide08 (slide) {
+  background(slide, RED);
+  topBar(slide, WHITE);
+
+  pill(slide, {
+    x: -0.2977, y: 2.7509, w: 2.9792, h: 0.8725, rotate: 90,
+    fill: { type: 'none' }, line: { color: DARK, width: 1.5 }
+  });
+  T(slide, 'BRAND', {
+    x: 0.0664, y: 2.8001, w: 2.2232, h: 0.7741, rotate: 90,
+    fontSize: 40, bold: true, color: WHITE, align: 'center', lineSpacingMultiple: 1, margin: 3.6
+  });
+
+  T(slide, [
+    { text: 'SMALL STUDIO WITH', options: { breakLine: true } },
+    { text: 'A ', options: {} },
+    { text: 'BRILLIANT IDEA ', options: { fontSize: 40 } },
+    { text: 'TO MAKE', options: { breakLine: true } },
+    { text: 'A BEAUTIFUL ', options: {} },
+    { text: 'DESIGN', options: { fontSize: 40 } }
+  ], { x: 5.6078, y: 1.6007, w: 6.9699, h: 1.9858, fontSize: 32, bold: true, color: BLACK, margin: [7.2, 7.2, 3.6, 3.6] });
+
+  const columnCopy = presentationsCopy(1) +
+    'Presentations are communication tools that can be used as demonstrations, lectures,, lectures, ' +
+    'speeches, reports, and more. Presentations are communication';
+  [7.0759, 9.9338].forEach(function (x) {
+    T(slide, columnCopy, {
+      x: x, y: 4.0544, w: 2.5213, h: 1.5146, fontSize: 8, color: WHITE, lineSpacingMultiple: 1.5, margin: 3.6
+    });
+  });
+
+  T(slide, 'Guideline', {
+    x: 0.2055, y: 5.3415, w: 6.2885, h: 1.5819,
+    fontFace: HEAD, fontSize: 88, color: WHITE, align: 'center', margin: [7.2, 7.2, 3.6, 3.6]
+  });
+
+  pageTag(slide, '08', DARK);
+}
+
+// -------------------------------------------------------------- slide 09 ---
+// Concept: oversized brand mark next to keyword stack.
+function slide09 (slide) {
+  background(slide, DARK);
+  topBar(slide, WHITE);
+
+  brandMark(slide, 1.8872, 1.6396, 3.5423, 3.0537, BLUE, BLUE);
+  T(slide, 'AIMER BRAND LOGO', {
+    x: 1.9649, y: 5.2996, w: 3.3868, h: 0.4039,
+    fontSize: 18, bold: true, color: YELLOW, align: 'center', margin: [7.2, 7.2, 3.6, 3.6]
+  });
+  T(slide, presentationsCopy(2) + 'Presentations are communication tools that can be used as demonstrations,', {
+    x: 1.0518, y: 6.0399, w: 5.213, h: 0.8078,
+    fontSize: 7, color: WHITE, align: 'center', lineSpacingMultiple: 1.5, margin: 3.6
+  });
+
+  detailsBlock(slide, 5.6114, 1.4662, { labelColor: YELLOW, textColor: WHITE });
+
+  T(slide, 'Brand Logos', {
+    x: 5.6114, y: 3.3825, w: 5.5015, h: 1.2117, fontFace: HEAD, fontSize: 66, color: YELLOW, wrap: false
+  });
+
+  pill(slide, { x: 9.0569, y: 2.0278, w: 6.5212, h: 1.0398, fill: { type: 'none' }, line: { color: BLUE, width: 1.5 } });
+  T(slide, 'CONCEPT', {
+    x: 9.459, y: 2.127, w: 5.5555, h: 0.8414, fontSize: 44, bold: true, color: WHITE, lineSpacingMultiple: 1, margin: 3.6
+  });
+
+  const keywords = [
+    { text: 'UNIQUE', x: 6.6274, y: 4.9022, w: 2.9426, h: 0.4375, size: 20, color: BLUE },
+    { text: 'STRONGEST', x: 8.552, y: 4.8276, w: 4.5552, h: 0.8414, size: 44, color: WHITE },
+    { text: 'CREATIVE', x: 6.6722, y: 5.5731, w: 3.7607, h: 0.4375, size: 20, color: WHITE },
+    { text: 'MODERN', x: 9.3465, y: 5.4996, w: 3.7607, h: 0.8414, size: 44, color: YELLOW }
+  ];
+  keywords.forEach(function (k) {
+    T(slide, k.text, { x: k.x, y: k.y, w: k.w, h: k.h, fontSize: k.size, color: k.color, align: 'right', margin: [7.2, 7.2, 3.6, 3.6] });
+  });
+
+  pageTag(slide, '09', BLUE);
+}
+
+// -------------------------------------------------------------- slide 10 ---
+// Primary logo with a construction grid around the mark.
+function slide10 (slide) {
+  background(slide, YELLOW);
+  topBar(slide, BLACK);
+
+  T(slide, 'Primary Logo', {
+    x: 0.7195, y: 1.1792, w: 6.5181, h: 1.2346, fontFace: HEAD, fontSize: 66, color: BLACK, lineSpacing: 85
+  });
+
+  detailsBlock(slide, 2.9133, 2.9211, {});
+  blob(slide, 0.7786, 3.165, 1.2489, 0.4755, RED);
+
+  // construction grid: two verticals, two horizontals, with round end caps
+  const grid = [
+    { x: 10.0311, y: 2.7901, w: 0, h: 3.1572 },
+    { x: 8.6229, y: 2.7901, w: 0, h: 3.1572 },
+    { x: 7.0101, y: 3.6348, w: 4.5312, h: 0 },
+    { x: 7.0101, y: 5.0861, w: 4.5312, h: 0 }
+  ];
+  grid.forEach(function (g) {
+    slide.addShape('line', {
+      x: g.x, y: g.y, w: g.w, h: g.h,
+      line: { color: RED, width: 0.75, beginArrowType: 'oval', endArrowType: 'oval' }
+    });
+  });
+
+  brandMark(slide, 8.623, 3.6278, 1.4082, 1.4514, RED, RED);
+
+  const gridLabels = [
+    { t: 'BRAND ', x: 8.9122, y: 3.0028, w: 0.7703, bold: true, align: 'center' },
+    { t: 'GUIDELINES', x: 8.5145, y: 5.4757, w: 1.6104, bold: true, align: 'center' },
+    { t: 'Primary', x: 7.2652, y: 4.1918, w: 1.4984 },
+    { t: 'Logo', x: 10.5194, y: 4.1918, w: 0.6899 }
+  ];
+  gridLabels.forEach(function (l) {
+    T(slide, l.t, { x: l.x, y: l.y, w: l.w, h: 0.2693, fontSize: 10, bold: !!l.bold, color: BLACK, align: l.align || 'left' });
+  });
+
+  T(slide, [
+    { text: 'Lorem Ipsum', options: { breakLine: true } }, { text: 'Dolor is', options: {} }
+  ], { x: 6.9894, y: 2.933, w: 1.1217, h: 0.4005, fontSize: 8, color: BLACK, lineSpacing: 11 });
+  T(slide, [
+    { text: 'Lorem Ipsum', options: { breakLine: true } }, { text: 'Dolor is simply Dummy', options: {} }
+  ], { x: 6.9894, y: 5.3581, w: 1.4678, h: 0.5566, fontSize: 8, color: BLACK, lineSpacing: 11 });
+  T(slide, 'Lorem', { x: 10.5194, y: 3.0124, w: 1.1217, h: 0.2462, fontSize: 8, color: BLACK, lineSpacing: 11 });
+  T(slide, 'Ipsum', { x: 10.5194, y: 5.4977, w: 1.1217, h: 0.2462, fontSize: 8, color: BLACK, lineSpacing: 11 });
+
+  bestExperience(slide, 0.7195, 5.3751, { base: BLACK, accent: BLACK, headline: BLACK });
+  pageTag(slide, '10', RED);
+}
+
+// -------------------------------------------------------------- slide 11 ---
+// Logo variations: three coloured cards with dimension arrows.
+function slide11 (slide) {
+  background(slide, DARK);
+  topBar(slide, WHITE);
+
+  // cards
+  rect(slide, { x: 0.5238, y: 1.9783, w: 2.7559, h: 2.7559, fill: { color: RED } });
+  rect(slide, { x: 4.2639, y: 1.9783, w: 2.7559, h: 3.5433, fill: { color: YELLOW } });
+  rect(slide, { x: 8.402, y: 1.5846, w: 2.7559, h: 3.5433, rotate: 90, fill: { color: BLUE } });
+
+  brandMark(slide, 1.1977, 2.3574, 1.4082, 1.4514, YELLOW, YELLOW);
+  brandMark(slide, 4.9378, 2.4957, 1.4082, 1.4514, RED, RED);
+  brandMark(slide, 8.277, 2.5502, 1.3044, 1.1245, WHITE, null);
+
+  pill(slide, { x: 9.5815, y: 2.9563, w: 1.6019, h: 0.3961, fill: { type: 'none' }, line: { color: YELLOW, width: 1.25 } });
+  T(slide, 'AIMER BRAND', {
+    x: 9.7358, y: 3.0191, w: 1.3607, h: 0.3029, fontSize: 12, bold: true, color: YELLOW, align: 'center', wrap: false
+  });
+  T(slide, 'AIMER BRAND', {
+    x: 4.2073, y: 4.2504, w: 2.8675, h: 0.4376,
+    fontFace: 'Poppins Black', fontSize: 20, bold: true, color: BLACK, align: 'center', charSpacing: 0.5
+  });
+
+  [['Symmetrical', 0.6488, 4.2521], ['Portrait', 4.3988, 5.0382], ['Landscape', 8.1488, 4.2521]].forEach(function (c) {
+    T(slide, c[0], { x: c[1], y: c[2], w: 1.6389, h: 0.3029, fontSize: 12, color: WHITE });
+  });
+
+  // dimension arrows and their labels
+  [[0.5238, 1.7006, 2.7559, 0], [7.9821, 1.7006, 3.5694, 0], [4.2639, 5.8811, 2.7559, 0],
+    [3.5099, 1.9783, 0, 2.7559], [7.2599, 1.9783, 0, 3.5476], [11.8016, 1.9783, 0, 2.7559]
+  ].forEach(function (a) { dimArrow(slide, a[0], a[1], a[2], a[3], WHITE); });
+
+  [['7 CM', 1.5059, 1.3743], ['7 CM', 3.4137, 3.2217], ['7 CM', 5.246, 6.0094],
+    ['9 CM', 7.185, 3.2155], ['7 CM', 9.371, 1.369], ['9 CM', 11.6652, 3.2155]
+  ].forEach(function (l) {
+    T(slide, l[0], { x: l[1], y: l[2], w: 0.7917, h: 0.2693, fontSize: 10, color: WHITE, align: 'center' });
+  });
+
+  T(slide, 'Variation', {
+    x: 7.9175, y: 5.3258, w: 6.5317, h: 1.2117, fontFace: HEAD, fontSize: 66, color: YELLOW
+  });
+  T(slide, [
+    { text: LOREP_2LINE[0], options: { breakLine: true } },
+    { text: LOREP_2LINE[1], options: {} }
+  ], { x: 0.4197, y: 5.3217, w: 3.4456, h: 0.6878, fontSize: 8, color: WHITE, lineSpacingMultiple: 1.5 });
+
+  pill(slide, { x: -0.6126, y: 6.4271, w: 5.5503, h: 0.8372, fill: { type: 'none' }, line: { color: BLUE, width: 2 } });
+  T(slide, 'BRAND CREATION DETAILS', {
+    x: -0.591, y: 6.6462, w: 4.8179, h: 0.4375,
+    fontSize: 20, bold: true, color: WHITE, align: 'right', margin: [7.2, 7.2, 3.6, 3.6]
+  });
+
+  pageTag(slide, '11', BLUE);
+}
+
+// -------------------------------------------------------------- slide 12 ---
+// Brand colours: four swatch tiles with RGB captions.
+const SWATCHES = [
+  { x: 6.2622, y: 2.8133, fill: YELLOW, code: '#442D1B', codeW: 0.8606 },
+  { x: 8.3892, y: 2.8133, fill: DARK, code: '#A58A5C', codeW: 0.9352 },
+  { x: 10.5162, y: 2.8133, fill: null, code: '#E8DECD', codeW: 0.9146 },
+  { x: 6.2622, y: 4.8226, fill: RED, code: '#65512E', codeW: 0.8761 }
+];
+
+function slide12 (slide) {
+  background(slide, BLUE);
+  topBar(slide, WHITE);
+
+  T(slide, 'Brand Colors', {
+    x: 0.7195, y: 1.1792, w: 6.5181, h: 1.2346, fontFace: HEAD, fontSize: 66, color: WHITE, lineSpacing: 85
+  });
+
+  SWATCHES.forEach(function (s) {
+    rect(slide, {
+      x: s.x, y: s.y, w: 2.127, h: 2.0093,
+      fill: s.fill ? { color: s.fill } : { type: 'none' },
+      line: s.fill ? { type: 'none' } : { color: WHITE, width: 1 }
+    });
+    T(slide, 'RGB', {
+      x: s.x + 0.1793, y: s.y + 1.0046, w: 0.717, h: 0.3282,
+      fontFace: BODY_MED, fontSize: 15, color: WHITE, lineSpacing: 16
+    });
+    T(slide, s.code, {
+      x: s.x + 0.1871, y: s.y + 1.2883, w: s.codeW, h: 0.2693, fontFace: BODY_MED, fontSize: 10, color: WHITE
+    });
+  });
+
+  T(slide, 'REBRANDING', {
+    x: 8.5433, y: 5.3498, w: 2.3913, h: 0.4039, fontSize: 18, bold: true, color: YELLOW, margin: [7.2, 7.2, 3.6, 3.6]
+  });
+  T(slide, presentationsCopy(2) + 'Presentations are communication tools that can.', {
+    x: 8.6058, y: 5.8015, w: 3.8664, h: 1.1107, fontSize: 8, color: WHITE, lineSpacingMultiple: 1.5, margin: 3.6
+  });
+
+  pill(slide, { x: 9.0569, y: 1.3155, w: 6.5212, h: 1.0398, fill: { type: 'none' }, line: { color: YELLOW, width: 1.5 } });
+  T(slide, 'AN IDEAS', {
+    x: 9.459, y: 1.4147, w: 5.5555, h: 0.8414, fontSize: 44, bold: true, color: BLACK, lineSpacingMultiple: 1, margin: 3.6
+  });
+
+  detailsBlock(slide, 0.6902, 2.9211, { labelColor: WHITE, textColor: WHITE });
+  blob(slide, 3.7865, 3.7443, 1.2489, 0.4755, YELLOW);
+
+  bestExperience(slide, 0.7195, 5.3751, { base: WHITE, accent: YELLOW, headline: YELLOW });
+  pageTag(slide, '12', YELLOW);
+}
+
+// -------------------------------------------------------------- slide 13 ---
+// Primary colours: three tint ramps of five steps each.
+const RAMP_LABELS = ['DARK PURPLE', 'GREEN', 'BLACK', 'BLUE', 'DARK PURPLE'];
+const RAMP_ALPHAS = [0, 20, 40, 60, 80];   // transparency applied left to right
+// capDx/capDy: caption offset from the swatch — first column differs from the rest
+const RAMPS = [
+  { color: DARK, x: 6.7575, y: 1.3011, capDx: [0, 0.0847], capDy: [0.9834, 0.935] },
+  { color: YELLOW, x: 6.7448, y: 3.2672, capDx: [0, 0.0847], capDy: [0.9834, 0.935] },
+  { color: BLUE, x: 6.7513, y: 5.2333, capDx: [-0.0846, 0], capDy: [0.9681, 0.9197] }
+];
+
+function colorRamp (slide, ramp) {
+  RAMP_ALPHAS.forEach(function (alpha, i) {
+    const x = ramp.x + i * 1.0344;
+    const cx = x + ramp.capDx[i === 0 ? 0 : 1];
+    const cy = ramp.y + ramp.capDy[i === 0 ? 0 : 1];
+    rect(slide, {
+      x: x, y: ramp.y, w: 1.0338, h: 0.7817,
+      fill: alpha ? { color: ramp.color, transparency: alpha } : { color: ramp.color }
+    });
+    T(slide, RAMP_LABELS[i], { x: cx, y: cy, w: 1.0338, h: 0.2021, fontSize: 6, color: WHITE, margin: 3.6 });
+    T(slide, [
+      { text: 'RGB :  CODE NAME', options: { breakLine: true } },
+      { text: 'COLOR SCHEME', options: {} }
+    ], { x: cx, y: cy + 0.2172, w: 1.0338, h: 0.3028, fontSize: 6, color: WHITE, margin: 3.6 });
+  });
+}
+
+function slide13 (slide) {
+  background(slide, RED);
+  topBar(slide, WHITE);
+
+  T(slide, 'Primary \t\t\t \t\tColors', {
+    x: 0.7195, y: 1.1792, w: 6.5181, h: 2.4267, fontFace: HEAD, fontSize: 66, color: WHITE, lineSpacing: 85
+  });
+
+  RAMPS.forEach(function (r) { colorRamp(slide, r); });
+
+  pill(slide, { x: -0.7845, y: 4.0008, w: 3.4021, h: 0.8372, fill: { type: 'none' }, line: { color: DARK, width: 2 } });
+  T(slide, 'AIMER', {
+    x: -1.3123, y: 4.1327, w: 3.4021, h: 0.5722,
+    fontSize: 28, bold: true, color: WHITE, align: 'right', margin: [7.2, 7.2, 3.6, 3.6]
+  });
+  pill(slide, { x: 3.3649, y: 4.0103, w: 2.3049, h: 0.8372, fill: { color: DARK }, line: { color: YELLOW, width: 2 } });
+  T(slide, 'OUR VALUE', {
+    x: 3.3649, y: 4.2006, w: 2.3049, h: 0.4375,
+    fontSize: 20, bold: true, color: YELLOW, align: 'center', margin: [7.2, 7.2, 3.6, 3.6]
+  });
+
+  T(slide, presentationsCopy(2) + 'Presentations are communication tools that can.', {
+    x: 0.7195, y: 5.5454, w: 5.1419, h: 0.9087, fontSize: 8, color: WHITE, lineSpacingMultiple: 1.5, margin: 3.6
+  });
+
+  pageTag(slide, '13', DARK);
+}
+
+// -------------------------------------------------------------- slide 14 ---
+// Typography: two font specimens, each with a pill label and an arrow.
+const ALPHA_UPPER = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const ALPHA_LOWER = 'abcdefghijklmnopqrstuvwxyz';
+
+// The first row sits inside a group that shifts it 0.144" down from its own frame.
+const TYPE_ROWS = [
+  { label: 'Abril Fatface', labelFont: HEAD, labelBold: false, pillY: 3.3575, pillColor: DARK, labelY: 3.5165, arrowX: 3.3294, arrowY: 3.7761, specX: 5.1836, specY: 3.2153 },
+  { label: 'Poppins', labelFont: BODY, labelBold: true, pillY: 5.3652, pillColor: RED, labelY: 5.537, arrowX: 3.4961, arrowY: 5.7838, specX: 5.3502, specY: 5.223 }
+];
+
+function slide14 (slide) {
+  background(slide, YELLOW);
+  topBar(slide, BLACK);
+
+  T(slide, 'Brand Typography', {
+    x: 0.4197, y: 1.3276, w: 8.494, h: 1.2117, fontFace: HEAD, fontSize: 66, color: BLACK
+  });
+
+  T(slide, 'Details', { x: 9.4556, y: 1.2825, w: 1.6191, h: 0.4039, fontSize: 18, color: BLACK });
+  T(slide, DETAILS_COPY, { x: 9.4596, y: 1.74, w: 3.3238, h: 0.9213, fontSize: 8, color: BLACK, lineSpacing: 15 });
+
+  TYPE_ROWS.forEach(function (row) {
+    pill(slide, { x: -0.3709, y: row.pillY, w: 3.4021, h: 0.8372, fill: { type: 'none' }, line: { color: row.pillColor, width: 2 } });
+    T(slide, row.label, {
+      x: 0.4197, y: row.labelY, w: 2.3025, h: 0.5594,
+      fontFace: row.labelFont, fontSize: 24, bold: row.labelBold, color: RED,
+      paraSpaceBefore: 10, margin: [7.2, 7.2, 3.6, 3.6]
+    });
+    slide.addShape('line', {
+      x: row.arrowX, y: row.arrowY, w: 1.5559, h: 0,
+      line: { color: WHITE, width: 0.75, endArrowType: 'triangle' }
+    });
+    T(slide, [
+      { text: ALPHA_UPPER, options: { breakLine: true } },
+      { text: ALPHA_LOWER, options: {} }
+    ], {
+      x: row.specX, y: row.specY, w: 7.1081, h: 1.1216, fontFace: HEAD, fontSize: 24, color: BLACK,
+      lineSpacingMultiple: 1, paraSpaceBefore: 10, margin: [7.2, 7.2, 3.6, 3.6]
+    });
+  });
+
+  blob(slide, 3.0354, 6.6386, 1.0745, 0.4091, RED);
+  pageTag(slide, '14', RED);
+}
+
+// -------------------------------------------------------------- slide 15 ---
+// Primary typography specimen with the weight list.
+const WEIGHTS = [
+  { t: 'Abril Font', x: 8.8688, y: 3.4449, w: 2.1812, color: WHITE, underline: true },
+  { t: 'Thin', x: 8.8688, y: 3.9866, w: 1.4287, color: WHITE },
+  { t: 'Extra Light', x: 8.8714, y: 4.5273, w: 2.1303, color: BLUE },
+  { t: 'Light', x: 8.8688, y: 5.042, w: 1.4304, color: WHITE },
+  { t: 'Regular', x: 8.8642, y: 5.6096, w: 1.7326, color: WHITE },
+  { t: 'Medium', x: 11.0295, y: 3.4449, w: 1.6104, color: WHITE },
+  { t: 'SemiBold', x: 11.0106, y: 3.9737, w: 1.6294, color: WHITE },
+  { t: 'Bold', x: 11.0106, y: 4.5291, w: 1.7237, color: BLUE },
+  { t: 'ExtraBold', x: 11.0106, y: 5.0567, w: 2.0023, color: WHITE },
+  { t: 'Black', x: 11.0106, y: 5.6237, w: 1.8352, color: WHITE }
+];
+
+function slide15 (slide) {
+  background(slide, DARK);
+  topBar(slide, WHITE);
+
+  T(slide, 'Primary Typography', {
+    x: 0.7195, y: 1.3132, w: 10.7249, h: 1.2346, fontFace: HEAD, fontSize: 66, color: YELLOW, lineSpacing: 85
+  });
+
+  T(slide, 'Ab', { x: 0.7175, y: 2.8963, w: 3.132, h: 2.6254, fontFace: HEAD, fontSize: 150, color: BLUE });
+  T(slide, ALPHA_UPPER, { x: 4.2295, y: 3.3708, w: 4.1171, h: 0.9424, fontFace: HEAD, fontSize: 25, color: WHITE });
+  T(slide, ALPHA_LOWER, { x: 4.2295, y: 4.5342, w: 3.6311, h: 0.9424, fontFace: HEAD, fontSize: 25, color: WHITE });
+
+  WEIGHTS.forEach(function (w) {
+    T(slide, w.t, {
+      x: w.x, y: w.y, w: w.w, h: 0.4376, fontFace: HEAD, fontSize: 30, color: w.color,
+      superscript: true, underline: w.underline ? { style: 'sng' } : undefined
+    });
+  });
+
+  T(slide, presentationsCopy(2) + 'Presentations are communication tools that can.', {
+    x: 0.7195, y: 6.1006, w: 5.1419, h: 0.9087, fontSize: 8, color: WHITE, lineSpacingMultiple: 1.5, margin: 3.6
+  });
+
+  pill(slide, { x: 6.3467, y: 6.1748, w: 3.1671, h: 0.7377, fill: { type: 'none' }, line: { color: YELLOW, width: 0.75 } });
+  T(slide, 'Font : Abril Fatface', {
+    x: 6.6776, y: 6.353, w: 2.5055, h: 0.4039, fontSize: 18, color: YELLOW, wrap: false
+  });
+
+  pageTag(slide, '15', BLUE);
+}
+
+// -------------------------------------------------------------- slide 16 ---
+// Brand positioning: copy columns plus two picture frames from the layout.
+function slide16 (slide) {
+  background(slide, RED);
+  topBar(slide, WHITE);
+
+  T(slide, 'Brand Positioning', {
+    x: 0.7195, y: 1.1792, w: 9.4932, h: 1.2346, fontFace: HEAD, fontSize: 66, color: WHITE, lineSpacing: 85
+  });
+
+  T(slide, 'Lorem Ipsum\u00a0is simply dummy text of the printingand typesetting industry. ' +
+    "Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, " +
+    'when an unknown printer took a galley of type and', {
+    x: 5.3286, y: 2.7444, w: 4.0813, h: 0.9786, fontSize: 9, color: WHITE, lineSpacing: 16
+  });
+
+  picturePlaceholder(slide, 5.4173, 3.9306, 4.0813, 3.0615);
+  picturePlaceholder(slide, 9.8254, 2.5238, 2.9683, 4.4365);
+
+  detailsBlock(slide, 0.6902, 2.7444, { labelColor: WHITE, textColor: WHITE });
+  blob(slide, 3.7865, 3.7443, 1.2489, 0.4755, DARK);
+
+  bestExperience(slide, 0.7195, 5.3751, { base: WHITE, accent: DARK, headline: DARK });
+
+  pill(slide, { x: 10.1571, y: 1.4048, w: 2.3049, h: 0.8372, fill: { color: DARK }, line: { color: YELLOW, width: 2 } });
+  T(slide, 'OUR VALUE', {
+    x: 10.1571, y: 1.5952, w: 2.3049, h: 0.4375,
+    fontSize: 20, bold: true, color: YELLOW, align: 'center', margin: [7.2, 7.2, 3.6, 3.6]
+  });
+
+  pageTag(slide, '16', DARK);
+}
+
+// -------------------------------------------------------------- slide 17 ---
+// Brand imagery: sparse layout with the blob mark and a call-out button.
+function slide17 (slide) {
+  background(slide, RED);
+  topBar(slide, WHITE);
+
+  T(slide, 'Brand Imagery', {
+    x: 0.7195, y: 1.3426, w: 6.6269, h: 1.2117, fontFace: HEAD, fontSize: 66, color: WHITE, wrap: false
+  });
+  T(slide, [
+    { text: LOREP_2LINE[0], options: { breakLine: true } },
+    { text: LOREP_2LINE[1], options: {} }
+  ], { x: 0.7195, y: 2.6461, w: 3.4456, h: 0.6878, fontSize: 8, color: WHITE, lineSpacingMultiple: 1.5 });
+
+  blob(slide, 7.3059, 2.3654, 1.585, 0.6034, DARK);
+
+  T(slide, 'Details', { x: 0.7156, y: 4.5882, w: 1.6191, h: 0.4039, fontSize: 18, color: WHITE });
+  T(slide, DETAILS_COPY, { x: 0.7195, y: 5.0458, w: 1.8718, h: 1.7627, fontSize: 8, color: WHITE, lineSpacing: 15 });
+
+  pill(slide, { x: 5.1615, y: 5.1653, w: 3.4021, h: 0.8372, fill: { color: DARK }, line: { color: YELLOW, width: 2 } });
+  T(slide, 'BRAND CREATION', {
+    x: 5.1615, y: 5.3651, w: 3.4021, h: 0.4375,
+    fontSize: 20, color: YELLOW, align: 'center', margin: [7.2, 7.2, 3.6, 3.6]
+  });
+
+  pageTag(slide, '17', DARK);
+}
+
+// -------------------------------------------------------------- slide 18 ---
+// Brand application: phone + tablet device mockups.
+const DEVICE_BEZEL = 0.055;
+
+function deviceFrame (slide, x, y, w, h, radius, screenColor) {
+  pill(slide, { x: x, y: y, w: w, h: h, radius: radius, fill: { color: BLACK }, line: { type: 'none' } });
+  pill(slide, {
+    x: x + DEVICE_BEZEL, y: y + DEVICE_BEZEL,
+    w: w - 2 * DEVICE_BEZEL, h: h - 2 * DEVICE_BEZEL, radius: radius - DEVICE_BEZEL,
+    fill: { color: screenColor }, line: { type: 'none' }
+  });
+}
+
+function slide18 (slide) {
+  background(slide, BLUE);
+  topBar(slide, WHITE);
+
+  T(slide, [
+    { text: 'Brand ', options: { color: BLACK } },
+    { text: 'Application', options: { color: WHITE } }
+  ], { x: 0.4197, y: 1.3817, w: 9.705, h: 1.2117, fontFace: HEAD, fontSize: 66 });
+
+  deviceFrame(slide, 6.4821, 3.0977, 1.559, 3.3056, 0.22, BLUE);
+  pill(slide, { x: 6.875, y: 3.0977, w: 0.75, h: 0.14, radius: 0.055, fill: { color: BLACK }, line: { type: 'none' } });
+  pill(slide, { x: 7.0758, y: 3.148, w: 0.3715, h: 0.04, radius: 0.02, fill: { color: '484747' }, line: { type: 'none' } });
+
+  deviceFrame(slide, 8.4907, 3.0977, 4.3177, 3.3056, 0.18, BLUE);
+  pill(slide, { x: 8.79, y: 3.0977, w: 0.38, h: 0.045, radius: 0.02, fill: { color: '484747' }, line: { type: 'none' } });
+  T(slide, '9:41   \u25b0 \u25b2 \u25ae', {
+    x: 12.15, y: 3.16, w: 0.6, h: 0.12, fontSize: 4, color: DARK, align: 'right'
+  });
+
+  T(slide, 'Mobile', {
+    x: 5.3926, y: 5.5834, w: 1.2021, h: 0.4376, rotate: 90,
+    fontSize: 20, bold: true, color: YELLOW, align: 'center'
+  });
+  T(slide, 'Tab Device', {
+    x: 10.6496, y: 2.4394, w: 2.2019, h: 0.4376, fontSize: 20, bold: true, color: YELLOW, align: 'center'
+  });
+
+  T(slide, [
+    { text: LOREP_2LINE[0], options: { breakLine: true } },
+    { text: LOREP_2LINE[1], options: {} }
+  ], { x: 0.7195, y: 3.1636, w: 3.4456, h: 0.6878, fontSize: 8, color: WHITE, lineSpacingMultiple: 1.5 });
+  T(slide, LOREP_LONG, { x: 0.7195, y: 3.9504, w: 3.5606, h: 0.6878, fontSize: 8, color: WHITE, lineSpacingMultiple: 1.5 });
+
+  pill(slide, { x: 8.9486, y: 1.2195, w: 5.2081, h: 0.8372, fill: { color: DARK }, line: { color: YELLOW, width: 2 } });
+  T(slide, 'BRAND MOCKUP', {
+    x: 9.2698, y: 1.3817, w: 3.4021, h: 0.5048,
+    fontSize: 24, bold: true, color: YELLOW, align: 'center', margin: [7.2, 7.2, 3.6, 3.6]
+  });
+
+  bestExperience(slide, 0.7195, 5.3751, { base: WHITE, accent: YELLOW, headline: YELLOW });
+  pageTag(slide, '18', YELLOW);
+}
+
+// -------------------------------------------------------------- slide 19 ---
+// Brand stationary: two business-card mockups.
+function slide19 (slide) {
+  background(slide, DARK);
+  topBar(slide, WHITE);
+
+  T(slide, 'Brand Stationary', {
+    x: 0.7195, y: 1.1809, w: 8.0961, h: 1.2117, fontFace: HEAD, fontSize: 66, color: WHITE
+  });
+
+  pill(slide, { x: -0.7845, y: 2.5077, w: 3.4021, h: 0.8372, fill: { type: 'none' }, line: { color: BLUE, width: 2 } });
+  T(slide, 'AIMER', {
+    x: -1.3123, y: 2.6396, w: 3.4021, h: 0.5722,
+    fontSize: 28, bold: true, color: BLUE, align: 'right', margin: [7.2, 7.2, 3.6, 3.6]
+  });
+
+  slide.addShape('ellipse', { x: 9.3006, y: 2.442, w: 0.0885, h: 0.0885, fill: { color: WHITE } });
+  T(slide, [
+    { text: 'Lorem Ipsum', options: { bold: true } },
+    { text: '\u00a0is simply dummy text of the printing and typesetting.', options: {} }
+  ], { x: 9.1933, y: 2.7014, w: 2.8486, h: 0.4593, fontSize: 10, color: WHITE, lineSpacing: 13 });
+  blob(slide, 10.569, 1.6741, 1.0988, 0.4183, BLUE);
+
+  // dark card (left)
+  rect(slide, { x: 2.6985, y: 3.6031, w: 4.4442, h: 2.5626, fill: { type: 'none' }, line: { color: YELLOW, width: 0.75 } });
+  rect(slide, { x: 2.7026, y: 5.7623, w: 4.4442, h: 0.2433, fill: { color: BLUE } });
+  brandMark(slide, 3.1012, 3.8355, 0.7733, 0.7997, YELLOW, null);
+  pill(slide, { x: 4.0353, y: 4.0781, w: 1.4178, h: 0.3506, fill: { type: 'none' }, line: { color: BLUE, width: 1 } });
+  T(slide, 'AIMER BRAND', {
+    x: 4.1612, y: 4.1276, w: 1.1661, h: 0.2693, fontSize: 10, bold: true, color: YELLOW, align: 'center', wrap: false
+  });
+  T(slide, 'BUSINESS CARD', {
+    x: 0.7426, y: 5.0671, w: 2.8524, h: 0.4376, rotate: 90, fontSize: 20, bold: true, color: WHITE
+  });
+
+  // yellow card (right)
+  rect(slide, { x: 7.5931, y: 3.6031, w: 4.4442, h: 2.5626, fill: { color: YELLOW }, line: { color: RED, width: 0.75 } });
+  rect(slide, { x: 7.5971, y: 5.7623, w: 4.4442, h: 0.2433, fill: { color: RED } });
+  brandMark(slide, 8.1658, 4.2374, 1.0063, 1.0371, RED, RED);
+  T(slide, 'AIMER BRAND', {
+    x: 7.5971, y: 5.3077, w: 2.1436, h: 0.3365,
+    fontSize: 14, bold: true, color: BLACK, align: 'center', margin: [7.2, 7.2, 3.6, 3.6]
+  });
+  line(slide, { x: 9.7407, y: 4.2353, w: 0, h: 1.3295, line: { color: RED, width: 0.75 } });
+
+  // contact rows: small hexagonal icon + label
+  const CONTACTS = ['0123456789', 'lore@example.com', '159 Street Name '];
+  CONTACTS.forEach(function (label, i) {
+    const y = 4.7801 + i * 0.222;
+    slide.addShape('hexagon', { x: 10.2392, y: y, w: 0.152, h: 0.162, fill: { type: 'none' }, line: { color: RED, width: 0.75 } });
+    T(slide, label, { x: 10.3657, y: y - 0.088, w: 1.6523, h: 0.2517, fontSize: 8, color: BLACK, lineSpacing: 16 });
+  });
+
+  T(slide, presentationsCopy(2) + 'Presentations are communication tools that can.', {
+    x: 0.7195, y: 6.6739, w: 10.1201, h: 0.5048, fontSize: 8, color: WHITE, lineSpacingMultiple: 1.5, margin: 3.6
+  });
+
+  pageTag(slide, '19', BLUE);
+}
+
+// -------------------------------------------------------------- slide 20 ---
+// Closing slide with three contact columns.
+const CLOSING_COLUMNS = [
+  { x: 3.061, title: 'Contact', lines: ['Phone : + 459 789 540', 'Free toll : + 1286 4789 456', '_', 'Fax : + 145 3657 4596'] },
+  { x: 5.6806, title: 'Address', lines: ['Altier Brand ', '374 William S Canning Blvd,', 'Fall River MA 2721', 'United States'] },
+  { x: 8.3001, title: 'Social', lines: ['Example text', 'www.domain@gmail.com', '_', 'www.socialmedia.com'] }
+];
+
+function slide20 (slide) {
+  background(slide, YELLOW);
+  topBar(slide, BLACK);
+
+  T(slide, 'THANK YOU', {
+    x: 2.5972, y: 1.3389, w: 8.1389, h: 1.582, fontFace: HEAD, fontSize: 88, color: BLACK, align: 'center'
+  });
+
+  CLOSING_COLUMNS.forEach(function (col) {
+    T(slide, col.title, { x: col.x, y: 5.3433, w: 1.5632, h: 0.3029, fontFace: HEAD, fontSize: 12, color: BLACK });
+    T(slide, col.lines.map(function (l, i) {
+      return { text: l, options: i < col.lines.length - 1 ? { breakLine: true } : {} };
+    }), { x: col.x, y: 5.6881, w: 1.9722, h: 0.7742, fontSize: 8, color: BLACK, lineSpacing: 12 });
+  });
+
+  [5.0051, 7.7682].forEach(function (x) {
+    line(slide, { x: x, y: 5.4235, w: 0, h: 0.974, line: { color: WHITE, width: 2 } });
+  });
+
+  blob(slide, 0.741, 6.2245, 1.2489, 0.4755, RED);
+  pageTag(slide, '20', RED);
+}
+
+// ------------------------------------------------------------------ main ---
+const BUILDERS = [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
+  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20];
+
+function build () {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'BRAND_16x9', width: SLIDE_W, height: SLIDE_H });
+  pptx.layout = 'BRAND_16x9';
+  pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
+  pptx.author = 'Aimer Brand';
+  pptx.title = 'Brand Guidelines';
+
+  BUILDERS.forEach(function (builder) { builder(pptx.addSlide()); });
+
+  return pptx.writeFile({
+    fileName: path.join(__dirname, '118de37a-4036-446b-aaa9-f1cb3547f4a0_grok_final.pptx')
+  });
+}
+
+build().then(function (f) { console.log('wrote ' + f); }).catch(function (e) {
+  console.error(e);
+  process.exit(1);
+});
