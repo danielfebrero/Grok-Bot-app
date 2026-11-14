@@ -1,0 +1,77 @@
+{
+  "namespace": "user-Gmail-xai",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-11-13T09:23:26+01:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "threads": {
+          "items": {
+            "properties": {
+              "messages": {
+                "items": {
+                  "properties": {
+                    "body_preview": {
+                      "type": "string"
+                    },
+                    "date": {
+                      "type": "string"
+                    },
+                    "from": {
+                      "type": "string"
+                    },
+                    "message_id": {
+                      "type": "string"
+                    },
+                    "subject": {
+                      "type": "string"
+                    },
+                    "to": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "body_preview",
+                    "date",
+                    "from",
+                    "message_id",
+                    "subject",
+                    "to"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "snippet": {
+                "type": "string"
+              },
+              "thread_id": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "messages",
+              "snippet",
+              "thread_id",
+              "url"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "threads"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "search"
+}

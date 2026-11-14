@@ -1,0 +1,26 @@
+{
+  "description": "Edit an existing agent's profile: its name and/or description. Only the fields you provide are changed; the rest are left exactly as they were, and there is no way to clear or delete an agent through this tool. Use it to refine a teammate you (or the user) created.",
+  "inputSchema": {
+    "properties": {
+      "agent_id": {
+        "description": "The id of the agent to update.",
+        "minLength": 1,
+        "type": "string"
+      },
+      "description": {
+        "description": "A new persona/description for the agent. Omit to leave it unchanged.",
+        "type": "string"
+      },
+      "name": {
+        "description": "A new name for the agent. Omit to leave the name unchanged.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "agent_id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "UpdateAgent"
+}

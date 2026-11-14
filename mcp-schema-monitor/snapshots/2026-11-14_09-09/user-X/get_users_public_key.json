@@ -1,0 +1,33 @@
+{
+  "description": "Returns a user's registered public keys for X Chat encryption. Every key field is returned by default, so public_key.fields can be left out. It takes public_key, signing_public_key, identity_public_key_signature, public_key_version and juicebox_config.",
+  "inputSchema": {
+    "properties": {
+      "id": {
+        "description": "Numeric user ID, not `me`. For your own keys, use the `id` from Get My User (`GET /2/users/me`).",
+        "type": "string"
+      },
+      "public_key.fields": {
+        "description": "A comma separated list of PublicKey fields to display.",
+        "items": {
+          "enum": [
+            "identity_public_key_signature",
+            "juicebox_config",
+            "public_key",
+            "public_key_version",
+            "signing_public_key",
+            "user_id"
+          ],
+          "type": "string"
+        },
+        "minItems": 1,
+        "type": "array"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_users_public_key"
+}

@@ -1,0 +1,47 @@
+{
+  "description": "List the meetings you have joined or scheduled, newest first, 10 per page unless you pass limit. Without statuses, the first page leads with the meetings in progress. Each row has the internal meeting ID, the meeting title if one was given at join, status (SCHEDULED is a schedule; JOINING and LIVE are meetings in progress; ENDED, FAILED, and CANCELLED are finished; CANCELLED never happened), provider (GOOGLE_MEET, ZOOM, or MICROSOFT_TEAMS), and requested time (when you were asked to join, which orders the list). A schedule row has its scheduleId, its next start, and how it repeats. Each occurrence a schedule fires is its own row with its own internal meeting ID: JOINING with \"joining in N minutes\" and its join time until you join, then LIVE. Each row also has the join time once live, the end time if the meeting has ended, and whether notes exist. Narrow with statuses, requested_after, and requested_before. When more meetings match, the page ends with a cursor; pass it with the same filters to get the next page. Use FindMeeting instead when you have the meeting's link or code.",
+  "inputSchema": {
+    "properties": {
+      "cursor": {
+        "description": "The cursor the previous page ended with. Pass the same filters with it.",
+        "minLength": 1,
+        "type": "string"
+      },
+      "limit": {
+        "description": "Meetings per page, at most 50.",
+        "maximum": 50,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "requested_after": {
+        "description": "ISO 8601 time. Only meetings whose requested time is at or after it.",
+        "format": "date-time",
+        "type": "string"
+      },
+      "requested_before": {
+        "description": "ISO 8601 time. Only meetings whose requested time is before it.",
+        "format": "date-time",
+        "type": "string"
+      },
+      "statuses": {
+        "description": "Only meetings in these statuses. SCHEDULED is a schedule; JOINING and LIVE are meetings in progress; ENDED, FAILED, and CANCELLED are finished.",
+        "items": {
+          "enum": [
+            "SCHEDULED",
+            "JOINING",
+            "LIVE",
+            "ENDED",
+            "FAILED",
+            "CANCELLED"
+          ],
+          "type": "string"
+        },
+        "minItems": 1,
+        "type": "array"
+      }
+    },
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "ListMeetings"
+}

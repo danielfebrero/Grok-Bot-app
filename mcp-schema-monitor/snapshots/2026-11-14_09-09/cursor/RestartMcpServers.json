@@ -1,0 +1,9 @@
+{
+  "description": "Restart (reconnect) the installed MCP servers. This is useful when a server is stuck, errored, or you just finished authenticating one. Confirm with the user first if a server is mid-task.",
+  "inputSchema": {
+    "properties": {},
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "RestartMcpServers"
+}

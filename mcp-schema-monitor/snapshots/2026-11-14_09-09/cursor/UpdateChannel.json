@@ -1,0 +1,34 @@
+{
+  "description": "Add and/or remove member agents of an existing channel (a group chat) by its id. Only the ids you pass change; the rest of the roster stays exactly as it was, and a channel holds at most 6 members. A channel always keeps at least one member. A removal that would empty it is refused. Members you add see the channel in their next channel turn; removed members simply stop receiving its posts. You can only change channels you are currently a member of; any other channel is reported as not found.",
+  "inputSchema": {
+    "properties": {
+      "add_member_ids": {
+        "description": "Agent ids to add to the channel. Ids that are not existing agents are ignored.",
+        "items": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "channel_id": {
+        "description": "The id of the channel to change.",
+        "minLength": 1,
+        "type": "string"
+      },
+      "remove_member_ids": {
+        "description": "Agent ids to remove from the channel.",
+        "items": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "channel_id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "UpdateChannel"
+}

@@ -1,0 +1,167 @@
+{
+  "description": "Change a meeting you joined or scheduled, by internal meeting ID; a schedule's is its scheduleId. instruction replaces what you saved to do in or after the meeting; only the user who asked for the meeting can set it, from their own chat. title, schedule, and url change a schedule; schedule takes the same form as in JoinMeeting, and a new time or link needs the user's approval like a new join.",
+  "inputSchema": {
+    "properties": {
+      "instruction": {
+        "description": "Replaces the saved instruction. An empty string clears it.",
+        "maxLength": 2000,
+        "type": "string"
+      },
+      "interactive": {
+        "description": "Omit it to keep the current value. false: you only listen and take notes. true: anyone in the meeting can talk to you, and you answer in its chat.",
+        "type": "boolean"
+      },
+      "meeting_id": {
+        "description": "The internal meeting ID returned by JoinMeeting, ListMeetings, or FindMeeting.",
+        "maxLength": 64,
+        "minLength": 1,
+        "type": "string"
+      },
+      "schedule": {
+        "anyOf": [
+          {
+            "properties": {
+              "at": {
+                "description": "When to join, more than a minute from now.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "type": {
+                "const": "once",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "at"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "daysOfWeek": {
+                "description": "Weekly only.",
+                "items": {
+                  "enum": [
+                    "MO",
+                    "TU",
+                    "WE",
+                    "TH",
+                    "FR",
+                    "SA",
+                    "SU"
+                  ],
+                  "type": "string"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "frequency": {
+                "description": "At most daily. Every weekday is weekly on MO-FR.",
+                "enum": [
+                  "daily",
+                  "weekly",
+                  "monthly",
+                  "yearly"
+                ],
+                "type": "string"
+              },
+              "interval": {
+                "description": "Every N units, such as 2 for every other week. Default 1.",
+                "minimum": 1,
+                "type": "integer"
+              },
+              "month": {
+                "description": "Yearly only: 1-12.",
+                "type": "integer"
+              },
+              "monthDay": {
+                "description": "Monthly or yearly: day 1-31. Months without it are skipped.",
+                "type": "integer"
+              },
+              "startingFrom": {
+                "description": "Skip occurrences before this time.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "time": {
+                "description": "Local start time, 24-hour HH:MM.",
+                "type": "string"
+              },
+              "timezone": {
+                "description": "IANA timezone, such as America/Los_Angeles.",
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": {
+                "const": "recurring",
+                "type": "string"
+              },
+              "weekdayOfMonth": {
+                "description": "Monthly, instead of monthDay, such as the last FR.",
+                "properties": {
+                  "day": {
+                    "enum": [
+                      "MO",
+                      "TU",
+                      "WE",
+                      "TH",
+                      "FR",
+                      "SA",
+                      "SU"
+                    ],
+                    "type": "string"
+                  },
+                  "week": {
+                    "enum": [
+                      "first",
+                      "second",
+                      "third",
+                      "fourth",
+                      "last"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "week",
+                  "day"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "type",
+              "frequency",
+              "time",
+              "timezone"
+            ],
+            "type": "object"
+          }
+        ],
+        "description": "Replaces a schedule's whole schedule: once, or recurring at most daily."
+      },
+      "shouldCameraOn": {
+        "description": "On by default. Off only for zero distraction.",
+        "type": "boolean"
+      },
+      "title": {
+        "description": "Renames a schedule.",
+        "maxLength": 200,
+        "minLength": 1,
+        "type": "string"
+      },
+      "url": {
+        "description": "With schedule, a different link. The schedule becomes a new one with a new scheduleId.",
+        "minLength": 1,
+        "type": "string"
+      }
+    },
+    "required": [
+      "meeting_id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "UpdateMeeting"
+}

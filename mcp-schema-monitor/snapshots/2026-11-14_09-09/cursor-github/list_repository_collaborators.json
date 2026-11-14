@@ -1,0 +1,55 @@
+{
+  "description": "GET /repos/{owner}/{repo}/collaborators: one page of the users with access to the repository, each with its `permissions` and `role_name`. Organization members with access through teams count unless `affiliation` narrows it.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "additionalProperties": false,
+    "properties": {
+      "affiliation": {
+        "description": "Default all.",
+        "enum": [
+          "outside",
+          "direct",
+          "all"
+        ],
+        "type": "string"
+      },
+      "owner": {
+        "description": "Repository owner (user or org login).",
+        "type": "string"
+      },
+      "page": {
+        "description": "1-based page number.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "per_page": {
+        "description": "Results per page (GitHub's default is 30, max 100).",
+        "maximum": 100,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "permission": {
+        "description": "Only collaborators with at least this permission.",
+        "enum": [
+          "pull",
+          "triage",
+          "push",
+          "maintain",
+          "admin"
+        ],
+        "type": "string"
+      },
+      "repo": {
+        "description": "Repository name.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "repo"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "list_repository_collaborators"
+}

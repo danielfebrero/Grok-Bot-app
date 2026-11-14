@@ -1,0 +1,25 @@
+{
+  "description": "Create or update a Cursor canvas — a self-contained React `.canvas.tsx` page persisted in this run's store. Make one for a report or dashboard, for something asked for as a canvas or by name as a report, memo or dashboard, or for work the user will iterate on over time or live with you; never for an answer that is merely long, and never beside the same content in the chat, where the reply is one or two lines and the link. Provide `title` to create a new canvas, or `canvas_id` to replace the whole source of an existing one (a follow-up about a canvas changes it rather than creating another; a change to part of a page is EditCanvas, and a rewrite is only for a change spread through the file); `contents` is always the full source, composed in this call rather than drafted in a file or Shell first; `$file:` references are refused. On success returns the canvas url to share with the user as a markdown link. On failure returns the errors with the offending lines, keeps the source as a draft and names it; fix the marked lines with EditCanvas on that draft instead of sending the whole page again.",
+  "inputSchema": {
+    "properties": {
+      "canvas_id": {
+        "description": "Omit to create a new canvas. Pass the id of an existing canvas in this run's store to overwrite it in place.",
+        "type": "string"
+      },
+      "contents": {
+        "description": "The full source of the canvas — one self-contained React `.canvas.tsx` module. Overwrites the whole canvas; send the complete file, not a patch.",
+        "type": "string"
+      },
+      "title": {
+        "description": "Human-readable title. Provide it when creating a new canvas. Omit to keep an existing canvas's title.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "contents"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "WriteCanvas"
+}

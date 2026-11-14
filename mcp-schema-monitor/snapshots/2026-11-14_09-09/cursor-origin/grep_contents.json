@@ -1,0 +1,74 @@
+{
+  "description": "Search file contents across one Origin-hosted repository at a ref, which defaults to the default branch. The query is a regular expression matched case-sensitively; set literal for exact text, or caseInsensitive to ignore case (regex mode prefixes (?i) for GrepContents). wholeWord applies only with literal; for regex use \\b. Returns matching lines plus any requested context lines, capped at 1000 matching occurrences, and sets limitHit when that cap is reached. Each returned line contains its full text, so the occurrence cap does not bound response bytes. There is no pagination. Narrow query, filterPath, includes, or excludes to reach other matches.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "caseInsensitive": {
+        "description": "Ignore case when matching; regex mode prefixes the query with (?i) for GrepContents, and that prefix counts toward the query UTF-8 cap",
+        "type": "boolean"
+      },
+      "contextAfter": {
+        "description": "Context lines after each match, at most 10",
+        "type": "number"
+      },
+      "contextBefore": {
+        "description": "Context lines before each match, at most 10",
+        "type": "number"
+      },
+      "excludes": {
+        "description": "Globs naming paths to leave out; an exclude beats an include",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "filterPath": {
+        "description": "File or directory to search, relative to the repo root",
+        "type": "string"
+      },
+      "includes": {
+        "description": "Globs naming the only paths to search",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "literal": {
+        "description": "Match query as exact text",
+        "type": "boolean"
+      },
+      "maxResults": {
+        "description": "Matching occurrences to return, at most 1000. Zero uses the default of 1000",
+        "type": "number"
+      },
+      "name": {
+        "description": "Origin repository name within that namespace",
+        "type": "string"
+      },
+      "owner": {
+        "description": "Origin namespace (owner) slug, taken from list_namespaces or an earlier Origin result. A GitHub owner or org name is not an Origin namespace unless list_namespaces returns it.",
+        "type": "string"
+      },
+      "query": {
+        "description": "Regular expression matched case-sensitively by default. Set literal for exact text, or caseInsensitive to ignore case (regex mode prefixes (?i)). wholeWord applies only with literal; for regex use \\b.",
+        "type": "string"
+      },
+      "ref": {
+        "description": "Branch, tag, or commit to search",
+        "type": "string"
+      },
+      "wholeWord": {
+        "description": "Match whole words only; only applied when literal is true. For regex, use \\b instead.",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "owner",
+      "name",
+      "query"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "grep_contents"
+}

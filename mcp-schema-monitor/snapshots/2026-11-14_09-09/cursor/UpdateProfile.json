@@ -1,0 +1,82 @@
+{
+  "description": "Change your profile and settings. Only the fields you pass change. For your picture use UpdateAvatar.",
+  "inputSchema": {
+    "properties": {
+      "avatar_color": {
+        "enum": [
+          "black",
+          "brown",
+          "red",
+          "orange",
+          "yellow",
+          "green",
+          "cyan",
+          "blue",
+          "violet",
+          "magenta",
+          "gray"
+        ],
+        "type": "string"
+      },
+      "avatar_shape": {
+        "description": "Your default mark, hidden while a custom picture is installed.",
+        "enum": [
+          "blob",
+          "pebble",
+          "bean",
+          "egg",
+          "squircle",
+          "tablet",
+          "capsule",
+          "cylinder",
+          "hex",
+          "gem",
+          "crystal",
+          "wedge",
+          "shield",
+          "dome",
+          "arch",
+          "cloud",
+          "teardrop",
+          "leaf",
+          "square",
+          "sparkle",
+          "clover",
+          "flower",
+          "heart",
+          "house",
+          "star"
+        ],
+        "type": "string"
+      },
+      "description": {
+        "description": "Your intro.",
+        "type": "string"
+      },
+      "drafting_disabled": {
+        "description": "Pass false to turn draft cards back on when the user asks. You can't turn them off; tell the user to click \"Disable drafts for this Bot\" on a draft card. Owner only.",
+        "type": "boolean"
+      },
+      "hidden_from_sidebar": {
+        "description": "Hides your sidebar row; you stay reachable through Cmd-K and Hidden chats.",
+        "type": "boolean"
+      },
+      "name": {
+        "description": "Your name, the chat title the user sees.",
+        "minLength": 1,
+        "type": "string"
+      },
+      "notify_on_updates": {
+        "description": "The \"Notify me about this assistant\" toggle.",
+        "type": "boolean"
+      },
+      "title": {
+        "description": "Short role label beside your name (\"Designer\"); \"\" clears it.",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "UpdateProfile"
+}

@@ -1,0 +1,25 @@
+{
+  "description": "Set or clear your profile picture. Write or download the image first.",
+  "inputSchema": {
+    "properties": {
+      "action": {
+        "enum": [
+          "set",
+          "clear"
+        ],
+        "type": "string"
+      },
+      "path": {
+        "description": "set only. Absolute path to a png/jpg/webp/gif/svg under 5 MB, on your box (under /workspace is fine) or the user's computer.",
+        "minLength": 1,
+        "type": "string"
+      }
+    },
+    "required": [
+      "action"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "UpdateAvatar"
+}

@@ -1,0 +1,50 @@
+{
+  "description": "Send a message to ANOTHER of your user's agents, OR post into a GROUP chat you belong to, by its id (not the user, whom you reach with SendToUser). This is FIRE-AND-FORGET and asynchronous, like texting: it returns a delivery acknowledgement right away. priority is REQUIRED and decides how a 1:1 message reaches its recipient. priority=true wakes them now. Use it when they should act on the message or someone is waiting on their reply (a task, a question you or the user needs answered, a handoff, a STOP or change of plan). priority=false does NOT wake them. The message is held for the start of their next turn, possibly much later. Use it for anything informational: a status update, FYI, acknowledgement, thanks, or a reply nobody is waiting for. When in doubt whether someone is waiting, use true. Group posts always land immediately. It does NOT return their reply, and you must not wait or poll for one in this turn. Send it and move on. To include image(s), such as a screenshot, chart, or photo the other agent needs, pass images: [{\"url\":\"file:///absolute/path/to/shot.png\",\"alt\":\"...\"}] (file:// or https://). Never paste an image as a markdown ![](...) in the message text. You are running a routine in the background, and nobody can approve a send. Message a bot or post to a group only when the routine's instruction asks for it, or when handing work to another bot is clearly the routine's goal. Never message bots on your own initiative or fan out to several, and don't spam a group: every send wakes real agents. Keep it purposeful, professional, and minimal, and never relay the user's private words verbatim. Replies go to the parent bot's conversation, never to you, so name what you sent and to whom in your final message, or in your WakeParent reason when you call it.",
+  "inputSchema": {
+    "properties": {
+      "images": {
+        "description": "Optional image(s) to send with the message, such as a screenshot, chart, or photo the other agent needs. They are delivered with your message. A 1:1 recipient actually sees them (like an image the user sends), and they render with your text in the exchange. They are not delivered to groups.",
+        "items": {
+          "properties": {
+            "alt": {
+              "description": "Optional short description of this image, shown on hover and as its fullscreen caption.",
+              "type": "string"
+            },
+            "url": {
+              "description": "file:// or https:// URL of the image.",
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "url"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "message": {
+        "description": "What to say. Write it as if texting a teammate: lead with the point, keep it short.",
+        "minLength": 1,
+        "type": "string"
+      },
+      "priority": {
+        "description": "REQUIRED. Is this message actionable for the recipient? true: they should act on it, or someone is waiting on their reply (a task, a question you or the user needs answered, a handoff, a STOP or change of plan). It is delivered now and wakes them. false: informational only (a status update, FYI, acknowledgement, thanks, or a reply nobody is waiting for). It is held and read at the start of their next turn, whenever that is, without waking them. Ignored for groups, which always post immediately.",
+        "type": "boolean"
+      },
+      "target_id": {
+        "description": "The id of the target, either another agent or a GROUP you belong to, not a name.",
+        "minLength": 1,
+        "type": "string"
+      }
+    },
+    "required": [
+      "target_id",
+      "message",
+      "priority"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "SendToAgent"
+}

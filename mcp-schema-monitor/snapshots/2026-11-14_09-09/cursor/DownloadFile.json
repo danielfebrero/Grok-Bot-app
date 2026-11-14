@@ -1,0 +1,42 @@
+{
+  "description": "Fetch a file from one of the user's connected services onto your computer using the account they already connected. The file's bytes go straight from the service to your computer: you never read or paste them, so this works for any size or type up to the limit, and it is the right tool whenever you need to work on a file that lives in one of these services (read it, convert it, attach it, upload it somewhere else). Do not ask a service's own tools to print a file's contents into the conversation; download it and open it locally. The result tells you where the file landed.\nconnection is the connection's identifier: the same one GetMcpServerStatus lists and that connection's own tools are prefixed with (for example user-onedrive, dashboard-team-1-Google-drive, user-SharePoint-xai or user-Gmail--personal). The service short name (google-drive, onedrive, sharepoint, gmail or outlook) is accepted when exactly one account of that service is connected; with several accounts, name the identifier so the right account is used. Supported today:\n- Google Drive: source.fileId is a Drive file id from the Drive listing or search tools. Google Docs, Sheets, Slides and Drawings have no file of their own and are exported as .docx, .xlsx, .pptx and .png; the returned name carries that extension.\n- OneDrive: source.fileId is an item id from list_drive_items or search_drive_items, or source.path is a path from the OneDrive root (e.g. \"Documents/notes.txt\").\n- Gmail: source.fileId is \"<message id>/<attachment id>\", both from get_thread or read_email (each attachment listed on a message carries an id). This is the only way to get an email attachment's bytes; the Gmail tools themselves never return them.\n- Outlook: source.fileId is \"<message id>/<attachment id>\", both from get_mail_message (each attachment it lists carries an id). This is the only way to get an Outlook attachment's bytes; the Outlook tools themselves never return them.\n- SharePoint: source.fileId is \"{drive_id}/{item_id}\" from sharepoint_ls or sharepoint_search_documents. A path is not accepted.\ndestination.path is the full path on your computer, name included; omit it to land the file in your downloads folder under the service's file name. A connection that cannot serve files answers with the ones that can.",
+  "inputSchema": {
+    "properties": {
+      "connection": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "destination": {
+        "description": "Where the file lands on your computer.",
+        "properties": {
+          "path": {
+            "description": "Absolute path on your computer for the file, name included; only paths under /workspace or your own agent directory (/home/box/agent-data/agents/<your id>) are accepted. Omit to land it in your downloads folder under the service's file name; the result tells you where. An existing file at the path is replaced.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "source": {
+        "description": "Which file to pull. Provide exactly one of fileId or path.",
+        "properties": {
+          "fileId": {
+            "description": "Provider file id from that connection's listing or search tools. Google Drive takes ids only.",
+            "type": "string"
+          },
+          "path": {
+            "description": "OneDrive only: file path from the OneDrive root, e.g. \"Documents/notes.txt\". Provide exactly one of fileId or path.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "required": [
+      "connection",
+      "source"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "DownloadFile"
+}

@@ -1,0 +1,18 @@
+{
+  "description": "Remove ONE custom MCP server by its server identifier. A custom server is one added with AddMcpServer, not one that came from a plugin. This is destructive and deletes the server with all of its accounts, which signs the user out of it, so call it only once the user has typed a request to remove it by name: a yes to your question or a tap on an option does not count, so ask them to type the request themselves, such as remove Weather, instead of confirming with a question widget. Only remove a server the user asked to remove, never to fix one. To fix a connector that is failing or needs sign-in, reconnect it with RestartMcpServers or sign in again with AuthenticateMcpServer, and otherwise tell the user what failed. A server the listing marks `plugin=<id>` came from a marketplace plugin. Removing it would uninstall that WHOLE plugin, which this tool refuses. Use UninstallPlugin for those, and tell the user the full scope it removes. To remove just one account and keep the server, use RemoveMcpAccount instead.",
+  "inputSchema": {
+    "properties": {
+      "server_id": {
+        "description": "The server identifier shown by GetMcpServerStatus. It is the same identifier that GetDynamicTools and CallDynamicTool address, e.g. \"dashboard-team-1-Slack\". Never a display name.",
+        "minLength": 1,
+        "type": "string"
+      }
+    },
+    "required": [
+      "server_id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "UninstallMcpServer"
+}

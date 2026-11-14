@@ -1,0 +1,47 @@
+{
+  "description": "Save, rewrite, or delete one of your reusable skills. A skill has no trigger; a saved task that runs on a schedule is a routine. Cursor-managed skills can't be changed.",
+  "inputSchema": {
+    "properties": {
+      "action": {
+        "enum": [
+          "write",
+          "delete"
+        ],
+        "type": "string"
+      },
+      "body": {
+        "description": "Required on write. The recipe, in markdown.",
+        "minLength": 1,
+        "type": "string"
+      },
+      "description": {
+        "description": "Required on write: one line a reader uses to decide it applies (\"use this when …\").",
+        "type": "string"
+      },
+      "id": {
+        "description": "An existing skill's id. Required for delete. On write, pass it only to rewrite that skill; omit it to create one (its id is made from the name).",
+        "minLength": 1,
+        "type": "string"
+      },
+      "name": {
+        "description": "Required on write.",
+        "minLength": 1,
+        "type": "string"
+      },
+      "scope": {
+        "description": "Omit for the default. \"user\": the owner's skill library, which all of their bots share. \"bot\": this bot alone. A call is refused where that scope is not available.",
+        "enum": [
+          "user",
+          "bot"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "action"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "UpdateSkill"
+}

@@ -1,0 +1,30 @@
+{
+  "description": "Rename one of an MCP server's accounts (change its label). Only rename when the user asks for a new label, never as a step in fixing a connector. The account's server identifier changes with the label at the next listing, so after renaming, re-run GetMcpServerStatus (or GetDynamicTools) before calling that account's tools again. Stale identifiers fail cleanly. Call it only once the user has typed a request to rename that account by name: a yes to your question or a tap on an option does not count, so ask them to type the request themselves, such as rename my Weather work account to side, instead of confirming with a question widget.",
+  "inputSchema": {
+    "properties": {
+      "account_label": {
+        "description": "The account's label exactly as shown by GetMcpServerStatus (account=\"…\"); the quoted form is accepted verbatim.",
+        "minLength": 1,
+        "type": "string"
+      },
+      "new_account_label": {
+        "description": "The new short lowercase label (e.g. \"work\").",
+        "minLength": 1,
+        "type": "string"
+      },
+      "server_id": {
+        "description": "The server identifier shown by GetMcpServerStatus. It is the same identifier that GetDynamicTools and CallDynamicTool address, e.g. \"dashboard-team-1-Slack\". Never a display name.",
+        "minLength": 1,
+        "type": "string"
+      }
+    },
+    "required": [
+      "server_id",
+      "account_label",
+      "new_account_label"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "RenameMcpAccount"
+}

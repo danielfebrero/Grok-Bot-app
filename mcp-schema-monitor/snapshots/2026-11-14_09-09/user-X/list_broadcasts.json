@@ -1,0 +1,64 @@
+{
+  "description": "Returns the authenticated user's live-video broadcasts, or selected owned broadcasts when ids are provided. At most one of `ids`, `max_results` may be provided. At most one of `ids`, `pagination_token` may be provided.",
+  "inputSchema": {
+    "properties": {
+      "broadcast.fields": {
+        "description": "A comma separated list of Broadcast fields to display.",
+        "items": {
+          "enum": [
+            "available_for_replay",
+            "broadcast_id",
+            "chat_option",
+            "created_at_ms",
+            "end_ms",
+            "height",
+            "id",
+            "image_url",
+            "image_url_medium",
+            "image_url_small",
+            "is_high_latency",
+            "language",
+            "live_category_id",
+            "media_key",
+            "scheduled_end_ms",
+            "scheduled_start_ms",
+            "share_url",
+            "source_id",
+            "start_ms",
+            "state",
+            "title",
+            "total_watched",
+            "total_watching",
+            "tweet_id",
+            "twitter_user_id",
+            "updated_at_ms",
+            "width"
+          ],
+          "type": "string"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "ids": {
+        "description": "Comma-separated broadcast IDs to retrieve instead of listing broadcasts.",
+        "items": {
+          "type": "string"
+        },
+        "maxItems": 100,
+        "minItems": 1,
+        "type": "array"
+      },
+      "max_results": {
+        "maximum": 100,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "pagination_token": {
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "list_broadcasts"
+}

@@ -1,0 +1,20 @@
+{
+  "description": "Find ready-made Bot templates the user can import as a new Bot, from the built-in starters (such as Chief of Staff, Inbox Manager, or Sales Outbound) and the public Bot marketplace.\nUse it when the user asks what Bots they could make, wants a Bot for a job, or asks for template ideas.\nRead-only. Each result is a markdown deep link; paste it unchanged into SendToUser and the chat renders it as a pill that opens the import dialog.",
+  "inputSchema": {
+    "properties": {
+      "limit": {
+        "description": "Maximum templates to return for a query (default 8, max 20).",
+        "maximum": 20,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "query": {
+        "description": "What the user wants a Bot for, in a few words (e.g. \"inbox triage\", \"sales outbound\", \"travel\"). Omit to list the built-in templates and top marketplace templates by name.",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "SearchBotTemplates"
+}

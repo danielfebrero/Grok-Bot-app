@@ -1,0 +1,97 @@
+{
+  "description": "POST /repos/{owner}/{repo}/pulls/{pull_number}/reviews: approve, request changes, or comment, optionally with inline comments on specific files and lines (each needs `path` and `line`, or a legacy `position`). Omit `event` to leave the review PENDING (unsubmitted): then add comments with add_comment_to_pending_review and publish it with submit_pending_pull_request_review.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "additionalProperties": false,
+    "properties": {
+      "body": {
+        "description": "Review summary; required for REQUEST_CHANGES and COMMENT.",
+        "type": "string"
+      },
+      "comments": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "body": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "line": {
+              "description": "Line in the diff the comment applies to (the last line of a range).",
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "description": "File path relative to the repository root.",
+              "type": "string"
+            },
+            "position": {
+              "description": "Legacy diff position; prefer line/side.",
+              "minimum": 1,
+              "type": "integer"
+            },
+            "side": {
+              "enum": [
+                "LEFT",
+                "RIGHT"
+              ],
+              "type": "string"
+            },
+            "start_line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "start_side": {
+              "enum": [
+                "LEFT",
+                "RIGHT"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "body"
+          ],
+          "type": "object"
+        },
+        "maxItems": 50,
+        "type": "array"
+      },
+      "commit_id": {
+        "description": "Head SHA the review applies to; defaults to the current head.",
+        "type": "string"
+      },
+      "event": {
+        "description": "Submit as this; omitted = create a pending review.",
+        "enum": [
+          "APPROVE",
+          "REQUEST_CHANGES",
+          "COMMENT"
+        ],
+        "type": "string"
+      },
+      "owner": {
+        "description": "Repository owner (user or org login).",
+        "type": "string"
+      },
+      "pull_number": {
+        "description": "Pull request number.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "repo": {
+        "description": "Repository name.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "repo",
+      "pull_number"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "create_pull_request_review"
+}

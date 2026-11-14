@@ -1,0 +1,18 @@
+{
+  "description": "Read the source of a Cursor canvas. Pass `canvas_id` for a canvas in this run's store, or a canonical https://cursor.com/canvas/<storeId>/<canvasId> `url` to read another store's canvas or a shared canvas. If both are provided they must name the same canvas id and the url's storeId is used for the read; a malformed url is ignored when `canvas_id` is present.",
+  "inputSchema": {
+    "properties": {
+      "canvas_id": {
+        "description": "The id of a canvas in this run's store to read. When both `canvas_id` and `url` are provided they must name the same canvas id; the url's storeId is used for the read.",
+        "type": "string"
+      },
+      "url": {
+        "description": "A canonical https://cursor.com/canvas/<storeId>/<canvasId> canvas url. Use this to read a canvas in another store or from a share link. A malformed url is ignored when `canvas_id` is present; if both resolve they must name the same canvas id and this url's storeId is used for the read.",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "ReadCanvas"
+}

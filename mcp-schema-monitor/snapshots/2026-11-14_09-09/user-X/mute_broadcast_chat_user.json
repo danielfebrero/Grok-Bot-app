@@ -1,0 +1,29 @@
+{
+  "description": "Prevents a user from posting further messages in a running broadcast chat. When `end_at_ms` is provided, the mute expires at that time. The authenticated user must be the broadcast host or a moderator.",
+  "inputSchema": {
+    "properties": {
+      "end_at_ms": {
+        "description": "The Unix timestamp in milliseconds when the mute expires. Omit this field to mute indefinitely.",
+        "type": "string"
+      },
+      "id": {
+        "type": "string"
+      },
+      "message_id": {
+        "description": "A chat message to remove while muting the user.",
+        "type": "string"
+      },
+      "user_id": {
+        "description": "The user to mute.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "user_id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "mute_broadcast_chat_user"
+}

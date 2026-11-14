@@ -1,0 +1,19 @@
+{
+  "description": "Leave a meeting you joined, or cancel a schedule. meeting_id is the internal meeting ID from JoinMeeting, ListMeetings, or FindMeeting; a schedule's is its scheduleId. Cancelling a schedule does not end a meeting it already joined.",
+  "inputSchema": {
+    "properties": {
+      "meeting_id": {
+        "description": "The internal meeting ID returned by JoinMeeting, ListMeetings, or FindMeeting.",
+        "maxLength": 64,
+        "minLength": 1,
+        "type": "string"
+      }
+    },
+    "required": [
+      "meeting_id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "LeaveMeeting"
+}

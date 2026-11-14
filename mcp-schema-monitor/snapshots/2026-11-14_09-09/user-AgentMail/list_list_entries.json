@@ -1,0 +1,46 @@
+{
+  "description": "List the entries on one of an inbox's allow or block lists. Which list is chosen by direction (send filters recipients of outbound mail; receive filters senders of new inbound mail; reply filters senders of inbound mail continuing a thread this inbox already replied to) and listType (allow or block). A non-empty allow list admits only its entries; a block list blocks its entries: a send to a blocked recipient fails, and blocked inbound mail is kept with the blocked label. Entries marked readOnly are suppressions AgentMail added after a bounce, spam complaint, or unsubscribe.",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "direction": {
+        "description": "Which traffic the list governs: send filters the recipients of outbound mail; receive filters the senders of new inbound mail; reply filters the senders of inbound mail that continues a thread this inbox already replied to",
+        "enum": [
+          "send",
+          "receive",
+          "reply"
+        ],
+        "type": "string"
+      },
+      "inboxId": {
+        "description": "Inbox ID: the inbox's email address, from list_inboxes",
+        "type": "string"
+      },
+      "limit": {
+        "default": 10,
+        "description": "Number of items per page",
+        "type": "number"
+      },
+      "listType": {
+        "description": "allow: once the list has an entry, only listed addresses pass; block: listed addresses are blocked",
+        "enum": [
+          "allow",
+          "block"
+        ],
+        "type": "string"
+      },
+      "pageToken": {
+        "description": "nextPageToken from the previous page's result; omit for the first page",
+        "type": "string"
+      }
+    },
+    "required": [
+      "inboxId",
+      "direction",
+      "listType"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "list_list_entries"
+}

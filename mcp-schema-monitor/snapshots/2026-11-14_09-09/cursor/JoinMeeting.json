@@ -1,0 +1,192 @@
+{
+  "description": "Join a Google Meet, Zoom, or Microsoft Teams meeting the user asked you to attend, now or on a schedule. Pass the link with any passcode it carries, and its title. Pass instruction when the user asks for something in or after the meeting. Without schedule you join now. With schedule you join later, once or recurring, at a local time in a timezone; a schedule must start more than a minute from now. UpdateMeeting changes a meeting and LeaveMeeting leaves one or cancels a schedule. Returns the internal meeting ID, provider, and external meeting ID from the link, plus the scheduleId for a schedule. GetMeetingSummary reads the notes; ReadMeetingTranscript reads the exact words.",
+  "inputSchema": {
+    "properties": {
+      "calendarEvent": {
+        "description": "A calendar event to follow; its times win. once follows the event, recurring its series, whose RRULE gives the days and time. It moves with the event and ends when nothing is upcoming.",
+        "properties": {
+          "calendarId": {
+            "description": "The calendar the event was found on, from the calendar tools. Omit for the primary calendar.",
+            "maxLength": 1024,
+            "minLength": 1,
+            "type": "string"
+          },
+          "eventId": {
+            "description": "One occurrence's id exactly as get_event returned it, such as abc_20261021T173000Z; never a series id.",
+            "maxLength": 1024,
+            "minLength": 1,
+            "type": "string"
+          },
+          "provider": {
+            "enum": [
+              "google",
+              "outlook"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "eventId"
+        ],
+        "type": "object"
+      },
+      "instruction": {
+        "description": "What the user asked in their chat for you to do in or after the meeting. It comes back with the joined and ended notices.",
+        "maxLength": 2000,
+        "minLength": 1,
+        "type": "string"
+      },
+      "interactive": {
+        "description": "true: you answer anyone there in the meeting chat, for a small team call. false: listen only, for a large or external one. The user's choice wins. If nothing shows who'll be there, ask.",
+        "type": "boolean"
+      },
+      "schedule": {
+        "anyOf": [
+          {
+            "properties": {
+              "at": {
+                "description": "When to join, more than a minute from now.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "type": {
+                "const": "once",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "at"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "daysOfWeek": {
+                "description": "Weekly only.",
+                "items": {
+                  "enum": [
+                    "MO",
+                    "TU",
+                    "WE",
+                    "TH",
+                    "FR",
+                    "SA",
+                    "SU"
+                  ],
+                  "type": "string"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "frequency": {
+                "description": "At most daily. Every weekday is weekly on MO-FR.",
+                "enum": [
+                  "daily",
+                  "weekly",
+                  "monthly",
+                  "yearly"
+                ],
+                "type": "string"
+              },
+              "interval": {
+                "description": "Every N units, such as 2 for every other week. Default 1.",
+                "minimum": 1,
+                "type": "integer"
+              },
+              "month": {
+                "description": "Yearly only: 1-12.",
+                "type": "integer"
+              },
+              "monthDay": {
+                "description": "Monthly or yearly: day 1-31. Months without it are skipped.",
+                "type": "integer"
+              },
+              "startingFrom": {
+                "description": "Skip occurrences before this time.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "time": {
+                "description": "Local start time, 24-hour HH:MM.",
+                "type": "string"
+              },
+              "timezone": {
+                "description": "IANA timezone, such as America/Los_Angeles.",
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": {
+                "const": "recurring",
+                "type": "string"
+              },
+              "weekdayOfMonth": {
+                "description": "Monthly, instead of monthDay, such as the last FR.",
+                "properties": {
+                  "day": {
+                    "enum": [
+                      "MO",
+                      "TU",
+                      "WE",
+                      "TH",
+                      "FR",
+                      "SA",
+                      "SU"
+                    ],
+                    "type": "string"
+                  },
+                  "week": {
+                    "enum": [
+                      "first",
+                      "second",
+                      "third",
+                      "fourth",
+                      "last"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "week",
+                  "day"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "type",
+              "frequency",
+              "time",
+              "timezone"
+            ],
+            "type": "object"
+          }
+        ],
+        "description": "Join later: once, or recurring at most daily. Omit to join now."
+      },
+      "shouldCameraOn": {
+        "description": "On by default. Off only for zero distraction.",
+        "type": "boolean"
+      },
+      "title": {
+        "description": "The meeting's title from the user's message, the invite, or the calendar event. If none of them names the meeting, as when the user sends only a link, use the external meeting ID from the link, such as abc-defg-hij for Meet, 123-4567-890 for Zoom, or 25367890123456 for Teams. Do not make up a title. This is not your display name.",
+        "maxLength": 200,
+        "minLength": 1,
+        "type": "string"
+      },
+      "url": {
+        "description": "The Google Meet, Zoom, or Microsoft Teams link to join, as the user gave it.",
+        "minLength": 1,
+        "type": "string"
+      }
+    },
+    "required": [
+      "url",
+      "interactive"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "JoinMeeting"
+}

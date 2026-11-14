@@ -1,0 +1,17 @@
+{
+  "description": "Disconnect one of your channels; the live connection closes within seconds.",
+  "inputSchema": {
+    "properties": {
+      "platform": {
+        "minLength": 1,
+        "type": "string"
+      }
+    },
+    "required": [
+      "platform"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "DisconnectChannel"
+}

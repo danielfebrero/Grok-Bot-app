@@ -1,0 +1,24 @@
+{
+  "description": "Force a message into a running background subagent to course-correct it without aborting it. The subagent interrupts its current step, reads your message, and continues from where it was (its context is preserved, so it does not start over). Use this to unstick or redirect a subagent that is looping, stuck, or heading the wrong way, for example to tell a computerUse subagent to try a different element, that the user just signed in so it can proceed, or to wrap up and report what it has. Pass its id as subagent_id (the \"Agent ID:\" line of the Task result). You're still revived with its result when it finishes; to follow up AFTER a subagent has already finished, use Task with the resume parameter instead.",
+  "inputSchema": {
+    "properties": {
+      "message": {
+        "description": "The instruction to inject. The subagent interrupts what it is doing, reads this, and continues from where it was with its context intact.",
+        "minLength": 1,
+        "type": "string"
+      },
+      "subagent_id": {
+        "description": "The running subagent's id, from the \"Agent ID:\" line of the Task result that dispatched it.",
+        "minLength": 1,
+        "type": "string"
+      }
+    },
+    "required": [
+      "subagent_id",
+      "message"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "MessageSubagent"
+}

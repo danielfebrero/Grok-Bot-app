@@ -1,0 +1,39 @@
+{
+  "description": "Delete a calendar event, or cancel dates of a recurring one; this cannot be undone. A one-off or recurring event's UUID deletes it and every date: it disappears at once and is removed in the background. A dated ID (<uuid>_<slot>) cancels that date, or with mode future that date and every later one. Attendees are emailed a cancellation only with sendInvites, and only for events this inbox organizes. Calendar works for every organization in US production; EU production returns 403 \"Calendar isn't available in this region yet\".",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "eventId": {
+        "description": "Event ID: a one-off or recurring event's UUID, or a dated ID (<uuid>_<slot>) for one date of a recurring event; from get_agenda, create_event, or a message's calendarEventId",
+        "type": "string"
+      },
+      "ifMatch": {
+        "description": "Optional: the etag from your latest read or write of it. The change is then refused with 412 if it changed since; without it the change applies to it as it is now",
+        "type": "string"
+      },
+      "inboxId": {
+        "description": "Inbox ID: the inbox's email address, from list_inboxes",
+        "type": "string"
+      },
+      "mode": {
+        "description": "For a dated ID only: single (the default) changes just that date, future that date and every later one",
+        "enum": [
+          "single",
+          "future"
+        ],
+        "type": "string"
+      },
+      "sendInvites": {
+        "description": "Email every attendee a cancellation (one send per attendee against send limits). Only for events this inbox organizes",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "inboxId",
+      "eventId"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "delete_event"
+}

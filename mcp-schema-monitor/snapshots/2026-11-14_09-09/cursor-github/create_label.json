@@ -1,0 +1,39 @@
+{
+  "description": "POST /repos/{owner}/{repo}/labels: create a label. GitHub answers 422 `already_exists` when the name is taken.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "additionalProperties": false,
+    "properties": {
+      "color": {
+        "description": "Random when omitted.",
+        "pattern": "^[0-9a-fA-F]{6}$",
+        "type": "string"
+      },
+      "description": {
+        "maxLength": 100,
+        "type": "string"
+      },
+      "name": {
+        "description": "Label name (case-insensitive).",
+        "minLength": 1,
+        "type": "string"
+      },
+      "owner": {
+        "description": "Repository owner (user or org login).",
+        "type": "string"
+      },
+      "repo": {
+        "description": "Repository name.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "repo",
+      "name"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "create_label"
+}

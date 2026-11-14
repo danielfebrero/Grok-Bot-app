@@ -1,0 +1,53 @@
+{
+  "description": "Returns a broadcast owned by the authenticated user.",
+  "inputSchema": {
+    "properties": {
+      "broadcast.fields": {
+        "description": "A comma separated list of Broadcast fields to display.",
+        "items": {
+          "enum": [
+            "available_for_replay",
+            "broadcast_id",
+            "chat_option",
+            "created_at_ms",
+            "end_ms",
+            "height",
+            "id",
+            "image_url",
+            "image_url_medium",
+            "image_url_small",
+            "is_high_latency",
+            "language",
+            "live_category_id",
+            "media_key",
+            "scheduled_end_ms",
+            "scheduled_start_ms",
+            "share_url",
+            "source_id",
+            "start_ms",
+            "state",
+            "title",
+            "total_watched",
+            "total_watching",
+            "tweet_id",
+            "twitter_user_id",
+            "updated_at_ms",
+            "width"
+          ],
+          "type": "string"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "id": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_broadcast"
+}
