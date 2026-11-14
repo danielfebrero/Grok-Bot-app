@@ -9,6 +9,15 @@ packages confondus. Entrées les plus récentes en haut. Heures de Paris
 
 <!-- NOUVELLES-ENTREES-ICI -->
 
+## 2026-11-14 17:54 (Paris) — `2026-11-13_18-00` → `2026-11-14_17-54`
+
+Changement de surface RPC détecté : **24 méthode(s) ajoutée(s)**.
+
+Ajoutées : `BackgroundComposerService.SetProjectJoinByLink`, `DashboardService.GetCloudAgentStartupScript`, `DashboardService.GetGiftCodeInfo`, `DashboardService.StartTeamGrokBotOwnershipTransfer`, `DashboardService.UpdateCloudAgentStartupScript`, `GrokBotService.AdminExplainGrokBotSlackAccess`, `GrokBotService.ArchiveGrokBotChangelogEntryDraftInternal`, `GrokBotService.CreateGrokBotChangelogEntryInternal`, `GrokBotService.DisconnectGrokBotThirdPartyConnection`, `GrokBotService.GetGrokBotChangelogEntryInternal`, `GrokBotService.GetGrokBotMessagingContactPhoto`, `GrokBotService.GetGrokBotPaperTermsInternal`, `GrokBotService.GetGrokBotShoppingOrderState`, `GrokBotService.GetGrokBotSlackWorkspaceInstall`, `GrokBotService.ListGrokBotChangelogEntriesInternal`, `GrokBotService.ListGrokBotThirdPartyConnections`, `GrokBotService.ListPublicGrokBotChangelog`, `GrokBotService.ResolveGrokBotAgentFileReads`, `GrokBotService.SetGrokBotChangelogEntryStatusInternal`, `GrokBotService.SetGrokBotPaperTermsInternal`, `GrokBotService.StartGrokBotSlackWorkspaceInstall`, `GrokBotService.UninstallGrokBotSlackWorkspaceInstall`, `GrokBotService.UpdateGrokBotChangelogEntryInternal`, `GrokBotService.UpsertGrokBotChangelogEntryDraftInternal`
+
+Rapport : [reports/2026-11-14_17-54.md](reports/2026-11-14_17-54.md).
+
+
 ## 2026-11-13 18:00 (Paris) — `2026-11-12_09-56` → `2026-11-13_18-00`
 
 Changement de surface RPC détecté : **50 méthode(s) ajoutée(s)**, **2 supprimée(s)**.
