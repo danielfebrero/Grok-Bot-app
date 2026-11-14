@@ -1,0 +1,965 @@
+/**
+ * "KPI Dashboard" deck (20 slides, 13.333 x 7.5 in) rebuilt with pptxgenjs.
+ * Every visual is a native shape / text box - no images, no embedded blobs.
+ */
+const pptxgen = require('pptxgenjs');
+const path = require('path');
+
+/* ------------------------------------------------------------------ *
+ * Palette & typography
+ * ------------------------------------------------------------------ */
+const RED = 'FF0000'; // primary
+const DARK = 'C00000'; // deep red
+const MID = 'FF5757'; // salmon
+const LIGHT = 'FFA7A7'; // pale pink
+const WHITE = 'FFFFFF';
+const BLACK = '000000';
+const INK = '0C0C0C'; // needle / hub black
+const GRID = 'BFBFBF';
+const GRID2 = 'D0CECE';
+const GRID3 = 'D8D8D8';
+const AXIS = '7F7F7F';
+const AXIS2 = 'A5A5A5';
+
+const SB = 'Inter SemiBold';
+const REG = 'Inter';
+
+// pptxgenjs rewrites these option objects in place, so hand out a fresh copy every time.
+const noLine = () => ({ type: 'none' });
+const softShadow = () => ({ type: 'outer', color: BLACK, opacity: 0.22, blur: 6, offset: 1.5, angle: 45 });
+const dropShadow = () => ({ type: 'outer', color: BLACK, opacity: 0.118, blur: 4, offset: 3, angle: 270 });
+
+/* ------------------------------------------------------------------ *
+ * Primitive helpers
+ * ------------------------------------------------------------------ */
+function text(slide, str, o) {
+  slide.addText(str, Object.assign(
+    { fontFace: SB, fontSize: 12, color: BLACK, align: 'left', valign: 'top', margin: 0, h: 0.3 },
+    o
+  ));
+}
+
+function shape(slide, kind, o) {
+  slide.addShape(kind, Object.assign({ line: noLine() }, o));
+}
+
+function rect(slide, x, y, w, h, color, extra) {
+  shape(slide, 'rect', Object.assign({ x, y, w, h, fill: { color } }, extra));
+}
+
+/** White panel with the deck's signature soft drop shadow. */
+function card(slide, x, y, w, h, color) {
+  rect(slide, x, y, w, h, color || WHITE, { shadow: softShadow() });
+}
+
+function circle(slide, x, y, d, color, shadow) {
+  shape(slide, 'ellipse', { x, y, w: d, h: d, fill: { color }, shadow: shadow ? softShadow() : undefined });
+}
+
+function line(slide, x, y, w, h, color, width, flipV) {
+  shape(slide, 'line', { x, y, w, h, flipV: !!flipV, line: { color, width: width || 1 } });
+}
+
+/** Ring / pie segment: blockArc between two angles (0 deg = 3 o'clock, clockwise). */
+function arc(slide, x, y, size, color, startAng, endAng, thickness, rotate) {
+  shape(slide, 'blockArc', {
+    x, y, w: size, h: size, fill: { color }, rotate: rotate || 0,
+    angleRange: [startAng, endAng], arcThicknessRatio: thickness,
+  });
+}
+
+/** Bezier polyline described in normalised (0..1) coordinates of its own box. */
+function curvePoints(w, h, segs) {
+  return segs.map(function (s, i) {
+    if (i === 0) return { x: s[0] * w, y: s[1] * h };
+    if (s.length === 6) {
+      return {
+        curve: { type: 'cubic', x1: s[0] * w, y1: s[1] * h, x2: s[2] * w, y2: s[3] * h },
+        x: s[4] * w, y: s[5] * h,
+      };
+    }
+    return { x: s[0] * w, y: s[1] * h };
+  });
+}
+
+function curve(slide, x, y, w, h, segs, opts) {
+  shape(slide, 'custGeom', Object.assign({ x, y, w, h, points: curvePoints(w, h, segs) }, opts));
+}
+
+function stroke(color) {
+  return { line: { color: color, width: 1 } };
+}
+
+/* ------------------------------------------------------------------ *
+ * Shared curve geometry (normalised control points)
+ * ------------------------------------------------------------------ */
+const WAVE_BLACK = [[0, 1],
+  [0.09774, 0.88761, 0.19549, 0.77521, 0.25564, 0.65585],
+  [0.31579, 0.53648, 0.32675, 0.27836, 0.3609, 0.28379],
+  [0.39505, 0.28921, 0.42356, 0.64267, 0.46053, 0.6884],
+  [0.49749, 0.73413, 0.54355, 0.54733, 0.58271, 0.55818],
+  [0.62187, 0.56903, 0.64787, 0.84653, 0.69549, 0.75351],
+  [0.74311, 0.6605, 0.81767, 0.00939, 0.86842, 0.00009],
+  [0.91917, -0.00921, 1, 0.6977, 1, 0.6977]];
+
+const WAVE_RED = [[0, 1],
+  [0.12111, 0.5605, 0.24223, 0.12101, 0.34515, 0.01594],
+  [0.44807, -0.08913, 0.52425, 0.35933, 0.61754, 0.36958],
+  [0.71082, 0.37983, 0.84111, 0.04925, 0.90485, 0.07744],
+  [0.96859, 0.10563, 0.9843, 0.32217, 1, 0.53872]];
+
+const WAVE_PINK = [[0, 1],
+  [0.03786, 0.66371, 0.07572, 0.32741, 0.12178, 0.28197],
+  [0.16784, 0.23652, 0.2338, 0.74248, 0.27635, 0.72733],
+  [0.31889, 0.71218, 0.34582, 0.27894, 0.37705, 0.19108],
+  [0.40827, 0.10321, 0.43599, 0.16229, 0.4637, 0.20016],
+  [0.49141, 0.23804, 0.50976, 0.45163, 0.54333, 0.4183],
+  [0.57689, 0.38498, 0.60578, 0.0093, 0.66511, 0.00021],
+  [0.72443, -0.00888, 0.84348, 0.285, 0.8993, 0.36377],
+  [0.95511, 0.44254, 0.97756, 0.45769, 1, 0.47284]];
+
+const WAVE_MARKET = [[0, 1],
+  [0.04053, 0.90878, 0.08106, 0.81755, 0.13208, 0.77811],
+  [0.18309, 0.73866, 0.25542, 0.80079, 0.30608, 0.76331],
+  [0.35674, 0.72584, 0.39483, 0.53156, 0.43606, 0.55325],
+  [0.47729, 0.57495, 0.52655, 0.93294, 0.55346, 0.89349],
+  [0.58036, 0.85404, 0.58281, 0.33629, 0.59748, 0.31657],
+  [0.61216, 0.29684, 0.6153, 0.77811, 0.64151, 0.77515],
+  [0.66771, 0.77219, 0.71733, 0.37081, 0.75472, 0.29882],
+  [0.7921, 0.22682, 0.82495, 0.393, 0.86583, 0.3432],
+  [0.90671, 0.29339, 0.95335, 0.1467, 1, 0]];
+
+const AREA_BACK = [[0, 1],
+  [0.04743, 0.77305, 0.09485, 0.54611, 0.13705, 0.48058],
+  [0.17925, 0.41505, 0.21448, 0.63749, 0.25319, 0.60683],
+  [0.29191, 0.57617, 0.3134, 0.32307, 0.36934, 0.29662],
+  [0.42528, 0.27017, 0.52362, 0.49561, 0.58885, 0.44812],
+  [0.65408, 0.40062, 0.69222, -0.08032, 0.76074, 0.01166],
+  [0.82927, 0.10364, 0.91463, 0.55182, 1, 1]];
+
+const AREA_MIDDLE = [[0, 0.99825],
+  [0.06571, 0.87179, 0.13287, 0.73512, 0.17166, 0.68716],
+  [0.21045, 0.6392, 0.20794, 0.71673, 0.23272, 0.7105],
+  [0.2575, 0.70428, 0.27498, 0.72918, 0.32034, 0.6498],
+  [0.36569, 0.57043, 0.45065, 0.28015, 0.50485, 0.23424],
+  [0.55906, 0.18832, 0.58871, 0.41323, 0.64557, 0.37432],
+  [0.70243, 0.3354, 0.79601, -0.01868, 0.84601, 0.00077],
+  [0.89601, 0.02023, 0.91991, 0.32451, 0.94557, 0.49105],
+  [0.97124, 0.65759, 0.98562, 0.82879, 1, 1]];
+
+const AREA_FRONT = [[0, 0.99526],
+  [0.04323, 0.91041, 0.08645, 0.82555, 0.11836, 0.80108],
+  [0.15028, 0.77661, 0.15535, 0.87844, 0.19147, 0.84844],
+  [0.22759, 0.81845, 0.29591, 0.6519, 0.33507, 0.62111],
+  [0.37424, 0.59033, 0.39353, 0.71504, 0.42646, 0.66374],
+  [0.45938, 0.61243, 0.49782, 0.35431, 0.53264, 0.31326],
+  [0.56745, 0.27222, 0.58834, 0.46955, 0.63534, 0.41746],
+  [0.68233, 0.36536, 0.76501, -0.01827, 0.81462, 0.00068],
+  [0.86423, 0.01962, 0.9047, 0.44745, 0.93299, 0.53112],
+  [0.96127, 0.6148, 0.97317, 0.42456, 0.98433, 0.50271],
+  [0.9955, 0.58085, 0.99775, 0.79043, 1, 1]];
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const NN12 = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
+
+/* ------------------------------------------------------------------ *
+ * Composite widgets reused across slides
+ * ------------------------------------------------------------------ */
+function slideTitle(slide, str, w) {
+  text(slide, str, { x: 0.974, y: 0.764, w: w, h: 0.471, fontSize: 28 });
+}
+
+function siteTag(slide, y) {
+  text(slide, 'www.yoursite.com', { x: 10.394, y: y, w: 2.023, h: 0.236, fontSize: 14, align: 'right' });
+}
+
+function lead(slide, x, y, w, str, extra) {
+  text(slide, str, Object.assign(
+    { x: x, y: y, w: w, h: 0.57, fontFace: REG, fontSize: 12, lineSpacingMultiple: 1.5 },
+    extra
+  ));
+}
+
+/** Four coloured KPI tiles across the top of a dashboard. */
+const TILE_X = [0.958, 3.927, 6.896, 9.865];
+const TILE_FILL = [DARK, RED, MID, LIGHT];
+const STAT_TILES = [
+  { value: '567.89 K', vx: 1.515, vw: 1.437, label: 'Session', lw: 0.719 },
+  { value: '6.000', vx: 4.691, vw: 1.020, label: 'Total User', lw: 1.025 },
+  { value: '1.25%', vx: 7.604, vw: 0.960, label: 'Convention Rate', lw: 1.135 },
+  { value: '2.8 K', vx: 10.713, vw: 0.856, label: 'Bounce Rate', lw: 0.856, ink: true },
+];
+
+function kpiTiles(slide, y, tiles) {
+  tiles.forEach(function (t, i) {
+    rect(slide, TILE_X[i], y, 2.551, 1.017, TILE_FILL[i]);
+    const ink = t.ink ? BLACK : WHITE;
+    text(slide, t.value, { x: t.vx, y: y + 0.200, w: t.vw, h: 0.337, fontSize: 20, color: ink });
+    text(slide, t.label, {
+      x: t.vx, y: y + 0.595, w: t.lw, h: 0.223, fontFace: REG, fontSize: 10,
+      color: ink, lineSpacingMultiple: 1.5,
+    });
+  });
+}
+
+/** Half-circle speedometer used on slides 4, 5, 6 and 12. */
+function meterArcs(slide, x, y, size, sweep, withRed) {
+  arc(slide, x, y, size, DARK, 180, 357.9216, 0.14128);
+  arc(slide, x, y, size, MID, 180, sweep, 0.1412);
+  if (withRed) arc(slide, x, y, size, RED, 175.3266, 244.2688, 0.14514, 56.676);
+}
+
+/** 80% doughnut with knob, shared by slides 9 and 11. */
+function ringGauge(slide, x, y) {
+  circle(slide, x, y, 2.586, WHITE, true);
+  arc(slide, x + 0.209, y + 0.210, 2.168, DARK, 180, 95.4227, 0.22828);
+  arc(slide, x + 0.209, y + 0.210, 2.168, MID, 180, 25.5759, 0.22564);
+  circle(slide, x + 0.612, y + 0.612, 1.363, WHITE, true);
+  circle(slide, x + 1.884, y + 1.552, 0.439, WHITE, true);
+  circle(slide, x + 1.929, y + 1.598, 0.350, MID);
+  text(slide, '80%', { x: x + 0.851, y: y + 1.125, w: 0.884, h: 0.337, fontSize: 20, align: 'center' });
+}
+
+/** Numeric axis tick labels (10pt Inter). */
+function ticks(slide, items, opts) {
+  items.forEach(function (t) {
+    text(slide, t[0], Object.assign(
+      { x: t[1], y: t[2], w: t[3], h: 0.223, fontFace: REG, fontSize: 10, align: 'center', lineSpacingMultiple: 1.5 },
+      opts
+    ));
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Slides
+ * ------------------------------------------------------------------ */
+
+// 1 - Cover
+function slide01(pres) {
+  const s = pres.addSlide();
+  rect(s, 0, 0, 13.333, 7.5, WHITE);
+  shape(s, 'rect', { x: 0, y: 0, w: 13.333, h: 7.5, fill: { color: BLACK, transparency: 44.314 } });
+  text(s, 'KPI DASHBOARD', {
+    x: 1.503, y: 1.755, w: 10.327, h: 1.481, fontSize: 88, color: WHITE, align: 'center',
+  });
+  text(s, 'Vel turpis nunc eget lorem dolor sed viverra ipsum. Laoreet suspendisse interdum consectetur '
+    + 'libero id faucibus nisl tincidunt. Arcu risus quis varius quam quisque id diam vel. Volutpat '
+    + 'consequat mauris nunc congue nisi vitae hasellus vestibulum lorem.', {
+    x: 2.917, y: 3.627, w: 7.5, h: 0.873, fontFace: REG, fontSize: 12, color: WHITE,
+    align: 'center', lineSpacingMultiple: 1.5,
+  });
+  rect(s, 5.382, 5.065, 2.569, 0.681, RED);
+  text(s, 'Get Started', { x: 5.862, y: 5.237, w: 1.722, h: 0.337, fontSize: 20, color: WHITE, align: 'center' });
+}
+
+// 2 - Overall Performance Meters
+function slide02(pres) {
+  const s = pres.addSlide();
+  shape(s, 'pie', {
+    x: 5.0341, y: 1.4476, w: 7.3826, h: 7.3826, fill: { color: WHITE }, rotate: 90,
+    angleRange: [90.3924, 270], shadow: dropShadow(),
+  });
+  arc(s, 5.871, 1.955, 5.708, DARK, 180, 0, 0.5);
+  arc(s, 5.871, 1.955, 5.708, MID, 180, 248.0872, 0.49882);
+  arc(s, 5.871, 1.951, 5.708, RED, 175.3266, 234.0316, 0.50128, 72.821);
+  circle(s, 7.624, 3.766, 2.221, WHITE, true);
+  text(s, '75%', { x: 8.161, y: 4.573, w: 1.146, h: 0.606, fontSize: 36, align: 'center' });
+
+  text(s, 'Overall Performance Meters', { x: 0.974, y: 0.764, w: 5.715, h: 0.471, fontSize: 28 });
+  lead(s, 0.972, 1.670, 4.051,
+    'Vel turpis nunc eget lorem dolor sed viverra ipsum. Laoreet suspendisse interdum consectetur libero.');
+
+  [['Excellent', MID, 0.958, 3.178, 1.682, 3.243, 1.374],
+    ['Standard', RED, 0.958, 4.183, 1.682, 4.250, 1.360],
+    ['Bad', DARK, 0.972, 5.188, 1.679, 5.256, 0.564]].forEach(function (r) {
+    rect(s, r[2], r[3], 0.471, 0.471, r[1]);
+    text(s, r[0], { x: r[4], y: r[5], w: r[6], h: 0.337, fontSize: 20 });
+  });
+
+  siteTag(s, 6.516);
+  line(s, 0.958, 6.750, 1.819, 0, BLACK, 1);
+}
+
+// 3 - Financial Performance KPI
+function slide03(pres) {
+  const s = pres.addSlide();
+  arc(s, 0.985, 2.382, 4.368, RED, 180, 359.9993, 0.40034);
+  arc(s, 4.483, 2.367, 4.368, DARK, 180, 359.9993, 0.40034, 180);
+  arc(s, 7.980, 2.382, 4.368, RED, 180, 359.9993, 0.40034);
+
+  [['72%', 2.237, 2.688, 0.962], ['75%', 5.734, 6.183, 0.968], ['78%', 9.231, 9.678, 0.973]]
+    .forEach(function (g) {
+      circle(s, g[1], 3.618, 1.865, WHITE, true);
+      text(s, g[0], { x: g[2], y: 4.281, w: g[3], h: 0.539, fontSize: 32, align: 'center' });
+    });
+
+  text(s, 'Financial Performance KPI', { x: 0.985, y: 0.764, w: 5.329, h: 0.471, fontSize: 28 });
+  lead(s, 8.366, 0.750, 4.051,
+    'Vel turpis nunc eget lorem dolor sed viverra ipsum. Laoreet suspendisse interdum consectetur libero.');
+  text(s, 'Total $ 1.400.00', { x: 0.985, y: 6.415, w: 2.479, h: 0.337, fontSize: 20 });
+  siteTag(s, 6.516);
+}
+
+// 4 & 5 - Performance Evaluation Meters (5 adds knobs instead of the red overlay arc)
+const EVAL_CARDS = [
+  { x: 0.958, gx: 1.470, hx: 1.992, px: 2.311, tx: 1.696, dx: 1.314, pct: '62%', title: 'Very Low ', sweep: 232.2541, knob: [1.839, 2.550] },
+  { x: 4.994, gx: 5.506, hx: 6.028, px: 6.347, tx: 5.732, dx: 5.329, pct: '75%', title: 'Medium', sweep: 273.2012, knob: [6.654, 2.357] },
+  { x: 9.031, gx: 9.542, hx: 10.064, px: 10.383, tx: 9.768, dx: 9.386, pct: '85%', title: 'High', sweep: 307.3480, knob: [11.308, 2.630] },
+];
+
+function evaluationMeters(pres, withRed) {
+  const s = pres.addSlide();
+  EVAL_CARDS.forEach(function (c, i) {
+    card(s, c.x, 1.807, 3.386, 4.943);
+    meterArcs(s, c.gx, 2.419, 2.363, withRed ? 232.2541 : c.sweep, withRed);
+    circle(s, c.hx, 2.882, 1.319, WHITE, true);
+    text(s, c.pct, { x: c.px, y: 3.373, w: 0.681, h: 0.337, fontSize: 20, align: 'center' });
+    text(s, [{ text: c.title, options: { breakLine: true } }, { text: 'Performance' }], {
+      x: c.tx, y: i === 2 ? 4.571 : 4.567, w: 1.911, h: 0.673, fontSize: 20, align: 'center',
+    });
+    lead(s, c.dx, i === 2 ? 5.601 : 5.603, 2.675,
+      'Vel turpis nunc eget lorem dolor sed viverra ipsum laoreet.', { align: 'center' });
+    if (!withRed) {
+      circle(s, c.knob[0], c.knob[1], 0.306, WHITE, true);
+      circle(s, c.knob[0] + 0.033, c.knob[1] + 0.034, 0.239, MID);
+    }
+  });
+  text(s, 'Performance Evaluation Meters', { x: 0.974, y: 0.764, w: 6.393, h: 0.471, fontSize: 28 });
+}
+
+// 6 - Customer Service Benchmarking
+const BENCH_CARDS = [
+  { x: 0.958, y: 2.411, pct: '62%', needleAngle: -35.247, nx: 2.009, ny: 3.213 },
+  { x: 6.986, y: 2.411, pct: '75%', needleAngle: 0, nx: 8.209, ny: 3.213 },
+  { x: 0.958, y: 4.672, pct: '80%', needleAngle: 25.931, nx: 2.330, ny: 5.425 },
+  { x: 6.986, y: 4.672, pct: '84%', needleAngle: 56.898, nx: 8.433, ny: 5.560 },
+];
+
+function slide06(pres) {
+  const s = pres.addSlide();
+  BENCH_CARDS.forEach(function (c) {
+    card(s, c.x, c.y, 5.431, 2.078);
+    meterArcs(s, c.x + 0.423, c.y + 0.417, 1.752, 232.2541, true);
+    circle(s, c.x + 1.108, c.y + 1.121, 0.400, WHITE, true);
+    circle(s, c.x + 1.198, c.y + 1.210, 0.221, INK);
+    shape(s, 'triangle', { x: c.nx, y: c.ny, w: 0.153, h: 0.560, fill: { color: INK }, rotate: c.needleAngle });
+    text(s, c.pct, { x: c.x + 2.838, y: c.y + 0.341, w: 0.681, h: 0.337, fontSize: 20 });
+    text(s, 'Text Title Here', { x: c.x + 2.838, y: c.y + 0.802, w: 1.670, h: 0.236, fontSize: 14 });
+    text(s, 'Vel turpis nunc eget lorem dolor sed viverra ipsum laoreet.', {
+      x: c.x + 2.838, y: c.y + 1.262, w: 2.145, h: 0.475, fontFace: REG, fontSize: 10, lineSpacingMultiple: 1.5,
+    });
+  });
+  text(s, 'Customer Service Benchmarking', { x: 0.974, y: 0.764, w: 6.651, h: 0.471, fontSize: 28 });
+  lead(s, 8.366, 0.750, 4.051,
+    'Vel turpis nunc eget lorem dolor sed viverra ipsum. Laoreet suspendisse interdum consectetur libero.');
+}
+
+// 7 - MRR Dashboard
+const MRR_TILES = [
+  { value: '$ 50.000', vx: 1.515, vw: 1.437, label: 'Total MRR', lw: 0.719 },
+  { value: '$ 30.000', vx: 4.484, vw: 1.437, label: 'Net New MRR', lw: 1.025 },
+  { value: '$ 20.000', vx: 7.453, vw: 1.437, label: 'Expansion MRR', lw: 1.291 },
+  { value: '$ 65.000', vx: 10.422, vw: 1.437, label: 'Churned MRR', lw: 1.291, ink: true },
+];
+const MRR_BARS = [0.783, 1.094, 1.339, 0.922, 1.094, 1.617, 1.900, 1.483, 1.617, 1.094, 1.172, 2.028];
+
+function slide07(pres) {
+  const s = pres.addSlide();
+  card(s, 0.958, 3.267, 7.786, 3.483);
+  rect(s, 8.944, 3.267, 3.472, 3.483, DARK);
+
+  MRR_BARS.forEach(function (h, i) {
+    rect(s, 2.144 + i * 0.4999, 5.827 - h, 0.233, h, RED);
+  });
+  line(s, 1.927, 5.827, 6.167, 0, BLACK, 1);
+  ['0', '2', '4', '6', '8', '10'].forEach(function (v, i) {
+    text(s, v, {
+      x: i === 5 ? 1.609 : 1.642, y: 5.716 - i * 0.3833, w: i === 5 ? 0.165 : 0.099, h: 0.223,
+      fontFace: REG, fontSize: 10, lineSpacingMultiple: 1.5,
+    });
+  });
+  MONTHS.forEach(function (m, i) {
+    text(s, m, { x: 2.010 + i * 0.4998, y: 6.015, w: 0.501, h: 0.202, align: 'center' });
+  });
+
+  kpiTiles(s, 1.943, MRR_TILES);
+  slideTitle(s, 'MRR Dashboard', 3.229);
+  siteTag(s, 0.764);
+
+  circle(s, 9.707, 4.030, 1.935, WHITE);
+  shape(s, 'pie', { x: 9.490, y: 3.812, w: 2.370, h: 2.370, fill: { color: LIGHT }, angleRange: [0, 270] });
+  text(s, [{ text: 'MRR', options: { breakLine: true } }, { text: 'Grwoth' }],
+    { x: 10.258, y: 5.330, w: 0.833, h: 0.471, fontSize: 14 });
+  text(s, '80%', { x: 10.706, y: 4.488, w: 0.750, h: 0.236, fontSize: 14, align: 'center' });
+}
+
+// 8 - MRR Breakdown Dashboard
+const BREAKDOWN_TILES = [
+  { value: '$ 452', vx: 1.474, vw: 0.884, label: 'MRR' },
+  { value: '$ 1,452', vx: 3.747, vw: 1.109, label: 'ARR' },
+  { value: '78', vx: 6.328, vw: 0.454, label: 'Customer' },
+  { value: '$ 3,452', vx: 8.479, vw: 1.189, label: 'LTV' },
+  { value: '$ 89', vx: 11.100, vw: 0.719, label: 'ARPU', ink: true },
+];
+// Repeating 3-column rhythm: [red y/h, salmon y/h]
+const BREAKDOWN_PATTERN = [
+  { red: [4.982, 0.949], mid: [4.467, 0.515] },
+  { red: [5.366, 0.565], mid: [4.634, 0.732] },
+  { red: [5.162, 0.769], mid: [4.235, 1.131] },
+];
+
+function slide08(pres) {
+  const s = pres.addSlide();
+  card(s, 0.958, 3.322, 11.458, 3.428);
+
+  for (let r = 0; r < 10; r++) {
+    line(s, 2.063, 3.669 + r * 0.2827, 9.722, 0, r === 9 ? AXIS : GRID, 1);
+  }
+  for (let c = 0; c < 13; c++) {
+    line(s, 2.063 + c * 0.8102, 3.669, 0, 2.544, GRID, 1);
+  }
+  for (let i = 0; i < 12; i++) {
+    const x = 2.230 + i * 0.8102;
+    const p = BREAKDOWN_PATTERN[i % 3];
+    rect(s, x, 3.952, 0.478, 1.979, DARK);
+    rect(s, x, p.red[0], 0.478, p.red[1], RED);
+    rect(s, x, p.mid[0], 0.478, p.mid[1], MID);
+  }
+
+  [['01', RED, 2.063, 2.230], ['02', MID, 2.448, 2.614], ['03', DARK, 2.831, 2.997]].forEach(function (l) {
+    rect(s, l[2], 6.396, 0.103, 0.103, l[1]);
+    text(s, l[0], { x: l[3], y: 6.380, w: 0.187, h: 0.135, fontSize: 8 });
+  });
+  for (let i = 0; i <= 10; i++) {
+    const v = String(i * 10);
+    text(s, v, {
+      x: i === 0 ? 1.677 : (i === 1 ? 1.643 : 1.589), y: 6.102 - i * 0.2545,
+      w: i === 0 ? 0.099 : (i === 1 ? 0.166 : 0.274), h: 0.223,
+      fontFace: REG, fontSize: 10, align: 'center', lineSpacingMultiple: 1.5,
+    });
+  }
+
+  slideTitle(s, 'MRR Breakdown Dashboard', 5.619);
+  BREAKDOWN_TILES.forEach(function (t, i) {
+    const x = 0.958 + i * 2.3858;
+    if (i === 4) rect(s, x, 2.068, 1.915, 0.858, DARK); else card(s, x, 2.068, 1.915, 0.858);
+    const ink = t.ink ? WHITE : BLACK;
+    const dy = (i === 1 || i === 2) ? 0.006 : 0;
+    text(s, t.value, { x: t.vx, y: 2.203 + dy, w: t.vw, h: 0.337, fontSize: 20, color: ink });
+    text(s, t.label, {
+      x: t.vx, y: 2.567 + dy, w: 0.719, h: 0.223, fontFace: REG, fontSize: 10,
+      color: ink, lineSpacingMultiple: 1.5,
+    });
+  });
+}
+
+/** Shared 0..100 x-axis + 0..1000 y-axis used by slides 9 and 13. */
+function costProfitAxes(s) {
+  line(s, 5.727, 5.551, 6.178, 0, AXIS, 1);
+  for (let i = 0; i <= 10; i++) {
+    const v = String(i * 10);
+    text(s, v, {
+      x: i === 0 ? 5.727 : 5.529 + i * 0.608, y: 5.769, w: i === 0 ? 0.099 : 0.296, h: 0.223,
+      fontFace: REG, fontSize: 10, align: 'center', lineSpacingMultiple: 1.5,
+    });
+  }
+  for (let i = 0; i <= 10; i++) {
+    const v = String(i * 100);
+    text(s, v, {
+      x: i === 0 ? 5.303 : (i === 10 ? 5.112 : 5.216), y: 5.328 - i * 0.2957,
+      w: i === 0 ? 0.099 : (i === 10 ? 0.481 : 0.274), h: 0.223,
+      fontFace: REG, fontSize: 10, align: 'center', lineSpacingMultiple: 1.5,
+    });
+  }
+}
+
+// 9 - Annual Sales Summary
+function slide09(pres) {
+  const s = pres.addSlide();
+  card(s, 0.958, 2.056, 3.338, 4.694);
+  card(s, 4.600, 2.056, 7.817, 4.694);
+  costProfitAxes(s);
+  curve(s, 5.793, 4.684, 5.956, 0.723, WAVE_RED, stroke(DARK));
+  curve(s, 5.816, 2.717, 5.911, 2.389, WAVE_BLACK, stroke(BLACK));
+
+  [['This Years', BLACK, 5.727, 6.469, 0.742], ['Last Years', DARK, 7.587, 8.329, 0.742]]
+    .forEach(function (l) {
+      rect(s, l[2], 6.289, 0.551, 0.144, l[1]);
+      text(s, l[0], { x: l[3], y: 6.294, w: l[4], h: 0.135, fontSize: 8 });
+    });
+
+  circle(s, 10.541, 2.963, 0.223, DARK);
+  rect(s, 8.780, 2.708, 1.520, 0.723, DARK);
+  text(s, '4456 USD', { x: 8.982, y: 2.845, w: 1.115, h: 0.236, fontSize: 14, color: WHITE });
+  text(s, 'Peak Point', {
+    x: 8.982, y: 3.094, w: 0.684, h: 0.201, fontFace: REG, fontSize: 9,
+    color: WHITE, lineSpacingMultiple: 1.5,
+  });
+  text(s, 'Cost Profit Analysis', { x: 6.137, y: 2.465, w: 1.952, h: 0.202, fontSize: 12 });
+
+  ringGauge(s, 1.334, 3.618);
+  text(s, 'Overall Sales Growth For The Years',
+    { x: 1.597, y: 2.601, w: 2.060, h: 0.404, fontSize: 12, align: 'center' });
+  slideTitle(s, 'Annual Sales Summary', 4.644);
+  text(s, '12,000 USD', { x: 10.020, y: 0.764, w: 2.396, h: 0.471, fontSize: 28, align: 'right' });
+  text(s, 'Total Annual Income', {
+    x: 10.689, y: 1.264, w: 1.728, h: 0.268, fontFace: REG, fontSize: 12,
+    align: 'right', lineSpacingMultiple: 1.5,
+  });
+}
+
+// 10 - Monthly Sales Growth And Booking
+function slide10(pres) {
+  const s = pres.addSlide();
+  card(s, 0.958, 3.750, 11.458, 3.000);
+  line(s, 2.524, 6.133, 9.093, 0, AXIS, 1);
+  for (let i = 0; i <= 10; i++) {
+    text(s, String(i * 10), {
+      x: i === 0 ? 2.524 : 2.233 + i * 0.8949, y: 6.270, w: i === 0 ? 0.145 : 0.435, h: 0.139,
+      fontFace: REG, fontSize: 10, align: 'center', lineSpacingMultiple: 1.5,
+    });
+  }
+  curve(s, 2.622, 5.591, 8.766, 0.452, WAVE_RED, stroke(DARK));
+  curve(s, 2.655, 4.362, 8.700, 1.494, WAVE_BLACK, stroke(BLACK));
+  for (let i = 0; i <= 10; i++) {
+    text(s, String(i * 100), {
+      x: i === 0 ? 1.901 : (i === 10 ? 1.619 : 1.772), y: i === 10 ? 4.007 : 5.994 - i * 0.1959,
+      w: i === 0 ? 0.145 : (i === 10 ? 0.708 : 0.403), h: 0.139,
+      fontFace: REG, fontSize: 10, align: 'center', lineSpacingMultiple: 1.5,
+    });
+  }
+
+  card(s, 6.111, 1.833, 6.306, 1.715);
+  text(s, [{ text: 'Booking', options: { breakLine: true } }, { text: 'This Month' }],
+    { x: 6.406, y: 2.441, w: 1.211, h: 0.471, fontSize: 14 });
+  text(s, '$ 578.000K', { x: 8.124, y: 2.086, w: 3.997, h: 0.808, fontSize: 48 });
+  text(s, 'Booked To Date vs 600.10k Target', {
+    x: 8.124, y: 2.956, w: 3.263, h: 0.312, fontFace: REG, fontSize: 14, lineSpacingMultiple: 1.5,
+  });
+
+  [{ x: 0.958, fill: DARK, big: '2.3 : 2', bx: 1.464, bw: 1.266, lx: 1.264, l1: 'Quote To Close Target', l2: '2.0 Or Lower' },
+    { x: 3.535, fill: RED, big: '20.3 : 2', bx: 3.902, bw: 1.541, lx: 3.841, l1: 'Lead To Close Target', l2: '20.3 : 2 Or Lower' }]
+    .forEach(function (t) {
+      rect(s, t.x, 1.819, 2.276, 1.743, t.fill);
+      text(s, t.big, { x: t.bx, y: 2.118, w: t.bw, h: 0.471, fontSize: 28, color: WHITE, align: 'center' });
+      text(s, [{ text: t.l1, options: { breakLine: true } }, { text: t.l2 }], {
+        x: t.lx, y: 2.726, w: 1.664, h: 0.538, fontFace: REG, fontSize: 11,
+        color: WHITE, lineSpacingMultiple: 1.5,
+      });
+    });
+  slideTitle(s, 'Monthly Sales Growth And Booking', 7.149);
+}
+
+// 11 - Monthly Sales Growth And NPM
+const NPM_BARS = [0.511, 0.714, 0.873, 0.601, 0.714, 1.054, 1.239, 0.967, 1.054, 0.714, 0.764, 1.322];
+
+/** 12-month column chart with alternating red/salmon bars; baseline at `base`. */
+function monthColumns(s, x0, base, labelY) {
+  NPM_BARS.forEach(function (h, i) {
+    rect(s, x0 + i * 0.5110, base - h, 0.238, h, i % 2 === 0 ? RED : MID);
+  });
+  MONTHS.forEach(function (m, i) {
+    text(s, m, { x: x0 - 0.137 + i * 0.5110, y: labelY, w: 0.512, h: 0.132, fontSize: 12, align: 'center' });
+  });
+}
+
+function slide11(pres) {
+  const s = pres.addSlide();
+  card(s, 4.978, 2.111, 7.439, 4.639);
+  line(s, 5.335, 3.871, 6.724, 0, GRID3, 1);
+  curve(s, 5.408, 3.443, 6.482, 0.357, WAVE_RED, stroke(DARK));
+  curve(s, 5.432, 2.473, 6.434, 1.179, WAVE_BLACK, stroke(BLACK));
+  MONTHS.forEach(function (m, i) {
+    text(s, m, { x: 5.335 + i * 0.5657, y: 4.093, w: 0.501, h: 0.202, fontSize: 12, align: 'center' });
+  });
+
+  monthColumns(s, 5.978, 6.134, 6.256);
+  line(s, 5.756, 6.134, 6.303, 0, GRID3, 1);
+  ['0', '2', '4', '6', '8', '10'].forEach(function (v, i) {
+    text(s, v, {
+      x: i === 5 ? 5.432 : 5.465, y: 6.061 - i * 0.2498, w: i === 5 ? 0.168 : 0.101, h: 0.145,
+      fontFace: REG, fontSize: 10, lineSpacingMultiple: 1.5,
+    });
+  });
+
+  card(s, 0.958, 2.111, 3.798, 4.639);
+  ringGauge(s, 1.564, 2.383);
+  curve(s, 1.461, 5.254, 2.792, 0.703, WAVE_BLACK, stroke(BLACK));
+  line(s, 1.331, 6.118, 3.053, 0, GRID3, 1);
+  text(s, '0', { x: 1.331, y: 6.294, w: 0.101, h: 0.145, fontFace: REG, fontSize: 10, lineSpacingMultiple: 1.5 });
+  ticks(s, [['10', 1.804, 6.255, 0.218], ['20', 2.394, 6.255, 0.218], ['30', 2.985, 6.255, 0.218],
+    ['40', 3.575, 6.255, 0.218], ['50', 4.165, 6.255, 0.218]]);
+
+  slideTitle(s, 'Monthly Sales Growth And NPM', 6.448);
+  siteTag(s, 0.764);
+}
+
+// 12 - Sales And Sales Commision Analysis
+function slide12(pres) {
+  const s = pres.addSlide();
+  card(s, 4.978, 2.111, 7.439, 4.639);
+  line(s, 5.335, 5.923, 6.724, 0, GRID3, 1);
+  curve(s, 5.408, 5.495, 6.482, 0.357, WAVE_RED, stroke(DARK));
+  curve(s, 5.432, 4.525, 6.434, 1.179, WAVE_BLACK, stroke(BLACK));
+  MONTHS.forEach(function (m, i) {
+    text(s, m, { x: 5.335 + i * 0.5657, y: 6.145, w: 0.501, h: 0.202, fontSize: 12, align: 'center' });
+  });
+
+  monthColumns(s, 5.930, 3.836, 3.958);
+  line(s, 5.708, 3.836, 6.303, 0, GRID3, 1);
+  ['0', '2', '4', '6', '8', '10'].forEach(function (v, i) {
+    text(s, v, {
+      x: i === 5 ? 5.383 : 5.417, y: 3.763 - i * 0.2498, w: i === 5 ? 0.168 : 0.101, h: 0.145,
+      fontFace: REG, fontSize: 10, lineSpacingMultiple: 1.5,
+    });
+  });
+
+  card(s, 0.958, 2.111, 3.798, 4.639);
+  meterArcs(s, 1.490, 2.402, 2.875, 232.2541, true);
+  circle(s, 2.615, 3.557, 0.656, WHITE, true);
+  circle(s, 2.762, 3.703, 0.363, INK);
+  shape(s, 'triangle', { x: 2.519, y: 3.033, w: 0.251, h: 0.920, fill: { color: INK }, rotate: -35.247 });
+  text(s, [{ text: '130.4%', options: { breakLine: true } }, { text: 'Actual' }],
+    { x: 1.897, y: 4.522, w: 2.060, h: 0.673, fontSize: 20, align: 'center' });
+  curve(s, 1.598, 5.346, 2.518, 0.634, WAVE_BLACK, stroke(BLACK));
+  line(s, 1.481, 6.126, 2.752, 0, GRID3, 1);
+  text(s, '0', { x: 1.481, y: 6.284, w: 0.091, h: 0.131, fontFace: REG, fontSize: 10, lineSpacingMultiple: 1.5 });
+  ticks(s, [['10', 1.907, 6.249, 0.197], ['20', 2.440, 6.249, 0.197], ['30', 2.972, 6.249, 0.197],
+    ['40', 3.504, 6.249, 0.197], ['50', 4.037, 6.249, 0.197]], { h: 0.201 });
+
+  slideTitle(s, 'Sales And Sales Commision Analysis', 7.447);
+}
+
+// 13 - Sales Analysis Dashboard
+function slide13(pres) {
+  const s = pres.addSlide();
+  card(s, 4.600, 2.056, 7.817, 4.694);
+  costProfitAxes(s);
+  curve(s, 5.793, 4.684, 5.956, 0.723, WAVE_RED, stroke(DARK));
+  curve(s, 5.816, 2.717, 5.911, 2.389, WAVE_BLACK, stroke(BLACK));
+  curve(s, 5.792, 3.902, 5.931, 1.528, WAVE_PINK, stroke(MID));
+
+  [['Leads', BLACK, 5.727, 0.551, 0.144, 6.469, 0.415],
+    ['Sales', DARK, 7.075, 0.490, 0.129, 7.817, 0.369],
+    ['Revenue', MID, 8.432, 0.490, 0.129, 9.174, 0.611]].forEach(function (l) {
+    rect(s, l[2], 6.289, l[3], l[4], l[1]);
+    text(s, l[0], { x: l[5], y: 6.294, w: l[6], h: 0.135, fontSize: 8 });
+  });
+
+  card(s, 0.964, 2.056, 3.365, 4.694);
+  shape(s, 'donut', { x: 1.507, y: 2.578, w: 2.268, h: 2.268, fill: { color: DARK }, rectRadius: 0.4352 });
+  arc(s, 1.516, 2.589, 2.258, RED, 180, 357.3814, 0.3789);
+  shape(s, 'blockArc', {
+    x: 1.516, y: 2.589, w: 2.258, h: 2.258, fill: { color: MID },
+    angleRange: [180, 316.1663], arcThicknessRatio: 0.37866, rotate: 180, flipH: true,
+  });
+  circle(s, 2.248, 3.318, 0.809, WHITE, true);
+  shape(s, 'triangle', { x: 2.515, y: 3.605, w: 0.274, h: 0.236, fill: { color: DARK }, rotate: 90 });
+  s.addText([1, 2, 3, 4].map(function () {
+    return { text: 'Product Name', options: { bullet: { characterCode: '2013', indent: 13.5 }, breakLine: true } };
+  }), {
+    x: 1.765, y: 5.420, w: 1.540, h: 0.808, fontFace: SB, fontSize: 12, color: BLACK,
+    valign: 'top', margin: 0,
+  });
+
+  slideTitle(s, 'Sales Analysis Dashboard', 5.256);
+}
+
+// 14 - Trafic Report Dashboard  (stacked columns: [dark, red, salmon] as y/height pairs)
+const TRAFFIC_COLUMNS = [
+  { dark: [3.652, 2.373], red: [5.077, 0.949], mid: [4.561, 0.515] },
+  { dark: [4.161, 1.864], red: [5.460, 0.565], mid: [4.561, 0.898] },
+  { dark: [4.638, 1.387], red: [5.256, 0.769], mid: [5.076, 0.383] },
+  { dark: [4.046, 1.979], red: [5.077, 0.949], mid: [4.561, 0.515] },
+  { dark: [4.329, 1.696], red: [5.460, 0.565], mid: [4.893, 0.567] },
+  { dark: [3.906, 2.119], red: [5.256, 0.769], mid: [4.329, 1.131] },
+  { dark: [3.906, 2.119], red: [4.728, 1.297], mid: [4.450, 0.515] },
+  { dark: [4.046, 1.979], red: [5.256, 0.769], mid: [4.544, 0.732] },
+  { dark: [3.791, 2.234], red: [5.256, 0.769], mid: [4.329, 1.131] },
+  { dark: [3.652, 2.373], red: [5.076, 0.949], mid: [4.128, 0.949] },
+  { dark: [4.247, 1.778], red: [5.460, 0.565], mid: [4.728, 0.732] },
+  { dark: [4.046, 1.979], red: [5.256, 0.769], mid: [4.329, 1.131] },
+];
+
+/** Shared scaffolding for slides 14 & 20: y ticks 20..100, baseline, 01..12 labels. */
+function dashboardGrid(s) {
+  for (let i = 0; i <= 8; i++) {
+    text(s, String(20 + i * 10), {
+      x: 1.624, y: 5.688 - i * 0.2545, w: 0.274, h: 0.223,
+      fontFace: REG, fontSize: 10, align: 'center', lineSpacingMultiple: 1.5,
+    });
+  }
+  line(s, 2.107, 6.025, 9.644, 0, AXIS2, 1);
+  NN12.forEach(function (n, i) {
+    text(s, n, {
+      x: 2.366 + i * 0.8102, y: 6.198, w: 0.274, h: 0.223, fontSize: 10,
+      align: 'center', lineSpacingMultiple: 1.5,
+    });
+  });
+}
+
+function slide14(pres) {
+  const s = pres.addSlide();
+  card(s, 0.958, 3.322, 11.458, 3.428);
+  TRAFFIC_COLUMNS.forEach(function (c, i) {
+    const x = 2.264 + i * 0.8102;
+    rect(s, x, c.dark[0], 0.478, c.dark[1], DARK);
+    rect(s, x, c.red[0], 0.478, c.red[1], RED);
+    rect(s, x, c.mid[0], 0.478, c.mid[1], MID);
+  });
+  dashboardGrid(s);
+  slideTitle(s, 'Trafic Report Dashboard', 4.995);
+  kpiTiles(s, 1.943, STAT_TILES);
+}
+
+// 15 - Market Analysis
+function slide15(pres) {
+  const s = pres.addSlide();
+  card(s, 5.100, 1.555, 7.317, 5.206);
+  for (let i = 0; i < 6; i++) line(s, 6.1449 + i * 1.1347, 1.7315, 0, 4.8519, GRID2, 0.75, true);
+  for (let i = 0; i < 11; i++) line(s, 5.6984, 1.7315 + i * 0.4446, 6.1198, 0, GRID2, 0.75);
+  [6.289, 5.857, 5.423, 4.989, 4.556, 4.122, 3.688, 3.231, 2.775, 2.318, 1.861].forEach(function (y, i) {
+    text(s, String(i * 10), {
+      x: i === 10 ? 5.735 : 5.809, y: y, w: i === 10 ? 0.299 : 0.152, h: 0.179,
+      fontSize: 8, align: 'center', lineSpacingMultiple: 1.5,
+    });
+  });
+  ['January', 'February', 'March', 'April', 'May'].forEach(function (m, i) {
+    text(s, m, {
+      x: 6.347 + i * 1.1347, y: 6.253, w: 0.730, h: 0.223, fontSize: 10,
+      color: '262626', align: 'center', lineSpacingMultiple: 1.5,
+    });
+  });
+  curve(s, 6.131, 2.179, 5.679, 4.024, WAVE_MARKET, stroke(DARK));
+  s.addText('72%', {
+    x: 9.040, y: 2.939, w: 0.730, h: 0.357, fontFace: SB, fontSize: 16, color: '262626',
+    align: 'center', valign: 'top', margin: 0, lineSpacingMultiple: 1.5,
+    bullet: { characterCode: '2022', indent: 13.5 },
+  });
+
+  arc(s, 0.998, 2.289, 3.500, MID, 49.9748, 337.5536, 0.1545, 90);
+  arc(s, 0.998, 2.289, 3.500, DARK, 49.9748, 337.5536, 0.1545);
+  s.addText([{ text: '70', options: { fontSize: 88 } }, { text: '/30', options: { fontSize: 18 } }], {
+    x: 1.686, y: 2.688, w: 2.123, h: 1.962, fontFace: SB, color: BLACK,
+    align: 'center', valign: 'top', margin: 0, lineSpacingMultiple: 1.5,
+  });
+  text(s, 'Percent AVG', {
+    x: 2.129, y: 4.727, w: 1.238, h: 0.269, fontFace: REG, fontSize: 12,
+    align: 'center', lineSpacingMultiple: 1.5,
+  });
+  shape(s, 'roundRect', { x: 2.135, y: 6.188, w: 1.231, h: 0.580, fill: { color: RED }, rectRadius: 0.0967 });
+  text(s, 'Details', {
+    x: 2.132, y: 6.326, w: 1.238, h: 0.268, fontSize: 12, color: WHITE,
+    align: 'center', lineSpacingMultiple: 1.5,
+  });
+  slideTitle(s, 'Market Analysis', 3.263);
+}
+
+// 16 - Company Dashboard (six ring charts)
+const RING_COLS = [{ x: 4.956, bx: 4.955, w: 1.806, h: 1.812, ang: 98.7931, tx: 5.219, lx: 5.030 },
+  { x: 7.359, bx: 7.360, w: 1.762, h: 1.768, ang: 156.3585, tx: 7.603, lx: 7.433 },
+  { x: 9.762, bx: 9.763, w: 1.762, h: 1.768, ang: 30.6358, tx: 10.006, lx: 9.836 }];
+const RING_PCTS = ['70%', '55%', '90%'];
+
+function slide16(pres) {
+  const s = pres.addSlide();
+  card(s, 4.065, 1.095, 8.351, 5.704);
+
+  // Top row: pale disc + red pie wedge
+  RING_COLS.forEach(function (c, i) {
+    circle(s, c.x, i === 0 ? 1.341 : (i === 1 ? 1.325 : 1.322), 1.765, LIGHT);
+    shape(s, 'blockArc', {
+      x: c.bx, y: i === 0 ? 1.303 : (i === 1 ? 1.325 : 1.322), w: c.w, h: c.h,
+      fill: { color: RED }, angleRange: [c.ang, 0], arcThicknessRatio: 0.5,
+    });
+    text(s, RING_PCTS[i], { x: c.tx, y: 3.282, w: 1.277, h: 0.314, fontSize: 14, bold: true, align: 'center', lineSpacingMultiple: 1.5 });
+    text(s, 'Type 00' + (i + 1), { x: c.lx, y: 3.618, w: 1.616, h: 0.224, fontSize: 10, align: 'center', lineSpacingMultiple: 1.5 });
+  });
+
+  // Bottom row: salmon disc + deep red wedge
+  RING_COLS.forEach(function (c, i) {
+    circle(s, i === 0 ? 4.963 : c.x, i === 0 ? 4.317 : (i === 1 ? 4.329 : 4.326), i === 0 ? 1.805 : 1.765, MID);
+    shape(s, 'blockArc', {
+      x: c.bx, y: i === 0 ? 4.307 : (i === 1 ? 4.329 : 4.326), w: c.w, h: c.h,
+      fill: { color: DARK }, angleRange: [c.ang, 0], arcThicknessRatio: 0.5,
+    });
+    text(s, RING_PCTS[i], {
+      x: [5.240, 7.640, 10.036][i], y: i === 2 ? 5.051 : 5.071, w: 1.277, h: 0.314,
+      fontSize: 14, bold: true, color: WHITE, align: 'center', lineSpacingMultiple: 1.5,
+    });
+    text(s, 'Type 00' + (i + 4), { x: c.lx, y: 6.339, w: 1.616, h: 0.223, fontSize: 10, align: 'center', lineSpacingMultiple: 1.5 });
+  });
+
+  text(s, [{ text: 'Company', options: { breakLine: true } }, { text: 'Dashboard' }],
+    { x: 0.979, y: 1.095, w: 2.207, h: 0.942, fontSize: 28 });
+  text(s, 'Vel turpis nunc eget lorem dolor sed viverra ipsum. Laoreet suspendisse interdum consectetur.', {
+    x: 0.973, y: 3.689, w: 2.207, h: 1.176, fontFace: REG, fontSize: 12, lineSpacingMultiple: 1.5,
+  });
+  text(s, 'www.yoursite.com', { x: 0.973, y: 6.516, w: 2.023, h: 0.236, fontSize: 14, align: 'right' });
+}
+
+// 17 - Data Overview (stacked horizontal bars)
+const OVERVIEW_ROWS = [
+  { y: 3.827, pink: 7.726, red: [3.722, 2.290], dark: [6.012, 3.048], label: '3000', ly: 3.977 },
+  { y: 4.643, pink: 9.042, red: [4.103, 3.981], dark: [8.083, 3.048], label: '2000', ly: 4.789 },
+  { y: 5.458, pink: 8.608, red: [2.921, 2.591], dark: [5.512, 3.928], label: '1000', ly: 5.601 },
+];
+
+function slide17(pres) {
+  const s = pres.addSlide();
+  card(s, 0.958, 3.095, 11.458, 3.655);
+  OVERVIEW_ROWS.forEach(function (r) { rect(s, 2.530, r.y, r.pink, 0.559, MID); });
+  line(s, 2.530, 3.470, 0, 2.905, GRID, 1);
+  OVERVIEW_ROWS.forEach(function (r) {
+    rect(s, r.red[0], r.y, r.red[1], 0.559, RED);
+    rect(s, r.dark[0], r.y, r.dark[1], 0.559, DARK);
+  });
+  OVERVIEW_ROWS.forEach(function (r) {
+    text(s, r.label, { x: 1.804, y: r.ly, w: 0.483, h: 0.268, fontSize: 12, lineSpacingMultiple: 1.5 });
+  });
+  slideTitle(s, 'Data Overview', 2.977);
+  kpiTiles(s, 1.824, STAT_TILES);
+  siteTag(s, 0.764);
+}
+
+// 18 - Basic Table (built from coloured cells so the striping matches the original)
+const TABLE_ROWS = [
+  { fill: DARK, ink: WHITE, no: 'No', desc: 'Description', dw: 1.589, qty: 'Qty', qx: 6.745, qw: 0.728, amt: 'Ammount' },
+  { fill: LIGHT, ink: BLACK, no: '01.', desc: 'Product One', dw: 1.775, qty: '29', qx: 6.661, qw: 0.896, amt: '$ 45.000' },
+  { fill: MID, ink: WHITE, no: '02.', desc: 'Product Two', dw: 1.775, qty: '23', qx: 6.567, qw: 1.083, amt: '$ 38.000' },
+  { fill: LIGHT, ink: BLACK, no: '03.', desc: 'Product Three', dw: 2.025, qty: '12', qx: 6.661, qw: 0.896, amt: '$ 26.000' },
+];
+
+function slide18(pres) {
+  const s = pres.addSlide();
+  card(s, 0.958, 2.845, 11.458, 3.905);
+  TABLE_ROWS.forEach(function (r, i) {
+    const y = 3.250 + i * 0.7738;
+    rect(s, 1.732, y, 0.732, 0.774, r.fill);
+    rect(s, 2.574, y, 3.699, 0.774, r.fill);
+    rect(s, 6.384, y, 1.449, 0.774, r.fill);
+    rect(s, 7.944, y, 3.699, 0.774, r.fill);
+    const ty = y + 0.235;
+    text(s, r.no, { x: 1.859, y: ty, w: 0.478, h: 0.303, fontSize: 18, color: r.ink, align: 'center' });
+    text(s, r.desc, { x: 2.987, y: ty, w: r.dw, h: 0.303, fontSize: 18, color: r.ink });
+    text(s, r.qty, { x: r.qx, y: ty, w: r.qw, h: 0.303, fontSize: 18, color: r.ink, align: 'center' });
+    text(s, r.amt, { x: 8.352, y: i === 0 ? ty : ty - 0.016, w: 1.339, h: 0.303, fontSize: 18, color: r.ink });
+  });
+
+  card(s, 6.111, 0.750, 6.306, 1.715);
+  text(s, [{ text: 'Data', options: { breakLine: true } }, { text: 'Company' }],
+    { x: 6.406, y: 1.372, w: 1.008, h: 0.471, fontSize: 14 });
+  text(s, '$ 578.000K', { x: 8.124, y: 1.002, w: 3.997, h: 0.808, fontSize: 48 });
+  text(s, 'Data Average', {
+    x: 8.124, y: 1.873, w: 3.263, h: 0.312, fontFace: REG, fontSize: 14, lineSpacingMultiple: 1.5,
+  });
+  text(s, 'Basic Table', { x: 0.958, y: 0.764, w: 2.347, h: 0.471, fontSize: 28 });
+  lead(s, 0.958, 1.558, 4.038,
+    'Vel turpis nunc eget lorem dolor sed viverra ipsum. Laoreet suspendisse interdum consectetur.');
+}
+
+// 19 - Statisfaction Dashboard (three stacked area curves)
+function slide19(pres) {
+  const s = pres.addSlide();
+  card(s, 0.917, 2.750, 11.500, 4.000);
+  for (let i = 0; i < 6; i++) line(s, 2.687 + i * 1.7598, 3.150, 0, 3.001, GRID2, 0.75, true);
+  curve(s, 2.687, 3.386, 8.799, 2.639, AREA_BACK, { fill: { color: LIGHT } });
+  curve(s, 2.687, 3.660, 8.798, 2.364, AREA_MIDDLE, { fill: { color: RED, transparency: 69.02 } });
+  curve(s, 2.691, 4.475, 8.807, 1.555, AREA_FRONT, { fill: { color: MID } });
+
+  ['8 AM', '10 AM', '12 AM', '13 AM', '14 AM', '15 AM'].forEach(function (t, i) {
+    text(s, t, {
+      x: 2.358 + i * 1.7596, y: 6.267, w: 0.659, h: 0.083, fontFace: REG, fontSize: 6,
+      align: 'center', lineSpacingMultiple: 1.5,
+    });
+  });
+  ['500', '400', '300', '200', '100', '0'].forEach(function (v, i) {
+    s.addText(v, {
+      x: 1.518, y: 3.150 + i * 0.5510, w: 0.659, h: 0.111, fontFace: REG, fontSize: 8, color: BLACK,
+      align: 'right', valign: 'top', margin: 0, lineSpacingMultiple: 1.5,
+      bullet: { characterCode: '2022', indent: 13.5 },
+    });
+  });
+
+  text(s, 'Statisfaction Dashboard', { x: 0.958, y: 0.764, w: 4.926, h: 0.471, fontSize: 28 });
+  lead(s, 0.958, 1.558, 4.038,
+    'Vel turpis nunc eget lorem dolor sed viverra ipsum. Laoreet suspendisse interdum consectetur.');
+
+  [{ x: 7.262, fill: null, big: '$ 4.500', bx: 7.696, bw: 1.597, lx: 7.531, ink: BLACK },
+    { x: 9.953, fill: DARK, big: '$ 8.200', bx: 10.392, bw: 1.585, lx: 10.222, ink: WHITE }]
+    .forEach(function (c) {
+      if (c.fill) rect(s, c.x, 0.750, 2.464, 1.680, c.fill); else card(s, c.x, 0.750, 2.464, 1.680);
+      text(s, c.big, { x: c.bx, y: 0.997, w: c.bw, h: 0.471, fontSize: 28, color: c.ink, align: 'center' });
+      text(s, 'Vel turpis nunc eget lorem dolor sed viverra.', {
+        x: c.lx, y: 1.613, w: 1.926, h: 0.570, fontFace: REG, fontSize: 12,
+        color: c.ink, align: 'center', lineSpacingMultiple: 1.5,
+      });
+    });
+}
+
+// 20 - Procurement Quality Dashboard (columns + line overlay)
+const PROC_BARS = [1.513, 1.101, 0.769, 0.949, 1.387, 0.769, 1.297, 0.878, 1.355, 0.949, 1.101, 1.751];
+const PROC_DOTS = [[2.430, 4.206], [3.247, 4.619], [4.057, 4.950], [4.866, 4.771], [5.677, 4.333],
+  [6.488, 4.950], [7.298, 4.423], [8.107, 4.845], [8.918, 4.366], [9.735, 4.770],
+  [10.534, 4.614], [11.348, 3.968]];
+// [x, y, w, h, risesLeftToRight] - the flag picks which diagonal of the box is drawn
+const PROC_SEGMENTS = [
+  [2.543, 4.320, 0.723, 0.318, false], [3.360, 4.732, 0.716, 0.238, false],
+  [4.190, 4.838, 0.676, 0.179, true], [4.999, 4.399, 0.678, 0.438, true],
+  [5.810, 4.399, 0.698, 0.571, false], [6.621, 4.489, 0.676, 0.528, true],
+  [7.431, 4.489, 0.696, 0.375, false], [8.240, 4.433, 0.678, 0.479, true],
+  [9.031, 4.480, 0.704, 0.357, false], [9.868, 4.680, 0.666, 0.157, true],
+  [10.667, 4.035, 0.681, 0.645, true],
+];
+
+function slide20(pres) {
+  const s = pres.addSlide();
+  card(s, 0.958, 3.322, 11.458, 3.428);
+  PROC_BARS.forEach(function (h, i) {
+    rect(s, 2.264 + i * 0.8102, 6.025 - h, 0.478, h, RED);
+  });
+  dashboardGrid(s);
+  PROC_SEGMENTS.forEach(function (g) { line(s, g[0], g[1], g[2], g[3], BLACK, 1, g[4]); });
+  PROC_DOTS.forEach(function (d) { circle(s, d[0], d[1], 0.133, BLACK); });
+
+  slideTitle(s, 'Procurement Quality Dashboard', 6.507);
+  kpiTiles(s, 1.907, STAT_TILES);
+  siteTag(s, 0.764);
+}
+
+/* ------------------------------------------------------------------ *
+ * Build
+ * ------------------------------------------------------------------ */
+function build() {
+  const pres = new pptxgen();
+  pres.defineLayout({ name: 'KPI16x9', width: 13.333, height: 7.5 });
+  pres.layout = 'KPI16x9';
+  pres.title = 'KPI Dashboard';
+
+  slide01(pres);
+  slide02(pres);
+  slide03(pres);
+  evaluationMeters(pres, true);  // 4
+  evaluationMeters(pres, false); // 5
+  slide06(pres);
+  slide07(pres);
+  slide08(pres);
+  slide09(pres);
+  slide10(pres);
+  slide11(pres);
+  slide12(pres);
+  slide13(pres);
+  slide14(pres);
+  slide15(pres);
+  slide16(pres);
+  slide17(pres);
+  slide18(pres);
+  slide19(pres);
+  slide20(pres);
+
+  return pres.writeFile({
+    fileName: path.join(__dirname, '06d147da-20e7-4fc4-9980-7326a48353e6_grok_final.pptx'),
+  });
+}
+
+build().then(function (f) { console.log('wrote', f); }).catch(function (e) { console.error(e); process.exit(1); });

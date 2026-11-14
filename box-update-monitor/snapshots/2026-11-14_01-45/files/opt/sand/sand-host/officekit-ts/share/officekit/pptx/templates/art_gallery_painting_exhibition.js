@@ -1,0 +1,465 @@
+/**
+ * "Exhibition of Paintings" — Art Gallery deck (20 slides, 20" x 11.25").
+ * Recreated with pptxgenjs. The original's photographs sit in picture
+ * placeholders; here each is a tinted rounded panel marked "[image]".
+ */
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ theme */
+const BG = 'FAEDC8'; // cream page background
+const DARK = '1D1F16'; // dark olive cards
+const GOLD = 'C88F42'; // accent / headings
+const CREAM = 'FAEDC8'; // body copy on dark cards
+
+const F_TITLE = 'Krub SemiBold';
+const F_BODY = 'Inter Light';
+const F_MED = 'Krub Medium';
+
+const SLIDE_W = 20;
+const SLIDE_H = 11.25;
+
+/* ---------------------------------------------------------------- helpers */
+
+/** Dark rounded card. `r` is the corner radius in inches. */
+function card(slide, x, y, w, h, r) {
+  slide.addShape('roundRect', { x, y, w, h, rectRadius: r, fill: { color: DARK } });
+}
+
+/** Picture placeholder: rounded tinted panel standing in for a photograph. */
+function photoFrame(slide, x, y, w, h, r) {
+  slide.addShape('roundRect', {
+    x, y, w, h,
+    rectRadius: r,
+    fill: { color: GOLD, transparency: 90 },
+    line: { color: GOLD, width: 1, transparency: 45 },
+  });
+  slide.addText('[image]', {
+    x, y, w, h, align: 'center', valign: 'middle',
+    fontFace: F_BODY, fontSize: 20, color: GOLD, transparency: 40,
+  });
+}
+
+function text(slide, str, opts) {
+  slide.addText(str, Object.assign({ valign: 'top', fit: 'resize' }, opts));
+}
+
+/** Large gold headline (60pt unless overridden). */
+function title(slide, str, x, y, w, h, fontSize) {
+  text(slide, str, {
+    x, y, w, h,
+    fontFace: F_TITLE, fontSize: fontSize || 60, bold: true, color: GOLD,
+  });
+}
+
+/** Small gold sub-heading (20pt). */
+function label(slide, str, x, y, w, h, opts) {
+  text(slide, str, Object.assign({
+    x, y, w, h,
+    fontFace: F_TITLE, fontSize: 20, bold: true, color: GOLD,
+  }, opts));
+}
+
+/** Cream body copy, 18pt, 150% leading. */
+function body(slide, str, x, y, w, h, opts) {
+  text(slide, str, Object.assign({
+    x, y, w, h,
+    fontFace: F_BODY, fontSize: 18, color: CREAM, lineSpacingMultiple: 1.5,
+  }, opts));
+}
+
+/** Gold sub-heading carrying the deck's "o" bullet. */
+function bullet(slide, str, x, y, w, h) {
+  label(slide, str, x, y, w, h, { bullet: { characterCode: '006F' } });
+}
+
+/** Gold circle with a dark play triangle (used on the accordion cards). */
+function playButton(slide, x, y) {
+  const d = 0.5435;
+  slide.addShape('ellipse', { x, y, w: d, h: d, fill: { color: GOLD } });
+  slide.addShape('triangle', {
+    x: x + 0.2176, y: y + 0.2019, w: 0.1621, h: 0.1397,
+    rotate: 90, fill: { color: DARK },
+  });
+}
+
+/**
+ * Aperture mark used as the gallery logo: a gold disc split into six blades by
+ * dark spokes that run tangent to a small hexagonal opening in the middle.
+ */
+function apertureIcon(slide, x, y, d) {
+  slide.addShape('ellipse', { x, y, w: d, h: d, fill: { color: GOLD } });
+  const cx = x + d / 2;
+  const cy = y + d / 2;
+  const r = d / 2;
+  const gap = d * 0.07; // spoke thickness
+  const off = d * 0.12; // tangential offset, gives the pinwheel twist
+  for (let k = 0; k < 6; k++) {
+    const a = (k * 60 * Math.PI) / 180;
+    slide.addShape('rect', {
+      x: cx - off * Math.sin(a) + (r / 2) * Math.cos(a) - r / 2,
+      y: cy + off * Math.cos(a) + (r / 2) * Math.sin(a) - gap / 2,
+      w: r, h: gap, rotate: k * 60, fill: { color: DARK },
+    });
+  }
+  const hole = d * 0.26;
+  slide.addShape('hexagon', {
+    x: cx - hole / 2, y: cy - hole / 2, w: hole, h: hole, fill: { color: DARK },
+  });
+}
+
+/** Outlined envelope icon (replaces the mail graphic). */
+function mailIcon(slide, x, y, size) {
+  const ln = { color: GOLD, width: 1.5 };
+  slide.addShape('rect', { x, y: y + 0.09, w: size, h: size * 0.66, line: ln });
+  slide.addShape('line', { x, y: y + 0.09, w: size / 2, h: size * 0.33, line: ln });
+  slide.addShape('line', { x: x + size / 2, y: y + 0.42, w: size / 2, h: -size * 0.33, line: ln });
+}
+
+/** Repeating page furniture: dark bar, gallery name, date, aperture logo. */
+function header(slide) {
+  card(slide, 0.5656, 0.4, 18.8687, 1.2837, 0.3904);
+  text(slide, 'Art Gallery', {
+    x: 1.4959, y: 0.7893, w: 4.7583, h: 0.5049,
+    fontFace: F_TITLE, fontSize: 24, bold: true, color: GOLD,
+  });
+  text(slide, 'August 2024', {
+    x: 13.7457, y: 0.7826, w: 4.7583, h: 0.5049, align: 'right',
+    fontFace: F_TITLE, fontSize: 24, bold: true, color: GOLD,
+  });
+  apertureIcon(slide, 9.7041, 0.7465, 0.5906);
+}
+
+/**
+ * Accordion block used on slides 16 & 17: gold-labelled header strip with a
+ * play button, plus a body card underneath.
+ */
+function accordionBlock(slide, x, y, labelText, bodyText) {
+  card(slide, x, y, 9.3004, 1.3288, 0.2521);
+  label(slide, labelText, x + 0.8085, y + 0.4456, 6.1519, 0.4376);
+  playButton(slide, x + 8.1026, y + 0.3927);
+  card(slide, x, y + 1.4481, 9.3004, 2.9134, 0.2846);
+  body(slide, bodyText, x + 0.8085, y + 1.9721, 7.8376, 1.8654);
+}
+
+/* ------------------------------------------------------------------- copy */
+const LOREM_LONG =
+  'Lorem ipsum dolor sit amet consec adipiscing elit sedo eiusmod tempor incididunt ut labore et dolore magna aliqua. ' +
+  'Aenean euismod elementum nisi quis eleifend quam. Ridiculus mus mauris vitae ultricies leona integer malesuada. ' +
+  'Lacus viverra vitae congue eu consequat. Sollicitudin ac orci phasellus egestas tellus. Libero id faucibus nisl ' +
+  'tincidunt eget nullam non nisi. Pretium aenean pharetra magna ac placerat vestibulu lectus mauris Purus sit amet ' +
+  'luctus venenatis gestas quis ipsum.';
+
+const LOREM_MED =
+  'PLACEHOLDER' +
+  'aliqua. Aenean galesa elementum nisi quis eleifend quam. Ridiculus mus mauris.';
+
+const LOREM_SHORT =
+  'Lorem ipsum dolor sit amet consec adipiscing elit sedona eiusmod tempor cididunt ut labora dolore magna aliqua. ' +
+  'Aenean galesa elementum.';
+
+const LOREM_ACCORDION =
+  'Lorem ipsum dolor situan amet consec adipiscing elitus jedona  eiusmod tempor incididunt ut labore dolore magna ' +
+  'PLACEHOLDER' +
+  'acus viverra.';
+
+const LOREM_STAT =
+  'Lorem ipsum dolor metus consec dipiscing elit dona eiusmod tempor dunta.';
+
+const LOREM_CARD =
+  'Lorem ipsum dolor amet consec acing elit dona eiusmod tempor cidunt labora dolore magna aliqua nean galesa mentu.';
+
+const EXPERIENCE = 'PLACEHOLDER';
+
+/* --------------------------------------------------------- slide builders */
+
+// 1 — cover
+function slide01(s) {
+  card(s, 0.5656, 2.025, 18.8687, 8.825, 0.6099);
+  photoFrame(s, 10.2558, 2.8623, 8.2482, 7.1504, 0.7025);
+  title(s, 'Exhibition of', 2.0811, 5.625, 8.9502, 1.4473, 80);
+  title(s, 'Paintings', 2.0811, 6.8993, 12.5087, 2.8947, 166);
+}
+
+// 2 — intro
+function slide02(s) {
+  photoFrame(s, 12.6316, 2.025, 6.8028, 8.825, 0.4701);
+  card(s, 0.5656, 2.025, 11.7502, 8.825, 0.6099);
+  title(s, 'Discover the Colors of Emotion', 2.0585, 3.619, 7.4152, 2.1205);
+  body(s, LOREM_LONG, 2.0585, 6.0274, 9.0731, 3.2286);
+}
+
+// 3 — two numbered notes
+function slide03(s) {
+  card(s, 0.5656, 2.025, 18.8687, 8.825, 0.6099);
+  photoFrame(s, 11.4286, 5.8095, 7.3095, 4.4286, 0.6479);
+  title(s, 'Dive into a world where every brushstroke tells a story', 2.1299, 2.7943, 13.6608, 2.1205);
+  ['01 - Write Anything Here', '02 - Write Anything Here'].forEach((head, i) => {
+    const y = 5.6473 + i * 2.4935;
+    label(s, head, 2.1299, y, 8.6023, 0.4376);
+    body(s, LOREM_MED, 2.1299, y + 0.5288, 8.2122, 1.411);
+  });
+}
+
+// 4 — masterpieces, two stacked photos
+function slide04(s) {
+  photoFrame(s, 10.6053, 2.025, 8.8291, 4.2943, 0.4547);
+  photoFrame(s, 10.6053, 6.5557, 8.8291, 4.2943, 0.4547);
+  card(s, 0.5656, 2.025, 9.7502, 8.825, 0.6099);
+  title(s, 'Masterpieces of our upcoming exhibition', 1.8383, 3.3671, 7.2048, 3.1303);
+  body(s,
+    'PLACEHOLDER' +
+    'aliqua senean euismod elementum nis quis eleifend ridiculus mus mauris vitae ultricie leona integer malesuada. ' +
+    'Lacus viverat vitae congue eu consequat. Sollicitudin ac orci phasellus egestas tellus. Libero id faucibus nisl ' +
+    'tincidunt.',
+    1.8383, 6.7337, 7.2048, 2.7742);
+}
+
+// 5 — photo mosaic with a stat
+function slide05(s) {
+  photoFrame(s, 0.5656, 2.025, 5.4344, 8.825, 0.3756);
+  photoFrame(s, 6.127, 2.025, 5.4344, 4.3434, 0.3002);
+  photoFrame(s, 6.127, 6.5066, 5.4344, 4.3434, 0.3002);
+  card(s, 11.6884, 2.025, 7.7459, 8.8941, 0.5353);
+  title(s, 'Telling the beauty of life through paintings', 12.9962, 2.9814, 5.8554, 4.14);
+  title(s, '250+', 12.9962, 7.7606, 2.5404, 0.7742, 40);
+  body(s,
+    'Lorem ipsum dolor amet consec dipiscing elit Sedona eiusmod tempor didunt labore et dolore magna aliqua senean.',
+    12.9962, 8.5517, 5.3453, 1.411);
+}
+
+// 6 — beyond the canvas, three photos below
+function slide06(s) {
+  [0.5656, 6.917, 13.2683].forEach(x => photoFrame(s, x, 7.1973, 6.1661, 3.6527, 0.3552));
+  card(s, 0.5656, 2.025, 18.8687, 4.9506, 0.4153);
+  title(s, 'Beyond the Canvas', 1.8878, 2.9014, 10.2586, 1.1107);
+  body(s,
+    'PLACEHOLDER' +
+    'PLACEHOLDER' +
+    'malesuada. Lacus viverat vitae congue eu consequat. ',
+    1.8878, 4.2338, 9.3074, 1.8654);
+  label(s, EXPERIENCE, 12.303, 3.238, 6.1474, 0.7742);
+  body(s,
+    'PLACEHOLDER' +
+    'PLACEHOLDER',
+    12.303, 4.2338, 6.1474, 1.8654);
+}
+
+// 7 — five stacked bullet cards
+function slide07(s) {
+  photoFrame(s, 0.5656, 6.5417, 10.7201, 4.3083, 0.3853);
+  card(s, 0.5656, 2.025, 10.7201, 4.3083, 0.3614);
+  title(s, 'Witness the artist brilliance on canvas', 1.864, 3.1189, 8.4932, 2.1205);
+  for (let i = 0; i < 5; i++) {
+    const dy = i * 1.7796;
+    card(s, 11.4704 - i * 0.0025, 2.025 + dy, 7.964, 1.7067, 0.2725);
+    bullet(s, EXPERIENCE, 12.3762 - i * 0.0025, 2.4913 + dy, 6.1474, 0.7742);
+  }
+}
+
+// 8 — exhibitions, photos left
+function slide08(s) {
+  photoFrame(s, 0.5656, 2.025, 6.7122, 4.3307, 0.3633);
+  photoFrame(s, 0.5656, 6.5193, 6.7122, 4.3307, 0.3633);
+  card(s, 7.439, 2.025, 11.9953, 8.825, 0.594);
+  title(s, 'Exhibitions to express the unspeakable', 9.0103, 3.241, 9.8677, 2.1205);
+  body(s,
+    'PLACEHOLDER' +
+    'PLACEHOLDER' +
+    'nacus viverat vitae congue eu consequat orci phasellus.',
+    9.0103, 5.5754, 9.0135, 1.8654);
+  bullet(s, EXPERIENCE, 9.0103, 7.8264, 7.2278, 0.7742);
+  bullet(s, 'PLACEHOLDER',
+    9.0103, 8.8598, 8.823, 0.7742);
+}
+
+// 9 — banner title, two photos, two footnote cards
+function slide09(s) {
+  photoFrame(s, 0.5571, 4.7004, 9.3701, 4.2668, 0.4693);
+  photoFrame(s, 10.0643, 4.7004, 9.3701, 4.2668, 0.4693);
+  card(s, 0.5656, 2.025, 18.8687, 2.5004, 0.275);
+  title(s, 'Discover stunning paintings', 1.864, 2.7198, 16.2551, 1.1107);
+  [0.5571, 10.0728].forEach((x, i) => {
+    card(s, x, 9.1433 - i * 0.0011, 9.3701, 1.7067, 0.4041);
+    bullet(s, EXPERIENCE, x + 0.9058, 9.6096 - i * 0.0011, 7.2476, 0.7742);
+  });
+}
+
+// 10 — text left, three notes right
+function slide10(s) {
+  card(s, 0.5656, 2.025, 18.8687, 8.825, 0.6099);
+  title(s, 'Exhibition of works by talented artists', 1.9737, 3.5045, 7.8195, 2.1205);
+  body(s, LOREM_LONG, 1.9737, 6.0274, 9.0731, 3.2286);
+  ['01. Write Anything Here', '02. Write Anything Here', '03. Write Anything Here'].forEach((head, i) => {
+    const y = 3.0292 + i * 2.4384;
+    label(s, head, 11.8744, y, 6.1519, 0.4376);
+    body(s, LOREM_SHORT, 11.8744, y + 0.5288, 6.3875, 1.411);
+  });
+}
+
+// 11 — visual symphony, two tall photos
+function slide11(s) {
+  photoFrame(s, 9.9294, 2.025, 4.6535, 8.825, 0.549);
+  photoFrame(s, 14.7742, 2.025, 4.6535, 8.825, 0.549);
+  card(s, 0.5656, 2.025, 9.1725, 8.825, 0.6099);
+  title(s, 'Visual Symphony', 1.7463, 3.3594, 7.6109, 1.1107);
+  body(s,
+    'PLACEHOLDER' +
+    'enean euismod elementumi quis eleifend quam. Ridiculun mus mauris vitae ultricies leona integer malesuada. Lacus ' +
+    'viverra vitae congue eu consequat. ',
+    1.7463, 4.7561, 7.1109, 2.3198);
+  label(s, 'Write Anything Here', 1.7463, 7.5758, 6.9426, 0.4376);
+  body(s,
+    'PLACEHOLDER' +
+    'Aenean galesa sollicitudin orci sellus egestas.',
+    1.7463, 8.1046, 6.9426, 1.411);
+}
+
+// 12 — numbered list 01-04
+function slide12(s) {
+  card(s, 9.9068, 2.025, 9.5276, 8.825, 0.6099);
+  card(s, 0.5656, 2.025, 9.1725, 3.4274, 0.4036);
+  photoFrame(s, 0.5656, 5.625, 9.1725, 5.225, 0.4334);
+  title(s, 'Canvas of Life', 1.6716, 3.1833, 7.1656, 1.1107);
+  ['01', '02', '03', '04'].forEach((num, i) => {
+    const dy = i * 1.8939;
+    title(s, num, 11.0548, 3.0335 + dy, 1.1116, 0.7068, 36);
+    body(s, LOREM_SHORT, 12.1244, 2.8911 + dy, 6.3875, 1.411);
+  });
+}
+
+// 13 — amazing paintings
+function slide13(s) {
+  photoFrame(s, 0.5656, 2.025, 7.3435, 8.825, 0.5075);
+  card(s, 8.1413, 2.025, 11.293, 8.825, 0.6099);
+  title(s, 'Amazing paintings', 9.5353, 3.3783, 9.3284, 1.1107);
+  body(s,
+    'PLACEHOLDER' +
+    'aliqua. Aenean euismod elementum nisi quis eleifend quam. Ridiculus mus mauris vitae ultricies leona integer ' +
+    'malesuada. Lacus viverra vitae congue eu consequat. Sollicitudin ac orci phasellus egestas tellus. Libero id ' +
+    'faucibus nisl tincidunt eget nullam non nisi. Pretium aenean pharetra magna ac placerat vestibulu.',
+    9.5353, 4.9003, 9.0731, 2.7742);
+  title(s, '250+', 9.5353, 8.0857, 1.8928, 0.7742, 40);
+  body(s,
+    'PLACEHOLDER' +
+    'Aenean galesa sollicitudin orci sellus egestas.',
+    11.4281, 8.0857, 6.9426, 1.411);
+}
+
+// 14 — wide photo band above a summary card
+function slide14(s) {
+  photoFrame(s, 0.5656, 2.025, 18.8687, 3.4295, 0.4227);
+  card(s, 0.5656, 5.625, 18.8687, 5.225, 0.3611);
+  title(s, 'Creative Expressions', 1.9103, 6.6604, 9.6125, 1.1107);
+  body(s,
+    'PLACEHOLDER' +
+    'enean euismod elementumi quis eleifend quam. Ridiculun nusantara mauris vitae ultricies leona integer malesua. ' +
+    'Lacus viverra vitae congue eu consequat gallery artist. ',
+    1.9103, 7.9492, 9.6125, 1.8654);
+  bullet(s, EXPERIENCE, 12.4111, 6.6555, 6.3161, 0.7742);
+  bullet(s, 'PLACEHOLDER',
+    12.4111, 7.6821, 5.9889, 1.1107);
+  bullet(s, 'Enter a realm of dreams captured on canvas by visionary artists',
+    12.4111, 9.0453, 6.3161, 0.7742);
+}
+
+// 15 — big photo plus two stat cards
+function slide15(s) {
+  photoFrame(s, 0.5656, 2.025, 9.5344, 8.825, 0.6099);
+  photoFrame(s, 10.2422, 6.5193, 4.525, 4.3307, 0.4492);
+  photoFrame(s, 14.9094, 2.025, 4.525, 4.3307, 0.4492);
+  [[10.2422, 2.025, '250+'], [14.9094, 6.5193, '30+']].forEach(([x, y, stat]) => {
+    card(s, x, y, 4.525, 4.3307, 0.4492);
+    title(s, stat, x + 0.6185, y + 1.0643, 3.2879, 0.7742, 40);
+    body(s, LOREM_STAT, x + 0.6185, y + 1.8554, 3.2879, 1.411);
+  });
+}
+
+// 16 — story text plus accordion blocks 01-02
+function slide16(s) {
+  card(s, 0.5656, 2.025, 9.4344, 8.825, 0.6099);
+  title(s, 'Painting tells a unique story', 1.8315, 3.6253, 6.8758, 2.1205);
+  body(s,
+    'PLACEHOLDER' +
+    'nean euismod elementum nisi quis eleifend quam Riculun mus mauris vitae ultricies leona integer malesuada. Lacus ' +
+    'viverra vitae congue eu consequat. Soicitu orci phasel lua egestas tellus. Libero faucibus nisl tincidunt eget ' +
+    'nullam non nisi. Pretium aenean pharetra magna.',
+    1.8315, 6.0211, 7.2172, 3.2286);
+  accordionBlock(s, 10.134, 2.025, '01. Write Anything Here', LOREM_ACCORDION);
+  accordionBlock(s, 10.134, 6.4885, '02. Write Anything Here', LOREM_ACCORDION);
+}
+
+// 17 — accordion blocks 03-06
+function slide17(s) {
+  [
+    [0.5656, 2.025, '03. Write Anything Here'],
+    [0.5656, 6.4885, '04. Write Anything Here'],
+    [10.134, 2.025, '05. Write Anything Here'],
+    [10.134, 6.4885, '06. Write Anything Here'],
+  ].forEach(([x, y, head]) => accordionBlock(s, x, y, head, LOREM_ACCORDION));
+}
+
+// 18 — tall + wide photo with caption card
+function slide18(s) {
+  photoFrame(s, 0.5656, 2.025, 4.7955, 8.825, 0.516);
+  photoFrame(s, 5.5067, 2.025, 13.9277, 4.9194, 0.3881);
+  card(s, 5.5067, 7.1, 13.9277, 3.75, 0.3792);
+  label(s, EXPERIENCE, 6.6473, 8.0486, 10.7211, 0.4376);
+  body(s,
+    'PLACEHOLDER' +
+    'nean euismod elementum nisi quis eleifend quam Riculun mus mauris vitae ultricies leona integer malesuada. Lacus ' +
+    'viverra vitae congue eu consequat. ',
+    6.6473, 8.592, 11.6541, 1.411);
+  playButton(s, 18.5559, 7.3801);
+}
+
+// 19 — three photo cards with captions
+function slide19(s) {
+  [0.5656, 6.9094, 13.2533].forEach((x, i) => {
+    photoFrame(s, x, 2.025, 6.1811, 5.5004, 0.3675);
+    card(s, x, 7.6167, 6.1811, 3.2333, 0.411);
+    label(s, `0${i + 1}. Write Anything Here`, x + 0.4756, 8.2634, 5.2299, 0.4376, { align: 'center' });
+    body(s, LOREM_CARD, x + 0.4756, 8.7922, 5.2299, 1.411, { align: 'center' });
+  });
+}
+
+// 20 — contact
+function slide20(s) {
+  card(s, 0.5656, 2.025, 18.8687, 8.825, 0.6099);
+  photoFrame(s, 1.496, 2.904, 8.2482, 7.1504, 0.7025);
+  title(s, 'Contact Us', 10.8433, 6.8404, 7.7007, 1.4473, 80);
+  body(s, 'Thank you for your time and interest. We look forward to potentially partnering with you. ',
+    10.9409, 8.4857, 7.9263, 0.9088, { fontSize: 24, lineSpacingMultiple: 1 });
+  mailIcon(s, 10.9409, 9.5819, 0.4724);
+  text(s, 'partnership@paintings.com', {
+    x: 11.6447, y: 9.5925, w: 3.8676, h: 0.4376, wrap: false,
+    fontFace: F_MED, fontSize: 20, color: GOLD,
+  });
+}
+
+/* ------------------------------------------------------------------ build */
+const BUILDERS = [
+  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
+  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
+];
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'ART20', width: SLIDE_W, height: SLIDE_H });
+  pptx.layout = 'ART20';
+  pptx.author = 'Art Gallery';
+  pptx.title = 'Exhibition of Paintings';
+  pptx.defineSlideMaster({ title: 'ART_MASTER', background: { color: BG } });
+
+  BUILDERS.forEach(builder => {
+    const slide = pptx.addSlide({ masterName: 'ART_MASTER' });
+    header(slide);
+    builder(slide);
+  });
+
+  return pptx.writeFile({
+    fileName: path.join(__dirname, '0a7b03c1-7c16-4902-ac60-0474676fb123_grok_final.pptx'),
+  });
+}
+
+build().then(f => console.log('wrote', f)).catch(err => { console.error(err); process.exit(1); });
