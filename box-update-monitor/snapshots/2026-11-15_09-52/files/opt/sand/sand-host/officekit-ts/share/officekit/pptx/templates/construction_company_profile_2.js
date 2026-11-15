@@ -1,0 +1,1594 @@
+/**
+ * "CONSTRUCTION" - a 60-slide business template, rebuilt with PptxGenJS.
+ *
+ *   node <this file>.js   ->   writes <this file>.pptx beside the script.
+ *
+ * Deck at a glance
+ *   Canvas ....... 10 x 5.625 in (16:9), white background
+ *   Type ......... Montserrat everywhere; 24pt bold titles, 12pt sub-titles,
+ *                  7-9pt body copy, 36-44pt display numerals
+ *   Colour ....... amber accent on white, grey secondary text (see palette)
+ *   Furniture .... nearly every content slide carries the same three items:
+ *                  centred title, centred sub-title, amber page-number chip.
+ *                  `pageHead()` draws all three.
+ *   Artwork ...... the source deck's photographs become grey "[image]" boxes;
+ *                  its vector pictograms are redrawn as custGeom outlines
+ *                  (see the ICON OUTLINES section).
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+const FONT = 'Montserrat';
+
+/* Palette -- short names because they appear on almost every line. */
+const Y  = 'FFC000';  // amber accent (slides 27-60)
+const Y2 = 'FFCA00';  // amber accent (slides 1-26; a hair greener)
+const W  = 'FFFFFF';
+const K  = '000000';
+const G  = '808080';  // secondary text grey
+const G1 = 'D9D9D9';  // light grey fills / tracks
+const G2 = 'F2F2F2';  // lightest grey fills
+const G3 = 'BFBFBF';
+const G4 = 'A6A6A6';
+const BL = '00B0F0';  // chart blue
+const BL2 = '0070C0';
+const GN = '92D050';  // chart green
+const GN2 = '00B050';
+const RD = 'FF0000';
+
+/* Body copy repeated verbatim throughout the deck. */
+const L1 = 'Lorem ipsum dolor sit amet kolor suum ata si memet';
+const L2 = 'PLACEHOLDER';
+const L3 = 'PLACEHOLDER';
+const L4 = 'Lorem ipsum dolor sit amet  kolor suum ata si memet ta pleu bak muka keu ubat mata dan ubat saket hate';
+const L5 = 'PLACEHOLDER';
+const L6 = 'PLACEHOLDER';
+const L7 = 'PLACEHOLDER';
+
+/* ---------------------------------------------------------------- helpers --
+ * Every draw call is `fn(slide, ...geometry, opts)`.
+ *
+ * GEOMETRY IS IN HUNDREDTHS OF AN INCH, so the slide is 1000 x 562 and every
+ * coordinate is a short whole number: box(sl, 100, 41, 800, 51) is the title
+ * strip at x=1", y=0.41", 8" wide, 0.51" tall.  u() does the conversion.
+ *
+ * `opts` is either a colour string (shorthand for "solid fill, no outline")
+ * or a bag of short keys, so a whole shape still fits on one readable line:
+ *
+ *   f  fill colour      ft fill transparency %   l  line colour
+ *   lw line width (pt)  ld line dash             lh/le line arrow heads
+ *   s  font size (pt)   c  font colour           b  bold        i  italic
+ *   a  align l|c|r|j    v  vertical anchor t|m|b ls line spacing multiple
+ *   m  text inset (pt)  ww wrap off              bu bullet char code
+ *   rot rotation deg    fh/fv flip               rr roundRect radius (in)
+ *   ar arc [start,end] degrees
+ *
+ * Text runs are `{ t: 'string', o: {…same keys…, br: 1 to end the paragraph} }`.
+ */
+
+const ALIGN = { l: 'left', c: 'center', r: 'right', j: 'justify' };
+const VAL = { t: 'top', m: 'middle', b: 'bottom' };
+
+/** hundredths of an inch -> inches */
+const u = v => v / 100;
+
+function opt(o, x, y, w, h) {
+  if (typeof o === 'string') o = { f: o };     // colour shorthand
+  o = o || {};
+  const r = { x: u(x), y: u(y), w: u(w), h: u(h), fontFace: FONT };
+  if (o.f) r.fill = o.ft ? { color: o.f, transparency: o.ft } : { color: o.f };
+  r.line = o.l ? { color: o.l, width: o.lw || 1 } : { type: 'none' };
+  if (o.ld) r.line.dashType = o.ld;
+  if (o.lh) r.line.beginArrowType = o.lh;
+  if (o.le) r.line.endArrowType = o.le;
+  if (o.rot) r.rotate = o.rot;
+  if (o.fh) r.flipH = true;
+  if (o.fv) r.flipV = true;
+  if (o.rr) r.rectRadius = u(Math.min(w, h)) / 6;   // PowerPoint's default corner
+  if (o.ar) r.angleRange = o.ar;
+  if (o.s) r.fontSize = o.s;
+  r.color = o.c || K;
+  if (o.b) r.bold = true;
+  if (o.i) r.italic = true;
+  if (o.a) r.align = ALIGN[o.a];
+  r.valign = VAL[o.v || 't'];
+  if (o.ls) r.lineSpacingMultiple = o.ls;
+  if (o.m !== undefined) r.margin = o.m;
+  if (o.ww) r.wrap = false;
+  if (o.bu) r.bullet = { characterCode: o.bu, indent: o.bi || 13.5 };
+  return r;
+}
+
+/** Run list -> PptxGenJS text objects. */
+function runs(txt) {
+  if (typeof txt === 'string') return txt;
+  return txt.map(function (r) {
+    const o = r.o || {};
+    const p = {};
+    if (o.s) p.fontSize = o.s;
+    if (o.c) p.color = o.c;
+    if (o.b) p.bold = true;
+    if (o.i) p.italic = true;
+    if (o.u) p.underline = { style: 'sng' };
+    if (o.a) p.align = ALIGN[o.a];
+    if (o.ls) p.lineSpacingMultiple = o.ls;
+    if (o.bu) { p.bullet = { characterCode: o.bu, indent: o.bi || 13.5 }; }
+    if (o.br) p.breakLine = true;
+    return { text: r.t, options: p };
+  });
+}
+
+/** Any preset geometry (ellipse, triangle, star5, roundRect, line, arc, …). */
+function sh(sl, shape, x, y, w, h, o) { sl.addShape(shape, opt(o, x, y, w, h)); }
+
+/* The four geometries the deck leans on, as one-word calls. */
+const box = (sl, x, y, w, h, o) => sh(sl, 'rect', x, y, w, h, o);          // rectangle
+const el  = (sl, x, y, w, h, o) => sh(sl, 'ellipse', x, y, w, h, o);       // circle / oval
+const rr  = (sl, x, y, w, h, o) => sh(sl, 'roundRect', x, y, w, h,         // rounded card
+              Object.assign({ rr: 1 }, typeof o === 'string' ? { f: o } : o));
+const star = (sl, x, y, w, h, o) => sh(sl, 'star5', x, y, w, h, o);        // rating star
+
+/** Text in an invisible rectangle (i.e. a text box). */
+function t(sl, txt, x, y, w, h, o) {
+  const p = opt(typeof o === 'string' ? { c: o } : o, x, y, w, h);
+  p.shape = 'rect';
+  sl.addText(runs(txt), p);
+}
+
+/** Text inside a visible shape. */
+function ts(sl, shape, txt, x, y, w, h, o) {
+  const p = opt(o, x, y, w, h); p.shape = shape;
+  sl.addText(runs(txt), p);
+}
+
+/** Pictogram: a traced outline drawn as custGeom, scaled to fill x/y/w/h.
+ *  custGeom points are inches relative to the shape's own top-left corner. */
+function icon(sl, pts, x, y, w, h, o) {
+  const p = opt(o, x, y, w, h);
+  p.points = [];
+  pts.forEach(function (flat) {
+    for (let i = 0; i < flat.length; i += 2) {
+      p.points.push({ x: u(flat[i] * w) / 100, y: u(flat[i + 1] * h) / 100, moveTo: i === 0 });
+    }
+    p.points.push({ close: true });
+  });
+  sl.addShape('custGeom', p);
+}
+
+/** Native doughnut / pie chart. */
+function ch(sl, kind, cats, vals, x, y, w, h, colors, hole) {
+  sl.addChart(kind, [{ name: 'Series 1', labels: cats, values: vals }], {
+    x: u(x), y: u(y), w: u(w), h: u(h),
+    chartColors: colors, holeSize: hole,
+    showLegend: false, showValue: false, dataBorder: { pt: 0, color: W },
+  });
+}
+
+/** Stand-in for a photograph in the source deck. */
+function imgBox(sl, x, y, w, h) {
+  ts(sl, 'rect', '[image]', x, y, w, h,
+    { f: 'F4F4F4', l: 'C9C9C9', lw: 0.75, s: Math.max(7, Math.min(11, u(h) * 6)), c: G4, a: 'c', v: 'm' });
+}
+
+/** Title + sub-title + page-number chip: the furniture on 49 of the 60 slides. */
+function pageHead(sl, num, title, sub, accent) {
+  t(sl, title, 100, 41.2, 800, 50.5, { s: 24, b: 1, c: accent, a: 'c', v: 'b' });
+  t(sl, sub, 100, 86.8, 800, 30.3, { s: 12, a: 'c' });
+  ts(sl, 'rect', num, 475, 522.9, 50, 40.6, { f: accent, s: 11, c: W, a: 'c', v: 'm' });
+}
+
+/* ---------------------------------------------------------- ICON OUTLINES --
+ * Each pictogram from the source deck, traced to a handful of sub-paths on a
+ * 0..100 unit square: [x0,y0, x1,y1, …] per closed sub-path.  icon() scales
+ * them into place.                                                          */
+const i0 = [[0,67,24,100,100,0,27,67,0,39,0,67]];
+const i1 = [[35,49,2,0,100,0,100,100,0,100,35,49]];
+const i2 = [[100,34,33,0,0,67,66,100,100,34]];
+const i3 = [[0,0,100,0,100,90,21,91,16,100,17,90,0,90,0,0]];
+const i4 = [[56,17,50,0,44,17,0,17,0,100,100,100,100,17,56,17]];
+const i5 = [[45,80,50,100,55,80,100,80,100,0,0,0,0,80,45,80]];
+const i6 = [[100,32,67,30,100,0,0,32,22,100,67,100,67,50,100,32]];
+const i7 = [[100,12,7,5,0,89,64,89,100,12]];
+const i8 = [[95,68,34,93,2,40,81,7,17,54,95,68]];
+const i9 = [[42,29,59,73,100,50,22,3,12,100,42,29],[23,72,31,39,37,65,23,72]];
+const i10 = [[100,69,70,79,48,57,62,48,62,60,67,54,82,60,82,48,95,54,100,69],[88,27,79,3,61,8,57,30,69,52,79,49,88,27],[54,66,46,63,46,77,11,67,0,90,27,100,60,95,66,83,54,66],[51,38,42,11,21,13,15,41,30,68,41,64,51,38]];
+const i11 = [[50,66,10,0,0,16,50,100,100,16,90,0,50,66]];
+const i12 = [[50,67,10,0,0,17,50,100,100,17,90,0,50,67]];
+const i13 = [[100,50,50,100,0,50,50,0,100,50]];
+const i14 = [[100,93,95,100,3,99,2,1,97,1,100,93]];
+const i15 = [[82,18,50,4,18,18,4,50,18,82,50,96,82,82,96,50,82,18],[58,63,35,76,35,23,80,50,58,63]];
+const i16 = [[37,37,80,29,80,0,55,6,65,17,50,34,10,43,0,74,37,37],[30,100,30,77,17,77,17,100,30,100],[47,100,35,100,35,69,47,69,47,100],[65,100,52,100,52,57,65,57,65,100],[82,100,70,100,70,46,82,46,82,100],[87,31,87,100,100,100,100,31,87,31]];
+const i17 = [[50,25,67,32,75,50,50,75,32,67,25,50,32,32,50,25],[56,0,0,38,3,72,41,100,100,56,56,0]];
+const i18 = [[39,0,5,20,5,60,96,99,72,20,39,0],[39,12,66,40,39,67,12,40,39,12]];
+const i19 = [[74,12,4,12,12,40,46,68,30,100,70,100,54,68,97,18,90,6,74,12],[10,13,19,13,27,22,32,56,11,33,10,13],[68,56,73,22,81,13,90,13,89,33,68,56]];
+const i20 = [[0,100,16,29,33,8,54,0,74,8,88,29,100,100]];
+const i21 = [[0,100,13,29,29,8,50,0,71,8,87,29,100,100]];
+const i22 = [[99,40,40,1,1,60,62,99,99,40],[93,49,59,40,83,23,93,49],[78,18,56,33,40,9,78,18],[32,12,47,36,9,41,32,12],[8,50,55,50,18,79,8,50],[50,93,23,83,58,57,67,89,50,93],[74,85,66,55,92,57,74,85]];
+const i23 = [[0,34,46,96,95,24,52,64,34,12,0,34]];
+const i24 = [[0,53,66,100,40,48,0,34,0,53],[0,19,100,100,61,21,0,19],[27,86,13,100,0,86,13,73,27,86]];
+const i25 = [[53,0,22,100,99,44,53,0]];
+const i26 = [[76,45,81,4,0,0,0,99,88,91,76,45],[27,18,64,18,69,34,27,40,27,18],[59,81,27,81,27,55,69,58,73,73,59,81]];
+const i27 = [[50,0,3,52,53,98,50,0],[29,38,51,19,70,38,29,38]];
+const i28 = [[0,50,8,77,28,95,4,29,0,50],[84,48,65,2,8,22,38,81,34,22,64,23,75,80,84,48],[51,54,36,98,66,97,51,54],[94,26,75,93,98,63,94,26]];
+const i29 = [[61,0,0,31,0,100,100,100,100,0,61,0],[61,82,41,82,41,50,61,50,61,82]];
+const i30 = [[3,0,60,81,0,100,100,100,100,0,3,0],[60,51,41,51,41,19,60,19,60,51]];
+const i31 = [[0,0,0,100,100,100,100,0,0,0],[61,51,41,51,41,19,61,19,61,51]];
+const i32 = [[84,100,91,89,97,1,2,1,5,14,27,25,37,98,84,100]];
+const i33 = [[10,0,6,99,100,100]];
+const i34 = [[73,0,94,11,99,39,50,100,1,25,17,2,50,14,73,0]];
+const i35 = [[52,63,54,28,46,28,52,63],[54,68,46,77,54,68],[50,11,90,50,50,89,10,50,50,11],[50,100,100,50,50,0,0,50,50,100]];
+const i36 = [[85,22,30,22,0,98,45,35,63,58,2,100,78,70,85,22]];
+const i37 = [[12,0,100,88,88,100,0,12,12,0]];
+const i38 = [[100,100,100,0,49,8,0,35,0,62,11,70,58,93,100,100]];
+const i39 = [[0,9,78,50,0,100,97,61,75,20,0,9]];
+const i40 = [[100,50,71,19,0,0,78,50,0,100,71,81,100,50]];
+const i41 = [[11,12,85,1,100,25,96,97,4,97,11,12],[65,12,80,6,65,12],[52,21,26,58,52,91,76,58,52,21],[67,58,56,34,37,46,47,78,62,74,67,58],[52,30,36,38,30,58,36,77,52,85,72,58,52,30]];
+const i42 = [[69,32,26,100,84,71,97,0,29,45,23,98,28,67,69,32],[83,28,81,64,57,81,76,66,83,28],[23,66,37,38,69,17,37,39,23,66]];
+const i43 = [[49,0,55,35,42,16,49,0],[49,40,57,48,49,54,49,40],[55,35,61,42,74,33,82,10,69,12,55,35],[61,44,83,51,98,40,61,44],[61,52,90,64,90,75,69,70,61,52],[57,58,53,81,67,96,57,58],[49,60,44,89,33,96,32,76,49,60],[43,58,27,56,7,70,18,77,43,58],[39,50,20,35,2,40,11,50,39,50],[39,42,35,18,18,10,39,42]];
+const i44 = [[0,100,15,0,100,84,0,100]];
+const i45 = [[95,30,0,63,38,100,95,30]];
+const i46 = [[92,77,96,57,41,3,0,31,69,100,92,77]];
+const i47 = [[53,21,74,47,53,74,26,47,53,21],[58,0,0,41,42,100,100,63,58,0]];
+const i48 = [[43,0,100,0,100,100,0,100,0,34,43,0],[13,42,83,47,13,42],[13,71,83,76,13,71],[13,58,83,61,13,58],[13,87,83,89,13,87],[53,29,83,34,53,29],[53,16,83,21,53,16],[43,34,43,0,0,34,43,34]];
+const i49 = [[100,0,0,100,100,100,100,0]];
+const i50 = [[55,34,42,35,33,45,45,66,58,65,67,55,66,42,55,34],[58,53,47,58,42,47,53,42,58,53],[98,61,99,33,61,0,1,34,11,83,36,85,39,100,88,84,98,61],[73,57,61,71,43,72,29,61,27,43,39,29,57,28,71,39,73,57]];
+const i51 = [[97,38,60,1,47,71,61,100,99,60,97,38],[38,0,0,42,30,100,38,0]];
+const i52 = [[8,91,8,19,94,19,100,50,99,0,1,1,0,99,26,100,25,91,8,91],[82,3,92,3,92,15,82,15,82,3],[68,3,78,3,78,15,68,15,68,3]];
+const i53 = [[53,83,71,83,53,100,53,83],[47,100,29,83,47,83,47,100],[31,96,11,83,23,83,31,96],[69,96,77,83,88,83,69,96],[79,77,82,53,100,53,92,77,79,77],[53,77,53,53,77,53,73,77,53,77],[27,77,23,53,47,53,47,77,27,77],[7,77,0,53,18,53,21,77,7,77],[82,47,79,23,93,23,100,47,82,47],[53,47,53,23,73,23,77,47,53,47],[23,47,27,23,47,23,47,47,23,47],[0,47,7,22,21,23,18,47,0,47],[77,17,69,4,89,17,77,17],[53,17,53,0,71,17,53,17],[29,17,47,0,47,17,29,17],[11,17,31,4,23,17,11,17]];
+const i54 = [[95,87,84,57,81,0,19,0,16,58,4,96,85,99,96,96,95,87]];
+const i55 = [[98,0,1,1,1,99,99,99,98,0],[96,93,4,93,4,7,96,7,96,93]];
+const i56 = [[42,48,10,4,35,76,8,89,54,99,46,83,68,83,44,59,95,73,42,48],[86,60,68,28,46,44,65,25,15,4,44,46,96,68,86,46,86,60],[79,14,66,26,83,17,86,46,86,13,98,1,84,12,44,12,79,14]];
+const i57 = [[100,0,0,0,0,100,13,75,100,75,100,0]];
+const i58 = [[100,100,0,100,0,0,13,25,100,25,100,100]];
+const i59 = [[99,55,58,1,0,49,58,100,99,55]];
+const i60 = [[50,0,0,50,50,100,100,50,50,0],[50,93,7,50,50,7,93,50,50,93]];
+const i61 = [[94,16,34,25,99,57,63,100,0,73,74,64,16,12,94,16]];
+const i62 = [[50,44,15,59,0,100,100,100,85,59,50,44],[50,38,76,19,50,0,25,19,50,38]];
+const i63 = [[100,37,69,3,15,11,14,98,100,37]];
+const i64 = [[0,99,100,99,100,0,0,0,0,99]];
+const i65 = [[0,16,1,89,32,100,32,0,0,16],[90,3,68,0,68,100,100,87,90,3]];
+const i66 = [[66,6,27,25,6,63,60,100,100,97,66,6],[35,69,65,41,82,86,35,69]];
+const i67 = [[0,97,64,88,94,63,89,45,33,6,0,97],[38,87,19,86,37,41,64,66,38,87]];
+const i68 = [[67,17,72,6,60,2,56,13,67,17],[98,23,27,28,1,79,48,63,75,98,56,52,98,23]];
+const i69 = [[75,2,26,0,25,25,75,25,75,2],[76,77,26,76,17,98,82,100,76,77],[23,42,23,51,77,51,71,30,29,30,23,42],[50,39,57,44,43,44,50,39],[89,30,76,30,80,55,19,55,24,30,5,32,1,82,74,70,95,86,89,30]];
+const i70 = [[76,0,0,9,28,98,47,51,75,96,76,16,100,46,76,0]];
+const i71 = [[0,0,0,100,92,100,100,52,92,0]];
+const i72 = [[0,100,0,0,92,0,100,50,92,100]];
+const i73 = [[0,100,100,76,100,0,0,54,0,100]];
+const i74 = [[0,100,0,0,92,0,100,50,92,100,0,100]];
+const i75 = [[0,79,100,100,100,0,0,27,0,79]];
+const i76 = [[0,0,0,100,92,100,100,52,92,0,0,0]];
+const i77 = [[0,46,100,100,100,19,0,0,0,46]];
+const i78 = [[0,36,100,100,100,43,0,0,0,36]];
+const i79 = [[99,88,97,91,99,88],[97,18,75,59,60,43,58,53,57,32,43,39,53,12,66,17,76,5,97,18],[61,36,60,32,61,36],[65,7,61,10,65,7],[46,29,44,23,46,29],[43,42,48,38,55,42,60,53,51,80,48,58,41,53,43,42],[40,11,35,24,29,7,34,0,40,11],[30,4,23,10,26,5,22,4,30,4],[13,13,13,16,13,13],[19,17,14,15,19,17],[30,20,29,25,23,14,30,20],[12,18,32,32,20,49,37,70,26,99,26,59,1,25,12,18],[58,72,60,67,58,72],[76,61,79,67,76,61],[82,62,82,66,82,62],[91,68,87,64,91,68],[81,79,90,70,92,86,82,84,81,79]];
+const i80 = [[99,37,30,0,1,38,32,14,61,100,68,14,99,37]];
+const i81 = [[100,94,95,100,2,99,2,1,98,1,100,94]];
+const i82 = [[100,94,90,100,1,97,1,4,99,3,100,94]];
+const i83 = [[100,0,14,0,0,100]];
+const i84 = [[0,0,86,0,100,100]];
+const i85 = [[0,100,86,100,100,0]];
+const i86 = [[100,100,14,100,0,0]];
+const i87 = [[100,86,0,86,0,100,100,100,100,86],[100,72,0,72,0,86,100,86,100,72],[100,58,0,58,0,72,100,72,100,58],[100,43,0,43,0,57,100,57,100,43],[100,29,0,29,0,43,100,43,100,29],[100,15,0,15,0,28,100,28,100,15],[100,0,0,0,0,14,100,14,100,0]];
+const i88 = [[100,0,0,0,0,100,100,100,100,0]];
+const i89 = [[100,99,0,99,0,0,0,100,100,99]];
+const i90 = [[100,0,0,0,0,100,100,100]];
+const i91 = [[0,0,0,100,100,100,100,0]];
+const i92 = [[0,41,28,2,43,100,71,41,86,70,100,44,86,69,72,40,43,98,29,0,0,41]];
+const i93 = [[0,67,14,36,43,92,86,2,100,46,86,0,43,91,14,35,0,67]];
+const i94 = [[0,79,14,49,28,57,43,100,57,13,72,38,100,0,72,37,57,12,43,98,29,56,14,48,0,79]];
+const i95 = [[86,7,0,0,7,61,30,96,57,96,95,61,86,7],[86,57,86,18,95,37,86,57]];
+const i96 = [[0,0,21,80,43,99,63,97,88,62,100,0,0,0]];
+const i97 = [[62,100,84,74,51,31,78,0,24,39,62,100]];
+const i98 = [[100,34,63,0,25,34,40,61,92,75,100,34],[41,39,41,29,41,39],[56,39,56,29,56,39],[70,39,70,29,70,39],[86,39,86,29,86,39],[21,39,24,27,1,51,8,100,72,70,36,66,21,39]];
+const i99 = [[81,67,86,97,86,2,49,67,2,82,39,98,81,67]];
+const i100 = [[0,14,0,90,11,100,11,0,0,14],[16,100,80,100,80,0,16,0,16,100],[92,0,85,100,100,88,100,12,92,0]];
+const i101 = [[13,100,24,29,100,100,85,4,12,7,13,100]];
+const i102 = [[51,0,0,16,14,94,100,84,98,14,51,0],[43,27,18,16,68,16,43,27]];
+const i103 = [[90,0,51,66,0,0,43,100,90,0]];
+const i104 = [[100,100,75,0,7,3,0,100,100,100]];
+const i105 = [[86,0,4,5,7,98,96,95,100,14,86,0],[85,78,11,72,85,78],[85,54,11,48,85,44,85,54],[85,31,11,25,85,21,85,31]];
+const i106 = [[90,0,5,3,6,98,29,48,75,49,95,97,90,0],[14,39,14,14,14,39],[30,39,30,14,30,39]];
+const i107 = [[49,75,72,14,2,14,93,11,49,75],[46,84,61,96,34,96,46,84]];
+const i108 = [[100,8,86,0,14,0,2,4,1,95,16,100,86,100,98,96,100,8],[42,2,61,3,42,2],[58,97,40,95,61,94,58,97],[95,91,6,91,6,9,95,9,95,91]];
+const i109 = [[100,100,0,76,0,0,100,54,100,100]];
+const i110 = [[100,79,0,100,0,0,100,27,100,79]];
+const i111 = [[100,46,0,100,0,19,100,0,100,46]];
+const i112 = [[100,36,0,100,0,43,100,0,100,36]];
+const i113 = [[99,78,55,75,27,9,6,10,45,84,81,98,99,78],[18,3,34,31,18,3],[81,77,66,69,97,78,81,77]];
+const i114 = [[73,94,4,74,33,4,73,94],[65,32,40,39,37,66,55,61,65,32]];
+
+// 1. CONSTRUCTION
+function slide1(pptx) {
+  const sl = pptx.addSlide();
+  imgBox(sl, 0, 0, 1000, 465);
+  box(sl, 700, 356, 200, 206, Y2);
+  t(sl, "www.company.com", 100, 456, 592, 30, { s: 12, a: 'r' });
+  t(sl, "CONSTRUCTION", 33, 396, 658, 69, { s: 35, c: W, b: 1, a: 'r', v: 'b' });
+  sh(sl, 'frame', 774, 396, 52, 52, W);
+  t(sl, [{ t: "YOUR" }, { t: "LOGO", o: { b: 1 } }], 700, 455, 200, 37, { s: 16, c: W, a: 'c' });
+}
+
+// 2. (cover)
+function slide2(pptx) {
+  const sl = pptx.addSlide();
+  t(sl, "TABLE OF AGENDA", 100, 51, 800, 40, { c: Y2, b: 1, a: 'c', v: 'b' });
+  t(sl, L1, 100, 87, 800, 29, { s: 10.5, a: 'c' });
+  ts(sl, 'rect', "02", 475, 523, 50, 41, { f: Y2, s: 10, c: W, a: 'c', v: 'm' });
+  [
+    [112,190,"INTRODUCTION","ABOUT US"], [312,190,"COMPANY","STRUCTURES"],
+    [512,190,"OUR","EXPERT TEAMS"], [712,190,"OUR","PORTFOLIOS"],
+    [112,321,"CUSTOMER","COMMENTS"], [312,321,"OUR","TARGETS"], [512,321,"SIMPLE","INFOGRAPHIC"],
+    [712,321,"GET","IN TOUCH"],
+  ].forEach(([a, b, c, e]) => ts(sl, 'rect', [{ t: c, o: { br: 1 } }, { t: e, o: { c: Y2, b: 1 } }], a, b, 175, 100, { l: Y2, s: 10.5, c: G }));
+  [
+    [178,266,"08.00 "], [378,266,"08.30 "], [578,266,"09.00 "], [778,266,"09.30 "],
+    [178,398,"10.00 "], [378,398,"10.30 "], [578,398,"11.00 "], [778,398,"11.30 "],
+  ].forEach(([a, b, c]) => ts(sl, 'rect', [{ t: c }, { t: "AM", o: { s: 10, c: G } }], a, b, 119, 34, { f: W, s: 14, a: 'r', v: 'b' }));
+}
+
+// 3. YES!!
+function slide3(pptx) {
+  const sl = pptx.addSlide();
+  [
+    [0,200,"CLEAN","& SMART"], [700,300,"MINIMAL DESIGNS","CLEAN LAYOUT"],
+  ].forEach(([a, b, c, e]) => ts(sl, 'rect', [{ t: c, o: { br: 1 } }, { t: e }], a, 381, b, 181, { f: Y2, l: W, s: 16, c: W, a: 'c', v: 'm' }));
+  ts(sl, 'rect', "PROFESSIONAL", 200, 0, 200, 181, { f: Y2, l: W, s: 14, c: W, a: 'c', v: 'm' });
+  ts(sl, 'rect', [{ t: "YES!!", o: { br: 1 } }, { t: "WE ARE" }], 200, 281, 500, 200, { f: W, ft: 25, l: W, s: 36, a: 'c', v: 'm' });
+  [
+    [0,0,200,181], [0,181,200,200], [400,0,300,181], [700,0,100,281], [800,0,200,381],
+    [700,281,100,100], [200,181,500,381],
+  ].forEach(([a, b, c, e]) => imgBox(sl, a, b, c, e));
+}
+
+// 4. (cover)
+function slide4(pptx) {
+  const sl = pptx.addSlide();
+  [
+    [0,0,300,181], [300,0,400,281], [700,0,100,181], [800,0,200,181], [0,181,200,200],
+    [200,181,100,200], [300,281,200,100], [0,381,100,182], [100,381,200,182], [300,381,200,181],
+    [500,481,200,81], [500,282,300,200], [700,181,100,100], [800,181,200,381], [700,481,100,81],
+  ].forEach(([a, b, c, e]) => imgBox(sl, a, b, c, e));
+}
+
+// 5. OUR PORTFOLIO
+function slide5(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "05", "OUR PORTFOLIO", L1, Y2);
+  [
+    [100,164], [300,164], [500,164], [700,164], [100,322], [300,322], [500,322], [700,322],
+  ].forEach(([a, b]) => imgBox(sl, a, b, 200, 125));
+  [
+    [100,289,"Portfolio 01"], [300,289,"Portfolio 02"], [500,289,"Portfolio 03"],
+    [700,289,"Portfolio 04"], [100,447,"Portfolio 05"], [300,447,"Portfolio 06"],
+    [500,447,"Portfolio 07"], [700,447,"Portfolio 08"],
+  ].forEach(([a, b, c]) => ts(sl, 'rect', c, a, b, 200, 33, { l: Y2, s: 8.5, c: G, a: 'c', v: 'm' }));
+  [
+    [196,282], [396,282], [596,282], [796,282], [196,441], [396,441], [596,441], [796,441],
+  ].forEach(([a, b]) => sh(sl, 'triangle', a, b, 8, 7, W));
+}
+
+// 6. PRODUCT COMPARISON
+function slide6(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "06", "PRODUCT COMPARISON", L2, Y2);
+  [
+    [100,"PORTFOLIO 01"], [300,"PORTFOLIO 02"], [500,"PORTFOLIO 03"], [700,"PORTFOLIO 04"],
+  ].forEach(([a, b]) => ts(sl, 'rect', b, a, 289, 200, 33, { l: Y2, s: 8.5, c: G, a: 'c', v: 'm' }));
+  [196, 396, 596, 796].forEach(a => sh(sl, 'triangle', a, 282, 8, 7, W));
+  ts(sl, 'rect', [{ t: "$500 – $600", o: { bu: '2713', br: 1 } }, { t: "Made in Korea", o: { bu: '2713', br: 1 } }, { t: "1 year warranty", o: { bu: '2713' } }], 100, 322, 200, 143, { l: Y2, s: 9, ls: 1.5, m: [14.4, 14.4, 14.4, 7.2] });
+  [
+    [300,"$700 – $800","Made in Japan","1,5 year warranty"],
+    [500,"$900 – $1000","Made in Germany","2 years warranty"],
+  ].forEach(([a, b, c, e]) => ts(sl, 'rect', [{ t: b, o: { bu: '2713', br: 1 } }, { t: c, o: { bu: '2713', br: 1 } }, { t: e, o: { bu: '2713', br: 1 } }, { t: "Europe support", o: { bu: '2713' } }], a, 322, 200, 143, { l: Y2, s: 9, ls: 1.5, m: [14.4, 14.4, 14.4, 7.2] }));
+  ts(sl, 'rect', [{ t: "$1100 – $2000", o: { bu: '2713', br: 1 } }, { t: "Made in USA", o: { bu: '2713', br: 1 } }, { t: "5 years warranty", o: { bu: '2713', br: 1 } }, { t: "International Warranty", o: { bu: '2713', br: 1 } }, { t: "Europe Support", o: { bu: '2713' } }], 700, 322, 200, 143, { l: Y2, s: 9, ls: 1.5, m: [14.4, 14.4, 14.4, 7.2] });
+  [100, 300, 500, 698].forEach(a => imgBox(sl, a, 164, 200, 125));
+}
+
+// 7. PRODUCT COMPARISON 2
+function slide7(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "07", "PRODUCT COMPARISON 2", L2, Y2);
+  [
+    [306,G2], [340,W], [373,G2], [406,W], [440,G2],
+  ].forEach(([a, b]) => box(sl, 100, a, 200, 33, { f: b, l: W, lw: 0.5 }));
+  [
+    [300,306,G2], [300,340,W], [300,373,G2], [300,406,W], [300,440,G2], [500,306,G2],
+    [500,340,W], [500,373,G2], [500,406,W], [500,440,G2], [700,306,G2], [700,340,W],
+    [700,373,G2], [700,406,W], [700,440,G2],
+  ].forEach(([a, b, c]) => box(sl, a, b, 200, 33, c));
+  ts(sl, 'rect', "Specifications", 100, 181, 200, 125, { f: G2, l: W, lw: 0.5, s: 16, c: G, a: 'c', v: 'm' });
+  [
+    [306,"Price"], [340,"Made in"], [373,"Multi color"], [406,"International warranty"],
+    [440,"Cash back 20%"],
+  ].forEach(([a, b]) => ts(sl, 'rect', b, 100, a, 200, 33, { l: W, lw: 0.5, s: 8, a: 'c', v: 'm' }));
+  [
+    [300,306,"$ 1000"], [300,340,"China"], [500,306,"$ 1200"], [500,340,"France"],
+    [700,306,"$ 1500"], [700,340,"Germany"],
+  ].forEach(([a, b, c]) => t(sl, c, a, b, 200, 33, { s: 8, a: 'c', v: 'm' }));
+  [
+    [790,415], [790,448], [590,448], [790,381],
+  ].forEach(([a, b]) => icon(sl, i0, a, b, 20, 17, { f: "39B54A" }));
+  [
+    [595,417], [395,417], [395,450], [395,384], [595,384],
+  ].forEach(([a, b]) => icon(sl, i1, a, b, 11, 12, { f: "ED1C24" }));
+  [
+    [300,"PRODUCT NAME 01"], [500,"PRODUCT NAME 02"], [700,"PRODUCT NAME 03"],
+  ].forEach(([a, b]) => t(sl, b, a, 148, 200, 33, { s: 8, c: G, a: 'c', v: 'm' }));
+  [300, 500, 700].forEach(a => imgBox(sl, a, 181, 200, 125));
+}
+
+// 8. PROS & CONS COMPARISON
+function slide8(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "08", "PROS & CONS COMPARISON", "PLACEHOLDER", Y2);
+  [246, 559].forEach(a => t(sl, L4, a, 352, 254, 68, { s: 8, v: 'm', ls: 1.5 }));
+  [
+    246, 559,
+  ].forEach(a => t(sl, "Lorem ipsum dolor sit amet  kolor suum ata si memet ta pleu bak muka keu ubat gaki sagai dan ubat ceumeukam", a, 429, 254, 68, { s: 8, v: 'm', ls: 1.5 }));
+  [[200,362], [200,438], [514,362], [514,438]].forEach(([a, b]) => el(sl, a, b, 33, 33, { l: G, lw: 0.5 }));
+  [209, 522].forEach(a => icon(sl, i2, a, 370, 17, 17, { f: GN2 }));
+  [209, 522].forEach(a => box(sl, a, 452, 17, 6, RD));
+  [202, 514].forEach(a => imgBox(sl, a, 156, 282, 176));
+}
+
+// 9. PRODUCT DETAIL
+function slide9(pptx) {
+  const sl = pptx.addSlide();
+  t(sl, "PRODUCT DETAIL", 100, 44, 800, 50, { s: 24, c: Y2, b: 1, a: 'c', v: 'b' });
+  ts(sl, 'rect', "09", 475, 523, 50, 41, { f: Y2, s: 11, c: W, a: 'c', v: 'm' });
+  t(sl, L1, 100, 87, 800, 30, { s: 12, a: 'c' });
+  t(sl, "PLACEHOLDER", 525, 190, 375, 75, { s: 9, v: 'b', ls: 1.5 });
+  [
+    [156,"PRODUCT INFO"], [284,"SPECIFICATION"], [388,"FINAL PRICE"],
+  ].forEach(([a, b]) => t(sl, b, 525, a, 375, 30, { s: 12, c: Y2, b: 1 }));
+  t(sl, [{ t: "Photo by : " }, { t: "Mr. John Doe,", o: { b: 1 } }, { t: " Date : " }, { t: "15 Feb 2014,", o: { b: 1 } }, { t: " Category : " }, { t: "Furniture Design,", o: { b: 1 } }, { t: " Client : " }, { t: "Mr. Joemathys,", o: { b: 1 } }, { t: " Rating : 4" }], 525, 315, 375, 52, { s: 9, ls: 1.5 });
+  t(sl, [{ t: "1.234 " }, { t: "$", o: { s: 20, c: G } }], 523, 416, 217, 71, { s: 36, v: 'b' });
+  [
+    [535,G1], [548,G1], [561,G1], [575,G1], [588,G1], [535,Y2], [548,Y2], [562,Y2], [575,Y2],
+  ].forEach(([a, b]) => star(sl, a, 185, 11, 11, b));
+  imgBox(sl, 100, 163, 400, 225);
+  [100, 198, 298, 398].forEach(a => imgBox(sl, a, 397, 100, 75));
+}
+
+// 10. CUSTOMER REVIEW
+function slide10(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "10", "CUSTOMER REVIEW", L1, Y2);
+  icon(sl, i3, 524, 181, 376, 125, { l: Y2 });
+  t(sl, [{ t: "Mr. Joemathys", o: { br: 1 } }, { t: "(Product Analyst)", o: { s: 8, c: G, b: 0 } }], 517, 408, 125, 50, { s: 9, b: 1, v: 'm', ls: 1.5 });
+  sh(sl, 'line', 642, 323, 0, 126, { l: Y, lw: 0.5 });
+  [
+    [317,"Lorem ipsum dolor sit amet  kolor suum ata si memet ta pleu bak muka keu ubat mata"],
+    [394,"Lorem ipsum dolor sit amet  kolor suum ata si memet ta pleu bak muka keu ubat gaki sagai"],
+  ].forEach(([a, b]) => t(sl, b, 721, a, 179, 61, { s: 7, v: 'm', ls: 1.5 }));
+  [324, 400].forEach(a => el(sl, 675, a, 33, 33, { l: G, lw: 0.5 }));
+  icon(sl, i2, 683, 332, 17, 17, { f: GN2 });
+  box(sl, 683, 414, 17, 6, RD);
+  t(sl, "“ In the last two years, my life has completely changed. I always think I am very lucky to have joined this great company ”", 542, 195, 342, 82, { s: 10, v: 'm', ls: 1.5 });
+  imgBox(sl, 100, 181, 400, 269);
+  imgBox(sl, 524, 323, 75, 75);
+}
+
+// 11. CHECK OUT
+function slide11(pptx) {
+  const sl = pptx.addSlide();
+  box(sl, 100, 81, 8, 54, Y2);
+  t(sl, [{ t: "CHECK OUT", o: { br: 1 } }, { t: "EVERYTHING ABOUT US", o: { c: K, b: 1 } }], 110, 69, 390, 77, { s: 20, c: G4 });
+  sh(sl, 'arc', 92, 365, 125, 125, { ar: [270, 57.4], l: Y2 });
+  t(sl, "“ We are the best graphic design company or market place in the world ”", 110, 208, 306, 124, { s: 15, c: G, ls: 1.5 });
+  t(sl, [{ t: "Mr. John Doe", o: { br: 1 } }, { t: "(General Manager)", o: { c: G, b: 0 } }], 220, 436, 167, 52, { s: 9, b: 1, v: 'm', ls: 1.5 });
+  box(sl, 900, 181, 100, 300, Y2);
+  imgBox(sl, 100, 377, 104, 104);
+  imgBox(sl, 450, 181, 450, 300);
+}
+
+// 12. COMPANY TIMELINE
+function slide12(pptx) {
+  const sl = pptx.addSlide();
+  t(sl, "COMPANY TIMELINE", 100, 41, 800, 50, { s: 24, b: 1, a: 'c', v: 'b' });
+  ts(sl, 'rect', "12", 475, 523, 50, 41, { f: W, s: 11, c: W, a: 'c', v: 'm' });
+  t(sl, L1, 100, 87, 800, 30, { s: 12, a: 'c' });
+  [
+    [0,1000,G1], [0,178,Y2], [191,297,Y2], [500,296,Y2], [808,191,Y2],
+  ].forEach(([a, b, c]) => box(sl, a, 332, b, 8, c));
+  [178, 488, 796].forEach(a => el(sl, a, 324, 25, 25, { f: G, l: W, lw: 3 }));
+  [
+    100, 408, 717,
+  ].forEach(a => icon(sl, i4, a, 365, 183, 42, { f: G2, s: 9, a: 'c', v: 'm', m: [7.2, 7.2, 3.6, 7.2] }));
+  [100, 408, 717].forEach(a => box(sl, a, 406, 183, 5, W));
+  [
+    100, 408, 717,
+  ].forEach(a => icon(sl, i5, a, 273, 183, 35, { f: W, s: 9, c: W, a: 'c', m: [7.2, 7.2, 3.6, 3.6] }));
+  [100, 408, 717].forEach(a => t(sl, L3, a, 420, 183, 88, { s: 8, a: 'c', ls: 1.5 }));
+  [100, 408, 717].forEach(a => imgBox(sl, a, 156, 183, 117));
+}
+
+// 13. (cover)
+function slide13(pptx) {
+  const sl = pptx.addSlide();
+  ts(sl, 'rect', "13", 475, 523, 50, 41, { f: W, s: 11, c: W, a: 'c', v: 'm' });
+  [
+    [0,1000,G], [0,178,Y2], [191,297,Y2], [500,296,Y2], [808,191,Y2],
+  ].forEach(([a, b, c]) => box(sl, a, 332, b, 8, c));
+  [178, 488, 796].forEach(a => el(sl, a, 324, 25, 25, { f: G, l: W, lw: 3 }));
+  [
+    100, 408, 717,
+  ].forEach(a => icon(sl, i4, a, 365, 183, 42, { f: G2, s: 9, a: 'c', v: 'm', m: [7.2, 7.2, 3.6, 7.2] }));
+  [100, 408, 717].forEach(a => box(sl, a, 406, 183, 5, W));
+  [
+    100, 408, 717,
+  ].forEach(a => icon(sl, i5, a, 273, 183, 35, { f: W, s: 9, c: W, a: 'c', m: [7.2, 7.2, 3.6, 3.6] }));
+  [100, 408, 717].forEach(a => t(sl, L3, a, 420, 183, 88, { s: 8, a: 'c', ls: 1.5 }));
+  [100, 408, 717].forEach(a => imgBox(sl, a, 156, 183, 117));
+}
+
+// 14. OUR EXPERT TEAM
+function slide14(pptx) {
+  const sl = pptx.addSlide();
+  t(sl, " OUR EXPERT TEAM", 100, 41, 800, 50, { s: 24, c: Y2, b: 1, a: 'c', v: 'b' });
+  ts(sl, 'rect', "14", 475, 523, 50, 41, { f: W, s: 11, c: W, a: 'c', v: 'm' });
+  t(sl, L1, 100, 87, 800, 30, { s: 12, a: 'c' });
+  [
+    [106,"MRS. ELIZABETH","Creative Director"], [306,"MR. HIM BONDING","Sales Director"],
+    [506,"MR. JOHN DOE","Technical Director"], [706,"MRS. KAK BUNGSU","Account Director"],
+  ].forEach(([a, b, c]) => t(sl, [{ t: b, o: { br: 1 } }, { t: c, o: { s: 9, c: G, b: 0 } }], a, 340, 186, 58, { s: 10, c: Y2, b: 1, ls: 1.5 }));
+  [
+    106, 306, 506, 706,
+  ].forEach(a => t(sl, "Lorem ipsum dolor sit amet  kolor suum ata si memet ta pleu bak muka keu ubat", a, 404, 186, 68, { s: 8, v: 'm', ls: 1.5 }));
+  [116, 317, 516, 715].forEach(a => imgBox(sl, a, 165, 167, 167));
+}
+
+// 15. SINGLE TEAM INFO
+function slide15(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "15", "SINGLE TEAM INFO", L1, Y2);
+  [
+    [317,267,"MR. JOHN DOE","GENERAL MANAGER"], [614,283,"SKILL INFOGRAPHIC","ABOUT HIS SKILL"],
+  ].forEach(([a, b, c, e]) => t(sl, [{ t: c, o: { br: 1 } }, { t: e, o: { s: 8, c: G } }], a, 165, b, 61, { s: 12, c: Y2, ls: 1.5 }));
+  t(sl, [{ t: "Lorem ipsum dolor sit amet dan kolor suum ata si memet ata si memet ata si memet ata si memet ata si memet ata si memet ata si memet hayeu that.", o: { br: 1 } }, { t: "", o: { br: 1 } }, { t: "Meunyoe dilee boh meuria dalam paya hana soe kuet, tp jinoe boh meuria dalam paya ka abeh dikuet, han ditupu boh meuria teuglong mata watee ta ‘uet. Makajih bek pajoh boh meuria sembarangan" }], 317, 233, 267, 257, { s: 9, ls: 1.5 });
+  [[120,370], [119,394], [119,419], [119,444]].forEach(([a, b]) => el(sl, a, b, 20, 20, Y2));
+  [
+    [127,373,6,13,i6], [122,398,13,11,i7], [123,422,11,12,i8], [120,449,18,9,i9],
+  ].forEach(([a, b, c, e, g]) => icon(sl, g, a, b, c, e, { f: W }));
+  [
+    [140,367,25,"John_doe55"], [139,391,40,"Sijohn_teuga_twitt55"],
+    [139,416,25,"Kapluk_main_gugel"], [139,441,25,"Candu_devian_art55"],
+  ].forEach(([a, b, c, e]) => t(sl, e, a, b, 150, c, { s: 9, c: G, i: 1 }));
+  [
+    [238,"Adobe Photoshop"], [290,"Adobe Illustrator"], [341,"Adobe InDesign"],
+    [392,"Adobe Premiere"],
+  ].forEach(([a, b]) => t(sl, b, 614, a, 186, 25, { s: 9, c: G, b: 1 }));
+  [
+    [265,275,G1], [265,200,Y2], [316,275,G1], [316,217,Y2], [367,275,G1], [367,183,Y2],
+    [418,275,G1], [418,258,Y2],
+  ].forEach(([a, b, c]) => box(sl, 625, a, b, 8, c));
+  [
+    [238,"75%"], [290,"80%"], [341,"70%"], [392,"95%"],
+  ].forEach(([a, b]) => t(sl, b, 802, a, 108, 25, { s: 9, c: G, b: 1, a: 'r' }));
+  imgBox(sl, 100, 168, 175, 175);
+}
+
+// 16. ARTICLE WITH PHOTO
+function slide16(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "16", "ARTICLE WITH PHOTO", L2, Y2);
+  t(sl, [{ t: "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more", o: { br: 1 } }, { t: "", o: { br: 1 } }, { t: "recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum. Lorem Ipsum is simply dummy text of the printing and typesetting indust Lorem ipsum dolor when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries," }], 408, 160, 492, 293, { s: 8, ls: 1.5, m: [0, 7.2, 3.6, 3.6] });
+  imgBox(sl, 100, 173, 275, 200);
+}
+
+// 17. CHECK OUT
+function slide17(pptx) {
+  const sl = pptx.addSlide();
+  t(sl, [{ t: "CHECK OUT", o: { br: 1 } }, { t: "OUR BEST PRODUCTS", o: { c: K, b: 1 } }], 567, 77, 333, 77, { s: 20, c: G4 });
+  sh(sl, 'arc', 558, 213, 125, 125, { ar: [270, 57.4], l: Y2 });
+  t(sl, "“ We have amazing products for your great business, check it out now, enjoy it! ”", 554, 363, 346, 118, { s: 15, c: G, ls: 1.5 });
+  t(sl, [{ t: "Mr. Joemathys", o: { br: 1 } }, { t: "(Product Manager)", o: { c: G, b: 0 } }], 686, 283, 167, 52, { s: 9, b: 1, v: 'm', ls: 1.5 });
+  box(sl, 0, 171, 51, 303, Y2);
+  box(sl, 554, 87, 8, 54, Y2);
+  imgBox(sl, 51, 171, 449, 303);
+  imgBox(sl, 566, 225, 104, 104);
+}
+
+// 18. ABOUT US
+function slide18(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "18", "ABOUT US", L1, Y2);
+  t(sl, "Lorem ipsum dolor sit amet kuah tuhee jampue pisang wak ta lawok lawuk hayeu that lagee bu leukat watee maulod, alahai dek gam bek gosip keugob beh, desya teuh", 525, 206, 375, 98, { s: 9, ls: 1.5 });
+  [
+    [173,"WELCOME TO OUR AGENCY"], [300,"OUR SPECIALIZATION"],
+  ].forEach(([a, b]) => t(sl, b, 525, a, 375, 30, { s: 12, c: Y2, b: 1 }));
+  [341, 369, 397, 425].forEach(a => rr(sl, 537, a, 363, 23, Y2));
+  [
+    [341,322,"WEB DESIGN"], [369,338,"INTERIOR DESIGN"], [397,247,"ONLINE MARKETING"],
+    [425,313,"BUILDING CONSTRUCTION"],
+  ].forEach(([a, b, c]) => ts(sl, 'roundRect', c, 537, a, b, 23, { f: Y2, s: 8.5, c: W, v: 'm' }));
+  imgBox(sl, 100, 181, 400, 267);
+}
+
+// 19. OUR VISION
+function slide19(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "19", "OUR VISION", L1, Y2);
+  [
+    [246,"Lorem ipsum dolor sit amet kuah tuhee jampue pisang wak ta lawok lawuk hayeu that lagee bu leukat watee maulod, alahai dek gam bek gosip keugob beh, desya teuh bek teuga that peugah keu gob meulikot beh, desya teuh, rugo seumayang"],
+    [417,"Lorem ipsum dolor sit amet kuah tuhee jampue pisang wak ta lawok lawuk hayeu that lagee bu leukat watee maulod, alahai dek gam bek gosip keugob beh, desya teuh rugoe mantong seumayang"],
+  ].forEach(([a, b]) => t(sl, b, 100, a, 800, 53, { s: 9, a: 'c', ls: 1.5 }));
+  [
+    [212,"PROFESSIONALS"], [384,"COLLABORATION"],
+  ].forEach(([a, b]) => t(sl, b, 100, a, 800, 30, { s: 12, c: Y2, b: 1, a: 'c' }));
+  [
+    [156,42,i10], [360,13,i11], [353,13,i12], [347,13,i11], [331,21,i13],
+  ].forEach(([a, b, c]) => icon(sl, c, 475, a, 50, b, { f: Y2 }));
+}
+
+// 20. OUR MISSION
+function slide20(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "20", "OUR MISSION", L1, Y2);
+  [[121,165], [521,165], [121,339], [521,339]].forEach(([a, b]) => el(sl, a, b, 67, 67, { l: Y2 }));
+  [
+    [198,214], [598,214], [198,388], [598,388],
+  ].forEach(([a, b]) => t(sl, "PLACEHOLDER", a, b, 282, 75, { s: 9, v: 'm', ls: 1.5 }));
+  [
+    [198,185,"PROJECTING"], [598,185,"PROMOTING"], [198,359,"PRODUCTING"], [598,359,"SUPPORT"],
+  ].forEach(([a, b, c]) => t(sl, c, a, b, 282, 30, { s: 12, c: Y2, b: 1 }));
+  [
+    [138,184,34,25,i14], [135,352,40,40,i15], [539,184,31,27,i16], [538,355,34,34,i17],
+  ].forEach(([a, b, c, e, g]) => icon(sl, g, a, b, c, e, { f: Y2 }));
+  box(sl, 140, 186, 29, 18, W);
+  box(sl, 151, 209, 8, 2, Y2);
+  box(sl, 145, 211, 21, 2, Y2);
+}
+
+// 21. WHAT PEOPLE LOOKING FOR
+function slide21(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "21", "WHAT PEOPLE LOOKING FOR", "PLACEHOLDER", Y2);
+  [103, 395, 686].forEach(a => box(sl, a, 174, 208, 40, { f: W, l: G }));
+  [270, 270, 561, 561, 853, 853].forEach(a => box(sl, a, 175, 42, 39, G1));
+  [
+    [111,"I need more traffic"], [403,"I need higher ranks"], [694,"I want to be a winner"],
+  ].forEach(([a, b]) => t(sl, b, a, 177, 158, 34, { s: 9, c: G, v: 'm' }));
+  [
+    [103,"Yes, We have"], [396,"Of Course"], [686,"Yes, Sure!"],
+  ].forEach(([a, b]) => t(sl, b, a, 210, 208, 67, { s: 14, c: Y2, a: 'c', v: 'm' }));
+  [103, 396, 686].forEach(a => t(sl, L3, a, 413, 208, 68, { s: 8, a: 'c', ls: 1.5 }));
+  [
+    [144,"MORE TRAFFIC"], [436,"HIGHER RANKS"], [727,"I AM WINNER"],
+  ].forEach(([a, b]) => ts(sl, 'ellipse', b, a, 273, 127, 127, { f: W, l: G, s: 8, c: G, a: 'c', v: 'b', m: [0, 0, 14.4, 0] }));
+  [
+    [184,301,40,35,i16], [479,301,42,35,i10], [769,296,43,42,i19],
+  ].forEach(([a, b, c, e, g]) => icon(sl, g, a, b, c, e, { f: Y2 }));
+  [282, 573, 864].forEach(a => icon(sl, i18, a, 186, 18, 18, { f: W }));
+}
+
+// 22. WHAT THE RESULT
+function slide22(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "22", "WHAT THE RESULT", L2, Y2);
+  [
+    [192,303,308,96], [321,303,179,121], [167,303,336,29], [503,199,197,104], [499,240,284,63],
+  ].forEach(([a, b, c, e]) => sh(sl, 'line', a, b, c, e, { fh: 1, l: G4 }));
+  [
+    [225,285,278,17], [167,211,333,91], [503,304,222,3], [503,304,281,76], [500,304,166,119],
+    [499,304,84,127],
+  ].forEach(([a, b, c, e]) => sh(sl, 'line', a, b, c, e, { fh: 1, fv: 1, l: G4 }));
+  sh(sl, 'line', 346, 215, 153, 88, { l: G4 });
+  ts(sl, 'ellipse', [{ t: "YOUR PRODUCTS", o: { br: 1 } }, { t: "WILL BECOME", o: { c: K, br: 1 } }, { t: "POPULAR" }], 375, 174, 250, 250, { f: W, l: G, s: 10, c: G, a: 'c', v: 'b', m: [0, 0, 14.4, 0] });
+  icon(sl, i20, 488, 268, 65, 35, { f: Y2, l: W, lw: 3 });
+  [
+    [510,235,26,26], [467,224,32,31], [735,301,12,12], [750,301,12,12],
+  ].forEach(([a, b, c, e]) => el(sl, a, b, c, e, Y2));
+  icon(sl, i21, 447, 260, 75, 43, { f: Y2, l: W, lw: 3 });
+  [
+    [697,165], [783,211], [723,282], [781,362], [658,411], [570,428], [276,413], [148,384],
+    [118,307], [175,257], [117,179], [302,174],
+  ].forEach(([a, b]) => el(sl, a, b, 50, 50, { f: W, l: G4, lw: 0.5 }));
+  [
+    [709,179,26,21,i7], [796,224,25,25,i22], [799,373,13,27,i6], [671,425,25,24,i23],
+    [583,441,22,25,i8], [290,425,24,24,i24], [155,400,37,18,i9], [132,318,21,28,i25],
+    [187,273,14,17,i26], [201,277,14,13,i27], [127,190,28,28,i28], [310,189,8,14,i29],
+    [325,193,8,14,i30], [334,193,8,14,i31],
+  ].forEach(([a, b, c, e, g]) => icon(sl, g, a, b, c, e, { f: Y2 }));
+  box(sl, 205, 273, 7, 2, Y2);
+  box(sl, 320, 193, 3, 10, Y2);
+  box(sl, 320, 189, 3, 3, Y2);
+}
+
+// 23. OUR MAIN FOCUS
+function slide23(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "23", "OUR MAIN FOCUS", L1, Y2);
+  [[350,164], [500,164], [426,294]].forEach(([a, b]) => el(sl, a, b, 150, 150, { l: Y2 }));
+  [
+    [389,218,55,24,i32], [554,218,42,41,i18], [482,356,37,35,i34], [170,356,38,38,i35],
+  ].forEach(([a, b, c, e, g]) => icon(sl, g, a, b, c, e, { f: Y2 }));
+  [411, 426].forEach(a => el(sl, a, 251, 9, 8, Y2));
+  icon(sl, i33, 407, 239, 31, 9, { f: W, l: Y });
+  t(sl, "MERKETING", 142, 179, 200, 29, { s: 11, c: Y2, a: 'r' });
+  t(sl, L5, 142, 204, 200, 101, { s: 9, a: 'r', ls: 1.5 });
+  t(sl, "RESEARCH", 658, 179, 200, 29, { s: 11, c: Y2 });
+  [[658,204], [583,343]].forEach(([a, b]) => t(sl, L5, a, b, 200, 101, { s: 9, ls: 1.5 }));
+  t(sl, "EARNING", 400, 456, 200, 29, { s: 11, c: Y2, a: 'c' });
+  t(sl, L5, 212, 348, 200, 61, { s: 7, c: Y2, b: 1, i: 1, ls: 1.5 });
+}
+
+// 24. WHAT CAN WE DO
+function slide24(pptx) {
+  const sl = pptx.addSlide();
+  t(sl, "WHAT CAN WE DO", 100, 41, 800, 50, { s: 24, b: 1, a: 'c', v: 'b' });
+  ts(sl, 'rect', "24", 475, 523, 50, 41, { f: Y2, s: 11, c: W, a: 'c', v: 'm' });
+  t(sl, L1, 100, 87, 800, 30, { s: 12, a: 'c' });
+  [
+    [117,"COPYRIGHTING"], [317,"AUDIO MIXING"], [517,"PHOTOGRAPHY"], [711,"MARKETING"],
+  ].forEach(([a, b]) => ts(sl, 'rect', b, a, 213, 175, 117, { l: Y2, s: 11, a: 'c', v: 'b', m: [7.2, 7.2, 14.4, 3.6] }));
+  [[158,173], [357,172], [557,172], [757,172]].forEach(([a, b]) => el(sl, a, b, 83, 83, { f: W, l: Y2 }));
+  [
+    [181,200,33,33,i36], [204,196,13,13,i37], [389,196,14,35,i38], [410,198,8,30,i39],
+    [407,201,9,25,i40], [581,200,36,26,i41], [779,196,40,35,i16],
+  ].forEach(([a, b, c, e, g]) => icon(sl, g, a, b, c, e, { f: Y2 }));
+  [
+    [111,L5],
+    [311,"PLACEHOLDER"],
+    [511,"PLACEHOLDER"],
+    [711,"PLACEHOLDER"],
+  ].forEach(([a, b]) => t(sl, b, a, 339, 175, 120, { s: 9, a: 'c', ls: 1.5 }));
+  box(sl, 379, 208, 8, 9, Y2);
+}
+
+// 25. SKILLS INFOGRAPHIC
+function slide25(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "25", "SKILLS INFOGRAPHIC", L1, Y2);
+  [
+    [100,148], [300,148], [500,148], [700,148], [200,315], [400,315], [600,315],
+  ].forEach(([a, b]) => ch(sl, 'doughnut', ["1st Qtr", "2nd Qtr"], [70, 30], a, b, 200, 133, [G1, G1], 90));
+  [
+    [70,30,100,148], [85,15,300,148], [40,30,500,148], [50,50,700,148], [90,30,200,315],
+    [100,0,400,315], [70,30,600,315],
+  ].forEach(([a, b, c, e]) => ch(sl, 'doughnut', ["1st Qtr", "2nd Qtr"], [a, b], c, e, 200, 133, [Y2, W], 90));
+  [
+    [100,273,"COPYRIGHTING"], [300,273,"AUDIO"], [500,273,"VIDEO EDITING"],
+    [700,273,"PHOTOGRAPHY"], [200,440,"MARKETING"], [400,440,"GRAPHIC DESIGN"],
+    [600,440,"BRANDING"],
+  ].forEach(([a, b, c]) => t(sl, c, a, b, 200, 25, { s: 9, a: 'c' }));
+  [
+    [181,200,33,33,i36], [204,196,13,13,i37], [389,196,14,35,i38], [410,198,8,30,i39],
+    [407,201,9,25,i40], [782,200,36,26,i41], [280,361,40,35,i16], [580,194,40,40,i15],
+    [485,361,31,41,i42], [682,362,36,35,i43],
+  ].forEach(([a, b, c, e, g]) => icon(sl, g, a, b, c, e, { f: G }));
+  box(sl, 379, 208, 8, 9, G);
+}
+
+// 26. SINGLE SERVICE DETAILS
+function slide26(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "26", "SINGLE SERVICE DETAILS", "Lorem ipsum dolor sit amet kolor suum ata si memet ngon si maun", Y2);
+  t(sl, "GRAPHIC DESIGN", 400, 231, 200, 25, { s: 9, a: 'c' });
+  icon(sl, i42, 485, 163, 31, 41, { f: G });
+  el(sl, 460, 144, 81, 81, { l: Y2 });
+  [150, 400, 650].forEach(a => box(sl, a, 315, 200, 167, { l: Y2 }));
+  [
+    [150,"CORPORATE","IDENTITY"], [400,"PRINT","DESIGN"], [650,"WEB","DESIGN"],
+  ].forEach(([a, b, c]) => t(sl, [{ t: b, o: { br: 1 } }, { t: c }], a, 348, 200, 44, { s: 10, a: 'c' }));
+  [
+    [167,"Logo Design","Signage & Pos","Stationery Design"],
+    [417,"Magazines","Brochures & Catalogue","Advertising Design"],
+    [667,"PSD Design","Wordpress Coding","Joomla Adv"],
+  ].forEach(([a, b, c, e]) => t(sl, [{ t: b, o: { bu: '2713', br: 1 } }, { t: c, o: { bu: '2713', br: 1 } }, { t: e, o: { bu: '2713' } }], a, 396, 183, 71, { s: 8.5, ls: 1.5 }));
+  [150, 400, 650].forEach(a => box(sl, a, 315, 8, 167, Y2));
+  [450, 700, 200].forEach(a => box(sl, a, 281, 100, 60, { f: W, l: Y2 }));
+  [
+    [485,316,10,10,i44], [487,301,23,23,i45], [503,296,12,12,i46], [732,294,24,24,i17],
+    [751,313,15,14,i47], [240,298,21,26,i48], [240,298,8,8,i49],
+  ].forEach(([a, b, c, e, g]) => icon(sl, g, a, b, c, e, { f: Y2 }));
+}
+
+// 27. OUR WORKFLOW
+function slide27(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "27", "OUR WORKFLOW", "Lorem ipsum dolor sit amet kolor suum ata si memet ngon si maun", Y);
+  [
+    [93,198,"PROGRAMMING"], [204,315,"TESTING"], [725,315,"GO GLOBAL"],
+  ].forEach(([a, b, c]) => ts(sl, 'ellipse', c, a, b, 175, 175, { f: W, l: Y, s: 10, c: G, a: 'c', v: 'b', m: [0, 0, 14.4, 3.6] }));
+  [
+    [309,150,231,231,"PRODUCTION /","DEVELOPMENT"], [493,226,267,267,"TURN ON","IDEAS"],
+  ].forEach(([a, b, c, e, g, h]) => ts(sl, 'ellipse', [{ t: g, o: { br: 1 } }, { t: h }], a, b, c, e, { f: W, l: Y, s: 12, c: G, a: 'c', v: 'b', m: [0, 0, 14.4, 3.6] }));
+  [
+    [154,240,53,55,i50], [257,360,70,43,i51], [587,294,76,60,i52], [608,315,57,57,i53],
+    [412,252,27,11,i54], [385,202,79,48,i55], [792,355,42,51,i56],
+  ].forEach(([a, b, c, e, g]) => icon(sl, g, a, b, c, e, { f: Y }));
+  [[750,147], [816,184], [751,223]].forEach(([a, b]) => el(sl, a, b, 76, 76, { l: Y }));
+  ts(sl, 'rect', "INVESTMENT", 710, 173, 109, 24, { f: W, s: 9, c: Y, a: 'r', v: 'm' });
+  [
+    [822,211,"FEEDBACK"], [784,280,"MEASURE"],
+  ].forEach(([a, b, c]) => ts(sl, 'rect', c, a, b, 109, 24, { f: W, s: 9, c: Y, v: 'm' }));
+}
+
+// 28. OTHER PROCESS SAMPLE
+function slide28(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "28", "OTHER PROCESS SAMPLE", "Lorem ipsum dolor sit amet kolor suum ata si memet ngon si maun", Y);
+  [[99,12], [299,11], [500,11], [698,12]].forEach(([a, b]) => el(sl, a, 305, b, 11, Y));
+  [
+    [99,215,36,21.6,i57], [300,331,21.6,36,i58], [500,215,36,21.6,i57], [701,331,21.6,36,i58],
+  ].forEach(([a, b, c, e, g]) => icon(sl, g, a, b, 153, 73, { l: Y, s: 12, c: G, v: 'm', ls: 1.5, m: [14.4, 14.4, c, e] }));
+  [[89,334], [288,208], [489,334], [689,208]].forEach(([a, b]) => t(sl, L6, a, b, 186, 71, { s: 8, ls: 1.5 }));
+  el(sl, 900, 291, 38, 38, W);
+  icon(sl, i59, 907, 301, 22, 19, { f: Y });
+  icon(sl, i60, 900, 291, 39, 39, { f: Y });
+  [125, 326, 526, 726].forEach(a => sh(sl, 'line', a, 310, 127, 0, { l: G3, le: 'arrow' }));
+}
+
+// 29. FINISH
+function slide29(pptx) {
+  const sl = pptx.addSlide();
+  el(sl, 99, 305, 12, 11, Y);
+  el(sl, 299, 305, 11, 11, Y);
+  [
+    [99,215,36,21.6,i57], [300,331,21.6,36,i58],
+  ].forEach(([a, b, c, e, g]) => icon(sl, g, a, b, 153, 73, { l: Y, s: 12, c: G, v: 'm', ls: 1.5, m: [14.4, 14.4, c, e] }));
+  [[89,334], [288,208]].forEach(([a, b]) => t(sl, L6, a, b, 186, 71, { s: 8, ls: 1.5 }));
+  ts(sl, 'rect', "29", 475, 523, 50, 41, { f: Y, s: 11, c: W, a: 'c', v: 'm' });
+  el(sl, 483, 188, 246, 246, { f: W, l: G4 });
+  t(sl, "FINISH", 477, 201, 256, 222, { s: 28, c: Y, a: 'c', v: 'm' });
+  [
+    [783,213,"PAYMENT"], [806,298,"TESTIMONIAL"], [783,385,"GIFT / BONUS"],
+  ].forEach(([a, b, c]) => t(sl, c, a, b, 130, 25, { s: 9, c: Y, b: 1 }));
+  [[704,190], [729,275], [704,361]].forEach(([a, b]) => el(sl, a, b, 73, 73, { f: W, l: Y }));
+  [
+    [731,209,19,35,i61], [748,307,18,24,i62], [762,292,21,19,i63], [737,393,6,21,i64],
+    [728,394,25,21,i65], [730,381,10,11,i66], [741,381,10,11,i67],
+  ].forEach(([a, b, c, e, g]) => icon(sl, g, a, b, c, e, { f: Y }));
+  [125, 326].forEach(a => sh(sl, 'line', a, 310, 127, 0, { l: G3, le: 'arrow' }));
+}
+
+// 30. STEPS TO SUCCESS
+function slide30(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "30", "STEPS TO SUCCESS", L2, Y);
+  [
+    [131,370,77], [331,331,116], [531,292,155], [731,245,200],
+  ].forEach(([a, b, c]) => box(sl, a, b, 136, c, { l: Y }));
+  [
+    [100,"START"], [299,"CONFIDENT"], [499,"DESIGN"], [700,"SUCCESS"],
+  ].forEach(([a, b]) => t(sl, b, a, 459, 200, 30, { s: 12, c: G, a: 'c' }));
+  [
+    [773,322,52,51,i19], [273,245,27,29,i68], [461,196,35,37,i68], [658,144,44,46,i68],
+  ].forEach(([a, b, c, e, g]) => icon(sl, g, a, b, c, e, { f: Y }));
+  [
+    [132,377], [332,357], [532,341],
+  ].forEach(([a, b]) => t(sl, "Lorem ipsum dolor sit amet kuah tuhee jampue pisang wak ta", a, b, 133, 61, { s: 7, a: 'c', ls: 1.5 }));
+  [
+    [193,280], [389,244], [589,200],
+  ].forEach(([a, b]) => sh(sl, 'arc', a, b, 242, 242, { rot: 295.2, ar: [270, 8.3], l: Y, ld: 'lgDash', lh: 'oval', le: 'triangle' }));
+}
+
+// 31. SERVICE DEPARTMENTS
+function slide31(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "31", "SERVICE DEPARTMENTS", "PLACEHOLDER", Y);
+  [116, 316, 516, 716].forEach(a => box(sl, a, 165, 167, 167, { l: Y }));
+  [
+    [172,202,55,54,i69], [373,202,53,55,i50], [572,202,55,48,i16], [785,202,19,48,i38],
+    [815,205,12,42,i39], [810,209,12,34,i40], [212,383,7,15,i70], [212,461,7,15,i70],
+    [411,383,7,15,i70], [411,461,7,15,i70], [613,383,7,15,i70], [613,461,7,15,i70],
+    [813,383,7,15,i70], [813,461,7,15,i70],
+  ].forEach(([a, b, c, e, g]) => icon(sl, g, a, b, c, e, { f: Y }));
+  [
+    [116,273,10,"ADVERTISING"], [316,273,10,"WEB DESIGN"], [516,273,10,"CORP ANALYSIS"],
+    [716,273,10,"PUBLIC RELATIONS"], [106,376,20,"10"], [106,454,20,"23"], [306,376,20,"24"],
+    [306,454,20,"45"], [507,376,20,"32"], [507,454,20,"12"], [707,376,20,"10"],
+    [707,454,20,"43"],
+  ].forEach(([a, b, c, e]) => t(sl, e, a, b, 167, 25, { s: c, c: G, a: 'c', v: 'm' }));
+  box(sl, 772, 219, 10, 12, Y);
+  [
+    [116,348,"Promotion"], [116,426,"Creative Designer"], [315,348,"Interface Designer"],
+    [315,426,"Script Coder"], [517,348,"Optimizer"], [517,426,"Analyst"], [717,348,"Government"],
+    [717,426,"Spin"],
+  ].forEach(([a, b, c]) => t(sl, c, a, b, 167, 25, { s: 9, a: 'c', v: 'm' }));
+  [
+    [214,380], [214,457], [414,380], [414,457], [615,380], [615,457], [815,380], [815,457],
+  ].forEach(([a, b]) => el(sl, a, b, 3, 3, Y));
+}
+
+// 32. SIMPLE TIMELINE STORY
+function slide32(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "32", "SIMPLE TIMELINE STORY", "PLACEHOLDER", Y);
+  [
+    [0,1000,G1], [0,200,Y], [200,199,Y], [399,200,Y], [599,200,Y], [800,200,Y],
+  ].forEach(([a, b, c]) => box(sl, a, 405, b, 5, c));
+  [192, 392, 592, 792].forEach(a => el(sl, a, 400, 15, 15, Y));
+  [
+    [125,264,83,"Lorem ipsum dolor sit amet dan kolor suum ata si memet"],
+    [324,180,167,"Lorem ipsum dolor sit amet dan kolor suum ata si memet pakek keu ubat jerawat pasti puleh, meunyoe kon meukurap muka, cok nyan na mangat"],
+    [524,205,142,"PLACEHOLDER"],
+    [725,239,108,"PLACEHOLDER"],
+  ].forEach(([a, b, c, e]) => ts(sl, 'rect', e, a, b, 150, c, { l: Y, s: 8, a: 'c', v: 'm', ls: 1.5 }));
+  [
+    [100,"2009"], [299,"2011"], [500,"2013"], [699,"2014"],
+  ].forEach(([a, b]) => t(sl, b, a, 423, 200, 25, { s: 9, a: 'c' }));
+  [
+    [100,"WE BORN"], [299,"GROWTH"], [500,"JOIN PARTNER"], [699,"WE ARE HERE"],
+  ].forEach(([a, b]) => t(sl, b, a, 364, 200, 25, { s: 9, b: 1, a: 'c' }));
+}
+
+// 33. OUR AWARDS
+function slide33(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "33", "OUR AWARDS", L1, Y);
+  sh(sl, 'ribbon', 358, 292, 283, 63, { l: Y });
+  icon(sl, i19, 443, 181, 114, 110, { f: Y });
+  [
+    [421,322,158,24,14,"2012",G], [475,194,50,58,20,"1",W], [138,270,123,19,10.5,"2011",G],
+    [180,171,39,45,16,"3",W], [738,270,123,19,10.5,"2013",G], [780,171,39,45,16,"2",W],
+  ].forEach(([a, b, c, e, g, h, j]) => t(sl, h, a, b, c, e, { s: g, c: j, a: 'c', v: 'm' }));
+  t(sl, L3, 408, 398, 183, 88, { s: 8, a: 'c', ls: 1.5 });
+  [
+    [400,365,200,29,11], [122,303,155,25,9], [722,303,155,25,9],
+  ].forEach(([a, b, c, e, g]) => t(sl, "AWARDS NAME", a, b, c, e, { s: g, c: Y, a: 'c' }));
+  [90, 690].forEach(a => sh(sl, 'ribbon', a, 247, 219, 49, { l: Y }));
+  [155, 756].forEach(a => icon(sl, i19, a, 161, 88, 85, { f: Y }));
+  [128, 729].forEach(a => t(sl, L3, a, 329, 142, 79, { s: 7, a: 'c', ls: 1.5 }));
+}
+
+// 34. TEAM STRUCTURE
+function slide34(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "34", "TEAM STRUCTURE", L1, Y);
+  [[508,390], [100,392]].forEach(([a, b]) => box(sl, a, 181, b, 133, { l: Y }));
+  [
+    517, 108,
+  ].forEach(a => t(sl, "Lorem ipsum dolor sit amet dan kolor suum ata si memet ta pleu bak muka keu ubat jeurawat pasti bagah puleh, alah hai han ek ta khem", a, 264, 375, 43, { s: 7, a: 'c', v: 'm', ls: 1.5 }));
+  [
+    [100,"MR. JOHN DOE","CEO"], [508,"MRS. JOHN SARAH","CFO"],
+  ].forEach(([a, b, c]) => t(sl, [{ t: b, o: { br: 1 } }, { t: c, o: { s: 7, c: G } }], a, 226, 392, 37, { s: 9, a: 'c' }));
+  [100, 262, 425, 586, 748].forEach(a => box(sl, a, 380, 150, 100, { l: Y }));
+  [
+    [100,"MRS. BUNGSU","GRAPHIC DESIGNER"], [262,"MR. KAPLUK","SUPPORT STAFF"],
+    [425,"MRS. YUSNIAR","PRODUCT MANAGER"], [586,"MRS. RINAI","LUX DESIGNER"],
+    [748,"MR. MANDO","WEB DEVELOPER"],
+  ].forEach(([a, b, c]) => t(sl, [{ t: b, o: { br: 1 } }, { t: c, o: { s: 7, c: G } }], a, 422, 150, 48, { s: 9, a: 'c', ls: 1.5 }));
+  [
+    [262,148], [669,148], [145,347], [304,347], [467,347], [626,347], [790,347],
+  ].forEach(([a, b]) => imgBox(sl, a, b, 67, 67));
+}
+
+// 35. OUR GREAT CLIENTS
+function slide35(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "35", "OUR GREAT CLIENTS", "Lorem ipsum dolor sit amet kolor suum ata si memet dan simaun", Y);
+  [
+    [0,163,1000,302], [341,225,3,10], [341,221,3,3], [274,348,7,2],
+  ].forEach(([a, b, c, e]) => box(sl, a, b, c, e, Y));
+  [
+    [175,207], [324,206], [475,210], [620,207], [774,207], [245,331], [394,331], [545,330],
+    [690,331],
+  ].forEach(([a, b]) => el(sl, a, b, 50, 50, W));
+  [
+    [186,218,28,28,i28], [332,221,8,14,i29], [346,225,8,14,i30], [356,225,8,14,i31],
+    [487,224,26,21,i7], [633,220,25,25,i22], [257,347,14,17,i26], [271,351,14,13,i27],
+    [400,347,37,18,i9], [563,342,13,27,i6], [704,343,24,24,i24],
+  ].forEach(([a, b, c, e, g]) => icon(sl, g, a, b, c, e, { f: Y }));
+  [
+    [128,266,"COMPANY ONE"], [276,266,"COMPANY TWO"], [426,266,"COMPANY THREE"],
+    [572,266,"COMPANY FOUR"], [725,266,"COMPANY FIVE"], [197,392,"COMPANY SIX"],
+    [345,392,"COMPANY SEVEN"], [495,392,"COMPANY EIGHT"], [641,392,"COMPANY NINE"],
+  ].forEach(([a, b, c]) => t(sl, [{ t: c, o: { br: 1 } }, { t: "Specialist Skills", o: { s: 8 } }], a, b, 148, 40, { s: 10, c: W, a: 'c', v: 'm' }));
+  [785, 800].forEach(a => el(sl, a, 226, 12, 12, Y));
+}
+
+// 36. GREAT TESTIMONIALS
+function slide36(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "36", "GREAT TESTIMONIALS", L1, Y);
+  [
+    168, 343,
+  ].forEach(a => t(sl, "“ Lorem ipsum dolor sit amet kuah tuhee jampue pisang wak ta lawok lawuk hayeu that lagee bu leukat maulod yang penting bek nyeplak tgk beh ”", 183, a, 308, 71, { s: 8, v: 'b', ls: 1.5 }));
+  [
+    [183,243,"Mr. John Doe Smith","General Manager ","Shafura Design"],
+    [183,418,"Mrs. Fara Hack","Marketing Manager ","Joed Travel"],
+    [592,243,"Mrs. Julie Paret","CEO ","Diki Printing"],
+    [592,418,"Mr. John Paloe","General Manager ","Common Adv"],
+  ].forEach(([a, b, c, e, g]) => t(sl, [{ t: c, o: { b: 1, br: 1 } }, { t: e, o: { c: G } }, { t: "– " }, { t: g, o: { c: Y } }], a, b, 308, 50, { s: 8.5, v: 'b', ls: 1.5 }));
+  [
+    [168,"“ Lorem ipsum dolor sit amet kuah tuhee jampue wak ta lawok lawuk hayeu that lagee bu leukat watee maulod yang penting bek nyeplak tgk beh ”"],
+    [343,"“ Lorem ipsum dolor sit kuah tuhee jampue pisang wak ta lawok lawuk hayeu that lagee bu leukat watee maulod yang penting bek nyeplak tgk beh ”"],
+  ].forEach(([a, b]) => t(sl, b, 592, a, 308, 71, { s: 8, v: 'b', ls: 1.5 }));
+  [[100,167], [100,342], [513,342], [515,167]].forEach(([a, b]) => imgBox(sl, a, b, 75, 75));
+}
+
+// 37. SINGLE TESTIMONIAL
+function slide37(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "37", "SINGLE TESTIMONIAL", L1, Y);
+  box(sl, 0, 163, 1000, 233, Y);
+  t(sl, [{ t: "//" }, { t: " ", o: { c: G } }, { t: "In the last two years, my life has completely changed. I always think I am very lucky to have joined this great company ", o: { c: W } }, { t: "//" }], 200, 196, 600, 140, { b: 1, a: 'c', v: 'm', ls: 1.5 });
+  t(sl, [{ t: "Mrs. Fara Hack", o: { b: 1, br: 1 } }, { t: "Marketing Manager ", o: { c: G } }, { t: "– " }, { t: "Joed Travel", o: { c: Y } }], 300, 440, 400, 50, { s: 8.5, a: 'c', v: 'b', ls: 1.5 });
+  imgBox(sl, 463, 359, 75, 75);
+}
+
+// 38. WE HAVE
+function slide38(pptx) {
+  const sl = pptx.addSlide();
+  [
+    [467,201,73,92,i73,BL2], [543,201,345,70,i74,BL], [467,268,73,82,i75,G3],
+    [543,268,345,82,i76,Y], [467,330,73,92,i77,BL2], [543,348,345,74,i74,BL],
+    [467,370,73,117,i78,G3], [543,420,345,67,i76,Y],
+  ].forEach(([a, b, c, e, g, h]) => icon(sl, g, a, b, c, e, { f: h }));
+  box(sl, 533, 81, 8, 54, Y);
+  t(sl, [{ t: "WE HAVE", o: { br: 1 } }, { t: "NICE INFOGRAPHICS", o: { c: K, b: 1 } }], 543, 69, 390, 77, { s: 20, c: G4 });
+  sh(sl, 'arc', 298, 368, 125, 125, { ar: [270, 57.4], l: Y });
+  t(sl, [{ t: "Mr. John Doe", o: { br: 1 } }, { t: "(Report Analyst)", o: { c: G, b: 0 } }], 131, 435, 167, 53, { s: 9, b: 1, a: 'r', v: 'm', ls: 1.5 });
+  [
+    [201,"CLEAN"], [276,"MINIMAL / MODERN"], [351,"FUNCTIONAL"], [420,"PROFESSIONAL"],
+  ].forEach(([a, b]) => t(sl, b, 570, a, 295, 67, { s: 16, c: W, v: 'm' }));
+  t(sl, "“ We have great infographics design for your modern / clean and minimal presentation ”", 100, 187, 310, 156, { s: 15, c: G, a: 'r', ls: 1.5 });
+  imgBox(sl, 306, 382, 99, 99);
+}
+
+// 39. WE HAVE GOOD PRICE
+function slide39(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "39", "WE HAVE GOOD PRICE", L2, Y);
+  [
+    [306,G2], [340,W], [373,G2], [406,W], [440,G2],
+  ].forEach(([a, b]) => box(sl, 100, a, 200, 33, { f: b, l: W, lw: 0.5 }));
+  [
+    [300,306,G2], [300,340,W], [300,373,G2], [300,406,W], [300,440,G2], [500,306,G2],
+    [500,340,W], [500,373,G2], [500,406,W], [500,440,G2], [700,306,G2], [700,340,W],
+    [700,373,G2], [700,406,W], [700,440,G2],
+  ].forEach(([a, b, c]) => box(sl, a, b, 200, 33, c));
+  ts(sl, 'rect', "Pricing Plans", 100, 173, 200, 133, { f: G2, l: W, lw: 0.5, s: 16, c: G, a: 'c', v: 'm' });
+  [300, 500, 700].forEach(a => box(sl, a, 256, 200, 50, { f: Y, ft: 50 }));
+  [300, 500, 700].forEach(a => box(sl, a, 173, 200, 83, Y));
+  [
+    [300,"Standard"], [500,"Professional"], [700,"Ultimate"],
+  ].forEach(([a, b]) => t(sl, b, a, 182, 200, 30, { s: 12, c: W, a: 'c', v: 'm' }));
+  [367, 567, 767].forEach(a => el(sl, a, 223, 67, 67, W));
+  [
+    [354,"$100"], [554,"$200"], [754,"$300"],
+  ].forEach(([a, b]) => t(sl, [{ t: b, o: { br: 1 } }, { t: "/year", o: { s: 9, c: G } }], a, 234, 92, 45, { s: 12, a: 'c', v: 'm' }));
+  [
+    [306,"Internet Access"], [340,"Design Course"], [373,"Computer Maintenance"],
+    [406,"24 h Online Support"], [440,"Certificate"],
+  ].forEach(([a, b]) => ts(sl, 'rect', b, 100, a, 200, 33, { l: W, lw: 0.5, s: 8, a: 'c', v: 'm' }));
+  [
+    [300,306,"5H / Day"], [300,340,"3 Times / Week"], [300,373,"1 Time / Month"],
+    [500,306,"7H / Day"], [500,340,"4 Times / Week"], [500,373,"2 Times / Month"],
+    [700,306,"10H / Day"], [700,340,"6 Times / Week"], [700,373,"4 Times / Week"],
+  ].forEach(([a, b, c]) => t(sl, c, a, b, 200, 33, { s: 8, a: 'c', v: 'm' }));
+  [[790,415], [790,448], [590,448]].forEach(([a, b]) => icon(sl, i0, a, b, 20, 17, { f: "39B54A" }));
+  [[595,417], [395,417], [395,450]].forEach(([a, b]) => icon(sl, i1, a, b, 11, 12, { f: "ED1C24" }));
+}
+
+// 40. YOU HAVE GOOD OPTION
+function slide40(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "40", "YOU HAVE GOOD OPTION", L2, Y);
+  [
+    [642,418], [642,312], [642,339], [642,365], [642,391], [158,418], [158,313], [158,339],
+    [158,366], [158,392],
+  ].forEach(([a, b]) => box(sl, a, b, 200, 25, { f: G1, ft: 50 }));
+  [458, 333, 364, 395, 427].forEach(a => box(sl, 375, a, 250, 30, { f: G1, ft: 50 }));
+  [
+    [158,178,200,42,8,"OPTION ONE"], [642,178,200,42,8,"OPTION THREE"],
+    [375,156,250,50,10,"OPTION TWO"],
+  ].forEach(([a, b, c, e, g, h]) => ts(sl, 'rect', h, a, b, c, e, { f: Y, ft: 50, s: g, a: 'c', v: 'm' }));
+  [158, 642].forEach(a => box(sl, a, 220, 200, 92, Y));
+  [
+    [158,313,"5 hour per day"], [158,339,"2 hour Design course"],
+    [158,366,"Computer maintenance"], [158,392,"5 hour online support"],
+    [642,312,"20 hour per day"], [642,339,"10 hour design course"],
+    [642,365,"Computer maintenance"], [642,391,"24 hour online support + Certificate"],
+  ].forEach(([a, b, c]) => t(sl, c, a, b, 200, 25, { s: 7.5, a: 'c', v: 'm' }));
+  box(sl, 375, 206, 250, 125, Y);
+  [
+    [333,"12 hour per day"], [364,"5 hour design course"], [395,"Computer maintenance"],
+    [427,"12 hour online support + Certificate"],
+  ].forEach(([a, b]) => t(sl, b, 375, a, 250, 30, { s: 8.5, a: 'c', v: 'm' }));
+  [
+    [14,167,220,183,71,36,"50"], [18,383,214,233,84,44,"75"], [14,650,220,183,71,36,"90"],
+  ].forEach(([a, b, c, e, g, h, j]) => t(sl, [{ t: j }, { t: "$", o: { s: a, c: K } }], b, c, e, g, { s: h, c: W, a: 'c', v: 'm' }));
+  [167, 650].forEach(a => t(sl, "Per month", a, 275, 183, 25, { s: 9, a: 'c', v: 'm' }));
+  t(sl, "Per month", 383, 281, 233, 28, { s: 10.5, a: 'c', v: 'm' });
+  [
+    [234,Y2], [244,Y2], [254,Y2], [264,Y2], [275,Y2], [234,Y], [244,Y], [254,Y],
+  ].forEach(([a, b]) => star(sl, a, 427, 8, 8, b));
+  [
+    [464,Y2], [479,Y2], [494,Y2], [509,Y2], [524,Y2], [464,Y], [479,Y], [494,Y], [509,Y],
+    [524,Y],
+  ].forEach(([a, b]) => star(sl, a, 467, 12, 12, b));
+  [
+    [717,Y2], [727,Y2], [738,Y2], [748,Y2], [758,Y2], [717,Y], [728,Y], [738,Y], [748,Y],
+  ].forEach(([a, b]) => star(sl, a, 425, 8, 8, b));
+}
+
+// 41. OUR GOALS FOR NEXT YEAR
+function slide41(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "41", "OUR GOALS FOR NEXT YEAR", L2, Y);
+  [133, 283, 433, 583, 733].forEach(a => box(sl, a, 181, 133, 250, G2));
+  [162, 312, 462, 612, 762].forEach(a => el(sl, a, 229, 75, 75, { f: W, l: Y }));
+  [
+    [171,"1"], [321,"2"], [471,"3"], [621,"4"], [771,"5"],
+  ].forEach(([a, b]) => t(sl, b, a, 242, 58, 50, { s: 24, c: Y, a: 'c' }));
+  [
+    [133,"SEARCH"], [283,"SOCIALS"], [433,"POPULAR"], [583,"GLOBALS"], [733,"FRIENDLY"],
+  ].forEach(([a, b]) => t(sl, b, a, 344, 133, 29, { s: 10.5, a: 'c' }));
+  [
+    [133,"FIRST PARTITION"], [283,"SECOND PROGRAM"], [433,"WORLD WIDE WEB"],
+    [583,"MORE CLIENTS"], [733,"VERY LOW COST"],
+  ].forEach(([a, b]) => t(sl, b, a, 364, 133, 24, { s: 8, c: G, a: 'c' }));
+  [133, 283, 433, 583, 733].forEach(a => box(sl, a, 431, 133, 5, Y));
+}
+
+// 42. WORLD MAP INFOGRAPHIC
+function slide42(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "42", "WORLD MAP INFOGRAPHIC", L2, Y);
+  icon(sl, i79, 133, 147, 734, 382, { f: G1, ft: 50 });
+  [
+    [759,435,RD], [524,369,GN2], [332,414,BL2], [232,225,"7030A0"], [416,173,G], [567,223,G],
+    [746,266,"D92048"],
+  ].forEach(([a, b, c]) => icon(sl, i70, a, b, 18, 38, { f: c }));
+  [
+    [765,427,RD], [529,361,GN2], [338,406,BL2], [238,217,"7030A0"], [421,165,G], [573,216,G],
+    [752,258,"D92048"],
+  ].forEach(([a, b, c]) => el(sl, a, b, 7, 7, c));
+  [
+    [753,427,RD], [517,361,GN2], [326,406,BL2], [226,217,"7030A0"], [409,165,W], [561,216,W],
+    [740,258,"D92048"],
+  ].forEach(([a, b, c]) => sh(sl, 'line', a, b, 0, 46, { fv: 1, l: c }));
+  [
+    [645,416,"2.100",RD], [410,350,"1.168",GN2], [219,395,"4.468",BL2],
+    [119,206,"4.432","7030A0"], [302,154,"65",G], [453,205,"6.098",G],
+    [632,248,"3.072","D92048"],
+  ].forEach(([a, b, c, e]) => t(sl, c, a, b, 108, 44, { s: 20, c: e, a: 'r' }));
+  [
+    [644,446,RD], [408,380,GN2], [217,425,BL2], [117,236,"7030A0"], [300,184,G], [451,235,G],
+    [630,278,"D92048"],
+  ].forEach(([a, b, c]) => t(sl, "USERS", a, b, 108, 22, { s: 7, c: c, a: 'r' }));
+  [
+    [644,457,"AUSTRALIA",RD], [408,391,"AFRICA",GN2], [217,437,"SOUTH AMERICA",BL2],
+    [117,248,"NORTH AMERICA","7030A0"], [300,195,"GREEN LAND",G], [452,246,"EUROPE",G],
+    [631,289,"ASIA","D92048"],
+  ].forEach(([a, b, c, e]) => t(sl, c, a, b, 108, 22, { s: 7, c: e, b: 1, a: 'r' }));
+}
+
+// 43. WORLD MAP INFOGRAPHIC 2
+function slide43(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "43", "WORLD MAP INFOGRAPHIC 2", L2, Y);
+  icon(sl, i79, 133, 147, 734, 382, { f: G1, ft: 50 });
+  [[300,Y], [425,BL], [541,GN]].forEach(([a, b]) => box(sl, a, 481, 9, 9, b));
+  [
+    [306,103,"PRINT TEMPLATE"], [431,103,"WEB TEMPLATE"], [547,162,"PRESENTATION TEMPLATE"],
+  ].forEach(([a, b, c]) => t(sl, c, a, 468, b, 33, { s: 7, c: G, v: 'm', m: [7.2, 0, 0, 0] }));
+  [
+    [178,224,39,Y], [191,197,66,BL], [203,210,54,GN], [378,190,25,Y], [390,173,42,BL],
+    [403,181,35,GN], [507,218,50,Y], [520,185,83,BL], [532,200,68,GN], [737,266,39,Y],
+    [750,240,66,BL], [762,252,54,GN], [718,413,25,Y], [731,396,42,BL], [743,403,35,GN],
+    [477,366,25,Y], [490,349,42,BL], [502,357,35,GN], [300,370,50,Y], [313,337,83,BL],
+    [326,352,68,GN],
+  ].forEach(([a, b, c, e]) => rr(sl, a, b, 13, c, e));
+  [
+    [139,266,"NORTH AMERICA"], [139,171,"5000"], [338,219,"GREEN LAND"], [338,148,"2500"],
+    [468,271,"EUROPE"], [468,160,"6000"], [698,309,"ASIAN"], [698,213,"5000"],
+    [679,441,"AUSTRALIA"], [679,370,"2500"], [438,394,"AFRICA"], [438,324,"2500"],
+    [261,423,"SOUTH AMERICA"], [261,311,"6000"],
+  ].forEach(([a, b, c]) => t(sl, c, a, b, 117, 20, { s: 8, c: G, b: 1, a: 'c', v: 'm' }));
+}
+
+// 44. GENDER ACTIVITY
+function slide44(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "44", "GENDER ACTIVITY", L2, Y);
+  [
+    [563,G1], [593,G1], [624,G1], [654,G1], [684,G1], [714,G1], [744,G1], [774,G1], [323,G1],
+    [353,G1], [383,G1], [413,G1], [443,G1], [473,G1], [504,G1], [533,G1], [203,G1], [233,G1],
+    [263,G1], [293,G1], [563,Y], [593,Y], [624,Y], [654,Y], [684,Y], [714,Y], [744,G1], [774,G1],
+    [323,Y], [353,Y], [383,Y], [413,Y], [443,Y], [473,Y], [504,Y], [533,Y], [203,G1], [233,G1],
+    [263,Y], [293,Y],
+  ].forEach(([a, b]) => icon(sl, i70, a, 175, 23, 48, { f: b }));
+  [
+    [571,G1], [601,G1], [631,G1], [661,G1], [691,G1], [721,G1], [751,G1], [781,G1], [330,G1],
+    [360,G1], [390,G1], [420,G1], [450,G1], [480,G1], [511,G1], [541,G1], [210,G1], [240,G1],
+    [270,G1], [300,G1], [571,Y], [601,Y], [631,Y], [661,Y], [691,Y], [721,Y], [751,G1], [781,G1],
+    [330,Y], [360,Y], [390,Y], [420,Y], [450,Y], [480,Y], [511,Y], [541,Y], [210,G1], [240,G1],
+    [270,Y], [300,Y],
+  ].forEach(([a, b]) => el(sl, a, 165, 9, 9, b));
+  [
+    [570,G1], [600,G1], [631,G1], [661,G1], [691,G1], [721,G1], [751,G1], [781,G1], [330,G1],
+    [360,G1], [390,G1], [420,G1], [450,G1], [480,G1], [510,G1], [540,G1], [210,G1], [240,G1],
+    [270,G1], [300,G1], [570,Y], [600,Y], [631,Y], [661,G1], [691,G1], [721,G1], [751,G1],
+    [781,G1], [330,G1], [360,Y], [390,Y], [420,Y], [450,Y], [480,Y], [510,Y], [540,Y], [210,G1],
+    [240,G1], [270,G1], [300,G1],
+  ].forEach(([a, b]) => el(sl, a, 340, 9, 9, b));
+  [
+    [561,G1], [591,G1], [621,G1], [651,G1], [682,G1], [712,G1], [742,G1], [772,G1], [321,G1],
+    [351,G1], [381,G1], [411,G1], [441,G1], [471,G1], [501,G1], [531,G1], [201,G1], [231,G1],
+    [261,G1], [291,G1], [561,Y], [591,Y], [621,Y], [651,G1], [682,G1], [712,G1], [742,G1],
+    [772,G1], [321,G1], [351,Y], [381,Y], [411,Y], [441,Y], [471,Y], [501,Y], [531,Y], [201,G1],
+    [231,G1], [261,G1], [291,G1],
+  ].forEach(([a, b]) => icon(sl, i80, a, 350, 27, 48, { f: b }));
+  [
+    [216,"80%"], [390,"50%"],
+  ].forEach(([a, b]) => t(sl, [{ t: b, o: { br: 1 } }, { t: "Acitivity", o: { s: 10.5, c: G } }], 201, a, 598, 91, { s: 36, c: Y, a: 'c' }));
+}
+
+// 45. CUSTOMER INFOGRAPHIC
+function slide45(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "45", "CUSTOMER INFOGRAPHIC", L2, Y);
+  t(sl, "PRODUCT NAME", 400, 150, 200, 58, { s: 14, c: G, a: 'c', v: 'm' });
+  icon(sl, i70, 138, 160, 23, 48, { f: Y });
+  el(sl, 145, 150, 9, 9, Y);
+  el(sl, 846, 148, 9, 9, Y);
+  icon(sl, i80, 836, 158, 27, 48, { f: Y });
+  [
+    [229,"GRAPHIC DESIGN"], [281,"INTERIOR DESIGN"], [332,"WEB DESIGN"], [384,"MARKETING"],
+    [435,"INVESTATION"],
+  ].forEach(([a, b]) => ts(sl, 'rect', b, 400, a, 200, 46, { f: Y, s: 9, c: W, a: 'c', v: 'm' }));
+  [
+    [138,229], [138,281], [138,332], [138,384], [138,435], [600,229], [600,281], [600,332],
+    [600,384], [600,435],
+  ].forEach(([a, b]) => box(sl, a, b, 262, 46, Y2));
+  [
+    [200,229,200], [161,281,239], [267,332,133], [150,384,250], [225,435,175], [600,229,208],
+    [600,281,167], [600,332,246], [600,384,175], [600,435,122],
+  ].forEach(([a, b, c]) => box(sl, a, b, c, 46, Y));
+  [
+    [200,240,"75%"], [161,291,"85%"], [267,343,"45%"], [149,394,"90%"], [225,445,"65%"],
+    [766,240,"75%"], [726,291,"65%"], [804,343,"85%"], [733,394,"70%"], [681,445,"35%"],
+  ].forEach(([a, b, c]) => ts(sl, 'rect', c, a, b, 42, 25, { f: Y, s: 7, c: W, a: 'c', v: 'm' }));
+}
+
+// 46. MEDIA CONSUMPTION
+function slide46(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "46", "MEDIA CONSUMPTION", L2, Y);
+  [
+    [200,182,58,48,i81], [742,181,58,44,i14], [767,423,32,56,i82], [195,419,63,63,i15],
+  ].forEach(([a, b, c, e, g]) => icon(sl, g, a, b, c, e, { f: Y }));
+  [
+    [205,188,49,33,W], [746,186,49,31,W], [765,225,13,3,Y], [753,228,36,3,Y], [771,431,25,37,W],
+  ].forEach(([a, b, c, e, g]) => box(sl, a, b, c, e, g));
+  el(sl, 228, 224, 3, 3, W);
+  [[249,"Tablet"], [380,"Video Player"]].forEach(([a, b]) => t(sl, b, 191, a, 208, 30, { s: 12, c: G }));
+  [[249,"Computer"], [380,"Mobile"]].forEach(([a, b]) => t(sl, b, 601, a, 208, 30, { s: 12, c: G, a: 'r' }));
+  el(sl, 781, 472, 4, 4, W);
+  ch(sl, 'doughnut', ["1st Qtr", "2nd Qtr", "3rd Qtr", "4th Qtr"], [30, 30, 20, 20], 324, 212, 350, 233, [Y, "FFE080", Y, "FFE080"], 86);
+  [
+    [600,248,200,18,i83], [200,248,200,18,i84], [198,396,202,15,i85], [600,396,200,15,i86],
+  ].forEach(([a, b, c, e, g]) => icon(sl, g, a, b, c, e, { l: G3 }));
+  [419, 169].forEach(a => t(sl, "30%", 542, a, 188, 71, { s: 36, c: G, a: 'r' }));
+  [419, 169].forEach(a => t(sl, "20%", 271, a, 188, 71, { s: 36, c: G }));
+}
+
+// 47. SALES PIE GRAPHIC
+function slide47(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "47", "SALES PIE GRAPHIC", L2, Y);
+  ch(sl, 'pie', ["1st Qtr", "2nd Qtr", "3rd Qtr", "4th Qtr"], [40, 30, 20, 10], 8, 165, 488, 325, [Y, Y, Y, Y]);
+  el(sl, 88, 163, 327, 327, { l: Y, lw: 0.5 });
+  [
+    [312,206,188,50], [242,285,258,58],
+  ].forEach(([a, b, c, e]) => sh(sl, 'bentConnector3', a, b, c, e, { fv: 1, l: G, lh: 'oval' }));
+  [
+    [208,304,292,58], [200,206,300,233],
+  ].forEach(([a, b, c, e]) => sh(sl, 'bentConnector3', a, b, c, e, { l: G, lh: 'oval' }));
+  [[486,184], [485,263], [483,340], [483,417]].forEach(([a, b]) => el(sl, a, b, 44, 44, { f: W, l: G }));
+  [
+    [499,199,17,17,i36], [511,197,7,7,i37], [502,276,8,19,i38], [513,277,5,16,i39],
+    [511,279,5,13,i40], [496,355,19,14,i41], [495,430,21,19,i16],
+  ].forEach(([a, b, c, e, g]) => icon(sl, g, a, b, c, e, { f: Y }));
+  box(sl, 497, 283, 4, 5, Y);
+  [197, 277, 355, 432].forEach(a => t(sl, L4, 539, a, 360, 48, { s: 8, ls: 1.5 }));
+  [
+    [179,"PRINT DESIGN ","(40%)"], [258,"AUDIO COMPOSE ","(30%)"], [336,"PHOTOGRAPHY ","(20%)"],
+    [414,"ONLINE MARKETING ","(10%)"],
+  ].forEach(([a, b, c]) => t(sl, [{ t: b }, { t: c, o: { c: G } }], 538, a, 217, 25, { s: 9, c: Y, b: 1 }));
+}
+
+// 48. DATA ANALYZING
+function slide48(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "48", "DATA ANALYZING", L2, Y);
+  [782, 632, 182, 332, 482].forEach(a => rr(sl, a, 173, 35, 225, G1));
+  [
+    [332,231,167], [482,256,142], [632,198,200], [782,173,225], [182,198,200],
+  ].forEach(([a, b, c]) => rr(sl, a, b, 35, c, Y));
+  [
+    [150,"2012"], [300,"2013"], [450,"2014"], [600,"2015"], [750,"2016"],
+  ].forEach(([a, b]) => ts(sl, 'ellipse', b, a, 348, 100, 100, { f: W, l: Y, s: 14, c: G, a: 'c', v: 'm' }));
+  [
+    [125,"AUDIO MARKETING"], [275,"SOCIAL MEDIA"], [425,"MOBILE MARKETING"],
+    [575,"SALES PROMOTION"], [725,"VISUAL MARKETING"],
+  ].forEach(([a, b]) => t(sl, b, a, 456, 150, 33, { s: 8, c: G, a: 'c', v: 'm' }));
+  [
+    [154,206,"80%"], [304,240,"60%"], [454,264,"50%"], [604,206,"80%"], [754,181,"100%"],
+  ].forEach(([a, b, c]) => ts(sl, 'rect', c, a, b, 92, 25, { f: G3, l: W, s: 9, c: W, a: 'c', v: 'm' }));
+}
+
+// 49. THE GRAPHIC OF SALES 2021
+function slide49(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "49", "THE GRAPHIC OF SALES 2021", L2, Y);
+  [332, 482, 632, 782, 182].forEach(a => rr(sl, a, 203, 35, 233, G3));
+  [
+    [125,"PRINT TEMPLATE"], [275,"PRESENTATION"], [425,"WORDPRESS"], [575,"PSD TEMPLATE"],
+    [725,"3D OBJECT"],
+  ].forEach(([a, b]) => t(sl, b, a, 448, 150, 33, { s: 9, a: 'c', v: 'm' }));
+  [
+    [332,303,133], [482,278,158], [632,228,208], [782,341,96], [182,320,117],
+  ].forEach(([a, b, c]) => rr(sl, a, b, 35, c, Y));
+  [
+    [154,"50%"], [304,"60%"], [454,"70%"], [604,"90%"], [754,"40%"],
+  ].forEach(([a, b]) => t(sl, b, a, 165, 92, 25, { s: 12, a: 'c', v: 'm' }));
+}
+
+// 50. 2 BARS GRAPHIC SAMPLE
+function slide50(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "50", "2 BARS GRAPHIC SAMPLE", L2, Y);
+  [311, 461, 611, 761, 161, 204, 353, 504, 654, 804].forEach(a => rr(sl, a, 196, 35, 217, Y2));
+  [
+    [311,231,181], [461,265,148], [611,288,125], [761,206,206], [161,304,108],
+  ].forEach(([a, b, c]) => rr(sl, a, b, 35, c, Y));
+  [
+    [204,231,181], [354,265,148], [504,288,125], [654,265,148], [804,350,62],
+  ].forEach(([a, b, c]) => rr(sl, a, b, 35, c, BL));
+  [
+    [161,"50%"], [203,"80%"], [311,"80%"], [353,"65%"], [461,"65%"], [503,"55%"], [611,"55%"],
+    [653,"65%"], [761,"90%"], [803,"25%"],
+  ].forEach(([a, b]) => t(sl, b, a, 159, 35, 25, { s: 9, c: G, a: 'c', v: 'm', m: 0 }));
+  [
+    [161,"2012"], [310,"2013"], [461,"2014"], [611,"2015"], [761,"2016"],
+  ].forEach(([a, b]) => t(sl, b, a, 420, 78, 33, { s: 14, c: G, a: 'c', v: 'm' }));
+  box(sl, 382, 481, 9, 9, Y);
+  [
+    [388,"PRINT TEMPLATE"], [514,"WEB TEMPLATE"],
+  ].forEach(([a, b]) => t(sl, b, a, 468, 103, 33, { s: 7, c: G, v: 'm', m: [7.2, 0, 0, 0] }));
+  box(sl, 508, 481, 9, 9, BL);
+}
+
+// 51. 3 BARS GRAPHIC SAMPLE
+function slide51(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "51", "3 BARS GRAPHIC SAMPLE", L2, Y);
+  [
+    [298,196,217,G3], [447,196,217,G3], [598,196,217,G3], [748,196,217,G3], [148,196,217,G3],
+    [182,196,217,BL], [217,196,217,GN], [332,196,217,BL], [368,196,217,GN], [482,196,217,BL],
+    [518,196,217,GN], [632,196,217,BL], [668,196,217,GN], [782,196,217,BL], [818,196,217,GN],
+    [297,231,181,Y], [447,265,148,Y], [597,288,125,Y], [747,206,206,Y], [147,304,108,Y],
+    [182,231,181,BL], [217,265,148,GN], [332,265,148,BL], [367,288,125,GN], [482,288,125,BL],
+    [517,288,125,GN], [632,265,148,BL], [667,231,181,GN], [782,350,62,BL], [817,265,148,GN],
+  ].forEach(([a, b, c, e]) => rr(sl, a, b, 35, c, e));
+  [
+    [148,"50%"], [182,"80%"], [217,"65%"], [297,"80%"], [332,"65%"], [367,"55%"], [447,"65%"],
+    [482,"55%"], [518,"55%"], [598,"55%"], [632,"65%"], [668,"80%"], [748,"90%"], [782,"25%"],
+    [818,"65%"],
+  ].forEach(([a, b]) => t(sl, b, a, 159, 35, 25, { s: 9, c: G, a: 'c', v: 'm', m: 0 }));
+  [
+    [147,"2012"], [297,"2013"], [447,"2014"], [598,"2015"], [747,"2016"],
+  ].forEach(([a, b]) => t(sl, b, a, 420, 105, 33, { s: 14, c: G, a: 'c', v: 'm' }));
+  [[300,Y], [425,BL], [541,GN]].forEach(([a, b]) => box(sl, a, 481, 9, 9, b));
+  [
+    [306,103,"PRINT TEMPLATE"], [431,103,"WEB TEMPLATE"], [547,162,"PRESENTATION TEMPLATE"],
+  ].forEach(([a, b, c]) => t(sl, c, a, 468, b, 33, { s: 7, c: G, v: 'm', m: [7.2, 0, 0, 0] }));
+}
+
+// 52. OTHER GRAPHIC SAMPLE
+function slide52(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "52", "OTHER GRAPHIC SAMPLE", L2, Y);
+  [522, 462, 402, 280, 341, 221].forEach(a => icon(sl, i87, a, 153, 1, 237, { f: "F3F1EB" }));
+  [
+    [162,187,1,i88,"F3F1EB"], [162,220,1,i88,"F3F1EB"], [162,254,1,i88,"F3F1EB"],
+    [162,289,1,i88,"F3F1EB"], [162,323,1,i88,"F3F1EB"], [162,356,1,i88,"F3F1EB"],
+    [160,154,238,i89,G1], [160,226,121,i92,Y], [161,197,99,i93,GN2], [161,187,129,i94,BL],
+  ].forEach(([a, b, c, e, g]) => icon(sl, e, a, b, 422, c, { f: g }));
+  [
+    [139,153,1,"C9C3B1"], [139,187,1,"C9C3B1"], [139,220,1,"C9C3B1"], [139,254,1,"C9C3B1"],
+    [139,289,1,"C9C3B1"], [139,323,1,"C9C3B1"], [139,356,1,"C9C3B1"], [139,390,1,"C9C3B1"],
+    [300,481,9,Y], [425,481,9,BL], [541,481,9,GN],
+  ].forEach(([a, b, c, e]) => box(sl, a, b, 9, c, e));
+  [163, 222, 283, 342, 403, 462, 523, 582].forEach(a => box(sl, a, 405, 1, 9, "C9C3B1"));
+  [
+    [121,148,16,"70"], [121,182,16,"60"], [121,216,16,"50"], [121,250,16,"40"],
+    [121,283,16,"30"], [121,317,16,"20"], [121,351,14,"10"], [127,385,9,"0"], [154,419,26,"JAN"],
+    [214,419,24,"FEB"], [274,419,30,"MAR"], [334,419,27,"APR"], [394,419,29,"MAY"],
+    [454,419,26,"JUN"], [514,419,23,"JUL"], [574,419,28,"AUG"],
+  ].forEach(([a, b, c, e]) => t(sl, e, a, b, c, 15, { s: 9, c: G, ls: 1, m: 0, ww: 1 }));
+  [
+    [217,386,G4], [337,386,G4], [398,386,G4], [458,386,G4], [518,386,G4], [276,386,G4],
+    [276,224,Y], [217,258,Y], [337,341,Y], [398,286,Y], [458,269,Y], [518,305,Y], [398,249,GN2],
+    [458,256,GN2], [518,195,GN2], [337,283,GN2], [276,290,GN2], [217,228,GN2], [337,310,BL],
+    [398,198,BL], [458,231,BL], [518,221,BL], [276,256,BL], [217,245,BL],
+  ].forEach(([a, b, c]) => el(sl, a, b, 9, 9, c));
+  [
+    [306,103,"PRINT TEMPLATE"], [431,103,"WEB TEMPLATE"], [547,162,"PRESENTATION TEMPLATE"],
+  ].forEach(([a, b, c]) => t(sl, c, a, 468, b, 33, { s: 7, c: G, v: 'm', m: [7.2, 0, 0, 0] }));
+  [[165,Y], [251,BL], [343,GN2]].forEach(([a, b]) => icon(sl, i35, 657, a, 38, 38, { f: b }));
+  [
+    [156,Y], [243,BL], [335,GN2],
+  ].forEach(([a, b]) => t(sl, L5, 699, a, 200, 61, { s: 7, c: b, i: 1, ls: 1.5 }));
+}
+
+// 53. RADIAL FILL GRAPHICS
+function slide53(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "53", "RADIAL FILL GRAPHICS", L2, Y);
+  [131, 333, 532, 733].forEach(a => el(sl, a, 185, 136, 136, Y));
+  [[108,83], [311,47], [509,15], [711,118]].forEach(([a, b]) => box(sl, a, 169, 183, b, W));
+  [148, 350, 549, 750].forEach(a => el(sl, a, 201, 102, 102, { f: W, l: Y, lw: 0.5 }));
+  [
+    [157,"50"], [360,"80"], [558,"100"], [760,"25"],
+  ].forEach(([a, b]) => t(sl, [{ t: b }, { t: "%", o: { s: 10 } }], a, 216, 83, 75, { s: 20, a: 'c', v: 'm' }));
+  [115, 318, 516, 718].forEach(a => el(sl, a, 169, 167, 167, { l: Y, lw: 0.5 }));
+  [
+    [115,"PRINT TEMPLATE"], [318,"PRESENTATION"], [516,"WORDPRESS"], [718,"PSD TEMPLATE"],
+  ].forEach(([a, b]) => t(sl, b, a, 354, 167, 33, { s: 9, a: 'c', v: 'm' }));
+  [
+    107, 314, 512, 714,
+  ].forEach(a => t(sl, "PLACEHOLDER", a, 393, 175, 98, { s: 9, c: G, a: 'c', ls: 1.5 }));
+}
+
+// 54. INTERNATIONAL TRENDS
+function slide54(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "54", "INTERNATIONAL TRENDS", L2, Y);
+  el(sl, 339, 162, 322, 322, { l: Y });
+  t(sl, [{ t: "GLOBAL", o: { br: 1 } }, { t: "TRENDS", o: { c: G, br: 1 } }, { t: "2014" }], 357, 200, 284, 247, { s: 32, c: Y, a: 'c', v: 'm' });
+  [[692,202], [725,307], [692,422]].forEach(([a, b]) => t(sl, L7, a, b, 217, 44, { s: 7, ls: 1.5 }));
+  [
+    [692,183,"RELAXING"], [725,288,"CHATING"], [692,403,"SHOPING"],
+  ].forEach(([a, b, c]) => t(sl, c, a, b, 217, 25, { s: 9, c: Y, b: 1 }));
+  [[92,207], [58,310], [92,422]].forEach(([a, b]) => t(sl, L7, a, b, 217, 44, { s: 7, a: 'r', ls: 1.5 }));
+  [
+    [92,188,"PRINTING"], [58,291,"SINGING"], [92,403,"TRAVELLING"],
+  ].forEach(([a, b, c]) => t(sl, c, a, b, 217, 25, { s: 9, c: Y, b: 1, a: 'r' }));
+  [
+    [607,177], [644,287], [607,399], [322,399], [283,287], [322,177],
+  ].forEach(([a, b]) => el(sl, a, b, 73, 73, { f: W, l: Y }));
+  [
+    [631,213,31,14,i95], [627,228,35,1,i96], [633,192,15,19,i97], [661,305,38,32,i98],
+    [621,418,40,27,i99], [342,428,29,19,i100], [350,420,15,7,i101], [315,303,10,27,i102],
+    [311,317,17,24,i103], [349,195,19,11,i104], [349,217,19,15,i105], [343,208,31,14,i106],
+  ].forEach(([a, b, c, e, g]) => icon(sl, g, a, b, c, e, { f: Y }));
+}
+
+// 55. QUESTION AND ANSWER
+function slide55(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "55", "QUESTION AND ANSWER", L2, Y);
+  [
+    [231,"Lorem ipsum dolor sit amet kolor suum ata si meme an ata si maun dijak laju lam paya yang peunting bek peugah keu gob meulkot krn dosa teuh nyan makajih bek rugoe seumayang, meunyoe jeut bek teuga that gosip beh"],
+    [373,"Lorem ipsum dolor sit amet kolor suum ata si meme an ata si maun dijak laju lam paya yang peunting bek peugah keu gob meulkot krn dosa teuh nyan makajih bek rugoe seumayang, meunyoe jeut bek teuga that gosip beh yang paling penting beugleh hate dan bek teukabo."],
+  ].forEach(([a, b]) => ts(sl, 'rect', b, 100, a, 800, 83, { f: G2, s: 8, v: 'm', ls: 1.5, m: [43.2, 21.6, 3.6, 3.6] }));
+  [
+    [181,"How to register your site?"],
+    [323,"How much the cost of the Interior Design Course?, tell me please!"],
+  ].forEach(([a, b]) => ts(sl, 'rect', b, 100, a, 800, 42, { f: G2, s: 8, i: 1, v: 'm', m: [43.2, 43.2, 3.6, 3.6] }));
+  [181, 323].forEach(a => box(sl, 100, a, 42, 42, Y));
+  [231, 373].forEach(a => box(sl, 891, a, 9, 83, BL));
+  [194, 336].forEach(a => icon(sl, i107, 117, a, 8, 16, { f: W }));
+}
+
+// 56. WITH OUR APP
+function slide56(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "56", "WITH OUR APP", L2, Y);
+  icon(sl, i108, 427, 173, 146, 275, { f: Y });
+  t(sl, [{ t: "YOU", o: { br: 1 } }, { t: "WILL", o: { b: 1, br: 1 } }, { t: "GET" }], 433, 198, 133, 225, { s: 24, c: G, a: 'c', v: 'm' });
+  [
+    [383,222,61,i109], [383,273,54,i110], [383,320,61,i111], [383,352,77,i112], [573,222,61,i73],
+    [573,273,54,i75], [573,320,61,i77], [573,352,77,i78],
+  ].forEach(([a, b, c, e]) => icon(sl, e, a, b, 44, c, { f: G1 }));
+  [
+    [222,45,"CONNECTIONS"], [273,54,"FREE WIFI"], [332,49,"FAST RESPONSE"],
+    [386,45,"24H SUPPORT"],
+  ].forEach(([a, b, c]) => ts(sl, 'rect', c, 200, a, 183, b, { f: G2, s: 9, c: G, v: 'm', m: [21.6, 7.2, 3.6, 3.6] }));
+  [
+    [200,222,46], [200,273,54], [200,332,49], [200,386,45], [792,222,46], [792,273,54],
+    [792,332,49], [792,386,45],
+  ].forEach(([a, b, c]) => box(sl, a, b, 8, c, Y));
+  [
+    [222,45,"RESPONSIVE"], [273,54,"NEW UPDATES"], [332,49,"MARKET PLACE"],
+    [386,45,"CUSTOMIZABLE"],
+  ].forEach(([a, b, c]) => ts(sl, 'rect', c, 617, a, 183, b, { f: G2, s: 9, c: G, a: 'c', v: 'm', m: [7.2, 21.6, 3.6, 3.6] }));
+}
+
+// 57. WITH OUR SUPPORTS
+function slide57(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "57", "WITH OUR SUPPORTS", L2, Y);
+  icon(sl, i54, 223, 410, 122, 53, { f: Y });
+  icon(sl, i55, 101, 181, 365, 223, { f: Y });
+  [
+    [192,48,L4],
+    [267,48,"Lorem ipsum dolor sit amet  kolor suum ata si memet ta pleu bak muka keu ubat mata bek teuga gosip"],
+    [343,50,"Lorem ipsum dolor sit amet  ata si memet ta pleu bak muka keu rogoe seumayang meunyoe teuga kheun keu gob"],
+    [418,48,L4],
+  ].forEach(([a, b, c]) => t(sl, c, 539, a, 360, b, { s: 8, ls: 1.5 }));
+  [176, 252, 327, 402].forEach(a => el(sl, 500, a, 33, 33, { l: G, lw: 0.5 }));
+  [187, 262, 337, 412].forEach(a => icon(sl, i0, 509, a, 15, 13, { f: Y }));
+  [
+    [174,"CONNECTIONS"], [249,"RESPONSIVE"], [324,"NEW UPDATES"], [399,"MARKETPLACE"],
+  ].forEach(([a, b]) => t(sl, b, 538, a, 217, 25, { s: 9, c: Y, b: 1 }));
+  box(sl, 179, 273, 208, 40, { f: W, l: G, lw: 0.5 });
+  [274, 273].forEach(a => box(sl, 345, a, 42, 39, G1));
+  t(sl, "You Will Get", 187, 276, 158, 34, { s: 16, c: G, a: 'c', v: 'm' });
+  icon(sl, i18, 357, 284, 18, 18, { f: W });
+}
+
+// 58. CALENDAR OF EVENTS 2014
+function slide58(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "58", "CALENDAR OF EVENTS 2014", L2, Y);
+  [
+    [116,"02 "], [316,"12 "], [516,"20 "], [716,"22 "],
+  ].forEach(([a, b]) => t(sl, [{ t: b }, { t: "JANUARY", o: { s: 11, c: G } }], a, 378, 167, 40, { a: 'c', v: 'b' }));
+  [
+    [116,"EVENT NAME 01"], [316,"EVENT NAME 02"], [516,"EVENT NAME 03"], [716,"EVENT NAME 04"],
+  ].forEach(([a, b]) => ts(sl, 'rect', b, a, 332, 167, 33, { f: Y, s: 8, c: W, a: 'c', v: 'm' }));
+  [
+    108, 308, 508, 708,
+  ].forEach(a => t(sl, "PLACEHOLDER", a, 420, 183, 61, { s: 7, a: 'c', ls: 1.5 }));
+  [116, 316, 516, 716].forEach(a => imgBox(sl, a, 165, 167, 200));
+}
+
+// 59. STAY IN TOUCH
+function slide59(pptx) {
+  const sl = pptx.addSlide();
+  pageHead(sl, "59", "STAY IN TOUCH", L2, Y);
+  [
+    [190,193,33,34,i113], [592,194,31,33,i114], [191,309,31,31,i28], [600,310,14,29,i6],
+    [394,431,28,23,i7],
+  ].forEach(([a, b, c, e, g]) => icon(sl, g, a, b, c, e, { f: Y }));
+  [[177,180], [577,180], [177,295], [577,295], [378,413]].forEach(([a, b]) => el(sl, a, b, 60, 60, { l: Y }));
+  [
+    [249,180,"+ 123 456 789"], [647,180,"email@company.com"], [249,295,"Wordpress/company"],
+    [647,295,"email@facebook.com"], [448,413,"chat@twitter.com"],
+  ].forEach(([a, b, c]) => t(sl, c, a, b, 228, 60, { s: 14, c: G, v: 'm' }));
+}
+
+// 60. (cover)
+function slide60(pptx) {
+  const sl = pptx.addSlide();
+  imgBox(sl, 200, 0, 600, 381);
+  box(sl, 400, 290, 200, 167, Y);
+  sh(sl, 'frame', 474, 329, 52, 52, W);
+  t(sl, [{ t: "YOUR" }, { t: "LOGO", o: { b: 1 } }], 400, 388, 200, 37, { s: 16, c: W, a: 'c' });
+  t(sl, "THANKS FOR WATCHING THIS PRESENTATION", 100, 471, 800, 34, { s: 14, c: Y, a: 'c', v: 'b' });
+  t(sl, "www.company.com", 100, 496, 800, 30, { s: 12, c: G, a: 'c' });
+}
+
+/* ------------------------------------------------------------------- build */
+
+const SLIDES = [
+  slide1, slide2, slide3, slide4, slide5, slide6, slide7, slide8, slide9, slide10, slide11,
+  slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20, slide21,
+  slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29, slide30, slide31,
+  slide32, slide33, slide34, slide35, slide36, slide37, slide38, slide39, slide40, slide41,
+  slide42, slide43, slide44, slide45, slide46, slide47, slide48, slide49, slide50, slide51,
+  slide52, slide53, slide54, slide55, slide56, slide57, slide58, slide59, slide60,
+];
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'DECK', width: 10, height: 5.625 });
+  pptx.layout = 'DECK';
+  pptx.title = 'CONSTRUCTION';
+  SLIDES.forEach(function (fn) { fn(pptx); });
+  return pptx;
+}
+
+build()
+  .writeFile({ fileName: path.join(__dirname, path.basename(__filename, '.js') + '.pptx') })
+  .then(function (f) { console.log('wrote ' + f); })
+  .catch(function (e) { console.error(e); process.exit(1); });
