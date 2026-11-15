@@ -1,0 +1,51 @@
+{
+  "description": "Read one Origin-hosted pull request through a single view: summary, files, commits, reviews, comments, or threads. view defaults to summary. Summary includes labels, requested reviewers, and stack membership (stack id and parent pull request) when the pull request is stacked. The summary, reviews, and comments views carry authorDisplayName and authorHandle beside the opaque author id when Origin resolves them, so say the name rather than the id; a requested reviewer carries displayName and handle when Origin resolves them, and a group's are its name and organization/slug from the repository's reviewer roster, so a group missing from the roster is a bare grp_… id. The threads view requires threadIds and pages comments in those threads. Comments and threads carry url, a cursor.com link to that thread or comment on the pull request page. Images and recordings pasted into the description, a review, or a comment appear as cursor.com user-attachments URLs, and a cloud agent's screenshots and recordings as cursor.com artifact links; fetch one with get_pull_request_attachment.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "endLine": {
+        "type": "number"
+      },
+      "name": {
+        "description": "Origin repository name within that namespace",
+        "type": "string"
+      },
+      "number": {
+        "type": "number"
+      },
+      "owner": {
+        "description": "Origin namespace (owner) slug, taken from list_namespaces or an earlier Origin result. A GitHub owner or org name is not an Origin namespace unless list_namespaces returns it.",
+        "type": "string"
+      },
+      "pageSize": {
+        "type": "number"
+      },
+      "pageToken": {
+        "type": "string"
+      },
+      "startLine": {
+        "type": "number"
+      },
+      "threadIds": {
+        "description": "Thread ids for the threads view",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "view": {
+        "default": "summary",
+        "description": "summary (default), files, commits, reviews, comments, or threads",
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "name",
+      "number"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "pull_request_read"
+}

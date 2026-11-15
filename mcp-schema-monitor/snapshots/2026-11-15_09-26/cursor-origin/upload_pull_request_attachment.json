@@ -1,0 +1,33 @@
+{
+  "description": "Upload one image or video for an Origin-hosted repository's pull requests and return url, a cursor.com user-attachments URL that only readers of the repository can open. Write it into a description, review, or comment: an image as ![alt](url), a video as the bare url on its own line. content is the file's bytes in standard base64. fileName's extension sets the kind, an image (.gif, .jpeg, .jpg, .png, .webp) up to 10 MB or a video (.mov, .mp4, .webm) up to 100 MB, and Origin checks the file's bytes against that kind. The whole MCP request is limited to 1 MiB, so a file sent through this tool can be at most about 750 KiB before encoding. Needs write access to the repository's pull requests.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "content": {
+        "description": "The file's bytes in standard base64",
+        "type": "string"
+      },
+      "fileName": {
+        "description": "File name with its extension, such as screenshot.png",
+        "type": "string"
+      },
+      "name": {
+        "description": "Origin repository name within that namespace",
+        "type": "string"
+      },
+      "owner": {
+        "description": "Origin namespace (owner) slug, taken from list_namespaces or an earlier Origin result. A GitHub owner or org name is not an Origin namespace unless list_namespaces returns it.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "name",
+      "fileName",
+      "content"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "upload_pull_request_attachment"
+}

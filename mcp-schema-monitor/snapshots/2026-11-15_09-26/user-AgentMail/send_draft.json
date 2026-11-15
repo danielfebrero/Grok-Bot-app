@@ -1,0 +1,23 @@
+{
+  "description": "Send a draft right away; once sent it cannot be recalled. The draft is deleted and becomes a sent message; returns its messageId and threadId.",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "draftId": {
+        "description": "Draft ID, from list_drafts or create_draft",
+        "type": "string"
+      },
+      "inboxId": {
+        "description": "Inbox ID: the inbox's email address, from list_inboxes",
+        "type": "string"
+      }
+    },
+    "required": [
+      "inboxId",
+      "draftId"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "send_draft"
+}

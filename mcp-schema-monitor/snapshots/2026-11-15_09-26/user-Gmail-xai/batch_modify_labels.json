@@ -1,0 +1,34 @@
+{
+  "description": "Add or remove labels on multiple Gmail messages at once. More efficient than modifying one at a time. Common bulk operations: - Mark all as read: remove_label_ids = [\"UNREAD\"] - Archive all: remove_label_ids = [\"INBOX\"] - Star all: add_label_ids = [\"STARRED\"] The message_ids should come from gmail_search results. Maximum ~1000 messages per batch. This Gmail connection has no untrash, spam or filter tools. Restore a message from Trash with remove_label_ids [\"TRASH\"] and add_label_ids [\"INBOX\"]; mark spam with add_label_ids [\"SPAM\"] and remove_label_ids [\"INBOX\"] (the reverse for not spam). If Gmail refuses a system label, tell the user plainly that this connection cannot do that and that they can do it in Gmail. It cannot create, read or change Gmail filters: tell the user plainly and point them to Gmail's settings instead of trying other tool names or the browser.",
+  "inputSchema": {
+    "properties": {
+      "add_label_ids": {
+        "description": "Label IDs to add to all messages (e.g. [\"STARRED\", \"IMPORTANT\"])",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "message_ids": {
+        "description": "List of message IDs to modify (from gmail_search results)",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "remove_label_ids": {
+        "description": "Label IDs to remove from all messages (e.g. [\"UNREAD\", \"INBOX\"])",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "message_ids"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "batch_modify_labels"
+}

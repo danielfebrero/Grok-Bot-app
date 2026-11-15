@@ -1,0 +1,11 @@
+{
+  "description": "Topics EG et agents gb: que l'on peut adresser. Le slug ignore l'emoji du nom.",
+  "inputSchema": {
+    "additionalProperties": false,
+    "properties": {},
+    "required": [],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "peers"
+}

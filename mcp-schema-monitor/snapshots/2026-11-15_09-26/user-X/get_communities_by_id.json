@@ -1,0 +1,33 @@
+{
+  "description": "Retrieves details of a specific Community by its ID.",
+  "inputSchema": {
+    "properties": {
+      "community.fields": {
+        "description": "A comma separated list of Community fields to display.",
+        "items": {
+          "enum": [
+            "access",
+            "created_at",
+            "description",
+            "id",
+            "join_policy",
+            "member_count",
+            "name"
+          ],
+          "type": "string"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "id": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_communities_by_id"
+}

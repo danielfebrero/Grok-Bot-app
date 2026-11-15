@@ -1,0 +1,40 @@
+{
+  "description": "GET /repos/{owner}/{repo}/commits/{ref}: one commit with its stats and the files it touched (each with a `patch`), by SHA, branch, or tag.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "additionalProperties": false,
+    "properties": {
+      "owner": {
+        "description": "Repository owner (user or org login).",
+        "type": "string"
+      },
+      "page": {
+        "description": "1-based page number.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "per_page": {
+        "description": "Results per page (GitHub's default is 30, max 100).",
+        "maximum": 100,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "ref": {
+        "description": "Commit SHA, branch name, or tag name.",
+        "type": "string"
+      },
+      "repo": {
+        "description": "Repository name.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "repo",
+      "ref"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_commit"
+}

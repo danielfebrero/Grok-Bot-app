@@ -1,0 +1,27 @@
+{
+  "description": "Check or poll a backgrounded shell job. For work that does not have a shell id, you can omit the shell_id arg to sleep for the full `block_until_ms` duration (prefer this over sleeping in the shell, because it renders nicely to the user). At the end of your turn, you will be notified about any unawaited jobs that completed. If you think a job completed (e.g. because you killed it), observe it with AwaitShell to skip the notification, because stale notifications can confuse the user.\n\nPrefer NOT to poll reflexively with AwaitShell. Multitask on independent work while backgrounded jobs run, or finish your turn and rely on the end-of-turn completion notification. Poll with AwaitShell only when one of the following is true:\n- Your very next step is blocked on this specific job's result and you have no other productive work to do, OR\n- The task requires close monitoring (see shell guidance below).\n- Never poll a task whose tool result says it was \"manually backgrounded by the user\".\n- NEVER USE THIS TO POLL OR WAIT VACUOUSLY FOR A SUBAGENT LAUNCHED WITH THE Task TOOL — rely on the end-of-turn completion notification instead (it is delivered as soon as the subagent finishes; guessing a wait time is inefficient).\n- Shell: only poll with AwaitShell when the command requires close monitoring. Close monitoring means a long-running job that can silently hang, degrade, or need a course correction before it completes — e.g. training runs, eval runs, deployments, long builds, datagen pipelines, DB migrations, large data transfers. For fire-and-forget commands (tests, installs, dev servers/watchers, short scripts, etc.) the completion notification is enough — start them, keep working, and only poll with AwaitShell later if you end up blocked on the result.\n- Shell sanity check (regardless of close monitoring): when you spawn a command directly into the background (`block_until_ms: 0`), do a single status check by reading the output file to confirm the command didn't fail to start. This is a one-shot smoke check, not a polling loop.\n- Shell close-monitoring guidance (only applies in the close-monitoring case above):\n  - HARD STOPPING CONSTRAINT: once you've decided to actively poll, don't stop until (a) the job terminates, (b) the command reaches a healthy steady state (only for non-terminating commands, e.g. dev server/watcher), or (c) the command is hung — follow the hang guidance below.\n  - Waiting until a regex matches the output can be useful for e.g. known startup/status/error logs.\n  - Size `block_until_ms` to the command's expected runtime. When waiting further, avoid round 5-minute waits: prefer slices of 60–270s, which keep the prompt cache warm.\n  - Output file header has `pid` and `running_for_ms` (updated every 5000ms).\n  - When finished, footer with `exit_code` and `elapsed_ms` appears (regex only matches the body, not header/footer).\n  - If the command is taking longer than expected and appears hung (use judgment based on command type), kill the process if safe to do so using the pid in the header. If possible, fix the hang and proceed.\n\nOmit machineId for a command started on your box. For a command started on one of the user's computers, pass the same machineId that was used for the Shell call.",
+  "inputSchema": {
+    "properties": {
+      "block_until_ms": {
+        "description": "Max sleep time to block before returning (in milliseconds). Defaults to 30000ms. Set to 0 only together with shell_id, for a non-blocking status check of that shell. Must not exceed 780000 (13 minutes).",
+        "maximum": 780000,
+        "type": "number"
+      },
+      "machineId": {
+        "description": "Registered machine identifier.",
+        "type": "string"
+      },
+      "pattern": {
+        "description": "Block until the regex matches stdout/stderr stream (or task completes). Matches anywhere in the shell output, not just new output. Will not match terminal file headers or footers, e.g. exit_code. Accepts RE2 regex syntax (no lookahead, lookbehind or backreferences), compiled in multiline mode so ^ and $ match at line boundaries.",
+        "type": "string"
+      },
+      "shell_id": {
+        "description": "Optional shell id to poll. If omitted, this tool sleeps for the full block_until_ms duration and then returns. Required when block_until_ms is 0.",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "AwaitShell"
+}

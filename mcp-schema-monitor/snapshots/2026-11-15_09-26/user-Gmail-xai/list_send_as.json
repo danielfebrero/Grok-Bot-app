@@ -1,0 +1,9 @@
+{
+  "description": "List the addresses this Gmail account can send from: its own address and its send-as aliases. Entries with isPrimary true or verificationStatus \"accepted\" can be passed as `from` to gmail_create_draft or gmail_send_message. Returns raw Gmail JSON.",
+  "inputSchema": {
+    "properties": {},
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "list_send_as"
+}

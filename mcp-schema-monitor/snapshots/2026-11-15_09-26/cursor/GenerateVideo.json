@@ -1,0 +1,89 @@
+{
+  "description": "Generate a short MP4 video clip with Grok Imagine and save it as a project asset.\n\nSTRICT INVOCATION RULES (must follow):\n- Only use this tool when the user explicitly asks for a video, animation, or clip. Do not generate videos \"just to be helpful\".\n- This tool produces generated footage: live-action or cinematic scenes, a still brought to life, a character from reference images. It cannot produce designed motion such as motion graphics, kinetic typography, title cards, showreels, UI or product demos, charts, explainers, slideshows, or anything with exact timing, text, or brand assets.\n- Generation can take minutes; call it once per request.\n\nThe inputs select the mode:\n- Image-to-video: `image_path`. The image becomes the first frame; the prompt may be brief.\n- First and last frame: `last_frame_path`. The clip ends exactly on that image. Set `image_path` too to start on one image and end on another; the model animates the motion between them, and the same image for both makes a loop. The prompt may be brief. `last_frame_path` also combines with references.\n- Reference-to-video: `reference_image_paths`. Cite them in the prompt as <IMAGE_0>, <IMAGE_1>, ... If `image_path` is also set, it is <IMAGE_0> and the references start at <IMAGE_1>.\n- Text-to-video: prompt only.\n\n`keyframes` pins up to 4 images inside the clip in any mode; each appears exactly at its `timestamp_s`, strictly between 0 and `duration`. Use them for moments the clip must hit; pin the ends with `image_path` and `last_frame_path` instead.\n\nDescribe subject, motion, camera movement, lighting, and mood concretely. Set `duration` and `resolution` only when the user asks.\n\nThe generated video is saved to disk and is not shown to the user automatically; include its returned `file://` URL in your WakeParent report when the parent should show it to the user.",
+  "inputSchema": {
+    "properties": {
+      "aspect_ratio": {
+        "description": "Image-to-video defaults to the source image's ratio.",
+        "enum": [
+          "1:1",
+          "16:9",
+          "9:16",
+          "4:3",
+          "3:4",
+          "3:2",
+          "2:3"
+        ],
+        "type": "string"
+      },
+      "duration": {
+        "description": "Seconds, 1-15. Default 6.",
+        "maximum": 15,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "filename": {
+        "description": "Optional file name such as 'hero.mp4', without a directory.",
+        "type": "string"
+      },
+      "image_path": {
+        "description": "Still image to animate; becomes the first frame.",
+        "minLength": 1,
+        "type": "string"
+      },
+      "keyframes": {
+        "description": "Up to 4 images pinned inside the clip, each appearing exactly at its timestamp_s.",
+        "items": {
+          "properties": {
+            "image_path": {
+              "description": "Image that appears at timestamp_s.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "timestamp_s": {
+              "description": "Seconds into the clip, strictly between 0 and duration.",
+              "exclusiveMinimum": 0,
+              "type": "number"
+            }
+          },
+          "required": [
+            "image_path",
+            "timestamp_s"
+          ],
+          "type": "object"
+        },
+        "maxItems": 4,
+        "type": "array"
+      },
+      "last_frame_path": {
+        "description": "Image the clip ends on; becomes the last frame. Set image_path too to fix both ends.",
+        "minLength": 1,
+        "type": "string"
+      },
+      "prompt": {
+        "description": "Subject, motion, camera, and mood. Optional only for image-to-video.",
+        "type": "string"
+      },
+      "reference_image_paths": {
+        "description": "Up to 14 images guiding people, objects, clothing, or settings; re-rendered, not used as frames.",
+        "items": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "maxItems": 14,
+        "type": "array"
+      },
+      "resolution": {
+        "description": "\"480p\" (default), \"720p\", or \"1080p\". 1080p is only for text-to-video and image-to-video, without last_frame_path, keyframes, or reference_image_paths.",
+        "enum": [
+          "480p",
+          "720p",
+          "1080p"
+        ],
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "GenerateVideo"
+}

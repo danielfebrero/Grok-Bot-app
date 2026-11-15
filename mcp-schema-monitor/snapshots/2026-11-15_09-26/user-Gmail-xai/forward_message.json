@@ -1,0 +1,29 @@
+{
+  "description": "Forward an email to new recipients. Fetches the original message and sends it with a '---------- Forwarded message ----------' header including the original sender, date, subject. Optionally prepend a note above the forwarded content using additional_message.",
+  "inputSchema": {
+    "properties": {
+      "additional_message": {
+        "description": "Optional note to prepend above the forwarded content",
+        "type": "string"
+      },
+      "message_id": {
+        "description": "Message ID of the email to forward (from gmail_search or gmail_get_message)",
+        "type": "string"
+      },
+      "to": {
+        "description": "Email addresses to forward to",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "message_id",
+      "to"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "forward_message"
+}

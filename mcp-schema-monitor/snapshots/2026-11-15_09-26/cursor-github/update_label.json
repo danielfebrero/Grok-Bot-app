@@ -1,0 +1,43 @@
+{
+  "description": "PATCH /repos/{owner}/{repo}/labels/{name}: rename (`new_name`), recolor, or redescribe a label; issues carrying it follow. Always call `list_labels` first.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "additionalProperties": false,
+    "properties": {
+      "color": {
+        "description": "Six-digit hex color without the leading #, e.g. f29513.",
+        "pattern": "^[0-9a-fA-F]{6}$",
+        "type": "string"
+      },
+      "description": {
+        "maxLength": 100,
+        "type": "string"
+      },
+      "name": {
+        "description": "Label name (case-insensitive).",
+        "minLength": 1,
+        "type": "string"
+      },
+      "new_name": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "owner": {
+        "description": "Repository owner (user or org login).",
+        "type": "string"
+      },
+      "repo": {
+        "description": "Repository name.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "repo",
+      "name"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "update_label"
+}

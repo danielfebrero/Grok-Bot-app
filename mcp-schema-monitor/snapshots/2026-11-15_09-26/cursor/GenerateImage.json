@@ -1,0 +1,39 @@
+{
+  "description": "Generate an image file from a text description.\n\nSTRICT INVOCATION RULES (must follow):\n- Only use this tool when the user explicitly asks for an image. Do not generate images \"just to be helpful\".\n- Do not use this tool for data heavy visualizations such as charts, plots, tables.\n\nGeneral guidelines:\n- Provide a concrete description first: subject(s), layout, style, colors, text (if any), and constraints. Use at least 6 words; descriptions of 3 words or fewer are rejected.\n- If the user requests an aspect ratio, set `aspect_ratio` to one of \"1:1\", \"4:3\", \"3:4\", \"16:9\", or \"9:16\".\n- If the user provides reference images, include them in `reference_image_paths`.\n- For a well-known person, product, or place you have no image of, search the web for a photo of it, download it into the workspace, and include it in `reference_image_paths`, so the likeness comes from the photo rather than from memory.\n- If the user asked to see what a real person, product, or place looks like, show a real photo. If you can't get one, say so and don't generate one.\n- The generated image is saved to disk and is not shown to the user automatically; include its returned `file://` URL in your WakeParent report when the parent should show it to the user.\n\nExamples that should call this tool:\n- user: \"Generate an app icon for a note-taking app, minimal flat vector style.\" (explicitly requests an image asset)\n- user: \"Make a UI mockup of a settings screen with a dark mode toggle.\" (explicitly requests a UI mockup)\n- user: \"Generate an asset of a game character with a sword.\" (explicitly requests a visual asset)\n\nExamples that should not call this tool:\n- user: \"Create a plan to refactor this module.\" (planning request; respond in text or mermaid diagram)\n- user: \"Generate a chart of sales and revenue using data.csv.\" (data visualization; generate via code)",
+  "inputSchema": {
+    "properties": {
+      "aspect_ratio": {
+        "description": "Optional aspect ratio for the generated image. Supported values are \"1:1\", \"4:3\", \"3:4\", \"16:9\", and \"9:16\".",
+        "enum": [
+          "1:1",
+          "4:3",
+          "3:4",
+          "16:9",
+          "9:16"
+        ],
+        "type": "string"
+      },
+      "description": {
+        "description": "A detailed description of the image, at least 6 words. Descriptions of 3 words or fewer are rejected.",
+        "type": "string"
+      },
+      "filename": {
+        "description": "Optional filename for the generated image (e.g., 'diagram.png'). Do not include a directory path - the tool automatically handles where to save and how to display the image. If not provided, a timestamped filename will be generated.",
+        "type": "string"
+      },
+      "reference_image_paths": {
+        "description": "Optional array of file paths to reference images as additional inputs.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "description"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "GenerateImage"
+}

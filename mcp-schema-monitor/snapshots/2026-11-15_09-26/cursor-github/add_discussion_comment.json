@@ -1,0 +1,39 @@
+{
+  "description": "Comment on a discussion (GraphQL `addDiscussionComment`): a new top-level comment, or a reply when `reply_to_id` names a top-level comment (Discussions nest one level; replying to a reply is refused).",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "additionalProperties": false,
+    "properties": {
+      "body": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "discussion_number": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "owner": {
+        "description": "Repository owner (user or org login).",
+        "type": "string"
+      },
+      "reply_to_id": {
+        "description": "Node id of the top-level comment to reply to.",
+        "minLength": 1,
+        "type": "string"
+      },
+      "repo": {
+        "description": "Repository name.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "repo",
+      "discussion_number",
+      "body"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "add_discussion_comment"
+}

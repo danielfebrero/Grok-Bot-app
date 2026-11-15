@@ -1,0 +1,32 @@
+{
+  "description": "GET /repos/{owner}/{repo}/git/trees/{tree_sha}: a tree object. `tree_sha` may be a branch or tag name, or a commit or tree SHA; pass `recursive: true` to list the whole subtree in one call (GitHub truncates very large trees and says so with `truncated: true`).",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "additionalProperties": false,
+    "properties": {
+      "owner": {
+        "description": "Repository owner (user or org login).",
+        "type": "string"
+      },
+      "recursive": {
+        "type": "boolean"
+      },
+      "repo": {
+        "description": "Repository name.",
+        "type": "string"
+      },
+      "tree_sha": {
+        "description": "Tree SHA, commit SHA, branch, or tag.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "repo",
+      "tree_sha"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_git_tree"
+}

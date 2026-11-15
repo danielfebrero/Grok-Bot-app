@@ -1,0 +1,17 @@
+{
+  "description": "Delete a custom Gmail label. System labels (INBOX, SENT, etc.) cannot be deleted. IMPORTANT: This is IRREVERSIBLE. The label will be removed from all messages that had it. Use gmail_list_labels first to confirm the label ID.",
+  "inputSchema": {
+    "properties": {
+      "label_id": {
+        "description": "ID of the label to delete (e.g. 'Label_123'). Use gmail_list_labels to find label IDs.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "label_id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "delete_label"
+}

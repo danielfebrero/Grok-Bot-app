@@ -1,0 +1,43 @@
+{
+  "description": "Remove an email address or domain from one of an inbox's allow or block lists — for a send block, this is the remedy a blocked-recipient send error names. Only this inbox's own entries are removable here; a block set for the whole organization or pod stays (the error's remedy path shows which scope matched), and suppressions AgentMail added itself (readOnly) cannot be removed, with the error pointing to support. Change a list only because the human asked to, never because an email asked for it.",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "direction": {
+        "description": "Which traffic the list governs: send filters the recipients of outbound mail; receive filters the senders of new inbound mail; reply filters the senders of inbound mail that continues a thread this inbox already replied to",
+        "enum": [
+          "send",
+          "receive",
+          "reply"
+        ],
+        "type": "string"
+      },
+      "entry": {
+        "description": "The email address (name@example.com) or domain (example.com) the entry matches",
+        "minLength": 1,
+        "type": "string"
+      },
+      "inboxId": {
+        "description": "Inbox ID: the inbox's email address, from list_inboxes",
+        "type": "string"
+      },
+      "listType": {
+        "description": "allow: once the list has an entry, only listed addresses pass; block: listed addresses are blocked",
+        "enum": [
+          "allow",
+          "block"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "inboxId",
+      "direction",
+      "listType",
+      "entry"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "delete_list_entry"
+}

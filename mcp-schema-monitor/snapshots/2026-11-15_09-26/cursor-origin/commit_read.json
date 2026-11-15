@@ -1,0 +1,44 @@
+{
+  "description": "Read one commit in an Origin-hosted repository. Choose a single view: metadata, files, or a bounded patch. view defaults to metadata.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "endLine": {
+        "type": "number"
+      },
+      "name": {
+        "description": "Origin repository name within that namespace",
+        "type": "string"
+      },
+      "owner": {
+        "description": "Origin namespace (owner) slug, taken from list_namespaces or an earlier Origin result. A GitHub owner or org name is not an Origin namespace unless list_namespaces returns it.",
+        "type": "string"
+      },
+      "pageSize": {
+        "type": "number"
+      },
+      "pageToken": {
+        "type": "string"
+      },
+      "sha": {
+        "type": "string"
+      },
+      "startLine": {
+        "type": "number"
+      },
+      "view": {
+        "default": "metadata",
+        "description": "metadata (default), files, or a bounded patch",
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "name",
+      "sha"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "commit_read"
+}

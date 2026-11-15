@@ -1,0 +1,18 @@
+{
+  "description": "Nom de topic, emoji compris, vers eg:<slug>. ⚡️ seul devient eg:e26a1. Alert 🚨 devient eg:alert.",
+  "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+      "name": {
+        "description": "Nom du topic, emoji compris.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "resolve"
+}

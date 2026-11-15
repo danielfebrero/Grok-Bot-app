@@ -1,0 +1,11 @@
+{
+  "description": "Hooks enregistrés. Pas de secret dans la réponse.",
+  "inputSchema": {
+    "additionalProperties": false,
+    "properties": {},
+    "required": [],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "hook_list"
+}

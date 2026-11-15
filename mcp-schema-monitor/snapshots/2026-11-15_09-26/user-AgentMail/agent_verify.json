@@ -1,0 +1,18 @@
+{
+  "description": "Verify an unverified agent organization using the 6-digit code emailed to the human attached to it, lifting the unverified plan's caps (1 inbox, 10 sends/day) at no cost. Call this when a plan-cap error tells you to verify — ask your human for the code from their email. If no human is attached yet, call agent_attach_human first. The code expires after 24 hours and allows at most 10 attempts; after 10 wrong attempts even the correct code is rejected, so wait for it to expire, then call agent_attach_human with the same email for a new one.",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "otpCode": {
+        "description": "6-digit verification code emailed to the human attached to the organization",
+        "type": "string"
+      }
+    },
+    "required": [
+      "otpCode"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "agent_verify"
+}

@@ -1,0 +1,32 @@
+{
+  "description": "Pose un fait decide ou etat, 400 caractères au plus, que le prochain réveil doit revoir. Ce n'est pas la mémoire longue.",
+  "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+      "fact": {
+        "description": "Un fait, 400 caractères au plus.",
+        "type": "string"
+      },
+      "kind": {
+        "description": "decide ou etat.",
+        "type": "string"
+      },
+      "peer": {
+        "description": "eg:<slug> ou gb:<id>.",
+        "type": "string"
+      },
+      "team_id": {
+        "description": "Id d'un message de la salle, si le fait s'y rapporte.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "peer",
+      "kind",
+      "fact"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "liaison_commit"
+}

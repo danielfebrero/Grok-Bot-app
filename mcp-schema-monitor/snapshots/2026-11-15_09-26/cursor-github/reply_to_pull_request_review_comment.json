@@ -1,0 +1,41 @@
+{
+  "description": "POST /repos/{owner}/{repo}/pulls/{pull_number}/comments/{comment_id}/replies: reply in an existing review-comment thread.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "additionalProperties": false,
+    "properties": {
+      "body": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "comment_id": {
+        "description": "Id from list_pull_request_review_comments.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "owner": {
+        "description": "Repository owner (user or org login).",
+        "type": "string"
+      },
+      "pull_number": {
+        "description": "Pull request number.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "repo": {
+        "description": "Repository name.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "repo",
+      "pull_number",
+      "comment_id",
+      "body"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "reply_to_pull_request_review_comment"
+}

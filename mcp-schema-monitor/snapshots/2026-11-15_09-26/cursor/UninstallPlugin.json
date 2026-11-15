@@ -1,0 +1,18 @@
+{
+  "description": "Uninstall a plugin by its STABLE plugin id (from SearchPlugins). This is destructive and removes the WHOLE PLUGIN, meaning its install record and EVERY connector and skill it added, so disclose that full scope (list what goes) and call it only once the user has typed a request to remove it by name: a yes to your question or a tap on an option does not count, so ask them to type the request themselves, such as remove Weather, instead of confirming with a question widget. It also signs the user out of every connector it added, and installing it again does not bring a sign-in back. Only uninstall a plugin the user asked to remove, never to fix or reinstall one of its connectors. To fix a connector that is failing or needs sign-in, reconnect it with RestartMcpServers or sign in again with AuthenticateMcpServer, and otherwise tell the user what failed. Plugins required by the user's team cannot be uninstalled. This removes each of its servers with ALL of their accounts; to remove just one account from a server, use RemoveMcpAccount instead.",
+  "inputSchema": {
+    "properties": {
+      "plugin_id": {
+        "description": "The stable plugin id from SearchPlugins.",
+        "minLength": 1,
+        "type": "string"
+      }
+    },
+    "required": [
+      "plugin_id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "UninstallPlugin"
+}

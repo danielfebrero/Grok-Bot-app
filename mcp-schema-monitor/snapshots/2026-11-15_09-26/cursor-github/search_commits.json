@@ -1,0 +1,41 @@
+{
+  "description": "GET /search/commits with GitHub commit-search syntax (e.g. \"repo:owner/name fix login author:octocat\"). Runs as every connected account and merges the envelopes (items verbatim, deduplicated).",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "additionalProperties": false,
+    "properties": {
+      "order": {
+        "enum": [
+          "asc",
+          "desc"
+        ],
+        "type": "string"
+      },
+      "page": {
+        "description": "1-based page number.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "per_page": {
+        "description": "Results per page (GitHub's default is 30, max 100).",
+        "maximum": 100,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "q": {
+        "description": "GitHub search query syntax. A query can mix two kinds of terms:\n- Qualifiers such as `repo:owner/name`, `is:open`, `label:bug`, `author:octocat`, separated by spaces. Every qualifier must match: `author:octocat repo:owner/name` means items by `octocat` in `owner/name`. Exclude with `-`, e.g. `-label:wontfix`. AND / OR / NOT never apply to qualifiers; for `repo:a/b OR repo:c/d`, run one search per repo.\n- Plain text terms, which may be joined with AND / OR / NOT (at most five per query), e.g. `repo:owner/name crash OR panic`.",
+        "type": "string"
+      },
+      "sort": {
+        "description": "Sort field; best match when omitted.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "q"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "search_commits"
+}

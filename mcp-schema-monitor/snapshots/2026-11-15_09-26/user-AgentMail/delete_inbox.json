@@ -1,0 +1,18 @@
+{
+  "description": "Permanently delete an inbox and all of its threads, messages, and drafts; this cannot be undone. The deletion finishes in the background, and is refused while API keys scoped to the inbox exist.",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "inboxId": {
+        "description": "Inbox ID: the inbox's email address, from list_inboxes",
+        "type": "string"
+      }
+    },
+    "required": [
+      "inboxId"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "delete_inbox"
+}

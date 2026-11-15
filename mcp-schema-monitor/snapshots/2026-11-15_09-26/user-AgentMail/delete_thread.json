@@ -1,0 +1,23 @@
+{
+  "description": "Permanently delete a thread and all of its messages; this cannot be undone. To move a thread to trash instead, add the trash label with update_thread.",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "inboxId": {
+        "description": "Inbox ID: the inbox's email address, from list_inboxes",
+        "type": "string"
+      },
+      "threadId": {
+        "description": "Thread ID, from list_threads, search_threads, or a message's threadId",
+        "type": "string"
+      }
+    },
+    "required": [
+      "inboxId",
+      "threadId"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "delete_thread"
+}

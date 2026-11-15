@@ -1,0 +1,115 @@
+{
+  "description": "Returns the X calls on the authenticated user's calendar, earliest first: events on their X Calls calendar, and events on the Microsoft Outlook calendars they linked to X whose conference is an X call. Calls still running at start_time are included. The window defaults to the next 24 hours and may span at most 7 days. Use scheduled_call.fields to select which fields are returned. When both are provided, `start_time` must be earlier than `end_time`.",
+  "inputSchema": {
+    "properties": {
+      "call.fields": {
+        "description": "A comma separated list of Call fields to display.",
+        "items": {
+          "enum": [
+            "conversation_id",
+            "created_at",
+            "id",
+            "join_policy",
+            "join_url",
+            "participant_count",
+            "title",
+            "viewer_may_join"
+          ],
+          "type": "string"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "end_time": {
+        "description": "Calls starting before this time (RFC 3339). Defaults to 24 hours after start_time.",
+        "type": "string"
+      },
+      "expansions": {
+        "description": "A comma separated list of fields to expand.",
+        "items": {
+          "enum": [
+            "call_id",
+            "invitees",
+            "organizer_id"
+          ],
+          "type": "string"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "max_results": {
+        "description": "The most calls to return. Defaults to 20.",
+        "maximum": 100,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "scheduled_call.fields": {
+        "description": "A comma separated list of ScheduledCall fields to display.",
+        "items": {
+          "enum": [
+            "calendar",
+            "call_id",
+            "description",
+            "end_time",
+            "id",
+            "join_url",
+            "occurrence_start_time",
+            "recurrence",
+            "start_time",
+            "status",
+            "time_zone",
+            "title"
+          ],
+          "type": "string"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "start_time": {
+        "description": "Calls still running at this time or starting after it (RFC 3339). Defaults to now.",
+        "type": "string"
+      },
+      "user.fields": {
+        "description": "A comma separated list of User fields to display.",
+        "items": {
+          "enum": [
+            "active_follower_count",
+            "confirmed_email",
+            "connection_status",
+            "created_at",
+            "description",
+            "entities",
+            "id",
+            "is_identity_verified",
+            "location",
+            "name",
+            "org_only",
+            "parody",
+            "profile_banner_url",
+            "profile_image_url",
+            "protected",
+            "public_metrics",
+            "receives_your_chat",
+            "receives_your_dm",
+            "subscriber_count",
+            "subscribes_to_you",
+            "subscription",
+            "subscription_type",
+            "url",
+            "username",
+            "verified",
+            "verified_followers_count",
+            "verified_type",
+            "withheld"
+          ],
+          "type": "string"
+        },
+        "minItems": 1,
+        "type": "array"
+      }
+    },
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "list_scheduled_calls"
+}

@@ -1,0 +1,18 @@
+{
+  "description": "Retire un hook par id.",
+  "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+      "id": {
+        "description": "Id du hook.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "hook_delete"
+}

@@ -1,0 +1,42 @@
+{
+  "description": "One page of a discussion's top-level comments (GraphQL `discussion.comments`), each with `isAnswer`; `include_replies` nests up to 100 replies under each (Discussions nest one level).",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "additionalProperties": false,
+    "properties": {
+      "after": {
+        "description": "`pageInfo.endCursor` from the previous page.",
+        "type": "string"
+      },
+      "discussion_number": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "first": {
+        "description": "Page size (default 30, max 100).",
+        "maximum": 100,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "include_replies": {
+        "type": "boolean"
+      },
+      "owner": {
+        "description": "Repository owner (user or org login).",
+        "type": "string"
+      },
+      "repo": {
+        "description": "Repository name.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "repo",
+      "discussion_number"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_discussion_comments"
+}

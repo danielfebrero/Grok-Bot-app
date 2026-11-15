@@ -1,0 +1,66 @@
+{
+  "description": "Look up the meetings you have joined for one provider (GOOGLE_MEET, ZOOM, or MICROSOFT_TEAMS) and external meeting ID, newest first; a recurring meeting can match many times. Returns the internal meeting ID, the meeting title if one was given at join, status, provider, requested time, join time once live, end time if the meeting has ended, whether notes exist, and the external meeting ID you passed. Takes the same statuses, requested_after, requested_before, limit, and cursor as ListMeetings.",
+  "inputSchema": {
+    "properties": {
+      "cursor": {
+        "description": "The cursor the previous page ended with. Pass the same filters with it.",
+        "minLength": 1,
+        "type": "string"
+      },
+      "external_meeting_id": {
+        "description": "The external meeting ID: the provider's meeting id (Zoom numeric id, Meet code, or Teams meeting id).",
+        "maxLength": 256,
+        "minLength": 1,
+        "type": "string"
+      },
+      "limit": {
+        "description": "Meetings per page, at most 50.",
+        "maximum": 50,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "provider": {
+        "description": "GOOGLE_MEET, ZOOM, or MICROSOFT_TEAMS.",
+        "enum": [
+          "GOOGLE_MEET",
+          "ZOOM",
+          "MICROSOFT_TEAMS"
+        ],
+        "type": "string"
+      },
+      "requested_after": {
+        "description": "ISO 8601 time. Only meetings whose requested time is at or after it.",
+        "format": "date-time",
+        "type": "string"
+      },
+      "requested_before": {
+        "description": "ISO 8601 time. Only meetings whose requested time is before it.",
+        "format": "date-time",
+        "type": "string"
+      },
+      "statuses": {
+        "description": "Only meetings in these statuses. SCHEDULED is a schedule; JOINING and LIVE are meetings in progress; ENDED, FAILED, and CANCELLED are finished.",
+        "items": {
+          "enum": [
+            "SCHEDULED",
+            "JOINING",
+            "LIVE",
+            "ENDED",
+            "FAILED",
+            "CANCELLED"
+          ],
+          "type": "string"
+        },
+        "minItems": 1,
+        "type": "array"
+      }
+    },
+    "required": [
+      "provider",
+      "external_meeting_id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "FindMeeting"
+}

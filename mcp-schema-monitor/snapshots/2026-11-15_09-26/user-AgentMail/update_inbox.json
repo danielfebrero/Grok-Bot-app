@@ -1,0 +1,68 @@
+{
+  "description": "Update an inbox's display name or metadata. Metadata keys are merged; set a key to null to remove it, or set metadata to null to clear all. A new display name applies to mail sent afterwards.",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "displayName": {
+        "description": "New sender name recipients see on mail from this inbox",
+        "type": "string"
+      },
+      "inboxId": {
+        "description": "Inbox ID: the inbox's email address, from list_inboxes",
+        "type": "string"
+      },
+      "metadata": {
+        "anyOf": [
+          {
+            "additionalProperties": {
+              "type": [
+                "string",
+                "number",
+                "boolean",
+                "null"
+              ]
+            },
+            "propertyNames": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Metadata to merge into existing metadata. Set a key to null to remove it, or the whole field to null to clear all metadata"
+      },
+      "signature": {
+        "anyOf": [
+          {
+            "properties": {
+              "html": {
+                "description": "HTML version for the HTML part, at most 4,000 characters; link a logo by URL. When omitted, the HTML part gets text",
+                "type": "string"
+              },
+              "text": {
+                "description": "Signature for the plain-text part, at most 1,000 characters; line breaks are kept",
+                "type": "string"
+              }
+            },
+            "required": [
+              "text"
+            ],
+            "type": "object"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Replace the signature AgentMail adds to every message this inbox sends, or null to remove it"
+      }
+    },
+    "required": [
+      "inboxId"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "update_inbox"
+}

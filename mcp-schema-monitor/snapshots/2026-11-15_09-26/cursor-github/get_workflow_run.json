@@ -1,0 +1,30 @@
+{
+  "description": "GET /repos/{owner}/{repo}/actions/runs/{run_id}: the workflow run object.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "additionalProperties": false,
+    "properties": {
+      "owner": {
+        "description": "Repository owner (user or org login).",
+        "type": "string"
+      },
+      "repo": {
+        "description": "Repository name.",
+        "type": "string"
+      },
+      "run_id": {
+        "description": "Workflow run id.",
+        "minimum": 1,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "owner",
+      "repo",
+      "run_id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_workflow_run"
+}

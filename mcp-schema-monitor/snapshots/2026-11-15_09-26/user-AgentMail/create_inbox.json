@@ -1,0 +1,58 @@
+{
+  "description": "Create an inbox and return it, including the email address that is its inboxId. Optionally choose the username, domain, display name, and metadata; creating again with the same clientId returns the inbox it already created.",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "clientId": {
+        "description": "Your idempotency key: creating again with the same clientId returns the existing inbox",
+        "type": "string"
+      },
+      "displayName": {
+        "description": "Sender name recipients see; \"AgentMail\" when omitted, and an empty string sends none",
+        "type": "string"
+      },
+      "domain": {
+        "description": "Domain of the address, agentmail.to when omitted; a custom domain must be verified first",
+        "type": "string"
+      },
+      "metadata": {
+        "additionalProperties": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ]
+        },
+        "description": "Your own key-value data, stored on the inbox and returned with it; recipients never see it",
+        "propertyNames": {
+          "type": "string"
+        },
+        "type": "object"
+      },
+      "signature": {
+        "description": "Signature AgentMail adds to every message this inbox sends, after your content and above any quoted message; not added again when the body already contains it",
+        "properties": {
+          "html": {
+            "description": "HTML version for the HTML part, at most 4,000 characters; link a logo by URL. When omitted, the HTML part gets text",
+            "type": "string"
+          },
+          "text": {
+            "description": "Signature for the plain-text part, at most 1,000 characters; line breaks are kept",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "type": "object"
+      },
+      "username": {
+        "description": "Part of the address before the @; a random one is generated when omitted",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "create_inbox"
+}

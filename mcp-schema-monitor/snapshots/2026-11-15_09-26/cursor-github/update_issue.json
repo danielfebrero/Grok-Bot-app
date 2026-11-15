@@ -1,0 +1,76 @@
+{
+  "description": "PATCH /repos/{owner}/{repo}/issues/{issue_number}: edit title, body, labels, assignees, or state (with `state_reason`). `labels` and `assignees` replace the existing sets.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "additionalProperties": false,
+    "properties": {
+      "assignees": {
+        "items": {
+          "type": "string"
+        },
+        "maxItems": 10,
+        "type": "array"
+      },
+      "body": {
+        "type": "string"
+      },
+      "issue_number": {
+        "description": "Issue number.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "labels": {
+        "items": {
+          "type": "string"
+        },
+        "maxItems": 20,
+        "type": "array"
+      },
+      "milestone": {
+        "anyOf": [
+          {
+            "minimum": 1,
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "owner": {
+        "description": "Repository owner (user or org login).",
+        "type": "string"
+      },
+      "repo": {
+        "description": "Repository name.",
+        "type": "string"
+      },
+      "state": {
+        "enum": [
+          "open",
+          "closed"
+        ],
+        "type": "string"
+      },
+      "state_reason": {
+        "enum": [
+          "completed",
+          "not_planned",
+          "reopened"
+        ],
+        "type": "string"
+      },
+      "title": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "repo",
+      "issue_number"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "update_issue"
+}

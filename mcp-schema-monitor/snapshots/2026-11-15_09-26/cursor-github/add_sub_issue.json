@@ -1,0 +1,39 @@
+{
+  "description": "POST /repos/{owner}/{repo}/issues/{issue_number}/sub_issues: make an existing issue a sub-issue of `issue_number`. An issue has one parent: pass `replace_parent: true` to move it from another.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "additionalProperties": false,
+    "properties": {
+      "issue_number": {
+        "description": "Issue number.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "owner": {
+        "description": "Repository owner (user or org login).",
+        "type": "string"
+      },
+      "replace_parent": {
+        "type": "boolean"
+      },
+      "repo": {
+        "description": "Repository name.",
+        "type": "string"
+      },
+      "sub_issue_id": {
+        "description": "The sub-issue's `id` (the numeric id on the issue object, not its number).",
+        "minimum": 1,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "owner",
+      "repo",
+      "issue_number",
+      "sub_issue_id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "add_sub_issue"
+}

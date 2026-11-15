@@ -1,0 +1,28 @@
+{
+  "description": "Create a channel, a named group chat of one or more of your user's agents, and get its id back. Post into it afterwards with SendToAgent using that id; every member sees the post and can reply into the channel. You have no tool to delete a channel, so only create one the user actually needs; the user can delete it from the sidebar. Creating a channel is a real side effect the user sees in their sidebar. Do it when the user asked for a room or a task genuinely needs a standing group, never speculatively. Include your own id in member_ids if you should take part: membership is what lets you post into a channel and change it with UpdateChannel later.",
+  "inputSchema": {
+    "properties": {
+      "member_ids": {
+        "description": "The agent ids to seat in the channel, up to 6. Use ids from your teammates list, not names, and never a channel id (channels cannot nest).",
+        "items": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "name": {
+        "description": "A short, human-readable name for the channel (e.g. \"Launch team\").",
+        "minLength": 1,
+        "type": "string"
+      }
+    },
+    "required": [
+      "name",
+      "member_ids"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "CreateChannel"
+}

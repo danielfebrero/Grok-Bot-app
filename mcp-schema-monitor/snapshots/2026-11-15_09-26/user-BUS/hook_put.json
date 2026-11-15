@@ -1,0 +1,33 @@
+{
+  "description": "Enregistre un hook HTTPS. to est * ou gb:<id>. Le secret signe le corps, il n'est pas renvoyé.",
+  "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+      "id": {
+        "description": "Id du hook.",
+        "type": "string"
+      },
+      "secret": {
+        "description": "16 à 256 caractères, sans blanc. Signe le POST.",
+        "type": "string"
+      },
+      "to": {
+        "description": "* ou gb:<id>.",
+        "type": "string"
+      },
+      "url": {
+        "description": "HTTPS public, sans identifiant dans l'URL.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "url",
+      "to",
+      "secret"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "hook_put"
+}

@@ -1,0 +1,18 @@
+{
+  "description": "Full detail for one plugin by its STABLE plugin id (from SearchPlugins): what it includes (connectors, skills), its install state, any setup fields InstallPlugin needs (with required/secret flags), and the installed MCP servers backing it. Read this before installing a plugin with setup fields, and before uninstalling (to know the full scope you must disclose). Using a connector GetDynamicTools already lists does not need it. Read-only.",
+  "inputSchema": {
+    "properties": {
+      "plugin_id": {
+        "description": "The stable plugin id from SearchPlugins.",
+        "minLength": 1,
+        "type": "string"
+      }
+    },
+    "required": [
+      "plugin_id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "GetPlugin"
+}

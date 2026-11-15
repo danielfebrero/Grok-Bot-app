@@ -1,0 +1,31 @@
+{
+  "description": "Find inboxes by address or display name (word-prefix match, best match first) without paging the whole organization. Use it to resolve a name to an inboxId.",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "limit": {
+        "default": 10,
+        "description": "Number of items per page",
+        "exclusiveMinimum": 0,
+        "maximum": 100,
+        "type": "integer"
+      },
+      "pageToken": {
+        "description": "nextPageToken from the previous page's result; omit for the first page",
+        "type": "string"
+      },
+      "q": {
+        "description": "Words matched by prefix against inbox addresses and display names, or a full address",
+        "maxLength": 256,
+        "minLength": 2,
+        "type": "string"
+      }
+    },
+    "required": [
+      "q"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "search_inboxes"
+}

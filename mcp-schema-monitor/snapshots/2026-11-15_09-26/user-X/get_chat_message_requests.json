@@ -1,0 +1,48 @@
+{
+  "description": "Retrieves the authenticated user's pending Chat message requests from one inbox. Message contents are end-to-end encrypted unless the conversation is unencrypted. Accepting or deleting requests between pages can skip or repeat requests, and a page can be empty while `next_token` is set.",
+  "inputSchema": {
+    "properties": {
+      "chat_message_request.fields": {
+        "description": "A comma separated list of ChatMessageRequest fields to display.",
+        "items": {
+          "enum": [
+            "conversation_id",
+            "conversation_key_events",
+            "encoded_message_create_event",
+            "has_more_events",
+            "message_events",
+            "sender_id",
+            "sender_recently_modified_profile",
+            "social_proof_user_ids"
+          ],
+          "type": "string"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "inbox_type": {
+        "default": "you_may_know",
+        "description": "Which message request inbox to list: `you_may_know` (the apps' Priority tab) or `low_quality` (th...",
+        "enum": [
+          "you_may_know",
+          "low_quality"
+        ],
+        "type": "string"
+      },
+      "max_results": {
+        "default": 10,
+        "description": "The maximum number of message requests to return.",
+        "maximum": 50,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "pagination_token": {
+        "description": "The next_token from a previous response, to fetch the next page.",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_chat_message_requests"
+}

@@ -1,0 +1,14 @@
+{
+  "description": "The runtime status of the user's installed MCP servers (connected / needsAuth / needsGrant / error, per account). needsGrant means the user already connected it but has not granted it this turn: call AuthenticateMcpServer for it and nothing else; never treat it as missing, never install anything, and never open the browser or your desktop for the same service unless the user asks for it. Pass server_id (the server identifier, NEVER a display name) for one server; omit it to list everything. This is the complete list: it also shows connectors waiting on sign-in or a grant, which GetDynamicTools can leave out, so check it before treating a service as having no connector. Use it too for per-account detail, custom instructions, or to check a connector after installing or authenticating. To use a connector GetDynamicTools already lists, GetDynamicTools is enough. A server that is slow to answer reads initializing; check it again shortly. Read-only and never needs the user's permission.",
+  "inputSchema": {
+    "properties": {
+      "server_id": {
+        "description": "Optional. One server to report on. The server identifier shown by GetMcpServerStatus. It is the same identifier that GetDynamicTools and CallDynamicTool address, e.g. \"dashboard-team-1-Slack\". Never a display name. Omit to list every installed server.",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "GetMcpServerStatus"
+}

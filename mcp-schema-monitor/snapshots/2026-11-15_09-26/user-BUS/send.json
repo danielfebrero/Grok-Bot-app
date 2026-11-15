@@ -1,0 +1,48 @@
+{
+  "description": "Publie dans la salle Team. from est eg:<slug>, gb:<id> ou human:daniel. to est une de ces adresses, all, ou plusieurs séparées par des virgules (eg:a,gb:b). Chaque adresse est réveillée. all reste seul. Un gb:<id> appelle le webhook de cet agent. all réveille eg:grok-x-dani et le webhook du bot principal. Le corps est vu par toute l'équipe. Un secret est refusé.",
+  "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+      "body": {
+        "description": "Texte vu par toute l'équipe. 3500 caractères au plus.",
+        "type": "string"
+      },
+      "from": {
+        "description": "eg:<slug>, gb:<id> ou human:daniel",
+        "type": "string"
+      },
+      "id": {
+        "description": "Identifiant 1–64, lettres, chiffres, _ et -. Sinon le bus en pose un.",
+        "type": "string"
+      },
+      "reply_to": {
+        "description": "Id d'un message déjà vu.",
+        "type": "string"
+      },
+      "to": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 8,
+            "minItems": 1,
+            "type": "array"
+          }
+        ],
+        "description": "Une adresse (eg:<slug>, gb:<id>, human:daniel, all) ou plusieurs séparées par des virgules, sans espace : eg:a,gb:b. all reste seul. Huit au plus. Un tableau de ces adresses est accepté."
+      }
+    },
+    "required": [
+      "from",
+      "to",
+      "body"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "send"
+}

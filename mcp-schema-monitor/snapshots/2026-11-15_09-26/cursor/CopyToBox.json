@@ -1,0 +1,28 @@
+{
+  "description": "Copy a file from the user's computer into your box, verbatim. Use this to bring a user's file (any type, up to 100 MiB: a CSV, PDF, archive, image, dataset, binary) onto your box so you can work on it with Shell or Read, or open it in the box browser (parent agents delegate that GUI interaction to computerUse). This is the deliberate way to get a file into the box: the user does not have to drag it into chat first, and unlike reading the file and re-writing it, the bytes are copied exactly (no truncation, binaries are safe). Copy large files one at a time, and wait for each copy to finish before you start the next. Give the file's absolute path on the selected user's computer and its machineId; it lands in /workspace/uploads by default, or at a box_path you choose. Then open it with Shell at the path reported back.",
+  "inputSchema": {
+    "properties": {
+      "box_path": {
+        "description": "Where to put it inside your box. Absolute (e.g. /workspace/data.csv) or relative to /workspace. Omit to land it in /workspace/uploads under its original filename.",
+        "minLength": 1,
+        "type": "string"
+      },
+      "computer_path": {
+        "description": "Absolute path of the file to pull, on the selected user's computer. Any file type, up to 100 MiB; copied verbatim, so binaries and large files are safe, unlike reading then re-writing it as text.",
+        "minLength": 1,
+        "type": "string"
+      },
+      "machineId": {
+        "description": "Registered machine identifier.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "computer_path",
+      "machineId"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "CopyToBox"
+}

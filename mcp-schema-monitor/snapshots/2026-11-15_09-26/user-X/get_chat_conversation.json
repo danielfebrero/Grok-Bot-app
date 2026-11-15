@@ -1,0 +1,96 @@
+{
+  "description": "Returns metadata for a Chat conversation including type, muted status, group details, and your unread state. For the unread state, request chat_conversation.fields=unread,last_read_event_id,newest_event_id: those fields give your read state, computed from your latest read receipt and the conversation's latest notifying message. Use chat_conversation.fields to select which fields are returned. Use expansions to hydrate member, admin, or participant user objects. Use user.fields to control which profile fields are returned for expanded users; in a 1:1 chat, user.fields=receives_your_chat on the participant says how you can message them: encrypted, unencrypted, or none.",
+  "inputSchema": {
+    "properties": {
+      "chat_conversation.fields": {
+        "description": "A comma separated list of ChatConversation fields to display.",
+        "items": {
+          "enum": [
+            "admin_settings",
+            "created_at",
+            "group_avatar_url",
+            "group_description",
+            "group_description_key_version",
+            "group_name",
+            "id",
+            "invite",
+            "is_archived",
+            "is_muted",
+            "last_read_event_id",
+            "message_ttl_ms",
+            "newest_event_id",
+            "pending_member_ids",
+            "screen_capture_blocking_enabled",
+            "screen_capture_detection_enabled",
+            "type",
+            "unread",
+            "updated_at"
+          ],
+          "type": "string"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "expansions": {
+        "description": "A comma separated list of fields to expand.",
+        "items": {
+          "enum": [
+            "admin_ids",
+            "member_ids",
+            "participant_ids"
+          ],
+          "type": "string"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "id": {
+        "type": "string"
+      },
+      "user.fields": {
+        "description": "A comma separated list of User fields to display.",
+        "items": {
+          "enum": [
+            "active_follower_count",
+            "confirmed_email",
+            "connection_status",
+            "created_at",
+            "description",
+            "entities",
+            "id",
+            "is_identity_verified",
+            "location",
+            "name",
+            "org_only",
+            "parody",
+            "profile_banner_url",
+            "profile_image_url",
+            "protected",
+            "public_metrics",
+            "receives_your_chat",
+            "receives_your_dm",
+            "subscriber_count",
+            "subscribes_to_you",
+            "subscription",
+            "subscription_type",
+            "url",
+            "username",
+            "verified",
+            "verified_followers_count",
+            "verified_type",
+            "withheld"
+          ],
+          "type": "string"
+        },
+        "minItems": 1,
+        "type": "array"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_chat_conversation"
+}

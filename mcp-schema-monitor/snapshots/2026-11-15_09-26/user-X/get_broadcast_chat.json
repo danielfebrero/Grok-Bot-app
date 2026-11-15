@@ -1,0 +1,92 @@
+{
+  "description": "Returns newest-first chat messages for a broadcast owned by the authenticated user.",
+  "inputSchema": {
+    "properties": {
+      "broadcast_chat_message.fields": {
+        "description": "A comma separated list of BroadcastChatMessage fields to display.",
+        "items": {
+          "enum": [
+            "author_name",
+            "author_username",
+            "broadcast_id",
+            "created_at_ms",
+            "id",
+            "reply_to",
+            "text"
+          ],
+          "type": "string"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "expansions": {
+        "description": "A comma separated list of fields to expand.",
+        "items": {
+          "enum": [
+            "author_id"
+          ],
+          "type": "string"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "id": {
+        "type": "string"
+      },
+      "max_results": {
+        "default": 100,
+        "maximum": 200,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "pagination_token": {
+        "description": "A 64-bit signed integer.",
+        "type": "string"
+      },
+      "user.fields": {
+        "description": "A comma separated list of User fields to display.",
+        "items": {
+          "enum": [
+            "active_follower_count",
+            "confirmed_email",
+            "connection_status",
+            "created_at",
+            "description",
+            "entities",
+            "id",
+            "is_identity_verified",
+            "location",
+            "name",
+            "org_only",
+            "parody",
+            "profile_banner_url",
+            "profile_image_url",
+            "protected",
+            "public_metrics",
+            "receives_your_chat",
+            "receives_your_dm",
+            "subscriber_count",
+            "subscribes_to_you",
+            "subscription",
+            "subscription_type",
+            "url",
+            "username",
+            "verified",
+            "verified_followers_count",
+            "verified_type",
+            "withheld"
+          ],
+          "type": "string"
+        },
+        "minItems": 1,
+        "type": "array"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_broadcast_chat"
+}

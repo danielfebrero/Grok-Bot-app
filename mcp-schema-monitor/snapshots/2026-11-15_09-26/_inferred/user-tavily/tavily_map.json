@@ -1,0 +1,62 @@
+{
+  "namespace": "user-tavily",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-14T16:29:23+02:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "auth_mode": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        },
+        "endpoint": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "next_actions": {
+          "items": {
+            "properties": {
+              "instruction": {
+                "type": "string"
+              },
+              "resource": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "instruction",
+              "resource",
+              "type"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "supported": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "auth_mode",
+        "code",
+        "endpoint",
+        "message",
+        "next_actions",
+        "supported"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "tavily_map"
+}

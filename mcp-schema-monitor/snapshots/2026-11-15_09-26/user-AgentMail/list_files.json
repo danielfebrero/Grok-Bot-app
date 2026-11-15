@@ -1,0 +1,31 @@
+{
+  "description": "List the files in an inbox's drive (Agent Drive) in path order, optionally only those under a path prefix such as reports/. Results carry no download link; get_file returns one. A file created or deleted in the last second may not show yet. Agent Drive is in AgentMail Labs (US only); an organization outside Labs gets a 403.",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "inboxId": {
+        "description": "Inbox ID: the inbox's email address, from list_inboxes",
+        "type": "string"
+      },
+      "limit": {
+        "default": 10,
+        "description": "Number of items per page",
+        "type": "number"
+      },
+      "pageToken": {
+        "description": "nextPageToken from the previous page's result; omit for the first page",
+        "type": "string"
+      },
+      "pathPrefix": {
+        "description": "Only files whose path starts with this, e.g. reports/ (it matches characters, so reports/q matches reports/q3.pdf)",
+        "type": "string"
+      }
+    },
+    "required": [
+      "inboxId"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "list_files"
+}
