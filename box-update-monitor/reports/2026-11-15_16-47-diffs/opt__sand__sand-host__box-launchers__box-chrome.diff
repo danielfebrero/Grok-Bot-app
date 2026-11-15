@@ -1,0 +1,824 @@
+--- 2026-11-15_15-45:/opt/sand/sand-host/box-launchers/box-chrome
++++ 2026-11-15_16-47:/opt/sand/sand-host/box-launchers/box-chrome
+@@ -131,9 +131,12 @@
+ if [ "$(id -u)" -eq 0 ]; then
+ 	CHROME_DBUS_ADDRESS=""
+ fi
++BOX_CHROME_DBUS_SOURCE="env"
+ if [ -r "${CHROME_XDG}/dbus-session-address" ]; then
+ 	CHROME_DBUS_ADDRESS="$(cat "${CHROME_XDG}/dbus-session-address" 2>/dev/null || true)"
++	BOX_CHROME_DBUS_SOURCE=display
+ fi
++[ -n "${CHROME_DBUS_ADDRESS}" ] || BOX_CHROME_DBUS_SOURCE=none
+ # A window the window manager maximizes fills the work area a desktop panel's
+ # strut leaves (https://specifications.freedesktop.org/wm-spec/1.5/ar01s05.html#id-1.6.10).
+ BOX_CHROME_WM_MAXIMIZE=0
+@@ -215,6 +218,11 @@
+ BOX_PROFILE_DIR_FILE="${SAND_PROFILE_DIR}-${CHROME_DEBUG_PORT}"
+ SAND_PROFILE_PRIOR_BOOT=/tmp/sand-profile-prior-boot
+ BOX_PROFILE_PRIOR_BOOT_FILE="${SAND_PROFILE_PRIOR_BOOT}-${CHROME_DEBUG_PORT}"
++# The folder of the per-port files above. The X server keeps a display's lock
++# there, and the launcher keeps the display's record of its last cold launch
++# beside them.
++BOX_TMP_DIR="${SAND_PROFILE_PRIOR_BOOT%/*}"
++BOX_LAST_LAUNCH_FILE="${BOX_TMP_DIR}/sand-box-chrome-last-launch-${CHROME_DEBUG_PORT}"
+ UNGOOGLED_CHROMIUM=/opt/ungoogled-chromium/chrome
+ box_browser_ungoogled_wanted() {
+ 	[ "${SAND_BOX_BROWSER_UNGOOGLED:-0}" = "1" ] || [ -e "${SAND_BOX_BROWSER_UNGOOGLED_FILE:-/tmp/sand-box-browser-ungoogled}" ]
+@@ -386,6 +394,9 @@
+ BOX_WALL_EVIDENCE_WRITER_VERSION=2
+ CHROME_FLAGS+=(--sand-box-chrome-launcher="${BOX_CHROME_LAUNCHER_VERSION}")
+ CHROME_LAUNCH_WAIT_S=20
++CHROME_TIMEOUT_READ_S=2
++BOX_EXEC_DAEMON_PACKAGE=/exec-daemon/package.json
++BOX_X_LOCK_DIR="${BOX_TMP_DIR}"
+ BOX_BROWSER_FIREWALL_LIB=/usr/local/bin/box-browser-firewall.sh
+ BOX_BROWSER_FIREWALL_STATE=/tmp/sand-browser-firewall
+ BOX_BROWSER_FIREWALL_READ_S=2
+@@ -402,6 +413,8 @@
+ 	SAND_CHROME_PREPARE=1
+ 	shift
+ fi
++BOX_CHROME_RUNTIME_DIR=made
++[ ! -d "${CHROME_XDG}" ] || BOX_CHROME_RUNTIME_DIR=present
+ if [ "$(id -u)" -eq 0 ]; then
+ 	mkdir -p "${CHROME_PROFILE}" "${CHROME_XDG}" /workspace
+ 	chown box:box "${CHROME_PROFILE}" 2>/dev/null || true
+@@ -457,6 +470,8 @@
+ # request for this box's own port to it (https://curl.se/docs/manpage.html#--noproxy).
+ chrome_ready() {
+ 	curl --noproxy '*' --max-time 1 -fsS "http://127.0.0.1:${CHROME_DEBUG_PORT}/json/version" >/dev/null 2>&1
++	CHROME_READY_STATUS=$?
++	return "${CHROME_READY_STATUS}"
+ }
+ 
+ # Headful Chrome serves CDP on 127.0.0.1:<port> and, when that is still held,
+@@ -480,17 +495,67 @@
+ 	[ -n "${state}" ] && [ "${state%% *}" != Z ]
+ }
+ 
+-profile_browser_pid() {
+-	local pids pid
+-	pids="$(pgrep -d, -x chrome 2>/dev/null)" || return 1
+-	pid="$(ps -ww -o pid=,args= -p "${pids}" 2>/dev/null | awk -v want="--user-data-dir=${CHROME_PROFILE}" '
++# Whether one of the processes in the comma-separated list $1 still exists.
++# ps exits non-zero when it could not list the processes, and also when none
++# of the ones it was asked for exists any more
++# (https://gitlab.com/procps-ng/procps/-/blob/v4.0.4/src/ps/display.c). Only a
++# ps that failed while one of them is still there has failed to look.
++listed_process_left() {
++	local rest="$1," pid
++	while [ -n "${rest}" ]; do
++		pid="${rest%%,*}"
++		rest="${rest#*,}"
++		[ -z "${pid}" ] || [ ! -e "${BOX_PROC_ROOT}/${pid}" ] || return 0
++	done
++	return 1
++}
++
++# The browser of this profile among the processes $1 names: its pid, then the
++# exit statuses of ps and of awk, each after a colon. Any further arguments go
++# in front of both commands. awk reads ps through a pipe, so a listing of any
++# size needs no file.
++profile_browser_listing() {
++	local pids="$1"
++	shift
++	# shellcheck disable=SC2016
++	"$@" ps -ww -o pid=,args= -p "${pids}" 2>/dev/null | "$@" awk -v want="--user-data-dir=${CHROME_PROFILE}" '
+ 		{ for (i = 2; i <= NF; i++) if ($i ~ /^--type=/) next }
+-		{ for (i = 2; i <= NF; i++) if ($i == want) { print $1; exit } }')"
+-	[ -n "${pid}" ] && printf '%s' "${pid}"
++		{ for (i = 2; i <= NF; i++) if ($i == want) { print $1; exit } }'
++	printf ':%s:%s' "${PIPESTATUS[0]}" "${PIPESTATUS[1]}"
++}
++
++# Reads what profile_browser_listing printed for the processes $1. Prints the
++# browser's pid and exits 0 when it listed one. Otherwise exits 1 when the
++# listing held none, and 2 when it cannot say: awk failed, or ps failed while a
++# process it was asked for was still there.
++profile_browser_found() {
++	local pids="$1" listing="$2" pid statuses
++	pid="${listing%%:*}"
++	pid="${pid//[!0-9]/}"
++	if [ -n "${pid}" ]; then
++		printf '%s' "${pid}"
++		return 0
++	fi
++	statuses="${listing#*:}"
++	[ "${statuses#*:}" = 0 ] || return 2
++	[ "${statuses%%:*}" = 0 ] || ! listed_process_left "${pids}" || return 2
++	return 1
++}
++
++# Exits 1 when no browser of this profile runs and higher when it could not
++# look: pgrep exits above 1 then
++# (https://man7.org/linux/man-pages/man1/pgrep.1.html#EXIT_STATUS).
++profile_browser_pid() {
++	local pids
++	pids="$(pgrep -d, -x chrome 2>/dev/null)" || return
++	profile_browser_found "${pids}" "$(profile_browser_listing "${pids}")"
+ }
+ 
+ cdp_port_listening() {
+-	[ -n "$(ss -ltnH "sport = :${CHROME_DEBUG_PORT}" 2>/dev/null)" ]
++	local out
++	out="$(ss -ltnH "sport = :${CHROME_DEBUG_PORT}" 2>/dev/null)"
++	CDP_PORT_READ_STATUS=$?
++	[ -n "${out}" ]
+ }
+ 
+ stop_browser() {
+@@ -499,29 +564,54 @@
+ 	kill -TERM -- "${target}" 2>/dev/null || true
+ 	end=$((SECONDS + 3))
+ 	while process_running "${pid}" && [ "${SECONDS}" -lt "${end}" ]; do sleep 0.1; done
+-	process_running "${pid}" && kill -KILL -- "${target}" 2>/dev/null
++	process_running "${pid}" && {
++		CHROME_PRIOR_BROWSER=killed
++		kill -KILL -- "${target}" 2>/dev/null
++	}
+ 	end=$((SECONDS + 10))
+ 	while process_running "${pid}" && [ "${SECONDS}" -lt "${end}" ]; do sleep 0.1; done
+ }
+ 
+ release_profile_browser() {
+-	local pid end
+-	if pid="$(profile_browser_pid)"; then
++	local pid end status found=0
++	CHROME_PRIOR_BROWSER=none CHROME_PRIOR_PORT=""
++	pid="$(profile_browser_pid)" || found=$?
++	[ "${found}" -le 1 ] || CHROME_PRIOR_BROWSER=unread
++	if [ "${found}" -eq 0 ]; then
++		CHROME_PRIOR_BROWSER=exited
+ 		if ! chrome_on_ipv6_only; then
+ 			end=$((SECONDS + CHROME_RELEASE_GRACE_S))
+ 			while process_running "${pid}" && [ "${SECONDS}" -lt "${end}" ]; do
+-				chrome_ready && return 0
++				chrome_ready && {
++					CHROME_PRIOR_BROWSER=answered
++					return 0
++				}
+ 				sleep 0.1
+ 			done
+ 		fi
+-		process_running "${pid}" && stop_browser "${pid}"
+-		process_running "${pid}" && return 1
++		process_running "${pid}" && {
++			CHROME_PRIOR_BROWSER=stopped
++			stop_browser "${pid}"
++		}
++		process_running "${pid}" && {
++			CHROME_PRIOR_BROWSER=stuck
++			return 1
++		}
+ 	fi
+ 	end=$((SECONDS + CHROME_PORT_WAIT_S))
++	CHROME_PRIOR_PORT=free
+ 	while cdp_port_listening; do
++		CHROME_PRIOR_PORT=held
+ 		[ "${SECONDS}" -lt "${end}" ] || return 1
+ 		sleep 0.1
+ 	done
++	status=$?
++	if [ "${CDP_PORT_READ_STATUS:-0}" -ne 0 ]; then
++		CHROME_PRIOR_PORT=unread
++	elif [ "${CHROME_PRIOR_PORT}" != free ]; then
++		CHROME_PRIOR_PORT=cleared
++	fi
++	return "${status}"
+ }
+ 
+ # Chrome on Linux keeps only the last value of a repeated switch
+@@ -901,6 +991,596 @@
+ 	fi
+ }
+ 
++# curl's exit status says how a request ended (https://everything.curl.dev/cmdline/exitcode.html).
++curl_result_class() {
++	case "$1" in
++	0) printf ok ;;
++	7) printf refused ;;
++	28) printf timeout ;;
++	52) printf empty_reply ;;
++	56) printf reset ;;
++	22) printf http_error ;;
++	5 | 97) printf proxy_error ;;
++	*) printf other ;;
++	esac
++}
++
++# True for a regular file that is not a link. The reads below open nothing
++# else: opening a FIFO waits for its other end
++# (https://man7.org/linux/man-pages/man7/fifo.7.html) and a link leads to a
++# file someone else chose.
++plain_file() {
++	[ -f "$1" ] && [ ! -L "$1" ]
++}
++
++# A command ended by its cap, or one that could not be run, exits with one of
++# these (https://www.gnu.org/software/coreutils/manual/html_node/timeout-invocation.html).
++read_cut_off() {
++	case "$1" in
++	124 | 125 | 126 | 127 | 137) return 0 ;;
++	esac
++	return 1
++}
++
++# One more readiness request after the wait, keeping the HTTP status and
++# whether the connection opened (https://curl.se/docs/manpage.html#-w). It goes
++# to the port itself and not to a proxy the launcher's shell names
++# (https://curl.se/docs/manpage.html#--noproxy). $1 is the time it may take.
++cdp_timeout_probe() {
++	local out status=0 code="" connect="" class
++	out="$(timeout -s KILL "$1" curl --noproxy '*' --max-time 1 -sS -o /dev/null -w '%{http_code} %{time_connect}' \
++		"http://127.0.0.1:${CHROME_DEBUG_PORT}/json/version" 2>/dev/null)" || status=$?
++	if read_cut_off "${status}"; then
++		printf unread
++		return
++	fi
++	code="${out%% *}"
++	connect=""
++	[ "${out}" = "${code}" ] || connect="${out#* }"
++	connect="${connect%% *}"
++	case "${code}" in
++	[1-5][0-9][0-9]) ;;
++	*) code="" ;;
++	esac
++	case "${status}" in
++	0)
++		class=ok
++		[ -z "${code}" ] || [ "${code}" -lt 400 ] || class=http_error
++		;;
++	28)
++		class=connect_timeout
++		case "${connect}" in *[1-9]*) class=reply_timeout ;; esac
++		;;
++	*) class="$(curl_result_class "${status}")" ;;
++	esac
++	printf '%s %s' "${class}" "${code}"
++}
++
++# Who listens on the CDP port and where, from the socket table's process
++# column (https://man7.org/linux/man-pages/man8/ss.8.html). A listener that is
++# not this profile's browser is named by its executable name, from a closed set.
++# $1 is this profile's browser process, empty when there is none and unread
++# when it could not be looked up, in which case a holder named chrome is not
++# told apart. $2 is the time the read may take; a read that fails or is cut
++# off says so rather than that nothing listens.
++# Reads the socket table's rows for the port on its input and prints the
++# owner and the address they name.
++cdp_port_rows() {
++	local browser_pid="$1" local_address users rest name pid
++	local owner_re='\("([^"]*)",pid=([0-9]+)'
++	local listening=0 own=0 unsure=0 foreign="" ipv4=0 ipv6=0 wildcard=0 odd=0 owner address=""
++	while read -r _ _ _ local_address _ users; do
++		[ -n "${local_address}" ] || continue
++		listening=1
++		case "${local_address%:*}" in
++		127.0.0.1) ipv4=1 ;;
++		'[::1]') ipv6=1 ;;
++		0.0.0.0 | '*' | '[::]') wildcard=1 ;;
++		*) odd=1 ;;
++		esac
++		rest="${users}"
++		while [[ "${rest}" =~ ${owner_re} ]]; do
++			name="${BASH_REMATCH[1]}" pid="${BASH_REMATCH[2]}"
++			rest="${rest#*"${BASH_REMATCH[0]}"}"
++			if [ -n "${browser_pid}" ] && [ "${pid}" = "${browser_pid}" ]; then
++				own=1
++			elif [ "${browser_pid}" = unread ] && [ "${name}" = chrome ]; then
++				unsure=1
++			elif [ -z "${foreign}" ]; then
++				case "${name}" in
++				chrome) foreign=chrome ;;
++				node) foreign=node ;;
++				python*) foreign=python ;;
++				*) foreign=other ;;
++				esac
++			fi
++		done
++	done
++	if [ -n "${foreign}" ]; then
++		owner="${foreign}"
++	elif [ "${unsure}" -eq 1 ]; then
++		owner=unread
++	elif [ "${own}" -eq 1 ]; then
++		owner=browser
++	elif [ "${listening}" -eq 1 ]; then
++		owner=unknown
++	else
++		owner=none
++	fi
++	if [ "${wildcard}" -eq 1 ]; then
++		address=wildcard
++	elif [ "${odd}" -eq 1 ]; then
++		address=other
++	elif [ "${ipv4}" -eq 1 ] && [ "${ipv6}" -eq 1 ]; then
++		address=both_loopbacks
++	elif [ "${ipv4}" -eq 1 ]; then
++		address=ipv4_loopback
++	elif [ "${ipv6}" -eq 1 ]; then
++		address=ipv6_loopback
++	fi
++	printf '%s %s' "${owner}" "${address}"
++}
++
++cdp_port_listener() {
++	local out
++	out="$(
++		timeout -s KILL "$2" ss -ltnpH "sport = :${CHROME_DEBUG_PORT}" 2>/dev/null | cdp_port_rows "$1"
++		printf ':%s' "${PIPESTATUS[0]}"
++	)"
++	if [ "${out##*:}" != 0 ]; then
++		printf unread
++		return
++	fi
++	printf '%s' "${out%:*}"
++}
++
++# Chrome names the machine and process holding a profile in its SingletonLock
++# link, and a starting browser waits on a lock whose process is a live Chrome
++# before it serves the profile
++# (https://chromium.googlesource.com/chromium/src/+/refs/tags/154.0.8037.57/chrome/browser/process_singleton_posix.cc).
++# $1 is this profile's browser process, as for cdp_port_listener: when it
++# could not be looked up, a lock held by a live Chrome is not told apart.
++# $2 is the time reading the link may take.
++profile_lock_state() {
++	local browser_pid="$1" lock="${CHROME_PROFILE}/SingletonLock" target pid stat="" state comm
++	if [ ! -L "${lock}" ]; then
++		printf absent
++		return
++	fi
++	if ! target="$(timeout -s KILL "$2" readlink -- "${lock}" 2>/dev/null)"; then
++		printf unread
++		return
++	fi
++	pid="${target##*-}"
++	case "${target}" in
++	*-*) ;;
++	*) pid="" ;;
++	esac
++	case "${pid}" in
++	'' | *[!0-9]*)
++		printf unreadable
++		return
++		;;
++	esac
++	if [ -n "${browser_pid}" ] && [ "${pid}" = "${browser_pid}" ]; then
++		printf own
++		return
++	fi
++	if [ "${target%-*}" != "${HOSTNAME:-}" ]; then
++		printf other_machine
++		return
++	fi
++	if [ ! -e "${BOX_PROC_ROOT}/${pid}" ]; then
++		printf dead
++		return
++	fi
++	! plain_file "${BOX_PROC_ROOT}/${pid}/stat" ||
++		IFS= read -r stat 2>/dev/null <"${BOX_PROC_ROOT}/${pid}/stat" || true
++	state="${stat##*) }"
++	state="${state%% *}"
++	comm="${stat#*(}"
++	comm="${comm%)*}"
++	if [ -z "${stat}" ]; then
++		printf unread
++	elif [ "${state}" = Z ]; then
++		printf dead
++	elif [ "${comm}" = chrome ] && [ "${browser_pid}" = unread ]; then
++		printf unread
++	elif [ "${comm}" = chrome ]; then
++		printf live_chrome
++	else
++		printf live_other
++	fi
++}
++
++# Walks up from the launcher's parent. A parent it cannot read is not the same
++# as no exec daemon among them, so it reads unread.
++launched_from() {
++	local pid="${PPID}" depth=0 args arg stat file
++	while [ "${depth}" -lt 8 ]; do
++		case "${pid}" in
++		0 | 1) break ;;
++		'' | *[!0-9]*)
++			printf unread
++			return
++			;;
++		esac
++		file="${BOX_PROC_ROOT}/${pid}/cmdline"
++		args=()
++		if ! plain_file "${file}" || ! mapfile -d '' -t -n 4 args 2>/dev/null <"${file}"; then
++			printf unread
++			return
++		fi
++		for arg in "${args[@]}"; do
++			case "${arg}" in
++			*/exec-daemon/index.js | */exec-daemon/exec-daemon)
++				printf exec_daemon
++				return
++				;;
++			esac
++		done
++		file="${BOX_PROC_ROOT}/${pid}/stat"
++		stat=""
++		! plain_file "${file}" || IFS= read -r stat 2>/dev/null <"${file}" || true
++		if [ -z "${stat}" ]; then
++			printf unread
++			return
++		fi
++		stat="${stat##*) }"
++		stat="${stat#* }"
++		pid="${stat%% *}"
++		depth=$((depth + 1))
++	done
++	printf other
++}
++
++exec_daemon_build_fields() {
++	local line lines=0 commit="" built=""
++	local commit_re='"gitCommit":[[:space:]]*"([0-9a-f]{7,40})"'
++	local built_re='"buildTimestamp":[[:space:]]*"([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{1,3})?Z)"'
++	plain_file "${BOX_EXEC_DAEMON_PACKAGE}" || return 0
++	while [ "${lines}" -lt 16 ] && { IFS= read -r -n 256 line || [ -n "${line}" ]; }; do
++		lines=$((lines + 1))
++		[[ "${line}" =~ ${commit_re} ]] && commit="${BASH_REMATCH[1]}"
++		[[ "${line}" =~ ${built_re} ]] && built="${BASH_REMATCH[1]}"
++	done 2>/dev/null <"${BOX_EXEC_DAEMON_PACKAGE}"
++	[ -z "${commit}" ] || printf ',"execDaemonCommit":"%s"' "${commit}"
++	[ -z "${built}" ] || printf ',"execDaemonBuiltAt":"%s"' "${built}"
++}
++
++box_boot_age_fields() {
++	local started="${SAND_BOX_BOOT_STARTED_AT_MS:-}" now="${EPOCHSECONDS:-}" age
++	case "${started}:${now}" in
++	: | :* | *: | *[!0-9:]*) return 0 ;;
++	esac
++	[ "${#started}" -le 15 ] || return 0
++	age=$((10#${now} - 10#${started} / 1000))
++	[ "${age}" -lt 0 ] || [ "${age}" -gt 315360000 ] || printf ',"bootAgeS":%s' "${age}"
++}
++
++# Read once after a wait for CDP ran out, outside the row's duration. What
++# needs a command runs in the background against one deadline, just short of
++# CHROME_TIMEOUT_READ_S after this function starts so that writing the row
++# fits inside it: every command may take only the time left, and this function
++# stops listening at the deadline, so the launcher is held that long at most
++# whatever a read does. That covers the process entries read for the
++# launcher's ancestry too, since reading one can wait on the process it
++# describes. A read that did not finish, or that a shell without a sub-second
++# clock never started, reads unread, and the row says whether the reads
++# finished, were cut off at the deadline or were not run. A read outside its
++# closed set writes no field.
++cdp_timeout_detail_fields() {
++	local wait_status="$1" cap="${CHROME_TIMEOUT_READ_S:-2}" now="${EPOCHREALTIME:-}" class end reads fd line
++	local ended=0 finished="" name
++	now="${now/[.,]/}"
++	case "${wait_status}" in
++	'' | *[!0-9]*) ;;
++	*)
++		class="$(curl_result_class "${wait_status}")"
++		case "${class}" in
++		refused | timeout | empty_reply | reset | http_error | proxy_error | other)
++			printf ',"cdpWaitResult":"%s"' "${class}"
++			;;
++		esac
++		;;
++	esac
++	box_boot_age_fields
++	case "${cap}:${now}" in
++	: | :* | *: | *[!0-9:]*) ;;
++	*)
++		end=$((now + cap * 1000000 - 100000))
++		# A read that outlives the deadline must hold nothing of the launcher's:
++		# not the launch lock, which the next launch waits on, nor its input and
++		# error streams, which its caller may wait on.
++		exec {fd}< <(
++			exec </dev/null 2>/dev/null 9>&-
++			cdp_timeout_command_reads "${end}"
++		)
++		reads=$!
++		while read_time_left "${end}"; do
++			IFS= read -r -t "${READ_TIME_LEFT}" -u "${fd}" line || {
++				ended=$?
++				break
++			}
++			finished+=" ${line%% *}"
++			printf '%s' "${line#* }"
++		done
++		exec {fd}<&-
++		# read exits 1 once the reads have closed their end and above 128 when
++		# its time ran out (https://www.gnu.org/software/bash/manual/html_node/Bash-Builtins.html);
++		# only reads still running are ended.
++		[ "${ended}" -eq 1 ] || kill "${reads}" 2>/dev/null || true
++		;;
++	esac
++	case "${finished}:${reads:-}" in
++	" from probe lock owner":*) printf ',"cdpReads":"finished"' ;;
++	*:) printf ',"cdpReads":"not_run"' ;;
++	*) printf ',"cdpReads":"cut_off"' ;;
++	esac
++	for name in from probe lock owner; do
++		case "${finished} " in
++		*" ${name} "*) continue ;;
++		esac
++		case "${name}" in
++		from) printf ',"launchedFrom":"unread"' ;;
++		probe) printf ',"cdpProbe":"unread"' ;;
++		lock) printf ',"profileLock":"unread"' ;;
++		owner) printf ',"cdpPortOwner":"unread"' ;;
++		esac
++	done
++}
++
++# The time left until $1, a microsecond count on the clock of EPOCHREALTIME
++# (https://www.gnu.org/software/bash/manual/html_node/Bash-Variables.html), as
++# seconds in READ_TIME_LEFT. Fails once none is left.
++read_time_left() {
++	local now="${EPOCHREALTIME:-}" left
++	now="${now/[.,]/}"
++	READ_TIME_LEFT=""
++	case "${now}" in
++	'' | *[!0-9]*) return 1 ;;
++	esac
++	left=$(($1 - now))
++	[ "${left}" -gt 0 ] || return 1
++	printf -v READ_TIME_LEFT '%d.%06d' "$((left / 1000000))" "$((left % 1000000))"
++}
++
++# This profile's browser process, found as profile_browser_pid finds it, with
++# each command it runs held to the time left until $1. Prints the process id.
++# Exits 1 when there is none and 2 when a command failed or was cut off, which
++# says nothing about a browser.
++profile_browser_pid_until() {
++	local end="$1" pids listing status=0
++	read_time_left "${end}" || return 2
++	pids="$(timeout -s KILL "${READ_TIME_LEFT}" pgrep -d, -x chrome 2>/dev/null)" || status=$?
++	case "${status}" in
++	0) ;;
++	1) return 1 ;;
++	*) return 2 ;;
++	esac
++	read_time_left "${end}" || return 2
++	listing="$(profile_browser_listing "${pids}" timeout -s KILL "${READ_TIME_LEFT}")"
++	profile_browser_found "${pids}" "${listing}" || status=$?
++	listing="${listing#*:}"
++	[ "${status}" -ne 1 ] || ! read_cut_off "${listing%%:*}" || status=2
++	return "${status}"
++}
++
++# Writes one line per read, its name and then its row fields, so a deadline
++# keeps what finished and the caller knows what did not.
++cdp_timeout_command_reads() {
++	local end="$1" pid="" found=0 class code owner address lock line from out
++	from="$(launched_from)"
++	line=""
++	case "${from}" in
++	exec_daemon | other | unread) line=",\"launchedFrom\":\"${from}\"" ;;
++	esac
++	printf 'from %s\n' "${line}"
++	read_time_left "${end}" || return 0
++	out="$(cdp_timeout_probe "${READ_TIME_LEFT}")"
++	class="${out%% *}"
++	code="${out#"${class}"}"
++	code="${code# }"
++	line=""
++	case "${class}" in
++	ok | refused | connect_timeout | reply_timeout | empty_reply | reset | http_error | proxy_error | other | unread)
++		line=",\"cdpProbe\":\"${class}\""
++		;;
++	esac
++	case "${code}" in
++	[1-5][0-9][0-9]) line+=",\"cdpProbeHttpStatus\":${code}" ;;
++	esac
++	printf 'probe %s\n' "${line}"
++	pid="$(profile_browser_pid_until "${end}")" || found=$?
++	[ "${found}" -eq 0 ] || pid=""
++	[ "${found}" -le 1 ] || pid=unread
++	read_time_left "${end}" || return 0
++	lock="$(profile_lock_state "${pid}" "${READ_TIME_LEFT}")"
++	line=""
++	case "${lock}" in
++	own | live_chrome | live_other | dead | other_machine | unreadable | absent | unread)
++		line=",\"profileLock\":\"${lock}\""
++		;;
++	esac
++	printf 'lock %s\n' "${line}"
++	read_time_left "${end}" || return 0
++	out="$(cdp_port_listener "${pid}" "${READ_TIME_LEFT}")"
++	owner="${out%% *}"
++	address="${out#"${owner}"}"
++	address="${address# }"
++	line=""
++	case "${owner}" in
++	browser | chrome | node | python | other | unknown | none | unread) line=",\"cdpPortOwner\":\"${owner}\"" ;;
++	esac
++	case "${address}" in
++	ipv4_loopback | ipv6_loopback | both_loopbacks | wildcard | other)
++		line+=",\"cdpPortAddress\":\"${address}\""
++		;;
++	esac
++	printf 'owner %s\n' "${line}"
++}
++
++# The X server writes its process id to the display's lock file
++# (https://gitlab.freedesktop.org/xorg/xserver/-/blob/master/os/utils.c) and a
++# server that is killed leaves the file behind, so the id counts only while it
++# is a live X server started for this display. A different one since the
++# display's last cold launch means the display was taken down in between. The
++# id stays in the display's record, which sits outside the profile so that
++# nothing that saves or copies a profile holds it.
++read_display_server() {
++	local pid="" lock="${BOX_X_LOCK_DIR:-/tmp}/.X${BOX_DISPLAY_NUM:-1}-lock" entry stat="" state comm
++	local cap="${CHROME_TIMEOUT_READ_S:-2}" now="${EPOCHREALTIME:-}" fd reader named="" ended=0
++	CHROME_DISPLAY_SERVER="" CHROME_DISPLAY_SERVER_UNREAD=""
++	! plain_file "${lock}" || read -r pid _ 2>/dev/null <"${lock}" || true
++	case "${pid}" in
++	'' | *[!0-9]*) return 0 ;;
++	esac
++	entry="${BOX_PROC_ROOT:-/proc}/${pid}"
++	! plain_file "${entry}/stat" || IFS= read -r stat 2>/dev/null <"${entry}/stat" || true
++	state="${stat##*) }"
++	state="${state%% *}"
++	comm="${stat#*(}"
++	comm="${comm%)*}"
++	case "${state}:${comm}" in
++	[!Z]:X*) ;;
++	*) return 0 ;;
++	esac
++	# A read of a process's command line goes through that process's memory and
++	# can wait on it (get_mm_cmdline, https://github.com/torvalds/linux/blob/v6.12/fs/proc/base.c),
++	# so a child does it against the deadline the reads after a timed-out wait
++	# have, holding neither the launch lock nor the launcher's streams, and is
++	# ended when it has not answered by then.
++	CHROME_DISPLAY_SERVER_UNREAD=1
++	now="${now/[.,]/}"
++	case "${cap}:${now}" in
++	: | :* | *: | *[!0-9:]*) return 0 ;;
++	esac
++	read_time_left "$((now + cap * 1000000 - 100000))" || return 0
++	exec {fd}< <(
++		exec </dev/null 2>/dev/null 9>&-
++		display_server_named "${entry}/cmdline"
++	)
++	reader=$!
++	IFS= read -r -t "${READ_TIME_LEFT}" -u "${fd}" named || ended=$?
++	exec {fd}<&-
++	[ "${ended}" -eq 1 ] || kill -KILL "${reader}" 2>/dev/null || true
++	case "${named}" in
++	yes) CHROME_DISPLAY_SERVER="${pid}" CHROME_DISPLAY_SERVER_UNREAD="" ;;
++	no) CHROME_DISPLAY_SERVER_UNREAD="" ;;
++	esac
++}
++
++display_server_named() {
++	local arg
++	local -a args=()
++	if ! plain_file "$1" || ! mapfile -d '' -t -n 64 args 2>/dev/null <"$1"; then
++		printf no
++		return 0
++	fi
++	for arg in "${args[@]}"; do
++		if [ "${arg}" = ":${BOX_DISPLAY_NUM:-1}" ]; then
++			printf yes
++			return 0
++		fi
++	done
++	printf no
++}
++
++# down is a display with no live X server as this launch begins, whatever the
++# record says. Otherwise the server is compared with the one the previous cold
++# launch on the display recorded, which is - when that launch found none.
++read_last_launch() {
++	local boot="$1" record="${BOX_LAST_LAUNCH_FILE:-}" recorded_boot="" mode="" outcome="" server=""
++	CHROME_PREV_MODE="" CHROME_PREV_OUTCOME="" CHROME_DISPLAY_SERVER_STATE=""
++	if [ -n "${CHROME_DISPLAY_SERVER_UNREAD:-}" ]; then
++		CHROME_DISPLAY_SERVER_STATE=unread
++	elif [ -z "${CHROME_DISPLAY_SERVER}" ]; then
++		CHROME_DISPLAY_SERVER_STATE=down
++	fi
++	[ -n "${record}" ] && plain_file "${record}" || return 0
++	read -r recorded_boot mode outcome server _ 2>/dev/null <"${record}" || true
++	[ "${recorded_boot}" = "${boot}" ] || return 0
++	CHROME_PREV_MODE="${mode}" CHROME_PREV_OUTCOME="${outcome}"
++	[ -n "${CHROME_DISPLAY_SERVER}" ] || return 0
++	case "${server}" in
++	"${CHROME_DISPLAY_SERVER}") CHROME_DISPLAY_SERVER_STATE=same ;;
++	-) CHROME_DISPLAY_SERVER_STATE=restarted ;;
++	'' | *[!0-9]*) ;;
++	*) CHROME_DISPLAY_SERVER_STATE=restarted ;;
++	esac
++}
++
++write_last_launch() {
++	local record="${BOX_LAST_LAUNCH_FILE:-}" server="${CHROME_DISPLAY_SERVER:--}"
++	[ -n "${record}" ] || return 0
++	[ -z "${CHROME_DISPLAY_SERVER_UNREAD:-}" ] || server="?"
++	# Anything at the path that is not a plain file stays as it is and the
++	# display goes without a record.
++	plain_file "${record}" || { [ ! -e "${record}" ] && [ ! -L "${record}" ]; } || return 0
++	printf '%s %s %s %s\n' "$1" "$2" "$3" "${server}" 2>/dev/null >"${record}" || true
++}
++
++# The backend stamps a pod whose drive was seeded from a snapshot, and the
++# entrypoint exports the boot time to everything it starts; a launcher that
++# has neither was not started from that environment and cannot tell.
++box_drive_seeded() {
++	if [ "${SAND_BOX_USER_DATA_DRIVE_SEEDED_FROM_SNAPSHOT:-}" = 1 ]; then
++		printf seeded
++	elif [ -n "${SAND_BOX_BOOT_STARTED_AT_MS:-}" ]; then
++		printf not_seeded
++	else
++		printf unknown
++	fi
++}
++
++launch_begin_facts() {
++	local entry
++	CHROME_PRIOR_LOCK=false CHROME_PRIOR_TMP=""
++	[ ! -L "${CHROME_PROFILE}/SingletonLock" ] || CHROME_PRIOR_LOCK=true
++	[ -n "${CHROME_TMPDIR:-}" ] || return 0
++	CHROME_PRIOR_TMP=false
++	for entry in "${CHROME_TMPDIR}"/* "${CHROME_TMPDIR}"/.[!.]*; do
++		if [ -e "${entry}" ] || [ -L "${entry}" ]; then
++			CHROME_PRIOR_TMP=true
++			break
++		fi
++	done
++}
++
++launch_begin_row_fields() {
++	case "${CHROME_PRIOR_BROWSER:-}" in
++	none | answered | exited | stopped | killed | stuck | unread)
++		printf ',"priorBrowser":"%s"' "${CHROME_PRIOR_BROWSER}"
++		;;
++	esac
++	case "${CHROME_PRIOR_PORT:-}" in
++	free | cleared | held | unread) printf ',"priorPort":"%s"' "${CHROME_PRIOR_PORT}" ;;
++	esac
++	case "${CHROME_PRIOR_LOCK:-}" in
++	true | false) printf ',"priorLock":%s' "${CHROME_PRIOR_LOCK}" ;;
++	esac
++	case "${CHROME_PRIOR_TMP:-}" in
++	true | false) printf ',"priorTmp":%s' "${CHROME_PRIOR_TMP}" ;;
++	esac
++	case "${BOX_CHROME_RUNTIME_DIR:-}" in
++	present | made) printf ',"runtimeDir":"%s"' "${BOX_CHROME_RUNTIME_DIR}" ;;
++	esac
++	case "${BOX_CHROME_DBUS_SOURCE:-}" in
++	display | env | none) printf ',"dbusSource":"%s"' "${BOX_CHROME_DBUS_SOURCE}" ;;
++	esac
++	case "${CHROME_PREV_MODE:-}" in
++	prepare | window) printf ',"prevMode":"%s"' "${CHROME_PREV_MODE}" ;;
++	esac
++	case "${CHROME_PREV_OUTCOME:-}" in
++	started | ready | cdp_timeout | window_timeout) printf ',"prevOutcome":"%s"' "${CHROME_PREV_OUTCOME}" ;;
++	esac
++	case "${CHROME_DISPLAY_SERVER_STATE:-}" in
++	same | restarted | down | unread) printf ',"displayServer":"%s"' "${CHROME_DISPLAY_SERVER_STATE}" ;;
++	esac
++	printf ',"driveSeeded":"%s"' "$(box_drive_seeded)"
++	exec_daemon_build_fields
++}
++
+ next_launch_attempt() {
+ 	local counter="${CHROME_PROFILE}/.sand-launch-count" boot="$1"
+ 	local recorded_boot="" count=0
+@@ -975,12 +1655,16 @@
+ 
+ start_chrome() {
+ 	local mode="$1" visible=1 started_ms attempt outcome duration_ms cdp_ready_ms launcher_fields shown boot
+-	local cdp_state="" firewall=""
++	local cdp_state="" firewall="" cdp_wait_status=""
+ 	shift
+ 	[ "${mode}" = window ] || visible=0
+ 	boot="$(box_boot_id)"
+ 	record_profile_origin "${boot}"
+ 	attempt="$(next_launch_attempt "${boot}")"
++	read_display_server
++	read_last_launch "${boot}"
++	launch_begin_facts
++	write_last_launch "${boot}" "${mode}" started
+ 	started_ms="$(date +%s%3N)"
+ 	if [ "${CHROME_PORT_HELD}" -eq 0 ]; then
+ 		if [ "${policy_status:-0}" = 3 ]; then
+@@ -1001,6 +1685,7 @@
+ 	fi
+ 	if ! wait_for_chrome 0; then
+ 		outcome=cdp_timeout
++		cdp_wait_status="${CHROME_READY_STATUS:-}"
+ 	else
+ 		cdp_ready_ms="${CHROME_CDP_READY_MS}"
+ 		restore_cookie_seed
+@@ -1051,6 +1736,9 @@
+ 		launcher_fields+=",\"cdpTimeoutState\":\"${cdp_state}\""
+ 		;;
+ 	esac
++	launcher_fields+="$(launch_begin_row_fields)"
++	[ "${outcome:-}" != cdp_timeout ] || launcher_fields+="$(cdp_timeout_detail_fields "${cdp_wait_status}")"
++	write_last_launch "${boot}" "${mode}" "${outcome}"
+ 	printf '{"kind":"chrome_launch","display":%s,"mode":"%s","attempt":%s,"outcome":"%s","durationMs":%s%s}\n' \
+ 		"${BOX_DISPLAY_NUM:-1}" "${mode}" "${attempt}" "${outcome}" "${duration_ms}" "${launcher_fields}" \
+ 		2>/dev/null >>"${SAND_BOX_TELEMETRY_LOG:-/tmp/sand-box-telemetry.log}" || true

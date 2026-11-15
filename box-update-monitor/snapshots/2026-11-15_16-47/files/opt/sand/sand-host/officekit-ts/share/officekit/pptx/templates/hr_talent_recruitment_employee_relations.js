@@ -1,0 +1,648 @@
+/**
+ * "The Human Code of HR Management" — 20-slide deck rebuilt with pptxgenjs.
+ *
+ * Run:  node 093c90d7-daf9-4a69-84a8-0a9bd69ed952_grok_final.js
+ * Out:  093c90d7-daf9-4a69-84a8-0a9bd69ed952_grok_final.pptx (next to this file)
+ *
+ * Positions and sizes are inches, font sizes are points — the same units the
+ * source deck uses once EMUs are divided out. Photographic content in the
+ * original sits in empty picture placeholders, so it is stood in for by flat
+ * colour blocks; the small vector icons are redrawn from native shapes.
+ */
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ palette */
+const PINK_LT = 'F0A0B5'; // theme accent1
+const PINK_MD = 'E8878B'; // theme accent2
+const PINK_DK = 'E76184'; // theme accent3
+const NAVY = '211F44'; // theme accent4 — dark slide background
+const WHITE = 'FFFFFF';
+const BLACK = '000000';
+const INK = '0D0D0D'; // black lumMod 95%
+const GREY_TX = '262626'; // black lumMod 85%
+const GREY_MD = '595959'; // black lumMod 65%
+const ROSE_DK = 'E24A72'; // accent1 lumMod 75%
+
+// Every pink surface in the deck carries the same accent3 -> accent1 gradient,
+// running from the top-left corner to the bottom-right one.
+const GRAD_FROM = PINK_DK;
+const GRAD_TO = PINK_LT;
+// Gradient-painted text runs collapse to the middle stop.
+const PINK_TEXT = PINK_MD;
+
+const HEAD = 'Oswald'; // theme major font
+const BODY = 'Lato'; // theme minor font
+
+const SLIDE_W = 13.333;
+const SLIDE_H = 7.5;
+
+/* ------------------------------------------------------------------ helpers */
+
+/** Text box carrying the deck's defaults: Lato 14pt, black, top anchored. */
+function text(slide, runs, opt) {
+    slide.addText(runs, Object.assign({ fontFace: BODY, fontSize: 14, color: BLACK, valign: 'top', isTextBox: true }, opt));
+}
+
+/** Two-tone headline: plain run then a run in the pink gradient tone. */
+function headline(slide, plain, accent, opt) {
+    text(slide, [{ text: plain }, { text: accent, options: { color: PINK_TEXT } }],
+        Object.assign({ fontFace: HEAD, color: BLACK }, opt));
+}
+
+/** Body copy where every paragraph shares one style; '' yields a blank line. */
+function paras(slide, lines, opt) {
+    const runs = lines.map((line, i) => ({ text: line, options: { breakLine: i < lines.length - 1 } }));
+    text(slide, runs, Object.assign({ lineSpacingMultiple: 1.2 }, opt));
+}
+
+function rect(slide, o) { slide.addShape('rect', o); }
+function ellipse(slide, o) { slide.addShape('ellipse', o); }
+
+/** Blend the two gradient stops; t runs 0 (accent3) .. 1 (accent1). */
+function gradStop(t) {
+    const from = [0xE7, 0x61, 0x84], to = [0xF0, 0xA0, 0xB5];
+    return from.map((v, i) => Math.round(v + (to[i] - v) * t))
+        .map(v => v.toString(16).padStart(2, '0').toUpperCase()).join('');
+}
+
+/**
+ * Pink gradient surface. pptxgenjs writes solid fills only, so the corner-to-
+ * corner gradient is laid down as a grid of ~0.55" tiles, each tile taking the
+ * blend value at its own centre.
+ */
+const TILE = 0.55;
+function gradPanel(slide, x, y, w, h) {
+    const nx = Math.max(2, Math.round(w / TILE)), ny = Math.max(2, Math.round(h / TILE));
+    const cw = w / nx, ch = h / ny;
+    for (let i = 0; i < nx; i++) {
+        for (let j = 0; j < ny; j++) {
+            const t = (((i + 0.5) / nx) * w + ((j + 0.5) / ny) * h) / (w + h);
+            rect(slide, { x: x + i * cw, y: y + j * ch, w: cw + 0.02, h: ch + 0.02, fill: { color: gradStop(t) }, line: { type: 'none' } });
+        }
+    }
+}
+
+/**
+ * White card styling. Every card carries a wide soft drop shadow; most also
+ * carry a pink outer glow, approximated here by a hairline border.
+ */
+function cardStyle(glow) {
+    return {
+        fill: { color: WHITE },
+        line: glow === false ? { type: 'none' } : { color: 'F6C3C9', width: 1 },
+        shadow: { type: 'outer', color: BLACK, opacity: 0.12, blur: 60, offset: 20, angle: 45 },
+    };
+}
+
+/* --------------------------------------------------------------------- icons */
+
+// Slim "up-right arrow" freeform reused all over the deck, as fractions of its box.
+const ARROW = [
+    [1.000, 0.613], [0.501, 0.000], [0.460, 0.048], [0.000, 0.613], [0.078, 0.712],
+    [0.443, 0.264], [0.443, 1.000], [0.554, 1.000], [0.554, 0.264], [0.922, 0.712],
+];
+
+function arrow(slide, x, y, w, h, color, rotate, flipH) {
+    const points = ARROW.map(([fx, fy], i) => ({ x: fx * w, y: fy * h, moveTo: i === 0 }));
+    points.push({ close: true });
+    slide.addShape('custGeom', { x, y, w, h, points, fill: { color }, rotate: rotate || 0, flipH: !!flipH });
+}
+
+/** One stylised person: round head over a shoulder blob. */
+function person(slide, x, y, s, color) {
+    ellipse(slide, { x: x + 0.24 * s, y, w: 0.34 * s, h: 0.34 * s, fill: { color }, line: { type: 'none' } });
+    slide.addShape('round2SameRect', {
+        x: x + 0.06 * s, y: y + 0.40 * s, w: 0.70 * s, h: 0.42 * s,
+        fill: { color }, line: { type: 'none' }, rectRadius: 0.16 * s,
+    });
+}
+
+/** Head inside a headset ring — the deck's "call center" glyph. */
+function iconCallCenter(slide, x, y, s, color) {
+    person(slide, x + 0.05 * s, y + 0.16 * s, 0.94 * s, color);
+    ellipse(slide, {
+        x: x + 0.26 * s, y: y + 0.06 * s, w: 0.48 * s, h: 0.42 * s,
+        fill: { type: 'none' }, line: { color, width: 2 },
+    });
+}
+
+/** Speech panel above three heads — the deck's "customer review" glyph. */
+function iconReview(slide, x, y, s, color) {
+    slide.addShape('roundRect', { x: x + 0.10 * s, y: y + 0.08 * s, w: 0.78 * s, h: 0.32 * s, fill: { color }, line: { type: 'none' }, rectRadius: 0.05 * s });
+    rect(slide, { x: x + 0.20 * s, y: y + 0.16 * s, w: 0.56 * s, h: 0.035 * s, fill: { color: WHITE }, line: { type: 'none' } });
+    rect(slide, { x: x + 0.28 * s, y: y + 0.25 * s, w: 0.40 * s, h: 0.035 * s, fill: { color: WHITE }, line: { type: 'none' } });
+    person(slide, x + 0.02 * s, y + 0.50 * s, 0.38 * s, color);
+    person(slide, x + 0.60 * s, y + 0.50 * s, 0.38 * s, color);
+    person(slide, x + 0.31 * s, y + 0.58 * s, 0.40 * s, color);
+}
+
+/** Three overlapping people — the deck's "users" glyph. */
+function iconUsers(slide, x, y, s, color) {
+    person(slide, x + 0.00 * s, y + 0.18 * s, 0.46 * s, color);
+    person(slide, x + 0.54 * s, y + 0.18 * s, 0.46 * s, color);
+    person(slide, x + 0.26 * s, y + 0.32 * s, 0.50 * s, color);
+}
+
+/** The icon trio (call-center / review / users) that decorates most slides. */
+function iconTrio(slide, x, y, s) {
+    iconCallCenter(slide, x, y, s, PINK_LT);
+    iconReview(slide, x + 1.274 * s, y + 0.032 * s, s, PINK_MD);
+    iconUsers(slide, x + 2.524 * s, y + 0.032 * s, s, PINK_DK);
+}
+
+/* --------------------------------------------------------- master decoration */
+
+const HEADER_ITEMS = [
+    { label: 'Human Resources', x: 1.141, y: 0.168, w: 1.848, align: 'left' },
+    { label: 'Talent', x: 4.562, y: 0.181, w: 1.176, align: 'center' },
+    { label: 'Recruitment', x: 6.934, y: 0.181, w: 1.176, align: 'center' },
+    { label: 'Employee Relations', x: 9.267, y: 0.181, w: 1.831, align: 'center' },
+    { label: '2025', x: 11.491, y: 0.181, w: 1.176, align: 'right' },
+];
+
+/** Slide-master furniture: pink review glyph plus the five nav labels. */
+function header(slide, dark) {
+    iconReview(slide, 0.748, 0.181, 0.363, PINK_LT);
+    HEADER_ITEMS.forEach(it => {
+        text(slide, it.label, {
+            x: it.x, y: it.y, w: it.w, h: 0.377, align: it.align,
+            fontFace: HEAD, fontSize: 14, color: dark ? WHITE : BLACK, lineSpacingMultiple: 1.3,
+        });
+    });
+}
+
+/* ------------------------------------------------------------ slide builders */
+
+function slide01(s) { // Title
+    header(s, true);
+    iconTrio(s, 5.228, 1.665, 0.637);
+    text(s, [{ text: 'The Human Code of ', options: { color: PINK_TEXT } }, { text: 'HR Management', options: { color: WHITE } }],
+        { x: 5.228, y: 2.563, w: 7.31, h: 2.524, fontFace: HEAD, fontSize: 72 });
+    paras(s, ['Lorem ipsum dolor sit amet, consectetur adiiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. '],
+        { x: 5.228, y: 5.393, w: 7.458, h: 0.643, color: WHITE });
+}
+
+function slide02(s) { // Table of contents
+    header(s, false);
+    iconTrio(s, 1.164, 1.425, 0.637);
+    text(s, [{ text: 'Main ', options: { color: INK } }, { text: 'Topics', options: { color: PINK_TEXT } }],
+        { x: 6.667, y: 1.089, w: 5.906, h: 1.447, fontFace: HEAD, fontSize: 80, charSpacing: -1.5, align: 'right' });
+    gradPanel(s, 0, 2.898, 7.737, 4.611);
+
+    // Column captions render in all-caps via the source's cap="all".
+    text(s, [{ text: 'SECTION', options: { fontSize: 14 } }, { text: ':', options: { fontSize: 12, fontFace: BODY } }],
+        { x: 0.992, y: 3.236, w: 0.827, h: 0.187, fontFace: HEAD, color: WHITE, valign: 'middle', margin: 0 });
+    text(s, 'NUMBER PAGE:', { x: 5.529, y: 3.236, w: 1.506, h: 0.187, color: WHITE, valign: 'middle', margin: 0 });
+
+    const TOC = [
+        ['Lorem Ipsum Dolor Sit Amet', '04'], ['Consectetur Adiiscing Elit', '09'],
+        ['Lorem Ipsum Dolor Sit Amet', '12'], ['Sed Do Eiusmod Tempor', '15'],
+        ['Incididunt Ut Labore Et Dolore', '16'], ['Sed Do Eiusmod Tempor', '19'],
+    ];
+    TOC.forEach(([label, page], i) => {
+        text(s, label, { x: 0.86, y: 3.844 + i * 0.4965, w: 4.174, h: 0.404, fontSize: 18, color: WHITE });
+        text(s, page, {
+            x: 5.92, y: 3.891 + i * 0.4965, w: 0.668, h: 0.312, fontSize: 18, color: WHITE,
+            charSpacing: -1.5, align: 'center', valign: 'middle', margin: 0,
+        });
+    });
+
+    text(s, 'Core Sections', { x: 8.864, y: 5.158, w: 3.709, h: 0.438, fontFace: HEAD, fontSize: 20, align: 'right' });
+    paras(s, ['Lorem ipsum dolor sit amet, consect', 'etur adiiscing elit, sed do eiusmod tempor incididunt ut labore et dolore.'],
+        { x: 8.601, y: 5.596, w: 3.956, h: 0.925, align: 'right' });
+}
+
+/** The pink "stat" tile (big value + caption + corner arrow) on slides 3 and 4. */
+function statTile(s, o) {
+    gradPanel(s, o.x, o.y, o.w, o.h);
+    text(s, o.value, { x: o.x + 0.312, y: o.y + 0.247, w: o.w - 0.652, h: 0.831, fontFace: HEAD, fontSize: 36, color: WHITE, align: o.align, lineSpacingMultiple: 1.3 });
+    text(s, o.caption, { x: o.x + 0.312, y: o.y + 1.039, w: o.w - 0.652, h: 0.372, color: WHITE, align: o.align, lineSpacingMultiple: 1.3 });
+    arrow(s, o.ax, o.ay, o.aw, o.aw * 0.813, WHITE, o.arot);
+}
+
+function slide03(s) { // Introduction to HR Management
+    header(s, false);
+    headline(s, 'Introduction to ', 'HR Management', { x: 0.858, y: 1.346, w: 6.308, h: 2.524, fontSize: 72 });
+    paras(s, ['Lorem ipsum dolor sit amet, consectetur adiiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. '],
+        { x: 0.943, y: 3.87, w: 5.783, h: 0.638 });
+    iconTrio(s, 0.943, 4.834, 0.637);
+    statTile(s, { x: 7.383, y: 4.755, w: 3.517, h: 1.651, value: '123,457,00', caption: 'Applicant', align: 'right', ax: 7.52, ay: 4.922, aw: 0.375, arot: 315 });
+}
+
+function slide04(s) { // The Evolution of HR
+    header(s, false);
+    iconTrio(s, 0.776, 1.212, 0.637);
+    text(s, [{ text: 'The Evolution of ' }, { text: 'HR', options: { color: PINK_TEXT } }],
+        { x: 5.429, y: 0.935, w: 7.144, h: 1.212, fontFace: HEAD, fontSize: 66, align: 'right' });
+    text(s, 'From Administration to Strategy', { x: 0.776, y: 2.507, w: 4.236, h: 0.505, fontFace: HEAD, fontSize: 24 });
+    paras(s, [
+        'Lorem ipsum dolor sit amet, consectetur adiiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.', '',
+        'Lorem ipsum dolor sit amet, consectetur sed do adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore consectetur sed',
+    ], { x: 0.776, y: 3.084, w: 5.68, h: 1.768 });
+
+    text(s, '40%', { x: 1.972, y: 5.361, w: 1.505, h: 0.64, fontFace: HEAD, fontSize: 32, align: 'right' });
+    text(s, 'New Clients', { x: 1.972, y: 5.868, w: 1.505, h: 0.381, align: 'right', lineSpacingMultiple: 1.3 });
+    statTile(s, { x: 3.852, y: 4.827, w: 2.453, h: 1.651, value: '123.57$', caption: '2020-2025 ', align: 'left', ax: 5.913, ay: 4.988, aw: 0.258, arot: 45 });
+}
+
+function slide05(s) { // Core Function of HR (dark)
+    header(s, true);
+    text(s, [{ text: 'Core Function of ', options: { color: WHITE } }, { text: 'HR', options: { color: PINK_TEXT } }],
+        { x: 7.471, y: 1.23, w: 5.304, h: 2.524, fontFace: HEAD, fontSize: 72 });
+    paras(s, ['Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam. Non exercitationem.'],
+        { x: 7.471, y: 3.95, w: 4.518, h: 0.64, color: WHITE });
+
+    [['Classic Era', 7.494], ['Modern Era', 9.924]].forEach(([label, x]) => {
+        text(s, label, { x, y: 5.023, w: 2.302, h: 0.37, fontFace: HEAD, fontSize: 16, color: WHITE });
+        text(s, ['Lorem ipsum dolor', 'Sit amet.', 'Qui sint neque'].map(t => ({
+            text: t, options: { bullet: { type: 'number', numberType: 'arabicPeriod', indent: 18 } },
+        })), { x, y: 5.394, w: 2.302, h: 0.805, fontSize: 12, color: WHITE, lineSpacingMultiple: 1.2 });
+    });
+
+    const STATS = [{ value: '87%', x: 1.083, cx: 1.105 }, { value: '323K', x: 3.219, cx: 3.241 }, { value: '13%', x: 5.355, cx: 5.355 }];
+    STATS.forEach(st => {
+        text(s, st.value, { x: st.x, y: 1.464, w: 1.255, h: 0.64, fontFace: HEAD, fontSize: 32, color: WHITE });
+        text(s, 'Lorem ipsum', { x: st.cx, y: 1.971, w: 1.435, h: 0.381, color: WHITE, lineSpacingMultiple: 1.3 });
+    });
+    [2.929, 5.061].forEach(x => s.addShape('line', { x, y: 1.603, w: 0, h: 0.6, line: { color: WHITE, width: 1 } }));
+}
+
+function slide06(s) { // Attracting Top Talent
+    header(s, false);
+    const COLS = [
+        { title: 'Boost Performance', tw: 3.015, tx: 1.106, ty: 3.673, bx: 1.106, by: 4.178, badge: 3.688, bady: 1.156, ax: 3.798, ay: 1.272, pink: true },
+        { title: 'Strengthens Advantage', tw: 3.094, tx: 5.149, ty: 3.661, bx: 5.149, by: 4.166, badge: 7.770, bady: 1.164, ax: 7.879, ay: 1.292, pink: false },
+        { title: 'Reduces Costs', tw: 2.274, tx: 9.201, ty: 3.661, bx: 9.201, by: 4.166, badge: 11.797, bady: 1.186, ax: 11.907, ay: 1.297, pink: false },
+    ];
+    COLS.forEach(c => {
+        if (c.pink) gradPanel(s, c.badge, c.bady, 0.588, 0.599);
+        else rect(s, { x: c.badge, y: c.bady, w: 0.588, h: 0.599, fill: { color: WHITE }, line: { type: 'none' } });
+        arrow(s, c.ax, c.ay, 0.398, 0.324, c.pink ? WHITE : PINK_MD, 45);
+        text(s, c.title, { x: c.tx, y: c.ty, w: c.tw, h: 0.505, fontFace: HEAD, fontSize: 24 });
+        paras(s, ['Lorem ipsum dolor sit amet, cons', 'ectetur adiiscing elit, sed do eius', 'mod tempor incididunt ut.'],
+            { x: c.bx, y: c.by, w: 3.094, h: 0.92 });
+    });
+    headline(s, 'Attracting ', 'Top Talent', { x: 0.671, y: 5.541, w: 8.391, h: 1.313, fontSize: 72 });
+    iconTrio(s, 10.051, 5.818, 0.637);
+}
+
+function slide07(s) { // Upskilling for The Future
+    // Three staggered "price cards" hanging off the top edge, back to front.
+    const CARDS = [
+        { x: 5.769, y: 0.016, w: 2.329, h: 5.778, pink: true, label: 'Productivity Gains', size: 18, bold: true, price: '$38.4 B', lx: 5.971, ly: 0.917, lw: 2.091, ax: 5.973, ay: 5.239 },
+        { x: 3.276, y: 0.016, w: 2.203, h: 4.660, pink: false, label: 'Lack Access', size: 20, bold: false, price: '$28.7 B', lx: 3.444, ly: 0.907, lw: 2.092, ax: 3.478, ay: 4.109 },
+        { x: 0.870, y: 0.000, w: 2.097, h: 3.667, pink: false, label: 'Competitive Edge', size: 18, bold: false, price: '$18.9 B', lx: 1.003, ly: 0.918, lw: 1.981, ax: 1.071, ay: 3.113 },
+    ];
+    CARDS.forEach(c => {
+        const fg = c.pink ? WHITE : BLACK;
+        if (c.pink) gradPanel(s, c.x, c.y, c.w, c.h);
+        else rect(s, Object.assign({ x: c.x, y: c.y, w: c.w, h: c.h }, cardStyle()));
+        text(s, 'Reserve Price', { x: c.lx, y: c.ly, w: 1.35, h: 0.303, fontSize: 12, color: fg });
+        text(s, c.label, { x: c.lx, y: c.ly + 0.376, w: c.lw, h: 0.42, fontFace: HEAD, fontSize: c.size, bold: c.bold, color: fg });
+        text(s, c.price, { x: c.lx, y: c.ly + 0.85, w: 1.35, h: 0.303, fontSize: 12, color: fg });
+        arrow(s, c.ax, c.ay, 0.392, 0.319, fg, 45);
+    });
+    header(s, false);
+    headline(s, 'Upskilling for ', 'The Future', { x: 8.532, y: 1.305, w: 4.119, h: 3.736, fontSize: 72 });
+    paras(s, ['Lorem ipsum dolor sit amet, consectetur adiiscing elit, sed do eiusmod tempor'],
+        { x: 8.532, y: 5.156, w: 4.119, h: 0.638 });
+    iconTrio(s, 0.905, 5.236, 0.821);
+}
+
+function slide08(s) { // Well-being at Work
+    header(s, false);
+    // Laptop mock-up: the original freeform stack, drawn back to front.
+    const LAPTOP = [
+        [6.537, 6.275, 8.428, 0.140, '575554'], [6.537, 6.224, 3.510, 0.066, '767676'],
+        [11.457, 6.224, 3.508, 0.066, '505050'], [10.044, 6.224, 1.413, 0.070, '565656'],
+        [6.537, 6.218, 3.510, 0.066, 'A7A7A7'], [7.305, 1.607, 6.890, 4.600, '504E4E'],
+        [7.305, 1.582, 6.893, 0.240, '1A1A1A'], [7.335, 6.059, 6.832, 0.147, '212121'],
+        [7.335, 1.607, 6.832, 4.452, BLACK], [11.457, 6.218, 3.508, 0.066, '818181'],
+        [10.044, 6.218, 1.413, 0.070, '838180'], [7.305, 6.206, 6.893, 0.012, '131313'],
+    ];
+    LAPTOP.forEach(([x, y, w, h, color]) => rect(s, { x, y, w, h, fill: { color }, line: { type: 'none' } }));
+
+    headline(s, 'Well-being ', 'at Work', { x: 0.953, y: 1.446, w: 5.713, h: 2.524, fontSize: 72 });
+    iconTrio(s, 0.953, 4.108, 0.637);
+    text(s, 'Mental Health for Talent', { x: 0.953, y: 5.152, w: 3.709, h: 0.438, fontFace: HEAD, fontSize: 20 });
+    paras(s, ['Lorem ipsum dolor sit amet, consectetur adiiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. '],
+        { x: 0.953, y: 5.559, w: 5.652, h: 0.638 });
+}
+
+/* Line-art glyphs tucked into the corner of the slide 9 cards. */
+function glyphTrend(s, x, y, w, h, color) { // rising zig-zag under an arrow head
+    [[0.00, 0.75, 0.30, 0.34], [0.30, 0.34, 0.50, 0.56], [0.50, 0.56, 0.86, 0.08]].forEach(([x1, y1, x2, y2]) => {
+        s.addShape('line', {
+            x: x + Math.min(x1, x2) * w, y: y + Math.min(y1, y2) * h,
+            w: Math.abs(x2 - x1) * w, h: Math.abs(y2 - y1) * h,
+            flipV: y2 < y1, line: { color, width: 2 },
+        });
+    });
+    s.addShape('triangle', { x: x + 0.72 * w, y, w: 0.28 * w, h: 0.30 * h, fill: { color }, line: { type: 'none' }, rotate: 40 });
+}
+function glyphLock(s, x, y, w, h, color) {
+    ellipse(s, { x: x + 0.24 * w, y, w: 0.52 * w, h: 0.52 * h, fill: { type: 'none' }, line: { color, width: 2 } });
+    s.addShape('roundRect', { x, y: y + 0.34 * h, w, h: 0.66 * h, fill: { color }, line: { type: 'none' }, rectRadius: 0.02 });
+    ellipse(s, { x: x + 0.40 * w, y: y + 0.53 * h, w: 0.20 * w, h: 0.22 * h, fill: { color: WHITE }, line: { type: 'none' } });
+}
+function glyphMolecule(s, x, y, w, h, color) {
+    s.addShape('line', { x: x + 0.22 * w, y: y + 0.20 * h, w: 0.45 * w, h: 0.22 * h, line: { color, width: 1.5 } });
+    s.addShape('line', { x: x + 0.30 * w, y: y + 0.40 * h, w: 0.36 * w, h: 0.28 * h, flipV: true, line: { color, width: 1.5 } });
+    ellipse(s, { x: x + 0.62 * w, y, w: 0.26 * w, h: 0.26 * h, fill: { color }, line: { type: 'none' } });
+    ellipse(s, { x: x + 0.44 * w, y: y + 0.44 * h, w: 0.56 * w, h: 0.56 * h, fill: { color }, line: { type: 'none' } });
+    ellipse(s, { x, y: y + 0.05 * h, w: 0.48 * w, h: 0.48 * h, fill: { type: 'none' }, line: { color, width: 2 } });
+}
+function glyphLinks(s, x, y, w, h, color) {
+    ellipse(s, { x: x + 0.17 * w, y, w: 0.83 * w, h: 0.62 * h, fill: { type: 'none' }, line: { color, width: 2 } });
+    ellipse(s, { x, y: y + 0.38 * h, w: 0.83 * w, h: 0.62 * h, fill: { type: 'none' }, line: { color, width: 2 } });
+}
+
+function slide09(s) { // Labor Law — 2x2 card grid
+    header(s, false);
+    iconTrio(s, 0.915, 1.498, 0.637);
+    headline(s, 'Labor ', 'Law', { x: 0.915, y: 2.348, w: 4.884, h: 1.582, fontSize: 88 });
+    text(s, 'Ethical HR Practices', { x: 0.915, y: 4.326, w: 3.709, h: 0.438, fontFace: HEAD, fontSize: 20 });
+    paras(s, ['Lorem ipsum dolor sit amet, consectetur adiiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna'],
+        { x: 0.915, y: 4.778, w: 5.259, h: 0.638 });
+
+    const CARD_BODY = 'Lorem ipsum dolor sit amet,consectetur adiiscing elit,sed do eiusmod';
+    const CARDS = [
+        { x: 6.856, y: 1.375, pink: true, title: 'Contract Law', tw: 1.395, tx: 6.991, bx: 6.991, glyph: glyphTrend, gx: 8.603, gy: 1.641, gw: 0.603, gh: 0.408 },
+        { x: 9.904, y: 1.375, pink: false, title: 'Occupational Safety', tw: 2.454, tx: 10.049, bx: 10.025, glyph: glyphLock, gx: 11.832, gy: 1.581, gw: 0.464, gh: 0.507 },
+        { x: 6.856, y: 4.111, pink: false, title: 'Health Law', tw: 2.117, tx: 6.991, bx: 6.991, glyph: glyphMolecule, gx: 8.759, gy: 4.305, gw: 0.482, gh: 0.473 },
+        { x: 9.904, y: 4.111, pink: true, title: 'Wage Law', tw: 1.945, tx: 10.119, bx: 10.095, glyph: glyphLinks, gx: 11.949, gy: 4.308, gw: 0.337, gh: 0.455 },
+    ];
+    CARDS.forEach(c => {
+        const fg = c.pink ? WHITE : BLACK;
+        if (c.pink) gradPanel(s, c.x, c.y, 2.601, 2.265);
+        else rect(s, Object.assign({ x: c.x, y: c.y, w: 2.601, h: 2.265 }, cardStyle()));
+        c.glyph(s, c.gx, c.gy, c.gw, c.gh, fg);
+        text(s, c.title, { x: c.tx, y: c.y + 0.866, w: c.tw, h: 0.404, fontFace: HEAD, fontSize: 18, color: fg });
+        paras(s, [CARD_BODY], { x: c.bx, y: c.y + 1.272, w: 2.358, h: 0.808, fontSize: 12, color: fg });
+    });
+}
+
+function slide10(s) { // Conflict Resolution — bar comparison (dark)
+    header(s, true);
+    text(s, [{ text: 'Conflict ', options: { color: WHITE } }, { text: 'Resolution', options: { color: PINK_TEXT } }],
+        { x: 0.993, y: 0.964, w: 8.399, h: 1.447, fontFace: HEAD, fontSize: 80 });
+    iconTrio(s, 9.691, 1.404, 0.637);
+
+    const BARS = [
+        { x: 4.185, y: 4.403, h: 1.754, ghost: true, label: '21,23%', ly: 3.643 },
+        { x: 6.185, y: 3.637, h: 2.519, ghost: false, label: '45,67%', ly: 2.937 },
+        { x: 8.813, y: 4.342, h: 1.754, ghost: true, label: '31,23%', ly: 3.582 },
+        { x: 10.813, y: 3.576, h: 2.519, ghost: false, label: '67,89%', ly: 2.876 },
+    ];
+    BARS.forEach(b => {
+        if (b.ghost) rect(s, { x: b.x, y: b.y, w: 1.686, h: b.h, fill: { color: WHITE, transparency: 75 }, line: { type: 'none' } });
+        else gradPanel(s, b.x, b.y, 1.686, b.h);
+        text(s, b.label, { x: b.x, y: b.ly, w: 1.777, h: 0.64, fontFace: HEAD, fontSize: 32, color: WHITE, align: 'right' });
+    });
+    text(s, '2024', { x: 6.581, y: 6.277, w: 0.873, h: 0.37, fontSize: 16, color: WHITE, align: 'center' });
+    text(s, '2025', { x: 11.238, y: 6.277, w: 0.873, h: 0.37, fontSize: 16, color: WHITE, align: 'center' });
+
+    text(s, 'Prevents Disruption', { x: 0.899, y: 3.3, w: 2.107, h: 0.37, fontFace: HEAD, fontSize: 16, color: WHITE });
+    paras(s, ['Lorem ipsum dolor sit amet. Qui sint'], { x: 0.909, y: 3.597, w: 2.097, h: 0.572, fontSize: 12, color: WHITE });
+    arrow(s, 0.971, 4.395, 0.778, 0.633, PINK_MD, 45);
+    paras(s, ['Lorem ipsum dolor sit amet. Qui sint neque a velit'], { x: 0.91, y: 5.253, w: 2.054, h: 0.933, color: WHITE });
+}
+
+function slide11(s) { // Onboarding Excellence
+    header(s, false);
+    gradPanel(s, 0.763, 0.908, 2.776, 1.609);
+    text(s, '01', { x: 0.972, y: 1.233, w: 0.489, h: 0.426, fontFace: HEAD, fontSize: 16, bold: true, color: WHITE, lineSpacingMultiple: 1.3 });
+    text(s, 'Line', { x: 0.972, y: 1.531, w: 0.544, h: 0.314, fontFace: HEAD, fontSize: 10.5, bold: true, color: WHITE, lineSpacingMultiple: 1.3 });
+    paras(s, ['Lorem ipsum dolor sit a', 'met, consectetueradipis', 'cing elit. Maecenas port', 'titor congue massa. '],
+        { x: 1.516, y: 1.233, w: 1.883, h: 0.998, fontSize: 10.5, color: WHITE, lineSpacingMultiple: 1.3 });
+
+    rect(s, Object.assign({ x: 0.76, y: 2.644, w: 3.517, h: 1.651 }, cardStyle()));
+    text(s, '79.112%', { x: 0.972, y: 2.839, w: 3.047, h: 0.831, fontFace: HEAD, fontSize: 36, color: ROSE_DK, lineSpacingMultiple: 1.3 });
+    text(s, 'Project On', { x: 0.972, y: 3.63, w: 3.435, h: 0.372, color: GREY_MD, lineSpacingMultiple: 1.3 });
+    arrow(s, 3.966, 2.753, 0.247, 0.201, ROSE_DK, 135, true);
+
+    text(s, 'First Impression Matter', { x: 0.828, y: 4.542, w: 3.709, h: 0.505, fontFace: HEAD, fontSize: 24 });
+    paras(s, [
+        'Lorem ipsum dolor sit amet, consectetur adiiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ', '',
+        'consectetur adiiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
+    ], { x: 0.828, y: 5.114, w: 6.0, h: 1.491 });
+    headline(s, 'Onboarding ', 'Excellence', { x: 7.238, y: 4.533, w: 4.202, h: 2.322, fontSize: 66 });
+}
+
+function slide12(s) { // PM in Digital Age — two wide cards
+    header(s, false);
+    headline(s, 'PM in ', 'Digital Age', { x: 0.651, y: 1.26, w: 7.78, h: 1.447, fontSize: 80 });
+    iconTrio(s, 8.691, 1.592, 0.821);
+
+    const PANELS = [
+        { x: 0.667, title: 'Real-Time Feedback', tx: 1.030, bx: 1.002, badge: 5.905, bady: 3.431, ax: 5.998, ay: 3.542, solid: false },
+        { x: 6.667, title: 'People Analytics', tx: 7.067, bx: 7.039, badge: 11.939, bady: 3.431, ax: 12.050, ay: 3.517, solid: true },
+    ];
+    PANELS.forEach(p => {
+        rect(s, Object.assign({ x: p.x, y: 3.611, w: 5.713, h: 2.891 }, cardStyle()));
+        if (p.solid) rect(s, { x: p.badge, y: p.bady, w: 0.631, h: 0.612, fill: { color: PINK_DK }, line: { type: 'none' } });
+        else gradPanel(s, p.badge, p.bady, 0.631, 0.612);
+        arrow(s, p.ax, p.ay, 0.471, 0.383, WHITE, 45);
+        text(s, p.title, { x: p.tx, y: 4.162, w: 4.264, h: 0.438, fontFace: HEAD, fontSize: 20 });
+        paras(s, [
+            'Lorem ipsum dolor sit amet, consectetur adiiscing elit, sed do eiusmod tempor incididunt ut labore et ', '',
+            'dolore magna aliqua. Ut enim ad minim veniam,',
+        ], { x: p.bx, y: 4.7, w: 5.264, h: 1.208 });
+    });
+}
+
+function slide13(s) { // Engagement & Motivation Strategy — tablet mock-up
+    // The source rotates one tall graphic 90deg; here it is a bezel, screen and stylus.
+    // Both run off the bottom-left of the slide, just as the artwork does.
+    s.addShape('roundRect', { x: -0.60, y: 2.778, w: 9.217, h: 5.10, fill: { color: BLACK }, line: { type: 'none' }, rectRadius: 0.22 });
+    s.addShape('roundRect', { x: -0.36, y: 3.014, w: 8.741, h: 4.75, fill: { color: WHITE }, line: { type: 'none' }, rectRadius: 0.10 });
+    s.addShape('roundRect', { x: 1.235, y: 2.500, w: 5.510, h: 0.215, fill: { color: 'EDEDED' }, line: { color: 'D4D4D4', width: 0.75 }, rectRadius: 0.107 });
+    header(s, false);
+    headline(s, 'Engagement & ', 'Motivation Strategy', { x: 0.682, y: 0.861, w: 11.969, h: 1.212, fontSize: 66 });
+    iconTrio(s, 9.013, 2.807, 0.821);
+    text(s, [
+        { text: 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam. Non exercitationem ', options: { breakLine: true } },
+        { text: 'Sit possimus fuga iste nostrum sed deserunt fugiat et minus dolore ab soluta perferendis. Quo delectus soluta qui autem suscipit qui aliquid debitis. ' },
+    ], { x: 9.013, y: 3.997, w: 3.639, h: 2.22, color: GREY_TX, lineSpacingMultiple: 1.2, paraSpaceBefore: 12 });
+}
+
+function slide14(s) { // Consultan Psychology in Work (dark) — team strip
+    header(s, true);
+    text(s, [{ text: 'Consultan ', options: { color: WHITE } }, { text: 'Psychology in Work', options: { color: PINK_TEXT } }],
+        { x: 1.0, y: 1.076, w: 11.573, h: 1.313, fontFace: HEAD, fontSize: 72 });
+    paras(s, ['Lorem ipsum dolor sit amet. Qui sint neque a velit'], { x: 1.0, y: 2.817, w: 2.054, h: 0.933, color: WHITE });
+    arrow(s, 3.164, 3.085, 0.778, 0.633, PINK_MD, 45);
+    iconTrio(s, 1.0, 4.678, 0.637);
+
+    const PEOPLE = [
+        { name: 'Nadine', x: 4.248, w: 2.664, tx: 4.426, cx: 4.461, pink: true },
+        { name: 'Johane', x: 7.060, w: 2.671, tx: 7.260, cx: 7.291, pink: false },
+        { name: 'Launa', x: 9.878, w: 2.694, tx: 10.089, cx: 10.081, pink: false },
+    ];
+    PEOPLE.forEach(p => {
+        const fg = p.pink ? WHITE : BLACK;
+        if (p.pink) gradPanel(s, p.x, 5.525, p.w, 0.966);
+        else rect(s, Object.assign({ x: p.x, y: 5.525, w: p.w, h: 0.966 }, cardStyle(false)));
+        text(s, p.name, { x: p.tx, y: 5.658, w: 1.983, h: 0.404, fontFace: HEAD, fontSize: 18, color: fg });
+        text(s, 'Lorem ipsum dolor sit', { x: p.cx, y: 6.019, w: 1.937, h: 0.303, fontSize: 12, color: fg });
+    });
+}
+
+function slide15(s) { // Career Pathing — full-height pink panel
+    gradPanel(s, 0, 1.116, 6.667, 6.411);
+    header(s, false);
+    text(s, 'Traditional Career Path', { x: 0.606, y: 1.803, w: 3.332, h: 0.505, fontFace: HEAD, fontSize: 24, color: WHITE });
+    paras(s, [
+        'Lorem ipsum dolor sit amet, consectetur adiiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.', '',
+        'Lorem ipsum dolor sit amet, consectetur sed do adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore consectetur sed',
+    ], { x: 0.606, y: 2.401, w: 5.467, h: 2.056, color: WHITE });
+    text(s, 'Lateral Career Path', { x: 0.606, y: 5.266, w: 3.332, h: 0.505, fontFace: HEAD, fontSize: 24, color: WHITE });
+    paras(s, ['Lorem ipsum dolor sit amet, consectetur adiiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.'],
+        { x: 0.606, y: 5.864, w: 5.467, h: 0.925, color: WHITE });
+
+    headline(s, 'Career ', 'Pathing', { x: 7.162, y: 1.1, w: 4.87, h: 2.794, fontSize: 80 });
+    iconTrio(s, 7.162, 4.175, 0.637);
+    text(s, 'Succession Planning', { x: 7.162, y: 5.114, w: 3.709, h: 0.505, fontFace: HEAD, fontSize: 24 });
+    paras(s, ['Lorem ipsum dolor sit amet, consectetur adiiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. '],
+        { x: 7.162, y: 5.619, w: 5.259, h: 0.925 });
+}
+
+function slide16(s) { // Workplace Diversity — three stat rows
+    header(s, false);
+    headline(s, 'Workplace Diversity ', 'Equity & Inclusion', { x: 7.157, y: 1.066, w: 5.628, h: 3.433, fontSize: 66 });
+    text(s, 'DEI', { x: 7.157, y: 4.894, w: 3.709, h: 0.505, fontFace: HEAD, fontSize: 24 });
+    paras(s, ['Lorem ipsum dolor sit amet, consectetur adiiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. '],
+        { x: 7.157, y: 5.398, w: 5.259, h: 0.925 });
+
+    const ROWS = [
+        { x: 0.811, y: 1.123, pink: false, px: 1.231, vy: 1.510, cx: 1.253, cy: 2.017, bx: 3.249, by: 1.473 },
+        { x: 0.760, y: 2.920, pink: true, px: 1.180, vy: 3.294, cx: 1.201, cy: 3.801, bx: 3.197, by: 3.257 },
+        { x: 0.760, y: 4.710, pink: false, px: 1.180, vy: 5.110, cx: 1.201, cy: 5.618, bx: 3.197, by: 5.074 },
+    ];
+    ROWS.forEach(r => {
+        const fg = r.pink ? WHITE : BLACK;
+        if (r.pink) gradPanel(s, r.x, r.y, 6.0, 1.66);
+        else rect(s, Object.assign({ x: r.x, y: r.y, w: 6.0, h: 1.66 }, cardStyle()));
+        text(s, '99%', { x: r.px, y: r.vy, w: 1.255, h: 0.64, fontFace: HEAD, fontSize: 32, color: fg });
+        text(s, 'Lorem ipsum', { x: r.cx, y: r.cy, w: 1.435, h: 0.381, color: fg, lineSpacingMultiple: 1.3 });
+        paras(s, ['Lorem ipsum dolor sit amet, consectetur adiiscing elit, sed do eiusmod tempor incididunt ut.'],
+            { x: r.bx, y: r.by, w: 3.257, h: 0.925, color: fg });
+    });
+}
+
+function slide17(s, pptx) { // Hybrid Performance — native bar chart
+    header(s, false);
+    headline(s, 'Hybrid  ', 'Performance', { x: 1.016, y: 1.163, w: 5.585, h: 2.524, fontSize: 72 });
+
+    const LEGEND = [
+        { value: '91', color: PINK_LT, vy: 3.865, ty: 3.856, cy: 4.227 },
+        { value: '36', color: PINK_MD, vy: 4.942, ty: 4.933, cy: 5.304 },
+        { value: '11', color: PINK_DK, vy: 6.050, ty: 6.042, cy: 6.412 },
+    ];
+    LEGEND.forEach(l => {
+        text(s, [{ text: l.value, options: { fontSize: 36 } }, { text: 'B', options: { fontSize: 24 } }],
+            { x: 1.179, y: l.vy, w: 1.424, h: 0.707, fontFace: HEAD, color: l.color });
+        text(s, '11/04/2025 Type', { x: 2.603, y: l.ty, w: 3.879, h: 0.37, fontFace: HEAD, fontSize: 16, color: INK });
+        paras(s, ['Lorem ipsum dolor sit amet. Qui sint neque a'], { x: 2.603, y: l.cy, w: 3.879, h: 0.323, fontSize: 12, color: GREY_MD });
+    });
+
+    s.addChart(pptx.ChartType.bar, [{
+        name: 'Series 1',
+        labels: ['Best Data One', 'Best Data Two', 'Best Data Three'],
+        values: [32, 28, 25],
+    }], {
+        x: 7.852, y: 1.031, w: 4.957, h: 6.488,
+        barDir: 'col', barGapWidthPct: 80,
+        chartColors: ['F7CFDA', 'F3C3C5', 'F3B0C1'],
+        showLegend: false, showTitle: false, showValue: false,
+        catAxisHidden: true, catAxisMajorTickMark: 'none',
+        valAxisMinVal: 0, valAxisMaxVal: 35, valAxisMajorUnit: 5,
+        valAxisLineShow: false, valAxisMajorTickMark: 'none',
+        valAxisLabelFontFace: BODY, valAxisLabelFontSize: 12, valAxisLabelColor: GREY_MD,
+        valGridLine: { color: 'ECECEC', size: 0.75 },
+        catGridLine: { style: 'none' },
+    });
+
+    // Ranking pucks overlapping the tops of the bars.
+    const PUCKS = [
+        { x: 8.642, y: 1.639, tx: 8.729, ty: 1.667, num: '1', sup: 'st', color: PINK_LT },
+        { x: 10.103, y: 2.487, tx: 10.134, ty: 2.539, num: '2', sup: 'nd', color: PINK_MD },
+        { x: 11.545, y: 3.118, tx: 11.605, ty: 3.194, num: '3', sup: 'rd', color: PINK_DK },
+    ];
+    PUCKS.forEach(p => {
+        ellipse(s, { x: p.x, y: p.y, w: 0.846, h: 0.846, fill: { color: p.color }, line: { type: 'none' } });
+        text(s, [{ text: p.num, options: { fontSize: 36 } }, { text: p.sup, options: { fontSize: 24 } }],
+            { x: p.tx, y: p.ty, w: 1.424, h: 0.707, fontFace: HEAD, color: WHITE });
+    });
+}
+
+function slide18(s) { // Emotional Intelligence in Human Resources (dark)
+    header(s, true);
+    text(s, [
+        { text: '       Emotional Intelligence\t\t\tin ', options: { color: WHITE } },
+        { text: 'Human Resources', options: { color: PINK_TEXT } },
+    ], { x: 2.121, y: 2.381, w: 10.432, h: 2.322, fontFace: HEAD, fontSize: 66, align: 'right' });
+    text(s, 'Managing Across Cultures', { x: 0.76, y: 4.976, w: 4.184, h: 0.505, fontFace: HEAD, fontSize: 24, color: WHITE });
+    paras(s, ['Lorem ipsum dolor sit amet, consectetur adiiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. '],
+        { x: 0.76, y: 5.481, w: 5.933, h: 0.643, color: WHITE });
+    iconTrio(s, 6.942, 5.348, 0.821);
+}
+
+function slide19(s) { // Contact Our Management
+    header(s, false);
+    text(s, [{ text: 'Contact' }, { text: ' Our Management', options: { color: PINK_TEXT } }],
+        { x: 5.713, y: 1.442, w: 7.132, h: 1.111, fontFace: HEAD, fontSize: 60, color: BLACK, charSpacing: -3 });
+    text(s, 'About the Company', { x: 5.713, y: 3.127, w: 2.966, h: 0.574, fontFace: HEAD, fontSize: 24, lineSpacingMultiple: 1.3 });
+    paras(s, [
+        'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis', '',
+        'Nunc viverra imperdiet enim. Fusce est. Vivamus a tellus.',
+    ], { x: 5.713, y: 3.72, w: 6.86, h: 1.603, color: GREY_TX, lineSpacingMultiple: 1.3 });
+
+    const CONTACT = [
+        { label: 'Phone', value: '+1234567890', x: 1.033 },
+        { label: 'Website', value: 'https://www.web.com/', x: 3.674 },
+        { label: 'Email', value: 'mail@mail.com', x: 6.746 },
+    ];
+    CONTACT.forEach(c => {
+        text(s, c.label, { x: c.x, y: 5.806, w: 2.335, h: 0.426, fontFace: HEAD, fontSize: 16, lineSpacingMultiple: 1.3 });
+        text(s, c.value, { x: c.x, y: 6.232, w: 2.335, h: 0.386, color: GREY_TX, lineSpacingMultiple: 1.3 });
+    });
+}
+
+function slide20(s) { // Thank You
+    header(s, false);
+    text(s, 'Thank', { x: 3.06, y: 1.537, w: 6.685, h: 2.615, fontFace: HEAD, fontSize: 166, lineSpacingMultiple: 0.9 });
+    text(s, 'You', { x: 6.643, y: 3.622, w: 4.042, h: 2.615, fontFace: HEAD, fontSize: 166, color: PINK_TEXT, lineSpacingMultiple: 0.9 });
+    arrow(s, 0.87, 4.365, 0.778, 0.633, PINK_MD, 45);
+    paras(s, ['Lorem ipsum dolor sit amet. Qui sint neque a velit'], { x: 1.747, y: 4.261, w: 2.054, h: 0.933 });
+    paras(s, ['Lorem ipsum dolor sit amet, consectetur adiiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. '],
+        { x: 8.664, y: 5.941, w: 4.042, h: 0.92 });
+}
+
+/* ---------------------------------------------------------------------- main */
+
+const BUILDERS = [
+    slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
+    slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
+];
+const DARK_SLIDES = new Set([1, 5, 10, 14, 18]);
+
+function build() {
+    const pptx = new PptxGenJS();
+    pptx.defineLayout({ name: 'DECK', width: SLIDE_W, height: SLIDE_H });
+    pptx.layout = 'DECK';
+    pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
+    pptx.title = 'The Human Code of HR Management';
+
+    BUILDERS.forEach((buildSlide, i) => {
+        const slide = pptx.addSlide();
+        slide.background = { color: DARK_SLIDES.has(i + 1) ? NAVY : WHITE };
+        buildSlide(slide, pptx);
+    });
+
+    return pptx.writeFile({ fileName: path.join(__dirname, '093c90d7-daf9-4a69-84a8-0a9bd69ed952_grok_final.pptx') });
+}
+
+build().then(f => console.log('wrote', f)).catch(err => { console.error(err); process.exit(1); });

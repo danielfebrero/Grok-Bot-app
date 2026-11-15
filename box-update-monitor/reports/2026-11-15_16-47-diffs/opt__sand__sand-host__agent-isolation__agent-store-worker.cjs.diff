@@ -1,0 +1,19 @@
+--- 2026-11-15_15-45:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
++++ 2026-11-15_16-47:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
+@@ -20391,6 +20391,7 @@
+     this.assistantTextStepIndices = [];
+     this.appSecretsRequestStepIndices = [];
+     this.preferenceChangeStepIndices = [];
++    this.unfoldedStepIndices = [];
+     proto3.util.initPartial(data, this);
+   }
+   static fromBinary(bytes, options) {
+@@ -20406,7 +20407,7 @@
+     return proto3.util.equals(_AgentConversationTurnStructure, a, b);
+   }
+   static $() {
+-    return ["AgentConversationTurnStructure|1 user_message 12|2 steps 12*|3 request_id 9?|4 encrypted_model 9?|5 dynamic_tool_count 13?|6 send_message_step_indices 13*|7 routed_model_display_name 9?|8 subagent_dispatch_steps #0*|9 dynamic_tool_names 9*|10 user_message_id 9?|11 long_reasoning_reminder #1?|12 long_reasoning_reminder_exposure_logged 8|13 assistant_text_step_indices 13*|14 assistant_text_steps_recorded 8?|15 app_secrets_request_step_indices 13*|16 preference_change_step_indices 13*|17 run #2?|18 thread_id 9?", SubagentDispatchStep, LongReasoningReminderState, TurnRunRecord];
++    return ["AgentConversationTurnStructure|1 user_message 12|2 steps 12*|3 request_id 9?|4 encrypted_model 9?|5 dynamic_tool_count 13?|6 send_message_step_indices 13*|7 routed_model_display_name 9?|8 subagent_dispatch_steps #0*|9 dynamic_tool_names 9*|10 user_message_id 9?|11 long_reasoning_reminder #1?|12 long_reasoning_reminder_exposure_logged 8|13 assistant_text_step_indices 13*|14 assistant_text_steps_recorded 8?|15 app_secrets_request_step_indices 13*|16 preference_change_step_indices 13*|17 run #2?|18 thread_id 9?|19 unfolded_step_indices 13*", SubagentDispatchStep, LongReasoningReminderState, TurnRunRecord];
+   }
+ };
+ var LongReasoningReminderState = class _LongReasoningReminderState extends __protoMessage374 {

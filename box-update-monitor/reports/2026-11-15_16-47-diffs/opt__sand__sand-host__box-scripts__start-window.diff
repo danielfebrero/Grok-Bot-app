@@ -1,0 +1,29 @@
+--- 2026-11-15_15-45:/opt/sand/sand-host/box-scripts/start-window
++++ 2026-11-15_16-47:/opt/sand/sand-host/box-scripts/start-window
+@@ -19,6 +19,12 @@
+ WINDOW_VNC_UNAVAILABLE_EXIT_CODE=74
+ WINDOW_VNC_NOT_STARTED_EXIT_CODE=72
+ # <<< box port table <<<
++# >>> box exec peer auth (from packages/constants/src/exec-daemon-peer-auth.ts; regenerate: pnpm --filter sand run gen:box-ports) >>>
++EXEC_PEER_TOKEN_SHA256_PATH="/run/sand-exec-peer-auth/token.sha256"
++EXEC_PEER_TOKEN_SHA256_FILE_ENV="EXEC_DAEMON_PEER_TOKEN_SHA256_FILE"
++EXEC_LISTEN_HOST_ENV="EXEC_DAEMON_LISTEN_HOST"
++EXEC_LISTEN_HOST_LOOPBACK="127.0.0.1"
++# <<< box exec peer auth <<<
+ # >>> box screen (from sand/src/shared/box/box-contract.ts; regenerate: pnpm --filter sand run gen:box-ports) >>>
+ COMPUTER_USE_API_WIDTH=1280
+ COMPUTER_USE_API_HEIGHT=800
+@@ -123,8 +129,12 @@
+ 	if [ "${SAND_DISABLE_TELEMETRY:-}" != "1" ] && [ -z "${GROK_BOT_WORKER_POOL:-}" ] && [ -z "${GROK_BOT_WORKER_AUTH_TOKEN_FILE:-}" ]; then
+ 		ENCODING_REPORT_ARGS=(--metrics-endpoint-when-asked "${SAND_BACKEND_URL:-${CURSOR_API_BASE_URL:-https://api2.cursor.sh}}" --metrics-host sand_box)
+ 	fi
++	PEER_AUTH_ENV=("${EXEC_LISTEN_HOST_ENV}=${EXEC_LISTEN_HOST_LOOPBACK}")
++	if [ -e "${EXEC_PEER_TOKEN_SHA256_PATH}" ]; then
++		PEER_AUTH_ENV+=("${EXEC_PEER_TOKEN_SHA256_FILE_ENV}=${EXEC_PEER_TOKEN_SHA256_PATH}")
++	fi
+ 	DISPLAY="${DISP}" \
+-		env -u SAND_GATEWAY_TOKEN -u SAND_INFERENCE_RENEWAL_CREDENTIAL -u SAND_EGRESS_TUNNEL_BEARER -u SAND_DESKTOP_UNIT "${DAEMON_BUS_ENV[@]}" \
++		env -u SAND_GATEWAY_TOKEN -u SAND_INFERENCE_RENEWAL_CREDENTIAL -u SAND_EGRESS_TUNNEL_BEARER -u SAND_DESKTOP_UNIT -u "${EXEC_PEER_TOKEN_SHA256_FILE_ENV}" "${DAEMON_BUS_ENV[@]}" "${PEER_AUTH_ENV[@]}" \
+ 		setsid nohup /exec-daemon/exec-daemon serve \
+ 		--port "${EXEC_DAEMON_PORT}" \
+ 		--pty-websocket-port "${PTY_PORT}" \

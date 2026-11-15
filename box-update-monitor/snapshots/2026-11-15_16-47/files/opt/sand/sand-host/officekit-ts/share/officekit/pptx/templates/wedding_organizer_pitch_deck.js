@@ -1,0 +1,478 @@
+/*
+ * "Wedding Organizer" deck — rebuilt with pptxgenjs.
+ * Slide size 20 x 11.25 in.
+ *
+ * The original deck's picture frames all ship empty (they are unfilled photo
+ * placeholders), so `photoFrame()` draws the same empty frame outline. The
+ * only real rasters were a tick and a star glyph, both redrawn as shapes.
+ */
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+// ── palette (theme "Custom 115") ─────────────────────────────────────────────
+const DEEP = '4A3E26'; // accent1 – gradient start
+const GOLD = 'A88D56'; // accent2 – accent words, rules, gradient mid
+const SAND = 'CDBE9F'; // accent3 – hairlines, tinted side panels, gradient end
+const INK = '1B1B1B'; // dk1  – headlines
+const INK2 = '242424'; // dk2  – serif sub-headings
+const PAPER = 'FDFDFD'; // lt1  – slide background / light text
+const PANEL = 'FAFAFA'; // lt2  – light chip background
+const GRAY = '474747'; // accent6 – body copy
+const STAR = 'FFC000';
+
+// The deck's two 45° washes, as [position, colour] stops.
+const WASH_CARD = [[0, DEEP], [0.72, GOLD], [1, SAND]]; // big cards & panels
+const WASH_CHIP = [[0, DEEP], [1, GOLD]]; // small discs & pills
+
+const FONT_SANS = 'Poppins';
+const FONT_SERIF = 'Playfair Display';
+
+// ── low-level helpers ────────────────────────────────────────────────────────
+const rect = (s, o) => s.addShape('rect', o);
+const roundRect = (s, o) => s.addShape('roundRect', o);
+const ellipse = (s, o) => s.addShape('ellipse', o);
+const hairline = (s, x, y, w, o) => s.addShape('line', { x, y, w, h: 0, line: o });
+
+/** Colour of a stop list at position `t` (0..1). */
+function washAt(stops, t) {
+	let i = 1;
+	while (i < stops.length - 1 && t > stops[i][0]) i++;
+	const [p0, c0] = stops[i - 1];
+	const [p1, c1] = stops[i];
+	const f = Math.min(1, Math.max(0, (t - p0) / (p1 - p0)));
+	let hex = '';
+	for (let ch = 0; ch < 6; ch += 2) {
+		const a = parseInt(c0.substr(ch, 2), 16);
+		const b = parseInt(c1.substr(ch, 2), 16);
+		hex += Math.round(a + (b - a) * f).toString(16).padStart(2, '0');
+	}
+	return hex.toUpperCase();
+}
+
+/**
+ * Position on a 45° ramp for a point (dx, dy) inside a w x h box — matches how
+ * the source deck's `<a:lin ang="2700000" scaled="0"/>` fills actually render.
+ */
+const washPos = (dx, dy, w, h) => (dx + dy) / (Math.SQRT2 * (w + h));
+
+/** Flat stand-in for a wash on shapes too small to band (centre of the ramp). */
+const washMid = stops => washAt(stops, washPos(0.5, 0.5, 1, 1));
+const CHIP = washMid(WASH_CHIP); // small discs
+const MARK = washMid(WASH_CARD); // the header's paired dots
+
+/**
+ * Disc carrying a wash. Starts from the darkest colour, then stacks circular
+ * segments ("chord" shapes) whose straight edges run perpendicular to the 45°
+ * gradient, each one lighter and smaller than the last.
+ */
+function washedDisc(s, x, y, d, stops) {
+	// Position on the ramp `u` of the way along the disc's 45° diameter.
+	const along = u => washPos(0.5 + (u - 0.5) / Math.SQRT2, 0.5 + (u - 0.5) / Math.SQRT2, 1, 1);
+	ellipse(s, { x, y, w: d, h: d, fill: { color: washAt(stops, along(0.5 / WASH_BANDS)) }, line: { type: 'none' } });
+	for (let i = 1; i < WASH_BANDS; i++) {
+		const u = i / WASH_BANDS;
+		const half = Math.acos(2 * u - 1) * 180 / Math.PI; // arc half-angle whose chord sits at u
+		s.addShape('chord', {
+			// Angles run clockwise from 3 o'clock and must stay in [0, 360).
+			x, y, w: d, h: d, angleRange: [(405 - half) % 360, (405 + half) % 360],
+			fill: { color: washAt(stops, along((u + (i + 1) / WASH_BANDS) / 2)) }, line: { type: 'none' },
+		});
+	}
+}
+
+const WASH_BANDS = 12; // segments used to wash a disc
+const WASH_STEP_DIV = 60; // tiles per (width + height) — trades file size for smoothness
+const TILE_BLEED = 0.03; // in, overlap that hides hairline seams between tiles
+
+/**
+ * Rounded card carrying the deck's 45° dark→light wash, painted as a grid of
+ * flat tiles (pptxgenjs shape fills are single-colour). Layers, bottom-up:
+ * a flat underlay so any seam shows a near-match instead of the background,
+ * four corner patches that supply the arcs, then the tiles themselves.
+ * `adj` is the OOXML corner adjust, as a fraction of the short side.
+ */
+function card(s, x, y, w, h, adj, stops) {
+	stops = stops || WASH_CARD;
+	const at = (dx, dy) => washAt(stops, washPos(dx, dy, w, h));
+	const r = adj * Math.min(w, h);
+	const step = (w + h) / WASH_STEP_DIV;
+
+	roundRect(s, { x, y, w, h, fill: { color: at(w / 2, h / 2) }, line: { type: 'none' }, rectRadius: r });
+	if (r > 0) {
+		[[0, 0], [w - 2 * r, 0], [0, h - 2 * r], [w - 2 * r, h - 2 * r]].forEach(([dx, dy]) => roundRect(s, {
+			x: x + dx, y: y + dy, w: 2 * r, h: 2 * r,
+			fill: { color: at(dx + r, dy + r) }, line: { type: 'none' }, rectRadius: r,
+		}));
+	}
+
+	// These three bands add up to the card minus its four corner boxes.
+	[[0, r, w, h - 2 * r], [r, 0, w - 2 * r, r], [r, h - r, w - 2 * r, r]].forEach(([bx, by, bw, bh]) => {
+		if (bw <= 0 || bh <= 0) return;
+		const cols = Math.max(1, Math.round(bw / step));
+		const rows = Math.max(1, Math.round(bh / step));
+		const tw = bw / cols;
+		const th = bh / rows;
+		for (let i = 0; i < cols; i++) {
+			for (let j = 0; j < rows; j++) {
+				const tx = bx + i * tw;
+				const ty = by + j * th;
+				rect(s, {
+					x: x + tx, y: y + ty,
+					w: Math.min(tx + tw + TILE_BLEED, w) - tx, h: Math.min(ty + th + TILE_BLEED, h) - ty,
+					fill: { color: at(tx + tw / 2, ty + th / 2) }, line: { type: 'none' },
+				});
+			}
+		}
+	});
+}
+
+/** Empty photo placeholder frame, as it appears in the source deck. */
+function photoFrame(s, x, y, w, h, adj) {
+	const opt = { x, y, w, h, fill: { type: 'none' }, line: { type: 'none' } };
+	if (adj) { opt.rectRadius = adj * Math.min(w, h); roundRect(s, opt); } else rect(s, opt);
+}
+
+// The deck's text insets, in points: [left, right, bottom, top].
+const TEXT_INSET = [7.2, 7.2, 3.6, 3.6];
+
+function txt(s, content, o) {
+	s.addText(content, Object.assign({ fontFace: FONT_SANS, align: 'left', valign: 'top', margin: TEXT_INSET }, o));
+}
+
+/**
+ * Headline built from runs. Second tuple slot picks the run style:
+ *   0 = upright, base colour    1 = upright gold
+ *   2 = italic gold             3 = italic, base colour
+ */
+const RUN_STYLE = {
+	0: {}, 1: { color: GOLD }, 2: { italic: true, color: GOLD }, 3: { italic: true },
+};
+function headline(s, runs, o) {
+	const base = o.color || INK;
+	txt(s, runs.map(([t, style]) => ({
+		text: t, options: Object.assign({ color: base }, RUN_STYLE[style]),
+	})), Object.assign({ fontSize: 80 }, o));
+}
+
+/** Big serif number with a serif caption below it. */
+function stat(s, num, label, x, y, o) {
+	o = o || {};
+	txt(s, num, { x, y, w: o.numW || 2.105, h: 0.909, fontFace: FONT_SERIF, fontSize: o.numSize || 48, color: PAPER });
+	txt(s, label, { x, y: y + (o.gap || 0.9), w: o.labW || 2.009, h: 0.656, fontFace: FONT_SERIF, fontSize: o.labSize || 16.5, color: PAPER });
+}
+
+// ── running header: two overlapping gold dots, a rule, page no. + tagline ────
+const TOPBAR = {
+	1: { mark: 1.0, page: 'PAGE 01', px: 5.25, pw: 0.837, palign: 'left', tag: 7.746 },
+	2: { mark: 1.0, page: 'PAGE 02', px: 5.25, pw: 0.879, palign: 'left', tag: 7.746 },
+	3: { mark: 12.0, page: 'PAGE 03', px: 18.204, pw: 0.882, palign: 'right' },
+	4: { mark: 1.0 },
+	5: { mark: 12.0, page: 'PAGE 05', px: 18.199, pw: 0.887, palign: 'right' },
+	6: { mark: 1.0, page: 'PAGE 06', px: 5.25, pw: 0.889, palign: 'left', tag: 7.746 },
+	7: { mark: 1.0, page: 'PAGE 07', px: 5.25, pw: 0.873, palign: 'left' },
+	8: { mark: 1.0, page: 'PAGE 08', px: 8.991, pw: 0.889, palign: 'left', tag: 12.904 },
+	9: { mark: 12.0, page: 'PAGE 03', px: 18.204, pw: 0.882, palign: 'right' },
+	10: { mark: 1.0, page: 'PAGE 10', px: 5.25, pw: 0.837, palign: 'left', tag: 7.746 },
+};
+
+function topBar(s, n) {
+	const b = TOPBAR[n];
+	[b.mark, b.mark + 0.3333].forEach(x => washedDisc(s, x, 0.625, 0.4167, WASH_CARD));
+	hairline(s, b.mark + 0.5833, 0.8333, 1.4167, { color: SAND, width: 1 });
+	const lbl = { y: 0.6819, h: 0.303, fontSize: 12, color: INK };
+	if (b.page) txt(s, b.page, Object.assign({ x: b.px, w: b.pw, align: b.palign }, lbl));
+	if (b.tag) txt(s, 'DREAM WEDDING FOR YOU', Object.assign({ x: b.tag, w: 2.346, align: 'right' }, lbl));
+}
+
+// ── pictograms (tiny vector groups / PNG glyphs in the original) ─────────────
+/**
+ * Award rosette on the chips: a scalloped medal with a punched-out centre,
+ * sitting on two splayed ribbon tails. `w` is the medal diameter; the whole
+ * glyph is centred on `cx` and runs from `cy` down.
+ */
+function rosetteIcon(s, cx, cy, w, holeColor) {
+	[-1, 1].forEach(sgn => rect(s, {
+		x: cx + sgn * w * 0.2 - w * 0.09, y: cy + w * 0.5, w: w * 0.18, h: w * 0.52,
+		fill: { color: PAPER }, line: { type: 'none' }, rotate: sgn * 16,
+	}));
+	s.addShape('star12', { x: cx - w / 2, y: cy, w, h: w, fill: { color: PAPER }, line: { type: 'none' } });
+	ellipse(s, { x: cx - w * 0.23, y: cy + w * 0.27, w: w * 0.46, h: w * 0.46, fill: { color: holeColor }, line: { type: 'none' } });
+}
+
+/** Slim white "→" starting at (x, y) on its centre line. */
+function arrowIcon(s, x, y, len) {
+	rect(s, { x, y: y - len * 0.07, w: len * 0.78, h: len * 0.14, fill: { color: PAPER }, line: { type: 'none' } });
+	s.addShape('triangle', {
+		x: x + len * 0.6, y: y - len * 0.3, w: len * 0.4, h: len * 0.6,
+		fill: { color: PAPER }, line: { type: 'none' }, rotate: 90,
+	});
+}
+
+/** White tick centred in a gold disc. */
+function checkIcon(s, cx, cy, d) {
+	const stroke = (dx, dy, len, rot) => rect(s, {
+		x: cx + dx - len / 2, y: cy + dy - d * 0.055, w: len, h: d * 0.11,
+		fill: { color: PAPER }, line: { type: 'none' }, rotate: rot,
+	});
+	stroke(-d * 0.13, d * 0.08, d * 0.26, 45);
+	stroke(d * 0.08, d * 0.0, d * 0.5, -45);
+}
+
+const ICONS = {
+	puzzle(s, x, y, w, h) { // 2x2 jigsaw, each piece with an outward knob
+		const pw = w * 0.46;
+		const ph = h * 0.46;
+		const knob = w * 0.15;
+		[0, 1].forEach(r => [0, 1].forEach(c => {
+			const px = x + c * w * 0.54;
+			const py = y + r * h * 0.54;
+			roundRect(s, { x: px, y: py, w: pw, h: ph, fill: { color: PAPER }, line: { type: 'none' }, rectRadius: w * 0.05 });
+			// Knob on the outward-facing horizontal and vertical edge.
+			ellipse(s, { x: px + (c ? pw - knob / 2 : -knob / 2), y: py + ph / 2 - knob / 2, w: knob, h: knob, fill: { color: PAPER }, line: { type: 'none' } });
+			ellipse(s, { x: px + pw / 2 - knob / 2, y: py + (r ? ph - knob / 2 : -knob / 2), w: knob, h: knob, fill: { color: PAPER }, line: { type: 'none' } });
+		}));
+	},
+	briefcase(s, x, y, w, h) {
+		rect(s, { x: x + w * 0.32, y, w: w * 0.36, h: h * 0.22, fill: { color: PAPER }, line: { type: 'none' } });
+		roundRect(s, { x, y: y + h * 0.2, w, h: h * 0.8, fill: { color: PAPER }, line: { type: 'none' }, rectRadius: w * 0.05 });
+	},
+	chat(s, x, y, w, h) { // small speech bubble behind a larger one
+		const bubble = (bx, by, bw, bh, tailX, rot) => {
+			ellipse(s, { x: bx, y: by, w: bw, h: bh, fill: { color: PAPER }, line: { type: 'none' } });
+			s.addShape('triangle', {
+				x: tailX, y: by + bh * 0.72, w: bw * 0.3, h: bh * 0.38,
+				fill: { color: PAPER }, line: { type: 'none' }, rotate: rot,
+			});
+		};
+		bubble(x, y + h * 0.22, w * 0.58, h * 0.58, x + w * 0.04, 200);
+		bubble(x + w * 0.36, y, w * 0.64, h * 0.64, x + w * 0.42, 190);
+	},
+};
+
+// ── shared slide fragments ───────────────────────────────────────────────────
+
+/** "Your Detail / Achievement Here" chip (slides 1 and 10). */
+function achievementChip(s, x, y, gold) {
+	if (gold) {
+		// Washed chip: the disc is a translucent white knockout on top of it.
+		card(s, x, y, 2.6948, 0.9391, 0.2038, WASH_CHIP);
+		ellipse(s, { x: x + 0.1909, y: y + 0.1916, w: 0.5559, h: 0.5559, fill: { color: PAPER, transparency: 90 }, line: { type: 'none' } });
+	} else {
+		roundRect(s, { x, y, w: 2.6948, h: 0.9391, fill: { color: PANEL }, line: { type: 'none' }, rectRadius: 0.2038 * 0.9391 });
+		washedDisc(s, x + 0.1909, y + 0.1916, 0.5559, WASH_CHIP);
+	}
+	rosetteIcon(s, x + 0.4688, y + 0.335, 0.2, gold ? '6A5A3C' : CHIP);
+	txt(s, 'Your Detail Achievement Here', {
+		x: x + 0.7858, y: y + 0.2171, w: 1.7333, h: 0.4544,
+		fontFace: FONT_SERIF, fontSize: 10.5, color: gold ? PAPER : INK2,
+	});
+}
+
+/** Gold disc + tick, followed by a serif subtitle and a paragraph. */
+function checkBlock(s, o) {
+	washedDisc(s, o.iconX, o.y + o.iconDy, 0.441, WASH_CHIP);
+	checkIcon(s, o.iconX + 0.2205, o.y + o.iconDy + 0.2205, 0.441);
+	txt(s, o.title, { x: o.textX, y: o.y, w: o.titleW, h: 0.55, fontFace: FONT_SERIF, fontSize: o.titleSize, color: INK2, lineSpacingMultiple: 1.3 });
+	txt(s, o.body, { x: o.bodyX, y: o.y + o.bodyDy, w: o.bodyW, h: 1.0, fontSize: o.bodySize, color: GRAY, lineSpacingMultiple: 1.3 });
+}
+
+// ── slide builders ───────────────────────────────────────────────────────────
+
+function slide01(s) {
+	rect(s, { x: 12, y: 0, w: 8, h: 11.25, fill: { color: SAND, transparency: 75 }, line: { type: 'none' } });
+	photoFrame(s, 7.25, 0.625, 9.0, 10.625);
+	[17.0, 5.0].forEach(x => s.addShape('line', { x, y: 0, w: 0, h: 11.25, line: { color: SAND, width: 0.75, transparency: 45 } }));
+	card(s, 11.0833, 0.625, 7.9167, 5.0, 0.1289);
+	topBar(s, 1);
+
+	stat(s, '907+', 'Type Your Achievements', 13.9155, 1.9583, { numSize: 36, numW: 1.523, labW: 1.751, gap: 0.927 });
+	stat(s, '78%', 'Type Your Achievements', 16.3117, 1.9583, { numSize: 36, numW: 1.355, labW: 1.688, gap: 0.927 });
+	hairline(s, 14.0, 4.125, 4.0, { color: PAPER, width: 0.75 });
+
+	headline(s, [['Wedding', 0]], { x: 0.9167, y: 2.375, w: 6.83, h: 1.717, fontSize: 96 });
+	headline(s, [['Organizer', 1]], { x: 0.75, y: 3.816, w: 9.579, h: 2.423, fontSize: 138 });
+	hairline(s, 1.0, 7.375, 4.0, { color: GOLD, width: 3 });
+
+	[[1.0, 8.0058, false], [3.8609, 8.0058, true], [1.0, 9.1026, false], [3.8609, 9.1026, false]]
+		.forEach(([x, y, gold]) => achievementChip(s, x, y, gold));
+}
+
+function slide02(s) {
+	topBar(s, 2);
+	headline(s, [['About ', 0], ['Us', 2]], { x: 1.0, y: 2.125, w: 6.83, h: 1.717, fontSize: 96 });
+	txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce consequat quam sit amet pellentesque rutrum. Curabitur ullamcorper maximus mi, vel blandit orci viverra in',
+		{ x: 1.0, y: 4.125, w: 7.658, h: 1.159, fontSize: 16.5, color: GRAY, lineSpacingMultiple: 1.3 });
+	photoFrame(s, 1.0099, 6.2125, 8.9902, 4.333, 0.1667);
+
+	[['278+', 1.5417], ['907+', 6.2125]].forEach(([num, y]) => {
+		card(s, 10.401, y, 8.5891, 4.3218, 0.1667);
+		stat(s, num, 'Type Your Achievements', 11.3838, y + 1.35);
+		txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce consequat quam sit am etell entesque rutrum. ',
+			{ x: 13.9202, y: y + 1.452, w: 4.087, h: 1.52, fontSize: 16.5, color: PAPER, lineSpacingMultiple: 1.3 });
+	});
+}
+
+function slide03(s) {
+	card(s, 1.0179, 0.7083, 8.0654, 9.8333, 0.0745);
+	topBar(s, 3);
+	[2.7195, 7.1012].forEach(y => {
+		txt(s, 'Your Topic Here', { x: 1.995, y, w: 3.201, h: 0.571, fontFace: FONT_SERIF, fontSize: 24, color: PAPER, lineSpacingMultiple: 1.3 });
+		txt(s, 'Lorem ipsum dolor sit amet co ns ectetur adipiscing elit',
+			{ x: 1.995, y: y + 0.632, w: 4.049, h: 0.798, fontSize: 16.5, color: PAPER, lineSpacingMultiple: 1.3 });
+	});
+	photoFrame(s, 6.5, 1.4927, 4.5049, 3.8829, 0.1667);
+	photoFrame(s, 6.5, 5.8744, 4.5049, 3.8829, 0.1667);
+
+	headline(s, [['Wedding ', 0], ['Portfolio', 2]], { x: 11.9167, y: 2.1454, w: 6.83, h: 3.063, fontSize: 88 });
+	txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce consequat quam sit amet pellentesque rutrum. Curabitur ullamcorper.',
+		{ x: 11.9167, y: 6.2083, w: 6.288, h: 1.159, fontSize: 16.5, color: GRAY, lineSpacingMultiple: 1.3 });
+	txt(s, '90+ Little Statement About Heading', { x: 11.958, y: 7.9108, w: 3.455, h: 1.464, fontFace: FONT_SERIF, fontSize: 27, color: INK2 });
+	txt(s, 'Your Detail Statement Here', { x: 16.1031, y: 8.6682, w: 2.537, h: 0.707, fontFace: FONT_SERIF, fontSize: 18, color: INK2 });
+}
+
+function slide04(s) {
+	card(s, 9, 0, 11, 11.25, 0);
+	photoFrame(s, 10.0, 0.625, 9.0, 7.0, 0.1667);
+	topBar(s, 4);
+	headline(s, [['Our ', 0], ['Missions ', 2], ['at 2025', 0]], { x: 0.8333, y: 2.0813, w: 7.333, h: 2.794 });
+	txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce cons equat quam sit amet pellentesque rutru rabitur ullam corpe',
+		{ x: 10.0, y: 8.875, w: 8.394, h: 0.798, fontSize: 16.5, color: PAPER, lineSpacingMultiple: 1.3 });
+
+	[5.7667, 8.1833].forEach(y => checkBlock(s, {
+		y, iconX: 0.9545, iconDy: 0.1375, textX: 1.4233, titleW: 5.238, titleSize: 24,
+		title: 'Type Your Subtitle Here', bodyX: 0.8333, bodyDy: 0.7, bodyW: 6.75, bodySize: 16.5,
+		body: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce cons equat quam sit amet pellentesque rutru rabitur ullam corpe',
+	}));
+}
+
+function slide05(s) {
+	card(s, 1.0833, 1.1369, 4.8076, 4.3609, 0.1667);
+	stat(s, '278+', 'Type Your Achievements', 2.0236, 2.1542, { numSize: 60, numW: 3.143, labW: 3.143, labSize: 32, gap: 1.148 });
+	photoFrame(s, 1.0833, 5.7522, 4.8074, 4.3609, 0.1667);
+	photoFrame(s, 6.1667, 1.1369, 4.8074, 8.9764, 0.1667);
+	topBar(s, 5);
+	headline(s, [['What ', 0], ['We', 2], [' Do?', 0]], { x: 11.8333, y: 2.3956, w: 7.333, h: 1.313, fontSize: 72 });
+
+	[
+		[4.883, ICONS.puzzle, 12.1167, 5.1658, 0.4253, 0.4264],
+		[6.7123, ICONS.briefcase, 12.1592, 7.0639, 0.3402, 0.2888],
+		[8.5417, ICONS.chat, 12.1464, 8.8689, 0.3659, 0.3375],
+	].forEach(([y, icon, ix, iy, iw, ih]) => {
+		washedDisc(s, 11.8333, y, 0.992, WASH_CHIP);
+		icon(s, ix, iy, iw, ih);
+		txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce consequat quam sit am etell entesque',
+			{ x: 12.9697, y: y + 0.072, w: 6.197, h: 0.798, fontSize: 16.5, color: GRAY, lineSpacingMultiple: 1.3 });
+	});
+}
+
+function slide06(s) {
+	topBar(s, 6);
+	headline(s, [['Why ', 0], ['Choose', 2], [' Us?', 0]], { x: 0.8768, y: 2.3313, w: 6.83, h: 2.794 });
+
+	[[1.4649, 2.8232], [5.9101, 7.2683]].forEach(([cardY, textY]) => {
+		card(s, 9.0, cardY, 10.0164, 3.875, 0.1667);
+		photoFrame(s, 9.0, cardY, 3.8953, 3.875, 0.1667);
+		txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce consequat quam sit am etell entesque',
+			{ x: 13.4762, y: textY, w: 4.8333, h: 1.159, fontSize: 16.5, color: PAPER, lineSpacingMultiple: 1.3 });
+	});
+
+	[['01.', 5.8261], ['02.', 8.0989]].forEach(([no, y]) => {
+		card(s, 0.9878, y, 4.9932, 0.6395, 0.2605, WASH_CHIP);
+		txt(s, no + ' Type Your Subtitle Here', { x: 1.1079, y: y + 0.063, w: 3.431, h: 0.424, fontFace: FONT_SERIF, fontSize: 16.5, color: PAPER, lineSpacingMultiple: 1.3 });
+		ellipse(s, { x: 5.4197, y: y + 0.1365, w: 0.3665, h: 0.3665, fill: { color: PAPER, transparency: 80 }, line: { type: 'none' } });
+		arrowIcon(s, 5.5197, y + 0.3193, 0.1665);
+		txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce conse quat quam sit amet pellent esqu ullamcorper',
+			{ x: 0.8768, y: y + 0.7034, w: 7.59, h: 0.798, fontSize: 16.5, color: GRAY, lineSpacingMultiple: 1.3 });
+	});
+}
+
+function slide07(s) {
+	photoFrame(s, 10.0, 0, 8.0, 11.25);
+	topBar(s, 7);
+	headline(s, [['We ', 0], ['Create', 2], [' The Best Event', 0]], { x: 0.9167, y: 2.2083, w: 8.333, h: 2.794 });
+
+	[[2.625, '90%', 3.9138, 15.1496], [6.7374, '278+', 8.0261, 15.1671]].forEach(([cardY, num, numY, numX]) => {
+		card(s, 14.0, cardY, 5.0, 3.8189, 0.1667);
+		txt(s, num, { x: numX, y: numY, w: 1.776, h: 0.808, fontFace: FONT_SERIF, fontSize: 42, color: PAPER });
+		txt(s, 'Your Topic Here', { x: numX, y: numY + 0.6705, w: 2.7, h: 0.571, fontFace: FONT_SERIF, fontSize: 24, color: PAPER, lineSpacingMultiple: 1.3 });
+	});
+
+	[5.5807, 7.2344, 8.8881].forEach(y => checkBlock(s, {
+		y, iconX: 0.9167, iconDy: 0.1753, textX: 1.4483, titleW: 4.262, titleSize: 21,
+		title: 'Insert Your Topic Here', bodyX: 1.4483, bodyDy: 0.5027, bodyW: 7.159, bodySize: 15,
+		body: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit sce cons equat quam sit amet pellentesque rutru',
+	}));
+}
+
+function slide08(s) {
+	// Half-rounded tab bleeding off the right edge (rotated 180° in the original).
+	// Narrow tab bleeding off the right edge: one rounded corner at the bottom
+	// (a round1Rect flipped 180° in the original), washed top-light to bottom-dark.
+	const tab = { x: 18.9792, y: 0, w: 1.0106, h: 5.625 };
+	const tabAt = fy => washAt(WASH_CARD, 0.62 - 0.42 * fy);
+	s.addShape('round1Rect', {
+		x: tab.x, y: tab.y, w: tab.w, h: tab.h, rotate: 180,
+		fill: { color: tabAt(1) }, line: { type: 'none' },
+	});
+	const tabRows = 24;
+	for (let i = 0; i < tabRows - 4; i++) {
+		const rh = tab.h / tabRows;
+		rect(s, {
+			x: tab.x, y: tab.y + i * rh, w: tab.w, h: rh + TILE_BLEED,
+			fill: { color: tabAt((i + 0.5) / tabRows) }, line: { type: 'none' },
+		});
+	}
+	photoFrame(s, 1.0, 1.6667, 7.0, 8.9583, 0.1667);
+	topBar(s, 8);
+	headline(s, [['We Have The ', 0], ['Best', 2], [' Organizer', 0]], { x: 8.9167, y: 2.1646, w: 8.333, h: 2.794 });
+
+	[0, 1, 2, 3, 4].forEach(i => s.addShape('star5', {
+		x: 9.0262 + i * 0.3494, y: 6.0181, w: 0.3522, h: 0.3522,
+		fill: { color: STAR, transparency: i === 4 ? 65 : 0 }, line: { type: 'none' },
+	}));
+	txt(s, '4.0 Stars Rating', { x: 10.7634, y: 6.0165, w: 1.72, h: 0.345, fontSize: 12, color: '909090', lineSpacingMultiple: 1.3 });
+	txt(s, 'Type Your Subtitle Here', { x: 8.9167, y: 6.3943, w: 7.525, h: 0.571, fontFace: FONT_SERIF, fontSize: 24, color: INK2, lineSpacingMultiple: 1.3 });
+	txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce consequat quam sit amet pellentesque rutrum. Curabitur ullamcorper maximus mi, vel blandit orci viverra in. Praesent suscipit felis sem, sed tempus sapien cursus dapibus vamus aliquet diam ut arcu molestie posue',
+		{ x: 8.9167, y: 7.1891, w: 7.658, h: 1.881, fontSize: 16.5, color: GRAY, lineSpacingMultiple: 1.3 });
+}
+
+function slide09(s) {
+	photoFrame(s, 0, 0, 9.2312, 11.25);
+	card(s, 5.0, 1.625, 14.0, 8.0417, 0.087);
+	topBar(s, 9);
+	headline(s, [['We', 0], [' Create ', 3], ['The Best Event', 0]], { x: 6.0833, y: 2.5417, w: 8.333, h: 2.794, color: PAPER });
+	stat(s, '278+', 'Type Your Achievements', 6.0833, 6.0681);
+	txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce consequat quam sit am etell entesque rutrum. Curabitur ullamcorper maximus mi, vel blandit orci viverra in. Praesent suscipit felis sem, sed tempus sapien cursus dapibus. Nullam mi odio, aliquet eget',
+		{ x: 8.5647, y: 6.0428, w: 9.102, h: 1.52, fontSize: 16.5, color: PAPER, lineSpacingMultiple: 1.3 });
+}
+
+function slide10(s) {
+	rect(s, { x: 13, y: 0, w: 7, h: 11.25, fill: { color: SAND, transparency: 75 }, line: { type: 'none' } });
+	photoFrame(s, 12.0089, 0.4571, 6.4077, 10.7929);
+	topBar(s, 10);
+	card(s, 11.0833, 2.5417, 7.9167, 5.0833, 0.1322);
+
+	headline(s, [['Time to Say', 0]], { x: 0.9167, y: 2.7083, w: 8.417, h: 1.212, fontSize: 66 });
+	headline(s, [['Thank You', 1]], { x: 0.75, y: 3.9516, w: 10.159, h: 2.423, fontSize: 138 });
+	hairline(s, 1.0, 7.375, 4.0, { color: GOLD, width: 3 });
+
+	[[1.0, 8.0058, false], [3.9719, 8.0058, true], [1.0, 9.2692, false], [3.9719, 9.2692, false]]
+		.forEach(([x, y, gold]) => achievementChip(s, x, y, gold));
+}
+
+// ── build ────────────────────────────────────────────────────────────────────
+const BUILDERS = [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10];
+
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'WIDE_20x1125', width: 20, height: 11.25 });
+pptx.layout = 'WIDE_20x1125';
+pptx.title = 'Wedding Organizer';
+
+BUILDERS.forEach(build => {
+	const slide = pptx.addSlide();
+	slide.background = { color: PAPER };
+	build(slide);
+});
+
+pptx.writeFile({ fileName: path.join(__dirname, '068c8172-eb92-4dc1-9050-725d39d40c17_grok_final.pptx') })
+	.then(f => console.log('wrote ' + f));

@@ -1,0 +1,766 @@
+/**
+ * ZEEBOUND SCHOOL — "Education Presentation Template"
+ * Standalone pptxgenjs rebuild of the 20-slide reference deck (13.333in x 7.5in).
+ *
+ * Run:  node 10a245d0-3b94-478d-8524-b6f35b4b1966_grok_final.js
+ * Out:  10a245d0-3b94-478d-8524-b6f35b4b1966_grok_final.pptx (next to this file)
+ *
+ * Raster images in the original are reproduced as flat grey "[image]" boxes.
+ */
+
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ palette */
+
+const C = {
+  bg: 'ECEFE9', // page background
+  purple: 'B898F1', // primary accent panels
+  teal: '48BDBE', // "explore more" buttons
+  yellow: 'FBDE3B', // star badge
+  black: '000000',
+  white: 'FFFFFF',
+  tab: 'B2B5AF', // inactive nav tab
+  dim: 'BFBFBF', // muted header text
+  pale: 'D9D9D9', // muted labels / chart bars
+  grey: '808080', // chart bars
+  image: '8C8C8C', // image placeholder fill
+};
+
+const F = { head: 'Archivo Black', body: 'Work Sans', alt: 'Overpass', foot: 'Signika' };
+
+/* Preset-geometry corner ratios used all over the deck. */
+const R_ONE = 0.23087; // round1Rect  <a:gd name="adj" fmla="val 23087"/>
+const R_CARD = 0.16667; // roundRect default corner
+const R_PILL = 0.5; // roundRect fully rounded (buttons)
+
+/* --------------------------------------------------------------- primitives */
+
+const rad = (w, h, frac) => frac * Math.min(w, h);
+
+function rect(s, x, y, w, h, o = {}) {
+  s.addShape('rect', { x, y, w, h, ...o });
+}
+function rr(s, x, y, w, h, o = {}) {
+  s.addShape('roundRect', { x, y, w, h, rectRadius: rad(w, h, R_CARD), ...o });
+}
+function pill(s, x, y, w, h, o = {}) {
+  s.addShape('roundRect', { x, y, w, h, rectRadius: rad(w, h, R_PILL), ...o });
+}
+function rr1(s, x, y, w, h, o = {}) {
+  s.addShape('round1Rect', { x, y, w, h, rectRadius: rad(w, h, R_ONE), ...o });
+}
+const HAIRLINE = 0.5; // theme line style used by every straight connector in the deck
+
+function hline(s, x, y, w, color = C.black) {
+  s.addShape('line', { x, y, w, h: 0, line: { color, width: HAIRLINE } });
+}
+function vline(s, x, y, h, color = C.black) {
+  s.addShape('line', { x, y, w: 0, h, line: { color, width: HAIRLINE } });
+}
+
+/**
+ * Text box. Defaults mirror PowerPoint (top anchored, left aligned, 12pt Work Sans).
+ * `runs` is a string or an array of pptxgenjs text runs.
+ */
+function text(s, runs, x, y, w, h, o = {}) {
+  s.addText(runs, {
+    x,
+    y,
+    w,
+    h,
+    fontFace: o.font || F.body,
+    fontSize: o.size || 12,
+    color: o.color || C.black,
+    bold: !!o.bold,
+    italic: !!o.italic,
+    align: o.align || 'left',
+    valign: o.valign || 'top',
+    wrap: o.wrap !== false,
+    lineSpacingMultiple: o.lsp,
+    margin: o.margin,
+  });
+}
+
+/* --------------------------------------------------------------- components */
+
+/** Black drop-shadow card behind a white card — the deck's signature title frame. */
+function shadowCard(s, x, y, w, h, dx, dy) {
+  rr(s, x + dx, y + dy, w, h, { fill: { color: C.black } });
+  rr(s, x, y, w, h, { fill: { color: C.white } });
+}
+
+/** Yellow 10-point star with a black star behind it and a tilted plus on top. */
+function badge(s, x, y, size = 1.12) {
+  const k = size / 1.12;
+  s.addShape('star10', { x, y, w: 1.12 * k, h: 1.058 * k, fill: { color: C.black } });
+  s.addShape('star10', { x: x + 0.09 * k, y: y - 0.014 * k, w: 1.14 * k, h: 1.14 * k, fill: { color: C.yellow } });
+  s.addShape('mathPlus', {
+    x: x + 0.4 * k,
+    y: y + 0.313 * k,
+    w: 0.487 * k,
+    h: 0.487 * k,
+    rotate: 15,
+    fill: { color: C.black },
+  });
+}
+
+/** Teal pill button with a black offset shadow; (x, y) is the shadow's top-left. */
+function exploreBtn(s, x, y, o = {}) {
+  const small = !!o.small;
+  const w = small ? 1.9 : 2.685;
+  const h = small ? 0.471 : 0.63;
+  const dx = o.lift ? 0.058 : 0.052;
+  const dy = o.lift ? 0.078 : 0.055;
+  pill(s, x, y, w, h, { fill: { color: C.black } });
+  pill(s, x + dx, y - dy, w, h, { fill: { color: C.teal } });
+  text(s, 'EXPLORE MORE', x + dx + (small ? 0.381 : 0.714), y - dy + (small ? 0.115 : 0.177), small ? 1.265 : 1.788, small ? 0.235 : 0.275, {
+    size: small ? 10.5 : 12,
+    bold: !!o.bold,
+    margin: 0,
+    lsp: 1.5,
+  });
+}
+
+/** "Education Presentation Template" credit line. */
+function footer(s, x, y, o = {}) {
+  const font = o.font || F.body;
+  text(
+    s,
+    [
+      { text: 'Education', options: { bold: true, fontFace: font } },
+      { text: ' Presentation Template', options: { fontFace: font } },
+    ],
+    x,
+    y,
+    2.851,
+    0.286,
+    { size: 11 }
+  );
+}
+
+/** Flat stand-in for a photo / raster asset in the original deck. */
+function imageBox(s, x, y, w, h) {
+  rect(s, x, y, w, h, { fill: { color: C.image } });
+  text(s, '[image]', x, y + h / 2 - 0.2, w, 0.4, { size: 12, color: C.white, align: 'center', valign: 'middle' });
+}
+
+/**
+ * Persistent header: Home / Content tabs, ZEEBOUND wordmark, page counter, rules.
+ * `ink` flips the wordmark, counter and rules to white on dark slides.
+ * The two rules sit slightly higher from slide 7 onwards, as in the original.
+ */
+function chrome(s, num, o = {}) {
+  const ink = o.ink || C.black;
+  const rules = Number(num) < 6 ? [0.2092, 0.8519] : [0.1929, 0.8403];
+  const RX = 3.3384, RW = 9.3989;
+  rect(s, 0.952, -0.163, 0.659, 1.372, { rotate: 270, fill: { color: C.purple } });
+  rect(s, 2.323, -0.163, 0.659, 1.372, { rotate: 270, fill: { color: C.tab } });
+  text(s, 'Home', 0.977, 0.352, 0.96, 0.34, { size: 12, bold: true, color: C.white, valign: 'middle', margin: 5.6 });
+  text(s, 'Content', 2.255, 0.372, 0.96, 0.34, { size: 12, bold: true, color: C.white, valign: 'middle', margin: 5.6 });
+  text(s, 'ZEEBOUND', o.markX || 6.246, 0.355, 1.543, 0.337, { size: 14, bold: true, color: ink, lsp: 1 });
+  text(
+    s,
+    [
+      { text: 'EDUCATION/ ', options: { color: ink } },
+      { text: 'PRESENTATIONTEMPLATE', options: { color: o.tmpl || C.dim } },
+    ],
+    9.557,
+    0.413,
+    3.132,
+    0.269,
+    { size: 10 }
+  );
+  text(s, '|', 12.381, 0.373, 0.195, 0.326, { size: 10, valign: 'middle', wrap: false, margin: 5.6 });
+  text(s, num, 12.525, 0.376, 0.33, 0.326, { size: 10, bold: true, color: ink, valign: 'middle', wrap: false, margin: 5.6 });
+  rules.forEach((y) => hline(s, RX, y, RW, ink));
+}
+
+/* ------------------------------------------------------- shared copy blocks */
+
+const LOREM_FULL =
+  'Vel turpis nunc eget lorem dolor sed viverra ipsum. Laoreet suspendisse interdum consectetur libero id faucibus nisl tincidunt. Arcu risus quis varius quam quisque id diam vel. Volutpat consequat mauris nunc congue nisi vitae. ';
+const LOREM_LONG =
+  'Vel turpis nunc eget lorem dolor sed viverra ipsum. Laoreet suspendisse interdum consectetur libero id faucibus nisl tincidunt. Arcu risus quis varius quam';
+const LOREM_MID = 'Vel turpis nunc eget lorem dolor sed viverra ipsum. Laoreet suspendisse interdum';
+const LOREM_SHORT = 'Vel turpis nunc eget lorem dolor sed viverra ipsum. Laoreet suspendisse';
+const IPSUM_HEAD = 'lorem ipsum dolor sit amet, amor consectetur adipiscing elit, sed do eiusmod tempor incididunt';
+
+/* -------------------------------------------------------------- slide 1..20 */
+
+function slide01(s) {
+  imageBox(s, 8.234, 1.365, 4.693, 6.022);
+  rr1(s, 5.762, 0.522, 1.898, 12.308, {
+    rotate: 90,
+    flipH: true,
+    fill: { color: C.purple },
+    line: { color: C.white, width: 10 },
+  });
+  text(
+    s,
+    [
+      { text: 'EDUCATION', options: { bold: true } },
+      { text: ' PRESENTATION TEMPLATE' },
+    ],
+    0.982,
+    6.531,
+    3.932,
+    0.303,
+    { size: 12 }
+  );
+  text(s, '2024-2028', 6.149, 6.511, 1.788, 0.275, { size: 12, bold: true, margin: 0, lsp: 1.5 });
+
+  shadowCard(s, 0.654, 1.378, 7.054, 2.546, -0.092, 0.231);
+  text(s, 'ZEEBOUND', 0.991, 1.614, 6.186, 1.212, { font: F.head, size: 66 });
+  text(s, 'SCHOOL', 0.991, 2.566, 6.186, 1.212, { font: F.head, size: 66 });
+  text(s, 'PROVIDING A JOYOUS LEARNING ENVIRONMENT', 0.928, 4.621, 3.764, 0.64, { size: 16, bold: true });
+
+  chrome(s, '00');
+  exploreBtn(s, 9.552, 6.41, { bold: true, lift: true });
+  badge(s, 6.852, 3.351);
+}
+
+function slide02(s) {
+  pill(s, 0.509, 6.078, 2.685, 0.63, { fill: { color: C.black } });
+  shadowCard(s, 0.567, 1.422, 5.738, 1.397, -0.075, 0.127);
+  rr1(s, 6.019, 3.583, 7.489, 4.299, { flipH: true, fill: { color: C.purple }, line: { color: C.white, width: 10 } });
+  imageBox(s, 7.232, 1.422, 5.609, 5.398);
+
+  text(s, 'GREETING', 0.567, 1.689, 7.489, 1.212, { font: F.head, size: 66, bold: true });
+  text(s, 'WELCOME TO CLASS', 0.656, 1.521, 2.623, 0.337, { size: 14, bold: true });
+  text(s, LOREM_FULL, 0.656, 3.592, 5.106, 1.178, { size: 12, margin: 0, lsp: 1.5 });
+
+  pill(s, 0.567, 6.0, 2.685, 0.63, { fill: { color: C.teal } });
+  text(s, 'EXPLORE MORE', 1.281, 6.177, 1.788, 0.275, { size: 12, margin: 0, lsp: 1.5 });
+
+  chrome(s, '01');
+  badge(s, 5.274, 5.309);
+}
+
+function slide03(s) {
+  imageBox(s, 6.667, 0, 6.667, 7.5);
+  rr1(s, 0.897, 1.408, 8.071, 4.471, { flipH: true, fill: { color: C.purple }, line: { color: C.white, width: 10 } });
+
+  text(s, 'Welcome to class', 1.741, 2.311, 2.623, 0.37, { size: 16, bold: true });
+  text(s, 'GREETING', 1.663, 2.496, 7.489, 1.212, { font: F.head, size: 66, bold: true });
+  text(s, LOREM_FULL, 1.775, 3.958, 4.892, 1.178, { size: 12, margin: 0, lsp: 1.5 });
+  footer(s, 0.72, 6.538);
+
+  chrome(s, '02', { ink: C.white, markX: 6.709 });
+  exploreBtn(s, 5.823, 5.541, { lift: true });
+  badge(s, 8.162, 1.033);
+}
+
+function slide04(s) {
+  rr1(s, 7.374, 3.991, 5.372, 2.801, { fill: { color: C.purple }, line: { color: C.white, width: 10 } });
+  imageBox(s, 8.21, 1.228, 3.759, 2.698);
+  shadowCard(s, 0.649, 1.407, 6.194, 1.713, -0.081, 0.156);
+  text(s, 'RULES APPLICABLE TO STUDENTS', 0.91, 1.624, 5.757, 1.313, { font: F.head, size: 36, bold: true });
+
+  rr1(s, 1.428, 3.991, 5.239, 2.843, { fill: { color: C.white }, line: { color: C.black, width: 10 } });
+  text(s, '01', 1.744, 4.338, 1.404, 0.909, { size: 48, bold: true });
+  text(s, 'Arrive on time for class', 2.796, 4.604, 4.26, 0.404, { size: 18, bold: true, margin: 0, lsp: 1.5 });
+  text(s, LOREM_LONG + ' quisque id diam vel.', 1.917, 5.273, 4.26, 1.178, { size: 12, margin: 0, lsp: 1.5 });
+
+  text(s, '02', 7.652, 4.388, 1.404, 0.909, { size: 48, bold: true });
+  text(s, 'Complete all assignments', 8.784, 4.632, 4.26, 0.404, { size: 18, bold: true, margin: 0, lsp: 1.5 });
+  text(s, LOREM_LONG + '.', 7.824, 5.273, 4.26, 0.875, { size: 12, margin: 0, lsp: 1.5 });
+
+  chrome(s, '03');
+  exploreBtn(s, 9.677, 6.459);
+  badge(s, 0.811, 3.558);
+}
+
+function slide05(s) {
+  shadowCard(s, 5.589, 1.189, 6.359, 2.038, -0.083, 0.185);
+  rr1(s, -0.117, -0.111, 4.204, 7.019, { flipV: true, fill: { color: C.purple }, line: { color: C.white, width: 10 } });
+  imageBox(s, 0.615, 1.68, 3.938, 4.141);
+
+  text(s, 'RULES APPLICABLE TO STUDENTS', 5.833, 1.552, 6.442, 1.313, { font: F.head, size: 36, bold: true });
+  footer(s, 0.615, 6.254);
+
+  text(s, '01', 5.653, 3.674, 1.404, 0.774, { size: 40, bold: true });
+  text(s, 'Arrive on time for class', 5.721, 4.345, 3.006, 0.367, { size: 16, bold: true, margin: 0, lsp: 1.5 });
+  text(s, LOREM_MID, 5.721, 4.816, 2.706, 0.875, { size: 12, margin: 0, lsp: 1.5 });
+
+  text(s, '02', 9.562, 3.674, 1.404, 0.774, { size: 40, bold: true });
+  text(s, 'Complete all assignments', 9.631, 4.345, 2.982, 0.367, { size: 16, bold: true, margin: 0, lsp: 1.5 });
+  text(s, LOREM_MID + '.', 9.664, 4.816, 2.706, 0.875, { size: 12, margin: 0, lsp: 1.5 });
+
+  chrome(s, '04');
+  exploreBtn(s, 9.525, 6.334);
+  badge(s, 11.205, 2.711);
+}
+
+function slide06(s) {
+  rr1(s, 8.815, 1.238, 4.675, 6.409, {
+    flipH: true,
+    flipV: true,
+    fill: { color: C.purple },
+    line: { color: C.white, width: 10 },
+  });
+  imageBox(s, 8.887, 1.275, 4.519, 3.75);
+
+  // two white feature cards, each with a black offset shadow
+  rr1(s, 0.548, 3.96, 3.875, 3.014, { flipH: true, fill: { color: C.black } });
+  rr1(s, 4.799, 3.969, 6.409, 3.014, { flipH: true, fill: { color: C.black } });
+  shadowCard(s, 0.571, 1.298, 7.978, 1.713, -0.104, 0.156);
+  rr1(s, 0.72, 3.75, 3.949, 3.014, { flipH: true, fill: { color: C.white } });
+  rr1(s, 4.943, 3.75, 6.409, 3.014, { flipH: true, fill: { color: C.white } });
+
+  text(s, "THIS DAY'S LESSON", 0.665, 1.802, 9.213, 0.909, { font: F.head, size: 48 });
+  text(s, 'Physical Activity', 1.03, 4.587, 4.26, 0.403, { size: 18, bold: true, margin: 0, lsp: 1.5 });
+  text(s, 'Vel turpis nunc eget lorem dolor sed viverra ipsum. Laoreet suspendisse interdum lora consectetur libero id faucibus nisl tincidunt.', 1.03, 5.084, 3.137, 1.178, { size: 12, margin: 0, lsp: 1.5 });
+  text(s, 'Writing Letters and Numbers', 6.011, 4.587, 4.26, 0.403, { size: 18, bold: true, margin: 0, lsp: 1.5 });
+  text(s, LOREM_LONG + ' quisque id diam vel.', 6.011, 5.084, 4.26, 1.178, { size: 12, margin: 0, lsp: 1.5 });
+
+  s.addShape('star32', { x: 3.249, y: 4.046, w: 0.999, h: 0.999, rectRadius: rad(0.999, 0.999, 0.43755), fill: { color: C.teal } });
+  text(s, 'FRESH AND FIT', 3.509, 4.369, 0.593, 0.337, { size: 10, margin: 0 });
+
+  chrome(s, '05');
+  exploreBtn(s, 8.119, 6.401);
+  badge(s, 10.458, 3.404);
+}
+
+function slide07(s) {
+  text(s, "THIS WEEK'S LESSON", 0.548, 1.411, 10.286, 1.01, { font: F.head, size: 54 });
+
+  // three numbered cards; the middle one is purple with a black shadow
+  rr1(s, 0.548, 2.839, 3.358, 1.822, { fill: { color: C.white } });
+  rr1(s, 5.083, 2.987, 3.358, 1.822, { fill: { color: C.black } });
+  rr1(s, 4.916, 2.839, 3.358, 1.822, { fill: { color: C.purple } });
+  rr1(s, 9.428, 2.839, 3.358, 1.822, { fill: { color: C.white } });
+
+  const cards = [
+    { n: '01', nx: 0.689, ny: 3.109, title: 'Coloring', tx: 1.728, tw: 1.413, bx: 1.737, bw: 2.094, ty: 3.322 },
+    { n: '02', nx: 5.046, ny: 3.091, title: 'Cooperation', tx: 6.097, tw: 1.838, bx: 6.135, bw: 2.065, ty: 3.322 },
+    { n: '03', nx: 9.629, ny: 3.103, title: 'Numbers', tx: 10.652, tw: 1.423, bx: 10.636, bw: 2.075, ty: 3.309 },
+  ];
+  cards.forEach((c) => {
+    text(s, c.n, c.nx, c.ny, 1.404, 0.909, { font: F.alt, size: 48, bold: true });
+    text(s, c.title, c.tx, c.ty, c.tw, 0.303, { font: F.alt, size: 18, margin: 0 });
+    text(s, LOREM_SHORT, c.bx, 3.725, c.bw, 0.606, { font: F.alt, size: 12, margin: 0 });
+  });
+
+  text(s, LOREM_FULL, 0.548, 5.16, 10.286, 0.677, { font: F.alt, size: 14, margin: 0, lsp: 1.5 });
+
+  chrome(s, '06');
+  exploreBtn(s, 0.548, 6.336);
+  badge(s, 12.274, 4.265, 0.796);
+  footer(s, 10.086, 6.591);
+}
+
+function slide08(s) {
+  // purple panel rotated 90 deg (a rotated group in the original)
+  rr1(s, 8.051, 2.355, 5.116, 3.773, { rotate: 90, fill: { color: C.black } });
+  rr1(s, 8.357, 2.101, 5.116, 3.773, { rotate: 90, fill: { color: C.purple } });
+  imageBox(s, 7.932, 4.348, 4.869, 2.658);
+
+  shadowCard(s, 0.632, 1.633, 4.839, 2.038, -0.063, 0.185);
+  text(s, 'CHILD', 0.896, 1.914, 2.647, 0.909, { font: F.head, size: 48 });
+  text(s, 'MINDSETS', 0.896, 2.744, 4.207, 0.909, { font: F.head, size: 48 });
+  text(s, LOREM_LONG, 0.72, 4.247, 4.224, 0.884, { font: F.alt, size: 12, margin: 0, lsp: 1.5 });
+
+  text(s, '01', 9.34, 1.841, 1.404, 1.01, { font: F.alt, size: 54, bold: true });
+  text(s, 'Prepare', 10.473, 2.195, 1.413, 0.303, { font: F.alt, size: 18, margin: 0 });
+  text(s, '02', 9.34, 3.192, 1.404, 1.01, { font: F.alt, size: 54, bold: true });
+  text(s, 'Set aside time', 10.505, 3.506, 1.838, 0.303, { font: F.alt, size: 18, margin: 0 });
+  hline(s, 9.42, 1.837, 3.193);
+  hline(s, 9.42, 3.052, 3.193);
+
+  chrome(s, '07');
+  exploreBtn(s, 0.664, 6.225);
+  badge(s, 4.824, 1.46, 0.796);
+}
+
+function slide09(s) {
+  imageBox(s, 0, 0, 3.35, 7.5);
+  rr1(s, 8.896, 5.042, 3.891, 2.111, { fill: { color: C.black } });
+  rr1(s, 9.078, 4.831, 3.891, 2.111, { fill: { color: C.purple } });
+
+  shadowCard(s, 3.741, 1.046, 4.839, 2.038, -0.063, 0.185);
+  text(s, 'CHILD', 3.78, 1.147, 3.245, 1.01, { font: F.head, size: 54 });
+  text(s, 'MINDSETS', 3.78, 1.977, 5.158, 1.01, { font: F.head, size: 54 });
+  text(s, LOREM_LONG, 3.814, 3.481, 4.146, 0.884, { font: F.alt, size: 12, margin: 0, lsp: 1.5 });
+
+  const rows = [
+    { n: '01', nx: 3.756, ny: 4.735, t: 'Prepare', tx: 4.932, tw: 1.637, ty: 4.975 },
+    { n: '02', nx: 3.706, ny: 5.674, t: 'Set aside time', tx: 4.895, tw: 2.129, ty: 5.934 },
+    { n: '03', nx: 3.708, ny: 6.535, t: 'Spark their curiosity', tx: 4.865, tw: 3.095, ty: 6.804 },
+  ];
+  rows.forEach((r) => {
+    text(s, r.n, r.nx, r.ny, 1.626, 0.909, { font: F.alt, size: 48, bold: true });
+    text(s, r.t, r.tx, r.ty, r.tw, 0.303, { font: F.alt, size: 18, margin: 0 });
+  });
+  hline(s, 3.831, 5.575, 3.193);
+  hline(s, 3.831, 6.457, 3.193);
+
+  text(s, 'Turpis nunc eget lorem dolor sed viverra ipsum. Laoreet suspendisse interdum consectetur libero.', 9.078, 3.481, 2.795, 0.757, { font: F.alt, size: 10, margin: 0, lsp: 1.5 });
+  text(s, '80', 9.351, 5.054, 1.817, 1.01, { font: F.alt, size: 60, margin: 0 });
+  text(s, '+', 10.367, 5.326, 0.674, 0.673, { font: F.alt, size: 40, margin: 0 });
+  text(s, 'CHILD', 10.403, 5.226, 1.35, 0.168, { font: F.alt, size: 10, bold: true, margin: 0 });
+  text(s, LOREM_SHORT, 10.664, 6.064, 2.177, 0.606, { font: F.alt, size: 12, margin: 0 });
+
+  chrome(s, '08');
+}
+
+function slide10(s) {
+  rr1(s, 0.592, 3.44, 11.984, 3.238, { flipH: true, flipV: true, fill: { color: C.black } });
+  rr1(s, 0.592, 3.286, 11.984, 3.238, { flipH: true, flipV: true, fill: { color: C.purple } });
+  imageBox(s, 7.72, 3.763, 3.66, 2.285);
+
+  shadowCard(s, 6.197, 1.706, 6.631, 1.456, -0.087, 0.132);
+  text(s, 'SAMPLE CASE', 6.494, 1.989, 6.925, 1.01, { font: F.head, size: 54 });
+
+  // floating white "1-3 years" note card
+  rr1(s, 1.227, 1.842, 3.891, 2.111, { fill: { color: C.white } });
+  badge(s, 1.407, 2.014, 0.796);
+  text(s, '1-3 YEARS', 1.981, 2.349, 1.788, 0.202, { size: 12, bold: true, align: 'center', margin: 0 });
+  text(s, LOREM_MID, 2.423, 2.656, 2.643, 0.875, { size: 12, margin: 0, lsp: 1.5 });
+
+  text(s, 'Early Learning', 1.407, 4.801, 3.66, 0.275, { size: 12, bold: true, margin: 0, lsp: 1.5 });
+  text(s, LOREM_LONG, 1.407, 5.173, 4.526, 0.875, { size: 12, margin: 0, lsp: 1.5 });
+
+  chrome(s, '09');
+  exploreBtn(s, 9.494, 6.264);
+}
+
+function slide11(s) {
+  imageBox(s, 0.59, 1.488, 3.331, 5.463);
+  rr1(s, 5.011, 5.052, 4.411, 1.632, { fill: { color: C.black } });
+  rr1(s, 4.931, 5.0, 4.411, 1.632, { fill: { color: C.purple } });
+
+  shadowCard(s, 4.853, 1.552, 7.885, 1.456, -0.103, 0.132);
+  text(s, 'SAMPLE CASE', 5.358, 1.822, 6.925, 1.111, { font: F.head, size: 60 });
+
+  text(s, 'Early Learning', 5.155, 3.523, 3.66, 0.275, { size: 12, bold: true, margin: 0, lsp: 1.5 });
+  text(s, LOREM_LONG, 5.155, 3.895, 4.411, 0.802, { size: 11, margin: 0, lsp: 1.5 });
+  // the original starts this label with an empty line, pushing it down inside the card
+  text(s, [{ text: ' ', options: { bold: true, breakLine: true } }, { text: 'Spontaneous' }], 5.155, 4.851, 3.66, 0.578, {
+    size: 12,
+    bold: true,
+    margin: 0,
+    lsp: 1.5,
+  });
+  text(s, 'Vel turpis nunc eget lorem dolor sed viverra ipsum. Laoreet suspendisse interdum consectetur libero id faucibus nisl tincidunt. ', 5.155, 5.529, 4.411, 0.802, { size: 11, margin: 0, lsp: 1.5 });
+
+  // two big purple stats, each with a small yellow "years" seal
+  [
+    { v: '14+', vy: 3.822, sy: 3.951, ly: 4.136, label: '1-3 ' },
+    { v: '43+', vy: 5.425, sy: 5.472, ly: 5.691, label: '3-5' },
+  ].forEach((st) => {
+    text(s, st.v, 10.042, st.vy, 1.817, 1.01, { size: 60, color: C.purple, margin: 0 });
+    s.addShape('star10', { x: 11.814, y: st.sy, w: 0.796, h: 0.752, fill: { color: C.black } });
+    s.addShape('star10', { x: 11.878, y: st.sy - 0.009, w: 0.81, h: 0.81, fill: { color: C.yellow } });
+    text(s, [{ text: st.label, options: { breakLine: true } }, { text: 'YEARS' }], 11.373, st.ly, 1.788, 0.353, {
+      size: 10.5,
+      align: 'center',
+      margin: 0,
+    });
+  });
+
+  chrome(s, '10');
+  exploreBtn(s, 7.27, 6.459, { small: true });
+}
+
+function slide12(s) {
+  // accordion: five rows, the first one expanded
+  rr1(s, 0.596, 2.289, 6.81, 1.076, { fill: { color: C.black } });
+  rr1(s, 1.732, 2.226, 5.611, 1.076, { fill: { color: C.white } });
+  const rows = [
+    { y: 3.42, ny: 3.404, ty: 3.565, ay: 3.566, q: 'Question no two?' },
+    { y: 4.198, ny: 4.174, ty: 4.343, ay: 4.326, q: 'Question no three?' },
+    { y: 4.976, ny: 4.969, ty: 5.151, ay: 5.104, q: 'Question no four?' },
+    { y: 5.754, cy: 5.774, ny: 5.763, ty: 5.924, ay: 5.881, q: 'Question no five?' },
+  ];
+  rows.forEach((r) => rr1(s, 1.732, r.y, 5.611, 0.659, { fill: { color: C.white } }));
+
+  text(s, 'Question no one?', 1.853, 2.338, 2.143, 0.337, { size: 14 });
+  text(s, 'Vel turpis nunc eget lorem dolor sed viverra ipsum. Laoreet suspendisse interdum consectetur libero id faucibus nisi.', 1.964, 2.739, 4.866, 0.37, { size: 11, margin: 0 });
+  s.addShape('triangle', { x: 6.957, y: 2.439, w: 0.097, h: 0.084, rotate: 180, fill: { color: C.black } });
+  rows.forEach((r) => {
+    text(s, r.q, 1.853, r.ty, 2.143, 0.337, { size: 14 });
+    s.addShape('triangle', { x: 6.957, y: r.ay, w: 0.097, h: 0.084, rotate: 180, fill: { color: C.black } });
+  });
+
+  // purple number chips down the left edge
+  rect(s, 0.596, 2.226, 1.137, 1.076, { fill: { color: C.purple } });
+  text(s, '01', 0.751, 2.369, 1.213, 0.707, { size: 36, bold: true });
+  rows.forEach((r, i) => {
+    rect(s, 0.596, r.cy || r.y, 1.137, 0.659, { fill: { color: C.purple } });
+    text(s, '0' + (i + 2), 0.751, r.ny, 1.213, 0.64, { size: 32, bold: true });
+  });
+
+  text(s, [{ text: 'ASKED ', options: { breakLine: true } }, { text: 'QUESTION' }], 8.349, 2.123, 4.625, 1.582, {
+    font: F.head,
+    size: 44,
+  });
+  text(s, LOREM_FULL, 8.477, 3.901, 4.26, 1.357, { size: 11, margin: 0, lsp: 1.5 });
+
+  chrome(s, '11');
+  exploreBtn(s, 8.477, 5.936, { small: true });
+  badge(s, 6.763, 1.973, 0.796);
+}
+
+function slide13(s) {
+  imageBox(s, 0.892, 3.875, 4.777, 2.941);
+  shadowCard(s, 0.645, 1.397, 5.372, 1.745, -0.07, 0.159);
+  text(s, [{ text: 'DISCUSSION ', options: { breakLine: true } }, { text: 'AND SHARING' }], 0.844, 1.531, 6.432, 1.582, {
+    font: F.head,
+    size: 44,
+  });
+
+  // three list cards; the middle one is purple
+  const items = [
+    { y: 1.593, fy: 1.531, sy: 1.601, sx: 8.232, ny: 1.763, nx: 8.344, ty: 1.677, card: C.white, seal: C.purple },
+    { y: 2.731, fy: 2.666, sy: 2.746, sx: 8.222, ny: 2.898, nx: 8.326, ty: 2.838, card: C.purple, seal: C.white },
+    { y: 3.856, fy: 3.802, sy: 3.875, sx: 8.222, ny: 4.034, nx: 8.326, ty: 3.943, card: C.white, seal: C.purple },
+  ];
+  items.forEach((it) => rr1(s, 8.164, it.y, 4.491, 0.902, { fill: { color: C.black } }));
+  items.forEach((it, i) => {
+    rr1(s, 8.085, it.fy, 4.491, 0.902, { fill: { color: it.card } });
+    s.addShape('star32', { x: it.sx, y: it.sy, w: 0.742, h: 0.742, rectRadius: rad(0.742, 0.742, 0.43755), fill: { color: it.seal } });
+    text(s, '0' + (i + 1), it.nx, it.ny, 0.649, 0.438, { size: 20 });
+    text(s, LOREM_SHORT, 9.1, it.ty, 3.153, 0.572, { size: 12, margin: 0, lsp: 1.5 });
+  });
+
+  chrome(s, '12');
+  exploreBtn(s, 9.917, 6.295);
+  badge(s, 5.143, 6.237, 0.796);
+}
+
+function slide14(s) {
+  shadowCard(s, 0.598, 1.403, 5.372, 1.745, -0.07, 0.159);
+  rr1(s, 7.927, 0, 5.573, 7.609, { flipH: true, fill: { color: C.purple }, line: { color: C.white, width: 10 } });
+  imageBox(s, 9.07, 4.827, 3.351, 2.113);
+
+  text(s, 'SECURITY GUARANTEE', 0.91, 1.484, 7.35, 1.582, { font: F.head, size: 44 });
+  text(s, 'PLACEHOLDER', 0.667, 3.583, 5.26, 2.356, { size: 24, margin: 0, lsp: 1.5 });
+
+  text(s, '24', 9.074, 0.805, 1.476, 1.65, { size: 72, margin: 0, lsp: 1.5 });
+  text(s, 'HOUR CCTV', 9.074, 2.202, 2.683, 0.458, { size: 20, bold: true, margin: 0, lsp: 1.5 });
+  text(s, 'CONTROL', 9.074, 2.565, 2.683, 0.448, { size: 20, bold: true, margin: 0, lsp: 1.5 });
+
+  chrome(s, '13', { tmpl: C.pale });
+  exploreBtn(s, 0.596, 6.43);
+  badge(s, 9.007, 3.452, 0.796);
+}
+
+function slide15(s) {
+  rr1(s, -0.188, -0.156, 6.493, 7.812, { fill: { color: C.purple }, line: { color: C.bg, width: 10 } });
+  imageBox(s, 0.667, 3.689, 4.499, 3.072);
+  shadowCard(s, 0.369, 1.307, 5.372, 1.745, -0.07, 0.159);
+  text(s, [{ text: 'POSITIVE ', options: { breakLine: true } }, { text: 'BEHAVIOUR' }], 0.505, 1.407, 7.35, 1.717, {
+    font: F.head,
+    size: 48,
+  });
+
+  text(s, LOREM_MID, 6.88, 2.085, 2.333, 0.766, { size: 10.5, margin: 0, lsp: 1.5 });
+  hline(s, 10.646, 2.3, 2.179);
+  hline(s, 10.646, 2.812, 2.179);
+  text(s, 'Friendly Teacher', 10.883, 2.428, 1.75, 0.252, { size: 15, bold: true, margin: 0, wrap: false });
+
+  rr1(s, 7.017, 3.498, 6.0, 3.731, { fill: { color: C.black } });
+  rr1(s, 6.881, 3.359, 6.0, 3.731, { fill: { color: C.white } });
+  text(s, LOREM_FULL, 7.427, 4.075, 4.26, 1.481, { size: 12, margin: 0, lsp: 1.5 });
+
+  chrome(s, '14');
+  exploreBtn(s, 7.405, 6.045);
+  badge(s, 9.879, 2.173, 0.796);
+}
+
+function slide16(s) {
+  imageBox(s, 0.596, 0.86, 6.0, 6.268);
+  rr1(s, 4.536, 2.402, 8.42, 3.731, { fill: { color: C.black } });
+  rr1(s, 4.366, 2.119, 8.42, 3.731, { fill: { color: C.white } });
+
+  text(s, [{ text: 'SUMMARY OF ', options: { breakLine: true } }, { text: 'THE CLASS' }], 4.758, 2.402, 9.099, 1.582, {
+    font: F.head,
+    size: 44,
+  });
+
+  const cols = [
+    { n: '01', nx: 4.758, t: 'Good relationship', tx: 5.934, tw: 2.188, bx: 5.944, ny: 3.97 },
+    { n: '02', nx: 8.951, t: 'Can spell letters', tx: 10.14, tw: 2.129, bx: 10.184, ny: 3.949 },
+  ];
+  cols.forEach((c) => {
+    text(s, c.n, c.nx, c.ny, 1.626, 0.909, { size: 48, bold: true, color: C.purple });
+    text(s, c.t, c.tx, 4.154, c.tw, 0.303, { size: 18, bold: true, margin: 0 });
+    text(s, LOREM_SHORT, c.bx, 4.622, 2.177, 0.808, { size: 12, margin: 0 });
+  });
+
+  chrome(s, '15');
+  badge(s, 10.835, 2.806, 0.796);
+}
+
+function slide17(s) {
+  rr1(s, 0.18, 3.26, 12.667, 3.963, { fill: { color: C.black } });
+  shadowCard(s, 0.291, 1.182, 6.132, 1.504, -0.08, 0.137);
+  rr1(s, 0, 3.124, 12.667, 3.963, { fill: { color: C.purple } });
+
+  text(s, 'SCHEDULE', 0.455, 1.588, 6.212, 1.036, { font: F.head, size: 66, valign: 'middle', margin: 4, lsp: 0.8 });
+  text(s, IPSUM_HEAD + ' labore.', 7.377, 1.45, 5.199, 1.01, { size: 18 });
+
+  const sessions = [
+    { pillY: 3.741, y: 4.46, title: 'Briefing Class', ty: 3.804, day: 'MONDAY', dy: 4.457, room: '@ FUNNY ROOM', num: '- 04', px: 2.969, tx: 3.096, ny: 4.204 },
+    { pillY: 5.273, y: 5.992, title: ' Letter Class', ty: 5.336, day: 'TUESDAY', dy: 5.989, room: '@ MR CREPES ROOM', num: '- 05', px: 2.953, tx: 3.096, ny: 5.736 },
+  ];
+  sessions.forEach((r) => {
+    pill(s, r.px, r.pillY, 2.685, 0.63, { fill: { color: C.teal } });
+    text(s, '2024', 1.096, r.y, 1.557, 0.37, { size: 16, bold: true });
+    text(s, r.num, 1.76, r.y - 0.07, 1.557, 0.286, { size: 10.5, bold: true });
+    text(s, r.title, r.tx, r.ty, 4.599, 0.505, { size: 24, bold: true, italic: true });
+    text(s, r.day, 3.146, r.dy, 1.557, 0.303, { size: 12, bold: true });
+    text(s, '10AM-12AM ', 6.336, r.dy - 0.006, 1.557, 0.303, { size: 12, bold: true });
+    text(s, r.room, 7.444, r.dy - 0.006, 2.508, 0.303, { size: 12 });
+    text(
+      s,
+      [{ text: 'NOTES-', options: { bold: true, breakLine: true } }, { text: 'sit amet, consectetur adipiscing elit, sed.' }],
+      10.157,
+      r.ny,
+      1.808,
+      0.841,
+      { size: 11 }
+    );
+  });
+
+  chrome(s, '16');
+  badge(s, 11.883, 2.948, 0.796);
+}
+
+function slide18(s) {
+  rr1(s, -0.125, -0.187, 6.424, 7.797, { fill: { color: C.purple }, line: { color: C.white, width: 10 } });
+  text(s, [{ text: 'INFO', options: { breakLine: true } }, { text: 'GRAPHIC' }], 0.695, 1.291, 5.699, 1.925, {
+    font: F.head,
+    size: 66,
+    valign: 'middle',
+    margin: 4,
+    lsp: 0.8,
+  });
+  text(s, IPSUM_HEAD + ' ut labore et dolore magna aliqua. urna porttitor rhoncus dolor purus.', 0.597, 3.216, 5.199, 1.616, { size: 18 });
+
+  const stats = [
+    { n: '01', nx: 0.666, nw: 0.648, ny: 5.171, v: '360+', vx: 0.628, vw: 2.19, vy: 5.685, vh: 0.601, l: 'Student', lx: 0.581, lw: 1.632 },
+    { n: '02', nx: 2.666, nw: 0.837, ny: 5.137, v: '42+', vx: 2.601, vw: 1.409, vy: 5.676, vh: 0.619, l: 'Teacher', lx: 2.569, lw: 1.602 },
+    { n: '03', nx: 4.112, nw: 0.993, ny: 5.14, v: '7.4%', vx: 4.065, vw: 1.409, vy: 5.676, vh: 0.619, l: 'Growth', lx: 4.034, lw: 1.161 },
+  ];
+  stats.forEach((st) => {
+    text(s, st.n, st.nx, st.ny, st.nw, 0.309, { size: 14, color: 'E4D8CC', valign: 'middle', margin: 4, lsp: 0.8 });
+    text(s, st.v, st.vx, st.vy, st.vw, st.vh, { size: 36, valign: 'middle', margin: 4, lsp: 0.8 });
+    text(s, st.l, st.lx, 6.321, st.lw, 0.404, { size: 18, color: C.pale });
+  });
+
+  // horizontal stacked bar chart, drawn with plain rectangles
+  vline(s, 7.614, 1.417, 3.8, C.black);
+  [8.87, 10.126, 11.382, 12.638].forEach((x) => vline(s, x, 1.417, 3.8, C.dim));
+  const bars = [
+    { y: 1.758, label: 'May', ly: 2.011, lx: 7.072, seg: [[7.614, 1.824, C.purple], [9.438, 1.824, C.grey], [11.261, 0.8, C.pale]] },
+    { y: 2.946, label: 'June', ly: 3.194, lx: 7.011, seg: [[7.614, 2.512, C.purple], [10.126, 1.135, C.grey], [11.261, 1.256, C.pale]] },
+    { y: 4.135, label: 'July', ly: 4.442, lx: 7.011, seg: [[7.614, 1.0, C.purple], [8.614, 1.765, C.grey], [10.382, 1.115, C.pale]] },
+  ];
+  bars.forEach((b) => {
+    b.seg.forEach(([x, w, color]) => rect(s, x, b.y, w, 0.753, { fill: { color } }));
+    text(s, b.label, b.lx, b.ly, 0.81, 0.269, { size: 10, bold: true });
+  });
+  [
+    ['0', 7.477, 0.344],
+    ['15', 8.741, 0.344],
+    ['30', 9.957, 0.422],
+    ['45', 11.203, 0.422],
+    ['60', 12.448, 0.422],
+  ].forEach(([t, x, w]) => text(s, t, x, 5.323, w, 0.269, { size: 10, bold: true }));
+
+  // legend row beneath the chart
+  text(s, '2019 - 2024', 7.322, 6.049, 1.649, 0.309, { size: 14, valign: 'middle', margin: 4, lsp: 0.8 });
+  text(s, 'Intensive', 7.343, 6.408, 1.649, 0.366, { size: 18, valign: 'middle', margin: 4, lsp: 0.8 });
+  rect(s, 9.477, 6.135, 1.438, 0.545, { fill: { color: C.pale } });
+  [
+    ['A', 9.675, 9.69, 9.604],
+    ['B', 10.027, 10.054, null],
+    ['C', 10.383, 10.399, 10.605],
+  ].forEach(([t, cx, tx, maskX]) => {
+    s.addShape('ellipse', { x: cx, y: 6.236, w: 0.297, h: 0.297, fill: { type: 'none' }, line: { color: C.black, width: 1 } });
+    // grey patch that clips the outer circle so the trio reads as one linked group
+    if (maskX !== null) rect(s, maskX, maskX < 10 ? 6.351 : 6.26, 0.171, 0.182, { fill: { color: C.pale } });
+    text(s, t, tx, 6.195, 0.309, 0.381, { size: 16, bold: true, valign: 'middle', margin: 4 });
+  });
+  s.addShape('triangle', { x: 12.433, y: 5.967, w: 0.205, h: 0.176, fill: { color: C.purple } });
+  text(s, '7.4%', 11.735, 6.239, 1.805, 0.572, { font: F.alt, size: 28, bold: true });
+
+  chrome(s, '17');
+  badge(s, 4.751, 1.221, 0.796);
+}
+
+/** Company / website / address block used on the closing slides. */
+function contactBlock(s, x, y) {
+  const lines = [
+    { y: y, w: 1.781, rows: ['COMPANY NAME', 'ZEEBOUND SCHOOL'], h: 0.505 },
+    { y: y + 0.824, w: 1.473, rows: ['WEBSITE', 'www.zeebound.com'], h: 0.505 },
+    { y: y + 1.666, w: 1.36, rows: ['ADDRESS', 'Fifth Avenue Abbey', '24356 - Brighton'], h: 0.808 },
+  ];
+  lines.forEach((b) => {
+    const runs = b.rows.map((t, i) => ({ text: t, options: { bold: i === 0, breakLine: i < b.rows.length - 1 } }));
+    text(s, runs, x, b.y, b.w, b.h, { size: 9, margin: 7.2, lsp: 1 });
+  });
+}
+
+function slide19(s) {
+  imageBox(s, 0, 0, 13.333, 7.5);
+  rr1(s, 0, 1.519, 7.214, 5.981, { fill: { color: C.purple } });
+  shadowCard(s, 0.602, 2.16, 5.863, 1.745, -0.077, 0.159);
+  text(s, 'CONTACT', 0.738, 2.672, 6.151, 1.12, { font: F.head, size: 72, valign: 'middle', margin: 4, lsp: 0.8 });
+  text(s, 'lorem ipsum dolor sit amet, amor consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ', 0.644, 4.438, 3.356, 1.919, { size: 18 });
+  contactBlock(s, 4.886, 4.437);
+  footer(s, 0.644, 6.624);
+
+  chrome(s, '18');
+  badge(s, 0.301, 1.843, 0.796);
+}
+
+function slide20(s) {
+  shadowCard(s, 0.27, 1.763, 10.171, 3.956, -0.133, 0.36);
+  text(s, 'THANK YOU FOR YOUR ATTENTION!', 0.606, 2.021, 8.823, 3.713, {
+    font: F.head,
+    size: 88,
+    valign: 'middle',
+    margin: 4,
+    lsp: 0.8,
+  });
+  rr1(s, 0, 6.654, 7.667, 0.846, { fill: { color: C.bg } });
+  footer(s, 0.542, 6.985, { font: F.foot });
+  contactBlock(s, 11.368, 2.674);
+
+  chrome(s, '19');
+}
+
+/* ---------------------------------------------------------------- assembly */
+
+const SLIDES = [
+  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
+  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
+];
+
+/** Slides 19 and 20 sit on their own coloured stage. */
+const BACKGROUNDS = { 19: '028E44', 20: C.purple };
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'WIDE', width: 13.3333333, height: 7.5 }); // 12192000 EMU
+  pptx.layout = 'WIDE';
+  pptx.author = 'ZEEBOUND School';
+  pptx.title = 'Education Presentation Template';
+
+  SLIDES.forEach((builder, i) => {
+    const s = pptx.addSlide();
+    s.background = { color: BACKGROUNDS[i + 1] || C.bg };
+    builder(s);
+  });
+
+  return pptx.writeFile({
+    fileName: path.join(__dirname, '10a245d0-3b94-478d-8524-b6f35b4b1966_grok_final.pptx'),
+  });
+}
+
+build().then((f) => console.log('wrote', f));
