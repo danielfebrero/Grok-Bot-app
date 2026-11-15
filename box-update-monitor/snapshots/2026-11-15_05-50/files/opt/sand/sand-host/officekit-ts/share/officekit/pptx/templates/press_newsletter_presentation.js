@@ -1,0 +1,525 @@
+/**
+ * "Letters de Presses" newsletter deck — rebuilt with PptxGenJS.
+ *
+ * 20 slides, 13.333in x 7.5in. Raster/photo content in the original is empty
+ * picture placeholders, so each is redrawn here as a translucent grey panel
+ * with a "Picture Here" caption and a small vector picture glyph.
+ *
+ *   node 15970631-ba36-4572-aecd-bfb0eb44de89_grok_final.js
+ */
+
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ theme */
+
+const SLIDE_W = 12192000 / 914400; // 13.3333in
+const SLIDE_H = 6858000 / 914400; // 7.5in
+
+const CREAM = 'FFF4EF'; // accent5 — page background
+const INK = '262626'; // tx1 @85% — headlines
+const RED = 'FE261A'; // accent2 — numbers / highlights
+const GOLD = 'F4D74E'; // accent4 — rating stars
+const GREY = '595959'; // tx1 @65% — body copy, rules
+const GREY_D = '404040'; // tx1 @75% — denser body copy
+const NEAR_BK = '0D0D0D'; // tx1 @95%
+const SNOW = 'F2F2F2'; // body copy on dark slides
+const SILVER = 'D9D9D9'; // muted chrome on dark slides
+
+const HEAD = 'Rubik SemiBold'; // +mj-lt
+const BODY = 'Poppins Light'; // +mn-lt
+const LOGO = 'Rubik Black';
+
+const LOREM = 'A wonderful serenity has taken possession of my entire soul, like these sweet.';
+const LOREM_M = 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy with my.';
+const LOREM_W = 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy with my whole.';
+const TAIL_LONG = 'has taken possession of my entire soul, like these sweet mornings of spring which I enjoy with my whole heart. I am alone, and feel the charm of existence in this spot, which was created for the bliss of souls like mine.';
+const TAIL_MED = 'has taken possession of my entire soul, like these sweet mornings of spring which I enjoy with my.';
+const LEAD = 'A wonderful serenity ';
+
+/* ---------------------------------------------------------------- helpers */
+
+/** Plain text box: top-anchored, no bullet, Poppins Light unless overridden. */
+function tx(slide, content, opts) {
+	slide.addText(content, Object.assign({ fontFace: BODY, valign: 'top' }, opts));
+}
+
+/** Big Rubik headline. */
+function headline(slide, str, x, y, w, h, fontSize, color, align) {
+	tx(slide, str, { x, y, w, h, fontSize, fontFace: HEAD, color: color || INK, align: align || 'left' });
+}
+
+/**
+ * Auto-numbered "1." paragraph. PptxGenJS starts a new paragraph whenever a
+ * run carries `bullet`, so the bullet + align must be repeated on every run.
+ */
+function numbered(slide, runs, start, opts) {
+	const bullet = { type: 'number', style: 'arabicPeriod', numberStartAt: start, indent: 27 };
+	const text = runs.map(r => ({ text: r.text, options: Object.assign({ align: 'left', bullet }, r.options) }));
+	tx(slide, text, opts);
+}
+
+/** Hairline rule (the deck uses 0.5pt for chrome, 1pt for the TOC dividers). */
+function rule(slide, x, y, w, color, width) {
+	slide.addShape('line', { x, y, w, h: 0, line: { color, width: width || 0.5 } });
+}
+
+/** Solid accent bar used under the "[01]" notes. */
+function bar(slide, x, y, w) {
+	slide.addShape('rect', { x, y, w, h: 0.05, fill: { color: RED }, line: { type: 'none' } });
+}
+
+/**
+ * Master chrome: registration rules, wordmark, kicker, rotated spine label.
+ * `dark` flips the palette for the two charcoal slides.
+ */
+function frame(slide, opts) {
+	const o = opts || {};
+	const stroke = o.dark ? CREAM : GREY;
+	const label = o.dark ? SILVER : GREY;
+
+	[0.3642, 0.7699, 12.5744, 12.9801].forEach(x => {
+		slide.addShape('line', { x, y: 0, w: 0, h: SLIDE_H, line: { color: stroke, width: 0.5 } });
+	});
+	slide.addShape('line', { x: 6.6667, y: 0, w: 0, h: 0.8268, line: { color: stroke, width: 0.5 } });
+	rule(slide, 0, 0.8268, SLIDE_W, stroke);
+	if (o.bottomRule !== false) rule(slide, 0, 6.7138, SLIDE_W, stroke);
+
+	tx(slide, 'Letters de Presses', {
+		x: 1.1023, y: 0.4018, w: 2.4413, h: 0.2861,
+		fontFace: LOGO, fontSize: 11, color: o.dark ? CREAM : GREY,
+	});
+	tx(slide, 'Presentation', { x: 10.7703, y: 0.4018, w: 1.4607, h: 0.2693, fontSize: 10, color: label, align: 'right' });
+	tx(slide, 'Newsletter', {
+		x: 11.7976, y: 3.7414, w: 2.0021, h: 0.2693, rotate: 90,
+		fontSize: 10, color: label, align: 'center',
+	});
+	slide.slideNumber = {
+		x: 12.5017, y: 6.8623, w: 0.4931, h: 0.2861,
+		align: 'right', fontFace: LOGO, fontSize: 11, color: label,
+	};
+}
+
+/**
+ * Stand-in for an empty picture placeholder: translucent panel + caption +
+ * a vector "photo" glyph (frame, sun, two mountains) centred in the panel.
+ */
+function pictureBox(slide, x, y, w, h, capColor) {
+	const G = { w: 0.875, h: 0.69 };
+	const ix = x + (w - G.w) / 2;
+	const iy = y + (h - G.h) / 2;
+	const flat = c => ({ fill: { color: c }, line: { type: 'none' } });
+
+	slide.addShape('rect', Object.assign({ x, y, w, h }, { fill: { color: SILVER, transparency: 75 }, line: { type: 'none' } }));
+	tx(slide, 'Picture Here', { x, y, w, h: 0.4, fontSize: 16, color: capColor || '000000', align: 'center' });
+
+	slide.addShape('rect', Object.assign({ x: ix, y: iy, w: G.w, h: G.h }, flat('4D4D4D')));
+	slide.addShape('rect', Object.assign({ x: ix + 0.015, y: iy + 0.015, w: G.w - 0.03, h: G.h - 0.03 }, flat('FAFAFA')));
+	slide.addShape('rect', {
+		x: ix + 0.055, y: iy + 0.055, w: G.w - 0.11, h: G.h - 0.11,
+		fill: { color: 'FAFAFA' }, line: { color: 'A8A8A8', width: 0.75 },
+	});
+	slide.addShape('ellipse', Object.assign({ x: ix + 0.15, y: iy + 0.12, w: 0.15, h: 0.145 }, flat('F8DB8F')));
+	slide.addShape('triangle', Object.assign({ x: ix + 0.26, y: iy + 0.265, w: 0.510, h: 0.355 }, flat('83BEEC')));
+	slide.addShape('triangle', {
+		x: ix + 0.10, y: iy + 0.415, w: 0.43, h: 0.205,
+		fill: { color: '83BEEC' }, line: { color: 'FAFAFA', width: 0.75 },
+	});
+}
+
+/** "[01] + short paragraph" note, optionally underscored by a red bar. */
+function taggedNote(slide, n) {
+	tx(slide, n.tag, { x: n.tx, y: n.ty, w: n.tw, h: 0.3702, fontSize: 16, fontFace: HEAD, color: RED, wrap: false });
+	tx(slide, n.text || LOREM, { x: n.px, y: n.py, w: n.pw, h: 0.8701, fontSize: 12, color: GREY, lineSpacingMultiple: 1.3 });
+	if (n.barX !== undefined) bar(slide, n.barX, n.barY, 2.641);
+}
+
+/** Red lead-in + grey remainder, the deck's standard body paragraph. */
+function leadParagraph(slide, tail, opts) {
+	tx(slide, [
+		{ text: LEAD, options: { bold: true, color: RED } },
+		{ text: tail, options: { color: opts.tailColor || GREY } },
+	], Object.assign({ lineSpacingMultiple: 1.5 }, opts));
+}
+
+/** Numbered headline + grey paragraph beneath it (slides 4, 8, 9). */
+function newsItem(slide, it) {
+	numbered(slide, [{ text: it.head, options: { bold: true, color: RED } }], it.n, {
+		x: it.x, y: it.y, w: it.headW, h: 0.3857, fontSize: 14, lineSpacingMultiple: 1.3,
+	});
+	tx(slide, it.body, {
+		x: it.x, y: it.y + 0.4039, w: it.bodyW, h: 0.9812,
+		fontSize: 12, color: GREY_D, lineSpacingMultiple: 1.5,
+	});
+}
+
+/* ------------------------------------------------------------ slide 1..20 */
+
+function slide01(s) {
+	frame(s);
+	headline(s, 'NEWSLETTER.', 0.9853, 1.3145, 12.2865, 2.0364, 115);
+	[
+		{ tag: '[01]', tx: 5.2448, ty: 4.0220, tw: 0.6244, px: 5.9114, py: 3.9491, pw: 2.9826 },
+		{ tag: '[02]', tx: 8.8876, ty: 4.0220, tw: 0.6595, px: 9.6394, py: 3.9491, pw: 2.7448 },
+		{ tag: '[03]', tx: 5.2448, ty: 5.3588, tw: 0.6613, px: 5.9114, py: 5.2755, pw: 2.9826 },
+		{ tag: '[04]', tx: 8.8876, ty: 5.3588, tw: 0.6665, px: 9.6394, py: 5.2755, pw: 2.7448 },
+	].forEach(n => taggedNote(s, n));
+	pictureBox(s, 1.1846, 3.5649, 3.7385, 2.7903);
+}
+
+function slide02(s) {
+	frame(s);
+	headline(s, 'TABLE OF CONTENT.', 0.9853, 1.2045, 6.4065, 2.3225, 66);
+
+	const ROWS = [
+		{ col: 0, y: 4.1176, n: '01.', label: 'Announcement', w: 2.5907 },
+		{ col: 0, y: 4.8579, n: '02.', label: 'In Depth ', w: 1.6666 },
+		{ col: 0, y: 5.5981, n: '03.', label: 'In Brief ', w: 1.5608 },
+		{ col: 1, y: 4.1176, n: '04.', label: 'Welcome!', w: 1.8409 },
+		{ col: 1, y: 4.8579, n: '05.', label: 'Events', w: 1.5608 },
+		{ col: 1, y: 5.5988, n: '06.', label: 'Festival', w: 1.5608 },
+	];
+	const NUM_X = [1.4876, 8.0601];
+	const LBL_X = [3.0295, 9.6020];
+	ROWS.forEach(r => {
+		tx(s, r.n, { x: NUM_X[r.col], y: r.y, w: 0.6955, h: 0.4039, fontSize: 18, fontFace: HEAD, color: RED });
+		tx(s, r.label, { x: LBL_X[r.col], y: r.y, w: r.w, h: 0.4039, fontSize: 18, color: INK });
+	});
+	[1.1406, 7.7131].forEach(x => {
+		[4.6326, 5.3729, 6.1131].forEach(y => rule(s, x, y, 4.3333, GREY, 1));
+	});
+
+	pictureBox(s, 7.3917, 1.4603, 4.8146, 1.9170);
+}
+
+function slide03(s) {
+	frame(s);
+	headline(s, 'ANNOUNCEMENT.', 1.0794, 1.3156, 9.1576, 1.1107, 60);
+	numbered(s, [
+		{ text: LEAD, options: { bold: true, color: RED } },
+		{ text: TAIL_LONG, options: { color: GREY } },
+	], 1, { x: 1.0794, y: 4.8854, w: 7.1429, h: 1.3046, fontSize: 14, lineSpacingMultiple: 1.3 });
+
+	pictureBox(s, 9.0794, 1.3810, 3.0635, 4.9146);
+	pictureBox(s, 1.1900, 2.7619, 7.0317, 1.7778);
+}
+
+function slide04(s) {
+	frame(s);
+	[
+		{ n: 1, x: 1.1270, y: 4.8461, headW: 3.0825, bodyW: 4.3258 },
+		{ n: 2, x: 5.3595, y: 3.3643, headW: 2.6142, bodyW: 4.4425 },
+		{ n: 3, x: 8.0921, y: 1.7032, headW: 2.2636, bodyW: 4.3523 },
+	].forEach(it => newsItem(s, Object.assign({ head: 'Announcement', body: LOREM_M }, it)));
+
+	pictureBox(s, 1.1270, 1.2688, 3.0825, 2.9692);
+	pictureBox(s, 8.2540, 5.0952, 3.9524, 1.3335);
+}
+
+function slide05(s) {
+	frame(s);
+	headline(s, 'WELL-DESIGNED NEWSLETTER.', 0.9853, 1.4762, 6.7925, 1.5820, 44);
+	tx(s, 'See News Announcement', {
+		x: 7.3492, y: 4.3713, w: 3.5814, h: 0.4263,
+		fontSize: 16, bold: true, color: RED, lineSpacingMultiple: 1.3,
+	});
+	tx(s, LOREM_W, { x: 7.3492, y: 4.8532, w: 4.8254, h: 1.1279, fontSize: 14, color: GREY_D, lineSpacingMultiple: 1.5 });
+
+	pictureBox(s, 6.6667, 1.3651, 5.5079, 1.9206);
+	pictureBox(s, 1.1587, 4.2143, 5.5079, 1.9206);
+}
+
+function slide06(s) {
+	s.background = { color: INK };
+	frame(s, { dark: true });
+	tx(s, [
+		{ text: LEAD, options: { bold: true } },
+		{ text: 'has taken possession of my entire soul, like these sweet mornings of spring which I enjoy with my whole heart. I am alone, and feel the charm of existence.' },
+	], { x: 1.1023, y: 3.6161, w: 5.1587, h: 1.3046, fontSize: 14, color: SNOW, lineSpacingMultiple: 1.3 });
+	tx(s, 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings', {
+		x: 1.1023, y: 5.3491, w: 5.1587, h: 0.6920, fontSize: 14, color: SNOW, lineSpacingMultiple: 1.3,
+	});
+
+	pictureBox(s, 1.1756, 1.4921, 4.9673, 1.6956);
+	pictureBox(s, 7.0100, 1.2381, 5.1587, 5.0317);
+}
+
+function slide07(s) {
+	frame(s);
+	s.addShape('rect', { x: 5.8730, y: 3.7500, w: 6.3250, h: 2.6310, fill: { color: RED }, line: { type: 'none' } });
+	headline(s, 'IN \u2013 DEPTH.', 1.1353, 1.2574, 4.3481, 2.1205, 60);
+
+	s.addChart('line', [
+		{ name: 'Series 1', labels: ['Category 1', 'Category 2', 'Category 3', 'Category 4'], values: [4.3, 2.5, 3.5, 4.5] },
+		{ name: 'Series 2', labels: ['Category 1', 'Category 2', 'Category 3', 'Category 4'], values: [2.4, 4.4, 1.8, 2.8] },
+		{ name: 'Series 3', labels: ['Category 1', 'Category 2', 'Category 3', 'Category 4'], values: [2, 1, 3, 5] },
+	], {
+		x: 6.3335, y: 3.8328, w: 5.4033, h: 2.3796,
+		chartColors: [INK, GOLD, CREAM],
+		lineSize: 2.25, lineSmooth: true, lineDataSymbol: 'none',
+		showLegend: false,
+		showTitle: true, title: 'Chart Title', titleFontFace: BODY, titleFontSize: 18.6, titleColor: SNOW,
+		catAxisHidden: true, catAxisLineShow: false,
+		valAxisLineShow: false, valAxisLabelFontFace: BODY, valAxisLabelFontSize: 12, valAxisLabelColor: SNOW,
+		valGridLine: { color: SILVER, size: 0.75 },
+	});
+
+	[
+		{ tx: 5.4900, bx: 5.4833, label: 'Title 01' },
+		{ tx: 9.0341, bx: 9.0275, label: 'Title 02' },
+	].forEach(c => {
+		tx(s, c.label, {
+			x: c.tx, y: 1.4831, w: 1.7553, h: 0.42,
+			fontSize: 14, bold: true, color: RED, align: 'justify', lineSpacingMultiple: 1.5,
+		});
+		tx(s, 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings', {
+			x: c.bx, y: 1.8868, w: 3.2382, h: 1.1279, fontSize: 14, color: GREY_D, lineSpacingMultiple: 1.5,
+		});
+	});
+
+	pictureBox(s, 1.1353, 3.7500, 4.7377, 2.6310);
+}
+
+function slide08(s) {
+	frame(s);
+	headline(s, 'SECTOR NEWS.', 1.0276, 1.1769, 7.0955, 1.1107, 60);
+	[
+		{ n: 1, y: 2.9008 },
+		{ n: 2, y: 4.9380 },
+	].forEach(it => newsItem(s, {
+		n: it.n, x: 4.9288, y: it.y, headW: 2.6142, bodyW: 4.4425,
+		head: 'Sectore News Here', body: LOREM_M,
+	}));
+
+	pictureBox(s, 1.2154, 2.6308, 2.9846, 3.6923);
+	pictureBox(s, 9.7692, 1.3846, 2.3487, 4.9385);
+}
+
+function slide09(s) {
+	frame(s, { bottomRule: false });
+	headline(s, 'SECTOR NEWS.', 1.0276, 1.1769, 7.0955, 1.1107, 60);
+	[1.1756, 5.0224, 8.8692].forEach((x, i) => newsItem(s, {
+		n: i + 1, x, y: 2.9606, headW: 2.6142, bodyW: 3.4412,
+		head: 'Sectore News Here',
+		body: 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring.',
+	}));
+
+	pictureBox(s, 1.1756, 4.8254, 10.9932, 2.6746);
+	pictureBox(s, 8.0935, 1.3175, 3.9354, 0.9702);
+}
+
+function slide10(s) {
+	frame(s);
+	headline(s, 'NEWS UPCOMING.', 1.0276, 1.1769, 6.3216, 2.1205, 60);
+	tx(s, [
+		{ text: '\u201CThrough the Lens ' },
+		{ text: 'Breaking', options: { color: RED } },
+		{ text: ' News in the World of ' },
+		{ text: 'Photography', options: { color: RED } },
+		{ text: '\u201D' },
+	], { x: 7.3008, y: 1.0798, w: 5.0049, h: 2.2551, fontSize: 32, fontFace: HEAD, italic: true, color: '000000' });
+
+	tx(s, LOREM_W, { x: 7.3492, y: 3.9473, w: 4.8254, h: 1.1279, fontSize: 14, color: GREY_D, lineSpacingMultiple: 1.5 });
+	tx(s, LOREM, { x: 7.3492, y: 5.4396, w: 4.8254, h: 0.7744, fontSize: 14, color: GREY_D, lineSpacingMultiple: 1.5 });
+
+	pictureBox(s, 1.1900, 3.7500, 4.9841, 2.4563);
+}
+
+function slide11(s) {
+	frame(s);
+	headline(s, 'IN - BRIEF.', 1.0276, 1.1769, 4.1878, 2.1205, 60);
+	leadParagraph(s, TAIL_MED, {
+		x: 1.0276, y: 4.4089, w: 3.7878, h: 1.6785, fontSize: 16, tailColor: GREY_D,
+	});
+	[
+		{ tag: '[01]', tx: 8.6564, ty: 1.5334, tw: 0.6244, px: 9.3231, py: 1.4605, pw: 2.9826, barX: 9.4377, barY: 2.4183 },
+		{ tag: '[02]', tx: 8.6564, ty: 3.4989, tw: 0.6595, px: 9.3231, py: 3.4260, pw: 2.7448, barX: 9.4377, barY: 4.3839 },
+		{ tag: '[03]', tx: 8.6564, ty: 5.3588, tw: 0.6613, px: 9.3231, py: 5.2755, pw: 2.9826, barX: 9.4421, barY: 6.2211 },
+	].forEach(n => taggedNote(s, n));
+
+	pictureBox(s, 5.0923, 1.3385, 3.0256, 4.7489);
+}
+
+function slide12(s) {
+	s.background = { color: INK };
+	frame(s, { dark: true });
+	headline(s, 'QUICK NEWS OVERVIEW.', 1.0276, 1.2794, 6.4010, 2.1205, 60, CREAM);
+
+	// Cream cards are stored rotated 270deg; keep the source geometry as-is.
+	[
+		{ card: 2.1374, text: 1.2941, amount: '$125.000' },
+		{ card: 6.4882, text: 5.6449, amount: '$555.000' },
+	].forEach(c => {
+		s.addShape('rect', {
+			x: c.card, y: 2.7882, w: 2.0437, h: 3.9673, rotate: 270,
+			fill: { color: CREAM }, line: { type: 'none' },
+		});
+		headline(s, c.amount, c.text, 4.0324, 3.7302, 0.7068, 36);
+		leadParagraph(s, 'has taken possession of my entire soul.', {
+			x: c.text, y: 4.7027, w: 3.7302, h: 0.7744, fontSize: 14,
+		});
+	});
+
+	pictureBox(s, 8.3016, 1.3651, 3.6190, 4.8254, CREAM);
+}
+
+function slide13(s) {
+	frame(s);
+	headline(s, 'EXPLORING KEY TOPICS.', 1.0276, 1.2794, 10.4962, 1.1107, 60);
+	leadParagraph(s, TAIL_MED, { x: 6.5831, y: 4.9962, w: 5.8613, h: 1.2745, fontSize: 16, tailColor: GREY_D });
+
+	pictureBox(s, 1.1587, 2.8664, 4.7302, 3.2765);
+	pictureBox(s, 6.6667, 2.8664, 5.5079, 1.8730);
+}
+
+function slide14(s) {
+	frame(s);
+	headline(s, 'WELCOME!', 1.0276, 1.2024, 7.2105, 1.1107, 60);
+	tx(s, [
+		{ text: 'Through the Lens ' },
+		{ text: 'Breaking.', options: { color: RED } },
+	], { x: 0.9958, y: 2.7235, w: 5.0049, h: 0.3702, fontSize: 16, fontFace: HEAD, color: '000000' });
+	tx(s, LEAD + TAIL_LONG, {
+		x: 1.1111, y: 3.2813, w: 5.8613, h: 1.2841, fontSize: 12, color: GREY, lineSpacingMultiple: 1.5,
+	});
+
+	pictureBox(s, 7.3651, 1.3968, 4.8571, 3.1686);
+	pictureBox(s, 1.1900, 4.9366, 11.0317, 1.3952);
+}
+
+function slide15(s) {
+	frame(s);
+	headline(s, 'MEET NEWSLETTER TEAM.', 0.7604, 1.2024, 11.8125, 1.1107, 60, INK, 'center');
+
+	[
+		{ x: 1.1538, name: 'Morisuea Lukiz' },
+		{ x: 5.0359, name: 'Charista Ruinda' },
+		{ x: 8.9179, name: 'Christiana Morphis' },
+	].forEach(m => {
+		pictureBox(s, m.x, 2.5846, 3.2615, 2.6769);
+		tx(s, m.name, { x: m.x, y: 5.4555, w: 3.2615, h: 0.3702, fontSize: 16, fontFace: HEAD, color: INK, align: 'center' });
+		tx(s, 'A wonderful serenity has taken possession of my entire.', {
+			x: m.x - 0.0427, y: 5.8258, w: 3.3043, h: 0.6782,
+			fontSize: 12, color: GREY, align: 'center', lineSpacingMultiple: 1.5,
+		});
+	});
+}
+
+function slide16(s) {
+	frame(s);
+	s.addShape('rect', { x: 6.3020, y: 0.8370, w: 2.7910, h: 5.8660, fill: { color: INK }, line: { type: 'none' } });
+	headline(s, 'COSTUMER SERVICE.', 1.0276, 1.2024, 7.2105, 2.1205, 60);
+
+	const THANKS = 'Thank you for reaching out to us. We truly appreciate your feedback and are here to help you.';
+	[
+		{ name: 'Mouriz Muana', y: 1.2589, picY: 1.2224, starY: 2.8716 },
+		{ name: 'Syeril Dhamai', y: 4.4338, picY: 4.0815, starY: 6.0465 },
+	].forEach(t => {
+		pictureBox(s, 6.6369, t.picY, 2.1200, 2.2360, CREAM);
+		tx(s, t.name, { x: 9.4323, y: t.y, w: 2.1091, h: 0.4039, fontSize: 18, fontFace: HEAD, color: RED });
+		tx(s, THANKS, {
+			x: 9.4323, y: t.y + 0.4908, w: 3.1406, h: 0.9812,
+			fontSize: 12, color: NEAR_BK, lineSpacingMultiple: 1.5,
+		});
+		[9.5802, 10.0191, 10.4543, 10.8895, 11.3247].forEach(x => {
+			s.addShape('star5', { x, y: t.starY, w: 0.1947, h: 0.1947, fill: { color: GOLD }, line: { type: 'none' } });
+		});
+	});
+
+	leadParagraph(s, 'has taken possession of my entire soul, like these sweet mornings of spring which I enjoy with my whole heart. I am alone, and feel the charm of.', {
+		x: 1.0635, y: 4.5352, w: 4.8095, h: 1.4813, fontSize: 14,
+	});
+}
+
+function slide17(s) {
+	frame(s);
+	headline(s, 'GLOBAL EVENTS TO CHECK OUT.', 1.0276, 1.2024, 7.2105, 2.1205, 60);
+	[
+		{ tag: '[01]', tx: 4.9611, ty: 3.7753, tw: 0.6244, px: 5.6277, py: 3.7024, pw: 2.9826, barX: 5.7423, barY: 4.6602 },
+		{ tag: '[02]', tx: 4.9611, ty: 5.1811, tw: 0.6595, px: 5.6277, py: 5.1081, pw: 2.9826, barX: 5.7423, barY: 6.0660 },
+	].forEach(n => taggedNote(s, n));
+
+	pictureBox(s, 1.1746, 3.7500, 3.3968, 2.3929);
+	pictureBox(s, 9.0000, 1.3968, 3.1587, 4.7460);
+}
+
+function slide18(s) {
+	frame(s);
+	headline(s, 'UPCOMING NEWS.', 4.9365, 1.4944, 8.7130, 1.1107, 60);
+	tx(s, [
+		{ text: '21 AUGUST', options: { breakLine: true } },
+		{ text: '2025' },
+	], { x: 9.6984, y: 3.3492, w: 3.0317, h: 1.0434, fontSize: 28, fontFace: HEAD, color: INK });
+	leadParagraph(s, 'has taken possession of my entire soul, like these sweet.', {
+		x: 9.7460, y: 4.6650, w: 2.4762, h: 1.4813, fontSize: 14,
+	});
+
+	pictureBox(s, 1.2222, 1.3651, 3.4286, 4.7619);
+	pictureBox(s, 5.1111, 3.3492, 4.2540, 2.7778);
+}
+
+function slide19(s) {
+	frame(s);
+	headline(s, 'YEARLY CELEBRATIONS WHAT\u2019S COMING.', 1.0276, 1.2024, 6.8454, 2.3225, 44);
+
+	[
+		{ x: 1.0587, ruleX: 1.1313, date: '16-10-2026', dateW: 2.0842, bodyW: 2.7667 },
+		{ x: 4.7469, ruleX: 4.8773, date: '21-09-2027', dateW: 2.3539, bodyW: 2.9356 },
+	].forEach(c => {
+		tx(s, c.date, { x: c.x, y: 4.0226, w: c.dateW, h: 0.4039, fontSize: 18, fontFace: HEAD, color: NEAR_BK });
+		rule(s, c.ruleX, 4.5691, 0.8528, RED, 0.5);
+		tx(s, 'Title About Events', { x: c.x, y: 4.6610, w: 2.3775, h: 0.4039, fontSize: 18, color: NEAR_BK, wrap: false });
+		leadParagraph(s, 'has taken possession of my entire soul, like these sweet morning.', {
+			x: c.x, y: 5.1206, w: c.bodyW, h: 0.9812, fontSize: 12,
+		});
+	});
+
+	pictureBox(s, 8.2698, 0.8368, 3.9048, 5.8663);
+}
+
+function slide20(s) {
+	frame(s);
+	headline(s, 'THANK YOU.', 4.4821, 1.1947, 8.8513, 1.5820, 88);
+	[
+		{ tag: '[01]', tx: 4.3480, tw: 0.6244, px: 5.0147, title: 'See You Next Newsletter' },
+		{ tag: '[02]', tx: 8.6403, tw: 0.6595, px: 9.3070, title: 'Stay With Newsletter' },
+	].forEach(n => {
+		taggedNote(s, { tag: n.tag, tx: n.tx, ty: 5.0624, tw: n.tw, px: n.px, py: 5.5143, pw: 2.9826 });
+		tx(s, n.title, { x: n.px, y: 5.0624, w: 3.2659, h: 0.3702, fontSize: 16, fontFace: HEAD, color: NEAR_BK });
+	});
+
+	pictureBox(s, 1.1900, 1.4127, 2.7634, 4.9717);
+	pictureBox(s, 4.7077, 3.0263, 7.4352, 1.4473);
+}
+
+/* -------------------------------------------------------------------- run */
+
+const BUILDERS = [
+	slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
+	slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
+];
+
+function build() {
+	const pptx = new PptxGenJS();
+	pptx.defineLayout({ name: 'NEWSLETTER', width: SLIDE_W, height: SLIDE_H });
+	pptx.layout = 'NEWSLETTER';
+	pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
+	pptx.title = 'Newsletter';
+	pptx.author = 'Letters de Presses';
+
+	pptx.defineSlideMaster({ title: 'BASE', background: { color: CREAM } });
+
+	BUILDERS.forEach(fn => {
+		const slide = pptx.addSlide({ masterName: 'BASE' });
+		fn(slide);
+	});
+
+	return pptx;
+}
+
+build()
+	.writeFile({ fileName: path.join(__dirname, '15970631-ba36-4572-aecd-bfb0eb44de89_grok_final.pptx') })
+	.then(f => console.log('wrote ' + f))
+	.catch(err => { console.error(err); process.exit(1); });

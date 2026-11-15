@@ -1,0 +1,599 @@
+/**
+ * "PORTFOLIO & RESUME" deck — rebuilt with pptxgenjs.
+ * 15 slides, 13.333 x 7.5 in (16:9). Dark navy theme with a mint accent.
+ *
+ * The source deck contains no photographs: every picture frame in it is an
+ * empty PowerPoint picture placeholder, which renders as bare background. The
+ * only raster asset is the small "person" glyph in the PROFILE pill, redrawn
+ * here with native shapes (see personIcon).
+ */
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+// ---------------------------------------------------------------- palette ---
+const NAVY = '1B1C30'; // accent1 / slide background
+const MINT = '7CDEC7'; // accent2
+const WHITE = 'FFFFFF'; // bg1
+const GREY = 'BFBFBF'; // bg1 @ lumMod 75% — body copy
+
+const SANS = 'Urbanist';
+const SANS_SB = 'Urbanist SemiBold';
+const BODY = 'Roboto';
+
+/** Mint tint used by "ghost" chips: accent2 at 13% alpha over the navy bg. */
+const TINT = { color: MINT, transparency: 87 };
+/** Same idea, inverted, for chips sitting on a mint card. */
+const TINT1 = { color: NAVY, transparency: 87 };
+const NOFILL = { type: 'none' };
+
+// ------------------------------------------------------------- primitives ---
+const rect = (s, o) => s.addShape('rect', o);
+const roundRect = (s, o) => s.addShape('roundRect', o);
+const oval = (s, o) => s.addShape('ellipse', o);
+const line = (s, o) => s.addShape('line', o);
+const poly = (s, x, y, w, h, pts, o) => s.addShape('custGeom', Object.assign({ x, y, w, h, points: pts }, o));
+
+/**
+ * Text box. Defaults match the deck: Urbanist, white, top-aligned, no wrap and
+ * "resize shape to fit text" (every text box in the source carries spAutoFit).
+ */
+const txt = (s, text, o) =>
+  s.addText(text, Object.assign({ fontFace: SANS, color: WHITE, valign: 'top', wrap: false, fit: 'resize', margin: [7.2, 7.2, 3.6, 3.6] }, o));
+
+/** Body copy: 11pt Roboto, grey, 150% line spacing, wrapping. */
+const body = (s, text, x, y, w, h, o) =>
+  txt(s, text, Object.assign({ x, y, w, h, fontFace: BODY, fontSize: 11, color: GREY, lineSpacingMultiple: 1.5, wrap: true }, o));
+
+/** 11pt Roboto label centred on a pill/chip of width `w` at `x`. */
+const chipLabel = (s, text, x, y, w, color) =>
+  txt(s, text, { x: x - 0.078, y, w: w + 0.156, h: 0.348, fontSize: 11, fontFace: BODY, color, align: 'center', lineSpacingMultiple: 1.5, wrap: true });
+
+/** Small caption above a section title. */
+const kicker = (s, text, x, y, o) => txt(s, text, Object.assign({ x, y, w: 1.974, h: 0.37, fontSize: 16, wrap: true }, o));
+
+/**
+ * Draw normalised path points (fractions of w/h) as a custom-geometry shape.
+ * A point is [x, y] for a line, [x, y, 'm'] to start a subpath,
+ * [x, y, x1, y1, x2, y2] for a cubic bezier, and 'z' to close.
+ */
+function shape(s, x, y, w, h, norm, o) {
+  const pts = norm.map((p) => {
+    if (p === 'z') return { close: true };
+    if (p.length === 6) return { x: p[0] * w, y: p[1] * h, curve: { type: 'cubic', x1: p[2] * w, y1: p[3] * h, x2: p[4] * w, y2: p[5] * h } };
+    return { x: p[0] * w, y: p[1] * h, moveTo: p[2] === 'm' };
+  });
+  return poly(s, x, y, w, h, pts, o);
+}
+
+// ------------------------------------------------------------------ icons ---
+// Pixel-style arrow ("→" when rotated 270 deg): shaft plus stair-stepped head.
+const ARROW = [
+  [0.577, 0.776, 'm'], [0.712, 0.776], [0.712, 0.669], [0.721, 0.662], [0.853, 0.662], [0.853, 0.552],
+  [0.862, 0.552], [1.0, 0.552], [1.0, 0.672], [0.859, 0.672], [0.859, 0.781], [0.718, 0.781],
+  [0.718, 0.891], [0.577, 0.891], [0.577, 1.0], [0.423, 1.0], [0.423, 0.891], [0.282, 0.891],
+  [0.282, 0.781], [0.141, 0.781], [0.141, 0.672], [0.0, 0.672], [0.0, 0.552], [0.147, 0.552],
+  [0.147, 0.662], [0.288, 0.662], [0.288, 0.776], [0.423, 0.776], [0.423, 0.0], [0.577, 0.0], 'z',
+];
+const arrow = (s, x, y, w, h, rot, color) => shape(s, x, y, w, h, ARROW, { fill: { color: color || MINT }, rotate: rot || 0 });
+
+// Isometric cube logo — six flat facets inside the 0.191 x 0.222 group box.
+const CUBE = [
+  { x: 0.019, y: 0.0, w: 0.769, h: 0.29, p: [[0.626, 0.335, 'm'], [0.874, 0.665], [1.0, 0.498], [0.626, 0.0], [0.0, 0.833], [0.126, 1.0], 'z'] },
+  { x: 0.212, y: 0.193, w: 0.768, h: 0.29, p: [[0.874, 0.0, 'm'], [0.374, 0.666], [0.126, 0.335], [0.0, 0.502], [0.374, 1.0], [1.0, 0.168], 'z'] },
+  { x: 0.0, y: 0.469, w: 0.481, h: 0.531, p: [[0.201, 0.091, 'm'], [0.0, 0.0], [0.0, 0.545], [1.0, 1.0], [1.0, 0.817], [0.201, 0.453], 'z'] },
+  { x: 0.0, y: 0.275, w: 0.481, h: 0.531, p: [[0.0, 0.183, 'm'], [0.799, 0.547], [0.799, 0.909], [1.0, 1.0], [1.0, 0.455], [0.0, 0.0], 'z'] },
+  { x: 0.519, y: 0.372, w: 0.288, h: 0.628, p: [[1.0, 0.155, 'm'], [1.0, 0.0], [0.0, 0.23], [0.0, 1.0], [0.336, 0.923], [0.336, 0.308], 'z'] },
+  { x: 0.712, y: 0.275, w: 0.288, h: 0.628, p: [[0.664, 0.077, 'm'], [0.664, 0.692], [0.0, 0.845], [0.0, 1.0], [1.0, 0.77], [1.0, 0.0], 'z'] },
+];
+const cubeLogo = (s, x, y, w, h) =>
+  CUBE.forEach((f) => shape(s, x + f.x * w, y + f.y * h, f.w * w, f.h * h, f.p, { fill: { color: MINT } }));
+
+// 5 x 5 dot grid decoration (title and closing slides).
+function dotGrid(s, x, y, w, h) {
+  const d = 0.0238;
+  for (let r = 0; r < 5; r++) {
+    for (let c = 0; c < 5; c++) {
+      oval(s, { x: x + (0.0119 + c * 0.244 - d / 2) * w, y: y + (0.0137 + r * 0.2431 - d / 2) * h, w: d * w, h: d * h, fill: { color: WHITE } });
+    }
+  }
+}
+
+// Mouse cursor: white arrow with a dark outline.
+const CURSOR = [
+  [0.0, 0.0, 'm'], [0.0, 0.96], [0.059, 0.96], [0.059, 0.92], [0.177, 0.92], [0.177, 0.88],
+  [0.294, 0.88], [0.294, 0.84], [0.412, 0.84], [0.412, 0.92], [0.471, 0.92], [0.471, 1.0],
+  [0.529, 1.0], [0.529, 0.96], [0.647, 0.96], [0.647, 0.92], [0.588, 0.92], [0.588, 0.84],
+  [0.529, 0.8], [0.647, 0.8], [0.647, 0.76], [0.764, 0.76], [0.764, 0.72], [0.882, 0.72],
+  [0.882, 0.68], [1.0, 0.68], [1.0, 0.64], [0.941, 0.64], [0.941, 0.6], [0.882, 0.6],
+  [0.882, 0.56], [0.823, 0.56], [0.823, 0.52], [0.764, 0.52], [0.764, 0.48], [0.706, 0.48],
+  [0.706, 0.44], [0.647, 0.44], [0.647, 0.4], [0.588, 0.4], [0.588, 0.36], [0.529, 0.36],
+  [0.529, 0.32], [0.471, 0.32], [0.471, 0.28], [0.412, 0.28], [0.412, 0.24], [0.353, 0.24],
+  [0.353, 0.2], [0.294, 0.2], [0.294, 0.16], [0.235, 0.16], [0.235, 0.12], [0.177, 0.12],
+  [0.177, 0.08], [0.118, 0.08], [0.118, 0.04], [0.059, 0.04], [0.059, 0.0], 'z',
+];
+const cursor = (s, x, y, w, h) => shape(s, x, y, w, h, CURSOR, { fill: { color: WHITE }, line: { color: NAVY, width: 1.5 } });
+
+// Mint bullet marker: a small square turned 330 degrees.
+const diamond = (s, x, y, size) => rect(s, { x, y, w: size || 0.104, h: size || 0.104, fill: { color: MINT }, rotate: 330 });
+
+// Chevron "v" — the collapsed-accordion affordance. In the original it is an
+// L-shaped corner bracket in a tiny square box, turned 45 degrees.
+const CHEVRON = [[0.0, 1.0, 'm'], [0.0, 0.806], [0.806, 0.806], [0.806, 0.0], [1.0, 0.0], [1.0, 1.0], 'z'];
+const chevron = (s, x, y, size, color) => shape(s, x, y, size, size, CHEVRON, { fill: { color: color || MINT }, rotate: 45 });
+
+// Person glyph (head + shoulders) for the PROFILE pill.
+function personIcon(s, x, y, w, h) {
+  oval(s, { x: x + 0.29 * w, y: y + 0.08 * h, w: 0.42 * w, h: 0.42 * h, fill: { color: MINT } });
+  shape(s, x, y, w, h, [[0.12, 0.92, 'm'], [0.12, 0.72], [0.3, 0.58], [0.7, 0.58], [0.88, 0.72], [0.88, 0.92], 'z'], { fill: { color: MINT } });
+}
+
+// Contact glyphs on the closing contact slide.
+const phoneIcon = (s, x, y, w, h) =>
+  shape(s, x, y, w, h, [
+    [0.579, 0.58, 'm'], [0.36, 0.7, 0.5, 0.659, 0.399, 0.738], [0.14, 0.7, 0.3, 0.639, 0.259, 0.598],
+    [0.16, 0.919, 0.0, 0.799, 0.099, 0.878], [0.698, 0.7, 0.218, 0.998, 0.459, 0.939],
+    [0.937, 0.138, 0.937, 0.46, 0.998, 0.219], [0.718, 0.12, 0.878, 0.079, 0.818, 0.0],
+    [0.718, 0.341, 0.619, 0.239, 0.66, 0.278], [0.579, 0.58, 0.759, 0.377, 0.68, 0.479], 'z',
+  ], { fill: { color: MINT } });
+
+const mailIcon = (s, x, y, w, h) =>
+  shape(s, x, y, w, h, [
+    [0.039, 0.095, 'm'], [0.44, 0.439, 0.076, 0.123, 0.44, 0.439], [0.501, 0.467, 0.46, 0.467, 0.479, 0.467],
+    [0.538, 0.439, 0.518, 0.467, 0.538, 0.467], [0.941, 0.095, 0.555, 0.439, 0.922, 0.123],
+    [0.961, 0.0, 0.98, 0.063, 0.998, 0.0], [0.039, 0.0], [0.039, 0.095, 0.0, 0.0, 0.02, 0.063], 'z',
+    [0.961, 0.281, 'm'], [0.538, 0.625, 0.941, 0.281, 0.555, 0.593], [0.501, 0.625, 0.538, 0.625, 0.518, 0.625],
+    [0.44, 0.625, 0.479, 0.625, 0.46, 0.625], [0.039, 0.281, 0.421, 0.593, 0.059, 0.281],
+    [0.02, 0.281, 0.02, 0.253, 0.02, 0.281], [0.02, 0.933], [0.076, 0.996, 0.02, 0.965, 0.039, 0.996],
+    [0.922, 0.996], [0.98, 0.933, 0.961, 0.996, 0.98, 0.965], [0.98, 0.281], [0.961, 0.281, 0.98, 0.281, 0.98, 0.253], 'z',
+  ], { fill: { color: MINT } });
+
+const pinIcon = (s, x, y, w, h) =>
+  shape(s, x, y, w, h, [
+    [0.5, 0.0, 'm'], [1.0, 0.364, 0.769, 0.0, 1.0, 0.16], [0.512, 1.0, 1.0, 0.551, 0.512, 1.0],
+    [0.0, 0.364, 0.512, 1.0, 0.0, 0.56], [0.5, 0.0, 0.0, 0.164, 0.237, 0.0], 'z',
+    [0.502, 0.202, 'm'], [0.292, 0.351, 0.387, 0.202, 0.292, 0.269], [0.502, 0.5, 0.292, 0.433, 0.387, 0.5],
+    [0.713, 0.351, 0.618, 0.5, 0.713, 0.433], [0.502, 0.202, 0.713, 0.269, 0.618, 0.202], 'z',
+  ], { fill: { color: MINT } });
+
+// ------------------------------------------------------- shared furniture ---
+/**
+ * Soft radial mint glow: a 9.429in circle of mint that is strongest at the
+ * centre and fades to nothing at the rim. GLOW_STOPS lists the design's opacity
+ * at each half-inch of radius. pptxgenjs emits solid fills only, so the
+ * gradient is stacked from concentric circles drawn largest-first; each one's
+ * opacity is the increment that lifts the accumulated cover to its target.
+ */
+const GLOW_R = 4.7145;
+const GLOW_STOPS = [0.64, 0.557, 0.468, 0.391, 0.315, 0.251, 0.191, 0.145, 0.097, 0.065, 0.0];
+const STOP_STEP = GLOW_R / (GLOW_STOPS.length - 1);
+const RINGS = 24;
+// Renderers round each blend down to whole 8-bit channels, so a deep stack ends
+// up slightly too dark; nudge every layer up by roughly one channel step.
+const GLOW_TRUNC = 1 / 130;
+function glowAlphaAt(r) {
+  const k = Math.min(r / STOP_STEP, GLOW_STOPS.length - 1.001);
+  const lo = Math.floor(k);
+  return GLOW_STOPS[lo] + (GLOW_STOPS[lo + 1] - GLOW_STOPS[lo]) * (k - lo);
+}
+
+const GLOW_LAYERS = (() => {
+  const out = [];
+  let covered = 0;
+  for (let i = RINGS; i >= 1; i--) {
+    // The band inside ring i should read as the profile at its mid-radius.
+    const target = glowAlphaAt(GLOW_R * ((i - 0.5) / RINGS));
+    out.push({ r: GLOW_R * (i / RINGS), alpha: 1 - (1 - target) / (1 - covered) + GLOW_TRUNC });
+    covered = target;
+  }
+  return out;
+})();
+function glow(s, x, y) {
+  const cx = x + GLOW_R;
+  const cy = y + GLOW_R;
+  GLOW_LAYERS.forEach((L) => oval(s, { x: cx - L.r, y: cy - L.r, w: 2 * L.r, h: 2 * L.r, fill: { color: MINT, transparency: 100 - L.alpha * 100 } }));
+}
+
+/** Top navigation bar: logo + name (left), Projects / Dashboard / PROFILE (right). */
+function navBar(s) {
+  cubeLogo(s, 0.486, 0.549, 0.191, 0.222);
+  txt(s, 'WILLIAM ELLISON', { x: 0.742, y: 0.535, w: 1.348, h: 0.269, fontSize: 10, fontFace: SANS_SB });
+  txt(s, 'Projects', { x: 9.366, y: 0.535, w: 0.703, h: 0.269, fontSize: 10, align: 'right' });
+  txt(s, 'Dashboard', { x: 10.259, y: 0.535, w: 0.903, h: 0.269, fontSize: 10, fontFace: SANS_SB, align: 'right' });
+  line(s, { x: 10.301, y: 0.826, w: 0.819, h: 0, line: { color: MINT, width: 0.75 } });
+  roundRect(s, { x: 11.491, y: 0.497, w: 1.197, h: 0.356, rectRadius: 0.178, fill: NOFILL, line: { color: MINT, width: 0.5 } });
+  personIcon(s, 11.629, 0.58, 0.173, 0.173);
+  txt(s, 'PROFILE', { x: 11.871, y: 0.549, w: 0.721, h: 0.269, fontSize: 10, align: 'right' });
+}
+
+/**
+ * Section heading: a plain white word, a mint semibold word on the next line
+ * (or beside it), and the pixel arrow tucked in front of the second word.
+ */
+function heading(s, x, y, top, bottom, o) {
+  const dy = o.dy === undefined ? 0.538 : o.dy;
+  txt(s, top, { x, y, w: o.wTop, h: 0.707, fontSize: 36 });
+  txt(s, bottom, { x: x + o.dx, y: y + dy, w: o.wBot, h: 0.707, fontSize: 36, fontFace: SANS_SB, color: MINT });
+  arrow(s, x + o.ax, y + (o.ay === undefined ? 0.675 : o.ay), 0.33, 0.425, 270);
+}
+
+/** Filled/outlined pill with a label — the deck's standard chip. */
+function chip(s, c) {
+  const fg = c.on === 'mint' ? NAVY : WHITE;
+  const solid = !!c.solid;
+  roundRect(s, {
+    x: c.x, y: c.y, w: c.w, h: 0.41, rectRadius: 0.205,
+    fill: solid ? { color: c.on === 'mint' ? NAVY : MINT } : (c.on === 'mint' ? TINT1 : TINT),
+    line: solid ? null : { color: c.on === 'mint' ? NAVY : MINT, width: 0.5 },
+  });
+  chipLabel(s, c.text, c.x, c.y, c.w, solid ? (c.on === 'mint' ? MINT : NAVY) : fg);
+}
+
+// ------------------------------------------------------------ copy blocks ---
+const LOREM_LONG = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Curabitur ullamcorper nibh at diam bibendum facilisis a non augue. Vestibulum vel maximus arcu. Etiam ultricies est non augue sagittis viverra. Cras lobortis';
+const LOREM_MED = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Curabitur ullamcorper nibh at diam bibendum facilisis a non augue. Vestibulum vel maximus';
+const LOREM_MED2 = LOREM_MED + ' arcu. Etiam';
+const LOREM_MED3 = LOREM_MED + ' arcu. Etiam ultricies est non augue sagittis';
+const LOREM_CARD = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Curabitur ullamcorper nibh at diam bibendum facilisis a non';
+const LOREM_SHORT = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Curabitur ullamcorper';
+const LOREM_SHORT2 = LOREM_SHORT + ' nibh at diam bibendum';
+const LOREM_FAQ = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Curabitur ullamcorper nibh at diam bibendum facilisis a non augue. Vestibulum vel maximus arcu. Etiam ultricies est non augue sagittis viverra. ';
+
+// ------------------------------------------------------------- slide 1/15 ---
+/** Shared construction for the opening and closing "hero" slides. */
+function heroSlide(s, cfg) {
+  const t = cfg.t; // top-left of the big headline block
+  txt(s, cfg.line1, { x: t.x, y: t.y, w: cfg.w1, h: 1.851, fontSize: 104, fontFace: SANS_SB, color: MINT });
+  roundRect(s, { x: cfg.pill1.x, y: t.y + 1.917, w: cfg.pill1.w, h: 1.585, rectRadius: 0.793, fill: NOFILL, line: { color: MINT, width: 1 } });
+  roundRect(s, { x: cfg.pill2.x, y: t.y + 1.725, w: cfg.pill2.w, h: 1.948, rectRadius: 0.974, fill: NOFILL, line: { color: MINT, width: 1, transparency: 60 } });
+  txt(s, cfg.line2, { x: t.x + 0.01, y: t.y + 1.851, w: cfg.w2, h: 1.717, fontSize: 96, fontFace: SANS_SB });
+  dotGrid(s, cfg.dots.x, cfg.dots.y, 1.066, 0.925);
+  diamond(s, cfg.sq.x, cfg.sq.y, 0.352);
+  cursor(s, cfg.cur.x, cfg.cur.y, 0.547, 0.806);
+  arrow(s, cfg.arw.x, cfg.arw.y, 0.843, 1.086, cfg.arw.rot);
+  txt(s, '20', { x: cfg.yr.x, y: cfg.yr.y, w: 0.789, h: 0.707, fontSize: 36, fontFace: SANS_SB, color: MINT });
+  txt(s, '35', { x: cfg.yr.x + 0.014, y: cfg.yr.y + 0.479, w: 0.742, h: 0.707, fontSize: 36, fontFace: SANS_SB });
+}
+
+function slide1(s) {
+  glow(s, 8.882, -4.654);
+  glow(s, 1.76, 4.142);
+  heroSlide(s, {
+    t: { x: 3.194, y: 1.728 }, line1: 'PORTFOLIO', line2: '& RESUME', w1: 7.968, w2: 6.723,
+    pill1: { x: 2.747, w: 7.623 }, pill2: { x: 2.524, w: 8.085 },
+    dots: { x: 1.889, y: 2.123 }, sq: { x: 2.236, y: 2.41 }, cur: { x: 9.839, y: 4.998 },
+    arw: { x: 11.886, y: 5.834, rot: 0 }, yr: { x: 0.595, y: 5.764 },
+  });
+  txt(s, 'Showcasing Skills in Technology & Innovation', { x: 4.337, y: 5.593, w: 4.66, h: 0.37, fontSize: 16 });
+  navBar(s);
+}
+
+function slide15(s) {
+  rect(s, { x: 0, y: 0, w: 13.333, h: 7.5, fill: { color: NAVY } });
+  glow(s, 8.827, -4.666);
+  glow(s, -6.258, -1.505);
+  heroSlide(s, {
+    t: { x: 1.168, y: 3.209 }, line1: 'SEE YOU', line2: 'NEXT  TIME', w1: 6.087, w2: 7.414,
+    pill1: { x: 4.861, w: 4.068 }, pill2: { x: 0.739, w: 8.401 },
+    dots: { x: 7.359, y: 3.675 }, sq: { x: 7.706, y: 3.962 }, cur: { x: 8.671, y: 5.901 },
+    arw: { x: 9.633, y: 5.4, rot: 270 }, yr: { x: 11.776, y: 5.521 },
+  });
+  navBar(s);
+}
+
+// ---------------------------------------------------------------- slide 2 ---
+function slide2(s) {
+  glow(s, 3.408, -1.525);
+  dotGrid(s, 6.499, 1.101, 1.066, 0.925);
+  kicker(s, 'Hello, I’m', 0.908, 1.735);
+  txt(s, 'WILLIAM', { x: 0.907, y: 1.943, w: 3.117, h: 1.01, fontSize: 54 });
+  txt(s, 'ELLISON', { x: 2.025, y: 2.74, w: 3.14, h: 1.01, fontSize: 54, fontFace: SANS_SB, color: MINT });
+  arrow(s, 1.197, 2.873, 0.558, 0.719, 270);
+  body(s, LOREM_LONG, 0.951, 4.167, 4.249, 1.181);
+  // Two "toggle switch" rows: label, mint track, white knob.
+  [{ text: 'Problem Solving', y: 5.709, w: 1.853, tx: 2.953 },
+   { text: 'Technological Advancement', y: 6.125, w: 3.047, tx: 4.022 }].forEach((r) => {
+    txt(s, r.text, { x: 0.951, y: r.y, w: r.w, h: 0.37, fontSize: 16 });
+    roundRect(s, { x: r.tx, y: r.y + 0.023, w: 0.633, h: 0.301, rectRadius: 0.151, fill: { color: MINT } });
+    oval(s, { x: r.tx + 0.376, y: r.y + 0.07, w: 0.208, h: 0.208, fill: { color: WHITE } });
+  });
+  arrow(s, 10.803, 2.593, 0.249, 0.321, 270);
+  body(s, 'Passion for solving problems with technology', 10.684, 2.926, 1.969, 0.625);
+  txt(s, 'With 10+ Years Experience', { x: 10.674, y: 3.599, w: 1.974, h: 0.64, fontSize: 16, wrap: true });
+  navBar(s);
+}
+
+// ---------------------------------------------------------------- slide 3 ---
+function slide3(s) {
+  glow(s, -4.951, 3.656);
+  glow(s, 10.06, -2.836);
+  kicker(s, 'Introduction', 7.902, 1.693);
+  heading(s, 7.901, 1.943, 'Professional', 'Summary', { wTop: 2.853, wBot: 2.448, dx: 0.736, ax: 0.285 });
+  body(s, LOREM_LONG, 7.945, 3.323, 4.249, 1.181);
+  [{ text: 'Tech-driven Problem Solver', x: 8.382, y: 4.912, w: 3.27, tw: 2.958, solid: true, dy: 5.046 },
+   { text: 'Skilled In Modern Tools & Frameworks', x: 8.385, y: 5.566, w: 4.249, tw: 3.992, solid: false, dy: 5.72 },
+   { text: 'User-centered Solutions', x: 8.385, y: 6.211, w: 3.0, tw: 2.59, solid: false, dy: 6.363 }].forEach((c) => {
+    roundRect(s, { x: c.x, y: c.y, w: c.w, h: 0.41, rectRadius: 0.205, fill: c.solid ? { color: MINT } : TINT, line: c.solid ? null : { color: MINT, width: 0.5 } });
+    txt(s, c.text, { x: c.x + 0.184, y: c.y + 0.023, w: c.tw, h: 0.37, fontSize: 16, color: c.solid ? NAVY : WHITE });
+    diamond(s, 8.062, c.dy);
+  });
+  navBar(s);
+}
+
+// ---------------------------------------------------------------- slide 4 ---
+const EDU = [
+  { x: 0.752, tx: 0.673, cx: 2.119, degree: 'Bachelor Degree', uni: 'ABC University ', year: '(2012)', hi: false },
+  { x: 3.9, tx: 3.822, cx: 5.267, degree: 'Master Degree', uni: 'DEF University ', year: '(2016)', hi: false },
+  { x: 7.057, tx: 7.016, cx: 8.424, degree: 'Doctorate Degree', uni: 'GHI University ', year: '(2020)', hi: true },
+];
+
+function slide4(s) {
+  glow(s, 3.268, -5.67);
+  kicker(s, 'Information', 0.896, 1.335);
+  heading(s, 0.895, 1.585, 'Education', 'Journey', { wTop: 2.409, wBot: 1.997, dx: 3.015, dy: 0, ax: 2.563, ay: 0.146 });
+  line(s, { x: 0, y: 2.963, w: 9.292, h: 0, line: { color: MINT, width: 1, endArrowType: 'triangle' } });
+  EDU.forEach((c) => {
+    const fg = c.hi ? NAVY : WHITE;
+    roundRect(s, { x: c.x, y: 3.449, w: 2.763, h: 3.284, rectRadius: 0.239, fill: c.hi ? { color: MINT } : NOFILL, line: c.hi ? null : { color: MINT, width: 0.5 } });
+    diamond(s, c.cx, 2.911);
+    txt(s, c.degree, { x: c.tx, y: 3.849, w: 2.92, h: 0.37, fontSize: 16, align: 'center', color: c.hi ? NAVY : MINT, wrap: true });
+    chip(s, { text: 'Software Angineering', x: c.x + 0.369, y: 4.346, w: 2.025, on: c.hi ? 'mint' : 'navy' });
+    txt(s, [{ text: c.uni, options: { color: fg } }, { text: c.year, options: { color: c.hi ? NAVY : MINT } }],
+      { x: c.x - 0.078, y: 4.937, w: 2.92, h: 0.37, fontSize: 16, align: 'center', wrap: true });
+    body(s, LOREM_SHORT, c.x + 0.164, 5.307, 2.436, 0.903, { align: 'center', color: c.hi ? NAVY : GREY });
+  });
+  navBar(s);
+}
+
+// ---------------------------------------------------------------- slide 5 ---
+const JOBS = [
+  { y: 1.582, dy: 2.295, role: 'Backend Developer', roleW: 1.679, org: 'Lorem ABC Studio', when: '2016-2020', hi: true },
+  { y: 3.36, dy: 4.108, role: 'Frontend Developer', roleW: 1.679, org: 'EFGH Dev Company', when: '2011-2016', hi: false },
+  { y: 5.183, dy: 5.923, role: 'Intern', roleW: 0.853, org: 'HIJKLM Company', when: '2010-2011', hi: false },
+];
+
+function slide5(s) {
+  glow(s, -6.447, -0.332);
+  glow(s, 7.402, 3.95);
+  kicker(s, 'Experience', 0.742, 1.693);
+  heading(s, 0.742, 1.943, 'Real Work', 'Experience', { wTop: 2.413, wBot: 2.761, dx: 0.736, ax: 0.284 });
+  body(s, LOREM_MED, 0.786, 3.346, 3.736, 0.903);
+  txt(s, '10+ Years Experience', { x: 0.772, y: 4.778, w: 2.57, h: 0.404, fontSize: 18 });
+  body(s, LOREM_MED2, 0.75, 5.151, 3.317, 1.181);
+  line(s, { x: 5.176, y: 0, w: 0, h: 6.984, line: { color: MINT, width: 1, endArrowType: 'triangle' } });
+  JOBS.forEach((j) => {
+    const fg = j.hi ? NAVY : WHITE;
+    rect(s, { x: 5.124, y: j.dy, w: 0.104, h: 0.104, fill: { color: MINT }, rotate: 60 });
+    roundRect(s, { x: 5.616, y: j.y, w: 7.068, h: 1.514, rectRadius: 0.24, fill: j.hi ? { color: MINT } : NOFILL, line: j.hi ? null : { color: MINT, width: 0.75 } });
+    line(s, { x: 8.295, y: j.y, w: 0, h: 1.514, line: { color: j.hi ? NAVY : MINT, width: 1 } });
+    chip(s, { text: j.role, x: 5.814, y: j.y + 0.21, w: j.roleW, on: j.hi ? 'mint' : 'navy' });
+    txt(s, j.org, { x: 5.867, y: j.y + 0.652, w: 2.92, h: 0.37, fontSize: 16, color: fg, wrap: true });
+    txt(s, j.when, { x: 5.904, y: j.y + 0.942, w: 1.498, h: 0.348, fontSize: 11, fontFace: BODY, color: j.hi ? NAVY : MINT, lineSpacingMultiple: 1.5, wrap: true });
+    body(s, LOREM_CARD, 8.569, j.y + 0.387, 3.9, 0.903, { color: j.hi ? NAVY : GREY });
+  });
+  navBar(s);
+}
+
+// ---------------------------------------------------------------- slide 6 ---
+function slide6(s) {
+  glow(s, -1.092, 3.977);
+  glow(s, -3.804, -6.345);
+  kicker(s, 'Experience', 0.674, 5.328);
+  heading(s, 0.673, 5.578, 'Study Case', 'Highlight', { wTop: 2.781, wBot: 2.213, dx: 0.736, ax: 0.285 });
+  body(s, LOREM_LONG, 4.165, 5.784, 5.383, 0.903);
+  roundRect(s, { x: 9.764, y: 3.977, w: 2.593, h: 2.755, rectRadius: 0.224, fill: { color: NAVY }, line: { color: MINT, width: 0.5 } });
+  chip(s, { text: '2032', x: 11.301, y: 4.218, w: 0.877, on: 'navy' });
+  txt(s, 'Technology Advancement', { x: 9.988, y: 4.922, w: 2.701, h: 0.64, fontSize: 16, wrap: true });
+  body(s, LOREM_SHORT, 9.988, 5.534, 2.436, 0.903);
+  navBar(s);
+}
+
+// ---------------------------------------------------------------- slide 7 ---
+const CORE = [
+  { y: 1.663, tag: 'Backend Developer', tagW: 1.679, title: 'Programming / Development', titleW: 3.417, hi: true },
+  { y: 3.205, tag: 'Frontend Developer', tagW: 1.679, title: 'UI/UX Design Principles', titleW: 2.92, hi: false },
+  { y: 4.727, tag: 'Web Developer', tagW: 1.528, title: 'Cloud & Hosting Knowledge', titleW: 2.92, hi: false },
+];
+
+function slide7(s) {
+  kicker(s, 'Skills', 3.217, 1.586, { align: 'right' });
+  txt(s, 'Core', { x: 5.274, y: 1.418, w: 1.305, h: 0.707, fontSize: 36 });
+  arrow(s, 6.709, 1.559, 0.33, 0.425, 270);
+  txt(s, 'Skills', { x: 7.16, y: 1.418, w: 1.338, h: 0.707, fontSize: 36, fontFace: SANS_SB, color: MINT });
+  CORE.forEach((c) => {
+    const fg = c.hi ? NAVY : WHITE;
+    roundRect(s, { x: 9.08, y: c.y, w: 3.608, h: 1.199, rectRadius: 0.19, fill: c.hi ? { color: MINT } : NOFILL, line: c.hi ? null : { color: MINT, width: 0.75 } });
+    chip(s, { text: c.tag, x: 9.277, y: c.y + 0.21, w: c.tagW, on: c.hi ? 'mint' : 'navy' });
+    txt(s, c.title, { x: 9.331, y: c.y + 0.652, w: c.titleW, h: 0.37, fontSize: 16, color: fg, wrap: true });
+    chevron(s, 12.196, c.y + 0.328, 0.111, fg);
+  });
+  line(s, { x: 9.199, y: 6.556, w: 3.489, h: 0, line: { color: MINT, width: 1, endArrowType: 'triangle' } });
+  navBar(s);
+}
+
+// ---------------------------------------------------------------- slide 8 ---
+function slide8(s) {
+  glow(s, 4.01, -6.948);
+  glow(s, -3.988, 4.596);
+  // Wide panel: rounded on the left, running off the right edge of the slide.
+  shape(s, 3.741, 1.354, 9.697, 5.459, [
+    [0.049, 0.0, 'm'], [1.0, 0.0], [1.0, 1.0], [0.049, 1.0],
+    [0.0, 0.914, 0.022, 1.0, 0.0, 0.961], [0.0, 0.086], [0.049, 0.0, 0.0, 0.039, 0.022, 0.0], 'z',
+  ], { fill: NOFILL, line: { color: MINT, width: 0.5 } });
+  kicker(s, 'Skills', 0.742, 1.693);
+  heading(s, 0.742, 1.943, 'Technical', 'Skills', { wTop: 2.342, wBot: 1.338, dx: 0.736, ax: 0.284 });
+  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Curabitur ullamcorper nibh at diam bibendum facilisis a', 0.754, 4.006, 2.33, 1.181);
+  body(s, 'non augue. Vestibulum vel maximus arcu. Etiam ultricies est', 0.754, 5.505, 1.962, 0.903);
+  [{ text: 'Frontend Development', x: 4.583, w: 2.876, tw: 2.49, solid: false },
+   { text: 'Backend', x: 7.627, w: 1.403, tw: 1.061, solid: true },
+   { text: 'APIs & Integrations', x: 9.214, w: 2.277, tw: 2.062, solid: false }].forEach((t) => {
+    roundRect(s, { x: t.x, y: 6.033, w: t.w, h: 0.41, rectRadius: 0.205, fill: t.solid ? { color: MINT } : TINT, line: t.solid ? null : { color: MINT, width: 0.5 } });
+    txt(s, t.text, { x: t.x + 0.184, y: 6.057, w: t.tw, h: 0.37, fontSize: 16, color: t.solid ? NAVY : WHITE });
+  });
+  diamond(s, 4.26, 6.187);
+  navBar(s);
+}
+
+// ---------------------------------------------------------------- slide 9 ---
+const PROJ_TAGS = [
+  { text: 'Micro Services', dx: 0.152, y: 5.587, w: 1.424 },
+  { text: 'React', dx: 1.732, y: 5.587, w: 0.865 },
+  { text: 'Embedded Systems', dx: 0.152, y: 6.142, w: 1.802 },
+];
+
+function slide9(s) {
+  glow(s, 5.091, -6.179);
+  glow(s, -4.347, 4.745);
+  roundRect(s, { x: 0.637, y: 1.299, w: 3.445, h: 5.548, rectRadius: 0.298, fill: { color: MINT } });
+  roundRect(s, { x: 4.486, y: 1.299, w: 3.445, h: 5.548, rectRadius: 0.298, fill: NOFILL, line: { color: MINT, width: 0.5 } });
+  [{ x: 0.887, hi: true }, { x: 4.748, hi: false }].forEach((c) => {
+    if (c.hi) {
+      txt(s, 'Project ABC Front End Development (2026)', { x: c.x, y: 3.851, w: 2.92, h: 0.64, fontSize: 16, color: NAVY, wrap: true });
+    } else {
+      txt(s, [{ text: 'Project ABC Front End Development ' }, { text: '(2026)', options: { color: MINT } }],
+        { x: c.x, y: 3.851, w: 2.92, h: 0.64, fontSize: 16, wrap: true });
+    }
+    body(s, LOREM_CARD, c.x, 4.477, 3.033, 0.903, { color: c.hi ? NAVY : GREY });
+    PROJ_TAGS.forEach((t) => chip(s, { text: t.text, x: c.x + t.dx, y: t.y, w: t.w, on: c.hi ? 'mint' : 'navy' }));
+  });
+  kicker(s, 'Portfolio', 8.452, 1.693);
+  heading(s, 8.451, 1.943, 'Project', 'Highlight', { wTop: 1.755, wBot: 2.213, dx: 0.736, ax: 0.285 });
+  body(s, LOREM_LONG, 8.495, 3.323, 4.097, 1.181);
+  txt(s, '2100+', { x: 8.451, y: 4.879, w: 1.357, h: 0.64, fontSize: 32, color: MINT });
+  txt(s, 'Completed Projects', { x: 9.798, y: 4.879, w: 1.82, h: 0.64, fontSize: 16, wrap: true });
+  body(s, LOREM_SHORT2, 8.464, 5.587, 4.097, 0.625);
+  navBar(s);
+}
+
+// --------------------------------------------------------------- slide 10 ---
+function slide10(s) {
+  glow(s, -4.065, -5.865);
+  glow(s, 0.979, 3.94);
+  kicker(s, 'Portfolio', 0.742, 1.693);
+  heading(s, 0.742, 1.943, 'Personal Portfolio', 'Projects', { wTop: 4.036, wBot: 2.006, dx: 0.736, ax: 0.284 });
+  body(s, LOREM_LONG, 0.785, 4.109, 4.249, 1.181);
+  txt(s, '230+ Clients', { x: 0.776, y: 5.518, w: 2.628, h: 0.64, fontSize: 32, color: MINT });
+  txt(s, 'Certified Freelancer', { x: 0.782, y: 6.061, w: 2.165, h: 0.37, fontSize: 16 });
+  // Mint "scroll down" tab on the right edge.
+  roundRect(s, { x: 11.814, y: 1.117, w: 0.889, h: 2.172, rectRadius: 0.157, fill: { color: MINT } });
+  line(s, { x: 12.244, y: 1.435, w: 0, h: 1.5, line: { color: NAVY, width: 1, endArrowType: 'triangle' } });
+  navBar(s);
+}
+
+// --------------------------------------------------------------- slide 11 ---
+function slide11(s) {
+  glow(s, -5.675, -2.344);
+  glow(s, 8.315, 3.025);
+  [{ y: 1.306, hi: true }, { y: 4.199, hi: false }].forEach((c) => {
+    roundRect(s, { x: 0.645, y: c.y, w: 6.669, h: 2.637, rectRadius: 0.405, fill: c.hi ? { color: MINT } : NOFILL, line: c.hi ? null : { color: MINT, width: 0.5 } });
+    chevron(s, 6.827, c.y + 0.332, 0.111, c.hi ? NAVY : MINT);
+  });
+  txt(s, '2035', { x: 5.531, y: 2.133, w: 0.719, h: 0.348, fontSize: 11, fontFace: BODY, color: NAVY, lineSpacingMultiple: 1.5, wrap: true });
+  txt(s, [{ text: '1' }, { text: 'st', options: { superscript: true } }, { text: ' Place Awardee on System Development' }],
+    { x: 5.531, y: 2.436, w: 1.665, h: 1.178, fontSize: 16, color: NAVY, wrap: true });
+  txt(s, '2034', { x: 5.531, y: 5.343, w: 0.822, h: 0.348, fontSize: 11, fontFace: BODY, color: MINT, lineSpacingMultiple: 1.5, wrap: true });
+  txt(s, 'Certified Web Developer by ABC', { x: 5.531, y: 5.646, w: 1.903, h: 0.909, fontSize: 16, wrap: true });
+  kicker(s, 'Portfolio', 8.396, 1.766);
+  heading(s, 8.396, 2.016, 'Awards &', 'Achievement', { wTop: 2.427, wBot: 3.244, dx: 0.735, ax: 0.284 });
+  body(s, LOREM_LONG, 8.439, 3.396, 4.249, 1.181);
+  [{ n: '27+', label: 'Competition Awardee', y: 4.966, nw: 0.945, lw: 1.82 },
+   { n: '78%', label: 'Winning Rate Among Professionals', y: 5.674, nw: 0.966, lw: 2.583 }].forEach((r) => {
+    txt(s, r.n, { x: 8.401, y: r.y, w: r.nw, h: 0.64, fontSize: 32, color: MINT });
+    txt(s, r.label, { x: 9.46, y: r.y - 0.015, w: r.lw, h: 0.64, fontSize: 16, wrap: true });
+  });
+  navBar(s);
+}
+
+// --------------------------------------------------------------- slide 12 ---
+function slide12(s) {
+  glow(s, 7.95, 2.124);
+  glow(s, -5.848, 1.203);
+  kicker(s, 'Hobby/Interest', 0.908, 1.693);
+  heading(s, 0.907, 1.943, 'Other', 'Interest', { wTop: 1.497, wBot: 1.937, dx: 0.736, ax: 0.285 });
+  body(s, LOREM_MED3, 0.951, 3.323, 3.973, 1.181);
+  [{ text: 'Personal Website Creation', y: 4.924, w: 3.154, tw: 2.798, solid: true },
+   { text: '3d Design & Rendering', y: 5.527, w: 2.772, tw: 2.441, solid: false },
+   { text: 'Technical Engineering', y: 6.139, w: 2.772, tw: 2.367, solid: false }].forEach((it) => {
+    roundRect(s, { x: 1.443, y: it.y, w: it.w, h: 0.41, rectRadius: 0.205, fill: it.solid ? { color: MINT } : TINT, line: it.solid ? null : { color: MINT, width: 0.5 } });
+    txt(s, it.text, { x: 1.628, y: it.y + 0.015, w: it.tw, h: 0.37, fontSize: 16, color: it.solid ? NAVY : WHITE });
+    diamond(s, 1.121, it.y + 0.145);
+  });
+  navBar(s);
+}
+
+// --------------------------------------------------------------- slide 13 ---
+function slide13(s) {
+  glow(s, 1.282, -5.795);
+  glow(s, -5.347, 3.912);
+  kicker(s, 'Q&A', 0.908, 1.525);
+  heading(s, 0.907, 1.775, 'Frequent ', 'Questions', { wTop: 2.318, wBot: 2.439, dx: 0.736, ax: 0.285 });
+  roundRect(s, { x: 0.951, y: 3.384, w: 2.25, h: 0.356, rectRadius: 0.178, fill: TINT, line: { color: MINT, width: 0.5 } });
+  txt(s, 'www:\\\\yourbrand.com', { x: 1.292, y: 3.423, w: 2.065, h: 0.286, fontSize: 11, fontFace: BODY, wrap: true });
+  diamond(s, 1.126, 3.51);
+  body(s, LOREM_LONG, 0.951, 3.912, 4.249, 1.181);
+  body(s, LOREM_SHORT2, 0.951, 5.351, 4.249, 0.625);
+  // FAQ card 1 (highlighted).
+  roundRect(s, { x: 6.225, y: 1.417, w: 6.615, h: 1.514, rectRadius: 0.24, fill: { color: MINT } });
+  chip(s, { text: 'Question 1', x: 6.422, y: 1.628, w: 1.301, on: 'mint' });
+  txt(s, 'Am I still Available for Freelance Job?', { x: 6.475, y: 2.069, w: 2.92, h: 0.64, fontSize: 16, color: NAVY, wrap: true });
+  body(s, LOREM_CARD, 8.94, 1.783, 3.9, 0.903, { color: NAVY });
+  // FAQ card 2 (outlined).
+  roundRect(s, { x: 6.225, y: 3.187, w: 6.615, h: 2.222, rectRadius: 0.253, fill: NOFILL, line: { color: MINT, width: 0.75 } });
+  chip(s, { text: 'Question 1', x: 6.422, y: 3.398, w: 1.301, on: 'navy' });
+  txt(s, 'How to Contact William Ellison for Work?', { x: 6.475, y: 3.912, w: 2.325, h: 0.909, fontSize: 16, wrap: true });
+  body(s, LOREM_FAQ, 8.94, 3.798, 3.9, 1.181);
+  chevron(s, 9.09, 3.502, 0.166, MINT);
+  // Footer bar with the closing note.
+  roundRect(s, { x: 6.225, y: 5.703, w: 6.615, h: 0.602, rectRadius: 0.301, fill: NOFILL, line: { color: MINT, width: 0.75 } });
+  txt(s, 'For more information, please visit my websites', { x: 6.475, y: 5.819, w: 5.673, h: 0.37, fontSize: 16, italic: true, color: GREY, wrap: true });
+  chevron(s, 12.329, 5.883, 0.166, MINT);
+  line(s, { x: 0.8, y: 6.669, w: 11.994, h: 0, line: { color: MINT, width: 1, endArrowType: 'triangle' } });
+  navBar(s);
+}
+
+// --------------------------------------------------------------- slide 14 ---
+function slide14(s) {
+  glow(s, -4.102, -5.51);
+  glow(s, 8.832, 3.911);
+  kicker(s, 'Contact Information', 8.772, 1.693, { w: 2.719 });
+  heading(s, 8.772, 1.943, 'Let’s Collaborate', 'Together', { wTop: 3.964, wBot: 2.316, dx: 0.735, ax: 0.284 });
+  // Phone block.
+  roundRect(s, { x: 8.805, y: 3.566, w: 1.075, h: 0.356, rectRadius: 0.178, fill: TINT, line: { color: MINT, width: 0.5 } });
+  txt(s, 'Phone', { x: 8.967, y: 3.582, w: 1.755, h: 0.337, fontSize: 14, wrap: true });
+  phoneIcon(s, 9.076, 4.089, 0.239, 0.237);
+  txt(s, 'Customer Support', { x: 9.468, y: 4.055, w: 2.065, h: 0.278, fontSize: 10.5, fontFace: BODY, wrap: true });
+  txt(s, '+1 555-123-4567', { x: 10.881, y: 4.037, w: 1.656, h: 0.303, fontSize: 12, fontFace: BODY, color: GREY, wrap: true });
+  mailIcon(s, 9.071, 4.509, 0.248, 0.153);
+  txt(s, 'Company Email', { x: 9.468, y: 4.454, w: 2.241, h: 0.278, fontSize: 10.5, fontFace: BODY, wrap: true });
+  txt(s, 'name@company.mail', { x: 10.728, y: 4.423, w: 2.694, h: 0.303, fontSize: 12, fontFace: BODY, color: GREY, wrap: true });
+  // Address block.
+  roundRect(s, { x: 8.805, y: 5.08, w: 1.202, h: 0.356, rectRadius: 0.178, fill: TINT, line: { color: MINT, width: 0.5 } });
+  txt(s, 'Address', { x: 8.926, y: 5.083, w: 1.755, h: 0.337, fontSize: 14, wrap: true });
+  pinIcon(s, 9.071, 5.614, 0.243, 0.343);
+  txt(s, '123 Street Name, Anywhere 400, Any City, State 12345', { x: 9.333, y: 5.575, w: 2.694, h: 0.471, fontSize: 11, fontFace: BODY, color: GREY, wrap: true });
+  // Footer strip.
+  roundRect(s, { x: 0.527, y: 6.491, w: 5.401, h: 0.356, rectRadius: 0.178, fill: NOFILL, line: { color: MINT, width: 0.5 } });
+  txt(s, 'For further information, you can also visit my website page!', { x: 1.088, y: 6.524, w: 4.916, h: 0.286, fontSize: 11, fontFace: BODY, wrap: true });
+  roundRect(s, { x: 6.084, y: 6.491, w: 2.25, h: 0.356, rectRadius: 0.178, fill: TINT, line: { color: MINT, width: 0.5 } });
+  txt(s, 'www:\\\\yourbrand.com', { x: 6.426, y: 6.53, w: 2.065, h: 0.286, fontSize: 11, fontFace: BODY, wrap: true });
+  diamond(s, 6.26, 6.617);
+  line(s, { x: 8.334, y: 6.669, w: 4.46, h: 0, line: { color: MINT, width: 1, endArrowType: 'triangle' } });
+  navBar(s);
+}
+
+// ------------------------------------------------------------------- main ---
+const BUILDERS = [slide1, slide2, slide3, slide4, slide5, slide6, slide7, slide8, slide9, slide10, slide11, slide12, slide13, slide14, slide15];
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'WIDE', width: 13.333, height: 7.5 });
+  pptx.layout = 'WIDE';
+  pptx.theme = { headFontFace: SANS, bodyFontFace: SANS };
+  BUILDERS.forEach((fn) => {
+    const s = pptx.addSlide();
+    s.background = { color: NAVY };
+    fn(s);
+  });
+  return pptx.writeFile({ fileName: path.join(__dirname, '0b8a8c07-546c-4bca-85da-30ea1ac2248b_grok_final.pptx') });
+}
+
+build().then((f) => console.log('wrote', f));
