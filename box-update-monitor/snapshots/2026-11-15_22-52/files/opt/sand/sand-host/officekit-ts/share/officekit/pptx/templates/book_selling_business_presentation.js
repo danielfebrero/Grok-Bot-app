@@ -1,0 +1,1173 @@
+/**
+ * "Book Selling" business presentation template -- rebuilt with pptxgenjs.
+ *
+ * Run:  node 14691ea0-b803-449e-84c1-92c403430714_grok_final.js
+ * Out:  14691ea0-b803-449e-84c1-92c403430714_grok_final.pptx (next to this file)
+ *
+ * Photographs in the original deck are replaced by flat placeholder rectangles.
+ */
+
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ theme */
+
+const SLIDE_W = 13.333;
+const SLIDE_H = 7.5;
+
+const BG = '181717'; // master background: bg2 @ lumMod 10%
+const WHITE = 'FFFFFF';
+const TEAL = '10A19D'; // accent1
+const PURPLE = '540375'; // accent2
+const GREY85 = 'D9D9D9'; // white lumMod 85%
+const GREY95 = 'F2F2F2'; // white lumMod 95%
+const INK = '404040'; // black lumMod 75%
+const FONT = 'Mulish'; // major + minor latin typeface
+const PLACEHOLDER = '2E2C2C'; // flat fill standing in for photos
+
+// Every gradient in the deck runs accent2 -> accent1 along a 135 deg axis.
+const GRAD_FROM = PURPLE;
+const GRAD_TO = TEAL;
+
+/* ---------------------------------------------------------------- helpers */
+
+const rgb = (h) => [0, 2, 4].map((i) => parseInt(h.substr(i, 2), 16));
+const GF = rgb(GRAD_FROM);
+const GT = rgb(GRAD_TO);
+
+/** Colour at position `t` (0 = accent2 end, 1 = accent1 end) of the deck ramp. */
+function ramp(t) {
+  const u = Math.max(0, Math.min(1, t));
+  return GF.map((v, i) => Math.round(v + (GT[i] - v) * u))
+    .map((v) => v.toString(16).padStart(2, '0').toUpperCase())
+    .join('');
+}
+
+/** Mid-tone of the ramp: chart bars and glyphs that are too small to band. */
+const RAMP_MID = ramp(0.5);
+/** Average of a gradient-filled chart bar -- pptxgenjs series take one colour. */
+const BAR_TONE = '37548B';
+
+/**
+ * The deck's signature 135-degree gradient, rendered as a fan of flat bands.
+ * `poly` is the outline to fill (see rrPoly / ovalPoly); each band is the slice
+ * of that outline between two cuts perpendicular to the gradient axis, so the
+ * silhouette -- rounded corners included -- stays exact.
+ *
+ *   dir 'tr' (default) purple top-right, teal bottom-left  (most of the deck)
+ *       'tl'           purple top-left,  teal bottom-right
+ *       'br'           purple bottom-right, teal top-left
+ *       'bl'           purple bottom-left,  teal top-right
+ */
+const DIAG = Math.SQRT1_2;
+const GRAD_AXIS = {
+  tr: [-DIAG, DIAG], tl: [DIAG, DIAG], br: [-DIAG, -DIAG], bl: [DIAG, -DIAG],
+};
+
+function gradFill(slide, poly, opt) {
+  const o = opt || {};
+  const axis = GRAD_AXIS[o.dir || 'tr'];
+  const proj = (p) => p[0] * axis[0] + p[1] * axis[1];
+  const ds = poly.map(proj);
+  const lo = Math.min.apply(null, ds);
+  const span = Math.max.apply(null, ds) - lo;
+  const bands = Math.max(6, Math.min(64, Math.round(span / (o.step || 0.13))));
+
+  for (let i = 0; i < bands; i++) {
+    // 0.001" of overlap between neighbouring bands hides hairline seams.
+    let slice = halfPlane(poly, axis, lo + (span * (i + 1)) / bands + 0.001, true);
+    slice = halfPlane(slice, axis, lo + (span * i) / bands - 0.001, false);
+    if (slice.length < 3) continue;
+    const xs = slice.map((p) => p[0]);
+    const ys = slice.map((p) => p[1]);
+    const x0 = Math.min.apply(null, xs);
+    const y0 = Math.min.apply(null, ys);
+    slide.addShape('custGeom', {
+      x: x0, y: y0,
+      w: Math.max(Math.max.apply(null, xs) - x0, 0.001),
+      h: Math.max(Math.max.apply(null, ys) - y0, 0.001),
+      points: slice
+        .map((p) => ({ x: +(p[0] - x0).toFixed(4), y: +(p[1] - y0).toFixed(4) }))
+        .concat([{ close: true }]),
+      fill: { color: ramp((i + 0.5) / bands) }, line: { type: 'none' },
+    });
+  }
+}
+
+/** Sutherland-Hodgman clip of `poly` against the line `p . axis = limit`. */
+function halfPlane(poly, axis, limit, keepBelow) {
+  const proj = (p) => p[0] * axis[0] + p[1] * axis[1];
+  const inside = (p) => (keepBelow ? proj(p) <= limit : proj(p) >= limit);
+  const out = [];
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i];
+    const b = poly[(i + 1) % poly.length];
+    if (inside(a)) out.push(a);
+    if (inside(a) !== inside(b)) {
+      const t = (limit - proj(a)) / (proj(b) - proj(a));
+      out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
+    }
+  }
+  return out;
+}
+
+const ARC_SEGMENTS = 8;
+/** Rounded-rectangle outline. `square` names corners that keep a sharp angle. */
+function rrPoly(x, y, w, h, r, square) {
+  const sharp = square || [];
+  const arcs = [
+    ['tl', x + r, y + r, 180, 270], ['tr', x + w - r, y + r, 270, 360],
+    ['br', x + w - r, y + h - r, 0, 90], ['bl', x + r, y + h - r, 90, 180],
+  ];
+  const pts = [];
+  arcs.forEach((arc) => {
+    const name = arc[0];
+    if (sharp.indexOf(name) >= 0) {
+      pts.push([name[1] === 'l' ? x : x + w, name[0] === 't' ? y : y + h]);
+      return;
+    }
+    for (let i = 0; i <= ARC_SEGMENTS; i++) {
+      const a = ((arc[3] + ((arc[4] - arc[3]) * i) / ARC_SEGMENTS) * Math.PI) / 180;
+      pts.push([arc[1] + r * Math.cos(a), arc[2] + r * Math.sin(a)]);
+    }
+  });
+  return pts;
+}
+
+/** Ellipse outline. */
+function ovalPoly(x, y, w, h) {
+  const pts = [];
+  for (let i = 0; i < 44; i++) {
+    const a = (i / 44) * 2 * Math.PI;
+    pts.push([x + (w / 2) * (1 + Math.cos(a)), y + (h / 2) * (1 + Math.sin(a))]);
+  }
+  return pts;
+}
+
+/** Plain rectangular gradient. */
+function gradient(slide, x, y, w, h, opt) {
+  gradFill(slide, rrPoly(x, y, w, h, 0, ['tl', 'tr', 'br', 'bl']), opt);
+}
+
+/** Gradient panel; `corners` names the corners that stay square. */
+function gradPanel(slide, x, y, w, h, r, opt) {
+  const o = opt || {};
+  const poly = o.ellipse ? ovalPoly(x, y, w, h) : rrPoly(x, y, w, h, r, o.corners);
+  gradFill(slide, poly, o);
+}
+
+/** Full-bleed gradient slide background (slides 7, 12, 23). */
+function gradBackground(slide) {
+  gradient(slide, 0, 0, SLIDE_W, SLIDE_H, { step: 0.34 });
+}
+
+/** Solid stand-in for a photo/illustration from the original deck. */
+function photo(slide, x, y, w, h, opt) {
+  const o = opt || {};
+  slide.addShape(o.ellipse ? 'ellipse' : 'roundRect', {
+    x, y, w, h, rectRadius: o.r === undefined ? 0.02 : o.r,
+    fill: { color: o.color || PLACEHOLDER }, line: { type: 'none' },
+  });
+  slide.addText('[image]', {
+    x, y: y + h / 2 - 0.2, w, h: 0.4, align: 'center', valign: 'middle',
+    fontFace: FONT, fontSize: 11, color: '6E6E6E',
+  });
+}
+
+/** Text box. `t` may be a string or an array of run objects. */
+function text(slide, t, o) {
+  slide.addText(t, Object.assign({ fontFace: FONT, color: WHITE, valign: 'top' }, o));
+}
+
+/** Title made of a white part followed by a teal part. */
+function splitTitle(slide, white, teal, o) {
+  const runs = [{ text: white, options: { color: WHITE } }];
+  if (teal) runs.push({ text: teal, options: { color: TEAL } });
+  text(slide, runs, Object.assign({ bold: true, fontSize: 48, charSpacing: -1.5, lineSpacing: 55 }, o));
+}
+
+/** Body copy: 12 pt white, 150 % leading, matching the "Google Shape" boxes. */
+function body(slide, t, o) {
+  text(slide, t, Object.assign({ fontSize: 12, lineSpacingMultiple: 1.5 }, o));
+}
+
+/** Small "View More" / "Buy Now" pill with a divider and an arrow. */
+function pillButton(slide, x, y, label, opt) {
+  const o = opt || {};
+  const w = 1.267;
+  const h = 0.303;
+  const fg = o.fg || WHITE;
+  if (o.solid) {
+    slide.addShape('roundRect', {
+      x, y, w, h, rectRadius: 0.05, fill: { color: o.solid }, line: { type: 'none' },
+    });
+  } else {
+    gradPanel(slide, x, y, w, h, 0.05);
+  }
+  text(slide, label, {
+    x: x + 0.034, y, w: 0.778, h, fontSize: 8, valign: 'middle', color: o.fg || WHITE,
+  });
+  slide.addShape('line', { x: x + 0.814, y, w: 0, h, line: { color: o.divider || fg, width: 0.75 } });
+  slide.addShape('line', {
+    x: x + 0.918, y: y + h / 2, w: 0.244, h: 0,
+    line: { color: fg, width: 1, endArrowType: 'triangle' },
+  });
+}
+
+/** Tick mark drawn from two strokes (the deck uses a check icon everywhere). */
+function checkMark(slide, x, y, size, color, weight) {
+  const w = weight || 1.75;
+  slide.addShape('line', {
+    x, y: y + size * 0.45, w: size * 0.34, h: size * 0.36,
+    line: { color, width: w },
+  });
+  slide.addShape('line', {
+    x: x + size * 0.34, y: y + size * 0.12, w: size * 0.62, h: size * 0.69,
+    line: { color, width: w }, flipV: true,
+  });
+}
+
+/** White rounded tile with a gradient tick inside (slides 9, 11, 22). */
+function checkTile(slide, x, y, s, opt) {
+  const o = opt || {};
+  if (o.white) {
+    slide.addShape('roundRect', {
+      x, y, w: s, h: s, rectRadius: s * 0.18, fill: { color: WHITE }, line: { type: 'none' },
+    });
+    checkMark(slide, x + s * 0.22, y + s * 0.26, s * 0.55, PURPLE, 2);
+  } else {
+    gradPanel(slide, x, y, s, s, s * 0.18);
+    checkMark(slide, x + s * 0.22, y + s * 0.26, s * 0.55, WHITE, 2);
+  }
+}
+
+/** Round or rounded-square icon badge standing in for the deck's SVG glyphs. */
+function iconBadge(slide, x, y, s, opt) {
+  const o = opt || {};
+  const shape = o.circle ? 'ellipse' : 'roundRect';
+  if (o.invert) {
+    gradPanel(slide, x, y, s, s, s / 2, { ellipse: o.circle });
+  } else {
+    slide.addShape(shape, {
+      x, y, w: s, h: s, rectRadius: s * 0.16,
+      fill: { color: WHITE }, line: { type: 'none' },
+    });
+  }
+  const g = s * 0.46;
+  const gx = x + (s - g) / 2;
+  const gy = y + (s - g) / 2;
+  const fill = o.invert ? WHITE : RAMP_MID;
+  // A tiny abstract mark: three stacked bars ~ the "stack of books" family of icons.
+  for (let i = 0; i < 3; i++) {
+    slide.addShape('roundRect', {
+      x: gx + i * g * 0.06, y: gy + i * g * 0.32, w: g - i * g * 0.12, h: g * 0.22,
+      rectRadius: g * 0.05, fill: { color: fill }, line: { type: 'none' },
+    });
+  }
+}
+
+/* ------------------------------------------------------------------ deck  */
+
+const pptx = new PptxGenJS();
+pptx.title = 'BOOK SELLING - Business Presentation Template';
+pptx.layout = 'LAYOUT_16x9';
+pptx.defineLayout({ name: 'CUSTOM', width: SLIDE_W, height: SLIDE_H });
+pptx.layout = 'CUSTOM';
+pptx.theme = { headFontFace: FONT, bodyFontFace: FONT };
+
+let slideNo = 0;
+function newSlide(opt) {
+  const o = opt || {};
+  const s = pptx.addSlide();
+  s.background = { color: BG };
+  slideNo += 1;
+  if (o.gradient) gradBackground(s);
+  // Master carries a bold white slide number in the top-right corner.
+  s.addText(String(slideNo), {
+    x: 12.828, y: 0.251, w: 0.451, h: 0.269, align: 'center', valign: 'middle',
+    fontFace: FONT, fontSize: 10, bold: true, charSpacing: 2, color: WHITE,
+  });
+  return s;
+}
+
+const LOREM = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, ';
+const LOREM_LONG = LOREM + 'quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.\u00a0';
+const CARD_BODY = 'Lorem ipsum dolor sit amet, consectetur adi\npiscing elit. Sed';
+const PROJECT_BODY =
+  'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin bibendum risus sit amet venenatis tristique. ' +
+  'Morbi tortor justo, porta eget consequat ac, semper sit amet sem. Proin porta odio arcu, sit amet finibus urna ';
+
+/* --------------------------------------------------------------- slide 1  */
+// Cover: gradient panel on the left, photo placeholder on the right.
+function slide1() {
+  const s = newSlide();
+  gradPanel(s, 0.738, 0.938, 5.929, 5.625, 0.31, { dir: 'tl', corners: ['tr', 'br'] });
+  text(s, 'BOOK SELLING', {
+    x: 1.025, y: 1.49, w: 5.354, h: 2.794, fontSize: 80, bold: true, lineSpacing: 92,
+  });
+  text(s, 'Business Presentation Template', { x: 1.025, y: 4.247, w: 3.922, h: 0.404, fontSize: 18 });
+  body(s, LOREM_LONG, { x: 1.025, y: 4.697, w: 5.206, h: 1.313 });
+}
+
+/* --------------------------------------------------------------- slide 2  */
+// Wide gradient card with the headline over two photo placeholders.
+function slide2() {
+  const s = newSlide();
+  gradPanel(s, 0.978, 2.031, 10.137, 4.719, 0.29);
+  text(s, 'DISCOVER YOUR NEXT GREAT READ', {
+    x: 1.956, y: 2.551, w: 5.267, h: 2.322, fontSize: 44, bold: true, charSpacing: -1.5, lineSpacing: 51,
+  });
+  body(s, 'Your text description here', { x: 1.956, y: 4.874, w: 2.945, h: 0.454, fontSize: 14, bold: true });
+  body(s, LOREM, { x: 1.956, y: 5.22, w: 4.71, h: 1.01 });
+}
+
+/* --------------------------------------------------------------- slide 3  */
+// Split layout: copy + two stats on the left, two icon cards on the right.
+function slide3() {
+  const s = newSlide();
+  splitTitle(s, 'STRATEGIES FOR EFFECTIVE ', 'BOOK SELLING', {
+    x: 0.939, y: 0.75, w: 5.299, h: 2.524,
+  });
+  body(s, LOREM + 'quis nostrud exercitation ullamco', { x: 0.939, y: 3.304, w: 5.028, h: 1.01 });
+
+  [
+    { y: 0.499, title: 'Engaging Readers' },
+    { y: 3.819, title: 'Boosting Sales' },
+  ].forEach((card) => {
+    gradPanel(s, 7.688, card.y, 2.418, 3.181, 0.27);
+    iconBadge(s, 8.006, card.y + 0.374, 0.634, { circle: true });
+    text(s, card.title, {
+      x: 7.909, y: card.y + 1.138, w: 1.895, h: 0.64, fontSize: 16, bold: true, lineSpacing: 19,
+    });
+    text(s, CARD_BODY, {
+      x: 7.909, y: card.y + 1.907, w: 2.198, h: 0.87, fontSize: 12, lineSpacingMultiple: 1.3,
+    });
+  });
+
+  [
+    { x: 0.939, value: '65%', label: 'Opportunities' },
+    { x: 3.1, value: '85%', label: 'Sales Success' },
+  ].forEach((stat) => {
+    text(s, stat.value, {
+      x: stat.x, y: 4.707, w: 1.326, h: 0.64, fontSize: 32, bold: true, color: TEAL,
+    });
+    text(s, stat.label, { x: stat.x, y: 5.303, w: 1.675, h: 0.37, fontSize: 16, bold: true });
+  });
+}
+
+/* --------------------------------------------------------------- slide 4  */
+// Left column of copy plus a highlight pill; tall gradient panel on the right.
+function slide4() {
+  const s = newSlide();
+  gradPanel(s, 8.714, 0, 5.238, 7.5, 0.19, { corners: ['tr', 'br'] });
+  splitTitle(s, 'UNLOCKING THE MAGIC ', 'OF BOOKS', { x: 0.818, y: 1.171, w: 4.602, h: 2.524 });
+  body(s, LOREM.trim().slice(0, -1) + '.', { x: 0.818, y: 3.746, w: 4.718, h: 1.01 });
+
+  gradPanel(s, 0.891, 5.062, 3.884, 0.91, 0.11);
+  text(s, '1500+', { x: 1.089, y: 5.186, w: 1.104, h: 0.404, fontSize: 18, bold: true });
+  text(s, 'Customers', { x: 1.05, y: 5.538, w: 1.181, h: 0.286, fontSize: 10.5 });
+  text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. ', {
+    x: 2.269, y: 5.19, w: 2.36, h: 0.605, fontSize: 12, lineSpacingMultiple: 1.3,
+  });
+}
+
+/* --------------------------------------------------------------- slide 5  */
+// Rotated "2024" panel at the top, title block below.
+function slide5() {
+  const s = newSlide();
+  gradPanel(s, 5.5235, 0.7825, 7.143, 2.938, 0.24, { dir: 'br', corners: ['tl', 'bl'] });
+  splitTitle(s, 'BOOK SELLING ', 'MASTERY', { x: 0.667, y: 3.925, w: 5.512, h: 1.717 });
+  body(s, LOREM.trim().slice(0, -1) + '.', { x: 0.667, y: 5.642, w: 4.718, h: 1.01 });
+
+  text(s, '2024', {
+    x: 6.677, y: 1.519, w: 2.363, h: 1.464, fontSize: 54, bold: true, align: 'center',
+    rotate: 270, lineSpacingMultiple: 1.5,
+  });
+  body(s, 'Time Management', { x: 5.979, y: 1.18, w: 1.634, h: 0.707, bold: true });
+  body(s, 'Create a Detailed Plan', { x: 5.979, y: 2.616, w: 1.464, h: 0.707, bold: true });
+  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.', {
+    x: 8.579, y: 1.18, w: 3.913, h: 1.01,
+  });
+  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.', {
+    x: 8.579, y: 2.616, w: 3.543, h: 0.707, bold: true,
+  });
+}
+
+/* --------------------------------------------------------------- slide 6  */
+// Centred title over four statistic bars.
+function slide6() {
+  const s = newSlide();
+  text(s, 'STRATEGIES FOR SUCCESS', {
+    x: 3.911, y: 1.162, w: 5.512, h: 1.717, fontSize: 48, bold: true, align: 'center',
+    charSpacing: -1.5, lineSpacing: 55,
+  });
+
+  const STATS = [
+    { x: 1.327, y: 3.845, value: '85%', dollar: false, vw: 1.089, tx: 2.477 },
+    { x: 1.327, y: 5.287, value: '427K', dollar: false, vw: 1.396, tx: 2.477, vx: 1.276 },
+    { x: 7.594, y: 3.845, value: '450', dollar: true, vw: 1.089, tx: 8.745 },
+    { x: 7.594, y: 5.287, value: '932', dollar: true, vw: 1.089, tx: 8.745 },
+  ];
+  STATS.forEach((st) => {
+    gradPanel(s, st.x, st.y, 4.58, 1.129, 0.14);
+    const runs = [];
+    if (st.dollar) runs.push({ text: '$', options: { superscript: true } });
+    runs.push({ text: st.value, options: {} });
+    text(s, runs, {
+      x: st.vx === undefined ? st.x + 0.103 : st.vx, y: st.y + 0.16, w: st.vw, h: 0.808,
+      fontSize: 28, bold: true, align: 'center', lineSpacingMultiple: 1.5,
+    });
+    body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor', {
+      x: st.tx, y: st.y + 0.211, w: 3.326, h: 0.707,
+    });
+  });
+}
+
+/* --------------------------------------------------------------- slide 7  */
+// Full gradient background with a white feature card.
+function slide7() {
+  const s = newSlide({ gradient: true });
+  text(s, 'THE FUTURE OF BOOK SELLING', {
+    x: 0.755, y: 4.833, w: 5.988, h: 1.717, fontSize: 48, bold: true, charSpacing: -1.5, lineSpacing: 55,
+  });
+  body(s, 'Trends and Tactics for Success', { x: 7.038, y: 4.872, w: 3.13, h: 0.404, bold: true });
+  body(s, PROJECT_BODY, { x: 7.045, y: 5.197, w: 5.36, h: 1.313 });
+
+  s.addShape('roundRect', {
+    x: 9.35, y: 0.826, w: 2.418, h: 2.845, rectRadius: 0.27,
+    fill: { color: WHITE }, line: { type: 'none' },
+  });
+  iconBadge(s, 9.668, 1.031, 0.634, { circle: true, invert: true });
+  text(s, "Bookstore's Revenue", {
+    x: 9.57, y: 1.795, w: 1.895, h: 0.64, fontSize: 16, bold: true, color: PURPLE, lineSpacing: 19,
+  });
+  text(s, CARD_BODY, {
+    x: 9.57, y: 2.564, w: 2.198, h: 0.87, fontSize: 12, color: PURPLE, lineSpacingMultiple: 1.3,
+  });
+}
+
+/* --------------------------------------------------------------- slide 8  */
+// Centred title, two gradient cards and a description column with a button.
+function slide8() {
+  const s = newSlide();
+  splitTitle(s, 'LITERARY ', 'COMMERCE', {
+    x: 5.366, y: 1.043, w: 6.454, h: 1.717, align: 'center',
+  });
+
+  [
+    { x: 4.046, title: 'Book Selling Strategy' },
+    { x: 6.613, title: 'Successful Book Sales' },
+  ].forEach((card) => {
+    gradPanel(s, card.x, 3.384, 2.418, 3.181, 0.27);
+    iconBadge(s, card.x + 0.318, 3.757, 0.634, { circle: true });
+    text(s, card.title, {
+      x: card.x + 0.221, y: 4.521, w: 1.895, h: 0.64, fontSize: 16, bold: true, lineSpacing: 19,
+    });
+    text(s, CARD_BODY, {
+      x: card.x + 0.221, y: 5.291, w: 2.198, h: 0.87, fontSize: 12, lineSpacingMultiple: 1.3,
+    });
+  });
+
+  body(s, 'Non-Verbal Communication Project', { x: 9.336, y: 3.384, w: 3.13, h: 0.404, bold: true });
+  body(s, PROJECT_BODY + 'semper vitae.', { x: 9.343, y: 3.709, w: 3.407, h: 1.919 });
+  pillButton(s, 9.423, 5.858, 'View More');
+}
+
+/* --------------------------------------------------------------- slide 9  */
+// Gradient title card top-left, checklist of three items bottom-right.
+function slide9() {
+  const s = newSlide();
+  gradPanel(s, 0.784, 0.718, 5.692, 3.032, 0.24, { corners: ['bl', 'br'] });
+  text(s, 'MARKETING YOUR BOOKS', {
+    x: 1.011, y: 1.022, w: 5.238, h: 1.717, fontSize: 48, bold: true, charSpacing: -1.5, lineSpacing: 55,
+  });
+  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna ', {
+    x: 1.011, y: 2.739, w: 4.947, h: 0.707,
+  });
+
+  [
+    { y: 3.893, label: 'Effective Strategies' },
+    { y: 4.573, label: 'Customer Engagement' },
+    { y: 5.253, label: 'Proven Sales' },
+  ].forEach((row) => {
+    checkTile(s, 7.111, row.y + 0.02, 0.375);
+    body(s, row.label, { x: 7.49, y: row.y, w: 2.4, h: 0.404, bold: true });
+  });
+
+  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.', {
+    x: 7.003, y: 5.97, w: 5.238, h: 0.707,
+  });
+}
+
+/* -------------------------------------------------------------- slide 10  */
+// Near-full-bleed gradient panel with headline and a row of KPI figures.
+function slide10() {
+  const s = newSlide();
+  gradPanel(s, 0.667, 0.75, 12.667, 6.75, 0.58, { dir: 'tl', corners: ['tr', 'bl', 'br'] });
+  text(s, "ENHANCING YOUR BOOKSTORE'S REVENUE", {
+    x: 0.907, y: 1.568, w: 6.187, h: 2.524, fontSize: 48, bold: true, charSpacing: -1.5, lineSpacing: 55,
+  });
+  body(s, LOREM + 'quis nostrud exercitation ullamco laboris nisi', {
+    x: 0.986, y: 4.427, w: 5.581, h: 1.01,
+  });
+
+  const KPIS = [
+    { x: 0.986, w: 0.965, runs: [{ text: '881+' }] },
+    { x: 2.265, w: 1.06, runs: [{ text: '$', options: { superscript: true } }, { text: '78.00' }] },
+    { x: 3.639, w: 0.965, runs: [{ text: '80' }, { text: '%', options: { superscript: true } }] },
+    { x: 4.918, w: 0.965, runs: [{ text: '7812k' }] },
+  ];
+  KPIS.forEach((k) => {
+    text(s, k.runs, {
+      x: k.x, y: 5.513, w: k.w, h: 0.555, fontSize: 18, bold: true,
+      lineSpacingMultiple: 1.5,
+    });
+  });
+}
+
+/* -------------------------------------------------------------- slide 11  */
+// Title + button on the left; 2x2 feature grid inside a gradient panel.
+function slide11() {
+  const s = newSlide();
+  splitTitle(s, 'CRAFTING A BOOK SELLING ', 'STRATEGY', { x: 0.741, y: 1.444, w: 4.889, h: 2.524 });
+  body(s, LOREM.trim().slice(0, -1) + '.', { x: 0.741, y: 4.186, w: 4.344, h: 1.01 });
+  pillButton(s, 0.808, 5.644, 'View More');
+
+  gradPanel(s, 6.312, 1.167, 7.81, 5.266, 0.26, { corners: ['tr', 'br'] });
+  [
+    { x: 6.873, icon: 6.859, title: 'Book Inventory', tw: 1.984 },
+    { x: 10.261, icon: 10.297, title: 'Identify Resources', tw: 3.543 },
+  ].forEach((col) => {
+    iconBadge(s, col.icon, 1.783, 0.484, { invert: true });
+    body(s, col.title, { x: col.x, y: 2.284, w: col.tw, h: 0.404, bold: true });
+    body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore', {
+      x: col.x, y: 2.706, w: 2.633, h: 1.313,
+    });
+  });
+  [
+    { x: 6.942, title: 'Resource Allocation' },
+    { x: 10.368, title: 'Utilize Technology' },
+  ].forEach((col) => {
+    checkTile(s, col.x, 4.677, 0.375, { white: true });
+    body(s, col.title, { x: col.x + 0.378, y: 4.659, w: 2.633, h: 0.404, bold: true });
+    body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.', {
+      x: col.x, y: 5.205, w: 2.633, h: 0.707, bold: true,
+    });
+  });
+}
+
+/* -------------------------------------------------------------- slide 12  */
+// Gradient background, headline and four label buttons along the bottom.
+function slide12() {
+  const s = newSlide({ gradient: true });
+  text(s, 'FINANCIAL BOOK SELLING', {
+    x: 0.792, y: 0.919, w: 5.122, h: 1.717, fontSize: 48, bold: true, charSpacing: -1.5, lineSpacing: 55,
+  });
+  ['Budget Planning', 'Cost Estimation', 'Cost Estimation', 'Funding'].forEach((label, i) => {
+    const x = 0.785 + i * 3.0485;
+    // Sits directly on the gradient background -- no carve colour available.
+    gradient(s, x, 5.532, 2.618, 0.76, { step: 0.16 });
+    text(s, label, {
+      x, y: 5.532, w: 2.618, h: 0.76, fontSize: 18, align: 'center', valign: 'middle',
+    });
+  });
+}
+
+/* -------------------------------------------------------------- slide 13  */
+// Three pricing cards, each with an icon tile, price, ticks and a Buy Now pill.
+function slide13() {
+  const s = newSlide();
+  splitTitle(s, 'PACKAGE BOOK ', 'SELLING', {
+    x: 1.187, y: 0.782, w: 10.959, h: 0.909, align: 'center',
+  });
+
+  [
+    { x: 1.43, price: '150', icon: 0.903, tick: 1.845, tx: 2.143, buy: 2.297 },
+    { x: 5.247, price: '300', icon: 4.719, tick: 5.666, tx: 5.965, buy: 6.044 },
+    { x: 9.063, price: '499', icon: 8.536, tick: 9.505, tx: 9.803, buy: 9.957 },
+  ].forEach((card) => {
+    gradPanel(s, card.x, 2.241, 3.001, 4.509, 0.22);
+    iconBadge(s, card.icon, 1.949, 1.055);
+    text(s, [{ text: '$', options: { superscript: true } }, { text: card.price }], {
+      x: card.x + 0.431, y: 2.298, w: 2.139, h: 1.111, fontSize: 40, bold: true, align: 'center',
+      lineSpacingMultiple: 1.5,
+    });
+    body(s, 'Lorem ipsum', { x: card.x + 0.793, y: 3.166, w: 1.416, h: 0.404 });
+    ['Lorem ipsum dolor sit amet.', 'Lorem ipsum dolor sit amet.', 'Lorem ipsum dolor sit amet.'].forEach((line, i) => {
+      const y = 3.66 + i * 0.8335;
+      checkMark(s, card.tick, y + 0.093, 0.219, WHITE, 1.5);
+      body(s, line, { x: card.tx, y, w: 2.214, h: 0.707, bold: true });
+    });
+    pillButton(s, card.buy, 6.24, 'Buy Now', { solid: WHITE, fg: PURPLE, divider: INK });
+  });
+}
+
+/* -------------------------------------------------------------- slide 14  */
+// Gradient panel with headline, KPI row and a phone mock-up placeholder.
+function slide14() {
+  const s = newSlide();
+  gradPanel(s, 0, 1.2255, 12.667, 6.3085, 0.54, { corners: ['tl', 'bl', 'br'] });
+  photo(s, 7.766, 0.308, 3.871, 6.83, { color: '242236', r: 0.4 });
+  text(s, 'INNOVATIVE APPROACHES FOR MODERN RETAILERS', {
+    x: 0.777, y: 1.555, w: 4.791, h: 3.332, fontSize: 48, bold: true, charSpacing: -1.5, lineSpacing: 55,
+  });
+  body(s, LOREM + 'quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea', {
+    x: 0.777, y: 4.887, w: 5.681, h: 1.01,
+  });
+  const KPIS = [
+    { x: 0.777, w: 0.965, runs: [{ text: '561+' }] },
+    { x: 1.978, w: 0.965, runs: [{ text: '$', options: { superscript: true } }, { text: '5.99' }] },
+    { x: 3.179, w: 0.965, runs: [{ text: '45' }, { text: '%', options: { fontSize: 12 } }] },
+    { x: 4.38, w: 1.097, runs: [{ text: '6.756k' }] },
+  ];
+  KPIS.forEach((k) => {
+    text(s, k.runs, {
+      x: k.x, y: 5.972, w: k.w, h: 0.555, fontSize: 18, bold: true,
+      lineSpacingMultiple: 1.5,
+    });
+  });
+}
+
+/* -------------------------------------------------------------- slide 15  */
+// Bullet list on the left, desktop mock-up over a gradient panel on the right.
+function slide15() {
+  const s = newSlide();
+  gradPanel(s, 5.831, 2.419, 8.639, 5.56, 0.3, { corners: ['tr', 'bl', 'br'] });
+  photo(s, 6.694, 1.348, 6.196, 5.167, { color: '25243A', r: 0.1 });
+  splitTitle(s, 'BOOK SELLING ', 'IN THE DIGITAL', {
+    x: 1.017, y: 1.348, w: 5.014, h: 1.582, fontSize: 44, lineSpacing: 51,
+  });
+  [3.368, 4.202, 5.035].forEach((y) => {
+    checkMark(s, 1.117, y + 0.114, 0.21, WHITE, 1.75);
+    body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.', {
+      x: 1.411, y, w: 3.873, h: 0.707,
+    });
+  });
+  pillButton(s, 1.113, 6.046, 'View More');
+}
+
+/* -------------------------------------------------------------- slide 16  */
+// Profile intro plus a wide gradient band holding two icon + text blocks.
+function slide16() {
+  const s = newSlide();
+  text(s, [
+    { text: 'Milla', options: { color: WHITE } },
+    { text: ' ', options: { color: INK } },
+    { text: 'Hannell', options: { color: TEAL } },
+  ], { x: 0.924, y: 1.053, w: 4.651, h: 0.909, fontSize: 48, bold: true, fontFace: FONT });
+  text(s, 'Our Manager Book Selling', { x: 0.922, y: 1.966, w: 3.242, h: 0.404, fontSize: 18 });
+  text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud.', {
+    x: 0.922, y: 2.679, w: 4.652, h: 0.889, fontSize: 12, lineSpacingMultiple: 1.3,
+  });
+
+  gradPanel(s, 0.667, 4.4005, 12.0, 2.173, 0.128, { dir: 'bl' });
+  [
+    { tile: 1.13, tx: 2.696, title: 'Short Your Description' },
+    { tile: 6.667, tx: 8.228, title: 'Short Your Project Experience' },
+  ].forEach((blk) => {
+    slideIconTile(s, blk.tile, 4.811, 1.349);
+    text(s, blk.title, { x: blk.tx, y: 4.811, w: 3.824, h: 0.37, fontSize: 16 });
+    text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore.', {
+      x: blk.tx, y: 5.184, w: 3.824, h: 0.889, fontSize: 12, lineSpacingMultiple: 1.3,
+    });
+  });
+}
+
+/** White rounded tile with a gradient "stack" glyph, used on slide 16. */
+function slideIconTile(slide, x, y, s) {
+  slide.addShape('roundRect', {
+    x, y, w: s, h: s, rectRadius: s * 0.17, fill: { color: WHITE }, line: { type: 'none' },
+  });
+  const g = s * 0.55;
+  for (let i = 0; i < 3; i++) {
+    slide.addShape('roundRect', {
+      x: x + (s - g) / 2 + i * g * 0.05, y: y + (s - g) / 2 + i * g * 0.3,
+      w: g - i * g * 0.1, h: g * 0.2, rectRadius: g * 0.04,
+      fill: { color: ramp(0.25 + i * 0.25) }, line: { type: 'none' },
+    });
+  }
+}
+
+/* -------------------------------------------------------------- slide 17  */
+// Headline, an up-arrow marker and three equal gradient cards.
+function slide17() {
+  const s = newSlide();
+  text(s, [
+    { text: 'INSPIRING TEAMS', options: { color: WHITE } },
+    { text: ' ', options: { color: '262626' } },
+    { text: 'TO SUCCESS', options: { color: TEAL } },
+  ], { x: 0.83, y: 0.93, w: 5.837, h: 1.717, fontSize: 48, bold: true, charSpacing: -1.5, lineSpacing: 55, fontFace: FONT });
+  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim', {
+    x: 0.83, y: 2.713, w: 5.9, h: 0.707,
+  });
+  s.addShape('upArrow', {
+    x: 7.642, y: 3.419, w: 0.376, h: 0.411, fill: { color: WHITE }, line: { type: 'none' },
+  });
+
+  [0.911, 3.194, 5.476].forEach((x) => {
+    gradPanel(s, x, 4.249, 2.166, 2.013, 0.11);
+    text(s, 'Insert Your Text', {
+      x: x + 0.195, y: 4.622, w: 1.912, h: 0.37, fontSize: 16, bold: true,
+    });
+    text(s, 'Lorem ipsum dolor sit amet, consec tetur adipis', {
+      x: x + 0.195, y: 4.995, w: 1.746, h: 0.889, fontSize: 12, lineSpacingMultiple: 1.3,
+    });
+  });
+}
+
+/* -------------------------------------------------------------- slide 18  */
+// Angled gradient band, an income summary and a white column chart card.
+function slide18() {
+  const s = newSlide();
+  splitTitle(s, 'DATA INCOME ', 'BOOK SELLING', { x: 0.667, y: 0.75, w: 5.444, h: 1.717, charSpacing: 0 });
+  text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation.', {
+    x: 0.667, y: 2.471, w: 5.794, h: 0.863, fontSize: 12, lineSpacingMultiple: 1.3,
+  });
+  gradPanel(s, 0, 3.6475, 8.667, 3.853, 0.42, { corners: ['tl', 'bl', 'br'] });
+
+  iconBadge(s, 1.052, 4.5, 0.669);
+  text(s, 'Income', { x: 1.052, y: 5.305, w: 2.059, h: 0.37, fontSize: 16, bold: true });
+  text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. sed do eiusmod tempor ', {
+    x: 1.052, y: 5.7, w: 2.85, h: 0.871, fontSize: 12, lineSpacingMultiple: 1.3,
+  });
+  text(s, 'Total Data', { x: 4.269, y: 4.799, w: 2.015, h: 0.37, fontSize: 16, bold: true });
+  text(s, '1,9M', { x: 4.269, y: 5.237, w: 2.015, h: 0.774, fontSize: 40, bold: true });
+  text(s, 'Lorem ipsum dolor sit amet, consectetur', {
+    x: 4.269, y: 5.988, w: 2.282, h: 0.604, fontSize: 12, lineSpacingMultiple: 1.3,
+  });
+
+  s.addShape('roundRect', {
+    x: 7.805, y: 1.17, w: 4.398, h: 5.357, rectRadius: 0.25,
+    fill: { color: WHITE }, line: { color: GREY95, width: 0.75 },
+  });
+  text(s, 'Data Income', {
+    x: 8.128, y: 1.456, w: 2.835, h: 0.438, fontSize: 20, bold: true, color: '262626',
+  });
+  s.addChart(pptx.ChartType.bar, [{
+    name: 'Series 1',
+    labels: ['January', 'Feb', 'Mar', 'Apr'],
+    values: [2, 1.2, 3, 2.4],
+  }], {
+    x: 8.058, y: 1.873, w: 3.892, h: 4.353,
+    barDir: 'col', barGapWidthPct: 27, chartColors: [GREY85, GREY85, BAR_TONE, GREY85],
+    showLegend: false, showTitle: false,
+    valAxisHidden: true, valGridLine: { style: 'none' },
+    catAxisLabelColor: '808080', catAxisLabelFontSize: 12, catAxisLabelFontFace: FONT,
+    catAxisLineShow: true, catAxisLineColor: GREY95,
+    chartArea: { fill: { type: 'none' } }, plotArea: { fill: { type: 'none' } },
+  });
+}
+
+/* -------------------------------------------------------------- slide 19  */
+// Two project cards, each a gradient panel wrapping a white column chart.
+function slide19() {
+  const s = newSlide();
+  splitTitle(s, 'DATA ', 'BOOK SELLING ', { x: 0.998, y: 0.898, w: 4.871, h: 1.717, charSpacing: 0 });
+
+  [
+    { y: 3.05, ty: 4.017, title: 'Data Project 01', value: '675K' },
+    { y: 4.968, ty: 5.934, title: 'Data Project 02', value: '764K' },
+  ].forEach((row) => {
+    gradPanel(s, 1.043, row.y, 0.669, 0.669, 0.12);
+    barGlyph(s, 1.169, row.y + 0.126, 0.417);
+    text(s, row.title, { x: 1.904, y: row.y, w: 3.435, h: 0.37, fontSize: 16, bold: true });
+    text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor', {
+      x: 1.904, y: row.y + 0.391, w: 3.435, h: 0.604, fontSize: 12, lineSpacingMultiple: 1.3,
+    });
+    text(s, row.value, { x: 1.904, y: row.ty, w: 1.24, h: 0.673, fontSize: 28, bold: true, color: TEAL });
+    text(s, '/mo', { x: 2.984, y: row.ty + 0.173, w: 1.24, h: 0.42, fontSize: 16, bold: true, color: TEAL });
+  });
+
+  [
+    { x: 6.011, cx: 6.156, label: 'AUGUST ', sub: 'Data Project 01', s1: [2, 3, 3.5, 4], s2: [1.7, 3.3, 3, 3.3], s3: [2, 2.5, 3.2, 3] },
+    { x: 9.397, cx: 9.541, label: 'OCTOBER', sub: 'Data Project 02', s1: [3.3, 2.5, 3.5, 4.2], s2: [3, 2, 3, 4], s3: [2.6, 1.7, 3.3, 3.8] },
+  ].forEach((card) => {
+    gradPanel(s, card.x, 1.248, 3.27, 5.366, 0.3);
+    text(s, card.label, { x: card.x + 0.269, y: 1.55, w: 2.755, h: 0.707, fontSize: 36, bold: true });
+    text(s, card.sub, {
+      x: card.x + 0.269, y: 2.203, w: 2.611, h: 0.407, fontSize: 16, lineSpacingMultiple: 1.2, bold: true,
+    });
+    s.addChart(pptx.ChartType.bar, [
+      { name: 'Series 1', labels: ['C1', 'C2', 'C3', 'C4'], values: card.s1 },
+      { name: 'Series 2', labels: ['C1', 'C2', 'C3', 'C4'], values: card.s2 },
+      { name: 'Series 3', labels: ['C1', 'C2', 'C3', 'C4'], values: card.s3 },
+    ], {
+      x: card.cx, y: 2.614, w: 2.982, h: 3.489,
+      barDir: 'col', barGapWidthPct: 219, barOverlapPct: -27,
+      chartColors: [WHITE, WHITE, WHITE], showLegend: false, showTitle: false,
+      catAxisHidden: true, valAxisHidden: true, valGridLine: { style: 'none' },
+      chartArea: { fill: { type: 'none' } }, plotArea: { fill: { type: 'none' } },
+    });
+    text(s, '1 Month', { x: card.x + 0.269, y: 6.048, w: 1.232, h: 0.346, fontSize: 12 });
+    text(s, '4 Weeks', { x: card.x + 1.341, y: 6.048, w: 1.46, h: 0.346, fontSize: 12 });
+  });
+}
+
+/** Small bar-chart glyph used as an icon on slides 19 and 20. */
+function barGlyph(slide, x, y, s, color) {
+  const c = color || WHITE;
+  [0.55, 0.8, 0.35, 0.65].forEach((hf, i) => {
+    slide.addShape('rect', {
+      x: x + s * (0.12 + i * 0.21), y: y + s * (0.88 - hf * 0.7), w: s * 0.13, h: s * hf * 0.7,
+      fill: { color: c }, line: { type: 'none' },
+    });
+  });
+}
+
+/* -------------------------------------------------------------- slide 20  */
+// Headline, three icon tiles and a wide horizontal bar chart.
+function slide20() {
+  const s = newSlide();
+  splitTitle(s, 'DATA GROWTH ', 'BOOK SELLING', { x: 1.28, y: 0.898, w: 5.228, h: 2.524, charSpacing: 0 });
+  gradPanel(s, 1.374, 3.857, 0.669, 0.669, 0.14);
+  envelopeGlyph(s, 1.56, 4.1, 0.297);
+  [2.463, 3.553].forEach((x, i) => {
+    s.addShape('roundRect', {
+      x, y: 3.857, w: 0.669, h: 0.669, rectRadius: 0.1,
+      fill: { color: WHITE }, line: { color: 'E7E6E6', width: 0.75 },
+    });
+    if (i === 0) calendarGlyph(s, x + 0.192, 4.192, 0.286);
+    else clipboardGlyph(s, x + 0.22, 4.176, 0.229);
+  });
+  text(s, 'Project Growth', { x: 1.28, y: 4.776, w: 3.083, h: 0.37, fontSize: 16, bold: true });
+  text(s, 'Lorem ipsum dolor sit amet, ', {
+    x: 1.28, y: 5.16, w: 3.083, h: 0.341, fontSize: 12, lineSpacingMultiple: 1.3,
+  });
+  text(s, '564K', { x: 1.28, y: 5.475, w: 1.24, h: 0.673, fontSize: 28, bold: true, color: TEAL });
+  text(s, '/month', { x: 2.36, y: 5.649, w: 1.123, h: 0.42, fontSize: 16, bold: true, color: TEAL });
+
+  s.addChart(pptx.ChartType.bar, [
+    { name: 'Series 1', labels: ['Data 01', 'Data 02', 'Data 03', 'Data 04'], values: [2, 2.5, 3.5, 4.5] },
+    { name: 'Series 2', labels: ['Data 01', 'Data 02', 'Data 03', 'Data 04'], values: [2.4, 3.5, 3, 4] },
+    { name: 'Series 3', labels: ['Data 01', 'Data 02', 'Data 03', 'Data 04'], values: [2.5, 3, 3.7, 5] },
+  ], {
+    x: 6.667, y: 1.173, w: 6.288, h: 5.129,
+    barDir: 'bar', barGapWidthPct: 126, barOverlapPct: 4,
+    chartColors: [BAR_TONE, BAR_TONE, BAR_TONE], showLegend: false, showTitle: false,
+    catAxisHidden: true, valAxisMaxVal: 5, valAxisLabelColor: WHITE,
+    valAxisLabelFontSize: 12, valAxisLabelFontFace: FONT, valAxisLineShow: false,
+    valGridLine: { style: 'solid', color: GREY95, size: 0.75 },
+    chartArea: { fill: { type: 'none' } }, plotArea: { fill: { type: 'none' } },
+  });
+}
+
+function envelopeGlyph(slide, x, y, s) {
+  slide.addShape('rect', { x, y, w: s, h: s * 0.62, fill: { color: WHITE }, line: { type: 'none' } });
+  slide.addShape('line', { x, y, w: s / 2, h: s * 0.36, line: { color: RAMP_MID, width: 1 } });
+  slide.addShape('line', { x: x + s / 2, y, w: s / 2, h: s * 0.36, line: { color: RAMP_MID, width: 1 }, flipV: true });
+}
+function calendarGlyph(slide, x, y, s) {
+  slide.addShape('roundRect', {
+    x, y, w: s, h: s * 0.9, rectRadius: s * 0.1, fill: { color: RAMP_MID }, line: { type: 'none' },
+  });
+  slide.addShape('rect', { x: x + s * 0.12, y: y + s * 0.32, w: s * 0.76, h: s * 0.42, fill: { color: WHITE }, line: { type: 'none' } });
+}
+function clipboardGlyph(slide, x, y, s) {
+  slide.addShape('roundRect', {
+    x, y, w: s, h: s * 1.35, rectRadius: s * 0.16, fill: { color: RAMP_MID }, line: { type: 'none' },
+  });
+  slide.addShape('rect', { x: x + s * 0.28, y: y - s * 0.06, w: s * 0.44, h: s * 0.2, fill: { color: WHITE }, line: { type: 'none' } });
+}
+
+/* -------------------------------------------------------------- slide 21  */
+// Twelve-month column chart with three callout chips, headline underneath.
+function slide21() {
+  const s = newSlide();
+  s.addChart(pptx.ChartType.bar, [{
+    name: 'Series 1',
+    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Des'],
+    values: [1, 2, 3, 2, 4, 2.8, 3.3, 3, 2, 3, 4.5, 5],
+  }], {
+    x: 1.086, y: 1.553, w: 11.149, h: 2.466,
+    barDir: 'col', barGapWidthPct: 27, showLegend: false, showTitle: false,
+    chartColors: [GREY85, BAR_TONE, GREY85, GREY85, GREY85, GREY85, BAR_TONE, GREY85, GREY85, GREY85, BAR_TONE, GREY85],
+    catAxisLabelColor: WHITE, catAxisLabelFontSize: 12, catAxisLabelFontFace: FONT,
+    catAxisLineShow: true, catAxisLineColor: GREY95,
+    valAxisLabelColor: WHITE, valAxisLabelFontSize: 12, valAxisLabelFontFace: FONT,
+    valAxisLineShow: true, valAxisLineColor: GREY95,
+    valGridLine: { style: 'solid', color: GREY95, size: 0.75 },
+    chartArea: { fill: { type: 'none' } }, plotArea: { fill: { type: 'none' } },
+  });
+
+  [
+    { x: 2.062, y: 1.818, label: '30% Good', ax: 2.976, ay: 2.326, ah: 0.713 },
+    { x: 6.367, y: 1.103, label: '60% Better', ax: 7.281, ay: 1.649, ah: 0.9 },
+    { x: 9.822, y: 0.773, label: '80% Best', ax: 10.736, ay: 1.345, ah: 0.9 },
+  ].forEach((chip) => {
+    s.addShape('line', {
+      x: chip.ax, y: chip.ay, w: 0, h: chip.ah,
+      line: { color: 'BFBFBF', width: 1, dashType: 'dash', beginArrowType: 'triangle' },
+    });
+    gradPanel(s, chip.x, chip.y, 1.828, 0.484, 0.08, { step: 0.12 });
+    text(s, chip.label, {
+      x: chip.x, y: chip.y, w: 1.828, h: 0.484, fontSize: 16, bold: true,
+      align: 'center', valign: 'middle',
+    });
+  });
+
+  splitTitle(s, 'DATA OVERVIEW ', 'BOOK SELLING', { x: 0.821, y: 4.528, w: 6.015, h: 1.717, charSpacing: 0 });
+  text(s, 'Project Growth', { x: 7.281, y: 4.619, w: 3.083, h: 0.37, fontSize: 16, bold: true });
+  text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation.', {
+    x: 7.281, y: 5.029, w: 4.585, h: 1.126, fontSize: 12, lineSpacingMultiple: 1.3,
+  });
+}
+
+/* -------------------------------------------------------------- slide 22  */
+// 5x6 comparison table with gradient header/first column and tick marks.
+function slide22() {
+  const s = newSlide();
+  splitTitle(s, 'TABLE DATA ', 'BOOK INVENTORY', {
+    x: 1.292, y: 0.812, w: 10.772, h: 0.909, align: 'center', charSpacing: 0,
+  });
+  text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation.', {
+    x: 2.794, y: 1.724, w: 7.745, h: 0.601, fontSize: 12, align: 'center',
+    lineSpacingMultiple: 1.3,
+  });
+
+  const TX = 1.043;
+  const TY = 2.667;
+  const COLW = [1.857, 1.628, 1.557, 1.375, 1.375];
+  const ROWH = [0.715, 0.715, 0.715, 0.715, 0.575, 0.56];
+  const colX = (c) => TX + COLW.slice(0, c).reduce((a, b) => a + b, 0);
+  const rowY = (r) => TY + ROWH.slice(0, r).reduce((a, b) => a + b, 0);
+  // Header row and left label column are gradient-filled cell by cell.
+  ROWH.forEach((h, r) => {
+    const cells = r === 0 ? COLW.length : 1;
+    for (let c = 0; c < cells; c++) gradient(s, colX(c), rowY(r), COLW[c], h, { step: 0.14 });
+  });
+
+  const HEADERS = ['Description', 'Project 1', 'Project 2', 'Project 3', 'Project 4'];
+  const rows = [HEADERS.map((h) => ({
+    text: h,
+    options: { fill: { type: 'none' }, color: WHITE, fontSize: 14, bold: true, align: 'center', valign: 'middle' },
+  }))];
+  // Which project columns are ticked on each body row.
+  const TICKS = [[1, 3], [2, 3, 4], [1, 2, 3], [4], [1, 3]];
+  TICKS.forEach((marks, r) => {
+    const shade = r % 2 === 0 ? GREY85 : GREY95;
+    const row = [{
+      text: 'Insert Text Here',
+      options: { fill: { type: 'none' }, color: WHITE, fontSize: 12, align: 'center', valign: 'middle' },
+    }];
+    for (let c = 1; c <= 4; c++) row.push({ text: '', options: { fill: { color: shade } } });
+    rows.push(row);
+  });
+  s.addTable(rows, {
+    x: TX, y: TY, w: 7.793, colW: COLW, rowH: ROWH,
+    border: { type: 'none' }, fontFace: FONT, margin: 0.05,
+  });
+  // Tick badges sit on top of the table cells.
+  TICKS.forEach((marks, r) => {
+    marks.forEach((c) => {
+      const size = 0.258;
+      const bx = colX(c) + COLW[c] / 2 - size / 2;
+      const by = rowY(r + 1) + ROWH[r + 1] / 2 - size / 2;
+      gradPanel(s, bx, by, size, size, 0.05, { step: 0.1 });
+      checkMark(s, bx + 0.05, by + 0.06, 0.16, WHITE, 1.25);
+    });
+  });
+
+  gradPanel(s, 9.614, 3.307, 0.669, 0.669, 0.12);
+  archiveGlyph(s, 9.806, 3.515, 0.286);
+  text(s, 'Data List Project', { x: 9.511, y: 4.201, w: 2.554, h: 0.37, fontSize: 16, bold: true });
+  text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing', {
+    x: 9.511, y: 4.58, w: 2.554, h: 0.598, fontSize: 12, lineSpacingMultiple: 1.3,
+  });
+  text(s, ['Lorem ipsum dolor', 'Lorem Ipsum dolor ', 'Lorem Ipsum dolor', 'Lorem Ipsum dolor'].map((t) => ({
+    text: t, options: { breakLine: true, bullet: { characterCode: '2022' } },
+  })), {
+    x: 9.526, y: 5.226, w: 2.082, h: 1.274, fontSize: 12, color: WHITE,
+    lineSpacingMultiple: 1.5, fontFace: FONT,
+  });
+}
+
+function archiveGlyph(slide, x, y, s) {
+  slide.addShape('rect', { x, y, w: s, h: s * 0.26, fill: { color: WHITE }, line: { type: 'none' } });
+  slide.addShape('rect', { x: x + s * 0.08, y: y + s * 0.3, w: s * 0.84, h: s * 0.6, fill: { color: WHITE }, line: { type: 'none' } });
+  slide.addShape('rect', { x: x + s * 0.32, y: y + s * 0.46, w: s * 0.36, h: s * 0.1, fill: { color: RAMP_MID }, line: { type: 'none' } });
+}
+
+/* -------------------------------------------------------------- slide 23  */
+// Gradient background with a white checklist "table" built from pill rows.
+function slide23() {
+  const s = newSlide({ gradient: true });
+  text(s, 'BOOK SELLING CHECKLIST', {
+    x: 2.134, y: 0.762, w: 9.088, h: 0.909, fontSize: 48, bold: true, align: 'center',
+    charSpacing: -1.5, fontFace: FONT,
+  });
+  s.addShape('roundRect', {
+    x: 1.333, y: 1.877, w: 10.667, h: 4.115, rectRadius: 0.12,
+    fill: { color: WHITE }, line: { color: GREY95, width: 0.75 },
+  });
+
+  const COLS = [
+    { x: 1.628, w: 0.865, head: 'Status' },
+    { x: 2.659, w: 1.653, head: '  Value Title' },
+    { x: 4.478, w: 1.653, head: 'Date' },
+    { x: 6.298, w: 5.363, head: 'Description' },
+  ];
+  COLS.forEach((col) => {
+    gradPanel(s, col.x, 2.126, col.w, 0.417, 0.05, { step: 0.12 });
+    text(s, col.head, {
+      x: col.x, y: 2.126, w: col.w, h: 0.417, fontSize: 14, bold: true,
+      align: col.head === 'Status' ? 'center' : 'left', valign: 'middle',
+    });
+  });
+  // The Date header carries a small dropdown caret.
+  s.addShape('triangle', {
+    x: 5.837, y: 2.28, w: 0.16, h: 0.1, rotate: 180, fill: { color: WHITE }, line: { type: 'none' },
+  });
+
+  const ROWS = [
+    { title: 'Book One', date: '10/09/2024', desc: 'Lorem ipsum dolor sit amet', done: true },
+    { title: 'Book two', date: '15/09/2024', desc: 'consectetur adipiscing elit, sed do ', done: true },
+    { title: 'Book Three', date: '17/09/2024', desc: 'eiusmod tempor incididunt ut labore et ', done: true },
+    { title: 'Book Four', date: '18/09/2024', desc: 'dolore magna aliqua. Ut enim ad minim veniam, quis nostrud ', done: false },
+    { title: 'Book Five', date: '23/09/2024', desc: 'exercitation ullamco laboris nisi ut aliquip ex ea ', done: false },
+  ];
+  ROWS.forEach((row, i) => {
+    const y = 2.78 + i * 0.5325;
+    [[1.628, 0.865, ''], [2.659, 1.653, row.title], [4.478, 1.653, ' ' + row.date], [6.298, 5.363, row.desc]].forEach((c) => {
+      s.addShape('roundRect', {
+        x: c[0], y, w: c[1], h: 0.417, rectRadius: 0.05, fill: { color: GREY95 }, line: { type: 'none' },
+      });
+      if (c[2]) {
+        text(s, c[2], {
+          x: c[0], y, w: c[1], h: 0.417, fontSize: 12, color: INK, valign: 'middle',
+        });
+      }
+    });
+    if (row.done) checkMark(s, 1.925, y + 0.05, 0.315, TEAL, 2.5);
+  });
+
+  // Pagination chips.
+  ['1', '2', '3'].forEach((n, i) => {
+    const x = 1.667 + i * 0.3835;
+    if (i === 0) gradPanel(s, x, 5.501, 0.333, 0.314, 0.05, { step: 0.1 });
+    else s.addShape('roundRect', { x, y: 5.501, w: 0.333, h: 0.314, rectRadius: 0.05, fill: { color: GREY95 }, line: { type: 'none' } });
+    text(s, n, {
+      x, y: 5.501, w: 0.333, h: 0.314, fontSize: 12, align: 'center', valign: 'middle',
+      color: i === 0 ? WHITE : GREY85,
+    });
+  });
+
+  text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation.', {
+    x: 2.794, y: 6.14, w: 7.745, h: 0.604, fontSize: 12, align: 'center',
+    lineSpacingMultiple: 1.3,
+  });
+}
+
+/* -------------------------------------------------------------- slide 24  */
+// Three overlapping gradient circles with icon bubbles plus a two-year recap.
+function slide24() {
+  const s = newSlide();
+  splitTitle(s, 'DATA PROCESS ', 'BOOK SELLING', { x: 0.683, y: 0.933, w: 5.464, h: 1.717, charSpacing: 0 });
+  text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation.', {
+    x: 0.734, y: 2.588, w: 5.025, h: 0.863, fontSize: 12, lineSpacingMultiple: 1.3,
+  });
+
+  [
+    { x: 6.999, y: 0.668, title: 'Step One', tx: 7.297 },
+    { x: 9.152, y: 1.942, title: 'Step Two', tx: 9.45 },
+    { x: 7.04, y: 3.821, title: 'Step Three', tx: 7.444 },
+  ].forEach((c) => {
+    gradPanel(s, c.x, c.y, 3.032, 3.031, 1.516, { ellipse: true });
+    text(s, c.title, {
+      x: c.tx, y: c.y + 0.777, w: 2.222, h: 0.496, fontSize: 20, bold: true, align: 'center',
+      lineSpacingMultiple: 1.3,
+    });
+    text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do', {
+      x: c.tx, y: c.y + 1.295, w: 2.222, h: 0.865, fontSize: 12, align: 'center', lineSpacingMultiple: 1.3,
+    });
+  });
+
+  [
+    { x: 6.57, y: 1.82, glyph: 'clip' },
+    { x: 11.807, y: 3.094, glyph: 'cal' },
+    { x: 6.564, y: 4.973, glyph: 'case' },
+  ].forEach((b) => {
+    s.addShape('ellipse', {
+      x: b.x, y: b.y, w: 0.727, h: 0.727, fill: { color: WHITE }, line: { color: GREY95, width: 0.75 },
+    });
+    if (b.glyph === 'cal') calendarGlyph(s, b.x + 0.221, b.y + 0.221, 0.286);
+    else if (b.glyph === 'clip') clipboardGlyph(s, b.x + 0.249, b.y + 0.205, 0.229);
+    else briefcaseGlyph(s, b.x + 0.204, b.y + 0.221, 0.32);
+  });
+
+  [
+    { x: 0.746, year: '2023' },
+    { x: 3.488, year: '2024' },
+  ].forEach((col) => {
+    text(s, col.year, { x: col.x, y: 3.857, w: 1.384, h: 0.572, fontSize: 28, color: TEAL });
+    text(s, 'Best Sellers', { x: col.x, y: 4.476, w: 1.735, h: 0.37, fontSize: 16, bold: true });
+    text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna', {
+      x: col.x, y: 4.85, w: 2.564, h: 1.126, fontSize: 12, lineSpacingMultiple: 1.3,
+    });
+  });
+}
+
+function briefcaseGlyph(slide, x, y, s) {
+  slide.addShape('roundRect', {
+    x, y: y + s * 0.18, w: s, h: s * 0.7, rectRadius: s * 0.1, fill: { color: RAMP_MID }, line: { type: 'none' },
+  });
+  slide.addShape('rect', { x: x + s * 0.32, y, w: s * 0.36, h: s * 0.2, fill: { color: RAMP_MID }, line: { type: 'none' } });
+  slide.addShape('rect', { x, y: y + s * 0.46, w: s, h: s * 0.08, fill: { color: WHITE }, line: { type: 'none' } });
+}
+
+/* -------------------------------------------------------------- slide 25  */
+// Closing slide: giant THANK YOU over a gradient panel plus contact details.
+function slide25() {
+  const s = newSlide();
+  gradPanel(s, 0, 0.5415, 12.408, 6.417, 0.5, { dir: 'br', corners: ['tl', 'bl'] });
+  text(s, [
+    { text: 'THANK', options: { breakLine: true } },
+    { text: 'YOU', options: {} },
+  ], {
+    x: 0.819, y: 1.198, w: 6.833, h: 3.332, fontSize: 96, bold: true, charSpacing: -1.5,
+    color: WHITE, fontFace: FONT, lineSpacing: 110,
+  });
+  text(s, 'FOR YOUR ATTENTION', {
+    x: 0.819, y: 4.467, w: 3.801, h: 0.505, fontSize: 24, bold: true, charSpacing: -1.5,
+  });
+  text(s, 'Template for your business', { x: 0.819, y: 5.269, w: 3.858, h: 0.37, fontSize: 16 });
+  text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aenean tincidunt imperdiet congue. Nullam vitae tempus sem.', {
+    x: 0.819, y: 5.671, w: 4.605, h: 0.631, fontSize: 11, lineSpacingMultiple: 1.5,
+  });
+
+  [
+    { y: 4.27, icon: 'globe', label: 'www.website.com', w: 2.6, iy: 4.266 },
+    { y: 4.93, icon: 'phone', label: '+123 6678 8890', w: 2.4, iy: 4.954 },
+    { y: 5.591, icon: 'pin', label: 'Address Street, Address City, Address Country', w: 3.205, iy: 5.643 },
+  ].forEach((row) => {
+    contactGlyph(s, 7.036, row.iy, 0.404, row.icon);
+    text(s, row.label, { x: 7.59, y: row.y, w: row.w, h: 0.707, fontSize: 18 });
+  });
+}
+
+function contactGlyph(slide, x, y, s, kind) {
+  if (kind === 'globe') {
+    slide.addShape('ellipse', { x, y, w: s, h: s, fill: { type: 'none' }, line: { color: WHITE, width: 1.25 } });
+    slide.addShape('ellipse', { x: x + s * 0.3, y, w: s * 0.4, h: s, fill: { type: 'none' }, line: { color: WHITE, width: 1 } });
+    slide.addShape('line', { x, y: y + s / 2, w: s, h: 0, line: { color: WHITE, width: 1 } });
+  } else if (kind === 'phone') {
+    slide.addShape('roundRect', {
+      x: x + s * 0.16, y: y + s * 0.16, w: s * 0.5, h: s * 0.62, rectRadius: s * 0.14,
+      fill: { color: WHITE }, line: { type: 'none' }, rotate: 20,
+    });
+  } else {
+    slide.addShape('rect', { x: x + s * 0.24, y, w: s * 0.1, h: s, fill: { color: WHITE }, line: { type: 'none' } });
+    slide.addShape('rect', { x: x + s * 0.34, y: y + s * 0.08, w: s * 0.46, h: s * 0.3, fill: { color: WHITE }, line: { type: 'none' } });
+  }
+}
+
+/* ------------------------------------------------------------------ build */
+
+[slide1, slide2, slide3, slide4, slide5, slide6, slide7, slide8, slide9, slide10,
+  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19,
+  slide20, slide21, slide22, slide23, slide24, slide25].forEach((fn) => fn());
+
+pptx.writeFile({
+  fileName: path.join(__dirname, '14691ea0-b803-449e-84c1-92c403430714_grok_final.pptx'),
+}).then((f) => console.log('wrote', f));
