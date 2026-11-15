@@ -1,0 +1,14 @@
+{
+  "name": "sand-card-text-recognition",
+  "version": "1.0.0",
+  "description": "On-device text recognition for the Sand desktop app's card photo fill",
+  "main": "index.js",
+  "private": true,
+  "scripts": {
+    "install": "node-gyp rebuild"
+  },
+  "gypfile": true,
+  "dependencies": {
+    "node-addon-api": "^8.0.0"
+  }
+}
