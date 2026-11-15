@@ -1,0 +1,1011 @@
+/**
+ * "ARCHITECTURE & 2025 CONSTRUCTION" company profile deck - 28 slides, 16:9 (13.333 x 7.5 in).
+ *
+ * Standalone pptxgenjs re-creation of the reference presentation.
+ * Run with:  node 1350c80b-3089-4dfa-848c-bb4e17cceaae_grok_final.js
+ */
+
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+const pptx = new PptxGenJS();
+const S = pptx.ShapeType;
+
+/* ------------------------------------------------------------------ *
+ * Palette / typography
+ * ------------------------------------------------------------------ */
+
+const YELLOW = 'FDC208'; // theme accent5
+const ORANGE = 'EB593C'; // theme accent4
+const DARK = '323232'; // theme dk2 - headline charcoal
+const INK = '262626'; // near-black body text
+const BLACK = '000000';
+const WHITE = 'FFFFFF';
+const GREY_CARD = 'F2F2F2';
+const RULE = 'D8D8D8';
+
+const JOST = 'Jost SemiBold';
+const ROBOTO = 'Roboto';
+
+const SLIDE_W = 13.333;
+const SLIDE_H = 7.5;
+
+// Shared text presets. Every text box in the deck is top-anchored.
+const TITLE = { fontFace: JOST, fontSize: 30, lineSpacingMultiple: 1.33333, valign: 'top', align: 'left' };
+const HEAD = { fontFace: JOST, fontSize: 16, lineSpacingMultiple: 1.1875, valign: 'top', align: 'left' };
+const BODY = { fontFace: ROBOTO, fontSize: 10, color: BLACK, lineSpacingMultiple: 1.5, valign: 'top', align: 'left' };
+const NUMBER = { fontFace: JOST, fontSize: 50, color: INK, lineSpacingMultiple: 1.0, valign: 'top', align: 'left' };
+
+// Drop shadow used by the floating white cards.
+const CARD_SHADOW = { type: 'outer', blur: 5, offset: 0.01, angle: 0, color: BLACK, opacity: 0.22 };
+
+/* ------------------------------------------------------------------ *
+ * Small helpers
+ * ------------------------------------------------------------------ */
+
+/** One text run. */
+const T = (text, options) => ({ text: text, options: options || {} });
+
+/** Last run of a paragraph - ends the line. */
+const BR = (text, options) => ({ text: text, options: Object.assign({ breakLine: true }, options) });
+
+/** Solid rectangle. */
+function box(sl, x, y, w, h, color, extra) {
+  sl.addShape(S.rect, Object.assign({ x: x, y: y, w: w, h: h, fill: { color: color }, line: { type: 'none' } }, extra));
+}
+
+/** Circle (x/y = top-left of its bounding square). */
+function circle(sl, x, y, d, opts) {
+  sl.addShape(S.ellipse, Object.assign({ x: x, y: y, w: d, h: d, line: { type: 'none' } }, opts));
+}
+
+/** Horizontal rule / straight connector. */
+function rule(sl, x, y, w, color, ptWidth) {
+  sl.addShape(S.line, { x: x, y: y, w: w, h: 0, line: { color: color, width: ptWidth } });
+}
+
+/**
+ * Empty picture frame.
+ * The reference deck ships photo placeholders with no embedded media, so each
+ * one is reproduced as an invisible frame that keeps the surrounding layout.
+ */
+function picFrame(sl, x, y, w, h, shape) {
+  sl.addShape(shape || S.rect, { x: x, y: y, w: w, h: h, line: { type: 'none' } });
+}
+
+/** Linear interpolation between two hex colors. */
+function mix(from, to, t) {
+  let out = '';
+  for (let i = 0; i < 6; i += 2) {
+    const a = parseInt(from.substr(i, 2), 16);
+    const b = parseInt(to.substr(i, 2), 16);
+    out += Math.round(a + (b - a) * t).toString(16).padStart(2, '0');
+  }
+  return out.toUpperCase();
+}
+
+// Gradient sweep directions, as screen-space angles pointing from orange to
+// yellow (0 = right, 90 = down).  These mirror the deck's three `a:lin` angles.
+const GRAD_MAIN = 260; // yellow top-left -> orange bottom-right (used almost everywhere)
+const GRAD_ORANGE_TOP = 90; // orange top -> yellow bottom
+const GRAD_ORANGE_BOTTOM = 270; // yellow top -> orange bottom
+
+/** Sutherland-Hodgman half-plane clip: keeps the side where sign*(p.d - limit) >= 0. */
+function clipHalfPlane(poly, dx, dy, limit, sign) {
+  const kept = [];
+  const side = q => sign * (q[0] * dx + q[1] * dy - limit);
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i], b = poly[(i + 1) % poly.length];
+    const va = side(a), vb = side(b);
+    if (va >= 0) kept.push(a);
+    if ((va >= 0) !== (vb >= 0)) {
+      const t = va / (va - vb);
+      kept.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
+    }
+  }
+  return kept;
+}
+
+/**
+ * The deck's signature orange -> yellow linear gradient.
+ * pptxgenjs has no gradient-fill API, so the area is sliced into thin bands
+ * perpendicular to `angle` and each band is filled with its own solid color.
+ */
+function gradientPoly(sl, poly, angle) {
+  const rad = (angle * Math.PI) / 180;
+  const dx = Math.cos(rad), dy = Math.sin(rad);
+  const projections = poly.map(q => q[0] * dx + q[1] * dy);
+  const lo = Math.min.apply(null, projections);
+  const hi = Math.max.apply(null, projections);
+  const bands = Math.max(16, Math.min(64, Math.round((hi - lo) * 12)));
+  const step = (hi - lo) / bands;
+  const overlap = step * 0.35; // hides hairline seams between adjacent bands
+
+  for (let i = 0; i < bands; i++) {
+    const near = lo + step * i - overlap;
+    const far = lo + step * (i + 1) + overlap;
+    const slice = clipHalfPlane(clipHalfPlane(poly, dx, dy, near, 1), dx, dy, far, -1);
+    if (slice.length < 3) continue;
+    const xs = slice.map(q => q[0]), ys = slice.map(q => q[1]);
+    const bx = Math.min.apply(null, xs), by = Math.min.apply(null, ys);
+    sl.addShape(S.custGeom, {
+      x: bx, y: by,
+      w: Math.max(0.01, Math.max.apply(null, xs) - bx),
+      h: Math.max(0.01, Math.max.apply(null, ys) - by),
+      fill: { color: mix(ORANGE, YELLOW, (i + 0.5) / bands) }, line: { type: 'none' },
+      points: slice.map(q => ({ x: q[0] - bx, y: q[1] - by })).concat([{ close: true }]),
+    });
+  }
+}
+
+/** Gradient-filled rectangle. */
+function gradient(sl, x, y, w, h, angle) {
+  gradientPoly(sl, [[x, y], [x + w, y], [x + w, y + h], [x, y + h]], angle || GRAD_MAIN);
+}
+
+/** New slide with the deck's default white background. */
+function newSlide(background) {
+  const sl = pptx.addSlide();
+  sl.background = { color: background || WHITE };
+  return sl;
+}
+
+/* ------------------------------------------------------------------ *
+ * Icons - flat vector marks drawn with custGeom / preset shapes.
+ * Each takes a bounding box in inches plus a color.
+ * ------------------------------------------------------------------ */
+
+/** Filled polygon; `pts` are fractions (0..1) of the bounding box. */
+function poly(sl, x, y, w, h, color, pts) {
+  sl.addShape(S.custGeom, {
+    x: x, y: y, w: w, h: h, fill: { color: color }, line: { type: 'none' },
+    points: pts.map(p => ({ x: w * p[0], y: h * p[1] })).concat([{ close: true }]),
+  });
+}
+
+/** Fractional rounded rectangle inside a bounding box. */
+function frect(sl, x, y, w, h, fx, fy, fw, fh, color, radius) {
+  sl.addShape(radius ? S.roundRect : S.rect, {
+    x: x + w * fx, y: y + h * fy, w: w * fw, h: h * fh,
+    fill: { color: color }, line: { type: 'none' }, rectRadius: radius,
+  });
+}
+
+/** Fractional ellipse inside a bounding box. */
+function fellipse(sl, x, y, w, h, fx, fy, fw, fh, color) {
+  sl.addShape(S.ellipse, { x: x + w * fx, y: y + h * fy, w: w * fw, h: h * fh, fill: { color: color }, line: { type: 'none' } });
+}
+
+const ICON = {
+  check: (sl, x, y, w, h, c) =>
+    poly(sl, x, y, w, h, c, [[0, 0.52], [0.14, 0.37], [0.38, 0.62], [0.86, 0.03], [1, 0.16], [0.38, 0.93]]),
+
+  // Bank / classical portico - roof, architrave, three columns, plinth.
+  bank: function (sl, x, y, w, h, c) {
+    poly(sl, x, y, w, h, c, [[0.5, 0], [1, 0.26], [1, 0.33], [0, 0.33], [0, 0.26]]);
+    frect(sl, x, y, w, h, 0.09, 0.38, 0.82, 0.06, c);
+    [0.16, 0.42, 0.68].forEach(fx => frect(sl, x, y, w, h, fx, 0.44, 0.16, 0.34, c));
+    frect(sl, x, y, w, h, 0.09, 0.78, 0.82, 0.06, c);
+    frect(sl, x, y, w, h, 0.02, 0.90, 0.96, 0.09, c, 0.02);
+  },
+
+  // Car, front elevation - cabin outline, body, grille slots, wheel legs.
+  car: function (sl, x, y, w, h, c) {
+    poly(sl, x, y, w, h, c, [[0.28, 0], [0.72, 0], [0.86, 0.10], [0.96, 0.40], [0.04, 0.40], [0.14, 0.10]]);
+    poly(sl, x, y, w, h, WHITE, [[0.24, 0.09], [0.77, 0.09], [0.88, 0.36], [0.12, 0.36]]);
+    frect(sl, x, y, w, h, 0, 0.36, 1, 0.50, c, w * 0.05);
+    [[0.07, 0.20], [0.35, 0.31], [0.72, 0.20]].forEach(g =>
+      frect(sl, x, y, w, h, g[0], 0.56, g[1], 0.13, WHITE, w * 0.03));
+    frect(sl, x, y, w, h, 0, 0.80, 0.21, 0.20, c);
+    frect(sl, x, y, w, h, 0.79, 0.80, 0.21, 0.20, c);
+  },
+
+  // Claw hammer.
+  hammer: function (sl, x, y, w, h, c) {
+    poly(sl, x, y, w, h, c, [[0, 0.03], [0.35, 0.03], [0.35, 0.00], [0.62, 0.00], [1, 0.10], [1, 0.20],
+      [0.72, 0.13], [0.62, 0.26], [0.35, 0.26], [0.35, 0.16], [0, 0.16]]);
+    poly(sl, x, y, w, h, c, [[0.40, 0.32], [0.60, 0.32], [0.68, 0.44], [0.68, 1], [0.32, 1], [0.32, 0.44]]);
+  },
+
+  // Crossed wrench (top-left to bottom-right) over a pencil (bottom-left to top-right).
+  tools: function (sl, x, y, w, h, c) {
+    poly(sl, x, y, w, h, c, [[0.14, 0.98], [0.86, 0.26], [0.76, 0.16], [0.04, 0.88]]); // pencil body
+    poly(sl, x, y, w, h, c, [[0.00, 1.00], [0.16, 0.97], [0.04, 0.86]]); // pencil tip
+    poly(sl, x, y, w, h, c, [[0.80, 0.06], [1.00, 0.26], [0.88, 0.38], [0.68, 0.18]]); // eraser head
+    poly(sl, x, y, w, h, c, [[0.31, 0.16], [0.83, 0.74], [0.72, 0.85], [0.20, 0.27]]); // wrench shaft
+    // Open-ended jaws: C-rings whose 110-degree gaps face away from the shaft.
+    [[0.22, 0.20, 280, 170], [0.80, 0.80, 100, 350]].forEach(jaw => {
+      const d = w * 0.40;
+      sl.addShape(S.blockArc, { x: x + w * jaw[0] - d / 2, y: y + h * jaw[1] - d / 2, w: d, h: d,
+        fill: { color: c }, line: { type: 'none' }, angleRange: [jaw[2], jaw[3]], arcThicknessRatio: 0.66 });
+    });
+  },
+
+  plane: (sl, x, y, w, h, c) =>
+    poly(sl, x, y, w, h, c, [
+      [0.50, 0], [0.57, 0.06], [0.61, 0.20], [0.61, 0.38], [1, 0.55], [1, 0.63], [0.61, 0.57],
+      [0.61, 0.80], [0.77, 0.92], [0.77, 1], [0.50, 0.93], [0.23, 1], [0.23, 0.92],
+      [0.39, 0.80], [0.39, 0.57], [0, 0.63], [0, 0.55], [0.39, 0.38], [0.39, 0.20], [0.43, 0.06]]),
+
+  bolt: (sl, x, y, w, h, c) =>
+    sl.addShape(S.lightningBolt, { x: x, y: y, w: w, h: h, fill: { color: c }, line: { type: 'none' } }),
+
+  // Broadcast target - three concentric rings, a core dot and a mast.
+  target: function (sl, x, y, w, h, c) {
+    const cx = x + w * 0.50, cy = y + h * 0.42;
+    [[1.00, 0.13], [0.62, 0.20], [0.24, 0.42]].forEach(r => {
+      const d = w * r[0];
+      sl.addShape(S.donut, { x: cx - d / 2, y: cy - d / 2, w: d, h: d,
+        fill: { color: c }, line: { type: 'none' }, rectRadius: d * r[1] });
+    });
+    frect(sl, x, y, w, h, 0.45, 0.42, 0.10, 0.58, c);
+  },
+
+  // Light bulb: outlined glass, screw base, radiating rays.
+  bulb: function (sl, x, y, w, h, c) {
+    const glass = w * 0.68;
+    sl.addShape(S.ellipse, { x: x + w * 0.16, y: y + h * 0.145, w: glass, h: glass, line: { color: c, width: 2.5 } });
+    box(sl, x + w * 0.40, y + h * 0.62, w * 0.20, h * 0.18, WHITE); // open the glass into the neck
+    frect(sl, x, y, w, h, 0.36, 0.60, 0.04, 0.35, c); // neck / base wall, left
+    frect(sl, x, y, w, h, 0.60, 0.60, 0.04, 0.35, c); // neck / base wall, right
+    [0.765, 0.835, 0.905].forEach(fy => frect(sl, x, y, w, h, 0.36, fy, 0.28, 0.028, c)); // screw threads
+    frect(sl, x, y, w, h, 0.37, 0.945, 0.26, 0.028, c);
+    frect(sl, x, y, w, h, 0.43, 0.975, 0.14, 0.028, c); // rounded contact tip
+    frect(sl, x, y, w, h, 0.47, 0.02, 0.05, 0.05, c); // ray: up
+    frect(sl, x, y, w, h, 0.01, 0.395, 0.09, 0.028, c); // ray: left
+    frect(sl, x, y, w, h, 0.90, 0.395, 0.09, 0.028, c); // ray: right
+    [[0.10, 0.115, 45], [0.79, 0.115, -45], [0.10, 0.63, -45], [0.79, 0.63, 45]].forEach(r =>
+      sl.addShape(S.rect, { x: x + w * r[0], y: y + h * r[1], w: w * 0.11, h: h * 0.028,
+        fill: { color: c }, line: { type: 'none' }, rotate: r[2] })); // diagonal rays
+  },
+
+  // Outlined house with chimney, window and door.
+  house: function (sl, x, y, w, h, c) {
+    sl.addShape(S.rect, { x: x + w * 0.15, y: y + h * 0.42, w: w * 0.70, h: h * 0.58, line: { color: c, width: 2 } });
+    sl.addShape(S.custGeom, { x: x, y: y, w: w, h: h, line: { color: c, width: 2 },
+      points: [{ x: w * 0.04, y: h * 0.50 }, { x: w * 0.5, y: h * 0.08 }, { x: w * 0.96, y: h * 0.50 }] });
+    sl.addShape(S.rect, { x: x + w * 0.70, y: y + h * 0.13, w: w * 0.12, h: h * 0.20, line: { color: c, width: 2 } });
+    sl.addShape(S.rect, { x: x + w * 0.38, y: y + h * 0.45, w: w * 0.22, h: h * 0.18, line: { color: c, width: 2 } });
+    sl.addShape(S.rect, { x: x + w * 0.36, y: y + h * 0.72, w: w * 0.26, h: h * 0.28, line: { color: c, width: 2 } });
+  },
+
+  // Outlined bus, front elevation.
+  bus: function (sl, x, y, w, h, c) {
+    sl.addShape(S.roundRect, { x: x + w * 0.18, y: y + h * 0.10, w: w * 0.64, h: h * 0.72, line: { color: c, width: 2 }, rectRadius: 0.05 });
+    sl.addShape(S.rect, { x: x + w * 0.20, y: y + h * 0.26, w: w * 0.28, h: h * 0.22, line: { color: c, width: 2 } });
+    sl.addShape(S.rect, { x: x + w * 0.52, y: y + h * 0.26, w: w * 0.28, h: h * 0.22, line: { color: c, width: 2 } });
+    sl.addShape(S.rect, { x: x + w * 0.06, y: y + h * 0.30, w: w * 0.12, h: h * 0.20, line: { color: c, width: 2 } });
+    sl.addShape(S.rect, { x: x + w * 0.82, y: y + h * 0.30, w: w * 0.12, h: h * 0.20, line: { color: c, width: 2 } });
+    sl.addShape(S.ellipse, { x: x + w * 0.24, y: y + h * 0.56, w: w * 0.13, h: h * 0.13, line: { color: c, width: 2 } });
+    sl.addShape(S.ellipse, { x: x + w * 0.63, y: y + h * 0.56, w: w * 0.13, h: h * 0.13, line: { color: c, width: 2 } });
+    frect(sl, x, y, w, h, 0.42, 0.58, 0.16, 0.045, c);
+    frect(sl, x, y, w, h, 0.42, 0.67, 0.16, 0.045, c);
+    sl.addShape(S.rect, { x: x + w * 0.24, y: y + h * 0.82, w: w * 0.10, h: h * 0.12, line: { color: c, width: 2 } });
+    sl.addShape(S.rect, { x: x + w * 0.66, y: y + h * 0.82, w: w * 0.10, h: h * 0.12, line: { color: c, width: 2 } });
+  },
+
+  phone: (sl, x, y, w, h, c) =>
+    poly(sl, x, y, w, h, c, [
+      [0.02, 0.06], [0.28, 0], [0.44, 0.30], [0.28, 0.44], [0.40, 0.64], [0.60, 0.74],
+      [0.72, 0.58], [1, 0.74], [0.92, 1], [0.60, 0.96], [0.24, 0.72], [0.04, 0.34]]),
+
+  // Globe rendered as the template's ring of dots.
+  globe: function (sl, x, y, w, h, c) {
+    const dots = [[0.42, 0.02, 0.26], [0.72, 0.14, 0.24], [0.78, 0.44, 0.22], [0.64, 0.70, 0.21],
+      [0.36, 0.78, 0.20], [0.14, 0.62, 0.19], [0.06, 0.34, 0.19], [0.18, 0.12, 0.14]];
+    dots.forEach(d => fellipse(sl, x, y, w, h, d[0], d[1], d[2], d[2] * (w / h), c));
+  },
+
+  mail: function (sl, x, y, w, h, c) {
+    box(sl, x, y, w, h, c);
+    poly(sl, x, y, w, h, WHITE, [[0.04, 0.10], [0.5, 0.58], [0.96, 0.10], [0.96, 0.00], [0.04, 0.00]]);
+  },
+};
+
+/* ------------------------------------------------------------------ *
+ * Repeated copy - the template's lorem-ipsum blocks
+ * ------------------------------------------------------------------ */
+
+const LOREM = {
+  full: 'It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum desktop publishing packages and ipsum\' will uncover many web sites still in their infancy.',
+  page: 'It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. ',
+  short: 'Be distracted by the readable content of a page when looking at its layout. ',
+  packages: 'It is a long established fact that a reader will be distracted by the readable content of packages and web page editors now use Lorem Ipsum.',
+  intro: 'It is a long established fact that a reader will be distracted by the readable content of packages and web page editors now use Lorem Ipsum as their default model text, and a search for \'PLACEHOLDER',
+  teaser: 'It is a long established fact that a reader will be distracted ',
+  looking: 'It is a long established fact that a looking at its layout. ',
+  duis: 'Duis consectetur Leo vel neque feugiat nec',
+  cardBody: 'PLACEHOLDER',
+  project: 'It is a long established fact that a reader will be distracted by the readable content of packages and web page editors now use Lorem Ipsum as their default model text, It is a long',
+};
+
+/* ================================================================== *
+ * Slide 1 - Title
+ * ================================================================== */
+function slide01() {
+  const sl = newSlide();
+  gradient(sl, 0, 0, 5.6, 5.369, GRAD_MAIN);
+  picFrame(sl, 0.923, 0.937, 5.744, 5.787);
+
+  box(sl, 5.841, 2.0, 2.968, 0.825, YELLOW);
+  sl.addText([T('Company Profile')], { x: 6.063, y: 2.151, w: 2.524, h: 0.454, fontFace: ROBOTO, fontSize: 21, color: BLACK, valign: 'top', align: 'left' });
+
+  sl.addText([
+    BR('ARCHITECTURE ', { fontSize: 45, color: INK, lineSpacingMultiple: 1.55555 }),
+    T('&  ', { fontSize: 80, color: YELLOW }),
+    T('20', { fontSize: 80, color: INK }),
+    T('25', { fontSize: 80, color: YELLOW }),
+    T(' CONSTRUCTION', { fontSize: 45, color: INK }),
+  ], { x: 7.036, y: 3.279, w: 5.744, h: 2.99, fontFace: JOST, lineSpacingMultiple: 0.875, valign: 'top', align: 'left' });
+}
+
+/* ================================================================== *
+ * Slide 2 - Welcome
+ * ================================================================== */
+function slide02() {
+  const sl = newSlide();
+  gradient(sl, 9.854, 0, 3.479, 7.5, GRAD_MAIN);
+  picFrame(sl, 7.723, 0.583, 4.716, 6.385);
+
+  sl.addText([
+    T('WELCOME TO OUR WORLD OF ', { color: BLACK }),
+    T('ARCHITECTURE', { color: YELLOW }),
+  ], { x: 0.886, y: 1.306, w: 4.031, h: 1.598, fontFace: JOST, fontSize: 35, lineSpacingMultiple: 1.0, valign: 'top', align: 'left' });
+
+  sl.addText([T('It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum desktop publishing packages and web page.')],
+    Object.assign({}, BODY, { x: 0.886, y: 3.062, w: 4.937, h: 0.714 }));
+
+  const columns = [
+    { x: 0.886, w: 1.949, label: 'ARCHITECTURE', body: 'It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout.' },
+    { x: 3.557, w: 2.107, label: 'CONSTRUCTION', body: 'Be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum desktop.' },
+  ];
+  columns.forEach(col => {
+    sl.addText([T(col.label)], { x: col.x, y: 5.083, w: col.w, h: 0.379, fontFace: ROBOTO, fontSize: 16, bold: true, color: BLACK, lineSpacingMultiple: 1.25, valign: 'top', align: 'left' });
+    sl.addText([T(col.body)], Object.assign({}, BODY, { x: col.x, y: 5.476, w: 2.377, h: 0.924 }));
+  });
+}
+
+/* ================================================================== *
+ * Slide 3 - Why choose us (photo left)
+ * ================================================================== */
+function slide03() {
+  const sl = newSlide();
+  picFrame(sl, 0, 0, 6.438, 7.5);
+
+  sl.addText([T('WHY CHOOSE ', { color: DARK }), T('US?', { color: YELLOW })],
+    Object.assign({}, TITLE, { x: 7.625, y: 1.21, w: 4.27, h: 0.648 }));
+
+  sl.addText([
+    BR('It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum their default model text.'),
+    BR(''),
+    T('Content of a page when looking at its layout. The point of using Lorem Ipsum desktop publishing packages'),
+  ], Object.assign({}, BODY, { x: 7.625, y: 2.176, w: 4.464, h: 1.345 }));
+
+  gradient(sl, 4.642, 4.826, 6.129, 1.809, GRAD_MAIN);
+  sl.addText([T('ADVANTAGES')], Object.assign({}, HEAD, { x: 5.211, y: 5.144, w: 2.226, h: 0.368, color: BLACK }));
+  sl.addText([T('It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum desktop publishing packages')],
+    { x: 5.211, y: 5.518, w: 5.198, h: 0.714, fontFace: ROBOTO, fontSize: 12, italic: true, color: INK, lineSpacingMultiple: 1.25, valign: 'top', align: 'left' });
+}
+
+/* ================================================================== *
+ * Slide 4 - Why choose us (dark panel)
+ * ================================================================== */
+function slide04() {
+  const sl = newSlide();
+  picFrame(sl, 6.667, 0, 6.667, 7.5);
+  box(sl, 0.794, 0.694, 6.96, 6.111, DARK);
+
+  sl.addText([T('WHY CHOOSE ', { color: WHITE }), T('US?', { color: YELLOW })],
+    Object.assign({}, TITLE, { x: 1.811, y: 1.436, w: 4.157, h: 0.648 }));
+  sl.addText([T(LOREM.packages)], Object.assign({}, BODY, { x: 1.874, y: 2.203, w: 4.842, h: 0.504, color: WHITE }));
+
+  const items = [
+    { y: 3.518, title: 'Adequate Construction Equipment', w: 2.807 },
+    { y: 5.038, title: 'Turnkey Construction Of Apartments', w: 2.59 },
+  ];
+  items.forEach(it => {
+    circle(sl, 1.858, it.y + 0.193, 0.76, { fill: { color: WHITE } });
+    ICON.check(sl, 2.012, it.y + 0.416, 0.453, 0.33, YELLOW);
+    sl.addText([T(it.title)], Object.assign({}, HEAD, { x: 2.889, y: it.y, w: it.w, h: 0.635, color: WHITE }));
+    sl.addText([T('It is a long established fact that a reader will be distracted by page when looking at its layout. ')],
+      Object.assign({}, BODY, { x: 2.889, y: it.y + 0.627, w: 3.778, h: 0.504, color: WHITE }));
+  });
+}
+
+/* ================================================================== *
+ * Slide 5 - Overview
+ * ================================================================== */
+function slide05() {
+  const sl = newSlide();
+  picFrame(sl, 0.641, 0.554, 5.559, 6.4);
+
+  sl.addText([T('OVERVIEW', { color: BLACK })], Object.assign({}, TITLE, { x: 7.426, y: 1.537, w: 2.856, h: 0.648 }));
+  sl.addText([
+    BR('Established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum desktop.'),
+    BR(''),
+    T('It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using.'),
+  ], Object.assign({}, BODY, { x: 7.503, y: 2.15, w: 3.841, h: 1.556 }));
+
+  gradient(sl, 4.246, 4.508, 8.214, 1.809, GRAD_MAIN);
+  sl.addText([T('ESTABLISHED FACT THAT A READER')],
+    { x: 4.7, y: 5.068, w: 2.313, h: 0.64, fontFace: JOST, fontSize: 16, bold: true, color: BLACK, valign: 'top', align: 'left' });
+  sl.addText([T('It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum desktop publishing packages.')],
+    { x: 7.426, y: 5.031, w: 4.462, h: 0.714, fontFace: ROBOTO, fontSize: 11, italic: true, color: INK, lineSpacingMultiple: 1.36363, valign: 'top', align: 'left' });
+}
+
+/* ================================================================== *
+ * Slide 6 - Architecture and structures of the future
+ * ================================================================== */
+function slide06() {
+  const sl = newSlide();
+  // Right-triangle wedge filling the lower-right corner, gradient top->bottom.
+  gradientPoly(sl, [[13.333, 0], [13.333, 7.5], [7.5, 7.5]], GRAD_ORANGE_BOTTOM);
+  sl.addShape(S.ellipse, { x: 7.242, y: 1.495, w: 5.179, h: 5.179, line: { color: WHITE, width: 5 } });
+  picFrame(sl, 7.242, 1.495, 5.179, 5.179, S.ellipse);
+
+  sl.addText([T('ARCHITECTURE', { color: YELLOW }), T(' AND STRUCTURES OF THE FUTURE', { color: BLACK })],
+    { x: 0.749, y: 0.759, w: 6.493, h: 0.963, fontFace: JOST, fontSize: 30, lineSpacingMultiple: 1.0, valign: 'top', align: 'left' });
+
+  rule(sl, 0.844, 2.551, 2.172, YELLOW, 4);
+  sl.addText([T('Web page editors now use Lorem Ipsum as their default model text, and a search.')],
+    { x: 0.749, y: 2.705, w: 2.521, h: 1.111, fontFace: ROBOTO, fontSize: 15, color: BLACK, valign: 'top', align: 'left' });
+  sl.addText([T(LOREM.full)], Object.assign({}, BODY, { x: 3.542, y: 2.446, w: 2.997, h: 1.384 }));
+
+  picFrame(sl, 0.831, 4.704, 2.108, 2.069);
+  sl.addText([T('SOPHIA AVA')], { x: 3.169, y: 6.266, w: 1.897, h: 0.337, fontFace: JOST, fontSize: 16, color: BLACK, lineSpacingMultiple: 1.0, valign: 'top', align: 'left' });
+  sl.addText([T('Main Builder')], { x: 3.169, y: 6.539, w: 1.195, h: 0.269, fontFace: ROBOTO, fontSize: 12, bold: true, color: YELLOW, lineSpacingMultiple: 1.0, valign: 'top', align: 'left' });
+}
+
+/* ================================================================== *
+ * Slide 7 - Corporate / Builderarch
+ * ================================================================== */
+function slide07() {
+  const sl = newSlide();
+  gradient(sl, 0, 1.81, 4.381, 5.69, GRAD_MAIN);
+  picFrame(sl, 0.921, 0, 5.746, 6.595);
+
+  sl.addText([T('CORPORATE')], { x: 7.746, y: 1.411, w: 1.723, h: 0.367, fontFace: ROBOTO, fontSize: 16, bold: true, color: YELLOW, lineSpacingMultiple: 1.1875, valign: 'top', align: 'left' });
+  sl.addText([T('BUILDERARCH', { color: DARK })], Object.assign({}, TITLE, { x: 7.746, y: 1.69, w: 3.394, h: 0.648 }));
+  sl.addText([T(LOREM.full)], Object.assign({}, BODY, { x: 7.746, y: 2.427, w: 4.667, h: 0.924 }));
+
+  const items = [{ y: 4.328, icon: ICON.house }, { y: 5.821, icon: ICON.bus }];
+  items.forEach(it => {
+    circle(sl, 7.762, it.y, 0.785, { fill: { color: YELLOW } });
+    it.icon(sl, 7.967, it.y + 0.208, 0.372, 0.37, WHITE);
+    sl.addText([T(LOREM.page)], Object.assign({}, BODY, { x: 8.736, y: it.y + 0.036, w: 3.0, h: 0.714 }));
+  });
+}
+
+/* ================================================================== *
+ * Slide 8 - A multimedia presentation
+ * ================================================================== */
+function slide08() {
+  const sl = newSlide();
+  picFrame(sl, 7.317, 0, 6.016, 7.5);
+
+  sl.addText([T('A MUL TIMEDIA ', { color: YELLOW }), T('PRESENTION OF OUR COMPANY', { color: DARK })],
+    Object.assign({}, TITLE, { x: 0.952, y: 0.916, w: 5.063, h: 1.77 }));
+  sl.addText([T(LOREM.full)], Object.assign({}, BODY, { x: 0.952, y: 2.914, w: 5.492, h: 0.714 }));
+
+  gradient(sl, 3.768, 4.571, 5.39, 1.809, GRAD_MAIN);
+  sl.addText([T('GET TO KNOW OUR ', { color: INK }), T('COMPANY CLOSER', { color: WHITE })],
+    Object.assign({}, TITLE, { x: 4.246, y: 4.912, w: 4.484, h: 1.209 }));
+
+  sl.addText([T('420K', { color: YELLOW })], Object.assign({}, TITLE, { x: 0.952, y: 4.963, w: 1.568, h: 0.648 }));
+  sl.addText([T('It is a long established fact that a reader will be distracted sites still in their infancy.')],
+    Object.assign({}, BODY, { x: 0.952, y: 5.666, w: 2.068, h: 0.714 }));
+}
+
+/* ================================================================== *
+ * Slide 9 - About us / mission-vision-goals
+ * ================================================================== */
+function slide09() {
+  const sl = newSlide();
+  picFrame(sl, 0.749, 0, 12.585, 3.481);
+
+  sl.addText([T('ABOUT ', { color: DARK }), T('US', { color: YELLOW })],
+    Object.assign({}, TITLE, { x: 0.749, y: 4.194, w: 2.505, h: 0.648 }));
+  sl.addText([
+    BR('It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum their default model text, and a search for \'lorem ipsum'),
+    BR(''),
+    T(LOREM.page),
+  ], Object.assign({}, BODY, { x: 0.749, y: 4.921, w: 4.874, h: 1.345 }));
+
+  gradient(sl, 6.667, 1.454, 5.918, 6.046, GRAD_MAIN);
+
+  const items = [
+    { y: 2.523, label: 'MISSION', outline: true, icon: ICON.plane, ix: 7.552, iw: 0.477, color: WHITE },
+    { y: 3.846, label: 'VISION', outline: false, icon: ICON.bolt, ix: 7.649, iw: 0.283, color: YELLOW },
+    { y: 5.170, label: 'GOALS', outline: true, icon: ICON.target, ix: 7.595, iw: 0.391, color: WHITE },
+  ];
+  items.forEach(it => {
+    circle(sl, 7.359, it.y + 0.136, 0.864, it.outline ? { fill: { type: 'none' }, line: { color: INK, width: 1 } } : { fill: { color: WHITE } });
+    it.icon(sl, it.ix, it.y + 0.322, it.iw, 0.492, it.color);
+    sl.addText([T(it.label, { color: INK })], Object.assign({}, HEAD, { x: 8.541, y: it.y, w: 1.723, h: 0.367 }));
+    sl.addText([T(LOREM.short)], Object.assign({}, BODY, { x: 8.541, y: it.y + 0.421, w: 3.0, h: 0.504, color: INK }));
+  });
+}
+
+/* ================================================================== *
+ * Slide 10 - Professional services
+ * ================================================================== */
+function slide10() {
+  const sl = newSlide();
+  box(sl, 0, 0, 6.667, 3.75, DARK);
+  gradient(sl, 0, 3.75, 6.667, 0.735, GRAD_MAIN);
+  picFrame(sl, 6.667, 0, 6.667, 4.492);
+
+  sl.addText([T('WE PROVIDE ONLY ', { color: WHITE, bold: true }), T('PROFESSIONAL SERVICES', { color: YELLOW, bold: true })],
+    { x: 0.851, y: 1.108, w: 3.673, h: 0.784, fontFace: ROBOTO, fontSize: 20, lineSpacingMultiple: 1.25, valign: 'top', align: 'left' });
+  sl.addText([T(LOREM.page)], Object.assign({}, BODY, { x: 0.851, y: 1.954, w: 4.212, h: 0.504, color: WHITE }));
+
+  sl.addText([T('WE HAVE ONLY A QUALIFIED TEAM OF BUILDERS AND ', { color: BLACK }), T('EXPERIENCED ARCHITECTS', { color: YELLOW, bold: true })],
+    { x: 0.851, y: 5.219, w: 4.784, h: 1.134, fontFace: ROBOTO, fontSize: 20, lineSpacingMultiple: 1.25, valign: 'top', align: 'left' });
+  sl.addText([
+    BR('It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum desktop publishing packages'),
+    BR(''),
+    T(LOREM.page),
+  ], Object.assign({}, BODY, { x: 6.667, y: 5.009, w: 4.784, h: 1.345 }));
+}
+
+/* ================================================================== *
+ * Slides 11 & 12 - About our builder company (two stat tiles)
+ * ================================================================== */
+function statTiles(sl, y, firstColor, secondColor) {
+  box(sl, 0.778, y, 2.73, 2.357, YELLOW);
+  box(sl, 3.929, y, 2.73, 2.357, DARK);
+  const tiles = [
+    { x: 1.252, value: '+5.85', color: firstColor },
+    { x: 4.403, value: '93.3%', color: secondColor },
+  ];
+  tiles.forEach(t => {
+    sl.addText([T(t.value, { color: t.color })], Object.assign({}, TITLE, { x: t.x, y: y + 0.54, w: 1.782, h: 0.648, align: 'center' }));
+    sl.addText([T(LOREM.duis)], Object.assign({}, BODY, { x: t.x, y: y + 1.313, w: 1.782, h: 0.504, color: t.color, align: 'center' }));
+  });
+}
+
+function slide11() {
+  const sl = newSlide();
+  picFrame(sl, 7.333, 0, 6.0, 6.726);
+  sl.addText([T('ABOUT', { color: YELLOW }), T(' OUR BUILDER COMPANY', { color: DARK })],
+    Object.assign({}, TITLE, { x: 0.778, y: 1.226, w: 4.635, h: 1.209 }));
+  sl.addText([T('It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum desktop publishing packages and web page editors.')],
+    Object.assign({}, BODY, { x: 0.778, y: 2.925, w: 5.063, h: 0.714 }));
+  statTiles(sl, 4.369, INK, WHITE);
+}
+
+function slide12() {
+  const sl = newSlide();
+  picFrame(sl, 0, 1.884, 7.681, 5.616);
+  gradient(sl, 7.681, 3.75, 5.652, 3.75, GRAD_MAIN);
+  box(sl, 6.113, 1.863, 5.969, 4.422, WHITE, { shadow: CARD_SHADOW });
+
+  sl.addText([T('ABOUT', { color: YELLOW }), T(' OUR BUILDER COMPANY', { color: DARK })],
+    Object.assign({}, TITLE, { x: 7.05, y: 3.032, w: 4.427, h: 1.209 }));
+  sl.addText([T('It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum desktop publishing packages and web page editors now use Lorem Ipsum')],
+    Object.assign({}, BODY, { x: 7.05, y: 4.6, w: 4.413, h: 0.924 }));
+  statTiles(sl, 0.675, WHITE, WHITE);
+}
+
+/* ================================================================== *
+ * Slide 13 - Numbered list, professional team
+ * ================================================================== */
+function slide13() {
+  const sl = newSlide();
+  sl.addText([T('WE ARE A PROFESSIONAL ', { color: YELLOW }), T('TEAM OF ARCHITECTS AND BUILDERS', { color: DARK })],
+    Object.assign({}, TITLE, { x: 0.795, y: 2.024, w: 2.413, h: 4.014 }));
+  picFrame(sl, 4.016, 0, 4.175, 7.5);
+
+  const items = [
+    { n: '1.', y: 1.664, title: 'QULIFIED STAFF ', w: 2.192 },
+    { n: '2.', y: 3.288, title: 'The Best Building Materials ', w: 3.0 },
+    { n: '3.', y: 4.913, title: 'Realization on Time', w: 2.192 },
+  ];
+  items.forEach(it => {
+    sl.addText([T(it.n)], Object.assign({}, NUMBER, { x: 8.49, y: it.y + 0.086, w: 1.048, h: 0.837 }));
+    sl.addText([T(it.title, { color: INK })], Object.assign({}, HEAD, { x: 9.538, y: it.y, w: it.w, h: 0.367 }));
+    sl.addText([T(LOREM.short)], Object.assign({}, BODY, { x: 9.538, y: it.y + 0.358, w: 3.0, h: 0.504, color: INK }));
+  });
+}
+
+/* ================================================================== *
+ * Slide 14 - Architecture and construction business
+ * ================================================================== */
+function slide14() {
+  const sl = newSlide();
+  picFrame(sl, 0.794, 0.691, 5.127, 6.809);
+
+  sl.addText([
+    T('ARCHITECTURE', { color: YELLOW }),
+    BR(' ', { color: DARK }),
+    T('AND CONSTRUCTION BUSINESS', { color: BLACK }),
+  ], Object.assign({}, TITLE, { x: 6.936, y: 1.024, w: 4.689, h: 1.77 }));
+  sl.addText([T(LOREM.packages)], Object.assign({}, BODY, { x: 6.936, y: 3.076, w: 5.127, h: 0.504 }));
+
+  const items = [
+    { y: 4.293, title: 'Building Economic System', w: 3.144 },
+    { y: 5.574, title: 'Prefabricated Houses', w: 2.755 },
+  ];
+  items.forEach(it => {
+    circle(sl, 6.998, it.y + 0.083, 0.76, { fill: { color: YELLOW } });
+    ICON.check(sl, 7.152, it.y + 0.306, 0.453, 0.33, WHITE);
+    sl.addText([T(it.title)], { x: 8.029, y: it.y, w: it.w, h: 0.367, fontFace: ROBOTO, fontSize: 16, bold: true, color: BLACK, lineSpacingMultiple: 1.1875, valign: 'top', align: 'left' });
+    sl.addText([T('It is a long established fact that a reader will be distracted by the readable that a reader will be distracted by content.')],
+      Object.assign({}, BODY, { x: 8.029, y: it.y + 0.422, w: 4.033, h: 0.504 }));
+  });
+}
+
+/* ================================================================== *
+ * Slide 15 - Get to know our company closer
+ * ================================================================== */
+function slide15() {
+  const sl = newSlide();
+  picFrame(sl, 8.403, 0, 4.931, 7.5);
+
+  sl.addText([
+    BR('GET TO KNOW ', { color: DARK }),
+    T('OUR ', { color: DARK }),
+    T('COMPANY CLOSER', { color: YELLOW }),
+  ], Object.assign({}, TITLE, { x: 0.841, y: 1.003, w: 3.778, h: 1.77 }));
+  sl.addText([T('Packages and web page editors now use Lorem Ipsum as their default model text, and a search for \'lorem ipsum')],
+    Object.assign({}, BODY, { x: 0.841, y: 3.012, w: 4.921, h: 0.504 }));
+
+  ICON.bulb(sl, 0.894, 5.144, 0.864, 1.055, YELLOW);
+  sl.addText([T('THE MAIN IDEA OF OUR COMPANY', { color: BLACK })], Object.assign({}, HEAD, { x: 2.26, y: 5.204, w: 2.671, h: 0.634 }));
+  sl.addText([T('It is a long established fact that a reader will be distracted a page when looking at its layout. ')],
+    Object.assign({}, BODY, { x: 2.26, y: 5.901, w: 3.27, h: 0.504 }));
+
+  const cards = [
+    { y: 0.807, n: '1.', title: 'ARCHITECTURAL DESIGN', highlight: false },
+    { y: 2.932, n: '2.', title: 'CONSTRUCTION WORKS', highlight: true },
+    { y: 5.056, n: '3.', title: 'INTERIOR FINISHING', highlight: false },
+  ];
+  cards.forEach(c => {
+    if (c.highlight) gradient(sl, 6.355, c.y, 4.931, 1.809, GRAD_MAIN);
+    else box(sl, 6.355, c.y, 4.931, 1.809, GREY_CARD);
+    sl.addText([T(c.n)], Object.assign({}, NUMBER, { x: 6.646, y: c.y + 0.505, w: 1.048, h: 0.837 }));
+    sl.addText([T(c.title)], { x: 7.61, y: c.y + 0.484, w: 3.0, h: 0.367, fontFace: ROBOTO, fontSize: 16, bold: true, color: INK, lineSpacingMultiple: 1.1875, valign: 'top', align: 'left' });
+    sl.addText([T(LOREM.cardBody)], Object.assign({}, BODY, { x: 7.61, y: c.y + 0.826, w: 3.355, h: 0.504, color: INK }));
+  });
+}
+
+/* ================================================================== *
+ * Slide 16 - A creative construction company (stats column)
+ * ================================================================== */
+function slide16() {
+  const sl = newSlide();
+  picFrame(sl, 0, 0, 3.349, 7.5);
+  picFrame(sl, 10.19, 4.877, 2.048, 1.885);
+  gradient(sl, 3.349, 0, 3.508, 7.5, GRAD_MAIN);
+
+  sl.addText([T('A CREATIVE ', { color: YELLOW }), T('CONSTRUCTION COMPANY', { color: DARK })],
+    Object.assign({}, TITLE, { x: 7.413, y: 0.812, w: 4.032, h: 1.77 }));
+  sl.addText([
+    BR('PLACEHOLDER'),
+    BR(''),
+    T('It is a long established fact that a reader will be distracted by the readable content of packages and web page editors now use Lorem Ipsum as their default model text, '),
+  ], Object.assign({}, BODY, { x: 7.413, y: 2.785, w: 4.333, h: 1.345 }));
+
+  const stats = [
+    { y: 1.146, x: 4.212, w: 1.782, value: '25 823', label: 'Satisfied Customers With The Services' },
+    { y: 3.167, x: 4.212, w: 1.782, value: '19 625', label: 'Built Apartments for developers' },
+    { y: 5.188, x: 4.019, w: 2.169, value: '235 843', label: 'Used tons of concrete for construction' },
+  ];
+  stats.forEach(s => {
+    sl.addText([T(s.value, { color: WHITE })], Object.assign({}, TITLE, { x: s.x, y: s.y, w: s.w, h: 0.648, align: 'center' }));
+    sl.addText([T(s.label)], Object.assign({}, BODY, { x: 4.212, y: s.y + 0.662, w: 1.782, h: 0.504, color: WHITE, align: 'center' }));
+  });
+
+  sl.addText([T('JAMES SMITH', { color: BLACK })],
+    { x: 8.246, y: 6.176, w: 1.764, h: 0.337, fontFace: JOST, fontSize: 16, lineSpacingMultiple: 1.0, valign: 'top', align: 'right' });
+  sl.addText([T('Main Builder')],
+    { x: 8.798, y: 6.511, w: 1.212, h: 0.269, fontFace: ROBOTO, fontSize: 12, bold: true, color: YELLOW, lineSpacingMultiple: 1.0, valign: 'top', align: 'right' });
+}
+
+/* ================================================================== *
+ * Slide 17 - Meet our experts (4 up, gradient band)
+ * ================================================================== */
+function slide17() {
+  const sl = newSlide();
+  sl.addText([T('MEET', { color: YELLOW }), T(' OUR EXPERTS', { color: DARK })],
+    Object.assign({}, TITLE, { x: 0.73, y: 0.745, w: 4.33, h: 0.648 }));
+  sl.addText([T('It is a long established fact that a reader will be distracted by the readable content of packages and web page editors now use Lorem Ipsum as their default model text, and the readable content of packages and web page editors')],
+    Object.assign({}, BODY, { x: 6.952, y: 0.79, w: 5.603, h: 0.714 }));
+
+  gradient(sl, 0, 3.75, 13.333, 3.75, GRAD_ORANGE_TOP);
+
+  const team = [
+    { x: 0.778, name: 'JAMES SMITH', nw: 1.802, role: 'Main Architect', rw: 1.391 },
+    { x: 3.905, name: 'JOHN DOE', nw: 1.802, role: 'Main Builder', rw: 1.156 },
+    { x: 7.032, name: 'JAMES VANE', nw: 1.802, role: 'Foreman ', rw: 1.156 },
+    { x: 10.159, name: 'HENRY WOTTON', nw: 1.943, role: 'Builder', rw: 1.156 },
+  ];
+  team.forEach(m => {
+    picFrame(sl, m.x, 2.436, 2.397, 2.615);
+    sl.addText([T(m.name)], { x: m.x, y: 5.676, w: m.nw, h: 0.325, fontFace: ROBOTO, fontSize: 16, bold: true, color: INK, lineSpacingMultiple: 1.0, valign: 'top', align: 'left' });
+    sl.addText([T(m.role)], { x: m.x, y: 5.993, w: m.rw, h: 0.269, fontFace: ROBOTO, fontSize: 12, bold: true, color: INK, lineSpacingMultiple: 1.0, valign: 'top', align: 'left' });
+    sl.addText([T(LOREM.teaser)], Object.assign({}, BODY, { x: m.x, y: 6.306, w: 2.222, h: 0.504, color: INK }));
+  });
+}
+
+/* ================================================================== *
+ * Slide 18 - Meet our professional team (3 cards)
+ * ================================================================== */
+function slide18() {
+  const sl = newSlide();
+  sl.addText([T('MEET OUR ', { color: DARK }), T('PROFESSIONAL TEAM', { color: YELLOW })],
+    Object.assign({}, TITLE, { x: 2.825, y: 0.527, w: 7.683, h: 0.648, align: 'center' }));
+  sl.addText([T(LOREM.intro)], Object.assign({}, BODY, { x: 1.571, y: 1.314, w: 10.19, h: 0.504, align: 'center' }));
+
+  const cards = [
+    { x: 1.294, px: 1.857, tx: 1.714, rx: 1.964, name: 'JAMES SMITH', role: 'Main Architect', color: BLACK, highlight: false },
+    { x: 5.135, px: 5.683, tx: 5.556, rx: 5.805, name: 'JOHN DOE', role: 'Main Builder', color: INK, highlight: true },
+    { x: 8.976, px: 9.54, tx: 9.397, rx: 9.646, name: 'JAMES VANE', role: 'Foreman ', color: BLACK, highlight: false },
+  ];
+  cards.forEach(c => {
+    if (c.highlight) gradient(sl, c.x, 2.587, 3.063, 4.243, GRAD_ORANGE_TOP);
+    else sl.addShape(S.rect, { x: c.x, y: 2.587, w: 3.063, h: 4.243, line: { color: YELLOW, width: 2 } });
+    picFrame(sl, c.px, 2.772, 1.936, 1.936, S.ellipse);
+    sl.addText([T(c.name, { color: c.color })], { x: c.tx, y: 5.112, w: 2.222, h: 0.337, fontFace: JOST, fontSize: 16, lineSpacingMultiple: 1.0, valign: 'top', align: 'center' });
+    sl.addText([T(c.role)], { x: c.rx, y: 5.43, w: 1.723, h: 0.269, fontFace: ROBOTO, fontSize: 12, bold: true, color: c.color, lineSpacingMultiple: 1.0, valign: 'top', align: 'center' });
+    sl.addText([T(LOREM.teaser)], Object.assign({}, BODY, { x: c.tx, y: 5.773, w: 2.222, h: 0.504, color: c.color, align: 'center' }));
+  });
+}
+
+/* ================================================================== *
+ * Slides 19 & 20 - History timeline
+ * ================================================================== */
+function timeline(sl, milestones) {
+  milestones.forEach(m => {
+    box(sl, m.x, 3.588, 1.444, 1.135, m.dark ? DARK : YELLOW);
+    sl.addText([T(m.year, { color: m.dark ? WHITE : INK })],
+      Object.assign({}, TITLE, { x: m.yx, y: 3.831, w: m.yw, h: 0.648, align: 'center' }));
+    sl.addText(m.title.map((line, i) => (i === m.title.length - 1 ? T(line, { color: m.titleColor || BLACK }) : BR(line, { color: m.titleColor || BLACK }))),
+      Object.assign({}, HEAD, { x: m.tx, y: 5.159, w: m.tw, h: 0.635 }));
+    sl.addText([T(LOREM.looking)], Object.assign({}, BODY, { x: m.tx, y: 5.882, w: m.bw, h: 0.504 }));
+  });
+}
+
+function slide19() {
+  const sl = newSlide();
+  sl.addText([
+    BR('THE HISTORY ', { color: DARK }),
+    T('OF ', { color: DARK }),
+    T('OUR COMPANY', { color: YELLOW }),
+  ], Object.assign({}, TITLE, { x: 0.73, y: 0.542, w: 4.476, h: 1.209 }));
+  sl.addText([T('It is a long established fact that a reader will be distracted by the Ipsum as their default model text, ')],
+    Object.assign({}, BODY, { x: 0.73, y: 1.996, w: 3.825, h: 0.504 }));
+  picFrame(sl, 5.651, 0, 7.683, 2.857);
+
+  rule(sl, 2.175, 4.155, 11.159, RULE, 2);
+  timeline(sl, [
+    { x: 0.73, year: '1994', yx: 0.722, yw: 1.381, tx: 0.651, tw: 1.524, bw: 2.206, title: ['STARTING A BUSINESS'] },
+    { x: 3.844, year: '1997', yx: 3.915, yw: 1.302, tx: 3.836, tw: 2.365, bw: 2.365, title: ['BUSINESS DEVELOPMENT'] },
+    { x: 7.021, year: '2000', yx: 7.082, yw: 1.384, tx: 7.021, tw: 1.75, bw: 2.365, title: ['NEW WORK PLACES'] },
+    { x: 10.206, year: '2005', yx: 10.331, yw: 1.257, tx: 10.206, tw: 1.937, bw: 2.365, title: ['COOPERATION WITH ENVATO'] },
+  ]);
+}
+
+function slide20() {
+  const sl = newSlide();
+  sl.addText([T('GET TO KNOW OUR STORY TO THE END AND ', { color: BLACK }), T('SEE FOR YOURSELF', { color: YELLOW, bold: true })],
+    { x: 0.815, y: 0.805, w: 3.029, h: 0.9, fontFace: ROBOTO, fontSize: 16, lineSpacingMultiple: 1.1875, valign: 'top', align: 'left' });
+  sl.addText([T('It is a long established fact that a reader will be distracted by the Ipsum as their default model text, ')],
+    Object.assign({}, BODY, { x: 0.73, y: 1.885, w: 3.873, h: 0.504 }));
+
+  const captions = [
+    { x: 5.651, tx: 5.886, text: 'Advanced construction machines' },
+    { x: 9.714, tx: 9.945, text: 'Residential apartments for sale' },
+  ];
+  captions.forEach(c => {
+    picFrame(sl, c.x, 0, 3.619, 2.49);
+    box(sl, c.x, 2.49, 3.619, 0.437, YELLOW);
+    sl.addText([T(c.text)], { x: c.tx, y: 2.538, w: 2.853, h: 0.3, fontFace: ROBOTO, fontSize: 12, bold: true, color: INK, lineSpacingMultiple: 1.25, valign: 'top', align: 'left' });
+  });
+
+  rule(sl, 0, 4.155, 10.206, RULE, 2);
+  timeline(sl, [
+    { x: 0.73, year: '2008', yx: 0.743, yw: 1.368, tx: 0.651, tw: 2.365, bw: 2.222, title: ['CONSTRUCTION OF A BIRCH ESTATE'] },
+    { x: 3.844, year: '2012', yx: 3.984, yw: 1.249, tx: 3.836, tw: 2.365, bw: 2.222, title: ['CONSTRUCTION OF APARTMENTS'] },
+    { x: 7.021, year: '2015', yx: 7.146, yw: 1.257, tx: 7.021, tw: 3.042, bw: 2.222, title: ['INVESTMENT IN ', 'MACHINE DEVELOPMENT'] },
+    { x: 10.206, year: '2022', yx: 10.331, yw: 1.257, tx: 10.206, tw: 1.937, bw: 2.222, dark: true, titleColor: YELLOW, title: ['WIN BUILDER AWARD'] },
+  ]);
+}
+
+/* ================================================================== *
+ * Slides 21-23 - Our service
+ * ================================================================== */
+function slide21() {
+  const sl = newSlide();
+  picFrame(sl, 4.349, 0, 3.937, 7.5);
+
+  sl.addText([T('OUR ', { color: DARK }), T('SERVICE', { color: YELLOW })],
+    { x: 0.603, y: 2.018, w: 2.972, h: 1.23, fontFace: JOST, fontSize: 35, lineSpacingMultiple: 1.14285, valign: 'top', align: 'left' });
+  sl.addText([
+    BR('It is a long established fact that a reader will be web page editors now use Lorem Ipsum as their default model text, It is a long'),
+    BR(''),
+    T('PLACEHOLDER'),
+  ], Object.assign({}, BODY, { x: 0.603, y: 3.75, w: 3.247, h: 1.345 }));
+
+  const rows = [
+    { y: 0.656, title: 'HOUSE BUILDING', tw: 2.094, icon: ICON.bank, ix: 8.217, iy: 1.315, iw: 0.492, ih: 0.492, gradientBar: false },
+    { y: 2.878, title: 'CONCRETE SURFACES', tw: 2.566, icon: ICON.car, ix: 8.226, iy: 3.566, iw: 0.492, ih: 0.434, gradientBar: true },
+    { y: 5.035, title: 'RENOVATION', tw: 2.094, icon: ICON.tools, ix: 8.232, iy: 5.693, iw: 0.461, ih: 0.492, gradientBar: false },
+  ];
+  rows.forEach(r => {
+    box(sl, 7.733, r.y, 4.931, 1.809, WHITE, { shadow: { type: 'outer', blur: 4, offset: 3, angle: 45, color: BLACK, opacity: 0.25 } });
+    if (r.gradientBar) gradient(sl, 7.501, r.y, 0.232, 1.809, GRAD_ORANGE_TOP);
+    else box(sl, 7.501, r.y, 0.232, 1.809, YELLOW);
+    r.icon(sl, r.ix, r.iy, r.iw, r.ih, YELLOW);
+    sl.addText([T(r.title, { color: BLACK })], Object.assign({}, HEAD, { x: 9.059, y: r.y + 0.385, w: r.tw, h: 0.367 }));
+    sl.addText([T(LOREM.short)], Object.assign({}, BODY, { x: 9.059, y: r.y + 0.743, w: 2.566, h: 0.504 }));
+  });
+}
+
+function slide22() {
+  const sl = newSlide();
+  picFrame(sl, 1.651, 0, 11.683, 4.987);
+  gradient(sl, 0.603, 0.587, 4.619, 2.952, GRAD_ORANGE_TOP);
+
+  sl.addText([T('OUR SERVICE', { color: WHITE })], Object.assign({}, TITLE, { x: 1.19, y: 1.304, w: 3.333, h: 0.648 }));
+  sl.addText([T('It is a long established fact that a reader will be web page editors now use Lorem Ipsum.')],
+    Object.assign({}, BODY, { x: 1.19, y: 2.369, w: 3.492, h: 0.504, color: WHITE }));
+
+  const cols = [
+    { tx: 1.439, tw: 2.094, title: 'HOUSE BUILDING', icon: ICON.bank, ix: 0.597, iy: 5.874, iw: 0.492, ih: 0.492 },
+    { tx: 5.586, tw: 2.566, title: 'CONCRETE SURFACES', icon: ICON.car, ix: 4.753, iy: 5.903, iw: 0.492, ih: 0.434 },
+    { tx: 9.726, tw: 2.566, title: 'RENOVATION', icon: ICON.tools, ix: 8.899, iy: 5.874, iw: 0.461, ih: 0.492 },
+  ];
+  cols.forEach(c => {
+    c.icon(sl, c.ix, c.iy, c.iw, c.ih, YELLOW);
+    sl.addText([T(c.title, { color: BLACK })], Object.assign({}, HEAD, { x: c.tx, y: 5.745, w: c.tw, h: 0.368 }));
+    sl.addText([T('It is a long established fact that a reader will page when looking at its layout. ')],
+      Object.assign({}, BODY, { x: c.tx, y: 6.167, w: 2.719, h: 0.504 }));
+  });
+}
+
+function slide23() {
+  const sl = newSlide();
+  gradient(sl, 0, 3.75, 13.333, 3.75, GRAD_MAIN);
+
+  sl.addText([T('OUR ', { color: DARK }), T('SERVICE', { color: YELLOW })],
+    Object.assign({}, TITLE, { x: 2.825, y: 0.606, w: 7.683, h: 0.648, align: 'center' }));
+  sl.addText([T(LOREM.intro)], Object.assign({}, BODY, { x: 1.571, y: 1.393, w: 10.19, h: 0.504, align: 'center' }));
+
+  const cards = [
+    { x: 0.698, tx: 1.099, tw: 2.094, title: 'HOUSE BUILDING', icon: ICON.bank, ix: 1.832, iy: 3.403, iw: 0.492, ih: 0.492, lx: 1.832 },
+    { x: 3.757, tx: 3.951, tw: 2.566, title: 'CONCRETE SURFACES', icon: ICON.car, ix: 4.891, iy: 3.432, iw: 0.492, ih: 0.434, lx: 4.938 },
+    { x: 6.816, tx: 6.988, tw: 2.549, title: 'DRILLING WALLES', icon: ICON.hammer, ix: 8.136, iy: 3.403, iw: 0.252, ih: 0.492, lx: 7.963 },
+    { x: 9.875, tx: 10.047, tw: 2.417, title: 'RENOVATION', icon: ICON.tools, ix: 11.024, iy: 3.403, iw: 0.461, ih: 0.492, lx: 10.994 },
+  ];
+  cards.forEach(c => {
+    box(sl, c.x, 2.841, 2.76, 3.873, WHITE, { shadow: CARD_SHADOW });
+    c.icon(sl, c.ix, c.iy, c.iw, c.ih, YELLOW);
+    sl.addText([T(c.title, { color: BLACK })], Object.assign({}, HEAD, { x: c.tx, y: 4.293, w: c.tw, h: 0.368, align: 'center' }));
+    rule(sl, c.lx, 4.825, 0.492, RULE, 2);
+    sl.addText([
+      BR('It is a long established fact '),
+      T('that a reader will be distracted by when looking at layout. '),
+    ], Object.assign({}, BODY, { x: c.x + 0.172, y: 5.145, w: 2.417, h: 0.714, align: 'center' }));
+  });
+}
+
+/* ================================================================== *
+ * Slides 24-26 - Projects
+ * ================================================================== */
+function slide24() {
+  const sl = newSlide();
+  sl.addText([T('OUR LATEST ', { color: DARK }), T('PROJECTS', { color: YELLOW })],
+    Object.assign({}, TITLE, { x: 0.968, y: 1.283, w: 3.058, h: 1.209 }));
+  sl.addText([
+    BR('It is a long established fact that a reader will be distracted by the readable content of packages their default model text, It is a long'),
+    BR(''),
+    T('established fact that a reader will be distracted by the readable content of packages.'),
+  ], Object.assign({}, BODY, { x: 0.968, y: 2.967, w: 3.254, h: 1.345 }));
+
+  rule(sl, 1.111, 5.323, 3.111, YELLOW, 4);
+  sl.addText([T('It is a long established fact that a reader will be distracted by the readable content of packages and web page editors now use Lorem Ipsum.')],
+    Object.assign({}, BODY, { x: 0.968, y: 5.531, w: 3.492, h: 0.714 }));
+
+  picFrame(sl, 5.493, 0.523, 3.492, 3.135);
+  picFrame(sl, 5.493, 3.895, 3.492, 3.135);
+  picFrame(sl, 9.262, 0.523, 3.492, 6.508);
+}
+
+function slide25() {
+  const sl = newSlide(INK);
+  picFrame(sl, 1.079, 0.984, 5.587, 2.766);
+  picFrame(sl, 6.667, 3.75, 5.587, 2.766);
+
+  sl.addText([T('PROJECT TITLE GOES HERE 1', { color: WHITE })],
+    Object.assign({}, HEAD, { x: 8.636, y: 1.595, w: 3.618, h: 0.367, align: 'right' }));
+  sl.addText([T(LOREM.project)], Object.assign({}, BODY, { x: 8.032, y: 2.058, w: 4.222, h: 0.714, color: WHITE, align: 'right' }));
+
+  sl.addText([T('PROJECT TITLE GOES HERE 2', { color: WHITE })],
+    Object.assign({}, HEAD, { x: 1.079, y: 4.656, w: 3.618, h: 0.367 }));
+  sl.addText([T(LOREM.project)], Object.assign({}, BODY, { x: 1.079, y: 5.119, w: 4.222, h: 0.714, color: WHITE }));
+}
+
+function slide26() {
+  const sl = newSlide();
+  sl.addText([T('PROJECT TITLE ', { color: DARK }), T('GOES HERE', { color: YELLOW })],
+    Object.assign({}, TITLE, { x: 3.135, y: 0.728, w: 7.063, h: 0.648, align: 'center' }));
+  sl.addText([T(LOREM.intro)], Object.assign({}, BODY, { x: 1.571, y: 1.52, w: 10.19, h: 0.504, align: 'center' }));
+
+  [0.698, 3.757, 6.816, 9.875].forEach(x => picFrame(sl, x, 2.778, 2.76, 3.873));
+}
+
+/* ================================================================== *
+ * Slide 27 - Company achievements
+ * ================================================================== */
+function slide27() {
+  const sl = newSlide();
+  sl.addText([T('COMPANY ', { color: DARK }), T('ACHIEVEMENTS', { color: YELLOW })],
+    Object.assign({}, TITLE, { x: 0.619, y: 0.673, w: 3.667, h: 1.209 }));
+  sl.addText([
+    BR('It is a long established fact that a reader will be distracted by the readable content of packages and web page editors now use Lorem Ipsum as their default model text, '),
+    BR(''),
+    T('established fact that a reader will be distracted by the readable content of packages.'),
+  ], Object.assign({}, BODY, { x: 0.619, y: 2.301, w: 3.918, h: 1.345 }));
+  picFrame(sl, 0.619, 4.206, 5.75, 3.294);
+
+  const rows = [
+    { y: 1.163, pct: '70%', title: 'The Awesome Title Goes Here' },
+    { y: 2.668, pct: '85%', title: 'Architectural Title Goes Here' },
+    { y: 4.173, pct: '75%', title: 'Interior Design Title Goes Here' },
+    { y: 5.679, pct: '80%', title: 'Construction Title Goes Here' },
+  ];
+  rows.forEach(r => {
+    circle(sl, 6.965, r.y + 0.046, 0.833, { fill: { color: YELLOW } });
+    sl.addText([T(r.pct)], { x: 7.069, y: r.y + 0.279, w: 0.624, h: 0.367, fontFace: ROBOTO, fontSize: 16, bold: true, color: INK, lineSpacingMultiple: 1.1875, valign: 'top', align: 'center' });
+    sl.addText([T(r.title, { color: BLACK })], Object.assign({}, HEAD, { x: 8.289, y: r.y, w: 3.918, h: 0.367 }));
+    sl.addText([T(LOREM.page)], Object.assign({}, BODY, { x: 8.289, y: r.y + 0.422, w: 4.235, h: 0.504 }));
+  });
+}
+
+/* ================================================================== *
+ * Slide 28 - Thank you / contacts
+ * ================================================================== */
+function slide28() {
+  const sl = newSlide();
+  box(sl, 3.667, 0, 8.54, 4.055, DARK);
+  gradient(sl, 12.218, 4.055, 1.115, 3.455, GRAD_MAIN);
+  picFrame(sl, 0, 0.937, 3.667, 6.563);
+
+  sl.addText([
+    T('THANK', { color: YELLOW }),
+    BR(' ', { color: WHITE }),
+    T('YOU VERY MUCH', { color: WHITE }),
+  ], Object.assign({}, TITLE, { x: 4.533, y: 1.123, w: 3.98, h: 1.209 }));
+  sl.addText([T('PLACEHOLDER')],
+    Object.assign({}, BODY, { x: 4.533, y: 2.749, w: 4.8, h: 0.504, color: WHITE }));
+
+  const contacts = [
+    { icon: ICON.phone, ix: 4.708, iy: 5.127, iw: 0.41, ih: 0.38, x: 4.675, ly: 5.771, vy: 6.097, lw: 1.277, vw: 1.277, label: 'Phone', value: '+123 456 7890' },
+    { icon: ICON.globe, ix: 6.895, iy: 5.132, iw: 0.398, ih: 0.369, x: 6.844, ly: 5.736, vy: 6.062, lw: 1.963, vw: 1.669, label: 'Web Address', value: 'www.example.com' },
+    { icon: ICON.mail, ix: 9.76, iy: 5.186, iw: 0.398, ih: 0.261, x: 9.699, ly: 5.736, vy: 6.062, lw: 2.171, vw: 2.358, label: 'Email Address', value: 'Lorem Ipsum123@gmail.com' },
+  ];
+  contacts.forEach(c => {
+    c.icon(sl, c.ix, c.iy, c.iw, c.ih, YELLOW);
+    sl.addText([T(c.label, { color: DARK })], { x: c.x, y: c.ly, w: c.lw, h: 0.358, fontFace: JOST, fontSize: 16, lineSpacingMultiple: 1.125, valign: 'top', align: 'left' });
+    sl.addText([T(c.value)], { x: c.x, y: c.vy, w: c.vw, h: 0.255, fontFace: ROBOTO, fontSize: 11, color: BLACK, lineSpacingMultiple: 1.0, valign: 'top', align: 'left' });
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Build
+ * ------------------------------------------------------------------ */
+
+pptx.defineLayout({ name: 'WIDE_16x9', width: SLIDE_W, height: SLIDE_H });
+pptx.layout = 'WIDE_16x9';
+pptx.author = 'pptxgenjs';
+pptx.title = 'Architecture & 2025 Construction - Company Profile';
+
+[slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
+  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
+  slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28].forEach(build => build());
+
+pptx.writeFile({ fileName: path.join(__dirname, '1350c80b-3089-4dfa-848c-bb4e17cceaae_grok_final.pptx') })
+  .then(file => console.log('wrote ' + file));

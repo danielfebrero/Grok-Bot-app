@@ -1,0 +1,1016 @@
+/**
+ * "Bensmith - General carpentry" : 51-slide deck rebuilt with pptxgenjs only.
+ *
+ * Run:  node 0184c5da-8874-42e5-8ecf-2c71a1268b19_grok_final.js
+ * Out:  0184c5da-8874-42e5-8ecf-2c71a1268b19_grok_final.pptx  (next to this file)
+ */
+'use strict';
+const PptxGenJS = require('pptxgenjs');
+const path = require('path');
+
+/* ============================== design tokens ============================== */
+const SLIDE_W = 26.66493;           // 24382413 EMU
+const SLIDE_H = 15.0;               // 13716000 EMU
+
+const BG     = '483E38';            // page background (theme lt1)
+const PANEL  = '372D2A';            // dark panel  (theme accent1)
+const ORANGE = 'F16925';            // brand accent(theme accent2)
+const WHITE  = 'FFFFFF';
+const PIE_GREY = '837E7B';          // 3rd pie slice
+const PHOTO  = '4A4039';            // stand-in fill for the deck's empty photo frames
+
+const HEAD = 'Raleway SemiBold';    // theme major font
+const BODY = 'Lato';                // theme minor font
+
+/* Reusable text recipes (sizes/leading taken from the source layouts). */
+const T_TITLE = { fontFace: HEAD, fontSize: 108, color: WHITE, lineSpacing: 120 };
+const T_LEAD  = { fontFace: BODY, fontSize: 48,  color: WHITE, lineSpacing: 68  };
+const T_BODY  = { fontFace: BODY, fontSize: 36,  color: WHITE, lineSpacing: 58  };
+const T_CARD  = { fontFace: BODY, fontSize: 48,  color: WHITE, align: 'center',
+                  valign: 'middle', margin: [0, 0, 14.2, 14.2] };
+
+/* ============================== tiny helpers =============================== */
+
+/** Text box. Source boxes use zero insets and top alignment unless stated. */
+function text(s, body, o) {
+    s.addText(body, Object.assign({ fontFace: BODY, fontSize: 36, color: WHITE,
+        align: 'left', valign: 'top', margin: 0 }, o));
+}
+
+/** Outline of an OOXML `parallelogram` (adj = 0..100000 of the short side). */
+function paraPoints(w, h, adj) {
+    const k = (adj / 100000) * Math.min(w, h);
+    return [{ x: k, y: 0 }, { x: w, y: 0 }, { x: w - k, y: h }, { x: 0, y: h }, { close: true }];
+}
+
+/** Slanted block: {x,y,w,h,adj,fill,line,lineW,rotate}. */
+function para(s, o) {
+    s.addShape('custGeom', {
+        x: o.x, y: o.y, w: o.w, h: o.h, rotate: o.rotate,
+        points: paraPoints(o.w, o.h, o.adj),
+        fill: o.fill ? { color: o.fill } : { type: 'none' },
+        line: o.line ? { color: o.line, width: o.lineW || 1 } : { type: 'none' },
+    });
+}
+
+/** Free polygon given in 0..1 coordinates of the shape box. */
+function poly(s, o) {
+    const pts = o.pts.map(p => ({ x: +(p[0] * o.w).toFixed(4), y: +(p[1] * o.h).toFixed(4) }));
+    if (o.close !== false) pts.push({ close: true });
+    s.addShape('custGeom', {
+        x: o.x, y: o.y, w: o.w, h: o.h, rotate: o.rotate, points: pts,
+        fill: o.fill ? { color: o.fill } : { type: 'none' },
+        line: o.line ? { color: o.line, width: o.lineW || 1 } : { type: 'none' },
+    });
+}
+
+/** Points along a circular arc - used for the hand-built line icons. */
+function arcPts(cx, cy, rx, ry, a0, a1, n) {
+    const out = [];
+    for (let i = 0; i <= n; i++) {
+        const a = (a0 + (a1 - a0) * i / n) * Math.PI / 180;
+        out.push([cx + rx * Math.cos(a), cy + ry * Math.sin(a)]);
+    }
+    return out;
+}
+
+/** Ring / circle outline. */
+function ring(s, x, y, d, color, lw) {
+    s.addShape('ellipse', { x, y, w: d, h: d, fill: { type: 'none' },
+        line: { color, width: lw } });
+}
+
+/** Empty photo frame of the template (source holds no picture data). */
+function photo(s, o) {
+    if (o.shape === 'ellipse') {
+        s.addShape('ellipse', { x: o.x, y: o.y, w: o.w, h: o.h, fill: { color: PHOTO },
+            line: { type: 'none' } });
+    } else if (o.adj) {
+        para(s, { x: o.x, y: o.y, w: o.w, h: o.h, adj: o.adj, fill: PHOTO });
+    } else {
+        s.addShape('rect', { x: o.x, y: o.y, w: o.w, h: o.h, fill: { color: PHOTO },
+            line: { type: 'none' } });
+    }
+}
+
+/* ------------------------------- furniture -------------------------------- */
+
+/** "Bensmith / PERSONAL CARPEN" logo, rebuilt from shapes + type (no bitmap). */
+function logo(s) {
+    poly(s, { x: 1.127, y: 1.120, w: 1.120, h: 1.313, fill: ORANGE,
+        pts: [[0.744, 0], [1, 0.35], [0.439, 0.35], [0.439, 1], [0, 0.361]] });
+    text(s, 'Bensmith', { x: 1.72, y: 1.63, w: 4.0, h: 0.95, fontSize: 58, bold: true,
+        fontFace: 'Raleway', color: WHITE, valign: 'middle' });
+    text(s, 'PERSONAL CARPEN', { x: 1.79, y: 2.54, w: 4.2, h: 0.36, fontSize: 17,
+        charSpacing: 11.5, color: WHITE, valign: 'middle' });
+}
+
+/** Slide-number badge (slanted, from the slide master). */
+function pageNum(s, n) {
+    text(s, String(n), { x: 24.278, y: 13.186, w: 1.302, h: 0.686, shape: 'custGeom',
+        points: paraPoints(1.302, 0.686, 59899), line: { color: ORANGE, width: 1.5 },
+        fontSize: 24, align: 'center', valign: 'middle' });
+}
+
+/** Every slide but the cover carries the badge; all carry the logo.
+ *  `frames` are painted first so the logo/badge always stay on top. */
+function newSlide(pptx, n, frames) {
+    const s = pptx.addSlide();
+    s.background = { color: BG };
+    (frames || []).forEach(f => photo(s, f));
+    logo(s);
+    if (n > 1) pageNum(s, n);
+    return s;
+}
+
+/** Thin outlined pill in the top-right corner ("OUR MISSION", "TIMELINE", ...). */
+function cornerTag(s, label, x, w, h) {
+    text(s, label.toUpperCase(), { x, y: 1.779, w, h, shape: 'rect',
+        line: { color: ORANGE, width: 1 }, fontSize: 28, charSpacing: 6,
+        align: 'right', valign: 'middle', margin: [5.7, 8.5, 5.7, 11.3], lineSpacing: 36 });
+}
+
+/* ---------------------- decorative "collage" ornaments --------------------- */
+
+const STRIPE_ADJ = 57450;
+
+function stripe(s, x, y, w, color, h) {
+    para(s, { x, y, w, h: h || 0.296, adj: STRIPE_ADJ, fill: color });
+}
+/** Solid wedge that hugs the bottom-left / top-right slide corner. */
+function cornerBL(s, x, y, w, h, rotate) {
+    poly(s, { x, y, w, h, rotate, fill: ORANGE, pts: [[1, 0], [0, 0], [0, 1], [0.633, 1]] });
+}
+function cornerTR(s, x, y, w, h, rotate) {
+    poly(s, { x, y, w, h, rotate, fill: ORANGE, pts: [[1, 0], [0.36, 0], [0, 1], [1, 1]] });
+}
+/** Long bar with one tapered end. */
+function taperBar(s, x, y, w, h, color) {
+    poly(s, { x, y, w, h, fill: color, pts: [[0, 1], [0.024, 0.016], [1, 0], [1, 1]] });
+}
+
+/* ================================= slides ================================== */
+
+function slide01(p) {                                   // Title slide
+    const s = newSlide(p, 1);
+    cornerBL(s, -0.001, 13.444, 2.448, 1.556);
+    stripe(s, 5.056, 9.380, 6.985, WHITE);
+    stripe(s, 9.018, 2.476, 6.985, ORANGE);
+    stripe(s, 1.133, 3.565, 6.985, WHITE);
+    stripe(s, 12.302, 9.380, 6.985, ORANGE);
+    cornerTR(s, 24.247, 0.0, 2.419, 1.507);
+    stripe(s, 16.264, 2.476, 6.985, WHITE);
+    taperBar(s, 20.358, 7.984, 6.307, 0.304, WHITE);
+
+    [[6.517, 6.049], [12.623, 6.529], [19.208, 6.049]].forEach(([x, w], i) =>
+        para(s, { x, y: i === 1 ? 12.676 : (i === 0 ? 12.683 : 12.674), w, h: 1.167,
+            adj: 56148, fill: PANEL }));
+
+    text(s, 'General carpentry', Object.assign({}, T_TITLE,
+        { x: 8.078, y: 10.339, w: 16.401, h: 1.683, fontSize: 130 }));
+
+    [['Yoursite.com', 8.290, 3.502, 7.331], ['Your@name.com', 14.528, 4.263, 13.562],
+     ['YourCompany', 20.977, 3.919, 19.994]].forEach(([label, x, w, ix]) => {
+        text(s, label, Object.assign({}, T_BODY, { x, y: 12.859, w, h: 0.813 }));
+        s.addShape('rect', { x: ix, y: 13.06, w: 0.34, h: 0.42,
+            fill: { type: 'none' }, line: { color: ORANGE, width: 1.5 } });
+    });
+}
+
+function slide02(p) {                                   // Table of contents
+    const s = newSlide(p, 2);
+    text(s, 'Table of contents', Object.assign({}, T_TITLE,
+        { x: 2.215, y: 3.276, w: 22.235, h: 1.683, align: 'center' }));
+    const rows = ['Introduction', 'Stories', 'Infographics', 'Summary', 'Contacts'];
+    text(s, rows.join('\n'), Object.assign({}, T_LEAD, { x: 7.085, y: 5.244, w: 5.123, h: 4.768 }));
+    text(s, ['02', '04', '28', '44', '48'].join('\n'),
+        Object.assign({}, T_LEAD, { x: 18.312, y: 5.244, w: 1.333, h: 4.768, align: 'right' }));
+    // leader rules between the entry and its page number
+    [[11.062, 5.938, 7.500], [9.417, 6.917, 9.146], [10.990, 7.854, 7.573],
+     [10.083, 8.812, 8.479], [9.958, 9.750, 8.604]].forEach(([x, y, w]) =>
+        s.addShape('line', { x, y, w, h: 0, line: { color: ORANGE, width: 0.75 } }));
+}
+
+function slide03(p) {                                   // Agenda
+    const s = newSlide(p, 3);
+    text(s, 'Agenda', Object.assign({}, T_TITLE,
+        { x: 2.215, y: 3.255, w: 22.235, h: 1.683, align: 'center' }));
+    const cols = [
+        { x: 1.077, time: '9:00 AM',  tx: 2.048, bx: 2.215, by: 8.421, bh: 3.158,
+          body: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Phasellus vitae nibh non.' },
+        { x: 9.467, time: '11:00 AM', tx: 10.450, bx: 10.352, by: 8.377, bh: 3.158,
+          body: 'Vivamus efficitur iaculis nisl, vitae pulvinar risus tristique nec. Praesent ut sodales metus. ' },
+        { x: 17.778, time: '14:00 AM', tx: 18.745, bx: 18.490, by: 8.377, bh: 3.254,
+          body: 'Nulla commodo \nsollicitudin ligula, et molestie velit lobortis sollicitudin.' },
+    ];
+    cols.forEach(c => {
+        const y = c.x === 9.467 ? 5.808 : 5.898;
+        para(s, { x: c.x, y, w: 7.675, h: 1.700, adj: 57843, fill: PANEL });
+        para(s, { x: c.x, y, w: 1.300, h: 1.700, adj: 75551, fill: ORANGE });
+        text(s, c.time.toUpperCase(), { x: c.tx, y, w: 5.70, h: 1.70, fontSize: 48,
+            align: 'center', valign: 'middle' });
+        text(s, c.body, Object.assign({}, T_BODY, { x: c.bx, y: c.by, w: 5.96, h: c.bh }));
+    });
+}
+
+/* Slides 4-9 : the "heading" family. */
+function headingSlide(p, n, o) {
+    const s = newSlide(p, n, o.bgPhoto ? [{ x: 0, y: 0, w: 26.665, h: 15 }] : null);
+    if (o.panel) para(s, Object.assign({ adj: 58070, fill: PANEL }, o.panel));
+    text(s, o.title, Object.assign({}, T_TITLE, o.titleBox));
+    if (o.body) text(s, o.body, Object.assign({}, T_BODY, o.bodyBox));
+    if (o.cols) {
+        text(s, o.cols[0], Object.assign({}, T_BODY, { x: 5.896, y: 7.678, w: 7.86, h: 3.158 }));
+        text(s, o.cols[1], Object.assign({}, T_BODY, { x: 14.848, y: 7.678, w: 7.86, h: 3.158 }));
+    }
+    return s;
+}
+
+const COL_A = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. \nMorbi at tellus euismod, hendrerit nisl in, commodo libero.';
+const COL_B = 'Pellentesque molestie sem elit, sit amet ornare ligula vehicula tempus. Nulla a orci felis. Vestibulum varius erat quis elementum.';
+
+function slide04(p) {
+    headingSlide(p, 4, {
+        panel: { x: 7.854, y: 2.863, w: 10.917, h: 9.387 },
+        title: 'Custom home\nand remodel specialist',
+        titleBox: { x: 2.215, y: 5.339, w: 22.235, h: 3.366, align: 'center' },
+    });
+}
+function slide05(p) {
+    headingSlide(p, 5, {
+        bgPhoto: true,
+        title: 'Remodel specialist \nand custom home',
+        titleBox: { x: 2.215, y: 5.339, w: 22.235, h: 3.366, align: 'center' },
+    });
+}
+function slide06(p) {
+    headingSlide(p, 6, {
+        panel: { x: 2.729, y: 3.634, w: 10.917, h: 9.387 },
+        title: 'Complete\ngeneral\ncarpentry',
+        titleBox: { x: 2.215, y: 5.422, w: 9.202, h: 5.049 },
+        body: 'Donec ac pulvinar dolor. Aenean tristique, magna in condimentum posuere, magna arcu rutrum ex, in aliquet enim quam placerat tortor. Pellentesque convallis nec ipsum pulvinar lobortis.',
+        bodyBox: { x: 13.632, y: 5.961, w: 10.285, h: 3.971 },
+    });
+}
+function slide07(p) {
+    headingSlide(p, 7, {
+        bgPhoto: true,
+        panel: { x: 0, y: 3.634, w: 13.646, h: 9.387 },
+        title: 'General\ncomplete\ncarpentry',
+        titleBox: { x: 2.215, y: 5.422, w: 9.202, h: 5.049 },
+        body: 'Aenean tristique, magna in condimentum posuere, magna arcu rutrum ex, in aliquet enim quam placerat tortor. Pellentesque convallis nec ipsum pulvinar lobortis. Donec ac pulvinar dolor. ',
+        bodyBox: { x: 13.632, y: 5.961, w: 10.285, h: 4.067 },
+    });
+}
+function slide08(p) {
+    headingSlide(p, 8, {
+        panel: { x: 2.729, y: 3.634, w: 10.917, h: 9.387 },
+        title: 'Woodworking with style',
+        titleBox: { x: 2.215, y: 5.422, w: 20.493, h: 1.683 },
+        cols: [COL_A, COL_B],
+    });
+}
+function slide09(p) {
+    headingSlide(p, 9, {
+        bgPhoto: true,
+        panel: { x: 0, y: 3.634, w: 13.646, h: 9.387 },
+        title: 'With style woodworking',
+        titleBox: { x: 2.215, y: 5.422, w: 20.493, h: 1.683 },
+        cols: [COL_B, COL_A],
+    });
+}
+
+function slide10(p) {                                   // Cover collage - 1
+    const s = newSlide(p, 10, [{ x: -0.001, y: 2.476, w: 16.004, h: 12.524 }]);
+    cornerBL(s, -0.001, 13.444, 2.448, 1.556);
+    stripe(s, 5.056, 9.380, 6.985, WHITE);
+    stripe(s, 9.018, 2.476, 6.985, ORANGE);
+    stripe(s, 1.133, 3.565, 6.985, WHITE);
+    text(s, 'Construction.\nDesign. Build', Object.assign({}, T_TITLE,
+        { x: 13.548, y: 5.422, w: 10.993, h: 3.366 }));
+    text(s, 'Donec ac pulvinar dolor. Aenean tristique, magna in condimentum posuere, magna arcu rutrum.',
+        Object.assign({}, T_BODY, { x: 14.938, y: 9.407, w: 9.509, h: 2.44 }));
+}
+
+function slide11(p) {                                   // Cover collage - 2
+    const s = newSlide(p, 11, [{ x: 12.302, y: 0, w: 14.364, h: 11.417 }]);
+    stripe(s, 12.302, 9.380, 6.985, ORANGE);
+    cornerTR(s, 24.247, 0.0, 2.419, 1.507);
+    stripe(s, 16.264, 2.476, 6.985, WHITE);
+    taperBar(s, 18.573, 11.088, 8.103, 0.304, WHITE);
+    text(s, 'Complete home\ncare services', Object.assign({}, T_TITLE,
+        { x: 2.257, y: 5.422, w: 11.702, h: 3.366 }));
+    text(s, 'Aenean tristique, magna in condime\nposuere, magna arcu rutrum. Donec \nac pulvinar dolor. ',
+        Object.assign({}, T_BODY, { x: 3.646, y: 9.407, w: 10.312, h: 2.344 }));
+}
+
+function slide12(p) {                                   // Left image layout
+    const s = newSlide(p, 12, [{ x: 0, y: 4.312, w: 12.604, h: 7.938, adj: 58472 }]);
+    stripe(s, 0, 11.954, 8.135, ORANGE);
+    cornerTag(s, 'Our mission', 20.569, 4.964, 0.82);
+    text(s, 'Woodworking\nand carpentry', Object.assign({}, T_TITLE,
+        { x: 13.548, y: 5.422, w: 10.993, h: 3.366 }));
+    text(s, 'Aliquam erat lectus, pharetra vel congue nec, porta at elit. Vivamus nunc sem, vehicula ut luctus a, ultrices in nibh.',
+        Object.assign({}, T_BODY, { x: 14.938, y: 9.407, w: 9.509, h: 2.344 }));
+}
+
+function slide13(p) {                                   // Right image layout
+    const s = newSlide(p, 13, [{ x: 9.354, y: 0, w: 17.328, h: 14.969 }]);
+    text(s, 'Finley crafted\nfurniture', Object.assign({}, T_TITLE,
+        { x: 2.257, y: 5.422, w: 11.702, h: 3.366 }));
+    text(s, 'Donec ac pulvinar dolor. Aenean \ntristique, magna in condimentum \nposuere, magna arcu rutrum.',
+        Object.assign({}, T_BODY, { x: 3.646, y: 9.407, w: 10.312, h: 2.44 }));
+}
+
+function slide14(p) {                                   // Top image layout
+    const s = newSlide(p, 14, [{ x: 1.119, y: 3.563, w: 24.414, h: 4.791, adj: 58472 }]);
+    cornerTag(s, 'Our vision', 21.014, 4.519, 0.832);
+    text(s, 'Personalized woodwork', Object.assign({}, T_TITLE,
+        { x: 2.215, y: 9.339, w: 22.235, h: 1.683, align: 'center' }));
+    text(s, 'Aliquam erat lectus, pharetra vel congue nec, porta at elit. \nVivamus nunc sem, vehicula ut luctus a, ultrices in nibh.',
+        Object.assign({}, T_BODY, { x: 2.215, y: 11.531, w: 22.235, h: 1.531, align: 'center' }));
+}
+
+function slide15(p) {                                   // Bottom image layout
+    const s = newSlide(p, 15, [{ x: 0.036, y: 9.021, w: 26.629, h: 5.982, adj: 58472 }]);
+    text(s, 'Home remodeling company', Object.assign({}, T_TITLE,
+        { x: 2.215, y: 3.651, w: 22.235, h: 1.683, align: 'center' }));
+    text(s, 'Fusce at feugiat tortor, eget porttitor mi. Pellentesque habitant morbi \ntristique senectus et netus et malesuada fames ac turpis egestas.',
+        Object.assign({}, T_BODY, { x: 2.215, y: 5.843, w: 22.235, h: 1.531, align: 'center' }));
+}
+
+function slide16(p) {                                   // What we do
+    const s = newSlide(p, 16);
+    text(s, 'What we Do', Object.assign({}, T_TITLE,
+        { x: 2.215, y: 3.255, w: 22.235, h: 1.683, align: 'center' }));
+    const cards = [
+        { x: 2.208, rule: ORANGE, tx: 4.431, ty: 6.729, label: 'Furniture\nRepair' },
+        { x: 9.083, rule: WHITE,  tx: 11.306, ty: 6.682, label: 'General Carpentry' },
+        { x: 15.877, rule: ORANGE, tx: 18.181, ty: 6.682, label: 'Mosquito Netting' },
+    ];
+    cards.forEach(c => {
+        para(s, { x: c.x, y: 6.729, w: 8.417, h: 3.958, adj: 58158, fill: PANEL });
+        para(s, { x: c.x, y: 10.438, w: 6.275, h: 0.250, adj: 58158, fill: c.rule });
+        text(s, c.label, Object.assign({}, T_CARD, { x: c.tx, y: c.ty, w: 4.133, h: 3.708 }));
+    });
+}
+
+function slide17(p) {                                   // Our goals (line icons)
+    const s = newSlide(p, 17);
+    text(s, 'Our goals', Object.assign({}, T_TITLE, { x: 2.257, y: 5.422, w: 9.723, h: 1.683 }));
+    text(s, 'Donec ac pulvinar dolor. Aenean tristique, magna in condimentum posuere, magna arcu rutrum ex, in aliquet enim quam placerat tortor. ',
+        Object.assign({}, T_BODY, { x: 3.646, y: 7.699, w: 8.333, h: 3.158 }));
+
+    const rows = [
+        { y: 2.789, ty: 2.789, label: 'Financial\nLeadership', icon: 'chart' },
+        { y: 6.135, ty: 6.180, label: 'Top rated Company', icon: 'star' },
+        { y: 9.481, ty: 9.487, label: 'Satisfied Customers', icon: 'user' },
+    ];
+    rows.forEach(r => {
+        para(s, { x: 15.533, y: r.y, w: 8.823, h: 2.745, adj: 58124, fill: PANEL });
+        para(s, { x: 12.545, y: r.y, w: 4.728, h: 2.745, adj: 58124, fill: ORANGE });
+        text(s, r.label, Object.assign({}, T_CARD, { x: 17.273, y: r.ty, w: 5.519, h: 2.739 }));
+        drawGoalIcon(s, r.icon, 14.11, r.y + 0.78);
+    });
+}
+
+/** Three white line icons used on the "Our goals" slide. */
+function drawGoalIcon(s, kind, x, y) {
+    const LW = 4, C = WHITE;
+    if (kind === 'chart') {                       // rising zig-zag with an arrow head
+        poly(s, { x, y, w: 1.57, h: 1.176, line: C, lineW: LW, close: false,
+            pts: [[0, 1], [0.275, 0.505], [0.535, 0.837], [1, 0]] });
+        poly(s, { x: x + 1.10, y, w: 0.47, h: 0.42, line: C, lineW: LW, close: false,
+            pts: [[0, 0.06], [1, 0], [0.93, 1]] });
+    } else if (kind === 'star') {                 // sparkling star
+        s.addShape('star5', { x: x + 0.14, y: y - 0.10, w: 1.30, h: 1.25,
+            fill: { type: 'none' }, line: { color: C, width: LW } });
+        [[-0.10, 0.05, -0.30, -0.15], [1.40, 0.05, 1.60, -0.15],
+         [-0.15, 0.80, -0.38, 0.88], [1.45, 0.80, 1.68, 0.88]].forEach(([x1, y1, x2, y2]) =>
+            poly(s, { x: x + Math.min(x1, x2), y: y + Math.min(y1, y2),
+                w: Math.abs(x2 - x1), h: Math.abs(y2 - y1), line: C, lineW: LW, close: false,
+                pts: x1 < x2 ? [[0, 1], [1, 0]] : [[0, 0], [1, 1]] }));
+        poly(s, { x: x + 0.76, y: y + 1.10, w: 0.01, h: 0.20, line: C, lineW: LW,
+            close: false, pts: [[0, 0], [0, 1]] });
+    } else {                                      // head + shoulders
+        ring(s, x + 0.42, y - 0.12, 0.62, C, LW);
+        poly(s, { x: x + 0.10, y: y + 0.52, w: 1.26, h: 0.72, line: C, lineW: LW, close: false,
+            pts: arcPts(0.5, 1.0, 0.5, 1.0, 180, 360, 24) });
+    }
+}
+
+function slide18(p) {                                   // Our values
+    const s = newSlide(p, 18);
+    para(s, { x: 2.339, y: 7.438, w: 10.917, h: 3.938, adj: 58070, fill: PANEL });
+    para(s, { x: 13.234, y: 3.500, w: 10.917, h: 3.938, adj: 58070, fill: PANEL });
+    para(s, { x: 10.958, y: 7.486, w: 10.856, h: 3.861, adj: 58070, line: ORANGE, lineW: 2.75 });
+    text(s, 'Our values', Object.assign({}, T_TITLE, { x: 5.590, y: 4.670, w: 8.160, h: 1.683 }));
+    text(s, 'Love our business\nand our clients', Object.assign({}, T_CARD,
+        { x: 15.313, y: 3.500, w: 6.759, h: 3.938 }));
+    text(s, 'Ask a lot of questions\nto know company', Object.assign({}, T_CARD,
+        { x: 13.312, y: 7.375, w: 6.759, h: 3.938 }));
+    text(s, 'We often demand\nmore of ourselves', Object.assign({}, T_CARD,
+        { x: 4.499, y: 7.375, w: 6.759, h: 3.938 }));
+}
+
+function slide19(p) {                                   // Team
+    const s = newSlide(p, 19, [2.890, 10.828, 18.766].map(x =>
+        ({ shape: 'ellipse', x, y: 4.417, w: 5.009, h: 5.009 })));
+    cornerTag(s, 'Our team', 21.504, 4.029, 0.844);
+    const people = [
+        { px: 2.890,  bx: 2.004,  nx: 2.780,  nw: 4.887, rx: 2.113,  name: 'John Smith',  role: 'Carpenter', adj: 69943 },
+        { px: 10.828, bx: 10.043, nx: 10.828, nw: 5.009, rx: 10.051, name: 'Joana Smith', role: 'Sales Manager', adj: 71278 },
+        { px: 18.766, bx: 18.082, nx: 18.766, nw: 5.009, rx: 17.989, name: 'John Doe',    role: 'Carpenter', adj: 71278 },
+    ];
+    people.forEach(m => {
+        para(s, { x: m.bx, y: 10.013, w: 6.579, h: 1.413, adj: 57843, fill: PANEL });
+        para(s, { x: m.bx, y: 10.013, w: 1.114, h: 1.413, adj: m.adj, fill: ORANGE });
+        text(s, m.name, Object.assign({}, T_CARD, { x: m.nx, y: 10.013, w: m.nw, h: 1.413 }));
+        text(s, m.role, Object.assign({}, T_BODY,
+            { x: m.rx, y: 11.559, w: 6.562, h: 0.718, align: 'center' }));
+    });
+}
+
+function slide20(p) {                                   // Testimonial
+    const s = newSlide(p, 20, [{ x: 1.119, y: 4.417, w: 10.652, h: 6.312, adj: 58472 }]);
+    para(s, { x: 8.125, y: 4.417, w: 17.455, h: 6.312, adj: 58070, fill: PANEL });
+    para(s, { x: 16.375, y: 5.045, w: 0.917, h: 0.960, adj: 58070, fill: ORANGE });
+    para(s, { x: 17.009, y: 5.045, w: 0.917, h: 0.960, adj: 58070, fill: ORANGE });
+    text(s, 'PLACEHOLDER',
+        Object.assign({}, T_LEAD, { x: 12.719, y: 6.218, w: 8.698, h: 2.861 }));
+    text(s, '\u2014 John Smith', Object.assign({}, T_LEAD,
+        { x: 14.677, y: 9.072, w: 6.740, h: 0.859, color: ORANGE }));
+}
+
+function slide21(p) {                                   // Clients logo grid
+    const grid = [];
+    [6.476, 8.859].forEach(y =>
+        [3.513, 8.513, 13.512, 18.511].forEach(x => grid.push({ x, y, w: 4.927, h: 2.312 })));
+    const s = newSlide(p, 21, grid);
+    text(s, 'Our Clients', Object.assign({}, T_TITLE,
+        { x: 2.215, y: 3.255, w: 22.235, h: 1.683, align: 'center' }));
+}
+
+function slide22(p) {                                   // Quotation
+    const s = newSlide(p, 22, [{ x: 0, y: 0, w: 26.665, h: 15, adj: 58472 }]);
+    para(s, { x: 2.729, y: 4.417, w: 22.851, h: 6.312, adj: 58070, fill: PANEL });
+    para(s, { x: 1.146, y: 4.417, w: 5.458, h: 6.312, adj: 68375, fill: ORANGE });
+    text(s, 'Carpentry is the Illusion of Perfection', { x: 5.625, y: 4.417, w: 15.438,
+        h: 6.312, fontFace: HEAD, fontSize: 108, color: WHITE, align: 'center',
+        valign: 'middle', margin: [0, 0, 14.2, 14.2] });
+}
+
+function slide23(p) {                                   // Gallery - 1 image
+    const s = newSlide(p, 23, [{ x: -0.001, y: 0, w: 26.671, h: 15 }]);
+    stripe(s, 3.421, 12.229, 6.985, WHITE);
+    stripe(s, 9.018, 2.476, 6.985, ORANGE);
+    stripe(s, 1.133, 3.565, 6.985, WHITE);
+    cornerTR(s, 0.014, 13.487, 2.419, 1.507, 180);
+    stripe(s, 10.662, 12.229, 6.985, ORANGE);
+    cornerTR(s, 24.247, 0, 2.419, 1.507);
+    stripe(s, 16.264, 2.476, 6.985, WHITE);
+    taperBar(s, 18.552, 11.133, 8.118, 0.304, WHITE);
+}
+
+function slide24(p) {                                   // Gallery - 2 images
+    const s = newSlide(p, 24, [{ x: 3.114, y: 2.470, w: 12.857, h: 10.056 },
+                               { x: 10.634, y: 2.470, w: 12.857, h: 10.056 }]);
+    stripe(s, 3.114, 12.229, 7.184, WHITE);
+    stripe(s, 8.787, 2.470, 7.184, ORANGE);
+    stripe(s, 10.628, 12.229, 7.184, ORANGE);
+    stripe(s, 16.301, 2.470, 7.184, WHITE);
+}
+
+function slide25(p) {                                   // Gallery - 3 images
+    const s = newSlide(p, 25, [{ x: 6.529, y: 2.824, w: 12.857, h: 10.056 },
+                               { x: 14.744, y: 3.917, w: 10.417, h: 7.871 },
+                               { x: 0.776, y: 3.917, w: 10.417, h: 7.871 }]);
+    cornerTag(s, 'Image gallery', 19.819, 5.714, 0.808);
+    stripe(s, 6.529, 12.584, 7.184, WHITE);
+    stripe(s, 12.202, 2.824, 7.184, ORANGE);
+    stripe(s, 19.146, 3.917, 6.016, WHITE);
+    stripe(s, 14.744, 11.491, 6.016, ORANGE);
+    stripe(s, 5.177, 3.917, 6.016, WHITE);
+    stripe(s, 0.776, 11.491, 6.016, ORANGE);
+}
+
+function slide26(p) {                                   // Gallery - 4 images
+    const s = newSlide(p, 26, [[4.812, 2.842], [14.146, 2.863], [11.000, 8.322], [1.667, 8.301]]
+        .map(([x, y]) => ({ x, y, w: 10.958, h: 4.658, adj: 58472 })));
+    [[1.626, 12.714, WHITE], [4.201, 8.288, ORANGE], [10.978, 12.714, ORANGE],
+     [13.557, 8.288, WHITE], [4.786, 7.205, WHITE], [7.362, 2.774, ORANGE],
+     [14.139, 7.226, ORANGE], [16.726, 2.795, WHITE]].forEach(([x, y, c]) =>
+        stripe(s, x, y, 8.447, c));
+}
+
+function slide27(p) {                                   // Progress bar (chart)
+    const s = newSlide(p, 27);
+    cornerTag(s, 'Our progress', 20.022, 5.511, 0.814);
+    s.addChart(p.ChartType.bar, [
+        { name: '95% growth', labels: [''], values: [95] },
+        { name: ' ',          labels: [''], values: [5]  },
+    ], {
+        x: 4.479, y: 4.667, w: 17.667, h: 4.042,
+        barDir: 'bar', barGrouping: 'percentStacked', barGapWidthPct: 10, barOverlapPct: 100,
+        chartColors: [ORANGE, WHITE], showLegend: false, showValue: false,
+        catAxisHidden: true, valAxisHidden: true, valAxisMinVal: 0,
+        catAxisLineShow: false, valAxisLineShow: false,
+        valGridLine: { style: 'none' }, catGridLine: { style: 'none' },
+    });
+    text(s, '95% growth', { x: 4.479, y: 4.667, w: 16.783, h: 4.042, fontFace: HEAD,
+        fontSize: 66, bold: true, color: WHITE, align: 'center', valign: 'middle' });
+    text(s, 'Donec ac pulvinar dolor. Aenean tristique, magna in condimentum posuere, magna arcu rutrum ex, in aliquet enim quam placerat tortor. ',
+        Object.assign({}, T_BODY, { x: 4.479, y: 9.209, w: 17.667, h: 1.531 }));
+}
+
+function slide28(p) {                                   // Sales ratio
+    const s = newSlide(p, 28);
+    cornerTag(s, 'Sales Ratio', 20.779, 4.754, 0.826);
+    const items = [
+        { bx: 3.817,  bw: 8.725, kw: 1.478, adj: 68502, px: 4.400,  lx: 5.294,  pct: '80%', label: 'Finished goods' },
+        { bx: 14.220, bw: 8.676, kw: 1.470, adj: 68935, px: 14.859, lx: 15.628, pct: '20%', label: 'Raw material' },
+    ];
+    items.forEach(it => {
+        para(s, { x: it.bx, y: 8.367, w: it.bw, h: 1.768, adj: 57843, fill: PANEL });
+        para(s, { x: it.bx, y: 8.367, w: it.kw, h: 1.768, adj: it.adj, fill: ORANGE });
+        text(s, it.pct, { x: it.px, y: 5.526, w: 8.625, h: 2.945, fontFace: BODY, fontSize: 200,
+            bold: true, color: ORANGE, align: 'center', valign: 'top', margin: 0 });
+        text(s, it.label, Object.assign({}, T_CARD, { x: it.lx, y: 8.367, w: 6.122, h: 1.768 }));
+    });
+}
+
+function slide29(p) {                                   // Big number
+    const s = newSlide(p, 29);
+    para(s, { x: 2.271, y: 3.634, w: 11.375, h: 9.387, adj: 58070, fill: PANEL });
+    text(s, '9', { x: 3.479, y: 3.319, w: 6.580, h: 9.088, fontFace: BODY, fontSize: 600,
+        bold: true, color: ORANGE, align: 'right', valign: 'middle', margin: 0 });
+    text(s, 'Happy customers\nevery day', Object.assign({}, T_TITLE,
+        { x: 13.332, y: 5.339, w: 9.702, h: 5.049 }));
+}
+
+/* -------------------------------- charts ---------------------------------- */
+
+const CHART_BOX  = { x: 2.938, y: 5.167, w: 20.792, h: 8.229 };
+const AXIS_STYLE = {
+    catAxisLabelColor: WHITE, catAxisLabelFontFace: BODY, catAxisLabelFontSize: 24,
+    valAxisLabelColor: WHITE, valAxisLabelFontFace: BODY, valAxisLabelFontSize: 24,
+    catGridLine: { style: 'none' }, valGridLine: { style: 'none' },
+};
+const LEGEND_STYLE = {
+    showLegend: true, legendPos: 'r', legendFontFace: BODY, legendFontSize: 60,
+    legendColor: WHITE,
+};
+
+function chartTitle(s, label) {
+    text(s, label, Object.assign({}, T_TITLE,
+        { x: 2.215, y: 3.255, w: 22.235, h: 1.683, align: 'center' }));
+}
+
+function slide30(p) {                                   // Column chart
+    const s = newSlide(p, 30);
+    chartTitle(s, 'Financial ratio');
+    const years = ['2016', '2017', '2018', '2019'];
+    s.addChart(p.ChartType.bar, [
+        { name: 'Costs',  labels: years, values: [50, 53, 60, 65] },
+        { name: 'Income', labels: years, values: [55, 58, 50, 75] },
+    ], Object.assign({}, CHART_BOX, AXIS_STYLE, LEGEND_STYLE, {
+        barDir: 'col', barGrouping: 'clustered', barGapWidthPct: 100, barOverlapPct: -5,
+        chartColors: [PANEL, ORANGE],
+        showValue: true, dataLabelFormatCode: '"$"#,##0', dataLabelPosition: 'ctr',
+        dataLabelFontFace: BODY, dataLabelFontSize: 36, dataLabelBold: true, dataLabelColor: WHITE,
+    }));
+}
+
+function slide31(p) {                                   // Bar chart
+    const s = newSlide(p, 31);
+    chartTitle(s, 'Growth projection');
+    const years = ['2017', '2018', '2019'];
+    s.addChart(p.ChartType.bar, [
+        { name: 'Income', labels: years, values: [50, 70, 95] },
+        { name: 'Costs',  labels: years, values: [60, 90, 60] },
+    ], Object.assign({}, CHART_BOX, AXIS_STYLE, LEGEND_STYLE, {
+        barDir: 'bar', barGrouping: 'clustered', barGapWidthPct: 100, barOverlapPct: -5,
+        chartColors: [ORANGE, PANEL], valAxisLabelPos: 'low',
+        showValue: true, dataLabelFormatCode: '"$"#,##0', dataLabelPosition: 'ctr',
+        dataLabelFontFace: BODY, dataLabelFontSize: 36, dataLabelColor: WHITE,
+    }));
+}
+
+function slide32(p) {                                   // Line (smoothed scatter)
+    const s = newSlide(p, 32);
+    chartTitle(s, 'Projected sales');
+    s.addChart(p.ChartType.scatter, [
+        { name: 'X-Axis', values: [2016, 2017, 2018, 2019] },
+        { name: 'Costs',  values: [1, 3, 2, 4] },
+    ], Object.assign({}, CHART_BOX, {
+        chartColors: [ORANGE], lineSize: 4, lineSmooth: true, showLegend: false,
+        lineDataSymbol: 'circle', lineDataSymbolSize: 12, lineDataSymbolLineColor: 'C1824F',
+        catAxisLabelColor: WHITE, catAxisLabelFontFace: BODY, catAxisLabelFontSize: 24,
+        valAxisLabelColor: WHITE, valAxisLabelFontFace: BODY, valAxisLabelFontSize: 24,
+        catAxisMinVal: 2016, catAxisMaxVal: 2020, catAxisMajorUnit: 1, valAxisMajorUnit: 1,
+        catGridLine: { color: '6E635C', size: 1, style: 'solid' },
+        valGridLine: { color: '6E635C', size: 1, style: 'solid' },
+    }));
+}
+
+function slide33(p) {                                   // Area chart
+    const s = newSlide(p, 33);
+    chartTitle(s, 'Growth graph');
+    const years = ['2016', '2017', '2018', '2019', '2020'];
+    s.addChart([{ type: p.ChartType.area, data: [
+        { name: 'Income', labels: years, values: [14, 18, 15, 20, 16] },
+        { name: 'Costs',  labels: years, values: [10, 14, 8, 12, 10] },
+    ] }], Object.assign({}, CHART_BOX, AXIS_STYLE, LEGEND_STYLE, {
+        barGrouping: 'standard', chartColors: [ORANGE, PANEL],
+    }));
+}
+
+function slide34(p) {                                   // Pie chart
+    const s = newSlide(p, 34);
+    cornerTag(s, 'Comparison', 20.571, 4.962, 0.820);
+    s.addChart(p.ChartType.pie, [{
+        name: 'Sales', labels: ['Goods', 'Services', 'Other'], values: [0.35, 0.40, 0.25],
+    }], Object.assign({
+        x: 4.062, y: 3.333, w: 18.583, h: 10.062,
+        chartColors: [ORANGE, PIE_GREY, PANEL], firstSliceAng: 25,
+        showValue: true, showPercent: false, dataLabelFormatCode: '0%',
+        dataLabelPosition: 'ctr', dataLabelFontFace: BODY, dataLabelFontSize: 60,
+        dataLabelBold: true, dataLabelColor: WHITE,
+    }, LEGEND_STYLE, { legendBold: true }));
+}
+
+function slide35(p) {                                   // Market share : 3 doughnuts
+    const s = newSlide(p, 35);
+    cornerTag(s, 'Market share', 20.003, 5.530, 0.814);
+    const cards = [
+        { x: 2.762,  pct: 0.25, body: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. ' },
+        { x: 10.613, pct: 0.65, body: 'Vivamus efficitur iaculis nisl, vitae pulvinar risus tristique nec. ' },
+        { x: 18.446, pct: 0.80, body: 'Nulla commodo sollicitudin ligula, et molestie lobortis.' },
+    ];
+    cards.forEach(c => {
+        s.addChart(p.ChartType.doughnut, [{
+            name: 'Input actual value', labels: ['Actual', 'Remainder'],
+            values: [c.pct, +(1 - c.pct).toFixed(2)],
+        }], {
+            x: c.x, y: 4.083, w: 5.438, h: 5.104, holeSize: 75,
+            chartColors: [ORANGE, PANEL], showLegend: false, showValue: false,
+            dataBorder: { pt: 8, color: BG },
+        });
+        text(s, Math.round(c.pct * 100) + '%', { x: c.x, y: 5.90, w: 5.438, h: 1.5,
+            fontFace: BODY, fontSize: 72, bold: true, color: ORANGE,
+            align: 'center', valign: 'middle' });
+        text(s, c.body, Object.assign({}, T_BODY,
+            { x: c.x + 0.001, y: 9.209, w: 5.438, h: 2.44, align: 'center' }));
+    });
+}
+
+function slide36(p) {                                   // List of items 01-04
+    const s = newSlide(p, 36);
+    cornerTag(s, 'List of items', 20.255, 5.278, 0.882);
+    const items = [
+        { n: '01', nx: 0.896,  nw: 2.585, bx: 3.081,  by: 4.377, tx: 5.083,  ty: 4.377, ny: 5.043, label: 'Donec pulvinar ornare mauris.' },
+        { n: '02', nx: 13.917, nw: 2.577, bx: 16.018, by: 4.540, tx: 18.096, ty: 4.377, ny: 5.043, label: 'Cras blandit, \narcu sit amet.' },
+        { n: '03', nx: 0.896,  nw: 2.585, bx: 3.078,  by: 8.300, tx: 5.083,  ty: 8.360, ny: 9.026, label: 'Proin euismod \nquam eu.' },
+        { n: '04', nx: 13.917, nw: 2.577, bx: 16.016, by: 8.463, tx: 18.096, ty: 8.360, ny: 9.026, label: 'Morbi pulvinar \nenim quis.' },
+    ];
+    items.forEach(it => {
+        para(s, { x: it.bx + 0.419, y: it.by, w: 9.139, h: 3.092, adj: 57843, fill: PANEL });
+        para(s, { x: it.bx, y: it.by, w: 2.221, h: 3.092, adj: 78890, fill: ORANGE });
+        text(s, it.n, Object.assign({}, T_TITLE, { x: it.nx, y: it.ny, w: it.nw, h: 1.683,
+            color: ORANGE, fontFace: BODY, align: 'right' }));
+        text(s, it.label, Object.assign({}, T_CARD, { x: it.tx, y: it.ty, w: 5.792, h: 3.092 }));
+    });
+}
+
+function slide37(p) {                                   // Checklist beside an image
+    const s = newSlide(p, 37, [{ x: -0.003, y: 3.563, w: 13.196, h: 9.170 }]);
+    stripe(s, 2.349, 12.358, 5.775, WHITE, 0.244);
+    stripe(s, 7.421, 3.562, 5.772, ORANGE, 0.244);
+    stripe(s, 0.933, 4.459, 5.750, WHITE, 0.244);
+    cornerTR(s, 0.003, 12.627, 1.991, 1.240, 180);
+    const rows = [
+        { by: 3.642, cy: 4.096, ty: 3.377, h: 1.531, body: 'Nulla feugiat bibendum venenatis. Ut dictum urna ac ornare sagittis. ' },
+        { by: 7.122, cy: 7.619, ty: 7.002, h: 1.531, body: 'Aliquam at mi volutpat, rhoncus enim in, rhoncus justo. Aenean id ante purus.' },
+        { by: 10.769, cy: 11.222, ty: 10.629, h: 1.627, body: 'Cras blandit, arcu sit amet semper accumsan, ligula diam elementum.' },
+    ];
+    rows.forEach(r => {
+        para(s, { x: 13.340, y: r.by, w: 2.828, h: 1.576, adj: 58124, fill: PANEL });
+        poly(s, { x: 14.400, y: r.cy, w: 0.864, h: 0.583, line: ORANGE, lineW: 8, close: false,
+            pts: [[0, 0.517], [0.326, 1], [1, 0]] });                      // check mark
+        text(s, r.body, Object.assign({}, T_BODY, { x: 16.674, y: r.ty, w: 8.906, h: r.h }));
+    });
+}
+
+function slide38(p) {                                   // List of images
+    const s = newSlide(p, 38, [{ shape: 'ellipse', x: 2.890,  y: 4.417, w: 5.009, h: 5.009 },
+                               { shape: 'ellipse', x: 9.623,  y: 2.621, w: 7.401, h: 7.401 },
+                               { shape: 'ellipse', x: 18.766, y: 4.417, w: 5.009, h: 5.009 }]);
+    cornerTag(s, 'List of images', 19.799, 5.734, 0.869);
+    [[2.762, 10.022, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. '],
+     [10.614, 10.793, 'Vivamus efficitur iaculis nisl, vitae pulvinar risus tristique nec. '],
+     [18.447, 10.022, 'Nulla commodo sollicitudin ligula, et molestie lobortis.']
+    ].forEach(([x, y, body]) =>
+        text(s, body, Object.assign({}, T_BODY, { x, y, w: 5.438, h: 2.344, align: 'center' })));
+}
+
+function slide39(p) {                                   // Our services (tool icons)
+    const s = newSlide(p, 39);
+    chartTitle(s, 'Our services');
+    const cards = [
+        { kx: 0.934,  bx: 1.311,  tx: 2.762,  icon: 'drill' },
+        { kx: 8.748,  bx: 9.124,  tx: 10.614, icon: 'tape' },
+        { kx: 16.661, bx: 17.037, tx: 18.465, icon: 'toolbox' },
+    ];
+    const labels = ['Base trim and crown installation.', 'Measuring tools is used woodworking.',
+                    'Repair any sort of made of wood.'];
+    cards.forEach((c, i) => {
+        para(s, { x: c.bx, y: 9.398, w: 8.209, h: 2.777, adj: 57843, fill: PANEL });
+        para(s, { x: c.kx, y: 9.398, w: 1.995, h: 2.777, adj: 78890, fill: ORANGE });
+        text(s, labels[i], Object.assign({}, T_CARD,
+            { x: c.tx, y: 9.398, w: 5.101, h: 2.777, fontSize: 36 }));
+    });
+    drawToolIcon(s, 'drill', 4.19, 6.13);
+    drawToolIcon(s, 'tape', 12.10, 6.07);
+    drawToolIcon(s, 'toolbox', 20.04, 6.13);
+}
+
+/** Simple outlined tool pictograms for the services slide. */
+function drawToolIcon(s, kind, x, y) {
+    const LW = 4, C = ORANGE;
+    const rect = (dx, dy, w, h, r) => s.addShape(r ? 'roundRect' : 'rect',
+        { x: x + dx, y: y + dy, w, h, rectRadius: r || 0,
+          fill: { type: 'none' }, line: { color: C, width: LW } });
+    const line = (dx, dy, w) => s.addShape('line',
+        { x: x + dx, y: y + dy, w, h: 0, line: { color: C, width: LW } });
+    if (kind === 'drill') {
+        rect(0.27, 0.06, 2.25, 1.35, 0.12);          // motor housing
+        rect(0.63, 0.32, 0.85, 0.24, 0.10);          // grip inlay
+        rect(0.00, 0.27, 0.28, 0.40, 0.06);          // chuck
+        rect(2.01, 0.84, 0.33, 1.00, 0.10);          // handle
+        [0.27, 0.44, 0.62].forEach(dy => line(1.83, dy, 0.52));
+        rect(0.62, 1.15, 0.91, 0.69);                // battery
+    } else if (kind === 'tape') {
+        ring(s, x + 0.00, y + 0.18, 2.05, C, LW);
+        ring(s, x + 0.42, y + 0.60, 1.22, C, LW);
+        ring(s, x + 0.64, y + 0.82, 0.77, C, LW);
+        rect(0.96, 0.00, 0.93, 0.60, 0.10);          // pull tab
+        rect(1.93, 1.83, 0.54, 0.34);                // tape end
+    } else {
+        rect(0.00, 0.53, 2.37, 1.69, 0.10);          // box
+        rect(0.65, 0.00, 1.06, 0.53, 0.16);          // handle
+        line(0.01, 0.97, 2.34);                      // lid seam
+        rect(0.34, 0.90, 0.31, 0.26);                // latches
+        rect(1.71, 0.90, 0.31, 0.26);
+        ring(s, x + 0.85, y + 1.53, 0.70, C, LW);    // gear
+    }
+}
+
+function slide40(p) {                                   // Pricing
+    const s = newSlide(p, 40);
+    cornerTag(s, 'Our pricing', 20.590, 4.943, 0.826);
+    const panel = (body, o) => text(s, body, {
+        x: o.x, y: o.y, w: o.w, h: o.h, shape: 'rect', fill: { color: o.fill },
+        fontFace: BODY, fontSize: 36, color: WHITE, align: 'center', valign: 'middle',
+        margin: [0, 0, 14.2, 14.2], lineSpacingMultiple: 1.2 });
+    panel('Pellentesque luctus \norci at usto pretium pellentesque.',
+        { x: 0.018, y: 4.384, w: 11.778, h: 8.084, fill: PANEL });
+    panel('Lorem ipsum dolor \nsit amet, adipiscing \nelit.',
+        { x: 14.739, y: 4.384, w: 11.778, h: 8.084, fill: PANEL });
+    panel('Pellentesque congue magna in feugiat consequat.',
+        { x: 6.833, y: 3.663, w: 12.887, h: 9.525, fill: ORANGE });
+    const tiers = [
+        { name: 'Basic',   nx: 4.417,  ny: 5.797, price: '$50',  px: 1.979,  py: 10.010, color: ORANGE },
+        { name: 'Premium', nx: 12.125, ny: 5.089, price: '$250', px: 9.188,  py: 10.260, color: WHITE  },
+        { name: 'Pro',     nx: 18.917, ny: 5.797, price: '$150', px: 16.479, py: 10.010, color: ORANGE },
+    ];
+    tiers.forEach(t => {
+        text(s, t.name, { x: t.nx, y: t.ny, w: 5.438, h: 1.122, fontFace: HEAD, fontSize: 72,
+            color: t.color, align: 'center', valign: 'top', margin: 0, lineSpacing: 80 });
+        text(s, t.price, { x: t.px, y: t.py, w: 5.438, h: 1.683, fontFace: BODY, fontSize: 108,
+            color: t.color, align: 'center', valign: 'top', margin: 0, lineSpacing: 120 });
+    });
+}
+
+/* ---------------------------------- tables --------------------------------- */
+
+const TABLE_POS  = { x: 2.979, y: 3.396, colW: [5.460, 10.295, 4.717], rowH: 1.2403 };
+const TABLE_ROWS = [
+    ['Lorem ipsum', 'Integer in ex varius ', '1000.00'],
+    ['Dolor',       'Consectetur lorem',     '1500.00'],
+    ['Consectetur', 'Duis sit amet porta nisi', '3000.00'],
+    ['Adipiscing',  'Mauris non ultrices velit', '4500.00'],
+    ['Praesent',    'Aliquam mattis aliquam', '4750.00'],
+    ['Tristique',   'Praesent vitae tincidunt', '5000.00'],
+];
+const CELL_BASE = { fontFace: BODY, fontSize: 36, color: BG, fill: { color: WHITE },
+                    valign: 'middle', margin: [11.3, 14.4, 7.2, 56.7] };
+const GRID = { pt: 1, color: 'D6D2CF' };
+
+function slide41(p) {                                   // Vertical (header row) table
+    const s = newSlide(p, 41);
+    const head = ['Name', 'Property', 'Price'].map((t, i) => ({
+        text: t,
+        options: Object.assign({}, CELL_BASE, { fontFace: 'Raleway', fontSize: 48,
+            color: WHITE, fill: { color: ORANGE }, align: i === 2 ? 'right' : 'left',
+            border: [GRID, GRID, GRID, GRID] }),
+    }));
+    const rows = TABLE_ROWS.map(r => r.map((t, i) => ({
+        text: t,
+        options: Object.assign({}, CELL_BASE, { align: i === 2 ? 'right' : 'left',
+            border: [GRID, GRID, GRID, GRID] }),
+    })));
+    s.addTable([head].concat(rows), Object.assign({}, TABLE_POS,
+        { rowH: new Array(7).fill(TABLE_POS.rowH) }));
+}
+
+function slide42(p) {                                   // Horizontal (header column) table
+    const s = newSlide(p, 42);
+    const months = ['February', 'March', 'April', 'May', 'June', 'July', 'August'];
+    const body = TABLE_ROWS.concat([['', 'Nulla consequat, risus blandit', '5250.00']]);
+    const rows = months.map((m, r) => [
+        { text: m, options: Object.assign({}, CELL_BASE, { fontFace: 'Raleway', fontSize: 48,
+            bold: true, color: WHITE, fill: { color: ORANGE }, border: [GRID, GRID, GRID, GRID] }) },
+        { text: body[r][1], options: Object.assign({}, CELL_BASE,
+            { border: [GRID, GRID, GRID, GRID] }) },
+        { text: body[r][2], options: Object.assign({}, CELL_BASE,
+            { align: 'right', border: [GRID, GRID, GRID, GRID] }) },
+    ]);
+    s.addTable(rows, Object.assign({}, TABLE_POS, { rowH: new Array(7).fill(TABLE_POS.rowH) }));
+}
+
+/* -------------------------------- timelines -------------------------------- */
+
+/** Bordered "day / month" chip used by every timeline slide. */
+function dateChip(s, day, x, y, filled) {
+    text(s, day, { x, y, w: 4.812, h: 2.480, shape: 'rect',
+        fill: filled ? { color: BG } : { type: 'none' },
+        line: { color: ORANGE, width: 2.5 },
+        fontFace: BODY, fontSize: 88, bold: true, color: ORANGE,
+        align: 'center', valign: 'top', margin: [0, 0, 11.3, 0] });
+    text(s, 'August', Object.assign({}, T_BODY,
+        { x: x + 0.697, y: y + 1.548, w: 2.959, h: 0.561, align: 'center', lineSpacing: 40 }));
+}
+
+function slide43(p) {                                   // Timeline
+    const s = newSlide(p, 43);
+    text(s, 'Timeline', Object.assign({}, T_TITLE, { x: 2.257, y: 5.422, w: 9.723, h: 1.683 }));
+    text(s, 'Donec ac pulvinar dolor. Aenean tristique, magna in condimentum posuere, magna arcu rutrum ex, in aliquet enim quam placerat tortor. ',
+        Object.assign({}, T_BODY, { x: 3.646, y: 7.699, w: 8.333, h: 3.158 }));
+    [['15', 2.692, 3.118, 'Nulla feugiat bibendum venenatis. Ut dictum urna ac ornare sagittis.'],
+     ['16', 6.157, 6.583, 'Morbi pulvinar enim quis tortor maximus, ut laoreet metus.'],
+     ['17', 9.645, 10.071, 'Integer vitae semper orci, in \nvenenatis risus.']
+    ].forEach(([day, y, ty, body]) => {
+        dateChip(s, day, 12.229, y);
+        text(s, body, Object.assign({}, T_BODY, { x: 17.021, y: ty, w: 8.333, h: 1.627 }));
+    });
+}
+
+function slide44(p) {                                   // Timeline with image
+    const s = newSlide(p, 44, [{ x: 0, y: 4.312, w: 11.073, h: 7.938, adj: 58472 }]);
+    stripe(s, 0, 11.949, 6.604, ORANGE);
+    [['18', 2.692, 3.118, 'Integer vitae semper orci, in \nvenenatis risus.'],
+     ['19', 6.157, 6.583, 'Morbi pulvinar enim quis tortor maximus, ut laoreet metus.'],
+     ['20', 9.645, 10.255, 'Nulla feugiat bibendum venenatis. Ut dictum urna ac ornare sagittis.']
+    ].forEach(([day, y, ty, body]) => {
+        dateChip(s, day, 12.229, y);
+        text(s, body, Object.assign({}, T_BODY, { x: 17.021, y: ty, w: 8.333, h: 1.531 }));
+    });
+}
+
+/** Slides 45 / 46 : three chips in a row with a caption underneath. */
+function horizontalTimeline(p, n, o) {
+    const s = newSlide(p, n, o.frames);
+    const cols = [
+        { x: 3.538,  ty: 10.844 },
+        { x: 11.133, ty: 10.814 },
+        { x: 18.728, ty: 10.814 },
+    ];
+    cols.forEach((c, i) => {
+        dateChip(s, o.days[i], c.x, 7.425, o.filled);
+        text(s, o.notes[i], Object.assign({}, T_BODY,
+            { x: c.x, y: c.ty, w: 5.155, h: o.noteH }));
+    });
+    return s;
+}
+
+function slide45(p) {
+    const s = horizontalTimeline(p, 45, {
+        days: ['10', '11', '12'], noteH: 1.531,
+        notes: ['Nulla feugiat bibendum venenatis. Ut dict.',
+                'Cras et nisi eget neque eleifend rhoncus.',
+                'Donec lorem ligula, laoreet dictum.'],
+    });
+    text(s, 'Milestones\nand deliverables', Object.assign({}, T_TITLE,
+        { x: 2.215, y: 3.255, w: 22.235, h: 3.366, align: 'center' }));
+}
+
+function slide46(p) {
+    const s = horizontalTimeline(p, 46, {
+        days: ['13', '14', '15'], noteH: 1.627, filled: true,
+        frames: [{ x: 1.157, y: 3.563, w: 24.652, h: 4.791, adj: 58472 }],
+        notes: ['Aenean pellentesque mauris et augue.',
+                'Cras et nisi eget neque eleifend rhoncus.',
+                'Donec lorem ligula, laoreet dictum.'],
+    });
+    cornerTag(s, 'timeline', 21.707, 3.826, 0.927);
+}
+
+function slide47(p) {                                   // Summary
+    const s = newSlide(p, 47, [{ x: -0.001, y: 0, w: 26.667, h: 15 }]);
+    cornerBL(s, -0.001, 13.444, 2.448, 1.556);
+    stripe(s, 5.056, 9.380, 6.985, WHITE);
+    stripe(s, 9.018, 2.476, 6.985, ORANGE);
+    stripe(s, 1.133, 3.565, 6.985, WHITE);
+    stripe(s, 12.302, 9.380, 6.985, ORANGE);
+    cornerTR(s, 24.247, 0, 2.419, 1.507);
+    stripe(s, 16.264, 2.476, 6.985, WHITE);
+    taperBar(s, 20.358, 7.984, 6.307, 0.304, WHITE);
+    text(s, 'Summary', Object.assign({}, T_TITLE,
+        { x: 5.226, y: 10.422, w: 16.214, h: 1.683, align: 'center' }));
+    text(s, 'Donec ac pulvinar dolor. Aenean tristique, magna in condimentum posuere, magna arcu rutrum ex, in aliquet enim quam placerat tortor. ',
+        Object.assign({}, T_BODY, { x: 5.226, y: 12.401, w: 16.214, h: 1.531, align: 'center' }));
+}
+
+function slide48(p) {                                   // Call to action
+    const s = newSlide(p, 48, [{ x: 0, y: 0, w: 26.665, h: 15, adj: 58472 }]);
+    text(s, 'Discover us', { x: 7.208, y: 6.083, w: 12.084, h: 2.236, shape: 'rect',
+        fill: { color: ORANGE }, fontFace: HEAD, fontSize: 108, color: WHITE,
+        align: 'center', valign: 'middle', margin: [0, 28.3, 0, 28.3], lineSpacing: 120 });
+}
+
+function slide49(p) {                                   // Locations
+    const s = newSlide(p, 49, [{ x: 3.875, y: 4.938, w: 18.979, h: 8.938 }]);
+    chartTitle(s, 'Our branches');
+    const pins = [
+        { city: 'New York', x: 9.551,  y: 7.454, w: 3.813, h: 1.120, mx: 9.000,  my: 7.677 },
+        { city: 'Milan',    x: 14.218, y: 8.043, w: 2.579, h: 1.207, mx: 13.667, my: 8.309 },
+        { city: 'Tokyo',    x: 21.988, y: 6.378, w: 2.923, h: 1.246, mx: 21.458, my: 6.663 },
+    ];
+    pins.forEach(pn => {
+        text(s, pn.city, { x: pn.x, y: pn.y, w: pn.w, h: pn.h, shape: 'rect',
+            fill: { color: PANEL }, fontFace: HEAD, fontSize: 36, color: WHITE,
+            align: 'left', valign: 'middle', margin: [0, 17.0, 0, 14.2], lineSpacing: 58 });
+        para(s, { x: pn.mx, y: pn.my, w: 0.917, h: 0.675, adj: 58070, fill: ORANGE });
+    });
+}
+
+function slide50(p) {                                   // Follow us
+    const s = newSlide(p, 50);
+    chartTitle(s, 'Follow us');
+    cornerTag(s, 'Social media', 20.274, 5.259, 0.814);
+    const nets = [
+        { x: 2.397,  y: 6.119, hx: 1.430,  hy: 9.410, handle: 'YourCompany' },
+        { x: 10.595, y: 6.119, hx: 10.161, hy: 9.348, handle: '#YourCompany' },
+        { x: 18.793, y: 6.157, hx: 17.934, hy: 9.348, handle: '#YourCompany' },
+    ];
+    nets.forEach(n => {
+        s.addShape('rect', { x: n.x, y: n.y, w: 4.917, h: 2.729,
+            fill: { type: 'none' }, line: { color: ORANGE, width: 2.5 } });
+        s.addShape('rect', { x: n.x + 2.16, y: n.y + 0.83, w: 0.60, h: 1.07,
+            fill: { type: 'none' }, line: { color: ORANGE, width: 3 } });
+        text(s, n.handle, Object.assign({}, T_LEAD,
+            { x: n.hx, y: n.hy, w: 6.344, h: 0.954, align: 'center' }));
+    });
+}
+
+function slide51(p) {                                   // Contacts
+    const s = newSlide(p, 51);
+    chartTitle(s, 'Thank you');
+    cornerTag(s, 'Contact us', 20.793, 4.740, 0.826);
+    const cards = [
+        { kx: 0.497,  y: 5.979, tx: 3.177,  tw: 5.260, body: '123 Street, City, State 45678' },
+        { kx: 8.549,  y: 5.979, tx: 10.990, tw: 5.219, body: '+00 123 456 789 +00 987 654 321' },
+        { kx: 16.613, y: 5.959, tx: 18.760, tw: 5.517, body: 'your@name.com www.yoursite.com' },
+    ];
+    cards.forEach(c => {
+        para(s, { x: c.kx + 0.419, y: c.y, w: 9.147, h: 3.104, adj: 57843, fill: PANEL });
+        para(s, { x: c.kx, y: c.y, w: 2.223, h: 3.104, adj: 78890, fill: ORANGE });
+        text(s, c.body, Object.assign({}, T_CARD,
+            { x: c.tx, y: 5.979, w: c.tw, h: 3.104, align: 'left' }));
+    });
+}
+
+/* ================================== build ================================== */
+
+const BUILDERS = [
+    slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
+    slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
+    slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29, slide30,
+    slide31, slide32, slide33, slide34, slide35, slide36, slide37, slide38, slide39, slide40,
+    slide41, slide42, slide43, slide44, slide45, slide46, slide47, slide48, slide49, slide50,
+    slide51,
+];
+
+function build() {
+    const pptx = new PptxGenJS();
+    pptx.defineLayout({ name: 'CARPENTER', width: SLIDE_W, height: SLIDE_H });
+    pptx.layout = 'CARPENTER';
+    pptx.author = 'pptxgenjs';
+    pptx.title = 'General carpentry';
+    BUILDERS.forEach(fn => fn(pptx));
+    return pptx.writeFile({
+        fileName: path.join(__dirname, '0184c5da-8874-42e5-8ecf-2c71a1268b19_grok_final.pptx'),
+    });
+}
+
+build().then(f => console.log('wrote ' + f)).catch(e => { console.error(e); process.exit(1); });

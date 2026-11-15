@@ -1,0 +1,634 @@
+/**
+ * "Premium Umrah Packages for Groups" — 24-slide deck rebuilt with pptxgenjs.
+ *
+ *   node 161b07fa-6a3c-47f0-83be-ff2fde7d23f7_grok_final.js
+ *
+ * writes 161b07fa-6a3c-47f0-83be-ff2fde7d23f7_grok_final.pptx next to this file.
+ *
+ * Photos in the original are empty picture placeholders (they render blank) and are
+ * therefore not drawn; the small raster/vector icons are replaced by a white outline
+ * glyph inside the green tile they sit on.
+ */
+
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ palette */
+
+const GREEN = '003C32'; // theme accent1
+const DARK = '262626'; // titles
+const GRAY = '808080'; // body copy
+const WHITE = 'FFFFFF';
+const ARC = '33635B'; // accent1 @ 80% alpha over the white background
+
+const HEAD = 'Poppins'; // theme major font
+const BODY = 'Open Sans'; // theme minor font
+
+const SLIDE_W = 13.333333;
+const SLIDE_H = 7.5;
+
+/** Soft drop shadow used by every white "card" in the deck.
+ *  Returns a new object each call — pptxgenjs rewrites these fields in place. */
+function cardShadow() {
+	return { type: 'outer', color: '000000', opacity: 0.12, blur: 10, offset: 0.5, angle: 90 };
+}
+
+/* ------------------------------------------------------------------ helpers */
+
+/** 11pt grey paragraph, 1.5 line spacing — the deck's standard body copy. */
+function copy(slide, str, x, y, w, h, extra) {
+	slide.addText(str, Object.assign({
+		x: x, y: y, w: w, h: h,
+		fontFace: BODY, fontSize: 11, color: GRAY,
+		lineSpacingMultiple: 1.5, valign: 'top',
+	}, extra));
+}
+
+/** 18pt green sub-heading. */
+function heading(slide, str, x, y, w, h, extra) {
+	slide.addText(str, Object.assign({
+		x: x, y: y, w: w, h: h,
+		fontFace: BODY, fontSize: 18, color: GREEN, valign: 'top',
+	}, extra));
+}
+
+/** 16pt bold Poppins item label. */
+function label(slide, str, x, y, w) {
+	slide.addText(str, {
+		x: x, y: y, w: w, h: 0.3702,
+		fontFace: HEAD, fontSize: 16, bold: true, color: DARK, valign: 'top',
+	});
+}
+
+/** Bold Poppins section title preceded by the short green rule. */
+function title(slide, str, x, y, w, h, size) {
+	slide.addShape('roundRect', { x: x + 0.1216, y: y - 0.1624, w: 0.6373, h: 0.083, fill: { color: GREEN } });
+	slide.addText(str, {
+		x: x, y: y, w: w, h: h,
+		fontFace: HEAD, fontSize: size || 28, bold: true, color: DARK, valign: 'top',
+	});
+}
+
+/**
+ * Native-shape stand-ins for the deck's raster/SVG icon artwork, drawn as a
+ * white outline inside the green tile. `scale` is a fraction of the tile.
+ */
+const GLYPHS = {
+	plane: { shape: 'triangle', scale: 0.58 },
+	moon: { shape: 'moon', scale: 0.60, rotate: 180 },
+	chart: { shape: 'upArrow', scale: 0.56 },
+	ticket: { shape: 'snip2SameRect', scale: 0.62 },
+	pin: { shape: 'teardrop', scale: 0.54, rotate: 135 },
+	check: { shape: 'snip1Rect', scale: 0.58 },
+	money: { shape: 'ellipse', scale: 0.56 },
+	people: { shape: 'smileyFace', scale: 0.62 },
+	passport: { shape: 'roundRect', scale: 0.50 },
+	hotel: { shape: 'pentagon', scale: 0.58 },
+	image: { shape: 'rect', scale: 0.62 },
+	question: { shape: 'donut', scale: 0.58 },
+	handshake: { shape: 'leftRightArrow', scale: 0.62 },
+	mail: { shape: 'rect', scale: 0.56 },
+	phone: { shape: 'roundRect', scale: 0.42 },
+};
+
+/** Green rounded tile with a white outline glyph standing in for the icon art. */
+function iconTile(slide, x, y, size, glyph, extra) {
+	slide.addShape('roundRect', Object.assign({ x: x, y: y, w: size, h: size, fill: { color: GREEN } }, extra));
+	const g = GLYPHS[glyph] || GLYPHS.image;
+	const gs = size * g.scale;
+	slide.addShape(g.shape, Object.assign({
+		x: x + (size - gs) / 2, y: y + (size - gs) / 2, w: gs, h: gs,
+		rotate: g.rotate || 0, line: { color: WHITE, width: 0.75 },
+	}, extra));
+}
+
+/** Thin quarter-circle outline used as decoration in the corners. */
+function arc(slide, x, y, size, rotate) {
+	slide.addShape('arc', { x: x, y: y, w: size, h: size, rotate: rotate || 0, line: { color: ARC, width: 0.5 } });
+}
+
+/** White rounded-top card with the soft shadow (round2SameRect, often rotated). */
+function card(slide, x, y, w, h, extra) {
+	slide.addShape('round2SameRect', Object.assign({
+		x: x, y: y, w: w, h: h, fill: { color: WHITE }, shadow: cardShadow(),
+	}, extra));
+}
+
+/** Green tab bleeding off the top-left edge holding the website line. */
+function webTab(slide) {
+	slide.addShape('round1Rect', {
+		x: 0.9277, y: -0.9277, w: 0.5573, h: 2.4127, rotate: 90,
+		fill: { color: GREEN }, rectRadius: 0.1424,
+	});
+	slide.addText('Your Website Here', {
+		x: 0.1964, y: 0.1356, w: 2.0199, h: 0.2861,
+		fontFace: BODY, fontSize: 11, color: WHITE, charSpacing: 2,
+		align: 'center', valign: 'top', wrap: false,
+	});
+}
+
+/** Green tab in the bottom-right corner holding the page number. */
+function pageTab(slide, num) {
+	slide.addShape('round1Rect', {
+		x: 12.776, y: 6.9427, w: 0.5573, h: 0.5573, rotate: 270,
+		fill: { color: GREEN }, rectRadius: 0.1424,
+	});
+	slide.addText(num, {
+		x: 12.776, y: 7.0777, w: 0.5573, h: 0.2861,
+		fontFace: HEAD, fontSize: 11, bold: true, color: WHITE,
+		align: 'center', valign: 'top', wrap: false,
+	});
+}
+
+/** Icon tile + bold label + grey caption, the deck's repeated three-part item. */
+function iconItem(slide, item) {
+	iconTile(slide, item.tileX, item.tileY, item.tileSize || 0.3702, item.glyph);
+	label(slide, item.label, item.labelX, item.labelY, item.labelW);
+	copy(slide, item.text, item.copyX, item.copyY, item.copyW || 3.0952, item.copyH || 0.6268);
+}
+
+/* ------------------------------------------------------------------- lorem */
+
+const L_LONG = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. ';
+const L_SHORT = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod';
+const L_TILE = 'Lorem ipsum dolor sit consectete adipiscing elit, sed deiusmod tempor incididunt labore et dolore magna aliqua. ';
+const L_BLOCK = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim minim veniam, quis nostrud exercitation ullamco laboris nisi aliquip commodo consequat aute irure dolor in reprehenderit in voluptate.';
+const L_TIMELINE = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam nostrud exercitation ullamco laboris';
+const L_MONEY = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi';
+const L_TEAM = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut';
+const L_QUOTE = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, eiusmod tempor incididunt ut labore et dolore magna aliqua enim ad minim';
+const L_MAGNA = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ';
+
+const ATTRACTION_TITLES = ['HISTORIC SITES', 'SHOPPING AREAS', 'RESTAURANTS'];
+const DESTINATIONS = 'KEY DESTINATIONS IN MECCA, MEDINA, AND SURROUNDING AREAS';
+const COST_TITLE = 'DETAILED COST BREAKDOWN FOR GROUP PACKAGES';
+const PAY_TITLE = 'PAYMENT PLANS, DISCOUNTS FOR EARLY BOOKING';
+const EXPERTISE = 'EXPERTISE AND EXPERIENCE OF TEAM MEMBERS';
+const BIOS = 'BRIEF BIOS OF KEY TEAM MEMBERS';
+const SHOWCASE = 'SHOWCASING SUCCESSFUL GROUP TOURS MANAGED IN THE PAST';
+
+/* ------------------------------------------------------------------ slides */
+
+/** 01 — cover. */
+function slide01(pres) {
+	const s = pres.addSlide();
+	// green "Present By" pill (rounded-top rectangle laid on its side)
+	s.addShape('round2SameRect', { x: 1.0528, y: 4.0885, w: 1.1062, h: 3.2119, rotate: 90, fill: { color: GREEN } });
+	iconTile(s, 0.7143, 0.6667, 0.5858, 'plane');
+	s.addText('Lorem ipsum dolor consectetur adipiscing, sed eiusmod', {
+		x: -0.242, y: 2.4755, w: 2.4984, h: 0.6268, rotate: 90,
+		fontFace: BODY, fontSize: 11, color: GRAY, lineSpacingMultiple: 1.5, valign: 'top',
+	});
+	s.addText('Present By:', {
+		x: 0.2453, y: 5.4047, w: 1.0873, h: 0.3029,
+		fontFace: BODY, fontSize: 12, color: WHITE, valign: 'top', wrap: false,
+	});
+	s.addText('JONATHAN WILSON', {
+		x: 0.2453, y: 5.6139, w: 2.3863, h: 0.3702,
+		fontFace: HEAD, fontSize: 16, bold: true, color: WHITE, valign: 'top', wrap: false,
+	});
+	s.addText('Journey to Spirituality:', {
+		x: 4.8174, y: 4.7811, w: 3.3452, h: 0.3702,
+		fontFace: BODY, fontSize: 16, color: GRAY, charSpacing: 2.3, valign: 'top', wrap: false,
+	});
+	s.addText('PREMIUM UMRAH PACKAGES FOR GROUPS', {
+		x: 4.8174, y: 5.1528, w: 7.7223, h: 1.582,
+		fontFace: HEAD, fontSize: 44, bold: true, color: DARK, valign: 'top',
+	});
+	s.addShape('ellipse', { x: 2.8439, y: 5.3264, w: 0.736, h: 0.736, fill: { color: WHITE }, shadow: cardShadow() });
+	// the page tab sits mid-right on the cover instead of bottom-right
+	s.addShape('round1Rect', { x: 12.776, y: 3.8934, w: 0.5573, h: 0.5573, rotate: 180, fill: { color: GREEN }, rectRadius: 0.1424 });
+	s.addText('01', {
+		x: 12.776, y: 4.0206, w: 0.5573, h: 0.3029,
+		fontFace: HEAD, fontSize: 12, bold: true, color: WHITE, align: 'center', valign: 'top', wrap: false,
+	});
+}
+
+/** 02 — introduction. */
+function slide02(pres) {
+	const s = pres.addSlide();
+	arc(s, 11.3387, -1.9946, 3.9892, 180);
+	webTab(s);
+	pageTab(s, '24');
+	title(s, 'INTRODUCTION', 7.816, 1.5814, 3.6548, 0.5722);
+	heading(s, 'ESSENCE AND SIGNIFICANCE OF UMRAH', 7.816, 2.6095, 3.6548, 0.7068);
+	copy(s, L_LONG.replace('ex ea commodo', 'commodo'), 7.816, 3.4802, 4.4321, 1.1821);
+	iconTile(s, 7.9376, 5.2565, 0.5858, 'moon');
+	copy(s, L_TILE, 8.9206, 5.0972, 3.3274, 0.9044);
+}
+
+/** 03 — targeting group clients. */
+function slide03(pres) {
+	const s = pres.addSlide();
+	arc(s, 11.3387, -1.9946, 3.9892, 180);
+	webTab(s);
+	pageTab(s, '03');
+	title(s, 'TARGETING GROUP CLIENTS', 8.5779, 1.6944, 3.565, 1.0434);
+	heading(s, 'BENEFITS OF GROUP PACKAGES FOR ORGANIZATIONS AND GATHERINGS', 1.1493, 4.3559, 6.6602, 0.7068);
+	iconTile(s, 1.2709, 5.6729, 0.5858, 'chart');
+	copy(s, L_BLOCK, 2.4127, 5.3747, 5.3968, 1.1821);
+}
+
+/** 04 — available packages overview. */
+function slide04(pres) {
+	const s = pres.addSlide();
+	arc(s, -1.6204, 5.8796, 3.2408, 0);
+	webTab(s);
+	pageTab(s, '04');
+	title(s, 'AVAILABLE PACKAGES OVERVIEW', 1.1652, 1.464, 4.6742, 1.0434);
+	copy(s, L_LONG, 1.1652, 2.6736, 6.6667, 0.9044);
+	heading(s, 'BREAKDOWN OF THE TYPES OF GROUP PACKAGES', 1.1652, 4.1483, 4.7872, 0.7068);
+	iconTile(s, 1.2868, 5.3144, 0.5858, 'ticket');
+	copy(s, L_BLOCK, 2.2163, 5.0162, 5.6091, 1.1821);
+}
+
+/** 05 — tourist attractions, three stacked items on the right. */
+function slide05(pres) {
+	const s = pres.addSlide();
+	arc(s, -1.4705, 6.0295, 2.9409, 0);
+	arc(s, 11.8629, -1.4705, 2.9409, 180);
+	webTab(s);
+	pageTab(s, '05');
+	[1.3039, 3.2087, 5.1135].forEach(function (y, i) {
+		iconItem(s, {
+			tileX: 9.433, tileY: y,
+			label: ATTRACTION_TITLES[i], labelX: 10.0248, labelY: y, labelW: i === 1 ? 2.2897 : 1.8913,
+			text: L_SHORT, copyX: 9.3526, copyY: y + 0.4559, glyph: 'pin',
+		});
+	});
+	title(s, 'TOURIST ATTRACTIONS', 1.1652, 4.2453, 3.2317, 1.0434);
+	heading(s, 'Key destinations in mecca, medina, and surrounding areas', 1.1652, 5.4892, 4.8348, 0.7068);
+}
+
+/** 06 — tourist attractions, two items across the bottom. */
+function slide06(pres) {
+	const s = pres.addSlide();
+	arc(s, 11.8629, 2.3519, 2.9409, 180);
+	webTab(s);
+	pageTab(s, '06');
+	title(s, 'TOURIST ATTRACTIONS', 1.216, 1.1332, 3.3078, 1.0434);
+	copy(s, 'Lorem ipsum dolor sit consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud', 1.216, 2.4011, 3.4507, 1.1821);
+	heading(s, DESTINATIONS, 5.8155, 4.656, 4.8348, 0.7068);
+	iconItem(s, {
+		tileX: 5.8959, tileY: 5.5838, glyph: 'pin',
+		label: 'HISTORIC SITES', labelX: 6.4876, labelY: 5.5838, labelW: 2.1235,
+		text: L_SHORT, copyX: 5.8155, copyY: 6.0396,
+	});
+	iconItem(s, {
+		tileX: 9.4032, tileY: 5.5838, glyph: 'pin',
+		label: 'SHOPPING AREAS', labelX: 9.9949, labelY: 5.5838, labelW: 2.2432,
+		text: L_SHORT, copyX: 9.3227, copyY: 6.0396,
+	});
+}
+
+/** 07 — tourist attractions, title moved to the lower left. */
+function slide07(pres) {
+	const s = pres.addSlide();
+	arc(s, 10.4994, -2.834, 5.6679, 180);
+	arc(s, -1.4705, 6.0295, 2.9409, 0);
+	webTab(s);
+	pageTab(s, '07');
+	title(s, 'TOURIST ATTRACTIONS', 1.2857, 5.0868, 3.3078, 1.0434);
+	heading(s, DESTINATIONS, 5.5274, 4.4774, 5.4444, 0.7068);
+	iconItem(s, {
+		tileX: 5.6078, tileY: 5.5273, glyph: 'pin',
+		label: 'RESTAURANTS', labelX: 6.1996, labelY: 5.5273, labelW: 1.8913,
+		text: L_SHORT, copyX: 5.5274, copyY: 5.9832,
+	});
+	iconItem(s, {
+		tileX: 9.2163, tileY: 5.5273, glyph: 'pin',
+		label: 'SHOPPING AREAS', labelX: 9.808, labelY: 5.5273, labelW: 2.2432,
+		text: L_SHORT, copyX: 9.1359, copyY: 5.9832,
+	});
+}
+
+/** Shared right-hand timeline: vertical rule, three date markers and captions. */
+function timeline(slide, ruleY, months) {
+	slide.addShape('line', { x: 7.9057, y: ruleY, w: 0, h: 5.1135, line: { color: GREEN, width: 0.5 } });
+	[
+		{ tile: 1.6572, label: 1.3039, w: 1.8913 },
+		{ tile: 3.5619, label: 3.2087, w: 2.2897 },
+		{ tile: 5.4667, label: 5.1135, w: 1.8913 },
+	].forEach(function (row, i) {
+		iconTile(slide, 8.5758, row.tile, 0.3702, 'check');
+		label(slide, months[i], 9.3526, row.label, row.w);
+		copy(slide, L_SHORT, 9.3526, row.label + 0.4559, 3.0952, 0.6268);
+	});
+}
+
+/** 08 — travel timeline & departure dates. */
+function slide08(pres) {
+	const s = pres.addSlide();
+	arc(s, 11.8629, -1.4705, 2.9409, 180);
+	webTab(s);
+	pageTab(s, '08');
+	timeline(s, 2.3865, ['JANUARY, 2023', 'FEBRUARY, 2023', 'MARCH, 2023']);
+	title(s, 'TRAVEL TIMELINE & DEPARTURE DATES', 1.2857, 1.4705, 3.8889, 1.0434);
+	copy(s, L_TIMELINE, 1.2857, 2.6495, 4.6667, 0.9044);
+	heading(s, 'DURATION AND SCHEDULE OF THE PILGRIMAGE JOURNEY', 1.2857, 4.1715, 4.4603, 0.7068);
+	copy(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam nostrud exercitation ullamco laboris nisi ut aliquip exa commodo consequat. ', 1.2857, 5.0139, 4.6667, 1.1821);
+}
+
+/** 09 — departure dates for the next six months. */
+function slide09(pres) {
+	const s = pres.addSlide();
+	arc(s, -1.4705, 6.0295, 2.9409, 0);
+	webTab(s);
+	pageTab(s, '09');
+	timeline(s, -0.0059, ['APRIL, 2023', 'MAY, 2023', 'JUNE, 2023']);
+	heading(s, 'DEPARTURE DATES FOR THE NEXT SIX MONTHS', 1.2857, 4.5434, 4.3178, 0.7068);
+	copy(s, L_TIMELINE, 1.2857, 5.2916, 4.6667, 0.9044);
+}
+
+/** 10 — financial packages, content on the right. */
+function slide10(pres) {
+	const s = pres.addSlide();
+	arc(s, -3.2828, 4.2172, 6.5657, 0);
+	arc(s, 11.8629, -1.4705, 2.9409, 180);
+	webTab(s);
+	pageTab(s, '10');
+	title(s, 'FINANCIAL PACKAGES', 6.9365, 1.3441, 4.873, 0.5722);
+	[
+		{ tile: 2.56, head: 2.4794, copyY: 3.3006, text: COST_TITLE },
+		{ tile: 4.6737, head: 4.5931, copyY: 5.4139, text: PAY_TITLE },
+	].forEach(function (row) {
+		iconTile(s, 7.0472, row.tile, 0.5457, 'money');
+		heading(s, row.text, 7.9206, row.head, 4.4127, 0.7068);
+		copy(s, L_MONEY, 6.9365, row.copyY, 5.3968, 0.9044);
+	});
+}
+
+/** 11 — financial packages, title on the left. */
+function slide11(pres) {
+	const s = pres.addSlide();
+	webTab(s);
+	pageTab(s, '11');
+	title(s, 'FINANCIAL PACKAGES', 1.1905, 1.3441, 4.873, 0.5722);
+	[
+		{ tile: 3.3275, head: 3.247, copyY: 4.0682, text: COST_TITLE },
+		{ tile: 5.2418, head: 5.1612, copyY: 5.982, text: PAY_TITLE },
+	].forEach(function (row) {
+		iconTile(s, 6.9679, row.tile, 0.5457, 'money');
+		heading(s, row.text, 7.8413, row.head, 4.4127, 0.7068);
+		copy(s, L_MAGNA, 6.8571, row.copyY, 5.3968, 0.6268);
+	});
+}
+
+/** 12 — our team, wide card bleeding off the right edge. */
+function slide12(pres) {
+	const s = pres.addSlide();
+	card(s, 8.9165, -0.144, 1.5667, 7.2669, { rotate: 270 });
+	webTab(s);
+	pageTab(s, '12');
+	title(s, 'OUR TEAM', 1.381, 1.4388, 2.4127, 0.5722);
+	copy(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt  labore dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla sint occaecat cupidatat non proident sunt in culpa qui officia', 4.6667, 0.8289, 7.7302, 1.1821);
+	iconTile(s, 5.7935, 3.2167, 0.5457, 'people');
+	heading(s, EXPERTISE, 6.7765, 3.1361, 3.6869, 0.7068);
+	copy(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing eliter, sed eiusmod tempor', 10.5789, 3.0373, 2.248, 0.9044);
+	heading(s, BIOS, 8.4603, 4.968, 3.1429, 0.7068);
+	copy(s, L_MAGNA, 8.4603, 5.8098, 3.9365, 0.9044);
+}
+
+/** 13 — our team, card centred on the slide. */
+function slide13(pres) {
+	const s = pres.addSlide();
+	arc(s, 10.5867, -2.7467, 5.4933, 180);
+	arc(s, -1.4705, 6.0295, 2.9409, 0);
+	card(s, 4.3527, 0.1165, 1.5667, 7.2669, { rotate: 270 });
+	webTab(s);
+	pageTab(s, '13');
+	title(s, 'OUR TEAM', 1.381, 1.7402, 2.4127, 0.5722);
+	copy(s, L_TEAM, 4.1001, 1.1339, 3.8564, 1.1821);
+	iconTile(s, 1.2297, 3.4772, 0.5457, 'people');
+	heading(s, EXPERTISE, 2.2126, 3.3966, 3.6869, 0.7068);
+	copy(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing eliter, sed eiusmod tempor', 6.0151, 3.2978, 2.248, 0.9044);
+	heading(s, BIOS, 1.381, 5.4217, 2.7192, 0.7068);
+	copy(s, L_TEAM, 4.1001, 5.184, 3.8564, 1.1821);
+}
+
+/** 14 — airport services. */
+function slide14(pres) {
+	const s = pres.addSlide();
+	arc(s, -1.4705, 6.0295, 2.9409, 0);
+	arc(s, 8.6166, -1.2161, 2.4321, 180);
+	card(s, 5.7325, 0.6684, 1.5667, 9.7619, { rotate: 270 });
+	webTab(s);
+	pageTab(s, '14');
+	title(s, 'AIRPORT SERVICES', 1.2149, 1.5763, 4.127, 0.5722);
+	heading(s, 'STREAMLINED AIRPORT EXPERIENCES FOR GROUPS', 1.2149, 2.7223, 4.8075, 0.7068);
+	copy(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco', 6.5007, 1.4139, 2.3014, 2.0152);
+	[
+		{ tile: 1.3366, text: 2.3196, glyph: 'plane' },
+		{ tile: 6.3789, text: 7.362, glyph: 'passport' },
+	].forEach(function (col) {
+		iconTile(s, col.tile, 5.2565, 0.5858, col.glyph);
+		copy(s, L_TILE, col.text, 5.0972, 3.3274, 0.9044);
+	});
+}
+
+/** 15 — hotel accommodations. */
+function slide15(pres) {
+	const s = pres.addSlide();
+	arc(s, -2.1732, 5.3268, 4.3465, 0);
+	arc(s, 12.1173, -1.2161, 2.4321, 180);
+	card(s, 8.6404, 1.7434, 1.5667, 7.8192, { rotate: 270 });
+	webTab(s);
+	pageTab(s, '15');
+	title(s, 'HOTEL ACCOMMODATIONS', 6.6667, 1.226, 5.8168, 0.5722);
+	heading(s, 'PREMIUM HOTEL PARTNERSHIPS AND LODGING OPTIONS', 6.6667, 2.3087, 4.7778, 0.7068);
+	copy(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex commodo consequat. ', 6.6667, 3.1505, 5.6806, 0.9044);
+	copy(s, 'Lorem ipsum dolor sit consectetur', 0.4031, 1.6365, 1.6065, 0.6268, { rotate: 270 });
+	iconTile(s, 5.2413, 5.3802, 0.5457, 'hotel');
+	copy(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. ', 6.2128, 5.2008, 6.6667, 0.9044);
+}
+
+/** 16 — previous projects. */
+function slide16(pres) {
+	const s = pres.addSlide();
+	arc(s, -1.4705, 6.0295, 2.9409, 0);
+	card(s, 1.6437, 2.9509, 1.5667, 4.8541, { rotate: 90, flipH: true });
+	webTab(s);
+	pageTab(s, '16');
+	title(s, 'PREVIOUS PROJECTS', 1.3333, 1.5898, 4.3333, 0.5722);
+	copy(s, L_LONG + 'Duis aute irure dolor in reprehenderit in voluptate velit esse', 1.3333, 2.297, 5.9365, 1.1821);
+	heading(s, SHOWCASE, 6.2222, 4.5048, 5.3333, 0.7068);
+	copy(s, L_LONG, 6.2222, 5.3467, 5.9365, 0.9044);
+	iconTile(s, 4.5813, 5.1051, 0.5457, 'image', { flipH: true });
+	copy(s, 'Lorem ipsum dolor sit consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ', 0.5159, 4.9258, 3.7767, 0.9044);
+}
+
+/** 17 — previous program. */
+function slide17(pres) {
+	const s = pres.addSlide();
+	arc(s, 12.1173, -1.2161, 2.4321, 180);
+	card(s, 8.3847, -0.9655, 2.7195, 7.1776, { rotate: 90, flipH: true, flipV: true });
+	webTab(s);
+	pageTab(s, '17');
+	title(s, 'PREVIOUS PROGRAM', 1.1111, 1.426, 4.3333, 0.5722);
+	iconTile(s, 5.8829, 2.3505, 0.5457, 'image', { flipH: true });
+	heading(s, SHOWCASE, 7.0476, 1.967, 2.8333, 1.3127);
+	copy(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip exa commodo consequat. Duis aute irure reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. ', 6.0356, 4.8246, 6.3454, 1.1821);
+	copy(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod incididunt ut ullamco laboris nisi ut aliquip ex ea commodo consequat. ', 6.0356, 6.0067, 6.3454, 0.6268);
+}
+
+/** 18 — testimonials: three quote cards. */
+function slide18(pres) {
+	const s = pres.addSlide();
+	arc(s, 12.1173, -1.2161, 2.4321, 180);
+	card(s, 10.0245, 3.451, 2.0966, 3.4234, { rotate: 270, flipH: true, flipV: true });
+	card(s, 10.0245, 0.6256, 2.0966, 3.4234, { rotate: 270, flipH: true, flipV: true });
+	card(s, 1.6818, 0.5391, 2.0966, 5.4498, { rotate: 270, flipH: true, flipV: true });
+	webTab(s);
+	pageTab(s, '18');
+	title(s, 'TESTIMONIALS', 1.1319, 1.281, 3.6825, 0.5722);
+	heading(s, 'FEEDBACK FROM PREVIOUS GROUP CLIENTS', 1.1319, 4.7701, 3.6825, 0.7068);
+	copy(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore edolore magna. Ut enim ad minim veniam, nostrud exercitation', 1.1319, 5.4769, 4.4921, 0.9044);
+	// left quote, then the two stacked on the right
+	iconTile(s, 1.6977, 2.9711, 0.5858, 'question');
+	copy(s, L_QUOTE, 2.7875, 2.5341, 2.2108, 1.4598);
+	[{ tile: 2.0501, text: 1.6131 }, { tile: 4.8698, text: 4.4328 }].forEach(function (row) {
+		iconTile(s, 9.0618, row.tile, 0.5858, 'question', { flipH: true });
+		copy(s, L_QUOTE, 10.1586, row.text, 2.2108, 1.4598);
+	});
+}
+
+/** 19 — why choose our services: rating cards with star tiles. */
+function slide19(pres) {
+	const s = pres.addSlide();
+	arc(s, -1.4705, 6.0295, 2.9409, 0);
+	[0.1383, 2.1, 4.0601].forEach(function (y) {
+		card(s, 10.8146, y, 1.7358, 3.3016, { rotate: 90, flipH: true, flipV: true });
+	});
+	webTab(s);
+	pageTab(s, '19');
+	[1.1988, 3.1644, 5.1198].forEach(function (y) {
+		copy(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, eiusmod tempor incididunt labore dolore magna', 10.8148, y, 2.2108, 1.1821);
+	});
+	// 1, 2 and 3 stars for the three cards
+	[1.6318, 3.4001, 3.7839, 5.161, 5.5449, 5.9448].forEach(function (y) {
+		s.addShape('roundRect', { x: 10.3605, y: y, w: 0.316, h: 0.316, fill: { color: GREEN } });
+		s.addShape('star5', { x: 10.4444, y: y + 0.0839, w: 0.1482, h: 0.1482, line: { color: WHITE, width: 0.5 } });
+	});
+	title(s, 'WHY CHOOSE OUR SERVICES', 1.1319, 1.3855, 4.2014, 1.0434);
+	heading(s, "UNIQUE SELLING POINTS OF THE AGENCY'S OFFERINGS", 1.1319, 2.8847, 4.0586, 0.7068);
+	copy(s, L_LONG.replace('ex ea commodo', 'commodo'), 1.1319, 3.7555, 4.4321, 1.1821);
+	iconTile(s, 1.2535, 5.5318, 0.5858, 'question');
+	copy(s, L_TILE, 2.2366, 5.3725, 3.3274, 0.9044);
+}
+
+/** 20 — partnerships: one wide card with three columns. */
+function slide20(pres) {
+	const s = pres.addSlide();
+	s.addShape('roundRect', { x: 0.7548, y: 4.9419, w: 11.8237, h: 1.9792, fill: { color: WHITE }, shadow: cardShadow() });
+	arc(s, 10.5867, -2.7467, 5.4933, 180);
+	webTab(s);
+	pageTab(s, '20');
+	[
+		{ tileX: 1.5077, labelX: 2.0994, labelW: 1.8913, copyX: 1.4273, label: 'AIRLINES' },
+		{ tileX: 5.1995, labelX: 5.7912, labelW: 1.8913, copyX: 5.119, label: 'HOTELS' },
+		{ tileX: 8.8912, labelX: 9.483, labelW: 2.2432, copyX: 8.8108, label: 'TRANSPORT' },
+	].forEach(function (col) {
+		iconItem(s, {
+			tileX: col.tileX, tileY: 5.3902, glyph: 'handshake',
+			label: col.label, labelX: col.labelX, labelY: 5.3902, labelW: col.labelW,
+			text: L_SHORT, copyX: col.copyX, copyY: 5.846,
+		});
+	});
+	title(s, 'PARTNERSHIPS', 1.2821, 1.2345, 4.2014, 0.5722);
+	heading(s, 'COLLABORATIONS WITH AIRLINES, HOTELS, LOCAL TRANSPORT', 1.2821, 1.9734, 4.3492, 0.7068);
+	copy(s, L_LONG, 1.2821, 2.804, 4.5091, 1.1821);
+}
+
+/** 21 — Q & A: two mirrored answer cards. */
+function slide21(pres) {
+	const s = pres.addSlide();
+	arc(s, 12.1173, -1.2161, 2.4321, 180);
+	card(s, 10.2854, 1.5598, 1.5667, 4.5293, { rotate: 270 });
+	card(s, 6.8928, 3.4217, 1.5667, 4.5293, { rotate: 90, flipH: true });
+	webTab(s);
+	pageTab(s, '21');
+	title(s, 'Q & A', 1.2821, 1.3157, 1.7179, 0.5722);
+	copy(s, L_LONG + 'Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.', 3.4488, 0.9295, 8.5963, 1.1821);
+	heading(s, 'ADDRESSING COMMON CONCERNS', 6.1176, 3.3213, 2.0198, 1.0098);
+	iconTile(s, 8.5112, 3.5316, 0.5858, 'question');
+	copy(s, L_TILE, 9.5515, 3.3723, 3.3274, 0.9044);
+	iconTile(s, 9.6479, 5.3934, 0.5858, 'question', { flipH: true });
+	copy(s, L_TILE, 5.866, 5.2341, 3.3274, 0.9044);
+}
+
+/** 22 — booking & contact. */
+function slide22(pres) {
+	const s = pres.addSlide();
+	card(s, 9.1503, 2.4212, 3.8367, 4.5293, { rotate: 270 });
+	arc(s, 12.1173, -1.2161, 2.4321, 180);
+	webTab(s);
+	pageTab(s, '22');
+	title(s, 'BOOKING & CONTACT', 1.2821, 1.3157, 4.5591, 0.5722);
+	heading(s, 'How to book and get in touch', 1.2821, 1.8323, 4.5591, 0.4039);
+	copy(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed deiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip exea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse', 6.2897, 1.0541, 5.7615, 1.1821);
+	[
+		{ y: 3.4042, copyY: 3.86, labelW: 2.2588, glyph: 'mail' },
+		{ y: 4.8848, copyY: 5.3407, labelW: 2.2432, glyph: 'phone' },
+	].forEach(function (row) {
+		iconItem(s, {
+			tileX: 9.6223, tileY: row.y, glyph: row.glyph,
+			label: 'CONTACT DETAIL', labelX: 10.2141, labelY: row.y, labelW: row.labelW,
+			text: L_SHORT, copyX: 9.5419, copyY: row.copyY,
+		});
+	});
+}
+
+/** 23 — terms & conditions. */
+function slide23(pres) {
+	const s = pres.addSlide();
+	arc(s, 12.1173, -1.2161, 2.4321, 180);
+	webTab(s);
+	pageTab(s, '23');
+	title(s, 'TERMS & CONDITIONS', 6.9647, 1.3172, 4.5591, 0.5722);
+	copy(s, L_TEAM, 6.9647, 2.0583, 5.3845, 0.9044);
+	heading(s, 'IMPORTANT TERMS OF THE TRAVEL PACKAGE', 6.9647, 3.6556, 4.5591, 0.7068);
+	[
+		{ tile: 4.7182, copyY: 4.4494 },
+		{ tile: 5.7096, copyY: 5.4407 },
+	].forEach(function (row) {
+		iconTile(s, 7.0863, row.tile, 0.3702, 'check');
+		copy(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation', 7.7901, row.copyY, 4.5591, 0.9044);
+	});
+}
+
+/** 24 — thank you. */
+function slide24(pres) {
+	const s = pres.addSlide();
+	card(s, 3.2836, 2.8193, 1.5667, 5.4852, { rotate: 270 });
+	webTab(s);
+	pageTab(s, '24');
+	title(s, 'THANK YOU', 1.2028, 1.3172, 4.3211, 0.9088, 48);
+	heading(s, 'Appreciation and invitation to join the spiritual journey', 1.2028, 2.2737, 3.9401, 0.5722, { fontSize: 14 });
+	copy(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sedo eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud', 1.2028, 3.0408, 4.6509, 0.9044);
+	// heart tile: the icon here is a native outline shape in the original
+	s.addShape('roundRect', { x: 1.0315, y: 5.269, w: 0.5858, h: 0.5858, fill: { color: GREEN } });
+	s.addShape('heart', { x: 1.1823, y: 5.4197, w: 0.2842, h: 0.2842, line: { color: WHITE, width: 1 } });
+	copy(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation', 1.9665, 5.1096, 4.452, 0.9044);
+}
+
+/* -------------------------------------------------------------------- build */
+
+function build() {
+	const pres = new PptxGenJS();
+	pres.defineLayout({ name: 'UMRAH', width: SLIDE_W, height: SLIDE_H });
+	pres.layout = 'UMRAH';
+	pres.theme = { headFontFace: HEAD, bodyFontFace: BODY };
+	pres.title = 'Premium Umrah Packages for Groups';
+
+	[
+		slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08,
+		slide09, slide10, slide11, slide12, slide13, slide14, slide15, slide16,
+		slide17, slide18, slide19, slide20, slide21, slide22, slide23, slide24,
+	].forEach(function (fn) { fn(pres); });
+
+	return pres.writeFile({ fileName: path.join(__dirname, '161b07fa-6a3c-47f0-83be-ff2fde7d23f7_grok_final.pptx') });
+}
+
+build().then(function (f) { console.log('wrote', f); }, function (e) { console.error(e); process.exit(1); });
