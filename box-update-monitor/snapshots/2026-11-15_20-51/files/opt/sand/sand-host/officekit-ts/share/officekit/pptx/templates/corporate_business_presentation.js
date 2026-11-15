@@ -1,0 +1,1394 @@
+/**
+ * Rebuild of "0c9d077e-ca33-4dab-a068-9e8dd05516a1.pptx" with pptxgenjs.
+ *
+ * 35 slides, 13.333 x 7.5 in (16:9).  Raster artwork in the source deck
+ * (photos, device mockups) is replaced by flat colour placeholders.
+ *
+ *   node 0c9d077e-ca33-4dab-a068-9e8dd05516a1_grok_final.js
+ */
+
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ *
+ * Palette / typography
+ * ------------------------------------------------------------------ */
+
+const C = {
+  indigo: '3C40C6',        // brand indigo
+  indigoSoft: '7C7ED8',    // indigo @ 67% alpha over white
+  indigoMid: '6669D2',     // indigo @ 78% alpha over white
+  violet: '5F27CD',
+  sand: 'FFE699',          // brand yellow
+  sandLight: 'FFF2CC',
+  black: '000000',
+  white: 'FFFFFF',
+  ink: '181717',
+  grey: '595959',
+  greyDark: '404040',
+  greySoft: 'BFBFBF',
+  greyPale: 'D9D9D9',
+  greyFaint: 'F2F2F2',
+  slate: '44546A',
+};
+
+const F = {
+  head: 'Montserrat ExtraBold',
+  sub: 'Montserrat',
+  body: 'Open Sans',
+  icon: 'DejaVu Sans',
+};
+
+/* Body copy that the template repeats over and over. */
+const T = {
+  full: 'It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point. is that it has a more-or-less normal distribution of letters, as opposed.',
+  fullPlain: 'It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point. is that it has a more-or-less normal distribution.',
+  half: 'It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point. ',
+  dots: 'It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout..',
+  brief: 'It is a long established fact that a reader will be distracted by the readable content.',
+  page: 'It is a long established fact that a reader will be distracted by the readable content of a page.',
+  tiny: 'It is a long established fact that a reader will be distracted.',
+  skill: 'It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. ',
+};
+
+const L = {
+  timeline: 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo libero vivamus porttitor dolor, conubia mollit. Sapien nam suspendisse, tincidunt eget ante tincidunt, eros in auctor fringilla praesent at diam. In et quam est eget mi. Pellentesque nunc orci eu enim, eget in fringilla vitae, et eros praesent dolor porttitor. Lacinia lectus nonummy, accumsan mauris in sed justotincidunt, eros in auctor fringilla praesent at diam. ',
+  step: 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo',
+  bullet: 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo libero vivamus',
+  bulletAlt: 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet,. Sapien nam suspendisse, tincidunt',
+  mockup: 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo libero vivamus porttitor dolor, conubia mollit. Sapien nam suspendisse, tincidunt eget ante tincidunt, eros in auctor fringilla praesent at diam. In et quam est eget mi. Pellentesque nunc orci eu enim, eget in fringilla vitae, et eros praesent dolor porttitor. Lacinia lectus nonummy, ',
+  donec: 'Donec porttitor porttitor ante. Nam dictum quam sed erat lobortis, et gravida nunc pellentesque. Donec porttitor porttitor ante. Nam dictum.',
+  layer: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed imperdiet tincidunt velit laoreet facilisis. ',
+  about: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam viverra euismod odio, gravida pellentesque urna varius vitae. Sed dui lorem, adipiscing in adipiscing et, interdum nec metus. Mauris ultricies, justo eu convallis placerat, felis enim ornare nisi, vitae mattis nulla',
+  map: 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo libero vivamus porttitor dolor, conubia mollit. Sapien nam suspendisse, tincidunt eget ante tincidunt, eros in auctor fringilla',
+  mapLong: 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo libero vivamus porttitor dolor, conubia mollit. Sapien nam suspendisse, tincidunt eget ante tincidunt, eros in auctor fringilla praesent at diam. In et quam est eget mi. Pellentesque.',
+};
+
+/* ------------------------------------------------------------------ *
+ * Low level helpers
+ * ------------------------------------------------------------------ */
+
+const rect = (s, x, y, w, h, color, opt) =>
+  s.addShape('rect', Object.assign({ x, y, w, h, fill: { color }, line: { type: 'none' } }, opt));
+
+const roundRect = (s, x, y, w, h, color, radiusFraction) =>
+  s.addShape('roundRect', {
+    x, y, w, h, fill: { color }, line: { type: 'none' },
+    rectRadius: (radiusFraction === undefined ? 0.16667 : radiusFraction) * Math.min(w, h),
+  });
+
+const oval = (s, x, y, w, h, color, opt) =>
+  s.addShape('ellipse', Object.assign({ x, y, w, h, fill: { color }, line: { type: 'none' } }, opt));
+
+const outlineBox = (s, x, y, w, h, color, width) =>
+  s.addShape('rect', { x, y, w, h, fill: { type: 'none' }, line: { color, width: width || 1.5 } });
+
+const hLine = (s, x, y, w, color, opt) =>
+  s.addShape('line', Object.assign({ x, y, w, h: 0, line: { color, width: 1 } }, opt));
+
+const vLine = (s, x, y, h, color, width) =>
+  s.addShape('line', { x, y, w: 0, h, line: { color, width: width || 1 } });
+
+const arrow = (s, x, y, w, color, width) =>
+  s.addShape('line', { x, y, w, h: 0, line: { color, width: width || 1, endArrowType: 'triangle' } });
+
+const arrowLeft = (s, x, y, w, color) =>
+  s.addShape('line', { x, y, w, h: 0, flipH: true, line: { color, width: 1, endArrowType: 'triangle' } });
+
+/* The source deck leaves every text body at PowerPoint's default insets. */
+const INSET = [7.2, 7.2, 3.6, 3.6]; // pts: left, right, bottom, top
+
+/** Generic text box.  Everything defaults to the deck's body font, top aligned. */
+function text(s, str, x, y, w, h, opt) {
+  s.addText(str, Object.assign(
+    { x, y, w, h, fontFace: F.body, fontSize: 10, color: C.grey, valign: 'top', margin: INSET },
+    opt));
+}
+
+/** Justified 10pt paragraph - the single most common element in the deck. */
+const para = (s, str, x, y, w, h, color, opt) =>
+  text(s, str, x, y, w, h, Object.assign(
+    { color, align: 'justify', lineSpacingMultiple: 2 }, opt));
+
+/** Big "Montserrat ExtraBold" headline; `parts` may be a string or rich-text runs. */
+const head = (s, parts, x, y, w, h, size, color, opt) =>
+  text(s, parts, x, y, w, h, Object.assign(
+    { fontFace: F.head, fontSize: size, bold: true, charSpacing: 3, color }, opt));
+
+/** Small caps-y label ("BUSINESS TEMPLATE", nav items, ...). */
+const label = (s, str, x, y, w, h, size, color, spacing, opt) =>
+  text(s, str, x, y, w, h, Object.assign(
+    { fontSize: size, bold: true, charSpacing: spacing, color }, opt));
+
+/**
+ * Stand-in for a bitmap in the source deck (phone / desktop / tablet mockups).
+ * Flat block in the photo's place, optionally captioned "[image]".
+ */
+function imageBox(s, x, y, w, h, opt) {
+  const o = opt || {};
+  s.addShape('rect', {
+    x, y, w, h, rotate: o.rotate,
+    fill: { color: o.color || C.greyPale },
+    line: o.border ? { color: o.border, width: 1 } : { type: 'none' },
+  });
+  if (o.caption !== false) {
+    s.addText('[image]', {
+      x, y: y + h / 2 - 0.16, w, h: 0.32, rotate: o.rotate,
+      fontFace: F.body, fontSize: 10, color: o.captionColor || C.grey, align: 'center', valign: 'middle',
+    });
+  }
+}
+
+/** Thin chevron ">" drawn as an open polyline. */
+const chevron = (s, x, y, w, h, color, width) =>
+  s.addShape('custGeom', {
+    x, y, w, h,
+    points: [{ x: 0, y: 0 }, { x: w, y: h / 2 }, { x: 0, y: h }],
+    fill: { type: 'none' }, line: { color, width: width || 2 },
+  });
+
+/** Square tile with a chevron in the middle - used on the "agenda" style slides. */
+function chevronTile(s, x, y, tile, mark) {
+  rect(s, x, y, 0.892, 0.941, tile);
+  chevron(s, x + 0.372, y + 0.346, 0.149, 0.249, mark, 2.25);
+}
+
+/** Glyph icon (DejaVu Sans has the best dingbat coverage of the installed fonts). */
+const icon = (s, ch, x, y, w, h, size, color) =>
+  s.addText(ch, { x, y, w, h, fontFace: F.icon, fontSize: size, color, align: 'center', valign: 'middle', margin: 0 });
+
+/* ------------------------------------------------------------------ *
+ * Pictograms - drawn from native shapes so they render everywhere
+ * ------------------------------------------------------------------ */
+
+/** Map pin: teardrop rotated tip-down, with a hollow centre. */
+function pin(s, x, y, d, color, holeColor) {
+  s.addShape('teardrop', { x, y, w: d, h: d, rotate: 135, fill: { color }, line: { type: 'none' } });
+  oval(s, x + d * 0.34, y + d * 0.26, d * 0.32, d * 0.32, holeColor);
+}
+
+/** Hourglass: two triangles tip to tip. */
+function hourglass(s, x, y, w, h, color) {
+  s.addShape('triangle', { x, y, w, h: h / 2, rotate: 180, fill: { color }, line: { type: 'none' } });
+  s.addShape('triangle', { x, y: y + h / 2, w, h: h / 2, fill: { color }, line: { type: 'none' } });
+}
+
+/** Head-and-shoulders silhouette. */
+function person(s, x, y, w, h, color) {
+  oval(s, x + w * 0.26, y, w * 0.48, h * 0.46, color);
+  roundRect(s, x, y + h * 0.52, w, h * 0.48, color, 0.45);
+}
+
+/** Two overlapping silhouettes. */
+function people(s, x, y, w, h, color) {
+  person(s, x, y + h * 0.14, w * 0.60, h * 0.86, color);
+  person(s, x + w * 0.36, y, w * 0.64, h * 0.94, color);
+}
+
+/** Camera body with lens. */
+function camera(s, x, y, w, h, color) {
+  rect(s, x + w * 0.20, y, w * 0.28, h * 0.20, color);
+  roundRect(s, x, y + h * 0.16, w, h * 0.84, color, 0.10);
+  oval(s, x + w * 0.30, y + h * 0.38, w * 0.40, h * 0.44, C.white);
+}
+
+/** Trophy: cup bowl, stem and base. */
+function trophy(s, x, y, w, h, color) {
+  s.addShape('blockArc', {
+    x, y: y - h * 0.30, w, h: h * 1.20, angleRange: [0, 180], arcThicknessRatio: 0.22,
+    rotate: 180, fill: { color }, line: { type: 'none' },
+  });
+  rect(s, x + w * 0.42, y + h * 0.48, w * 0.16, h * 0.30, color);
+  rect(s, x + w * 0.20, y + h * 0.80, w * 0.60, h * 0.18, color);
+}
+
+/** Paper plane. */
+function paperPlane(s, x, y, w, h, color) {
+  s.addShape('custGeom', {
+    x, y, w, h,
+    points: [{ x: w, y: 0 }, { x: 0, y: h * 0.45 }, { x: w * 0.38, y: h * 0.58 },
+             { x: w * 0.52, y: h }, { close: true }],
+    fill: { color }, line: { type: 'none' },
+  });
+}
+
+/** Crossed hammer and spanner. */
+function tools(s, x, y, w, h, color) {
+  s.addShape('rect', { x: x + w * 0.10, y: y + h * 0.42, w: w * 0.80, h: h * 0.16, rotate: -35, fill: { color }, line: { type: 'none' } });
+  s.addShape('rect', { x: x + w * 0.10, y: y + h * 0.42, w: w * 0.80, h: h * 0.16, rotate: 35, fill: { color }, line: { type: 'none' } });
+  oval(s, x, y, w * 0.30, h * 0.30, color);
+  oval(s, x + w * 0.70, y, w * 0.30, h * 0.30, color);
+}
+
+/** House with pitched roof. */
+function house(s, x, y, w, h, color) {
+  s.addShape('triangle', { x, y, w, h: h * 0.55, fill: { color }, line: { type: 'none' } });
+  rect(s, x + w * 0.18, y + h * 0.50, w * 0.64, h * 0.50, color);
+}
+
+/** Cog wheel: disc plus radial teeth. */
+function gear(s, x, y, d, color) {
+  const cx = x + d / 2;
+  const cy = y + d / 2;
+  for (let i = 0; i < 4; i += 1) {
+    s.addShape('rect', { x: cx - d * 0.5, y: cy - d * 0.13, w: d, h: d * 0.26, rotate: i * 45, fill: { color }, line: { type: 'none' } });
+  }
+  oval(s, x + d * 0.10, y + d * 0.10, d * 0.80, d * 0.80, color);
+  oval(s, x + d * 0.34, y + d * 0.34, d * 0.32, d * 0.32, C.white);
+}
+
+/** Envelope: body plus flap. */
+function envelope(s, x, y, w, h, color, paper) {
+  rect(s, x, y, w, h, color);
+  s.addShape('custGeom', {
+    x, y, w, h,
+    points: [{ x: 0, y: 0 }, { x: w, y: 0 }, { x: w / 2, y: h * 0.62 }, { close: true }],
+    fill: { color: paper }, line: { type: 'none' },
+  });
+}
+
+/** Square tile with a chevron in the middle - used on the "agenda" style slides. */
+function chevronTile(s, x, y, tile, mark) {
+  rect(s, x, y, 0.892, 0.941, tile);
+  chevron(s, x + 0.372, y + 0.346, 0.149, 0.249, mark, 2.25);
+}
+
+/** Telephone handset: thick arc tilted like a receiver. */
+function handset(s, x, y, w, h, color) {
+  s.addShape('blockArc', {
+    x, y, w, h, angleRange: [10, 190], arcThicknessRatio: 0.38,
+    rotate: 145, fill: { color }, line: { type: 'none' },
+  });
+}
+
+/**
+ * Phone mockup stand-in: rounded body, dark screen, home button.
+ * (The reference deck uses a photo here.)
+ */
+function phoneMockup(s, x, y, w, h, body, screen) {
+  roundRect(s, x, y, w, h, body, 0.09);
+  rect(s, x + w * 0.06, y + h * 0.09, w * 0.88, h * 0.76, screen);
+  s.addShape('ellipse', {
+    x: x + w * 0.41, y: y + h * 0.885, w: w * 0.18, h: w * 0.18,
+    fill: { type: 'none' }, line: { color: screen, width: 1 },
+  });
+}
+
+/**
+ * Desktop monitor stand-in (slide 26).  In the reference the screen is a
+ * transparent cut-out, so the panels behind it are painted back in.
+ */
+function desktopMockup(s, x, right, screenSplit) {
+  rect(s, x, 1.373, right - x, 4.631, C.black);              // bezel
+  rect(s, x, 1.706, screenSplit - x, 4.018, C.indigo);        // screen over indigo band
+  rect(s, screenSplit, 1.706, 5.604 - screenSplit, 4.018, C.white);
+  rect(s, x, 6.004, right - x, 0.719, 'C7C8CA');              // silver base
+  rect(s, x, 6.723, 2.83 - x, 0.777, 'BCBDC1');               // pedestal
+}
+
+/**
+ * Tablet mockup stand-in (slide 25): white bezel drawn as a thick outline so
+ * the diagonal indigo panel shows through the screen, as in the reference.
+ */
+function tabletMockup(s, x, y, w, h, rotate) {
+  s.addShape('roundRect', {
+    x, y, w, h, rotate, rectRadius: Math.min(w, h) * 0.05,
+    fill: { type: 'none' }, line: { color: C.white, width: 9 },
+  });
+  s.addShape('roundRect', {
+    x, y, w, h, rotate, rectRadius: Math.min(w, h) * 0.05,
+    fill: { type: 'none' }, line: { color: C.greyPale, width: 1 },
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Repeated page furniture
+ * ------------------------------------------------------------------ */
+
+const NAV = [
+  ['ONEDRIVE', 0.595, 1.766],
+  ['BUSINESS', 5.331, 1.766],
+  ['CORPORATE', 7.350, 1.913],
+  ['CONTACT', 9.370, 1.450],
+  ['BLOG', 11.172, 0.995],
+];
+
+/** White (or indigo) menu bar pinned to the top of the slide. */
+function navBar(s, barColor, textColor) {
+  rect(s, 0.359, 0.333, 12.616, 0.694, barColor);
+  NAV.forEach(([t, x, w]) => label(s, t, x, 0.552, w, 0.257, 10, textColor, 6));
+}
+
+const FOOTER_COLS = [
+  ['BUSINESS', 0.700, 1.766, 0.697],
+  ['PRESENTATION', 5.533, 2.380, 5.533],
+  ['CORPORATE', 9.673, 1.788, 9.673],
+];
+
+/** Yellow rule + black band with three short columns of copy. */
+function footerBand(s) {
+  rect(s, 0, 5.931, 13.333, 0.194, C.sand);
+  rect(s, 0, 6.125, 13.333, 1.375, C.black);
+  footerColumns(s, 6.353);
+}
+
+function footerColumns(s, y) {
+  FOOTER_COLS.forEach(([t, x, w, bx], i) => {
+    label(s, t, x, y + (i === 0 ? 0.038 : 0), w, i === 0 ? 0.257 : 0.358, 10, C.white, 6);
+    para(s, T.brief, bx, y + (i === 0 ? 0.310 : 0.272), 2.935, 0.606, C.white, { lineSpacingMultiple: 1.5 });
+  });
+}
+
+/** Yellow/black strip along the very bottom (timeline slides). */
+function bottomStrip(s) {
+  rect(s, 0, 7.042, 13.333, 0.111, C.sand);
+  rect(s, 0, 7.194, 13.333, 0.306, C.black);
+}
+
+/** Filled + outlined pill pair, e.g. CORPORATE / BUSINESS. */
+function buttonPair(s, x1, x2, y, opts) {
+  const o = opts || {};
+  rect(s, x1, y, 2.114, 0.669, o.fill || C.sand);
+  label(s, o.leftText || 'CORPORATE', x1 + 0.100, y + 0.201, 1.913, 0.266, 10, o.leftColor || C.grey, 6);
+  s.addShape('rect', { x: x2, y, w: 2.114, h: 0.669, fill: { type: 'none' }, line: { color: o.outline || C.white, width: 1 } });
+  label(s, o.rightText || 'BUSINESS', x2 + 0.100, y + 0.201, 1.913, 0.266, 10, o.rightColor || C.white, 6);
+}
+
+/** Slim "CORPORATE"/"BUSINESS" tag: narrow colour block with wider centred caption. */
+function tagButton(s, x, y, blockColor, caption, captionColor, opt) {
+  const o = opt || {};
+  s.addShape('rect', {
+    x: x + 0.470, y, w: 1.750, h: 0.306,
+    fill: { color: blockColor }, line: o.line ? { color: o.line, width: 1 } : { type: 'none' },
+  });
+  text(s, caption, x, y + 0.010, 2.690, 0.269,
+    { fontFace: F.sub, fontSize: 10, charSpacing: 3, color: captionColor, align: 'center' });
+}
+
+/** "Business template / Big Head / Sub Head" stack used on many slides. */
+function headingStack(s, x, y, kicker, title, sub, color, opt) {
+  const o = opt || {};
+  text(s, kicker, x, y, o.kickerW || 3.978, 0.404,
+    { fontFace: F.sub, fontSize: o.kickerSize || 18, bold: true, charSpacing: 3, color });
+  head(s, title, x, y + 0.339, 4.910, 0.774, 40, color);
+  head(s, sub, x + (o.subDx || 0), y + 1.034, o.subW || 5.347, 0.572, 28, color);
+}
+
+/** Three-line "TITLE / paragraph" block. */
+function titleAndCopy(s, title, body, x, y, w, color, opt) {
+  const o = opt || {};
+  head(s, title, x, y, o.titleW || 1.800, 0.438, o.titleSize || 20, color, { charSpacing: 0, align: o.align });
+  para(s, body, x, y + 0.438, w, o.h || 1.063, color, { align: o.bodyAlign || 'justify' });
+}
+
+/* ------------------------------------------------------------------ *
+ * Slides
+ * ------------------------------------------------------------------ */
+
+/** 1 - cover: "OneDrive" */
+function slide01(s) {
+  rect(s, 0, 0, 13.333, 7.5, C.indigoSoft);
+  footerBand(s);
+  label(s, 'BUSINESS PRESENTATION', 0.595, 2.058, 3.807, 0.264, 10, C.white, 6);
+  head(s, 'OneDrive', 0.498, 2.259, 6.168, 1.418, 80, C.white);
+  para(s, T.fullPlain, 0.595, 3.590, 6.072, 0.774, C.white);
+  buttonPair(s, 0.692, 3.012, 4.713);
+  arrow(s, 6.653, 3.347, 6.347, C.white);
+  navBar(s, C.white, C.grey);
+}
+
+/** 2 - "Welcome To / Message Company" */
+function slide02(s) {
+  rect(s, 0, 0, 13.333, 7.5, C.indigoSoft);
+  footerBand(s);
+  navBar(s, C.white, C.grey);
+  text(s, 'Business template', 0.359, 2.676, 3.978, 0.404,
+    { fontFace: F.sub, fontSize: 18, bold: true, charSpacing: 3, color: C.white });
+  head(s, 'Welcome To', 0.359, 3.015, 4.910, 0.774, 40, C.white);
+  head(s, 'Message Company', 0.414, 3.710, 5.558, 0.572, 28, C.white);
+  vLine(s, 5.681, 2.917, 1.421, C.white);
+  para(s, T.full, 6.202, 3.237, 6.773, 0.774, C.white);
+  buttonPair(s, 0.553, 2.852, 4.713);
+}
+
+/** 3 - quote */
+function slide03(s) {
+  rect(s, 0, 0, 13.333, 7.5, C.indigoSoft);
+  head(s, 'Qoute', 3.762, 0.764, 5.809, 0.228, 40, C.white, { align: 'center', charSpacing: 0 });
+  hLine(s, 0.375, 1.194, 4.556, C.white);
+  rect(s, 4.931, 0.992, 0.375, 0.411, C.sand);
+  hLine(s, 8.403, 1.194, 4.556, C.white);
+  rect(s, 8.028, 0.992, 0.375, 0.411, C.sand);
+  label(s, 'QOUTE SECTION NOW', 3.762, 6.346, 5.809, 0.228, 10, C.white, 6, { align: 'center', bold: true });
+  text(s, '"Try to be successful, stay away from potential failures. But sometimes you really need to taste it for a while, so we know true happiness. As well as a way to share and benefit others "',
+    2.208, 2.726, 8.917, 2.460,
+    { fontSize: 24, italic: true, color: C.white, align: 'center', lineSpacingMultiple: 1.5 });
+}
+
+/** 4 - agenda: indigo column left, two yellow cards right */
+function slide04(s) {
+  rect(s, 0, 0, 5.083, 7.5, C.indigoSoft);
+  [1.236, 3.944].forEach((y) => rect(s, 8.069, y, 5.264, 2.292, C.sand));
+  [[2.117, 1.544, 8.316], [4.811, 4.239, 8.283]].forEach(([py, ty, x]) => {
+    head(s, 'About our Agenda', x, ty, 4.559, 0.505, 24, C.grey);
+    para(s, T.fullPlain, x, py, 4.267, 1.063, C.grey);
+  });
+  [1.911, 4.620].forEach((y) => chevronTile(s, 3.568, y, C.sand, C.greyDark));
+  [[1.346, 1.784], [3.985, 4.423]].forEach(([ty, py]) => {
+    head(s, 'Title Here', 0.352, ty, 1.800, 0.438, 20, C.white, { charSpacing: 0 });
+    para(s, T.dots, 0.380, py, 2.892, 1.111, C.white);
+  });
+}
+
+/* Timeline milestone card: year + short paragraph. */
+function milestone(s, x, y, year) {
+  head(s, year, x + 0.240, y, 1.711, 0.301, 14, C.ink, { fontFace: F.body, charSpacing: 0 });
+  text(s, L.step, x, y + 0.237, 2.193, 0.858,
+    { color: C.ink, align: 'center', lineSpacingMultiple: 1.5 });
+}
+
+/* "WE ARE WE START" outlined start box. */
+function startBox(s, x, y) {
+  outlineBox(s, x, y, 2.333, 2.333, C.black, 1.5);
+  head(s, 'WE ARE WE START', x + 0.490, y + 0.973, 1.356, 0.555, 16, C.ink,
+    { fontFace: F.body, charSpacing: 0, align: 'center' });
+  s.addText(
+    [{ text: 'Lorem ipsum dolor sit amet,', options: { fontSize: 10 } },
+     { text: ' lacus nulla ac netus nibh aliquet', options: { fontSize: 8 } }],
+    { x: x + 0.081, y: y + 1.569, w: 2.070, h: 0.534, fontFace: F.body, color: C.ink,
+      align: 'center', lineSpacingMultiple: 1.5, valign: 'top', margin: 0 });
+}
+
+/* Shared header for the two timeline slides. */
+function timelineHeader(s, y, accent) {
+  head(s, 'Our company', 0.648, y, 4.824, 0.556, 36, C.grey, { charSpacing: 0 });
+  s.addText(
+    [{ text: 'Timeline', options: { color: C.sand } },
+     { text: ' ', options: { color: accent } },
+     { text: 'here.', options: { color: C.grey } }],
+    { x: 0.648, y: y + 0.571, w: 4.824, h: 0.556, fontFace: F.head, fontSize: 36, bold: true, valign: 'top', margin: 0 });
+  text(s, L.timeline, 0.648, y + 1.322, 11.303, 0.858, { color: C.ink, lineSpacingMultiple: 1.5 });
+}
+
+/** 5 - timeline running left to right (2020 / 2022 / 2024) */
+function slide05(s) {
+  timelineHeader(s, 0.490, 'E76801');
+  hLine(s, 3.159, 4.889, 10.175, C.black, { line: { color: C.black, width: 2.25 } });
+  startBox(s, 0.825, 3.722);
+  gear(s, 1.635, 3.930, 0.710, C.black);
+  rect(s, 5.153, 3.833, 0.972, 0.861, C.sand);
+  envelope(s, 5.302, 4.055, 0.674, 0.417, C.greyDark, C.sand);
+  rect(s, 7.760, 3.833, 0.972, 0.861, C.black);
+  paperPlane(s, 7.909, 4.005, 0.674, 0.546, C.white);
+  rect(s, 10.367, 3.833, 0.972, 0.861, C.sand);
+  paperPlane(s, 10.533, 4.000, 0.643, 0.638, C.greyDark);
+  [3.503, 6.422, 9.102].forEach((x) => arrow(s, x, 4.264, 1.023, C.grey));
+  [[4.525, '2020'], [7.150, '2022'], [9.759, '2024']].forEach(([x, y]) => milestone(s, x, 5.029, y));
+  bottomStrip(s);
+}
+
+/** 6 - timeline running right to left (2026 / 2028 / 2030) */
+function slide06(s) {
+  timelineHeader(s, 0.653, '6C5CE7');
+  hLine(s, 0, 4.639, 10.175, C.black, { line: { color: C.black, width: 2.25 } });
+  startBox(s, 10.175, 3.472);
+  house(s, 10.996, 3.653, 0.690, 0.611, C.black);
+  rect(s, 1.999, 3.569, 0.972, 0.861, C.sand);
+  tools(s, 2.126, 3.680, 0.717, 0.646, C.greyDark);
+  rect(s, 4.523, 3.569, 0.972, 0.861, C.black);
+  people(s, 4.648, 3.677, 0.722, 0.646, C.white);
+  rect(s, 7.179, 3.583, 0.972, 0.861, C.sand);
+  pin(s, 7.486, 3.725, 0.579, C.greyDark, C.sand);
+  [2.911, 5.319, 7.819].forEach((x) => arrowLeft(s, x, 4.014, 1.023, C.grey));
+  [[1.367, '2026'], [3.991, '2028'], [6.600, '2030']].forEach(([x, y]) => milestone(s, x, 4.779, y));
+  bottomStrip(s);
+}
+
+/** 7 - "About Us" with big yellow panel on the right */
+function slide07(s) {
+  rect(s, 6.667, 0, 6.667, 7.5, C.sand);
+  headingStack(s, 0.833, 1.389, 'Business template', 'About Us', 'Office The Company', C.grey);
+  para(s, T.full, 0.833, 3.197, 4.859, 1.063, C.grey);
+  para(s, T.half, 0.833, 4.529, 4.859, 0.727, C.grey);
+  tagButton(s, 0.478, 5.631, C.sand, 'CORPORATE', C.grey);
+  tagButton(s, 2.601, 5.631, C.black, 'BUSINESS', C.white);
+  chevronTile(s, 6.887, 3.291, C.white, C.greyDark);
+  text(s, T.tiny, 0.859, 6.237, 2.212, 0.606, { color: C.grey, lineSpacingMultiple: 1.5 });
+  arrow(s, 3.096, 6.694, 1.668, C.greyDark);
+}
+
+/** 8 - "About Our / The Vission Here" split panel */
+function slide08(s) {
+  rect(s, 5.153, 0, 3.861, 7.5, C.sand);
+  rect(s, 0, 0, 5.153, 7.5, C.indigo);
+  [1.303, 3.452, 5.602].forEach((y) => titleAndCopy(s, 'Title Here', T.dots, 5.637, y - 0.438, 2.892, C.grey));
+  headingStack(s, 0.393, 1.760, 'Business Template', 'About Our', 'The Vission Here', C.white, { subDx: 0.056, subW: 4.582 });
+  para(s, T.full, 0.491, 3.568, 4.069, 1.447, C.white);
+  para(s, T.half, 0.491, 5.231, 3.881, 1.111, C.white);
+}
+
+/** 9 - three "About Our Mission" rows plus yellow side panel */
+function slide09(s) {
+  rect(s, 9.028, 0, 4.306, 7.5, C.sand);
+  [1.078, 3.286, 5.495].forEach((y) => chevronTile(s, 8.693, y, C.indigo, C.white));
+  [[0.932, 1.424], [2.849, 3.495], [4.853, 5.662]].forEach(([ty, py]) => {
+    text(s, 'About Our Mission', 3.797, ty, 3.978, 0.404,
+      { fontFace: F.sub, fontSize: 18, bold: true, charSpacing: 3, color: C.grey });
+    para(s, T.half, 3.797, py, 4.524, 0.774, C.grey);
+  });
+  [1.026, 3.216, 5.405].forEach((y) => titleAndCopy(s, 'Title Here', T.dots, 10.013, y, 2.892, C.grey));
+}
+
+/** 10 - "Our Goals" (cover variant) */
+function slide10(s) {
+  rect(s, 0, 0, 13.333, 7.5, C.indigoSoft);
+  footerBand(s);
+  text(s, 'Business template', 0.359, 2.676, 3.978, 0.404,
+    { fontFace: F.sub, fontSize: 18, bold: true, charSpacing: 3, color: C.white });
+  s.addText([{ text: 'Our ', options: { color: C.white } }, { text: 'Goals', options: { color: C.sand } }],
+    { x: 0.359, y: 3.015, w: 4.910, h: 0.774, fontFace: F.head, fontSize: 40, bold: true, charSpacing: 3, valign: 'top', margin: 0 });
+  head(s, 'Message Company', 0.414, 3.710, 5.558, 0.572, 28, C.white);
+  vLine(s, 5.681, 2.917, 1.421, C.white);
+  para(s, T.full, 6.202, 3.237, 6.773, 0.774, C.white);
+  navBar(s, C.white, C.grey);
+}
+
+/** 11 - "Our History" with an indigo band across the lower half */
+function slide11(s) {
+  rect(s, 0, 3.458, 13.333, 0.278, C.sand);
+  navBar(s, C.white, C.grey);
+  text(s, 'Business template', 0.359, 1.389, 3.978, 0.404,
+    { fontFace: F.sub, fontSize: 18, bold: true, charSpacing: 3, color: C.grey });
+  s.addText([{ text: 'Our ', options: { color: C.grey } }, { text: 'History', options: { color: C.sand } }],
+    { x: 0.359, y: 1.728, w: 4.910, h: 0.774, fontFace: F.head, fontSize: 40, bold: true, charSpacing: 3, valign: 'top', margin: 0 });
+  head(s, 'Office The Company', 0.359, 2.423, 5.347, 0.572, 28, C.grey);
+  vLine(s, 5.861, 1.903, 1.092, C.greyDark);
+  para(s, T.full, 6.202, 1.984, 6.773, 0.727, C.grey);
+  rect(s, 0, 3.736, 13.333, 3.764, C.indigoSoft);
+  [['BUSINESS', 0.700, 1.766, 0.697, 0.038], ['PRESENTATION', 5.491, 2.380, 5.491, 0], ['CORPORATE', 9.813, 1.788, 9.813, 0]]
+    .forEach(([t, x, w, bx, dy]) => {
+      label(s, t, x, 5.402 + dy, w, dy ? 0.257 : 0.358, 10, C.white, 6);
+      para(s, T.brief, bx, 5.674 + dy, 2.935, 0.606, C.white, { lineSpacingMultiple: 1.5 });
+    });
+  [4.056, 8.515].forEach((x) => arrow(s, x, 6.015, 1.158, C.white));
+}
+
+/** 12 - "Company Overview" rows with indigo panel on the right */
+function slide12(s) {
+  rect(s, 8.250, 0, 5.083, 7.5, C.indigoMid);
+  [1.078, 3.286, 5.495].forEach((y) => chevronTile(s, 7.596, y, C.sand, C.greyDark));
+  [[0.697, 1.101, 2.036], [3.035, 3.438, 4.378], [5.250, 5.654, 6.662]].forEach(([ty, py, by]) => {
+    text(s, 'Company Overview', 0.996, ty, 3.978, 0.404,
+      { fontFace: F.sub, fontSize: 18, bold: true, charSpacing: 3, color: C.grey });
+    para(s, T.half, 0.996, py, 4.524, 0.774, C.grey);
+    tagButton(s, 0.633, by, C.sand, 'CORPORATE', C.greyDark);
+    arrow(s, 3.097, by + 0.158, 2.422, C.greyDark);
+  });
+  [1.020, 3.235, 5.449].forEach((y) => titleAndCopy(s, 'Title Here', T.dots, 9.046, y, 2.892, C.white, { h: 1.111 }));
+}
+
+/** 13 - three numbered white cards on indigo */
+function slide13(s) {
+  rect(s, 0, 0, 13.333, 7.5, C.indigoSoft);
+  [[1.125, 1.319, 2.042, 5.917, 2.222, 0.660, '01', 2.286, 0.918, 1.557, 1.815, 2.042],
+   [5.076, 1.326, 5.993, 5.931, 6.174, 0.660, '02', 6.227, 0.934, 5.508, 5.780, 6.007],
+   [9.028, 1.333, 9.944, 5.944, 10.125, 0.660, '03', 10.188, 0.950, 9.459, 9.746, 9.972]]
+    .forEach(([cx, cy, tagX, tagY, ovX, ovY, num, numX, numY, bodyX, titleX, labX]) => {
+      roundRect(s, cx, cy, 3.181, 4.847, C.white, 0.20);
+      roundRect(s, tagX, tagY, 1.347, 0.500, C.sand, 0.25);
+      oval(s, ovX, ovY, 0.986, 0.986, C.sand);
+      head(s, num, numX, numY, 0.859, 0.438, 20, C.greyDark, { charSpacing: 0, align: 'center' });
+      head(s, 'Title Here', titleX, 2.169, 1.800, 0.438, 20, C.grey, { charSpacing: 0, align: 'center' });
+      text(s, T.full, bodyX, 2.678, 2.317, 2.457, { color: C.grey, align: 'center', lineSpacingMultiple: 2 });
+      text(s, 'PHILOSOPHY', labX, 6.060, 1.347, 0.219,
+        { fontFace: F.sub, fontSize: 7, charSpacing: 3, color: C.grey, align: 'center' });
+    });
+}
+
+/** 14 - three circular service icons */
+function slide14(s) {
+  rect(s, 0, 0, 13.333, 7.5, C.indigoSoft);
+  const cards = [
+    [1.283, C.sand, 0.934, 0.602, 3.182],
+    [5.760, C.white, 5.407, 5.039, 3.256],
+    [10.249, C.sand, 9.901, 9.569, 3.182],
+  ];
+  cards.forEach(([x, fill, labX, bodyX, bodyW]) => {
+    oval(s, x, 2.409, 1.813, 1.813, fill);
+    label(s, 'OUR SERVICE', labX, 4.439, 2.519, 0.301, 12, C.white, 3, { fontFace: F.head, align: 'center' });
+    text(s, 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo.',
+      bodyX, 4.757, bodyW, 0.579, { color: C.white, align: 'center', lineSpacingMultiple: 1.5 });
+  });
+  trophy(s, 1.781, 2.932, 0.825, 0.755, C.greyDark);
+  pin(s, 6.364, 2.933, 0.787, C.grey, C.white);
+  camera(s, 10.767, 2.958, 0.787, 0.703, C.greyDark);
+  [3.439, 7.926].forEach((x) => arrow(s, x, 3.327, 1.955, C.white));
+  navBar(s, C.white, C.grey);
+  footerBand(s);
+}
+
+/** 15 - "Our About / Service The Company" feature list */
+function slide15(s) {
+  rect(s, 0, 0, 5.861, 7.5, C.indigoSoft);
+  rect(s, 1.729, 2.285, 2.403, 2.847, C.white);
+  handset(s, 2.665, 2.856, 0.531, 0.540, C.indigo);
+  text(s, 'Donec porttitor porttitor ante. Nam dictum quam sed erat lobortis, et gravida nunc pellentesque.',
+    1.729, 3.610, 2.402, 0.967, { fontSize: 9, color: C.grey, align: 'center', lineSpacingMultiple: 2 });
+  text(s, 'Business template', 6.913, 0.765, 3.978, 0.404,
+    { fontFace: F.sub, fontSize: 18, bold: true, charSpacing: 3, color: C.grey });
+  s.addText([{ text: 'Our ', options: { color: C.grey } }, { text: 'About', options: { color: C.sand } }],
+    { x: 6.913, y: 1.103, w: 4.910, h: 0.774, fontFace: F.head, fontSize: 40, bold: true, charSpacing: 3, valign: 'top', margin: 0 });
+  head(s, 'Service The Company', 6.913, 1.799, 5.740, 0.572, 28, C.grey);
+  const rows = [
+    [3.001, 'Start up', 1.333, 2],
+    [4.442, 'Business plan', 1.547, 2],
+    [5.986, 'Team work', 1.294, 1.5],
+  ];
+  rows.forEach(([y, title, tw, ls], i) => {
+    head(s, title, 7.533 + (i === 2 ? 0.065 : 0), y, tw, 0.337, 14, C.grey,
+      { fontFace: F.body, charSpacing: i === 0 ? 3 : 0 });
+    text(s, L.donec, 7.533 + (i === 2 ? 0.065 : 0), y + 0.336, i === 2 ? 4.444 : 4.328, i === 2 ? 0.555 : 0.707,
+      { fontSize: 9, color: C.grey, align: 'justify', lineSpacingMultiple: ls });
+  });
+  paperPlane(s, 6.913, 3.112, 0.498, 0.498, C.indigo);
+  hourglass(s, 6.981, 4.511, 0.376, 0.567, C.indigo);
+  people(s, 6.931, 6.083, 0.569, 0.459, C.indigo);
+}
+
+/** 16 - "What We Do" indigo panel on the right */
+function slide16(s) {
+  rect(s, 6.667, 0, 6.667, 7.5, C.indigo);
+  headingStack(s, 7.542, 1.045, 'Business template', 'What We Do', 'Office The Company', C.white);
+  para(s, T.full, 7.542, 2.853, 4.859, 1.063, C.white);
+  para(s, T.half, 7.542, 4.185, 4.859, 0.727, C.white);
+  tagButton(s, 7.187, 5.287, C.sand, 'CORPORATE', C.grey);
+  tagButton(s, 9.309, 5.287, C.black, 'BUSINESS', C.white);
+  text(s, T.tiny, 7.568, 5.893, 2.212, 0.580, { color: C.white, lineSpacingMultiple: 1.5 });
+  arrow(s, 9.804, 6.350, 1.668, C.white);
+}
+
+/** 17 - three "Choose Here" quadrants */
+function slide17(s) {
+  rect(s, 0, 3.736, 4.333, 3.764, C.indigo);
+  rect(s, 9.000, 3.764, 4.333, 3.764, C.indigo);
+  rect(s, 4.333, 0, 4.667, 3.764, C.sand);
+  const panels = [
+    [4.667, 0.727, 4.858, 1.158, C.grey, 5.322, 2.879],
+    [0.177, 4.546, 0.358, 5.068, C.white, 0.822, 6.758],
+    [9.177, 4.546, 9.358, 5.068, C.white, 9.822, 6.749],
+  ];
+  panels.forEach(([tx, ty, bx, by, color, gx, gy]) => {
+    text(s, 'Choose Here', tx, ty, 3.978, 0.404,
+      { fontFace: F.sub, fontSize: 18, bold: true, charSpacing: 3, color, align: 'center' });
+    text(s, T.full, bx, by, 3.618, 1.447, { color, align: 'center', lineSpacingMultiple: 2 });
+    tagButton(s, gx, gy, C.black, 'BUSINESS', C.white);
+  });
+}
+
+/** 18 - "Ceo & Founder" */
+function slide18(s) {
+  rect(s, 0, 0, 9.028, 7.5, C.black);
+  rect(s, 0, 1.222, 4.472, 5.056, C.sand);
+  [2.497, 4.483].forEach((y) => titleAndCopy(s, 'Title Here', T.dots, 4.787, y, 2.892, C.white, { h: 1.111 }));
+  rect(s, 8.833, 0, 0.194, 7.5, C.sand);
+  rect(s, 4.889, 1.222, 4.819, 0.917, C.white);
+  head(s, 'Ceo & Founder', 4.889, 1.307, 4.819, 0.707, 36, C.grey);
+}
+
+/** 19 - three staff cards on black */
+function slide19(s) {
+  rect(s, 0, 0, 13.333, 7.5, C.black);
+  const cards = [
+    [1.111, 'AUDREY', 1.245, 1.245],
+    [5.097, 'JESSICA', 5.180, 5.221],
+    [9.083, 'ISABELLE', 9.114, 9.196],
+  ];
+  cards.forEach(([x, name, nameX, bodyX]) => {
+    rect(s, x, 4.500, 3.181, 2.444, C.sand);
+    rect(s, x, 4.089, 2.083, 0.417, C.white);
+    head(s, name, nameX, 4.089, 1.800, 0.438, 20, C.grey, { charSpacing: 0 });
+    head(s, 'Our Staff Here', bodyX, 4.948, 2.584, 0.438, 20, C.grey, { charSpacing: 0 });
+    para(s, T.dots, bodyX, 5.386, 2.892, 1.063, C.grey);
+  });
+}
+
+/** 20 - three "Our Team Work" cards under an indigo nav bar */
+function slide20(s) {
+  const cards = [
+    [1.153, 'RICHARD', 0.650, 0.784, 1.287, 1.441],
+    [5.097, 'JOHNSON', 4.528, 4.663, 5.231, 5.385],
+    [9.042, 'LIU KIEM', 8.407, 8.542, 9.176, 9.330],
+  ];
+  cards.forEach(([x, name, tagX, nameX, bodyX, titleX]) => {
+    rect(s, x, 4.167, 3.139, 2.764, C.sand);
+    rect(s, tagX, 4.025, 2.083, 0.417, C.white);
+    head(s, name, nameX, 4.020, 1.800, 0.438, 20, C.grey, { charSpacing: 0 });
+    head(s, 'Our Team Work', titleX, 4.774, 2.584, 0.438, 20, C.grey, { charSpacing: 0, align: 'center' });
+    text(s, T.dots, bodyX, 5.212, 2.892, 1.063, { color: C.grey, align: 'center', lineSpacingMultiple: 2 });
+  });
+  navBar(s, C.indigo, C.white);
+}
+
+/** 21 - "Our Skills" with progress bars and a portrait circle */
+function slide21(s) {
+  rect(s, 0, 0, 10.531, 7.5, C.indigo);
+  rect(s, 10.509, 0, 2.825, 7.5, C.sand);
+  oval(s, 8.924, 1.212, 3.431, 3.521, C.white);
+  [1.170, 3.082, 4.995].forEach((y) => titleAndCopy(s, 'Title Here', T.page, 0.373, y, 2.530, C.white, { h: 1.111 }));
+  vLine(s, 3.083, 1.212, 5.331, C.white);
+  headingStack(s, 3.441, 1.271, 'Business Template', 'Our Skills', 'The Employees', C.white,
+    { kickerSize: 14, kickerW: 3.130, subDx: 0.056, subW: 4.155 });
+  const bars = [
+    [3.441, 3.305, 'TEAM IT DEVELOPMENT', '90%', 3.667, 3.914, 3.529, 3.046, 7.528],
+    [3.461, 5.209, 'TEAM DESIGN', '80%', 3.239, 5.811, 3.545, 2.184, 7.548],
+  ];
+  bars.forEach(([x, y, name, pct, fillW, copyY, barX, nameW, pctX]) => {
+    text(s, name, x, y, nameW, 0.286, { fontFace: F.sub, fontSize: 11, bold: true, charSpacing: 3, color: C.white });
+    text(s, pct, pctX, y, 0.701, 0.286, { fontFace: F.sub, fontSize: 11, bold: true, charSpacing: 3, color: C.white, align: 'right' });
+    rect(s, barX + 0.013, y + 0.397, 4.569, 0.083, C.white);
+    rect(s, barX, y + 0.397, fillW, 0.083, C.sand);
+    text(s, T.skill, x + 0.007, copyY, 4.487, 0.580, { color: C.white, align: 'justify', lineSpacingMultiple: 1.5 });
+  });
+  head(s, 'James', 9.838, 4.910, 1.564, 0.505, 24, C.white, { align: 'center' });
+  text(s, 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo libero vivamus porttitor dolor.',
+    9.370, 5.415, 2.500, 0.783, { fontSize: 9, color: C.white, align: 'center', lineSpacingMultiple: 1.5 });
+  ['g+', 'v', 'p', 'f'].forEach((g, i) => {
+    const x = 9.723 + i * 0.4545;
+    s.addShape('ellipse', { x, y: 6.483, w: 0.436, h: 0.436, fill: { type: 'none' }, line: { color: C.white, width: 1 } });
+    text(s, g, x, 6.523, 0.436, 0.3, { fontFace: F.sub, fontSize: 11, bold: true, color: C.white, align: 'center' });
+  });
+}
+
+/** 22 - "Break." (cover variant) */
+function slide22(s) {
+  rect(s, 0, 0, 13.333, 7.5, C.indigoSoft);
+  footerBand(s);
+  label(s, 'BUSINESS PRESENTATION', 0.595, 2.058, 3.807, 0.264, 10, C.white, 6);
+  head(s, 'Break.', 0.498, 2.259, 6.168, 1.418, 96, C.white);
+  para(s, T.fullPlain, 0.595, 3.590, 6.072, 0.774, C.white);
+  buttonPair(s, 0.692, 3.012, 4.713);
+  arrow(s, 5.533, 3.590, 7.442, C.white);
+  navBar(s, C.white, C.grey);
+}
+
+/* Feature list used by the phone-mockup and chart slides. */
+const MOCKUP_ROWS = [
+  ['LAYERED FILES', 1.221, 1.431, L.bulletAlt, '\u2B07'],
+  ['UNLIMITED OPTIONS', 3.170, 3.376, L.bullet, '\u26AF'],
+  ['FULL CUSTOMIZED', 5.094, 5.340, L.bullet, '\u2691'],
+];
+
+function mockupList(s, x, dy, textColor, dotColors, glyphColors, bodyW) {
+  MOCKUP_ROWS.forEach(([title, ty, by, body], i) => {
+    text(s, title, x + 0.014, ty + dy, 2.710, 0.303, { fontSize: 12, color: textColor });
+    text(s, body, x + (i === 1 ? 0.014 : 0), by + dy, bodyW || 2.723, 0.858,
+      { color: textColor, lineSpacingMultiple: 1.5 });
+  });
+  const ovX = x - 0.958;
+  [[1.232, 0], [3.223, 1], [5.264, 2]].forEach(([oy, i]) => {
+    oval(s, ovX, oy + dy, 0.728, 0.728, dotColors[i]);
+    icon(s, MOCKUP_ROWS[i][4], ovX + 0.10, oy + dy + 0.10, 0.528, 0.528, 18, glyphColors[i]);
+  });
+  [2.063, 4.080].forEach((cy) =>
+    s.addShape('line', { x: ovX + 0.364, y: cy + dy, w: 0, h: 1.056, line: { color: C.greySoft, width: 0.75, dashType: 'sysDash' } }));
+}
+
+/** 23 - phone mockup (light indigo) */
+function slide23(s) {
+  rect(s, 0, 0, 6.500, 7.5, C.indigoMid);
+  phoneMockup(s, 4.994, 1.140, 2.699, 5.271, 'EFE4E1', '3B3B3B');
+  hLine(s, 1.008, 3.098, 2.438, C.greyFaint, { line: { color: C.greyFaint, width: 1 } });
+  text(s, 'Phone Device Mockup Slide', 0.947, 1.972, 3.103, 1.007,
+    { fontFace: F.head, fontSize: 28, bold: true, color: C.greyFaint, lineSpacingMultiple: 0.9 });
+  text(s, L.mockup, 0.947, 3.619, 2.957, 2.373, { color: C.greyFaint, align: 'justify', lineSpacingMultiple: 1.5 });
+  mockupList(s, 9.180, 0, '111111', [C.indigo, C.sand, C.indigo], [C.white, C.grey, C.white]);
+}
+
+/** 24 - phone mockup (solid indigo) */
+function slide24(s) {
+  rect(s, 0, 0, 6.500, 7.5, C.indigo);
+  phoneMockup(s, 4.970, 1.114, 2.785, 5.317, '1E1E1E', '3B3B3B');
+  hLine(s, 1.032, 3.134, 2.438, C.white, { line: { color: C.white, width: 1 } });
+  text(s, 'Phone Device Mockup Slide', 0.971, 2.063, 3.152, 1.007,
+    { fontFace: F.head, fontSize: 28, bold: true, color: C.white, lineSpacingMultiple: 0.9 });
+  text(s, L.mockup, 0.971, 3.339, 3.003, 2.373, { color: C.white, align: 'justify', lineSpacingMultiple: 1.5 });
+  mockupList(s, 9.180, 0, '111111', [C.indigo, C.sand, C.indigo], [C.white, C.greyDark, C.white], 2.557);
+}
+
+/** 25 - "Million happy users" with tilted tablet mockups */
+function slide25(s) {
+  s.addShape('custGeom', {
+    x: 0, y: 0, w: 10.948, h: 6.321,
+    points: [{ x: 0, y: 0 }, { x: 10.948, y: 0 }, { x: 0, y: 6.321 }, { close: true }],
+    fill: { color: C.indigo }, line: { type: 'none' },
+  });
+  [[6.188, -0.772, 3.403, 4.771], [11.091, 0.616, 3.403, 4.771],
+   [1.811, 1.674, 3.403, 4.771], [5.492, 2.907, 5.039, 7.064]]
+    .forEach(([x, y, w, h]) => tabletMockup(s, x, y, w, h, 60));
+  head(s, 'Million happy users', 0.596, 0.614, 4.519, 0.391, 24, C.white, { charSpacing: 0 });
+  text(s, "There comes a nice little fluffer. This piece of canvas is your world. Let's give him a friend too.",
+    0.596, 1.041, 2.769, 0.956, { fontSize: 12, color: C.white, align: 'justify', lineSpacingMultiple: 1.6 });
+  roundRect(s, 9.585, 5.863, 3.152, 0.651, C.sand, 0.16);
+  head(s, 'Download Now', 9.868, 5.987, 2.176, 0.402, 16, C.grey, { charSpacing: 0, valign: 'middle' });
+  arrow(s, 12.228, 6.219, 0.227, C.greyDark, 3);
+}
+
+/** 26 - desktop mockup */
+function slide26(s) {
+  rect(s, 0, 0, 2.043, 7.5, C.indigo);
+  desktopMockup(s, -1.840, 5.924, 2.043);
+  rect(s, 6.667, 0, 6.667, 2.667, C.indigo);
+  head(s, 'Our desktop activities', 6.715, 4.196, 4.826, 0.579, 24, C.grey, { charSpacing: 0 });
+  text(s, "You have freedom here. The only guide is your heart. Trees grow in all kinds of ways. They're not all perfectly straight. ",
+    6.709, 4.761, 4.541, 0.614, { color: C.slate, align: 'justify', lineSpacingMultiple: 1.5 });
+  roundRect(s, 6.709, 5.724, 3.152, 0.651, C.sand, 0.16);
+  head(s, 'Download Now', 6.992, 5.849, 2.176, 0.402, 16, C.grey, { charSpacing: 0, valign: 'middle' });
+  arrow(s, 9.352, 6.080, 0.227, C.greyDark, 3);
+  rect(s, 6.667, 6.899, 6.667, 0.601, C.indigo);
+}
+
+/* One isometric slab of the layer-box diagram: two side faces plus the top. */
+function layerSlab(s, y, top, side) {
+  s.addShape('custGeom', {
+    x: 2.405, y: y + 0.542, w: 1.240, h: 0.993,
+    points: [{ x: 1.240, y: 0.993 }, { x: 0, y: 0.485 }, { x: 0, y: 0 }, { x: 1.240, y: 0.508 }, { close: true }],
+    fill: { color: side }, line: { type: 'none' },
+  });
+  s.addShape('custGeom', {
+    x: 3.645, y: y + 0.508, w: 1.352, h: 1.027,
+    points: [{ x: 1.352, y: 0 }, { x: 1.352, y: 0.485 }, { x: 0, y: 1.027 }, { x: 0, y: 0.542 }, { close: true }],
+    fill: { color: side }, line: { type: 'none' },
+  });
+  s.addShape('custGeom', {
+    x: 2.405, y, w: 2.592, h: 1.050,
+    points: [{ x: 1.240, y: 1.050 }, { x: 0, y: 0.543 }, { x: 1.352, y: 0 }, { x: 2.592, y: 0.509 }, { close: true }],
+    fill: { color: top }, line: { type: 'none' },
+  });
+}
+
+/* Segmented progress bar built from small parallelograms. */
+function segmentBar(s, x, y, filled, color, highlight) {
+  for (let i = 0; i < 20; i += 1) {
+    const c = i >= filled ? C.greyPale : (highlight === i ? C.violet : color);
+    s.addShape('parallelogram', { x: x + i * 0.12, y, w: 0.169, h: 0.156, fill: { color: c }, line: { type: 'none' } });
+  }
+}
+
+/** 27 - "Layer Box Diagram" */
+function slide27(s) {
+  head(s, 'Layer Box Diagram', 0.993, 0.194, 11.500, 0.763, 32, C.grey, { charSpacing: 0, align: 'center', valign: 'bottom' });
+  [2.492, 3.408, 4.430, 5.290, 6.182].forEach((y, i) => {
+    const x = i < 3 ? 0.832 : 0.881;
+    oval(s, x + 0.049, y + 0.048, 0.091, 0.091, '808080');
+    s.addShape('line', { x: x + 0.170, y: y + 0.098, w: 7.087, h: 0, line: { color: '808080', width: 1, dashType: 'dash', endArrowType: 'oval' } });
+  });
+  [[1.831, C.indigo, C.indigo], [2.712, C.sandLight, C.sand], [3.661, C.indigo, C.indigo],
+   [4.518, C.sandLight, C.sand], [5.433, C.indigo, C.indigo]]
+    .forEach(([y, top, side]) => layerSlab(s, y, top, side));
+  [[5.258, 1.830], [5.239, 2.730], [5.239, 3.723], [5.235, 4.683], [5.256, 5.585]]
+    .forEach(([x, y]) => text(s, L.layer, x, y, 2.898, 0.663, { color: C.greyDark, wrap: true }));
+  head(s, 'About Business', 9.022, 1.820, 2.544, 0.438, 20, C.grey, { charSpacing: 0 });
+  text(s, L.about, 9.021, 2.494, 3.893, 1.363, { color: C.greyDark, align: 'justify', lineSpacingMultiple: 1.5 });
+  const bars = [
+    [4.289, 4.519, 'Correspondence', 14, C.indigo, -1, '$243', C.sand, 4.426],
+    [4.791, 5.021, 'Growth p/month', 15, C.sand, -1, '$598', C.indigo, 4.925],
+    [5.267, 5.497, 'Feedback from customers', 9, C.indigo, 3, '$587', C.sand, 5.396],
+    [5.744, 5.974, 'Feedback from customers', 15, C.sand, -1, '$233', C.indigo, 5.878],
+  ];
+  bars.forEach(([ty, by, name, filled, color, hl, price, tagColor, tagY], i) => {
+    text(s, name, 9.130, ty, 3.020, 0.269,
+      { fontSize: 10, bold: true, italic: true, color: C.greyDark, align: 'justify' });
+    segmentBar(s, 9.13 + (i % 2 ? 0.05 : 0), by, filled, color, hl);
+    s.addShape('custGeom', {
+      x: 12.107, y: tagY, w: 0.782, h: 0.348,
+      points: [{ x: 0.136, y: 0 }, { x: 0.782, y: 0 }, { x: 0.782, y: 0.348 }, { x: 0.136, y: 0.348 },
+               { x: 0.136, y: 0.255 }, { x: 0, y: 0.174 }, { x: 0.136, y: 0.093 }, { close: true }],
+      fill: { color: tagColor }, line: { type: 'none' },
+    });
+    text(s, price, 12.243, tagY + 0.04, 0.646, 0.27, { fontSize: 12, color: C.white, align: 'center' });
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Icon-sheet kit (slides 34 & 35)
+ *
+ * The source deck ends with two catalogue pages of ~150 pictograms each.
+ * They are rebuilt here from a small vocabulary of primitives, laid out on
+ * the same grid; ICON_SHEET_A / _B below name the pictogram in every cell.
+ * ------------------------------------------------------------------ */
+
+/* Each entry draws one pictogram into the box (x, y, d, d).
+   `w` is the stroke weight for outline pictograms. */
+const ICON_KIT = {
+  pin: (s, x, y, d, c, w) => {
+    s.addShape('teardrop', { x, y, w: d, h: d, rotate: 135, fill: { type: 'none' }, line: { color: c, width: w } });
+    s.addShape('ellipse', { x: x + d * 0.34, y: y + d * 0.26, w: d * 0.3, h: d * 0.3, fill: { type: 'none' }, line: { color: c, width: w } });
+  },
+  circle: (s, x, y, d, c, w) =>
+    s.addShape('ellipse', { x, y, w: d, h: d, fill: { type: 'none' }, line: { color: c, width: w } }),
+  dot: (s, x, y, d, c) => oval(s, x + d * 0.22, y + d * 0.22, d * 0.56, d * 0.56, c),
+  ring: (s, x, y, d, c, w) => {
+    s.addShape('ellipse', { x, y, w: d, h: d, fill: { type: 'none' }, line: { color: c, width: w } });
+    oval(s, x + d * 0.3, y + d * 0.3, d * 0.4, d * 0.4, c);
+  },
+  square: (s, x, y, d, c, w) =>
+    s.addShape('rect', { x, y: y + d * 0.06, w: d, h: d * 0.88, fill: { type: 'none' }, line: { color: c, width: w } }),
+  card: (s, x, y, d, c, w) =>
+    s.addShape('roundRect', { x, y: y + d * 0.14, w: d, h: d * 0.72, rectRadius: d * 0.14, fill: { type: 'none' }, line: { color: c, width: w } }),
+  block: (s, x, y, d, c) => rect(s, x + d * 0.06, y + d * 0.12, d * 0.88, d * 0.76, c),
+  screen: (s, x, y, d, c, w) => {
+    s.addShape('rect', { x, y: y + d * 0.10, w: d, h: d * 0.62, fill: { type: 'none' }, line: { color: c, width: w } });
+    s.addShape('rect', { x: x + d * 0.32, y: y + d * 0.76, w: d * 0.36, h: d * 0.14, fill: { color: c }, line: { type: 'none' } });
+  },
+  phone: (s, x, y, d, c, w) =>
+    s.addShape('roundRect', { x: x + d * 0.26, y, w: d * 0.48, h: d, rectRadius: d * 0.08, fill: { type: 'none' }, line: { color: c, width: w } }),
+  plus: (s, x, y, d, c) => {
+    rect(s, x + d * 0.42, y + d * 0.10, d * 0.16, d * 0.80, c);
+    rect(s, x + d * 0.10, y + d * 0.42, d * 0.80, d * 0.16, c);
+  },
+  minus: (s, x, y, d, c) => rect(s, x + d * 0.10, y + d * 0.42, d * 0.80, d * 0.16, c),
+  cross: (s, x, y, d, c) => {
+    s.addShape('rect', { x: x + d * 0.06, y: y + d * 0.42, w: d * 0.88, h: d * 0.16, rotate: 45, fill: { color: c }, line: { type: 'none' } });
+    s.addShape('rect', { x: x + d * 0.06, y: y + d * 0.42, w: d * 0.88, h: d * 0.16, rotate: -45, fill: { color: c }, line: { type: 'none' } });
+  },
+  check: (s, x, y, d, c, w) =>
+    s.addShape('custGeom', {
+      x, y, w: d, h: d,
+      points: [{ x: d * 0.15, y: d * 0.52 }, { x: d * 0.40, y: d * 0.78 }, { x: d * 0.88, y: d * 0.22 }],
+      fill: { type: 'none' }, line: { color: c, width: w },
+    }),
+  arrowUp: (s, x, y, d, c) => {
+    s.addShape('triangle', { x: x + d * 0.20, y: y + d * 0.08, w: d * 0.60, h: d * 0.40, fill: { color: c }, line: { type: 'none' } });
+    rect(s, x + d * 0.42, y + d * 0.42, d * 0.16, d * 0.50, c);
+  },
+  arrowDown: (s, x, y, d, c) => {
+    s.addShape('triangle', { x: x + d * 0.20, y: y + d * 0.52, w: d * 0.60, h: d * 0.40, rotate: 180, fill: { color: c }, line: { type: 'none' } });
+    rect(s, x + d * 0.42, y + d * 0.08, d * 0.16, d * 0.50, c);
+  },
+  arrowRight: (s, x, y, d, c) => {
+    s.addShape('triangle', { x: x + d * 0.52, y: y + d * 0.20, w: d * 0.40, h: d * 0.60, rotate: 90, fill: { color: c }, line: { type: 'none' } });
+    rect(s, x + d * 0.08, y + d * 0.42, d * 0.50, d * 0.16, c);
+  },
+  arrowLeft: (s, x, y, d, c) => {
+    s.addShape('triangle', { x: x + d * 0.08, y: y + d * 0.20, w: d * 0.40, h: d * 0.60, rotate: 270, fill: { color: c }, line: { type: 'none' } });
+    rect(s, x + d * 0.42, y + d * 0.42, d * 0.50, d * 0.16, c);
+  },
+  play: (s, x, y, d, c) =>
+    s.addShape('triangle', { x: x + d * 0.18, y: y + d * 0.12, w: d * 0.64, h: d * 0.76, rotate: 90, fill: { color: c }, line: { type: 'none' } }),
+  pause: (s, x, y, d, c) => {
+    rect(s, x + d * 0.20, y + d * 0.12, d * 0.16, d * 0.76, c);
+    rect(s, x + d * 0.62, y + d * 0.12, d * 0.16, d * 0.76, c);
+  },
+  chevron: (s, x, y, d, c, w) => chevron(s, x + d * 0.30, y + d * 0.18, d * 0.36, d * 0.64, c, w),
+  lines: (s, x, y, d, c) => [0.22, 0.44, 0.66].forEach((f) => rect(s, x + d * 0.08, y + d * f, d * 0.84, d * 0.10, c)),
+  cloud: (s, x, y, d, c, w) =>
+    s.addShape('cloud', { x, y: y + d * 0.14, w: d, h: d * 0.72, fill: { type: 'none' }, line: { color: c, width: w } }),
+  cloudFill: (s, x, y, d, c) => s.addShape('cloud', { x, y: y + d * 0.14, w: d, h: d * 0.72, fill: { color: c }, line: { type: 'none' } }),
+  star: (s, x, y, d, c, w) =>
+    s.addShape('star5', { x, y, w: d, h: d, fill: { type: 'none' }, line: { color: c, width: w } }),
+  heart: (s, x, y, d, c, w) =>
+    s.addShape('heart', { x, y: y + d * 0.06, w: d, h: d * 0.88, fill: { type: 'none' }, line: { color: c, width: w } }),
+  heartFill: (s, x, y, d, c) => s.addShape('heart', { x, y: y + d * 0.06, w: d, h: d * 0.88, fill: { color: c }, line: { type: 'none' } }),
+  drop: (s, x, y, d, c, w) =>
+    s.addShape('teardrop', { x, y, w: d, h: d, rotate: 135, fill: { type: 'none' }, line: { color: c, width: w } }),
+  dropFill: (s, x, y, d, c) => s.addShape('teardrop', { x, y, w: d, h: d, rotate: 135, fill: { color: c }, line: { type: 'none' } }),
+  pieHalf: (s, x, y, d, c) => s.addShape('pie', { x, y, w: d, h: d, angleRange: [0, 180], fill: { color: c }, line: { type: 'none' } }),
+  pieQtr: (s, x, y, d, c) => s.addShape('pie', { x, y, w: d, h: d, angleRange: [270, 360], fill: { color: c }, line: { type: 'none' } }),
+  donut: (s, x, y, d, c) => s.addShape('donut', { x, y, w: d, h: d, fill: { color: c }, line: { type: 'none' } }),
+  folder: (s, x, y, d, c) => {
+    rect(s, x + d * 0.04, y + d * 0.16, d * 0.44, d * 0.14, c);
+    rect(s, x + d * 0.04, y + d * 0.26, d * 0.92, d * 0.56, c);
+  },
+  folderOpen: (s, x, y, d, c, w) => {
+    s.addShape('rect', { x: x + d * 0.04, y: y + d * 0.16, w: d * 0.44, h: d * 0.16, fill: { type: 'none' }, line: { color: c, width: w } });
+    s.addShape('rect', { x: x + d * 0.04, y: y + d * 0.28, w: d * 0.92, h: d * 0.54, fill: { type: 'none' }, line: { color: c, width: w } });
+  },
+  doc: (s, x, y, d, c) => {
+    rect(s, x + d * 0.16, y + d * 0.06, d * 0.68, d * 0.88, c);
+    rect(s, x + d * 0.66, y + d * 0.06, d * 0.18, d * 0.18, C.black);
+  },
+  docLine: (s, x, y, d, c, w) =>
+    s.addShape('rect', { x: x + d * 0.18, y: y + d * 0.06, w: d * 0.64, h: d * 0.88, fill: { type: 'none' }, line: { color: c, width: w } }),
+  clock: (s, x, y, d, c, w) => {
+    s.addShape('ellipse', { x, y, w: d, h: d, fill: { type: 'none' }, line: { color: c, width: w } });
+    rect(s, x + d * 0.46, y + d * 0.24, d * 0.08, d * 0.30, c);
+    rect(s, x + d * 0.50, y + d * 0.46, d * 0.24, d * 0.08, c);
+  },
+  search: (s, x, y, d, c, w) => {
+    s.addShape('ellipse', { x, y, w: d * 0.72, h: d * 0.72, fill: { type: 'none' }, line: { color: c, width: w } });
+    s.addShape('rect', { x: x + d * 0.56, y: y + d * 0.62, w: d * 0.38, h: d * 0.10, rotate: 45, fill: { color: c }, line: { type: 'none' } });
+  },
+  flag: (s, x, y, d, c) => {
+    rect(s, x + d * 0.14, y + d * 0.04, d * 0.10, d * 0.92, c);
+    rect(s, x + d * 0.24, y + d * 0.12, d * 0.58, d * 0.38, c);
+  },
+  bell: (s, x, y, d, c, w) => {
+    s.addShape('blockArc', { x: x + d * 0.10, y: y + d * 0.04, w: d * 0.80, h: d * 1.20, angleRange: [180, 360], arcThicknessRatio: 0.05, fill: { type: 'none' }, line: { color: c, width: w } });
+    rect(s, x + d * 0.08, y + d * 0.62, d * 0.84, d * 0.08, c);
+  },
+  map: (s, x, y, d, c, w) => {
+    s.addShape('rect', { x, y: y + d * 0.16, w: d, h: d * 0.68, fill: { type: 'none' }, line: { color: c, width: w } });
+    rect(s, x + d * 0.34, y + d * 0.16, d * 0.06, d * 0.68, c);
+    rect(s, x + d * 0.66, y + d * 0.16, d * 0.06, d * 0.68, c);
+  },
+  grid: (s, x, y, d, c) => [0.08, 0.56].forEach((fy) => [0.08, 0.56].forEach((fx) =>
+    rect(s, x + d * fx, y + d * fy, d * 0.34, d * 0.34, c))),
+  gridOpen: (s, x, y, d, c, w) => [0.08, 0.56].forEach((fy) => [0.08, 0.56].forEach((fx) =>
+    s.addShape('rect', { x: x + d * fx, y: y + d * fy, w: d * 0.34, h: d * 0.34, fill: { type: 'none' }, line: { color: c, width: w } }))),
+  camera: (s, x, y, d, c) => camera(s, x + d * 0.04, y + d * 0.10, d * 0.92, d * 0.78, c),
+  house: (s, x, y, d, c) => house(s, x + d * 0.04, y + d * 0.08, d * 0.92, d * 0.82, c),
+  gear: (s, x, y, d, c) => gear(s, x, y, d, c),
+  people: (s, x, y, d, c) => people(s, x + d * 0.04, y + d * 0.12, d * 0.92, d * 0.66, c),
+  person: (s, x, y, d, c) => {
+    oval(s, x + d * 0.30, y + d * 0.06, d * 0.40, d * 0.40, c);
+    s.addShape('blockArc', { x: x + d * 0.10, y: y + d * 0.38, w: d * 0.80, h: d * 1.10, angleRange: [180, 360], arcThicknessRatio: 0.5, fill: { color: c }, line: { type: 'none' } });
+  },
+  mail: (s, x, y, d, c) => envelope(s, x, y + d * 0.20, d, d * 0.60, c, C.black),
+  plane: (s, x, y, d, c) => paperPlane(s, x + d * 0.04, y + d * 0.10, d * 0.92, d * 0.80, c),
+  trophy: (s, x, y, d, c) => trophy(s, x + d * 0.12, y + d * 0.14, d * 0.76, d * 0.76, c),
+  hourglass: (s, x, y, d, c) => hourglass(s, x + d * 0.24, y + d * 0.06, d * 0.52, d * 0.88, c),
+  tools: (s, x, y, d, c) => tools(s, x + d * 0.04, y + d * 0.06, d * 0.92, d * 0.88, c),
+  banned: (s, x, y, d, c, w) => {
+    s.addShape('ellipse', { x, y, w: d, h: d, fill: { type: 'none' }, line: { color: c, width: w } });
+    s.addShape('rect', { x: x + d * 0.05, y: y + d * 0.45, w: d * 0.90, h: d * 0.10, rotate: -45, fill: { color: c }, line: { type: 'none' } });
+  },
+  target: (s, x, y, d, c, w) => {
+    s.addShape('ellipse', { x: x + d * 0.16, y: y + d * 0.16, w: d * 0.68, h: d * 0.68, fill: { type: 'none' }, line: { color: c, width: w } });
+    rect(s, x + d * 0.46, y, d * 0.08, d, c);
+    rect(s, x, y + d * 0.46, d, d * 0.08, c);
+  },
+  globe: (s, x, y, d, c, w) => {
+    s.addShape('ellipse', { x, y, w: d, h: d, fill: { type: 'none' }, line: { color: c, width: w } });
+    s.addShape('ellipse', { x: x + d * 0.30, y, w: d * 0.40, h: d, fill: { type: 'none' }, line: { color: c, width: w } });
+    rect(s, x, y + d * 0.46, d, d * 0.06, c);
+  },
+  bars: (s, x, y, d, c) => [[0.08, 0.30], [0.38, 0.55], [0.68, 0.80]].forEach(([fx, fh]) =>
+    rect(s, x + d * fx, y + d * (0.92 - fh), d * 0.20, d * fh, c)),
+  chart: (s, x, y, d, c, w) => {
+    s.addShape('rect', { x, y: y + d * 0.08, w: d, h: d * 0.80, fill: { type: 'none' }, line: { color: c, width: w } });
+    [[0.18, 0.28], [0.44, 0.46], [0.68, 0.36]].forEach(([fx, fh]) => rect(s, x + d * fx, y + d * (0.80 - fh), d * 0.14, d * fh, c));
+  },
+  cart: (s, x, y, d, c, w) => {
+    s.addShape('rect', { x: x + d * 0.16, y: y + d * 0.18, w: d * 0.76, h: d * 0.42, fill: { type: 'none' }, line: { color: c, width: w } });
+    oval(s, x + d * 0.24, y + d * 0.70, d * 0.20, d * 0.20, c);
+    oval(s, x + d * 0.64, y + d * 0.70, d * 0.20, d * 0.20, c);
+  },
+  book: (s, x, y, d, c, w) => {
+    s.addShape('rect', { x, y: y + d * 0.14, w: d * 0.46, h: d * 0.72, fill: { type: 'none' }, line: { color: c, width: w } });
+    s.addShape('rect', { x: x + d * 0.52, y: y + d * 0.14, w: d * 0.46, h: d * 0.72, fill: { type: 'none' }, line: { color: c, width: w } });
+  },
+  calendar: (s, x, y, d, c, w) => {
+    s.addShape('rect', { x, y: y + d * 0.16, w: d, h: d * 0.72, fill: { type: 'none' }, line: { color: c, width: w } });
+    rect(s, x, y + d * 0.16, d, d * 0.16, c);
+    rect(s, x + d * 0.20, y + d * 0.04, d * 0.10, d * 0.20, c);
+    rect(s, x + d * 0.68, y + d * 0.04, d * 0.10, d * 0.20, c);
+  },
+  music: (s, x, y, d, c) => {
+    oval(s, x + d * 0.10, y + d * 0.62, d * 0.32, d * 0.28, c);
+    rect(s, x + d * 0.38, y + d * 0.10, d * 0.10, d * 0.66, c);
+    rect(s, x + d * 0.38, y + d * 0.10, d * 0.44, d * 0.14, c);
+  },
+  sun: (s, x, y, d, c) => {
+    oval(s, x + d * 0.28, y + d * 0.28, d * 0.44, d * 0.44, c);
+    for (let i = 0; i < 4; i += 1) {
+      s.addShape('rect', { x: x - d * 0.04, y: y + d * 0.46, w: d * 1.08, h: d * 0.08, rotate: i * 45, fill: { color: c }, line: { type: 'none' } });
+    }
+  },
+};
+
+/* 20 x 8 catalogue - outline pictograms in white (slide 34). */
+const ICON_SHEET_A = [
+  'pin,flag,map,trophy,target,drop,dropFill,cloud,drop,drop,cloud,cloud,cloud,cloud,drop,cloud,sun,lines,mail,circle',
+  'flag,flag,pin,camera,screen,screen,phone,phone,screen,heart,star,lines,square,card,check,bell,drop,target,gridOpen,house',
+  'phone,card,camera,doc,camera,screen,grid,music,ring,grid,grid,docLine,check,check,arrowRight,arrowLeft,arrowUp,arrowDown,arrowUp,gear',
+  'phone,play,play,play,cross,lines,play,pause,square,play,arrowUp,gridOpen,chevron,chevron,chevron,chevron,arrowLeft,arrowRight,arrowUp,arrowDown',
+  'play,play,lines,chevron,chevron,cross,ring,music,music,music,plus,minus,cross,check,lines,plus,minus,cross,check,chevron',
+  'music,music,globe,card,bars,arrowDown,arrowUp,arrowRight,arrowLeft,arrowUp,chevron,chevron,chevron,chevron,arrowRight,arrowUp,arrowDown,plus,minus,donut',
+  'arrowDown,search,flag,chevron,search,cart,cart,cart,doc,check,ring,ring,search,search,search,arrowDown,arrowUp,cross,chevron,circle',
+  'calendar,arrowDown,arrowUp,folderOpen,drop,docLine,tools,flag,cloud,cloud,arrowLeft,arrowRight,arrowUp,arrowLeft,arrowUp,arrowDown,chevron,chevron,chevron,chevron',
+];
+
+/* 19 x 7 catalogue - solid pictograms in sand (slide 35). */
+const ICON_SHEET_B = [
+  'cloudFill,cloudFill,cloudFill,cloudFill,cloudFill,dropFill,dropFill,dropFill,dropFill,target,banned,globe,phone,phone,screen,screen,screen,screen,screen',
+  'plus,minus,check,cross,banned,arrowDown,arrowUp,arrowLeft,arrowRight,search,search,search,play,dot,pause,play,play,play,play',
+  'square,doc,block,card,sun,sun,map,map,map,map,heartFill,doc,doc,doc,doc,doc,doc,plane,doc',
+  'person,person,person,person,person,person,person,people,dot,clock,clock,hourglass,plus,minus,check,cross,chevron,chevron,dot',
+  'pieHalf,pieQtr,pieQtr,pieHalf,pieHalf,pieQtr,pieHalf,chart,bars,chart,chart,screen,screen,square,circle,lines,lines,dot,dot',
+  'play,dot,block,pause,play,play,play,play,arrowUp,bell,music,music,folder,folder,folder,folder,chevron,lines,dot',
+  'doc,doc,doc,doc,doc,doc,calendar,calendar,arrowDown,arrowUp,arrowRight,arrowLeft,doc,book,book,book,flag,lines,dot',
+];
+
+/** Paints one icon catalogue on the given grid. */
+function iconSheet(s, rows, x0, y0, stepX, stepY, size, color, stroke) {
+  rows.forEach((row, r) => {
+    row.split(',').forEach((kind, c) => {
+      const draw = ICON_KIT[kind];
+      if (draw) draw(s, x0 + c * stepX - size / 2, y0 + r * stepY - size / 2, size, color, stroke);
+    });
+  });
+}
+
+/** 28 - clustered column + stock chart, indigo panel with feature list */
+function slide28(s) {
+  s.addChart('bar', [
+    { name: 'Volume', labels: ['5/1/2002', '6/1/2002', '7/1/2002', '8/1/2002', '9/1/2002'], values: [70, 120, 150, 135, 148] },
+  ], {
+    x: 0.417, y: 1.407, w: 7.028, h: 4.685,
+    barDir: 'col', barGrouping: 'clustered', gapWidth: 150,
+    chartColors: [C.indigo],
+    title: 'Chart Title', showTitle: true, titleFontFace: F.body, titleFontSize: 18, titleColor: C.black,
+    showLegend: true, legendPos: 'b', legendFontFace: F.body, legendFontSize: 12,
+    catAxisLabelFontFace: F.body, catAxisLabelFontSize: 12,
+    valAxisLabelFontFace: F.body, valAxisLabelFontSize: 12,
+    valGridLine: { style: 'solid', color: 'D9D9D9', size: 1 },
+  });
+  rect(s, 8.264, 0, 5.069, 7.5, C.indigo);
+  rect(s, 8.014, 0, 0.250, 7.5, C.sand);
+  mockupList(s, 9.805, 0.111, C.white, [C.white, C.sand, C.white], [C.greyDark, C.white, C.greyDark]);
+}
+
+/** 29 - 100% stacked bar chart on black */
+function slide29(s) {
+  rect(s, 0, 0, 13.333, 7.5, C.black);
+  s.addChart('bar', [
+    { name: 'Series 1', labels: ['Category 1', 'Category 2', 'Category 3', 'Category 4'], values: [4.3, 2.5, 3.5, 4.5] },
+    { name: 'Series 2', labels: ['Category 1', 'Category 2', 'Category 3', 'Category 4'], values: [2.4, 4.4, 1.8, 2.8] },
+    { name: 'Series 3', labels: ['Category 1', 'Category 2', 'Category 3', 'Category 4'], values: [2, 2, 3, 5] },
+  ], {
+    x: 0.291, y: 1.727, w: 6.278, h: 4.185,
+    barDir: 'bar', barGrouping: 'percentStacked', gapWidth: 150, overlap: 100,
+    chartColors: [C.sand, C.white, 'D9D9D9'],
+    title: 'Chart Title', showTitle: true, titleFontFace: F.body, titleFontSize: 18, titleColor: C.white,
+    showLegend: true, legendPos: 'b', legendFontFace: F.body, legendFontSize: 12, legendColor: C.white,
+    catAxisLabelFontFace: F.body, catAxisLabelFontSize: 12, catAxisLabelColor: C.white,
+    valAxisLabelFontFace: F.body, valAxisLabelFontSize: 12, valAxisLabelColor: C.white,
+    valAxisLabelFormatCode: '0%',
+    valGridLine: { style: 'solid', color: '404040', size: 1 },
+    catGridLine: { style: 'none' },
+  });
+  headingStack(s, 7.628, 1.510, 'BUSINESS TEMPLATE', 'Chart title', 'In the company', C.white,
+    { kickerSize: 14, kickerW: 3.130, subDx: 0.028, subW: 4.458 });
+  para(s, T.full, 7.684, 3.318, 4.859, 1.063, C.white);
+  para(s, T.half, 7.684, 4.650, 4.859, 0.727, C.white);
+  tagButton(s, 7.301, 5.751, C.sand, 'CORPORATE', C.grey);
+  tagButton(s, 9.424, 5.751, C.white, 'BUSINESS', C.grey, { line: C.greyDark });
+  vLine(s, 7.107, 1.482, 4.685, C.white);
+}
+
+/** 30 - 100% stacked column chart on white */
+function slide30(s) {
+  s.addChart('bar', [
+    { name: 'Series 1', labels: ['Category 1', 'Category 2', 'Category 3', 'Category 4'], values: [4.3, 2.5, 3.5, 4.5] },
+    { name: 'Series 2', labels: ['Category 1', 'Category 2', 'Category 3', 'Category 4'], values: [2.4, 4.4, 1.8, 2.8] },
+    { name: 'Series 3', labels: ['Category 1', 'Category 2', 'Category 3', 'Category 4'], values: [2, 2, 3, 5] },
+  ], {
+    x: 6.667, y: 1.662, w: 6.264, h: 4.176,
+    barDir: 'col', barGrouping: 'percentStacked', gapWidth: 150, overlap: 100,
+    chartColors: [C.indigo, C.sand, 'F2F2F2'],
+    title: 'Chart Title', showTitle: true, titleFontFace: F.body, titleFontSize: 18, titleColor: C.grey,
+    showLegend: true, legendPos: 'b', legendFontFace: F.body, legendFontSize: 12, legendColor: C.grey,
+    catAxisLabelFontFace: F.body, catAxisLabelFontSize: 12, catAxisLabelColor: C.grey,
+    valAxisLabelFontFace: F.body, valAxisLabelFontSize: 12, valAxisLabelColor: C.grey,
+    valAxisLabelFormatCode: '0%',
+    valGridLine: { style: 'solid', color: 'D9D9D9', size: 1 },
+  });
+  headingStack(s, 0.678, 1.440, 'BUSINESS TEMPLATE', 'Chart title', 'In the company', C.grey,
+    { kickerSize: 14, kickerW: 3.130, subDx: 0.028, subW: 4.780 });
+  para(s, T.full, 0.734, 3.248, 4.859, 1.063, C.grey);
+  para(s, T.half, 0.734, 4.580, 4.859, 0.727, C.grey);
+  tagButton(s, 0.351, 5.682, C.sand, 'MORE US', C.grey);
+  tagButton(s, 2.474, 5.682, C.indigo, 'MORE US', C.white, { line: C.greyDark });
+  vLine(s, 6.264, 1.412, 4.685, C.greyDark);
+}
+
+/* ------------------------------------------------------------------ *
+ * Maps (slides 31 & 32)
+ *
+ * Landmasses are stored as flat polygons: ['fill key', x0,y0, x1,y1, ...]
+ * with coordinates in hundredths of an inch.
+ * ------------------------------------------------------------------ */
+
+const WORLD_SHAPES = [
+  ['grey', 585,390, 594,416, 563,457, 564,484, 586,506, 622,501, 638,509, 636,523, 650,551, 644,571, 664,622,
+    686,616, 706,590, 705,576, 722,563, 717,532, 751,491, 732,490, 719,477, 703,438, 731,483, 762,471,
+    776,456, 766,447, 754,451, 744,431, 772,445, 798,446, 815,460, 827,496, 834,476, 866,454, 874,474,
+    882,475, 892,515, 876,507, 904,536, 885,488, 895,484, 902,495, 913,487, 903,468, 908,459, 888,460,
+    877,436, 854,440, 831,429, 834,416, 816,402, 832,392, 801,398, 772,382, 767,396, 758,394, 758,412,
+    746,408, 746,396, 723,388, 722,398, 689,398, 694,377, 709,382, 720,367, 697,356, 681,327, 665,348,
+    638,349, 639,336, 634,352, 598,370, 607,388],
+  ['grey', 281,426, 299,452, 285,432, 291,428, 318,467, 362,482, 374,496, 388,496, 381,538, 412,582, 397,670,
+    402,690, 422,694, 412,680, 422,668, 417,660, 425,643, 457,621, 448,609, 457,598, 437,560, 424,549,
+    410,553, 400,540, 411,530, 412,515, 425,517, 438,506, 442,515, 462,508, 407,486, 393,496, 375,494,
+    373,478, 358,475, 362,459, 342,468, 323,434],
+  ['grey', 140,287, 152,299, 136,301, 155,307, 141,320, 165,331, 157,343, 177,324, 219,329, 210,324, 209,281,
+    166,274],
+  ['grey', 695,277, 654,286, 646,303, 626,317, 628,331, 642,328, 648,343, 654,340, 658,315, 672,299, 681,304,
+    670,322, 688,322, 696,313, 688,287],
+  ['grey', 436,207, 385,203, 352,211, 360,220, 346,214, 338,223, 370,234, 357,243, 382,244, 400,223],
+  ['grey', 857,368, 866,382, 900,394, 942,377, 932,373, 934,366, 914,369, 888,359],
+  ['grey', 358,263, 360,277, 390,277, 404,288, 400,301, 390,306, 420,316, 425,309, 418,297, 429,302, 435,295,
+    389,261, 375,260, 368,269, 368,259],
+  ['grey', 255,269, 273,267, 291,285, 323,280, 311,260, 303,271, 263,256],
+  ['sand', 687,336, 699,356, 722,366, 714,383, 742,394, 742,364, 781,362, 783,349, 804,344, 855,368, 881,365,
+    884,358, 938,366, 946,352, 958,352, 975,372, 986,372, 976,384, 984,390, 1004,357, 989,345, 1007,329,
+    1042,329, 1050,318, 1069,316, 1046,342, 1049,360, 1063,347, 1068,326, 1112,315, 1117,301, 1135,307, 1142,299,
+    1104,281, 1059,283, 1004,266, 975,276, 966,262, 920,261, 925,247, 897,238, 839,261, 838,269, 822,266,
+    818,296, 813,265, 799,274, 804,288, 782,281, 738,295, 734,287, 734,297, 713,308, 706,296, 724,291,
+    696,281, 690,287, 697,315],
+  ['sand', 212,282, 212,324, 227,327, 243,352, 264,368, 364,368, 382,380, 376,392, 413,374, 424,387, 435,381,
+    419,366, 451,357, 426,325, 416,333, 402,316, 389,316, 394,341, 385,348, 386,360, 375,346, 348,338,
+    340,329, 344,317, 378,292, 370,281, 362,293, 344,271, 337,274, 341,290, 285,291, 250,279],
+  ['sand', 439,507, 426,519, 414,517, 402,543, 410,551, 425,548, 446,567, 447,584, 458,596, 448,608, 459,618,
+    471,595, 492,583, 510,540, 478,524, 466,527, 464,510, 442,517],
+  ['sand', 675,464, 643,454, 612,479, 620,486, 649,481, 658,498, 672,488],
+  ['indigo', 741,370, 760,377, 753,386, 765,394, 766,383, 777,379, 802,398, 817,389, 835,391, 818,403, 836,415,
+    834,428, 854,438, 878,434, 888,457, 904,452, 916,459, 947,436, 942,416, 948,410, 937,403, 974,390,
+    985,374, 950,353, 934,370, 943,378, 898,396, 878,392, 856,370, 808,346, 783,351, 782,363, 751,360],
+  ['indigo', 574,212, 547,214, 548,205, 535,199, 489,201, 468,211, 438,211, 420,220, 425,228, 404,234, 416,245,
+    434,244, 451,254, 453,271, 468,279, 459,292, 464,305, 486,325, 497,300, 544,279, 530,275, 548,275,
+    537,261, 555,255, 549,242, 558,239, 550,230],
+  ['indigo', 418,382, 414,376, 374,396, 371,382, 360,394, 368,378, 341,369, 259,372, 260,400, 271,417, 309,426,
+    332,443, 340,432, 366,430, 381,446, 378,428, 391,416, 390,404],
+  ['indigo', 1037,596, 1007,554, 1003,572, 980,555, 926,586, 930,622, 976,612, 1009,636, 1027,632],
+];
+
+const EUROPE_SHAPES = [
+  ['grey', 2,409, 18,449, 2,460, 2,522, 35,522, 56,512, 71,521, 97,521, 113,505, 110,496, 124,500,
+    124,479, 92,460, 75,471, 51,470, 45,455, 30,450, 39,438, 43,448, 61,446, 57,437, 63,436,
+    53,424, 38,423, 35,413, 21,419],
+  ['grey', 452,392, 432,408, 447,430, 423,442, 436,476, 458,474, 471,485, 468,473, 485,470, 495,425, 478,412,
+    483,394],
+  ['grey', 373,567, 348,581, 336,616, 348,623, 382,699, 388,679, 398,676, 374,630, 393,598, 386,572],
+  ['grey', 352,426, 344,444, 360,488, 402,489, 427,475, 415,438, 383,426],
+  ['grey', 356,374, 320,358, 281,368, 275,384, 289,384, 297,404, 313,416, 348,402],
+  ['grey', 392,274, 386,285, 393,298, 378,302, 414,319, 440,346, 444,364, 433,377, 449,382, 470,366, 489,366,
+    489,349, 461,346, 448,325, 398,295],
+  ['grey', 584,440, 544,442, 548,449, 536,460, 549,466, 557,503, 571,510, 554,528, 572,530, 562,542, 570,542,
+    582,522, 579,500, 565,498, 564,484, 586,460, 566,454, 587,446],
+  ['grey', 331,334, 324,326, 297,331, 283,343, 283,362, 336,354, 329,348],
+  ['grey', 670,279, 642,249, 596,252, 566,276, 567,289, 554,303, 528,316, 524,332, 498,327, 481,340, 494,330,
+    524,337, 527,319, 562,301, 567,277, 582,261, 639,251, 663,277, 655,285, 656,305, 640,326, 658,338,
+    654,328, 670,302],
+  ['grey', 401,386, 388,375, 362,382, 348,408, 365,410, 381,398, 395,398],
+  ['grey', 54,346, 50,378, 68,392, 75,380, 93,386, 87,380, 101,372, 82,352, 66,363],
+  ['grey', 440,427, 426,410, 396,414, 389,424, 418,434],
+  ['grey', 400,400, 416,410, 434,399, 434,389, 458,386, 421,380],
+  ['grey', 338,336, 341,360, 366,377, 374,374, 365,344],
+  ['grey', 309,281, 326,287, 330,311, 318,311, 306,325, 342,311, 348,294, 338,283],
+  ['grey', 340,508, 352,517, 377,510, 354,490],
+  ['sand', 287,309, 279,309, 268,283, 242,273, 234,284, 210,279, 193,294, 145,307, 99,331, 112,357, 121,356,
+    134,371, 174,350, 226,350],
+  ['sand', 350,415, 327,412, 307,426, 289,424, 273,406, 283,388, 269,412, 246,411, 212,438, 203,452, 207,469,
+    248,466, 269,486, 289,476, 290,464, 341,460, 339,442],
+  ['sand', 439,498, 420,510, 418,542, 406,559, 420,568, 421,592, 390,644, 398,668, 411,677, 428,663, 440,610,
+    451,600, 444,571, 454,537],
+  ['sand', 486,532, 455,547, 450,574, 456,603, 444,614, 443,637, 462,610, 458,603, 472,602, 495,583, 495,540],
+  ['sand', 347,460, 296,470, 290,481, 295,493, 287,498, 308,519, 327,520, 337,493, 352,485],
+  ['sand', 682,592, 665,580, 642,584, 634,594, 640,606, 657,609, 679,603],
+  ['violet', 77,385, 103,421, 95,456, 129,476, 132,496, 98,526, 46,520, 37,527, 3,528, 13,561, 3,568,
+    3,744, 257,744, 269,700, 286,698, 280,682, 292,681, 297,668, 289,654, 311,653, 299,645, 307,636,
+    322,640, 350,672, 311,672, 304,687, 339,701, 362,700, 370,682, 359,674, 342,625, 331,618, 340,585,
+    325,574, 338,568, 340,554, 325,526, 305,524, 281,500, 284,483, 267,491, 247,472, 204,475, 197,449,
+    214,430, 202,428, 209,413, 196,414, 198,402, 108,397],
+  ['violet', 539,330, 524,342, 500,335, 489,344, 498,357, 496,374, 504,375, 484,408, 530,438, 551,418, 565,420,
+    567,410, 592,414, 566,382, 574,346],
+  ['violet', 654,277, 640,257, 599,261, 573,281, 576,291, 560,311, 536,323, 640,359, 653,355, 652,344, 632,338,
+    628,327],
+];
+
+/** Draws one traced map; `fills` maps the polygon's key to a colour. */
+function mapShapes(s, shapes, fills) {
+  shapes.forEach((shape) => {
+    const color = fills[shape[0]];
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (let i = 1; i < shape.length; i += 2) {
+      x0 = Math.min(x0, shape[i]); x1 = Math.max(x1, shape[i]);
+      y0 = Math.min(y0, shape[i + 1]); y1 = Math.max(y1, shape[i + 1]);
+    }
+    const points = [];
+    for (let i = 1; i < shape.length; i += 2) {
+      points.push({ x: (shape[i] - x0) / 100, y: (shape[i + 1] - y0) / 100 });
+    }
+    points.push({ close: true });
+    s.addShape('custGeom', {
+      x: x0 / 100, y: y0 / 100, w: (x1 - x0) / 100, h: (y1 - y0) / 100,
+      points, fill: { color }, line: { type: 'none' },
+    });
+  });
+}
+
+/** 31 - "GLOBAL MAP" */
+function slide31(s) {
+  head(s, 'GLOBAL MAP', 3.207, 0.739, 6.920, 0.556, 36, C.greyDark, { align: 'center' });
+  mapShapes(s, WORLD_SHAPES, { grey: C.greySoft, sand: C.sand, indigo: C.indigo });
+}
+
+/** 32 - "EUROPE MAP" with two headline figures */
+function slide32(s) {
+  mapShapes(s, EUROPE_SHAPES, { grey: C.greyPale, sand: C.sand, violet: C.violet });
+  head(s, 'EUROPE MAP', 3.207, 0.779, 6.920, 0.556, 36, C.grey, { align: 'center' });
+  head(s, '$638BN', 7.735, 2.604, 3.029, 0.837, 40, C.grey);
+  text(s, L.map, 7.735, 3.263, 4.859, 0.858, { color: C.ink, lineSpacingMultiple: 1.5 });
+  head(s, '$228BN', 7.720, 4.368, 3.044, 0.837, 40, C.grey);
+  text(s, L.mapLong, 7.735, 5.163, 4.859, 1.111, { color: C.ink, lineSpacingMultiple: 1.5 });
+}
+
+/** 33 - "Thanks." closing cover */
+function slide33(s) {
+  rect(s, 0, 0, 13.333, 7.5, C.indigo);
+  footerBand(s);
+  label(s, 'BUSINESS PRESENTATION', 0.595, 2.058, 3.807, 0.264, 10, C.white, 6);
+  head(s, 'Thanks.', 0.498, 2.259, 6.168, 1.418, 80, C.white);
+  para(s, T.fullPlain, 0.595, 3.590, 6.072, 0.774, C.white);
+  buttonPair(s, 0.692, 3.012, 4.713);
+  arrow(s, 5.639, 3.347, 7.361, C.white);
+  navBar(s, C.white, C.grey);
+}
+
+/** 34 - outline icon catalogue, white on black */
+function slide34(s) {
+  rect(s, 0, 0, 13.333, 7.5, C.black);
+  iconSheet(s, ICON_SHEET_A, 1.410, 1.889, 0.5383, 0.5373, 0.32, C.white, 1);
+}
+
+/** 35 - solid icon catalogue, sand on black */
+function slide35(s) {
+  rect(s, 0, 0, 13.333, 7.5, C.black);
+  iconSheet(s, ICON_SHEET_B, 1.825, 2.023, 0.5537, 0.5535, 0.30, C.sand, 1.25);
+}
+
+/* ------------------------------------------------------------------ *
+ * Assemble
+ * ------------------------------------------------------------------ */
+
+const BUILDERS = [
+  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09,
+  slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18,
+  slide19, slide20, slide21, slide22, slide23, slide24, slide25, slide26, slide27,
+  slide28, slide29, slide30, slide31, slide32, slide33, slide34, slide35,
+];
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'WIDE_16x9', width: 13.333, height: 7.5 });
+  pptx.layout = 'WIDE_16x9';
+  pptx.title = 'OneDrive Business Presentation';
+
+  BUILDERS.forEach((fn) => {
+    const slide = pptx.addSlide();
+    slide.background = { color: C.white };
+    fn(slide);
+  });
+
+  return pptx.writeFile({
+    fileName: path.join(__dirname, '0c9d077e-ca33-4dab-a068-9e8dd05516a1_grok_final.pptx'),
+  });
+}
+
+build().then((f) => console.log('wrote', f)).catch((e) => { console.error(e); process.exit(1); });
