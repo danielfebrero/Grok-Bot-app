@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Chrome executes the native-messaging manifest `path` as a binary and uses its stdout as the message channel, so this wrapper execs node on the .mjs and every diagnostic goes to stderr: https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging#native-messaging-host-protocol
+node_bin="${SAND_WEBAUTHN_PROXY_NODE:-/exec-daemon/node}"
+if [ ! -x "${node_bin}" ]; then
+	node_bin="$(command -v node || true)"
+fi
+if [ -z "${node_bin}" ] || [ ! -x "${node_bin}" ]; then
+	echo "sand-webauthn-proxy-host: no node runtime found" >&2
+	exit 1
+fi
+
+exec "${node_bin}" /usr/local/bin/webauthn-proxy-host.mjs "$@"
