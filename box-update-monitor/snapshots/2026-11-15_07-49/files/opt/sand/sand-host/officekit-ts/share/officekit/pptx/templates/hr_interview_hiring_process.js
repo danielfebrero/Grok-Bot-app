@@ -1,0 +1,817 @@
+/**
+ * "Interview & Hiring" — 20 slide deck, rebuilt with pptxgenjs.
+ *
+ * The source deck's photographs are not embedded; every raster image is
+ * redrawn as a flat placeholder rectangle in the same position and size.
+ *
+ *   node 165c0e0f-bef2-4d88-a6c3-a8ad2a2b5156_grok_final.js
+ */
+'use strict';
+
+const PptxGenJS = require('pptxgenjs');
+const path = require('path');
+
+/* ------------------------------------------------------------------ theme */
+
+const C = {
+  blue: '0139B2',      // primary brand blue
+  blueDeep: '0542BF',
+  blueVivid: '013DBF',
+  blueSoft: '1B4DBA',
+  navy: '011C57',
+  navyMid: '012E91',
+  orange: 'FE8338',
+  orange2: 'FE7B2B',
+  amber: 'FFC000',
+  ink: '262626',
+  slate: '374151',
+  gray: 'A5A5A5',
+  gray2: '7F7F7F',
+  hair: 'F2F2F2',      // 1pt card outlines
+  hairDark: 'D8D8D8',
+  tint: 'F2F8FC',      // pale blue panels
+  tint2: 'F3F8FC',
+  white: 'FFFFFF',
+  photo: 'D6DFE8',     // stand-in tone for photographs
+  pink: 'FADAF2',
+};
+
+const F = {
+  head: 'Poppins',
+  semi: 'Poppins SemiBold',
+  med: 'Poppins Medium',
+  body: 'DM Sans',
+  sym: 'DejaVu Sans',  // pictographic glyphs used in place of icon images
+};
+
+/* Glyphs standing in for the deck's small icon images. */
+const ICON = {
+  handshake: '\u22C8',   // clasped wedges
+  team: '\u263B',        // filled face
+  badge: '\u25A4',       // ruled card
+  globe: '\u2295',
+  books: '\u25A5',       // shelf of spines
+  bulb: '\u2600',
+  box: '\u2B22',         // hexagon "cube"
+  wallet: '\u25E8',
+  cloud: '\u2601',
+  check: '\u2714',
+  cross: '\u2716',
+};
+
+/* ---------------------------------------------------------------- helpers */
+
+const txt = (s, str, o) =>
+  s.addText(str, Object.assign(
+    { fontFace: F.head, fontSize: 14, color: C.ink, valign: 'top', align: 'left' }, o));
+
+const box = (s, x, y, w, h, o) => s.addShape('rect', Object.assign({ x, y, w, h }, o));
+
+/**
+ * Flat rectangle standing in for a photograph. `framePt` draws the white keyline
+ * the reference puts around some photos; the stroke is grown outward so the
+ * placeholder keeps its full footprint.
+ */
+const photo = (s, x, y, w, h, framePt) => {
+  s.addShape('rect', { x, y, w, h, fill: { color: C.photo } });
+  if (framePt) {
+    const o = framePt / 144;
+    s.addShape('rect', {
+      x: x - o, y: y - o, w: w + 2 * o, h: h + 2 * o,
+      fill: { type: 'none' }, line: { color: C.white, width: framePt },
+    });
+  }
+};
+
+const hLine = (s, x, y, w, color, pt) =>
+  s.addShape('line', { x, y, w, h: 0, line: { color, width: pt || 1 } });
+
+const vLine = (s, x, y, h, color, pt) =>
+  s.addShape('line', { x, y, w: 0, h, line: { color, width: pt || 1 } });
+
+/** Eyebrow label that sits above nearly every slide title. */
+const eyebrow = (s, x, y, str, color) =>
+  txt(s, str || 'Interview & Hiring', { x, y, w: 2.569, h: 0.338, fontSize: 14, color: color || C.orange2 });
+
+const title = (s, x, y, w, h, str, size) =>
+  txt(s, str, { x, y, w, h, fontSize: size || 36, bold: true });
+
+const para = (s, x, y, w, h, str, o) =>
+  txt(s, str, Object.assign(
+    { x, y, w, h, fontFace: F.body, fontSize: 12, lineSpacingMultiple: 1.5 }, o));
+
+/** Multi-paragraph body copy (blank strings render as empty lines). */
+const paras = (s, x, y, w, h, lines, o) =>
+  s.addText(lines.map(t => ({ text: t, options: { breakLine: true } })), Object.assign(
+    { x, y, w, h, fontFace: F.body, fontSize: 12, color: C.ink, valign: 'top', lineSpacingMultiple: 1.5 }, o));
+
+const bullets = (s, x, y, w, h, items, o) => {
+  const cfg = o || {};
+  s.addText(items.map(t => ({ text: t, options: { bullet: { indent: cfg.indent || 22.5 }, breakLine: true } })), {
+    x, y, w, h, valign: 'top',
+    fontFace: F.body, fontSize: cfg.fontSize || 12, color: cfg.color || C.ink,
+    lineSpacingMultiple: cfg.ls || 2,
+  });
+};
+
+/** Filled circle with a white ring and a centred glyph — the deck's icon chip. */
+const chip = (s, x, y, d, glyph, o) => {
+  const cfg = o || {};
+  s.addShape('ellipse', {
+    x, y, w: d, h: d,
+    fill: { color: cfg.fill || C.blueDeep },
+    line: cfg.ring === null ? { type: 'none' } : { color: cfg.ring || C.white, width: cfg.ringPt || 5 },
+  });
+  if (glyph) {
+    txt(s, glyph, {
+      x, y, w: d, h: d, align: 'center', valign: 'middle',
+      fontFace: F.sym, fontSize: cfg.glyphSize || Math.round(d * 35), color: cfg.glyphColor || C.white,
+    });
+  }
+};
+
+/** Page counter in the top-right corner (12.241, 0.168) on most slides. */
+const pageNum = (s, label, x, y, w) =>
+  txt(s, label, { x: x === undefined ? 12.241 : x, y: y === undefined ? 0.168 : y, w: w || 0.903, h: 0.338, align: 'right' });
+
+/** Circled page counter used on slides 9, 13, 15, 16, 17. */
+const pageRing = (s, x, y, label, d) => {
+  const dia = d || 1.014;
+  s.addShape('ellipse', { x, y, w: dia, h: dia, fill: { type: 'none' }, line: { color: C.orange, width: 1 } });
+  txt(s, label, { x, y: y + dia / 2 - 0.163, w: dia, h: 0.337, align: 'center' });
+};
+
+const designTag = (s, x, w) =>
+  txt(s, 'Design 2025', { x: x === undefined ? 10.769 : x, y: 0.192, w: w || 2.375, h: 0.303, fontSize: 12, align: 'right' });
+
+const proTag = (s, x, y, align) =>
+  txt(s, 'Professional     |    Modern', {
+    x: x === undefined ? 10.769 : x, y: y === undefined ? 7.002 : y,
+    w: 2.375, h: 0.303, fontSize: 12, align: align || 'right',
+  });
+
+/** Name / italic caption / paragraph stack used on slides 7, 12 and 17. */
+const infoBlock = (s, x, y, o) => {
+  txt(s, o.title, { x, y, w: 2.981, h: 0.404, fontFace: F.semi, fontSize: 18 });
+  txt(s, o.sub || 'interview techniques', { x, y: y + 0.418, w: 2.569, h: 0.303, fontSize: 12, italic: true, color: C.gray });
+  para(s, x, y + (o.bodyDy || 0.733), o.bodyW || 3.417, 0.631, o.body, { fontSize: 11 });
+};
+
+const LOREM_SHORT = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed dolor is amet.';
+const LOREM_TEMPOR = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed dolor is amet eiusmod tempor.';
+
+/* ------------------------------------------------------------ slide 1..20 */
+
+function slide01(s) {
+  photo(s, 8.887, 0.957, 4.064, 5.632);
+  box(s, 0, -0.004, 7.833, 7.504, { fill: { color: C.blue } });
+  box(s, 0.494, 0.492, 7.335, 6.594, { fill: { color: C.blueDeep } });
+  box(s, 8.294, 0.453, 3.993, 5.174, { fill: { type: 'none' }, line: { color: C.orange, width: 2 } });
+
+  txt(s, 'INTERVIEW & HIRING', { x: 10.155, y: 6.71, w: 2.929, h: 0.337, align: 'right' });
+  txt(s, '01/20', { x: 1.278, y: 1.199, w: 0.727, h: 0.337, color: C.white });
+  txt(s, 'JOB 2025', { x: 1.278, y: 2.743, w: 3.312, h: 0.337, color: C.white });
+  txt(s, 'Interview', { x: 1.278, y: 3.135, w: 5.798, h: 1.313, fontSize: 72, bold: true, color: C.white });
+  txt(s, 'INTERVIEW & HIRING PRESENTATION', { x: 1.278, y: 4.503, w: 4.612, h: 0.337, color: C.white });
+  txt(s, 'LINK JOB', { x: 1.278, y: 6.046, w: 1.404, h: 0.337, fontFace: F.body, color: C.white });
+  txt(s, 'Presentation     |     www.presentation.com',
+    { x: 1.278, y: 6.421, w: 4.292, h: 0.337, fontFace: F.body, color: C.white });
+
+  cornerRings(s, 6.775, 0.492, 5.62, -0.557);
+}
+
+/** The two interlocked half-rings that decorate the cover and closing slide. */
+function cornerRings(s, ax, ay, bx, by) {
+  const arc = (x, y, d, color, rot, range, thick) =>
+    s.addShape('blockArc', {
+      x, y, w: d, h: d, fill: { color }, rotate: rot,
+      angleRange: range, arcThicknessRatio: thick,
+    });
+  arc(ax, ay, 2.094, C.blue, -90, [180, 0], 0.5);
+  arc(ax + 0.104, ay + 0.094, 1.905, C.orange2, -90, [180, 0.132], 0.35266);
+  arc(bx, by, 2.094, C.blue, -180, [221.87, 0], 0.5);
+  arc(bx + 0.094, by + 0.097, 1.905, C.orange2, -180, [220.63, 0.132], 0.35266);
+}
+
+function slide02(s) {
+  box(s, 0.139, 3.813, 3.028, 3.687, { fill: { color: C.orange } });
+  box(s, 0.139, 0, 3.028, 3.66, { fill: { color: C.blue } });
+
+  txt(s, '02/20', { x: 6.792, y: 0.797, w: 0.903, h: 0.338 });
+  designTag(s, 11.792, 1.352);
+  eyebrow(s, 6.792, 1.426);
+  title(s, 6.792, 1.778, 4.806, 1.447, 'Importance of Effective Hiring', 40);
+  para(s, 6.792, 3.5, 5.694, 1.129,
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud.',
+    { fontSize: 14 });
+
+  box(s, 6.875, 5.088, 5.389, 1.615, { fill: { type: 'none' }, line: { color: C.hair, width: 1 } });
+  bullets(s, 7.187, 5.404, 4.77, 0.982, [
+    'Explanation of the importance of making good hiring',
+    'Impact of hiring on company performance and culture',
+    'Introduction to the key steps in the hiring process',
+  ], { ls: 1.5 });
+
+  photo(s, 0.694, 0.617, 5.167, 6.262, 10);
+}
+
+function slide03(s) {
+  photo(s, 0.236, 1.28, 3.431, 5.193);
+  txt(s, '03/20', { x: 0.854, y: 0.609, w: 0.903, h: 0.338 });
+  box(s, 3.887, 0.194, 2.375, 5.787, { fill: { color: C.tint2 } });
+
+  eyebrow(s, 7.057, 1.534);
+  title(s, 7.057, 1.886, 5.177, 1.313, 'Job Analysis and Job Description');
+  para(s, 7.083, 3.461, 5.29, 0.982,
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation.');
+  bullets(s, 7.057, 4.706, 5.29, 1.26, [
+    'Lorem ipsum dolor sit amet, consectetur adipiscing.',
+    'Sed do eiusmod tempor incididunt ut labore et dolore magna.',
+    'Liqua. Ut enim ad minim veniam, quis nostrud.',
+  ], { indent: 13.5 });
+
+  [['Importance', 0.790, 1.602, 4.325, 1.500, ICON.handshake],
+   ['Criteria', 2.490, 3.336, 4.500, 1.168, ICON.badge],
+   ['Applicant', 4.224, 5.071, 4.500, 1.168, ICON.team]].forEach(([label, cy, ly, lx, lw, glyph]) => {
+    chip(s, 4.708, cy, 0.744, glyph, { fill: C.white, ring: null, glyphColor: C.blue, glyphSize: 26 });
+    txt(s, label, { x: lx, y: ly, w: lw, h: 0.337, align: 'center' });
+  });
+
+  designTag(s);
+  proTag(s);
+  chip(s, 1.579, 6.1, 0.744, ICON.team, { fill: C.blueVivid, glyphSize: 26 });
+}
+
+function slide04(s) {
+  photo(s, 0.75, 0, 4.5, 6.712);
+  photo(s, 7.833, 2.91, 4.389, 2.355);
+
+  title(s, 6.083, 0.782, 6.292, 1.313, 'Sourcing and Attracting Candidates');
+  eyebrow(s, 6.083, 2.108);
+  para(s, 6.083, 5.732, 6.292, 0.982,
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.');
+
+  box(s, 3.189, 2.91, 4.389, 2.355, { fill: { color: C.blue, transparency: 10 }, line: { color: C.white, width: 5 } });
+  bullets(s, 3.587, 3.203, 3.592, 1.664, [
+    'Overview of different sourcing channels ',
+    'Strategies for attracting ',
+    'Qualified candidates',
+    'Importance of employer branding',
+  ], { color: C.white });
+
+  chip(s, 11.85, 3.717, 0.744, ICON.badge, { glyphSize: 24 });
+  pageNum(s, '04/20');
+}
+
+function slide05(s) {
+  [0.32, 4.628, 8.937].forEach(x => photo(s, x, 3.167, 4.076, 2.37));
+
+  box(s, 5.972, 0.341, 7.042, 2.454, { fill: { type: 'none' }, line: { color: C.hair, width: 1 } });
+  eyebrow(s, 0.94, 0.868);
+  title(s, 0.934, 1.234, 4.244, 1.313, 'Screening and Shortlisting');
+
+  txt(s, 'Screening and Shortlisting', { x: 6.465, y: 0.796, w: 4.244, h: 0.438, fontFace: F.med, fontSize: 20 });
+  hLine(s, 6.556, 1.275, 0.208, C.orange, 1);
+  para(s, 6.465, 1.456, 6.027, 0.909,
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.',
+    { fontSize: 11 });
+
+  [[0.781, 0.733, ICON.handshake], [5.087, 5.027, ICON.bulb], [9.394, 9.322, ICON.team]]
+    .forEach(([cx, tx, glyph]) => {
+      chip(s, cx, 5.165, 0.744, glyph, { glyphSize: 26 });
+      txt(s, 'Interview & Hiring', { x: tx, y: 6.133, w: 2.375, h: 0.37, fontFace: F.med, fontSize: 16 });
+      para(s, tx, 6.503, 3.424, 0.353, 'Lorem ipsum dolor sit amet, consectetur.', { fontSize: 11 });
+    });
+
+  pageNum(s, '05/20', 11.942, 0.551);
+}
+
+function slide06(s) {
+  photo(s, 0.389, 0.347, 5.722, 6.306);
+  vLine(s, 0.389, 0.347, 6.179, C.blueVivid, 1);
+  hLine(s, 0.389, 0.347, 5.722, C.orange, 1);
+
+  box(s, 6.5, 0, 6.833, 0.982, { fill: { color: C.tint2 } });
+  txt(s, 'Preparing', { x: 6.861, y: 0.304, w: 1.361, h: 0.337, bold: true });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur.',
+    { x: 8.292, y: 0.315, w: 3.569, h: 0.303, fontFace: F.body, fontSize: 12 });
+  pageNum(s, '06/20', 12.094, 0.294);
+
+  title(s, 7.111, 1.849, 4.0, 0.841, 'Preparing', 44);
+  eyebrow(s, 7.111, 2.705, 'For the interview', C.orange);
+  para(s, 7.111, 3.224, 5.29, 0.982,
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation.');
+
+  // Six option pills: first is solid blue, last solid orange, the rest outlined.
+  const pills = [
+    [7.222, 4.590, C.blueDeep, C.white], [9.736, 4.590, null, C.ink],
+    [7.222, 5.331, null, C.ink], [9.736, 5.331, null, C.ink],
+    [7.222, 6.069, null, C.ink], [9.736, 6.069, C.orange, C.white],
+  ];
+  pills.forEach(([x, y, fill, color]) => {
+    box(s, x, y, 2.347, 0.583, fill
+      ? { fill: { color: fill } }
+      : { fill: { color: C.white }, line: { color: C.hairDark, width: 1 } });
+    txt(s, 'For the interview', { x, y: y + 0.13, w: 2.347, h: 0.337, align: 'center', color });
+  });
+
+  proTag(s, 0.283, 6.919, 'left');
+}
+
+function slide07(s) {
+  photo(s, 1.083, 3.041, 5.514, 2.528);
+  vLine(s, 8.01, 1.569, 3.722, C.orange, 1);
+
+  eyebrow(s, 0.958, 0.865, 'Interview & Hiring', C.orange);
+  title(s, 0.958, 1.229, 6.125, 1.313, 'Interview Techniques and Questions');
+  para(s, 0.958, 5.976, 5.819, 0.679,
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.');
+  chip(s, 0.711, 3.887, 0.744, ICON.handshake, { glyphSize: 26 });
+
+  [[1.346, 'Overview of effective'], [3.232, 'Examples of interview '], [5.131, 'Legal considerations']]
+    .forEach(([y, heading]) => {
+      chip(s, 7.862, y + 0.041, 0.303, null);
+      infoBlock(s, 8.521, y, { title: heading, body: LOREM_TEMPOR, bodyW: 3.854 });
+    });
+
+  pageNum(s, '07/20');
+}
+
+function slide08(s) {
+  photo(s, 0.576, 0.513, 4.999, 2.764);
+  photo(s, 3.014, 3.499, 2.562, 3.488);
+  hLine(s, 0.576, 0.319, 4.999, C.orange, 1);
+  hLine(s, 0.576, 6.973, 2.208, C.orange, 1);
+  vLine(s, 0.389, 0.5, 2.792, C.orange, 1);
+
+  bullets(s, 0.576, 3.764, 1.978, 2.723,
+    ['Use of', 'Assessment', 'Tools,', 'Tests, and', 'Simulations'], { fontSize: 16 });
+
+  eyebrow(s, 6.472, 1.119);
+  title(s, 6.472, 1.482, 5.986, 1.313, 'Interview Techniques and Questions');
+  para(s, 6.472, 2.952, 5.839, 0.679,
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.');
+
+  [['01', 4.108, 4.174, 0.707, 'Importance of assessing candidate competencies related to the job.'],
+   ['02', 5.449, 5.392, 1.010, 'Techniques for evaluating technical skills, problem-solving abilities, and behavioral competencies.']]
+    .forEach(([n, y, ty, th, body]) => {
+      box(s, 6.556, y, 0.896, 0.896, { fill: { type: 'none' }, line: { color: C.hair, width: 1 } });
+      txt(s, n, { x: 6.556, y, w: 0.896, h: 0.896, fontSize: 18, align: 'center', valign: 'middle' });
+      txt(s, body, { x: 7.757, y: ty, w: 4.555, h: th, fontFace: F.body, fontSize: 18 });
+    });
+
+  pageNum(s, '08/20');
+}
+
+function slide09(s) {
+  photo(s, 0.917, 2.472, 3.778, 5.028);
+  photo(s, 9.569, 0.25, 3.611, 3.431);
+  photo(s, 9.569, 3.819, 3.611, 3.431);
+  box(s, 4.833, 2.722, 4.597, 4.542, { fill: { color: C.tint2 } });
+
+  eyebrow(s, 1.625, 0.873);
+  title(s, 1.625, 1.237, 6.667, 0.707, 'Evaluating Cultural Fit');
+
+  [[3.715, 3.619, 3.069, 'PLACEHOLDER'],
+   [4.784, 4.736, 3.625, 'PLACEHOLDER'],
+   [5.853, 5.805, 3.625, 'Techniques for assessing a candidate\u2019s alignment with the company culture']]
+    .forEach(([cy, ty, w, body]) => {
+      chip(s, 4.472, cy, 0.583, ICON.check, { glyphSize: 21 });
+      para(s, 5.278, ty, w, 0.679, body, { color: C.slate });
+    });
+
+  pageRing(s, 0.467, 0.944, '09/20', 0.899);
+  txt(s, 'Professional     |    Modern',
+    { x: -0.624, y: 5.932, w: 2.528, h: 0.303, fontSize: 12, rotate: -90 });
+}
+
+function slide10(s) {
+  photo(s, 0.712, 0.646, 5.934, 3.104);
+  hLine(s, 0.712, 0.458, 5.934, C.orange, 1);
+  vLine(s, 0.545, 0.646, 3.104, C.orange, 1);
+
+  box(s, 6.866, 0.646, 6.468, 3.104, { fill: { type: 'none' }, line: { color: C.hair, width: 1 } });
+  eyebrow(s, 7.398, 1.13);
+  title(s, 7.398, 1.473, 4.812, 1.919, 'Reference Checks and Background Verification');
+  txt(s, 'Reference Checks', { x: 7.398, y: 4.326, w: 4.244, h: 0.37, fontSize: 16, bold: true });
+  para(s, 7.398, 4.712, 5.12, 0.909,
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed dolore eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation.',
+    { fontSize: 11 });
+
+  [[7.44, 5.975, 8.156, 5.984, '700K', ICON.box], [10.087, 5.971, 10.804, 5.98, '$250', ICON.wallet]]
+    .forEach(([cx, cy, tx, ty, value, glyph]) => {
+      chip(s, cx, cy, 0.646, glyph, { fill: C.tint, ring: null, glyphColor: C.blueVivid, glyphSize: 24 });
+      txt(s, value, { x: tx, y: ty, w: 0.836, h: 0.37, fontSize: 16, bold: true });
+      txt(s, 'Lorem ipsum dolor', { x: tx, y: ty + 0.356, w: 1.4, h: 0.572, fontFace: F.body, fontSize: 11, color: C.gray2 });
+    });
+
+  box(s, 0.712, 3.965, 2.851, 2.709, { fill: { color: C.tint2 }, line: { color: C.white, width: 1 } });
+  box(s, 3.795, 3.949, 2.851, 2.724, { fill: { color: C.tint2 } });
+  [[1.056, 4.562, 'Reference Checks', 0.728], [4.12, 4.551, 'Verification', 3.795]].forEach(([x, y, label, lx]) => {
+    txt(s, '700K', { x, y, w: 1.198, h: 0.505, fontSize: 24, bold: true });
+    txt(s, label, { x, y: 5.064, w: 2.291, h: 0.337, bold: true });
+    para(s, x, 5.418, 2.291, 0.909,
+      'Lorem ipsum dolor sit amet consectetur adipiscing elit, sed dolore eiusmod', { fontSize: 11 });
+    hLine(s, lx, 6.854, 2.835, C.blueVivid, 1);
+  });
+
+  chip(s, 3.168, 3.363, 1.009, ICON.handshake, { ringPt: 10, glyphSize: 33 });
+  pageNum(s, '10/20');
+}
+
+function slide11(s) {
+  eyebrow(s, 1.074, 1.074);
+  title(s, 1.074, 1.444, 3.51, 1.313, 'Making the Job Offer');
+  para(s, 1.074, 2.944, 3.572, 1.423,
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.', { fontSize: 18 });
+  paras(s, 1.074, 4.556, 3.572, 1.891, [
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ',
+    '',
+    'Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris',
+  ]);
+
+  photo(s, 5.771, 0.525, 3.083, 3.662);
+  photo(s, 9.073, 2.04, 3.083, 2.147);
+  photo(s, 8.271, 4.375, 4.625, 2.6);
+  hLine(s, 9.073, 1.843, 3.0, C.hairDark, 1);
+  vLine(s, 12.332, 2.047, 2.14, C.hairDark, 1);
+  hLine(s, 5.771, 4.385, 2.25, C.hairDark, 1);
+  hLine(s, 5.771, 6.975, 2.25, C.hairDark, 1);
+
+  bullets(s, 5.771, 4.582, 2.088, 2.185,
+    ['Assessment', 'Tools,', 'Tests, and', 'Simulations'], { fontSize: 16 });
+  pageNum(s, '11/20');
+}
+
+function slide12(s) {
+  [0, 1.901, 3.803, 5.704].forEach(y => photo(s, 1.049, y, 3.076, 1.796));
+  box(s, 4.792, 2.757, 7.865, 4.743, { fill: { color: C.tint2 } });
+  vLine(s, 4.229, -0.021, 7.521, C.orange, 1);
+
+  eyebrow(s, 5.29, 0.777);
+  title(s, 5.29, 1.121, 4.646, 1.313, 'Onboarding and Orientation');
+
+  [[0.529, ICON.team], [2.427, ICON.globe], [4.325, ICON.books], [6.223, ICON.cloud]]
+    .forEach(([y, glyph]) => chip(s, 0.677, y, 0.744, glyph, { glyphSize: 26 }));
+
+  [5.29, 8.868].forEach(x => [3.242, 5.083].forEach(y =>
+    infoBlock(s, x, y, { title: 'Examples of interview ', body: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed dolor is amet.' })));
+
+  pageNum(s, '12/20');
+}
+
+function slide13(s) {
+  pageRing(s, 0.954, 0.818, '13/20');
+  title(s, 2.182, 0.665, 8.042, 1.313, 'Candidate Experience and Employer Branding');
+
+  box(s, 0.954, 2.232, 11.572, 1.313, { fill: { type: 'none' }, line: { color: C.hair, width: 1 } });
+  para(s, 1.411, 2.548, 10.835, 0.679,
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor.');
+
+  [[0.954, 'Candidate Experience', 0.807, 2.279, 1.37, 6.54],
+   [3.420, 'Employer Branding', 3.253, 2.3, 3.837, 6.549],
+   [5.887, 'Candidate Experience', 5.72, 2.3, 6.303, 6.549]].forEach(([x, label, lx, lw, cx, cy]) => {
+    photo(s, x, 3.843, 2.133, 2.133);
+    hLine(s, x, 6.476, 2.133, C.hairDark, 1);
+    txt(s, label, { x: lx, y: 6.147, w: lw, h: 0.303, fontSize: 12, bold: true, align: 'center' });
+    txt(s, 'Lorem ipsum', { x: cx, y: cy, w: 1.133, h: 0.286, fontFace: F.body, fontSize: 11, color: C.gray2, align: 'center' });
+  });
+
+  paras(s, 8.354, 3.943, 4.172, 1.891, [
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim.',
+    '',
+    'Quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.',
+  ]);
+
+  designTag(s, 11.646, 1.498);
+  proTag(s);
+}
+
+function slide14(s) {
+  box(s, 0.625, 0.604, 6.042, 6.292, { fill: { color: C.tint2 } });
+
+  photo(s, 0.993, 1.006, 2.167, 2.256, 5);
+  txt(s, 'Avoiding Bias', { x: 3.507, y: 1.416, w: 2.743, h: 0.37, fontSize: 16, bold: true });
+  paras(s, 3.507, 1.816, 2.743, 1.186, [
+    'Lorem ipsum dolor sit amet, cons',
+    'ectetur adipiscing elit, sed do eiusmod tempor incididunt utama labore et dolore.',
+  ], { fontSize: 11 });
+
+  hLine(s, 0.993, 3.792, 5.257, C.white, 2);
+
+  photo(s, 4.146, 4.238, 2.167, 2.256, 5);
+  txt(s, 'Discrimination', { x: 1.083, y: 4.539, w: 2.743, h: 0.37, fontSize: 16, bold: true, align: 'right' });
+  paras(s, 1.083, 4.94, 2.743, 1.186, [
+    'Lorem ipsum dolor sit amet, cons',
+    'ectetur adipiscing elit, sed do eiusmod tempor incididunt utama labore et dolore.',
+  ], { fontSize: 11, align: 'right' });
+
+  eyebrow(s, 7.479, 1.038);
+  title(s, 7.479, 1.403, 5.271, 1.313, 'Avoiding Bias and Discrimination');
+  paras(s, 7.479, 2.898, 5.0, 1.891, [
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam.',
+    '',
+    'quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure doloR.',
+  ]);
+
+  [7.563, 10.198].forEach((x, i) => {
+    box(s, x, 5.198, 2.043, 1.296, { fill: { type: 'none' }, line: { color: C.hair, width: 1 } });
+    txt(s, '700K', { x: x + 0.275, y: 5.557, w: 0.836, h: 0.37, fontSize: 16, bold: true });
+    txt(s, 'Lorem ipsum dolor', { x: x + 0.275, y: 5.913, w: 1.4, h: 0.572, fontFace: F.body, fontSize: 11, color: C.gray2 });
+    if (i === 0) hLine(s, 9.607, 5.845, 0.591, C.hair, 1);
+  });
+
+  pageNum(s, '14/20');
+}
+
+function slide15(s) {
+  box(s, 5.732, 2.665, 7.059, 4.398, { fill: { color: C.tint2 } });
+  photo(s, 0.542, 2.665, 4.191, 4.398);
+  vLine(s, 4.893, 2.665, 4.398, C.orange, 1);
+
+  eyebrow(s, 1.742, 1.019);
+  title(s, 1.742, 1.361, 10.654, 0.707, 'Interviewer Training and Development');
+  pageRing(s, 0.542, 0.954, '15/20');
+  designTag(s, 11.646, 1.498);
+
+  [[3.422, 3.315, 2.161, 'Importance of interviewer training', 3.547, 3.341],
+   [4.584, 4.476, 2.161, 'Techniques for improvin', 4.650, 4.457],
+   [5.746, 5.638, 2.328, 'Continuous learning and feedback', 5.824, 5.572]]
+    .forEach(([cy, ty, tw, label, chevY, noteY]) => {
+      chip(s, 5.42, cy, 0.583, ICON.check, { ringPt: 10, glyphSize: 21 });
+      txt(s, label, { x: 6.163, y: ty, w: tw, h: 0.774, lineSpacingMultiple: 1.5 });
+      s.addShape('chevron', { x: 8.88, y: chevY, w: 0.459, h: 0.459, fill: { color: C.white } });
+      paras(s, 9.845, noteY, 2.438, 0.835, [
+        'Lorem ipsum dolor sit amet, con', 'sectetur adipiscing elit, sed do eiusmod tempor',
+      ], { fontSize: 10 });
+    });
+}
+
+function slide16(s) {
+  box(s, 0, 0.519, 3.271, 6.461, { fill: { color: C.tint } });
+  box(s, 0, 1.458, 2.993, 4.584, { fill: { color: C.white } });
+  photo(s, 0, 1.551, 2.896, 4.398);
+  txt(s, '- Improvement ', { x: 0.361, y: 0.885, w: 1.91, h: 0.337, bold: true, color: '000000' });
+  txt(s, '- Best Practices', { x: 0.361, y: 6.279, w: 1.91, h: 0.337, bold: true, color: '000000' });
+
+  eyebrow(s, 5.417, 0.707);
+  txt(s, 'Continuous Improvement and Best Practices',
+    { x: 5.417, y: 1.061, w: 6.894, h: 1.313, fontSize: 36, bold: true, color: '000000' });
+  pageRing(s, 4.146, 1.186, '15/20');
+
+  hLine(s, 4.239, 4.917, 7.587, C.hair, 0.75);
+  vLine(s, 7.988, 2.938, 3.854, C.hair, 0.75);
+
+  [4.146, 8.725].forEach(x => [3.068, 5.402].forEach(cy => {
+    chip(s, x + 0.093, cy, 0.406, ICON.check, { fill: C.tint, ring: null, glyphColor: C.blueVivid, glyphSize: 18 });
+    txt(s, 'Avoiding Bias', { x: x + 0.569, y: cy + 0.035, w: 1.91, h: 0.337, bold: true });
+    para(s, x, cy + 0.481, 3.104, 0.909,
+      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt utama labore et.',
+      { fontSize: 11 });
+  }));
+}
+
+function slide17(s) {
+  box(s, 8.188, 0, 5.146, 7.5, { fill: { color: C.tint } });
+
+  pageRing(s, 0.996, 1.061, '15/20');
+  s.addText([
+    { text: 'Meet', options: { breakLine: true } },
+    { text: 'Our Team' },
+    { text: '.', options: { color: C.orange2 } },
+  ], { x: 2.193, y: 0.814, w: 3.752, h: 1.582, fontFace: F.head, fontSize: 44, bold: true, color: C.ink, valign: 'top' });
+
+  txt(s, 'Interview & Hiring', { x: 0.877, y: 2.786, w: 2.569, h: 0.37, fontFace: F.med, fontSize: 16 });
+  para(s, 0.893, 3.177, 5.249, 0.679,
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore.');
+
+  hLine(s, 8.188, 3.75, 5.146, C.white, 1);
+
+  [[7.253, 0.976, 9.456, 1.184, 'Albert Jesenty', 5],
+   [0.959, 4.542, 3.162, 4.749, 'Steven Marlonty', 0],
+   [7.253, 4.542, 9.456, 4.749, 'Kenedy Hamsty', 5]].forEach(([px, py, tx, ty, name, frame]) => {
+    photo(s, px, py, 1.862, 1.982, frame);
+    infoBlock(s, tx, ty, { title: name, body: LOREM_SHORT, bodyDy: 0.96 });
+    hLine(s, tx + 0.084, ty + 0.856, 2.897, C.orange2, 0.75);
+  });
+}
+
+function slide18(s) {
+  /* Custom outlines are stored as unit-square fractions and scaled on use. */
+  const poly = (x, y, w, h, color, pts) => s.addShape('custGeom', {
+    x, y, w, h, fill: { color },
+    points: pts.map(pt => (pt.length === 2
+      ? { x: pt[0] * w, y: pt[1] * h }
+      : { curve: { type: 'cubic', x1: pt[0] * w, y1: pt[1] * h, x2: pt[2] * w, y2: pt[3] * h }, x: pt[4] * w, y: pt[5] * h }))
+      .concat([{ close: true }]),
+  });
+
+  // Tapered neck hanging a pictogram badge off an arrow.
+  const STEM = [[0, 0], [1, 0], [1, 0.005], [0.855, 0.096],
+    [0.735, 0.208, 0.66, 0.364, 0.66, 0.535], [0.66, 0.706, 0.735, 0.861, 0.855, 0.974],
+    [0.897, 1], [0.103, 1], [0.145, 0.974],
+    [0.266, 0.861, 0.34, 0.706, 0.34, 0.535], [0.34, 0.364, 0.266, 0.208, 0.145, 0.096], [0, 0.005]];
+  const stem = (x, y) => poly(x, y, 0.23, 0.71, C.blue, STEM);
+
+  // Dark rounded tab that peeks out behind the left of each arrow.
+  const NOTCH_TOP = [[0.345, 0], [0.416, 0, 0.483, 0.009, 0.538, 0.025], [0.608, 0.053],
+    [1, 0.222], [0, 0.222], [0, 0.146], [0, 0.065, 0.154, 0, 0.345, 0]];
+  const NOTCH_BTM = [[0, 0.778], [1, 0.778], [0.608, 0.947], [0.538, 0.975],
+    [0.483, 0.991, 0.416, 1, 0.345, 1], [0.154, 1, 0, 0.935, 0, 0.854]];
+  const notch = (x, y) => {
+    poly(x, y, 0.618, 1.638, C.navy, NOTCH_TOP);
+    poly(x, y, 0.618, 1.638, C.navy, NOTCH_BTM);
+  };
+
+  // The chevron: an upper and a lower slanted band that meet at the point.
+  const ARROW_TOP = [[0.536, 0], [0.562, 0, 0.586, 0.018, 0.605, 0.05], [0.631, 0.105],
+    [0.771, 0.445], [1, 1], [0.462, 1], [0.233, 0.445], [0.092, 0.105], [0.067, 0.049],
+    [0.057, 0.034, 0.046, 0.021, 0.035, 0.013], [0, 0]];
+  const ARROW_BTM = [[0.462, 0], [1, 0], [0.77, 0.556], [0.63, 0.894], [0.613, 0.936],
+    [0.605, 0.949, 0.561, 0.999, 0.536, 0.999], [0, 0.998], [0.035, 0.985],
+    [0.046, 0.977, 0.067, 0.949, 0.092, 0.893], [0.232, 0.557]];
+  const arrow = (x, y, topColor, botColor) => {
+    poly(x, y, 1.726, 0.818, topColor, ARROW_TOP);
+    poly(x, y + 0.817, 1.727, 0.821, botColor, ARROW_BTM);
+  };
+
+  const STEPS = [
+    { x: 1.911, y: 2.081, up: C.navyMid, dn: C.blue,
+      label: 'Strength', labelX: 0.428, labelW: 2.043, labelY: 2.698,
+      stemX: 2.244, stemY: 3.715, copyX: 1.636, copyY: 0.928, lateStem: false },
+    { x: 4.645, y: 3.800, up: C.blue, dn: C.navyMid,
+      label: 'Weakness', labelX: 3.064, labelW: 2.146, labelY: 4.382,
+      stemX: 4.909, stemY: 3.092, copyX: 4.152, copyY: 5.717, lateStem: true },
+    { x: 7.342, y: 2.061, up: C.navyMid, dn: C.blue,
+      label: 'Opportunities', labelX: 5.891, labelW: 2.181, labelY: 2.668,
+      stemX: 7.681, stemY: 3.694, copyX: 6.929, copyY: 0.928, lateStem: false },
+    { x: 10.076, y: 3.780, up: C.blue, dn: C.navyMid,
+      label: 'Threats', labelX: 8.526, labelW: 2.106, labelY: 4.380,
+      stemX: 10.387, stemY: 3.072, copyX: 9.667, copyY: 5.715, lateStem: true },
+  ];
+
+  STEPS.filter(st => !st.lateStem).forEach(st => stem(st.stemX, st.stemY));
+  STEPS.forEach(st => notch(st.x, st.y));
+
+  // Pale zig-zag band woven between the four arrows.
+  poly(0, 2.316, 13.333, 2.865, C.tint, [
+    [0.480, 0.004], [0.723, 0.000], [0.723, 0.600], [1.000, 0.600], [1.000, 0.993],
+    [0.647, 0.993], [0.647, 0.393], [0.520, 0.393], [0.520, 1.000], [0.240, 1.000],
+    [0.240, 0.400], [0.000, 0.400], [0.000, 0.007], [0.315, 0.007], [0.315, 0.607],
+    [0.444, 0.607], [0.444, 0.004],
+  ]);
+
+  STEPS.forEach(st => {
+    arrow(st.x + 0.214, st.y, st.up, st.dn);
+    txt(s, st.label, { x: st.labelX, y: st.labelY, w: st.labelW, h: 0.404, fontFace: F.semi, fontSize: 18, align: 'right' });
+    paras(s, st.copyX, st.copyY, 2.564, 0.835, [
+      'Aliquip ex ea commodo consequat.', 'Duis aute irure dolor  voluptate velit', 'esse cillum dolore eu fugiat',
+    ], { fontSize: 10 });
+  });
+
+  // Pictogram badges at the free end of each stem.
+  const dot = (x, y, d, color) => s.addShape('ellipse', { x, y, w: d, h: d, fill: { color } });
+
+  dot(2.057, 4.402, 0.609, C.blue);                                    // target
+  dot(2.249, 4.594, 0.224, C.white);
+  dot(2.281, 4.626, 0.160, C.ink);
+  dot(2.329, 4.674, 0.064, C.white);
+
+  box(s, 4.718, 2.750, 0.626, 0.341, { fill: { color: C.blue } });     // printer
+  box(s, 4.903, 2.580, 0.257, 0.241, { fill: { color: C.white } });
+  [[2.651, 0.100], [2.707, 0.199], [2.764, 0.199]].forEach(([y, w]) => box(s, 4.931, y, w, 0.028, { fill: { color: C.ink } }));
+  box(s, 4.860, 2.956, 0.342, 0.135, { fill: { color: C.white } });
+
+  box(s, 7.507, 4.489, 0.645, 0.498, { fill: { color: C.blue } });     // camera
+  box(s, 7.707, 4.400, 0.178, 0.089, { fill: { color: C.blue } });
+  box(s, 7.511, 4.560, 0.107, 0.071, { fill: { color: C.white } });
+  dot(7.636, 4.596, 0.320, C.white);
+  dot(7.671, 4.631, 0.249, C.ink);
+  dot(7.707, 4.667, 0.178, C.white);
+
+  box(s, 10.257, 2.582, 0.491, 0.491, { fill: { color: C.blue } });    // floppy disk
+  box(s, 10.372, 2.625, 0.260, 0.166, { fill: { color: C.white } });
+  box(s, 10.401, 2.655, 0.043, 0.108, { fill: { color: C.ink } });
+  dot(10.431, 2.835, 0.144, C.white);
+  box(s, 10.481, 2.886, 0.043, 0.043, { fill: { color: C.ink } });
+
+  STEPS.filter(st => st.lateStem).forEach(st => stem(st.stemX, st.stemY));
+
+  pageNum(s, '18/20');
+  proTag(s, 0.262, 7.002, 'left');
+}
+
+function slide19(s) {
+  box(s, 0.474, 1.623, 2.186, 5.877, { fill: { color: C.tint } });
+  txt(s, 'Price Table For New Member',
+    { x: 2.664, y: 0.501, w: 8.006, h: 0.707, fontSize: 36, bold: true, color: '000000', align: 'center' });
+  para(s, 3.466, 1.149, 6.402, 0.376,
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit.', { align: 'center' });
+
+  const CHECK = ICON.check, CROSS = ICON.cross;
+  const plans = [
+    { name: 'BASIC', price: '119', disc: 'Disc 5%', dx: -3.924, dy: 0.018,
+      card: C.blueVivid, cardLine: { color: C.white, width: 5 }, fg: C.white,
+      btnFill: C.tint, btnFace: F.head, btnBold: true, btnColor: C.blue, rule: C.navyMid,
+      ribbon: [1.038, 2.146, 0.953], discX: 0.747, discY: 2.367,
+      rows: [
+        ['Lorem ipsum placeholder', C.pink, CHECK, C.white],
+        ['Text commonly ', C.pink, CHECK, C.white],
+        ['Used in the graphic, print.', C.navy, CROSS, C.navy],
+        ['Publishing industries', C.navy, CROSS, C.navy],
+      ] },
+    { name: 'STANDARD', price: '259', disc: 'Disc 10%', dx: 0, dy: 0,
+      card: C.tint2, cardLine: null, fg: C.ink,
+      btnFill: C.white, btnFace: F.med, btnBold: false, btnColor: C.blueVivid, rule: C.white,
+      ribbon: [4.927, 2.116, 0.987], discX: 4.667, discY: 2.355,
+      rows: [
+        ['Lorem ipsum placeholder', C.ink, CHECK, '00A651'],
+        ['Text commonly ', C.ink, CHECK, '00A651'],
+        ['Used in the graphic, print.', C.ink, CHECK, '00A651'],
+        ['Publishing industries', C.gray, CROSS, 'FF0000'],
+      ] },
+    { name: 'PREMIUM', price: '349', disc: 'Disc 25%', dx: 3.947, dy: 0,
+      card: C.tint2, cardLine: null, fg: C.ink,
+      btnFill: C.white, btnFace: F.med, btnBold: false, btnColor: C.blueVivid, rule: C.white,
+      ribbon: [8.869, 2.115, 0.987], discX: 8.634, discY: 2.330,
+      rows: [
+        ['Lorem ipsum placeholder', C.ink, CHECK, '00A651'],
+        ['Text commonly ', C.ink, CHECK, '00A651'],
+        ['Used in the graphic, print.', C.ink, CHECK, '00A651'],
+        ['Publishing industries', C.ink, CHECK, '00A651'],
+      ] },
+  ];
+
+  plans.forEach(p => {
+    const X = v => v + p.dx, Y = v => v + p.dy;
+    box(s, X(4.928), Y(2.116), 3.486, 4.884,
+      Object.assign({ fill: { color: p.card } }, p.cardLine ? { line: p.cardLine } : {}));
+    txt(s, p.name, { x: X(5.631), y: Y(2.410), w: 2.08, h: 0.404, fontSize: 18, bold: true, color: p.fg, align: 'center' });
+    s.addText([
+      { text: '$', options: { fontSize: 20 } },
+      { text: p.price, options: { fontSize: 44 } },
+      { text: '.99', options: { fontSize: 20 } },
+    ], { x: X(5.674), y: Y(2.879), w: 1.994, h: 0.841, fontFace: F.head, color: p.fg, align: 'center', valign: 'top' });
+    txt(s, 'MONTH', { x: X(6.116), y: Y(3.542), w: 1.111, h: 0.286, fontFace: F.body, fontSize: 11, color: p.fg, align: 'center' });
+    txt(s, 'Lorem ipsum\u00A0is placeholder text commonly used in the.',
+      { x: X(5.479), y: Y(3.835), w: 2.384, h: 0.534, fontSize: 9, color: p.fg, align: 'center', lineSpacingMultiple: 1.5 });
+
+    box(s, X(5.363), Y(4.509), 2.616, 0.395, { fill: { color: p.btnFill } });
+    txt(s, 'Start Free Trial', {
+      x: X(5.363), y: Y(4.509), w: 2.616, h: 0.395, align: 'center', valign: 'middle',
+      fontFace: p.btnFace, fontSize: 11, bold: p.btnBold, color: p.btnColor,
+    });
+
+    hLine(s, X(5.363), Y(5.220), 2.616, p.rule, 0.75);
+    p.rows.forEach((row, i) => {
+      const ty = Y(5.282) + i * 0.3425;
+      txt(s, row[0], { x: X(5.363), y: ty, w: 1.715, h: 0.252, fontFace: F.body, fontSize: 9, color: row[1] });
+      txt(s, row[2], { x: X(7.674), y: ty - 0.022, w: 0.27, h: 0.25, fontFace: F.sym, fontSize: 11, color: row[3], align: 'center' });
+      hLine(s, X(5.363), Y(5.574) + i * 0.3395, 2.616, p.rule, 0.75);
+    });
+
+    s.addShape('diagStripe', { x: p.ribbon[0], y: p.ribbon[1], w: p.ribbon[2], h: p.ribbon[2], fill: { color: C.amber } });
+    txt(s, p.disc, { x: p.discX, y: p.discY, w: 1.281, h: 0.256, fontSize: 11, align: 'center', rotate: -45.24 });
+  });
+
+  pageNum(s, '19/20');
+}
+
+function slide20(s) {
+  box(s, 0.375, 0.375, 6.167, 6.75, { fill: { color: C.blue } });
+  box(s, 7.208, 0, 6.125, 1.235, { fill: { color: C.tint } });
+
+  txt(s, '20/20', { x: 7.208, y: 1.653, w: 0.945, h: 0.307, fontSize: 12 });
+  txt(s, 'Thank You', { x: 7.208, y: 3.055, w: 5.75, h: 1.212, fontSize: 66, bold: true });
+  txt(s, 'For Watching', { x: 7.208, y: 4.269, w: 1.981, h: 0.404, fontSize: 18 });
+
+  box(s, 7.208, 5.913, 5.333, 1.212, { fill: { type: 'none' }, line: { color: C.hair, width: 1 } });
+  txt(s, 'PRESENTATION TEMPLATE', { x: 7.548, y: 6.244, w: 3.441, h: 0.303, fontFace: F.body, fontSize: 12, bold: true });
+  txt(s, 'Powerpoint   |   Keynote   |   Goodle Slides',
+    { x: 7.548, y: 6.552, w: 4.292, h: 0.303, fontFace: F.body, fontSize: 12 });
+
+  cornerRings(s, 5.488, 0.388, 4.331, -0.662);
+  txt(s, 'SEE YOU', { x: 0.801, y: 0.746, w: 2.811, h: 0.707, fontSize: 36, bold: true, color: C.navyMid });
+  txt(s, 'THANK YOU', { x: 3.947, y: 4.36, w: 3.76, h: 0.707, fontSize: 36, bold: true, color: C.navyMid, rotate: -90 });
+  photo(s, 0.375, 1.875, 4.541, 5.25, 10);
+}
+
+/* ------------------------------------------------------------------ build */
+
+const BUILDERS = [slide01, slide02, slide03, slide04, slide05, slide06, slide07,
+  slide08, slide09, slide10, slide11, slide12, slide13, slide14, slide15,
+  slide16, slide17, slide18, slide19, slide20];
+
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'WIDE_16x9', width: 13.333, height: 7.5 });
+pptx.layout = 'WIDE_16x9';
+pptx.title = 'Interview & Hiring Presentation';
+
+BUILDERS.forEach(build => {
+  const slide = pptx.addSlide();
+  slide.background = { color: C.white };
+  build(slide);
+});
+
+pptx.writeFile({ fileName: path.join(__dirname, '165c0e0f-bef2-4d88-a6c3-a8ad2a2b5156_grok_final.pptx') })
+  .then(f => console.log('wrote ' + f));
