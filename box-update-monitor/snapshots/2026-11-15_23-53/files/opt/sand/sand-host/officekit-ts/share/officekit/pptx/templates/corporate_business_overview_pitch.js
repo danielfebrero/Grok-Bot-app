@@ -1,0 +1,740 @@
+/**
+ * StarDeck - Business Presentation Template (25 slides, 13.333 x 7.5 in)
+ * Rebuilt with pptxgenjs only. Run: node <this file>
+ *
+ * The source deck contains no media parts: every "Picture Placeholder" is an
+ * empty frame that renders as blank, so nothing is drawn for them here.
+ */
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ *
+ * Palette / typography
+ * ------------------------------------------------------------------ */
+const NAVY = '104176';
+const RED = 'E33737';
+const DARK = '262626';
+const BLACK = '000000';
+const GREY = '595959';
+const LIGHT = 'F2F2F2';
+const WHITE = 'FFFFFF';
+
+const HEAD = 'Poppins';
+const BODY = 'Open Sans';
+
+const INSET = [7.2, 7.2, 3.6, 3.6]; // lIns, rIns, bIns, tIns in points (0.1" / 0.05")
+
+// The soft "floating card" glow. A fresh object per shape: pptxgenjs rewrites
+// these fields in place while serialising.
+const softShadow = () => ({ type: 'outer', color: '000000', opacity: 0.15, blur: 10.8, offset: 0, angle: 90 });
+
+/* ------------------------------------------------------------------ *
+ * Low level helpers
+ * ------------------------------------------------------------------ */
+
+/** Text box that never wraps (mirrors the template's wrap="none" + spAutoFit boxes). */
+function label(s, text, x, y, w, h, o = {}) {
+	s.addText(text, {
+		x, y, w, h,
+		fontFace: o.face || BODY,
+		fontSize: o.size || 12,
+		bold: !!o.bold,
+		color: o.color || GREY,
+		align: o.align || 'left',
+		charSpacing: o.spc,
+		valign: 'top',
+		wrap: false,
+		fit: 'resize',
+		margin: INSET,
+	});
+}
+
+/** Wrapping paragraph, 1.5 line spacing like the template body copy. */
+function para(s, text, x, y, w, h, o = {}) {
+	s.addText(text, {
+		x, y, w, h,
+		fontFace: BODY,
+		fontSize: o.size || 12,
+		color: o.color || GREY,
+		align: o.align || 'left',
+		lineSpacingMultiple: 1.5,
+		valign: 'top',
+		fit: 'resize',
+		margin: INSET,
+	});
+}
+
+/** Bulleted list ("• " hanging indent of 0.1875"). */
+function bullets(s, items, x, y, w, h, color) {
+	s.addText(
+		items.map(t => ({ text: t, options: { bullet: { indent: 13.5 }, breakLine: true } })),
+		{
+			x, y, w, h,
+			fontFace: BODY,
+			fontSize: 12,
+			color: color || GREY,
+			lineSpacingMultiple: 1.5,
+			valign: 'top',
+			fit: 'resize',
+			margin: INSET,
+		}
+	);
+}
+
+/** 40pt page heading. */
+function heading(s, text, x, y, w, h, o = {}) {
+	s.addText(text, {
+		x, y, w, h,
+		fontFace: HEAD, fontSize: 40, bold: true,
+		color: o.color || BLACK,
+		align: o.align || 'left',
+		valign: 'top',
+		wrap: o.wrap !== false,
+		fit: 'resize',
+		margin: INSET,
+	});
+}
+
+/** 16pt bold sub-heading ("Your Title Here"). */
+function subhead(s, text, x, y, o = {}) {
+	label(s, text, x, y, o.w || 1.873, 0.37, {
+		face: HEAD, size: 16, bold: true, color: o.color || DARK, align: o.align,
+	});
+}
+
+/** Big statistic number (32pt default, 36pt on the wide variants). */
+function stat(s, text, x, y, w, color, o = {}) {
+	const size = o.size || 32;
+	label(s, text, x, y, w, size === 32 ? 0.64 : 0.707, {
+		face: HEAD, size, bold: true, color, align: o.align,
+	});
+}
+
+function roundRect(s, x, y, w, h, o = {}) {
+	s.addShape('roundRect', {
+		x, y, w, h,
+		rectRadius: o.r === undefined ? Math.min(w, h) / 2 : o.r,
+		fill: o.fill ? { color: o.fill } : { type: 'none' },
+		line: o.line ? { color: o.line, width: o.lw || 1 } : undefined,
+		shadow: o.shadow ? softShadow() : undefined,
+	});
+}
+
+function hline(s, x, y, w, o = {}) {
+	s.addShape('line', { x, y, w, h: 0, line: { color: o.color || GREY, width: o.lw || 1, dashType: o.dash } });
+}
+
+/** Small ">" chevron used next to the card "Read More" links. */
+function chevron(s, x, y) {
+	s.addShape('chevron', { x, y, w: 0.093, h: 0.154, fill: { color: GREY } });
+}
+
+/** 0.548 x 0.304 pill holding a right arrow; no fill colour = outlined. */
+function arrowPill(s, x, y, fill) {
+	s.addShape('roundRect', {
+		x, y, w: 0.548, h: 0.304, rectRadius: 0.152,
+		fill: { color: fill || WHITE },
+		line: fill ? undefined : { color: GREY, width: 1 },
+	});
+	s.addShape('line', {
+		x: x + 0.16, y: y + 0.152, w: 0.228, h: 0,
+		line: { color: fill ? LIGHT : GREY, width: 1, endArrowType: 'arrow' },
+	});
+}
+
+/** "Read More >" footer link found inside cards. */
+function readMoreLink(s, x, y, chevronX) {
+	label(s, 'Read More', x, y, 1.056, 0.303);
+	chevron(s, chevronX, y + 0.074);
+}
+
+/**
+ * The rounded "Read More | Address | @socialmedia | ..." bar.
+ * bar = { x, y, w }, btn = { x?, color }, items = [{ t, x, w, align? }]
+ */
+function linkBar(s, bar, btn, items = []) {
+	roundRect(s, bar.x, bar.y, bar.w, 0.541, { fill: WHITE, line: GREY });
+	const bx = btn.x === undefined ? bar.x : btn.x;
+	roundRect(s, bx, bar.y + 0.005, 1.883, 0.535, { fill: btn.color });
+	label(s, 'Read More', bx + 0.224, bar.y + 0.118, 1.434, 0.303, { color: LIGHT, align: 'center', spc: 3 });
+	items.forEach(it => label(s, it.t, it.x, bar.y + 0.118, it.w, 0.303, { align: it.align || 'center', spc: it.spc }));
+}
+
+/* ------------------------------------------------------------------ *
+ * Free-form geometry
+ * Paths are stored as unit coordinates (0..1 of the shape box):
+ *   ['M',x,y] move  ['L',x,y] line  ['C',x1,y1,x2,y2,x,y] cubic  ['Z'] close
+ * ------------------------------------------------------------------ */
+function freeform(s, x, y, w, h, unitPath, fill, o = {}) {
+	// pptxgenjs emits <a:path w=shapeW h=shapeH>, so point coords are box-relative.
+	const pts = [];
+	unitPath.forEach(seg => {
+		const k = seg[0];
+		if (k === 'M') pts.push({ x: seg[1] * w, y: seg[2] * h, moveTo: true });
+		else if (k === 'L') pts.push({ x: seg[1] * w, y: seg[2] * h });
+		else if (k === 'C') pts.push({
+			x: seg[5] * w, y: seg[6] * h,
+			curve: { type: 'cubic', x1: seg[1] * w, y1: seg[2] * h, x2: seg[3] * w, y2: seg[4] * h },
+		});
+		else pts.push({ close: true });
+	});
+	s.addShape('custGeom', {
+		x, y, w, h, points: pts,
+		fill: { color: fill },
+		rotate: o.rotate,
+		shadow: o.shadow ? softShadow() : undefined,
+	});
+}
+
+const PATH = {
+	// Cover: full-width grey field with a scalloped bottom edge.
+	coverField: [
+		['M', 0, 0], ['L', 1, 0], ['L', 1, 0.3026], ['L', 0.993, 0.3384],
+		['C', 0.9347, 0.6154, 0.8518, 0.84, 0.7537, 0.9839], ['L', 0.742, 1], ['L', 0.7362, 0.9765],
+		['C', 0.7138, 0.8938, 0.6799, 0.8411, 0.6419, 0.8411], ['L', 0.3581, 0.8411],
+		['C', 0.3201, 0.8411, 0.2862, 0.8938, 0.2638, 0.9765], ['L', 0.258, 1], ['L', 0.2463, 0.9839],
+		['C', 0.1482, 0.84, 0.0653, 0.6154, 0.007, 0.3384], ['L', 0, 0.3026], ['Z'],
+	],
+	// Logo "S" cut out of a rounded square (drawn rotated 45deg).
+	logoS: [
+		['M', 0.9512, 0.0488], ['C', 0.9813, 0.079, 1, 0.1206, 1, 0.1667], ['L', 1, 0.4232],
+		['L', 0.8305, 0.2536], ['L', 0.3946, 0.2525], ['L', 0.9959, 0.8538], ['L', 0.9869, 0.8982],
+		['C', 0.9616, 0.958, 0.9024, 1, 0.8333, 1], ['L', 0.1667, 1],
+		['C', 0.0746, 1, 0, 0.9254, 0, 0.8333], ['L', 0, 0.5768], ['L', 0.1695, 0.7464],
+		['L', 0.6054, 0.7475], ['L', 0.0041, 0.1462], ['L', 0.0131, 0.1018],
+		['C', 0.0384, 0.042, 0.0976, 0, 0.1667, 0], ['L', 0.8333, 0],
+		['C', 0.8794, 0, 0.921, 0.0187, 0.9512, 0.0488], ['Z'],
+	],
+	// Skewed bar (the two strokes crossing the logo mark).
+	logoBar: [['M', 0.222, 0], ['L', 1, 0], ['L', 0.778, 1], ['L', 0, 1], ['Z']],
+	// Bottom-right red blob with a notch (slide 3).
+	blobRight: [
+		['M', 0.6981, 0], ['C', 0.7944, 0, 0.8862, 0.0208, 0.9698, 0.0584], ['L', 1, 0.074],
+		['L', 1, 1], ['L', 0.0434, 1], ['L', 0.0314, 0.9649],
+		['C', 0.011, 0.895, 0, 0.8207, 0, 0.7437], ['C', 0, 0.7181, 0.0012, 0.6927, 0.0036, 0.6677],
+		['L', 0.0123, 0.6073], ['L', 0.4078, 0.6073],
+		['C', 0.4958, 0.6073, 0.5671, 0.5313, 0.5671, 0.4376], ['L', 0.5671, 0.0135],
+		['L', 0.6267, 0.0038], ['C', 0.6501, 0.0013, 0.674, 0, 0.6981, 0], ['Z'],
+	],
+	// Bottom-left red blob (slide 15).
+	blobLeft: [
+		['M', 0.3547, 0], ['C', 0.377, 0, 0.399, 0.0012, 0.4207, 0.0035], ['L', 0.4511, 0.0085],
+		['L', 0.4511, 0.3777], ['C', 0.4511, 0.4483, 0.5049, 0.5056, 0.5713, 0.5056],
+		['L', 0.9745, 0.5056], ['L', 0.9869, 0.5481],
+		['C', 0.9955, 0.5928, 1, 0.639, 1, 0.6864], ['C', 1, 0.7812, 0.9819, 0.8715, 0.9493, 0.9536],
+		['L', 0.9283, 1], ['L', 0, 1], ['L', 0, 0.1133], ['L', 0.0471, 0.0828],
+		['C', 0.1386, 0.03, 0.2433, 0, 0.3547, 0], ['Z'],
+	],
+	// Quarter-circle navy blob, bottom-left (slide 18).
+	blobCorner: [
+		['M', 0.3563, 0], ['C', 0.7118, 0, 1, 0.3075, 1, 0.6867],
+		['C', 1, 0.7816, 0.982, 0.8719, 0.9494, 0.954], ['L', 0.9287, 1], ['L', 0, 1],
+		['L', 0, 0.115], ['L', 0.0495, 0.0829], ['C', 0.1407, 0.03, 0.2452, 0, 0.3563, 0], ['Z'],
+	],
+	// Wide navy banner with a scooped-out white card (slide 4).
+	bannerNotch: [
+		['M', 0.0219, 0], ['L', 0.6971, 0], ['L', 0.6971, 0.6569],
+		['C', 0.6971, 0.7237, 0.7051, 0.778, 0.715, 0.778], ['L', 0.9501, 0.778],
+		['C', 0.96, 0.778, 0.9681, 0.7237, 0.9681, 0.6569], ['L', 0.9681, 0], ['L', 0.9781, 0],
+		['C', 0.9902, 0, 1, 0.0662, 1, 0.1478], ['L', 1, 0.8522],
+		['C', 1, 0.9338, 0.9902, 1, 0.9781, 1], ['L', 0.0219, 1],
+		['C', 0.0098, 1, 0, 0.9338, 0, 0.8522], ['L', 0, 0.1478],
+		['C', 0, 0.0662, 0.0098, 0, 0.0219, 0], ['Z'],
+	],
+	// Card header (top corners rounded) and the band right below it (slide 10).
+	cardHead: [
+		['M', 0.0548, 0], ['L', 0.9452, 0], ['C', 0.9755, 0, 1, 0.0689, 1, 0.1539],
+		['L', 1, 1], ['L', 0, 1], ['L', 0, 0.1539], ['C', 0, 0.0689, 0.0245, 0, 0.0548, 0], ['Z'],
+	],
+	cardBand: [
+		['M', 0, 0], ['L', 1, 0], ['L', 1, 0.7334],
+		['C', 1, 0.8807, 0.9755, 1, 0.9452, 1], ['L', 0.0548, 1],
+		['C', 0.0245, 1, 0, 0.8807, 0, 0.7334], ['Z'],
+	],
+	// Full-width navy dome (slide 17).
+	dome: [
+		['M', 0.5, 0], ['C', 0.6686, 0, 0.8292, 0.1228, 0.9754, 0.345], ['L', 1, 0.3837],
+		['L', 1, 1], ['L', 0, 1], ['L', 0, 0.3837], ['L', 0.0246, 0.345],
+		['C', 0.1708, 0.1228, 0.3314, 0, 0.5, 0], ['Z'],
+	],
+	// Panel rounded on the left edge only (slides 18, 19).
+	panelLeft: [
+		['M', 0.1044, 0], ['L', 1, 0], ['L', 1, 1], ['L', 0.1044, 1],
+		['C', 0.0467, 1, 0, 0.9614, 0, 0.9137], ['L', 0, 0.0863],
+		['C', 0, 0.0386, 0.0467, 0, 0.1044, 0], ['Z'],
+	],
+	bannerLeft: [
+		['M', 0.0406, 0], ['L', 1, 0], ['L', 1, 1], ['L', 0.0406, 1],
+		['C', 0.0182, 1, 0, 0.9255, 0, 0.8336], ['L', 0, 0.1664],
+		['C', 0, 0.0745, 0.0182, 0, 0.0406, 0], ['Z'],
+	],
+	// Grey panel with a rounded rectangular hole punched in it (slide 21).
+	panelHole: [
+		['M', 0.0849, 0.061], ['C', 0.0646, 0.061, 0.0481, 0.0823, 0.0481, 0.1086],
+		['L', 0.0481, 0.8914], ['C', 0.0481, 0.9177, 0.0646, 0.939, 0.0849, 0.939],
+		['L', 0.455, 0.939], ['C', 0.4753, 0.939, 0.4918, 0.9177, 0.4918, 0.8914],
+		['L', 0.4918, 0.1086], ['C', 0.4918, 0.0823, 0.4753, 0.061, 0.455, 0.061], ['Z'],
+		['M', 0.4287, 0], ['L', 1, 0], ['L', 1, 1], ['L', 0.0666, 1],
+		['C', 0.0298, 1, 0, 0.9614, 0, 0.9137], ['L', 0, 0.0863],
+		['C', 0, 0.0386, 0.0298, 0, 0.0666, 0], ['L', 0.4287, 0], ['Z'],
+	],
+	// Portfolio tile: image area (top rounded) + caption strip (bottom rounded).
+	tileTop: [
+		['M', 0.0753, 0], ['L', 0.9247, 0], ['C', 0.9663, 0, 1, 0.0395, 1, 0.0883],
+		['L', 1, 1], ['L', 0, 1], ['L', 0, 0.0883], ['C', 0, 0.0395, 0.0337, 0, 0.0753, 0], ['Z'],
+	],
+	tileFoot: [
+		['M', 0, 0], ['L', 1, 0], ['L', 1, 0.7601],
+		['C', 1, 0.8926, 0.9663, 1, 0.9247, 1], ['L', 0.0753, 1],
+		['C', 0.0337, 1, 0, 0.8926, 0, 0.7601], ['Z'],
+	],
+};
+
+/* ------------------------------------------------------------------ *
+ * The floating navigation bar repeated on every slide
+ * ------------------------------------------------------------------ */
+const NAV_ITEMS = [
+	{ t: 'About', x: 4.267, w: 0.677, align: 'left' },
+	{ t: 'Services', x: 5.533, w: 0.84 },
+	{ t: 'Team', x: 6.962, w: 0.638 },
+	{ t: 'Portfolio', x: 8.189, w: 0.877, align: 'right' },
+];
+
+function logoMark(s, x, y) {
+	s.addShape('ellipse', { x, y, w: 0.377, h: 0.377, fill: { color: RED } });
+	freeform(s, x + 0.110, y + 0.115, 0.148, 0.148, PATH.logoS, WHITE, { rotate: 315 });
+	freeform(s, x + 0.174, y + 0.137, 0.128, 0.029, PATH.logoBar, WHITE);
+	freeform(s, x + 0.067, y + 0.212, 0.128, 0.029, PATH.logoBar, WHITE);
+}
+
+function navBar(s) {
+	roundRect(s, 1.721, 0.405, 9.892, 0.541, { fill: WHITE, shadow: true });
+	roundRect(s, 9.837, 0.405, 1.776, 0.541, { fill: NAVY });
+	logoMark(s, 1.812, 0.487);
+	label(s, 'StarDeck', 2.241, 0.507, 1.122, 0.337, { face: HEAD, size: 14, bold: true, color: DARK });
+	NAV_ITEMS.forEach(n => label(s, n.t, n.x, 0.524, n.w, 0.303, { align: n.align || 'center' }));
+	label(s, 'Read More', 10.007, 0.524, 1.434, 0.303, { color: LIGHT, align: 'center', spc: 3 });
+}
+
+/* ------------------------------------------------------------------ *
+ * Shared copy
+ * ------------------------------------------------------------------ */
+const LOREM_LONG = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna ullamco laboris nisi commodo consequat. ';
+const LOREM_MED = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ';
+const CARD_COPY = 'Lorem ipsum dolor sit consectetur adipiscing elit, sed do eiusmod';
+const TITLE = 'Your Title Here';
+const URL = 'www.yourwebsitehere.com';
+const BUL_2 = ['Lorem ipsum dolor sit amet', 'Ut enim minim veniam'];
+const BUL_2C = ['Lorem ipsum dolor sit consectetur ', 'Ut enim ad minim veniam quis'];
+const BUL_2S = ['Lorem ipsum dolor sit ', 'Ut enim ad minim'];
+const BUL_2L = ['Lorem ipsum dolor amet, consectetur', 'Ut enim ad minim veniam, quis'];
+const BUL_3 = ['Lorem ipsum dolor sit consectetur', 'Ut enim ad minim veniam nostrud', 'Duis aute irure dolor repreh'];
+const BAR_ITEMS = (x1, x2, x3) => [
+	{ t: 'Address', x: x1, w: 0.84 },
+	{ t: '@socialmedia', x: x2, w: 1.282 },
+	{ t: 'Phone Number', x: x3, w: 1.403 },
+];
+
+/* ------------------------------------------------------------------ *
+ * Slides
+ * ------------------------------------------------------------------ */
+const slides = [];
+
+// 1 - Cover
+slides.push(s => {
+	freeform(s, 0, 0, 13.333, 4.381, PATH.coverField, LIGHT);
+	label(s, 'StarDeck', 3.669, 1.342, 5.996, 1.582, { face: HEAD, size: 88, bold: true, color: BLACK, align: 'center' });
+	label(s, 'Business Presentation Template', 4.253, 2.669, 4.828, 0.37, { size: 16, align: 'center', spc: 3 });
+	label(s, 'Prepared By :', 1.075, 6.026, 1.254, 0.303);
+	label(s, 'Louise Christman', 1.074, 6.329, 2.223, 0.37, { face: HEAD, size: 16, bold: true, color: DARK });
+	label(s, 'Presented By :', 10.935, 6.026, 1.322, 0.303, { align: 'right' });
+	label(s, 'Margaret  Kirkland', 9.896, 6.329, 2.363, 0.37, { face: HEAD, size: 16, bold: true, color: DARK, align: 'right' });
+});
+
+// 2 - Table of content
+slides.push(s => {
+	heading(s, 'Table Of Content', 1.034, 1.543, 5.03, 0.774, { wrap: false });
+	const rows = [
+		{ y: 2.618, t: 'Welcome', w: 0.928, n: '03', nx: 3.349, nw: 0.489 },
+		{ y: 3.122, t: 'About', w: 0.677, n: '05', nx: 3.337, nw: 0.502 },
+		{ y: 3.626, t: 'Service', w: 0.759, n: '10', nx: 3.407, nw: 0.432 },
+		{ y: 4.164, t: 'Team', w: 0.638, n: '16', nx: 3.409, nw: 0.43 },
+		{ y: 4.668, t: 'Portfolio', w: 0.877, n: '20', nx: 3.355, nw: 0.484 },
+		{ y: 5.172, t: 'Contact', w: 0.805, n: '24', nx: 3.355, nw: 0.484 },
+	];
+	rows.forEach(r => {
+		const y = r.y;
+		label(s, r.t, 1.034, y, r.w, 0.303);
+		label(s, r.n, r.nx, y - 0.034, r.nw, 0.37, { face: HEAD, size: 16, bold: true, color: DARK, align: 'right' });
+		hline(s, 1.13, y + 0.37, 2.613, { lw: 1.5, dash: 'dash' });
+	});
+
+	roundRect(s, 4.606, 2.656, 6.306, 1.419, { fill: NAVY, r: 0.21 });
+	stat(s, '12+', 6.416, 3.046, 0.908, WHITE);
+	bullets(s, BUL_3, 7.523, 2.877, 3.265, 0.978, LIGHT);
+	subhead(s, TITLE, 4.5, 4.5);
+	bullets(s, ['Lorem ipsum dolor sit amet, consectetur adipiscing ', 'Ut enim ad minim veniam, quis nostrud'], 4.503, 4.871, 4.471, 0.675);
+
+	linkBar(s, { x: 1.133, y: 6.127, w: 7.617 }, { x: 1.13, color: RED }, [{ t: URL, x: 6.183, w: 2.341, align: 'right' }]);
+});
+
+// 3 - Welcome message (centred)
+slides.push(s => {
+	freeform(s, 11.151, 5.455, 2.179, 2.045, PATH.blobRight, RED);
+	heading(s, 'Welcome Message', 3.84, 1.543, 5.654, 0.774, { align: 'center' });
+	para(s, LOREM_LONG, 2.648, 2.425, 8.037, 0.675, { align: 'center' });
+	arrowPill(s, 6.393, 3.475);
+	linkBar(s, { x: 0.947, y: 4.301, w: 8.669 }, { color: NAVY }, BAR_ITEMS(3.616, 5.301, 7.428));
+	[2.785, 5.78].forEach(x => {
+		subhead(s, TITLE, x, 5.645);
+		bullets(s, BUL_2, x + 0.003, 6.015, 2.63, 0.675);
+	});
+});
+
+// 4 - Welcome message (split)
+slides.push(s => {
+	freeform(s, 1.126, 5.022, 11.082, 1.645, PATH.bannerNotch, NAVY);
+	heading(s, 'Welcome Message', 1.034, 1.592, 3.449, 1.447);
+	para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna enim ad minim veniam.', 1.034, 3.303, 4.198, 0.978);
+
+	roundRect(s, 6.087, 2.181, 3.231, 1.944, { fill: WHITE, r: 0.225, shadow: true });
+	stat(s, '96%', 6.417, 2.496, 1.154, RED);
+	bullets(s, BUL_2, 6.417, 3.134, 2.63, 0.675);
+	arrowPill(s, 8.303, 2.575);
+
+	roundRect(s, 1.721, 5.577, 1.883, 0.535, { fill: RED });
+	label(s, 'Read More', 1.945, 5.69, 1.434, 0.303, { color: LIGHT, align: 'center', spc: 3 });
+	stat(s, '12+', 4.038, 5.524, 0.908, WHITE);
+	bullets(s, BUL_3, 5.204, 5.355, 3.265, 0.978, LIGHT);
+});
+
+// 5 - About our company
+slides.push(s => {
+	heading(s, 'About Our Company', 4.915, 1.592, 6.386, 0.774);
+	para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ecommodo consequat. Duis aute irure dolor in reprehenderit voluptate velit esse cillum dolore eu fugiat nulla pariatur.', 4.915, 2.467, 7.473, 1.281);
+	linkBar(s, { x: 2.939, y: 4.334, w: 9.208 }, { color: NAVY }, BAR_ITEMS(5.793, 7.563, 9.774));
+	stat(s, '96%', 4.915, 5.782, 1.273, RED, { size: 36, align: 'center' });
+	[6.667, 9.745].forEach(x => {
+		subhead(s, TITLE, x, 5.461);
+		bullets(s, ['Lorem ipsum dolor sit amet ', 'Ut enim minim veniam quis ', 'Duis aute irure dolor'], x, 5.831, 2.644, 0.978);
+	});
+});
+
+// 6 - History of our company
+slides.push(s => {
+	heading(s, 'History Of Our Company', 1.034, 1.592, 4.479, 1.447);
+	para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, do eiusmod tempor incididunt ut labore et dolore magna aliqua. ', 1.034, 3.155, 5.632, 0.675);
+	linkBar(s, { x: 1.116, y: 4.478, w: 6.93 }, { color: NAVY }, [{ t: URL, x: 4.851, w: 2.986, align: 'right', spc: 2 }]);
+	stat(s, '75K', 3.485, 5.743, 1.152, RED, { size: 36 });
+	subhead(s, TITLE, 4.978, 5.575);
+	bullets(s, ['Lorem ipsum dolor sit amet, consectetur adipiscing ', 'Ut enim ad minim veniam, quis nostrud'], 4.978, 5.945, 4.471, 0.675);
+	bullets(s, BUL_2, 9.822, 5.944, 2.678, 0.675);
+});
+
+// 7 - Who we are?
+slides.push(s => {
+	heading(s, 'Who We Are?', 1.034, 1.592, 4.479, 0.774);
+	para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed eiusmod tempor incididunt ut labore et dolore magna aliqua. ', 5.732, 1.641, 5.619, 0.675);
+	arrowPill(s, 11.845, 1.827, RED);
+	roundRect(s, 0.941, 2.742, 11.451, 2.48, { fill: NAVY, r: 0.338 });
+	[1.549, 5.103, 8.656].forEach(x => {
+		subhead(s, TITLE, x, 3.162, { color: WHITE });
+		bullets(s, BUL_2C, x, 3.532, 3.128, 0.675, LIGHT);
+	});
+});
+
+// 8 - Our company vision
+slides.push(s => {
+	heading(s, 'Our Company Vision', 1.034, 1.592, 4.479, 1.447);
+	para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, eiusmod tempor incididunt ut labore et dolore magna aliqua. ', 1.03, 3.112, 5.343, 0.675);
+	const cards = [
+		{ x: 1.134, n: '12+', nw: 0.908, ax: 3.698 },
+		{ x: 4.883, n: '75K', nw: 1.045, ax: 7.448 },
+		{ x: 8.633, n: '96%', nw: 1.154, ax: 11.198 },
+	];
+	cards.forEach(c => {
+		roundRect(s, c.x, 4.409, 3.567, 2.299, { fill: WHITE, r: 0.242, shadow: true });
+		stat(s, c.n, c.x + 0.357, 4.712, c.nw, NAVY);
+		subhead(s, TITLE, c.x + 0.357, 5.351);
+		para(s, CARD_COPY, c.x + 0.357, 5.721, 2.882, 0.675);
+		arrowPill(s, c.ax, c.x === 8.633 ? 4.857 : 4.879, RED);
+	});
+});
+
+// 9 - Our company mission
+slides.push(s => {
+	heading(s, 'Our Company Mission', 5.187, 1.592, 4.479, 1.447);
+	arrowPill(s, 11.79, 2.163, RED);
+	para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim minim veniam quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. ', 5.187, 3.186, 7.348, 0.978);
+	stat(s, '31M', 5.187, 4.636, 1.159, RED, { size: 36 });
+	[6.782, 9.692].forEach(x => {
+		subhead(s, TITLE, x, 4.468);
+		bullets(s, ['Lorem ipsum dolor sit amet, ', 'Ut enim minim veniam'], x, 4.839, 2.645, 0.675);
+	});
+	linkBar(s, { x: 3.13, y: 6.16, w: 9.208 }, { color: NAVY }, BAR_ITEMS(5.983, 7.753, 9.965));
+});
+
+// 10 - What we offer?
+slides.push(s => {
+	heading(s, 'What We Offer?', 4.257, 1.592, 4.82, 0.774, { align: 'center' });
+	const cards = [
+		{ x: 1.134, head: NAVY, n: '75K', nx: 2.649, nw: 1.152, tx: 1.491, bx: 1.491, rx: 1.491, cx: 4.168 },
+		{ x: 4.883, head: RED, n: '31M', nx: 6.399, nw: 1.159, tx: 5.241, bx: 5.234, rx: 5.234, cx: 7.911 },
+		{ x: 8.633, head: DARK, n: '96%', nx: 10.149, nw: 1.273, tx: 8.99, bx: 8.99, rx: 8.984, cx: 11.661 },
+	];
+	cards.forEach(c => {
+		const hx = c.x + 0.251;
+		roundRect(s, c.x, 2.548, 3.567, 4.16, { fill: WHITE, r: 0.438, shadow: true });
+		freeform(s, hx, 2.814, 3.063, 1.091, PATH.cardHead, c.head);
+		freeform(s, hx, 3.904, 3.063, 0.629, PATH.cardBand, LIGHT);
+		stat(s, c.n, c.nx, 3.039, c.nw, WHITE, { size: 36 });
+		subhead(s, TITLE, c.tx, 4.046);
+		bullets(s, ['Lorem ipsum dolor sit consecte', 'Ut enim ad minim veniam, quis', 'Duis aute irure dolor'], c.bx, 4.771, 2.882, 0.978);
+		hline(s, c.x === 8.633 ? 8.628 : c.x, 5.986, 3.567);
+		readMoreLink(s, c.rx, 6.196, c.cx);
+	});
+});
+
+// 11 - Our company services
+slides.push(s => {
+	heading(s, 'Our Company Services', 1.034, 1.592, 4.479, 1.447);
+	para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed eiusmod tempor incididunt ut labore et dolore magna aliqua. ', 1.034, 3.112, 5.632, 0.675);
+	linkBar(s, { x: 1.116, y: 4.097, w: 5.384 }, { color: NAVY }, [{ t: URL, x: 3.775, w: 2.341, align: 'right' }]);
+	chevron(s, 6.149, 4.295);
+	[{ x: 1.034, n: '75K', nw: 1.045 }, { x: 4.034, n: '96%', nw: 1.154 }].forEach(c => {
+		stat(s, c.n, c.x, 5.044, c.nw, RED);
+		subhead(s, TITLE, c.x, 5.684);
+		bullets(s, ['Lorem ipsum dolor sit amet, ', 'Ut enim minim veniam'], c.x, 6.054, 2.632, 0.675);
+	});
+});
+
+// 12 - Why choose us?
+slides.push(s => {
+	heading(s, 'Why Choose Us?', 1.654, 1.592, 10.019, 0.774, { align: 'center' });
+	roundRect(s, 1.134, 2.653, 11.061, 4.055, { fill: LIGHT, r: 0.251 });
+	const cols = [{ nx: 1.812, tx: 2.624 }, { nx: 5.216, tx: 5.981 }, { nx: 8.619, tx: 9.4 }];
+	const rows = [
+		{ y: 3.11, color: NAVY, nums: [{ t: '01', w: 0.663 }, { t: '02', w: 0.751 }, { t: '03', w: 0.766 }] },
+		{ y: 4.825, color: RED, nums: [{ t: '04', w: 0.798 }, { t: '05', w: 0.786 }, { t: '06', w: 0.78 }] },
+	];
+	rows.forEach(r => cols.forEach((c, i) => {
+		stat(s, r.nums[i].t, c.nx, r.y, r.nums[i].w, r.color);
+		subhead(s, TITLE, c.tx, r.y + 0.269);
+		bullets(s, ['Lorem ipsum dolor sit consecte', 'Ut enim ad minim veniam'], c.nx, r.y + 0.64, 2.896, 0.675);
+	}));
+});
+
+// 13 - Market overview
+slides.push(s => {
+	heading(s, 'Market Overview & Opportunities', 1.034, 1.592, 5.946, 1.447);
+	para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ute labore et dolore magna aliqua. ', 1.034, 3.21, 7.521, 0.675);
+	[{ x: 1.134, n: '12+', nw: 0.908, ax: 3.698 }, { x: 4.883, n: '75K', nw: 1.045, ax: 7.448 }].forEach(c => {
+		roundRect(s, c.x, 4.409, 3.567, 2.299, { fill: WHITE, r: 0.242, shadow: true });
+		stat(s, c.n, c.x + 0.357, 4.712, c.nw, NAVY);
+		subhead(s, TITLE, c.x + 0.357, 5.351);
+		para(s, CARD_COPY, c.x + 0.357, 5.721, 2.882, 0.675);
+		arrowPill(s, c.ax, 4.879, RED);
+	});
+});
+
+// 14 - How we work
+slides.push(s => {
+	heading(s, 'How We Work', 4.257, 1.592, 4.82, 0.774, { align: 'center' });
+	para(s, LOREM_LONG, 2.648, 2.425, 8.037, 0.675, { align: 'center' });
+	linkBar(s, { x: 3.974, y: 3.535, w: 5.384 }, { x: 7.476, color: NAVY }, [{ t: URL, x: 4.169, w: 2.341, align: 'left' }]);
+	const cards = [
+		{ x: 1.721, fill: NAVY, tx: 2.361, ty: 5.014, px: 1.992, py: 5.384, tc: WHITE, pc: LIGHT },
+		{ x: 5.09, fill: RED, tx: 5.73, ty: 5.019, px: 5.362, py: 5.389, tc: WHITE, pc: LIGHT },
+		{ x: 8.46, fill: WHITE, tx: 9.1, ty: 5.019, px: 8.732, py: 5.389, tc: DARK, pc: GREY, shadow: true },
+	];
+	cards.forEach(c => {
+		roundRect(s, c.x, 4.706, 3.152, 1.662, { fill: c.fill, r: 0.175, shadow: c.shadow });
+		subhead(s, TITLE, c.tx, c.ty, { color: c.tc, align: 'center' });
+		para(s, 'Lorem ipsum dolor consectet adipiscing elit sed do', c.px, c.py, 2.609, 0.675, { align: 'center', color: c.pc });
+	});
+});
+
+// 15 - Take a break
+slides.push(s => {
+	freeform(s, -0.003, 5.455, 2.175, 2.045, PATH.blobLeft, RED);
+	heading(s, 'Take a Break Slides', 1.034, 1.592, 4.355, 1.447);
+	para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.', 1.034, 3.136, 4.499, 0.978);
+
+	roundRect(s, 1.115, 4.706, 5.719, 1.662, { fill: NAVY, r: 0.175 });
+	stat(s, '96%', 1.636, 5.217, 1.154, WHITE);
+	subhead(s, TITLE, 3.041, 5.014, { color: WHITE });
+	bullets(s, BUL_2L, 3.041, 5.384, 3.333, 0.675, LIGHT);
+
+	roundRect(s, 8.72, 2.23, 3.498, 1.789, { fill: WHITE, r: 0.188, shadow: true });
+	bullets(s, ['Lorem ipsum dolor sit consecte', 'Ut enim ad minim veniam'], 9.03, 2.482, 2.882, 0.675);
+	hline(s, 8.72, 3.396, 3.498);
+	readMoreLink(s, 9.03, 3.555, 11.707);
+
+	stat(s, '75K', 9.671, 4.694, 1.045, NAVY);
+	subhead(s, TITLE, 9.671, 5.334);
+	para(s, CARD_COPY, 9.671, 5.704, 2.882, 0.675);
+	arrowPill(s, 11.879, 4.862, RED);
+});
+
+// 16 - Meet our team
+slides.push(s => {
+	heading(s, 'Meet Our Team', 1.034, 1.592, 4.82, 0.774);
+	arrowPill(s, 11.652, 1.827, RED);
+	const cards = [
+		{ x: 1.134, hx: 1.313, name: 'Charles G. Corman', nx: 1.717, nw: 2.386, bx: 1.402, ax: 3.789 },
+		{ x: 4.878, hx: 5.057, name: 'Wilma F. Williams', nx: 5.54, nw: 2.262, bx: 5.146, ax: 7.534 },
+		{ x: 8.633, hx: 8.813, name: 'Thomas D. Peck', nx: 9.41, nw: 2.018, bx: 8.901, ax: 11.289 },
+	];
+	cards.forEach(c => {
+		roundRect(s, c.x, 2.548, 3.567, 4.16, { fill: WHITE, r: 0.267, shadow: true });
+		roundRect(s, c.hx, 2.733, 3.204, 0.638, { fill: NAVY, r: 0.161 });
+		label(s, c.name, c.nx, 2.867, c.nw, 0.37, { face: HEAD, size: 16, bold: true, color: WHITE, align: 'center' });
+		bullets(s, BUL_2S, c.bx, 5.811, 2.139, 0.675);
+		arrowPill(s, c.ax, 5.996, RED);
+	});
+});
+
+// 17 - Our company team
+slides.push(s => {
+	heading(s, 'Our Company Team', 3.384, 1.592, 6.566, 0.774, { align: 'center' });
+	para(s, LOREM_LONG, 2.648, 2.425, 8.037, 0.675, { align: 'center' });
+	freeform(s, 0, 3.805, 13.333, 3.695, PATH.dome, NAVY);
+	linkBar(s, { x: 3.974, y: 3.535, w: 5.384 }, { color: RED }, [{ t: URL, x: 6.612, w: 2.341, align: 'right' }]);
+	chevron(s, 9.02, 3.732);
+});
+
+// 18 - Charles G. Corman
+slides.push(s => {
+	freeform(s, 0, 5.4, 2.241, 2.1, PATH.blobCorner, NAVY);
+	freeform(s, 9.066, 1.592, 4.267, 5.163, PATH.panelLeft, LIGHT);
+	heading(s, 'Charles G. Corman', 1.034, 1.592, 5.656, 0.774, { color: DARK, wrap: false });
+	para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. ', 1.034, 2.522, 7.044, 0.978);
+	bullets(s, ['Lorem ipsum dolor sit amet, ', 'Ut enim minim veniam'], 9.545, 5.69, 2.737, 0.675);
+	[{ ty: 4.054, by: 4.425, ay: 4.61 }, { ty: 5.699, by: 6.069, ay: 6.255 }].forEach(b => {
+		subhead(s, TITLE, 4.481, b.ty);
+		bullets(s, ['Lorem ipsum dolor sit amet, ', 'Ut enim minim veniam'], 4.485, b.by, 2.736, 0.675);
+		arrowPill(s, 7.381, b.ay, RED);
+	});
+	hline(s, 4.606, 5.4, 3.323);
+});
+
+// 19 - Wilma F. Williams
+slides.push(s => {
+	heading(s, 'Wilma F. Williams', 6.492, 1.592, 5.338, 0.774, { color: DARK, wrap: false });
+	para(s, LOREM_MED, 6.492, 2.478, 5.827, 0.675);
+	freeform(s, 6.514, 3.82, 6.819, 1.662, PATH.bannerLeft, NAVY);
+	stat(s, '12+', 8.476, 4.331, 0.908, WHITE);
+	subhead(s, TITLE, 9.583, 4.128, { color: WHITE });
+	bullets(s, BUL_2L, 9.583, 4.498, 3.333, 0.675, LIGHT);
+	linkBar(s, { x: 1.134, y: 6.168, w: 11.066 }, { color: RED }, [
+		...BAR_ITEMS(3.819, 5.232, 7.081),
+		{ t: URL, x: 9.057, w: 2.341, align: 'right' },
+	]);
+});
+
+// 20 - Our best work
+slides.push(s => {
+	heading(s, 'Our Best Work', 4.52, 1.592, 4.294, 0.774, { color: DARK, align: 'center' });
+	linkBar(s, { x: 3.974, y: 2.566, w: 5.384 }, { color: RED }, [{ t: URL, x: 6.612, w: 2.341, align: 'right' }]);
+	chevron(s, 9.02, 2.763);
+});
+
+// 21 - Our company portfolio
+slides.push(s => {
+	freeform(s, 7.6, 2.33, 5.733, 4.425, PATH.panelHole, LIGHT);
+	heading(s, 'Our Company Portfolio', 1.034, 1.592, 4.499, 1.447, { color: DARK });
+	para(s, LOREM_MED, 1.034, 3.15, 5.852, 0.675);
+
+	roundRect(s, 5.169, 4.04, 3.231, 1.944, { fill: WHITE, r: 0.225, shadow: true });
+	stat(s, '96%', 5.499, 4.356, 1.154, RED);
+	bullets(s, BUL_2, 5.499, 4.993, 2.63, 0.675);
+	arrowPill(s, 7.385, 4.434);
+
+	subhead(s, TITLE, 10.699, 3.555);
+	bullets(s, BUL_2S, 10.696, 3.926, 2.139, 0.675);
+	bullets(s, BUL_2S, 10.696, 4.926, 2.139, 0.675);
+	hline(s, 10.42, 5.917, 2.914);
+	readMoreLink(s, 10.698, 6.163, 12.559);
+
+	linkBar(s, { x: 1.116, y: 6.216, w: 5.384 }, { color: NAVY }, [{ t: URL, x: 3.775, w: 2.341, align: 'right' }]);
+	chevron(s, 6.149, 6.414);
+});
+
+// 22 - Our portfolio
+slides.push(s => {
+	heading(s, 'Our Portfolio', 4.417, 1.592, 4.499, 0.774, { color: DARK, align: 'center' });
+	const tiles = [
+		{ x: 1.128, bx: 1.39, ax: 3.778, arrow: NAVY },
+		{ x: 4.883, bx: 5.146, ax: 7.534, arrow: RED },
+		{ x: 8.628, bx: 8.89, ax: 11.278, arrow: null },
+	];
+	tiles.forEach(t => {
+		freeform(s, t.x, 2.548, 3.567, 3.041, PATH.tileTop, LIGHT, { shadow: true });
+		freeform(s, t.x, 5.589, 3.567, 1.12, PATH.tileFoot, WHITE, { shadow: true });
+		hline(s, t.x, 5.589, 3.567);
+		bullets(s, BUL_2S, t.bx, 5.811, 2.139, 0.675);
+		arrowPill(s, t.ax, 5.996, t.arrow);
+	});
+});
+
+// 23 - SWOT analysis
+slides.push(s => {
+	heading(s, 'SWOT Analysis', 4.417, 1.592, 4.499, 0.774, { color: DARK, align: 'center' });
+	para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore', 2.648, 2.425, 8.037, 0.372, { align: 'center' });
+	const quads = [
+		{ x: 1.227, y: 3.138, fill: NAVY, letter: 'S', circle: WHITE, lc: DARK, tc: WHITE, bc: LIGHT, tx: 2.879, bw: 3.37 },
+		{ x: 6.785, y: 3.138, fill: RED, letter: 'W', circle: WHITE, lc: DARK, tc: WHITE, bc: LIGHT, tx: 8.428, bw: 3.37 },
+		{ x: 1.227, y: 4.997, fill: DARK, letter: 'O', circle: WHITE, lc: DARK, tc: WHITE, bc: LIGHT, tx: 2.879, bw: 3.37 },
+		{ x: 6.785, y: 4.997, fill: WHITE, letter: 'T', circle: NAVY, lc: WHITE, tc: DARK, bc: GREY, tx: 8.431, bw: 3.367, shadow: true },
+	];
+	quads.forEach(q => {
+		roundRect(s, q.x, q.y, 5.321, 1.662, { fill: q.fill, r: 0.175, shadow: q.shadow });
+		s.addShape('ellipse', { x: q.x + 0.361, y: q.y + 0.308, w: 1.046, h: 1.046, fill: { color: q.circle } });
+		label(s, q.letter, q.x + 0.453, q.y + 0.444, 0.861, 0.774, { face: HEAD, size: 40, bold: true, color: q.lc, align: 'center' });
+		subhead(s, TITLE, q.tx, q.y + 0.308, { color: q.tc });
+		bullets(s, BUL_2L, q.tx, q.y + 0.679, q.bw, 0.675, q.bc);
+	});
+});
+
+// 24 - Contact information
+slides.push(s => {
+	heading(s, 'Contact Information', 1.034, 1.592, 4.355, 1.447);
+	para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris consequat. ', 1.034, 3.18, 4.601, 1.281);
+	s.addShape('rect', { x: 0, y: 5.095, w: 13.333, h: 1.706, fill: { color: LIGHT } });
+	[{ x: 1.034, ax: 3.422, arrow: NAVY }, { x: 5.199, ax: 7.587, arrow: RED }, { x: 9.364, ax: 11.751, arrow: null }].forEach(c => {
+		subhead(s, TITLE, c.x, 5.425);
+		bullets(s, BUL_2S, c.x, 5.795, 2.139, 0.675);
+		arrowPill(s, c.ax, 5.981, c.arrow);
+	});
+});
+
+// 25 - Thank you
+slides.push(s => {
+	label(s, 'Thank You', 5.429, 4.963, 6.899, 1.582, { face: HEAD, size: 88, bold: true, color: BLACK });
+	label(s, 'For Watching This Presentation', 5.429, 6.29, 4.299, 0.37, { size: 16, spc: 2 });
+	roundRect(s, 1.061, 3.348, 3.54, 3.312, { fill: WHITE, r: 0.288, shadow: true });
+	stat(s, '75K', 2.308, 3.754, 1.045, RED, { align: 'center' });
+	subhead(s, TITLE, 1.894, 4.402, { align: 'center' });
+	para(s, 'Lorem ipsum dolor sit consectetur adipiscing elit sed eiusmod', 1.298, 4.773, 3.065, 0.675, { align: 'center' });
+	roundRect(s, 1.889, 5.704, 1.883, 0.535, { fill: NAVY });
+	label(s, 'Read More', 2.113, 5.818, 1.434, 0.303, { color: LIGHT, align: 'center', spc: 3 });
+});
+
+/* ------------------------------------------------------------------ *
+ * Build
+ * ------------------------------------------------------------------ */
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'WIDE', width: 13.333, height: 7.5 });
+pptx.layout = 'WIDE';
+pptx.author = 'StarDeck';
+pptx.title = 'StarDeck - Business Presentation Template';
+
+slides.forEach(build => {
+	const slide = pptx.addSlide();
+	slide.background = { color: WHITE };
+	build(slide);
+	navBar(slide);
+});
+
+pptx.writeFile({ fileName: path.join(__dirname, '0b505374-e828-47f9-881b-39a3c04bf646_grok_final.pptx') })
+	.then(f => console.log('wrote', f));

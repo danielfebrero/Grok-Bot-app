@@ -1,0 +1,501 @@
+/**
+ * Recreation of "Board Meeting" deck (20 slides, 13.333 x 7.5 in) with PptxGenJS.
+ * Raster photography from the original is replaced by flat "[image]" placeholders.
+ */
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+// ---------------------------------------------------------------- design tokens
+const INK = '010207'; // theme tx1  - near-black
+const PAPER = 'FEFEFF'; // theme bg1  - near-white
+const INK_SOFT = '171717'; // theme tx2
+const YELLOW = 'F4F06D'; // theme accent1
+const LILAC = 'C3ACD0'; // theme accent2
+const CREAM = 'FFFBF5'; // theme accent4
+const PHOTO = '7F6654'; // stand-in tone for the one photograph in the deck
+
+const HEAD = 'Public Sans'; // major latin
+const BODY = 'Roboto'; // minor latin
+const THIN = 'Public Sans ExtraLight';
+
+const TIGHT = 0.80357; // lnSpc used by the template's headers / lists
+const DATE_W = 2.969;
+const CAPTION = { fontSize: 11, fontFace: THIN, valign: 'top', lineSpacingMultiple: TIGHT };
+
+// ---------------------------------------------------------------- tiny helpers
+const box = (slide, text, o) => slide.addText(text, Object.assign({ valign: 'top' }, o));
+
+const rect = (slide, x, y, w, h, o = {}) =>
+    slide.addShape('rect', Object.assign({ x, y, w, h }, o));
+
+const oval = (slide, x, y, w, h, o = {}) =>
+    slide.addShape('ellipse', Object.assign({ x, y, w, h }, o));
+
+const rule = (slide, x, y, w, color) =>
+    slide.addShape('line', { x, y, w, h: 0, line: { color, width: 1 } });
+
+/** Small numbered/plain badge circle used on the "considerations" slides. */
+const badge = (slide, x, y, d, label, o = {}) =>
+    slide.addText(label, Object.assign(
+        { shape: 'ellipse', x, y, w: d, h: d, align: 'center', valign: 'middle' }, o));
+
+/** "Company Name" tag, top-left on nearly every slide. */
+const companyTag = (slide, x, y, color, o = {}) =>
+    box(slide, 'Company Name', Object.assign({ x, y, w: DATE_W, h: 0.249, color }, CAPTION, o));
+
+/** "14th July, 2023" tag, top-right on nearly every slide. */
+const dateTag = (slide, x, y, color) =>
+    box(slide, [
+        { text: '14' },
+        { text: 'th', options: { superscript: true } },
+        { text: ' July, 2023' },
+    ], Object.assign({ x, y, w: DATE_W, h: 0.249, color, align: 'right' }, CAPTION));
+
+/** Hand-drawn looking "By Konkulakan" ellipse stamp (text first, then the ring). */
+const stamp = (slide, x, y, color, ringColor) => {
+    box(slide, 'By Konkulakan', {
+        x: x + 0.127, y: y + 0.1652, w: 1.4578, h: 0.2861,
+        fontSize: 11, fontFace: HEAD, color, align: 'center',
+    });
+    oval(slide, x, y, 1.7118, 0.8016, { rotate: 347.034, fill: { type: 'none' }, line: { color: ringColor, width: 1 } });
+};
+
+/** Flat rectangle standing in for a photograph. */
+const photoStub = (slide, x, y, w, h) =>
+    slide.addText('[image]', {
+        shape: 'rect', x, y, w, h, fill: { color: PHOTO },
+        align: 'center', valign: 'middle', fontSize: 12, fontFace: BODY, color: CREAM,
+    });
+
+// ---------------------------------------------------------------- slide builders
+const LOREM = "Lorem Ipsum is simply dummy text of the printing and typesetting industry. " +
+    "Lorem Ipsum has been the industry's standard dummy text ever since the 1500s";
+
+function slide01(s) {
+    // Title slide: big wordmark left, yellow swatch bottom-right, black bleed strip at the right edge.
+    box(s, [
+        { text: 'Board', options: { breakLine: true } },
+        { text: 'Meeting' },
+    ], { x: 0.5208, y: 2.4163, w: 5.2257, h: 2.4706, fontSize: 88, fontFace: HEAD, color: INK, lineSpacingMultiple: TIGHT });
+    dateTag(s, 3.3001, 0.5615, INK);
+    companyTag(s, 0.505, 0.5615, INK, { fontFace: HEAD });
+    rect(s, 6.7708, 4.619, 2.9688, 2.881, { fill: { color: YELLOW } });
+    stamp(s, 7.3993, 5.6587, INK, INK);
+    rect(s, 12.7083, 0, 0.625, 7.5, { fill: { color: INK } });
+    box(s, LOREM, { x: 0.505, y: 6.4926, w: 5.9077, h: 0.4712, fontSize: 11, fontFace: BODY, color: INK });
+}
+
+const AGENDA = ['Big Picture', 'Team', 'Product', 'Financials & Roadmap', 'Q&A'];
+
+function slide02(s) {
+    rect(s, 0, 0, 13.3333, 2.9206, { fill: { color: INK } });
+    box(s, 'Agenda', { x: 0.5208, y: 0.6693, w: 5.2257, h: 1.582, fontSize: 88, fontFace: HEAD, color: PAPER });
+    companyTag(s, 9.752, 1.3358, PAPER, { fontFace: HEAD, align: 'center' });
+    AGENDA.forEach((label, i) => {
+        const y = 3.7794 + i * 0.6682;
+        const row = { h: 0.3433, fontSize: 18, fontFace: HEAD, color: INK, lineSpacingMultiple: TIGHT };
+        box(s, String(i + 1).padStart(2, '0'), Object.assign({ x: 0.625, y, w: 1.8403 }, row));
+        rule(s, 1.8785, y + 0.1389, 4.9132, INK);
+        box(s, label, Object.assign({ x: 7.5868, y, w: 4.3056 }, row));
+    });
+    rect(s, 10.8681, 2.9206, 2.4653, 4.5794, { fill: { color: YELLOW } });
+    stamp(s, 11.2448, 4.8095, INK, INK_SOFT);
+}
+
+function slide03(s) {
+    box(s, 'Big Picture', { x: 1.441, y: 1.3406, w: 7.9167, h: 1.582, fontSize: 88, fontFace: HEAD, color: PAPER });
+    box(s, '01', { x: 0.5208, y: 1.8455, w: 0.9201, h: 0.5722, fontSize: 28, fontFace: THIN, color: PAPER });
+    rect(s, 8.6111, 3.75, 4.7222, 3.75, { fill: { color: YELLOW } });
+    box(s, LOREM, { x: 9.2361, y: 5.2043, w: 3.4722, h: 0.8415, fontSize: 11, fontFace: BODY, color: INK });
+    dateTag(s, 9.8438, 0.5615, PAPER);
+    companyTag(s, 0.505, 0.5615, PAPER);
+}
+
+const HIGHLIGHTS = [
+    { x: 1.3299, y: 4.5725, bodyY: 4.9832, w: 2.9823, title: 'Team', body: 'Grew from 26 people (last board meeting) to 135 (now).' },
+    { x: 5.1233, y: 5.232, bodyY: 5.6428, w: 2.9757, title: 'Global expansion', body: 'Finished construction of Tokyo and Tel Aviv offices.' },
+    { x: 8.9034, y: 4.5725, bodyY: 4.9832, w: 2.989, title: 'Product', body: 'Successfully implemented integrations across all clients.' },
+];
+
+function slide04(s) {
+    rect(s, 0, 2.2421, 13.3333, 5.2579, { fill: { color: INK } });
+    box(s, 'Highlight', { x: 4.0538, y: 0.6771, w: 5.2257, h: 0.9088, fontSize: 48, fontFace: HEAD, color: INK, align: 'center' });
+    HIGHLIGHTS.forEach(c => {
+        box(s, c.body, { x: c.x, y: c.bodyY, w: c.w, h: 0.4712, fontSize: 11, fontFace: BODY, color: PAPER });
+        box(s, c.title, { x: c.x, y: c.y, w: 2.8712, h: 0.4039, fontSize: 18, fontFace: HEAD, color: YELLOW });
+    });
+    dateTag(s, 9.8438, 6.7117, PAPER);
+    companyTag(s, 0.505, 6.7117, PAPER);
+    box(s, 'By Konkulakan', { x: 4.9048, y: 6.6749, w: 3.5238, h: 0.2861, fontSize: 11, fontFace: HEAD, color: PAPER, align: 'center' });
+}
+
+const CHALLENGES = [
+    {
+        n: '1', y: 1.5025, badgeY: 1.7651, titleY: 2.7278, bodyY: 3.1353,
+        title: 'Stabilize CAC', body: 'Reduce marketing team spend and address customer churn',
+    },
+    {
+        n: '2', y: 4.6275, badgeY: 4.9162, titleY: 5.6954, bodyY: 6.1029,
+        title: 'M&A Strategy', body: 'As we move towards building a cloud, need to develop a strong strategy for future acquisitions',
+    },
+];
+
+function slide05(s) {
+    rect(s, 6.7708, 0, 6.5625, 7.5, { fill: { color: INK } });
+    box(s, 'Challenges', { x: 0.5208, y: 1.5916, w: 5.2257, h: 0.9088, fontSize: 48, fontFace: HEAD, color: INK });
+    dateTag(s, 9.8438, 0.5615, PAPER);
+    companyTag(s, 0.505, 0.5615, INK);
+    CHALLENGES.forEach(c => {
+        rect(s, 7.7951, c.y, 4.9132, 2.2475, { fill: { type: 'none' }, line: { color: YELLOW, width: 1 } });
+        box(s, c.title, { x: 8.1446, y: c.titleY, w: 3.5394, h: 0.4039, fontSize: 18, fontFace: HEAD, color: YELLOW });
+        box(s, c.body, { x: 8.1446, y: c.bodyY, w: 4.2046, h: 0.4712, fontSize: 11, fontFace: BODY, color: PAPER });
+        badge(s, 8.2081, c.badgeY, 0.4665, c.n, { fill: { color: YELLOW }, fontSize: 11, fontFace: BODY, color: INK });
+    });
+}
+
+const TEAM = [
+    { x: 0.625, name: 'John Smith', nameX: 0.8924, nameW: 2.3299, role: 'CEO', roleX: 0.8924 },
+    { x: 3.6979, name: 'Jessica Lee', nameX: 3.9653, nameW: 2.3299, role: 'HR', roleX: 3.9653 },
+    { x: 6.7708, name: 'Lisa Chen', nameX: 6.9142, nameW: 2.5779, role: 'Head of Customer Support', roleX: 7.0382 },
+    { x: 9.8438, name: 'Andrew Mitchell', nameX: 10.1632, nameW: 2.3299, role: 'Head of Sales', roleX: 10.1632 },
+];
+
+function slide06(s) {
+    box(s, 'Current Team', { x: 4.0538, y: 0.9566, w: 5.2257, h: 0.9088, fontSize: 48, fontFace: HEAD, color: INK, align: 'center' });
+    dateTag(s, 9.8438, 0.5615, INK);
+    companyTag(s, 0.505, 0.5615, INK);
+    TEAM.forEach(p => rect(s, p.x, 5.4322, 2.8646, 1.4428, { fill: { color: YELLOW }, line: { color: INK, width: 1 } }));
+    TEAM.forEach(p => {
+        box(s, p.name, { x: p.nameX, y: 5.8086, w: p.nameW, h: 0.4039, fontSize: 18, fontFace: HEAD, color: INK, align: 'center' });
+        box(s, p.role, { x: p.roleX, y: 6.2125, w: 2.3299, h: 0.2861, fontSize: 11, fontFace: BODY, color: INK, align: 'center' });
+    });
+}
+
+function slide07(s) {
+    rect(s, 0, 0, 0.625, 7.5, { fill: { color: YELLOW } });
+    box(s, 'Olivia Baker', { x: 6.4425, y: 2.8804, w: 5.2257, h: 0.9088, fontSize: 48, fontFace: HEAD, color: YELLOW });
+    box(s, 'Head of Design', { x: 6.4425, y: 3.75, w: 5.2257, h: 0.4039, fontSize: 18, fontFace: BODY, color: PAPER });
+    box(s, "Olivia is a talented and imaginative designer. She leads the design team, creating visually " +
+        "stunning and user-friendly interfaces for the company's products. Olivia's creative vision helps " +
+        "enhance the company's brand identity and user experience.",
+        { x: 6.4425, y: 6.2821, w: 6.2659, h: 0.6563, fontSize: 11, fontFace: BODY, color: CREAM });
+    companyTag(s, 6.4425, 0.5615, PAPER);
+    box(s, 'New Hire', { x: 9.9707, y: 2.4303, w: 1.4578, h: 0.2861, fontSize: 11, fontFace: THIN, color: CREAM, align: 'center' });
+    oval(s, 9.8438, 2.1726, 1.7118, 0.8016, { rotate: 347.034, fill: { type: 'none' }, line: { color: CREAM, width: 1 } });
+    dateTag(s, 9.8438, 0.5615, PAPER);
+}
+
+const DEPARTMENTS = [
+    { x: 0.5203, y: 4.4365, name: 'Engineering', size: '39 Members' },
+    { x: 3.6726, y: 4.4365, name: 'Design', size: '17 Members' },
+    { x: 6.8502, y: 4.4379, name: 'Marketing', size: '14 Members' },
+    { x: 0.5203, y: 5.9141, name: 'Product', size: '30 Members' },
+    { x: 3.6979, y: 5.9141, name: 'QA', size: '7 Members' },
+    { x: 6.8502, y: 5.9141, name: 'Accounting', size: '9 Members' },
+];
+
+function slide08(s) {
+    // Yellow marker strokes sit behind the "n Members" lines.
+    [0.4891, 3.6696, 6.7874].forEach(x => [4.8563, 6.2922].forEach(y =>
+        rect(s, x, y, 1.7808, 0.4039, { fill: { color: YELLOW } })));
+    rect(s, 0, 0, 6.7708, 3.75, { fill: { color: INK } });
+    rect(s, 9.8438, 3.75, 3.4896, 3.75, { fill: { color: YELLOW } });
+    box(s, 'Team Structure', { x: 0.5208, y: 1.5703, w: 5.2257, h: 0.9088, fontSize: 48, fontFace: HEAD, color: PAPER });
+    dateTag(s, 3.2899, 0.5615, PAPER);
+    companyTag(s, 0.505, 0.5615, PAPER);
+    DEPARTMENTS.forEach(d => {
+        box(s, d.name, { x: d.x, y: d.y, w: 2.0739, h: 0.4039, fontSize: 18, fontFace: HEAD, color: INK });
+        box(s, d.size, { x: d.x, y: d.y + 0.4039, w: 2.0739, h: 0.4039, fontSize: 18, fontFace: BODY, color: INK });
+    });
+    stamp(s, 10.7326, 5.2242, INK, INK);
+}
+
+function slide09(s) {
+    rect(s, 0.625, 3.0159, 12.0833, 5.0456, { fill: { color: YELLOW }, line: { color: INK, width: 1 } });
+    dateTag(s, 9.8601, 0.5615, PAPER);
+    companyTag(s, 0.5367, 0.5615, PAPER);
+    box(s, 'Team Update', { x: 1.3368, y: 3.7095, w: 5.2257, h: 0.2861, fontSize: 11, fontFace: HEAD, color: INK });
+    box(s, "We're going to begin hiring in our new international offices by the end of Q3. We're currently " +
+        "looking for recruiting leads in each of these cities. We'll host a leadership summit in Boulder, " +
+        "Colorado alongside the annual company offsite in Hawaii. (In other words, while everyone else is " +
+        "bonding with luaus and mai tais, we will be shivering in the snow. So it goes.)",
+        { x: 1.3368, y: 4.4141, w: 10.5556, h: 2.5244, fontSize: 24, fontFace: HEAD, color: INK });
+}
+
+const KPIS = [
+    {
+        y: 1.1905, swatchY: 1.1905, titleY: 1.6492, bodyY: 2.0567, valueY: 1.5987,
+        title: 'Growth Rate', body: 'All revenue and growth targetsare exceeding forecast',
+        bodyW: 2.3316, bodyH: 0.4712, value: '10%',
+    },
+    {
+        y: 3.1551, swatchY: 3.1573, titleY: 3.5857, bodyY: 3.9932, valueY: 3.574,
+        title: 'NPS', body: 'Refocused customer supportefforts to improve NPS',
+        bodyW: 2.5151, bodyH: 0.4712, value: '75',
+    },
+    {
+        y: 5.1241, swatchY: 5.1262, titleY: 5.6417, bodyY: 6.0492, valueY: 5.5451,
+        title: 'Users', body: 'We hit the 1 million mark!',
+        bodyW: 2.5151, bodyH: 0.2861, value: '1M',
+    },
+];
+
+function slide10(s) {
+    KPIS.forEach(k => rect(s, 10.4514, k.swatchY, 2.0486, 1.7466, { fill: { color: YELLOW } }));
+    box(s, 'KPI Update', { x: 0.5208, y: 5.7303, w: 5.2257, h: 0.9088, fontSize: 48, fontFace: HEAD, color: PAPER });
+    dateTag(s, 9.8438, 0.5615, PAPER);
+    companyTag(s, 0.505, 0.5615, PAPER);
+    KPIS.forEach(k => rect(s, 7.5868, k.y, 4.9132, 1.7509, { fill: { type: 'none' }, line: { color: YELLOW, width: 1 } }));
+    KPIS.forEach(k => {
+        box(s, k.title, { x: 7.9363, y: k.titleY, w: 2.5151, h: 0.4039, fontSize: 18, fontFace: HEAD, color: YELLOW });
+        box(s, k.body, { x: 7.9363, y: k.bodyY, w: k.bodyW, h: k.bodyH, fontSize: 11, fontFace: BODY, color: PAPER });
+        box(s, k.value, { x: 10.5908, y: k.valueY, w: 1.7697, h: 0.9088, fontSize: 48, fontFace: HEAD, color: INK, align: 'center' });
+    });
+}
+
+const FINANCIALS = [
+    {
+        y: 3.6883, h: 0.8415, label: 'Burn Rate', items: [
+            '100k average Jan - Apr (excluding subsidy)',
+            '20k in Feb (5k lawyers, 15k advertising)',
+            '10k in Mar (research)',
+            '20k in Apr (5k hiring, 10k taxes, 5k legal advisor)'],
+    },
+    {
+        y: 5.1697, h: 0.6563, label: 'Cash Projections', items: [
+            '150k cash spent until today',
+            '220k cash end of July',
+            '90k projected cash end of Dec'],
+    },
+    {
+        y: 6.466, h: 0.4712, label: 'Subsidies', items: [
+            'Received 30k',
+            'Application for additional 10k'],
+    },
+];
+
+function slide11(s) {
+    rect(s, 0, 0, 13.3333, 3.2698, { fill: { color: INK } });
+    box(s, 'Company Financials', { x: 0.5208, y: 1.3721, w: 8.0903, h: 0.9088, fontSize: 48, fontFace: HEAD, color: PAPER });
+    dateTag(s, 9.8596, 0.5615, PAPER);
+    companyTag(s, 0.505, 0.5615, PAPER);
+    FINANCIALS.forEach(g => {
+        box(s, g.label, { x: 0.5208, y: g.y, w: 1.9444, h: 0.2861, fontSize: 11, fontFace: HEAD, color: INK });
+        box(s, g.items.map(t => ({ text: t, options: { bullet: { type: 'number', style: 'arabicPeriod', indent: 18 } } })),
+            { x: 3.5938, y: g.y, w: 3.9931, h: g.h, fontSize: 11, fontFace: BODY, color: INK });
+    });
+    rule(s, 0.625, 4.8497, 6.5972, INK);
+    rule(s, 0.625, 6.146, 6.5972, INK);
+}
+
+const ROADMAP = [
+    { x: 0.5293, dotX: 0.6367, title: 'Q1 — On Track', body: 'Re-calibrate marketing team spend', bodyH: 0.4728 },
+    { x: 3.9663, dotX: 4.0737, title: 'Q2 — Roadblock', body: 'Address customer churn', bodyH: 0.2861 },
+    { x: 7.4031, dotX: 7.5105, title: 'Q3 — On Track', body: 'Expand sales team hiring in the US', bodyH: 0.2861 },
+    { x: 10.84, dotX: 10.9474, title: 'Q4 — On Track', body: 'Build out M&A strategy', bodyH: 0.2861 },
+];
+
+function slide12(s) {
+    companyTag(s, 9.8596, 6.735, PAPER, { align: 'right' });
+    box(s, 'Roadmap', { x: 0.505, y: 5.5221, w: 5.2257, h: 0.9088, fontSize: 48, fontFace: HEAD, color: CREAM });
+    box(s, '2023', { x: 0.5208, y: 6.2013, w: 5.2257, h: 0.9088, fontSize: 48, fontFace: BODY, color: YELLOW });
+    rule(s, 0, 4.061, 13.3333, YELLOW);
+    ROADMAP.forEach(q => {
+        oval(s, q.dotX, 3.8933, 0.3353, 0.3353, { fill: { color: YELLOW } });
+        box(s, q.title, { x: q.x, y: 4.5382, w: 2.7047, h: 0.4039, fontSize: 18, fontFace: HEAD, color: YELLOW });
+        box(s, q.body, { x: q.x, y: 4.9457, w: 2.7047, h: q.bodyH, fontSize: 11, fontFace: BODY, color: CREAM });
+    });
+}
+
+const PRIORITIES = [
+    ['Talent Retention', 'HR'],
+    ['Increasing Growth Targets', 'Sales'],
+    ['Partnership Opportunities', 'Business Development'],
+    ['M&A Strategy', 'Product'],
+    ['Cross-Product Functionality', 'R&D'],
+    ['Press for Fundraising Round', 'Corporate Marketing'],
+];
+
+function slide13(s) {
+    rect(s, 5.6479, 0, 0.505, 3.75, { fill: { color: YELLOW } });
+    rect(s, 5.6479, 3.75, 0.505, 3.75, { fill: { color: PAPER } });
+    box(s, 'Current Priorities', { x: 6.6641, y: 1.6187, w: 6.0417, h: 0.9088, fontSize: 48, fontFace: HEAD, color: PAPER });
+    dateTag(s, 9.8596, 0.5615, PAPER);
+    companyTag(s, 6.7205, 0.5615, PAPER);
+
+    const hairline = [
+        { pt: 0.75, color: PAPER }, { type: 'none' },
+        { pt: 0.75, color: PAPER }, { type: 'none' },
+    ];
+    s.addTable(PRIORITIES.map(([topic, owner]) => [
+        { text: topic, options: { fontFace: HEAD } },
+        { text: owner, options: { fontFace: BODY } },
+    ]), {
+        x: 6.7708, y: 3.75, w: 5.9375, colW: [4.1157, 1.8218], rowH: 0.5208,
+        fontSize: 11, color: YELLOW, valign: 'middle', border: hairline,
+    });
+}
+
+function slide14(s) {
+    rect(s, 6.7708, 3.75, 6.5625, 3.75, { fill: { color: YELLOW } });
+    companyTag(s, 0.5208, 0.5615, PAPER);
+    box(s, 'Talent Retention', {
+        x: 0.5208, y: 1.5012, w: 5.2257, h: 1.3935,
+        fontSize: 48, fontFace: HEAD, color: PAPER, lineSpacingMultiple: TIGHT,
+    });
+    box(s, "We're committed to improving talent retention across the board, especially as we continue to " +
+        "expand our international teams. One of our focus areas is investing in identifying internal " +
+        "promotion opportunities.",
+        { x: 7.4392, y: 4.8172, w: 5.2257, h: 1.6156, fontSize: 18, fontFace: BODY, color: INK });
+}
+
+/** Numbered checklist shared by slides 15 and 18. */
+function checklist(s, items, textColor) {
+    items.forEach((label, i) => {
+        const y = 4.0852 + i * 0.5972;
+        box(s, label, { x: 1.3299, y, w: i === 3 ? 4.3125 : 4.2083, h: 0.4039, fontSize: 18, fontFace: BODY, color: textColor });
+        badge(s, 0.625, y, 0.4039, String(i + 1), {
+            fill: { type: 'none' }, line: { color: YELLOW, width: 1 },
+            fontSize: 18, fontFace: HEAD, color: YELLOW,
+        });
+    });
+}
+
+function slide15(s) {
+    box(s, [
+        { text: 'M&A Strategy :', options: { fontFace: HEAD, breakLine: true } },
+        { text: 'Top Considerations', options: { fontFace: BODY } },
+    ], { x: 0.4732, y: 1.7511, w: 6.25, h: 1.3935, fontSize: 48, color: PAPER, lineSpacingMultiple: TIGHT });
+    dateTag(s, 9.8596, 0.5615, LILAC);
+    companyTag(s, 0.505, 0.5615, PAPER);
+    checklist(s, ['Build or Buy', 'Due Diligence', 'Impact on Valuation',
+        'Cross-Platform Functionalities', 'Technical Implications'], YELLOW);
+}
+
+function slide16(s) {
+    rect(s, 0, 0, 13.3333, 1.3803, { fill: { color: YELLOW } });
+    s.addChart('bar', [{
+        name: 'Series 1',
+        labels: ['Q1', 'Q2', 'Q3', 'Q4'],
+        values: [300, 800, 2500, 5000],
+    }], {
+        x: 5.4728, y: 2.0478, w: 7.3782, h: 4.9187,
+        barDir: 'col', barGrouping: 'clustered', barGapWidthPct: 219, barOverlapPct: -27,
+        chartColors: [YELLOW],
+        showLegend: false, showTitle: false,
+        showValue: true, dataLabelPosition: 'outEnd', dataLabelFormatCode: 'General',
+        dataLabelColor: YELLOW, dataLabelFontFace: BODY, dataLabelFontSize: 18,
+        catAxisLabelColor: YELLOW, catAxisLabelFontFace: BODY, catAxisLabelFontSize: 18,
+        catAxisLineColor: 'BDC7F6', catGridLine: { style: 'none' },
+        valAxisLabelColor: PAPER, valAxisLabelFontFace: BODY, valAxisLabelFontSize: 12,
+        valAxisLineShow: false, valGridLine: { color: PAPER, style: 'solid', size: 0.75 },
+    });
+    dateTag(s, 9.8596, 0.5615, INK);
+    companyTag(s, 0.505, 0.5615, INK);
+    box(s, [
+        { text: 'Increasing', options: { breakLine: true } },
+        { text: 'Growth', options: { breakLine: true } },
+        { text: 'Targets' },
+    ], { x: 0.505, y: 2.0478, w: 4.0407, h: 2.0465, fontSize: 48, fontFace: HEAD, color: PAPER, lineSpacingMultiple: TIGHT });
+    box(s, "To hit our 2020 ARR goals, we've brought on a Senior Director of Sales to lead our efforts to " +
+        "expand in Asia. We've also reassigned territories and restructured the pay scale for sales teams " +
+        "across all of our offices.",
+        { x: 0.505, y: 6.1252, w: 4.0089, h: 0.8415, fontSize: 11, fontFace: BODY, color: PAPER });
+}
+
+const OFFERINGS = [
+    ['Feature Name', 'Status', 'Due Date', 'Assignee'],
+    ['Mobile Optimization', 'Testing', '14 June', 'Julius'],
+    ['App Marketplace', 'Implementing', '28 June', 'Ben'],
+    ['Cross-Platform Sync', 'Concept', '30 June', 'Vanessa'],
+];
+
+function slide17(s) {
+    rect(s, 0, 6.0952, 13.3333, 1.4048, { fill: { color: INK } });
+    box(s, [
+        { text: 'Enterprise Offerings: ', options: { fontFace: HEAD } },
+        { text: 'Roadmap', options: { fontFace: BODY } },
+    ], { x: 3.1099, y: 1.2101, w: 7.1136, h: 1.7166, fontSize: 48, color: INK, align: 'center' });
+
+    const grid = [{ pt: 0.75, color: INK }, { pt: 0.75, color: INK }, { pt: 0.75, color: INK }, { pt: 0.75, color: INK }];
+    s.addTable(OFFERINGS.map((row, r) => row.map(cell => ({
+        text: cell,
+        options: r === 0
+            ? { bold: true, fontFace: HEAD, fill: { color: YELLOW } }
+            : { fontFace: BODY, fill: { color: CREAM } },
+    }))), {
+        x: 0.625, y: 3.75, w: 12.0833, colW: [3.0208, 3.0208, 3.0208, 3.0208], rowH: 0.7813,
+        fontSize: 18, color: INK, valign: 'middle', border: grid,
+    });
+    dateTag(s, 9.8438, 0.5615, INK);
+    companyTag(s, 0.505, 0.5615, INK);
+}
+
+function slide18(s) {
+    box(s, 'Next Board Meeting', { x: 0.4732, y: 1.6423, w: 7.1136, h: 0.9088, fontSize: 48, fontFace: HEAD, color: PAPER });
+    dateTag(s, 9.8438, 0.5615, LILAC);
+    companyTag(s, 0.505, 0.5615, PAPER);
+    box(s, '7 July', { x: 0.5208, y: 2.3447, w: 5.2257, h: 0.9088, fontSize: 48, fontFace: BODY, color: YELLOW });
+    checklist(s, ['Learnings from Beta testing', 'Polished GTM strategy', 'Update on pricing',
+        'Annual accounts approval', 'Initial mobile concepts'], YELLOW);
+    photoStub(s, 8.819, 0, 4.514, 7.5);
+}
+
+const CONTACT = [
+    { x: 7.6662, y: 1.2816, label: 'Email', value: 'info@buana.inc', valueW: 1.9692, valueH: 0.2861 },
+    { x: 7.6662, y: 2.0227, label: 'Phone', value: '+1 (555) 123-4567', valueW: 2.9688, valueH: 0.2861 },
+    { x: 10.5308, y: 1.2816, label: 'Website', value: 'www.buana.inc', valueW: 1.9692, valueH: 0.2861 },
+    { x: 10.5308, y: 2.0227, label: 'Address', value: '123 Main Street\nCity, State 12345', valueW: 2.1776, valueH: 0.4712 },
+];
+
+function slide19(s) {
+    rect(s, 6.7708, 0, 6.5625, 3.75, { fill: { color: INK } });
+    dateTag(s, 9.8438, 0.5615, PAPER);
+    companyTag(s, 0.505, 0.5615, INK);
+    box(s, 'Contact', { x: 0.4732, y: 1.6423, w: 7.1136, h: 0.9088, fontSize: 48, fontFace: HEAD, color: INK });
+    CONTACT.forEach(c => {
+        box(s, c.label, { x: c.x, y: c.y, w: 1.9692, h: 0.2861, fontSize: 11, fontFace: HEAD, color: YELLOW });
+        box(s, c.value, { x: c.x, y: c.y + 0.2861, w: c.valueW, h: c.valueH, fontSize: 11, fontFace: BODY, color: PAPER });
+    });
+}
+
+function slide20(s) {
+    box(s, 'Thank You', { x: 2.943, y: 2.4987, w: 7.4474, h: 1.582, fontSize: 88, fontFace: HEAD, color: PAPER, align: 'center' });
+    dateTag(s, 9.8438, 0.5615, PAPER);
+    companyTag(s, 0.505, 0.5615, PAPER);
+    box(s, 'By Konkulakan', { x: 5.9377, y: 4.2458, w: 1.4578, h: 0.2861, fontSize: 11, fontFace: THIN, color: YELLOW, align: 'center' });
+    oval(s, 5.8108, 4.0807, 1.7118, 0.8016, { rotate: 347.034, fill: { type: 'none' }, line: { color: YELLOW, width: 1 } });
+    box(s, 'info@buana.inc', { x: 0.5198, y: 6.6841, w: 1.9692, h: 0.2861, fontSize: 11, fontFace: BODY, color: PAPER });
+    box(s, 'www.buana.inc', { x: 10.9077, y: 6.6841, w: 1.9692, h: 0.2861, fontSize: 11, fontFace: BODY, color: PAPER, align: 'right' });
+    box(s, [
+        { text: 'Buana Inc', options: { fontFace: HEAD } },
+        { text: '. 123 Main Street, City, State 12345', options: { fontFace: BODY } },
+    ], { x: 3.6979, y: 6.6841, w: 5.9375, h: 0.2861, fontSize: 11, color: PAPER, align: 'center' });
+}
+
+// ---------------------------------------------------------------- assembly
+const DECK = [
+    [slide01, PAPER], [slide02, PAPER], [slide03, INK], [slide04, YELLOW],
+    [slide05, PAPER], [slide06, PAPER], [slide07, INK], [slide08, PAPER],
+    [slide09, YELLOW], [slide10, INK], [slide11, YELLOW], [slide12, INK],
+    [slide13, INK], [slide14, INK], [slide15, INK], [slide16, INK],
+    [slide17, CREAM], [slide18, INK], [slide19, CREAM], [slide20, INK],
+];
+
+function build() {
+    const pptx = new PptxGenJS();
+    pptx.defineLayout({ name: 'DECK', width: 13.333333333333334, height: 7.5 });
+    pptx.layout = 'DECK';
+    pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
+    pptx.title = 'Board Meeting';
+
+    DECK.forEach(([builder, background]) => {
+        const slide = pptx.addSlide();
+        slide.background = { color: background };
+        builder(slide);
+    });
+    return pptx;
+}
+
+build().writeFile({ fileName: path.join(__dirname, '05a42c40-776b-4462-a8d7-c527aab612a2_grok_final.pptx') })
+    .then(f => console.log('wrote', f));

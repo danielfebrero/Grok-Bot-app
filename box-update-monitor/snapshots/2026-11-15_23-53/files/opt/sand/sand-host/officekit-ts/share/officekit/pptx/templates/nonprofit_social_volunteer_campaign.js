@@ -1,0 +1,784 @@
+/**
+ * "Non Profit Campaign" — 20-slide deck rebuilt with pptxgenjs.
+ * Slide size 10 x 5.625 in (16:9).   Run:  node <this file>
+ *
+ * Everything is drawn from native pptxgenjs primitives.  Photographs in the
+ * source deck are replaced by flat "[image]" placeholder blocks, and the
+ * decorative blurred glows / gradients are re-created with stacked shapes.
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ================================================================== *
+ * Design tokens
+ * ================================================================== */
+const W = 10;
+const H = 5.625;
+
+const ORANGE = 'FF7848'; // theme accent 1
+const YELLOW = 'FFD873'; // theme accent 2
+const INK = '262626';
+const INK2 = '3F3F3F';
+const BODY = '595959';
+const MUTE = 'A5A5A5';
+const MUTE2 = '7F7F7F';
+const WHITE = 'FFFFFF';
+const PLACE = 'F2F2F2'; // flat tone of the deck's image placeholders
+
+const FH = 'Sora SemiBold'; // headings
+const FB = 'Manrope'; // body copy
+
+const INSET = [5.4, 5.4, 2.7, 2.7]; // l, r, b, t in points — the deck's text insets
+const NOLINE = { type: 'none' };
+// the wide, very soft drop shadow the source applies to its cards
+const SOFT_SHADOW = { type: 'outer', color: '000000', opacity: 0.15, blur: 41, offset: 9, angle: 90 };
+
+/* ================================================================== *
+ * Generic helpers
+ * ================================================================== */
+function mix(a, b, t) {
+  const ch = (i) => {
+    const v = Math.round(parseInt(a.substr(i, 2), 16) * (1 - t) + parseInt(b.substr(i, 2), 16) * t);
+    return Math.max(0, Math.min(255, v)).toString(16).padStart(2, '0');
+  };
+  return (ch(0) + ch(2) + ch(4)).toUpperCase();
+}
+
+/** Text box carrying the deck's default typography. */
+function txt(slide, text, o) {
+  slide.addText(text, Object.assign({
+    fontFace: FB, fontSize: 11, color: BODY,
+    align: 'left', valign: 'top', wrap: true, isTextBox: true, margin: INSET,
+  }, o));
+}
+
+const head = (s, text, o) => txt(s, text, Object.assign({ fontFace: FH, fontSize: 33, color: INK }, o));
+const eyebrow = (s, o) => txt(s, 'Subtitle Here', Object.assign({ fontSize: 11, color: MUTE, w: 1.9, h: 0.252 }, o));
+
+/** White (or tinted) card with a hairline coloured outline. */
+function card(s, o) {
+  s.addShape('roundRect', {
+    x: o.x, y: o.y, w: o.w, h: o.h, rectRadius: o.r,
+    fill: o.fill === null ? NOLINE : { color: o.fill || WHITE },
+    line: o.line ? { color: o.line, width: 0.75 } : NOLINE,
+    shadow: o.shadow === false ? undefined : SOFT_SHADOW,
+  });
+}
+
+/**
+ * Horizontal orange -> yellow gradient inside a rounded rectangle.
+ * Painted as left-anchored roundRects of growing width, since pptxgenjs
+ * cannot emit a real <a:gradFill>.
+ */
+function gradRoundRect(s, o) {
+  const steps = o.steps || 30;
+  const r = o.r || 0;
+  if (o.shadow !== false) {
+    s.addShape('roundRect', {
+      x: o.x, y: o.y, w: o.w, h: o.h, rectRadius: r,
+      fill: { color: ORANGE }, line: NOLINE, shadow: SOFT_SHADOW,
+    });
+  }
+  const span = o.gradW || o.w; // colour ramp length, may be shorter than the shape
+  const wMin = Math.min(2 * r, o.w);
+  const wAt = (i) => wMin + (o.w - wMin) * (i / steps);
+  for (let i = steps; i >= 1; i--) {
+    s.addShape('roundRect', {
+      x: o.x, y: o.y, w: wAt(i), h: o.h, rectRadius: r,
+      fill: { color: mix(ORANGE, YELLOW, Math.min(1, ((wAt(i - 1) + wAt(i)) / 2) / span)) }, line: NOLINE,
+    });
+  }
+  if (o.line) card(s, { x: o.x, y: o.y, w: o.w, h: o.h, r: r, fill: null, line: o.line });
+}
+
+/** Same gradient, clipped to a circle (used for the numbered badges). */
+function gradEllipse(s, o) {
+  const steps = 14;
+  for (let i = steps; i >= 1; i--) {
+    const k = i / steps;
+    s.addShape('pie', {
+      x: o.x + o.w * (1 - k) / 2, y: o.y, w: o.w * k, h: o.h,
+      angleRange: [270, 90], fill: { color: mix(ORANGE, YELLOW, (1 + k) / 2) }, line: NOLINE,
+    });
+  }
+  for (let i = steps; i >= 1; i--) {
+    const k = i / steps;
+    s.addShape('pie', {
+      x: o.x + o.w * (1 - k) / 2, y: o.y, w: o.w * k, h: o.h,
+      angleRange: [90, 270], fill: { color: mix(ORANGE, YELLOW, (1 - k) / 2) }, line: NOLINE,
+    });
+  }
+}
+
+/** Full-bleed diagonal accent gradient: orange bottom-left -> yellow top-right. */
+function gradientBackground(s) {
+  const steps = 60;
+  const len = Math.hypot(W, H);
+  const ang = Math.atan2(-H, W);
+  const band = len / steps;
+  for (let i = 0; i < steps; i++) {
+    const d = (i + 0.5) * band;
+    s.addShape('rect', {
+      x: Math.cos(ang) * d - band / 2, y: H + Math.sin(ang) * d - len / 2,
+      w: band * 1.06, h: len, rotate: (ang * 180) / Math.PI,
+      fill: { color: mix(ORANGE, YELLOW, 0.04 + 0.92 * ((i + 0.5) / steps)) }, line: NOLINE,
+    });
+  }
+}
+
+/**
+ * Blurred colour blob.  Concentric ellipses are stacked outside-in and each
+ * ring's alpha is picked so the accumulated coverage traces a gaussian —
+ * which is what the original artwork's soft radial blur looks like.
+ * The four tones below are sampled from that artwork.
+ */
+const GLOW_TONE = {
+  o: { color: 'FE8E57', peak: 0.68 },
+  y: { color: 'FED892', peak: 0.59 },
+  oSoft: { color: 'FF7747', peak: 0.44 },
+  yWarm: { color: 'FEE399', peak: 0.64 },
+};
+
+function glow(s, cx, cy, sx, sy, tone) {
+  const t = GLOW_TONE[tone];
+  const rings = 30;
+  let covered = 0;
+  for (let k = rings; k >= 1; k--) {
+    const f = (2.9 * k) / rings; // radius in sigmas
+    const target = t.peak * Math.exp(-(f * f) / 2);
+    const alpha = 1 - (1 - target) / (1 - covered);
+    covered = target;
+    if (alpha <= 0.004) continue;
+    s.addShape('ellipse', {
+      x: cx - sx * f, y: cy - sy * f, w: 2 * sx * f, h: 2 * sy * f,
+      fill: { color: t.color, transparency: Math.round((1 - alpha) * 100) }, line: NOLINE,
+    });
+  }
+}
+
+/** Per-slide decorative blobs: [centreX, centreY, sigmaX, sigmaY, tone]. */
+const glows = (s, list) => list.forEach((b) => glow(s, b[0], b[1], b[2], b[3], b[4]));
+
+/** Stand-in for a photograph: flat block plus a small caption. */
+function photo(s, o) {
+  const square = o.r === 0;
+  const bodyH = o.h - (o.arch || 0);
+  s.addShape(square ? 'rect' : 'roundRect', Object.assign(
+    { x: o.x, y: o.y, w: o.w, h: bodyH, fill: { color: PLACE }, line: NOLINE },
+    square ? {} : { rectRadius: o.r === undefined ? 0.14 : o.r },
+  ));
+  if (o.arch) {
+    // the source bulges the block's bottom edge downward
+    s.addShape('chord', {
+      x: o.x, y: o.y + o.h - 2.06 * o.arch, w: o.w, h: 2.06 * o.arch,
+      angleRange: [0, 180], fill: { color: PLACE }, line: NOLINE,
+    });
+  }
+  if (o.caption !== false) {
+    txt(s, '[image]', {
+      x: o.x, y: (o.cy === undefined ? o.y + o.h / 2 : o.cy) - 0.16, w: o.w, h: 0.32,
+      align: 'center', valign: 'middle', fontSize: 10, color: '8C8C8C',
+    });
+  }
+}
+
+/**
+ * The deck's card badges.  Three pictogram variants appear throughout:
+ *   'pair' — two people side by side
+ *   'star' — one person with a small star
+ *   'wave' — one person with speech waves
+ * All are built from an ellipse head plus a half-ellipse body.
+ */
+function icon(s, kind, x, y, w, h, color) {
+  const f = { color: color };
+  const bust = (bx, bw, by, bh) => s.addShape('pie', {
+    x: x + bx * w, y: y + by * h, w: bw * w, h: bh * h,
+    angleRange: [180, 360], fill: f, line: NOLINE,
+  });
+  const head2 = (hx, hy, hw, hh) => s.addShape('ellipse', {
+    x: x + hx * w, y: y + hy * h, w: hw * w, h: hh * h, fill: f, line: NOLINE,
+  });
+
+  if (kind === 'pair') {
+    head2(0.60, 0.08, 0.34, 0.34);
+    bust(0.52, 0.48, 0.44, 0.86);
+    head2(0.04, 0.00, 0.44, 0.44);
+    bust(0.00, 0.60, 0.46, 1.08);
+    return;
+  }
+  head2(0.02, 0.00, 0.48, 0.48);
+  bust(0.00, 0.66, 0.50, 1.00);
+  if (kind === 'star') {
+    s.addShape('star5', { x: x + 0.58 * w, y: y + 0.52 * h, w: 0.44 * w, h: 0.44 * h, fill: f, line: NOLINE });
+  } else {
+    // speech waves: two nested arcs to the right of the head
+    [[0.56, 0.46], [0.80, 0.66]].forEach(([sz, ox]) => s.addShape('arc', {
+      x: x + ox * w, y: y + (0.24 - sz / 2) * h, w: sz * w, h: sz * h,
+      angleRange: [305, 55], line: { color: color, width: Math.max(1.1, 9 * w) },
+    }));
+  }
+}
+
+/** Envelope glyph in the footer. */
+function mailIcon(s, x, y, color) {
+  s.addShape('rect', { x: x, y: y, w: 0.123, h: 0.089, fill: { color: color }, line: NOLINE });
+  s.addShape('triangle', {
+    x: x + 0.012, y: y + 0.012, w: 0.099, h: 0.05, flipV: true,
+    fill: { color: WHITE }, line: NOLINE,
+  });
+}
+
+/** Map pin glyph (closing slide). */
+function pinIcon(s, x, y, color) {
+  s.addShape('ellipse', { x: x, y: y, w: 0.073, h: 0.073, fill: { color: color }, line: NOLINE });
+  s.addShape('triangle', { x: x + 0.014, y: y + 0.052, w: 0.045, h: 0.066, flipV: true, fill: { color: color }, line: NOLINE });
+}
+
+/**
+ * Master furniture: brand tag top-right, e-mail bottom-left, slide number.
+ * `tone === 'light'` is the variant used over the accent background.
+ */
+function chrome(s, num, tone) {
+  const light = tone === 'light';
+  txt(s, 'Non Profit Campaign', {
+    x: 8.092, y: 0.266, w: 1.523, h: 0.222, align: 'right',
+    fontFace: FH, fontSize: 8, color: light ? WHITE : ORANGE, lineSpacingMultiple: 1.1,
+  });
+  mailIcon(s, 0.469, 5.334, light ? WHITE : YELLOW);
+  txt(s, 'mail@yourcompany.com', {
+    x: 0.575, y: 5.275, w: 1.607, h: 0.21, fontFace: FH, fontSize: 8, color: light ? WHITE : 'BFBFBF',
+  });
+  txt(s, String(num), {
+    x: 8.779, y: 5.226, w: 0.975, h: 0.215, align: 'right', fontSize: 8, color: light ? WHITE : MUTE,
+  });
+}
+
+/* ================================================================== *
+ * Europe map (slide 17) — country outlines traced from the artwork.
+ * Each entry is a closed polygon, flattened as x0,y0,x1,y1,… inches
+ * relative to the map's top-left corner.
+ * ================================================================== */
+const MAP_X = 5.416, MAP_Y = 0.748, MAP_W = 4.123, MAP_H = 4.139;
+
+const EUROPE = [
+  { color: PLACE, paths: [ // rest of Europe
+    [2.35,3.40,2.42,3.29,2.42,3.21,2.35,3.17,2.14,3.17,2.24,3.33,2.35,3.43,2.35,3.40],
+    [2.24,3.32,2.15,3.16,2.35,3.15,2.42,3.19,2.38,3.06,2.29,3.07,2.20,3.01,2.09,3.11,1.98,3.12,2.06,3.16,2.15,3.31,2.31,3.39,2.24,3.32],
+    [2.52,3.67,2.56,3.59,2.52,3.55,2.52,3.46,2.44,3.42,2.41,3.47,2.44,3.50,2.42,3.60,2.48,3.70,2.52,3.67],
+    [2.17,2.78,2.08,2.76,1.93,2.84,1.93,2.90,1.66,2.91,1.66,2.97,1.76,3.00,1.87,2.97,1.88,3.01,2.04,3.02,2.15,3.00,2.27,2.85,2.22,2.78,2.17,2.78],
+    [2.69,2.85,2.55,2.78,2.36,2.88,2.27,2.85,2.20,2.90,2.18,2.98,2.30,3.07,2.52,3.06,2.69,2.85],
+    [2.35,2.65,2.28,2.61,2.22,2.63,2.08,2.54,1.87,2.62,2.00,2.80,2.07,2.79,2.08,2.76,2.22,2.80,2.38,2.69,2.35,2.65],
+    [2.58,2.72,2.37,2.70,2.22,2.80,2.27,2.86,2.33,2.88,2.55,2.78,2.66,2.82,2.69,2.74,2.58,2.72],
+    [0.28,3.86,0.25,3.81,0.29,3.78,0.24,3.72,0.29,3.70,0.29,3.57,0.34,3.52,0.17,3.46,0.13,3.49,0.07,3.76,0.12,3.82,0.14,3.95,0.25,3.94,0.25,3.88,0.28,3.86],
+    [1.38,2.64,1.35,2.70,1.39,2.72,1.38,2.64],
+    [3.19,3.14,3.15,3.11,3.14,3.00,3.05,2.82,2.96,2.87,2.72,2.85,2.51,3.07,2.59,3.19,2.68,3.22,2.68,3.26,2.81,3.30,3.06,3.26,3.17,3.30,3.20,3.20,3.27,3.15,3.19,3.14],
+    [3.22,2.89,3.10,2.80,3.03,2.81,3.14,2.99,3.14,3.11,3.21,3.00,3.29,3.02,3.22,2.89],
+    [3.06,3.24,2.91,3.30,2.73,3.29,2.68,3.24,2.71,3.37,2.68,3.44,2.74,3.52,2.93,3.53,3.00,3.47,3.12,3.47,3.09,3.39,3.17,3.30,3.06,3.24],
+    [2.56,3.59,2.73,3.53,2.68,3.43,2.52,3.45,2.52,3.54,2.56,3.59],
+    [3.97,2.91,4.10,2.86,4.12,2.70,3.90,2.61,3.75,2.60,3.72,2.52,3.64,2.51,3.62,2.40,3.39,2.41,3.34,2.50,2.84,2.44,2.76,2.48,2.81,2.58,2.70,2.68,2.67,2.80,2.72,2.86,2.88,2.88,3.10,2.81,3.22,2.88,3.29,2.99,3.28,3.02,3.21,3.01,3.16,3.13,3.27,3.14,3.37,2.99,3.48,3.00,3.47,3.05,3.60,3.06,3.49,3.12,3.59,3.15,3.59,3.22,3.84,3.15,3.71,3.12,3.69,3.06,3.77,3.00,3.97,2.95,3.97,2.91],
+    [3.47,2.23,3.37,2.11,3.38,2.02,3.13,1.97,3.03,2.01,2.93,2.18,2.78,2.22,2.80,2.33,2.75,2.39,2.76,2.47,2.91,2.43,3.33,2.49,3.39,2.41,3.44,2.40,3.41,2.29,3.51,2.27,3.47,2.23],
+    [1.70,2.98,1.60,2.90,1.47,2.91,1.36,3.05,1.41,3.03,1.45,3.10,1.52,3.09,1.56,3.03,1.61,3.09,1.74,2.98,1.70,2.98],
+    [3.30,1.28,3.42,1.14,3.30,1.03,3.34,0.98,3.27,0.87,3.27,0.79,3.32,0.77,3.23,0.60,3.30,0.50,3.18,0.38,3.24,0.24,3.14,0.16,3.01,0.19,2.90,0.38,2.72,0.35,2.62,0.28,2.57,0.30,2.55,0.32,2.61,0.36,2.77,0.45,2.79,0.69,2.82,0.75,2.90,0.79,2.91,0.87,2.56,1.16,2.61,1.33,2.58,1.43,2.84,1.50,3.13,1.44,3.30,1.28],
+    [1.93,3.10,2.09,3.12,2.19,3.01,2.18,2.98,1.93,3.01,1.93,3.10],
+    [3.00,3.50,2.95,3.53,2.73,3.52,2.57,3.58,2.49,3.71,2.55,3.81,2.66,3.82,2.57,3.84,2.61,3.95,2.72,3.99,2.70,3.92,2.77,3.90,2.72,3.86,2.82,3.84,2.80,3.79,2.73,3.80,2.68,3.63,2.78,3.65,2.82,3.58,2.96,3.60,3.00,3.50],
+    [2.93,4.10,2.74,4.10,2.87,4.14,2.99,4.10,2.93,4.10],
+    [1.71,1.91,1.73,1.78,1.61,1.85,1.61,1.89,1.55,1.87,1.52,1.96,1.57,2.12,1.67,2.12,1.65,2.07,1.75,2.09,1.68,2.02,1.76,1.95,1.71,1.91],
+    [1.90,1.99,1.79,2.00,1.83,2.09,1.80,2.13,1.87,2.11,1.90,1.99],
+    [2.38,3.33,2.35,3.43,2.42,3.47,2.46,3.42,2.38,3.33],
+    [2.68,3.32,2.68,3.22,2.58,3.19,2.58,3.14,2.51,3.06,2.37,3.07,2.43,3.22,2.38,3.34,2.45,3.41,2.52,3.45,2.66,3.43,2.70,3.36,2.68,3.32],
+  ] },
+  { color: YELLOW, paths: [ // yellow group
+    [2.04,2.24,2.03,2.34,2.08,2.55,2.23,2.63,2.29,2.61,2.40,2.70,2.69,2.74,2.70,2.68,2.81,2.59,2.75,2.39,2.79,2.33,2.78,2.22,2.73,2.17,2.45,2.14,2.41,2.16,2.33,2.11,2.04,2.24],
+    [2.75,1.94,2.87,1.94,3.01,2.02,3.16,1.97,3.09,1.79,2.89,1.74,2.83,1.75,2.80,1.86,2.68,1.77,2.60,1.82,2.57,1.97,2.75,1.94],
+    [2.61,2.07,2.72,2.10,2.72,2.17,2.78,2.21,2.85,2.22,2.94,2.19,3.02,2.08,3.02,2.02,2.88,1.94,2.65,1.93,2.57,1.95,2.56,2.06,2.61,2.07],
+    [3.12,1.61,3.13,1.56,2.98,1.55,2.84,1.56,2.75,1.62,2.78,1.70,2.85,1.71,2.83,1.74,3.09,1.79,3.12,1.61],
+    [2.68,1.68,2.65,1.74,2.74,1.68,2.68,1.68],
+    [2.72,1.64,2.66,1.65,2.72,1.64],
+    [2.81,0.71,2.77,0.45,2.55,0.31,2.49,0.40,2.36,0.37,2.33,0.46,2.23,0.49,2.13,0.71,2.06,0.73,2.05,0.82,1.99,0.91,2.01,1.00,1.94,1.00,1.88,1.07,1.87,1.28,1.93,1.36,1.88,1.39,1.90,1.50,1.85,1.52,1.80,1.64,1.94,2.05,2.03,2.04,2.07,1.96,2.21,1.94,2.26,1.85,2.21,1.88,2.24,1.67,2.33,1.63,2.41,1.52,2.27,1.42,2.25,1.32,2.29,1.20,2.60,0.97,2.59,0.88,2.68,0.75,2.82,0.75,2.81,0.71],
+    [2.40,1.77,2.35,1.79,2.34,1.87,2.40,1.77],
+    [3.34,0.08,3.22,0.04,3.17,0.10,3.18,0.02,3.11,0.00,3.04,0.10,3.03,0.03,2.90,0.14,2.98,0.02,2.95,0.00,2.75,0.11,2.75,0.17,2.71,0.11,2.76,0.03,2.65,0.07,2.70,0.13,2.60,0.14,2.63,0.18,2.52,0.15,2.54,0.23,2.53,0.18,2.47,0.19,2.46,0.13,2.39,0.15,2.40,0.21,2.29,0.23,2.24,0.28,2.29,0.30,2.30,0.35,2.26,0.33,2.23,0.36,2.20,0.32,2.17,0.35,2.18,0.28,2.13,0.31,2.04,0.41,1.93,0.47,2.19,0.38,2.22,0.39,2.21,0.45,2.16,0.42,2.10,0.47,1.96,0.70,1.90,0.71,1.88,0.85,1.77,0.88,1.83,0.94,1.71,0.97,1.63,1.08,1.57,1.05,1.58,1.10,1.46,1.14,1.50,1.18,1.42,1.18,1.30,1.26,1.32,1.33,1.28,1.47,1.34,1.50,1.42,1.48,1.35,1.54,1.30,1.52,1.29,1.60,1.39,1.58,1.32,1.66,1.45,1.73,1.53,1.72,1.73,1.61,1.74,1.56,1.82,1.65,1.84,1.52,1.91,1.50,1.88,1.39,1.93,1.35,1.87,1.28,1.88,1.04,2.01,1.00,1.99,0.91,2.05,0.73,2.13,0.70,2.24,0.48,2.35,0.44,2.36,0.37,2.50,0.39,2.53,0.31,2.62,0.27,2.71,0.35,2.89,0.37,3.01,0.18,3.14,0.15,3.24,0.22,3.24,0.27,3.38,0.22,3.39,0.19,3.32,0.21,3.23,0.15,3.30,0.17,3.38,0.13,3.34,0.08],
+  ] },
+  { color: ORANGE, paths: [ // orange group
+    [0.34,2.08,0.23,2.10,0.19,2.19,0.24,2.21,0.27,2.17,0.33,2.22,0.38,2.18,0.34,2.08],
+    [1.02,2.39,0.95,2.33,0.89,2.35,0.83,2.17,0.72,2.03,0.60,1.99,0.69,1.79,0.52,1.79,0.60,1.65,0.55,1.69,0.44,1.69,0.37,1.83,0.31,1.81,0.38,1.87,0.34,1.93,0.38,1.97,0.32,2.03,0.38,1.99,0.39,2.04,0.43,2.04,0.45,1.98,0.43,2.12,0.58,2.10,0.56,2.16,0.61,2.20,0.61,2.28,0.50,2.28,0.47,2.35,0.51,2.40,0.42,2.46,0.63,2.50,0.48,2.56,0.43,2.66,0.57,2.60,0.98,2.53,0.93,2.50,1.02,2.39],
+    [0.27,1.78,0.33,1.72,0.27,1.78],
+    [0.75,1.52,0.78,1.43,0.74,1.46,0.75,1.52],
+    [1.50,2.77,1.27,2.69,1.25,2.64,1.21,2.66,1.05,2.53,0.99,2.64,0.89,2.67,0.86,2.73,0.71,2.69,0.72,2.81,0.58,2.78,0.46,2.81,0.48,2.87,0.64,2.92,0.77,3.05,0.72,3.35,0.87,3.42,0.92,3.39,1.13,3.43,1.13,3.37,1.17,3.34,1.36,3.38,1.49,3.30,1.41,3.17,1.46,3.12,1.45,3.08,1.41,3.03,1.38,3.05,1.48,2.90,1.53,2.77,1.50,2.77],
+    [1.64,3.37,1.58,3.43,1.60,3.52,1.64,3.48,1.64,3.37],
+    [1.13,3.43,0.92,3.39,0.87,3.42,0.72,3.34,0.20,3.30,0.09,3.36,0.13,3.48,0.30,3.47,0.34,3.52,0.29,3.56,0.28,3.69,0.24,3.72,0.29,3.85,0.24,3.92,0.37,4.03,0.69,3.97,0.86,3.79,0.85,3.69,0.94,3.57,1.12,3.50,1.13,3.43],
+    [1.13,3.69,1.06,3.72,1.11,3.73,1.13,3.69],
+    [2.07,3.85,1.88,3.88,2.08,3.98,2.12,3.85,2.07,3.85],
+    [1.59,3.57,1.53,3.60,1.57,3.78,1.66,3.74,1.66,3.59,1.59,3.57],
+    [2.18,3.53,2.05,3.45,1.98,3.32,1.88,3.24,1.93,3.01,1.87,2.95,1.74,2.98,1.68,3.04,1.62,3.04,1.61,3.09,1.56,3.03,1.52,3.09,1.45,3.09,1.45,3.14,1.40,3.18,1.45,3.26,1.49,3.27,1.47,3.31,1.59,3.24,1.67,3.27,1.77,3.42,2.13,3.67,2.15,3.86,2.25,3.74,2.22,3.65,2.35,3.65,2.18,3.53],
+    [1.22,2.49,1.36,2.56,1.38,2.47,1.45,2.41,1.42,2.37,1.47,2.33,1.46,2.27,1.33,2.30,1.31,2.35,1.25,2.33,1.18,2.48,1.12,2.51,1.22,2.49],
+    [1.08,2.54,1.22,2.66,1.26,2.63,1.32,2.71,1.39,2.62,1.29,2.49,1.08,2.54],
+    [1.44,2.33,1.40,2.37,1.44,2.41,1.37,2.47,1.36,2.56,1.39,2.72,1.53,2.77,1.49,2.92,1.93,2.90,1.93,2.85,2.01,2.78,1.92,2.72,1.87,2.62,2.09,2.52,2.02,2.34,2.04,2.23,1.96,2.19,1.98,2.14,1.79,2.23,1.79,2.17,1.57,2.12,1.62,2.23,1.56,2.27,1.44,2.26,1.44,2.33],
+    [0.33,2.22,0.27,2.17,0.24,2.21,0.19,2.19,0.23,2.09,0.15,2.10,0.17,2.17,0.03,2.18,0.03,2.26,0.09,2.32,0.01,2.46,0.10,2.49,0.33,2.41,0.33,2.22],
+  ] },
+];
+
+function drawEurope(s) {
+  EUROPE.forEach((group) => group.paths.forEach((flat) => {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (let i = 0; i < flat.length; i += 2) {
+      x0 = Math.min(x0, flat[i]); x1 = Math.max(x1, flat[i]);
+      y0 = Math.min(y0, flat[i + 1]); y1 = Math.max(y1, flat[i + 1]);
+    }
+    const pts = [];
+    for (let i = 0; i < flat.length; i += 2) pts.push({ x: flat[i] - x0, y: flat[i + 1] - y0 });
+    pts.push({ close: true });
+    s.addShape('custGeom', {
+      x: MAP_X + x0, y: MAP_Y + y0, w: Math.max(x1 - x0, 0.02), h: Math.max(y1 - y0, 0.02),
+      points: pts, fill: { color: group.color }, line: { color: WHITE, width: 0.6 },
+    });
+  }));
+}
+
+/* ================================================================== *
+ * Slide builders
+ * ================================================================== */
+
+// 1 — cover
+function slide01(s) {
+  gradientBackground(s);
+  card(s, { x: 0.617, y: 0.522, w: 8.766, h: 4.581, r: 0.22, line: ORANGE });
+  photo(s, { x: 0.777, y: 0.699, w: 8.423, h: 2.434, r: 0.12, cy: 1.916 });
+  txt(s, [
+    { text: 'Non Profit ', options: { color: ORANGE } },
+    { text: 'Campaign', options: { color: INK } },
+  ], { x: 0.899, y: 3.377, w: 6.701, h: 0.795, fontFace: FH, fontSize: 43 });
+  txt(s, 'Social Volunteer Presentation Template', { x: 1.548, y: 4.179, w: 4.289, h: 0.303, fontSize: 14 });
+  s.addShape('line', { x: 0.994, y: 4.318, w: 0.454, h: 0, line: { color: ORANGE, width: 1.5 } });
+  [['F54000', 8.265], [ORANGE, 8.593], [YELLOW, 8.92]].forEach(([c, x]) => {
+    s.addShape('ellipse', { x: x, y: 4.63, w: 0.269, h: 0.269, fill: { color: c }, line: NOLINE });
+  });
+}
+
+// 2 — introduction
+function slide02(s) {
+  glows(s, [[6.73, 3.54, 0.78, 0.78, 'o'], [5.59, 2.04, 0.66, 0.60, 'y']]);
+  chrome(s, 2);
+  photo(s, { x: 5.686, y: 1.009, w: 3.559, h: 3.557, r: 1.78 });
+  txt(s, 'Introduction', { x: 0.832, y: 1.059, w: 1.203, h: 0.252, color: MUTE2 });
+  head(s, 'The Role Nonprofits Social Development', { x: 0.832, y: 1.311, w: 4.548, h: 1.742 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris',
+    { x: 0.832, y: 3.252, w: 4.136, h: 1.105, fontSize: 12, lineSpacingMultiple: 1.3 });
+  card(s, { x: 5.726, y: 3.758, w: 3.48, h: 0.934, r: 0.156, line: ORANGE });
+  txt(s, '87%', { x: 5.939, y: 3.966, w: 0.993, h: 0.53, fontFace: FH, fontSize: 27, color: ORANGE });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. ',
+    { x: 6.995, y: 3.967, w: 2.101, h: 0.517, lineSpacingMultiple: 1.3 });
+}
+
+// 3 — gradient banner with three pill cards
+function slide03(s) {
+  glows(s, [[0.73, 1.48, 0.90, 0.95, 'o'], [2.85, 0.90, 0.54, 0.92, 'y']]);
+  chrome(s, 3);
+  gradRoundRect(s, { x: 0.810, y: 0.972, w: 9.44, h: 2.173, r: 0.217, gradW: 9.19, steps: 40, shadow: false });
+  eyebrow(s, { x: 1.235, y: 1.476, color: WHITE });
+  head(s, 'Transform Live Nonprofit Work', { x: 1.235, y: 1.752, w: 8.096, h: 0.631, color: WHITE });
+
+  [
+    { x: 1.278, line: ORANGE, lx: 1.998, lw: 1.628, ik: 'star', ix: 1.506, iy: 2.951, iw: 0.289, ih: 0.338, ic: ORANGE, tx: 1.363, tw: 2.204 },
+    { x: 3.975, line: YELLOW, lx: 4.614, lw: 1.661, ik: 'pair', ix: 4.206, iy: 2.980, iw: 0.313, ih: 0.297, ic: YELLOW, tx: 4.202, tw: 2.098 },
+    { x: 6.672, line: ORANGE, lx: 7.408, lw: 1.597, ik: 'wave', ix: 6.921, iy: 2.976, iw: 0.316, ih: 0.305, ic: ORANGE, tx: 6.949, tw: 2.101 },
+  ].forEach((c) => {
+    card(s, { x: c.x, y: 2.775, w: 2.478, h: 0.706, r: 0.118, line: c.line });
+    txt(s, 'Subtitle Here', { x: c.lx, y: 2.977, w: c.lw, h: 0.303, fontFace: FH, fontSize: 14, color: INK });
+    icon(s, c.ik, c.ix, c.iy, c.iw, c.ih, c.ic);
+    txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor',
+      { x: c.tx, y: 3.653, w: c.tw, h: 0.745, lineSpacingMultiple: 1.3 });
+  });
+}
+
+// 4 — impact figures
+function slide04(s) {
+  glows(s, [[5.69, 3.39, 0.90, 0.87, 'o'], [4.95, 1.40, 0.86, 0.55, 'y']]);
+  chrome(s, 4);
+  photo(s, { x: 5.126, y: 1.188, w: 5.1, h: 3.25, r: 0.2, cy: 2.813 });
+  eyebrow(s, { x: 0.469, y: 1.099 });
+  head(s, 'Impact for Nonprofit Social', { x: 0.469, y: 1.374, w: 4.572, h: 1.287, fontSize: 36 });
+
+  [
+    { x: 0.469, line: YELLOW, nx: 0.603, tx: 0.660, value: '305+' },
+    { x: 2.295, line: ORANGE, nx: 2.417, tx: 2.474, value: '62M' },
+  ].forEach((c) => {
+    card(s, { x: c.x, y: 3.045, w: 1.544, h: 1.085, r: 0.181, line: c.line });
+    txt(s, c.value, { x: c.nx, y: 3.232, w: 1.299, h: 0.48, align: 'center', fontFace: FH, fontSize: 24, color: INK2 });
+    txt(s, 'Sample text', { x: c.tx, y: 3.717, w: 1.186, h: 0.286, align: 'center', lineSpacingMultiple: 1.3 });
+  });
+
+  gradRoundRect(s, { x: 4.128, y: 2.948, w: 1.82, h: 1.279, r: 0.213 });
+  txt(s, '800B', { x: 4.321, y: 3.198, w: 1.433, h: 0.581, align: 'center', fontFace: FH, fontSize: 30, color: WHITE });
+  txt(s, 'Sample text', { x: 4.444, y: 3.777, w: 1.186, h: 0.285, align: 'center', color: WHITE, lineSpacingMultiple: 1.3 });
+}
+
+// 5 — two numbered blocks over the accent background
+function slide05(s) {
+  gradientBackground(s);
+  chrome(s, 5, 'light');
+  photo(s, { x: 0.938, y: 0.939, w: 3.931, h: 1.807, r: 0.19 });
+  photo(s, { x: 5.198, y: 2.927, w: 3.931, h: 1.759, r: 0.2 });
+
+  txt(s, '01', { x: 5.356, y: 0.985, w: 1.422, h: 0.429, fontFace: FH, fontSize: 21, color: WHITE });
+  s.addShape('line', { x: 5.401, y: 1.583, w: 3.749, h: 0, line: { color: WHITE, width: 1, transparency: 36 } });
+  txt(s, 'Now Is the Time to Act', { x: 5.316, y: 1.703, w: 3.971, h: 0.429, fontFace: FH, fontSize: 21, color: WHITE });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing',
+    { x: 5.316, y: 2.176, w: 3.931, h: 0.261, color: WHITE, lineSpacingMultiple: 1.2 });
+
+  txt(s, '02', { x: 3.216, y: 3.090, w: 1.422, h: 0.429, align: 'right', fontFace: FH, fontSize: 21, color: WHITE });
+  s.addShape('line', { x: 1.092, y: 3.633, w: 3.492, h: 0, line: { color: WHITE, width: 1, transparency: 36 } });
+  txt(s, 'Speak Up, Stand Strong', { x: 0.872, y: 3.826, w: 3.827, h: 0.429, align: 'right', fontFace: FH, fontSize: 21, color: WHITE });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing',
+    { x: 0.768, y: 4.295, w: 3.931, h: 0.261, align: 'right', color: WHITE, lineSpacingMultiple: 1.2 });
+
+  card(s, { x: 0.613, y: 0.755, w: 0.648, h: 0.647, r: 0.324, line: YELLOW });
+  icon(s, 'pair', 0.781, 0.930, 0.313, 0.297, YELLOW);
+  card(s, { x: 8.739, y: 2.748, w: 0.648, h: 0.647, r: 0.324, line: ORANGE });
+  icon(s, 'wave', 8.934, 2.948, 0.257, 0.248, ORANGE);
+}
+
+// 6 — half-bleed image with two feature cards
+function slide06(s) {
+  glows(s, [[9.40, 5.28, 1.07, 0.96, 'o'], [9.78, 2.93, 1.05, 0.54, 'y']]);
+  chrome(s, 6);
+  photo(s, { x: -0.25, y: -0.25, w: 5.719, h: 4.708, r: 0.24, cy: 2.229 });
+  eyebrow(s, { x: 5.978, y: 0.845 });
+  head(s, 'Helping the Nonprofit', { x: 5.978, y: 1.120, w: 3.231, h: 1.287, fontSize: 36 });
+
+  gradRoundRect(s, { x: 2.744, y: 2.858, w: 3.515, h: 2.011, r: 0.194 });
+  s.addShape('ellipse', { x: 3.105, y: 3.133, w: 0.545, h: 0.514, fill: { color: WHITE }, line: NOLINE });
+  icon(s, 'wave', 3.249, 3.266, 0.257, 0.248, ORANGE);
+  txt(s, 'Insert Subtitle Text Here', { x: 3.035, y: 3.755, w: 2.894, h: 0.33, fontFace: FH, fontSize: 14, color: WHITE, lineSpacingMultiple: 1.2 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit elit dolor ode sitto',
+    { x: 3.035, y: 4.096, w: 3.127, h: 0.483, color: WHITE, lineSpacingMultiple: 1.2 });
+
+  card(s, { x: 6.417, y: 2.858, w: 3.0, h: 2.011, r: 0.219, line: ORANGE });
+  gradEllipse(s, { x: 6.698, y: 3.133, w: 0.545, h: 0.514 });
+  icon(s, 'pair', 6.837, 3.263, 0.268, 0.254, WHITE);
+  txt(s, 'Insert Subtitle Text Here', { x: 6.629, y: 3.755, w: 2.69, h: 0.311, fontFace: FH, fontSize: 14, color: INK2, lineSpacingMultiple: 1.2 });
+  txt(s, 'Lorem ipsum dolor sit amet, consecte adipiscing elit dolor ode sitto',
+    { x: 6.629, y: 4.096, w: 2.789, h: 0.483, lineSpacingMultiple: 1.2 });
+}
+
+// 7 — three service cards
+function slide07(s) {
+  glows(s, [[7.64, 4.65, 0.81, 0.80, 'o'], [9.14, 3.43, 0.63, 0.68, 'y']]);
+  chrome(s, 7);
+  eyebrow(s, { x: 0.778, y: 0.939 });
+  head(s, 'Every Child Deserves a Chance', { x: 0.744, y: 1.231, w: 2.798, h: 1.742 });
+  photo(s, { x: 4.053, y: 0.827, w: 5.354, h: 2.172, r: 0.22 });
+
+  [
+    { x: 0.845, grad: false, line: YELLOW, tx: 1.013, ty: 3.645, by: 4.008, title: 'Service One', tc: INK2, bc: BODY, ik: 'pair', ix: 2.863, iy: 3.653, iw: 0.313, ih: 0.297, ic: YELLOW },
+    { x: 3.762, grad: true, line: YELLOW, tx: 3.964, ty: 3.645, by: 3.997, title: 'Service Two', tc: WHITE, bc: WHITE, ik: 'star', ix: 6.010, iy: 3.652, iw: 0.265, ih: 0.311, ic: WHITE },
+    { x: 6.698, grad: false, line: ORANGE, tx: 6.951, ty: 3.633, by: 3.986, title: 'Service Three', tc: INK2, bc: BODY, ik: 'wave', ix: 8.908, iy: 3.659, iw: 0.283, ih: 0.272, ic: ORANGE },
+  ].forEach((c) => {
+    const box = { x: c.x, y: 3.45, w: 2.7, h: 1.296, r: 0.129, line: c.line };
+    if (c.grad) gradRoundRect(s, box); else card(s, box);
+    txt(s, c.title, { x: c.tx, y: c.ty, w: 2.176, h: 0.347, fontFace: FH, fontSize: 14, color: c.tc, lineSpacingMultiple: 1.3 });
+    txt(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit',
+      { x: c.tx, y: c.by, w: 2.176, h: 0.51, color: c.bc, lineSpacingMultiple: 1.3 });
+    icon(s, c.ik, c.ix, c.iy, c.iw, c.ih, c.ic);
+  });
+}
+
+// 8 — two dated events
+function slide08(s) {
+  glows(s, [[-0.61, 1.41, 0.81, 0.81, 'o'], [0.85, -0.05, 0.67, 0.66, 'y']]);
+  chrome(s, 8);
+  txt(s, 'Subtitle Here', { x: 4.050, y: 0.593, w: 1.9, h: 0.252, align: 'center', color: MUTE });
+  head(s, 'One Act of Kindness at a Time', { x: 1.215, y: 0.840, w: 7.57, h: 0.631, align: 'center' });
+
+  [
+    { x: 1.237, tx: 1.346, px: 1.438, date: 'June 23, 2025' },
+    { x: 5.201, tx: 5.346, px: 5.401, date: 'August 24, 2025' },
+  ].forEach((c) => {
+    photo(s, { x: c.x, y: 1.772, w: 3.57, h: 2.026, r: 0.21 });
+    gradRoundRect(s, { x: c.px, y: 3.596, w: 1.651, h: 0.383, r: 0.191, steps: 22 });
+    txt(s, c.date, { x: c.px, y: 3.596, w: 1.651, h: 0.383, align: 'center', valign: 'middle', fontSize: 12, color: WHITE });
+    txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. In a commodo purus. Phasellus pulvinar felis ac ipsum',
+      { x: c.tx, y: 4.139, w: 3.48, h: 0.746, lineSpacingMultiple: 1.3 });
+  });
+}
+
+// 9 — statement slide
+function slide09(s) {
+  gradientBackground(s);
+  chrome(s, 9, 'light');
+  photo(s, { x: 5.975, y: 0, w: 4.275, h: 5.625, r: 0.3 });
+  txt(s, 'Tips and Trick', { x: 0.690, y: 1.160, w: 2.904, h: 0.358, fontSize: 15, color: WHITE, lineSpacingMultiple: 1.2 });
+  head(s, 'Because Everyone Deserves a Chance to Thrive, Not Just Survive',
+    { x: 0.690, y: 1.587, w: 4.756, h: 2.297, color: WHITE });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. In a commodo purus. Phasellus pulvinar felis ac ipsum',
+    { x: 0.690, y: 3.948, w: 4.368, h: 0.517, color: WHITE, lineSpacingMultiple: 1.3 });
+}
+
+// 10 — four numbered service cards
+function slide10(s) {
+  glows(s, [[9.91, 3.86, 0.72, 0.78, 'o'], [8.47, 5.14, 0.58, 0.67, 'y']]);
+  chrome(s, 10);
+  eyebrow(s, { x: 0.658, y: 0.640 });
+  head(s, 'Shine a Light on the Issue', { x: 0.658, y: 0.916, w: 3.329, h: 1.186 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud',
+    { x: 5.093, y: 1.136, w: 4.074, h: 0.746, lineSpacingMultiple: 1.3 });
+
+  ['Service One', 'Service Two', 'Service Three', 'Service Four'].forEach((title, i) => {
+    const x = 0.758 + i * 2.186;
+    card(s, { x: x, y: 2.422, w: 2.017, h: 2.188, r: 0.149, line: i % 2 ? YELLOW : ORANGE });
+    gradEllipse(s, { x: x + 1.255, y: 2.696, w: 0.547, h: 0.547 });
+    txt(s, '0' + (i + 1), { x: x + 1.255, y: 2.696, w: 0.547, h: 0.547, align: 'center', valign: 'middle', fontFace: FH, fontSize: 12, color: WHITE });
+    txt(s, title, { x: x + 0.213, y: 2.720, w: 1.029, h: 0.53, fontFace: FH, fontSize: 14, color: INK2 });
+    txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. In a commodo purus',
+      { x: x + 0.213, y: 3.376, w: 1.809, h: 0.976, lineSpacingMultiple: 1.3 });
+  });
+}
+
+// 11 — image mosaic
+function slide11(s) {
+  glows(s, [[4.46, 3.61, 0.86, 0.85, 'o'], [5.87, 1.94, 0.75, 0.67, 'y']]);
+  chrome(s, 11);
+  eyebrow(s, { x: 0.837, y: 1.066 });
+  head(s, 'Be the Change Wish to See', { x: 0.837, y: 1.342, w: 3.705, h: 1.186 });
+  photo(s, { x: 0.939, y: 2.990, w: 3.815, h: 1.711, r: 0.219 });
+  photo(s, { x: 4.897, y: 1.163, w: 1.932, h: 3.538, r: 0.227 });
+  photo(s, { x: 6.973, y: 1.163, w: 2.124, h: 2.206, r: 0.231 });
+  gradRoundRect(s, { x: 6.993, y: 3.538, w: 2.104, h: 1.162, r: 0.150 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. In a ',
+    { x: 7.203, y: 3.742, w: 1.753, h: 0.741, color: WHITE, lineSpacingMultiple: 1.3 });
+}
+
+// 12 — three tall picture cards
+function slide12(s) {
+  gradientBackground(s);
+  chrome(s, 12, 'light');
+  [
+    { x: 0.689, px: 0.701, tx: 0.885, r: 0.229, ik: 'pair', ix: 2.940, iy: 3.455, iw: 0.313, ih: 0.297, ic: YELLOW },
+    { x: 3.589, px: 3.583, tx: 3.786, r: 0.221, ik: 'wave', ix: 5.911, iy: 3.475, iw: 0.287, ih: 0.277, ic: ORANGE },
+    { x: 6.490, px: 6.493, tx: 6.686, r: 0.203, ik: 'star', ix: 8.792, iy: 3.459, iw: 0.265, ih: 0.311, ic: YELLOW },
+  ].forEach((c) => {
+    card(s, { x: c.x, y: 0.775, w: 2.821, h: 3.99, r: c.r, line: ORANGE });
+    photo(s, { x: c.px, y: 0.775, w: 2.818, h: 2.572, r: c.r, arch: 0.264 });
+    txt(s, 'Insert Subtitle Text Here', { x: c.tx, y: 3.746, w: 2.429, h: 0.252, fontFace: FH, fontSize: 11, color: INK2 });
+    txt(s, 'Lorem ipsum dolor sit amet, adipiscing elit. Maecenas porttitor',
+      { x: c.tx, y: 4.035, w: 2.42, h: 0.458, fontSize: 9, lineSpacingMultiple: 1.3 });
+    icon(s, c.ik, c.ix, c.iy, c.iw, c.ih, c.ic);
+  });
+}
+
+// 13 — speaker profile
+function slide13(s) {
+  glows(s, [[4.08, 4.86, 0.87, 0.89, 'o'], [6.07, 3.86, 0.61, 0.83, 'y']]);
+  chrome(s, 13);
+  photo(s, { x: 0.469, y: 0.406, w: 3.947, h: 5.4, r: 0.22, cy: 3.0 });
+  txt(s, 'Subtitle Here', { x: 4.890, y: 1.032, w: 1.338, h: 0.252 });
+  head(s, 'Mr. Axel Fanxen', { x: 4.890, y: 1.304, w: 4.623, h: 0.682, fontSize: 36 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam,.',
+    { x: 4.890, y: 2.087, w: 4.289, h: 0.746, lineSpacingMultiple: 1.3 });
+
+  card(s, { x: 4.935, y: 3.209, w: 2.066, h: 1.489, r: 0.207, line: ORANGE });
+  txt(s, 'Skill One', { x: 5.088, y: 3.574, w: 1.666, h: 0.328, fontFace: FH, fontSize: 15, color: INK2 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetuer', { x: 5.088, y: 3.897, w: 1.76, h: 0.519, lineSpacingMultiple: 1.3 });
+  icon(s, 'pair', 6.481, 3.439, 0.313, 0.297, ORANGE);
+
+  gradRoundRect(s, { x: 7.206, y: 3.209, w: 2.066, h: 1.489, r: 0.223 });
+  txt(s, 'Skill Two', { x: 7.401, y: 3.574, w: 1.666, h: 0.328, fontFace: FH, fontSize: 15, color: WHITE });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetuer', { x: 7.401, y: 3.897, w: 1.76, h: 0.519, color: WHITE, lineSpacingMultiple: 1.3 });
+  icon(s, 'star', 8.792, 3.442, 0.265, 0.311, WHITE);
+}
+
+// 14 — team grid
+function slide14(s) {
+  glows(s, [[-0.14, 2.43, 0.86, 0.88, 'o'], [1.82, 1.40, 0.61, 0.82, 'y']]);
+  chrome(s, 14);
+  txt(s, 'Subtitle Here', { x: 4.050, y: 0.593, w: 1.9, h: 0.252, align: 'center', color: MUTE });
+  head(s, 'Our Best Team Volunteer', { x: 1.215, y: 0.840, w: 7.57, h: 0.631, align: 'center' });
+
+  [
+    { name: 'John Dew', x: 1.016, px: 0.945, lx: 1.113, lw: 1.462 },
+    { name: 'Ana Post', x: 3.099, px: 3.009, lx: 3.173, lw: 1.462 },
+    { name: 'Marco Hoffman', x: 5.163, px: 5.073, lx: 5.237, lw: 1.463 },
+    { name: 'Claire Rolland', x: 7.184, px: 7.138, lx: 7.250, lw: 1.560 },
+  ].forEach((m) => {
+    photo(s, { x: m.px, y: 1.767, w: 1.896, h: 2.055, r: 0.19 });
+    txt(s, m.name, { x: m.x, y: 4.017, w: 1.72, h: 0.303, fontFace: FH, fontSize: 14, color: ORANGE });
+    s.addShape('line', { x: m.lx, y: 4.421, w: m.lw, h: 0, line: { color: MUTE, width: 1, transparency: 80 } });
+    txt(s, 'Position description.', { x: m.x, y: 4.477, w: 1.91, h: 0.286, color: INK2, lineSpacingMultiple: 1.3 });
+  });
+}
+
+// 15 — donut KPI between two images
+function slide15(s) {
+  glows(s, [[4.31, 3.58, 1.01, 1.06, 'o'], [6.75, 2.74, 0.67, 1.04, 'y']]);
+  chrome(s, 15);
+  txt(s, 'Subtitle Here', { x: 4.050, y: 0.593, w: 1.9, h: 0.252, align: 'center', color: MUTE });
+  head(s, 'Data Chart Nonprofits ', { x: 1.215, y: 0.840, w: 7.57, h: 0.682, align: 'center', fontSize: 36 });
+  gradRoundRect(s, { x: 3.386, y: 1.915, w: 3.229, h: 2.747, r: 0.279 });
+  photo(s, { x: -0.3, y: 2.056, w: 4.025, h: 2.458, r: 0.14, cy: 3.285 });
+  photo(s, { x: 6.268, y: 2.056, w: 4.032, h: 2.458, r: 0.14, cy: 3.285 });
+  s.addShape('blockArc', {
+    x: 4.410, y: 2.248, w: 1.178, h: 1.178, angleRange: [0, 359.9], arcThicknessRatio: 0.252,
+    fill: { color: WHITE, transparency: 77 }, line: NOLINE,
+  });
+  s.addShape('blockArc', {
+    x: 4.410, y: 2.248, w: 1.178, h: 1.178, angleRange: [270, 190], arcThicknessRatio: 0.252,
+    fill: { color: WHITE }, line: NOLINE,
+  });
+  txt(s, [
+    { text: '78', options: { fontSize: 24 } },
+    { text: '%', options: { fontSize: 21, superscript: true } },
+  ], { x: 4.586, y: 2.597, w: 0.826, h: 0.48, align: 'center', valign: 'middle', fontFace: FH, color: WHITE });
+  txt(s, 'Insert Text Here', { x: 3.696, y: 3.575, w: 2.608, h: 0.303, align: 'center', fontFace: FH, fontSize: 14, color: WHITE });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit.',
+    { x: 3.606, y: 3.862, w: 2.787, h: 0.517, align: 'center', color: WHITE, lineSpacingMultiple: 1.3 });
+}
+
+// 16 — three-step timeline
+function slide16(s) {
+  glows(s, [[0.61, 5.05, 0.94, 0.99, 'o'], [2.94, 4.43, 0.60, 0.97, 'y']]);
+  chrome(s, 16);
+  eyebrow(s, { x: 0.522, y: 0.441 });
+  head(s, 'Progress for Nonprofit', { x: 0.522, y: 0.726, w: 3.416, h: 1.287, fontSize: 36, lineSpacingMultiple: 1.0 });
+  txt(s, 'Lorem ipsum dolor sit amet, consect adipiscing elit. In a commodo purus. ',
+    { x: 0.522, y: 2.078, w: 3.416, h: 0.517, lineSpacingMultiple: 1.3 });
+
+  s.addShape('arc', {
+    x: 4.292, y: 1.663, w: 1.532, h: 1.532, angleRange: [166, 300],
+    line: { color: MUTE2, width: 0.75, dashType: 'dash', endArrowType: 'triangle' },
+  });
+  s.addShape('arc', {
+    x: 6.299, y: 3.009, w: 1.532, h: 1.532, angleRange: [342, 234],
+    line: { color: MUTE2, width: 0.75, dashType: 'dash', endArrowType: 'triangle' },
+  });
+
+  [
+    { x: 3.007, y: 2.891, r: 0.219, year: '2023', grad: false, line: ORANGE, yc: ORANGE, tc: INK2, bc: BODY, rule: MUTE2, rt: 49, ik: 'star', ix: 4.431, iy: 3.110, iw: 0.265, ih: 0.311, ic: ORANGE },
+    { x: 5.186, y: 2.021, r: 0.211, year: '2024', grad: false, line: YELLOW, yc: ORANGE, tc: INK2, bc: BODY, rule: MUTE2, rt: 49, ik: 'pair', ix: 6.567, iy: 2.252, iw: 0.313, ih: 0.297, ic: YELLOW },
+    { x: 7.387, y: 1.114, r: 0.220, year: '2025', grad: true, line: null, yc: WHITE, tc: WHITE, bc: WHITE, rule: WHITE, rt: 11, ik: 'wave', ix: 8.754, iy: 1.365, iw: 0.287, ih: 0.277, ic: WHITE },
+  ].forEach((c) => {
+    const box = { x: c.x, y: c.y, w: 1.931, h: 2.106, r: c.r, line: c.line };
+    if (c.grad) gradRoundRect(s, box); else card(s, box);
+    txt(s, c.year, { x: c.x + 0.176, y: c.y + 0.360, w: 1.465, h: 0.364, fontFace: FH, fontSize: 18, color: c.yc, lineSpacingMultiple: 0.95 });
+    s.addShape('line', {
+      x: c.x + 0.260, y: c.y + 0.830, w: 1.4, h: 0,
+      line: { color: c.rule, width: 0.75, dashType: 'dash', transparency: c.rt },
+    });
+    txt(s, 'Your Text Here', { x: c.x + 0.176, y: c.y + 0.937, w: 1.468, h: 0.268, fontFace: FH, fontSize: 12, color: c.tc, lineSpacingMultiple: 0.95 });
+    txt(s, 'Lorem ipsum dolor sit amet, consectetu', { x: c.x + 0.176, y: c.y + 1.214, w: 1.676, h: 0.502, color: c.bc, lineSpacingMultiple: 1.3 });
+    icon(s, c.ik, c.ix, c.iy, c.iw, c.ih, c.ic);
+  });
+}
+
+// 17 — Europe map + double donut
+function slide17(s) {
+  glows(s, [[1.87, 3.76, 0.83, 0.86, 'o'], [3.86, 2.90, 0.57, 0.80, 'y']]);
+  chrome(s, 17);
+  eyebrow(s, { x: 0.707, y: 0.663 });
+  head(s, 'Analyze at Europe Country', { x: 0.707, y: 0.947, w: 4.296, h: 1.287, fontSize: 36, lineSpacingMultiple: 1.0 });
+  drawEurope(s);
+
+  card(s, { x: 0.673, y: 2.565, w: 4.267, h: 2.1, r: 0.131, line: YELLOW });
+  s.addShape('blockArc', {
+    x: 1.025, y: 2.794, w: 1.624, h: 1.624, angleRange: [90, 266], arcThicknessRatio: 0.398,
+    fill: { color: YELLOW }, line: NOLINE,
+  });
+  s.addShape('blockArc', {
+    x: 1.025, y: 2.794, w: 1.624, h: 1.624, angleRange: [266, 86], arcThicknessRatio: 0.398,
+    fill: { color: ORANGE }, line: NOLINE,
+  });
+  icon(s, 'pair', 1.633, 3.412, 0.408, 0.388, INK);
+  txt(s, '90%', { x: 0.933, y: 3.555, w: 0.52, h: 0.257, align: 'center', fontSize: 9, color: WHITE, lineSpacingMultiple: 1.3 });
+  txt(s, '76%', { x: 2.222, y: 3.383, w: 0.52, h: 0.257, align: 'center', fontSize: 9, color: WHITE, lineSpacingMultiple: 1.3 });
+
+  [[2.853, 2.940, ORANGE], [3.652, 3.739, YELLOW]].forEach(([ty, dy, c]) => {
+    s.addShape('ellipse', { x: 2.891, y: dy, w: 0.13, h: 0.13, fill: { color: c }, line: NOLINE });
+    txt(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. ',
+      { x: 3.087, y: ty, w: 1.71, h: 0.746, lineSpacingMultiple: 1.3 });
+  });
+}
+
+// 18 — donation figure
+function slide18(s) {
+  glows(s, [[8.77, 3.22, 0.93, 0.95, 'o'], [6.77, 1.92, 0.69, 0.86, 'y']]);
+  chrome(s, 18);
+  eyebrow(s, { x: 0.982, y: 0.834 });
+  head(s, 'Let\u2019s go Donation', { x: 0.982, y: 1.118, w: 5.122, h: 0.682, fontSize: 36, lineSpacingMultiple: 1.0 });
+  photo(s, { x: 0.938, y: 2.128, w: 9.312, h: 2.188, r: 0.2, cy: 3.222 });
+  card(s, { x: 6.405, y: 1.329, w: 2.969, h: 2.452, r: 0.168, line: ORANGE });
+  txt(s, '$520,000', { x: 6.650, y: 1.615, w: 2.615, h: 0.555, fontFace: FH, fontSize: 30, color: ORANGE, lineSpacingMultiple: 0.95 });
+  s.addShape('line', { x: 6.754, y: 2.313, w: 2.309, h: 0, line: { color: MUTE2, width: 0.75, dashType: 'dash', transparency: 49 } });
+  txt(s, 'Your Text Here', { x: 6.650, y: 2.486, w: 1.468, h: 0.268, fontFace: FH, fontSize: 12, color: INK2, lineSpacingMultiple: 0.95 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. In a commodo purus. Phasellus pulvinar',
+    { x: 6.650, y: 2.763, w: 2.662, h: 0.746, lineSpacingMultiple: 1.3 });
+}
+
+// 19 — laptop mockup
+function slide19(s) {
+  gradientBackground(s);
+  chrome(s, 19, 'light');
+  // laptop mock-up: bezel, screen block, bottom bezel band and the angled base
+  s.addShape('roundRect', { x: 5.306, y: 0.917, w: 4.75, h: 3.569, rectRadius: 0.07, fill: { color: '141414' }, line: NOLINE });
+  photo(s, { x: 5.457, y: 1.159, w: 5.310, h: 3.324, r: 0.02, cy: 2.821 });
+  s.addShape('rect', { x: 5.306, y: 4.486, w: 4.75, h: 0.196, fill: { color: '4D4D4D' }, line: NOLINE });
+  s.addShape('custGeom', {
+    x: 4.681, y: 4.681, w: 5.375, h: 0.155,
+    points: [
+      { x: 0.625, y: 0 }, { x: 5.375, y: 0 }, { x: 5.375, y: 0.155 },
+      { x: 0.260, y: 0.155 }, { x: 0, y: 0.030 }, { close: true },
+    ],
+    fill: { color: '4A4947' }, line: NOLINE,
+  });
+
+  txt(s, 'Subtitle Here', { x: 0.700, y: 1.023, w: 1.9, h: 0.252, color: WHITE });
+  head(s, 'Expand Your Laptop Device', { x: 0.700, y: 1.307, w: 4.475, h: 1.439, fontSize: 41, color: WHITE, lineSpacingMultiple: 1.0 });
+
+  [
+    { x: 0.797, line: YELLOW, tx: 1.000, tw: 1.133, value: '125+', vc: INK2, ik: 'pair', ix: 2.669, iy: 3.342, iw: 0.313, ih: 0.297, ic: YELLOW },
+    { x: 3.485, line: ORANGE, tx: 3.700, tw: 1.283, value: '64GB', vc: ORANGE, ik: 'star', ix: 5.443, iy: 3.342, iw: 0.265, ih: 0.311, ic: ORANGE },
+  ].forEach((c) => {
+    card(s, { x: c.x, y: 3.109, w: 2.465, h: 1.254, r: 0.209, line: c.line });
+    txt(s, c.value, { x: c.tx, y: 3.291, w: c.tw, h: 0.53, fontFace: FH, fontSize: 27, color: c.vc, lineSpacingMultiple: 1.0 });
+    txt(s, 'Lorem ipsum dolor sit amet, ', { x: c.tx, y: 3.819, w: 2.125, h: 0.286, lineSpacingMultiple: 1.3 });
+    icon(s, c.ik, c.ix, c.iy, c.iw, c.ih, c.ic);
+  });
+}
+
+// 20 — closing
+function slide20(s) {
+  txt(s, '[image]', { x: 0, y: 2.65, w: W, h: 0.32, align: 'center', valign: 'middle', fontSize: 10, color: 'DCDCDC' });
+  glows(s, [[0.23, 0.19, 0.69, 0.76, 'oSoft'], [9.73, 5.21, 0.74, 0.77, 'yWarm']]);
+  txt(s, 'Non Profit Campaign', {
+    x: 8.092, y: 0.266, w: 1.523, h: 0.222, align: 'right', fontFace: FH, fontSize: 8, color: ORANGE, lineSpacingMultiple: 1.1,
+  });
+  txt(s, [
+    { text: 'Thank you for ', options: { color: '0C0C0C' } },
+    { text: 'caring about us!', options: { color: ORANGE } },
+  ], { x: 1.187, y: 1.433, w: 7.627, h: 2.095, align: 'center', fontFace: FH, fontSize: 60, lineSpacingMultiple: 1.0 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. In a commodo purus. Phasellus pulvinar felis ac ipsum consectetur.',
+    { x: 1.933, y: 3.619, w: 6.133, h: 0.517, align: 'center', color: INK2, lineSpacingMultiple: 1.3 });
+
+  mailIcon(s, 0.469, 5.334, ORANGE);
+  txt(s, 'mail@yourcompany.com', { x: 0.575, y: 5.275, w: 1.607, h: 0.21, fontFace: FH, fontSize: 8, color: BODY });
+  pinIcon(s, 2.192, 5.322, ORANGE);
+  txt(s, '331 Street, Los Angeles, US', { x: 2.256, y: 5.275, w: 1.713, h: 0.21, fontFace: FH, fontSize: 8, color: BODY });
+}
+
+/* ================================================================== *
+ * Build
+ * ================================================================== */
+const SLIDES = [
+  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
+  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
+];
+
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'DECK_16x9', width: W, height: H });
+pptx.layout = 'DECK_16x9';
+pptx.author = 'Non Profit Campaign';
+pptx.title = 'Non Profit Campaign';
+
+SLIDES.forEach((build) => build(pptx.addSlide()));
+
+pptx.writeFile({ fileName: path.join(__dirname, '07c9ef40-71eb-4a50-bf05-a6bec03a4da1_grok_final.pptx') })
+  .then((f) => console.log('wrote', f));
