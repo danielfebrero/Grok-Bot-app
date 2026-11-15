@@ -1,0 +1,360 @@
+import {
+  BOX_BROWSER_GPU_MODES,
+  BOX_BROWSER_PERSONA_BUCKETS,
+  BOX_BROWSER_WEBGL_BACKEND_CLASSES,
+  BOX_BROWSER_WEBGL_VERDICTS,
+  SAND_BOX_CDP_PORT_BASE,
+} from "./box-contract.generated.mjs";
+
+/*
+The coherent profile claims only what the launched browser backs. Stock
+Chrome on the GPU-less box renders WebGL on SwiftShader, on Mesa llvmpipe, or
+not at all, and no real GPU's limits, extensions, and rendered pixels can be
+reproduced from outside the browser in software, so WebGL is left exactly as
+box-chrome launched it. Every other claim is a CDP override sent to each page, frame,
+and worker target, so no realm runs injected code
+(https://chromedevtools.github.io/devtools-protocol/tot/Emulation/#method-setHardwareConcurrencyOverride).
+*/
+const COHERENT_WEBGL_BY_GPU_MODE = Object.freeze({
+  swiftshader: "swiftshader",
+  "angle-gl": "none",
+  stock: "none",
+  llvmpipe: "angle-opengl",
+  legacy: "unverified",
+  unknown: "unverified",
+});
+
+export function normalizeGpuMode(value) {
+  const mode = String(value ?? "").trim();
+  return BOX_BROWSER_GPU_MODES.includes(mode) ? mode : "unknown";
+}
+
+export function coherentHardwareProfile(gpuMode, persona = null) {
+  const mode = normalizeGpuMode(gpuMode);
+  return Object.freeze({
+    gpuMode: mode,
+    navigatorPlatform: "Linux x86_64",
+    hardwareConcurrency: persona?.hardwareConcurrency ?? 8,
+    webgl: COHERENT_WEBGL_BY_GPU_MODE[mode],
+  });
+}
+
+const DEVICE_SEED_RE = /^[0-9a-f]{64}$/;
+const PERSONA_HARDWARE_CONCURRENCY = Object.freeze([4, 6, 8, 12, 16]);
+
+export function parseDeviceSeed(raw) {
+  const seed = String(raw ?? "").trim();
+  return DEVICE_SEED_RE.test(seed) ? seed : null;
+}
+
+export function devicePersonaFromSeed(seed, { coreCount }) {
+  const draw = Number.parseInt(seed.slice(0, 8), 16);
+  const pick = PERSONA_HARDWARE_CONCURRENCY[draw % PERSONA_HARDWARE_CONCURRENCY.length];
+  if (pick <= coreCount) return Object.freeze({ hardwareConcurrency: pick });
+  const fitting = PERSONA_HARDWARE_CONCURRENCY.filter((count) => count <= coreCount);
+  if (fitting.length === 0) return Object.freeze({ hardwareConcurrency: coreCount });
+  const fallbackDraw = Number.parseInt(seed.slice(8, 16), 16);
+  return Object.freeze({ hardwareConcurrency: fitting[fallbackDraw % fitting.length] });
+}
+
+export function cpuCountFromAllowedList(list) {
+  let count = 0;
+  for (const range of String(list ?? "")
+    .trim()
+    .split(",")) {
+    const match = /^(\d+)(?:-(\d+))?$/.exec(range);
+    if (match == null) return null;
+    const first = Number(match[1]);
+    const last = match[2] === undefined ? first : Number(match[2]);
+    if (last < first) return null;
+    count += last - first + 1;
+  }
+  return count > 0 ? count : null;
+}
+
+const ANGLE_BACKEND_RE = /\bangle=([a-z0-9-]+)/;
+
+function webglStatusOff(status) {
+  return /^(?:disabled|unavailable)_off/.test(status);
+}
+
+export function observedWebglFromGpuInfo(gpu) {
+  const status = gpu?.featureStatus?.webgl;
+  if (typeof status !== "string") return "unknown";
+  if (webglStatusOff(status)) return "none";
+  const parts = gpu?.auxAttributes?.glImplementationParts;
+  const backend = typeof parts === "string" ? ANGLE_BACKEND_RE.exec(parts)?.[1] : undefined;
+  if (backend === "swiftshader") return "swiftshader";
+  return backend == null ? "unknown" : `angle-${backend}`;
+}
+
+export function verifyCoherentWebgl(profile, gpu) {
+  const observed = observedWebglFromGpuInfo(gpu);
+  if (profile.webgl === "unverified" || observed === "unknown") {
+    return { claimed: profile.webgl, observed, verdict: "unverified" };
+  }
+  return {
+    claimed: profile.webgl,
+    observed,
+    verdict: observed === profile.webgl ? "match" : "mismatch",
+  };
+}
+
+export function personaBucketFromSeed(seed) {
+  return Number.parseInt(seed.slice(-8), 16) % BOX_BROWSER_PERSONA_BUCKETS;
+}
+
+function closedClass(value, allowed, fallback) {
+  return allowed.includes(value) ? value : fallback;
+}
+
+export function webglBackendClass(observed) {
+  return closedClass(observed, BOX_BROWSER_WEBGL_BACKEND_CLASSES, "angle-other");
+}
+
+export function webglRendererFromGpuInfo(gpu) {
+  const status = gpu?.featureStatus?.webgl;
+  if (typeof status === "string" && webglStatusOff(status)) return "none";
+  const renderer = [
+    gpu?.auxAttributes?.glRenderer,
+    ...(Array.isArray(gpu?.devices) ? gpu.devices.map((device) => device?.deviceString) : []),
+  ].find((value) => typeof value === "string" && value.trim() !== "");
+  if (renderer === undefined) return "unknown";
+  if (/swiftshader/i.test(renderer)) return "swiftshader";
+  if (/llvmpipe/i.test(renderer)) return "llvmpipe";
+  if (/softpipe|lavapipe/i.test(renderer)) return "other_software";
+  return "other";
+}
+
+export function displayFromCdpPort(port) {
+  const display = port - SAND_BOX_CDP_PORT_BASE;
+  return display >= 1 && display <= 256 ? display : 0;
+}
+
+export function chromeFingerprintRow({
+  port,
+  profile,
+  check,
+  gpu,
+  personaSeed,
+  acceptLanguageList,
+}) {
+  return {
+    kind: "chrome_fingerprint",
+    display: displayFromCdpPort(port),
+    gpuMode: profile.gpuMode,
+    webglBackend: webglBackendClass(check.observed),
+    webglRenderer: webglRendererFromGpuInfo(gpu),
+    webglVerdict: closedClass(check.verdict, BOX_BROWSER_WEBGL_VERDICTS, "unverified"),
+    hardwareConcurrency: profile.hardwareConcurrency,
+    acceptLanguage: acceptLanguageClass(acceptLanguageList),
+    ...(personaSeed == null
+      ? { persona: false }
+      : { persona: true, personaBucket: personaBucketFromSeed(personaSeed) }),
+  };
+}
+
+const FLEET_ACCEPT_LANGUAGE = "en-US,en-GB,en";
+
+export function acceptLanguageClass(list) {
+  if (list == null) return "chrome_default";
+  if (list === FLEET_ACCEPT_LANGUAGE) return "fleet_default";
+  const english = String(list ?? "")
+    .split(",")
+    .map((tag) => tag.split("-")[0].toLowerCase() === "en");
+  if (english.every(Boolean)) return "en_only";
+  return english[0] ? "en_mixed" : "non_en_first";
+}
+
+// Chromium seeds the GREASE brand, its version, and the brand order with the major version (https://chromium.googlesource.com/chromium/src/+/refs/tags/154.0.8037.57/components/embedder_support/user_agent_utils.cc).
+const GREASE_CHARS = [" ", "(", ":", "-", ".", "/", ")", ";", "=", "?", "_"];
+const GREASE_VERSIONS = ["8", "99", "24"];
+const BRAND_ORDERS = [
+  [0, 1, 2],
+  [0, 2, 1],
+  [1, 0, 2],
+  [1, 2, 0],
+  [2, 0, 1],
+  [2, 1, 0],
+];
+
+export function chromeProductFromUserAgentProduct(product) {
+  const m = /Chrome\/(\d+)\.(\d+)\.(\d+)\.(\d+)/.exec(product ?? "");
+  if (m == null) return { major: "0", full: "0.0.0.0" };
+  return { major: m[1], full: `${m[1]}.${m[2]}.${m[3]}.${m[4]}` };
+}
+
+export function greaseBrandVersion(major) {
+  const seed = Number.parseInt(major, 10);
+  const brand = `Not${GREASE_CHARS[seed % GREASE_CHARS.length]}A${GREASE_CHARS[(seed + 1) % GREASE_CHARS.length]}Brand`;
+  const short = GREASE_VERSIONS[seed % GREASE_VERSIONS.length];
+  return { brand, short, full: `${short}.0.0.0` };
+}
+
+function shuffleBrands(major, entries) {
+  const order = BRAND_ORDERS[Number.parseInt(major, 10) % BRAND_ORDERS.length];
+  const shuffled = new Array(entries.length);
+  for (let i = 0; i < order.length; i++) shuffled[order[i]] = entries[i];
+  return shuffled;
+}
+
+function chromeBrandList(major, full) {
+  const grease = greaseBrandVersion(major);
+  return {
+    brands: shuffleBrands(major, [
+      { brand: grease.brand, version: grease.short },
+      { brand: "Chromium", version: major },
+      { brand: "Google Chrome", version: major },
+    ]),
+    fullVersionList: shuffleBrands(major, [
+      { brand: grease.brand, version: grease.full },
+      { brand: "Chromium", version: full },
+      { brand: "Google Chrome", version: full },
+    ]),
+  };
+}
+
+function buildUserAgentMetadata(product, acceptLanguageEnUs) {
+  const { major, full } = chromeProductFromUserAgentProduct(product);
+  const { brands, fullVersionList } = chromeBrandList(major, full);
+  return {
+    brands,
+    fullVersionList,
+    fullVersion: full,
+    platform: "Linux",
+    platformVersion: "",
+    architecture: "x86",
+    model: "",
+    mobile: false,
+    bitness: "64",
+    wow64: false,
+    ...(acceptLanguageEnUs ? { formFactors: ["Desktop"] } : {}),
+  };
+}
+
+const ACCEPT_LANGUAGE_LIST_RE =
+  /^[A-Za-z]{1,8}(?:-[A-Za-z0-9]{1,8})*(?:,[A-Za-z]{1,8}(?:-[A-Za-z0-9]{1,8})*)*$/;
+
+export function configuredAcceptLanguage(value) {
+  return typeof value === "string" && value.length <= 128 && ACCEPT_LANGUAGE_LIST_RE.test(value)
+    ? value
+    : FLEET_ACCEPT_LANGUAGE;
+}
+
+function overrideAcceptLanguage(acceptLanguageEnUs, acceptLanguage, fromChrome, overridden) {
+  if (!acceptLanguageEnUs) return { acceptLanguage: "en-US,en" };
+  if (fromChrome) return overridden ? { acceptLanguage: "" } : {};
+  return { acceptLanguage: configuredAcceptLanguage(acceptLanguage) };
+}
+
+export function buildUserAgentOverride(
+  product,
+  {
+    acceptLanguageEnUs = false,
+    acceptLanguage = "",
+    acceptLanguageFromChrome = false,
+    acceptLanguageOverridden = false,
+  } = {},
+) {
+  const { major } = chromeProductFromUserAgentProduct(product);
+  return {
+    userAgent: `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${major}.0.0.0 Safari/537.36`,
+    ...overrideAcceptLanguage(
+      acceptLanguageEnUs,
+      acceptLanguage,
+      acceptLanguageFromChrome,
+      acceptLanguageOverridden,
+    ),
+    platform: "Linux x86_64",
+    userAgentMetadata: buildUserAgentMetadata(product, acceptLanguageEnUs),
+  };
+}
+
+// https://chromium.googlesource.com/chromium/src/+/refs/tags/156.0.8078.47/net/http/http_util.cc
+export function nativeAcceptLanguageHeader(list) {
+  const tags = configuredAcceptLanguage(list).split(",");
+  const baseOf = (tag) => tag.split("-")[0];
+  const expanded = [];
+  tags.forEach((tag, index) => {
+    const base = baseOf(tag);
+    const withBase =
+      base === "x" || base === "i" || baseOf(tags[index + 1] ?? "") === base ? [tag] : [tag, base];
+    for (const entry of withBase) if (!expanded.includes(entry)) expanded.push(entry);
+  });
+  return expanded
+    .map((tag, index) => (index === 0 ? tag : `${tag};q=0.${Math.max(10 - index, 1)}`))
+    .join(",");
+}
+
+export const ACCEPT_LANGUAGE_EXTENSION_NAME = "Sand Accept-Language";
+
+const DNR_RESOURCE_TYPES = Object.freeze([
+  "main_frame",
+  "sub_frame",
+  "stylesheet",
+  "script",
+  "image",
+  "font",
+  "object",
+  "xmlhttprequest",
+  "ping",
+  "csp_report",
+  "media",
+  "websocket",
+  "webtransport",
+  "webbundle",
+  "other",
+]);
+
+const REGULAR_TAB_ALLOW_WORKER = `let queue = Promise.resolve();
+function sync() {
+  queue = queue
+    .then(async () => {
+      const tabs = await chrome.tabs.query({});
+      const regular = tabs.filter((tab) => !tab.incognito && tab.id >= 0).map((tab) => tab.id);
+      await chrome.declarativeNetRequest.updateSessionRules({
+        removeRuleIds: [2],
+        addRules: regular.length === 0 ? [] : [{ id: 2, priority: 2, action: { type: "allow" }, condition: { tabIds: regular, resourceTypes: ${JSON.stringify(DNR_RESOURCE_TYPES)} } }],
+      });
+    })
+    .catch(() => {});
+}
+chrome.tabs.onCreated.addListener(sync);
+chrome.tabs.onRemoved.addListener(sync);
+chrome.tabs.onReplaced.addListener(sync);
+sync();
+`;
+
+// https://developer.chrome.com/docs/extensions/reference/api/declarativeNetRequest#rules
+export function buildAcceptLanguageExtension(list) {
+  const manifest = {
+    manifest_version: 3,
+    name: ACCEPT_LANGUAGE_EXTENSION_NAME,
+    version: "1",
+    incognito: "spanning",
+    permissions: ["declarativeNetRequest"],
+    host_permissions: ["<all_urls>"],
+    background: { service_worker: "worker.js" },
+    declarative_net_request: {
+      rule_resources: [{ id: "accept_language", enabled: true, path: "rules.json" }],
+    },
+  };
+  const rules = [
+    {
+      id: 1,
+      priority: 1,
+      action: {
+        type: "modifyHeaders",
+        requestHeaders: [
+          { header: "accept-language", operation: "set", value: nativeAcceptLanguageHeader(list) },
+        ],
+      },
+      condition: { resourceTypes: DNR_RESOURCE_TYPES },
+    },
+  ];
+  return {
+    "manifest.json": `${JSON.stringify(manifest)}\n`,
+    "rules.json": `${JSON.stringify(rules)}\n`,
+    "worker.js": REGULAR_TAB_ALLOW_WORKER,
+  };
+}
