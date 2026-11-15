@@ -1,0 +1,704 @@
+/**
+ * "Conference" keynote deck (17 slides, 13.333 x 7.5 in) rebuilt with pptxgenjs.
+ * Photographs in the original are replaced by flat placeholder shapes.
+ *
+ *   node 056c1a65-b8a2-459a-94f8-090ccf0950e9_grok_final.js
+ */
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ================================================================== *
+ * Theme
+ * ================================================================== */
+const C = {
+  orange: 'D75811',    // accent2 — primary brand colour
+  yellow: 'DDB717',    // accent3
+  purple: '784B9C',    // accent1
+  teal: '19525B',      // accent4
+  white: 'FFFFFF',
+  black: '000000',
+  gray: '595959',      // tx1 @ 65% luminance
+  orangeDim: 'A1420D', // accent2 @ 75% luminance — chevron under-folds
+  yellowDim: 'A68911',
+  purpleDim: '5A3875'
+};
+
+const HEAD = 'Plus Jakarta Sans SemiBold'; // theme major font
+const BODY = 'Poppins Light';              // theme minor font
+
+/**
+ * pptxgenjs mutates the shadow object it is handed, so every shape needs
+ * its own copy — these are factories, not constants.
+ */
+const shadowCard = () => ({ type: 'outer', color: C.black, opacity: 0.11, blur: 18, offset: 3, angle: 90 });
+const shadowSoft = () => ({ type: 'outer', color: C.black, opacity: 0.1, blur: 30, offset: 3, angle: 90 });
+const shadowWide = () => ({ type: 'outer', color: C.black, opacity: 0.25, blur: 50, offset: 19, angle: 90 });
+const shadowFaint = () => ({ type: 'outer', color: C.black, opacity: 0.04, blur: 15, offset: 3, angle: 90 });
+const shadowDrop = () => ({ type: 'outer', color: C.black, opacity: 0.14, blur: 45, offset: 31, angle: 45 });
+
+/**
+ * pptxgenjs writes `adj = rectRadius / width`, while PowerPoint scales that
+ * adjust value by the *shorter* side. This converts a radius in inches.
+ */
+const corner = (w, h, r) => (r / Math.min(w, h)) * w;
+
+/* Filler copy reused across the deck. */
+const L1 = 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. ';
+const L2 = 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula';
+const L3 = 'Lorem ipsum dolor sit amet, consectetuer';
+const L4 = 'Lorem ipsum dolor sit amet  sed do eiusmod tempor incididunt ut';
+const L5 = 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo et ligula eget dolor. Aenean massa. Cum sociis natoque penatibus legit cum eget ';
+const LSIT = 'Lorem sit ipsum dolor sit';
+
+/* ================================================================== *
+ * Building blocks
+ * ================================================================== */
+
+/** Body copy — reference text boxes are top anchored and auto-fit to text. */
+function text (slide, content, o) {
+  slide.addText(content, Object.assign({ fontFace: BODY, fontSize: 12, valign: 'top', autoFit: true }, o));
+}
+
+/**
+ * Section headline. Plain strings are black; a string wrapped in an array
+ * is an italic orange accent run: headline(s, ['Plain ', ['Accent'], ' more'])
+ */
+function headline (slide, parts, o) {
+  const size = (o && o.fontSize) || 32;
+  const runs = parts.map(p => {
+    const accent = Array.isArray(p);
+    return {
+      text: accent ? p[0] : p,
+      options: { fontSize: size, fontFace: HEAD, italic: accent, color: accent ? C.orange : C.black }
+    };
+  });
+  slide.addText(runs, Object.assign({ fontFace: HEAD, fontSize: size, valign: 'top', autoFit: true }, o));
+}
+
+/** Rounded button with a centred italic label. */
+function pill (slide, o) {
+  slide.addShape('roundRect', {
+    x: o.x, y: o.y, w: o.w, h: o.h, fill: { color: o.fill },
+    rectRadius: corner(o.w, o.h, 0.09107 * o.h), shadow: shadowCard()
+  });
+  slide.addText(o.label, {
+    x: o.x + 0.062, y: o.y, w: o.w - 0.123, h: o.h,
+    fontFace: HEAD, fontSize: 12, italic: true,
+    color: o.color || C.white, align: 'center', valign: 'middle'
+  });
+}
+
+/** Check-marked list line (a Wingdings tick in the original). */
+function tick (slide, o) {
+  slide.addText(o.text, {
+    x: o.x, y: o.y, w: o.w || 2.391, h: 0.345, fontFace: BODY, fontSize: 12,
+    color: o.color || C.black, valign: 'top', autoFit: true, lineSpacingMultiple: 1.3,
+    bullet: { characterCode: '2713', indent: 13.5 }
+  });
+}
+
+/* ---- line-art icon stand-ins ------------------------------------- */
+
+/** Ticked checkbox (slide 7 bullets). */
+function iconCheck (slide, x, y, s) {
+  slide.addShape('roundRect', { x, y, w: s, h: s, fill: { type: 'none' }, line: { color: C.black, width: 1.25 }, rectRadius: corner(s, s, s * 0.16) });
+  slide.addText('✓', { x, y, w: s, h: s, fontFace: BODY, fontSize: 13, bold: true, align: 'center', valign: 'middle' });
+}
+
+/** Bullseye / target (slide 10 step markers). */
+function iconTarget (slide, x, y, s, color) {
+  slide.addShape('ellipse', { x, y, w: s, h: s, fill: { type: 'none' }, line: { color, width: 1.6 } });
+  slide.addShape('ellipse', { x: x + s * 0.29, y: y + s * 0.29, w: s * 0.42, h: s * 0.42, fill: { type: 'none' }, line: { color, width: 1.6 } });
+  slide.addShape('ellipse', { x: x + s * 0.43, y: y + s * 0.43, w: s * 0.14, h: s * 0.14, fill: { color } });
+  slide.addShape('line', { x: x + s * 0.5, y: y + s * 0.5, w: s * 0.42, h: s * 0.42, flipV: true, line: { color, width: 1.6 } });
+}
+
+/** Interlocked-knot mark (slide 4 card badge, slide 17 last icon). */
+function iconKnot (slide, x, y, s, color) {
+  slide.addShape('ellipse', { x: x + s * 0.2, y: y + s * 0.2, w: s * 0.6, h: s * 0.6, fill: { type: 'none' }, line: { color, width: 1.1 } });
+  [[0, 0], [0.66, 0], [0, 0.66], [0.66, 0.66]].forEach(p => {
+    slide.addShape('roundRect', {
+      x: x + p[0] * s, y: y + p[1] * s, w: s * 0.34, h: s * 0.34, rotate: 45,
+      fill: { type: 'none' }, line: { color, width: 1.1 }, rectRadius: corner(s * 0.34, s * 0.34, s * 0.06)
+    });
+  });
+}
+
+/** Video-call grid on a monitor (slide 17, first icon). */
+function iconMonitor (slide, x, y, s) {
+  slide.addShape('roundRect', { x, y: y + s * 0.06, w: s, h: s * 0.72, fill: { type: 'none' }, line: { color: C.black, width: 1.1 }, rectRadius: corner(s, s * 0.72, s * 0.06) });
+  [[0.12, 0.16], [0.55, 0.16], [0.12, 0.45], [0.55, 0.45]].forEach(p => {
+    slide.addShape('rect', { x: x + p[0] * s, y: y + p[1] * s, w: s * 0.33, h: s * 0.22, fill: { type: 'none' }, line: { color: C.black, width: 0.9 } });
+  });
+  slide.addShape('line', { x: x + s * 0.5, y: y + s * 0.78, w: 0, h: s * 0.12, line: { color: C.black, width: 1.1 } });
+  slide.addShape('line', { x: x + s * 0.25, y: y + s * 0.9, w: s * 0.5, h: 0, line: { color: C.black, width: 1.1 } });
+}
+
+/** Brain wired to circuit nodes (slide 17, second icon). */
+function iconBrain (slide, x, y, s) {
+  slide.addShape('ellipse', { x, y: y + s * 0.14, w: s * 0.6, h: s * 0.7, fill: { type: 'none' }, line: { color: C.black, width: 1.1 } });
+  [0.24, 0.46, 0.68].forEach(fy => {
+    slide.addShape('line', { x: x + s * 0.55, y: y + s * fy, w: s * 0.3, h: 0, line: { color: C.black, width: 0.9 } });
+    slide.addShape('ellipse', { x: x + s * 0.85, y: y + s * (fy - 0.05), w: s * 0.1, h: s * 0.1, fill: { color: C.black } });
+  });
+}
+
+/** Stacked layers (slide 17, third icon). */
+function iconLayers (slide, x, y, s) {
+  [0.12, 0.38, 0.62].forEach(fy => {
+    slide.addShape('diamond', { x, y: y + s * fy, w: s, h: s * 0.34, fill: { type: 'none' }, line: { color: C.black, width: 1.1 } });
+  });
+}
+
+/** Flat rectangle standing in for a photograph. */
+function imageBox (slide, o) {
+  slide.addShape('rect', { x: o.x, y: o.y, w: o.w, h: o.h, fill: { color: o.fill || 'EDEDED' } });
+  slide.addText('[image]', {
+    x: o.x, y: o.y + o.h / 2 - 0.16, w: o.w, h: 0.32,
+    fontFace: BODY, fontSize: 10, color: '9A9A9A', align: 'center', valign: 'middle'
+  });
+}
+
+/* ---- custom geometry --------------------------------------------- */
+
+/**
+ * Thick "Z" pipe used by the slide 10 timeline: drops down the left leg,
+ * turns right along a crossbar, then drops again on the right.
+ * `cross` is the absolute y of the crossbar's bottom edge.
+ */
+function zPipe (slide, o) {
+  const { x, y, w, h, t, cross, color } = o;
+  const cy = cross - y;          // crossbar bottom in local coordinates
+  const r = t;                   // outer bend radius
+  const ri = t * 0.25;           // inner bend radius
+  const k = 0.5;                 // cubic handle for a quarter turn
+  slide.addShape('custGeom', {
+    x, y, w, h, fill: { color },
+    points: [
+      { x: 0, y: 0, moveTo: true },
+      { x: 0, y: cy - r },
+      { x: r, y: cy, curve: { type: 'cubic', x1: 0, y1: cy - r * k, x2: r * (1 - k), y2: cy } },
+      { x: w - t, y: cy },
+      { x: w - t, y: h },
+      { x: w, y: h },
+      { x: w, y: cy - t + ri },
+      { x: w - t - ri, y: cy - t, curve: { type: 'cubic', x1: w, y1: cy - t + ri * k, x2: w - t - ri * k, y2: cy - t } },
+      { x: t + ri, y: cy - t },
+      { x: t, y: cy - t - ri, curve: { type: 'cubic', x1: t + ri * k, y1: cy - t, x2: t, y2: cy - t - ri * k } },
+      { x: t, y: 0 },
+      { close: true }
+    ]
+  });
+}
+
+/** Rounded speech slab with a tail hanging off one bottom corner (slide 12). */
+function speechSlab (slide, o) {
+  const { x, y, w, h, color, tail } = o;   // tail: 'left' | 'right'
+  const b = h * 0.755;                     // bottom edge of the bar
+  const r = w * 0.199;                     // corner radius
+  const right = [
+    { x: r, y: 0, moveTo: true },
+    { x: w - r * 0.2, y: 0 },
+    { x: w, y: r, curve: { type: 'cubic', x1: w - r * 0.09, y1: 0, x2: w, y2: r * 0.45 } },
+    { x: w, y: h },
+    { x: w * 0.855, y: b * 0.99, curve: { type: 'cubic', x1: w, y1: h, x2: w * 0.961, y2: h * 0.8 } },
+    { x: w * 0.743, y: b },
+    { x: r, y: b },
+    { x: 0, y: r, curve: { type: 'cubic', x1: r * 0.44, y1: b, x2: 0, y2: b - r * 0.45 } },
+    { x: r, y: 0, curve: { type: 'cubic', x1: 0, y1: r * 0.45, x2: r * 0.44, y2: 0 } },
+    { close: true }
+  ];
+  const mirrored = right.map(p => {
+    if (p.close) return p;
+    const q = { x: w - p.x, y: p.y };
+    if (p.moveTo) q.moveTo = true;
+    if (p.curve) q.curve = { type: 'cubic', x1: w - p.curve.x1, y1: p.curve.y1, x2: w - p.curve.x2, y2: p.curve.y2 };
+    return q;
+  });
+  slide.addShape('custGeom', { x, y, w, h, fill: { color }, points: tail === 'left' ? mirrored : right });
+}
+
+/**
+ * Rounded card with a triangular pointer above its top edge (slides 5, 7, 15).
+ * `top` is the fraction of the height where the card body begins; the tail
+ * x-positions are fractions of the width.
+ */
+function calloutCard (slide, o) {
+  const { x, y, w, h, top, tail, rotate } = o;
+  const r = 0.05;
+  const T = top * h;
+  slide.addShape('custGeom', {
+    x, y, w, h, fill: { color: C.white }, shadow: shadowCard(), rotate: rotate || 0,
+    points: [
+      { x: r, y: T, moveTo: true },
+      { x: w - r, y: T },
+      { x: w, y: T + r, curve: { type: 'cubic', x1: w - r * 0.45, y1: T, x2: w, y2: T + r * 0.45 } },
+      { x: w, y: h - r },
+      { x: w - r, y: h, curve: { type: 'cubic', x1: w, y1: h - r * 0.45, x2: w - r * 0.45, y2: h } },
+      { x: r, y: h },
+      { x: 0, y: h - r, curve: { type: 'cubic', x1: r * 0.45, y1: h, x2: 0, y2: h - r * 0.45 } },
+      { x: 0, y: T + r },
+      { x: r, y: T, curve: { type: 'cubic', x1: 0, y1: T + r * 0.45, x2: r * 0.45, y2: T } },
+      { close: true },
+      { x: tail.tip * w, y: 0, moveTo: true },
+      { x: tail.to * w, y: T },
+      { x: tail.from * w, y: T },
+      { close: true }
+    ]
+  });
+}
+
+/** Slanted parallelogram ribbon (slide 11). */
+function chevron (slide, o) {
+  const { x, y, w, h, color, dir, shadow } = o;   // dir: 'down' | 'up'
+  const a = 0.523, b = 0.478;
+  const pts = dir === 'down'
+    ? [{ x: a * w, y: 0, moveTo: true }, { x: w, y: h }, { x: b * w, y: h }, { x: 0, y: 0 }, { close: true }]
+    : [{ x: a * w, y: 0, moveTo: true }, { x: 0, y: h }, { x: b * w, y: h }, { x: w, y: 0 }, { close: true }];
+  slide.addShape('custGeom', Object.assign({ x, y, w, h, fill: { color }, points: pts }, shadow ? { shadow } : {}));
+}
+
+/* ================================================================== *
+ * Shared slide chrome
+ * ================================================================== */
+const NAV = [['Home', 6.755], ['About Us', 8.459], ['Service', 10.162], ['Contact', 11.865]];
+
+/** White nav labels re-drawn on the slides whose art covers the master bar. */
+function navOverlay (slide, xs) {
+  NAV.forEach((item, i) => {
+    text(slide, item[0], {
+      x: xs ? xs[i] : item[1], y: 0.304, w: 1.104, h: 0.345,
+      fontFace: HEAD, color: C.white, align: xs ? 'left' : 'center', lineSpacingMultiple: 1.3
+    });
+  });
+}
+
+function wordmark (slide) {
+  text(slide, 'Conference', { x: 0.364, y: 0.304, w: 2.5, h: 0.345, fontFace: HEAD, color: C.white, lineSpacingMultiple: 1.3 });
+}
+
+function pageNumber (slide, n) {
+  slide.addText(String(n), {
+    x: 11.89, y: 6.91, w: 1.079, h: 0.286,
+    fontFace: HEAD, fontSize: 11, bold: true, align: 'right', valign: 'top', autoFit: true
+  });
+}
+
+/* ================================================================== *
+ * Slides
+ * ================================================================== */
+
+// 1 — Cover
+function slide01 (s) {
+  imageBox(s, { x: 0, y: 0, w: 5.097, h: 7.5, fill: 'F2F2F2' });
+  s.addShape('rect', { x: 5.097, y: 0, w: 8.236, h: 7.5, fill: { color: C.orange } });
+  navOverlay(s, [5.556, 7.259, 8.963, 10.666]);
+  text(s, 'Conference Presentation', {
+    x: 5.562, y: 4.691, w: 3.688, h: 0.386, color: C.white, fontSize: 14, charSpacing: 3, lineSpacingMultiple: 1.3
+  });
+  text(s, 'Conference', { x: 5.562, y: 5.077, w: 7.581, h: 1.582, fontFace: HEAD, fontSize: 88, color: C.white });
+}
+
+// 2 — Introduction
+function slide02 (s) {
+  s.addShape('rect', { x: 0, y: 0, w: 3.604, h: 7.5, fill: { color: C.orange } });
+  s.addText('2025', {
+    x: 0.18, y: 3.465, w: 5.4, h: 2.0, fontFace: HEAD, fontSize: 140, color: C.white,
+    align: 'center', valign: 'middle', rotate: 270
+  });
+  wordmark(s);
+  text(s, 'www. Conference.com', { x: 0.364, y: 6.91, w: 3.5, h: 0.286, fontSize: 11, color: C.white });
+
+  headline(s, ['Introduction to the Annual ', ['Conference'], ' and Its ', ['Strategic'], ' Objectives'],
+    { x: 4.353, y: 3.01, w: 6.759, h: 1.717 });
+  text(s, L1 + 'Cum sociis natoque penatibus ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula',
+    { x: 4.353, y: 4.873, w: 6.468, h: 0.87, lineSpacingMultiple: 1.3 });
+  text(s, L1 + 'Cum sociis natoque penatibus ipsum',
+    { x: 4.353, y: 5.797, w: 6.468, h: 0.608, lineSpacingMultiple: 1.3 });
+
+  s.addShape('roundRect', { x: 2.499, y: 1.417, w: 6.529, h: 1.047, fill: { color: C.white }, rectRadius: corner(6.529, 1.047, 0.053), shadow: shadowCard() });
+  text(s, L1 + 'Cum sociis natoque penatibus ipsum',
+    { x: 2.698, y: 1.658, w: 6.132, h: 0.565, fontSize: 11, italic: true, lineSpacingMultiple: 1.3 });
+  s.addShape('roundRect', { x: 8.808, y: 1.656, w: 0.569, h: 0.569, fill: { color: C.orange }, rectRadius: corner(0.569, 0.569, 0.095), shadow: shadowCard() });
+  s.addText('❝', { x: 8.808, y: 1.656, w: 0.569, h: 0.569, fontFace: HEAD, fontSize: 20, color: C.white, align: 'center', valign: 'middle' });
+}
+
+// 3 — Central theme
+function slide03 (s) {
+  imageBox(s, { x: 0, y: 1.0, w: 13.333, h: 3.29 });
+  pill(s, { x: 0.779, y: 3.996, w: 4.609, h: 0.667, fill: C.orange, label: 'Exploring the Key Idea That Drives Collaboration' });
+  headline(s, [['Highlighting'], ' the Central Theme That Shapes the ', ['Conference'], ' Discussions'],
+    { x: 0.639, y: 5.11, w: 8.586, h: 1.178 });
+  text(s, L2, { x: 8.966, y: 5.395, w: 3.868, h: 0.608, lineSpacingMultiple: 1.3 });
+}
+
+// 4 — Two project cards
+function slide04 (s) {
+  imageBox(s, { x: 3.961, y: 0, w: 5.411, h: 7.5, fill: 'F2F2F2' });
+  const cards = [
+    { cx: 2.539, cy: 3.219, accent: C.yellow, big: '20', bigX: 3.746, bigY: 1.28, bigW: 3.264, lines: [LSIT, LSIT, LSIT] },
+    { cx: 7.773, cy: 1.156, accent: C.orange, big: '25', bigX: 6.411, bigY: 3.325, bigW: 3.436, lines: ['Lorem sit ipsum dolor', LSIT, LSIT] }
+  ];
+  cards.forEach(c => {
+    s.addText(c.big, { x: c.bigX, y: c.bigY, w: c.bigW, h: 2.895, fontFace: HEAD, fontSize: 166, color: C.white, align: 'center', valign: 'top', autoFit: true });
+    s.addShape('roundRect', { x: c.cx, y: c.cy, w: 3.022, h: 3.125, fill: { color: C.white }, rectRadius: corner(3.022, 3.125, 0.054), shadow: shadowCard() });
+    s.addShape('roundRect', { x: c.cx + 0.273, y: c.cy + 0.228, w: 0.632, h: 0.632, fill: { color: c.accent }, rectRadius: corner(0.632, 0.632, 0.027), shadow: shadowCard() });
+    iconKnot(s, c.cx + 0.414, c.cy + 0.355, 0.378, C.white);
+    text(s, 'Your Project One', { x: c.cx + 1.047, y: c.cy + 0.258, w: 1.519, h: 0.572, fontFace: HEAD, fontSize: 14 });
+    c.lines.forEach((t, i) => tick(s, { x: c.cx + 0.273, y: c.cy + 1.042 + i * 0.376, text: t }));
+    pill(s, { x: c.cx + 0.273, y: c.cy + 2.47, w: 1.547, h: 0.427, fill: c.accent, label: 'Learn More' });
+  });
+}
+
+// 5 — Agenda
+function slide05 (s) {
+  imageBox(s, { x: 6.699, y: 1.237, w: 3.075, h: 2.513 });
+  imageBox(s, { x: 9.88, y: 3.75, w: 2.513, h: 2.513 });
+  calloutCard(s, { x: 5.036, y: -1.404, w: 1.219, h: 7.314, rotate: 90, top: 0.107, tail: { tip: 1.0, from: 0.35, to: 0.67 } });
+  s.addText('18', { x: 2.19, y: 1.744, w: 0.878, h: 0.774, fontFace: HEAD, fontSize: 40, color: C.orange, align: 'center', valign: 'top', autoFit: true });
+  text(s, 'Jan', { x: 2.363, y: 2.375, w: 0.53, h: 0.345, align: 'center', lineSpacingMultiple: 1.3 });
+  text(s, L1, { x: 3.22, y: 1.928, w: 4.946, h: 0.608, lineSpacingMultiple: 1.3 });
+  s.addText([
+    { text: '— ', options: { fontFace: HEAD, italic: true } },
+    { text: 'What Lies Ahead for Attendees Throughout the Program', options: { fontFace: BODY, italic: true } }
+  ], { x: 10.087, y: 1.8, w: 2.32, h: 1.178, fontSize: 16, valign: 'top', autoFit: true });
+  pill(s, { x: 9.3, y: 3.537, w: 2.867, h: 0.427, fill: C.orange, label: 'From Keynotes to Networking' });
+  headline(s, ['A Detailed Look at the ', ['Conference Agenda'], ' and Daily ', ['Program Structure']],
+    { x: 0.94, y: 4.049, w: 7.994, h: 1.178 });
+  text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus',
+    { x: 0.94, y: 5.357, w: 6.66, h: 0.608, lineSpacingMultiple: 1.3 });
+}
+
+// 6 — Venue
+function slide06 (s) {
+  imageBox(s, { x: 2.888, y: 3.378, w: 9.692, h: 3.224 });
+  headline(s, ['Exploring the Venue and ', ['Experience'], ' That ', ['Brings People '], 'Together'],
+    { x: 0.769, y: 1.286, w: 7.943, h: 1.178 });
+  s.addShape('ellipse', { x: 9.195, y: 1.522, w: 0.174, h: 0.174, fill: { color: C.orange } });
+  text(s, 'A Space Designed for Learning, Networking, and Collaboration',
+    { x: 9.429, y: 1.398, w: 2.802, h: 0.596, fontFace: HEAD, italic: true, lineSpacingMultiple: 1.3 });
+
+  s.addShape('roundRect', { x: 5.331, y: 2.829, w: 3.951, h: 1.768, fill: { color: C.orange }, rectRadius: corner(3.951, 1.768, 0.09), shadow: shadowCard() });
+  text(s, 'A Space Designed for Learning Networking',
+    { x: 5.466, y: 3.027, w: 3.682, h: 0.334, fontFace: HEAD, italic: true, color: C.white, lineSpacingMultiple: 1.3 });
+  [0, 1, 2].forEach(i => tick(s, { x: 5.466, y: 3.409 + i * 0.323, w: 3.578, text: 'Lorem sit ipsum dolor sit Aenean', color: C.white }));
+
+  s.addShape('roundRect', { x: 1.49, y: 4.532, w: 3.479, h: 1.682, fill: { color: C.yellow }, rectRadius: corner(3.479, 1.682, 0.086), shadow: shadowCard() });
+  text(s, 'Lorem ipsum dolor sit amet, ligula consectetuer adipiscing elit. ',
+    { x: 1.695, y: 4.716, w: 3.165, h: 0.608, color: C.white, lineSpacingMultiple: 1.3 });
+  pill(s, { x: 1.695, y: 5.531, w: 1.547, h: 0.427, fill: C.white, label: 'Learn More', color: C.black });
+  s.addText('89%', { x: 3.488, y: 5.458, w: 1.303, h: 0.572, fontFace: HEAD, fontSize: 28, color: C.white, align: 'right', valign: 'top', autoFit: true });
+
+  s.addText('2025', { x: 8.251, y: 5.02, w: 5.083, h: 2.036, fontFace: HEAD, fontSize: 115, color: C.white, align: 'center', valign: 'top', autoFit: true });
+}
+
+// 7 — Why attend
+function slide07 (s) {
+  imageBox(s, { x: 1.455, y: 0.976, w: 2.691, h: 2.821 });
+  s.addShape('rect', { x: 2.508, y: 0, w: 3.822, h: 7.5, fill: { color: C.orange } });
+  s.addText('2025', { x: 2.33, y: 3.29, w: 6.41, h: 2.9, fontFace: HEAD, fontSize: 166, color: C.white, align: 'center', valign: 'top', autoFit: true, rotate: 270 });
+  headline(s, ['Why Attending This Conference Is a ', ['Valuable Investment '], 'of Time'],
+    { x: 7.16, y: 1.08, w: 5.76, h: 1.72 });
+  text(s, L1, { x: 7.16, y: 2.88, w: 4.95, h: 0.608, lineSpacingMultiple: 1.3 });
+  [0, 1, 2].forEach(i => {
+    const y = 4.017 + i * 0.791;
+    iconCheck(s, 7.446, y + 0.09, 0.35);
+    text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean. ',
+      { x: 7.94, y, w: 4.65, h: 0.608, lineSpacingMultiple: 1.3 });
+  });
+  imageBox(s, { x: 4.289, y: 3.703, w: 2.691, h: 2.821, fill: 'E4E4E4' });
+  calloutCard(s, { x: 0.821, y: 4.458, w: 3.761, h: 1.506, top: 0.305, tail: { tip: 0.862, from: 0.672, to: 0.79 } });
+  text(s, L2, { x: 0.956, y: 5.157, w: 3.49, h: 0.565, fontSize: 11, italic: true, lineSpacingMultiple: 1.3 });
+}
+
+// 8 — Committee
+function slide08 (s) {
+  headline(s, ['Introducing the Organizing Committee and Core Contributors'], { x: 0.669, y: 1.107, w: 8.062, h: 1.178 });
+  [0.669, 3.703, 6.738, 9.772].forEach((x, i) => {
+    imageBox(s, { x, y: 2.285, w: 2.888, h: 3.689, fill: 'E8E8E8' });
+    s.addShape('roundRect', { x, y: 3.055, w: 2.888, h: 2.917, fill: { color: i % 2 ? C.yellow : C.orange }, rectRadius: corner(2.888, 2.917, 0.132), shadow: shadowCard() });
+    s.addShape('roundRect', { x, y: 2.842, w: 0.619, h: 0.427, fill: { color: C.white }, rectRadius: corner(0.619, 0.427, 0.039), shadow: shadowCard() });
+    text(s, '0' + (i + 1) + '.', { x: x + 0.015, y: 2.904, w: 0.589, h: 0.303, fontFace: HEAD, italic: true, align: 'center' });
+    text(s, 'Mark Medison', { x, y: 6.152, w: 1.4, h: 0.303, fontFace: HEAD });
+    text(s, 'Your Position', { x, y: 6.379, w: 1.15, h: 0.28, fontSize: 9, italic: true, lineSpacingMultiple: 1.3 });
+    text(s, 'Lorem ipsum dolor sit amet, ', { x: x + 1.517, y: 6.125, w: 1.371, h: 0.565, fontSize: 11, italic: true, align: 'right', lineSpacingMultiple: 1.3 });
+  });
+}
+
+// 9 — Branding mockup
+function slide09 (s) {
+  s.addShape('rect', { x: 0, y: 0, w: 13.333, h: 3.249, fill: { color: C.orange } });
+  s.addText('2025', { x: 0.674, y: 1.094, w: 6.41, h: 2.9, fontFace: HEAD, fontSize: 166, color: C.white, align: 'center', valign: 'top', autoFit: true });
+  navOverlay(s);
+  wordmark(s);
+
+  // Laptop mock-up standing in for the product photo.
+  s.addShape('roundRect', { x: 6.26, y: 1.433, w: 7.5, h: 5.29, fill: { color: '111111' }, rectRadius: corner(7.5, 5.29, 0.05) });
+  s.addShape('rect', { x: 6.49, y: 1.727, w: 7.1, h: 4.64, fill: { color: C.white } });
+  s.addShape('ellipse', { x: 9.86, y: 1.55, w: 0.055, h: 0.055, fill: { color: '555555' } });
+  s.addShape('roundRect', { x: 5.32, y: 6.733, w: 8.02, h: 0.174, fill: { color: 'DFE2E5' }, rectRadius: corner(8.02, 0.174, 0.06) });
+  s.addShape('roundRect', { x: 8.6, y: 6.733, w: 0.95, h: 0.075, fill: { color: 'B6BABE' }, rectRadius: corner(0.95, 0.075, 0.037) });
+
+  headline(s, ['A Sneak Peek Into the Event Branding'], { x: 0.523, y: 3.659, w: 4.363, h: 1.178 });
+  text(s, L1, { x: 0.523, y: 5.037, w: 4.946, h: 0.608, lineSpacingMultiple: 1.3 });
+  pill(s, { x: 0.523, y: 5.887, w: 1.547, h: 0.427, fill: C.orange, label: 'Learn More' });
+}
+
+// 10 — Timeline infographic
+function slide10 (s) {
+  zPipe(s, { x: 0.32, y: -0.4, w: 3.3, h: 2.9, t: 0.79, cross: 1.98, color: C.purple });
+  zPipe(s, { x: 2.83, y: 2.51, w: 3.3, h: 2.3, t: 0.79, cross: 4.49, color: C.orange });
+  zPipe(s, { x: 5.34, y: 5.01, w: 3.29, h: 2.5, t: 0.79, cross: 6.98, color: C.yellow });
+
+  [
+    { y: 0.735, color: C.purple, label: 'Step One' },
+    { y: 3.217, color: C.orange, label: 'Step Two' },
+    { y: 5.43, color: C.yellow, label: 'Step Three' }
+  ].forEach((st, i) => {
+    const x = 2.779 + i * 2.461;
+    s.addShape('roundRect', { x, y: st.y, w: 3.53, h: 1.35, fill: { color: C.white }, rectRadius: corner(3.53, 1.35, 0.145), shadow: shadowCard() });
+    s.addShape('ellipse', { x: x + 0.331, y: st.y + 0.267, w: 0.816, h: 0.816, fill: { color: st.color } });
+    iconTarget(s, x + 0.5, st.y + 0.436, 0.478, C.white);
+    text(s, st.label, { x: x + 1.34, y: st.y + 0.21, w: 1.97, h: 0.34, fontFace: HEAD, fontSize: 14, bold: true, color: st.color });
+    text(s, L3, { x: x + 1.34, y: st.y + 0.46, w: 2.17, h: 0.608, lineSpacingMultiple: 1.3 });
+  });
+
+  s.addText([
+    { text: 'Our Timeline ', options: {} },
+    { text: 'Infographic', options: { color: C.orange } },
+    { text: ' Section.', options: {} }
+  ], { x: 7.22, y: 1.025, w: 5.075, h: 2.12, fontFace: HEAD, fontSize: 40, align: 'right', valign: 'top', autoFit: true });
+  text(s, 'Your Description Here', { x: 0.546, y: 5.08, w: 2.546, h: 0.372, fontFace: HEAD, fontSize: 14, italic: true, lineSpacingMultiple: 1.3 });
+  text(s, L2, { x: 0.564, y: 5.492, w: 3.867, h: 0.608, lineSpacingMultiple: 1.3 });
+}
+
+// 11 — Statistics chevrons
+function slide11 (s) {
+  headline(s, ['Reviewing Key Statistics and ', ['Impact From Previous'], ' Conferences'], { x: 1.045, y: 1.164, w: 8.207, h: 1.178 });
+
+  // Darker under-folds sit behind each ribbon.
+  chevron(s, { x: 8.588, y: 2.683, w: 1.887, h: 1.265, color: C.yellowDim, dir: 'down' });
+  chevron(s, { x: 6.606, y: 3.09, w: 1.887, h: 1.265, color: C.orangeDim, dir: 'down' });
+  chevron(s, { x: 4.62, y: 3.489, w: 1.887, h: 1.273, color: C.purpleDim, dir: 'down' });
+
+  [
+    { x: 3.496, y: 3.489, w: 2.155, h: 1.679, color: C.purple, label: 'Step 01', lx: 3.73, ly: 4.196 },
+    { x: 5.477, y: 3.09, w: 2.155, h: 1.672, color: C.orange, label: 'Step 02', lx: 5.673, ly: 3.808 },
+    { x: 7.451, y: 2.683, w: 2.157, h: 1.672, color: C.yellow, label: 'Step 03', lx: 7.659, ly: 3.402 }
+  ].forEach(r => {
+    chevron(s, { x: r.x, y: r.y, w: r.w, h: r.h, color: r.color, dir: 'up', shadow: shadowWide() });
+    s.addText(r.label, { x: r.lx, y: r.ly, w: 1.686, h: 0.269, fontFace: HEAD, fontSize: 16, color: C.white, align: 'center', valign: 'middle', rotate: 300.8, inset: 0 });
+  });
+
+  // Arrow head closing the sequence.
+  const AH = [[1142, 485], [927, 0], [292, 485], [502, 485], [0, 1633], [430, 1633], [932, 485], [1142, 485]];
+  s.addShape('custGeom', {
+    x: 9.446, y: 1.445, w: 2.734, h: 2.504, fill: { color: C.teal }, shadow: shadowWide(),
+    points: AH.map((q, i) => {
+      const p = { x: q[0] / 1142 * 2.734, y: q[1] / 1633 * 2.504 };
+      if (i === 0) p.moveTo = true;
+      return p;
+    }).concat([{ close: true }])
+  });
+  s.addText('Step 04', { x: 9.807, y: 2.796, w: 1.686, h: 0.269, fontFace: HEAD, fontSize: 16, color: C.white, align: 'center', valign: 'middle', rotate: 300.8, inset: 0 });
+
+  [
+    { x: 2.948, y: 5.732, w: 2.139, label: 'Conceive', line: C.purple },
+    { x: 5.349, y: 5.218, w: 2.139, label: 'Design', line: C.teal },
+    { x: 7.738, y: 4.704, w: 2.158, label: 'Manufacture', line: C.purple },
+    { x: 10.148, y: 4.19, w: 2.139, label: 'Deliver', line: C.teal }
+  ].forEach(st => {
+    s.addShape('roundRect', {
+      x: st.x, y: st.y, w: st.w, h: 0.429, fill: { color: C.white }, rectRadius: corner(st.w, 0.429, 0.2145),
+      line: { color: st.line, width: 0.75 }, shadow: shadowDrop()
+    });
+    s.addText(st.label, { x: st.x, y: st.y, w: st.w, h: 0.429, fontFace: HEAD, fontSize: 14, align: 'center', valign: 'middle' });
+    text(s, L3, { x: st.x - 0.03, y: st.y + 0.543, w: 2.17, h: 0.608, align: 'center', lineSpacingMultiple: 1.3 });
+  });
+}
+
+// 12 — Sponsorship
+function slide12 (s) {
+  [
+    { y: 5.265, color: C.yellow, tail: 'right', label: 'Competition', ly: 5.723, x: 7.596 },
+    { y: 3.9, color: C.orange, tail: 'left', label: 'Infrastructure', ly: 4.386, x: 7.548 },
+    { y: 2.534, color: C.yellow, tail: 'right', label: 'Releases', ly: 2.991, x: 7.596 },
+    { y: 1.153, color: C.orange, tail: 'left', label: 'Achievements', ly: 1.63, x: 7.548 }
+  ].forEach(b => {
+    speechSlab(s, { x: b.x, y: b.y, w: 3.446, h: 1.692, color: b.color, tail: b.tail });
+    s.addText(b.label, { x: 8.045, y: b.ly, w: 2.499, h: 0.37, fontFace: HEAD, fontSize: 16, bold: true, color: C.white, align: 'center', valign: 'middle' });
+  });
+
+  [
+    { x: 10.99, y: 1.664, d: 1.433, color: C.orange, big: 32, small: 12 },
+    { x: 6.05, y: 3.523, d: 1.271, color: C.yellow, big: 28, small: 11 }
+  ].forEach(b => {
+    s.addShape('flowChartConnector', { x: b.x, y: b.y, w: b.d, h: b.d, fill: { color: b.color }, shadow: shadowSoft() });
+    s.addText('45+', { x: b.x, y: b.y + b.d * 0.16, w: b.d, h: 0.45, fontFace: HEAD, fontSize: b.big, bold: true, color: C.white, align: 'center', valign: 'middle' });
+    s.addText('Your Text', { x: b.x, y: b.y + b.d * 0.55, w: b.d, h: 0.3, fontFace: HEAD, fontSize: b.small, color: C.white, align: 'center', valign: 'middle' });
+  });
+
+  headline(s, [['Sponsorship'], ' Opportunities and Strategic ', ['Partnership'], ' Benefits'], { x: 0.759, y: 1.276, w: 6.285, h: 1.717 });
+  s.addText([
+    { text: '385', options: { fontSize: 60 } },
+    { text: '%', options: { fontSize: 40 } }
+  ], { x: 0.759, y: 4.447, w: 2.963, h: 1.111, fontFace: HEAD, valign: 'top', autoFit: true });
+  text(s, 'Lorem ipsum dolor sit amet, consectetuer legit duluus legit  adipiscing elit. Aenean commodo ligula eget',
+    { x: 0.759, y: 5.586, w: 4.841, h: 0.608, lineSpacingMultiple: 1.3 });
+}
+
+// 13 — Milestone cards
+function slide13 (s) {
+  headline(s, ['Detailed Conference ', ['Timeline and Major'], ' Event Milestones'], { x: 0.982, y: 1.175, w: 6.757, h: 1.178 });
+  text(s, 'Lorem ipsum dolor sit amet, Aenean consectetuer legit duluus legit  adipiscing elit. Aenean',
+    { x: 0.983, y: 2.552, w: 3.403, h: 0.87, lineSpacingMultiple: 1.3 });
+
+  [
+    { x: 0.982, y: 4.292, color: C.orange, pct: '78%', label: 'Performance 01', r: 0.141 },
+    { x: 4.883, y: 2.901, color: C.yellow, pct: '80%', label: 'Performance 02', r: 0.089 },
+    { x: 8.784, y: 1.58, color: C.purple, pct: '97%', label: 'Performance 03', r: 0.099 }
+  ].forEach(c => {
+    s.addShape('roundRect', { x: c.x, y: c.y, w: 3.565, h: 2.031, fill: { color: c.color }, rectRadius: corner(3.565, 2.031, c.r), shadow: shadowCard() });
+    s.addText(c.pct, { x: c.x + 0.308, y: c.y + 0.221, w: 2.011, h: 0.712, fontFace: HEAD, fontSize: 40, color: C.white, valign: 'top', autoFit: true, lineSpacingMultiple: 0.9 });
+    text(s, c.label, { x: c.x + 0.308, y: c.y + 0.901, w: 2.011, h: 0.372, fontFace: HEAD, fontSize: 16, color: C.white });
+    text(s, L4, { x: c.x + 0.308, y: c.y + 1.216, w: 2.949, h: 0.608, color: C.white, lineSpacingMultiple: 1.3 });
+  });
+
+  s.addText('2025', { x: 8.784, y: 4.841, w: 2.35, h: 0.919, fontFace: HEAD, fontSize: 54, valign: 'top', autoFit: true, lineSpacingMultiple: 0.9 });
+  text(s, L4, { x: 8.784, y: 5.717, w: 3.176, h: 0.608, lineSpacingMultiple: 1.3 });
+}
+
+// 14 — Post-conference impact
+function slide14 (s) {
+  headline(s, ['Measuring Post-Conference Impact and Long-Term Benefits'], { x: 2.185, y: 1.083, w: 8.958, h: 1.178, align: 'center' });
+
+  // Half-disc behind the year, visible only through its shadow.
+  s.addShape('custGeom', {
+    x: 8.4, y: 5.588, w: 3.819, h: 1.909, fill: { color: C.white }, shadow: shadowSoft(),
+    points: [
+      { x: 1.909, y: 0, moveTo: true },
+      { x: 3.819, y: 1.909, curve: { type: 'cubic', x1: 2.964, y1: 0, x2: 3.819, y2: 0.855 } },
+      { x: 0, y: 1.909 },
+      { x: 1.909, y: 0, curve: { type: 'cubic', x1: 0, y1: 0.855, x2: 0.855, y2: 0 } },
+      { close: true }
+    ]
+  });
+
+  [
+    { x: 1.17, y: 2.702, w: 8.478, color: C.orange, n: '01', tx: 2.038, tw: 7.005, align: 'left', tag: 8.958, cx: 0.655, copy: L5 },
+    { x: 3.528, y: 4.148, w: 8.478, color: C.yellow, n: '02', tx: 4.32, tw: 6.833, align: 'right', tag: 2.836, cx: 11.554, copy: L5 },
+    { x: 1.232, y: 5.588, w: 5.955, color: C.purple, n: '03', tx: 1.818, tw: 4.613, align: 'left', tag: 6.497, cx: 0.717, copy: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo et ligula eget dolor. Aenean' }
+  ].forEach(r => {
+    s.addShape('rect', { x: r.x, y: r.y, w: r.w, h: 1.0, fill: { color: r.color }, shadow: shadowCard() });
+    text(s, r.copy, { x: r.tx, y: r.y + 0.2, w: r.tw, h: 0.608, color: C.white, align: r.align, lineSpacingMultiple: 1.3 });
+    s.addShape('flowChartConnector', { x: r.cx, y: r.y - 0.455, w: 0.909, h: 0.909, fill: { color: C.white }, shadow: shadowSoft() });
+    s.addText(r.n, { x: r.cx, y: r.y - 0.455, w: 0.909, h: 0.909, fontFace: HEAD, fontSize: 24, align: 'center', valign: 'middle' });
+    s.addShape('rect', { x: r.tag, y: r.y - 0.186, w: 1.378, h: 0.371, fill: { color: C.white }, shadow: shadowSoft() });
+    s.addText('Your text', { x: r.tag, y: r.y - 0.186, w: 1.378, h: 0.371, fontFace: HEAD, fontSize: 12, align: 'center', valign: 'middle' });
+  });
+
+  s.addText('2025', { x: 9.43, y: 6.166, w: 1.758, h: 0.841, fontFace: HEAD, fontSize: 44, align: 'center', valign: 'top', autoFit: true });
+}
+
+// 15 — Testimonial
+function slide15 (s) {
+  imageBox(s, { x: 1.343, y: 1.333, w: 1.596, h: 1.817, fill: 'F0F0F0' });
+  imageBox(s, { x: 11.22, y: 1.785, w: 1.596, h: 1.817, fill: 'F0F0F0' });
+  imageBox(s, { x: 10.178, y: 4.544, w: 1.596, h: 1.817, fill: 'F0F0F0' });
+  imageBox(s, { x: 5.517, y: 2.441, w: 2.299, h: 2.618, fill: 'F0F0F0' });
+
+  s.addText('20', { x: 2.928, y: 0.665, w: 4.567, h: 4.122, fontFace: HEAD, fontSize: 239, color: C.white, align: 'center', valign: 'top', autoFit: true, shadow: shadowFaint() });
+  s.addText('25', { x: 5.592, y: 2.71, w: 4.808, h: 4.122, fontFace: HEAD, fontSize: 239, color: C.white, align: 'center', valign: 'top', autoFit: true, shadow: shadowFaint() });
+
+  calloutCard(s, { x: 8.042, y: 1.832, w: 2.239, h: 0.758, rotate: 180, top: 0.435, tail: { tip: 0.907, from: 0.705, to: 0.827 } });
+  s.addText('Customers Testimonials', { x: 8.088, y: 1.895, w: 2.151, h: 0.303, fontFace: HEAD, fontSize: 12, align: 'center', valign: 'top', autoFit: true });
+
+  s.addShape('roundRect', { x: 2.186, y: 4.065, w: 3.891, h: 1.572, fill: { color: C.orange }, rectRadius: corner(3.891, 1.572, 0.08), shadow: shadowCard() });
+  text(s, '“ Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula “',
+    { x: 2.35, y: 4.253, w: 3.563, h: 0.565, fontSize: 11, italic: true, color: C.white, lineSpacingMultiple: 1.3 });
+  text(s, 'Mark Medison', { x: 2.35, y: 4.93, w: 2.123, h: 0.303, fontFace: HEAD, color: C.white });
+  text(s, 'Your Position', { x: 2.35, y: 5.155, w: 1.898, h: 0.284, fontSize: 9, italic: true, color: C.white, lineSpacingMultiple: 1.3 });
+}
+
+// 16 — Thank you
+function slide16 (s) {
+  imageBox(s, { x: 0, y: 0, w: 13.333, h: 3.939, fill: 'FAFAFA' });
+  navOverlay(s);
+  wordmark(s);
+  s.addText('Thank You!', { x: 0.494, y: 4.741, w: 7.579, h: 1.582, fontFace: HEAD, fontSize: 88, valign: 'top', autoFit: true });
+  pill(s, { x: 7.607, y: 3.477, w: 5.074, h: 0.667, fill: C.orange, label: 'Thank You for Joining Us — Together We Shape the Future' });
+
+  [
+    { x: 7.746, y: 4.635, label: 'Email', value: 'Investorpitch@gmail.com' },
+    { x: 10.649, y: 4.635, label: 'Website', value: 'www.companyinfo.com' },
+    { x: 7.746, y: 5.741, label: 'Phone Number', value: '+214-704-76532' },
+    { x: 10.649, y: 5.741, label: 'Instagram', value: 'Cembuly / Cembuil' }
+  ].forEach(c => {
+    text(s, c.label, { x: c.x, y: c.y, w: 2.27, h: 0.377, fontFace: HEAD, fontSize: 14, bold: true });
+    text(s, c.value, { x: c.x, y: c.y + 0.385, w: 2.74, h: 0.303 });
+  });
+}
+
+// 17 — Production notes
+function slide17 (s) {
+  const marker = (t, x, y) => text(s, t, { x, y, w: 2.571, h: 0.336, fontFace: HEAD, fontSize: 14, bold: true, color: 'FF0000', highlight: 'FFFF00' });
+  marker('Bisa pake icon ini', 0.559, 0.613);
+  marker('Referncee:', 5.245, 0.613);
+  marker('Jumlah Slide 16:', 9.475, 0.613);
+  marker('Dummy Text:', 5.245, 4.775);
+
+  iconMonitor(s, 0.607, 1.107, 0.505);
+  iconBrain(s, 1.664, 1.107, 0.505);
+  iconLayers(s, 2.721, 1.107, 0.505);
+  iconKnot(s, 3.778, 1.107, 0.505, C.black);
+
+  [
+    ['https://elements.envato.com/conference-keynote-T9YBLKK', 1.007, 0.505],
+    ['https://dribbble.com/shots/25085525-Selectel-flagship-conference-website', 1.611, 0.505],
+    ['https://dribbble.com/shots/25450265-Artist-Pitch-Deck', 2.215, 0.505],
+    ['https://dribbble.com/shots/25539467-Infobip-Shift-21-Conference-Branding-Visual-Identity', 2.819, 0.706],
+    ['https://dribbble.com/shots/24795008-Z2A-Digital-Conference-Stage-Merch', 3.625, 0.505]
+  ].forEach(l => text(s, l[0], { x: 5.245, y: l[1], w: 3.58, h: l[2], color: C.purple }));
+
+  const agenda = ['-cover : 1', '- text paragaph / introduction : 1', '- style guide : 3', '- team : 1',
+    '- mockup : 1', '- chart slide : 2', '- infographic : 5', '- testimonial : 1', '- end slide : 1'];
+  text(s, agenda.map(t => ({ text: t, options: { breakLine: true } })), { x: 9.475, y: 0.95, w: 3.58, h: 2.221, fontSize: 14 });
+
+  text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus',
+    { x: 5.245, y: 5.166, w: 6.657, h: 0.608, color: C.gray, lineSpacingMultiple: 1.3 });
+}
+
+/* ================================================================== *
+ * Build
+ * ================================================================== */
+const BUILDERS = [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09,
+  slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17];
+
+function build () {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'CONF16x9', width: 13.333, height: 7.5 });
+  pptx.layout = 'CONF16x9';
+  pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
+
+  // Master chrome: nav bar, wordmark and url. Slide artwork paints over it.
+  pptx.defineSlideMaster({
+    title: 'CONF',
+    background: { color: C.white },
+    objects: [
+      { text: { text: 'Conference', options: { x: 0.364, y: 0.304, w: 2.5, h: 0.345, fontFace: HEAD, fontSize: 12, valign: 'top', autoFit: true, lineSpacingMultiple: 1.3 } } },
+      { text: { text: 'www. Conference.com', options: { x: 0.364, y: 6.91, w: 3.5, h: 0.286, fontFace: BODY, fontSize: 11, valign: 'top', autoFit: true } } }
+    ].concat(NAV.map(n => ({
+      text: { text: n[0], options: { x: n[1], y: 0.304, w: 1.104, h: 0.345, fontFace: HEAD, fontSize: 12, align: 'center', valign: 'top', autoFit: true, lineSpacingMultiple: 1.3 } }
+    })))
+  });
+
+  BUILDERS.forEach((builder, i) => {
+    const slide = pptx.addSlide({ masterName: 'CONF' });
+    pageNumber(slide, i + 1);
+    builder(slide);
+  });
+
+  return pptx.writeFile({ fileName: path.join(__dirname, '056c1a65-b8a2-459a-94f8-090ccf0950e9_grok_final.pptx') });
+}
+
+build().then(f => console.log('wrote', f)).catch(e => { console.error(e); process.exit(1); });

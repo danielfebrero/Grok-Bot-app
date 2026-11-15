@@ -1,0 +1,716 @@
+/**
+ * "Ambition" business presentation template — recreated with pptxgenjs.
+ *
+ * Run:  node 0444ddd4-1595-4435-8986-ceefb4122164_grok_final.js
+ * Out:  0444ddd4-1595-4435-8986-ceefb4122164_grok_final.pptx  (next to this file)
+ *
+ * Slide size is 13.333 x 7.5 in (16:9, PptxGenJS "LAYOUT_WIDE").
+ *
+ * Images: the source deck ships empty picture placeholders on most slides, so
+ * they contribute nothing to the rendered page and are not reproduced here.
+ * Where artwork IS visible in the source (the photo frames of slides 5 and 8
+ * and the desktop mockup of slide 18) it is redrawn with native shapes rather
+ * than embedded bitmaps — see `photoFrame()` and `slide18()`.
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ---------------------------------------------------------------- palette */
+
+const NAVY = '182256'; // theme accent4 @ 75% luminance — the brand blue
+const BLACK = '000000';
+const NEAR_BLACK = '0D0D0D'; // tx1 @ 95% luminance — slide 14 background
+const INK = '262626';
+const WHITE = 'FFFFFF';
+const GREY = '808080';
+const LIGHT_GREY = 'D9D9D9';
+const PALE = 'F2F2F2';
+const PALE_BLUE = 'DAE3F3';
+const CRIMSON = 'BF2A52'; // theme accent1
+
+/* ------------------------------------------------------------------ fonts */
+
+const F = {
+  reg: 'Poppins',
+  light: 'Poppins Light',
+  med: 'Poppins Medium',
+  semi: 'Poppins SemiBold',
+};
+
+/* ---------------------------------------------------------------- helpers */
+
+// Text box. Source boxes are top-anchored and left-aligned unless stated.
+function txt(slide, content, o) {
+  slide.addText(content, Object.assign({ valign: 'top', fontFace: F.reg }, o));
+}
+
+// Flat filled rectangle.
+function rect(slide, x, y, w, h, fill, extra) {
+  slide.addShape('rect', Object.assign({ x, y, w, h, fill: { color: fill } }, extra));
+}
+
+// Straight rule / connector.
+function line(slide, x, y, w, h, color, width, extra) {
+  slide.addShape('line', Object.assign({ x, y, w, h, line: { color, width: width || 1 } }, extra));
+}
+
+// Free-form shape. custGeom path coordinates are relative to the shape box, so
+// `pts` entries are unit fractions: [u, v] or [u, v, u1, v1, u2, v2] (cubic).
+function poly(slide, x, y, w, h, pts, opts) {
+  const points = pts.map((p, i) => {
+    const pt = { x: p[0] * w, y: p[1] * h };
+    if (p.length === 6) {
+      pt.curve = { type: 'cubic', x1: p[2] * w, y1: p[3] * h, x2: p[4] * w, y2: p[5] * h };
+    } else if (i === 0) {
+      pt.moveTo = true;
+    }
+    return pt;
+  });
+  points.push({ close: true });
+  slide.addShape('custGeom', Object.assign({ x, y, w, h, points }, opts));
+}
+
+// The double block "smart quote" used on slides 6 and 9. One quote mark is
+// 0.4 of the box wide; the pair sits at u = 0.6 and u = 0.
+function quoteGlyph(slide, x, y, w, h, color) {
+  const mark = (o) => [
+    [o + 0.4000, 0.0000],
+    [o + 0.4000, 0.2162],
+    [o + 0.2764, 0.4960, o + 0.3528, 0.2163, o + 0.3103, 0.3403],
+    [o + 0.4000, 0.4960],
+    [o + 0.4000, 1.0000],
+    [o + 0.0000, 1.0000],
+    [o + 0.0000, 0.4960],
+    [o + 0.4000, 0.0000, o + 0.0035, 0.2208, o + 0.1816, 0.0000],
+  ];
+  poly(slide, x, y, w, h, mark(0.6), { fill: { color } });
+  poly(slide, x, y, w, h, mark(0.0), { fill: { color } });
+}
+
+// Stand-in for a photograph: the framed "picture" glyph (sun behind two hills)
+// that the source deck's empty picture placeholders render as.
+function photoFrame(slide, x, y, w, h) {
+  const X = (u) => x + u * w;
+  const Y = (v) => y + v * h;
+  rect(slide, x, y, w, h, WHITE);
+  slide.addShape('rect', { x: X(0.08), y: Y(0.17), w: 0.86 * w, h: 0.63 * h, fill: { color: WHITE }, line: { color: '595959', width: 1 } });
+  slide.addShape('rect', { x: X(0.15), y: Y(0.21), w: 0.71 * w, h: 0.55 * h, fill: { color: WHITE }, line: { color: 'A6A6A6', width: 0.5 } });
+  slide.addShape('ellipse', { x: X(0.21), y: Y(0.26), w: 0.16 * w, h: 0.16 * h, fill: { color: 'F7C873' }, line: { color: 'E8A33D', width: 0.75 } });
+  poly(slide, X(0.16), Y(0.52), 0.34 * w, 0.24 * h, [[0.0, 1], [0.56, 0], [1, 0.79], [1, 1]], { fill: { color: '6FA8DC' } });
+  poly(slide, X(0.32), Y(0.39), 0.53 * w, 0.37 * h, [[0.0, 1], [0.54, 0], [1, 0.68], [1, 1]], { fill: { color: '6FA8DC' } });
+}
+
+/* --------------------------------------------------- repeated text blocks */
+
+const LOREM_2LINE = [
+  'Lorep  ipsum duis aute irure dolor in kauselih oilue epreh',
+  'deriti vols esse cill inure dolorlaboru sit amet. Duis auelo irusitakus reprehenderi Voluptate lorem kuisais.',
+];
+
+// Two-paragraph 8pt body copy at 1.5 line spacing.
+function loremBody(slide, x, y, w, h, color, lines) {
+  const src = lines || LOREM_2LINE;
+  txt(slide, src.map((t, i) => ({ text: t, options: { breakLine: i < src.length - 1 } })),
+    { x, y, w, h, fontSize: 8, color, lineSpacingMultiple: 1.5 });
+}
+
+// "Design For Business / Presentation Template" + website.
+function footerBlock(slide, x, y, color) {
+  txt(slide, [
+    { text: 'Design For Business', options: { breakLine: true } },
+    { text: 'Presentation Template' },
+  ], { x, y, w: 2.433, h: 0.577, fontSize: 12, fontFace: F.med, color, margin: 0, lineSpacingMultiple: 1.5 });
+  txt(slide, 'www.yourwebsite.com',
+    { x, y: y + 0.78, w: 2.433, h: 0.185, fontSize: 11, fontFace: F.light, color, margin: 0 });
+}
+
+// "Text Tittle Here / California, 03/14/1990 / CEO & Owner" signature.
+function signatureBlock(slide, x, y, scale) {
+  const s = scale || 1;
+  txt(slide, 'Text Tittle  Here', { x, y, w: 2.188, h: 0.3, fontSize: 12 * s, fontFace: F.med, color: WHITE });
+  txt(slide, [
+    { text: 'California, ', options: { italic: true, fontFace: F.semi } },
+    { text: '03/14/1990', options: { italic: true, fontFace: 'Open Sans SemiBold' } },
+  ], { x, y: y + 0.339, w: 1.983, h: 0.32, fontSize: 10 * s, color: WHITE, lineSpacingMultiple: 1.5 });
+  txt(slide, 'CEO & Owner',
+    { x, y: y + 0.569, w: 1.746, h: 0.28, fontSize: 8 * s, color: WHITE, lineSpacingMultiple: 1.5 });
+}
+
+// Two-column word list (slides 10, 11 and 16). `dx` positions the left-aligned
+// variant from the block's left edge, `rdx` the right-aligned one from its
+// right edge.
+const WORD_LIST = [
+  { t: 'Lorem ipsum', dy: 0.000, w: 1.026, dx: 0.000, rdx: -0.042 },
+  { t: 'Lorem ipsum  Dolor', dy: 0.320, w: 1.417, dx: 0.000, rdx: 0.000 },
+  { t: 'Lorem ipsum  sit amet', dy: 0.640, w: 1.525, dx: 0.000, rdx: 0.000, h: 0.404 },
+  { t: 'Lorem', dy: 1.131, w: 1.417, dx: 0.000, rdx: 0.000 },
+  { t: 'Lorem', dy: -0.030, w: 1.417, dx: 1.650, rdx: 0.852 },
+  { t: 'Doloris', dy: 0.660, w: 1.417, dx: 1.650, rdx: 0.852 },
+  { t: 'Amet', dy: 1.001, w: 1.417, dx: 1.639, rdx: 0.840 },
+];
+
+function wordList(slide, x, y, align) {
+  const right = align === 'right';
+  WORD_LIST.forEach((it) => {
+    txt(slide, it.t, {
+      x: right ? x + it.rdx - it.w : x + it.dx,
+      y: y + it.dy, w: it.w, h: it.h || 0.252,
+      fontSize: 9, fontFace: F.med, color: WHITE, align: right ? 'right' : 'left',
+    });
+  });
+}
+
+// "01/10 — Lorem duils — rule — Lorep ipsum duis aute." index block.
+function indexBlock(slide, x, y) {
+  txt(slide, '01/10', { x, y, w: 1.372, h: 0.64, fontSize: 32, fontFace: F.med, color: WHITE });
+  txt(slide, 'Lorem duils', { x: x + 1.485, y: y + 0.037, w: 1.417, h: 0.269, fontSize: 10, fontFace: F.med, color: WHITE });
+  txt(slide, 'Lorep  ipsum duis aute.', { x: x + 1.345, y: y + 0.419, w: 1.699, h: 0.286, fontSize: 8, color: WHITE, lineSpacingMultiple: 1.5 });
+  line(slide, x + 0.135, y + 0.789, 2.563, 0, WHITE);
+}
+
+// "The Challenge" heading + grey paragraph, twice (slides 4 and 5).
+const CHALLENGE_1 = 'Nunc mioasjaa sapiana nenatis quis erat sodales pharetra justo. Donec adat iaculis diam Aliquam consequat id velit vel hendrerit sed metus.';
+const CHALLENGE_2A = 'Duis id rutrum ante. Vestibulum tincidunt metus at viverra tempus. Aenean ut ';
+const CHALLENGE_2B = 'Aliquam condimentum congue odio, at porta est lobortis sit amet. ';
+
+function challengeColumn(slide, x, yTop) {
+  txt(slide, 'The Challenge', { x, y: yTop, w: 2.433, h: 0.202, fontSize: 12, fontFace: F.med, color: BLACK, margin: 0 });
+  txt(slide, CHALLENGE_1, { x, y: yTop + 0.322, w: 2.433, h: 1.362, fontSize: 11, color: GREY, margin: 0, lineSpacingMultiple: 1.5 });
+  txt(slide, 'The Challenge', { x, y: yTop + 2.574, w: 2.433, h: 0.202, fontSize: 12, fontFace: F.med, color: BLACK, margin: 0 });
+  txt(slide, [
+    { text: CHALLENGE_2A, options: { breakLine: true } },
+    { text: '', options: { breakLine: true } },
+    { text: CHALLENGE_2B },
+  ], { x, y: yTop + 2.896, w: 2.433, h: 1.918, fontSize: 11, color: GREY, margin: 0, lineSpacingMultiple: 1.5 });
+}
+
+// Turn an array of strings into bulleted paragraphs.
+function bullets(lines, code, indent, extra) {
+  return lines.map((t, i) => ({
+    text: t,
+    options: Object.assign({ breakLine: i < lines.length - 1, bullet: { characterCode: code, indent } }, extra),
+  }));
+}
+
+/* ============================================================== the slides */
+
+// 1 — Title: "Ambition"
+function slide01(pptx) {
+  const s = pptx.addSlide();
+  rect(s, 0, 0, 13.333, 7.5, NAVY);
+  rect(s, 5.125, 0, 8.208, 7.5, BLACK);
+  txt(s, 'Ambition', { x: 0.791, y: 1.208, w: 8.918, h: 2.289, fontSize: 130, bold: true, color: WHITE, wrap: false });
+  txt(s, ['Business', 'Presentation', 'Template.'].map((t, i) => ({ text: t, options: { breakLine: i < 2 } })),
+    { x: 0.791, y: 3.583, w: 1.639, h: 0.942, fontSize: 16, fontFace: F.med, color: WHITE, wrap: false });
+  txt(s, 'Modern Design', { x: 0.794, y: 4.756, w: 1.05, h: 0.236, fontSize: 8, fontFace: F.med, color: WHITE, wrap: false });
+  loremBody(s, 0.791, 5.544, 3.446, 0.688, WHITE);
+}
+
+// 2 — Agenda grid, six numbered items
+function slide02(pptx) {
+  const s = pptx.addSlide();
+  rect(s, 0, 0, 13.354, 7.5, NAVY);
+
+  const ITEMS = [
+    { n: '01.', title: 'ABOUT US.', col: 0, row: 0 },
+    { n: '02.', title: 'SERVICES.', col: 0, row: 1 },
+    { n: '03.', title: 'TEAM INFO.', col: 0, row: 2 },
+    { n: '04.', title: 'PORTFOLIO.', col: 1, row: 0 },
+    { n: '05.', title: 'MOCKUP INFO.', col: 1, row: 1 },
+    { n: '06.', title: 'IMPORTANT INFO.', col: 1, row: 2 },
+  ];
+  const BODY = [
+    'Ur, venihil modi officat ioriberovit dolorum',
+    'Poreptaur que si cuptate vero vernature ere incnis am udolorese.',
+  ];
+  ITEMS.forEach((it) => {
+    const x = it.col === 0 ? 1.324 : 4.518;
+    const y = 1.572 + it.row * 1.8235;
+    txt(s, it.n, { x: x + 0.004, y, w: 0.667, h: 0.404, fontSize: 18, color: WHITE });
+    txt(s, it.title, { x: x - 0.005, y: y + 0.311, w: 2.732, h: 0.37, fontSize: 16, bold: true, color: WHITE });
+    txt(s, BODY.map((t, i) => ({ text: t, options: { breakLine: i === 0 } })),
+      { x, y: y + 0.696, w: 2.728, h: 0.666, fontSize: 8, color: WHITE, lineSpacingMultiple: 1.4 });
+  });
+}
+
+// 3 — "Problems"
+function slide03(pptx) {
+  const s = pptx.addSlide();
+  rect(s, 0, 0, 13.333, 7.5, NAVY);
+  rect(s, 3.333, 0, 10, 7.5, BLACK, { fill: { color: BLACK, transparency: 25 } });
+
+  txt(s, 'Problems', { x: 5.238, y: 1.39, w: 4.882, h: 1.111, fontSize: 60, bold: true, color: WHITE });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur.',
+    { x: 5.301, y: 2.899, w: 5.336, h: 0.352, fontSize: 11, bold: true, color: WHITE, align: 'justify', lineSpacingMultiple: 1.5 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec bibendum mi sed mattis ornare. Ut nisi magna, consectetur id tempor non, laoreet vitae dui. ',
+    { x: 5.297, y: 3.268, w: 5.919, h: 0.534, fontSize: 9, color: WHITE, lineSpacingMultiple: 1.5 });
+
+  [{ n: '01', x: 5.235, tx: 5.252, tw: 2.602, bw: 3.007 },
+   { n: '02', x: 8.381, tx: 8.381, tw: 2.815, bw: 3.253 }].forEach((c) => {
+    txt(s, c.n, { x: c.x, y: 4.299, w: 1.053, h: 0.774, fontSize: 40, bold: true, color: WHITE });
+    txt(s, 'Text Here', { x: c.tx, y: 4.96, w: c.tw, h: 0.421, fontSize: 14, bold: true, color: WHITE, lineSpacingMultiple: 1.5 });
+    txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec bibendum mi sed mattis ornare. ',
+      { x: c.tx, y: 5.349, w: c.bw, h: 0.761, fontSize: 9, color: WHITE, lineSpacingMultiple: 1.5 });
+  });
+
+  // navy sidebar
+  ['Lorem', 'Lorem duils', 'Doloris', 'Amet'].forEach((t, i) => {
+    txt(s, t, { x: i === 3 ? 0.509 : 0.52, y: 1.295 + i * 0.3437, w: 1.006, h: 0.252, fontSize: 9, fontFace: F.med, color: WHITE });
+  });
+  txt(s, 'Lorep  ipsum duis aute irure dolor in kaselih oilue reprehendesse cill inure dolorlaoru sit amet. ',
+    { x: 0.498, y: 2.922, w: 1.919, h: 0.614, fontSize: 7, italic: true, color: WHITE, lineSpacingMultiple: 1.5 });
+  footerBlock(s, 0.6, 5.24, WHITE);
+}
+
+// 4 — "Solution" (white left / navy right)
+function slide04(pptx) {
+  const s = pptx.addSlide();
+  rect(s, 0, 0, 6.667, 7.5, WHITE);
+  rect(s, 6.667, 0, 6.667, 7.5, NAVY);
+
+  challengeColumn(s, 0.6, 1.621);
+  txt(s, 'Solution', { x: 6.448, y: 0.866, w: 6.286, h: 1.447, fontSize: 80, bold: true, color: WHITE });
+
+  const POINTS = ['Lorem ipsum dolor sit amet,.', 'Donec a neque eget urna blandi.', 'Integer volutpat purus a leo.'];
+  [{ n: '02', y: 2.616 }, { n: '03', y: 4.884 }].forEach((c) => {
+    txt(s, c.n, { x: 8.87, y: c.y, w: 3.283, h: 0.774, fontSize: 40, bold: true, color: WHITE });
+    txt(s, 'Text Here', { x: 8.888, y: c.y + 0.662, w: 3.283, h: 0.421, fontSize: 14, bold: true, color: WHITE, lineSpacingMultiple: 1.5 });
+    txt(s, bullets(POINTS, '2022', 18), { x: 8.888, y: c.y + 1.05, w: 3.283, h: 0.834, fontSize: 10, color: WHITE, lineSpacingMultiple: 1.5 });
+  });
+}
+
+// 5 — "Welcome Messages" (CEO quote)
+function slide05(pptx) {
+  const s = pptx.addSlide();
+  rect(s, 0, 0, 13.333, 7.5, WHITE);
+  rect(s, 0, 0, 10, 7.5, BLACK);
+  photoFrame(s, 1.76, 3.32, 0.88, 0.66);
+
+  txt(s, 'Welcome Messages', { x: 0.619, y: 0.992, w: 8.298, h: 0.909, fontSize: 48, bold: true, color: WHITE });
+  txt(s, 'The CEO Quotes', { x: 4.21, y: 2.146, w: 2.369, h: 0.375, fontSize: 12, color: NAVY, align: 'justify', lineSpacingMultiple: 1.5 });
+  txt(s, 'If Everyone Is Moving Forward Together, Then Success Takes Care Of Itself.',
+    { x: 4.21, y: 2.632, w: 5.427, h: 2.255, fontSize: 32, bold: true, color: WHITE });
+  txt(s, [
+    { text: 'More Profits', options: { bold: true } },
+    { text: ': They Helped, We Gain More Dollars.' },
+  ], { x: 4.21, y: 4.932, w: 4.756, h: 0.33, fontSize: 10, color: WHITE, lineSpacingMultiple: 1.5 });
+
+  txt(s, 'Chief Executive Officer', { x: 0.743, y: 6.032, w: 2.433, h: 0.202, fontSize: 12, color: WHITE, margin: 0 });
+  txt(s, 'YOUR NAME HERE', { x: 0.743, y: 6.322, w: 2.433, h: 0.236, fontSize: 14, fontFace: F.semi, color: NAVY, margin: 0 });
+  txt(s, 'Modern Design', { x: 7.294, y: 6.106, w: 2.433, h: 0.185, fontSize: 11, fontFace: F.light, color: WHITE, margin: 0 });
+  txt(s, 'Presentation Template', { x: 7.294, y: 6.355, w: 2.433, h: 0.202, fontSize: 12, fontFace: F.med, color: NAVY, margin: 0 });
+
+  challengeColumn(s, 10.475, 1.542);
+}
+
+// 6 — Full-bleed pull quote
+function slide06(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: BLACK };
+  s.addShape('rect', { x: 11.461, y: -1.005, w: 1.996, h: 3.034, rotate: 320, fill: { color: WHITE, transparency: 93 } });
+  quoteGlyph(s, 6.132, 1.958, 1.07, 0.849, NAVY);
+  txt(s, 'It\u2019s not about ideas. It\u2019s about making ideas happen.',
+    { x: 1.282, y: 2.879, w: 10.769, h: 2.218, fontSize: 44, bold: true, color: WHITE, align: 'center', lineSpacingMultiple: 1.5 });
+  txt(s, 'Scott Belsky',
+    { x: 3.497, y: 5.263, w: 6.339, h: 0.512, fontSize: 18, color: NAVY, align: 'center', lineSpacingMultiple: 1.5 });
+}
+
+// 7 — "Ambition Competitive Advantages" + two price cards
+function slide07(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: NAVY };
+
+  txt(s, 'Lorem Ipsum', { x: 0.869, y: 1.701, w: 1.371, h: 0.236, fontSize: 8, fontFace: F.med, color: WHITE });
+  txt(s, ['Lorem ipsum', 'Dolor', 'Sit amet.'].map((t, i) => ({ text: t, options: { breakLine: i < 2 } })),
+    { x: 2.332, y: 1.415, w: 1.026, h: 0.555, fontSize: 9, fontFace: F.med, color: WHITE });
+  loremBody(s, 3.956, 1.28, 3.446, 0.688, WHITE, [
+    'Lorep  ipsum duis aute irure dolor in kauselih oilue epreh',
+    'deriti vols esse cill inure dolorlaboru sit amet. Duis autelo irusitakus reprehenderi Voluptate lorem kuisais.',
+  ]);
+  line(s, 0.869, 2.124, 6.739, 0, WHITE);
+  txt(s, 'Ambition Competitive Advantages',
+    { x: 0.669, y: 3.231, w: 5.984, h: 3.13, fontSize: 60, bold: true, color: WHITE });
+
+  // two identical "mini content" price cards
+  [1.665, 3.75].forEach((cardY) => {
+    s.addShape('roundRect', {
+      x: 8.037, y: cardY + 0.199, w: 3.616, h: 1.708, rectRadius: 0.197, fill: { color: WHITE },
+      shadow: { type: 'outer', color: BLACK, opacity: 0.25, blur: 60, offset: 0, angle: 90 },
+    });
+    s.addShape('roundRect', { x: 8.446, y: cardY, w: 2.341, h: 0.381, rectRadius: 0.19, fill: { color: BLACK } });
+    txt(s, 'Mini content #2', { x: 8.446, y: cardY, w: 2.341, h: 0.381, fontSize: 16, color: WHITE, align: 'center', valign: 'middle' });
+    txt(s, [
+      { text: '2.700 ', options: { fontSize: 32 } },
+      { text: '/year', options: { fontSize: 20 } },
+    ], { x: 8.446, y: cardY + 0.621, w: 2.963, h: 0.64, color: INK });
+    txt(s, '\u2018Lorem ipsum dolor sit amet',
+      { x: 8.446, y: cardY + 1.193, w: 2.963, h: 0.38, fontSize: 14, color: GREY, lineSpacingMultiple: 1.3, paraSpaceBefore: 12 });
+  });
+}
+
+// 8 — "Ambition Story" timeline
+function slide08(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: BLACK };
+  rect(s, 0, 4.512, 5.691, 2.988, NAVY);
+  line(s, 6.667, 1.789, 0, 5.711, NAVY, 2);
+
+  txt(s, 'Ambition Story', { x: 0.882, y: 1.657, w: 5.208, h: 2.322, fontSize: 66, bold: true, color: WHITE });
+
+  const STORY = 'It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem';
+  [{ year: '2021', y: 1.316, cy: 1.108 },
+   { year: '2022', y: 3.465, cy: 3.158 },
+   { year: '2023', y: 5.487, cy: 5.209 }].forEach((r) => {
+    photoFrame(s, 6.174, r.cy, 0.972, 0.972);
+    txt(s, r.year, { x: 7.57, y: r.y, w: 3.57, h: 0.417, fontSize: 14, bold: true, color: WHITE, margin: 1.95 });
+    txt(s, STORY, { x: 7.57, y: r.y + 0.417, w: 3.57, h: 0.63, fontSize: 9, color: WHITE, margin: 1.95, lineSpacing: 16, align: 'justify' });
+  });
+
+  txt(s, 'About Us', { x: 0.882, y: 5.162, w: 1.52, h: 0.37, fontSize: 16, bold: true, charSpacing: 1, color: WHITE });
+  [{ y: 5.637, t: 'Morbi accumsan suscipit nunc nec ultrices maecenas nulla enim, faucibus eget' },
+   { y: 6.386, t: 'Nullam tempus dui lobortis, laoreet ante ac, dictum ipsum fusce posuere elit risus, ' }].forEach((b) => {
+    txt(s, '\u2713', { x: 0.93, y: b.y + 0.02, w: 0.34, h: 0.28, fontSize: 13, bold: true, color: WHITE, fontFace: 'DejaVu Sans' });
+    txt(s, b.t, { x: 1.307, y: b.y, w: 3.657, h: 0.534, fontSize: 9, color: WHITE, lineSpacingMultiple: 1.5 });
+  });
+}
+
+// 9 — Big pull quote, navy panel on the right
+function slide09(pptx) {
+  const s = pptx.addSlide();
+  rect(s, 0, 0, 13.333, 7.5, WHITE);
+  rect(s, 6.667, 0, 6.667, 7.5, NAVY);
+
+  quoteGlyph(s, 0.447, 0.706, 2.663, 2.113, LIGHT_GREY);
+  txt(s, 'Success usually comes to those who are too busy to be looking for it.\u201D',
+    { x: 0.891, y: 1.467, w: 5.467, h: 5.15, fontSize: 50, fontFace: F.semi, color: BLACK });
+
+  rect(s, 7.267, 3.835, 1.799, 0.413, BLACK);
+  txt(s, 'TEXT TITTLE HERE', { x: 7.507, y: 3.948, w: 1.303, h: 0.236, fontSize: 8, charSpacing: 1, fontFace: F.med, color: WHITE, wrap: false });
+  txt(s, 'Lorep  ipsum duis aute irure dolor in kauselih oilusioisduili reprehenderitisi voluptates esse cill inure dolorlaborusita amet. Duis aute irusitaseiad dolorin repreheno dui lroeml',
+    { x: 7.165, y: 4.631, w: 3.912, h: 0.688, fontSize: 8, color: WHITE, lineSpacingMultiple: 1.5 });
+  signatureBlock(s, 7.165, 5.766, 1);
+  footerBlock(s, 10.666, 5.585, WHITE);
+}
+
+// 10 — "About Our Vision"
+function slide10(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: BLACK };
+  rect(s, 0, 1.361, 4.198, 6.139, NAVY);
+
+  wordList(s, 0.557, 1.846);
+  txt(s, 'About Our Vision', { x: 4.761, y: 1.899, w: 9.198, h: 0.942, fontSize: 60, bold: true, color: WHITE, lineSpacingMultiple: 0.8 });
+  footerBlock(s, 0.626, 5.817, WHITE);
+  signatureBlock(s, 11.264, 5.954, 0.92);
+}
+
+// 11 — "About US" dark card over the navy background
+function slide11(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: NAVY };
+  rect(s, 0.762, 0.905, 9.143, 5.976, BLACK, { fill: { color: BLACK, transparency: 25 } });
+
+  indexBlock(s, 1.292, 1.864);
+  txt(s, [
+    { text: '01', options: { fontSize: 11 } },
+    { text: '/', options: { fontSize: 10.5 } },
+    { text: '03', options: { fontSize: 8 } },
+  ], { x: 1.312, y: 3.191, w: 0.709, h: 0.286, fontFace: F.med, color: WHITE });
+  txt(s, 'Text Tittle Here', { x: 1.632, y: 3.669, w: 1.026, h: 0.236, fontSize: 8, fontFace: F.med, color: WHITE, wrap: false });
+  txt(s, [
+    { text: 'Lorep  ipsum duis ' },
+    { text: 'aute irure ', options: { bold: true } },
+    { text: 'dolor in kaselih oilue reprehendesse cill inure dolorlaoru sit amet. Duis aute' },
+    { text: ' irusitakus.', options: { bold: true } },
+  ], { x: 1.632, y: 3.997, w: 2.503, h: 0.614, fontSize: 7, color: WHITE, lineSpacingMultiple: 1.5 });
+  txt(s, 'LOREM IPSUM', { x: 1.657, y: 4.911, w: 1.092, h: 0.236, fontSize: 8, charSpacing: 1.1, color: WHITE, wrap: false });
+  line(s, 3.277, 5.029, 0.681, 0, WHITE, 1, { line: { color: WHITE, width: 1, endArrowType: 'triangle' } });
+  txt(s, 'About US', { x: 1.188, y: 5.283, w: 4.912, h: 1.313, fontSize: 72, bold: true, color: WHITE, wrap: false });
+
+  wordList(s, 12.127, 1.32, 'right');
+  txt(s, 'Lorem Ipsum dolor sit amet .', { x: 11.158, y: 6.318, w: 1.417, h: 0.471, fontSize: 11, fontFace: F.med, color: WHITE, align: 'right' });
+  s.addShape('triangle', { x: 12.749, y: 6.506, w: 0.128, h: 0.128, rotate: 270, fill: { color: WHITE } });
+}
+
+// 12 — "Executive Summary", two bulleted columns
+function slide12(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: BLACK };
+  txt(s, 'Executive Summary', { x: 0.874, y: 1.163, w: 6.553, h: 0.867, fontSize: 37.33, fontFace: F.semi, color: WHITE, lineSpacingMultiple: 1.216 });
+  line(s, 0.988, 2.017, 1.24, 0, BLACK, 2.5);
+  line(s, 6.273, 2.763, 0, 3.001, BLACK, 1);
+
+  const POINTS = [
+    'There are many variations of passages of Lorem Ipsum available, but',
+    'majority have suffered alteration in some form, by injected',
+    "humor, or randomized words which don't look even slightly believable.",
+    'If you are going to use a passage of Lorem Ipsum, you need to',
+    "be sure there isn't anything",
+  ];
+  [0.876, 6.667].forEach((x) => {
+    txt(s, 'Good Idea  Makes Everything is Better', { x, y: 2.763, w: 3.944, h: 0.446, fontSize: 13.33, color: WHITE, lineSpacingMultiple: 1.538 });
+    txt(s, 'There are many variations of passages of Lorem Ipsum available, but the or randomized words which',
+      { x, y: 3.373, w: 5.041, h: 0.666, fontSize: 12, italic: true, color: WHITE, lineSpacingMultiple: 1.4 });
+    txt(s, bullets(POINTS, '25AA', 13.3), { x, y: 4.161, w: 5.683, h: 1.717, fontSize: 10.67, color: WHITE, lineSpacingMultiple: 1.8 });
+  });
+  footerBlock(s, 10.491, 0.949, NAVY);
+}
+
+// 13 — "Featured Services"
+function slide13(pptx) {
+  const s = pptx.addSlide();
+  rect(s, 0, 0, 13.333, 7.5, WHITE);
+  rect(s, 0, 2.167, 1.795, 1.583, NAVY);
+
+  txt(s, 'Featured Services', { x: 0.874, y: 1.078, w: 6.553, h: 1.004, fontSize: 44, bold: true, color: BLACK, lineSpacingMultiple: 1.216 });
+
+  // right column: rule + intro + two icon rows
+  rect(s, 8.343, 1.053, 2.078, 0.05, NAVY);
+  txt(s, 'Lorem Ipsum dolor sit amet .', { x: 8.253, y: 1.274, w: 3.446, h: 0.337, fontSize: 14, fontFace: F.med, color: BLACK });
+  txt(s, 'Lorep  ipsum duis aute irure dolor in kaselih oilue epreh deriti vols cill inure dolorlru sit amet. ',
+    { x: 8.253, y: 1.821, w: 3.717, h: 0.981, fontSize: 12, color: GREY, lineSpacingMultiple: 1.5 });
+
+  const FEATURE_BODY = 'Lorep  ipsum duis aute irure dolor in kauselih oilue reprehnderiti vols esse cill inure dolorlaboru sit at. aute irusitakus repreheeri Voluptate lores kausiesuli. Lorem dolor sit amet.';
+  [3.908, 5.365].forEach((y) => {
+    txt(s, 'TEXT TITTLE HERE', { x: 8.703, y, w: 2.173, h: 0.286, fontSize: 11, bold: true, charSpacing: 0.5, color: NAVY });
+    txt(s, FEATURE_BODY, { x: 8.703, y: y + 0.261, w: 4.075, h: 0.688, fontSize: 8, color: GREY, lineSpacingMultiple: 1.5 });
+  });
+  // line-art icons beside the two feature rows: an open box, and a light bulb
+  // holding a cog with rays around it
+  s.addShape('cube', { x: 8.241, y: 3.951, w: 0.341, h: 0.398, fill: { type: 'none' }, line: { color: BLACK, width: 1 } });
+  const bulbLine = { color: BLACK, width: 0.75 };
+  s.addShape('ellipse', { x: 8.228, y: 5.432, w: 0.251, h: 0.251, fill: { type: 'none' }, line: bulbLine });
+  s.addShape('ellipse', { x: 8.311, y: 5.512, w: 0.086, h: 0.086, fill: { type: 'none' }, line: bulbLine });
+  [5.695, 5.735].forEach((y) => line(s, 8.284, y, 0.14, 0, BLACK, 0.75)); // bulb base
+  s.addShape('triangle', { x: 8.318, y: 5.762, w: 0.072, h: 0.042, rotate: 180, fill: { type: 'none' }, line: bulbLine });
+  [[8.354, 5.359, 0, 0.052], [8.153, 5.555, 0.052, 0], [8.503, 5.555, 0.052, 0],
+   [8.208, 5.408, 0.04, 0.04], [8.46, 5.408, -0.04, 0.04],
+   [8.208, 5.708, 0.04, -0.04], [8.46, 5.708, -0.04, -0.04]]
+    .forEach((r) => line(s, r[0], r[1], r[2], r[3], BLACK, 0.75));
+
+  // dark card: fingerprint + "980 / Secure Transaction"
+  s.addShape('rect', {
+    x: 3.036, y: 3.921, w: 4.933, h: 1.076, fill: { color: BLACK },
+    shadow: { type: 'outer', color: BLACK, opacity: 0.43, blur: 20, offset: 4, angle: 90 },
+  });
+  [0.435, 0.30, 0.17].forEach((d) => {
+    s.addShape('ellipse', {
+      x: 3.582 + (0.435 - d) / 2, y: 4.231 + (0.489 - d * 1.124) / 2, w: d, h: d * 1.124,
+      fill: { type: 'none' }, line: { color: WHITE, width: 1.25 },
+    });
+  });
+  txt(s, '980', { x: 4.171, y: 4.29, w: 0.483, h: 0.236, fontSize: 14, fontFace: F.med, color: WHITE, margin: 0 });
+  txt(s, '+56%', { x: 4.171, y: 4.538, w: 0.483, h: 0.118, fontSize: 7, fontFace: F.light, color: WHITE, margin: 0 });
+  line(s, 4.838, 4.169, 0, 0.6, PALE_BLUE);
+  txt(s, 'Secure Transaction', { x: 5.092, y: 4.246, w: 1.972, h: 0.185, fontSize: 11, fontFace: F.med, color: WHITE, margin: 0 });
+  txt(s, 'Phasellus metus arcu, viverra atas', { x: 5.092, y: 4.529, w: 2.457, h: 0.168, fontSize: 10, fontFace: F.light, color: WHITE, margin: 0 });
+
+  // white card: play button + "Flexibility global market growth"
+  s.addShape('rect', {
+    x: 3.036, y: 5.115, w: 4.933, h: 1.076, fill: { color: WHITE },
+    shadow: { type: 'outer', color: BLACK, opacity: 0.12, blur: 26, offset: 20, angle: 45 },
+  });
+  rect(s, 3.583, 5.449, 0.8, 0.4, BLACK);
+  rect(s, 3.983, 5.449, 0.4, 0.4, NAVY);
+  s.addShape('triangle', { x: 4.143, y: 5.607, w: 0.103, h: 0.071, rotate: 90, fill: { color: WHITE } });
+  txt(s, 'Flexibility global market growth', { x: 4.626, y: 5.423, w: 2.869, h: 0.185, fontSize: 11, fontFace: F.med, color: NAVY, margin: 0 });
+  txt(s, 'Aliquam dimentum', { x: 4.626, y: 5.706, w: 2.457, h: 0.168, fontSize: 10, fontFace: F.light, color: BLACK, margin: 0 });
+}
+
+// 14 — "Main Featured Services", three tiles + 70%
+function slide14(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: NEAR_BLACK };
+  rect(s, 0, 4.565, 3.136, 2.935, WHITE);
+  rect(s, 3.136, 4.565, 3.136, 2.935, NAVY);
+  rect(s, 6.273, 4.565, 3.136, 2.935, NAVY);
+
+  txt(s, 'Main Featured Services', { x: 5.632, y: 1.407, w: 7.79, h: 2.121, fontSize: 60, bold: true, color: WHITE });
+
+  const TILE_BODY = 'Lorep  ipsum duis aute irure dolor in kaush oilusioi reprehenderiti volui ptates esse cill inure dolorlasue boru sit amet. Duis aute';
+  [{ x: 0.329, color: INK, titleColor: BLACK, dy: 0 },
+   { x: 3.519, color: WHITE, titleColor: WHITE, dy: 0.024 },
+   { x: 6.599, color: WHITE, titleColor: WHITE, dy: 0 }].forEach((t) => {
+    txt(s, 'TEXT TITTLE HERE', { x: t.x, y: 5.867 + t.dy, w: 1.593, h: 0.286, fontSize: 10.5, charSpacing: 0.5, fontFace: F.med, color: t.titleColor });
+    txt(s, TILE_BODY, { x: t.x, y: 6.153 + t.dy, w: 2.799, h: 0.688, fontSize: 8, color: t.color, lineSpacingMultiple: 1.5 });
+  });
+
+  // tile icons, all line art: stacked cubes, paper plane, bar chart with arrow
+  s.addShape('cube', { x: 0.754, y: 4.972, w: 0.511, h: 0.5, fill: { type: 'none' }, line: { color: BLACK, width: 1 } });
+  poly(s, 3.91, 5.061, 0.405, 0.375,
+    [[0.00, 0.47], [1.00, 0.00], [0.55, 1.00], [0.40, 0.72], [0.33, 0.86], [0.32, 0.60]],
+    { fill: { type: 'none' }, line: { color: WHITE, width: 1 } });
+  [{ x: 6.958, h: 0.366 }, { x: 7.092, h: 0.232 }, { x: 7.226, h: 0.122 }].forEach((b) => {
+    s.addShape('rect', { x: b.x, y: 5.545 - b.h, w: 0.098, h: b.h, fill: { type: 'none' }, line: { color: WHITE, width: 1 } });
+  });
+  line(s, 6.958, 5.594, 0.415, 0, WHITE); // chart baseline
+  line(s, 7.373, 5.179, 0, 0.415, WHITE); // chart right axis
+  line(s, 7.129, 5.179, 0.2, 0.2, WHITE, 1, { line: { color: WHITE, width: 1, beginArrowType: 'triangle' } });
+
+  txt(s, [
+    { text: '70', options: { fontSize: 72 } },
+    { text: '%', options: { fontSize: 32 } },
+  ], { x: 9.768, y: 4.587, w: 3.655, h: 1.313, bold: true, color: WHITE });
+  txt(s, 'Successful Project', { x: 9.768, y: 5.769, w: 3.188, h: 0.404, fontSize: 18, color: WHITE });
+  loremBody(s, 9.768, 6.495, 3.446, 0.688, WHITE);
+}
+
+// 15 — "Meet The Ambition Team"
+function slide15(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: BLACK };
+  rect(s, 0, 0, 13.333, 4.286, NAVY);
+
+  txt(s, 'Meet The Ambition Team', { x: 3.569, y: 0.77, w: 6.419, h: 3.13, fontSize: 60, bold: true, color: WHITE });
+  rect(s, 8.268, 1.336, 1.3, 0.135, BLACK);
+  [1.684, 2.557, 3.43].forEach((y) => {
+    txt(s, 'Your Name Here', { x: 8.766, y, w: 2.173, h: 0.303, fontSize: 12, charSpacing: 0.5, fontFace: F.semi, color: WHITE });
+    txt(s, 'Lorep  ipsum duis aute irure dolor in kauselih oilusioalio',
+      { x: 8.766, y: y + 0.216, w: 3.677, h: 0.284, fontSize: 8, color: WHITE, lineSpacingMultiple: 1.5 });
+  });
+}
+
+// 16 — "Business Portfolio"
+function slide16(pptx) {
+  const s = pptx.addSlide();
+  rect(s, 0, 0, 13.333, 7.5, WHITE);
+  rect(s, 0, 0, 4.854, 7.5, NAVY);
+
+  wordList(s, 1.787, 0.994);
+  indexBlock(s, 0.379, 3.173);
+  txt(s, ['Risus eu ultrices.', 'donec sollicitudin sollicitudin'].map((t, i) => ({ text: t, options: { breakLine: i === 0 } })),
+    { x: 0.459, y: 4.885, w: 2.433, h: 0.529, fontSize: 11, color: WHITE, margin: 0, lineSpacingMultiple: 1.5 });
+  txt(s, 'Business Portfolio', { x: 0.459, y: 5.745, w: 4.4, h: 0.539, fontSize: 32, bold: true, color: WHITE, margin: 0 });
+
+  txt(s, ' Mauris eu nisl sed diam imperdiet iaculis vitae ut metus. Nam condimentum',
+    { x: 5.332, y: 0.966, w: 2.006, h: 0.66, fontSize: 9, fontFace: F.light, color: BLACK, margin: 0, lineSpacingMultiple: 1.5 });
+  txt(s, 'Your Text Here', { x: 10.501, y: 1.325, w: 2.006, h: 0.301, fontSize: 11, color: NAVY, align: 'right', valign: 'middle', margin: 2.8, lineSpacingMultiple: 1.2 });
+  txt(s, 'Presentation Template', { x: 10.074, y: 6.502, w: 2.433, h: 0.202, fontSize: 12, fontFace: F.med, color: BLACK, align: 'right', margin: 0 });
+}
+
+// 17 — "Portfolio Gallery"
+function slide17(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: BLACK };
+
+  txt(s, 'Portfolio Gallery', { x: 0.824, y: 0.768, w: 8.773, h: 1.19, fontSize: 66, bold: true, color: WHITE, valign: 'middle', margin: 2.8 });
+  txt(s, 'We love textures so much that we put them in all our layouts, from product pages to the homepage. We use textures to break up the page and create visual interest, but we also use them in a way that ties back to the brand.',
+    { x: 0.824, y: 2.106, w: 4.827, h: 1.089, fontSize: 10, color: WHITE, valign: 'middle', margin: 2.8, lineSpacingMultiple: 1.5 });
+
+  [{ x: 0.824, w: 1.065 }, { x: 7.418, w: 1.172 }, { x: 9.161, w: 1.065 }, { x: 10.903, w: 1.13 }].forEach((c) => {
+    txt(s, 'Your Text Here', { x: c.x, y: 6.538, w: c.w, h: 0.261, fontSize: 9, color: WHITE, valign: 'middle', margin: 2.8, lineSpacingMultiple: 1.2 });
+  });
+
+  txt(s, 'Modern Design', { x: 10.589, y: 2.691, w: 2.433, h: 0.185, fontSize: 11, fontFace: F.light, color: CRIMSON, margin: 0 });
+  txt(s, 'Presentation Template', { x: 10.589, y: 2.94, w: 2.433, h: 0.202, fontSize: 12, fontFace: F.med, color: CRIMSON, margin: 0 });
+}
+
+// 18 — "Dekstop Media Mockup" with a desktop-monitor illustration
+function slide18(pptx) {
+  const s = pptx.addSlide();
+  rect(s, 0, 0, 13.333, 7.5, WHITE);
+  rect(s, 0, 4.424, 10.472, 2.543, NAVY);
+
+  // desktop monitor — stands in for the product photograph
+  poly(s, 9.43, 5.57, 1.44, 0.55,
+    [[0.167, 0], [0.833, 0], [1, 1], [0, 1]], { fill: { color: 'C3C7CB' } });
+  s.addShape('ellipse', { x: 9.30, y: 6.03, w: 1.70, h: 0.22, fill: { color: 'CDD1D5' } });
+  s.addShape('roundRect', { x: 7.64, y: 2.23, w: 4.96, h: 2.91, rectRadius: 0.07, fill: { color: '10131F' } });
+  rect(s, 7.84, 2.43, 4.56, 2.49, WHITE);
+  s.addShape('roundRect', { x: 7.65, y: 5.14, w: 4.95, h: 0.45, rectRadius: 0.08, fill: { color: 'B7BBC0' } });
+
+  txt(s, ['Dekstop Media', 'Mockup'].map((t, i) => ({ text: t, options: { breakLine: i === 0 } })),
+    { x: 1.105, y: 0.61, w: 6.904, h: 2.121, fontSize: 60, bold: true, color: BLACK });
+  txt(s, 'Lorem Ipsum', { x: 1.105, y: 2.917, w: 1.805, h: 0.37, fontSize: 16, fontFace: F.med, color: CRIMSON });
+  loremBody(s, 1.105, 3.371, 3.446, 0.688, GREY, [
+    'Lorep  ipsum duis aute irure dolor in kauselih oilue epreh',
+    'deriti vols esse cill inure dolorlaboru sit amet. Duis autelo irusitakus reprehenderi Voluptate lorem kuisais.',
+  ]);
+  loremBody(s, 4.855, 3.371, 2.895, 0.688, GREY, [
+    'Lorep  ipsum duis aute irure dolor in reprehenderitisi voluptates esse cill',
+    'amet. Duis aute.',
+  ]);
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Nullam ac tortor vitae purus faucibus ornare suspendisse sed nisi. Maecenas accumsan lacus vel facilisis volutpat est',
+    { x: 1.105, y: 4.77, w: 5.436, h: 0.761, fontSize: 9, color: WHITE, lineSpacingMultiple: 1.5 });
+
+  [{ value: '1170+', label: 'Coustomer', vx: 0.926, vw: 1.431, lx: 0.629 },
+   { value: '12K', label: 'Project Success', vx: 3.104, vw: 1.073, lx: 2.628 },
+   { value: '1115', label: 'Happy Client ', vx: 5.104, vw: 1.073, lx: 4.64 }].forEach((st) => {
+    txt(s, st.value, { x: st.vx, y: 5.777, w: st.vw, h: 0.505, fontSize: 24, bold: true, fontFace: F.semi, color: WHITE, align: 'center' });
+    txt(s, st.label, { x: st.lx, y: 6.31, w: 2.026, h: 0.286, fontSize: 11, fontFace: F.semi, color: WHITE, align: 'center' });
+  });
+  [2.615, 4.615].forEach((x) => {
+    s.addShape('roundRect', { x, y: 5.871, w: 0.053, h: 0.632, rectRadius: 0.026, fill: { color: PALE } });
+  });
+}
+
+// 19 — "Keep In Touch With Us" contact bar
+function slide19(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: NAVY };
+
+  txt(s, 'Keep In Touch With Us', { x: 3.907, y: 0.796, w: 6.904, h: 2.121, fontSize: 60, bold: true, color: WHITE });
+  txt(s, 'Lorep  ipsum duis aute irure dolor in kauselih oilusioi repiehenderiti volui ptates esse cill inure dolrlasue boru sit amet. Duis aute',
+    { x: 8.025, y: 2.439, w: 3.06, h: 1.185, fontSize: 11, fontFace: F.med, color: WHITE, lineSpacingMultiple: 1.5 });
+  loremBody(s, 8.02, 3.755, 3.446, 0.688, WHITE);
+
+  s.addShape('roundRect', {
+    x: 1.505, y: 4.906, w: 11.086, h: 1.355, rectRadius: 0.158, fill: { color: WHITE },
+    shadow: { type: 'outer', color: BLACK, opacity: 0.43, blur: 20, offset: 4, angle: 90 },
+  });
+
+  [{ bx: 1.982, glyph: '\u260E', title: 'PHONE', tx: 2.756, ty: 5.281, body: '(800) 123 4567 | Mobile', byy: 5.53 },
+   { bx: 5.003, glyph: '\u2709', title: 'EMAIL', tx: 5.794, ty: 5.293, body: 'email@acuity.com', byy: 5.574 }].forEach((c) => {
+    s.addShape('roundRect', { x: c.bx, y: 5.334, w: 0.507, h: 0.507, rectRadius: 0.09, fill: { type: 'none' }, line: { color: NAVY, width: 1.75 } });
+    txt(s, c.glyph, { x: c.bx, y: 5.334, w: 0.507, h: 0.507, fontSize: 16, color: BLACK, fontFace: 'DejaVu Sans', align: 'center', valign: 'middle' });
+    txt(s, c.title, { x: c.tx, y: c.ty, w: 1.961, h: 0.337, fontSize: 14, bold: true, charSpacing: 1, color: INK });
+    txt(s, c.body, { x: c.tx, y: c.byy, w: 1.961, h: 0.352, fontSize: 11, color: GREY, lineSpacingMultiple: 1.5 });
+  });
+
+  // map pin
+  s.addShape('roundRect', { x: 8.025, y: 5.328, w: 0.507, h: 0.507, rectRadius: 0.09, fill: { type: 'none' }, line: { color: NAVY, width: 1.75 } });
+  poly(s, 8.191, 5.445, 0.175, 0.291,
+    [[0.5, 1], [0, 0.36], [0.5, 0, 0.16, 0.66, 0, 0.16], [1, 0.36, 1, 0.16, 1, 0.16], [0.5, 1, 1, 0.66, 0.84, 0.66]],
+    { fill: { color: BLACK } });
+  s.addShape('ellipse', { x: 8.245, y: 5.485, w: 0.068, h: 0.068, fill: { color: WHITE } });
+
+  txt(s, 'Street Name, 45, Building, New York',
+    { x: 8.765, y: 5.272, w: 1.96, h: 0.625, fontSize: 11, color: GREY, lineSpacingMultiple: 1.5 });
+  s.addShape('roundRect', { x: 10.811, y: 5.15, w: 1.537, h: 0.868, rectRadius: 0.058, fill: { color: BLACK } });
+  txt(s, 'REQUEST A QUOTE', { x: 10.811, y: 5.15, w: 1.537, h: 0.868, fontSize: 12, bold: true, charSpacing: 1, color: WHITE, align: 'center', valign: 'middle' });
+}
+
+// 20 — "Thank You"
+function slide20(pptx) {
+  const s = pptx.addSlide();
+  rect(s, 0, 0, 13.333, 7.5, NAVY);
+  rect(s, 5.125, 0, 8.208, 7.5, BLACK);
+
+  txt(s, 'Thank You', { x: 6.516, y: 0.515, w: 7.403, h: 4.477, fontSize: 130, bold: true, color: WHITE });
+  footerBlock(s, 0.875, 1.241, WHITE);
+  txt(s, ['Ambition', 'Presentation', 'Template.'].map((t, i) => ({ text: t, options: { breakLine: i < 2 } })),
+    { x: 0.791, y: 3.583, w: 1.639, h: 0.942, fontSize: 16, fontFace: F.med, color: WHITE, wrap: false });
+  txt(s, 'Modern Design', { x: 0.794, y: 4.756, w: 1.05, h: 0.236, fontSize: 8, fontFace: F.med, color: WHITE, wrap: false });
+  loremBody(s, 0.791, 5.544, 3.446, 0.688, WHITE);
+}
+
+/* -------------------------------------------------------------------- main */
+
+const BUILDERS = [slide01, slide02, slide03, slide04, slide05, slide06, slide07,
+  slide08, slide09, slide10, slide11, slide12, slide13, slide14, slide15,
+  slide16, slide17, slide18, slide19, slide20];
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.layout = 'LAYOUT_WIDE'; // 13.333 x 7.5 in
+  pptx.theme = { headFontFace: F.reg, bodyFontFace: F.reg };
+  pptx.title = 'Ambition \u2014 Business Presentation Template';
+  BUILDERS.forEach((fn) => fn(pptx));
+  return pptx;
+}
+
+build().writeFile({
+  fileName: path.join(__dirname, '0444ddd4-1595-4435-8986-ceefb4122164_grok_final.pptx'),
+}).then((f) => console.log('wrote', f));
