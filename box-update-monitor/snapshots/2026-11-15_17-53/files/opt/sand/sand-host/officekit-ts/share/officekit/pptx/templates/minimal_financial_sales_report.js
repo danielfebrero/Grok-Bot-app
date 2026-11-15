@@ -1,0 +1,600 @@
+/**
+ * Recreates "Minimal Report – Presentation Template 2025" (20 slides, 10 x 5.625 in)
+ * with pptxgenjs only. Raster photos in the original are replaced by flat
+ * placeholder shapes tagged "[image]".
+ *
+ * Run: node 02f79f05-a15c-40d7-acb6-29cd4cf7e6e3_grok_final.js
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+// ---------------------------------------------------------------------------
+// Palette / typography (theme "minimal report")
+// ---------------------------------------------------------------------------
+const ORANGE = 'F19B3A';   // accent1
+const PINK   = 'DDB8D9';   // accent2
+const BLUE   = '8DACE5';   // accent3
+const OLIVE  = '516049';   // accent4
+const SAGE   = 'ADCE9C';   // accent6
+const INK    = '262626';   // body text
+const BLACK  = '000000';
+const WHITE  = 'FFFFFF';
+const PHOTO  = 'F2F2F2';   // fill used for "[image]" placeholders
+const PHOTO_TXT = 'B0B0B0';
+
+const F_MED = 'Poppins Medium';  // headings / numbers
+const F_REG = 'Poppins';         // body copy
+
+const TITLE_SZ = 41;   // section titles
+const BODY_SZ  = 9;    // paragraph copy
+const KICKER_SZ = 14;  // "Sales Trends" eyebrow
+const STAT_SZ  = 21;   // big orange stat
+
+const LOREM_LONG = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
+  'incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud.';
+const LOREM_MED = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
+  'incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, ';
+const LOREM_SHORT = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
+  'incididunt ut labore et';
+const LOREM_TINY = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut.';
+const SERENITY = 'A wonderful serenity has taken possession of my entire soul';
+
+// ---------------------------------------------------------------------------
+// Decorative custom geometries, normalised to the unit square.
+// Each entry is a list of ['M'|'L'|'C'|'Z', ...coords] commands.
+// ---------------------------------------------------------------------------
+const BURST = [
+  ['M', 0.877, 0.5913], ['L', 1, 0.574], ['L', 0.8904, 0.515],
+  ['C', 0.8302, 0.4827, 0.8072, 0.4068, 0.839, 0.3457],
+  ['C', 0.8438, 0.3365, 0.8497, 0.3279, 0.8566, 0.3202], ['L', 0.9398, 0.2267], ['L', 0.8184, 0.2532],
+  ['C', 0.7517, 0.2677, 0.6861, 0.2246, 0.6718, 0.157],
+  ['C', 0.6696, 0.1468, 0.6687, 0.1364, 0.6691, 0.126], ['L', 0.6737, 0], ['L', 0.5975, 0.0996],
+  ['C', 0.5556, 0.1542, 0.4781, 0.164, 0.4243, 0.1215],
+  ['C', 0.4162, 0.1152, 0.4089, 0.1078, 0.4026, 0.0996], ['L', 0.3264, 0], ['L', 0.331, 0.1261],
+  ['C', 0.3335, 0.1952, 0.2803, 0.2533, 0.2122, 0.2559],
+  ['C', 0.202, 0.2563, 0.1918, 0.2554, 0.1818, 0.2532], ['L', 0.0603, 0.2267], ['L', 0.1438, 0.3202],
+  ['C', 0.1894, 0.3716, 0.1854, 0.4508, 0.1348, 0.4972],
+  ['C', 0.1272, 0.5042, 0.1188, 0.5102, 0.1097, 0.515], ['L', 0, 0.574], ['L', 0.123, 0.5913],
+  ['C', 0.1905, 0.6008, 0.2377, 0.664, 0.2284, 0.7325],
+  ['C', 0.227, 0.7428, 0.2243, 0.7529, 0.2204, 0.7626], ['L', 0.1737, 0.8794], ['L', 0.2789, 0.8123],
+  ['C', 0.3366, 0.7755, 0.4128, 0.7932, 0.449, 0.8519],
+  ['C', 0.4545, 0.8607, 0.4588, 0.8701, 0.4619, 0.88], ['L', 0.5001, 1], ['L', 0.5382, 0.88],
+  ['C', 0.5591, 0.8141, 0.6287, 0.7779, 0.6936, 0.7992],
+  ['C', 0.7033, 0.8024, 0.7126, 0.8068, 0.7212, 0.8123], ['L', 0.8264, 0.8793], ['L', 0.7797, 0.7625],
+  ['C', 0.754, 0.6984, 0.7844, 0.6254, 0.8475, 0.5993],
+  ['C', 0.857, 0.5954, 0.8669, 0.5927, 0.877, 0.5913], ['Z']
+];
+const TICKET = [
+  ['M', 0.8335, 0.0955], ['C', 0.77, -0.0049, 0.6439, -0.0302, 0.5519, 0.039],
+  ['C', 0.5316, 0.0543, 0.5141, 0.0734, 0.5001, 0.0955], ['C', 0.4623, 0.0357, 0.4, 0, 0.3334, 0],
+  ['L', 0.3334, 0], ['C', 0.2668, -0, 0.2045, 0.0357, 0.1667, 0.0955],
+  ['C', 0.1289, 0.0357, 0.0666, 0, 0, 0], ['L', 0, 1], ['C', 0.0666, 1, 0.1289, 0.9643, 0.1666, 0.9045],
+  ['C', 0.2044, 0.9643, 0.2667, 1, 0.3333, 1], ['L', 0.3333, 1],
+  ['C', 0.3999, 1, 0.4622, 0.9643, 0.5, 0.9045], ['C', 0.5634, 1.0049, 0.6895, 1.0302, 0.7816, 0.961],
+  ['C', 0.8019, 0.9457, 0.8194, 0.9266, 0.8334, 0.9045], ['C', 0.8711, 0.9643, 0.9334, 1, 1, 1],
+  ['L', 1, 0], ['C', 0.9335, 0, 0.8712, 0.0357, 0.8335, 0.0955], ['Z']
+];
+const LEAF = [
+  ['M', 0, 0], ['L', 0, 0.4905], ['C', -0.0003, 0.6718, 0.0954, 0.8399, 0.2514, 0.9323],
+  ['C', 0.3251, 0.9757, 0.4089, 0.9991, 0.4945, 1], ['C', 0.5272, 1.0003, 0.5598, 0.9974, 0.592, 0.9915],
+  ['C', 0.6967, 0.9721, 0.8036, 0.9755, 0.9089, 0.9924],
+  ['C', 0.9389, 0.9973, 0.9693, 0.9997, 0.9997, 0.9997], ['L', 1, 0.9997],
+  ['C', 0.9999, 0.9689, 0.9975, 0.9381, 0.9927, 0.9077],
+  ['C', 0.9755, 0.8034, 0.9719, 0.697, 0.9914, 0.5928], ['C', 0.9976, 0.5599, 1.0004, 0.5265, 1, 0.4931],
+  ['C', 0.9963, 0.2181, 0.7655, 0.0003, 0.4906, 0.0003], ['Z']
+];
+const PILL = [
+  ['M', 0.673, 0.0001], ['C', 0.7374, 0.0014, 0.8022, 0.019, 0.8588, 0.0543],
+  ['C', 1.0096, 0.1485, 1.0452, 0.3326, 0.9383, 0.4654], ['L', 0.6081, 0.8756],
+  ['C', 0.5011, 1.0085, 0.2921, 1.0398, 0.1412, 0.9457],
+  ['C', -0.0096, 0.8515, -0.0452, 0.6674, 0.0617, 0.5346], ['L', 0.3919, 0.1244],
+  ['C', 0.4588, 0.0413, 0.5655, -0.0021, 0.673, 0.0001], ['Z']
+];
+const ARCH = [
+  ['M', 0.5, 0], ['C', 0.7761, 0, 1, 0.168, 1, 0.3752], ['C', 1, 0.5605, 1, 0.7458, 1, 0.9311],
+  ['C', 1, 0.9692, 0.9589, 1, 0.9082, 1], ['L', 0.0918, 1], ['C', 0.0411, 1, 0, 0.9692, 0, 0.9311],
+  ['L', 0, 0.3752], ['C', 0, 0.168, 0.2239, 0, 0.5, 0], ['Z']
+];
+const LROUND = [
+  ['M', 0.1667, 0], ['L', 1, 0], ['L', 1, 1], ['L', 0.1667, 1], ['C', 0.0746, 1, 0, 0.933, 0, 0.8503],
+  ['L', 0, 0.1497], ['C', 0, 0.067, 0.0746, 0, 0.1667, 0], ['Z']
+];
+const CAPSULE_R = [
+  ['M', 0.5, 0], ['L', 1, 0], ['L', 1, 1], ['L', 0.5, 1], ['C', 0.2239, 1, 0, 0.7761, 0, 0.5],
+  ['C', 0, 0.2239, 0.2239, 0, 0.5, 0], ['Z']
+];
+const BLADE_A = [
+  ['M', 0.4398, 0], ['L', 0.9712, 0.7343], ['C', 1.0353, 0.8228, 0.9888, 0.9324, 0.8673, 0.979],
+  ['C', 0.7459, 1.0257, 0.5955, 0.9918, 0.5314, 0.9033], ['C', 0.3543, 0.6585, 0.1771, 0.4138, 0, 0.169],
+  ['Z']
+];
+const BLADE_B = [
+  ['M', 0.2525, 0.0002], ['C', 0.3555, -0.0031, 0.4561, 0.0365, 0.5033, 0.1062], ['L', 1, 0.8394],
+  ['L', 0.5225, 1], ['L', 0.0259, 0.2668], ['C', -0.0371, 0.1739, 0.0188, 0.0626, 0.1506, 0.0182],
+  ['C', 0.1836, 0.0071, 0.2182, 0.0013, 0.2525, 0.0002], ['Z']
+];
+const QUAD = [
+  ['M', 0, 0.2469], ['L', 0.8678, 0], ['L', 1, 0.7654], ['L', 0.1226, 1], ['L', 0, 0.2469], ['Z']
+];
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Convert a unit-square geometry into pptxgenjs `points` for a w x h box. */
+function geomPoints(geom, w, h) {
+  return geom.map(cmd => {
+    const [op] = cmd;
+    if (op === 'Z') return { close: true };
+    if (op === 'M') return { x: cmd[1] * w, y: cmd[2] * h, moveTo: true };
+    if (op === 'L') return { x: cmd[1] * w, y: cmd[2] * h };
+    return {
+      x: cmd[5] * w, y: cmd[6] * h,
+      curve: { type: 'cubic', x1: cmd[1] * w, y1: cmd[2] * h, x2: cmd[3] * w, y2: cmd[4] * h },
+    };
+  });
+}
+
+/** Flat decorative blob drawn from one of the geometries above. */
+function deco(s, geom, x, y, w, h, color, rotate) {
+  s.addShape('custGeom', { x, y, w, h, fill: { color }, line: { type: 'none' },
+    points: geomPoints(geom, w, h), rotate: rotate || 0 });
+}
+
+/** Placeholder standing in for a raster photo in the source deck. */
+function photo(s, o) {
+  const opts = { x: o.x, y: o.y, w: o.w, h: o.h,
+    fill: { color: o.color || PHOTO }, line: { type: 'none' }, rotate: o.rotate || 0 };
+  if (o.geom) { opts.points = geomPoints(o.geom, o.w, o.h); }
+  else if (o.radius) { opts.rectRadius = o.radius * Math.min(o.w, o.h); }
+  s.addShape(o.geom ? 'custGeom' : (o.shape || 'roundRect'), opts);
+  s.addText('[image]', { x: o.x, y: o.y + o.h / 2 - 0.16, w: o.w, h: 0.32, rotate: o.rotate || 0,
+    align: 'center', valign: 'middle', fontFace: F_REG, fontSize: 10, color: o.labelColor || PHOTO_TXT });
+}
+
+/** Text block matching the deck's Google-Slides text-box insets. */
+function text(s, str, o) {
+  s.addText(str, {
+    x: o.x, y: o.y, w: o.w, h: o.h,
+    align: o.align || 'left', valign: o.valign || 'top',
+    fontFace: o.font || F_REG, fontSize: o.sz, color: o.color || INK,
+    lineSpacingMultiple: o.lnSpc, margin: [5.4, 5.4, 2.7, 2.7],
+  });
+}
+
+const title = (s, str, o) => text(s, str, Object.assign({ font: F_MED, sz: TITLE_SZ }, o));
+const body = (s, str, o) => text(s, str, Object.assign({ sz: BODY_SZ, lnSpc: 1.6 }, o));
+
+/** "Sales Trends" eyebrow above a paragraph — the deck's most repeated block. */
+function kicker(s, o) {
+  text(s, o.label || 'Sales Trends', { x: o.x, y: o.y, w: 1.36, h: 0.303,
+    font: F_MED, sz: KICKER_SZ, align: o.align });
+  body(s, o.body, { x: o.bodyX !== undefined ? o.bodyX : o.x, y: o.y + 0.279,
+    w: o.w, h: o.h || 0.803, align: o.align });
+}
+
+/**
+ * Fresh shadow descriptor. pptxgenjs rewrites the object it is handed
+ * (inches -> EMU), so every shape needs its own copy.
+ */
+const shadow = (color, blur, offset, angle, opacity) =>
+  ({ type: 'outer', color, blur, offset, angle, opacity });
+
+const cardShadow = color => shadow(color, 15, 5, 38, 0.4);
+
+/** White rounded card with a thin orange keyline (used for stats and contacts). */
+function card(s, x, y, w, h, lineColor) {
+  const color = lineColor || ORANGE;
+  s.addShape('roundRect', { x, y, w, h, fill: { color: WHITE },
+    line: { color, width: 1 }, rectRadius: 0.11467 * Math.min(w, h), shadow: cardShadow(color) });
+}
+
+/** Card + orange headline number + supporting sentence. */
+function statCard(s, o) {
+  card(s, o.x, o.y, o.w, o.h);
+  s.addText(o.stat, { x: o.statX, y: o.statY, w: o.statW, h: 0.429, valign: 'top',
+    fontFace: F_MED, fontSize: STAT_SZ, color: ORANGE, margin: [5.4, 5.4, 2.7, 2.7] });
+  body(s, o.body, { x: o.statX, y: o.statY + 0.353, w: 3.375, h: 0.56 });
+}
+
+/** Small white square badge holding an ordinal such as "01". */
+function stepBadge(s, x, y, num, numX, numW) {
+  s.addShape('roundRect', { x, y, w: 0.439, h: 0.434, fill: { color: WHITE },
+    line: { color: ORANGE, width: 1 }, rectRadius: 0.11467 * 0.434 });
+  s.addText(num, { x: numX, y: y + 0.066, w: numW, h: 0.303, align: 'center', valign: 'top',
+    fontFace: F_MED, fontSize: KICKER_SZ, color: ORANGE, margin: [5.4, 5.4, 2.7, 2.7] });
+}
+
+// Smartphone mock-up (the source draws it from ~50 vector slivers). Body and
+// screen are separate because the deck interleaves them with the text cards.
+const PHONE_W = 2.064, PHONE_H = 4.236;
+
+function phoneBody(s, x, y) {
+  s.addShape('roundRect', { x, y, w: PHONE_W, h: PHONE_H,
+    fill: { color: '404040' }, line: { type: 'none' }, rectRadius: 0.3 });
+  s.addShape('roundRect', { x: x + 0.043, y: y + 0.043, w: PHONE_W - 0.086, h: PHONE_H - 0.086,
+    fill: { color: BLACK }, line: { type: 'none' }, rectRadius: 0.28 });
+}
+
+function phoneScreen(s, x, y) {
+  photo(s, { x: x + 0.099, y: y + 0.099, w: PHONE_W - 0.198, h: PHONE_H - 0.198,
+    radius: 0.13, color: 'F1F1F1' });
+  s.addShape('roundRect', { x: x + PHONE_W / 2 - 0.553, y: y + 0.127, w: 1.105, h: 0.144,
+    fill: { color: BLACK }, line: { type: 'none' }, rectRadius: 0.07 });
+}
+
+/** Laptop mock-up: two dark panels tilted like the photo they replace. */
+function laptopBody(s) {
+  [[5.476, -0.035, '2E2E2E'], [6.321, 3.851, '3A3A3A']].forEach(([x, y, color]) => {
+    s.addShape('roundRect', { x, y, w: 5.132, h: 3.745, fill: { color },
+      line: { type: 'none' }, rotate: -12.3, rectRadius: 0.14 });
+  });
+}
+
+/** Master-slide page marker ("Page" + number, top right). */
+function pageNum(s, n) {
+  text(s, 'Page', { x: 8.948, y: 0.05, w: 0.527, h: 0.252, sz: 11 });
+  text(s, String(n), { x: 9.379, y: 0.061, w: 0.385, h: 0.252, sz: 11 });
+}
+
+// ---------------------------------------------------------------------------
+// Slides
+// ---------------------------------------------------------------------------
+
+/** 1 — Title: outlined ellipse over three floating blobs. */
+function slide01(pptx) {
+  const s = pptx.addSlide();
+  s.addShape('ellipse', { x: 0.813, y: 0.883, w: 8.374, h: 3.86, fill: { color: WHITE },
+    line: { color: OLIVE, width: 1 },
+    shadow: cardShadow(OLIVE) });
+  text(s, 'Minimal Report', { x: 1.296, y: 2.018, w: 7.408, h: 1.186,
+    align: 'center', font: F_MED, sz: 66, color: BLACK });
+  text(s, 'Presentation Template 2025', { x: 3.436, y: 3.279, w: 3.128, h: 0.328,
+    align: 'center', font: F_MED, sz: 15 });
+  deco(s, BURST, 0.666, 3.173, 1.451, 1.429, ORANGE);
+  deco(s, LEAF, 7.36, 1.004, 0.794, 0.794, PINK, 157.6);
+  deco(s, TICKET, 8.627, 4.418, 0.707, 0.648, BLUE);
+}
+
+/** 2 — Financial Report: orange half-disc bleeding off the bottom edge. */
+function slide02(pptx) {
+  const s = pptx.addSlide();
+  s.addShape('pie', { x: 3.608, y: 2.589, w: 6.073, h: 6.073, fill: { color: ORANGE },
+    line: { type: 'none' }, angleRange: [0, 179.6], rotate: 180, flipH: true });
+  title(s, 'Financial Report', { x: 0.425, y: 0.713, w: 2.939, h: 1.439 });
+  kicker(s, { x: 0.425, y: 2.392, w: 3.375, h: 1.058, body: LOREM_LONG });
+  deco(s, BURST, 1.049, 4.225, 1.011, 0.996, ORANGE);
+  deco(s, TICKET, 7.666, 0.462, 0.707, 0.648, OLIVE);
+  photo(s, { x: 6.776, y: 1.432, w: 2.625, h: 3.51, radius: 0.09921 });
+  photo(s, { x: 3.933, y: 0.786, w: 2.625, h: 3.51, radius: 0.09921 });
+  pageNum(s, 2);
+}
+
+/** 3 — Market Analysis Overview: two tilted pill photos. */
+function slide03(pptx) {
+  const s = pptx.addSlide();
+  deco(s, BURST, 7.862, 0.982, 1.858, 1.83, ORANGE);
+  deco(s, LEAF, 4.231, 2.439, 2.04, 2.04, PINK, 90);
+  title(s, 'Market Analysis Overview', { x: 0.394, y: 0.591, w: 3.198, h: 2.121 });
+  text(s, '2025', { x: 0.447, y: 3.1, w: 0.868, h: 0.429, font: F_MED, sz: STAT_SZ, color: ORANGE });
+  body(s, LOREM_LONG, { x: 0.447, y: 3.452, w: 3.375, h: 1.058 });
+  deco(s, TICKET, 3.822, 0.591, 0.707, 0.648, BLUE);
+  deco(s, BURST, 2.24, 4.582, 0.918, 0.905, OLIVE);
+  photo(s, { x: 4.365, y: 0.329, w: 3.212, h: 3.647, geom: PILL, rotate: -7.1 });
+  photo(s, { x: 6.271, y: 1.635, w: 3.212, h: 3.647, geom: PILL, rotate: -7.1 });
+  pageNum(s, 3);
+}
+
+/** 4 — Annual Performance Review: stat card beside a capsule photo. */
+function slide04(pptx) {
+  const s = pptx.addSlide();
+  title(s, 'Annual Performance Review', { x: 0.416, y: 0.531, w: 4.2, h: 2.121 });
+  kicker(s, { x: 0.512, y: 2.926, w: 3.587, h: 0.318,
+    body: 'Lorem ipsum dolor sit amet, consectetur adipiscing.' });
+  statCard(s, { x: 0.512, y: 3.911, w: 3.983, h: 1.182,
+    stat: '112K', statX: 0.723, statY: 4.046, statW: 0.713, body: LOREM_SHORT });
+  photo(s, { x: 5.0, y: 0.531, w: 5.0, h: 4.562, geom: CAPSULE_R });
+  pageNum(s, 4);
+}
+
+/** 5 — Customer Feedback Summary: blue right triangle plus circular photo. */
+function slide05(pptx) {
+  const s = pptx.addSlide();
+  s.addShape('rtTriangle', { x: 5.104, y: 0, w: 4.896, h: 5.625, fill: { color: BLUE },
+    line: { type: 'none' }, flipH: true });
+  title(s, 'Customer Feedback Summary', { x: 0.397, y: 0.833, w: 3.11, h: 2.121 });
+  kicker(s, { x: 0.439, y: 3.402, w: 3.375, h: 1.058, body: LOREM_LONG });
+  deco(s, BURST, 4.082, 0.381, 0.918, 0.905, OLIVE);
+  deco(s, TICKET, 8.605, 4.596, 0.707, 0.648, ORANGE);
+  deco(s, LEAF, 4.337, 4.581, 0.718, 0.718, PINK, 157.6);
+  photo(s, { x: 5.0, y: 0.833, w: 3.958, h: 3.958, shape: 'ellipse' });
+  pageNum(s, 5);
+}
+
+/** 6 — Sales Trends: kicker, stat card and a rounded photo. */
+function slide06(pptx) {
+  const s = pptx.addSlide();
+  deco(s, TICKET, 4.585, 0.387, 2.036, 1.867, BLUE, 90);
+  title(s, 'Sales Trends', { x: 0.438, y: 1.013, w: 3.779, h: 0.757 });
+  card(s, 0.512, 3.263, 3.983, 1.562);
+  body(s, LOREM_MED, { x: 0.815, y: 3.905, w: 3.375, h: 0.803 });
+  text(s, '112K', { x: 0.815, y: 3.391, w: 0.713, h: 0.429, font: F_MED, sz: STAT_SZ, color: ORANGE });
+  kicker(s, { x: 0.438, y: 2.068, w: 3.375, h: 0.56,
+    body: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et.' });
+  deco(s, BURST, 8.76, 4.292, 1.083, 1.067, PINK);
+  photo(s, { x: 5.249, y: 0.799, w: 4.053, h: 4.026, radius: 0.09921 });
+  pageNum(s, 6);
+}
+
+/** 7 — Project Milestone Update: three numbered steps down the right edge. */
+function slide07(pptx) {
+  const s = pptx.addSlide();
+  title(s, 'Project Milestone Update', { x: 0.403, y: 0.454, w: 3.389, h: 2.121 });
+  kicker(s, { x: 0.417, y: 3.834, w: 3.375, h: 1.058, body: LOREM_LONG });
+  [['01', 0.697, 7.278, 0.338], ['02', 2.258, 7.256, 0.382], ['03', 3.871, 7.254, 0.385]]
+    .forEach(([num, y, numX, numW]) => {
+      stepBadge(s, 7.227, y, num, numX, numW);
+      body(s, LOREM_TINY, { x: 7.185, y: y + 0.497, w: 2.37, h: 0.803 });
+    });
+  deco(s, BURST, 3.508, 0.229, 1.083, 1.067, PINK);
+  photo(s, { x: 4.02, y: 0.454, w: 2.98, h: 4.716, radius: 0.09921 });
+  pageNum(s, 7);
+}
+
+/** 8 — Innovation Strategy Brief: centred text between two angled blades. */
+function slide08(pptx) {
+  const s = pptx.addSlide();
+  title(s, 'Innovation Strategy Brief', { x: 2.737, y: 1.421, w: 4.527, h: 1.49, align: 'center' });
+  kicker(s, { x: 4.32, y: 3.122, bodyX: 3.312, w: 3.375, body: LOREM_MED, align: 'center' });
+  deco(s, BURST, 1.945, 0.28, 1.083, 1.067, PINK);
+  deco(s, TICKET, 7.263, 4.645, 0.707, 0.648, ORANGE);
+  photo(s, { x: -1.092, y: -0.702, w: 4.406, h: 6.047, geom: BLADE_A });
+  photo(s, { x: 7.152, y: 0.302, w: 4.25, h: 6.033, geom: BLADE_B });
+  pageNum(s, 8);
+}
+
+/** 9 — Operational Efficiency Report: pink triangle, arch photo, 90% card. */
+function slide09(pptx) {
+  const s = pptx.addSlide();
+  s.addShape('rtTriangle', { x: 0, y: 0, w: 4.896, h: 5.625, fill: { color: PINK }, line: { type: 'none' } });
+  title(s, 'Operational Efficiency Report', { x: 4.502, y: 0.76, w: 4.986, h: 1.439 });
+  kicker(s, { x: 4.523, y: 2.386, w: 3.98, h: 0.803, body: LOREM_LONG });
+  card(s, 4.587, 3.696, 3.983, 1.057);
+  s.addText([{ text: '90', options: { fontSize: STAT_SZ } }, { text: '%', options: { fontSize: 15 } }],
+    { x: 4.89, y: 3.76, w: 0.694, h: 0.429, valign: 'top', fontFace: F_MED, color: ORANGE,
+      margin: [5.4, 5.4, 2.7, 2.7] });
+  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et.',
+    { x: 4.89, y: 4.122, w: 3.375, h: 0.56 });
+  deco(s, LEAF, 2.574, 0.848, 1.017, 1.018, OLIVE, -177);
+  photo(s, { x: 0.512, y: 0.76, w: 3.079, h: 4.104, geom: ARCH });
+  pageNum(s, 9);
+}
+
+/** 10 — Client Success Stories: $90.00 card next to a left-rounded photo. */
+function slide10(pptx) {
+  const s = pptx.addSlide();
+  title(s, 'Client Success Stories', { x: 0.459, y: 0.667, w: 4.488, h: 1.439 });
+  kicker(s, { x: 0.459, y: 2.419, w: 3.98, h: 0.803, body: LOREM_LONG });
+  statCard(s, { x: 0.512, y: 3.779, w: 3.983, h: 1.182,
+    stat: '$90.00', statX: 0.723, statY: 3.914, statW: 1.169, body: LOREM_SHORT });
+  deco(s, TICKET, 5.724, 2.426, 0.843, 0.773, ORANGE, 90);
+  photo(s, { x: 6.146, y: 0.667, w: 3.854, h: 4.292, geom: LROUND });
+  pageNum(s, 10);
+}
+
+/** 11 — Corporate Social Responsibility: banner photo over a two-step card. */
+function slide11(pptx) {
+  const s = pptx.addSlide();
+  title(s, 'Corporate Social Responsibility', { x: 0.396, y: 3.255, w: 4.315, h: 2.121 });
+  card(s, 5.0, 1.827, 4.488, 3.466);
+  [['01', 2.131, 5.509, 0.338], ['02', 3.696, 5.487, 0.382]].forEach(([num, y, numX, numW]) => {
+    stepBadge(s, 5.458, y, num, numX, numW);
+    body(s, LOREM_LONG, { x: 5.416, y: y + 0.497, w: 3.656, h: 0.803 });
+  });
+  photo(s, { x: 0.512, y: 0.302, w: 8.977, h: 2.51, radius: 0.09921 });
+  pageNum(s, 11);
+}
+
+/** 12 — Customer Journey Mapping: orange burst behind two rounded photos. */
+function slide12(pptx) {
+  const s = pptx.addSlide();
+  deco(s, BURST, 5.91, 0.19, 2.892, 2.849, ORANGE);
+  title(s, 'Customer Journey Mapping', { x: 0.449, y: 0.681, w: 3.355, h: 2.121 });
+  kicker(s, { x: 0.449, y: 3.658, w: 3.544, h: 0.803,
+    body: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ' +
+      'ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis.' });
+  photo(s, { x: 7.122, y: 1.339, w: 2.418, h: 3.4, radius: 0.09921 });
+  photo(s, { x: 4.145, y: 0.887, w: 2.74, h: 3.852, radius: 0.09921 });
+  pageNum(s, 12);
+}
+
+/** 13 — Future Workforce Trends: three arch photos with captions. */
+function slide13(pptx) {
+  const s = pptx.addSlide();
+  title(s, 'Future Workforce Trends', { x: 1.437, y: 0.405, w: 7.126, h: 0.757, align: 'center' });
+  const CAPTION = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore.';
+  [0.448, 3.698, 6.947].forEach(x => body(s, CAPTION, { x, y: 4.532, w: 2.604, h: 0.803, align: 'center' }));
+  deco(s, BURST, 0.254, 1.442, 1.083, 1.067, PINK);
+  deco(s, TICKET, 6.589, 2.85, 0.843, 0.773, ORANGE, 90);
+  [0.512, 3.762, 7.01].forEach(x => photo(s, { x, y: 1.646, w: 2.478, h: 2.854, geom: ARCH }));
+  pageNum(s, 13);
+}
+
+/** 14 — Quarterly Financial Report: narrow photo left, tall photo right. */
+function slide14(pptx) {
+  const s = pptx.addSlide();
+  deco(s, LEAF, -0.302, 3.71, 2.04, 2.04, PINK, 90);
+  title(s, 'Quarterly Financial Report', { x: 2.87, y: 0.671, w: 3.415, h: 2.121 });
+  kicker(s, { x: 2.87, y: 3.648, w: 3.7, h: 0.803, body: LOREM_LONG });
+  deco(s, TICKET, 6.327, 2.426, 0.843, 0.773, OLIVE, 90);
+  photo(s, { x: 0.512, y: 0.803, w: 1.926, h: 3.852, radius: 0.09921 });
+  photo(s, { x: 6.749, y: 0.803, w: 2.74, h: 4.822, shape: 'round2SameRect', radius: 0.12105 });
+  pageNum(s, 14);
+}
+
+/** 15 — Cybersecurity Readiness Plan: wide bottom photo band. */
+function slide15(pptx) {
+  const s = pptx.addSlide();
+  deco(s, TICKET, 7.897, 3.23, 2.036, 1.867, OLIVE, 90);
+  title(s, 'Cybersecurity Readiness Plan', { x: 0.418, y: 0.643, w: 4.582, h: 1.439 });
+  kicker(s, { x: 5.944, y: 0.822, w: 3.544, h: 0.803,
+    body: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ' +
+      'ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis.' });
+  photo(s, { x: -0.301, y: 2.521, w: 8.977, h: 3.104, shape: 'round2SameRect', radius: 0.16667 });
+  pageNum(s, 15);
+}
+
+/** 16 — Marketing Target Analysis: SWOT circles with letter chips. */
+function slide16(pptx) {
+  const s = pptx.addSlide();
+  const SWOT = [
+    { label: 'Strength',    letter: 'S', color: ORANGE, x: 0.839, textY: 2.698, triX: 1.671, triW: 0.189, triH: 0.161 },
+    { label: 'Weakness',    letter: 'W', color: PINK,   x: 2.998, textY: 2.698, triX: 3.823, triW: 0.21,  triH: 0.179 },
+    { label: 'Opportunity', letter: 'O', color: BLUE,   x: 5.157, textY: 2.689, triX: 5.986, triW: 0.21,  triH: 0.179 },
+    { label: 'Threat',      letter: 'T', color: OLIVE,  x: 7.338, textY: 2.698, triX: 8.148, triW: 0.21,  triH: 0.179 },
+  ];
+  const discShadow = () => shadow(BLACK, 41, 19, 90, 0.08);
+  const chipShadow = () => shadow(BLACK, 66, 30, 90, 0.15);
+  SWOT.forEach(q => {
+    s.addShape('ellipse', { x: q.x, y: 2.089, w: 1.86, h: 1.86, fill: { color: q.color },
+      line: { type: 'none' }, shadow: discShadow() });
+    s.addShape('triangle', { x: q.triX, y: 3.937 + (q.triH < 0.17 ? 0.009 : 0), w: q.triW, h: q.triH,
+      fill: { color: q.color }, line: { type: 'none' }, rotate: 180 });
+    text(s, q.label, { x: q.x + 0.047, y: q.textY, w: 1.759, h: 0.303,
+      align: 'center', font: F_MED, sz: KICKER_SZ, color: WHITE });
+    text(s, SERENITY, { x: q.x + 0.047, y: q.textY + 0.323, w: 1.759, h: 0.645,
+      align: 'center', sz: BODY_SZ, lnSpc: 1.3, color: WHITE });
+    s.addShape('ellipse', { x: q.x + 0.58, y: 4.272, w: 0.693, h: 0.693, fill: { color: WHITE },
+      line: { type: 'none' }, shadow: chipShadow() });
+    text(s, q.letter, { x: q.x + 0.515, y: 4.362, w: 0.823, h: 0.48,
+      align: 'center', font: F_MED, sz: 24, color: q.color });
+  });
+  title(s, 'Marketing Target Analysis', { x: 0.866, y: 0.586, w: 8.268, h: 0.757, align: 'center' });
+  text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean ma',
+    { x: 1.598, y: 1.524, w: 6.803, h: 0.261, align: 'center', sz: BODY_SZ, lnSpc: 1.3 });
+  // White glyphs in the upper half of each disc: book, box, paper plane, windmill.
+  const GLYPHS = [
+    { x: 1.598, y: 2.35,  w: 0.325, h: 0.266, shape: 'parallelogram' },
+    { x: 3.761, y: 2.312, w: 0.333, h: 0.283, shape: 'cube' },
+    { x: 5.886, y: 2.302, w: 0.352, h: 0.274, shape: 'triangle', rotate: 105 },
+    { x: 8.11,  y: 2.275, w: 0.316, h: 0.333, shape: 'star4' },
+  ];
+  GLYPHS.forEach(g => s.addShape(g.shape, { x: g.x, y: g.y, w: g.w, h: g.h,
+    fill: { color: WHITE }, line: { type: 'none' }, rotate: g.rotate || 0 }));
+  pageNum(s, 16);
+}
+
+/** 17 — User Data Comparison: two three-segment donut gauges. */
+function slide17(pptx) {
+  const s = pptx.addSlide();
+  const ringShadow = () => shadow(BLACK, 27, 14, 110, 0.09);
+  // [start, sweep] in degrees; the source uses three arcs per ring.
+  const ARCS = [[359.57, 144.6], [159.08, 260.74], [274.92, 345.02]];
+  [
+    { x: 1.985, pct: '70%', pctX: 1.406, colors: [PINK, ORANGE, BLUE], pctColor: ORANGE, discY: 2.473 },
+    { x: 6.294, pct: '40%', pctX: 7.621, colors: [ORANGE, PINK, BLUE], pctColor: BLUE, discY: 2.489 },
+  ].forEach(g => {
+    ARCS.forEach((a, i) => {
+      s.addShape('arc', { x: g.x, y: 2.118, w: 1.654, h: 1.654, fill: { type: 'none' },
+        line: { color: g.colors[i], width: 8.5 }, angleRange: a, rotate: 180 });
+    });
+    s.addShape('ellipse', { x: g.x + 0.355, y: g.discY, w: 0.912, h: 0.912, fill: { color: WHITE },
+      line: { type: 'none' }, shadow: ringShadow() });
+    // Stylised person icon at the centre of each gauge: head disc over shoulders.
+    s.addShape('ellipse', { x: g.x + 0.735, y: g.discY + 0.185, w: 0.155, h: 0.165,
+      fill: { color: g.pctColor }, line: { type: 'none' } });
+    s.addShape('pie', { x: g.x + 0.66, y: g.discY + 0.385, w: 0.305, h: 0.34,
+      fill: { color: g.pctColor }, line: { type: 'none' }, angleRange: [180, 360] });
+    // Round white "%" badge tangent to the ring.
+    s.addShape('ellipse', { x: g.pctX, y: 2.071, w: 0.836, h: 0.836, fill: { color: WHITE },
+      line: { type: 'none' }, shadow: ringShadow() });
+    text(s, g.pct, { x: g.pctX, y: 2.071, w: 0.836, h: 0.836,
+      align: 'center', valign: 'middle', font: F_MED, sz: 18, color: g.pctColor });
+  });
+  title(s, 'User Data Comparison', { x: 1.023, y: 0.568, w: 7.955, h: 0.706, align: 'center', lnSpc: 0.9 });
+  text(s, "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been " +
+    "the industry's standard dummy text ever since the 1500s. ",
+    { x: 1.824, y: 1.352, w: 6.389, h: 0.458, align: 'center', sz: BODY_SZ, lnSpc: 1.3 });
+  [{ label: 'Women User', x: 1.797, y: 4.146, bx: 1.76, bw: 2.097, bh: 0.432 },
+   { label: 'Men User', x: 6.142, y: 4.208, bx: 6.142, bw: 2.024, bh: 0.613 }].forEach(c => {
+    text(s, c.label, { x: c.x, y: c.y, w: 2.024, h: 0.278,
+      align: 'center', valign: 'middle', font: F_MED, sz: 12 });
+    text(s, SERENITY, { x: c.bx, y: c.y + 0.287, w: c.bw, h: c.bh,
+      align: 'center', sz: BODY_SZ, lnSpc: 1.2 });
+  });
+  // Skill pills between the two gauges.
+  [['Programming', ORANGE, 2.38, 4.315, 1.37], ['Networking', BLUE, 2.817, 4.414, 1.172],
+   ['Goals', SAGE, 3.262, 4.414, 1.172]].forEach(([label, color, y, tx, tw]) => {
+    s.addShape('roundRect', { x: 4.198, y, w: 1.604, h: 0.342, fill: { color },
+      line: { type: 'none' }, rectRadius: 0.171 });
+    text(s, label, { x: tx, y: y + 0.008, w: tw, h: 0.292,
+      align: 'center', font: F_MED, sz: 11, color: WHITE, lnSpc: 1.3 });
+  });
+  pageNum(s, 17);
+}
+
+/** 18 — Our Business Mockup: laptop placeholder tilted over the right half. */
+function slide18(pptx) {
+  const s = pptx.addSlide();
+  laptopBody(s);
+  title(s, 'Our Business Mockup', { x: 0.41, y: 0.822, w: 4.027, h: 1.32, lnSpc: 0.9 });
+  kicker(s, { x: 0.469, y: 2.337, w: 3.544, h: 0.803,
+    body: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ' +
+      'ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis.' });
+  statCard(s, { x: 0.512, y: 3.779, w: 3.983, h: 1.182,
+    stat: '$90.00', statX: 0.723, statY: 3.914, statW: 1.169, body: LOREM_SHORT });
+  deco(s, BURST, 5.021, 1.608, 1.083, 1.067, PINK);
+  photo(s, { x: 5.323, y: -0.406, w: 5.438, h: 4.219, geom: QUAD, color: 'EDEDED' });
+  pageNum(s, 18);
+}
+
+/** 19 — Get In Touch: three contact cards beside two phone mock-ups. */
+function slide19(pptx) {
+  const s = pptx.addSlide();
+  phoneBody(s, 7.049, 1.618);
+  title(s, 'Get In Touch', { x: 0.41, y: 0.822, w: 4.027, h: 0.706, lnSpc: 0.9 });
+  [['Address', 'Montclair, Newark, New York, US.', 1.701, 1.366],
+   ['Phone', '973-543-987', 3.001, 1.077],
+   ['Website', 'www.yourwebsite.com', 4.3, 1.353]].forEach(([label, value, y, labelW], i) => {
+    const x = i === 2 ? 0.527 : 0.524;
+    card(s, x, y, 3.983, 0.993);
+    text(s, label, { x: x + 0.208, y: y + 0.156, w: labelW, h: 0.429,
+      font: F_MED, sz: STAT_SZ, color: ORANGE });
+    body(s, value, { x: x + 0.208, y: y + 0.519, w: 3.567, h: 0.318 });
+  });
+  phoneBody(s, 5.789, 0.63);
+  phoneScreen(s, 7.049, 1.618);
+  phoneScreen(s, 5.789, 0.63);
+  pageNum(s, 19);
+}
+
+/** 20 — Thank You: outlined pill with two blobs. */
+function slide20(pptx) {
+  const s = pptx.addSlide();
+  s.addShape('roundRect', { x: 0.813, y: 1.848, w: 8.374, h: 1.93, fill: { color: WHITE },
+    line: { color: OLIVE, width: 1 }, rectRadius: 0.1393 * 1.93,
+    shadow: cardShadow(OLIVE) });
+  text(s, 'Thank You ', { x: 0.683, y: 1.904, w: 8.633, h: 1.818,
+    align: 'center', font: F_MED, sz: 104, color: BLACK });
+  deco(s, BURST, 0.381, 1.314, 1.083, 1.067, PINK);
+  deco(s, TICKET, 8.766, 3.123, 0.843, 0.773, BLUE, 90);
+  pageNum(s, 20);
+}
+
+// ---------------------------------------------------------------------------
+// Build
+// ---------------------------------------------------------------------------
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'DECK', width: 10, height: 5.625 });
+pptx.layout = 'DECK';
+pptx.title = 'Minimal Report';
+pptx.theme = { headFontFace: F_MED, bodyFontFace: F_REG };
+
+[slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
+ slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20]
+  .forEach(build => build(pptx));
+
+pptx.writeFile({ fileName: path.join(__dirname, '02f79f05-a15c-40d7-acb6-29cd4cf7e6e3_grok_final.pptx') })
+  .then(f => console.log('wrote', f));
