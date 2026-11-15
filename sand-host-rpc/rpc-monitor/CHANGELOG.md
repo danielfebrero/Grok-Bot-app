@@ -9,6 +9,15 @@ packages confondus. Entrées les plus récentes en haut. Heures de Paris
 
 <!-- NOUVELLES-ENTREES-ICI -->
 
+## 2026-11-15 16:19 (Paris) — `2026-11-14_17-54` → `2026-11-15_16-19`
+
+Changement de surface RPC détecté : **4 méthode(s) ajoutée(s)**.
+
+Ajoutées : `DashboardService.GetTeamGrokBotConnectorAudiences`, `DashboardService.GetTeamMemberEffectiveMcpPolicy`, `DashboardService.UpdateTeamGrokBotConnectorAudience`, `GrokBotService.AdminMoveGrokBotMessagingUserLines`
+
+Rapport : [reports/2026-11-15_16-19.md](reports/2026-11-15_16-19.md).
+
+
 ## 2026-11-14 17:54 (Paris) — `2026-11-13_18-00` → `2026-11-14_17-54`
 
 Changement de surface RPC détecté : **24 méthode(s) ajoutée(s)**.
