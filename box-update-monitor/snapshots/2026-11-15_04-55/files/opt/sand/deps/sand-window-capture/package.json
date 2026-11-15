@@ -1,0 +1,14 @@
+{
+  "name": "sand-window-capture",
+  "version": "1.0.0",
+  "description": "Window and screen-region capture for the Sand desktop app's mounted bot",
+  "main": "index.js",
+  "private": true,
+  "scripts": {
+    "install": "node-gyp rebuild"
+  },
+  "gypfile": true,
+  "dependencies": {
+    "node-addon-api": "^8.0.0"
+  }
+}

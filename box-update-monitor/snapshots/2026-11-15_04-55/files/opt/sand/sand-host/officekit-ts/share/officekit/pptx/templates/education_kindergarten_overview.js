@@ -1,0 +1,918 @@
+/**
+ * "Bumblebee Kindergarten" deck — rebuilt with pptxgenjs.
+ *
+ * Run:  node 1424a744-a78f-41e2-b474-ffa45c249dfe_grok_final.js
+ * Out:  1424a744-a78f-41e2-b474-ffa45c249dfe_grok_final.pptx  (next to this file)
+ *
+ * Photographic content in the original is replaced by flat grey placeholder
+ * shapes that keep the original organic silhouettes.
+ */
+
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ theme */
+
+const C = {
+  ink: '3C3C3C',      // dk1 - body copy
+  ink2: '313C41',     // dk2 - headings on light cards
+  white: 'FFFFFF',
+  yellow: 'F8DF5B',   // accent1
+  green: '2CC05E',    // accent2
+  blue: '1384EC',     // accent3
+  photo: 'BFBFBF',    // stand-in for the "your image here" bitmaps
+  track: 'D9D9D9',    // skill-bar background
+};
+
+const FONT = 'Raleway';     // major (headings, labels)
+const BODY_FONT = 'PT Sans'; // minor (paragraph copy)
+
+const TITLE_SIZE = 40;
+const BODY_SIZE = 9;
+const LABEL_SIZE = 15;
+
+const CARD_SHADOW = { type: 'outer', color: '000000', opacity: 0.2, blur: 3, offset: 0, angle: 45 };
+
+/* --------------------------------------------------------------- outlines
+ * Each entry: [tension, x0,y0, x1,y1, ...] — anchor points of a closed
+ * organic silhouette in 0..1 unit space, later smoothed into bezier curves.
+ */
+
+const OUTLINES = {
+  blobEgg:    [0.24, 0.597,0, 0.728,0.036, 0.855,0.199, 0.997,0.802, 0.95,0.922, 0.758,0.988, 0.304,0.991, 0.07,0.921, 0.001,0.785, 0.021,0.636, 0.159,0.297, 0.159,0.296, 0.196,0.24, 0.373,0.06],
+  blobRound:  [0.24, 0.625,0, 0.718,0.009, 0.966,0.191, 0.99,0.343, 0.998,0.565, 0.981,0.761, 0.663,0.994, 0.249,0.903, 0.006,0.55, 0.094,0.198, 0.374,0.059],
+  blobSquare: [0.17, 0.466,0, 0.691,0.007, 0.923,0.067, 0.992,0.183, 0.992,0.817, 0.923,0.933, 0.691,0.993, 0.242,0.989, 0.052,0.934, 0.006,0.831, 0.006,0.169, 0.052,0.066, 0.242,0.011],
+  blobTall:   [0.17, 0.534,0, 0.758,0.011, 0.948,0.066, 0.994,0.169, 0.994,0.831, 0.948,0.934, 0.758,0.989, 0.309,0.993, 0.077,0.933, 0.009,0.817, 0.009,0.183, 0.077,0.067, 0.309,0.007],
+  blobOval:   [0.24, 0.541,0.001, 0.711,0.024, 0.917,0.206, 0.988,0.451, 0.943,0.81, 0.451,0.994, 0.035,0.698, 0.089,0.246, 0.267,0.08],
+  blobWideA:  [0.20, 0.837,0, 0.978,0.2, 0.964,0.648, 0.849,0.838, 0.669,0.832, 0.519,0.992, 0.305,0.911, 0.184,0.92, 0.068,0.873, 0.009,0.678, 0.018,0.362, 0.139,0.164, 0.365,0.187, 0.486,0.047, 0.702,0.06, 0.812,0.004],
+  blobWideB:  [0.20, 0.163,0, 0.188,0.004, 0.298,0.06, 0.514,0.047, 0.635,0.187, 0.861,0.164, 0.983,0.362, 0.991,0.678, 0.932,0.873, 0.816,0.92, 0.695,0.911, 0.481,0.992, 0.331,0.832, 0.151,0.838, 0.036,0.648, 0.022,0.2],
+  blobWideC:  [0.28, 0.545,0, 0.62,0.023, 0.769,0.172, 0.936,0.245, 0.96,0.426, 0.988,0.628, 0.991,0.831, 0.873,0.965, 0.629,0.997, 0.477,0.93, 0.333,0.994, 0.114,0.951, 0.02,0.783, 0.008,0.606, 0.055,0.335, 0.166,0.148, 0.383,0.043],
+  blobRoundB: [0.28, 0.527,0, 0.698,0.035, 0.994,0.451, 0.81,0.943, 0.451,0.988, 0.206,0.917, 0.024,0.711, 0.08,0.267, 0.289,0.076],
+  blobRoundC: [0.28, 0.473,0, 0.754,0.089, 0.92,0.267, 0.976,0.711, 0.794,0.917, 0.549,0.988, 0.19,0.943, 0.006,0.451, 0.302,0.035],
+  blobWideD:  [0.28, 0.631,0, 0.82,0.209, 0.864,0.294, 0.94,0.349, 0.911,0.707, 0.81,0.756, 0.685,0.848, 0.581,0.955, 0.361,0.999, 0.144,0.94, 0.026,0.75, 0.005,0.5, 0.041,0.301, 0.146,0.153, 0.336,0.043, 0.472,0.02],
+  blobWideE:  [0.24, 0.473,0, 0.557,0.013, 0.767,0.376, 0.906,0.479, 0.962,0.546, 0.993,0.751, 0.85,0.902, 0.642,0.919, 0.404,0.998, 0.196,0.977, 0.05,0.87, 0.004,0.679, 0.017,0.42, 0.087,0.212, 0.223,0.062, 0.351,0.008],
+  pill:       [0.28, 0.355,0.035, 0.076,0.147, 0.003,0.482, 0.13,0.734, 0.268,0.758, 0.348,0.899, 0.48,0.886, 0.612,0.824, 0.759,0.964, 0.887,0.826, 0.996,0.545, 0.923,0.209, 0.744,0.056, 0.579,0.181, 0.475,0.011],
+  banner:     [0.24, 0.514,0.047, 0.298,0.06, 0.188,0.004, 0.022,0.2, 0.036,0.648, 0.151,0.838, 0.331,0.832, 0.481,0.992, 0.695,0.911, 0.816,0.92, 0.932,0.873, 0.991,0.678, 0.982,0.362, 0.861,0.164, 0.635,0.187],
+  drip:       [0.12, 0,0.198, 0.136,0.784, 0.376,0.762, 0.751,0.646, 0.989,0.168, 0.461,0],
+  star5:      [0.12, 0.976,0.44, 0.996,0.363, 0.931,0.318, 0.702,0.318, 0.637,0.27, 0.565,0.048, 0.5,0, 0.435,0.048, 0.363,0.27, 0.298,0.318, 0.069,0.318, 0.004,0.363, 0.024,0.44, 0.209,0.575, 0.234,0.651, 0.164,0.87, 0.189,0.947, 0.255,0.994, 0.331,0.968, 0.516,0.833, 0.596,0.833, 0.781,0.968, 0.857,0.994, 0.922,0.947, 0.947,0.87, 0.877,0.651, 0.902,0.575],
+};
+
+/* Radial motifs (petal repeated N times around the centre). Each motif entry
+ * is one cubic segment: three [angleOffsetFromPetalStart, radius] pairs. */
+const ROSETTES = {
+  burst12: { n: 12, start: 99.6, r0: 0.4435, seg: [
+    [[-0.5, 0.478], [-4.0, 0.502], [-7.9, 0.501]],
+    [[-11.8, 0.502], [-15.3, 0.478], [-15.84, 0.4441]],
+    [[-17.2, 0.377], [-19.2, 0.311], [-22.2, 0.246]],
+    [[-25.8, 0.313], [-28.2, 0.380], [-30.0, 0.4435]] ] },
+  aster8: { n: 8, start: 99.6, r0: 0.443, seg: [
+    [[-0.5, 0.478], [-4.0, 0.503], [-7.8, 0.501]],
+    [[-11.8, 0.502], [-15.3, 0.478], [-15.83, 0.444]],
+    [[-17.9, 0.350], [-21.6, 0.257], [-29.1, 0.168]],
+    [[-38.0, 0.260], [-42.3, 0.353], [-45.0, 0.443]] ] },
+  flower8: { n: 8, start: 114.8, r0: 0.3128, seg: [
+    [[-9.2, 0.531], [-32.9, 0.606], [-41.4, 0.367]],
+    [[-42.0, 0.358], [-43.2, 0.338], [-45.0, 0.3128]] ] },
+};
+
+/* US state outlines for slide 26, as flat [x0,y0,x1,y1,...] polygon rings
+ * in 0..1 map-box space. */
+const US_STATES = [
+[[0.284,0.864,0.286,0.851,0.277,0.856,0.284,0.864],[0.268,0.867,0.271,0.86,0.267,0.867],[0.319,0.888,0.315,0.87,0.31,0.879,0.319,0.888],[0.337,0.908,0.336,0.9,0.337,0.908],[0.349,0.914,0.358,0.907,0.344,0.897,0.349,0.914],[0.364,0.977,0.383,0.954,0.36,0.925,0.364,0.976]],
+[[0.904,0.435,0.891,0.385,0.895,0.437,0.904,0.435]],
+[[0.696,0.808,0.708,0.799,0.704,0.777,0.753,0.769,0.752,0.721,0.732,0.619,0.684,0.625,0.685,0.746,0.689,0.803,0.695,0.788,0.696,0.808]],
+[[0.099,0.859,0.092,0.85,0.099,0.859],[0.106,0.979,0.135,0.963,0.171,0.89,0.163,0.921,0.178,0.909,0.178,0.892,0.192,0.908,0.211,0.901,0.226,0.918,0.229,0.905,0.237,0.93,0.236,0.913,0.246,0.929,0.239,0.929,0.241,0.942,0.246,0.932,0.26,0.949,0.258,0.931,0.228,0.897,0.222,0.911,0.212,0.896,0.205,0.898,0.184,0.771,0.161,0.771,0.148,0.759,0.119,0.786,0.132,0.825,0.122,0.818,0.109,0.827,0.117,0.845,0.131,0.843,0.131,0.856,0.116,0.864,0.11,0.897,0.115,0.908,0.121,0.904,0.123,0.927,0.142,0.924,0.127,0.964,0.105,0.979],[0.09,0.99,0.098,0.983,0.09,0.99],[0.154,0.954,0.163,0.934,0.154,0.953],[0.239,0.941,0.233,0.917,0.227,0.922,0.238,0.941],[0.251,0.956,0.249,0.941,0.242,0.942,0.25,0.956]],
+[[0.859,0.979,0.864,0.904,0.823,0.765,0.811,0.764,0.81,0.781,0.807,0.774,0.757,0.779,0.752,0.769,0.703,0.778,0.707,0.804,0.715,0.792,0.713,0.801,0.731,0.793,0.726,0.797,0.742,0.804,0.744,0.796,0.75,0.821,0.771,0.799,0.783,0.806,0.805,0.839,0.805,0.879,0.809,0.884,0.807,0.873,0.813,0.876,0.809,0.892,0.82,0.918,0.824,0.908,0.822,0.928,0.849,0.972,0.863,0.967,0.859,0.978]],
+[[0.812,0.781,0.83,0.712,0.774,0.621,0.776,0.609,0.732,0.619,0.751,0.72,0.751,0.762,0.757,0.779,0.807,0.774,0.811,0.781]],
+[[0.681,0.568,0.685,0.561,0.762,0.55,0.786,0.513,0.77,0.465,0.756,0.472,0.736,0.456,0.717,0.505,0.711,0.498,0.707,0.512,0.684,0.512,0.675,0.547,0.665,0.543,0.659,0.571,0.68,0.568]],
+[[0.24,0.317,0.289,0.331,0.298,0.238,0.294,0.226,0.292,0.233,0.269,0.234,0.259,0.182,0.248,0.18,0.256,0.14,0.237,0.104,0.24,0.044,0.225,0.042,0.212,0.136,0.218,0.167,0.2,0.208,0.191,0.299,0.239,0.317]],
+[[0.663,0.552,0.682,0.53,0.689,0.48,0.677,0.337,0.63,0.341,0.638,0.367,0.624,0.384,0.618,0.43,0.634,0.48,0.643,0.481,0.64,0.506,0.663,0.552]],
+[[0.683,0.518,0.707,0.512,0.71,0.499,0.716,0.506,0.725,0.475,0.736,0.47,0.728,0.356,0.683,0.366,0.689,0.478,0.683,0.518]],
+[[0.618,0.425,0.624,0.385,0.638,0.364,0.619,0.304,0.531,0.307,0.53,0.337,0.544,0.42,0.613,0.416,0.618,0.425]],
+[[0.45,0.555,0.565,0.558,0.565,0.476,0.552,0.443,0.436,0.437,0.432,0.552,0.449,0.555]],
+[],
+[[0.623,0.845,0.621,0.839,0.623,0.845],[0.671,0.863,0.679,0.851,0.665,0.837,0.672,0.828,0.671,0.818,0.661,0.823,0.662,0.784,0.626,0.786,0.638,0.733,0.633,0.71,0.577,0.711,0.589,0.787,0.583,0.839,0.614,0.844,0.621,0.832,0.643,0.859,0.666,0.844,0.671,0.862]],
+[[0.251,0.738,0.289,0.748,0.306,0.531,0.218,0.507,0.212,0.544,0.202,0.54,0.205,0.609,0.185,0.672,0.25,0.738]],
+[[0.632,0.708,0.63,0.683,0.656,0.595,0.643,0.592,0.646,0.573,0.565,0.577,0.569,0.687,0.577,0.691,0.577,0.711,0.632,0.708]],
+[[0.953,0.231,0.959,0.197,0.963,0.202,0.973,0.186,0.971,0.168,0.979,0.171,0.979,0.162,0.985,0.169,0.982,0.161,1,0.138,0.98,0.112,0.964,0.055,0.955,0.066,0.948,0.059,0.934,0.151,0.952,0.231]],
+[[0.886,0.458,0.877,0.439,0.884,0.446,0.88,0.393,0.825,0.411,0.827,0.431,0.837,0.412,0.853,0.407,0.872,0.429,0.868,0.45,0.886,0.458],[0.895,0.46,0.906,0.434,0.895,0.437,0.887,0.391,0.88,0.393,0.887,0.396,0.882,0.427,0.894,0.459]],
+[[0.957,0.292,0.973,0.274,0.967,0.264,0.965,0.278,0.952,0.262,0.957,0.245,0.95,0.239,0.914,0.261,0.913,0.288,0.948,0.275,0.957,0.292],[0.962,0.297,0.964,0.289,0.962,0.297],[0.973,0.294,0.973,0.288,0.973,0.294]],
+[[0.645,0.136,0.656,0.122,0.645,0.135],[0.675,0.236,0.683,0.204,0.689,0.214,0.705,0.193,0.718,0.2,0.719,0.192,0.731,0.192,0.726,0.173,0.712,0.176,0.712,0.166,0.684,0.183,0.666,0.168,0.657,0.175,0.664,0.146,0.628,0.186,0.665,0.206,0.675,0.236],[0.706,0.213,0.706,0.205,0.705,0.212],[0.737,0.193,0.735,0.186,0.736,0.193],[0.728,0.358,0.751,0.352,0.764,0.3,0.754,0.262,0.737,0.278,0.745,0.251,0.741,0.216,0.714,0.203,0.709,0.243,0.707,0.226,0.697,0.248,0.702,0.329,0.694,0.362,0.728,0.357]],
+[[0.585,0.306,0.619,0.304,0.592,0.258,0.59,0.221,0.598,0.184,0.633,0.157,0.64,0.129,0.619,0.123,0.608,0.131,0.591,0.113,0.574,0.115,0.561,0.107,0.553,0.083,0.553,0.097,0.522,0.097,0.533,0.307,0.585,0.306]],
+[[0.668,0.814,0.67,0.806,0.689,0.805,0.684,0.626,0.645,0.63,0.63,0.683,0.638,0.733,0.625,0.786,0.661,0.783,0.668,0.814]],
+[[0.649,0.591,0.664,0.553,0.64,0.506,0.643,0.483,0.634,0.481,0.621,0.45,0.617,0.422,0.544,0.42,0.565,0.475,0.565,0.577,0.646,0.572,0.649,0.591]],
+[[0.269,0.234,0.292,0.233,0.294,0.225,0.298,0.237,0.301,0.218,0.412,0.241,0.419,0.09,0.254,0.048,0.251,0.054,0.24,0.044,0.237,0.104,0.255,0.141,0.247,0.179,0.259,0.181,0.269,0.233]],
+[[0.436,0.437,0.552,0.442,0.527,0.338,0.499,0.326,0.408,0.317,0.404,0.393,0.437,0.398,0.436,0.435]],
+[[0.199,0.579,0.2,0.535,0.207,0.536,0.21,0.524,0.21,0.542,0.215,0.536,0.24,0.317,0.143,0.28,0.126,0.394,0.199,0.579]],
+[[0.945,0.249,0.953,0.231,0.933,0.151,0.924,0.251,0.945,0.249]],
+[[0.906,0.415,0.915,0.356,0.912,0.331,0.898,0.322,0.892,0.351,0.903,0.367,0.892,0.393,0.905,0.415]],
+[[0.301,0.751,0.307,0.735,0.339,0.741,0.337,0.732,0.405,0.743,0.413,0.55,0.307,0.531,0.289,0.747,0.301,0.751]],
+[[0.914,0.348,0.946,0.314,0.915,0.336,0.9,0.177,0.87,0.195,0.854,0.261,0.818,0.274,0.823,0.292,0.811,0.326,0.883,0.302,0.912,0.33,0.915,0.347]],
+[[0.876,0.626,0.882,0.59,0.885,0.596,0.902,0.574,0.889,0.577,0.897,0.563,0.886,0.558,0.902,0.559,0.908,0.545,0.904,0.533,0.903,0.546,0.901,0.533,0.889,0.539,0.888,0.527,0.891,0.536,0.898,0.523,0.905,0.529,0.898,0.512,0.798,0.541,0.793,0.561,0.755,0.605,0.756,0.614,0.814,0.594,0.82,0.605,0.841,0.6,0.865,0.63,0.875,0.617,0.876,0.626],[0.888,0.591,0.895,0.586,0.888,0.59],[0.899,0.59,0.905,0.568,0.899,0.589],[0.911,0.538,0.901,0.511,0.911,0.538],[0.91,0.562,0.912,0.539,0.911,0.561]],
+[[0.515,0.214,0.531,0.209,0.522,0.097,0.42,0.089,0.413,0.205,0.514,0.214]],
+[[0.777,0.476,0.801,0.422,0.799,0.331,0.768,0.361,0.751,0.352,0.728,0.358,0.735,0.457,0.756,0.472,0.769,0.464,0.776,0.476]],
+[[0.568,0.689,0.565,0.558,0.415,0.55,0.414,0.57,0.468,0.575,0.472,0.657,0.519,0.685,0.53,0.672,0.534,0.686,0.555,0.676,0.568,0.688]],
+[[0.127,0.273,0.191,0.3,0.2,0.208,0.218,0.168,0.213,0.151,0.184,0.139,0.127,0.132,0.12,0.103,0.106,0.094,0.073,0.243,0.127,0.273]],
+[[0.888,0.391,0.903,0.368,0.892,0.35,0.897,0.321,0.883,0.302,0.811,0.326,0.81,0.316,0.805,0.321,0.799,0.33,0.807,0.416,0.888,0.391]],
+[[0.944,0.305,0.951,0.285,0.948,0.275,0.942,0.278,0.944,0.304],[0.954,0.295,0.953,0.286,0.954,0.295]],
+[[0.828,0.711,0.828,0.693,0.836,0.698,0.831,0.692,0.843,0.685,0.865,0.63,0.84,0.6,0.79,0.598,0.774,0.621,0.785,0.626,0.828,0.711]],
+[[0.532,0.346,0.53,0.214,0.413,0.205,0.408,0.316,0.499,0.326,0.532,0.346]],
+[[0.735,0.618,0.755,0.614,0.762,0.592,0.793,0.561,0.797,0.541,0.684,0.561,0.685,0.585,0.684,0.568,0.657,0.571,0.646,0.63,0.734,0.618]],
+[[0.511,0.987,0.517,0.915,0.583,0.839,0.588,0.784,0.578,0.751,0.576,0.69,0.555,0.676,0.534,0.686,0.522,0.676,0.519,0.685,0.466,0.649,0.468,0.575,0.413,0.57,0.405,0.742,0.337,0.732,0.337,0.738,0.367,0.793,0.373,0.829,0.394,0.856,0.416,0.826,0.434,0.832,0.469,0.919,0.477,0.964,0.511,0.986]],
+[[0.258,0.519,0.307,0.53,0.319,0.379,0.287,0.369,0.288,0.331,0.284,0.336,0.24,0.317,0.218,0.507,0.257,0.518]],
+[[0.902,0.183,0.901,0.176,0.902,0.183],[0.902,0.186,0.902,0.179,0.902,0.186],[0.927,0.256,0.928,0.165,0.902,0.178,0.913,0.26,0.926,0.256]],
+[[0.837,0.533,0.899,0.505,0.901,0.511,0.897,0.498,0.889,0.502,0.878,0.491,0.892,0.496,0.876,0.463,0.887,0.474,0.888,0.463,0.868,0.451,0.87,0.431,0.845,0.416,0.833,0.46,0.826,0.456,0.819,0.5,0.797,0.518,0.79,0.507,0.763,0.549,0.836,0.533],[0.897,0.491,0.905,0.451,0.897,0.458,0.897,0.491],[0.898,0.49,0.899,0.483,0.898,0.49]],
+[[0.127,0.132,0.16,0.14,0.179,0.139,0.181,0.131,0.212,0.15,0.226,0.039,0.142,0.002,0.144,0.043,0.131,0.072,0.139,0.044,0.126,0.06,0.136,0.033,0.109,0.01,0.113,0.068,0.105,0.091,0.119,0.103,0.127,0.132]],
+[[0.796,0.518,0.819,0.5,0.826,0.456,0.833,0.46,0.845,0.416,0.855,0.425,0.856,0.418,0.847,0.406,0.827,0.431,0.825,0.411,0.807,0.415,0.804,0.383,0.801,0.422,0.776,0.477,0.796,0.518]],
+[[0.663,0.338,0.676,0.336,0.684,0.227,0.669,0.258,0.67,0.213,0.619,0.185,0.62,0.171,0.599,0.187,0.592,0.258,0.617,0.288,0.624,0.335,0.63,0.341,0.663,0.338]],
+[[0.331,0.381,0.404,0.394,0.411,0.241,0.3,0.218,0.286,0.369,0.331,0.381]],
+[[0.123,0.618,0.12,0.61,0.123,0.618],[0.119,0.636,0.117,0.626,0.119,0.636],[0.142,0.656,0.191,0.665,0.19,0.639,0.205,0.608,0.124,0.393,0.142,0.28,0.134,0.287,0.135,0.276,0.075,0.248,0.061,0.31,0.069,0.405,0.076,0.417,0.08,0.406,0.089,0.413,0.078,0.412,0.083,0.435,0.077,0.418,0.074,0.427,0.089,0.553,0.124,0.589,0.142,0.655]],
+[[0.432,0.553,0.438,0.398,0.319,0.378,0.307,0.531,0.432,0.553]],
+[[0.917,0.329,0.944,0.304,0.941,0.278,0.914,0.288,0.916,0.328]],
+[[0.128,0.604,0.138,0.596,0.143,0.567,0.123,0.558,0.116,0.585,0.128,0.604],[0.123,0.618,0.12,0.61,0.123,0.618]],
+[[0.912,0.343,0.913,0.336,0.912,0.343]]
+];
+
+/* ------------------------------------------------------- geometry helpers */
+
+/** Closed Catmull-Rom spline through `pts`, emitted as pptxgenjs cubic points. */
+function splinePoints(anchors, tension) {
+  const n = anchors.length;
+  const at = (i) => anchors[((i % n) + n) % n];
+  const out = [{ x: at(0)[0], y: at(0)[1], moveTo: true }];
+  for (let i = 0; i < n; i++) {
+    const p0 = at(i - 1), p1 = at(i), p2 = at(i + 1), p3 = at(i + 2);
+    out.push({ x: p2[0], y: p2[1], curve: { type: 'cubic',
+      x1: p1[0] + (p2[0] - p0[0]) * tension, y1: p1[1] + (p2[1] - p0[1]) * tension,
+      x2: p2[0] - (p3[0] - p1[0]) * tension, y2: p2[1] - (p3[1] - p1[1]) * tension } });
+  }
+  out.push({ close: true });
+  return out;
+}
+
+const outlineCache = {};
+function outlinePoints(name) {
+  if (!outlineCache[name]) {
+    const flat = OUTLINES[name];
+    const anchors = [];
+    for (let i = 1; i < flat.length; i += 2) anchors.push([flat[i], flat[i + 1]]);
+    outlineCache[name] = splinePoints(anchors, flat[0]);
+  }
+  return outlineCache[name];
+}
+
+const rosetteCache = {};
+function rosettePoints(name) {
+  if (!rosetteCache[name]) {
+    const m = ROSETTES[name];
+    const polar = (deg, r) => ({ x: 0.5 + r * Math.cos(deg * Math.PI / 180), y: 0.5 + r * Math.sin(deg * Math.PI / 180) });
+    const pts = [Object.assign(polar(m.start, m.r0), { moveTo: true })];
+    for (let i = 0; i < m.n; i++) {
+      const base = m.start - i * (360 / m.n);
+      for (const s of m.seg) {
+        const c1 = polar(base + s[0][0], s[0][1]);
+        const c2 = polar(base + s[1][0], s[1][1]);
+        const p = polar(base + s[2][0], s[2][1]);
+        pts.push({ x: p.x, y: p.y, curve: { type: 'cubic', x1: c1.x, y1: c1.y, x2: c2.x, y2: c2.y } });
+      }
+    }
+    pts.push({ close: true });
+    rosetteCache[name] = pts;
+  }
+  return rosetteCache[name];
+}
+
+/** Scale unit-space points into a slide rectangle. */
+function place(points, x, y, w, h) {
+  return points.map((p) => {
+    if (p.close) return p;
+    const q = { x: x + p.x * w, y: y + p.y * h };
+    if (p.moveTo) q.moveTo = true;
+    if (p.curve) q.curve = { type: 'cubic', x1: x + p.curve.x1 * w, y1: y + p.curve.y1 * h,
+      x2: x + p.curve.x2 * w, y2: y + p.curve.y2 * h };
+    return q;
+  });
+}
+
+/* --------------------------------------------------------- shape emitters */
+
+/** Organic silhouette from OUTLINES / ROSETTES. `o` may carry flipH/flipV/rotate/line. */
+function blob(slide, name, x, y, w, h, color, o = {}) {
+  const pts = ROSETTES[name] ? rosettePoints(name) : outlinePoints(name);
+  slide.addShape('custGeom', Object.assign({ x, y, w, h, points: place(pts, 0, 0, w, h),
+    fill: color ? { color } : { type: 'none' } }, o));
+}
+
+/** Grey stand-in for a photo, using the same silhouette as the original frame. */
+function photo(slide, name, x, y, w, h, o = {}) {
+  blob(slide, name, x, y, w, h, C.photo, o);
+}
+
+function rect(slide, x, y, w, h, color, o = {}) {
+  slide.addShape('rect', Object.assign({ x, y, w, h, fill: { color } }, o));
+}
+
+function roundRect(slide, x, y, w, h, color, radius, o = {}) {
+  slide.addShape('roundRect', Object.assign({ x, y, w, h, fill: { color }, rectRadius: radius }, o));
+}
+
+/* ---------------------------------------------------------- text emitters */
+
+const TEXT_BASE = { margin: [7.2, 7.2, 3.6, 3.6], valign: 'top', isTextBox: true };
+
+/** Two-tone slide title: dark lead-in + green highlight. */
+function title(slide, x, y, w, h, dark, green, o = {}) {
+  const runs = [];
+  if (dark) runs.push({ text: dark, options: { color: C.ink } });
+  if (green) runs.push({ text: green, options: { color: C.green } });
+  slide.addText(runs, Object.assign({}, TEXT_BASE, {
+    x, y, w, h, fontFace: FONT, fontSize: TITLE_SIZE, bold: true, lineSpacingMultiple: 0.9,
+  }, o));
+}
+
+/** Bold Raleway label (card headings, names, numbers). */
+function label(slide, x, y, w, h, text, o = {}) {
+  slide.addText(text, Object.assign({}, TEXT_BASE, {
+    x, y, w, h, fontFace: FONT, fontSize: LABEL_SIZE, bold: true, color: C.ink,
+  }, o));
+}
+
+/** Justified PT Sans paragraph copy at 9pt / 1.5 line spacing. */
+function body(slide, x, y, w, h, text, o = {}) {
+  slide.addText(text, Object.assign({}, TEXT_BASE, {
+    x, y, w, h, fontFace: BODY_FONT, fontSize: BODY_SIZE, color: C.ink,
+    align: 'justify', lineSpacingMultiple: 1.5,
+  }, o));
+}
+
+/* ------------------------------------------------------ composite widgets */
+
+/** Rosette bullet + bold label + justified paragraph, the deck's workhorse. */
+function bulletBlock(slide, x, y, opts) {
+  const dot = opts.dot === undefined ? 0.2812 : opts.dot;
+  if (dot > 0) blob(slide, opts.icon || 'burst12', x, y + 0.0235, dot, dot, opts.dotColor || C.green, { flipV: true });
+  const tx = x + dot + (dot > 0 ? 0.0 : 0) + (opts.gap === undefined ? 0.0 : opts.gap);
+  label(slide, tx, y, opts.labelW || 1.8138, 0.3534, opts.label, { color: opts.color || C.ink });
+  body(slide, tx, y + 0.2461, opts.w || 1.8881, opts.h || 0.9853, opts.text, { color: opts.color || C.ink });
+}
+
+/** Yellow rounded "Feel the charm..." strip used on slides 9 and 10. */
+function pillNote(slide, x, y, w, text) {
+  roundRect(slide, x, y, w, 0.3966, C.yellow, 0.2);
+  slide.addText(text, Object.assign({}, TEXT_BASE, { x: x + 0.371, y: y + 0.059, w: w - 0.742, h: 0.3037,
+    fontFace: BODY_FONT, fontSize: BODY_SIZE, bold: true, color: C.ink2, align: 'center', lineSpacingMultiple: 1.5 }));
+}
+
+/** Small yellow "See More" button (a grouped pill in the original). */
+function seeMore(slide, x, y, color = C.yellow) {
+  roundRect(slide, x, y + 0.0478, 1.0174, 0.2307, color, 0.11);
+  slide.addText('See More', Object.assign({}, TEXT_BASE, { x: x + 0.0719, y, w: 0.8736, h: 0.3037,
+    fontFace: BODY_FONT, fontSize: BODY_SIZE, bold: true, color: C.ink2, align: 'center', lineSpacingMultiple: 1.5 }));
+}
+
+/** Coloured pill tag with centred white caption (year chips, area chips, class chips). */
+function pillTag(slide, x, y, w, h, color, text, size = LABEL_SIZE) {
+  blob(slide, 'pill', x, y, w, h, color);
+  slide.addText(text, Object.assign({}, TEXT_BASE, { x: x + w * 0.128, y: y + h * 0.157, w: w * 0.744, h: 0.3534,
+    fontFace: FONT, fontSize: size, bold: true, color: C.white, align: 'center' }));
+}
+
+/* ------------------------------------------- recurring background clusters */
+
+/** Blue/yellow drip hanging from the top edge. */
+function dripTop(slide, x, y, w, h, color, flipH) {
+  blob(slide, 'drip', x, y, w, h, color, flipH ? { flipH: true } : {});
+}
+
+/** Drip rising from the bottom edge (vertically mirrored). */
+function dripBottom(slide, x, y, w, h, color, flipH) {
+  blob(slide, 'drip', x, y, w, h, color, { flipV: true, flipH: !!flipH });
+}
+
+/* ------------------------------------------------------------ slide bodies */
+
+const LOREM = {
+  soul: 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy with my whole heart. I am alone, and feel the charm of existence in this spot, which was created for the bliss of souls like mine.',
+  suitable: 'Suitable for all categories.',
+  charmSpot: 'Which I enjoy with my whole heart. I am alone, and feel the charm of existence in this spot.',
+  blindTexts: 'The blind texts. Separated they live in Bookmarksgrove right at the coast of,',
+  feelCharm: 'Feel the charm of existence in this spot, which was.',
+  sweetCharm: 'Sweet mornings of spring which I enjoy with my whole heart. I am alone, and feel the charm .',
+  sweetFeel: 'Sweet mornings of spring which I enjoy with my whole heart. I am alone, and feel.',
+  aloneCharm: 'I am alone, and feel the charm of existence in this spot.',
+  timeline: 'These sweet mornings of spring which I enjoy with my whole heart. I am alone, and feel the charm of existence in this spot, which was.',
+  sweetShort: 'Sweet mornings of spring which I enjoy with my whole heart. I am alone, and feel the charm.',
+  country: 'Country, in which roasted parts of sentences fly into your mouth. Even the all.',
+  paradise: 'It is a paradisematic country, in which roasted parts of sentences fly into your mouth. Even the all-powerful Pointing has no control about the blind texts it is an almost unorthographic.',
+  regelialia: 'it with the necessary regelialia. It is a paradisematic country, in which roasted parts of sentences fly into your mouth. Even the all-powerful Pointing has no control about the blind texts',
+  sentencesBlind: 'Sentences fly into your mouth. Even the all-powerful Pointing has no control about the blind',
+  quote: '\u201CIt is a paradisematic country, in which roasted parts of sentences fly into your mouth. Even the all-powerful Pointing has no control about.\u201D',
+};
+
+/** 1 — cover: photo wash + green banner wordmark. */
+function slide01(s) {
+  rect(s, 0, 0, 10, 7.5, C.photo);            // full-bleed photo stand-in
+  rect(s, 0, 0, 10, 7.5, C.white, { fill: { color: C.white, transparency: 20 } });
+  blob(s, 'flower8', -0.9947, -0.3226, 2.2409, 2.2409, C.yellow, { flipV: true });
+  dripTop(s, 7.7553, -0.2213, 2.5654, 1.0954, C.blue, true);
+  dripBottom(s, 1.2462, 6.6467, 2.7539, 1.1759, C.blue);
+  blob(s, 'aster8', 1.198, 4.3008, 0.4567, 0.4567, C.yellow, { flipV: true });
+  blob(s, 'aster8', 7.7553, 2.0799, 0.4567, 0.4567, C.blue, { flipV: true });
+  blob(s, 'burst12', 9.3609, 5.8042, 1.2383, 1.2383, C.green, { flipV: true });
+  blob(s, 'banner', 1.6391, 2.6036, 6.7218, 2.2928, C.green, { rotate: -3.31 });
+  s.addText('Bumblebee', Object.assign({}, TEXT_BASE, { x: 1.9896, y: 2.9724, w: 6.1427, h: 1.3632,
+    fontFace: FONT, fontSize: 75, bold: true, color: C.white, align: 'center' }));
+  blob(s, 'pill', 6.1, 4.3008, 2.2609, 0.936, C.yellow);
+  s.addText('Kindergarten', Object.assign({}, TEXT_BASE, { x: 6.1767, y: 4.4604, w: 2.1686, h: 0.4544,
+    fontFace: FONT, fontSize: 21, bold: true, color: C.ink2, align: 'center' }));
+}
+
+/** 2 — welcome, portrait blob left, copy right. */
+function slide02(s) {
+  blob(s, 'burst12', 0.6938, 1.3969, 1.6073, 1.6073, C.yellow, { flipV: true });
+  photo(s, 'blobEgg', 0.8333, 1.3889, 3.7917, 4.6806);
+  blob(s, 'flower8', 0.8667, 2.4851, 0.9567, 0.9567, C.blue, { flipV: true });
+  dripTop(s, 7.7553, -0.2398, 2.5654, 1.0954, C.blue, true);
+  dripBottom(s, -0.6363, 6.6767, 2.2529, 0.962, C.yellow);
+  blob(s, 'aster8', 4.6118, 1.7247, 0.4567, 0.4567, C.yellow, { flipV: true });
+  title(s, 5.1146, 1.684, 4.0625, 1.9186, 'Welcome to Our ', 'Kindergarten');
+  body(s, 5.1146, 3.5935, 3.9792, 1.2125,
+    LOREM.soul + ' I am so happy, my dear friend, so absorbed in the exquisite sense of mere tranquil existence.');
+  roundRect(s, 3.4028, 5.1575, 2.7708, 0.4864, C.green, 0.24);
+  s.addText('Masha Darryl - Founder', Object.assign({}, TEXT_BASE, { x: 3.5002, y: 5.2366, w: 2.5759, h: 0.3534,
+    fontFace: FONT, fontSize: LABEL_SIZE, bold: true, color: C.white, align: 'center' }));
+}
+
+/** 3 — table of contents, 3x3 grid of rosette bullets. */
+function slide03(s) {
+  blob(s, 'flower8', 7.1042, -0.6822, 1.7569, 1.757, C.yellow, { flipV: true });
+  dripTop(s, -0.0759, -0.2217, 2.5654, 1.0954, C.blue);
+  dripBottom(s, 5.5221, 6.7485, 2.2529, 0.962, C.yellow);
+  title(s, 2.1892, 1.1712, 5.6215, 0.7068, 'List of ', 'Content', { align: 'center' });
+  const cols = [
+    { x: 0.7166, color: C.yellow, items: ['About Us', 'Vision & Mission', 'The History'] },
+    { x: 3.9104, color: C.green, items: ['Our Values', 'Teacher Profile', 'The Kids'] },
+    { x: 7.1042, color: C.blue, items: ['Our Gallery', 'Testimonial', 'Contact Us'] },
+  ];
+  cols.forEach((col) => {
+    col.items.forEach((name, r) => {
+      const y = 2.7587 + r * 1.1542;
+      blob(s, 'burst12', col.x, y, 0.5245, 0.5245, col.color, { flipV: true });
+      label(s, col.x + 0.5677, y - 0.0235, 1.7991, 0.3534, name);
+      body(s, col.x + 0.5677, y + 0.2461, 1.6116, 0.3037, LOREM.suitable);
+    });
+  });
+}
+
+/** 4 — about, two tall photo blobs on yellow pads. */
+function slide04(s) {
+  blob(s, 'blobTall', 4.7147, 4.2564, 1.2125, 2.7708, C.yellow, { rotate: 270, flipV: true });
+  blob(s, 'blobTall', 1.4563, 4.2564, 1.2125, 2.7708, C.yellow, { rotate: 270, flipV: true });
+  blob(s, 'flower8', 6.8601, 1.9613, 1.4166, 1.4166, C.yellow, { flipV: true });
+  blob(s, 'burst12', 6.0628, 0.4652, 1.1312, 1.1312, C.blue, { flipV: true });
+  photo(s, 'blobTall', 7.194, 2.696, 2.1289, 3.8873);
+  photo(s, 'blobTall', 4.6875, 0.7395, 2.1289, 3.8873);
+  dripTop(s, 7.9417, -0.2337, 2.5654, 1.0954, C.blue, true);
+  dripBottom(s, 1.7471, 6.8212, 2.2529, 0.962, C.green);
+  title(s, 0.6771, 1.2799, 4.0833, 1.3127, 'About Our ', 'Kindergarten');
+  body(s, 0.6771, 3.0475, 3.3854, 1.2125, LOREM.soul);
+  [0.9097, 4.1682].forEach((x) => {
+    label(s, x, 5.2239, 2.1686, 0.3534, 'Description', { color: C.ink2 });
+    body(s, x, 5.5305, 2.2948, 0.5309, 'Sweet mornings of spring which I enjoy with my whole heart. I am alone.', { color: C.ink2 });
+  });
+}
+
+/** 5 — "Shaping Bright Beginnings", two wide photo blobs right. */
+function slide05(s) {
+  blob(s, 'flower8', 8.389, 0.2769, 2.6541, 2.6541, C.blue, { flipV: true });
+  photo(s, 'blobWideA', 6.6444, 4.1048, 4.5917, 2.6313);
+  photo(s, 'blobWideB', 4.9424, 0.9306, 4.5917, 2.8194);
+  blob(s, 'aster8', 4.2342, 1.9782, 0.4567, 0.4567, C.yellow, { flipV: true });
+  blob(s, 'aster8', 6.4115, 4.8077, 0.6098, 0.6098, C.blue, { flipV: true });
+  dripBottom(s, -0.6363, 6.6806, 2.2529, 0.962, C.yellow);
+  title(s, 0.6771, 1.2795, 4.0833, 1.9186, 'Shaping ', 'Bright Beginnings');
+  body(s, 0.6771, 3.2215, 3.465, 0.9853,
+    'When, while the lovely valley teems with vapour around me, and the meridian sun strikes the upper surface of the impenetrable foliage of my trees, and but a few stray gleams.');
+  [0.7166, 3.6805].forEach((x) => {
+    bulletBlock(s, x, 4.843, { label: 'Description', labelW: 2.1686, w: 2.1686, h: 0.9853,
+      text: 'Sweet mornings of spring which I enjoy with my whole heart. I am alone, and feel the charm of existence in this spot,' });
+  });
+}
+
+/** 6 — history timeline on a yellow field: three white cards with year chips. */
+function slide06(s) {
+  s.background = { color: C.yellow };
+  dripTop(s, 7.7698, -0.2398, 2.5654, 1.0954, C.blue, true);
+  blob(s, 'flower8', -0.5748, 5.0304, 1.1496, 1.1496, C.blue, { flipV: true });
+  blob(s, 'aster8', 5.5762, 1.3792, 0.4724, 0.4724, C.white, { flipV: true });
+  title(s, 0.6771, 1.2364, 5.6979, 0.7068, 'History Timeline', '');
+  const chips = [{ year: '2015', color: C.green }, { year: '2018', color: C.blue }, { year: '2021', color: C.green }];
+  chips.forEach((chip, i) => {
+    const cx = 0.651 + i * 3.0459;
+    blob(s, 'blobTall', cx, 2.5556, 2.5546, 3.7083, C.white);
+    photo(s, 'blobTall', cx + 0.2028, 2.8513, 2.149, 1.7605);
+    body(s, cx + 0.2028, 4.8952, 2.149, 0.9853, LOREM.timeline, { color: C.ink2 });
+    pillTag(s, cx + 0.9438, 2.3303, 1.8693, 0.7739, chip.color, chip.year, 21);
+  });
+}
+
+/** 7 — why choose us: tall left photo, 2x2 bullet grid. */
+function slide07(s) {
+  blob(s, 'blobTall', 7.2367, 3.9234, 1.6724, 2.5, C.yellow, { rotate: 270, flipV: true });
+  blob(s, 'blobTall', 4.5016, 3.8999, 1.6724, 2.5, C.yellow, { rotate: 270, flipV: true });
+  photo(s, 'blobRound', 0.5586, 1.0191, 3.3594, 5.4618);
+  blob(s, 'flower8', -0.9612, -0.6798, 2.0601, 2.0601, C.green, { flipV: true });
+  dripBottom(s, -0.5512, 6.6111, 2.5578, 1.0922, C.blue);
+  dripTop(s, 8.1917, -0.2833, 2.5654, 1.0954, C.blue, true);
+  blob(s, 'aster8', 0.7277, 1.2795, 0.7658, 0.7658, C.yellow, { flipV: true });
+  title(s, 4.3125, 1.2795, 5.0104, 0.7068, 'Why ', 'Choose Us?');
+  [[4.2577, 2.5443, C.green, C.ink], [6.9728, 2.5443, C.green, C.ink],
+   [4.2577, 4.5262, C.white, C.ink2], [6.9728, 4.5262, C.white, C.ink2]].forEach(([x, y, dotColor, color]) => {
+    bulletBlock(s, x, y, { label: 'Description', text: LOREM.sweetCharm, dotColor, color });
+  });
+}
+
+/** 8 — curriculum: three approaches under an intro paragraph. */
+function slide08(s) {
+  blob(s, 'blobTall', 4.3048, 3.4874, 1.3905, 3.0431, C.yellow, { rotate: 270, flipV: true });
+  photo(s, 'blobWideC', -0.6636, -0.2639, 4.3616, 4.0139);
+  blob(s, 'flower8', 8.6641, -0.7825, 2.2229, 2.2229, C.blue, { flipV: true });
+  blob(s, 'burst12', 8.362, 0.5797, 1.0865, 1.0865, C.yellow, { flipV: true });
+  dripBottom(s, -0.6363, 6.6466, 2.7847, 1.189, C.green);
+  title(s, 4.0, 1.2795, 4.8125, 0.7068, 'Our ', 'Curriculum');
+  body(s, 4.0, 2.0129, 4.0104, 0.7581,
+    'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy with my whole heart. I am alone, and feel the charm of existence in this spot, which was created.');
+  [['Montessori', 0.7166, C.green, C.ink], ['Thematic', 3.8899, C.white, C.ink2], ['Play-Based', 7.0632, C.green, C.ink]]
+    .forEach(([name, x, dotColor, color]) => {
+      bulletBlock(s, x, 4.4957, { label: name, labelW: 1.939, w: 1.939, h: 0.7581,
+        text: LOREM.sweetShort, dotColor, color });
+    });
+}
+
+/** 9 — learning areas: two centre photo blobs flanked by bullets. */
+function slide09(s) {
+  dripBottom(s, 0.0183, 6.4532, 2.7949, 1.1934, C.green);
+  photo(s, 'blobSquare', 3.6493, -0.5139, 2.7014, 3.9888);
+  photo(s, 'blobSquare', 3.6493, 4.0251, 2.7014, 3.9888);
+  dripTop(s, 7.7553, -0.3532, 2.5654, 1.0954, C.yellow, true);
+  blob(s, 'flower8', -0.9609, 5.836, 2.2229, 2.2229, C.blue, { flipV: true });
+  blob(s, 'aster8', 3.2523, 1.8541, 0.7658, 0.7658, C.yellow, { flipV: true });
+  title(s, 0.6771, 1.2799, 2.7713, 1.3127, 'Learning', 'Areas');
+  [[0.6771, 3.0032], [0.6771, 4.3965], [6.8542, 1.4979], [6.8542, 2.9062], [6.8542, 4.3965]]
+    .forEach(([x, y]) => bulletBlock(s, x, y - 0.0234, { label: 'Description', w: 2.1875, h: 0.7581, text: LOREM.blindTexts }));
+  pillNote(s, 5.9368, 5.9997, 3.3861, LOREM.feelCharm);
+}
+
+/** 10 — daily activities: three egg photos left, four yellow strips right. */
+function slide10(s) {
+  title(s, 5.1848, 1.2413, 3.9548, 1.3127, 'Daily ', 'Activities');
+  photo(s, 'blobOval', 1.0497, 0.8472, 1.9725, 2.6917);
+  photo(s, 'blobOval', 0.6331, 4.1694, 1.9725, 2.6917);
+  photo(s, 'blobOval', 2.7914, 3.4363, 1.9725, 2.6917);
+  dripTop(s, 7.5331, -0.2639, 2.7877, 1.1903, C.blue, true);
+  dripBottom(s, 2.2097, 6.6408, 2.6952, 1.1509, C.green);
+  blob(s, 'flower8', -0.7569, 2.757, 1.5139, 1.5139, C.blue, { flipV: true });
+  blob(s, 'aster8', 3.4855, 2.0779, 0.8456, 0.8456, C.yellow, { flipV: true });
+  blob(s, 'aster8', 4.2744, 1.4664, 0.4895, 0.4895, C.green, { flipV: true });
+  body(s, 5.1849, 2.4731, 3.6605, 0.5309,
+    'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy with my whole.');
+  [3.3109, 4.0918, 4.8727, 5.6537].forEach((y) => pillNote(s, 5.1158, y, 3.7296, LOREM.feelCharm));
+}
+
+/** 11 — character building: two round photos, three bullets. */
+function slide11(s) {
+  photo(s, 'blobRound', 2.9479, 0.6528, 2.3654, 3.6643);
+  photo(s, 'blobRound', 0.5581, 3.183, 2.3654, 3.6643);
+  dripTop(s, -0.0954, -0.2953, 2.5654, 1.0954, C.blue);
+  dripBottom(s, 8.1854, 6.557, 2.6313, 1.1235, C.yellow);
+  blob(s, 'flower8', 1.0417, 1.2095, 1.2906, 1.2906, C.yellow, { flipV: true });
+  blob(s, 'aster8', 2.6532, 2.3318, 0.5894, 0.5894, C.green, { flipV: true });
+  title(s, 5.7917, 1.2413, 3.3472, 1.9186, 'Our ', 'Character Building');
+  body(s, 5.7917, 3.2315, 3.4688, 0.7581,
+    'Like these sweet mornings of spring which I enjoy with my whole heart. I am alone, and feel the charm of existence in this spot, which was created for the bliss of souls like mine.');
+  [3.1916, 5.304, 7.4164].forEach((x) => {
+    bulletBlock(s, x, 4.9921, { label: 'Description', labelW: 1.4632, w: 1.5627, h: 0.9853, text: LOREM.country });
+  });
+}
+
+/** 12 — age groups: white + yellow comparison cards. */
+function slide12(s) {
+  blob(s, 'blobTall', 6.6949, 2.8918, 2.7328, 3.21, C.yellow, { flipV: true });
+  photo(s, 'blobRoundB', 1.062, 3.9037, 2.8188, 2.9375);
+  photo(s, 'blobRoundC', 0.6771, 0.6588, 2.8188, 2.9375);
+  blob(s, 'flower8', -0.7569, 3.2479, 1.5139, 1.5139, C.green, { flipV: true });
+  blob(s, 'flower8', -0.7292, 6.1019, 1.9581, 1.9581, C.yellow, { flipV: true });
+  dripTop(s, 8.1897, -0.2557, 2.5654, 1.0954, C.blue, true);
+  title(s, 4.125, 1.1712, 4.7767, 1.3127, 'Age Group & ', 'Class  Level');
+  const groups = [
+    { x: 4.125, dot: C.green, color: C.ink, name: 'First Group', age: '4 Years Old', btn: C.yellow },
+    { x: 6.928, dot: C.white, color: C.ink2, name: 'Second Group', age: '5-6 Years Old', btn: C.white },
+  ];
+  groups.forEach((g) => {
+    blob(s, 'burst12', g.x, 3.3218, 0.2812, 0.2812, g.dot, { flipV: true });
+    label(s, g.x + 0.2812, 3.2983, 1.8438, 0.3534, g.name, { color: g.color });
+    label(s, g.x + 0.2813, 3.7398, 1.7282, 0.2903, g.age, { fontSize: 11.25, color: g.color });
+    body(s, g.x + 0.2812, 3.9838, 1.9854, 1.2125,
+      'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy with my whole heart. I am alone, and feel.', { color: g.color });
+    seeMore(s, g.x + 0.3163, 5.4138, g.btn);
+  });
+}
+
+/** 13 — teacher grid: four round portraits with names. */
+function slide13(s) {
+  blob(s, 'flower8', -0.64, -0.5791, 1.5139, 1.5139, C.yellow, { flipV: true });
+  dripTop(s, 7.7553, -0.2377, 2.5654, 1.0954, C.blue, true);
+  dripBottom(s, 7.8804, 6.6547, 2.5654, 1.0954, C.green);
+  blob(s, 'aster8', 6.0877, 1.3053, 0.5894, 0.5894, C.blue, { flipV: true });
+  title(s, 0.6771, 1.1712, 5.7935, 0.7068, 'Meet ', 'Our Teacher');
+  const people = [
+    { name: 'Sasha Alves', px: 0.6771, py: 2.3527, tx: 2.3719, ty: 2.7068 },
+    { name: 'Amanda Field', px: 5.2205, py: 2.3892, tx: 6.9272, ty: 2.7457 },
+    { name: 'Kevin Joe', px: 0.6771, py: 4.6886, tx: 2.3719, ty: 5.056 },
+    { name: 'Ian McKlein', px: 5.2205, py: 4.7251, tx: 6.9272, ty: 5.056 },
+  ];
+  people.forEach((p) => {
+    photo(s, 'blobRound', p.px, p.py, 1.4183, 1.7471);
+    label(s, p.tx, p.ty, 1.8138, 0.3534, p.name);
+    body(s, p.tx, p.ty + 0.2696, 2.1964, 0.7581, LOREM.sweetFeel);
+  });
+}
+
+/** 14 — teacher profile with experience list and skill bars. */
+function slide14(s) {
+  dripBottom(s, -0.6649, 6.2655, 3.7733, 1.6112, C.green);
+  blob(s, 'flower8', -0.9473, 2.283, 2.3562, 2.3563, C.yellow, { flipV: true });
+  blob(s, 'flower8', 2.0215, 5.8182, 2.2904, 2.2904, C.blue, { flipV: true });
+  dripTop(s, 8.5649, -0.3227, 2.5654, 1.0954, C.blue, true);
+  title(s, 4.375, 1.2361, 4.7708, 1.3125, 'Our Profile Teacher', '');
+  s.addText('Helena Parker', Object.assign({}, TEXT_BASE, { x: 4.375, y: 2.3557, w: 4.5417, h: 0.7742,
+    fontFace: FONT, fontSize: TITLE_SIZE, bold: true, color: C.green, lineSpacingMultiple: 0.9 }));
+  body(s, 4.375, 3.0364, 4.3935, 0.9853,
+    'It is a paradisematic country, in which roasted parts of sentences fly into your mouth. Even the all-powerful Pointing has no control about the blind texts it is an almost unorthographic life One day however a small line of blind text by the name of Lorem.');
+  label(s, 4.375, 4.3702, 1.7282, 0.2903, 'Experiences :', { fontSize: 11.25 });
+  [['First Experience', 4.375, 4.4175], ['Second Experience', 6.9958 - 0.123, 6.9154]].forEach(([name, tx, dx]) => {
+    blob(s, 'burst12', dx, 4.7322, 0.1416, 0.1416, C.green, { flipV: true });
+    s.addText([{ text: name + '\n', options: { bold: true } }, { text: LOREM.suitable }],
+      Object.assign({}, TEXT_BASE, { x: tx + 0.123, y: 4.6392, w: 1.6053, h: 0.5309,
+        fontFace: BODY_FONT, fontSize: BODY_SIZE, color: C.ink, lineSpacingMultiple: 1.5 }));
+  });
+  [['Personal Skill 1', 4.375, 4.4362, C.yellow], ['Personal Skill 2', 6.8542, 6.9154, C.blue]]
+    .forEach(([name, tx, bx, color]) => {
+      label(s, tx, 5.4736, 1.4632, 0.2524, name, { fontSize: BODY_SIZE });
+      roundRect(s, bx, 5.8182, 2.2304, 0.1136, C.track, 0.06);
+      roundRect(s, bx, 5.8182, 2.0324, 0.1136, color, 0.06);
+    });
+}
+
+/** 15 — yellow statement slide with three photo blobs. */
+function slide15(s) {
+  s.background = { color: C.yellow };
+  dripTop(s, -0.6643, -0.2902, 3.5639, 1.5218, C.blue);
+  dripBottom(s, 7.1458, 6.446, 3.2066, 1.3692, C.green);
+  blob(s, 'flower8', 6.6283, 5.6956, 1.6842, 1.6842, C.blue, { flipV: true });
+  blob(s, 'aster8', 0.6758, 2.6623, 0.5894, 0.5894, C.white, { flipV: true });
+  blob(s, 'aster8', 1.4929, 1.9691, 0.4684, 0.4684, C.white, { flipV: true });
+  photo(s, 'blobWideC', 2.8995, -0.8135, 3.663, 3.7765);
+  photo(s, 'blobRound', 6.875, 1.2316, 2.4492, 3.4628);
+  photo(s, 'blobRound', 3.9479, 3.3705, 2.4492, 3.4628);
+  s.addText('Where \nLittle Hands Make Big Discoveries.', Object.assign({}, TEXT_BASE, {
+    x: 0.6758, y: 3.75, w: 2.9583, h: 2.3225, fontFace: FONT, fontSize: 33, bold: true,
+    color: C.ink2, lineSpacingMultiple: 0.9 }));
+}
+
+/** 16 — classroom environment: two card photos + wide bottom photo. */
+function slide16(s) {
+  blob(s, 'flower8', -0.9969, -0.7734, 2.8459, 2.846, C.green, { flipV: true });
+  blob(s, 'drip', 8.1385, 4.4167, 3.2066, 1.3692, C.yellow, { flipH: true, flipV: true });
+  photo(s, 'blobSquare', 0.7639, 0.9306, 2.0901, 3.4861);
+  photo(s, 'blobSquare', 3.1788, 0.9306, 2.0901, 3.4861);
+  photo(s, 'blobWideB', 5.5937, 4.9861, 4.732, 3.2639);
+  blob(s, 'aster8', 8.7525, 0.6541, 0.7658, 0.7658, C.blue, { flipV: true });
+  title(s, 5.5937, 1.1712, 3.7535, 1.3127, 'Classroom Environment', '');
+  body(s, 5.5937, 2.6192, 3.6424, 0.9853, LOREM.soul + ' ');
+  [0.7639, 3.1554].forEach((x) => {
+    blob(s, 'burst12', x, 5.1829, 0.224, 0.224, C.green, { flipV: true });
+    label(s, x + 0.1777, 5.1373, 1.8138, 0.3534, 'Description');
+    body(s, x + 0.1777, 5.4068, 1.8606, 0.7581, LOREM.charmSpot);
+  });
+}
+
+/** 17 — facilities: four equal photo cards with centred captions. */
+function slide17(s) {
+  dripTop(s, 3.5614, -0.3407, 2.8771, 1.2285, C.yellow, true);
+  dripBottom(s, 3.7343, 6.8163, 2.5315, 1.0809, C.green);
+  blob(s, 'flower8', 8.8843, 0.3867, 1.9375, 1.9375, C.blue, { flipV: true });
+  title(s, 0.6771, 1.1712, 5.559, 0.7068, 'Our ', 'Facilities');
+  for (let i = 0; i < 4; i++) {
+    const x = 0.6771 + i * 2.2361;
+    photo(s, 'blobSquare', x, 2.4541, 1.9375, 2.7265);
+    label(s, x + 0.0618, 5.3938, 1.8138, 0.3534, 'Description', { align: 'center' });
+    body(s, x + 0.0618, 5.6633, 1.8138, 0.7581, LOREM.aloneCharm, { align: 'center' });
+  }
+}
+
+/** 18 — happy place: photo trio plus a +500K stat. */
+function slide18(s) {
+  blob(s, 'flower8', -0.6876, 0.4287, 2.301, 2.301, C.yellow, { flipV: true });
+  photo(s, 'blobSquare', 0.6771, 1.1712, 1.9375, 2.7959);
+  photo(s, 'blobSquare', 2.9132, 0.9541, 1.9375, 2.7959);
+  photo(s, 'blobWideA', 0.6195, 4.0972, 4.3805, 3.0214);
+  blob(s, 'drip', 6.5833, 6.7098, 2.3426, 1.0003, C.blue, { flipH: true, flipV: true });
+  blob(s, 'aster8', 4.5883, 5.6079, 0.642, 0.642, C.blue, { flipV: true });
+  title(s, 5.25, 1.1719, 4.0729, 1.9186, 'A Happy Place to ', 'Learn and Play');
+  body(s, 5.25, 3.1686, 3.9375, 0.7581,
+    'It is a paradisematic country, in which roasted parts of sentences fly into your mouth. Even the all-powerful Pointing has no control about the blind texts it is an almost unorthographic life One day.');
+  s.addText('+500K', Object.assign({}, TEXT_BASE, { x: 5.3854, y: 4.7193, w: 1.5729, h: 0.6563,
+    fontFace: FONT, fontSize: 33, bold: true, color: C.ink, lineSpacingMultiple: 0.9 }));
+  label(s, 5.3854, 5.2858, 1.5729, 0.2524, 'Description', { fontSize: BODY_SIZE });
+  body(s, 7.172, 4.8002, 2.1509, 0.9853, LOREM.regelialia.replace(' the blind texts', '').replace('mouth', 'mouth.'));
+}
+
+/** 19 — gallery: 4x2 grid of photo cards. */
+function slide19(s) {
+  blob(s, 'flower8', -0.8494, 5.3786, 2.7544, 2.7544, C.yellow, { flipV: true });
+  blob(s, 'flower8', 8.3542, -0.709, 2.301, 2.301, C.blue, { flipV: true });
+  blob(s, 'aster8', 1.2903, 0.401, 0.642, 0.642, C.yellow, { flipV: true });
+  title(s, 1.9323, 1.1712, 6.1354, 0.7068, 'Our ', 'Amazing Kids', { align: 'center' });
+  for (let r = 0; r < 2; r++) {
+    for (let c = 0; c < 4; c++) {
+      photo(s, 'blobSquare', 0.8021 + c * 2.2361, 2.3152 + r * 2.4086, 1.6875, 2.032);
+    }
+  }
+}
+
+/** 20 — memorable activities: yellow quote pad and two photo cards. */
+function slide20(s) {
+  dripTop(s, -0.2334, -0.4084, 2.993, 1.278, C.blue, true);
+  blob(s, 'drip', 8.0504, 6.5431, 2.9063, 1.241, C.green, { flipH: true, flipV: true });
+  blob(s, 'flower8', 8.3721, 0.7027, 1.305, 1.305, C.yellow, { flipV: true });
+  title(s, 0.6771, 1.7273, 3.4479, 1.3127, 'Memorable ', 'Activities');
+  body(s, 0.6771, 3.1397, 2.7188, 0.7581,
+    'It is a paradisematic country, in which roasted parts of sentences fly into your mouth. Even the all-powerful Pointing has no control about.');
+  blob(s, 'blobTall', 1.2466, 4.0392, 1.3922, 2.9062, C.yellow, { rotate: 270, flipV: true });
+  body(s, 0.75, 5.1133, 2.3854, 0.7581,
+    'Sweet mornings of spring which I enjoy with my whole heart. I am alone, and feel', { color: C.ink2 });
+  [['Sport Day', 4.3333, 4.3437, 4.5983], ['Costume Party', 6.9792, 6.9896, 7.2441]].forEach(([name, px, bx, lx]) => {
+    photo(s, 'blobSquare', px, 1.25, 2.3438, 3.625);
+    label(s, lx, 5.1608, 1.8138, 0.3534, name, { align: 'center' });
+    body(s, bx, 5.4303, 2.3229, 0.7581, 'Which I enjoy with my whole heart. I am alone, and feel the charm of existence.', { align: 'center' });
+  });
+}
+
+/** 21 — contact: phone mock-up plus social handles. */
+function slide21(s) {
+  blob(s, 'burst12', 0.8675, 4.3401, 1.955, 1.955, C.blue, { flipV: true });
+  blob(s, 'flower8', 2.6428, 0.8416, 2.2208, 2.2209, C.yellow, { flipV: true });
+  roundRect(s, 1.8708, 1.7273, 1.9083, 4.047, C.photo, 0.16);
+  // phone frame stand-in for the device mock-up bitmap
+  s.addShape('roundRect', { x: 1.8188, y: 1.6875, w: 2.0075, h: 4.125, rectRadius: 0.2,
+    fill: { type: 'none' }, line: { color: C.ink, width: 2 } });
+  s.addShape('roundRect', { x: 2.55, y: 1.79, w: 0.55, h: 0.11, rectRadius: 0.05, fill: { color: C.ink } });
+  dripTop(s, 7.2895, -0.2658, 3.0738, 1.3125, C.blue, true);
+  blob(s, 'drip', 3.2778, 6.4551, 3.4444, 1.4708, C.green, { flipH: true, flipV: true });
+  blob(s, 'aster8', 0.4846, 1.4166, 0.7658, 0.7658, C.green, { flipV: true });
+  blob(s, 'aster8', 8.6932, 5.3312, 0.6866, 0.6866, C.yellow, { flipV: true });
+  title(s, 5.3854, 1.7274, 3.3872, 1.9186, 'Get in Touch ', 'With Us');
+  body(s, 5.3854, 3.4998, 3.3867, 0.9853,
+    'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy with my whole heart. I am alone, and feel the charm of existence.');
+  label(s, 5.3854, 4.8296, 1.8138, 0.3534, 'Follow Us :');
+  [['yourwebsite.com', 5.2248], ['@youraccountname', 5.4746]].forEach(([handle, y], i) => {
+    s.addShape('ellipse', { x: 5.4109, y: y - 0.03, w: 0.24, h: 0.24, fill: { color: C.yellow } });
+    label(s, 5.6509, y, 1.8138, 0.2524, handle, { fontSize: BODY_SIZE });
+  });
+}
+
+/** 22 — awards: two photo blobs and a pair of flower badges. */
+function slide22(s) {
+  photo(s, 'blobWideA', -0.3569, 4.1883, 4.732, 2.909);
+  photo(s, 'blobWideB', 5.1458, 0.6806, 5.0966, 2.909);
+  dripTop(s, 2.5804, -0.2486, 2.5654, 1.0954, C.yellow, true);
+  blob(s, 'flower8', -0.7545, 3.952, 1.5089, 1.5089, C.green, { flipV: true });
+  title(s, 0.6771, 1.1712, 3.8785, 1.3127, 'Awards & ', 'Achievement');
+  body(s, 0.6771, 2.5627, 3.6255, 0.9853, LOREM.paradise);
+  [[5.4143, C.yellow], [7.8265, C.blue]].forEach(([x, color], i) => {
+    blob(s, 'flower8', x, 4.2422, 0.8854, 0.8854, color, { flipV: true });
+    blob(s, 'star5', x + 0.2611, 4.5041, 0.3631, 0.3616, C.white);
+    label(s, x - 0.4642 + 0.0234, 5.1914, 1.8138, 0.3534, 'Description', { align: 'center' });
+    body(s, x - 0.4876, 5.4609, 1.8606, 0.7581, LOREM.charmSpot, { align: 'center' });
+  });
+}
+
+/** 23 — admission process: four numbered flowers on a dotted zig-zag. */
+function slide23(s) {
+  dripTop(s, 7.7993, -0.2556, 2.8974, 1.2372, C.yellow, true);
+  blob(s, 'drip', -0.5625, 6.5071, 3.0216, 1.2902, C.green, { flipH: true, flipV: true });
+  blob(s, 'burst12', -0.9775, -0.4571, 2.3356, 2.3356, C.blue, { flipV: true });
+  title(s, 2.1892, 1.1712, 5.6215, 0.7068, 'Admission ', 'Process', { align: 'center' });
+  const steps = [
+    { n: '01', fx: 1.1647, fy: 2.9916, color: C.yellow, ty: 4.0118 },
+    { n: '02', fx: 3.377, fy: 3.6615, color: C.blue, ty: 4.6817 },
+    { n: '03', fx: 5.5892, fy: 2.9916, color: C.yellow, ty: 4.0118 },
+    { n: '04', fx: 7.8015, fy: 3.6615, color: C.blue, ty: 4.6817 },
+  ];
+  // dotted elbow connectors between consecutive steps
+  for (let i = 0; i < 3; i++) {
+    const y0 = steps[i].fy + 0.4427, y1 = steps[i + 1].fy + 0.4427;
+    const x0 = steps[i].fx + 0.8854, x1 = steps[i + 1].fx;
+    const mid = (x0 + x1) / 2;
+    const dots = { color: C.green, width: 1.5, dashType: 'sysDot' };
+    s.addShape('line', { x: x0, y: y0, w: mid - x0, h: 0, line: dots });
+    s.addShape('line', { x: mid, y: Math.min(y0, y1), w: 0, h: Math.abs(y1 - y0), line: dots });
+    s.addShape('line', { x: mid, y: y1, w: x1 - mid, h: 0, line: dots });
+  }
+  steps.forEach((st) => {
+    blob(s, 'flower8', st.fx, st.fy, 0.8854, 0.8854, st.color, { flipV: true });
+    s.addText(st.n, Object.assign({}, TEXT_BASE, { x: st.fx + 0.1041, y: st.fy + 0.2155, w: 0.6771, h: 0.4796,
+      fontFace: FONT, fontSize: 22.5, bold: true, color: C.white, align: 'center' }));
+    label(s, st.fx - 0.4642, st.ty, 1.8138, 0.3534, 'Description', { align: 'center' });
+    body(s, st.fx - 0.4876, st.ty + 0.2696, 1.8606, 0.7581, LOREM.charmSpot, { align: 'center' });
+  });
+}
+
+/** 24 — demographic donut chart with two face icons. */
+function slide24(s) {
+  dripTop(s, -0.2333, -0.2512, 2.5654, 1.0954, C.blue, true);
+  blob(s, 'drip', 7.7399, 6.4401, 2.9546, 1.2616, C.blue, { flipH: true, flipV: true });
+  title(s, 2.1892, 1.1712, 5.6215, 0.7068, 'Demographic ', 'Chart', { align: 'center' });
+  s.addChart('doughnut', [{ name: 'Age split', labels: ['4 years', '5-6 years'], values: [55, 45] }], {
+    x: 0.5836, y: 2.6171, w: 1.81, h: 1.81,
+    chartColors: [C.yellow, C.green], holeSize: 62,
+    showLegend: false, showTitle: false, showValue: false, dataBorder: { pt: 0, color: C.white },
+  });
+  faceIcon(s, 2.6824, 2.9754, 0.4677, C.yellow, true);
+  faceIcon(s, 2.6824, 3.6014, 0.4677, C.green, false);
+  ['55%', '45%'].forEach((v, i) => {
+    s.addText(v, Object.assign({}, TEXT_BASE, { x: 3.2206, y: 2.9818 + i * 0.6262, w: 0.972, h: 0.4796,
+      fontFace: FONT, fontSize: 22.5, bold: true, color: C.ink }));
+  });
+  label(s, 0.7235, 4.8046, 1.8138, 0.3534, 'Description');
+  body(s, 0.7235, 5.0742, 3.4692, 0.9853, LOREM.regelialia);
+  photo(s, 'blobSquare', 5.0, 2.4846, 4.1591, 3.47);
+}
+
+/** Outlined child face used as a chart legend icon. */
+function faceIcon(s, x, y, d, color, girl) {
+  s.addShape('ellipse', { x, y, w: d, h: d, fill: { type: 'none' }, line: { color, width: 2.5 } });
+  if (girl) {
+    for (let i = 0; i < 6; i++) {
+      const a = (i * 60 + 30) * Math.PI / 180;
+      s.addShape('ellipse', { x: x + d / 2 + Math.cos(a) * d * 0.42 - d * 0.15,
+        y: y + d / 2 + Math.sin(a) * d * 0.42 - d * 0.15, w: d * 0.3, h: d * 0.3,
+        fill: { type: 'none' }, line: { color, width: 2 } });
+    }
+  } else {
+    s.addShape('arc', { x: x + d * 0.16, y: y + d * 0.16, w: d * 0.68, h: d * 0.5,
+      angleRange: [180, 360], fill: { type: 'none' }, line: { color, width: 2.5 } });
+  }
+  [0.34, 0.66].forEach((f) => {
+    s.addShape('ellipse', { x: x + d * f - d * 0.05, y: y + d * 0.55, w: d * 0.1, h: d * 0.1, fill: { color } });
+  });
+}
+
+/** 25 — age comparison: big chart placeholder and a colour key. */
+function slide25(s) {
+  dripTop(s, 7.3411, -0.2058, 2.8734, 1.2269, C.blue, true);
+  dripBottom(s, -0.9948, 6.5452, 2.7031, 1.1542, C.blue);
+  blob(s, 'flower8', -0.901, -0.4302, 2.0051, 2.0051, C.yellow, { flipV: true });
+  title(s, 2.1892, 1.1712, 5.6215, 0.7068, 'Age ', 'Comparison', { align: 'center' });
+  photo(s, 'blobSquare', 1.104, 2.5824, 5.2206, 3.3217);
+  [['4 year old student', C.yellow, 3.1875], ['5-6 year old student', C.green, 3.5167]].forEach(([t, color, y]) => {
+    blob(s, 'burst12', 7.1847, y + 0.0835, 0.2231, 0.2231, color, { flipV: true });
+    s.addText(t, Object.assign({}, TEXT_BASE, { x: 7.4078, y, w: 1.6789, h: 0.3544,
+      fontFace: BODY_FONT, fontSize: 11.25, bold: true, color: C.ink, lineSpacingMultiple: 1.5 }));
+  });
+  label(s, 7.1847, 4.2433, 1.8138, 0.3534, 'Description');
+  body(s, 7.1847, 4.5128, 1.902, 0.9853,
+    'Roasted parts of sentences fly into your mouth. Even the all-powerful Pointing has no control about the blind texts');
+}
+
+/** 26 — US map with two callout areas. */
+function slide26(s) {
+  dripTop(s, 6.8521, -0.3611, 3.3625, 1.4358, C.blue, true);
+  blob(s, 'flower8', -0.6206, 5.9901, 2.0373, 2.0373, C.yellow, { flipV: true });
+  blob(s, 'aster8', -0.4614, 1.2895, 0.9228, 0.9228, C.green, { flipV: true });
+  blob(s, 'aster8', 8.6771, 1.4941, 0.75, 0.75, C.yellow, { flipV: true });
+  title(s, 2.1892, 1.1712, 5.6215, 0.7068, 'Our ', 'Kindergarten', { align: 'center' });
+  const MX = 2.7108, MY = 2.7328, MW = 4.5785, MH = 2.71;
+  US_STATES.forEach((state) => {
+    state.forEach((flat) => {
+      const pts = [];
+      for (let i = 0; i < flat.length; i += 2) {
+        pts.push({ x: MX + flat[i] * MW, y: MY + flat[i + 1] * MH, moveTo: i === 0 });
+      }
+      pts.push({ close: true });
+      s.addShape('custGeom', { x: MX, y: MY, w: MW, h: MH, points: pts,
+        fill: { color: C.photo }, line: { color: C.white, width: 0.75 } });
+    });
+  });
+  const areas = [
+    { tag: 'Area 01', color: C.green, px: 7.2774, py: 3.7222, lx: 6.3665, ly: 3.9835, tx: 7.2774, ty: 4.4405 },
+    { tag: 'Area 02', color: C.blue, px: 0.9757, py: 2.9806, lx: 2.453, ly: 3.2419, tx: 0.9757, ty: 3.6989 },
+  ];
+  areas.forEach((a) => {
+    s.addShape('line', { x: a.lx, y: a.ly, w: 0.8333, h: 0, line: { color: C.ink, width: 2.25, dashType: 'sysDot' } });
+    s.addShape('ellipse', { x: (a.tag === 'Area 01' ? a.lx : a.lx + 0.8333) - 0.055, y: a.ly - 0.055, w: 0.11, h: 0.11, fill: { color: C.ink } });
+    pillTag(s, a.px, a.py, 1.3997, 0.5794, a.color, a.tag);
+    label(s, a.tx, a.ty, 1.8138, 0.3534, 'Description');
+    body(s, a.tx, a.ty + 0.2711, 1.8138, 0.9853, LOREM.sentencesBlind);
+  });
+}
+
+/** 27 — tuition: two price cards with tick lists. */
+function slide27(s) {
+  blob(s, 'flower8', 2.3168, 3.7259, 1.5325, 1.5325, C.blue, { flipV: true });
+  photo(s, 'blobWideD', -0.4241, 4.2917, 4.5213, 3.9722);
+  dripTop(s, 5.524, -0.217, 3.0284, 1.2931, C.yellow);
+  title(s, 0.6771, 1.1712, 3.5625, 1.3127, 'Tuition & ', 'Fees');
+  body(s, 0.6771, 2.4468, 3.2604, 0.9853, 'It with the necessary ' + LOREM.regelialia.slice(20));
+  [{ x: 4.2944, tag: 'Class A', color: C.green, price: '$200' },
+   { x: 6.9217, tag: 'Class B', color: C.blue, price: '$220' }].forEach((card) => {
+    roundRect(s, card.x, 1.9671, 2.2292, 3.4792, C.white, 0.1, { shadow: CARD_SHADOW });
+    pillTag(s, card.x + 0.6943, 1.6997, 1.71, 0.7079, card.color, card.tag);
+    s.addText([{ text: card.price, options: { fontSize: 26.25 } }, { text: '/month', options: { fontSize: BODY_SIZE } }],
+      Object.assign({}, TEXT_BASE, { x: card.x + 0.1821, y: 2.5086, w: 1.5714, h: 0.5427,
+        fontFace: FONT, bold: true, color: C.ink2 }));
+    label(s, card.x + 0.1821, 3.2221, 1.3056, 0.2524, 'Description', { fontSize: BODY_SIZE, color: C.ink2 });
+    for (let i = 0; i < 4; i++) {
+      const y = 3.4493 + i * 0.3167;
+      blob(s, 'burst12', card.x + 0.263, y + 0.0651, 0.1482, 0.1482, C.green, { flipV: true });
+      body(s, card.x + 0.4113, y, 1.6226, 0.3037, LOREM.suitable, { color: C.ink2 });
+    }
+    blob(s, 'banner', card.x + 0.4213, 4.874, 1.314, 0.3844, C.yellow, { rotate: -3.31 });
+    s.addText('Register Now', Object.assign({}, TEXT_BASE, { x: card.x + 0.4834, y: 4.9526, w: 1.1469, h: 0.2524,
+      fontFace: FONT, fontSize: BODY_SIZE, bold: true, color: C.ink2, align: 'center' }));
+  });
+}
+
+/** 28 — testimonials: two quote cards with round portraits. */
+function slide28(s) {
+  dripBottom(s, 0.7535, 6.6111, 2.7485, 1.1736, C.green);
+  dripTop(s, 7.8889, -0.2565, 2.8988, 1.2378, C.blue, true);
+  blob(s, 'burst12', 3.3239, 1.5889, 0.6136, 0.6136, C.yellow, { flipV: true });
+  blob(s, 'flower8', -0.7163, 5.6528, 2.4946, 2.4946, C.yellow, { flipV: true });
+  title(s, 0.6771, 1.6944, 3.5625, 1.3127, 'Kids ', 'Testimonial');
+  body(s, 0.6771, 3.0599, 3.2604, 0.7581,
+    'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy with my whole heart.');
+  seeMore(s, 0.7535, 4.0946);
+  [{ cy: 0.649, py: 1.0972, qy: 2.2254, name: 'Alex - Student' },
+   { cy: 3.4768, py: 4.018, qy: 5.0532, name: 'Misha - Student' }].forEach((t) => {
+    blob(s, 'blobTall', 6.2545, t.cy, 1.6715, 4.1806, C.white, { rotate: 270, flipV: true, shadow: CARD_SHADOW });
+    photo(s, 'blobRound', 4.3542, t.py, 1.4062, 1.6347);
+    body(s, 5.9757, t.qy, 2.7049, 0.7581, LOREM.quote, { italic: true, color: C.ink2 });
+    s.addText(t.name, Object.assign({}, TEXT_BASE, { x: 5.9757, y: t.qy + 0.791, w: 1.4948, h: 0.3544,
+      fontFace: BODY_FONT, fontSize: 11.25, bold: true, color: C.ink2, lineSpacingMultiple: 1.5 }));
+  });
+}
+
+/** 29 — contact details next to a full-bleed photo blob. */
+function slide29(s) {
+  photo(s, 'blobWideE', -0.4134, -0.1806, 5.91, 7.7778);
+  blob(s, 'flower8', 4.1602, 1.2795, 1.2947, 1.2947, C.yellow, { flipV: true });
+  blob(s, 'aster8', 4.2342, 2.8211, 0.7658, 0.7658, C.blue, { flipV: true });
+  blob(s, 'flower8', 0.1959, 5.1624, 0.9604, 0.9604, C.blue, { flipV: true });
+  blob(s, 'burst12', 9.1833, 3.8301, 1.6334, 1.6334, C.yellow, { flipV: true });
+  dripTop(s, 7.7728, -0.3062, 2.5654, 1.0954, C.green, true);
+  title(s, 5.6111, 1.2795, 3.7639, 1.3125, 'Kindergarten ', 'Contact');
+  body(s, 5.6111, 2.6489, 3.2535, 0.5309,
+    'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy.');
+  [['Phone', '123-456-7890', 3.7408, 1.1484], ['Email', 'youremail@domain.com', 4.4516, 1.526],
+   ['Website', 'Yourwebsite.com', 5.1624, 1.1484]].forEach(([head, value, y, w]) => {
+    blob(s, 'burst12', 5.8411, y, 0.224, 0.224, C.green, { flipV: true });
+    label(s, 6.0651, y, 1.1484, 0.2524, head, { fontSize: BODY_SIZE });
+    body(s, 6.0651, y + 0.1806, w, 0.3037, value);
+  });
+}
+
+/** 30 — thank-you closer. */
+function slide30(s) {
+  blob(s, 'banner', 0.6882, 1.715, 6.7218, 1.9666, C.yellow, { rotate: -3.31 });
+  blob(s, 'flower8', 0.637, 2.7797, 1.1939, 1.194, C.blue, { flipV: true });
+  blob(s, 'flower8', 1.831, 4.3693, 0.7658, 0.7658, C.green, { flipV: true });
+  blob(s, 'aster8', 8.9763, 4.7968, 0.7658, 0.7658, C.blue, { flipV: true });
+  blob(s, 'aster8', 8.0053, 2.0799, 0.4567, 0.4567, C.green, { flipV: true });
+  dripBottom(s, 6.8587, 6.3193, 3.3913, 1.4481, C.yellow);
+  s.addText('Thank You', Object.assign({}, TEXT_BASE, { x: 1.5702, y: 2.0181, w: 6.1427, h: 1.3632,
+    fontFace: FONT, fontSize: 75, bold: true, color: C.ink2 }));
+  blob(s, 'pill', 5.3261, 3.5553, 2.2609, 0.936, C.green);
+  s.addText('Bumblebee', Object.assign({}, TEXT_BASE, { x: 5.5241, y: 3.759, w: 2.0845, h: 0.4544,
+    fontFace: FONT, fontSize: 21, bold: true, color: C.white, align: 'center' }));
+}
+
+/* ------------------------------------------------------------------- build */
+
+const BUILDERS = [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
+  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
+  slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29, slide30];
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.title = 'Bumblebee Kindergarten';
+  pptx.defineLayout({ name: 'DECK_4x3', width: 10, height: 7.5 });
+  pptx.layout = 'DECK_4x3';
+  BUILDERS.forEach((fn) => fn(pptx.addSlide()));
+  return pptx.writeFile({ fileName: path.join(__dirname, '1424a744-a78f-41e2-b474-ffa45c249dfe_grok_final.pptx') });
+}
+
+build().then((f) => console.log('wrote', f));

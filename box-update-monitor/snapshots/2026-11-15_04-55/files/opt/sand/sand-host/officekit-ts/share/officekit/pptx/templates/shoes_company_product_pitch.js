@@ -1,0 +1,787 @@
+#!/usr/bin/env node
+/**
+ * "SNICK-ROE — Shoes Presentation" (30 slides, 10 x 5.625 in).
+ *
+ * Rebuilt from scratch with pptxgenjs only. The original deck's photographs are
+ * solid-colour crops, so every picture is re-created here as `photo()` — a flat
+ * rectangle in the same place at the same size (see IMAGE_PLACEHOLDER_NOTE).
+ */
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'DECK', width: 10, height: 5.625 });
+pptx.layout = 'DECK';
+pptx.author = 'Snick-roe Shoes';
+pptx.title = 'Shoes Presentation';
+
+const S = pptx.ShapeType;
+
+/* ------------------------------------------------------------------ palette */
+
+const C = {
+  teal: '1F5455',       // accent4 - the brand green
+  tealDeep: '102A2A',   // accent4 @ lumMod 50%
+  tealInk: '173F40',    // bullet dots on the pricing table
+  sand: 'D5AA8F',       // accent3
+  white: 'FFFFFF',
+  ink: '0D0D0D',        // "black" headlines (tx1 @ lumMod 95%)
+  grey: '808080',       // body copy (bg1 @ lumMod 50%)
+  track: 'D9D9D9',      // unfilled part of a progress ring / star
+  photo: 'FF002A'       // IMAGE_PLACEHOLDER_NOTE: flat stand-in for the photos
+};
+
+const FONT = {
+  display: 'Playfair Display',   // major / headline face
+  body: 'Open Sans',             // minor / body face
+  semi: 'Open Sans Semibold'     // corner brand tag
+};
+
+const SIZE = { headline: 22.5, stat: 24, body: 8.25, tag: 9, pill: 6, ring: 15.75 };
+
+// pptxgenjs rewrites the shadow object in place, so hand out a fresh one each time.
+const shadow = (blur, opacity) => ({
+  type: 'outer', blur, offset: 0.01, angle: 90, color: '000000', opacity
+});
+const cardShadow = () => shadow(50, 0.2);   // the big soft drop under white cards
+const pillShadow = () => shadow(28, 0.3);   // the tighter one under the wide stat pills
+
+/* -------------------------------------------------------- lorem ipsum copy */
+
+const NB = '\u00A0'; // the deck writes "Lorem Ipsum" with a non-breaking space
+const L = {
+  tag: `Lorem Ipsum${NB}`,
+  ring: `Lorem Ipsum${NB}is simply dummy text of the printing`,
+  ringWide: `Lorem Ipsum${NB}is simply dummy text of the printing is simply dummy text of the`,
+  and: `Lorem Ipsum${NB}is simply dummy text of the printing and`,
+  simply: `Lorem Ipsum${NB}is simply dummy text of the printing and simply `,
+  text: `Lorem Ipsum${NB}is simply dummy text of the printing text`,
+  typesetting: `Lorem Ipsum${NB}is simply dummy text of the printing and typesetting`,
+  oneLorem: `Lorem Ipsum${NB}is simply dummy text of the printing and typesetting industry. Lorem`,
+  loremLoop: `Lorem Ipsum${NB}is simply dummy text of the printing and typesetting industry. `
+    + 'Lorem simply dummy text of the printing and typesetting industry. Lorem Lorem simply dummy text of the',
+  hasIpsum: `Lorem Ipsum${NB}is simply dummy text of the printing and typesetting industry. `
+    + "Lorem Ipsum has been the industry's standard dummy text of Ipsum has",
+  hasIpsumWord: `Lorem Ipsum${NB}is simply dummy text of the printing and typesetting industry. `
+    + "Lorem Ipsum has been the industry's standard dummy text of Ipsum",
+  hasDummy: `Lorem Ipsum${NB}is simply dummy text of the printing and typesetting industry. `
+    + "Lorem Ipsum has been the industry's standard dummy",
+  hasDummyText: `Lorem Ipsum${NB}is simply dummy text of the printing and typesetting industry. `
+    + "Lorem Ipsum has been the industry's standard dummy text",
+  standardOf: `Lorem Ipsum${NB}is simply dummy text of the printing and typesetting industry. `
+    + "Lorem Ipsum has been the industry's standard dummy text of Ipsum has been the industry's "
+    + 'standard of the printing and typesetting industry. ',
+  standardLorem: `Lorem Ipsum${NB}is simply dummy text of the printing and typesetting industry. `
+    + "Lorem Ipsum has been the industry's standard dummy text of Ipsum has been the industry's "
+    + 'standard of the printing and typesetting industry. Lorem',
+  standardEnd: `Lorem Ipsum${NB}is simply dummy text of the printing and typesetting industry. `
+    + "Lorem Ipsum has been the industry's standard dummy text of Ipsum has been the industry's "
+    + "standard of the printing and typesetting industry. Lorem Ipsum has been industry's standard "
+    + "dummy text of Ipsum has been the industry's standard ",
+  standardBeen: `Lorem Ipsum${NB}is simply dummy text of the printing and typesetting industry. `
+    + "Lorem Ipsum has been the industry's standard dummy text of Ipsum has been the industry's "
+    + "standard of the printing and typesetting industry. Lorem Ipsum has been industry's standard "
+    + 'dummy text of Ipsum has been the',
+  standardHasBeen: `Lorem Ipsum${NB}is simply dummy text of the printing and typesetting industry. `
+    + "Lorem Ipsum has been the industry's standard dummy text of Ipsum has been the industry's "
+    + 'standard of the printing and typesetting industry. Lorem Ipsum has been',
+  standardOfThe: `Lorem Ipsum${NB}is simply dummy text of the printing and typesetting industry. `
+    + "Lorem Ipsum has been the industry's standard dummy text of Ipsum has been the industry's standard of the",
+  visionary: `Lorem Ipsum${NB}is simply dummy text of the printing and typesetting industry. `
+    + "Lorem Ipsum has been the industry's standard dummy text of Ipsum has been the industry's "
+    + "standard of the printing and typesetting industry. Lorem text of Ipsum has been the industry's "
+    + 'standard of the printing and typesetting industry. ',
+  mark: `Lorem Ipsum${NB}is simply dummy text of the printing and typesetting industry. `
+    + 'PLACEHOLDER'
+    + 'text of the printing and typesetting industry. Lorem simply dummy text of the dummy text of '
+    + 'the printing and typesetting industry. ',
+  brandStandard: `Lorem Ipsum${NB}is simply dummy text of the printing and typesetting industry. `
+    + "Lorem Ipsum has been the industry's standard dummy text of Ipsum has been the industry's",
+  price: `Lorem Ipsum${NB}is simply`,
+  priceIs: `Lorem Ipsum${NB}is simply is`,
+  aboutProduct: `Lorem Ipsum${NB}is simply dummy text of the printing and typesetting industry. Lorem`
+};
+
+/* --------------------------------------------------------------- primitives */
+
+/** Flat colour rectangle. */
+function box(slide, x, y, w, h, color, opts) {
+  slide.addShape(S.rect, Object.assign({ x, y, w, h, fill: { color }, line: { type: 'none' } }, opts));
+}
+
+/**
+ * IMAGE_PLACEHOLDER_NOTE - every photo in the source deck is replaced by this
+ * flat rectangle at the picture's original position and size.
+ */
+function photo(slide, x, y, w, h) {
+  box(slide, x, y, w, h, C.photo);
+}
+
+/** Text block; matches PowerPoint's default top-anchored text frame. */
+function text(slide, content, o) {
+  slide.addText(content, {
+    x: o.x, y: o.y, w: o.w, h: o.h,
+    fontFace: o.font || FONT.body,
+    fontSize: o.size || SIZE.body,
+    color: o.color || C.grey,
+    bold: !!o.bold,
+    align: o.align || 'left',
+    valign: 'top',
+    lineSpacingMultiple: o.lineSpacing,
+    wrap: true
+  });
+}
+
+/** Multi-line headline in the display face. */
+function headline(slide, lines, o) {
+  const runs = lines.map((line, i) => ({
+    text: line,
+    options: { breakLine: i < lines.length - 1 }
+  }));
+  text(slide, runs, Object.assign({
+    font: FONT.display, size: SIZE.headline, bold: true, color: C.ink,
+    w: 3.49, h: 0.858
+  }, o));
+}
+
+/** Body paragraph: Open Sans 8.25 pt on 150 % leading. */
+function body(slide, copy, o) {
+  text(slide, copy, Object.assign({ lineSpacing: 1.5, color: C.grey }, o));
+}
+
+/** "Shoes / Presentation" brand tag, top-left of every slide but the cover. */
+function brandTag(slide, color) {
+  text(slide, [{ text: 'Shoes', options: { breakLine: true } }, { text: 'Presentation' }], {
+    x: 0.175, y: 0.372, w: 1.043, h: 0.404,
+    font: FONT.semi, size: SIZE.tag, color
+  });
+}
+
+/** Thin arrow in the top-right corner. */
+function cornerArrow(slide, color) {
+  slide.addShape(S.line, {
+    x: 9.263, y: 0.464, w: 0.408, h: 0,
+    line: { color, width: 2.25, endArrowType: 'triangle' }
+  });
+}
+
+/** "Description Here:" kicker. */
+function kicker(slide, x, y, color, w) {
+  text(slide, 'Description Here:', { x, y, w: w || 1.886, h: 0.252, size: 9, bold: true, color });
+}
+
+/** Big number + "Lorem Ipsum" caption (the deck's stat lock-up). */
+function stat(slide, x, y, value, color, align, captionColor) {
+  text(slide, value, {
+    x, y, w: 1.346, h: 0.505,
+    font: FONT.display, size: SIZE.stat, bold: true, color, align
+  });
+  body(slide, L.tag, { x, y: y + 0.373, w: 1.226, h: 0.288, align, color: captionColor || C.grey });
+}
+
+/** The sand "More Info" chip + its outlined twin. */
+function moreInfoPair(slide, x, y) {
+  slide.addShape(S.roundRect, { x, y, w: 0.623, h: 0.157, fill: { color: C.sand }, line: { type: 'none' } });
+  slide.addText([{ text: 'More ', options: { bold: true } }, { text: 'Info' }], {
+    x, y, w: 0.623, h: 0.157, align: 'center', valign: 'middle',
+    fontFace: FONT.body, fontSize: SIZE.pill, color: '000000'
+  });
+  slide.addShape(S.roundRect, {
+    x: x + 0.757, y, w: 0.623, h: 0.157, fill: { type: 'none' }, line: { color: C.teal, width: 0.75 }
+  });
+  slide.addText('More Info', {
+    x: x + 0.757, y, w: 0.623, h: 0.157, align: 'center', valign: 'middle',
+    fontFace: FONT.body, fontSize: SIZE.pill, color: C.teal
+  });
+}
+
+/**
+ * Progress ring: grey track + teal arc + teal end dot + percentage label.
+ * All rings in the deck are 0.86 in across and stop at 311.03 deg.
+ */
+const RING_SIZE = 0.86;
+function ring(slide, x, y, startAngle, label) {
+  slide.addShape(S.donut, {
+    x, y, w: RING_SIZE, h: RING_SIZE,
+    fill: { color: C.track }, line: { type: 'none' }, rectRadius: RING_SIZE * 0.06335
+  });
+  slide.addShape(S.blockArc, {
+    x: x + 0.002, y: y - 0.002, w: RING_SIZE, h: RING_SIZE,
+    fill: { color: C.teal }, line: { type: 'none' },
+    angleRange: [startAngle, 311.03], arcThicknessRatio: 0.157
+  });
+  slide.addShape(S.ellipse, {
+    x: x + 0.660, y: y + 0.106, w: 0.111, h: 0.111,
+    fill: { color: C.teal }, line: { type: 'none' }
+  });
+  text(slide, label, {
+    x: x + 0.092, y: y + 0.281, w: 0.714, h: 0.366,
+    font: FONT.display, size: SIZE.ring, bold: true, color: '000000', align: 'center'
+  });
+}
+
+/** Five-star rating strip (four sand stars, one grey). */
+function stars(slide, x, y) {
+  for (let i = 0; i < 5; i++) {
+    slide.addShape(S.star5, {
+      x: x + i * 0.1728, y: y + i * 0.0027, w: 0.146, h: 0.139,
+      fill: { color: i < 4 ? C.sand : C.track }, line: { type: 'none' }
+    });
+  }
+}
+
+/** House / telephone / globe glyph row that sits in the footer of a team card. */
+function contactIcons(slide, x, y, color, cutout) {
+  const fill = { color }, none = { type: 'none' };
+  // house: gable + body with a punched-out window and door
+  slide.addShape(S.triangle, { x, y, w: 0.183, h: 0.105, fill, line: none });
+  box(slide, x + 0.037, y + 0.097, 0.110, 0.087, color);
+  box(slide, x + 0.048, y + 0.117, 0.032, 0.032, cutout);
+  box(slide, x + 0.093, y + 0.134, 0.033, 0.050, cutout);
+  // telephone: handset bar over an outlined trapezoid base with a dial
+  slide.addShape(S.roundRect, { x: x + 0.330, y: y + 0.008, w: 0.167, h: 0.070, fill, line: none, rectRadius: 0.034 });
+  box(slide, x + 0.383, y + 0.038, 0.061, 0.040, cutout);
+  slide.addShape(S.trapezoid, {
+    x: x + 0.352, y: y + 0.078, w: 0.123, h: 0.100,
+    fill: { color: cutout }, line: { color, width: 1 }
+  });
+  slide.addShape(S.ellipse, { x: x + 0.398, y: y + 0.122, w: 0.032, h: 0.032, fill, line: none });
+  // globe: ring plus two land masses
+  slide.addShape(S.donut, { x: x + 0.662, y, w: 0.175, h: 0.176, fill, line: none, rectRadius: 0.017 });
+  slide.addShape(S.ellipse, { x: x + 0.725, y: y + 0.036, w: 0.050, h: 0.090, fill, line: none });
+  slide.addShape(S.ellipse, { x: x + 0.697, y: y + 0.075, w: 0.029, h: 0.045, fill, line: none });
+}
+
+/** Downward chevron drawn as two strokes. */
+function chevron(slide, x, y, w, h, color) {
+  slide.addShape(S.line, { x, y, w: w / 2, h, line: { color, width: 1.25 } });
+  slide.addShape(S.line, { x: x + w / 2, y, w: w / 2, h, flipV: true, line: { color, width: 1.25 } });
+}
+
+/* ------------------------------------------------------------- slide bodies */
+
+const slides = [];
+const slide = (fn) => slides.push(fn);
+
+/* 01 - cover */
+slide((s) => {
+  box(s, 0, 0, 10, 5.625, C.teal);
+  box(s, 0, 4.698, 5.608, 0.947, C.sand);
+  photo(s, 3.828, 0, 4.072, 5.172);
+
+  chevron(s, 9.414, 0.407, 0.171, 0.094, C.grey);
+  chevron(s, 9.414, 1.089, 0.173, 0.094, C.white);
+  text(s, '01', {
+    x: 9.06, y: 0.432, w: 0.88, h: 0.707,
+    font: FONT.body, size: 36, bold: true, color: C.white, align: 'center'
+  });
+
+  // social row: twitter bird / facebook "f" / instagram badge
+  s.addShape(S.moon, {
+    x: 1.069, y: 0.483, w: 0.143, h: 0.116, rotate: 205,
+    fill: { color: C.white }, line: { type: 'none' }
+  });
+  text(s, 'f', {
+    x: 1.373, y: 0.428, w: 0.14, h: 0.21,
+    font: FONT.body, size: 11, bold: true, color: C.white, align: 'center'
+  });
+  s.addShape(S.roundRect, {
+    x: 1.650, y: 0.467, w: 0.125, h: 0.125,
+    fill: { type: 'none' }, line: { color: C.white, width: 1 }, rectRadius: 0.03
+  });
+  s.addShape(S.donut, {
+    x: 1.682, y: 0.499, w: 0.061, h: 0.061,
+    fill: { color: C.white }, line: { type: 'none' }, rectRadius: 0.014
+  });
+
+  text(s, 'Join Us!', { x: 0.295, y: 0.407, w: 0.984, h: 0.27, color: C.white, size: 9, lineSpacing: 1.2 });
+  body(s, L.typesetting, { x: 0.295, y: 4.868, w: 2.507, h: 0.496, color: C.white });
+  text(s, [{ text: 'Best shoes production in ', options: { breakLine: true } }, { text: 'your town now!' }], {
+    x: 7.901, y: 4.818, w: 1.867, h: 0.379, color: C.white, align: 'right'
+  });
+
+  text(s, 'Shoes Presentation', {
+    x: 0.629, y: 2.753, w: 3.49, h: 0.353,
+    font: FONT.display, size: 15, bold: true, color: C.white
+  });
+  text(s, [
+    { text: 'SNICK-RO', options: { color: C.white } },
+    { text: 'E', options: { color: C.ink } }
+  ], { x: 0.587, y: 1.979, w: 4.413, h: 0.858, font: FONT.display, size: 45, bold: true });
+});
+
+/* 02 - about the product */
+slide((s) => {
+  box(s, 0, 1.433, 3.814, 4.192, C.teal);
+  brandTag(s, C.tealDeep);
+  headline(s, ['ABOUT', 'THE PRODUCT'], { x: 6.178, y: 1.714 });
+  body(s, L.loremLoop, { x: 6.202, y: 3.642, w: 2.877, h: 0.912 });
+  kicker(s, 6.178, 3.216, C.ink, 3.057);
+  cornerArrow(s, C.grey);
+  photo(s, 2.575, 0, 3.033, 5.118);
+  photo(s, 0, 2.24, 2.373, 2.879);
+});
+
+/* 03 - best shoes company */
+slide((s) => {
+  box(s, 7.341, 2.254, 2.659, 2.343, C.teal);
+  brandTag(s, C.tealDeep);
+  cornerArrow(s, C.grey);
+  headline(s, ['BEST SHOES COMPANY', 'IN YOUR TOWN'], { x: 0.77, y: 1.629, w: 4.564 });
+  body(s, L.standardEnd, { x: 0.787, y: 2.979, w: 4.043, h: 1.121 });
+  moreInfoPair(s, 0.892, 4.47);
+  photo(s, 5.818, -0.012, 2.824, 3.281);   // the picture frame is split in two
+  photo(s, 5.818, 3.414, 2.824, 2.211);
+});
+
+/* 04 - shoes speak louder than words */
+slide((s) => {
+  box(s, 0, 0, 3.94, 3.016, C.teal);
+  brandTag(s, C.white);
+  headline(s, ['SHOES SPEAK ', 'LOUDER THAN ', 'WORDS'], { x: 6.073, y: 1.063, w: 3.818, h: 1.237 });
+  stat(s, 6.099, 2.837, '200+', C.teal);
+  body(s, L.loremLoop, { x: 6.099, y: 3.843, w: 2.877, h: 0.912 });
+  cornerArrow(s, C.grey);
+  photo(s, 2.018, 1.063, 3.577, 4.562);
+});
+
+/* 05 - visionary statement */
+slide((s) => {
+  box(s, 0, 0, 10, 5.182, C.teal);
+  headline(s, ['VISIONARY', 'STATEMENT'], { x: 0.833, y: 1.311, color: C.white });
+  body(s, L.visionary, { x: 4.324, y: 1.311, w: 4.843, h: 0.912, color: C.white });
+  brandTag(s, C.white);
+  cornerArrow(s, C.white);
+  photo(s, 0.917, 2.812, 8.229, 2.812);
+});
+
+/* 06 - missionary in statement */
+slide((s) => {
+  brandTag(s, C.tealDeep);
+  cornerArrow(s, C.grey);
+  headline(s, ['MISSIONARY', 'IN STATEMENT'], { x: 2.854, y: 0.984 });
+  [
+    { n: '1', numX: 2.854, numY: 2.225, txX: 3.366, txY: 2.225 },
+    { n: '2', numX: 2.854, numY: 3.194, txX: 3.366, txY: 3.233 },
+    { n: '3', numX: 2.812, numY: 4.241, txX: 3.324, txY: 4.280 }
+  ].forEach((row) => {
+    body(s, L.hasIpsum, { x: row.txX, y: row.txY, w: 3.49, h: 0.704 });
+    text(s, row.n, {
+      x: row.numX, y: row.numY, w: 0.669, h: 0.404,
+      font: FONT.display, size: 18, bold: true, color: C.ink
+    });
+  });
+  photo(s, 0, 1.973, 1.993, 3.192);
+  photo(s, 7.41, 1.033, 2.59, 4.132);
+});
+
+/* 07 - about shoes platform */
+slide((s) => {
+  photo(s, 6.232, 0, 3.768, 4.634);
+  brandTag(s, C.tealDeep);
+  box(s, 2.673, 3.525, 2.327, 2.1, C.teal);
+  box(s, 5.166, 3.525, 2.327, 2.1, C.white, { shadow: cardShadow() });
+  ring(s, 5.896, 3.817, 148.97, '40%');
+  body(s, L.ring, { x: 5.419, y: 4.836, w: 1.852, h: 0.496, align: 'center' });
+  text(s, '20%', {
+    x: 3.087, y: 3.92, w: 1.5, h: 0.505,
+    font: FONT.display, size: SIZE.stat, bold: true, color: C.white, align: 'center'
+  });
+  body(s, L.ringWide, { x: 2.911, y: 4.549, w: 1.852, h: 0.704, color: C.white, align: 'center' });
+  headline(s, ['ABOUT', 'SHOES PLATFORM'], { x: 0.825, y: 1.383 });
+  body(s, L.standardOf, { x: 0.825, y: 2.448, w: 4.686, h: 0.704 });
+});
+
+/* 08 - new style for everyday */
+slide((s) => {
+  box(s, 0, 0, 10, 5.625, C.teal);
+  photo(s, 0.827, 1.057, 3.001, 3.611);
+  photo(s, 6.173, 3.425, 3.827, 2.2);
+  box(s, 4.111, 3.06, 2.474, 1.608, C.white, { shadow: shadow(30, 0.2) });
+  s.addShape(S.ellipse, { x: 4.325, y: 3.363, w: 0.472, h: 0.472, fill: { color: C.sand }, line: { type: 'none' } });
+  s.addShape(S.diamond, {
+    x: 4.446, y: 3.508, w: 0.227, h: 0.204,
+    fill: { type: 'none' }, line: { color: C.white, width: 0.75 }
+  });
+  body(s, L.simply, { x: 4.325, y: 3.916, w: 2.102, h: 0.496 });
+  text(s, '6000+', { x: 4.882, y: 3.456, w: 1.346, h: 0.404, font: FONT.display, size: 18, bold: true, color: C.ink });
+  brandTag(s, C.white);
+  headline(s, ['NEW STYLE', 'FOR EVERYDAY'], { x: 4.359, y: 0.924, color: C.white });
+  cornerArrow(s, C.white);
+  body(s, L.standardLorem, { x: 4.359, y: 2.017, w: 4.766, h: 0.704, color: C.white });
+});
+
+/* 09 - just feel good when use the brand */
+slide((s) => {
+  box(s, 0, 1.08, 7.937, 4.555, C.teal);
+  brandTag(s, C.tealDeep);
+  cornerArrow(s, C.grey);
+  headline(s, ['JUST FEEL GOOD WHEN USE THE BRAND'], { x: 0.833, y: 1.64, w: 4.31, color: C.white });
+  body(s, L.standardLorem, { x: 0.833, y: 2.733, w: 3.678, h: 0.912, color: C.white });
+  body(s, L.brandStandard, { x: 0.854, y: 3.881, w: 3.678, h: 0.704, color: C.white });
+  photo(s, 5.608, -0.01, 3.538, 4.555);
+});
+
+/* 10 - shoes in desion style */
+slide((s) => {
+  box(s, 0, 0, 3.794, 5.625, C.teal);
+  brandTag(s, C.white);
+  cornerArrow(s, C.grey);
+  headline(s, ['SHOES IN', 'DESION STYLE'], { x: 5.525, y: 0.993 });
+  [
+    { n: '1', numY: 2.234, txY: 2.234 },
+    { n: '2', numY: 3.203, txY: 3.172 },
+    { n: '3', numY: 4.172, txY: 4.140 }
+  ].forEach((row) => {
+    body(s, L.hasDummy, { x: 6.037, y: row.txY, w: 2.978, h: 0.704 });
+    text(s, row.n, {
+      x: 5.525, y: row.numY, w: 0.669, h: 0.404,
+      font: FONT.display, size: 18, bold: true, color: C.ink
+    });
+  });
+  photo(s, 2.412, 0.993, 2.323, 3.696);
+  photo(s, 0, 0.993, 2.16, 3.696);
+});
+
+/* 11 - limited design style */
+slide((s) => {
+  brandTag(s, C.tealDeep);
+  cornerArrow(s, C.grey);
+  box(s, 0.384, 3.398, 1.743, 1.215, C.white, { shadow: cardShadow() });
+  text(s, '50%', {
+    x: 0.505, y: 3.608, w: 1.5, h: 0.606,
+    font: FONT.display, size: 30, bold: true, color: C.teal, align: 'center'
+  });
+  stars(s, 0.844, 4.208);
+  body(s, L.oneLorem, { x: 0.392, y: 2.109, w: 1.521, h: 0.912 });
+  kicker(s, 0.384, 1.774, C.ink);
+  headline(s, ['LIMITED', 'DESIGN STYLE'], { x: 4.968, y: 3.33 });
+  body(s, L.standardOfThe + ' printing and', { x: 5.0, y: 4.347, w: 4.263, h: 0.704 });
+  photo(s, 2.459, 0, 1.963, 5.625);
+  photo(s, 4.61, 1.255, 5.39, 1.595);
+});
+
+/* 12 - must have for your collection */
+slide((s) => {
+  box(s, 0, 0, 6.72, 2.899, C.teal);
+  brandTag(s, C.white);
+  headline(s, ['MUST HAVE FOR ', 'YOUR COLLECTION'], { x: 0.833, y: 1.534, w: 3.774, color: C.white });
+  body(s, L.standardOf.replace(/ industry\. $/, ''), { x: 0.833, y: 3.22, w: 3.49, h: 0.912 });
+  moreInfoPair(s, 0.907, 4.5);
+  cornerArrow(s, C.grey);
+  photo(s, 5.0, 1.033, 5.0, 3.546);
+});
+
+/* 13 - daily collection */
+slide((s) => {
+  box(s, 4.431, 0, 5.569, 5.625, C.teal);
+  photo(s, 2.619, 1.03, 3.571, 4.608);
+  headline(s, ['DAILY ', 'COLLECTION'], { x: 6.674, y: 1.03, color: C.white });
+  body(s, L.hasIpsumWord, { x: 6.674, y: 2.157, w: 2.598, h: 0.912, color: C.white });
+  body(s, L.hasIpsumWord, { x: 6.674, y: 3.453, w: 2.598, h: 0.912, color: C.white });
+  box(s, 0.907, 2.227, 2.212, 1.995, C.white, { shadow: cardShadow() });
+  ring(s, 1.555, 2.448, 148.97, '40%');
+  body(s, L.ring, { x: 1.079, y: 3.468, w: 1.852, h: 0.496, align: 'center' });
+  brandTag(s, C.tealDeep);
+  cornerArrow(s, C.white);
+});
+
+/* 14 - introducing awesome product */
+slide((s) => {
+  photo(s, 6.095, 2.232, 3.905, 3.393);
+  brandTag(s, C.tealDeep);
+  cornerArrow(s, C.grey);
+  headline(s, ['INTRODUCING', 'AWESOME PRODUCT'], { x: 0.77, y: 1.629, w: 4.027 });
+  body(s, L.standardBeen, { x: 0.787, y: 2.979, w: 3.691, h: 1.121 });
+  moreInfoPair(s, 0.892, 4.47);
+  box(s, 5.0, 1.183, 1.743, 2.097, C.white, { shadow: cardShadow() });
+  ring(s, 5.429, 1.397, 19.96, '90%');
+  body(s, L.ring, { x: 5.203, y: 2.419, w: 1.337, h: 0.704, align: 'center' });
+});
+
+/* 15 - featuring some iconic shoes */
+slide((s) => {
+  box(s, 0, 0, 3.706, 2.194, C.teal);
+  box(s, 5.589, 4.273, 0.609, 0.201, C.sand);
+  s.addText('More info', {
+    x: 5.589, y: 4.273, w: 0.609, h: 0.201, align: 'center', valign: 'middle',
+    fontFace: FONT.body, fontSize: SIZE.pill, bold: true, color: '000000'
+  });
+  headline(s, ['FEATURING', 'SOME ICONIC SHOES'], { x: 5.52, y: 1.151 });
+  body(s, L.standardBeen, { x: 5.52, y: 2.826, w: 3.679, h: 1.121 });
+  cornerArrow(s, C.grey);
+  brandTag(s, C.white);
+  photo(s, 0.873, 1.007, 4.127, 3.604);
+});
+
+/* 16 - enhance your conidence */
+slide((s) => {
+  box(s, 7.265, 0, 2.735, 5.625, C.teal);
+  photo(s, 5.608, 1.03, 2.989, 4.595);
+  brandTag(s, C.tealDeep);
+  headline(s, ['ENHANCE ', 'YOUR CONIDENCE'], { x: 0.77, y: 1.549 });
+  body(s, L.standardBeen, { x: 0.787, y: 3.414, w: 3.691, h: 1.121 });
+  box(s, 6.47, 1.549, 3.233, 0.902, C.white, { shadow: pillShadow() });
+  stat(s, 6.46, 1.65, '80+', C.teal, 'center');
+  body(s, L.and, { x: 7.755, y: 1.738, w: 1.819, h: 0.704 });
+  kicker(s, 0.787, 2.979, C.ink);
+});
+
+/* 17 - cutting edge design */
+slide((s) => {
+  box(s, 0, 0, 2.14, 5.625, C.teal);
+  body(s, L.oneLorem, { x: 0.392, y: 2.109, w: 1.521, h: 0.912, color: C.white });
+  text(s, '20%', {
+    x: 0.344, y: 1.388, w: 1.5, h: 0.505,
+    font: FONT.display, size: SIZE.stat, bold: true, color: C.white
+  });
+  body(s, L.oneLorem, { x: 0.392, y: 3.329, w: 1.521, h: 0.912, color: C.white });
+  cornerArrow(s, C.grey);
+  brandTag(s, C.white);
+  headline(s, ['CUTTING', 'EDGE DESIGN'], { x: 6.118, y: 1.451 });
+  stat(s, 6.118, 2.642, '790+', C.teal);
+  body(s, L.loremLoop, { x: 6.118, y: 3.648, w: 2.877, h: 0.912 });
+  photo(s, 2.191, 0, 3.35, 5.635);
+});
+
+/* 18 - classic in black and white */
+slide((s) => {
+  brandTag(s, C.tealDeep);
+  cornerArrow(s, C.grey);
+  headline(s, ['CLASSIC IN BLACK', 'AND WHITE'], { x: 2.076, y: 0.979 });
+  stat(s, 6.132, 1.023, '200+', C.teal);
+  body(s, L.loremLoop, { x: 6.132, y: 2.029, w: 2.877, h: 0.912 });
+  body(s, L.loremLoop, { x: 6.039, y: 3.288, w: 2.877, h: 0.912 });
+  box(s, 0.67, 2.16, 1.77, 2.463, C.white, { shadow: cardShadow() });
+  ring(s, 1.126, 2.374, 36.55, '85%');
+  body(s, L.ring, { x: 0.9, y: 3.396, w: 1.337, h: 0.704, align: 'center' });
+  stars(s, 1.137, 4.21);
+  photo(s, 2.642, 2.16, 2.358, 2.463);
+});
+
+/* 19 - why people choose us? */
+slide((s) => {
+  box(s, 2.015, 2.272, 7.985, 3.353, C.teal);
+  photo(s, -0.005, 0, 4.982, 3.963);
+  cornerArrow(s, C.grey);
+  headline(s, ['WHY PEOPLE CHOOSE US?'], { x: 5.505, y: 1.144 });
+  stat(s, 5.505, 2.688, '990+', C.white, 'left', C.white);
+  body(s, L.loremLoop, { x: 5.505, y: 3.693, w: 2.877, h: 0.912, color: C.white });
+  box(s, 2.916, 3.693, 2.084, 1.215, C.white, { shadow: cardShadow() });
+  body(s, L.text, { x: 3.094, y: 4.149, w: 1.849, h: 0.496 });
+  text(s, 'BEST QUALITY', { x: 3.094, y: 3.921, w: 2.005, h: 0.252, size: 9, bold: true, color: C.ink });
+  box(s, 0.677, 3.694, 2.084, 1.215, C.sand, { shadow: cardShadow() });
+  body(s, L.text, { x: 0.872, y: 4.149, w: 1.849, h: 0.496, color: C.white });
+  text(s, 'BEST BRAND', { x: 0.887, y: 3.963, w: 2.005, h: 0.252, size: 9, bold: true, color: C.white });
+});
+
+/* 20 - perfect way to make your mark */
+slide((s) => {
+  headline(s, ['PERFECT WAY TO ', 'MAKE YOUR MARK'], { x: 0.811, y: 1.457 });
+  stat(s, 0.811, 2.648, '567+', C.teal);
+  body(s, L.mark, { x: 0.811, y: 3.654, w: 3.734, h: 1.121 });
+  brandTag(s, C.tealDeep);
+  photo(s, 5.592, 1.457, 2.132, 4.168);
+  photo(s, 7.868, 0, 2.132, 5.625);
+});
+
+/* 21 - limited color edition */
+slide((s) => {
+  photo(s, -0.001, 1.689, 3.2, 1.659);
+  photo(s, 3.365, 0, 1.984, 5.149);
+  brandTag(s, C.tealDeep);
+  cornerArrow(s, C.grey);
+  box(s, 0.801, 3.835, 3.233, 0.902, C.white, { shadow: pillShadow() });
+  stat(s, 0.792, 3.936, '60+', C.teal, 'center');
+  body(s, L.and, { x: 2.087, y: 4.024, w: 1.819, h: 0.704 });
+  headline(s, ['LIMITED COLOR', 'EDITION'], { x: 5.708, y: 1.142 });
+  body(s, L.hasIpsum, { x: 5.725, y: 3.007, w: 3.473, h: 0.704 });
+  body(s, L.hasIpsum, { x: 5.696, y: 3.931, w: 3.473, h: 0.704 });
+  kicker(s, 5.725, 2.699, C.ink);
+});
+
+/* 22 - woman shoes edition */
+slide((s) => {
+  box(s, 0, 0, 10, 5.625, C.teal);
+  brandTag(s, C.white);
+  headline(s, ['WOMAN SHOES', 'EDITION'], { x: 0.77, y: 1.549, color: C.white });
+  body(s, L.standardBeen, { x: 0.787, y: 3.414, w: 3.691, h: 1.121, color: C.white });
+  kicker(s, 0.787, 2.979, C.white);
+  photo(s, 4.903, 0, 5.097, 4.623);
+});
+
+/* 23 - football boots in collection */
+slide((s) => {
+  brandTag(s, C.tealDeep);
+  cornerArrow(s, C.grey);
+  headline(s, ['FOOTBALL BOOTS IN COLLECTION'], { x: 2.024, y: 0.986 });
+  stat(s, 6.109, 1.03, '50%', C.teal);
+  body(s, L.loremLoop, { x: 6.109, y: 1.984, w: 2.877, h: 0.912 });
+  body(s, L.loremLoop, { x: 6.109, y: 3.243, w: 2.877, h: 0.912 });
+  moreInfoPair(s, 6.19, 4.444);
+  photo(s, 0, 2.194, 5.631, 3.431);
+});
+
+/* 24 - running shoes edition */
+slide((s) => {
+  photo(s, 5.608, 0, 2.945, 4.612);
+  brandTag(s, C.tealDeep);
+  cornerArrow(s, C.grey);
+  headline(s, ['RUNNING SHOES', 'EDITION'], { x: 0.902, y: 1.144 });
+  body(s, L.hasIpsum, { x: 0.918, y: 3.009, w: 3.473, h: 0.704 });
+  body(s, L.hasIpsum, { x: 0.89, y: 3.933, w: 3.473, h: 0.704 });
+  kicker(s, 0.918, 2.701, C.ink);
+  box(s, 4.88, 2.754, 1.77, 2.463, C.white, { shadow: cardShadow() });
+  ring(s, 5.336, 2.968, 108.56, '55%');
+  body(s, L.ring, { x: 5.11, y: 3.989, w: 1.337, h: 0.704, align: 'center' });
+  stars(s, 5.346, 4.803);
+});
+
+/* 25 - limited collection */
+slide((s) => {
+  [0, 3.376, 6.752].forEach((x) => photo(s, x, 1.497, 3.248, 3.187));
+  brandTag(s, C.tealDeep);
+  cornerArrow(s, C.grey);
+  headline(s, ['LIMITED COLLECTION'], { x: 2.443, y: 0.713, w: 5.114, h: 0.48, align: 'center' });
+  [
+    { barX: 0.582, txX: 0.677, txY: 4.571 },
+    { barX: 4.052, txX: 4.126, txY: 4.546 },
+    { barX: 7.400, txX: 7.516, txY: 4.520 }
+  ].forEach((cta) => {
+    box(s, cta.barX, 4.397, 2.084, 0.575, C.teal, { shadow: cardShadow() });
+    text(s, 'BUY IT NOW!', {
+      x: cta.txX, y: cta.txY, w: 1.886, h: 0.303,
+      size: 12, bold: true, color: C.white, align: 'center'
+    });
+  });
+});
+
+/* 26 - about new arrivals */
+slide((s) => {
+  brandTag(s, C.tealDeep);
+  cornerArrow(s, C.grey);
+  headline(s, ['ABOUT', 'NEW ARRIVALS'], { x: 6.065, y: 1.333 });
+  body(s, L.standardHasBeen, { x: 6.082, y: 2.684, w: 3.18, h: 1.121 });
+  moreInfoPair(s, 6.188, 4.174);
+  photo(s, 0, 1.063, 1.971, 4.068);        // split picture frame
+  photo(s, 2.076, 1.063, 3.555, 4.068);
+});
+
+/* 27 - meet the team */
+slide((s) => {
+  const team = [
+    { name: 'Michaelle', cardX: 3.364, cardFill: C.tealDeep, nameColor: C.white, copyColor: C.white, iconColor: C.white, iconY: 4.131, nameX: 3.581, copyX: 3.440, iconX: 3.908, photoX: 3.367 },
+    { name: 'Nataline', cardX: 5.453, cardFill: C.white, nameColor: C.teal, copyColor: C.grey, iconColor: C.teal, iconY: 4.156, nameX: 5.567, copyX: 5.514, iconX: 6.018, photoX: 5.442 },
+    { name: 'Brilliane', cardX: 7.541, cardFill: C.tealDeep, nameColor: C.white, copyColor: C.white, iconColor: C.white, iconY: 4.131, nameX: 7.754, copyX: 7.612, iconX: 8.115, photoX: 7.544 }
+  ];
+  team.forEach((m) => box(s, m.cardX, 1.46, 1.941, 3.036, m.cardFill, m.cardFill === C.white ? { shadow: cardShadow() } : {}));
+  team.forEach((m) => {
+    text(s, m.name, {
+      x: m.nameX, y: 1.723, w: 1.523, h: 0.404,
+      font: FONT.semi, size: 18, bold: true, color: m.nameColor, align: 'center'
+    });
+    body(s, L.and, { x: m.copyX, y: 2.102, w: 1.813, h: 0.704, color: m.copyColor, align: 'center' });
+  });
+  brandTag(s, C.tealDeep);
+  cornerArrow(s, C.grey);
+  headline(s, ['MEET', 'THE TEAM'], { x: 0.349, y: 1.686 });
+  body(s, L.standardOfThe, { x: 0.41, y: 3.358, w: 2.514, h: 1.121 });
+  team.forEach((m) => contactIcons(s, m.iconX, m.iconY, m.iconColor, m.cardFill));
+  team.forEach((m) => photo(s, m.photoX, 2.828, 1.941, 1.104));
+});
+
+/* 28 - promotion and voucher */
+slide((s) => {
+  box(s, 0, 0, 10, 5.625, C.teal);
+  brandTag(s, C.white);
+  headline(s, ['PROMOTION', 'AND VOUCHER'], { x: 2.63, y: 3.176, color: C.white });
+  body(s, L.hasDummyText, { x: 2.63, y: 4.269, w: 2.918, h: 0.704, color: C.white });
+  box(s, 0.492, 1.81, 1.77, 2.463, C.white, { shadow: cardShadow() });
+  ring(s, 0.948, 2.024, 36.55, '85%');
+  body(s, L.ring, { x: 0.722, y: 3.045, w: 1.337, h: 0.704, align: 'center' });
+  stars(s, 0.958, 3.859);
+  body(s, L.hasDummyText, { x: 6.12, y: 4.274, w: 2.918, h: 0.704, color: C.white });
+  photo(s, 2.608, 0.561, 7.392, 2.252);
+});
+
+/* 29 - pricing table */
+slide((s) => {
+  const plans = [
+    {
+      name: 'Gold', price: '$60', card: [6.344, 1.976, 1.931, 2.759], cardFill: C.white,
+      title: [6.667, 2.171, 1.284], titleColor: C.ink,
+      dotX: 6.649, dotSize: 0.051, dotColor: C.tealInk,
+      copyX: 6.79, copyW: 1.786, copyColor: C.grey, copy: L.price,
+      rows: [2.622, 2.858, 3.095, 3.332], dotDrop: 0.089,
+      button: [6.849, 3.79, 0.988, 0.231], btnFill: C.teal, btnColor: C.white,
+      priceAt: [6.411, 3.938, 1.864], priceColor: C.ink
+    },
+    {
+      name: 'Platinum ', price: '$80', card: [3.95, 1.91, 2.101, 3.002], cardFill: C.teal,
+      title: [4.302, 2.05, 1.396], titleColor: C.white,
+      dotX: 4.081, dotSize: 0.055, dotColor: C.white,
+      copyX: 4.435, copyW: 1.943, copyColor: C.white, copy: L.priceIs,
+      rows: [2.459, 2.717, 2.974, 3.232, 3.475], dotDrop: 0.119,
+      button: [4.499, 3.952, 1.075, 0.251], btnFill: C.white, btnColor: C.tealInk,
+      priceAt: [4.022, 4.113, 2.028], priceColor: C.white
+    },
+    {
+      name: 'Medium ', price: '$40', card: [1.707, 2.05, 1.931, 2.759], cardFill: C.white,
+      title: [2.02, 2.244, 1.284], titleColor: C.ink,
+      dotX: 2.002, dotSize: 0.051, dotColor: C.tealInk,
+      copyX: 2.142, copyW: 1.786, copyColor: C.grey, copy: L.price,
+      rows: [2.695, 2.932, 3.168, 3.405], dotDrop: 0.089,
+      button: [2.168, 3.863, 0.988, 0.231], btnFill: C.teal, btnColor: C.white,
+      priceAt: [1.73, 4.011, 1.864], priceColor: C.ink
+    }
+  ];
+  plans.forEach((p) => {
+    box(s, p.card[0], p.card[1], p.card[2], p.card[3], p.cardFill, { shadow: shadow(30, 0.2) });
+    text(s, p.name, {
+      x: p.title[0], y: p.title[1], w: p.title[2], h: 0.325, align: 'center', lineSpacing: 1.5,
+      font: FONT.display, size: 10.13, bold: true, color: p.titleColor
+    });
+    p.rows.forEach((y) => {
+      s.addShape(S.ellipse, {
+        x: p.dotX, y: y + p.dotDrop, w: p.dotSize, h: p.dotSize,
+        fill: { color: p.dotColor }, line: { type: 'none' }
+      });
+      body(s, p.copy, { x: p.copyX, y, w: p.copyW, h: 0.279, size: 7.88, color: p.copyColor });
+    });
+    box(s, p.button[0], p.button[1], p.button[2], p.button[3], p.btnFill);
+    s.addText('More info', {
+      x: p.button[0], y: p.button[1], w: p.button[2], h: p.button[3], align: 'center', valign: 'middle',
+      fontFace: FONT.body, fontSize: 9, bold: true, color: p.btnColor
+    });
+    text(s, p.price, {
+      x: p.priceAt[0], y: p.priceAt[1], w: p.priceAt[2], h: 0.698, align: 'center', lineSpacing: 1.5,
+      font: FONT.display, size: 27, bold: true, color: p.priceColor
+    });
+  });
+  brandTag(s, C.tealDeep);
+  cornerArrow(s, C.grey);
+  headline(s, ['PRICING TABLE'], { x: 2.443, y: 0.905, w: 5.114, h: 0.48, align: 'center' });
+});
+
+/* 30 - thank you */
+slide((s) => {
+  photo(s, 0, 1.299, 7.321, 4.326);
+  brandTag(s, C.teal);
+  cornerArrow(s, C.grey);
+  box(s, 5.631, 2.353, 4.369, 1.594, C.teal, { shadow: cardShadow() });
+  text(s, 'THANK YOU FOR YOUR TIME.', {
+    x: 5.976, y: 2.743, w: 3.49, h: 0.909,
+    font: FONT.display, size: SIZE.stat, bold: true, color: C.white, align: 'center'
+  });
+  text(s, [{ text: 'Best shoes production in ', options: { breakLine: true } }, { text: 'your town now!' }], {
+    x: 7.932, y: 4.985, w: 1.867, h: 0.379, color: C.grey, align: 'right'
+  });
+});
+
+/* ------------------------------------------------------------------- render */
+
+slides.forEach((build) => build(pptx.addSlide()));
+
+pptx.writeFile({ fileName: path.join(__dirname, '05fcfb2a-8f13-405e-809f-79d3ab3cf200_grok_final.pptx') })
+  .then((f) => console.log('wrote', f));

@@ -1,0 +1,491 @@
+/**
+ * "Insurance" deck — rebuilt with pptxgenjs.
+ * Slide size 20 x 11.25 in (custom 16:9). Raster art (lotus logo, claim icons)
+ * is redrawn with native shapes; empty picture placeholders are left blank,
+ * exactly as they render in the source deck.
+ */
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ---------------------------------------------------------------- palette */
+const GREEN = '36C885'; // brand green (backgrounds, headings, panels)
+const MIST = 'F2F9FD'; // page background / text on green
+const INK = '030826'; // body copy
+const AMBER = 'FFC000'; // kickers, badge
+const WHITE = 'FFFFFF'; // cards
+
+/* -------------------------------------------------------------- typefaces */
+const F_MEDIUM = 'Inter Tight Medium';
+const F_TIGHT = 'Inter Tight';
+const F_LIGHT = 'Inter Light';
+
+/* Two column widths recur across nearly every slide. They are carried to four
+   decimals because the deck's copy wraps a word early if the box rounds down. */
+const W_HEAD = 6.9535; // heading / kicker column
+const W_TEXT = 7.3024; // body-copy column
+
+/* --------------------------------------------------- reusable text styles */
+const TITLE = { fontFace: F_MEDIUM, fontSize: 60, color: GREEN };
+const KICKER = { fontFace: F_MEDIUM, fontSize: 24, color: AMBER };
+const BODY = { fontFace: F_LIGHT, fontSize: 20, color: INK, lineSpacingMultiple: 1.5 };
+const LEAD = { fontFace: F_TIGHT, fontSize: 32, color: GREEN };
+const NAV = { fontFace: F_TIGHT, fontSize: 25, color: MIST, wrap: false };
+
+/* Every text box in the source deck is top-anchored and grows to fit its text. */
+function text(slide, body, box, style) {
+	slide.addText(body, Object.assign({ valign: 'top', autoFit: true }, box, style));
+}
+
+/** Kicker line + paragraph underneath it — the deck's workhorse block. */
+function block(slide, b) {
+	text(slide, b.kicker, { x: b.x, y: b.y, w: b.kickerW || b.w, h: 0.505 }, b.kickerStyle || KICKER);
+	text(slide, b.body, { x: b.x, y: b.y + 0.63, w: b.w, h: b.h || 1.557 }, b.bodyStyle || BODY);
+}
+
+function rect(slide, x, y, w, h, color, opts) {
+	slide.addShape('rect', Object.assign({ x, y, w, h, fill: { color } }, opts));
+}
+
+/** Diagonal hairline of the title/section layouts. */
+function diagonal(slide, x, y, w, h, color, flip) {
+	slide.addShape('line', Object.assign({ x, y, w, h, line: { color, width: 0.5 } }, flip));
+}
+
+/* ------------------------------------------------------------ lotus logo  */
+/* Stand-in for the "Lotus Flower" graphic on the master and the green title
+   slides: five pointed petals fanned out around a shared base. Each entry is
+   [centreX, centreY, width, height, rotation, sideBulge], all as a fraction of
+   the logo's bounding square. Drawn back-to-front so the middle petal is on top. */
+const LOTUS_PETALS = [
+	[0.205, 0.640, 0.105, 0.360, -46, 0.30],
+	[0.795, 0.640, 0.105, 0.360, 46, 0.30],
+	[0.272, 0.520, 0.165, 0.500, -12, 0.28],
+	[0.728, 0.520, 0.165, 0.500, 12, 0.28],
+	[0.497, 0.495, 0.250, 0.545, 0, 0.26],
+];
+
+/** One leaf/petal: two mirrored cubic curves meeting at a point top and bottom. */
+function petal(slide, cx, cy, w, h, rotate, bulge, color) {
+	slide.addShape('custGeom', {
+		x: cx - w / 2, y: cy - h / 2, w: w, h: h, rotate: rotate, fill: { color },
+		points: [
+			{ x: w / 2, y: 0 },
+			{ x: w / 2, y: h, curve: { type: 'cubic', x1: w, y1: h * bulge, x2: w, y2: h * (1 - bulge) } },
+			{ x: w / 2, y: 0, curve: { type: 'cubic', x1: 0, y1: h * (1 - bulge), x2: 0, y2: h * bulge } },
+			{ close: true },
+		],
+	});
+}
+
+function lotus(slide, x, y, size, color) {
+	LOTUS_PETALS.forEach(function (p) {
+		petal(slide, x + p[0] * size, y + p[1] * size, p[2] * size, p[3] * size, p[4], p[5], color);
+	});
+}
+
+/* ----------------------------------------------- "Easy Claim Process" icons */
+/* Three glyphs redrawn from primitives, white on the green slide. Coordinates
+   are fractions of the icon's bounding square `s`, traced off the originals. */
+
+/** Fill a polygon given as [x, y] fractions of the icon square. */
+function poly(slide, x, y, s, pts, color) {
+	const xs = pts.map(function (p) { return p[0]; });
+	const ys = pts.map(function (p) { return p[1]; });
+	const x0 = Math.min.apply(null, xs), y0 = Math.min.apply(null, ys);
+	const w = (Math.max.apply(null, xs) - x0) * s, h = (Math.max.apply(null, ys) - y0) * s;
+	slide.addShape('custGeom', {
+		x: x + x0 * s, y: y + y0 * s, w: w, h: h, fill: { color },
+		points: pts.map(function (p) { return { x: (p[0] - x0) * s, y: (p[1] - y0) * s }; }).concat([{ close: true }]),
+	});
+}
+
+/** Two people and a speech bubble holding a question mark. */
+function iconQuestions(slide, x, y, s, color) {
+	poly(slide, x, y, s, [[0.43, 0.09], [0.87, 0.09], [0.87, 0.39], [0.59, 0.39], [0.52, 0.48], [0.52, 0.39]], color);
+	slide.addText('?', {
+		x: x + 0.53 * s, y: y + 0.07 * s, w: 0.28 * s, h: 0.26 * s, margin: 0,
+		align: 'center', valign: 'middle', fontFace: F_MEDIUM, fontSize: 15 * s, color: GREEN,
+	});
+	slide.addShape('ellipse', { x: x + 0.224 * s, y: y + 0.375 * s, w: 0.185 * s, h: 0.19 * s, fill: { color } });
+	slide.addShape('round2SameRect', { x: x + 0.13 * s, y: y + 0.60 * s, w: 0.34 * s, h: 0.30 * s, fill: { color }, rectRadius: 0.15 * s });
+	slide.addShape('ellipse', { x: x + 0.474 * s, y: y + 0.518 * s, w: 0.185 * s, h: 0.19 * s, fill: { color } });
+	slide.addShape('round2SameRect', { x: x + 0.38 * s, y: y + 0.74 * s, w: 0.373 * s, h: 0.21 * s, fill: { color }, rectRadius: 0.16 * s });
+}
+
+/** First-aid case with a six-spoke star-of-life cut out of it. */
+function iconFirstAid(slide, x, y, s, color) {
+	slide.addShape('roundRect', { x: x + 0.333 * s, y: y + 0.13 * s, w: 0.331 * s, h: 0.16 * s, fill: { color }, rectRadius: 0.05 * s });
+	slide.addShape('rect', { x: x + 0.393 * s, y: y + 0.19 * s, w: 0.211 * s, h: 0.12 * s, fill: { color: GREEN } });
+	slide.addShape('roundRect', { x: x + 0.083 * s, y: y + 0.255 * s, w: 0.831 * s, h: 0.59 * s, fill: { color }, rectRadius: 0.07 * s });
+	[0, 60, 120].forEach(function (angle) {
+		slide.addShape('roundRect', {
+			x: x + 0.355 * s, y: y + 0.487 * s, w: 0.29 * s, h: 0.075 * s,
+			fill: { color: GREEN }, rectRadius: 0.037 * s, rotate: angle,
+		});
+	});
+}
+
+/** A heart resting above an open, upturned palm. */
+function iconCare(slide, x, y, s, color) {
+	slide.addShape('heart', { x: x + 0.355 * s, y: y + 0.14 * s, w: 0.35 * s, h: 0.34 * s, fill: { color } });
+	/* Palm slab, sloping down to the wrist at the lower left. */
+	poly(slide, x, y, s, [[0.35, 0.585], [0.72, 0.688], [0.665, 0.775], [0.19, 0.865], [0.045, 0.735], [0.10, 0.682]], color);
+	/* Closed fingers lying across the top of the palm. */
+	slide.addShape('roundRect', {
+		x: x + 0.349 * s, y: y + 0.578 * s, w: 0.326 * s, h: 0.078 * s,
+		fill: { color }, rectRadius: 0.039 * s,
+	});
+	/* Thumb angled up to the right. */
+	slide.addShape('roundRect', {
+		x: x + 0.653 * s, y: y + 0.573 * s, w: 0.304 * s, h: 0.095 * s,
+		fill: { color }, rectRadius: 0.047 * s, rotate: -46,
+	});
+}
+
+/* ------------------------------------------------------------ boilerplate */
+/** Light page: mist background plus the green lotus mark from the master. */
+function lightSlide(pptx) {
+	const slide = pptx.addSlide();
+	slide.background = { color: MIST };
+	lotus(slide, 0.853, 0.345, 0.984, GREEN);
+	return slide;
+}
+
+/** Green page (title, thanks, claim process). */
+function greenSlide(pptx) {
+	const slide = pptx.addSlide();
+	slide.background = { color: GREEN };
+	return slide;
+}
+
+const LOREM = {
+	full: 'Faucibus hendreri vestibu convallis cras acumsan sodales ulamcorper nec. Dis fringila eu malesuada eget comodo etiam. Lacinia crasu volutpat rutrum dictum. Eleifend et vestibusa, quam torquen dolor massa commodo dolor laoret ran faucibus.',
+	short: 'Faucibus hendreri vestibu convallis cras acumsan sodales ulamcorper nec. Dis fringila eu malesuada eget comodo etiam. Lacinia crasu volutpat.',
+	card: 'Faucibus hendreri vestibu convallis cras acumsan sodales amcorper nedis fringila eu malesuada eget comodo etiam. ',
+	property: 'Faucibus hendreri vestibu convallis cras acumsan sodales ulamcorper nec. Dis fringila euna malesuada eget comodo etiam. Lacinia crasu volutpat rutrum dictum. ',
+	claim: 'Faucibus hendre vestibu convallis cras acumsan sodales ulamcorper fringila euna malen suada comodo acinia crasu volutpat rutrum. ',
+	tiny: 'Faucibus hendreri vestibu convallis cras acumsan sodales ulamcorper nec fringila malesuada.',
+	tellus: 'Tellus integer odio magnis velit nascetu malesuada Dictumst et exun risus lobortis rutrum magna quam vivamus ligula. Cras viverra erat nostra orci natoqu tristique. Habitant dolor ligula inceptos.',
+};
+
+const HEADLINE = 'Protect Your Future with the Best Coverage';
+
+/* ============================================================== the slides */
+
+/** 1 — green cover: nav, oversized wordmark, registered-mark badge. */
+function slideCover(pptx) {
+	const slide = greenSlide(pptx);
+	diagonal(slide, 0.0, 0.0, 12.919, 6.865, MIST, { flipV: true });
+	diagonal(slide, 5.486, 0.0, 14.514, 6.594, MIST);
+	diagonal(slide, 15.011, 4.648, 4.989, 6.602, MIST, { flipH: true });
+	lotus(slide, 0.853, 0.345, 0.984, MIST);
+	navBar(slide);
+	text(slide, 'Insurance', { x: 2.047, y: 5.625, w: 13.5586, h: 3.803 },
+		{ fontFace: F_MEDIUM, fontSize: 220, color: MIST, wrap: false });
+	badgeR(slide, 14.672, 6.384);
+}
+
+function navBar(slide) {
+	text(slide, 'Claims', { x: 13.193, y: 0.608, w: 1.2118, h: 0.522 }, NAV);
+	text(slide, 'Our Story', { x: 15.011, y: 0.608, w: 1.6395, h: 0.522 }, NAV);
+	text(slide, 'Support', { x: 17.239, y: 0.608, w: 1.4064, h: 0.522 }, NAV);
+}
+
+function badgeR(slide, x, y) {
+	slide.addShape('ellipse', { x: x, y: y, w: 0.933, h: 0.933, fill: { color: AMBER } });
+	text(slide, 'R', { x: x + 0.213, y: y + 0.113, w: 0.507, h: 0.707 },
+		{ fontFace: F_MEDIUM, fontSize: 36, color: MIST, wrap: false });
+}
+
+/** 2 — statement slide, photo panel on the right. */
+function slideHeadline(pptx) {
+	const slide = lightSlide(pptx);
+	text(slide, HEADLINE, { x: 2.14, y: 2.526, w: W_TEXT, h: 3.13 }, TITLE);
+	text(slide, LOREM.full, { x: 2.14, y: 6.158, w: W_TEXT, h: 2.566 }, BODY);
+}
+
+/** 3 — "Insurance Is Not Just a Product", green side panel. */
+function slideNotAProduct(pptx) {
+	const slide = lightSlide(pptx);
+	rect(slide, 14.233, 0, 5.767, 11.25, GREEN);
+	text(slide, 'Insurance Is Not Just a Product', { x: 2.023, y: 2.652, w: W_HEAD, h: 2.121 }, TITLE);
+	text(slide, 'Write Anything Here', { x: 2.023, y: 5.402, w: W_HEAD, h: 0.505 }, KICKER);
+	text(slide, LOREM.full, { x: 2.023, y: 6.032, w: W_TEXT, h: 2.566 }, BODY);
+}
+
+/** 4 — mission. */
+function slideMission(pptx) {
+	const slide = lightSlide(pptx);
+	rect(slide, 14.111, 0, 5.889, 11.25, GREEN);
+	text(slide, 'Our Mission', { x: 2.0, y: 2.724, w: 4.8838, h: 0.505 }, KICKER);
+	text(slide, 'Delivering Reliable Protection', { x: 2.0, y: 3.441, w: W_HEAD, h: 2.121 }, TITLE);
+	text(slide, LOREM.full, { x: 2.0, y: 5.96, w: W_TEXT, h: 2.566 }, BODY);
+}
+
+/** 5 — vision: three stacked points, the middle one on a floating green card. */
+function slideVision(pptx) {
+	const slide = lightSlide(pptx);
+	rect(slide, 10.0, 4.139, 9.166, 2.972, GREEN, {
+		shadow: { type: 'outer', blur: 80, offset: 40, angle: 45, color: '000000', opacity: 0.15 },
+	});
+	text(slide, 'Our Vision', { x: 1.731, y: 3.11, w: 4.8838, h: 0.505 }, KICKER);
+	text(slide, 'Maintaining Your Financial Security', { x: 1.731, y: 3.827, w: W_HEAD, h: 2.121 }, TITLE);
+	text(slide,
+		'Faucibus hendreri vestibu convallis cras acumsan sodales ulamcorper nec. Dis fringila eu malesuada eget comodo etiam. Lacinia crasu volutpat rutrum dictum eifend et vestibusa quam torquen.',
+		{ x: 1.731, y: 6.201, w: W_TEXT, h: 2.061 }, BODY);
+
+	[
+		{ n: '01.', y: 1.512, onCard: false },
+		{ n: '02.', y: 4.532, onCard: true },
+		{ n: '03.', y: 7.552, onCard: false },
+	].forEach(function (item) {
+		block(slide, {
+			x: 11.297, y: item.y, w: W_TEXT, kickerW: W_HEAD,
+			kicker: item.n + ' Write Anything Here',
+			body: LOREM.short,
+			kickerStyle: item.onCard ? Object.assign({}, KICKER, { color: WHITE }) : KICKER,
+			bodyStyle: item.onCard ? Object.assign({}, BODY, { color: WHITE }) : BODY,
+		});
+	});
+}
+
+/** 6 — "Why Choose Us?", four points in two columns. */
+function slideWhyChooseUs(pptx) {
+	const slide = lightSlide(pptx);
+	diagonal(slide, 11.465, 0, 8.535, 4.644, GREEN);
+	text(slide, 'Why Choose Us?', { x: 2.32, y: 1.905, w: 9.1454, h: 1.212 },
+		Object.assign({}, TITLE, { fontSize: 66 }));
+	[
+		{ n: '01.', x: 2.32, y: 4.139, w: W_TEXT, kickerW: W_HEAD },
+		{ n: '02.', x: 2.32, y: 7.159, w: W_TEXT, kickerW: W_HEAD },
+		{ n: '03.', x: 10.919, y: 4.139, w: 6.7617, kickerW: 6.7617 },
+		{ n: '04.', x: 10.919, y: 7.159, w: 6.7617, kickerW: 6.7617 },
+	].forEach(function (item) {
+		block(slide, {
+			x: item.x, y: item.y, w: item.w, kickerW: item.kickerW,
+			kicker: item.n + ' Write Anything Here', body: LOREM.short,
+		});
+	});
+}
+
+/** 7 — "Types of Insurance", full-bleed photo panel on the left. */
+function slideTypes(pptx) {
+	const slide = lightSlide(pptx);
+	text(slide, 'Types of Insurance', { x: 10.256, y: 2.218, w: 8.2791, h: 1.111 }, TITLE);
+	[3.994, 6.846].forEach(function (y, i) {
+		block(slide, {
+			x: 10.256, y: y, w: W_TEXT, kickerW: W_HEAD,
+			kicker: '0' + (i + 1) + '. Write Anything Here', body: LOREM.short,
+		});
+	});
+}
+
+/** 8 — health insurance, pill CTA. */
+function slideHealth(pptx) {
+	const slide = lightSlide(pptx);
+	text(slide, 'Health Insurance', { x: 2.186, y: 2.811, w: 7.814, h: 1.111 }, TITLE);
+	text(slide, LOREM.full, { x: 2.186, y: 4.318, w: W_TEXT, h: 2.566 }, BODY);
+	pillButton(slide, 2.186, 7.393);
+}
+
+function pillButton(slide, x, y) {
+	slide.addShape('roundRect', { x: x, y: y, w: 3.1861, h: 1.047, fill: { color: GREEN }, rectRadius: 0.5235 });
+	text(slide, 'Discover Now', { x: x, y: y + 0.271, w: 3.1861, h: 0.505 },
+		Object.assign({}, KICKER, { color: WHITE, align: 'center' }));
+}
+
+/** 9 — life insurance, four green chips. */
+function slideLife(pptx) {
+	const slide = lightSlide(pptx);
+	[2.531, 4.159, 5.787, 7.415].forEach(function (y, i) {
+		slide.addShape('roundRect', { x: 9.442, y: y, w: 5.279, h: 1.303, fill: { color: GREEN } });
+		text(slide, '0' + (i + 1) + '. Write Anything Here', { x: 10.07, y: y + 0.399, w: 4.6512, h: 0.505 },
+			Object.assign({}, KICKER, { color: WHITE }));
+	});
+	text(slide, 'Life Insurance', { x: 2.047, y: 3.094, w: 7.5814, h: 1.111 }, TITLE);
+	text(slide,
+		'Faucibus hendreri vestibu convallis cras acumsan sodales ulam corper nec. Disan fringia eu malesuan eget comodo etiamu cinia crasu volutpat rutrum dictu.',
+		{ x: 2.047, y: 4.49, w: 5.721, h: 2.061 }, BODY);
+	text(slide, HEADLINE, { x: 2.047, y: 6.978, w: 5.5582, h: 1.178 }, LEAD);
+}
+
+/** 10 — travel: headline left, two notes right, photo strip along the bottom. */
+function slideJourney(pptx) {
+	const slide = lightSlide(pptx);
+	text(slide, 'Protecting Every Journey You Take', { x: 2.116, y: 1.943, w: 8.1861, h: 2.121 }, TITLE);
+	text(slide,
+		'Faucibus hendreri vestibu convas cras acumsan sodales ulamcorpe nec. Dis fringia eusa malesuada eget comodo etiam. Lacinia crasu volutpat rutrum dictum.',
+		{ x: 2.116, y: 4.311, w: 8.1861, h: 1.557 }, BODY);
+	[1.943, 4.186].forEach(function (y, i) {
+		block(slide, {
+			x: 11.442, y: y, w: W_TEXT, kickerW: W_HEAD, h: 1.052,
+			kicker: '0' + (i + 1) + '. Write Anything Here', body: LOREM.tiny,
+		});
+	});
+}
+
+/** 11 — property insurance. */
+function slideProperty(pptx) {
+	const slide = lightSlide(pptx);
+	text(slide, 'Property Insurance', { x: 2.07, y: 2.366, w: 8.9768, h: 1.111 }, TITLE);
+	[3.994, 6.698].forEach(function (y, i) {
+		block(slide, {
+			x: 2.07, y: y, w: 8.2093, kickerW: 8.0233,
+			kicker: '0' + (i + 1) + '. Write Anything Here', body: LOREM.property,
+		});
+	});
+}
+
+/** 12 — response time + headline statistic. */
+function slideQuickProtection(pptx) {
+	const slide = lightSlide(pptx);
+	rect(slide, 12.389, 0, 7.611, 11.25, GREEN);
+	text(slide, 'Quick Protection, Responsive Service', { x: 1.731, y: 2.519, w: 8.7442, h: 2.121 }, TITLE);
+	text(slide,
+		'Faucibus hendreri vestibu convallis cras acumsan sodales ulamcorper nec. Dis fringila eu malesuada eget comodo etiam. Lacinia crasu volutpat rutrum dictum. Eleifend et vestibusa quam torquen.',
+		{ x: 1.731, y: 5.028, w: W_TEXT, h: 2.061 }, BODY);
+	text(slide, '120+', { x: 1.731, y: 7.587, w: 2.6415, h: 1.111 }, TITLE);
+	text(slide, 'Delivering Reliable Protection', { x: 4.002, y: 7.553, w: 4.626, h: 1.178 }, LEAD);
+}
+
+/** 13 — two white cards straddling a green band. */
+function slideAccessible(pptx) {
+	const slide = lightSlide(pptx);
+	rect(slide, 0, 7.535, 20, 3.715, GREEN);
+	text(slide, 'Accessible and Efficient', { x: 2.221, y: 1.749, w: 15.5582, h: 1.111 }, TITLE);
+	[2.221, 10.36].forEach(function (x, i) {
+		rect(slide, x, 6.135, 7.419, 3.279, WHITE);
+		block(slide, {
+			x: x + 0.953, y: 6.681, w: 5.769,
+			kicker: '0' + (i + 1) + '. Write Anything Here', body: LOREM.card,
+		});
+	});
+}
+
+/** 14 — green slide: three claim-process icons with captions. */
+function slideClaimProcess(pptx) {
+	const slide = greenSlide(pptx);
+	text(slide, 'Easy Claim Process', { x: 1.841, y: 1.733, w: 12.3171, h: 1.111 },
+		Object.assign({}, TITLE, { color: WHITE }));
+	iconQuestions(slide, 1.841, 4.466, 1.659, WHITE);
+	iconFirstAid(slide, 7.646, 4.466, 1.798, WHITE);
+	iconCare(slide, 13.451, 4.466, 1.798, WHITE);
+	[
+		{ x: 1.841, w: 5.0976 },
+		{ x: 7.646, w: 5.0976 },
+		{ x: 13.451, w: 4.7074 },
+	].forEach(function (col, i) {
+		block(slide, {
+			x: col.x, y: 6.826, w: col.w, h: 2.061,
+			kicker: '0' + (i + 1) + '. Write Anything Here', body: LOREM.claim,
+			kickerStyle: Object.assign({}, KICKER, { color: WHITE }),
+			bodyStyle: Object.assign({}, BODY, { color: WHITE }),
+		});
+	});
+}
+
+/** 15 — two bonus cards, one white and one green. */
+function slideBonuses(pptx) {
+	const slide = lightSlide(pptx);
+	text(slide, 'More Protection with Added Bonuses', { x: 1.887, y: 2.717, w: 8.9025, h: 2.121 }, TITLE);
+	rect(slide, 1.887, 5.625, 7.419, 3.279, WHITE);
+	block(slide, { x: 2.84, y: 6.171, w: 5.769, kicker: '01. Write Anything Here', body: LOREM.card });
+	rect(slide, 9.782, 5.625, 7.419, 3.279, GREEN);
+	block(slide, {
+		x: 10.735, y: 6.171, w: 5.769, kicker: '02. Write Anything Here', body: LOREM.card,
+		kickerStyle: Object.assign({}, KICKER, { color: WHITE }),
+		bodyStyle: Object.assign({}, BODY, { color: WHITE }),
+	});
+}
+
+/** 16 — support: two text columns, green highlight card top right. */
+function slideAlwaysHere(pptx) {
+	const slide = lightSlide(pptx);
+	text(slide, 'We\u2019re Always Here for You', { x: 2.195, y: 2.148, w: 13.5122, h: 1.111 }, TITLE);
+	text(slide, [
+		{ text: LOREM.full, options: { breakLine: true } },
+		{ text: '', options: { breakLine: true } },
+		{ text: LOREM.tellus },
+	], { x: 2.195, y: 4.011, w: W_TEXT, h: 5.091 }, BODY);
+	rect(slide, 10.386, 4.011, 7.419, 3.279, GREEN);
+	block(slide, {
+		x: 11.34, y: 4.558, w: 5.769, kicker: 'Write Anything Here', body: LOREM.card,
+		kickerStyle: Object.assign({}, KICKER, { color: WHITE }),
+		bodyStyle: Object.assign({}, BODY, { color: WHITE }),
+	});
+	text(slide,
+		'Tellus integer odio magnis velit nascetu malesua datum risus lobortis rutrum magna quam vivamus ligula. Crasu viverra erat nostra orci always natoqu tristique. ',
+		{ x: 10.386, y: 7.731, w: 7.4187, h: 1.557 }, BODY);
+}
+
+/** 17 — coverage, photo panel on the left, pill CTA. */
+function slideCoverage(pptx) {
+	const slide = lightSlide(pptx);
+	text(slide, 'Coverage That Fits Your Needs', { x: 9.927, y: 1.821, w: 7.6098, h: 2.121 }, TITLE);
+	text(slide, [
+		{
+			text: 'Faucibus hendreri vestibu convallis cras acumsan sodales ulamcorper nec. Dis fringila euna malesuada eget comodo etiam. Lacinia crasu volutpat rutrum dictum. Eleifend etusa vestibusa, quam torquen dolor massa commodo.',
+			options: { breakLine: true },
+		},
+		{ text: '', options: { breakLine: true } },
+		{ text: 'Tellus integer odio magnis velit nascetu malesu dictums et exun risus lobortis rutrum magna quam vivamus ligula. ' },
+	], { x: 9.927, y: 4.302, w: 8.0244, h: 3.576 }, BODY);
+	pillButton(slide, 9.927, 8.383);
+}
+
+/** 18 — call to action with a 90% stat card. */
+function slideSwitch(pptx) {
+	const slide = lightSlide(pptx);
+	rect(slide, 18.122, 0, 1.878, 11.25, GREEN);
+	text(slide, 'Time to Switch to Smart Protection', { x: 2.219, y: 2.847, w: 7.4884, h: 2.121 }, TITLE);
+	text(slide, 'Write Anything Here', { x: 2.219, y: 5.548, w: W_HEAD, h: 0.505 }, KICKER);
+	text(slide, LOREM.full, { x: 2.219, y: 6.178, w: W_HEAD, h: 2.566 }, BODY);
+	rect(slide, 9.874, 5.842, 5.769, 3.279, WHITE);
+	text(slide, '90%', { x: 10.828, y: 6.451, w: 4.0987, h: 1.01 },
+		{ fontFace: F_MEDIUM, fontSize: 54, color: AMBER });
+	text(slide, 'Faucibus hendreri vestibus crasuna acumsa herasa', { x: 10.828, y: 7.46, w: 4.0987, h: 1.052 }, BODY);
+}
+
+/** 19 — team: three portrait placeholders with names underneath. */
+function slideTeam(pptx) {
+	const slide = lightSlide(pptx);
+	text(slide, 'Guided by Experienced Professionals', { x: 5.349, y: 1.257, w: 9.3024, h: 2.121 },
+		Object.assign({}, TITLE, { align: 'center' }));
+	[1.907, 7.585, 13.264].forEach(function (x) {
+		text(slide, 'Write Anything Name', { x: x, y: 8.61, w: 4.8293, h: 0.505 }, KICKER);
+		text(slide, 'Job Position', { x: x, y: 9.128, w: 4.8293, h: 0.547 }, BODY);
+	});
+}
+
+/** 20 — green closing slide. */
+function slideThanks(pptx) {
+	const slide = greenSlide(pptx);
+	diagonal(slide, 0.0, 0.0, 12.919, 6.865, MIST, { flipV: true });
+	diagonal(slide, 5.486, 0.0, 14.514, 6.594, MIST);
+	diagonal(slide, 15.011, 4.648, 4.989, 6.602, MIST, { flipH: true });
+	lotus(slide, 0.853, 0.345, 0.984, MIST);
+	navBar(slide);
+	text(slide, 'Thanks', { x: 2.047, y: 5.625, w: 12.2824, h: 4.544 },
+		{ fontFace: F_MEDIUM, fontSize: 264, color: MIST, wrap: false });
+	badgeR(slide, 13.524, 8.105);
+}
+
+/* ==================================================================== main */
+const BUILDERS = [
+	slideCover, slideHeadline, slideNotAProduct, slideMission, slideVision,
+	slideWhyChooseUs, slideTypes, slideHealth, slideLife, slideJourney,
+	slideProperty, slideQuickProtection, slideAccessible, slideClaimProcess,
+	slideBonuses, slideAlwaysHere, slideCoverage, slideSwitch, slideTeam,
+	slideThanks,
+];
+
+function build() {
+	const pptx = new PptxGenJS();
+	pptx.defineLayout({ name: 'CUSTOM_20x11_25', width: 20, height: 11.25 });
+	pptx.layout = 'CUSTOM_20x11_25';
+	pptx.title = 'Insurance';
+	BUILDERS.forEach(function (fn) { fn(pptx); });
+	return pptx.writeFile({ fileName: path.join(__dirname, '0d367ca3-9094-4d4a-bc18-11361309f03b_grok_final.pptx') });
+}
+
+build().then(function (f) { console.log('wrote ' + f); }, function (e) { console.error(e); process.exit(1); });

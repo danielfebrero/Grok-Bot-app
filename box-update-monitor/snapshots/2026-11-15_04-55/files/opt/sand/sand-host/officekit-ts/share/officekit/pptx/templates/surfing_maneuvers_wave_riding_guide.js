@@ -1,0 +1,489 @@
+/**
+ * SURFNTURF — "Wave Presentation" (23 slides, 16:9 / 13.333 x 7.5 in)
+ * Rebuilt with pptxgenjs. The original's picture placeholders (empty photo
+ * frames that render as a pale tint) are stood in for by flat tinted panels.
+ *
+ * Run: node 01819f65-86ed-439d-9f7d-f42a9d3f7447_grok_final.js
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ── palette ─────────────────────────────────────────────────────────── */
+const NAVY = '14213D'; // headline / body ink
+const ORANGE = 'FCA311'; // cover band
+const ICON = 'FAA52D'; // tick marks + line icons
+const RULE = '404040'; // tx1 @75% lum — hairline rules
+const PAPER = 'F2F2F2'; // bg1 @95% lum — chrome over full-bleed photos
+const PHOTO = 'EFF2F6'; // stand-in for photo placeholders
+
+/* ── type ────────────────────────────────────────────────────────────── */
+const XB = 'Montserrat ExtraBold';
+const SB = 'Montserrat SemiBold';
+const LT = 'Montserrat Light';
+
+const TITLE = { fontFace: XB, fontSize: 36, color: NAVY, charSpacing: 1 };
+const KICKER = { fontFace: SB, fontSize: 12, color: NAVY, charSpacing: 1 };
+const LABEL = { fontFace: SB, fontSize: 10, color: NAVY, charSpacing: 1 };
+const BODY = { fontFace: LT, fontSize: 8, color: NAVY, charSpacing: 1, lineSpacingMultiple: 1.5 };
+const MICRO = { fontFace: LT, fontSize: 6, color: '000000', charSpacing: 3 };
+
+/* ── low level helpers ───────────────────────────────────────────────── */
+
+/** Text box: top anchored, auto-height, exactly like the source deck. */
+function text(slide, x, y, w, h, runs, style, extra) {
+	slide.addText(runs, Object.assign({ x, y, w, h, valign: 'top', fit: 'resize' }, style, extra));
+}
+
+/** One paragraph per array entry; '' produces an empty line. */
+function paras(lines) {
+	return lines.map(t => ({ text: t, options: { breakLine: true } }));
+}
+
+const title = (s, x, y, w, h, lines, size) => text(s, x, y, w, h, paras(lines), TITLE, { fontSize: size || TITLE.fontSize });
+const kicker = (s, x, y, w, h, t) => text(s, x, y, w, h, t, KICKER);
+const label = (s, x, y, w, h, t, size) => text(s, x, y, w, h, t, LABEL, { fontSize: size || LABEL.fontSize });
+const body = (s, x, y, w, h, lines) => text(s, x, y, w, h, paras(lines), BODY);
+
+/** Stand-in for one of the deck's photographs: a flat tinted panel. */
+const photo = (slide, x, y, w, h) => slide.addShape('rect', { x, y, w, h, fill: { color: PHOTO } });
+
+/** Translucent white plate the cover/quote headlines sit on. */
+function plate(slide, x, y, w, h) {
+	slide.addShape('rect', { x, y, w, h, fill: { color: 'FFFFFF', transparency: 25 } });
+}
+
+/** Small orange marker bleeding off the slide edge (the deck's "logo" chip). */
+const tick = (s, x, y) => s.addShape('rect', { x, y, w: 0.375, h: 0.306, fill: { color: ICON } });
+
+/**
+ * Running header/footer: wordmark top-left or top-right, a hairline rule
+ * spanning [x, width], and the year in the opposite bottom corner.
+ * `light` switches the chrome to pale ink for full-bleed photo slides.
+ */
+function chrome(slide, mark, rule, opts) {
+	const { year = mark, yearX, light } = opts || {};
+	const color = light ? PAPER : '000000';
+	const corner = (side, x, y, w, t) =>
+		text(slide, x, y, w, 0.202, t, MICRO, { color, align: side === 'r' ? 'right' : 'left', wrap: false });
+
+	corner(mark, mark === 'r' ? 12.14 : 0.149, 0.152, 1.093, 'SURFNTURF');
+	slide.addShape('line', {
+		x: rule[0], y: 0.253, w: rule[1], h: 0,
+		line: { color: light ? PAPER : RULE, width: 0.5 },
+	});
+	corner(year, yearX !== undefined ? yearX : (year === 'r' ? 12.652 : 0.149), 7.147, 0.581, '2020');
+}
+
+/* ── line-art icons (originally vector freeforms) ────────────────────── */
+
+const stroke = w => ({ color: ICON, width: w });
+
+/**
+ * Open stroke through normalised points (0..1 inside the box x,y,w,h).
+ * pts = [start, ctrl, end, ctrl, end, ...] — quadratic segments.
+ */
+function curve(slide, box, pts, width) {
+	const [bx, by, bw, bh] = box;
+	const at = ([u, v]) => ({ x: u * bw, y: v * bh });
+	const points = [at(pts[0])];
+	for (let i = 1; i < pts.length; i += 2) {
+		const c = at(pts[i]);
+		points.push({ curve: { type: 'quadratic', x1: c.x, y1: c.y }, ...at(pts[i + 1]) });
+	}
+	slide.addShape('custGeom', { x: bx, y: by, w: bw, h: bh, points, line: stroke(width) });
+}
+
+/** Closed polygon outline whose corners are rounded by `r` (fraction of edge). */
+function roundedPoly(slide, box, verts, r, width) {
+	const [bx, by, bw, bh] = box;
+	const at = ([u, v]) => ({ x: u * bw, y: v * bh });
+	const lerp = (p, q, t) => [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
+	const n = verts.length;
+	const points = [];
+	for (let i = 0; i < n; i++) {
+		const cur = verts[i];
+		points.push(at(lerp(cur, verts[(i + n - 1) % n], r)));
+		points.push({ curve: { type: 'quadratic', x1: cur[0] * bw, y1: cur[1] * bh }, ...at(lerp(cur, verts[(i + 1) % n], r)) });
+	}
+	points.push({ close: true });
+	slide.addShape('custGeom', { x: bx, y: by, w: bw, h: bh, points, line: stroke(width) });
+}
+
+/** Surfboard outline: a full-bellied lens tapering to nose and tail. */
+function board(slide, x, y, w, h, rotate) {
+	// Bulge control points sit outside the box edges so the rails stay convex.
+	const rail = (sign, from, to) => ({
+		curve: { type: 'cubic', x1: w * (0.5 + sign * 0.62), y1: h * from, x2: w * (0.5 + sign * 0.62), y2: h * to },
+		x: w / 2, y: h * to,
+	});
+	slide.addShape('custGeom', {
+		x, y, w, h, rotate, line: stroke(1.5),
+		points: [{ x: w / 2, y: 0 }, rail(1, 0.15, 1), rail(-1, 0.85, 0), { close: true }],
+	});
+}
+
+/** Two swell crests, drawn under the surfboard glyphs. */
+const SWELL = [
+	[0.00, 0.80], [0.14, -0.15], [0.32, 0.50],
+	[0.50, 1.10], [0.68, 0.50], [0.86, -0.10], [1.00, 0.55],
+];
+
+/** Surfboard, crescent moon and swell — slide 4. */
+function iconSurfboard(slide, x, y, w, h) {
+	board(slide, x + 0.19 * w, y, 0.30 * w, h, 0);
+	slide.addShape('line', { x: x + 0.34 * w, y: y + 0.34 * h, w: 0, h: 0.38 * h, line: stroke(1.25) });
+	[[0.03, 0.47], [0.00, 0.59], [0.03, 0.71]].forEach(([dx, dy]) =>
+		slide.addShape('line', { x: x + dx * w, y: y + dy * h, w: 0.11 * w, h: 0, line: stroke(1.25) }));
+	slide.addShape('moon', { x: x + 0.56 * w, y: y + 0.02 * h, w: 0.30 * w, h: 0.46 * h, rotate: 150, line: stroke(1.5) });
+	[0.56, 0.77].forEach(v => curve(slide, [x + 0.54 * w, y + v * h, 0.44 * w, 0.16 * h], SWELL, 1.5));
+}
+
+/** Wave curling inside a rounded triangle — slide 5. */
+function iconWaveBadge(slide, x, y, w, h) {
+	const tri = [[0.5, 0], [1, 1], [0, 1]];
+	roundedPoly(slide, [x, y - 0.02 * h, w, 1.02 * h], tri, 0.14, 3);
+	roundedPoly(slide, [x + 0.16 * w, y + 0.22 * h, 0.68 * w, 0.64 * h], tri, 0.16, 1);
+	curve(slide, [x + 0.27 * w, y + 0.42 * h, 0.46 * w, 0.34 * h], [
+		[0.00, 1.00], [0.05, 0.25], [0.46, 0.05],  // left flank rising to the crest
+		[0.90, -0.13], [1.00, 0.40],               // crest rolling over to the right
+		[1.08, 0.82], [0.55, 0.86],                // lip curling down
+		[0.16, 0.89], [0.34, 0.52],                // hooking back up inside the barrel
+		[0.48, 0.28], [0.86, 0.55],                // tail flicking out to the right
+	], 2);
+}
+
+/** Two crossed longboards over a small break — slide 6. */
+function iconCrossedBoards(slide, x, y, w, h) {
+	board(slide, x + 0.13 * w, y + 0.04 * h, 0.30 * w, 0.76 * h, -30);
+	board(slide, x + 0.53 * w, y, 0.30 * w, 0.86 * h, 24);
+	curve(slide, [x + 0.52 * w, y + 0.76 * h, 0.44 * w, 0.20 * h], SWELL, 1.25);
+}
+
+/* ── recurring copy ──────────────────────────────────────────────────── */
+
+const INTRO = 'The bottom turn is the most important maneuver in surfing. For many, it represents the foundation of surf riding because it is the first turn on a wave after';
+const DROP = 'dropping in, and it allows you to channel the speed and momentum towards the open face ahead of you. The bottom turn is the bottom line. It is where it all begins';
+const SHUFFLE = 'it allows you to channel the speed and momentum towards the open face ahead of you. The dropping in, and bottom turn is the bottom line. It is where it all begins';
+const LIP = "The off-the-lip is a vertical top turn in which the surfer attacks a steep slope, projects half of his board off the wave's lip";
+const OPEN = 'PLACEHOLDER';
+const OPEN_FULL = 'The bottom turn is the most important maneuver in surfingto channel the speed and momentum towards the open face ahead of you. The dropping in, and bottom turn is the bottom line. ';
+
+/** Wide four-block essay used on slides 4, 7, 16, 18. */
+const ESSAY = [INTRO, '', DROP, '', SHUFFLE, '', DROP, ''];
+
+/** Narrow left column of the two-column spreads (9, 11, 15, 17). */
+const COL_A = [
+	'The bottom turn is the most important maneuver in surfing. For many, it ',
+	'',
+	'PLACEHOLDER',
+	'dropping in, and it allows you ',
+	'',
+	'to channel the speed and momentum towards the open face ahead of you. The bottom turn is the bottom ',
+	'',
+	'line. It is where it all begins',
+	'PLACEHOLDER',
+];
+
+/** Narrow right column of the two-column spreads (9, 11, 15). */
+const COL_B = [
+	'PLACEHOLDER',
+	'dropping in, and it allows you',
+	' ',
+	'bottom turn is the most important maneuver in surfing. For manyThe, it ',
+	'',
+	'towards the open face ahead of youto channel the speed and momentum. The bottom turn is the bottom ',
+	'',
+	'to channel the speed and momentum line. It is where it all beginsit allows you towards the open face ahead',
+];
+
+/** Tail block reused on slides 13, 14 and 19. */
+const TAIL = [
+	'to channel the speed and momentum towards the open face ahead of you. The bottom turn is the bottom ',
+	'',
+	'line. It is where it all begins',
+	'PLACEHOLDER',
+];
+
+/* ── slides ──────────────────────────────────────────────────────────── */
+
+const build = [];
+
+// 1 — cover
+build.push(s => {
+	photo(s, 0.358, 0.359, 12.618, 6.783);
+	s.addShape('rect', { x: 0, y: 1.546, w: 13.333, h: 4.01, fill: { color: ORANGE } });
+	plate(s, 0.688, 0.771, 7.367, 1.963);
+	title(s, 0.936, 0.89, 7.227, 1.313, ['ROUNDHOUSE CUTBACK ', 'LONGBOARD SURFER']);
+	text(s, 0.936, 2.203, 5.477, 0.303, 'WAVE PRESENTATION', KICKER, { fontFace: LT, color: RULE });
+});
+
+// 2 — table of contents
+const TOC = [
+	[1.726, 'Bottom Turn', 'The bottom turn is the most important maneuver in surfing', 0.484],
+	[2.652, 'Carve', 'PLACEHOLDER', 0.484],
+	[3.578, 'Cutback', 'The cutback is a key maneuver in surfing. It allows you to reduce the speed with a good purpose.', 0.686],
+	[4.706, 'Snap', 'The snap, also known as slash, is a radical change of trajectory in the pocket or on the top of the wave', 0.686],
+	[5.834, 'Off the Lip', LIP, 0.686],
+];
+build.push(s => {
+	title(s, 0.862, 0.594, 2.569, 0.707, ['Content']);
+	TOC.forEach(([y, head, copy, h]) => {
+		label(s, 0.862, y, 2.569, 0.269, head);
+		body(s, 0.862, y + 0.303, 3.174, h, [copy]);
+	});
+	tick(s, 0, 0.795);
+	chrome(s, 'l', [1.241, 3.738]);
+	photo(s, 5.337, 0, 7.997, 7.5);
+});
+
+// 3 — six thumbnails
+build.push(s => {
+	photo(s, 0, 0, 6.667, 7.5);
+	[0.734, 3.849].forEach(row => {
+		[7.11, 9.248, 11.378].forEach(x => {
+			photo(s, x, row, 1.633, 1.908);
+			label(s, x, row + 2.13, 1.641, 0.269, 'Bottom Turn');
+			body(s, x, row + 2.433, 1.641, 0.484, ['The bottom turn is the most']);
+		});
+	});
+	chrome(s, 'r', [6.948, 5.192]);
+});
+
+// 4 — essay left, photo grid right
+build.push(s => {
+	label(s, 0.677, 2.234, 2.569, 0.37, 'Bottom Turn', 16);
+	body(s, 0.677, 2.766, 3.174, 4.119, ESSAY);
+	iconSurfboard(s, 0.686, 0.615, 0.726, 0.712);
+	tick(s, 0, 0.795);
+	chrome(s, 'l', [1.241, 11.707]);
+	photo(s, 4.26, 0.615, 8.385, 3.135);
+	photo(s, 4.26, 3.896, 5.042, 2.99);
+	photo(s, 9.5, 3.896, 3.146, 2.99);
+});
+
+// 5 — half-bleed portrait
+build.push(s => {
+	title(s, 0.936, 0.671, 4.773, 1.313, ['INDIAN OCEAN', 'LIGHT’S UP']);
+	text(s, 0.936, 2.018, 2.569, 0.303, 'Tropical Thunder', KICKER, { color: RULE });
+	iconWaveBadge(s, 0.903, 4.828, 0.99, 0.88);
+	label(s, 0.936, 5.903, 2.569, 0.269, 'Bottom Turn');
+	body(s, 0.936, 6.206, 3.174, 0.484, ['The bottom turn is the most important maneuver in surfing']);
+	tick(s, 0, 0.795);
+	chrome(s, 'l', [1.241, 5.051]);
+	photo(s, 6.667, 0, 6.667, 7.5);
+});
+
+// 6 — "the perfect wave"
+build.push(s => {
+	title(s, 0.508, 2.673, 2.554, 0.774, ['THE PERFECT', 'WAVE'], 20);
+	label(s, 0.508, 3.75, 1.865, 0.269, 'OFF THE LIP');
+	body(s, 0.508, 4.053, 2.461, 3.109, [LIP, '', LIP, '', LIP, '']);
+	iconCrossedBoards(s, 0.508, 1.935, 0.602, 0.587);
+	tick(s, 0, 1.151);
+	chrome(s, 'l', [1.241, 11.853]);
+	photo(s, 3.396, 1.156, 9.938, 6.344);
+});
+
+// 7 — essay left, two stacked photos right
+build.push(s => {
+	title(s, 0.936, 1.24, 4.773, 1.313, ['THE CRADLE OF', 'HARD STORM']);
+	body(s, 0.936, 3.037, 5.085, 3.311, ESSAY);
+	tick(s, 0, 0.795);
+	chrome(s, 'l', [1.241, 11.686]);
+	photo(s, 6.667, 0.551, 6.125, 3.084);
+	photo(s, 6.667, 3.864, 6.125, 3.084);
+});
+
+// 8 — two wide bands, caption underneath
+build.push(s => {
+	photo(s, 0.542, 0.591, 12.24, 2.597);
+	photo(s, 0.542, 3.362, 12.24, 2.597);
+	title(s, 0.508, 6.267, 3.794, 0.774, ['INSANE SURFING’S SPINTERED FUTURE'], 20);
+	body(s, 4.625, 6.153, 8.156, 0.888, [[LIP, LIP, LIP].join(' ')]);
+	chrome(s, 'l', [1.241, 11.749]);
+});
+
+// 9 — two text columns left, photo mosaic right
+build.push(s => {
+	title(s, 0.936, 0.735, 4.862, 1.313, ['THE SEA CALLED MY SOUL']);
+	kicker(s, 0.936, 1.983, 4.642, 0.303, 'And I Answered With My Heart');
+	body(s, 0.936, 2.732, 2.266, 3.715, COL_A);
+	body(s, 3.442, 2.732, 2.266, 3.715, COL_B);
+	tick(s, 0, 0.795);
+	chrome(s, 'l', [1.241, 5.082]);
+	photo(s, 6.667, 0.28, 3.979, 4.718);
+	photo(s, 10.767, 0.28, 2.27, 4.718);
+	photo(s, 6.667, 5.12, 6.37, 2.1);
+});
+
+// 10 — full-bleed photo with two plates
+build.push(s => {
+	photo(s, 0, 0, 13.333, 7.5);
+	plate(s, 9.67, 4.743, 2.982, 2.239);
+	plate(s, 0.688, 0.771, 5.02, 1.963);
+	title(s, 0.936, 1.096, 4.773, 1.313, ['THE WAVES THAT SHAPE US']);
+	body(s, 9.93, 4.869, 2.461, 1.898, [LIP, '', LIP]);
+	chrome(s, 'l', [1.241, 11.655], { light: true });
+});
+
+// 11 — mirror of slide 9
+build.push(s => {
+	title(s, 7.183, 0.735, 4.963, 1.313, ['TALES FROM THE NORTH SHORE']);
+	kicker(s, 7.183, 1.983, 4.642, 0.303, 'And I Answered With My Heart');
+	body(s, 7.183, 2.732, 2.266, 3.715, COL_A);
+	body(s, 9.69, 2.732, 2.266, 3.715, COL_B);
+	tick(s, 12.958, 0.795);
+	chrome(s, 'r', [6.521, 5.619]);
+	[0.483, 2.454, 4.424].forEach(x => photo(s, x, 0.391, 1.826, 6.71));
+});
+
+// 12 — mirror of slide 6
+build.push(s => {
+	photo(s, 0, 0, 9.7, 7.5);
+	title(s, 10.059, 1.093, 2.554, 0.774, ['THE PERFECT', 'WAVE'], 20);
+	label(s, 10.059, 2.17, 1.865, 0.269, 'OFF THE LIP');
+	body(s, 10.059, 2.473, 2.461, 4.119, [LIP, '', LIP, '', LIP, '', LIP, '']);
+	tick(s, 12.972, 0.795);
+	chrome(s, 'r', [9.948, 2.192]);
+});
+
+// 13 — wide photo over a title bar
+build.push(s => {
+	photo(s, 0.506, 0.431, 12.322, 4.159);
+	title(s, 0.506, 5.135, 4.963, 1.313, ['THE SURFRIDER ISSUE']);
+	kicker(s, 0.506, 6.383, 4.642, 0.303, 'And I Answered With My Heart');
+	body(s, 7.714, 4.842, 2.266, 1.898, TAIL);
+	body(s, 10.561, 4.842, 2.266, 1.898, TAIL);
+	chrome(s, 'r', [0.229, 11.911]);
+});
+
+// 14 — half-bleed portrait left, long column right
+build.push(s => {
+	photo(s, 0, 0, 6.667, 7.5);
+	photo(s, 7.431, 0.872, 1.972, 2.248);
+	title(s, 7.431, 3.393, 2.413, 0.909, ['YOUNG PUMPING'], 24);
+	label(s, 7.431, 4.298, 2.257, 0.438, 'And I Answered With My Heart');
+	body(s, 7.431, 4.973, 2.266, 1.696, COL_A.slice(0, 4));
+	body(s, 9.938, 0.801, 2.266, 6.139, COL_B.concat(['', ''], TAIL, ['']));
+	tick(s, 12.958, 0.795);
+	chrome(s, 'r', [6.948, 5.192]);
+});
+
+// 15 — mirror of slide 9 with stacked photos
+build.push(s => {
+	title(s, 0.545, 0.735, 4.963, 1.313, ['HOW LOW CAN YOU GO ?']);
+	kicker(s, 0.545, 1.983, 4.642, 0.303, 'And I Answered With My Heart');
+	body(s, 0.545, 2.732, 2.266, 3.715, COL_A);
+	body(s, 3.052, 2.732, 2.266, 3.715, COL_B);
+	tick(s, 0, 0.795);
+	chrome(s, 'l', [1.241, 11.759]);
+	photo(s, 5.743, 0.557, 7.045, 3.123);
+	photo(s, 5.743, 3.819, 7.045, 3.123);
+});
+
+/** Slides 16 & 18 share one layout: photos left, headline + essay right. */
+function essaySpread(slide, lines, kickY, rule) {
+	title(slide, 7.44, 1.019, 4.773, 1.313, lines);
+	kicker(slide, 7.44, kickY, 4.642, 0.303, 'And I Answered With My Heart');
+	body(slide, 7.44, 3.037, 5.085, 3.311, ESSAY);
+	tick(slide, 12.958, 0.795);
+	chrome(slide, 'r', rule);
+}
+
+// 16 — single tall portrait left
+build.push(s => {
+	photo(s, 0.349, 0.292, 6.318, 6.799);
+	essaySpread(s, ['THE CRADLE OF', 'HARD STORM'], 2.181, [6.948, 5.192]);
+});
+
+// 17 — three photos, headline bottom-left
+build.push(s => {
+	photo(s, 0.55, 0.55, 3.321, 2.762);
+	photo(s, 4.33, 0.55, 4.651, 6.514);
+	photo(s, 9.349, 4.302, 3.321, 2.762);
+	title(s, 0.697, 3.75, 3.266, 1.313, ['SURFER', 'SURVIVAL']);
+	kicker(s, 0.697, 5.096, 2.569, 0.303, 'Tropical Thunder');
+	body(s, 0.697, 5.718, 3.174, 1.09, [OPEN_FULL]);
+	body(s, 9.426, 0.761, 3.357, 2.907, COL_A);
+	tick(s, 12.958, 0.795);
+	chrome(s, 'r', [0.26, 11.88], { year: 'l', yearX: 0.218 });
+});
+
+// 18 — photo triptych left
+build.push(s => {
+	photo(s, 0, 0, 3.208, 5.073);
+	photo(s, 3.458, 0, 3.208, 5.073);
+	photo(s, 0, 5.303, 6.667, 2.197);
+	essaySpread(s, ['THE ISLAND ', 'OF STRANGER'], 2.332, [6.906, 5.234]);
+});
+
+// 19 — full-bleed photo with a wide banner
+build.push(s => {
+	photo(s, 0, 0, 13.333, 7.5);
+	plate(s, 0, 0.514, 13.333, 2.248);
+	title(s, 0.702, 0.824, 5.041, 1.313, ['THE MANS WHO BIDES MOUNTAIN']);
+	kicker(s, 0.702, 2.072, 4.642, 0.303, 'And I Answered With My Heart');
+	body(s, 7.283, 0.677, 2.266, 1.898, TAIL);
+	body(s, 10.13, 0.677, 2.266, 1.898, TAIL);
+	chrome(s, 'l', [1.241, 11.655], { light: true });
+});
+
+// 20 — headline left, single landscape photo
+build.push(s => {
+	title(s, 0.697, 1.805, 3.266, 1.313, ['SURF N’', 'TURF']);
+	kicker(s, 0.697, 3.151, 2.569, 0.303, 'Tropical Thunder');
+	body(s, 0.697, 3.773, 3.174, 2.1, [OPEN, '', OPEN_FULL, '']);
+	tick(s, 0, 0.795);
+	chrome(s, 'l', [1.241, 11.749]);
+	photo(s, 4.436, 1.801, 8.897, 3.89);
+});
+
+// 21 — photo grid with a headline plate
+build.push(s => {
+	photo(s, 4.632, 4.72, 8.202, 2.289);
+	photo(s, 0.482, 0.472, 4.046, 2.919);
+	plate(s, 0.817, 1.234, 3.422, 1.477);
+	title(s, 0.881, 1.305, 3.266, 1.313, ['SURFER', 'SURVIVAL']);
+	chrome(s, 'l', [1.241, 11.749]);
+	photo(s, 0.482, 3.507, 4.046, 3.52);
+	photo(s, 4.638, 0.472, 4.046, 4.142);
+	photo(s, 8.788, 0.472, 4.046, 4.142);
+});
+
+// 22 — three photos above, two text columns below
+build.push(s => {
+	title(s, 0.459, 3.998, 2.907, 1.313, ['SURF N’', 'TURF']);
+	kicker(s, 0.459, 5.344, 2.569, 0.303, 'Tropical Thunder');
+	body(s, 0.459, 5.965, 2.931, 0.888, [OPEN]);
+	body(s, 3.592, 4.042, 2.931, 2.907, [
+		OPEN, '',
+		'PLACEHOLDER', '',
+		'maneuver in surfingto channel the speed and momentum towards the open face ahead of you. The dropping in, and bottom turn is the bottom line. ', '']);
+	chrome(s, 'l', [1.241, 11.749]);
+	tick(s, 0, 4.16);
+	photo(s, 0.37, 0.354, 3.012, 3.396);
+	photo(s, 3.572, 0.354, 3.012, 3.396);
+	photo(s, 6.741, 0.354, 6.222, 6.78);
+});
+
+// 23 — closing
+build.push(s => {
+	photo(s, 0, 0, 13.333, 7.5);
+	plate(s, 0.807, 5.239, 4.477, 1.596);
+	title(s, 1.349, 5.561, 3.575, 0.707, ['THANK YOU']);
+	text(s, 1.349, 6.268, 3.575, 0.303, 'WAVE PRESENTATION', KICKER, { fontFace: LT });
+});
+
+/* ── assemble ────────────────────────────────────────────────────────── */
+
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'WIDE', width: 12192000 / 914400, height: 6858000 / 914400 }); // exactly 16:9 @ 13.333 x 7.5 in
+pptx.layout = 'WIDE';
+pptx.title = 'SURFNTURF — Wave Presentation';
+
+build.forEach(fn => fn(pptx.addSlide()));
+
+pptx.writeFile({ fileName: path.join(__dirname, '01819f65-86ed-439d-9f7d-f42a9d3f7447_grok_final.pptx') })
+	.then(f => console.log('wrote', f));

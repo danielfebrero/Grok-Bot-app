@@ -1,0 +1,711 @@
+/**
+ * "Greeny." — Green Energy Investor Pitch Deck (10 slides, 13.333in x 7.5in).
+ *
+ * Standalone pptxgenjs re-creation of the reference deck. Every position is in
+ * inches and matches the source shape geometry. Raster images in the source
+ * (stock photos and small icon PNGs) are replaced with programmatic
+ * placeholders / native shapes.
+ *
+ *   node 1495d3c6-67c0-47f2-ba0f-a7f64067c9b7_grok_final.js
+ */
+
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+// ---------------------------------------------------------------------------
+// Design tokens
+// ---------------------------------------------------------------------------
+
+const FONT = 'Plus Jakarta Sans';
+const FONT_SEMI = 'Plus Jakarta Sans SemiBold';
+
+const C = {
+  ink: '181818',        // dk2 — headings / logo
+  black: '000000',      // dk1 — title text
+  white: 'FFFFFF',
+  offWhite: 'F2F2F2',   // light text on dark panels
+  deep: '164E50',       // accent1 — deep teal
+  teal: '21776A',       // accent2 — mid teal
+  mint: '88DE7B',       // accent3 — light green
+  paleMint: 'DBF4D7',   // lt2
+  deeper: '103A3C',     // darkest teal (blob on dark panel, "$" glyphs)
+  body: '7F7F7F',       // gray body copy
+  bodyAlt: '595959',    // gray body copy on the gradient slides
+  hairline: 'E7E7E7',   // thin divider rules
+  faint: 'F2F2F2',      // faint divider rules / decorative blob
+  softMint: 'BAEAB2',
+  gradFrom: 'E2F6DE',
+  gradTo: 'ABE7A2',
+  photo: 'CCCCCC',      // image placeholder fill
+  photoLabel: '8A8A8A',
+};
+
+// Text-frame insets used by every text box in the source deck (0.1" / 0.05").
+const INSETS = [7.2, 7.2, 3.6, 3.6];
+
+// pptxgenjs rewrites the shadow object it is handed, so hand it a fresh one.
+// outerShdw blurRad=254000 dist=127000 dir=90deg alpha=4.7% — buttons & cards.
+const cardShadow = () => ({ type: 'outer', color: '000000', opacity: 0.05, blur: 20, offset: 10, angle: 90 });
+// outerShdw blurRad=190500 dist=38100 dir=45deg alpha=20% — roadmap tiles.
+const tileShadow = () => ({ type: 'outer', color: '000000', opacity: 0.2, blur: 15, offset: 3, angle: 45 });
+
+const NO_LINE = { type: 'none' };
+
+// ---------------------------------------------------------------------------
+// Generic helpers
+// ---------------------------------------------------------------------------
+
+const rect = (s, x, y, w, h, color, extra) =>
+  s.addShape('rect', Object.assign({ x, y, w, h, fill: { color }, line: NO_LINE }, extra));
+
+const dot = (s, x, y, d, color) =>
+  s.addShape('ellipse', { x, y, w: d, h: d, fill: { color }, line: NO_LINE });
+
+/** Thin rule. `h` of 0 draws a horizontal rule, `w` of 0 a vertical one. */
+const rule = (s, x, y, w, h, color, extra) =>
+  s.addShape('line', Object.assign({ x, y, w, h, line: Object.assign({ color, width: 1.25 }, extra) }));
+
+const text = (s, content, opts) =>
+  s.addText(content, Object.assign({ fontFace: FONT, valign: 'top', margin: INSETS, wrap: true }, opts));
+
+/** 48pt bold slide headline, built from coloured runs. */
+const headline = (s, runs, opts) =>
+  text(s, runs.map((r) => ({ text: r[0], options: { color: r[1], bold: true, italic: !!r[2] } })),
+    Object.assign({ fontSize: 48 }, opts));
+
+/** 14pt semibold eyebrow/label, built from coloured runs. */
+const label = (s, runs, opts) =>
+  text(s, runs.map((r) => ({ text: r[0], options: { color: r[1] } })),
+    Object.assign({ fontFace: FONT_SEMI, fontSize: 14, lineSpacingMultiple: 1.5 }, opts));
+
+/** 24pt bold statistic, built from coloured runs. */
+const stat = (s, runs, opts) =>
+  text(s, runs.map((r) => ({ text: r[0], options: { color: r[1], bold: true } })),
+    Object.assign({ fontSize: 24 }, opts));
+
+/** 12pt gray paragraph at 150% leading. */
+const body = (s, str, opts) =>
+  text(s, str, Object.assign({ fontSize: 12, color: C.body, lineSpacingMultiple: 1.5 }, opts));
+
+const mixHex = (a, b, t) => [0, 2, 4]
+  .map((i) => {
+    const v = Math.round(parseInt(a.substr(i, 2), 16) * (1 - t) + parseInt(b.substr(i, 2), 16) * t);
+    return v.toString(16).padStart(2, '0');
+  })
+  .join('')
+  .toUpperCase();
+
+/**
+ * pptxgenjs has no gradient fill, so the deck's single linear gradient
+ * (E2F6DE -> ABE7A2 at 50deg) is painted as a stack of thin rotated bands.
+ * Bands overspill the box corners, so the caller draws it first.
+ */
+function linearGradient(s, x, y, w, h, from, to, angle) {
+  const BANDS = 44;
+  const rad = (angle * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  const along = Math.abs(w * cos) + Math.abs(h * sin);
+  const across = Math.abs(w * sin) + Math.abs(h * cos);
+  const step = along / BANDS;
+  for (let i = 0; i < BANDS; i++) {
+    const t = (i + 0.5) / BANDS;
+    const d = -along / 2 + t * along;
+    rect(s, cx + d * cos - step / 2, cy + d * sin - across / 2, step * 1.08, across,
+      mixHex(from, to, t), { rotate: angle });
+  }
+}
+
+/** Stand-in for a photo: flat gray block with a small caption. */
+function photo(s, x, y, w, h) {
+  rect(s, x, y, w, h, C.photo);
+  text(s, '[image]', {
+    x, y, w, h, align: 'center', valign: 'middle', margin: 0,
+    fontSize: 11, color: C.photoLabel,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Recurring decorative motifs
+// ---------------------------------------------------------------------------
+
+// Nine-lobed "flower" blob used as a faint background ornament (custGeom in the
+// source). Coordinates normalised to the shape box; the lobes bleed outside it.
+const BLOB_PATH = (() => {
+  const N = 662130;
+  const raw = [
+    [549865, 331065],
+    [728609, 440850, 684108, 540233, 485782, 485782],
+    [540233, 684108, 440840, 728609, 331065, 549865],
+    [221281, 728609, 121898, 684108, 176349, 485782],
+    [-21977, 540233, -66478, 440840, 112266, 331065],
+    [-66478, 221291, -21977, 121898, 176349, 176349],
+    [121898, -21977, 221291, -66478, 331065, 112266],
+    [440840, -66478, 540233, -21977, 485782, 176349],
+    [684108, 121907, 728609, 221291, 549865, 331065],
+  ];
+  return raw.map((p) => p.map((v) => v / N));
+})();
+
+function blob(s, x, y, size, color, rotate, transparency) {
+  // custGeom points are relative to the shape box.
+  const points = [{ moveTo: true, x: BLOB_PATH[0][0] * size, y: BLOB_PATH[0][1] * size }];
+  for (let i = 1; i < BLOB_PATH.length; i++) {
+    const p = BLOB_PATH[i];
+    points.push({
+      x: p[4] * size,
+      y: p[5] * size,
+      curve: {
+        type: 'cubic',
+        x1: p[0] * size, y1: p[1] * size,
+        x2: p[2] * size, y2: p[3] * size,
+      },
+    });
+  }
+  points.push({ close: true });
+  s.addShape('custGeom', {
+    x, y, w: size, h: size, points, rotate: rotate || 0,
+    fill: { color, transparency: transparency || 0 }, line: NO_LINE,
+  });
+}
+
+// Chunky "north-east arrow" glyph that sits inside the small square tiles and
+// next to the "Explore More" links (custGeom in the source, drawn at -45deg).
+const ARROW_PATH = [
+  [0.506, 0.000], [0.409, 0.084], [0.771, 0.439], [0.000, 0.439], [0.000, 0.559],
+  [0.771, 0.559], [0.409, 0.903], [0.506, 0.998], [0.998, 0.499], [0.506, 0.000],
+];
+
+function arrowGlyph(s, x, y, w, h, color) {
+  s.addShape('custGeom', {
+    x, y, w, h, rotate: -45, fill: { color }, line: NO_LINE,
+    points: ARROW_PATH.map((p, i) => ({ x: p[0] * w, y: p[1] * h, moveTo: i === 0 })),
+  });
+}
+
+/** Square tile (0.667in) carrying the arrow glyph. */
+function arrowTile(s, x, y, tileColor, glyphColor, shadow) {
+  rect(s, x, y, 0.667, 0.67, tileColor, shadow ? { shadow: cardShadow() } : undefined);
+  arrowGlyph(s, x + 0.221, y + 0.232, 0.225, 0.207, glyphColor);
+}
+
+/**
+ * The deck's "plug + leaf" mark (a 48px PNG in the source): a wall plug whose
+ * cord loops along the bottom and rises into a leaf at the upper right.
+ */
+function plugLeaf(s, x, y, size, color) {
+  const u = (v) => size * v;
+  const fill = { fill: { color }, line: NO_LINE };
+  rect(s, x + u(0.10), y, u(0.08), u(0.19), color);                        // left prong
+  rect(s, x + u(0.26), y, u(0.08), u(0.19), color);                        // right prong
+  rect(s, x + u(0.01), y + u(0.16), u(0.42), u(0.15), color);              // plug shoulder
+  s.addShape('trapezoid', Object.assign({                                  // tapered body
+    x: x + u(0.03), y: y + u(0.29), w: u(0.38), h: u(0.21),
+  }, fill));
+  rect(s, x + u(0.18), y + u(0.47), u(0.08), u(0.34), color);              // cord down
+  s.addShape('blockArc', Object.assign({                                   // cord U-turn
+    x: x + u(0.16), y: y + u(0.68), w: u(0.46), h: u(0.32),
+    angleRange: [0, 180], arcThicknessRatio: 0.36,
+  }, fill));
+  rect(s, x + u(0.54), y + u(0.52), u(0.08), u(0.30), color);              // cord up to leaf
+  s.addShape('teardrop', Object.assign({                                   // leaf
+    x: x + u(0.53), y: y + u(0.16), w: u(0.44), h: u(0.44), rotate: 225,
+  }, fill));
+}
+
+/** Square tile carrying the plug-and-leaf mark. */
+function plugTile(s, x, y, tileColor, glyphColor, shadow) {
+  rect(s, x, y, 0.667, 0.67, tileColor, shadow ? { shadow: cardShadow() } : undefined);
+  plugLeaf(s, x + 0.185, y + 0.187, 0.297, glyphColor);
+}
+
+/** Rounded "invoice + pen" mark used by the pricing tiles on slide 8. */
+function invoiceMark(s, x, y, size, color, holeColor) {
+  const u = (v) => size * v;
+  s.addShape('roundRect', {
+    x, y, w: u(0.84), h: u(0.84), rectRadius: size * 0.22,
+    fill: { color }, line: NO_LINE,
+  });
+  text(s, '$', {
+    x, y: y - u(0.08), w: u(0.44), h: u(0.84), margin: 0,
+    align: 'center', valign: 'middle', bold: true, fontSize: size * 56, color: holeColor,
+  });
+  rect(s, x + u(0.48), y + u(0.22), u(0.26), u(0.10), holeColor);
+  rect(s, x + u(0.48), y + u(0.42), u(0.18), u(0.10), holeColor);
+  // Pen nib crossing the lower-right corner.
+  s.addShape('rect', {
+    x: x + u(0.42), y: y + u(0.62), w: u(0.60), h: u(0.17), rotate: -45,
+    fill: { color }, line: NO_LINE,
+  });
+}
+
+/** "Greeny." wordmark plus the three status dots — present on every slide. */
+function chrome(s, logoColor) {
+  text(s, 'Greeny.', {
+    x: 0.558, y: 0.263, w: 1.026, h: 0.337,
+    fontSize: 14, bold: true, color: logoColor,
+  });
+  dot(s, 12.125, 0.375, 0.135, C.mint);
+  dot(s, 12.328, 0.375, 0.135, C.teal);
+  dot(s, 12.531, 0.375, 0.135, C.deep);
+}
+
+// ---------------------------------------------------------------------------
+// Slide builders
+// ---------------------------------------------------------------------------
+
+function slide1(pptx) {
+  const s = pptx.addSlide();
+  // Gradient goes down first: its rotated bands overspill onto the left half,
+  // which the dark band and the photo then cover.
+  linearGradient(s, 6.667, 0, 6.667, 7.5, C.gradFrom, C.gradTo, 50);
+  blob(s, 8.917, 2.979, 8.0, 'CEF1C9');
+  photo(s, 0, 0, 6.667, 4.143);
+  rect(s, 0, 4.133, 6.667, 3.367, C.deep);
+
+  // Header chrome sits over the gradient on this slide.
+  text(s, 'Greeny.', { x: 7.225, y: 0.263, w: 1.026, h: 0.337, fontSize: 14, bold: true, color: C.ink });
+  dot(s, 12.125, 0.375, 0.135, C.mint);
+  dot(s, 12.328, 0.375, 0.135, C.teal);
+  dot(s, 12.531, 0.375, 0.135, C.deep);
+
+  headline(s, [['Powering', C.teal], [' Tomorrow with ', C.black], ['Green Energy', C.black, true]],
+    { x: 7.532, y: 1.379, w: 5.174, h: 2.524 });
+  text(s, 'Lorem ipsum dolor sit, consectetur adipisicing elitist, sedol do eiusm tep incididunt labore dolore magna. ipsum',
+    { x: 7.532, y: 4.165, w: 4.875, h: 0.667, fontSize: 12, color: C.bodyAlt, lineSpacingMultiple: 1.5 });
+
+  rect(s, 7.618, 5.381, 2.222, 0.741, C.mint, { shadow: cardShadow() });
+  text(s, 'Start Your Journey', {
+    x: 7.763, y: 5.526, w: 1.932, h: 0.375,
+    fontSize: 12, bold: true, color: C.white, align: 'center', lineSpacingMultiple: 1.5,
+  });
+  text(s, 'Explore More', {
+    x: 10.188, y: 5.526, w: 1.325, h: 0.375,
+    fontSize: 12, bold: true, color: C.ink, align: 'center', lineSpacingMultiple: 1.5,
+  });
+  arrowGlyph(s, 11.488, 5.677, 0.153, 0.141, C.teal);
+
+  // Two stepped tiles straddling the photo / dark-band seam.
+  rect(s, 6.0, 3.464, 0.667, 0.67, C.teal);
+  rect(s, 5.333, 2.8, 0.667, 0.67, C.teal);
+  arrowGlyph(s, 5.554, 3.032, 0.225, 0.207, C.white);
+
+  // Footer block on the dark band.
+  plugLeaf(s, 5.806, 4.656, 0.335, C.white);
+  text(s, 'Green Energy Investor Pitch Deck',
+    { x: 0.542, y: 4.598, w: 1.889, h: 0.505, fontSize: 12, color: C.white });
+  stat(s, [['97', C.white], ['%', C.mint]], { x: 0.558, y: 6.171, w: 0.983, h: 0.505 });
+  rule(s, 0.68, 6.825, 0.682, 0, C.teal);
+  text(s, 'Clean Energy, Bright Future Ahead',
+    { x: 1.519, y: 6.155, w: 3.474, h: 0.909, fontFace: FONT_SEMI, fontSize: 24, color: C.white });
+}
+
+function slide2(pptx) {
+  const s = pptx.addSlide();
+  photo(s, 5.086, 3.531, 3.5, 3.219);
+  blob(s, -1.817, 4.412, 4.801, C.faint, 0, 35);
+  chrome(s, C.ink);
+
+  headline(s, [['Discover ', C.teal], ['Our Green Journey', C.black]],
+    { x: 0.836, y: 1.016, w: 5.174, h: 1.717 });
+
+  plugTile(s, 8.845, 3.531, C.deep, C.white, true);
+  body(s, 'Lorem ipsum dolor sit, constec amet elit incid labore ipsum do sitos, consectetu con. incididunt labore ame.',
+    { x: 8.793, y: 5.281, w: 3.768, h: 0.97 });
+  text(s, 'Explore More',
+    { x: 8.793, y: 6.375, w: 1.325, h: 0.375, fontSize: 12, bold: true, color: C.ink, lineSpacingMultiple: 1.5 });
+  arrowGlyph(s, 10.063, 6.526, 0.153, 0.141, C.mint);
+
+  label(s, [['Our Best ', C.teal], ['Company 01', C.ink]], { x: 0.836, y: 3.531, w: 2.553, h: 0.408 });
+  body(s, 'Lorem ipsum dolor sit, consectetur adipisicing sed do eiusm tep incididunt labore dolore magna. ipsum',
+    { x: 0.836, y: 4.005, w: 3.859, h: 0.97 });
+  stat(s, [['72.5', C.ink], ['%', C.mint], [' ', C.ink], ['/ ', C.hairline], ['86.4', C.ink], ['%', C.hairline]],
+    { x: 0.836, y: 5.212, w: 2.843, h: 0.505 });
+
+  arrowTile(s, 5.086, 6.08, C.mint, C.deep);
+
+  rule(s, 6.82, 1.175, 0, 1.558, C.hairline);
+  stat(s, [['20', C.ink], ['23', C.mint]], { x: 7.961, y: 1.864, w: 1.092, h: 0.505 });
+  label(s, [['Established Since', C.ink]], { x: 9.111, y: 1.326, w: 2.181, h: 0.408 });
+  body(s, 'Lorem ipsum dolor sit, consectetur adipisicing sed do eiusm tep',
+    { x: 9.111, y: 1.735, w: 3.108, h: 0.667 });
+}
+
+function slide3(pptx) {
+  const s = pptx.addSlide();
+  blob(s, 1.358, 4.412, 4.801, C.faint, 0, 35);
+  photo(s, 0.698, 1.0, 2.984, 2.744);
+  photo(s, 3.683, 3.756, 2.984, 2.744);
+  chrome(s, C.ink);
+
+  headline(s, [['Challenges ', C.teal], ['& The Solutions', C.black]],
+    { x: 7.566, y: 1.107, w: 4.663, h: 1.717 });
+
+  // Two "challenge" rows on the right, separated by a hairline.
+  const challenges = [
+    ['Aa.', 3.236, 3.265, 3.69, 0.565, ' Overcome 01', 2.553],
+    ['Bb.', 5.272, 5.301, 5.727, 0.596, ' Overcome 02', 2.658],
+  ];
+  challenges.forEach(([mark, myTop, labelTop, bodyTop, markW, suffix, labelW]) => {
+    text(s, mark, {
+      x: 7.567, y: myTop, w: markW, h: 0.451,
+      fontFace: FONT_SEMI, fontSize: 16, bold: true, color: C.hairline, lineSpacingMultiple: 1.5,
+    });
+    label(s, [['Challenges', C.teal], [suffix, C.ink]], { x: 8.163, y: labelTop, w: labelW, h: 0.408 });
+    body(s, 'Lorem ipsum dolor sit, consectetur adipisicing el, sed do eiusm tep incididunt labore dolore.',
+      { x: 8.163, y: bodyTop, w: 4.066, h: 0.667 });
+  });
+  rule(s, 7.566, 4.82, 4.663, 0, C.hairline);
+
+  // Two "solution" captions on the left, each headed by the plug-and-leaf mark.
+  const solutions = [[3.987, 1.629, 2.032, 2.457, '01'], [0.676, 4.476, 4.879, 5.305, '02']];
+  solutions.forEach(([x, iconTop, labelTop, bodyTop, num]) => {
+    plugLeaf(s, x + 0.106, iconTop, 0.297, 'C5C5C5');
+    label(s, [['The Solutions ', C.ink], [num, C.teal]], { x, y: labelTop, w: 2.553, h: 0.408 });
+    body(s, 'Lorem ipsum dolor sit, consect adipisicing elitos, sed do.',
+      { x, y: bodyTop, w: 2.664, h: 0.667 });
+  });
+
+  arrowTile(s, 0.695, 1.0, C.mint, C.deep);
+  plugTile(s, 6.0, 5.83, C.deep, C.white);
+}
+
+function slide4(pptx) {
+  const s = pptx.addSlide();
+  photo(s, 4.803, 1.0, 3.017, 3.576);
+  chrome(s, C.ink);
+
+  headline(s, [['Global ', C.teal], ['Renewable Energy Market Size', C.black]],
+    { x: 0.565, y: 5.151, w: 6.364, h: 1.717 });
+
+  // Two market-size figures stacked on the right.
+  [['829', 1.17, 1.702, 1.186], ['745', 3.339, 3.871, 3.356]].forEach(([value, statTop, labelTop, bodyTop]) => {
+    stat(s, [[value, C.ink], ['K', C.hairline]], { x: 8.463, y: statTop, w: 1.291, h: 0.627, lineSpacingMultiple: 1.5 });
+    label(s, [['Market ', C.ink], ['Size', C.teal]], { x: 8.463, y: labelTop, w: 1.291, h: 0.408 });
+    body(s, 'Lorem ipsum dolor sit, consect adipisicing elitos, sed dolo amet minim eli.',
+      { x: 10.03, y: bodyTop, w: 2.664, h: 0.97 });
+  });
+  rule(s, 8.569, 2.737, 4.056, 0, C.hairline);
+
+  stat(s, [['92.5', C.ink], ['%', C.mint]], { x: 0.708, y: 2.714, w: 1.615, h: 0.505 });
+  label(s, [['Project Overview 01', C.ink]], { x: 0.708, y: 3.241, w: 2.173, h: 0.421 });
+  body(s, 'Lorem ipsum dolor sitos, con ameto elit adipisicingo elit minimum. ',
+    { x: 0.708, y: 3.683, w: 3.017, h: 0.667 });
+
+  blob(s, 9.605, 4.923, 4.801, C.faint, 14.6, 35);
+  plugTile(s, 3.836, 1.0, C.deep, C.white, true);
+  arrowTile(s, 7.157, 3.906, C.mint, C.deep);
+}
+
+function slide5(pptx) {
+  const s = pptx.addSlide();
+  rect(s, 0, 4.353, 13.333, 3.147, C.deep);
+  blob(s, 11.075, 4.643, 4.229, C.deeper, 30.1, 35);
+  chrome(s, C.ink);
+
+  headline(s, [['Our', C.teal], [' Dedicated Green Team', C.black]],
+    { x: 7.625, y: 1.021, w: 5.042, h: 1.717 });
+
+  rule(s, 6.125, 1.175, 0, 1.558, C.hairline);
+  label(s, [['Our Best ', C.teal], ['Team', C.ink]], { x: 0.667, y: 1.399, w: 2.553, h: 0.408 });
+  body(s, 'Lorem ipsum dolor sit, consectetur adipisicing sed do eiusm tep incididunt labore dolore',
+    { x: 0.667, y: 1.831, w: 3.859, h: 0.667 });
+
+  // Featured founder card.
+  rect(s, 0.681, 3.463, 5.139, 3.208, C.teal, { shadow: cardShadow() });
+  photo(s, 0.868, 3.629, 2.361, 2.876);
+  text(s, 'Nathan Abraham', {
+    x: 3.461, y: 3.935, w: 2.085, h: 0.451,
+    fontFace: FONT_SEMI, fontSize: 16, color: C.white, align: 'center', lineSpacingMultiple: 1.5,
+  });
+  text(s, 'CO-Founder', {
+    x: 3.874, y: 4.341, w: 1.26, h: 0.364,
+    fontSize: 12, color: C.offWhite, align: 'center', lineSpacingMultiple: 1.5,
+  });
+  text(s, '\u2018\u2019Lorem ipsum dolor sit amet, posuere\u2019\u2019', {
+    x: 3.461, y: 4.844, w: 2.085, h: 0.667,
+    fontSize: 12, color: C.offWhite, align: 'center', lineSpacingMultiple: 1.5,
+  });
+  for (let i = 0; i < 5; i++) {
+    s.addShape('star5', {
+      x: 3.918 + i * 0.2487, y: 5.879, w: 0.177, h: 0.177,
+      fill: { color: C.white }, line: NO_LINE,
+    });
+  }
+
+  // Two supporting team members on the dark band.
+  [['James Nikolas', 'Project Managers', 6.848, 7.144], ['Marie Noah', 'Field Engineers', 10.251, 10.547]]
+    .forEach(([name, role, photoX, textX]) => {
+      photo(s, photoX, 3.491, 2.374, 1.921);
+      text(s, name, {
+        x: textX, y: 5.623, w: 1.782, h: 0.451,
+        fontFace: FONT_SEMI, fontSize: 16, color: C.white, align: 'center', lineSpacingMultiple: 1.5,
+      });
+      text(s, role, {
+        x: textX, y: 6.041, w: 1.782, h: 0.364,
+        fontSize: 12, color: C.offWhite, align: 'center', lineSpacingMultiple: 1.5,
+      });
+    });
+}
+
+function slide6(pptx) {
+  const s = pptx.addSlide();
+  rect(s, 0, 0, 6.349, 7.5, C.deep);
+  photo(s, 5.225, 1.0, 2.248, 3.204);
+  blob(s, 10.216, 4.834, 4.801, C.faint, 14.6, 35);
+  chrome(s, C.offWhite);
+
+  headline(s, [['Innovative', C.mint], [' Green Energy Solutions', C.offWhite]],
+    { x: 0.682, y: 4.251, w: 4.82, h: 2.524 });
+  stat(s, [['627.542', C.white], ['K', C.mint]], { x: 0.708, y: 2.389, w: 1.781, h: 0.505 });
+  text(s, 'Lorem ipsum dolor sitos, con ameto elit adipisicingo elit minimum. ',
+    { x: 0.708, y: 2.946, w: 3.017, h: 0.667, fontSize: 12, color: C.offWhite, lineSpacingMultiple: 1.5 });
+
+  // Two service blocks on the right, split by a vertical hairline.
+  [['01', 1.023, 1.426, 1.852], ['02', 4.812, 5.215, 5.641]].forEach(([num, iconTop, labelTop, bodyTop]) => {
+    plugLeaf(s, 8.012, iconTop, 0.297, 'C5C5C5');
+    label(s, [['Our Best Service ', C.ink], [num, C.teal]], { x: 7.905, y: labelTop, w: 2.553, h: 0.408 });
+    body(s, 'Lorem ipsum dolor sit, consect adipisicing elitos, sed do. Lorem ipsum doloris sit minimum amet.',
+      { x: 7.905, y: bodyTop, w: 3.574, h: 0.97 });
+  });
+  rule(s, 7.473, 4.812, 0, 1.798, C.hairline);
+
+  arrowTile(s, 6.807, 3.534, C.mint, C.deep);
+  rect(s, 7.966, 3.527, 1.975, 0.667, C.teal, { shadow: cardShadow() });
+  text(s, 'Join Us For More', {
+    x: 8.127, y: 3.639, w: 1.653, h: 0.375,
+    fontSize: 12, bold: true, color: C.white, align: 'center', lineSpacingMultiple: 1.5,
+  });
+  stat(s, [['25', C.ink], ['%', C.softMint]], { x: 10.246, y: 3.542, w: 0.795, h: 0.495, fontSize: 18, lineSpacingMultiple: 1.5 });
+  body(s, 'Lorem ipsum dolor', { x: 11.0, y: 3.613, w: 1.691, h: 0.364 });
+
+  plugTile(s, 4.263, 1.0, C.white, C.deep, true);
+}
+
+function slide7(pptx) {
+  const s = pptx.addSlide();
+  photo(s, 7.138, 4.042, 2.683, 2.674);
+  blob(s, 10.079, 5.534, 4.801, C.faint, 14.6, 35);
+  chrome(s, C.ink);
+
+  headline(s, [['Green ', C.teal], ['Energy Products in Action', C.black]],
+    { x: 7.138, y: 0.982, w: 4.688, h: 2.524 });
+
+  // Three bulleted product rows, hairline-separated.
+  const rows = [['01', 1.273, 1.469, 1.699, C.deep], ['02', 3.271, 3.466, 3.696, C.mint], ['03', 5.268, 5.463, 5.693, C.deep]];
+  rows.forEach(([num, labelTop, dotTop, bodyTop, dotColor]) => {
+    dot(s, 0.897, dotTop, 0.111, dotColor);
+    label(s, [['Amazing Products ', C.ink], [num, C.deep]], { x: 1.231, y: labelTop, w: 2.553, h: 0.408 });
+    body(s, 'Lorem ipsum dolor sit, consectetur adipisicing elitos, se do eiusm tep incididunt labore dolore magna. ipsum',
+      { x: 1.231, y: bodyTop, w: 4.551, h: 0.667 });
+  });
+  rule(s, 0.897, 2.818, 4.885, 0, C.faint);
+  rule(s, 0.897, 4.815, 4.885, 0, C.faint);
+
+  arrowTile(s, 7.138, 4.042, C.mint, C.deep);
+  plugTile(s, 10.127, 6.047, C.deep, C.white, true);
+  body(s, 'Lorem ipsum dolor sit, conse adipisicing elitos, sed do. ',
+    { x: 10.066, y: 3.963, w: 2.517, h: 0.667 });
+  stat(s, [['25.09', C.ink], ['%', C.mint]], { x: 10.066, y: 4.728, w: 1.615, h: 0.505 });
+}
+
+function slide8(pptx) {
+  const s = pptx.addSlide();
+  blob(s, 10.631, -2.165, 4.801, C.faint, 0, 35);
+  photo(s, 7.256, 1.0, 4.105, 2.176);
+  chrome(s, C.ink);
+
+  headline(s, [['Innovative ', C.teal], ['Power Revenue Model', C.black]],
+    { x: 0.683, y: 1.213, w: 5.906, h: 1.717 });
+
+  rect(s, 0, 3.75, 13.333, 3.75, C.deep);
+
+  // Three pricing columns on the dark band.
+  const plans = [
+    { textX: 0.811, tileX: 0.895, priceX: 1.58, perX: 2.839, price: '325.8', num: '01', tile: C.teal, glyph: C.white },
+    { textX: 5.428, tileX: 5.511, priceX: 6.197, perX: 7.455, price: '524.6', num: '02', tile: C.mint, glyph: C.deep },
+    { textX: 9.863, tileX: 9.946, priceX: 10.631, perX: 11.89, price: '792.5', num: '03', tile: C.paleMint, glyph: C.teal },
+  ];
+  plans.forEach((p) => {
+    rect(s, p.tileX, 4.706, 0.588, 0.588, p.tile, { shadow: cardShadow() });
+    invoiceMark(s, p.tileX + 0.184, 4.89, 0.22, p.glyph, p.tile);
+    stat(s, [['$', C.deeper], [p.price, C.white]], { x: p.priceX, y: 4.748, w: 1.367, h: 0.505 });
+    text(s, '/ Plan', {
+      x: p.perX, y: 4.819, w: 0.708, h: 0.375,
+      fontSize: 12, bold: true, color: C.white, lineSpacingMultiple: 1.5,
+    });
+    label(s, [['Best Business Model ' + p.num, C.white]], { x: p.textX, y: 5.423, w: 2.505, h: 0.408 });
+    text(s, 'Lorem ipsum dolor sit amet, eito adipisicing ultricies, sov.', {
+      x: p.textX, y: 5.877, w: 2.735, h: 0.667,
+      fontSize: 12, color: C.white, lineSpacingMultiple: 1.5,
+    });
+  });
+  rule(s, 4.483, 4.617, 0, 1.917, C.deeper);
+  rule(s, 8.983, 4.617, 0, 1.917, C.deeper);
+
+  arrowTile(s, 7.256, 2.506, C.mint, C.deep);
+  plugTile(s, 11.608, 1.0, C.deep, C.white, true);
+}
+
+// --- Slide 9 roadmap icons (48px PNGs in the source, redrawn as shapes) -----
+
+/** Trophy: bowl over a stem and plinth, with a C-shaped handle either side. */
+function trophyIcon(s, x, y, w, h, color) {
+  const fill = { fill: { color }, line: NO_LINE };
+  // blockArc[0,180] is a "U"; rotating it turns the opening toward the bowl.
+  s.addShape('blockArc', Object.assign({
+    x: x - w * 0.04, y: y + h * 0.06, w: w * 0.40, h: h * 0.34,
+    angleRange: [0, 180], arcThicknessRatio: 0.5, rotate: 90,
+  }, fill));
+  s.addShape('blockArc', Object.assign({
+    x: x + w * 0.64, y: y + h * 0.06, w: w * 0.40, h: h * 0.34,
+    angleRange: [0, 180], arcThicknessRatio: 0.5, rotate: 270,
+  }, fill));
+  s.addShape('ellipse', Object.assign({ x: x + w * 0.19, y: y + h * 0.02, w: w * 0.62, h: h * 0.16 }, fill));
+  s.addShape('trapezoid', Object.assign({ x: x + w * 0.19, y: y + h * 0.09, w: w * 0.62, h: h * 0.38, rotate: 180 }, fill));
+  rect(s, x + w * 0.43, y + h * 0.45, w * 0.14, h * 0.22, color);
+  s.addShape('trapezoid', Object.assign({ x: x + w * 0.28, y: y + h * 0.65, w: w * 0.44, h: h * 0.16 }, fill));
+  rect(s, x + w * 0.16, y + h * 0.81, w * 0.68, h * 0.17, color);
+}
+
+/** Ring-bound notebook: cover, spine strip and four binder rings. */
+function notebookIcon(s, x, y, w, h, color) {
+  rect(s, x + w * 0.30, y, w * 0.70, h, color);
+  rect(s, x + w * 0.14, y + h * 0.03, w * 0.13, h * 0.94, color);
+  for (let i = 0; i < 4; i++) rect(s, x, y + h * (0.11 + i * 0.24), w * 0.20, h * 0.09, color);
+}
+
+/** Head-and-shoulders avatar; the collar V is knocked out in the tile colour. */
+function personIcon(s, x, y, w, h, color, bg) {
+  const fill = { fill: { color }, line: NO_LINE };
+  s.addShape('ellipse', Object.assign({ x: x + w * 0.30, y: y + h * 0.13, w: w * 0.40, h: h * 0.42 }, fill));
+  s.addShape('pie', Object.assign({ x: x + w * 0.03, y: y + h * 0.55, w: w * 0.94, h: h * 0.90, angleRange: [180, 360] }, fill));
+  s.addShape('trapezoid', Object.assign({ x: x + w * 0.36, y: y + h * 0.56, w: w * 0.28, h: h * 0.22, rotate: 180, fill: { color: bg }, line: NO_LINE }));
+  rect(s, x + w * 0.46, y + h * 0.62, w * 0.08, h * 0.38, color);
+}
+
+/** Pie chart: a large disc with a small detached wedge at the upper right. */
+function pieIcon(s, x, y, w, h, color) {
+  const fill = { fill: { color }, line: NO_LINE };
+  s.addShape('pie', Object.assign({ x, y: y + h * 0.10, w: w * 0.88, h: h * 0.88, angleRange: [0, 300] }, fill));
+  s.addShape('pie', Object.assign({ x: x + w * 0.12, y, w: w * 0.88, h: h * 0.88, angleRange: [300, 360] }, fill));
+}
+
+/** Signpost: two arrow boards pointing opposite ways on a central post. */
+function signpostIcon(s, x, y, w, h, color) {
+  const fill = { fill: { color }, line: NO_LINE };
+  rect(s, x + w * 0.42, y, w * 0.16, h * 0.88, color);
+  s.addShape('homePlate', Object.assign({ x: x - w * 0.14, y: y + h * 0.12, w: w * 1.02, h: h * 0.19, rotate: 180 }, fill));
+  s.addShape('homePlate', Object.assign({ x: x + w * 0.12, y: y + h * 0.44, w: w * 1.02, h: h * 0.19 }, fill));
+  rect(s, x + w * 0.18, y + h * 0.88, w * 0.64, h * 0.12, color);
+}
+
+function slide9(pptx) {
+  const s = pptx.addSlide();
+  chrome(s, C.ink);
+
+  headline(s, [['Our ', C.teal], ['Energy Roadmap Vision', C.black]],
+    { x: 1.889, y: 1.032, w: 9.556, h: 0.909, align: 'center' });
+
+  // Five milestone tiles; odd ones caption above, even ones caption below.
+  const nodes = [
+    { x: 1.674, fill: C.deep, num: '01', above: true, icon: trophyIcon, iw: 0.398, ih: 0.407 },
+    { x: 3.847, fill: C.teal, num: '02', above: false, icon: notebookIcon, iw: 0.330, ih: 0.332 },
+    { x: 6.021, fill: C.mint, num: '03', above: true, icon: personIcon, iw: 0.325, ih: 0.385 },
+    { x: 8.194, fill: C.teal, num: '04', above: false, icon: pieIcon, iw: 0.376, ih: 0.366 },
+    { x: 10.367, fill: C.deep, num: '05', above: true, icon: signpostIcon, iw: 0.289, ih: 0.475 },
+  ];
+
+  // Dashed connectors weaving between the tiles.
+  [[2.32, 5.138, C.deep], [4.494, 3.846, C.teal], [6.667, 5.138, C.mint], [8.84, 3.846, C.teal]]
+    .forEach(([x, y, color]) => {
+      s.addShape('line', {
+        x, y, w: 2.173, h: 0.005,
+        line: { color, width: 2, dashType: 'dash', endArrowType: 'triangle' },
+      });
+    });
+
+  nodes.forEach((n) => {
+    rect(s, n.x, 3.846, 1.292, 1.292, C.white, { shadow: tileShadow() });
+    rect(s, n.x + 0.124, 3.97, 1.045, 1.045, n.fill, { shadow: tileShadow() });
+    n.icon(s, n.x + (1.292 - n.iw) / 2, 4.493 - n.ih / 2, n.iw, n.ih, C.white, n.fill);
+
+    const labelY = n.above ? 2.313 : 5.724;
+    const bodyY = n.above ? 2.622 : 6.033;
+    text(s, 'Roadmap ' + n.num, {
+      x: n.x - 0.175, y: labelY, w: 1.643, h: 0.337,
+      fontFace: FONT_SEMI, fontSize: 14, color: C.ink, align: 'center',
+    });
+    body(s, 'Lorem ipsum dolor amet, ut sit consectetur',
+      { x: n.x - 0.558, y: bodyY, w: 2.41, h: 0.707, align: 'center' });
+  });
+}
+
+function slide10(pptx) {
+  const s = pptx.addSlide();
+  // As on slide 1 the gradient bands overspill, so everything else follows.
+  linearGradient(s, 0, 0, 13.333, 4.125, C.gradFrom, C.gradTo, 50);
+  blob(s, -2.243, 1.128, 5.625, 'E6F8E3', -8.7);
+  photo(s, 0, 4.125, 6.667, 3.375);
+  rect(s, 6.667, 4.125, 6.667, 3.375, C.deep);
+  chrome(s, C.ink);
+
+  headline(s, [['We\u2019re ', C.teal], ['Grateful For Your ', C.black], ['Attention', C.black, true]],
+    { x: 0.667, y: 1.365, w: 6.183, h: 1.717 });
+
+  rule(s, 7.552, 1.417, 0, 1.665, 'B6EBAE');
+  text(s, 'Lorem ipsum dolor sit, consectetur adipisicing elitist, sedol do eiusm tep incididunt labo.',
+    { x: 8.343, y: 1.343, w: 3.917, h: 0.667, fontSize: 12, color: C.bodyAlt, lineSpacingMultiple: 1.5 });
+
+  rect(s, 8.429, 2.333, 2.222, 0.741, C.mint, { shadow: cardShadow() });
+  text(s, 'End Of The Journey', {
+    x: 8.574, y: 2.478, w: 1.932, h: 0.375,
+    fontSize: 12, bold: true, color: C.white, align: 'center', lineSpacingMultiple: 1.5,
+  });
+  text(s, 'Explore More', {
+    x: 10.972, y: 2.478, w: 1.325, h: 0.375,
+    fontSize: 12, bold: true, color: C.ink, align: 'center', lineSpacingMultiple: 1.5,
+  });
+  arrowGlyph(s, 12.251, 2.64, 0.153, 0.141, C.teal);
+
+  // Sign-off block on the dark panel.
+  text(s, [
+    { text: 'Feel', options: { color: C.mint } },
+    { text: ' Free To Reach Out To Us!', options: { color: C.white } },
+  ], { x: 7.2, y: 4.564, w: 3.102, h: 0.909, fontFace: FONT_SEMI, fontSize: 24 });
+  text(s, 'Green Energy Investor Pitch Deck',
+    { x: 7.2, y: 6.498, w: 1.889, h: 0.505, fontSize: 12, color: C.white });
+  plugLeaf(s, 12.464, 6.556, 0.335, C.white);
+
+  // Stepped tiles on the photo / panel seam.
+  rect(s, 6.0, 6.847, 0.667, 0.67, C.teal);
+  arrowTile(s, 5.333, 6.184, C.teal, C.white);
+}
+
+// ---------------------------------------------------------------------------
+// Build
+// ---------------------------------------------------------------------------
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'GREENY', width: 13.333, height: 7.5 });
+  pptx.layout = 'GREENY';
+  pptx.title = 'Green Energy Investor Pitch Deck';
+  pptx.author = 'Greeny.';
+
+  [slide1, slide2, slide3, slide4, slide5, slide6, slide7, slide8, slide9, slide10]
+    .forEach((builder) => builder(pptx));
+
+  return pptx.writeFile({
+    fileName: path.join(__dirname, '1495d3c6-67c0-47f2-ba0f-a7f64067c9b7_grok_final.pptx'),
+  });
+}
+
+build().then((f) => console.log('wrote ' + f)).catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

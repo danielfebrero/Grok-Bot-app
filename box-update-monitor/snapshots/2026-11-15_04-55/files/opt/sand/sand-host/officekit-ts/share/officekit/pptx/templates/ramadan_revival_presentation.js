@@ -1,0 +1,643 @@
+/**
+ * "Ramadan Revival" — 30-slide deck rebuilt with pptxgenjs.
+ *
+ * Run:  node 17bc3901-9056-4eac-ab44-173e4de81bf3_grok_final.js
+ * Out:  17bc3901-9056-4eac-ab44-173e4de81bf3_grok_final.pptx (next to this file)
+ *
+ * The source deck ships with EMPTY picture placeholders (no photos are stored in
+ * it), so those frames are intentionally left blank here too. The only raster art
+ * in the original is a set of flat icons and four device mock-ups; both are
+ * redrawn from native shapes (see the icon helpers and `deviceMock`).
+ */
+const PptxGenJS = require('pptxgenjs');
+const path = require('path');
+
+/* ---------------------------------------------------------------- palette */
+const C = {
+  navy: '002447',      // theme accent1 — headline blocks, dark panels
+  gold: 'FEB249',      // theme accent4 — arches, buttons, stars
+  white: 'FFFFFF',
+  black: '000000',
+  gray: '767171',      // body copy
+  track: 'D8D8D8',     // skill-bar track
+  pale: 'D3E9FF',      // faint outline used for the big background stars
+  paleGold: 'FFF0DB',
+  ink: '3C3C3C',       // device mock-up bezel
+  glass: 'E9EDF2',     // device mock-up screen
+};
+const FONT = { head: 'Philosopher', body: 'Lato' };
+
+/* ------------------------------------------------------- lorem ipsum body */
+/* The deck reuses a handful of filler paragraphs assembled from four fragments. */
+const F1 = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ';
+const F2 = 'Ut enim adminim veniamquis nostrud exercitation consectetur ';
+const F3 = 'adipiscing elit seddo eiusmod tempor inceiusmod tempor ';
+const F4 = 'incididunt ut labore et dolore magna aliqua';
+
+const T = {
+  one: F1,                                    // a single sentence
+  two: F1 + F2 + F3 + F4 + '. ',              // two full sentences
+  twoCut: F1 + F2 + F3 + F4 + '. ' + F2.trim(),
+  four: F1 + F2 + F3 + F4 + '. ' + F2 + F3 + F4,
+  half: F1 + F2.trim(),
+  toTempor: F1 + F2 + F3.trim(),
+  seddo: F1 + F2 + 'adipiscing elit seddo eiusmod. ',
+  tempor: F1 + F2 + 'adipiscing elit seddo eiusmod tempor inceiusmod tempor. ',
+  adipiscing: F1 + F2 + 'adipiscing.',
+  ad: F1 + F2 + 'ad. ',
+  as: F1 + F2 + 'as. ',
+  nostrud: F1 + F2 + F3 + F4 + '. ' + 'Ut enim adminim veniamquis nostrud',
+  veniamquis: F1 + F2 + F3 + F4 + '. ' + 'Ut enim adminim veniamquis.',
+  veniam: F1 + 'Ut enim adminim veniamquis',
+  ut: F1 + 'Ut',
+  et: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et. ',
+  magna: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna.',
+  lead: 'Lorem ipsum dolor sit amet, consectetur',
+  sub: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit sed do eiusmod tempor',
+  short: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore',
+  tiny: 'Lorem ipsum dolor',
+  card: 'Lorem ipsum dolor sit amet, consectetur dipiscing elit, sed diam nonummy nib euismod tincidunt ut laoreet do.',
+  cardShort: 'Lorem ipsum dolor sit amet, consectetur dipiscing elit, sed diam nonummy nib.',
+  cardDot: 'Lorem ipsum dolor sit amet, consectetur dipiscing elit, sed diam nonummy nib .',
+  intro: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. '
+    + 'Ut enim ad minim veniam, quis nostrud exercitation ullamco labor sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ',
+};
+
+/* ----------------------------------------------------------- text presets */
+const head = (size, color) => ({ fontFace: FONT.head, bold: true, fontSize: size, color: color || C.black });
+const body = (color) => ({ fontFace: FONT.body, fontSize: 10, color: color || C.gray, align: 'justify', lineSpacingMultiple: 1.5 });
+const lead = (color) => ({ fontFace: FONT.head, fontSize: 11, color: color || C.black, align: 'justify', lineSpacingMultiple: 1.5 });
+const sub = (color) => ({ fontFace: FONT.head, fontSize: 12, color: color || C.black, lineSpacingMultiple: 1.5 });
+const card = (color) => ({ fontFace: FONT.body, fontSize: 10, color: color || C.gray, align: 'center', lineSpacingMultiple: 1.38 });
+const label = (color) => ({ fontFace: FONT.head, bold: true, fontSize: 14, charSpacing: 0.4, color: color || C.navy, align: 'center' });
+
+/** PowerPoint's default text insets, in points: [left, right, bottom, top]. */
+const INSET = [7.2, 7.2, 3.6, 3.6];
+
+/** Free-standing text box: top-anchored and sized to its text, as in the original. */
+function txt(slide, text, opts) {
+  slide.addText(text, Object.assign({ valign: 'top', fit: 'resize', margin: INSET }, opts));
+}
+
+/** Caption centred inside a filled shape (buttons, banners). */
+function midText(slide, text, opts) {
+  slide.addText(text, Object.assign({ valign: 'middle', align: 'center', margin: INSET }, opts));
+}
+
+/* --------------------------------------------------------- shape helpers  */
+const fillShape = (slide, shape, o) => slide.addShape(shape, Object.assign({ line: { type: 'none' } }, o));
+
+/** Four-pointed sparkle. */
+function star4(slide, x, y, size, color) {
+  slide.addShape('star4', { x, y, w: size, h: size, fill: { color: color || C.gold }, line: { color: color || C.gold } });
+}
+
+/** The deck's signature motif: two concentric 8-point stars drawn as outlines. */
+function doubleStar(slide, x, y, size, lineOpts) {
+  slide.addShape('star8', { x, y, w: size, h: size, fill: { type: 'none' }, line: lineOpts });
+  const inner = size * 0.6321, off = size * 0.184;
+  slide.addShape('star8', { x: x + off, y: y + off, w: inner, h: inner, fill: { type: 'none' }, line: lineOpts });
+}
+
+/* ------------------------------------------------------------------ icons */
+/** Mosque logo (onion dome + crescent + plinth) — the deck's recurring brand mark. */
+function mosque(slide, x, y, s, color) {
+  fillShape(slide, 'moon', { x: x + 0.36 * s, y: y - 0.02 * s, w: 0.2 * s, h: 0.3 * s, fill: { color }, rotate: 200 });
+  slide.addShape('custGeom', {
+    x, y, w: s, h: s, fill: { type: 'none' }, line: { color, width: 9 * s },
+    points: [
+      { x: 0.06 * s, y: 0.84 * s },
+      { x: 0.5 * s, y: 0.21 * s, curve: { type: 'cubic', x1: -0.02 * s, y1: 0.55 * s, x2: 0.25 * s, y2: 0.25 * s } },
+      { x: 0.94 * s, y: 0.84 * s, curve: { type: 'cubic', x1: 0.75 * s, y1: 0.25 * s, x2: 1.02 * s, y2: 0.55 * s } },
+    ],
+  });
+  fillShape(slide, 'rect', { x, y: y + 0.84 * s, w: s, h: 0.14 * s, fill: { color } });
+}
+
+/** Water tap icon. */
+function tap(slide, x, y, s, color) {
+  fillShape(slide, 'rect', { x: x + 0.3 * s, y: y + 0.1 * s, w: 0.42 * s, h: 0.1 * s, fill: { color } });
+  fillShape(slide, 'rect', { x: x + 0.46 * s, y: y + 0.18 * s, w: 0.1 * s, h: 0.18 * s, fill: { color } });
+  fillShape(slide, 'rect', { x: x + 0.1 * s, y: y + 0.34 * s, w: 0.5 * s, h: 0.22 * s, fill: { color } });
+  fillShape(slide, 'round2SameRect', { x: x + 0.58 * s, y: y + 0.34 * s, w: 0.28 * s, h: 0.3 * s, rectRadius: 0.14 * s, fill: { color } });
+  fillShape(slide, 'teardrop', { x: x + 0.64 * s, y: y + 0.7 * s, w: 0.16 * s, h: 0.16 * s, rotate: 135, fill: { color } });
+}
+
+/** Draws a closed custGeom path from unit-square coordinates. */
+function glyph(slide, x, y, s, color, pts) {
+  const points = pts.map((p) => (p.c
+    ? { x: p.x * s, y: p.y * s, curve: { type: 'cubic', x1: p.c[0] * s, y1: p.c[1] * s, x2: p.c[2] * s, y2: p.c[3] * s } }
+    : { x: p.x * s, y: p.y * s }));
+  points.push({ close: true });
+  fillShape(slide, 'custGeom', { x, y, w: s, h: s, fill: { color }, points });
+}
+
+/** Open Quran icon: two splayed page blocks either side of the spine. */
+function book(slide, x, y, s, color) {
+  glyph(slide, x, y, s, color, [
+    { x: 0.10, y: 0.24 }, { x: 0.46, y: 0.36 }, { x: 0.46, y: 0.86 }, { x: 0.10, y: 0.74 },
+  ]);
+  glyph(slide, x, y, s, color, [
+    { x: 0.90, y: 0.24 }, { x: 0.54, y: 0.36 }, { x: 0.54, y: 0.86 }, { x: 0.90, y: 0.74 },
+  ]);
+}
+
+/** Cupped hands (dua) icon: an open cup with a small heart between the palms. */
+function hands(slide, x, y, s, color) {
+  glyph(slide, x, y, s, color, [
+    { x: 0.08, y: 0.20 },
+    { x: 0.50, y: 0.92, c: [0.02, 0.62, 0.20, 0.92] },
+    { x: 0.92, y: 0.20, c: [0.80, 0.92, 0.98, 0.62] },
+    { x: 0.74, y: 0.20 },
+    { x: 0.50, y: 0.70, c: [0.78, 0.54, 0.68, 0.70] },
+    { x: 0.26, y: 0.20, c: [0.32, 0.70, 0.22, 0.54] },
+  ]);
+  fillShape(slide, 'ellipse', { x: x + 0.38 * s, y: y + 0.26 * s, w: 0.24 * s, h: 0.24 * s, fill: { color } });
+}
+
+/** Crescent + star icon. */
+function moonStar(slide, x, y, s, color) {
+  fillShape(slide, 'moon', { x: x + 0.1 * s, y: y + 0.1 * s, w: 0.5 * s, h: 0.8 * s, fill: { color }, rotate: 180 });
+  fillShape(slide, 'star5', { x: x + 0.6 * s, y: y + 0.3 * s, w: 0.3 * s, h: 0.3 * s, fill: { color } });
+}
+
+/**
+ * Stand-in for the four raster device mock-ups of the original deck: a bezel,
+ * a screen and a short caption, all native shapes.
+ */
+function deviceMock(slide, o) {
+  const bezel = o.bezel === undefined ? 0.09 : o.bezel;
+  fillShape(slide, o.shape || 'roundRect', {
+    x: o.x, y: o.y, w: o.w, h: o.h, rectRadius: o.radius || 0.06, fill: { color: C.ink },
+  });
+  fillShape(slide, o.shape || 'roundRect', {
+    x: o.x + bezel, y: o.y + bezel + (o.top || 0), w: o.w - 2 * bezel, h: o.h - 2 * bezel - (o.top || 0) - (o.foot || 0),
+    rectRadius: o.radius ? o.radius / 2 : 0.03, fill: { color: C.glass },
+  });
+  if (o.stand) {
+    fillShape(slide, 'rect', { x: o.x + o.w / 2 - 0.35, y: o.y + o.h, w: 0.7, h: 0.42, fill: { color: C.ink } });
+    fillShape(slide, 'roundRect', { x: o.x + o.w / 2 - 1.1, y: o.y + o.h + 0.42, w: 2.2, h: 0.14, rectRadius: 0.07, fill: { color: C.ink } });
+  }
+  midText(slide, '[image]', { x: o.x, y: o.y + o.h / 2 - 0.2, w: o.w, h: 0.4, fontFace: FONT.body, fontSize: 12, color: C.gray });
+}
+
+/** Label + progress bar + percentage, as used on the profile slides. */
+function skillRow(slide, x, y, name, pct, barW) {
+  txt(slide, name, Object.assign(head(15, C.navy), { x, y, w: 1.475, h: 0.353 }));
+  fillShape(slide, 'rect', { x: x + 1.814, y: y + 0.419, w: 2.695, h: 0.081, fill: { color: C.track } });
+  fillShape(slide, 'rect', { x, y: y + 0.419, w: barW, h: 0.081, fill: { color: C.gold } });
+  txt(slide, pct, Object.assign(head(15, C.navy), { x: x + 3.805, y, w: 0.704, h: 0.353 }));
+}
+
+/** Five gold sparkles used as a rating row. */
+function rating(slide, x, y) {
+  [0, 0.396, 0.793, 1.189, 1.585].forEach((dx) => star4(slide, x + dx, y, 0.287));
+}
+
+/** Chevron-notched side panel (slide 19). `dir` = 1 points right, -1 points left. */
+function chevronPanel(slide, x, y, w, h, dir) {
+  const p = [[0.003, 0], [0.289, 0.154], [0.708, 0.146], [0.694, 0.356], [1, 0.5],
+             [0.694, 0.644], [0.708, 0.854], [0.289, 0.846], [0.003, 1], [0, 0.999], [0, 0.001]];
+  const pts = p.map(([u, v]) => ({ x: (dir > 0 ? u : 1 - u) * w, y: v * h }));
+  pts.push({ close: true });
+  fillShape(slide, 'custGeom', { x, y, w, h, fill: { color: C.gold }, points: pts });
+}
+
+/** Shallow arc band that caps the top and bottom of the pricing slide. */
+function arcBand(slide, x, y, w, h, flipV) {
+  fillShape(slide, 'custGeom', {
+    x, y, w, h, flipV: !!flipV, fill: { color: C.gold },
+    points: [
+      { x: w / 2, y: 0 },
+      { x: 0.993 * w, y: 0.855 * h, curve: { type: 'cubic', x1: 0.743 * w, y1: 0, x2: 0.946 * w, y2: 0.367 * h } },
+      { x: w, y: h }, { x: 0, y: h },
+      { x: w / 2, y: 0, curve: { type: 'cubic', x1: 0.054 * w, y1: 0.367 * h, x2: 0.257 * w, y2: 0 } },
+      { close: true },
+    ],
+  });
+}
+
+/** The gold mosque mark inherited from the slide master; present on every slide. */
+function masterMark(slide) {
+  mosque(slide, 0.469, 0.37, 0.6, C.gold);
+}
+
+/* ============================================================== SLIDES === */
+const slides = [];
+
+/* --- 1 & 16 & 30: cover / break / closing share one arch-and-stars layout - */
+function coverSlide(s, o) {
+  s.background = { color: C.navy };
+  masterMark(s);
+  doubleStar(s, 5.347, 0.36, 6.086, { color: C.pale, transparency: 89, width: 10 });
+  txt(s, o.title, Object.assign(head(66, C.white), { x: 1.632, y: 2.377, w: o.titleW, h: 2.322, wrap: false }));
+  txt(s, o.tagline, { x: 1.632, y: 4.786, w: o.taglineW, h: 0.337, fontFace: FONT.body, fontSize: 14, color: C.gold, wrap: false });
+  fillShape(s, 'round2SameRect', { x: 8.003, y: 0.839, w: 4.704, h: 6.661, rectRadius: 2.352, fill: { color: C.gold } });
+  txt(s, 'Ramadan Mubarak', { x: 0.469, y: 6.793, w: 1.829, h: 0.337, fontFace: FONT.body, fontSize: 14, color: C.white, wrap: false });
+  txt(s, '1446', { x: 6.719, y: 6.793, w: 0.658, h: 0.337, fontFace: FONT.body, fontSize: 14, color: C.white, align: 'right', wrap: false });
+  [[6.177, 2.103, 0.452], [3.179, 0.968, 0.2], [1.01, 5.413, 0.317],
+   [5.702, 6.03, 0.2], [0.669, 1.779, 0.2], [12.429, 0.662, 0.356]].forEach((v) => star4(s, v[0], v[1], v[2]));
+  s.addShape('line', { x: 2.494, y: 6.961, w: 4.135, h: 0, line: { color: C.gold, width: 1.5 } });
+}
+
+slides.push((s) => coverSlide(s, { title: 'RAMADAN \nREVIVAL', titleW: 5.254, tagline: 'Ramadan  Presentation Template', taglineW: 3.175 }));
+
+/* --- 2: gold stripe + navy circle ---------------------------------------- */
+slides.push((s) => {
+  masterMark(s);
+  fillShape(s, 'rect', { x: 8.46, y: 0, w: 2.543, h: 7.5, fill: { color: C.gold } });
+  txt(s, 'Get ready for 30 days until Ramadan', Object.assign(head(36), { x: 1.255, y: 1.69, w: 4.954, h: 1.313 }));
+  txt(s, T.four, Object.assign(body(), { x: 1.255, y: 3.302, w: 5.069, h: 1.582 }));
+  txt(s, T.short, Object.assign(lead(), { x: 1.255, y: 5.184, w: 4.198, h: 0.625 }));
+  fillShape(s, 'ellipse', { x: 7.163, y: 1.193, w: 5.113, h: 5.113, fill: { color: C.navy } });
+});
+
+/* --- 3: tall navy block -------------------------------------------------- */
+slides.push((s) => {
+  masterMark(s);
+  fillShape(s, 'rect', { x: 6.707, y: 0, w: 3.717, h: 6.04, fill: { color: C.navy } });
+  txt(s, 'Embracing the Blessings Journeying through Ramadan', Object.assign(head(36), { x: 1.606, y: 1.568, w: 3.561, h: 3.13 }));
+  txt(s, T.seddo, Object.assign(body(), { x: 1.606, y: 4.854, w: 3.561, h: 1.078 }));
+});
+
+/* --- 4: two "Title Here" blocks + RAMADAN banner ------------------------- */
+slides.push((s) => {
+  masterMark(s);
+  mosque(s, 0.469, 0.37, 0.6, C.white);
+  txt(s, 'Nurturing Faith and Gratitud', Object.assign(head(36), { x: 7.645, y: 1.396, w: 4.213, h: 1.313 }));
+  [2.92, 4.83].forEach((y) => txt(s, 'Title Here', Object.assign(sub(), { x: 7.645, y, w: 3.51, h: 0.37, bold: true, align: 'justify' })));
+  [3.33, 5.241].forEach((y) => txt(s, T.tempor, Object.assign(body(), { x: 7.645, y, w: 4.213, h: 1.078 })));
+  fillShape(s, 'rect', { x: 0, y: 5.949, w: 5.768, h: 1.551, fill: { color: C.navy } });
+  midText(s, 'RAMADAN', Object.assign(head(32, C.white), { x: 0, y: 5.949, w: 5.768, h: 1.551 }));
+  [0.618, 4.735].forEach((x) => doubleStar(s, x, 6.518, 0.414, { color: C.gold, width: 1.5 }));
+});
+
+/* --- 5: navy hero band + navy caption card ------------------------------- */
+slides.push((s) => {
+  masterMark(s);
+  fillShape(s, 'rect', { x: 5.929, y: 0.444, w: 7.404, h: 3.841, fill: { color: C.navy } });
+  txt(s, 'Ramadan  Histories', Object.assign(head(36), { x: 1.354, y: 1.669, w: 3.917, h: 1.313 }));
+  txt(s, T.two, Object.assign(body(), { x: 1.354, y: 3.15, w: 3.917, h: 1.33 }));
+  txt(s, T.lead, Object.assign(lead(), { x: 1.927, y: 4.738, w: 3.283, h: 0.349 }));
+  star4(s, 1.488, 4.754, 0.317);
+  txt(s, T.one, Object.assign(body(), { x: 1.354, y: 5.259, w: 3.917, h: 0.573 }));
+  fillShape(s, 'rect', { x: 6.919, y: 5.088, w: 5.302, h: 1.73, fill: { color: C.navy } });
+  doubleStar(s, 7.355, 5.563, 0.78, { color: C.gold, width: 2.75 });
+  txt(s, 'Lorem ipsum dolor sit amet consectet', Object.assign(sub(C.white), { x: 8.45, y: 5.493, w: 3.287, h: 0.303, bold: true }));
+  txt(s, T.et, Object.assign(body(C.white), { x: 8.455, y: 5.841, w: 3.287, h: 0.573 }));
+});
+
+/* --- 6: full-height navy column with bullet list ------------------------- */
+slides.push((s) => {
+  masterMark(s);
+  fillShape(s, 'rect', { x: 7.621, y: 0, w: 5.162, h: 7.5, fill: { color: C.navy } });
+  txt(s, 'Exploring \nthe Essence \nof Ramadan', Object.assign(head(36, C.white), { x: 8.315, y: 1.248, w: 3.917, h: 1.919 }));
+  txt(s, T.two, Object.assign(body(C.white), { x: 8.315, y: 3.295, w: 3.917, h: 1.33 }));
+  [4.883, 5.393, 5.903].forEach((y) => {
+    txt(s, T.lead, Object.assign(lead(C.white), { x: 8.889, y, w: 3.283, h: 0.349 }));
+    star4(s, 8.526, y + 0.074, 0.2);
+  });
+});
+
+/* --- 7: narrow navy column + Read More ----------------------------------- */
+slides.push((s) => {
+  masterMark(s);
+  fillShape(s, 'rect', { x: 9.778, y: 0.356, w: 2.768, h: 6.788, fill: { color: C.navy } });
+  txt(s, 'Ramadan Reverence Honoring Traditions and Values', Object.assign(head(32), { x: 1.255, y: 1.614, w: 4.583, h: 1.717 }));
+  txt(s, T.twoCut, Object.assign(body(), { x: 1.255, y: 3.504, w: 4.583, h: 1.33 }));
+  fillShape(s, 'rect', { x: 1.354, y: 5.298, w: 2.354, h: 0.588, fill: { color: C.gold } });
+  midText(s, 'Read More', Object.assign(head(14), { x: 1.354, y: 5.298, w: 2.354, h: 0.588 }));
+});
+
+/* --- 8: wide banner with tinted overlay ---------------------------------- */
+slides.push((s) => {
+  fillShape(s, 'round2SameRect', { x: 0, y: 0.229, w: 13.333, h: 3.031, flipV: true, rectRadius: 0.505, fill: { color: C.gold } });
+  fillShape(s, 'round2SameRect', { x: 0, y: 0, w: 13.333, h: 3.031, flipV: true, rectRadius: 0.505, fill: { color: C.navy, transparency: 56 } });
+  txt(s, 'The Spirit of Giving Charity in Ramadan', Object.assign(head(32), { x: 1.422, y: 3.9, w: 4.583, h: 1.178 }));
+  txt(s, T.twoCut, Object.assign(body(), { x: 1.422, y: 5.354, w: 4.583, h: 1.33 }));
+  [3.843, 5.448].forEach((y) => txt(s, 'Title Here', Object.assign(sub(), { x: 7.614, y, w: 3.51, h: 0.37, bold: true, align: 'justify' })));
+  [[4.253, T.ad], [5.858, T.as]].forEach((v) =>
+    txt(s, v[1], Object.assign(body(), { x: 7.614, y: v[0], w: 4.213, h: 0.825 })));
+  masterMark(s);
+});
+
+/* --- 9: profile with skill bars ------------------------------------------ */
+slides.push((s) => {
+  masterMark(s);
+  fillShape(s, 'round1Rect', { x: 0, y: 0, w: 5.879, h: 7.076, flipV: true, rectRadius: 0.98, fill: { color: C.navy } });
+  txt(s, 'Abbas Basheer', Object.assign(head(40), { x: 7.379, y: 1.52, w: 4.393, h: 0.774 }));
+  txt(s, T.adipiscing, Object.assign(body(), { x: 7.379, y: 2.383, w: 4.633, h: 0.825 }));
+  skillRow(s, 7.503, 3.716, 'Integrity', '90%', 3.905);
+  skillRow(s, 7.503, 4.598, 'Leadership', '80%', 3.538);
+  skillRow(s, 7.503, 5.48, 'Teamwork', '85%', 3.707);
+  mosque(s, 12.265, 0.37, 0.6, C.gold);
+});
+
+/* --- 10: three arch portraits ------------------------------------------- */
+slides.push((s) => {
+  masterMark(s);
+  const team = [[1.918, 1.828, 'MARCUS RAMON', 5.19], [5.401, 5.345, 'LILIAN ADAM', 5.194], [8.884, 8.83, 'TRISTAN DOE', 5.198]];
+  team.forEach((t) => fillShape(s, 'round2SameRect', { x: t[0], y: 1.829, w: 2.531, h: 3.046, rectRadius: 1.2655, fill: { color: C.gold } }));
+  team.forEach((t) => {
+    txt(s, t[2], Object.assign(label(), { x: t[1], y: t[3], w: 2.675, h: 0.337 }));
+    txt(s, T.card, Object.assign(card(), { x: t[1], y: t[3] + 0.387, w: 2.675, h: 0.77 }));
+  });
+  txt(s, 'Our Ramadan Team', Object.assign(head(40), { x: 3.224, y: 0.526, w: 6.885, h: 0.774, align: 'center' }));
+  fillShape(s, 'rect', { x: 0, y: 6.854, w: 13.333, h: 0.646, fill: { color: C.navy } });
+  [9.902, 3.017].forEach((x) => doubleStar(s, x, 0.707, 0.414, { color: C.gold, width: 1.5 }));
+});
+
+/* --- 11: navy panel on the right, two gold name plates ------------------- */
+slides.push((s) => {
+  masterMark(s);
+  fillShape(s, 'rect', { x: 7.906, y: 0, w: 5.427, h: 7.5, fill: { color: C.navy } });
+  txt(s, 'Here\u2019s Our Team', Object.assign(head(40, C.white), { x: 8.878, y: 1.523, w: 3.629, h: 1.447 }));
+  txt(s, T.sub, Object.assign(sub(C.white), { x: 8.878, y: 3.204, w: 3.629, h: 0.672 }));
+  txt(s, T.toTempor, Object.assign(body(C.white), { x: 8.883, y: 4.034, w: 3.625, h: 1.335 }));
+  fillShape(s, 'rect', { x: 8.97, y: 5.603, w: 1.431, h: 0.374, fill: { color: C.gold } });
+  midText(s, 'OUR TEAM', { x: 8.97, y: 5.603, w: 1.431, h: 0.374, fontFace: FONT.body, fontSize: 11, color: C.white });
+  [[0.969, 'MARCUS RAMON', 5.663, 5.99], [4.286, 'LILIAN ADAM', 5.7, 5.995]].forEach((t) => {
+    fillShape(s, 'rect', { x: t[0], y: 5.521, w: 2.698, h: 0.958, fill: { color: C.gold } });
+    txt(s, t[1], Object.assign(label(C.white), { x: t[0], y: t[2], w: 2.698, h: 0.337 }));
+    txt(s, 'Lorem ipsum dolor sit amet', Object.assign(card(C.white), { x: t[0], y: t[3], w: 2.698, h: 0.305 }));
+  });
+});
+
+/* --- 12: pale gold column + navy list card ------------------------------- */
+slides.push((s) => {
+  masterMark(s);
+  fillShape(s, 'rect', { x: 9.612, y: 0, w: 3.721, h: 7.5, fill: { color: C.gold, transparency: 75 } });
+  txt(s, 'Finding Peace in Ramadan Service', Object.assign(head(36), { x: 1.255, y: 1.816, w: 4.338, h: 1.313 }));
+  txt(s, T.nostrud, Object.assign(body(), { x: 1.255, y: 3.429, w: 4.338, h: 1.33 }));
+  txt(s, T.short, Object.assign(lead(), { x: 1.255, y: 5.058, w: 4.338, h: 0.625 }));
+  fillShape(s, 'rect', { x: 7.021, y: 4.573, w: 5.323, h: 2.198, fill: { color: C.navy } });
+  [[7.859, 7.496], [10.278, 9.915]].forEach((col) => {
+    [4.996, 5.46, 5.999].forEach((y) => {
+      txt(s, T.tiny, Object.assign(lead(C.white), { x: col[0], y, w: 1.59, h: 0.349 }));
+      star4(s, col[1], y + 0.074, 0.2);
+    });
+  });
+});
+
+/* --- 13: three service rows, middle one on a gold card ------------------- */
+slides.push((s) => {
+  masterMark(s);
+  fillShape(s, 'roundRect', { x: 1.219, y: 2.56, w: 5.771, h: 1.969, rectRadius: 0.328, fill: { color: C.gold } });
+  txt(s, 'Services That Can Be Obtained During Ramadan', Object.assign(head(36), { x: 8.141, y: 0.485, w: 4.338, h: 1.919 }));
+  tap(s, 1.502, 1.352, 0.6, C.navy);
+  book(s, 1.544, 3.245, 0.6, C.white);
+  hands(s, 1.544, 5.548, 0.6, C.navy);
+  [[1.034, C.navy, C.gray], [2.927, C.white, C.white], [5.23, C.navy, C.gray]].forEach((r) => {
+    txt(s, 'Service Here', Object.assign(sub(r[1]), { x: 2.659, y: r[0], w: 3.51, h: 0.37, bold: true, align: 'justify' }));
+    txt(s, T.half, Object.assign(body(r[2]), { x: 2.659, y: r[0] + 0.411, w: 3.966, h: 0.825 }));
+  });
+});
+
+/* --- 14: three rounded service cards ------------------------------------- */
+slides.push((s) => {
+  masterMark(s);
+  txt(s, 'Our Ramadan Service', Object.assign(head(40), { x: 3.224, y: 0.718, w: 6.885, h: 0.774, align: 'center' }));
+  txt(s, T.intro, { x: 1.99, y: 1.572, w: 9.354, h: 0.627, fontFace: FONT.body, fontSize: 11, color: C.gray, align: 'center', lineSpacingMultiple: 1.5 });
+  const cards = [[1.513, 1.606, 'Service One', C.navy, 5.85], [5.237, 5.345, 'Service Two', C.gold, 5.854], [8.961, 9.052, 'Service Three', C.navy, 5.858]];
+  cards.forEach((c) => {
+    fillShape(s, 'roundRect', { x: c[0], y: 2.599, w: 2.86, h: 2.86, rectRadius: 0.477, fill: { color: c[3] } });
+    txt(s, c[2], Object.assign(label(), { x: c[1], y: c[4], w: 2.675, h: 0.337 }));
+    txt(s, T.cardShort, Object.assign(card(), { x: c[1], y: c[4] + 0.387, w: 2.675, h: 0.537 }));
+  });
+});
+
+/* --- 15: navy slide, 2x2 icon grid --------------------------------------- */
+slides.push((s) => {
+  s.background = { color: C.navy };
+  masterMark(s);
+  [[1.942, 1.239], [1.942, 3.893], [4.639, 1.239], [4.639, 3.893]].forEach((p) =>
+    fillShape(s, 'roundRect', { x: p[0], y: p[1], w: 2.372, h: 2.369, rectRadius: 0.395, fill: { color: C.gold, transparency: 35 } }));
+  doubleStar(s, 0.441, -0.292, 8.083, { color: C.pale, transparency: 82, width: 10 });
+  doubleStar(s, 12.073, 6.387, 0.6, { color: C.gold, width: 2 });
+  star4(s, 0.924, 6.396, 0.452);
+  star4(s, 12.108, 0.694, 0.277);
+  txt(s, 'Navigating Ramadan\nService', Object.assign(head(40, C.white), { x: 8.166, y: 1.245, w: 3.629, h: 2.121 }));
+  txt(s, T.sub, Object.assign(sub(C.white), { x: 8.166, y: 3.482, w: 3.629, h: 0.672 }));
+  txt(s, T.toTempor, Object.assign(body(C.white), { x: 8.171, y: 4.312, w: 3.625, h: 1.335 }));
+  fillShape(s, 'rect', { x: 8.259, y: 5.881, w: 1.431, h: 0.374, fill: { color: C.gold } });
+  midText(s, 'OUR SERVICE', { x: 8.259, y: 5.881, w: 1.431, h: 0.374, fontFace: FONT.body, fontSize: 11, color: C.white });
+  tap(s, 2.678, 1.973, 0.9, C.white);
+  hands(s, 5.375, 1.973, 0.9, C.white);
+  book(s, 2.678, 4.627, 0.9, C.white);
+  moonStar(s, 5.375, 4.627, 0.9, C.white);
+});
+
+slides.push((s) => coverSlide(s, { title: 'BREAK \nSLIDE', titleW: 3.547, tagline: 'Ramadan Powerpoint Presentation Template', taglineW: 4.067 }));
+
+/* --- 17: gold + navy portfolio columns ----------------------------------- */
+slides.push((s) => {
+  masterMark(s);
+  fillShape(s, 'rect', { x: 9.646, y: 0, w: 3.405, h: 7.5, fill: { color: C.navy } });
+  fillShape(s, 'rect', { x: 6.241, y: 0, w: 3.405, h: 7.5, fill: { color: C.gold } });
+  txt(s, 'Portofolio for Ramadan  ', Object.assign(head(36), { x: 1.312, y: 1.669, w: 3.917, h: 1.313 }));
+  txt(s, T.two, Object.assign(body(), { x: 1.312, y: 3.15, w: 3.917, h: 1.33 }));
+  txt(s, T.lead, Object.assign(lead(), { x: 1.885, y: 4.738, w: 3.283, h: 0.349 }));
+  star4(s, 1.446, 4.754, 0.317);
+  txt(s, T.one, Object.assign(body(), { x: 1.312, y: 5.259, w: 3.917, h: 0.573 }));
+  [6.481, 9.864].forEach((x) => txt(s, T.one, Object.assign(body(C.white), { x, y: 0.472, w: 2.969, h: 0.825 })));
+});
+
+/* --- 18: activity slide with gold pill ----------------------------------- */
+slides.push((s) => {
+  masterMark(s);
+  fillShape(s, 'rect', { x: 6.667, y: 1.563, w: 6.667, h: 4.375, fill: { color: C.navy } });
+  doubleStar(s, 2.625, -0.292, 8.083, { color: C.pale, transparency: 75, width: 10 });
+  [12.364, 0.369].forEach((x) => doubleStar(s, x, 6.421, 0.6, { color: C.gold, width: 2 }));
+  fillShape(s, 'roundRect', { x: 1.545, y: 6.39, w: 10.242, h: 0.63, rectRadius: 0.315, fill: { color: C.gold, transparency: 10 } });
+  [[2.397, 2.845, T.toTempor, 1.078], [4.116, 4.531, T.ut, 0.573]].forEach((r) => {
+    txt(s, T.lead, Object.assign(lead(C.white), { x: 8.67, y: r[0], w: 3.283, h: 0.349 }));
+    star4(s, 8.307, r[0] + 0.074, 0.2, C.pale);
+    txt(s, r[2], Object.assign(body(C.white), { x: 8.162, y: r[1], w: 4.034, h: r[3] }));
+  });
+  s.addText([
+    { text: 'Al ', options: head(32, C.white) },
+    { text: 'Mubarakah', options: Object.assign(head(32, C.white), { charSpacing: 3 }) },
+    { text: ' Mosque', options: head(32, C.white) },
+  ], { x: 2.962, y: 6.386, w: 7.41, h: 0.64, align: 'center', valign: 'top' });
+  txt(s, 'Ramadan Activity', Object.assign(head(40), { x: 2.962, y: 0.393, w: 7.41, h: 0.774, align: 'center' }));
+});
+
+/* --- 19: chevron side panels --------------------------------------------- */
+slides.push((s) => {
+  masterMark(s);
+  fillShape(s, 'rect', { x: 0.417, y: 0.339, w: 0.74, h: 0.804, fill: { color: C.white } });
+  fillShape(s, 'rect', { x: 0.005, y: 6.844, w: 13.323, h: 0.656, fill: { color: C.navy } });
+  fillShape(s, 'rect', { x: 0, y: 0, w: 13.323, h: 0.656, fill: { color: C.navy } });
+  chevronPanel(s, 0, 0, 3.76, 7.5, 1);
+  chevronPanel(s, 9.563, 0, 3.771, 7.51, -1);
+  txt(s, 'Ramadan Reflections Stories of Faith and Devotion', Object.assign(head(36), { x: 4.375, y: 1.142, w: 4.583, h: 2.524, align: 'center' }));
+  txt(s, T.twoCut, Object.assign(body(), { x: 4.375, y: 3.976, w: 4.583, h: 1.33, align: 'center' }));
+  fillShape(s, 'rect', { x: 5.485, y: 5.719, w: 2.354, h: 0.588, fill: { color: C.gold } });
+  midText(s, 'Portofolio', Object.assign(head(14), { x: 5.485, y: 5.719, w: 2.354, h: 0.588 }));
+});
+
+/* --- 20: tall navy arch -------------------------------------------------- */
+slides.push((s) => {
+  masterMark(s);
+  fillShape(s, 'round2SameRect', { x: 2.417, y: 1.064, w: 3.594, h: 6.436, rectRadius: 0.464, fill: { color: C.navy } });
+  txt(s, 'Free Fast Breaking in Ramadan', Object.assign(head(36), { x: 8.406, y: 1.403, w: 3.917, h: 1.919 }));
+  txt(s, T.two, Object.assign(body(), { x: 8.406, y: 3.416, w: 3.917, h: 1.33 }));
+  txt(s, T.lead, Object.assign(lead(), { x: 8.979, y: 5.003, w: 3.283, h: 0.349 }));
+  star4(s, 8.54, 5.019, 0.317);
+  txt(s, T.one, Object.assign(body(), { x: 8.406, y: 5.524, w: 3.917, h: 0.573 }));
+});
+
+/* --- 21: navy header band + gold block ----------------------------------- */
+slides.push((s) => {
+  masterMark(s);
+  fillShape(s, 'rect', { x: 6.531, y: 4.111, w: 6.802, h: 2.849, fill: { color: C.gold } });
+  fillShape(s, 'rect', { x: 0, y: 0, w: 11.907, h: 3.389, fill: { color: C.navy } });
+  txt(s, 'Exploring Ramadan\'s Blessings', Object.assign(head(36, C.white), { x: 1.426, y: 1.005, w: 2.933, h: 1.919 }));
+  txt(s, 'Title Here', Object.assign(sub(), { x: 1.425, y: 3.97, w: 3.121, h: 0.37, bold: true, align: 'justify' }));
+  txt(s, T.veniamquis, Object.assign(body(), { x: 1.425, y: 4.447, w: 3.121, h: 2.087 }));
+});
+
+/* --- 22: mosque collaboration ------------------------------------------- */
+slides.push((s) => {
+  masterMark(s);
+  fillShape(s, 'rect', { x: 5.823, y: 0, w: 7.51, h: 7.5, fill: { color: C.navy } });
+  [3.882, 0.833].forEach((y) => fillShape(s, 'round2SameRect', { x: 6.615, y, w: 5.927, h: 2.829, rectRadius: 0.263, fill: { color: C.gold } }));
+  txt(s, 'Mosque\nCollaboration', Object.assign(head(42), { x: 0.935, y: 2.034, w: 4.045, h: 1.515 }));
+  txt(s, T.veniam, Object.assign(body(), { x: 0.935, y: 3.755, w: 4.045, h: 0.831, align: 'left' }));
+  txt(s, T.sub, Object.assign(sub(), { x: 0.935, y: 4.794, w: 3.618, h: 0.672 }));
+});
+
+/* --- 23: desktop mock-up + stat pill ------------------------------------- */
+slides.push((s) => {
+  masterMark(s);
+  fillShape(s, 'rect', { x: 1.802, y: 0, w: 3.802, h: 7.5, fill: { color: C.navy } });
+  deviceMock(s, { x: 1.15, y: 1.61, w: 5.05, h: 3.24, radius: 0.05, bezel: 0.14, stand: true });
+  fillShape(s, 'roundRect', { x: 7.585, y: 5.17, w: 4.935, h: 1.674, rectRadius: 0.365, fill: { color: C.gold } });
+  [['476+', 8.013, 1.104, 'Complate Project', 7.793, 1.545],
+   ['445+', 9.671, 1.114, 'On Progress', 9.565, 1.327],
+   ['450+', 11.226, 1.114, 'Review', 11.332, 0.9]].forEach((v) => {
+    txt(s, v[0], { x: v[1], y: 5.587, w: v[2], h: 0.572, fontFace: FONT.body, bold: true, fontSize: 28, color: C.white, align: 'center', valign: 'top' });
+    txt(s, v[3], { x: v[4], y: 6.15, w: v[5], h: 0.326, fontFace: FONT.head, fontSize: 10, color: C.white, align: 'center', lineSpacingMultiple: 1.5, valign: 'top' });
+  });
+  txt(s, 'Desktop Mockup\nSlides Design', Object.assign(head(36), { x: 7.72, y: 1.157, w: 4.503, h: 1.313 }));
+  txt(s, T.sub, Object.assign(sub(), { x: 7.715, y: 2.602, w: 3.618, h: 0.672 }));
+  txt(s, T.veniamquis, Object.assign(body(), { x: 7.72, y: 3.456, w: 4.602, h: 1.33 }));
+});
+
+/* --- 24: laptop mock-up over two star blocks ----------------------------- */
+slides.push((s) => {
+  masterMark(s);
+  fillShape(s, 'rect', { x: 6.103, y: 3.526, w: 3.917, h: 3.974, fill: { color: C.gold } });
+  doubleStar(s, 6.133, 3.585, 3.856, { color: C.paleGold, transparency: 75, width: 10 });
+  fillShape(s, 'rect', { x: 9.417, y: -0.03, w: 3.917, h: 3.974, fill: { color: C.navy } });
+  doubleStar(s, 9.447, 0.029, 3.856, { color: C.pale, transparency: 75, width: 10 });
+  deviceMock(s, { x: 7.05, y: 1.9, w: 5.3, h: 3.2, radius: 0.06, bezel: 0.12 });
+  fillShape(s, 'roundRect', { x: 6.573, y: 5.1, w: 6.292, h: 0.22, rectRadius: 0.11, fill: { color: C.ink } });
+  txt(s, 'Laptop Device Mockup Plan', Object.assign(head(36), { x: 1.299, y: 1.669, w: 3.917, h: 1.313 }));
+  txt(s, T.two, Object.assign(body(), { x: 1.299, y: 3.15, w: 3.917, h: 1.33 }));
+  txt(s, T.lead, Object.assign(lead(), { x: 1.873, y: 4.738, w: 3.283, h: 0.349 }));
+  star4(s, 1.433, 4.754, 0.317);
+  txt(s, T.one, Object.assign(body(), { x: 1.299, y: 5.259, w: 3.917, h: 0.573 }));
+});
+
+/* --- 25: phone mock-up --------------------------------------------------- */
+slides.push((s) => {
+  masterMark(s);
+  fillShape(s, 'round2SameRect', { x: 0.802, y: 1.24, w: 4.53, h: 6.26, rectRadius: 0.755, fill: { color: C.gold } });
+  fillShape(s, 'round2SameRect', { x: 1.584, y: 0.428, w: 4.53, h: 7.072, rectRadius: 0.755, fill: { color: C.navy } });
+  deviceMock(s, { x: 2.357, y: 1.053, w: 2.984, h: 6.02, radius: 0.34, bezel: 0.12 });
+  txt(s, 'Phone Application Mockup Design', Object.assign(head(32), { x: 7.219, y: 1.469, w: 4.583, h: 1.178 }));
+  txt(s, T.sub, Object.assign(sub(), { x: 7.219, y: 2.72, w: 3.618, h: 0.672 }));
+  txt(s, T.twoCut, Object.assign(body(), { x: 7.219, y: 3.504, w: 4.583, h: 1.33 }));
+  fillShape(s, 'rect', { x: 7.317, y: 5.298, w: 2.354, h: 0.588, fill: { color: C.gold } });
+  midText(s, 'Mockup', Object.assign(head(14), { x: 7.317, y: 5.298, w: 2.354, h: 0.588 }));
+  fillShape(s, 'rect', { x: 12.75, y: 0, w: 0.583, h: 7.5, fill: { color: C.navy } });
+});
+
+/* --- 26: tablet mock-up + skill bars ------------------------------------- */
+slides.push((s) => {
+  masterMark(s);
+  fillShape(s, 'rect', { x: 11.521, y: -0.014, w: 1.812, h: 1.639, fill: { color: C.gold } });
+  fillShape(s, 'round1Rect', { x: 7.062, y: -0.014, w: 6.271, h: 7.514, rectRadius: 1.608, fill: { color: C.navy } });
+  deviceMock(s, { x: 8.219, y: 0.781, w: 4.104, h: 6.155, radius: 0.22, bezel: 0.26 });
+  txt(s, 'Tablet Device Mockup Plan', Object.assign(head(36), { x: 1.364, y: 1.19, w: 4.393, h: 1.313 }));
+  txt(s, T.adipiscing, Object.assign(body(), { x: 1.364, y: 2.804, w: 4.393, h: 0.825 }));
+  skillRow(s, 1.487, 3.891, 'Integrity', '90%', 3.905);
+  skillRow(s, 1.487, 4.773, 'Leadership', '80%', 3.538);
+  skillRow(s, 1.487, 5.655, 'Teamwork', '85%', 3.707);
+});
+
+/* --- 27: pricing table --------------------------------------------------- */
+slides.push((s) => {
+  masterMark(s);
+  const cols = [[1.658, 1.857, 2.038, 2.181, 2.183, 'Basic', '$10'],
+                [5.281, 5.478, 5.659, 5.857, 5.858, 'Standard', '$20'],
+                [8.905, 9.104, 9.285, 9.54, 9.541, 'Premium', '$30']];
+  cols.forEach((c) => fillShape(s, 'roundRect', { x: c[0], y: 2.229, w: 2.771, h: 4.094, rectRadius: 0.462, fill: { color: C.navy } }));
+  cols.forEach((c) => {
+    txt(s, c[5], Object.assign(head(24, C.gold), { x: c[1], y: 2.616, w: 2.373, h: 0.505, align: 'center' }));
+    txt(s, c[6], Object.assign(head(40, C.white), { x: c[2], y: 3.272, w: 2.01, h: 0.774, align: 'center' }));
+    ['Your service list 1', 'Your service list 2', 'Your service list 3'].forEach((t, i) =>
+      txt(s, t, { x: i === 0 ? c[3] : c[4], y: 4.296 + i * 0.2855, w: 1.612, h: 0.286, fontFace: FONT.body, fontSize: 11, color: C.white, align: 'center', valign: 'top' }));
+    fillShape(s, 'roundRect', { x: c[2], y: 5.5, w: 2.034, h: 0.552, rectRadius: 0.223, fill: { color: C.gold } });
+    midText(s, 'Choose', { x: c[2], y: 5.5, w: 2.034, h: 0.552, fontFace: FONT.body, bold: true, fontSize: 16, color: C.black });
+  });
+  txt(s, 'Our Pricing Projects', Object.assign(head(40), { x: 3.062, y: 0.99, w: 7.208, h: 0.774, align: 'center' }));
+  [12.364, 0.369].forEach((x) => doubleStar(s, x, 6.535, 0.6, { color: C.gold, width: 2 }));
+  arcBand(s, 1.619, 6.949, 10.096, 0.551, false);
+  arcBand(s, 1.619, 0, 10.096, 0.551, true);
+});
+
+/* --- 28: testimonials ---------------------------------------------------- */
+slides.push((s) => {
+  masterMark(s);
+  fillShape(s, 'rect', { x: 6.971, y: 0.714, w: 5.26, h: 6.073, fill: { color: C.navy, transparency: 20 } });
+  [[1.546, 0.782], [1.55, 2.925], [1.55, 5.069]].forEach((p) =>
+    fillShape(s, 'ellipse', { x: p[0], y: p[1], w: 1.717, h: 1.717, fill: { color: C.gold } }));
+  [[3.563, 1.013, 'JOHN DOE', 1.977], [3.567, 3.155, 'MARCUS RAMON', 4.119], [3.567, 5.3, 'LILIAN ADAM', 6.264]].forEach((t) => {
+    txt(s, t[2], Object.assign(label(), { x: t[0], y: t[1], w: 2.675, h: 0.337, align: 'left' }));
+    txt(s, T.cardDot, Object.assign(card(), { x: t[0], y: t[1] + 0.371, w: 2.675, h: 0.537, align: 'left' }));
+    rating(s, t[0] + 0.156, t[3]);
+  });
+  txt(s, 'Our Ramadan \nProject Review', Object.assign(head(32, C.white), { x: 7.184, y: 1.611, w: 4.835, h: 1.178, align: 'center' }));
+  txt(s, T.four, Object.assign(body(C.white), { x: 7.368, y: 3.17, w: 4.465, h: 1.835 }));
+  txt(s, T.short, Object.assign(lead(C.white), { x: 7.424, y: 5.263, w: 4.355, h: 0.625 }));
+});
+
+/* --- 29: contact details + big gold star -------------------------------- */
+slides.push((s) => {
+  masterMark(s);
+  txt(s, 'Contact Us', Object.assign(head(36), { x: 1.063, y: 1.389, w: 4.292, h: 0.707 }));
+  txt(s, T.sub + ' incididunt ut', Object.assign(lead(C.gray), { x: 1.063, y: 2.247, w: 4.071, h: 0.625, align: 'left' }));
+  txt(s, T.magna, Object.assign(body(), { x: 1.063, y: 2.964, w: 3.999, h: 0.573 }));
+  const contacts = [
+    [1.112, 3.888, 'OUR ADDRESS', '200 Arcadway Av Nevv Canberra WA 5024 West', 1.711, 2.061, 4.24],
+    [3.922, 3.903, 'OFFICE HOURS', 'Monday \u2013 Thursday\n08:00 \u2013 17:00', 1.771, 1.771, 4.254],
+    [1.112, 5.382, 'GET IN TOUCH', '(+62) 8123 4567 790\n(+62) 908 4567 123', 1.711, 1.785, 5.734],
+    [3.922, 5.382, 'FOLLOW US', 'www.ramadan.com\noffice@ramadan.com', 1.421, 1.771, 5.734],
+  ];
+  contacts.forEach((c) => {
+    txt(s, c[2], { x: c[0], y: c[1], w: c[4], h: 0.337, fontFace: FONT.body, bold: true, fontSize: 14, color: C.black, valign: 'top' });
+    txt(s, c[3], { x: c[0], y: c[6], w: c[5], h: 0.625, fontFace: FONT.body, fontSize: 11, color: C.gray, lineSpacingMultiple: 1.5, valign: 'top' });
+  });
+  fillShape(s, 'star8', {
+    x: 5.803, y: -0.015, w: 7.53, h: 7.53, fill: { color: C.gold },
+    shadow: { type: 'outer', blur: 5, offset: 0, angle: 0, color: C.black, opacity: 0.1 },
+  });
+  s.addShape('star8', { x: 6.096, y: 0.278, w: 6.945, h: 6.945, fill: { type: 'none' }, line: { color: C.pale, width: 2 } });
+});
+
+slides.push((s) => coverSlide(s, { title: 'THANK\nYOU', titleW: 3.543, tagline: 'Ramadan Powerpoint Presentation Template', taglineW: 4.067 }));
+
+/* ================================================================ build == */
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'WIDE_16x9', width: 13.333, height: 7.5 });
+pptx.layout = 'WIDE_16x9';
+pptx.author = 'pptxgenjs';
+pptx.title = 'Ramadan Revival';
+pptx.theme = { headFontFace: FONT.head, bodyFontFace: FONT.body };
+
+slides.forEach((build) => build(pptx.addSlide()));
+
+pptx.writeFile({ fileName: path.join(__dirname, '17bc3901-9056-4eac-ab44-173e4de81bf3_grok_final.pptx') })
+  .then((f) => console.log('wrote', f));
