@@ -1,0 +1,746 @@
+/**
+ * "New Year Celebration" deck — rebuilt with pptxgenjs.
+ *
+ * The source deck's raster photos are replaced by light placeholder
+ * rectangles that keep the original position and size; the device
+ * mock-ups (phone / laptop / tablet) are redrawn as native shapes.
+ */
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ *
+ * Theme
+ * ------------------------------------------------------------------ */
+
+const GOLD = 'B27F49'; // accent2
+const RED = 'A0061B'; // accent3
+const GREEN = '3E5647'; // accent1
+const WHITE = 'FFFFFF';
+const INK = '262626'; // tx1 lumMod 85%
+const INK_SOFT = '404040'; // tx1 lumMod 75%
+const CHARCOAL = '333333'; // tx1 @ 80% alpha over the white background
+const DEVICE = '1A1A1A'; // phone / laptop / tablet chassis
+
+const HEAD = 'Montserrat'; // major latin
+const BODY = 'Open Sans'; // minor latin
+const SCRIPT = 'Yellowtail';
+
+const SLIDE_W = 13.333;
+const SLIDE_H = 7.5;
+
+const NOFILL = { color: WHITE, transparency: 100 };
+const NOLINE = { type: 'none' };
+const PHOTO_LINE = 'DCD6CE';
+const PHOTO_TEXT = 'B5ADA2';
+
+/* ------------------------------------------------------------------ *
+ * Small building blocks
+ * ------------------------------------------------------------------ */
+
+/** Plain text box; `opts` overrides any default. */
+function text(slide, body, x, y, w, h, opts) {
+	slide.addText(body, Object.assign({
+		x: x, y: y, w: w, h: h,
+		fontFace: BODY, fontSize: 12, color: INK,
+		valign: 'top', align: 'left', isTextBox: true,
+	}, opts || {}));
+}
+
+/** Body copy: 150% leading. */
+function paragraph(slide, body, x, y, w, h, opts) {
+	text(slide, body, x, y, w, h, Object.assign({ lineSpacingMultiple: 1.5 }, opts || {}));
+}
+
+/** Two-tone Montserrat headline: bold gold phrase + regular dark phrase. */
+function headline(slide, gold, dark, x, y, w, h, opts) {
+	const o = opts || {};
+	slide.addText([
+		{ text: gold, options: { bold: true, color: GOLD } },
+		{ text: dark, options: { bold: false, color: INK } },
+	], {
+		x: x, y: y, w: w, h: h,
+		fontFace: HEAD, fontSize: o.fontSize || 40, align: o.align || 'left',
+		charSpacing: o.charSpacing, valign: 'top', isTextBox: true,
+	});
+}
+
+/** Red script kicker with the little gold triangle bullet to its left. */
+function eyebrow(slide, x, y, w) {
+	slide.addShape('triangle', {
+		x: x - 0.249, y: y + 0.156, w: 0.146, h: 0.126,
+		fill: { color: GOLD }, line: NOLINE, rotate: 90,
+	});
+	text(slide, 'New Year Celebration ', x, y, w, 0.438,
+		{ fontFace: SCRIPT, fontSize: 20, color: RED });
+}
+
+/** Gold "LEARN MORE" button (x/y = top-left of the gold rectangle). */
+function learnMore(slide, x, y) {
+	box(slide, x, y, 1.931, 0.537, GOLD);
+	text(slide, 'LEARN MORE', x - 0.187, y + 0.1, 2.304, 0.337,
+		{ fontSize: 14, color: WHITE, align: 'center' });
+}
+
+function box(slide, x, y, w, h, color, opts) {
+	slide.addShape('rect', Object.assign({
+		x: x, y: y, w: w, h: h, fill: { color: color }, line: NOLINE,
+	}, opts || {}));
+}
+
+function circle(slide, x, y, d, color, opts) {
+	slide.addShape('ellipse', Object.assign({
+		x: x, y: y, w: d, h: d, fill: { color: color }, line: NOLINE,
+	}, opts || {}));
+}
+
+/**
+ * Stand-in for a picture frame. Most frames in the source deck are empty
+ * placeholders, so they are outlined rather than filled; `label` is passed
+ * only for the frames that really do carry artwork.
+ */
+function photo(slide, x, y, w, h, label) {
+	slide.addShape('rect', {
+		x: x, y: y, w: w, h: h,
+		fill: NOFILL, line: { color: PHOTO_LINE, width: 0.75 },
+	});
+	if (label) {
+		text(slide, label, Math.max(x, 0), y + h / 2 - 0.2, Math.min(w, SLIDE_W - x), 0.4,
+			{ fontSize: 11, color: PHOTO_TEXT, align: 'center' });
+	}
+}
+
+/* ------------------------------------------------------------------ *
+ * Device mock-ups (drawn, not embedded)
+ * ------------------------------------------------------------------ */
+
+/**
+ * Phone held upright — slide 5. The screen stays transparent (as in the
+ * source photo), so the chassis is a thick-stroked frame rather than a
+ * filled block.
+ */
+function phoneMockup(slide, x, y, w, h) {
+	const bezel = 0.11;
+	slide.addShape('roundRect', {
+		x: x + bezel / 2, y: y + bezel / 2, w: w - bezel, h: h - bezel, rectRadius: 0.36,
+		fill: NOFILL, line: { color: DEVICE, width: bezel * 72 },
+	});
+	slide.addShape('roundRect', {
+		x: x + w / 2 - 0.52, y: y + bezel, w: 1.04, h: 0.19, rectRadius: 0.09,
+		fill: { color: DEVICE }, line: NOLINE,
+	});
+}
+
+/**
+ * Laptop seen head-on. `y` is the outer edge of the lid and `dir` is +1 for
+ * an upright laptop or -1 for the upside-down one at the top of slide 9;
+ * every part is placed as an offset from that edge.
+ */
+function laptopMockup(slide, x, y, w, dir) {
+	// [offset from lid edge, thickness, colour, horizontal overhang, corner radius]
+	const PARTS = [
+		[3.55, 1.45, '242424', -0.02, 0], // keyboard deck
+		[3.22, 0.26, '2B2B2B', 0.25, 0.1], // hinge bar
+		[0.00, 3.20, DEVICE, 0, 0], // lid
+		[0.07, 3.00, WHITE, -0.07, 0], // screen
+	];
+	PARTS.forEach(function (part) {
+		slide.addShape(part[4] ? 'roundRect' : 'rect', {
+			x: x - part[3], w: w + 2 * part[3],
+			y: dir > 0 ? y + part[0] : y - part[0] - part[1], h: part[1],
+			rectRadius: part[4], fill: { color: part[2] }, line: NOLINE,
+		});
+	});
+	slide.addShape('rect', { // camera notch on the top bezel
+		x: x + w / 2 - 0.23, w: 0.46, h: 0.09,
+		y: dir > 0 ? y + 0.05 : y - 0.14,
+		fill: { color: DEVICE }, line: NOLINE,
+	});
+}
+
+/** Tablet standing upright — slide 14. */
+function tabletMockup(slide, x, y, w, h) {
+	const bezel = 0.1;
+	slide.addShape('roundRect', {
+		x: x + bezel / 2, y: y + bezel / 2, w: w - bezel, h: h - bezel, rectRadius: 0.26,
+		fill: { color: WHITE }, line: { color: DEVICE, width: bezel * 72 },
+	});
+	slide.addShape('roundRect', {
+		x: x + w / 2 - 0.42, y: y + bezel, w: 0.84, h: 0.14, rectRadius: 0.06,
+		fill: { color: DEVICE }, line: NOLINE,
+	});
+}
+
+/* ------------------------------------------------------------------ *
+ * Line-art pictograms
+ *
+ * Each icon is a list of [shape, x, y, w, h, rotate] with coordinates
+ * expressed as fractions of the icon's bounding box.
+ * ------------------------------------------------------------------ */
+
+const ICONS = {
+	people: [['ellipse', 0.36, 0.00, 0.28, 0.28], ['blockArc', 0.20, 0.26, 0.60, 0.46],
+		['ellipse', 0.00, 0.22, 0.24, 0.24], ['blockArc', -0.06, 0.46, 0.42, 0.40],
+		['ellipse', 0.76, 0.22, 0.24, 0.24], ['blockArc', 0.64, 0.46, 0.42, 0.40]],
+	smiley: [['smileyFace', 0.00, 0.00, 1.00, 1.00]],
+	sparkle: [['star4', 0.16, 0.16, 0.68, 0.68], ['star4', 0.00, 0.02, 0.26, 0.26],
+		['star4', 0.72, 0.66, 0.28, 0.28]],
+	cheers: [['triangle', 0.02, 0.02, 0.42, 0.44, 180], ['triangle', 0.56, 0.02, 0.42, 0.44, 180],
+		['rect', 0.21, 0.44, 0.02, 0.36], ['rect', 0.76, 0.44, 0.02, 0.36],
+		['rect', 0.10, 0.80, 0.26, 0.03], ['rect', 0.64, 0.80, 0.26, 0.03]],
+	firework: [['star8', 0.10, 0.00, 0.80, 0.80], ['rect', 0.49, 0.52, 0.02, 0.36],
+		['rect', 0.30, 0.88, 0.40, 0.03]],
+	bell: [['blockArc', 0.08, 0.10, 0.84, 0.84], ['rect', 0.02, 0.72, 0.96, 0.04],
+		['ellipse', 0.42, 0.80, 0.16, 0.16], ['rect', 0.47, 0.00, 0.06, 0.12]],
+	ornament: [['ellipse', 0.04, 0.20, 0.92, 0.80], ['rect', 0.42, 0.04, 0.16, 0.16],
+		['rect', 0.36, 0.00, 0.28, 0.06]],
+	snowglobe: [['ellipse', 0.02, 0.00, 0.96, 0.84], ['rect', 0.12, 0.84, 0.76, 0.16],
+		['triangle', 0.28, 0.16, 0.44, 0.56]],
+	gear: [['gear6', 0.00, 0.00, 1.00, 1.00], ['ellipse', 0.34, 0.34, 0.32, 0.32]],
+	phone: [['blockArc', -0.10, -0.10, 1.20, 1.20, 135]],
+	mail: [['rect', 0.00, 0.14, 1.00, 0.72], ['triangle', 0.06, 0.22, 0.88, 0.46, 180]],
+	globe: [['ellipse', 0.00, 0.00, 1.00, 1.00], ['ellipse', 0.30, 0.00, 0.40, 1.00],
+		['rect', 0.02, 0.47, 0.96, 0.02]],
+	home: [['triangle', 0.00, 0.02, 1.00, 0.52], ['rect', 0.18, 0.50, 0.64, 0.48]],
+};
+
+/** Draw an icon as thin outlines (`filled: true` renders solid instead). */
+function icon(slide, name, x, y, size, color, filled) {
+	ICONS[name].forEach(function (part) {
+		slide.addShape(part[0], {
+			x: x + part[1] * size, y: y + part[2] * size,
+			w: part[3] * size, h: part[4] * size,
+			rotate: part[5] || 0,
+			fill: filled ? { color: color } : NOFILL,
+			line: filled ? NOLINE : { color: color, width: 1 },
+		});
+	});
+}
+
+/** Icon centred inside a filled circle — the deck's recurring badge. */
+function iconBadge(slide, name, x, y, d, ringColor, glyphColor, opts) {
+	circle(slide, x, y, d, ringColor, opts);
+	const s = d * 0.5;
+	icon(slide, name, x + (d - s) / 2, y + (d - s) / 2, s, glyphColor, false);
+}
+
+/* ------------------------------------------------------------------ *
+ * Slides
+ * ------------------------------------------------------------------ */
+
+/** Slides 1, 10 and 20: full-bleed dark cover with a glowing headline. */
+function cover(slide, opts) {
+	box(slide, 0, 0, SLIDE_W, SLIDE_H, CHARCOAL);
+	text(slide, opts.script, opts.scriptX, opts.scriptY, 2.944, 0.774,
+		{ fontFace: SCRIPT, fontSize: opts.scriptSize || 40, color: GOLD });
+	text(slide, opts.title, opts.titleX, opts.titleY, opts.titleW, 2.4, {
+		fontFace: HEAD, fontSize: opts.titleSize, bold: true, color: WHITE, align: 'center',
+		glow: { size: 10, color: GREEN, opacity: 0.98 },
+	});
+	text(slide, opts.tagline, opts.taglineX, opts.taglineY, opts.taglineW, 0.404,
+		{ fontFace: HEAD, fontSize: 18, color: WHITE, align: 'center' });
+}
+
+function slide01(slide) {
+	cover(slide, {
+		script: 'Celebration', scriptX: 1.82, scriptY: 2.13,
+		title: 'New Year', titleX: 1.057, titleY: 2.58, titleW: 11.22, titleSize: 138,
+		tagline: 'Inspiring Progress And Possibilities Ahead',
+		taglineX: 3.905, taglineY: 4.839, taglineW: 5.524,
+	});
+}
+
+function slide02(slide) {
+	photo(slide, 7.163, 0, 6.17, 7.5);
+	eyebrow(slide, 1.209, 1.229, 3.473);
+	headline(slide, 'Welcome To A ', 'Brand New Year', 0.814, 1.827, 6.154, 1.447);
+	paragraph(slide, 'Lorem ipsum dolor sit amet, consectetuer adipiscing. Maecenas porttitor '
+		+ 'congue massa. Fusce posuere, magna sed pulvinar', 0.85, 3.581, 5.449, 0.675);
+
+	box(slide, 0, 4.823, 6.154, 1.447, GOLD);
+	circle(slide, 0.97, 5.122, 0.851, WHITE);
+	icon(slide, 'people', 1.219, 5.37, 0.353, GOLD, false);
+	text(slide, 'Reflection And Renewal', 2.319, 5.091, 3.208, 0.337,
+		{ fontSize: 14, bold: true, color: WHITE });
+	paragraph(slide, 'Adipiscing maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar',
+		2.319, 5.4, 3.707, 0.603, { fontSize: 10.5, color: WHITE });
+}
+
+function slide03(slide) {
+	photo(slide, 0, 0, 3.316, 1.972);
+	photo(slide, 3.574, 0, 3.316, 3.596);
+	photo(slide, 3.574, 3.851, 3.316, 3.649);
+	photo(slide, 0, 5.528, 3.316, 1.972);
+
+	box(slide, 0, 2.157, 3.316, 3.186, GOLD);
+	box(slide, 0.7, 2.852, 0.652, 0.652, WHITE);
+	icon(slide, 'smiley', 0.863, 3.016, 0.326, GOLD, false);
+	text(slide, 'New Beginnings', 0.605, 3.719, 2.383, 0.337, { fontSize: 14, bold: true, color: WHITE });
+	paragraph(slide, 'Lorem ipsum dolor sit amet massa. Fusce posuere ', 0.616, 4.045, 2.221, 0.603,
+		{ fontSize: 10.5, color: WHITE });
+
+	eyebrow(slide, 8.337, 1.308, 4.099);
+	headline(slide, 'Looking Back ', 'With Gratitude', 7.952, 1.818, 5.381, 1.447);
+	paragraph(slide, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor '
+		+ 'congue massa. Fusce posuere, magna sed pulvinar ultricies, purus', 8.067, 3.46, 4.65, 0.978);
+
+	[
+		{ x: 8.207, tx: 8.098, ring: GOLD, glyph: 'sparkle', title: 'Fresh Start' },
+		{ x: 10.937, tx: 10.829, ring: RED, glyph: 'cheers', title: 'Party Vibes' },
+	].forEach(function (c) {
+		iconBadge(slide, c.glyph, c.x, 4.81, 0.61, c.ring, WHITE);
+		text(slide, c.title, c.tx, 5.584, 2.008, 0.337, { fontSize: 14, bold: true, color: c.ring });
+		paragraph(slide, 'Lorem ipsum dolor sit', c.tx + 0.006, 5.929, 2.127, 0.338, { fontSize: 10.5 });
+	});
+}
+
+function slide04(slide) {
+	photo(slide, 6.073, 3.856, 2.998, 2.985);
+	photo(slide, 9.258, 0.664, 2.998, 2.985);
+
+	[
+		{ x: 6.073, y: 0.664, color: GOLD, big: '+437K', label: 'Celebration Time' },
+		{ x: 9.258, y: 3.856, color: RED, big: '+586K', label: 'Positive Energy' },
+	].forEach(function (c) {
+		box(slide, c.x, c.y, 2.998, 2.985, c.color);
+		text(slide, c.big, c.x + 0.443, c.y + 0.593, 2.474, 0.707, { fontSize: 36, color: WHITE });
+		text(slide, c.label, c.x + 0.443, c.y + 1.286, 2.392, 0.337, { fontSize: 14, bold: true, color: WHITE });
+		paragraph(slide, 'Lorem ipsum dolor sit amet consectetuer adipiscing elit. ',
+			c.x + 0.461, c.y + 1.706, 2.242, 0.603, { fontSize: 10.5, color: WHITE });
+	});
+
+	eyebrow(slide, 1.112, 1.277, 3.429);
+	headline(slide, 'Turning The ', 'Page To Possibility', 0.698, 1.782, 4.908, 2.121);
+	paragraph(slide, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor '
+		+ 'congue massa. Fusce posuere, magna sed pulvinar', 0.75, 4.132, 4.299, 0.978);
+	learnMore(slide, 0.875, 5.491);
+}
+
+function slide05(slide) {
+	box(slide, -0.021, 0, 4.826, 7.489, GOLD);
+	phoneMockup(slide, 3.53, 1.08, 2.82, 5.82);
+
+	eyebrow(slide, 8.492, 0.979, 3.59);
+	headline(slide, 'Celebrate the Spark ', 'of the New Year', 8.11, 1.586, 4.941, 2.121);
+	paragraph(slide, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor '
+		+ 'congue massa. Fusce posuere, magna pulvinar', 9.042, 4.01, 3.807, 0.978);
+	learnMore(slide, 9.153, 5.595);
+
+	[
+		{ y: 1.863, big: '+372K', label: 'Sparkling Moments' },
+		{ y: 4.074, big: '+854K', label: 'Cheers to Success' },
+	].forEach(function (c) {
+		text(slide, c.big, 0.553, c.y, 2.302, 0.64, { fontSize: 32, color: WHITE, align: 'right' });
+		text(slide, c.label, 0.558, c.y + 0.639, 2.271, 0.303,
+			{ fontSize: 12, bold: true, color: WHITE, align: 'right' });
+		paragraph(slide, 'Lorem ipsum dolor sit amet dolor consectetuer', 0.675, c.y + 0.961, 2.172, 0.603,
+			{ fontSize: 10.5, color: WHITE, align: 'right' });
+	});
+}
+
+function slide06(slide) {
+	photo(slide, 5.334, 2.739, 3.359, 2.023);
+	photo(slide, 5.334, 4.937, 3.359, 2.023);
+	photo(slide, 8.908, 0.483, 3.313, 2.023);
+	photo(slide, 8.908, 2.739, 3.313, 2.023);
+
+	eyebrow(slide, 1.165, 0.506, 4.094);
+	headline(slide, 'Reimagining Success ', 'For The New Year ', 0.806, 1.019, 7.108, 1.447);
+	paragraph(slide, 'adipiscing elit Maecenas porttitor congue massa. Fusce posuere, magna sed '
+		+ 'pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna.',
+		0.861, 3.295, 4.078, 1.28);
+
+	text(slide, '+372K', 0.861, 5.605, 1.698, 0.505, { fontFace: HEAD, fontSize: 24, color: GOLD });
+	text(slide, 'Sparkling Moments', 0.861, 6.139, 2.271, 0.303, { fontSize: 12, bold: true, color: GOLD });
+	paragraph(slide, 'Lorem ipsum dolor sit amet dolor consectetuer', 0.861, 6.409, 3.71, 0.338,
+		{ fontSize: 10.5 });
+
+	iconBadge(slide, 'firework', 8.414, 5.219, 0.534, RED, WHITE, { line: { color: WHITE, width: 2.5 } });
+	text(slide, 'New Year\u2019s Resolution', 9.27, 5.301, 3.12, 0.37, { fontSize: 16, color: RED });
+	paragraph(slide, 'Adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed',
+		9.291, 5.783, 3.244, 0.627, { fontSize: 11 });
+}
+
+function slide07(slide) {
+	photo(slide, 0, 0.791, 6.831, 3.144);
+	photo(slide, 7.848, 4.261, 4.31, 2.477);
+
+	eyebrow(slide, 8.087, 0.943, 4.737);
+	headline(slide, 'Celebrate The Spark ', 'Of The New Year ', 7.747, 1.481, 4.959, 2.121);
+
+	text(slide, 'Joy That Lights Up Every Heart', 3.013, 4.661, 3.899, 0.37,
+		{ fontSize: 16, color: RED, align: 'right' });
+	paragraph(slide, 'adipiscing elit Maecenas porttitor congue massa Fusce posuere, magna sed '
+		+ 'pulvinar ultricies purus lectus malesuada libero, sit amet commodo magna',
+		0.701, 5.154, 6.171, 0.675, { align: 'right' });
+
+	[
+		{ ring: 2.953, color: RED, glyph: 'ornament', big: '+8923K', tx: 1.485, cx: 0.461 },
+		{ ring: 6.326, color: GOLD, glyph: 'bell', big: '+6539K', tx: 4.858, cx: 3.833 },
+	].forEach(function (c) {
+		iconBadge(slide, c.glyph, c.ring, 6.081, 0.505, c.color, WHITE);
+		text(slide, c.big, c.tx, 6.009, 1.163, 0.404,
+			{ fontFace: HEAD, fontSize: 18, color: c.color, align: 'right' });
+		paragraph(slide, 'sit amet commodo magna', c.cx, 6.298, 2.206, 0.338,
+			{ fontSize: 10, align: 'right' });
+	});
+}
+
+/** Outline of the dashboard sparkline on slide 8, normalised to 0..1. */
+const SPARKLINE = [
+	[0.002, 0.142], [0.047, 0.226], [0.090, 0.409], [0.166, 0.409], [0.212, 0.529],
+	[0.252, 0.526], [0.294, 0.180], [0.374, 0.186], [0.416, 0.570], [0.459, 0.563],
+	[0.501, 0.115], [0.543, 0.112], [0.584, 0.455], [0.667, 0.458], [0.709, 0.226],
+	[0.784, 0.226], [0.823, 0.146], [0.874, 0.143], [0.918, 0.118], [0.956, 0.000],
+	[1.000, 0.000], [1.000, 1.000], [0.000, 1.000],
+];
+
+/** Series behind the line chart of the dashboard card (23 monthly steps). */
+const CHART_VALUES = [12, 12, 12, 7, 7, 22, 22, 22, 5, 5, 25, 25, 10, 10, 10, 20, 20, 20, 24, 24, 25, 30, 30];
+
+function slide08(slide) {
+	// Dashboard card
+	slide.addShape('roundRect', {
+		x: 6.943, y: 0.85, w: 5.183, h: 5.8, rectRadius: 0.05,
+		fill: { color: WHITE }, line: NOLINE,
+		shadow: { type: 'outer', blur: 18, offset: 3, angle: 90, color: '9E9E9E', opacity: 0.35 },
+	});
+	circle(slide, 11.397, 1.203, 0.419, 'F2F2F2');
+	[1.312, 1.389, 1.465].forEach(function (y) { circle(slide, 11.582, y, 0.048, '808080'); });
+
+	text(slide, 'Celebration Of Life', 7.344, 1.197, 2.646, 0.42, { fontSize: 14, bold: true, color: GOLD });
+	slide.addShape('roundRect', {
+		x: 7.381, y: 1.961, w: 0.58, h: 0.58, rectRadius: 0.1,
+		fill: { color: 'F2F2F2' }, line: NOLINE,
+	});
+	icon(slide, 'gear', 7.53, 2.094, 0.283, RED, true);
+	text(slide, '$ 11,342.00', 8.24, 2.013, 1.527, 0.252, { fontSize: 12, color: RED, margin: 0 });
+	text(slide, 'Profile Visits', 8.105, 2.26, 1.842, 0.347, { fontSize: 10.5, color: 'A6A6A6' });
+	text(slide, '+15,2%', 10.145, 2.017, 1.527, 0.42,
+		{ fontSize: 20, color: GOLD, align: 'right', margin: 0 });
+
+	// The reference fills the trend with a gold-to-white gradient. pptxgenjs
+	// only emits flat fills, so the same silhouette is stacked in translucent
+	// layers of increasing depth — the overlap darkens the top of the area.
+	const areaW = 4.272;
+	const areaH = 2.159;
+	const LAYERS = 14;
+	for (let layer = 0; layer < LAYERS; layer++) {
+		const depth = areaH * (0.45 + 0.55 * layer / (LAYERS - 1));
+		slide.addShape('custGeom', {
+			x: 7.399, y: 3.158, w: areaW, h: depth,
+			points: SPARKLINE.map(function (pt) {
+				return { x: areaW * pt[0], y: Math.min(areaH * pt[1], depth) };
+			}).concat([{ close: true }]),
+			fill: { color: GOLD, transparency: 94 }, line: NOLINE,
+		});
+	}
+	slide.addChart('line', [{
+		name: 'Series 1',
+		labels: CHART_VALUES.map(function (_, i) { return String(i + 1); }),
+		values: CHART_VALUES,
+	}], {
+		x: 7.176, y: 2.496, w: 4.73, h: 2.334,
+		chartColors: [GOLD], lineSize: 2.25, lineDataSymbol: 'none', lineSmooth: false,
+		catAxisHidden: true, valAxisHidden: true, showLegend: false,
+		catGridLine: { style: 'none' }, valGridLine: { style: 'none' },
+		chartArea: { fill: { color: WHITE, transparency: 100 } },
+		plotArea: { fill: { color: WHITE, transparency: 100 } },
+	});
+
+	[
+		{ y: 5.617, label: 'Donates ', amount: '$ 742,43', delta: '-143,53', color: 'C00000', flip: true },
+		{ y: 6.076, label: 'Podcasts', amount: '$ 951,35', delta: '-132,62', color: RED, flip: false },
+	].forEach(function (r) {
+		text(slide, r.label, 7.417, r.y, 1.278, 0.231, { fontSize: 11, color: INK_SOFT, margin: 0 });
+		text(slide, r.amount, 9.717, r.y, 1.033, 0.231, { fontSize: 11, color: 'BFBFBF', margin: 0 });
+		text(slide, r.delta, 11.027, r.y, 1.278, 0.231, { fontSize: 11, color: r.color, margin: 0 });
+		slide.addShape('triangle', {
+			x: 10.779, y: r.y + 0.045, w: 0.161, h: 0.138,
+			fill: { color: r.color }, line: NOLINE, flipV: r.flip,
+		});
+	});
+
+	eyebrow(slide, 1.394, 1.533, 4.241);
+	headline(slide, 'Designing The Future ', 'With Purpose', 1.054, 2.071, 4.959, 2.121);
+	text(slide, 'Creating Change That Lasts', 1.099, 4.451, 3.38, 0.37, { fontSize: 16, color: RED });
+	paragraph(slide, 'adipiscing elit Maecenas porttitor congue massa Fusce posuere, magna sed '
+		+ 'pulvinar ultricies purus lectus malesuada libero, sit amet commodo magna',
+		1.111, 4.989, 4.639, 0.978);
+}
+
+function slide09(slide) {
+	laptopMockup(slide, 7.50, 4.01, 4.90, -1);
+	laptopMockup(slide, 0.96, 2.39, 4.93, 1);
+
+	text(slide, 'Growth Begins From Within', 0.957, 0.759, 4.655, 0.37, { fontSize: 16, color: RED });
+	paragraph(slide, 'adipiscing elit Maecenas porttitor congue massa Fusce posuere, magna sed '
+		+ 'pulvinar ultricies purus lectus malesuada libero, sit', 0.957, 1.183, 5.192, 0.675);
+
+	eyebrow(slide, 7.924, 4.498, 4.852);
+	headline(slide, 'Be the Change ', 'You Wish to See', 7.584, 5.036, 4.959, 1.447);
+}
+
+function slide10(slide) {
+	cover(slide, {
+		script: '45 Minutes', scriptX: 3.788, scriptY: 2.043, scriptSize: 48,
+		title: 'Break Slide', titleX: 0.484, titleY: 2.732, titleW: 12.365, titleSize: 120,
+		tagline: 'Recharge Your Mind Before The Next Session',
+		taglineX: 2.808, taglineY: 4.627, taglineW: 7.717,
+	});
+}
+
+function slide11(slide) {
+	photo(slide, 4.853, 4.143, 3.121, 2.541);
+	photo(slide, 7.295, 0.778, 5.087, 3.063);
+
+	eyebrow(slide, 1.1, 1.11, 4.488);
+	headline(slide, 'Living Intentionally ', 'In The New Year', 0.735, 1.697, 6.252, 1.447);
+	text(slide, 'Small Changes, Lasting Results', 0.791, 3.414, 3.868, 0.37, { fontSize: 16, color: RED });
+	paragraph(slide, 'Adipiscing elit maecenas porttitor congue massa fusce posuere, magna sed '
+		+ 'pulvinar ultricies purus lectus malesuada libero, sit', 0.804, 3.953, 3.868, 0.978);
+	learnMore(slide, 0.922, 5.439);
+
+	iconBadge(slide, 'firework', 7.707, 4.725, 0.534, RED, WHITE, { line: { color: WHITE, width: 2.5 } });
+	text(slide, '+893K', 8.801, 4.638, 3.446, 0.707, { fontFace: HEAD, fontSize: 36, color: RED });
+	text(slide, 'Fireworks Night', 8.841, 5.337, 2.606, 0.37, { fontSize: 16, color: RED });
+	paragraph(slide, 'Adipiscing elit maecenas porttitor congue', 8.841, 5.724, 3.649, 0.372);
+}
+
+function slide12(slide) {
+	photo(slide, -0.016, 0.778, 6.335, 3.159);
+	photo(slide, 6.463, 0.778, 2.892, 3.159);
+
+	box(slide, 9.5, 0.778, 2.892, 3.159, GOLD);
+	text(slide, '+327', 9.754, 1.292, 1.736, 0.707,
+		{ fontFace: HEAD, fontSize: 40, color: WHITE, charSpacing: 3 });
+	text(slide, 'Journey Of Growth', 9.786, 1.987, 2.689, 0.37, { fontSize: 16, bold: true, color: WHITE });
+	paragraph(slide, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. ', 9.786, 2.84, 2.407, 0.603,
+		{ fontSize: 10.5, color: WHITE });
+
+	eyebrow(slide, 1.583, 4.564, 4.381);
+	headline(slide, 'Hope In ', 'Every Sunrise', 1.208, 5.206, 4.667, 1.313, { charSpacing: 3 });
+	text(slide, 'A New Era Of Creativity Begins', 7.006, 4.782, 4.233, 0.37, { fontSize: 16, color: RED });
+	paragraph(slide, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor '
+		+ 'congue massa. Fusce posuere, magna pulvinar ultricie  tpurus lectus malesuada libero, '
+		+ 'sit amet commodo', 7.02, 5.301, 5.688, 0.978, { color: INK_SOFT });
+}
+
+function slide13(slide) {
+	box(slide, -0.021, 4.347, 13.354, 3.142, GOLD);
+	eyebrow(slide, 5.569, 0.504, 3.501);
+	headline(slide, 'Meet Our ', 'Best Team ', 2.0, 1.047, 9.333, 0.707,
+		{ align: 'center', charSpacing: 3 });
+	paragraph(slide, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor '
+		+ 'congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, '
+		+ 'sit amet commodo magna eros quis urna.', 1.87, 1.892, 9.189, 0.675,
+		{ align: 'center', color: INK_SOFT });
+
+	[
+		{ x: 1.999, ring: 1.584, num: '01.', name: 'Amelia Scott', nameX: 2.162, nameW: 2.378 },
+		{ x: 5.521, ring: 5.093, num: '02.', name: 'Samuel Hayes', nameX: 5.506, nameW: 2.735 },
+		{ x: 9.044, ring: 8.624, num: '03.', name: 'Grace Turner', nameX: 9.007, nameW: 2.778 },
+	].forEach(function (m) {
+		photo(slide, m.x, 3.126, 2.705, 2.736, '[portrait]');
+		circle(slide, m.ring, 2.827, 0.851, WHITE, {
+			shadow: { type: 'outer', blur: 12, offset: 2, angle: 90, color: '9E9E9E', opacity: 0.3 },
+		});
+		text(slide, m.num, m.ring - 0.08, 3.007, 1.012, 0.374,
+			{ fontFace: HEAD, fontSize: 18, bold: true, color: RED, align: 'center', charSpacing: 3 });
+		text(slide, 'Lorem sit', m.ring + 0.039, 3.242, 0.772, 0.281,
+			{ fontSize: 8, color: RED, align: 'center' });
+		text(slide, m.name, m.nameX, 6.213, m.nameW, 0.37,
+			{ fontFace: HEAD, fontSize: 16, bold: true, color: WHITE, align: 'center' });
+	});
+}
+
+function slide14(slide) {
+	tabletMockup(slide, 1.36, 0.85, 3.99, 5.75);
+
+	eyebrow(slide, 7.028, 1.08, 3.69);
+	headline(slide, 'Let This Year Be ', 'Your Turning Point ', 6.667, 1.752, 6.053, 1.447);
+	text(slide, 'The Power Of Consistency And Courage', 6.667, 3.419, 4.604, 0.37,
+		{ fontSize: 16, color: RED });
+	paragraph(slide, 'PLACEHOLDER'
+		+ 'doloremque laudantium, totam rem aperiam, eaque ipsa', 6.667, 3.988, 6.085, 0.675);
+
+	[
+		{ x: 6.789, color: GOLD, big: '+5789', label: 'Midnight Toast' },
+		{ x: 9.673, color: RED, big: '+2378', label: 'Year of Growth' },
+	].forEach(function (c) {
+		box(slide, c.x, 5.086, 2.373, 1.206, c.color);
+		text(slide, c.big, c.x + 0.122, 5.219, 2.13, 0.572,
+			{ fontSize: 28, bold: true, color: WHITE, align: 'center' });
+		text(slide, c.label, c.x + 0.122, 5.738, 2.13, 0.337,
+			{ fontSize: 14, color: WHITE, align: 'center' });
+	});
+}
+
+function slide15(slide) {
+	photo(slide, 4.106, 0.483, 5.17, 7.017);
+	box(slide, -0.021, 4.692, 13.354, 2.808, GOLD);
+
+	eyebrow(slide, 1.15, 1.393, 4.191);
+	headline(slide, 'Thankful For The ', 'Hopeful The Future', 0.746, 2.123, 4.695, 2.121);
+	paragraph(slide, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor '
+		+ 'congue massa. Fusce posuere, magna sed', 0.875, 5.394, 3.462, 0.978, { color: WHITE });
+
+	text(slide, '+893K', 9.777, 1.61, 2.251, 0.707, { fontFace: HEAD, fontSize: 36, color: RED });
+	text(slide, 'Balance Of Memory', 9.817, 2.309, 2.399, 0.37, { fontSize: 16, color: RED });
+	paragraph(slide, 'Doloremque laudantium, totam rem aperiam, eaque ipsa', 9.83, 2.704, 2.939, 0.675);
+
+	text(slide, '+435K', 10.332, 5.277, 1.797, 0.572, { fontFace: HEAD, fontSize: 28, color: WHITE });
+	text(slide, 'Countdown To Midnight', 10.373, 5.876, 1.894, 0.64, { fontSize: 16, color: WHITE });
+}
+
+function slide16(slide) {
+	photo(slide, 0.786, 0.979, 2.924, 2.638);
+	photo(slide, 3.954, 0.979, 4.607, 2.638);
+	photo(slide, 3.954, 3.883, 3.275, 2.638);
+
+	text(slide, 'Growth Begins From Within', 9.124, 1.37, 4.209, 0.37, { fontSize: 16, color: RED });
+	paragraph(slide, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor '
+		+ 'congue massa. Fusce posuere, magna sed', 9.124, 1.809, 3.462, 0.978);
+
+	iconBadge(slide, 'firework', 3.687, 4.455, 0.534, RED, WHITE, { line: { color: WHITE, width: 2.5 } });
+	text(slide, '87,9%', 1.001, 4.346, 2.251, 0.707,
+		{ fontFace: HEAD, fontSize: 36, color: RED, align: 'right' });
+	text(slide, 'Cheers To Success', 0.853, 5.046, 2.399, 0.37,
+		{ fontSize: 16, color: RED, align: 'right' });
+	paragraph(slide, 'Doloremque laudantium, rem aperiam, eaque ipsa', 0.557, 5.44, 2.696, 0.675,
+		{ align: 'right' });
+
+	eyebrow(slide, 8.221, 4.2, 3.673);
+	headline(slide, 'Be the Change ', 'You Wish To See', 7.789, 4.86, 5.424, 1.447);
+}
+
+function slide17(slide) {
+	photo(slide, 4.58, 1.26, 8.28, 5.77, '[illustration: friends celebrating]');
+
+	eyebrow(slide, 0.848, 1.473, 4.164);
+	headline(slide, 'A Season For Growth ', 'And Gratitude', 0.484, 2.082, 4.795, 2.121);
+	text(slide, 'Welcoming The New With Laughter', 0.526, 4.474, 3.971, 0.37, { fontSize: 16, color: RED });
+	paragraph(slide, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor '
+		+ 'congue massa. Fusce posuere, magna sed', 0.554, 5.049, 4.324, 0.978);
+}
+
+/** Slide 18 chevron band: an arrow bar with a notched left edge. */
+function chevronBar(slide, x, y, w, h, color) {
+	const notch = 0.446;
+	slide.addShape('custGeom', {
+		x: x, y: y, w: w, h: h,
+		points: [
+			{ x: notch, y: h }, { x: 0, y: h / 2 }, { x: notch, y: 0 }, { x: w, y: 0 },
+			{ x: w - notch + 0.005, y: h }, { close: true },
+		],
+		fill: { color: color }, line: NOLINE, flipH: true,
+	});
+}
+
+function slide18(slide) {
+	// Three long diagonal ribbons sweeping off the bottom-left corner
+	[
+		{ x: 1.402, y: 4.296, w: 2.707, h: 3.939, color: GOLD },
+		{ x: 1.885, y: 3.454, w: 3.193, h: 4.781, color: RED },
+		{ x: 2.372, y: 2.612, w: 3.677, h: 5.623, color: GOLD },
+	].forEach(function (r) {
+		slide.addShape('custGeom', {
+			x: r.x, y: r.y, w: r.w, h: r.h,
+			points: [
+				{ x: r.w, y: 0.762 }, { x: 0.876, y: r.h }, { x: 0, y: r.h },
+				{ x: r.w - 0.438, y: 0 }, { close: true },
+			],
+			fill: { color: r.color }, line: NOLINE, flipH: true,
+		});
+	});
+
+	[
+		{ x: 2.904, y: 2.612, w: 5.2, h: 0.76, color: GOLD, tx: 3.518, tw: 3.655, label: 'Countdown To Midnight' },
+		{ x: 3.39, y: 3.454, w: 4.714, h: 0.759, color: RED, tx: 4.029, tw: 3.655, label: 'Celebration Of Change' },
+		{ x: 3.877, y: 4.296, w: 4.227, h: 0.76, color: GOLD, tx: 4.592, tw: 3.512, label: 'Ringing in the New Year' },
+	].forEach(function (r) {
+		chevronBar(slide, r.x, r.y, r.w, r.h, r.color);
+		text(slide, r.label, r.tx, r.y + 0.211, r.tw, 0.337, { fontSize: 14, bold: true, color: WHITE });
+	});
+
+	[
+		{ y: 2.525, iconY: 2.64, glyph: 'ornament', color: GOLD, size: 0.55 },
+		{ y: 3.432, iconY: 3.56, glyph: 'snowglobe', color: RED, size: 0.5 },
+		{ y: 4.339, iconY: 4.488, glyph: 'people', color: GOLD, size: 0.46 },
+	].forEach(function (r) {
+		icon(slide, r.glyph, 8.606, r.iconY, r.size, r.color, false);
+		paragraph(slide, 'Eos et accusamus et iusto odio dignissimos ducimus', 9.341, r.y, 2.591, 0.673);
+	});
+
+	eyebrow(slide, 5.569, 0.56, 3.748);
+	headline(slide, 'Hope In ', 'Every Sunrise', 2.0, 1.178, 9.333, 0.707,
+		{ align: 'center', charSpacing: 3 });
+	paragraph(slide, 'PLACEHOLDER'
+		+ 'doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo', 6.009, 5.604, 6.085, 0.675);
+}
+
+function slide19(slide) {
+	photo(slide, 0.58, 0.694, 2.664, 2.938);
+	photo(slide, 3.449, 0.694, 2.664, 6.111);
+
+	box(slide, 0.58, 3.867, 2.664, 2.938, GOLD);
+	text(slide, '+329K', 0.914, 4.509, 1.815, 0.572, { fontSize: 28, color: WHITE });
+	text(slide, 'Fresh Vision', 0.939, 5.034, 2.061, 0.37, { fontSize: 16, color: WHITE });
+	paragraph(slide, 'massa. Fusce posuere, magna sed pulvinar.', 0.96, 5.49, 1.993, 0.675,
+		{ color: WHITE });
+
+	eyebrow(slide, 7.049, 1.461, 4.34);
+	headline(slide, 'Contact', ' Information', 6.617, 2.159, 6.716, 0.774);
+	paragraph(slide, 'porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus '
+		+ 'lectus malesuada libero, sit amet commodo magna eros quis urna.', 6.652, 3.036, 6.045, 0.675);
+
+	[
+		{ x: 6.81, y: 4.09, color: RED, glyph: 'phone', tx: 7.538, tw: 2.456, label: '+123-456-7890' },
+		{ x: 9.713, y: 4.09, color: GOLD, glyph: 'mail', tx: 10.603, tw: 2.73, label: 'hello@reallygreatsite.com' },
+		{ x: 6.81, y: 5.379, color: GOLD, glyph: 'globe', tx: 7.538, tw: 2.456, label: 'www.reallygreatsite.com' },
+		{ x: 9.713, y: 5.379, color: RED, glyph: 'home', tx: 10.603, tw: 2.435, label: '123 Anywhere St., Any City' },
+	].forEach(function (c) {
+		iconBadge(slide, c.glyph, c.x, c.y, 0.539, c.color, WHITE);
+		text(slide, c.label, c.tx, c.y + 0.15, c.tw, 0.286,
+			{ fontSize: 11, color: INK_SOFT, valign: 'middle' });
+	});
+}
+
+function slide20(slide) {
+	cover(slide, {
+		script: 'Finished', scriptX: 1.41, scriptY: 2.233,
+		title: 'Thank You', titleX: 1.104, titleY: 2.712, titleW: 11.124, titleSize: 132,
+		tagline: 'We Appreciate Your Time And Attention',
+		taglineX: 2.65, taglineY: 4.82, taglineW: 8.032,
+	});
+}
+
+const SLIDES = [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09,
+	slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20];
+
+/* ------------------------------------------------------------------ *
+ * Build
+ * ------------------------------------------------------------------ */
+
+function build() {
+	const pptx = new PptxGenJS();
+	pptx.defineLayout({ name: 'WIDE', width: SLIDE_W, height: SLIDE_H });
+	pptx.layout = 'WIDE';
+	pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
+	pptx.title = 'New Year Celebration';
+
+	SLIDES.forEach(function (builder) {
+		const slide = pptx.addSlide();
+		slide.slideNumber = {
+			x: 12.352, y: 6.843, w: 0.63, h: 0.308,
+			align: 'right', valign: 'middle', fontFace: BODY, fontSize: 12, color: RED,
+		};
+		builder(slide);
+	});
+
+	return pptx.writeFile({
+		fileName: path.join(__dirname, '0746cf57-ebfd-4823-9584-1679ae4e08da_grok_final.pptx'),
+	});
+}
+
+build().then(function (file) { console.log('wrote', file); });

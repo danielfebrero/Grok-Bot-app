@@ -1,0 +1,922 @@
+/**
+ * "Packdex - Express Deliver To Your Home" - 36 slide deck, rebuilt with pptxgenjs.
+ *
+ * Slide size 13.333 x 7.5 in (16:9). Theme "packdex purple":
+ * headings Raleway Black, body Poppins, magenta/orange accent pair.
+ *
+ * The original ships no photographs: every picture frame is an empty layout
+ * placeholder, so only the layout's colour blocks are reproduced (see LAYOUT).
+ * The handful of embedded icon graphics are redrawn with native shapes.
+ */
+'use strict';
+
+const path = require('path');
+const pptxgen = require('pptxgenjs');
+
+// ---------------------------------------------------------------- palette ---
+const C = {
+  dark: '212121',      // tx1
+  gray: '3F3F3F',      // tx2 - headings / labels
+  body: '474747',      // accent6 - body copy
+  mute: '919191',      // italic sub-captions
+  white: 'FFFFFF',
+  magenta: 'AA1AA0',   // accent1
+  orange: 'F6710E',    // accent2
+  plum: '71116A',      // accent3
+  rust: 'BD5507',      // accent4
+  cream: 'FDE3CF',     // accent2 @ 20% lum
+  peach: 'FBC69F',     // accent2 @ 40% lum
+  lilac: 'F7C9F3',     // accent1 @ 20% lum
+  deepPlum: '550D50',
+  brown: '7D3805'
+};
+
+const HEAD = 'Raleway Black';  // +mj-lt
+const BODY = 'Poppins';        // +mn-lt
+
+const KICKER = 'EXPRESS DELIVER TO YOUR HOME';
+const LOREM = {
+  full: 'PLACEHOLDER',
+  long: 'PLACEHOLDER',
+  mid: 'PLACEHOLDER',
+  short: 'PLACEHOLDER',
+  card: 'Aliquet nibh biba praesentasi tristique magna util sign sitd a ami nas sit amet. Risus pretium quamis vulpu tat e dignim imal silka milal necis badui nunca',
+  toc: 'Aliquaet nibh prae sent ano tristique magna sit amet. ',
+  reason: 'Lorem ipsum praes entasi tristiq ue mag na util sign si do',
+  pyramid: 'Tristique nulla aliquet enim tortor at auc itor urna nunc id. Maecenas accumsan nulla aliquet enim aliquet enim',
+  topic: 'Aliquet nibh praesent tristique magna sit amet. Risus venti la pretium quam vulputate dign tempor incididu.',
+  timeline: 'Quis variusuam Ut miaopinenim blandit volutpataec vasteus. nec dui ultrices',
+  process: 'Quis varius quam quisque id diam vel. Ut eni'
+};
+const DETAIL = 'Detail Of Pacdex Delivery Here';
+const PROGRAM = 'Detail Program Here';
+const BULLETS4 = ['Fast and Safe Delivery', 'The Best Express Delivery', '219,101+ Total Achievement', 'Trusted By Client Since 1990'];
+
+// ------------------------------------------------------------- primitives ---
+const NOLINE = { type: 'none' };
+
+/** Solid rectangle. */
+function rect(s, x, y, w, h, color, transparency) {
+  s.addShape('rect', { x, y, w, h, line: NOLINE, fill: transparency ? { color, transparency } : { color } });
+}
+
+/** Solid circle (x/y = top-left of its bounding box). */
+function dot(s, x, y, d, color, transparency) {
+  s.addShape('ellipse', { x, y, w: d, h: d, line: NOLINE, fill: transparency ? { color, transparency } : { color } });
+}
+
+/** Straight rule; `h` of 0 draws horizontally, `w` of 0 vertically. */
+function rule(s, x, y, w, h, color, width, dashType) {
+  s.addShape('line', { x, y, w, h, line: dashType ? { color, width, dashType } : { color, width } });
+}
+
+/** Text box. Defaults mirror the deck: Poppins 11pt, body grey, top aligned. */
+function tx(s, text, o) {
+  s.addText(text, Object.assign({
+    fontFace: BODY, fontSize: 11, color: C.body, valign: 'top', isTextBox: true
+  }, o));
+}
+
+/** Section eyebrow ("EXPRESS DELIVER TO YOUR HOME"). */
+function kicker(s, x, y, o) {
+  tx(s, KICKER, Object.assign({ x, y, w: 3.6, h: 0.337, fontSize: 14, bold: true, color: C.orange, wrap: false }, o));
+}
+
+/** Big Raleway headline. */
+function headline(s, text, x, y, w, o) {
+  tx(s, text, Object.assign({ x, y, w, h: 1.313, fontFace: HEAD, fontSize: 36, color: C.dark }, o));
+}
+
+/** Kicker + headline pair, the standard slide intro. */
+function intro(s, text, x, y, w, o) {
+  kicker(s, x + 0.014, y, o && o.kicker);
+  headline(s, text, x, y + 0.315, w, o && o.head);
+}
+
+/** Body paragraph at 11pt / 150% leading. */
+function para(s, text, x, y, w, h, o) {
+  tx(s, text, Object.assign({ x, y, w, h, lineSpacingMultiple: 1.5 }, o));
+}
+
+/** Vertical accent rule + paragraph, used all over the deck. */
+function quoteBlock(s, text, x, y, w, h, color) {
+  rule(s, x, y + 0.071, 0, 1.172, color || C.orange, 2.25);
+  para(s, text, x + 0.277, y + 0.142, w, h, color === C.white ? { color: C.white } : null);
+}
+
+// --------------------------------------------------------- deck furniture ---
+/** Orange "half pill" plus two cream dots in the top-right corner. */
+function cornerBlob(s) {
+  s.addShape('custGeom', {
+    x: 11.141, y: 0, w: 1.046, h: 0.312, fill: { color: C.orange }, line: NOLINE,
+    points: [
+      { x: 0, y: 0 }, { x: 1.046, y: 0 }, { x: 1.02, y: 0.048 },
+      { x: 0.523, y: 0.312, curve: { type: 'cubic', x1: 0.912, y1: 0.208, x2: 0.73, y2: 0.312 } },
+      { x: 0.026, y: 0.048, curve: { type: 'cubic', x1: 0.316, y1: 0.312, x2: 0.134, y2: 0.208 } },
+      { close: true }
+    ]
+  });
+  dot(s, 12.427, 0.229, 0.26, C.cream);
+  dot(s, 12.828, 0.229, 0.26, C.cream);
+}
+
+/** Short orange tab bleeding off the right edge. */
+function edgeBar(s, y) { rect(s, 13.283, y, 0.05, 2.0, C.orange); }
+
+/** Orange rule hanging from the top edge (rotated bar in the original). */
+function topTick(s, cx) { rect(s, cx - 1.475, 0, 3.0, 0.05, C.orange); }
+
+/** Concentric translucent orange rings used as a watermark. */
+function ring(s, x, y, d) {
+  dot(s, x, y, d, C.orange, 80);
+  dot(s, x + d * 0.2614, y + d * 0.2614, d * 0.477, C.orange, 80);
+}
+
+/** "Express Delivery Page N" footer. */
+function pageNum(s, n) {
+  tx(s, 'Express Delivery Page ' + n, {
+    x: 11.603, y: 6.973, w: 1.506, h: 0.236, fontSize: 8, color: '353535', align: 'right', wrap: false
+  });
+}
+
+/**
+ * Colour blocks inherited from the slide layout, drawn behind everything else.
+ * Each entry is [x, y, w, h, colour, transparency]; the layouts also carry empty
+ * picture placeholders, which hold no artwork in this deck and so draw nothing.
+ */
+const LAYOUT = {
+  cover:      [[0.671, 3.75, 12.613, 3.75, C.cream, 65]],
+  welcome:    [[9.688, 4.756, 3.646, 2.021, C.magenta], [4.688, 4.756, 5.0, 2.021, C.cream, 65]],
+  achieve:    [[0, 3.75, 7.688, 2.0, C.cream, 65]],
+  deliver:    [[0, 0, 6.667, 7.5, C.cream, 65], [0, 0, 5.708, 6.729, C.magenta]],
+  goals:      [[0, 0, 6.667, 7.5, C.magenta]],
+  missions:   [[6.667, 0, 6.667, 7.5, C.cream, 65], [0, 4.729, 10.688, 2.771, C.magenta]],
+  packageA:   [[5.682, 0, 6.964, 7.5, C.cream, 65]],
+  global:     [[2.625, 0, 4.042, 7.5, C.cream, 65], [0, 2.729, 5.677, 4.771, C.magenta]],
+  quality:    [[8.667, 0, 4.667, 7.5, C.cream, 65], [0, 0, 4.667, 2.771, C.magenta]],
+  packageB:   [[0, 4.729, 13.333, 2.771, C.cream, 65]],
+  kinds:      [[0, 0, 3.646, 7.5, C.cream, 65], [2.688, 1.75, 3.979, 5.75, C.magenta]],
+  onTime:     [[7.667, 0, 5.062, 7.5, C.cream, 65], [6.681, 2.762, 4.033, 4.009, C.magenta]],
+  work:       [[0.656, 0, 4.042, 7.5, C.cream, 65], [3.688, 4.771, 9.646, 2.729, C.magenta]],
+  platform:   [[7.656, 1.75, 4.042, 5.75, C.cream, 65]],
+  mainSvc:    [[1.625, 0, 5.042, 7.5, C.cream, 65]],
+  team:       [[-0.0, 0.719, 7.667, 4.01, C.cream, 65], [5.667, 0.719, 7.667, 4.01, C.magenta]],
+  manager:    [[4.688, 3.75, 3.958, 3.062, C.cream, 65]],
+  courier:    [[0, 4.75, 5.687, 2.75, C.magenta]],
+  founder:    [[0, 2.729, 3.646, 4.771, C.cream, 65]],
+  portfolio:  [[5.667, 0, 2.986, 7.5, C.cream, 65], [0, 0, 5.667, 7.5, C.magenta]],
+  intl:       [[12.668, 4.75, 0.665, 2.042, C.magenta], [0, 4.75, 4.667, 2.042, C.cream]],
+  bestSvcA:   [[6.667, 0, 4.0, 7.5, C.cream, 65]],
+  bestSvcB:   [[6.667, 0, 6.0, 7.5, C.cream, 65], [8.791, 0.75, 4.542, 3.0, C.magenta]],
+  testimony:  [[2.667, 0, 6.0, 7.5, C.cream, 65]],
+  breakTime:  [[7.729, 0, 5.604, 7.5, C.magenta], [0, 5.717, 5.667, 1.783, C.cream]],
+  quote:      [[1.646, 0, 5.021, 7.5, C.cream, 65], [0.635, 0, 5.021, 7.5, C.magenta]],
+  contact:    [[6.667, 0, 4.0, 7.5, C.cream, 65], [8.688, 2.75, 4.646, 4.75, C.magenta]],
+  thanks:     [[7.757, 0, 3.91, 6.833, C.magenta]]
+};
+
+function layoutBg(s, name) {
+  LAYOUT[name].forEach(function (b) { rect(s, b[0], b[1], b[2], b[3], b[4], b[5]); });
+}
+
+/** Rule that is stored rotated 90 degrees in the original (i.e. drawn horizontal). */
+function ruleRot(s, x, y, len, color) { rule(s, x - len / 2, y + len / 2, len, 0, color, 2.25); }
+
+// ------------------------------------------------------------ composites ---
+/**
+ * "01 / The Packdex Goal One" block: big number, title, italic caption, copy.
+ * `stack: true` puts the number on its own line above the title instead of beside it.
+ */
+function numberedItem(s, o) {
+  const dx = o.stack ? -0.013 : 0.803;
+  const dy = o.stack ? 0.804 : 0.135;
+  tx(s, o.num, { x: o.x, y: o.y, w: 0.915, h: 0.832, fontSize: 32, bold: true, color: o.numColor || C.orange, lineSpacingMultiple: 1.5 });
+  tx(s, o.title, { x: o.x + dx, y: o.y + dy, w: 3.346, h: 0.458, fontFace: HEAD, fontSize: 16, color: o.titleColor || C.gray, lineSpacingMultiple: 1.5 });
+  tx(s, o.caption || DETAIL, { x: o.x + dx + 0.004, y: o.y + dy + 0.38, w: 2.735, h: 0.352, italic: true, color: o.captionColor || C.mute, lineSpacingMultiple: 1.5 });
+  para(s, o.text, o.x + dx + 0.016, o.y + dy + 0.806, o.w || 4.809, 0.63, { color: o.color || C.body });
+}
+
+/** Big statistic: value / label / italic hint (e.g. "20,901+ Delivery Portfolio"). */
+function statBlock(s, o) {
+  tx(s, o.value, { x: o.x, y: o.y, w: 1.647, h: 0.65, fontSize: 24, bold: true, color: o.valueColor || C.orange, lineSpacingMultiple: 1.5 });
+  tx(s, o.label, { x: o.x + 0.004, y: o.y + 0.627, w: 2.098, h: 0.424, fontFace: HEAD, fontSize: 14, color: o.labelColor || C.gray, lineSpacingMultiple: 1.5 });
+  tx(s, PROGRAM, { x: o.x + 0.008, y: o.y + 0.988, w: 1.79, h: 0.33, fontSize: 10, italic: true, color: o.hintColor || C.body, transparency: o.hintColor ? 0 : 25, lineSpacingMultiple: 1.5 });
+}
+
+/** Ringed bullet dot + bold label (the deck's checklist rows). */
+function checkRow(s, x, y, text, color, o) {
+  const d = (o && o.size) || 0.198;
+  dot(s, x, y, d, color, 65);
+  dot(s, x + d * 0.231, y + d * 0.231, d * 0.535, color);
+  tx(s, text, Object.assign({
+    x: x + d * 1.545, y: y - 0.114, w: 2.95, h: 0.375, fontSize: 12, bold: true,
+    color: color === C.white ? C.white : C.gray, lineSpacingMultiple: 1.5
+  }, o && o.text));
+}
+
+/** Small ringed dot + title + sub-line (used for feature lists and contacts). */
+function featureRow(s, o) {
+  const d = o.size || 0.265;
+  dot(s, o.x, o.y, d, o.color || C.orange, 65);
+  dot(s, o.x + d * 0.231, o.y + d * 0.231, d * 0.54, o.color || C.orange);
+  tx(s, o.title, { x: o.x + o.gap, y: o.y - 0.149, w: o.tw || 3.829, h: 0.413, fontFace: o.titleFace || HEAD, fontSize: 14, color: o.titleColor || C.gray, bold: !!o.bold, lineSpacingMultiple: 1.5 });
+  tx(s, o.sub, { x: o.x + o.gap, y: o.y + 0.234, w: o.sw || 4.579, h: 0.352, color: o.subColor || C.body, lineSpacingMultiple: 1.5 });
+}
+
+/** Skill meter: track, filled bar, knob, "Type Your Skill Here" label and percent. */
+function skillBar(s, o) {
+  rect(s, o.x + 0.036, o.y, o.track, 0.073, o.trackColor, o.trackColor === C.white ? 65 : 0);
+  rect(s, o.x, o.y, o.fill, 0.073, o.barColor);
+  dot(s, o.x + o.fill - 0.078, o.y - 0.044, 0.161, o.barColor);
+  tx(s, 'Type Your Skill Here', { x: o.x - 0.005, y: o.y - 0.31, w: 2.102, h: 0.229, fontSize: 10, italic: true, color: o.labelColor, lineSpacingMultiple: 1.5, margin: 0 });
+  tx(s, o.pct, { x: o.x + o.track + 0.061, y: o.y - 0.121, w: 0.499, h: 0.24, fontSize: 10.5, color: o.labelColor, align: 'justify', lineSpacingMultiple: 1.5, margin: 0 });
+}
+
+/** Round social buttons: twitter bird, facebook "f", linkedin "in". */
+function socialRow(s, x, y, color) {
+  const c = color || C.orange;
+  dot(s, x, y, 0.226, c);
+  s.addShape('custGeom', {                      // stylised bird wing
+    x: x + 0.048, y: y + 0.07, w: 0.13, h: 0.095, fill: { color: C.white }, line: NOLINE,
+    points: [{ x: 0, y: 0.02 }, { x: 0.13, y: 0 }, { x: 0.085, y: 0.06 }, { x: 0.03, y: 0.095 }, { close: true }]
+  });
+  dot(s, x + 0.306, y, 0.226, c);
+  tx(s, 'f', { x: x + 0.306, y: y + 0.01, w: 0.226, h: 0.2, fontSize: 12, bold: true, color: C.white, align: 'center', valign: 'middle' });
+  s.addShape('roundRect', { x: x + 0.613, y: y + 0.012, w: 0.213, h: 0.213, rectRadius: 0.04, fill: { color: c }, line: NOLINE });
+  tx(s, 'in', { x: x + 0.613, y: y + 0.018, w: 0.213, h: 0.19, fontSize: 8, bold: true, color: C.white, align: 'center', valign: 'middle' });
+}
+
+// ------------------------------------------------------------------ icons ---
+/** Trophy glyph (cup + stem + base). */
+function iconTrophy(s, cx, cy, k) {
+  rect(s, cx - 0.155 * k, cy - 0.21 * k, 0.31 * k, 0.20 * k, C.white);
+  rect(s, cx - 0.185 * k, cy - 0.21 * k, 0.05 * k, 0.14 * k, C.white);
+  rect(s, cx + 0.135 * k, cy - 0.21 * k, 0.05 * k, 0.14 * k, C.white);
+  s.addShape('ellipse', { x: cx - 0.155 * k, y: cy - 0.12 * k, w: 0.31 * k, h: 0.22 * k, fill: { color: C.white }, line: NOLINE });
+  rect(s, cx - 0.03 * k, cy - 0.02 * k, 0.06 * k, 0.16 * k, C.white);
+  rect(s, cx - 0.12 * k, cy + 0.12 * k, 0.24 * k, 0.06 * k, C.white);
+}
+
+/** Speech-bubble glyph with three dots. */
+function iconMessage(s, x, y, w, h) {
+  rect(s, x, y, w, h * 0.78, C.white);
+  s.addShape('triangle', { x: x + w * 0.12, y: y + h * 0.78, w: w * 0.2, h: h * 0.22, fill: { color: C.white }, line: NOLINE, rotate: 180 });
+  for (let i = 0; i < 3; i++) dot(s, x + w * (0.24 + i * 0.2), y + h * 0.32, w * 0.11, C.magenta);
+}
+
+/** Person glyph (head + shoulders). */
+function iconPerson(s, cx, cy, k) {
+  s.addShape('ellipse', { x: cx - 0.14 * k, y: cy - 0.24 * k, w: 0.28 * k, h: 0.28 * k, fill: { color: C.white }, line: NOLINE });
+  s.addShape('ellipse', { x: cx - 0.26 * k, y: cy + 0.02 * k, w: 0.52 * k, h: 0.40 * k, fill: { color: C.white }, line: NOLINE });
+  rect(s, cx - 0.26 * k, cy + 0.22 * k, 0.52 * k, 0.12 * k, C.white);
+}
+
+/** Opening double quote mark. */
+function iconQuote(s, x, y, w, h) {
+  for (let i = 0; i < 2; i++) {
+    const ox = x + i * w * 0.55;
+    rect(s, ox, y + h * 0.36, w * 0.36, h * 0.64, C.orange);
+    s.addShape('pie', { x: ox, y: y, w: w * 0.36, h: h * 0.72, fill: { color: C.orange }, line: NOLINE, angleRange: [180, 0] });
+    rect(s, ox + w * 0.18, y + h * 0.36, w * 0.18, h * 0.16, C.orange);
+  }
+}
+
+// ------------------------------------------------------------ slide 1..36 ---
+const build = [];
+
+// 1 - cover
+build.push(function (s) {
+  layoutBg(s, 'cover');
+  cornerBlob(s);
+  edgeBar(s, 4.792);
+  tx(s, [{ text: 'Pack', options: { color: C.dark } }, { text: 'dex', options: { color: C.magenta } }],
+    { x: 6.997, y: 1.384, w: 6.266, h: 1.717, fontFace: HEAD, fontSize: 96 });
+  tx(s, KICKER, { x: 7.055, y: 3.015, w: 4.918, h: 0.438, fontSize: 20, bold: true, color: C.orange });
+  rect(s, 4.629, 4.792, 5.992, 2.708, C.magenta, 10);
+  ring(s, 6.084, 4.214, 1.163);
+  tx(s, '2023', { x: 5.249, y: 5.488, w: 0.959, h: 1.447, fontSize: 40, color: C.white });
+  rule(s, 6.646, 5.554, 0, 1.496, C.white, 1.25);
+  ['The Best Value Of Delivery Service', '2.190+ Total Business Achievements', 'Trusted By Client Since 2002']
+    .forEach(function (t, i) {
+      tx(s, t, { x: 7.017, y: 5.504 + i * 0.4925, w: 3.4, h: 0.372, fontFace: HEAD, fontSize: 12, color: C.white, lineSpacingMultiple: 1.5 });
+    });
+});
+
+// 2 - table of contents
+build.push(function (s) {
+  rect(s, 7.757, 0, 5.576, 7.5, C.magenta);
+  rect(s, 4.984, 0.771, 7.683, 5.958, C.white);
+  topTick(s, 2.121);
+  tx(s, 'Table Of Contents', { x: 0.533, y: 2.717, w: 4.175, h: 1.919, fontFace: HEAD, fontSize: 54, color: C.dark });
+  tx(s, KICKER, { x: 0.547, y: 2.339, w: 3.403, h: 0.337, fontSize: 14, bold: true, color: C.orange, wrap: false });
+  const items = ['About Us', 'Our Team', 'Services', 'Our Portfolio', 'Infographic', 'Get In Touch'];
+  items.forEach(function (label, i) {
+    const col = i % 2;                       // left / right column
+    const row = Math.floor(i / 2);
+    const x = 5.533 + col * 3.49;
+    const y = 1.524 + row * 1.7565;
+    const accent = col ? C.magenta : C.gray; // right column is magenta
+    tx(s, '0' + (i + 1), { x: x, y: y, w: 0.812, h: 0.572, fontSize: 28, color: accent });
+    tx(s, label, { x: x + 0.73, y: y + 0.019, w: 1.7, h: 0.37, fontFace: HEAD, fontSize: 16, color: accent, wrap: false });
+    para(s, LOREM.toc, x + 0.73, y + 0.328, 2.406, 0.625);
+  });
+});
+
+// 3 - welcome
+build.push(function (s) {
+  layoutBg(s, 'welcome');
+  cornerBlob(s);
+  intro(s, 'Welcome To Packdex Express Delivery.', 5.511, 0.915, 5.938);
+  quoteBlock(s, LOREM.long, 5.674, 2.967, 6.689, 0.908);
+  ['The Best Value Of Delivery Service', '2.190+ Total Business Achievements', 'Trusted By Client Since 2002']
+    .forEach(function (t, i) {
+      dot(s, 5.652, 5.152 + i * 0.556, 0.141, C.orange);
+      tx(s, t, { x: 5.915, y: 5.024 + i * 0.556, w: 3.4, h: 0.372, fontFace: HEAD, fontSize: 12, color: C.gray, lineSpacingMultiple: 1.5 });
+    });
+  dot(s, 9.972, 5.243, 1.046, C.white, 65);
+  iconMessage(s, 10.28, 5.571, 0.428, 0.39);
+  para(s, 'PLACEHOLDER', 11.157, 5.288, 2.084, 0.908, { color: C.white });
+  ring(s, 4.106, 4.174, 1.163);
+});
+
+// 4 - about / achievement
+build.push(function (s) {
+  layoutBg(s, 'achieve');
+  rect(s, 7.688, 0, 5.646, 3.75, C.magenta);
+  ring(s, 7.106, 3.169, 1.163);
+  topTick(s, 2.121);
+  intro(s, 'About Packdeck Company Achievement', 0.543, 0.978, 5.938);
+  [['20,901+', 'Delivery Portfolio', 0.582], ['100%', 'Delivery Solution', 2.834], ['2022', 'Best Achievement', 4.899]]
+    .forEach(function (d) { statBlock(s, { x: d[2], y: 4.085 + (d[2] > 4 ? -0.038 : 0), value: d[0], label: d[1], valueColor: C.plum }); });
+  para(s, 'PLACEHOLDER', 0.567, 5.935, 6.687, 0.63);
+  rule(s, 8.22, 0.967, 1.172, 0, C.white, 2.25);
+  tx(s, 'Achievement Description', { x: 8.22, y: 1.221, w: 3.866, h: 0.458, fontFace: HEAD, fontSize: 16, color: C.white, lineSpacingMultiple: 1.5 });
+  tx(s, DETAIL, { x: 8.223, y: 1.601, w: 2.735, h: 0.352, italic: true, color: C.white, lineSpacingMultiple: 1.5 });
+  para(s, 'Aliquet nibh biba praesentasi tristique magna util sign sitd a ami nas sit amet. Risus pretium quamis vulputate dignim imal silka milal necis badui nunca mat tis enim util sigi', 8.225, 2.003, 4.712, 0.908, { color: C.white });
+});
+
+// 5 - we always deliver
+build.push(function (s) {
+  layoutBg(s, 'deliver');
+  cornerBlob(s);
+  edgeBar(s, 3.755);
+  pageNum(s, 5);
+  ring(s, 4.085, 2.689, 1.163);
+  intro(s, 'We Always Deliver With Fast & Quality', 7.083, 0.899, 5.291);
+  tx(s, 'The Delivery Description', { x: 7.113, y: 2.948, w: 3.346, h: 0.458, fontFace: HEAD, fontSize: 16, color: C.gray, lineSpacingMultiple: 1.5 });
+  tx(s, DETAIL, { x: 7.117, y: 3.328, w: 2.735, h: 0.352, italic: true, color: C.mute, lineSpacingMultiple: 1.5 });
+  para(s, LOREM.full, 7.113, 3.709, 5.615, 0.908);
+  BULLETS4.forEach(function (t, i) { checkRow(s, 7.203, 4.845 + i * 0.4345, t, C.orange, { text: { x: 7.509, w: 2.95 } }); });
+});
+
+// 6 - about the goals
+build.push(function (s) {
+  layoutBg(s, 'goals');
+  intro(s, 'About The Packdex Company Goals', 0.456, 3.418, 4.973, { head: { color: C.white }, kicker: { color: C.white } });
+  ruleRot(s, 1.129, 4.919, 1.172, C.white);
+  para(s, 'PLACEHOLDER', 0.456, 5.738, 5.861, 0.908, { color: C.white });
+  numberedItem(s, { x: 7.171, y: 3.209, num: '01', title: 'The Packdex Goal One', text: LOREM.mid });
+  numberedItem(s, { x: 7.171, y: 5.16, num: '02', title: 'The Packdex Goal Two', text: LOREM.mid });
+  ring(s, 6.085, 2.211, 1.163);
+});
+
+// 7 - missions
+build.push(function (s) {
+  layoutBg(s, 'missions');
+  topTick(s, 2.121);
+  intro(s, 'About Packdex Company Missions', 0.567, 1.159, 4.973);
+  para(s, 'PLACEHOLDER', 0.567, 3.22, 4.85, 0.908);
+  rect(s, 5.708, 1.708, 2.974, 4.083, C.white);
+  statBlock(s, { x: 6.271, y: 2.163, value: '20,901+', label: 'Delivery Portfolio' });
+  statBlock(s, { x: 6.271, y: 4.019, value: '100%', label: 'Delivery Solution' });
+  ['Packdex Mission One', 'Packdex Mission Two'].forEach(function (t, i) {
+    const y = 5.169 + i * 0.973;
+    dot(s, 0.648, y, 0.198, C.white, 65);
+    dot(s, 0.693, y + 0.046, 0.106, C.white);
+    tx(s, t, { x: 0.983, y: y - 0.173, w: 2.95, h: 0.467, fontSize: 16, bold: true, color: C.white, lineSpacingMultiple: 1.5 });
+    tx(s, 'Aliquet nibh biba praesentasi tristique magna', { x: 0.983, y: y + 0.257, w: 3.913, h: 0.352, color: C.white, lineSpacingMultiple: 1.5 });
+  });
+});
+
+// 8 - express delivery for all package
+build.push(function (s) {
+  layoutBg(s, 'packageA');
+  rect(s, 0, 3.75, 9.667, 3.021, C.magenta, 10);
+  topTick(s, 2.163);
+  intro(s, 'Express Delivery For All Package', 0.552, 0.901, 4.612);
+  para(s, LOREM.mid, 0.555, 2.787, 4.89, 0.63);
+  numberedItem(s, { x: 0.576, y: 4.019, stack: true, num: '01', title: 'The Packdex Goal One', text: LOREM.short, w: 3.72, numColor: C.white, titleColor: C.white, captionColor: C.white, color: C.white });
+  numberedItem(s, { x: 5.009, y: 4.019, stack: true, num: '02', title: 'The Packdex Goal Two', text: LOREM.short, w: 3.72, numColor: C.white, titleColor: C.white, captionColor: C.white, color: C.white });
+});
+
+// 9 - being global logistic
+build.push(function (s) {
+  layoutBg(s, 'global');
+  cornerBlob(s);
+  pageNum(s, 9);
+  intro(s, 'Being Global Logistic Service Provider', 6.958, 1.071, 5.73);
+  quoteBlock(s, LOREM.full, 7.144, 3.066, 5.335, 0.908);
+  featureRow(s, { x: 7.039, y: 4.816, gap: 0.382, title: 'Stay At Home For Cargo Delivery', sub: LOREM.reason });
+  featureRow(s, { x: 7.039, y: 5.843, gap: 0.382, title: 'The Best Value Of Delivery Service', sub: LOREM.reason });
+  ring(s, 4.099, 2.118, 1.163);
+});
+
+// 10 - quality delivery
+build.push(function (s) {
+  layoutBg(s, 'quality');
+  intro(s, 'We Always Bring The Quality Delivery', 0.547, 3.34, 5.391);
+  quoteBlock(s, LOREM.long, 0.706, 5.444, 6.689, 0.908);
+  ['100% Express Delivery', 'Quality Protections'].forEach(function (t, i) {
+    const y = 0.671 + i * 1.014;
+    dot(s, 0.648, y, 0.198, C.white, 65);
+    dot(s, 0.693, y + 0.045, 0.106, C.white);
+    tx(s, t, { x: 0.983, y: y - 0.173, w: 2.95, h: 0.467, fontSize: 16, bold: true, color: C.white, lineSpacingMultiple: 1.5 });
+    tx(s, 'Aliquet nibh biba praesentasi tristique', { x: 0.983, y: y + 0.256, w: 3.351, h: 0.352, color: C.white, lineSpacingMultiple: 1.5 });
+  });
+  statBlock(s, { x: 9.021, y: 0.636, value: '100%', label: 'Delivery Solution' });
+  statBlock(s, { x: 11.086, y: 0.598, value: '2022', label: 'Best Achievement' });
+  ring(s, 8.085, 2.189, 1.163);
+});
+
+// 11 - delivery packages
+build.push(function (s) {
+  layoutBg(s, 'packageB');
+  rect(s, 5.646, 3.75, 7.062, 3.062, C.magenta);
+  cornerBlob(s);
+  topTick(s, 2.163);
+  intro(s, 'Express Delivery For All Package', 0.688, 1.198, 4.557);
+  quoteBlock(s, 'PLACEHOLDER', 6.074, 1.511, 6.055, 0.908);
+  const pkg = 'PLACEHOLDER';
+  numberedItem(s, { x: 5.971, y: 4.065, stack: true, num: '01', title: 'Delivery Package One', text: pkg, w: 3.18, numColor: C.white, titleColor: C.white, caption: 'Detail Of Pacdex Delivery', captionColor: C.white, color: C.white });
+  numberedItem(s, { x: 9.306, y: 4.065, stack: true, num: '02', title: 'Delivery Package Two', text: pkg, w: 3.18, numColor: C.white, titleColor: C.white, caption: 'Detail Of Pacdex Delivery', captionColor: C.white, color: C.white });
+});
+
+// 12 - kind of delivery service
+build.push(function (s) {
+  layoutBg(s, 'kinds');
+  cornerBlob(s);
+  pageNum(s, 12);
+  intro(s, 'The Kind Of Packdex Delivery Service', 7.197, 0.904, 5.391);
+  tx(s, 'The Delivery Service Description', { x: 7.227, y: 2.868, w: 3.914, h: 0.458, fontFace: HEAD, fontSize: 16, color: C.gray, lineSpacingMultiple: 1.5 });
+  para(s, 'PLACEHOLDER', 7.227, 3.343, 5.559, 0.63);
+  checkRow(s, 7.317, 4.177, BULLETS4[0], C.orange, { text: { x: 7.623 } });
+  checkRow(s, 7.317, 4.628, BULLETS4[1], C.orange, { text: { x: 7.623 } });
+  para(s, 'PLACEHOLDER', 7.213, 4.987, 5.559, 0.63);
+  checkRow(s, 7.303, 5.821, BULLETS4[2], C.orange, { text: { x: 7.608 } });
+  checkRow(s, 7.303, 6.272, BULLETS4[3], C.orange, { text: { x: 7.608 } });
+  ring(s, 5.201, 1.256, 1.014);
+});
+
+// 13 - on time for you
+build.push(function (s) {
+  layoutBg(s, 'onTime');
+  topTick(s, 2.163);
+  intro(s, 'Delivery Service On Time For You', 0.543, 0.883, 4.964);
+  quoteBlock(s, LOREM.full, 0.667, 2.841, 5.335, 0.908);
+  [['01', '82.140+ Delivery/Day'], ['02', '100% Trusted Details']].forEach(function (d, i) {
+    const y = 4.404 + i * 1.198;
+    dot(s, 0.482, y, 0.9, C.orange, 80);
+    dot(s, 0.614, y + 0.132, 0.636, C.white);
+    tx(s, d[0], { x: 0.614, y: y + 0.132, w: 0.636, h: 0.636, fontSize: 14, bold: true, color: C.orange, align: 'center', valign: 'middle' });
+    tx(s, d[1], { x: 1.569, y: y - 0.065, w: 2.389, h: 0.421, fontSize: 14, bold: true, color: C.gray, lineSpacingMultiple: 1.5 });
+    para(s, LOREM.reason, 1.569, y + 0.319, 2.656, 0.63);
+  });
+  tx(s, 'The Service Detail Here', { x: 7.238, y: 5.586, w: 2.919, h: 0.458, fontFace: HEAD, fontSize: 16, color: C.white, align: 'center', lineSpacingMultiple: 1.5 });
+  tx(s, 'Detail Of Pacdex Delivery', { x: 7.33, y: 5.965, w: 2.735, h: 0.352, italic: true, color: C.white, align: 'center', lineSpacingMultiple: 1.5 });
+  ring(s, 10.205, 2.255, 1.014);
+});
+
+// 14 - how the work
+build.push(function (s) {
+  layoutBg(s, 'work');
+  cornerBlob(s);
+  intro(s, 'How The Packdex Delivery Work?', 6.255, 1.091, 5.391);
+  quoteBlock(s, LOREM.full, 6.416, 3.043, 5.994, 0.908);
+  BULLETS4.forEach(function (t, i) { checkRow(s, 8.719, 5.139 + i * 0.4715, t, C.white, { text: { x: 9.102 } }); });
+});
+
+// 15 - knowing our platform
+build.push(function (s) {
+  layoutBg(s, 'platform');
+  rect(s, 9.688, 3.75, 2.979, 3.042, C.magenta);
+  topTick(s, 2.131);
+  intro(s, 'Knowing Our Delivery Platform Is The Best', 0.522, 0.925, 5.757);
+  rule(s, 0.667, 2.954, 0, 2.387, C.orange, 2.25);
+  para(s, LOREM.full, 0.944, 3.005, 5.335, 0.908);
+  statBlock(s, { x: 0.93, y: 4.023, value: '20,901+', label: 'Delivery Portfolio' });
+  statBlock(s, { x: 3.25, y: 4.023, value: '100%', label: 'Delivery Solution' });
+  dot(s, 10.654, 4.217, 1.046, C.white, 65);
+  iconTrophy(s, 11.177, 4.74, 1.0);
+  tx(s, 'Achievement Detail', { x: 9.912, y: 5.562, w: 2.529, h: 0.458, fontFace: HEAD, fontSize: 16, color: C.white, align: 'center', lineSpacingMultiple: 1.5 });
+  tx(s, 'Detail Of Pacdex Delivery', { x: 9.912, y: 5.942, w: 2.529, h: 0.352, italic: true, color: C.white, align: 'center', lineSpacingMultiple: 1.5 });
+  ring(s, 10.205, 1.261, 1.014);
+});
+
+// 16 - our main service
+build.push(function (s) {
+  layoutBg(s, 'mainSvc');
+  dot(s, 3.312, 3.385, 2.792, C.white);
+  rect(s, 0.667, 0.708, 4.042, 2.062, C.magenta);
+  intro(s, 'Our Main Service', 7.188, 2.267, 4.937, { head: { h: 0.707 } });
+  [['The Packdex Service One', 3.606], ['The Packdex Service Two', 5.227]].forEach(function (d) {
+    tx(s, d[0], { x: 7.661, y: d[1], w: 3.299, h: 0.458, fontFace: HEAD, fontSize: 16, color: C.gray, lineSpacingMultiple: 1.5 });
+    tx(s, DETAIL, { x: 7.665, y: d[1] + 0.38, w: 2.735, h: 0.352, italic: true, color: C.mute, lineSpacingMultiple: 1.5 });
+    para(s, 'PLACEHOLDER', 7.677, d[1] + 0.723, 4.892, 0.63);
+    dot(s, 7.243, d[1] + 0.157, 0.329, C.orange, 65);
+    dot(s, 7.319, d[1] + 0.233, 0.177, C.orange);
+  });
+  statBlock(s, { x: 2.398, y: 0.988, value: '100%', label: 'Delivery Solution', valueColor: C.white, labelColor: C.white, hintColor: C.white });
+  dot(s, 1.075, 1.217, 1.046, C.white, 65);
+  iconTrophy(s, 1.598, 1.74, 1.0);
+});
+
+// 17 - pricing
+build.push(function (s) {
+  cornerBlob(s);
+  edgeBar(s, 3.755);
+  topTick(s, 1.778);
+  pageNum(s, 17);
+  [0.303, 0.682, 1.06, 1.439].forEach(function (x, i) {
+    s.addShape('ellipse', { x, y: 7.051, w: 0.13, h: 0.144, fill: { color: i === 2 ? C.peach : C.cream }, line: NOLINE });
+  });
+  const plans = [
+    { x: 1.934, y: 2.636, badge: 'REGULAR SERVICE', badgeFill: C.magenta, price: '$159', card: C.white, ink: C.gray, priceColor: C.magenta, feat: 'Features', featSize: 16, rows: 3 },
+    { x: 5.183, y: 2.193, badge: 'SPECIAL SERVICE', badgeFill: C.orange, price: '$329', card: C.magenta, ink: C.white, priceColor: C.white, feat: 'FEATURES', featSize: 14, rows: 4 },
+    { x: 8.431, y: 2.636, badge: 'PREMIUM SERVICE', badgeFill: C.magenta, price: '$249', card: C.white, ink: C.gray, priceColor: C.magenta, feat: 'Features', featSize: 16, rows: 3 }
+  ];
+  const features = ['Anit smagna sit amet', 'Consectetur adip iscing elit', 'Duir nunc mattis enim', 'Auctor urna nunc mecen'];
+  plans.forEach(function (p) {
+    const h = p.rows === 4 ? 4.338 : 3.895;
+    rect(s, p.x, p.y, 2.968, h, p.card);
+    rule(s, p.x, p.y + 1.584, 2.968, 0, 'D9D9D9', 1.25, 'dash');
+    rect(s, p.x + 0.5, p.y - 0.205, 1.967, 0.453, p.badgeFill);
+    tx(s, p.badge, { x: p.x + 0.5, y: p.y - 0.205, w: 1.967, h: 0.453, fontSize: 10.5, bold: true, color: C.white, align: 'center', valign: 'middle' });
+    tx(s, p.price, { x: p.x + 0.383, y: p.y + 0.345, w: 2.201, h: 0.919, fontSize: 36, bold: true, color: p.priceColor, align: 'center', lineSpacingMultiple: 1.5 });
+    tx(s, '/month', { x: p.x + 0.817, y: p.y + 1.169, w: 1.333, h: 0.252, fontSize: 9, color: p.ink, align: 'center' });
+    tx(s, p.feat, { x: p.x + 0.692, y: p.y + 1.708, w: 1.583, h: 0.467, fontSize: p.featSize, bold: true, color: p.ink, align: 'center', lineSpacingMultiple: 1.5 });
+    for (let i = 0; i < p.rows; i++) {
+      tx(s, features[i], {
+        x: p.x + 0.203, y: p.y + 2.301 + i * 0.409, w: 2.664, h: 0.349, color: p.ink, margin: 0,
+        lineSpacingMultiple: 1.5, bullet: { type: 'number', numberType: 'arabicPeriod', numberStartAt: i + 1, indent: 18 }
+      });
+    }
+  });
+  tx(s, 'Pricing Services', { x: 3.58, y: 0.926, w: 6.174, h: 0.707, fontFace: HEAD, fontSize: 36, color: C.dark, align: 'center' });
+  tx(s, KICKER, { x: 4.899, y: 0.61, w: 3.536, h: 0.337, fontSize: 14, bold: true, color: C.orange, align: 'center' });
+});
+
+// 18 - meet our team
+build.push(function (s) {
+  layoutBg(s, 'team');
+  intro(s, 'Meet Our Team', 0.698, 1.207, 4.271, { head: { h: 0.707 } });
+  quoteBlock(s, 'PLACEHOLDER', 6.282, 1.146, 6.055, 0.908, C.white);
+  [['Samanta F. Dune', 'Project Manager'], ['Ronald G. Dune', 'CEO & Founder'],
+   ['Poska P. Dune', 'General Manager'], ['Tune K. Dune', 'Our Senior Courier']].forEach(function (p, i) {
+    const x = 0.814 + i * 3.0823;
+    tx(s, p[0], { x, y: 5.876, w: 2.458, h: 0.404, fontSize: 18, bold: true, color: C.gray, align: 'center' });
+    tx(s, p[1], { x: x + 0.321, y: 6.265, w: 1.816, h: 0.286, fontSize: 11, italic: true, charSpacing: 0.3, color: C.body, align: 'center' });
+    socialRow(s, x + 0.816, 6.634);
+  });
+});
+
+// 19 - general manager
+build.push(function (s) {
+  layoutBg(s, 'manager');
+  rect(s, 8.646, 3.75, 4.688, 3.062, C.magenta);
+  cornerBlob(s);
+  intro(s, 'Let\u2019s Know About Our General Manager', 5.093, 1.071, 5.757);
+  tx(s, 'Poska P. Dune', { x: 5.107, y: 4.251, w: 2.311, h: 0.438, fontFace: HEAD, fontSize: 20, color: C.gray });
+  tx(s, 'General Manager', { x: 5.107, y: 4.681, w: 1.922, h: 0.286, fontSize: 10.5, italic: true, charSpacing: 0.3, color: C.mute });
+  para(s, 'PLACEHOLDER', 5.087, 4.928, 3.303, 0.908);
+  socialRow(s, 5.207, 6.091);
+  [['90%', 2.8], ['75%', 2.0], ['85%', 2.5]].forEach(function (d, i) {
+    skillBar(s, { x: 9.142, y: 4.57 + i * 0.7435, track: 3.2, fill: d[1], pct: d[0], trackColor: C.white, barColor: C.white, labelColor: C.white });
+  });
+});
+
+// 20 - senior courier
+build.push(function (s) {
+  layoutBg(s, 'courier');
+  topTick(s, 2.163);
+  intro(s, 'About Packdex Senior Courier Here', 0.551, 0.821, 5.407);
+  quoteBlock(s, 'PLACEHOLDER', 0.671, 2.935, 6.844, 0.908);
+  [['90%', 3.3], ['75%', 2.6], ['85%', 3.0]].forEach(function (d, i) {
+    skillBar(s, { x: 0.696, y: 5.273 + i * 0.7435, track: 3.8, fill: d[1], pct: d[0], trackColor: C.white, barColor: C.white, labelColor: C.white });
+  });
+  rect(s, 5.687, 4.75, 3.0, 2.75, C.cream, 65);
+  dot(s, 6.704, 5.096, 0.967, C.orange);
+  iconPerson(s, 7.188, 5.58, 0.9);
+  tx(s, 'Ronald G. Dune', { x: 5.923, y: 6.247, w: 2.529, h: 0.404, fontSize: 18, bold: true, color: C.gray, align: 'center' });
+  tx(s, 'CEO And Founder', { x: 6.212, y: 6.565, w: 1.951, h: 0.352, fontSize: 11, italic: true, color: C.gray, align: 'center', lineSpacingMultiple: 1.5 });
+});
+
+// 21 - CEO and founder
+build.push(function (s) {
+  layoutBg(s, 'founder');
+  rect(s, 3.705, 3.75, 2.962, 3.025, C.magenta, 10);
+  cornerBlob(s);
+  intro(s, 'Let\u2019s See Packdex CEO And Founder', 7.458, 1.002, 5.0);
+  quoteBlock(s, 'PLACEHOLDER', 7.608, 2.904, 4.719, 0.908);
+  [['90%', 4.0, C.plum], ['75%', 3.3, C.magenta], ['85%', 3.7, C.plum]].forEach(function (d, i) {
+    skillBar(s, { x: 7.592, y: 4.912 + i * 0.7435, track: 4.4, fill: d[1], pct: d[0], trackColor: C.lilac, barColor: d[2], labelColor: C.body });
+  });
+  dot(s, 4.588, 4.091, 1.195, C.white, 65);
+  iconPerson(s, 5.186, 4.689, 1.1);
+  tx(s, 'Ronald G. Dune', { x: 3.921, y: 5.582, w: 2.529, h: 0.404, fontSize: 18, bold: true, color: C.white, align: 'center' });
+  tx(s, 'CEO And Founder', { x: 4.21, y: 5.92, w: 1.951, h: 0.352, fontSize: 11, italic: true, color: C.white, align: 'center', lineSpacingMultiple: 1.5 });
+});
+
+// 22 - delivery portfolio
+build.push(function (s) {
+  layoutBg(s, 'portfolio');
+  intro(s, 'About Packdex Delivery Portfolio', 0.562, 1.042, 4.922, { head: { color: C.white }, kicker: { color: C.white } });
+  ruleRot(s, 1.253, 2.985, 1.172, C.white);
+  para(s, 'PLACEHOLDER', 0.576, 3.901, 4.81, 0.908, { color: C.white });
+  statBlock(s, { x: 0.631, y: 5.163, value: '100%', label: 'Delivery Solution', valueColor: C.white, labelColor: C.white, hintColor: C.white });
+  statBlock(s, { x: 2.696, y: 5.125, value: '2022', label: 'Best Achievement', valueColor: C.white, labelColor: C.white, hintColor: C.white });
+  quoteBlock(s, 'PLACEHOLDER', 6.691, 5.337, 5.698, 0.908);
+});
+
+// 23 - international portfolio
+build.push(function (s) {
+  layoutBg(s, 'intl');
+  cornerBlob(s);
+  intro(s, 'The International Delivery Portfolio', 5.552, 0.877, 5.0);
+  [['01. The Portfolio One', 5.566], ['02. The Portfolio Two', 9.322]].forEach(function (d) {
+    tx(s, d[0], { x: d[1], y: 2.868, w: 3.346, h: 0.467, fontSize: 16, bold: true, color: C.gray, lineSpacingMultiple: 1.5 });
+    tx(s, DETAIL, { x: d[1] + 0.003, y: 3.248, w: 2.735, h: 0.352, italic: true, color: C.mute, lineSpacingMultiple: 1.5 });
+    para(s, 'PLACEHOLDER', d[1] + 0.016, 3.675, 3.099, 0.63);
+  });
+  dot(s, 0.372, 5.248, 1.046, C.orange);
+  iconTrophy(s, 0.895, 5.771, 1.0);
+  tx(s, '82.140+ Delivery/Day', { x: 1.605, y: 5.28, w: 2.389, h: 0.421, fontSize: 14, bold: true, color: C.gray, lineSpacingMultiple: 1.5 });
+  para(s, LOREM.reason, 1.605, 5.664, 2.656, 0.63);
+});
+
+// 24 - best services
+build.push(function (s) {
+  layoutBg(s, 'bestSvcA');
+  rect(s, 7.667, 3.75, 5.0, 3.083, C.magenta, 10);
+  topTick(s, 2.163);
+  intro(s, 'We Always Bring The Best Services', 0.543, 0.925, 4.964);
+  quoteBlock(s, LOREM.full, 0.667, 2.883, 5.335, 0.908);
+  [['01', 'The Reason One Here'], ['02', 'The Reason Two Here']].forEach(function (d, i) {
+    const y = 4.446 + i * 1.198;
+    dot(s, 0.482, y, 0.9, C.orange, 80);
+    dot(s, 0.614, y + 0.132, 0.636, C.white);
+    tx(s, d[0], { x: 0.614, y: y + 0.132, w: 0.636, h: 0.636, fontSize: 14, bold: true, color: C.orange, align: 'center', valign: 'middle' });
+    tx(s, d[1], { x: 1.569, y: y - 0.065, w: 2.389, h: 0.421, fontSize: 14, bold: true, color: C.gray, lineSpacingMultiple: 1.5 });
+    para(s, LOREM.reason, 1.569, y + 0.318, 2.656, 0.63);
+  });
+  ruleRot(s, 8.714, 3.731, 1.172, C.white);
+  tx(s, 'Achievement Description', { x: 8.031, y: 4.571, w: 3.866, h: 0.458, fontFace: HEAD, fontSize: 16, color: C.white, lineSpacingMultiple: 1.5 });
+  tx(s, DETAIL, { x: 8.034, y: 4.951, w: 2.735, h: 0.352, italic: true, color: C.white, lineSpacingMultiple: 1.5 });
+  para(s, LOREM.card, 8.036, 5.353, 4.393, 0.908, { color: C.white });
+});
+
+// 25 - best services (wide photo)
+build.push(function (s) {
+  layoutBg(s, 'bestSvcB');
+  BULLETS4.forEach(function (t, i) { checkRow(s, 9.458, 1.237 + i * 0.5985, t, C.white, { text: { x: 9.841 } }); });
+  intro(s, 'We Always Bring The Best Services', 0.543, 4.718, 4.964);
+  quoteBlock(s, 'PLACEHOLDER', 6.999, 4.996, 5.182, 0.908);
+});
+
+// 26 - client testimony
+build.push(function (s) {
+  layoutBg(s, 'testimony');
+  rect(s, 5.667, 3.75, 7.021, 3.042, C.magenta);
+  cornerBlob(s);
+  intro(s, 'Our Client Testimony', 5.604, 0.987, 6.174, { head: { h: 0.707 } });
+  para(s, 'PLACEHOLDER', 5.596, 2.38, 6.758, 0.908);
+  dot(s, 6.181, 4.564, 1.372, C.white, 65);
+  iconMessage(s, 6.586, 4.994, 0.561, 0.512);
+  tx(s, 'The Detail Testimony Here', { x: 7.864, y: 4.405, w: 3.866, h: 0.458, fontFace: HEAD, fontSize: 16, color: C.white, lineSpacingMultiple: 1.5 });
+  tx(s, DETAIL, { x: 7.868, y: 4.785, w: 2.735, h: 0.352, italic: true, color: C.white, lineSpacingMultiple: 1.5 });
+  para(s, LOREM.card, 7.869, 5.187, 4.393, 0.908, { color: C.white });
+});
+
+// 27 - break
+build.push(function (s) {
+  layoutBg(s, 'breakTime');
+  topTick(s, 2.163);
+  tx(s, 'It\u2019s Time To Break', { x: 0.531, y: 1.259, w: 4.835, h: 2.524, fontFace: HEAD, fontSize: 72, color: C.dark });
+  tx(s, 'LET\u2019S TAKE A BREAK NOW', { x: 0.582, y: 3.81, w: 3.918, h: 0.512, fontSize: 18, bold: true, color: C.orange, align: 'justify', lineSpacingMultiple: 1.5 });
+  rect(s, 3.734, 4.708, 5.924, 2.083, C.white, 10);
+  tx(s, '30\u2019', { x: 4.185, y: 4.812, w: 2.341, h: 1.61, fontSize: 66, bold: true, color: C.orange, lineSpacingMultiple: 1.5 });
+  para(s, 'Aliquet nibh biba praesentasi tristique magna util sign sitda aminas sit amet. Risus pretium quamis vulputa', 6.094, 5.296, 3.406, 0.908);
+});
+
+// 28..30 - company timeline (three chapters of the same board)
+function timelineSlide(o) {
+  return function (s) {
+    rule(s, o.lineX, 3.75, o.lineW, 0, C.magenta, 1, 'lgDash');
+    if (o.blob) cornerBlob(s);
+    if (o.edge) edgeBar(s, 3.755);
+    if (o.tick) topTick(s, o.tick);
+    if (o.page) pageNum(s, o.page);
+    if (o.dots) {
+      [0.303, 0.682, 1.06, 1.439].forEach(function (x, i) {
+        s.addShape('ellipse', { x, y: 7.051, w: 0.13, h: 0.144, fill: { color: i === 2 ? C.peach : C.cream }, line: NOLINE });
+      });
+    }
+    if (o.edgeLabel) tx(s, o.edgeLabel[0], { x: o.edgeLabel[1], y: 3.537, w: 2.368, h: 0.505, fontFace: HEAD, fontSize: 24, color: C.dark });
+    if (o.mid) {
+      dot(s, 6.469, 3.553, 0.395, C.orange);
+      tx(s, 'Summer Break', { x: 5.052, y: 3.989, w: 3.229, h: 0.438, fontFace: HEAD, fontSize: 20, color: C.gray, align: 'center' });
+      tx(s, 'June to September', { x: 5.518, y: 4.324, w: 2.297, h: 0.375, fontSize: 12, bold: true, color: C.body, align: 'center', lineSpacingMultiple: 1.5 });
+    }
+    o.projects.forEach(function (p) {
+      tx(s, p[0], { x: p[1] + 0.836, y: 4.739, w: 2.297, h: 0.467, fontFace: HEAD, fontSize: 16, color: C.gray, align: 'center', lineSpacingMultiple: 1.5 });
+      tx(s, LOREM.timeline, { x: p[1], y: 5.209, w: 3.968, h: 0.625, color: C.body, align: 'center', lineSpacingMultiple: 1.5, paraSpaceBefore: 18, paraSpaceAfter: 18 });
+    });
+    tx(s, 'Company Timeline', { x: 3.58, y: 1.134, w: 6.174, h: 0.707, fontFace: HEAD, fontSize: 36, color: C.dark, align: 'center' });
+    tx(s, KICKER, { x: 4.899, y: 0.819, w: 3.536, h: 0.337, fontSize: 14, bold: true, color: C.orange, align: 'center' });
+  };
+}
+build.push(timelineSlide({ lineX: 4.458, lineW: 8.875, tick: 1.778, dots: true,
+  edgeLabel: ['Project Start', 0.945], projects: [['01. Project One', 2.474], ['02. Project Two', 7.579]] }));
+build.push(timelineSlide({ lineX: 0, lineW: 13.333, mid: true,
+  projects: [['03. Project Three', 1.235], ['04. Project Four', 8.131]] }));
+build.push(timelineSlide({ lineX: 0, lineW: 8.875, blob: true, edge: true, page: 30,
+  edgeLabel: ['Project End', 10.075], projects: [['05. Project Five', 1.734], ['06. Project Six', 6.838]] }));
+
+// 31 - pyramid infographic
+build.push(function (s) {
+  cornerBlob(s);
+  edgeBar(s, 3.755);
+  topTick(s, 1.778);
+  // drop shadows behind the two lower tiers
+  s.addShape('custGeom', { x: 3.665, y: 3.483, w: 1.425, h: 3.386, rotate: -74.6, fill: { color: C.brown }, line: NOLINE,
+    points: [{ x: 0, y: 3.386 }, { x: 0.535, y: 0 }, { x: 1.425, y: 0.182 }, { x: 0.967, y: 2.548 }, { close: true }] });
+  s.addShape('custGeom', { x: 3.639, y: 2.926, w: 1.37, h: 2.092, rotate: -74.6, fill: { color: C.deepPlum }, line: NOLINE,
+    points: [{ x: 0, y: 2.092 }, { x: 0.892, y: 0 }, { x: 1.37, y: 0.082 }, { x: 0.99, y: 1.243 }, { close: true }] });
+  // tiers: top triangle then two trapezoids
+  s.addShape('custGeom', { x: 3.368, y: 2.316, w: 1.115, h: 1.175, fill: { color: C.magenta }, line: NOLINE,
+    points: [{ x: 0.558, y: 0 }, { x: 1.115, y: 1.175 }, { x: 0, y: 1.175 }, { close: true }] });
+  s.addShape('custGeom', { x: 2.699, y: 3.728, w: 2.454, h: 1.175, fill: { color: C.orange }, line: NOLINE,
+    points: [{ x: 0.557, y: 0 }, { x: 1.897, y: 0 }, { x: 2.454, y: 1.175 }, { x: 0, y: 1.175 }, { close: true }] });
+  s.addShape('custGeom', { x: 2.029, y: 5.139, w: 3.794, h: 1.175, fill: { color: C.plum }, line: NOLINE,
+    points: [{ x: 0.558, y: 0 }, { x: 3.236, y: 0 }, { x: 3.794, y: 1.175 }, { x: 0, y: 1.175 }, { close: true }] });
+  // tier glyphs: gear, head, target
+  const gx = 3.692 + 0.233;
+  dot(s, gx - 0.16, 2.848 + 0.073, 0.32, C.white);
+  dot(s, gx - 0.075, 2.848 + 0.158, 0.15, C.magenta);
+  s.addShape('custGeom', { x: 3.692, y: 4.074, w: 0.467, h: 0.467, fill: { color: C.white }, line: NOLINE,
+    points: [{ x: 0.09, y: 0.467 }, { x: 0.09, y: 0.25 }, { x: 0.16, y: 0.09 }, { x: 0.31, y: 0.03 },
+             { x: 0.44, y: 0.13 }, { x: 0.44, y: 0.30 }, { x: 0.30, y: 0.30 }, { x: 0.30, y: 0.467 }, { close: true }] });
+  dot(s, gx - 0.185, 5.538 + 0.048, 0.37, C.white);
+  dot(s, gx - 0.13, 5.538 + 0.103, 0.26, C.plum);
+  dot(s, gx - 0.075, 5.538 + 0.158, 0.15, C.white);
+  [['01', C.magenta, 'Creative Services', 2.496], ['02', C.orange, 'Reimagine Fashion', 3.877], ['03', C.plum, 'The Best Target', 5.258]]
+    .forEach(function (d) {
+      tx(s, d[0], { x: 6.291, y: d[3], w: 0.95, h: 0.774, fontSize: 40, bold: true, color: d[1] });
+      tx(s, d[2], { x: 7.24, y: d[3] + 0.016, w: 3.484, h: 0.46, fontSize: 16, bold: true, color: C.gray, lineSpacingMultiple: 1.5 });
+      para(s, LOREM.pyramid, 7.24, d[3] + 0.428, 4.659, 0.627);
+    });
+  tx(s, 'Pyramid Infographic', { x: 3.58, y: 1.134, w: 6.174, h: 0.707, fontFace: HEAD, fontSize: 36, color: C.dark, align: 'center' });
+  tx(s, KICKER, { x: 4.899, y: 0.819, w: 3.536, h: 0.337, fontSize: 14, bold: true, color: C.orange, align: 'center' });
+});
+
+// 32 - process infographic
+build.push(function (s) {
+  cornerBlob(s);
+  edgeBar(s, 3.755);
+  topTick(s, 1.778);
+  const steps = [
+    { x: 1.578, color: C.magenta, glyph: 'bulb' },
+    { x: 3.812, color: C.orange, glyph: 'hands' },
+    { x: 6.045, color: C.plum, glyph: 'chart' },
+    { x: 8.279, color: C.rust, glyph: 'pie' },
+    { x: 10.511, color: C.deepPlum, glyph: 'people' }
+  ];
+  steps.forEach(function (st, i) {
+    dot(s, st.x, 3.38, 1.556, st.color);
+    const cx = st.x + 0.778, cy = 4.158;
+    if (st.glyph === 'bulb') {
+      dot(s, cx - 0.16, cy - 0.28, 0.32, C.white);
+      rect(s, cx - 0.07, cy - 0.02, 0.14, 0.22, C.white);
+      rect(s, cx - 0.09, cy + 0.21, 0.18, 0.05, C.white);
+    } else if (st.glyph === 'hands') {
+      s.addShape('parallelogram', { x: cx - 0.32, y: cy - 0.14, w: 0.42, h: 0.28, fill: { color: C.white }, line: NOLINE });
+      s.addShape('parallelogram', { x: cx - 0.09, y: cy - 0.14, w: 0.42, h: 0.28, fill: { color: C.white }, line: NOLINE, flipH: true });
+    } else if (st.glyph === 'chart') {
+      [0.09, 0.18, 0.27, 0.36].forEach(function (h, k) { rect(s, cx - 0.28 + k * 0.14, cy + 0.22 - h, 0.09, h, C.white); });
+      rect(s, cx - 0.32, cy + 0.22, 0.64, 0.04, C.white);
+    } else if (st.glyph === 'pie') {
+      s.addShape('pie', { x: cx - 0.28, y: cy - 0.28, w: 0.56, h: 0.56, fill: { color: C.white }, line: NOLINE, angleRange: [0, 270] });
+    } else {
+      dot(s, cx - 0.31, cy - 0.2, 0.19, C.white); dot(s, cx - 0.1, cy - 0.26, 0.22, C.white); dot(s, cx + 0.13, cy - 0.2, 0.19, C.white);
+      s.addShape('ellipse', { x: cx - 0.36, y: cy - 0.02, w: 0.72, h: 0.32, fill: { color: C.white }, line: NOLINE });
+    }
+    if (i < 4) {
+      s.addShape('rightArrow', { x: 3.242 + i * 2.2335, y: 4.014, w: 0.46, h: 0.288, line: NOLINE,
+        fill: { color: [C.lilac, C.cream, 'F5BDF1', 'FDDBC2'][i] } });
+    }
+    rule(s, st.x + 0.778, 4.938, 0, 0.552, C.dark, 1, 'dash');
+    tx(s, 'Topic Here', { x: st.x - 0.109, y: 5.489, w: 1.773, h: 0.467, fontFace: HEAD, fontSize: 16, color: C.gray, align: 'center', lineSpacingMultiple: 1.5, paraSpaceBefore: 18, paraSpaceAfter: 18 });
+    tx(s, LOREM.process, { x: st.x - 0.34, y: 5.84, w: 2.235, h: 0.63, color: C.body, align: 'center', lineSpacingMultiple: 1.5, paraSpaceBefore: 18, paraSpaceAfter: 18 });
+  });
+  tx(s, 'Pharetra massa massa ultricies mi quis. Velit aliquet sagittis id consectetur purus ut. Leo vel orci porta non pulvinar. Gravida arcu ac tortor dignissim convallis aenean. Scelerisque purus semper eget duis at. Eu feugiat pretium nibh ipsum consequat nisl vel pretium lectus. ',
+    { x: 1.159, y: 2.305, w: 11.015, h: 0.625, color: C.body, align: 'center', lineSpacingMultiple: 1.5, paraSpaceBefore: 18, paraSpaceAfter: 18 });
+  tx(s, 'Process Infographic', { x: 3.58, y: 1.134, w: 6.174, h: 0.707, fontFace: HEAD, fontSize: 36, color: C.dark, align: 'center' });
+  tx(s, KICKER, { x: 4.899, y: 0.819, w: 3.536, h: 0.337, fontSize: 14, bold: true, color: C.orange, align: 'center' });
+});
+
+// 33 - business infographic (four teardrop quadrants)
+build.push(function (s) {
+  cornerBlob(s);
+  edgeBar(s, 3.755);
+  topTick(s, 1.778);
+  // rotate a teardrop so its square corner points at the middle of the board
+  const quads = [
+    { x: 4.77, y: 2.644, color: C.orange, rotate: 90, glyph: 'venn' },
+    { x: 6.855, y: 2.644, color: C.magenta, rotate: 180, glyph: 'hourglass' },
+    { x: 4.77, y: 4.606, color: C.rust, rotate: 0, glyph: 'bars' },
+    { x: 6.855, y: 4.606, color: C.plum, rotate: 270, glyph: 'timer' }
+  ];
+  quads.forEach(function (q) {
+    s.addShape('teardrop', { x: q.x, y: q.y, w: 1.713, h: 1.713, fill: { color: q.color }, line: NOLINE, rotate: q.rotate });
+    dot(s, q.x + 0.132, q.y + 0.132, 1.448, C.white, 75);
+    const cx = q.x + 0.856, cy = q.y + 0.856;
+    if (q.glyph === 'venn') {
+      dot(s, cx - 0.16, cy - 0.28, 0.31, C.white); dot(s, cx - 0.31, cy - 0.05, 0.31, C.white); dot(s, cx, cy - 0.05, 0.31, C.white);
+    } else if (q.glyph === 'hourglass') {
+      s.addShape('triangle', { x: cx - 0.2, y: cy - 0.26, w: 0.4, h: 0.25, fill: { color: C.white }, line: NOLINE, rotate: 180 });
+      s.addShape('triangle', { x: cx - 0.2, y: cy + 0.01, w: 0.4, h: 0.25, fill: { color: C.white }, line: NOLINE });
+      rect(s, cx - 0.24, cy - 0.3, 0.48, 0.05, C.white); rect(s, cx - 0.24, cy + 0.25, 0.48, 0.05, C.white);
+    } else if (q.glyph === 'bars') {
+      [0.14, 0.26, 0.38].forEach(function (h, k) { rect(s, cx - 0.24 + k * 0.16, cy + 0.2 - h, 0.11, h, C.white); });
+      rect(s, cx - 0.28, cy + 0.2, 0.56, 0.04, C.white);
+    } else {
+      s.addShape('ellipse', { x: cx - 0.26, y: cy - 0.22, w: 0.52, h: 0.52, fill: { color: q.color }, line: { color: C.white, width: 2.5 } });
+      rect(s, cx - 0.08, cy - 0.34, 0.16, 0.07, C.white);
+      rect(s, cx - 0.02, cy - 0.1, 0.03, 0.16, C.white);
+    }
+  });
+  [[1.276, 2.628, 'right'], [1.276, 4.846, 'right'], [8.74, 2.619, 'left'], [8.74, 4.846, 'left']].forEach(function (d) {
+    tx(s, 'The Topic Here', { x: d[2] === 'right' ? 2.118 : d[0], y: d[1], w: 2.475, h: 0.46, fontSize: 16, bold: true, color: C.gray, align: d[2], lineSpacingMultiple: 1.5 });
+    tx(s, LOREM.topic, { x: d[0] + (d[2] === 'right' ? 0 : 0.004), y: d[1] + 0.451, w: d[2] === 'right' ? 3.317 : 3.281, h: 0.904, color: C.body, align: d[2] === 'right' ? 'right' : 'justify', lineSpacingMultiple: 1.5 });
+  });
+  tx(s, 'Business Infographic', { x: 3.58, y: 1.134, w: 6.174, h: 0.707, fontFace: HEAD, fontSize: 36, color: C.dark, align: 'center' });
+  tx(s, KICKER, { x: 4.899, y: 0.819, w: 3.536, h: 0.337, fontSize: 14, bold: true, color: C.orange, align: 'center' });
+});
+
+// 34 - quote
+build.push(function (s) {
+  layoutBg(s, 'quote');
+  cornerBlob(s);
+  edgeBar(s, 3.755);
+  pageNum(s, 34);
+  iconQuote(s, 7.369, 1.766, 0.586, 0.465);
+  tx(s, 'Individual commitment to a group effort that is what makes a team work, company work, society work, civilization work.',
+    { x: 7.254, y: 2.592, w: 5.557, h: 2.457, fontSize: 28, bold: true, color: C.dark });
+  tx(s, 'Ronald G. Dune', { x: 1.583, y: 5.077, w: 3.125, h: 0.505, fontSize: 24, color: C.white, align: 'center' });
+  tx(s, 'Business Expert', { x: 1.94, y: 5.494, w: 2.411, h: 0.421, fontSize: 14, italic: true, color: C.white, align: 'center', lineSpacingMultiple: 1.5 });
+  socialRow(s, 2.732, 6.377, C.white);
+});
+
+// 35 - get in touch
+build.push(function (s) {
+  layoutBg(s, 'contact');
+  topTick(s, 2.163);
+  kicker(s, 0.557, 1.15);
+  tx(s, 'Get In Touch', { x: 0.543, y: 1.466, w: 4.964, h: 0.909, fontFace: HEAD, fontSize: 48, color: C.dark });
+  quoteBlock(s, LOREM.full, 0.667, 2.821, 5.335, 0.908);
+  [['Phone Number', '+000 000 000 00 000', 0.944, 4.526], ['Our Address', 'Goodwin Street, N4 3HQ', 3.81, 4.526],
+   ['E-mail Address', 'info@yourmal.com', 0.944, 5.542], ['Office Hours', '08.00 AM \u2013 08.00 PM', 3.81, 5.542]]
+    .forEach(function (d) {
+      tx(s, d[0], { x: d[2], y: d[3], w: 2.296, h: 0.467, fontSize: 16, bold: true, color: C.body, lineSpacingMultiple: 1.5 });
+      tx(s, d[1], { x: d[2], y: d[3] + 0.385, w: 2.184, h: 0.375, fontSize: 12, color: C.body, lineSpacingMultiple: 1.5 });
+      dot(s, d[2] - 0.38, d[3] + 0.143, 0.342, C.orange, 75);
+      dot(s, d[2] - 0.296, d[3] + 0.227, 0.176, C.orange);
+    });
+});
+
+// 36 - thanks
+build.push(function (s) {
+  layoutBg(s, 'thanks');
+  rect(s, 5.729, 1.708, 6.938, 3.125, C.white, 10);
+  tx(s, [{ text: 'Tha', options: { color: C.dark } }, { text: 'nks', options: { color: C.orange } }],
+    { x: 6.276, y: 1.973, w: 6.266, h: 2.036, fontFace: HEAD, fontSize: 115 });
+  tx(s, 'AND SEE YOU NEXT TIME', { x: 6.334, y: 3.896, w: 3.533, h: 0.438, fontSize: 20, bold: true, color: C.orange });
+});
+
+// ------------------------------------------------------------------- main ---
+function main() {
+  const pres = new pptxgen();
+  pres.defineLayout({ name: 'PACKDEX', width: 13.333, height: 7.5 });
+  pres.layout = 'PACKDEX';
+  pres.title = 'Packdex - Express Deliver To Your Home';
+  pres.theme = { headFontFace: HEAD, bodyFontFace: BODY };
+
+  build.forEach(function (fn) {
+    const slide = pres.addSlide();
+    slide.background = { color: C.white };
+    fn(slide);
+  });
+
+  return pres.writeFile({ fileName: path.join(__dirname, '1052dfba-38b1-4e37-832c-e61ce3ef909f_grok_final.pptx') });
+}
+
+main().then(function (f) { console.log('wrote ' + f); }, function (e) { console.error(e); process.exit(1); });
