@@ -1,0 +1,1053 @@
+/**
+ * "MEDIKARE" medical presentation template - 40 slides, 20 x 11.25 in.
+ * Rebuilt with pptxgenjs only. Photographs in the source deck are flat grey
+ * placeholder plates; they are reproduced here as plain coloured rectangles.
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ── palette ────────────────────────────────────────────────────────────── */
+const BLUE = '3439FB';   // gradient start (indigo)
+const CYAN = '019EFD';   // gradient end
+const MID = '1A6BFC';   // blend of the two - stands in for the gradient
+const INK = '262626';
+const SLATE = '595959';
+const MUTE = 'BFBFBF';
+const WHITE = 'FFFFFF';
+const LILAC = 'F9F8FD';   // card tint
+const PH1 = '999999';   // dark image placeholder plate
+const PH2 = 'D6D6D6';   // light image placeholder plate
+
+/* ── typography ─────────────────────────────────────────────────────────── */
+const SORA = 'Sora';            // display / headings
+const DM = 'DM Sans';         // body copy
+const DMM = 'DM Sans Medium';  // labels, eyebrows
+const DMS = 'DM Sans SemiBold';// buttons, page numbers
+
+const SLIDE_W = 20;
+const SLIDE_H = 11.25;
+
+/* ── low level helpers ──────────────────────────────────────────────────── */
+
+const hex = (c) => [0, 2, 4].map((i) => parseInt(c.substr(i, 2), 16));
+const pad = (n) => ('0' + Math.round(n).toString(16).toUpperCase()).slice(-2);
+
+/** linear blend between two hex colours */
+function mix(a, b, t) {
+  const A = hex(a), B = hex(b);
+  return A.map((v, i) => pad(v + (B[i] - v) * t)).join('');
+}
+
+/**
+ * The deck's signature 315-degree gradient: BLUE at the bottom-left corner
+ * running to CYAN at the top-right. pptxgenjs has no gradient fill, so plain
+ * rectangles are tiled with a coarse grid of flat cells and every rounded or
+ * irregular shape simply uses the blended mid tone.
+ */
+function ramp(slide, x, y, w, h, opt) {
+  const o = opt || {};
+  const cols = o.cells || 12, rows = o.cells || 12;
+  const cw = w / cols, ch = h / rows;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const t = ((c + 0.5) / cols + (1 - (r + 0.5) / rows)) / 2;
+      // cells are opaque and pre-blended toward white so overlapping their
+      // hairline bleed never darkens the seams
+      const tone = o.fade ? mix(mix(BLUE, CYAN, t), WHITE, o.fade) : mix(BLUE, CYAN, t);
+      slide.addShape('rect', {
+        x: x + c * cw, y: y + r * ch, w: cw + 0.012, h: ch + 0.012,
+        fill: { color: tone }, line: { type: 'none' },
+      });
+    }
+  }
+}
+
+/**
+ * Soft radial glow. The source applies a 2.08" glow plus a 1.39" soft edge to
+ * a plain circle; here the falloff is stacked from concentric rings whose
+ * per-ring alpha is derived from a smoothstep coverage curve.
+ */
+function blob(slide, cx, cy, r, color) {
+  const rings = 26;
+  const rOut = r * 1.40;          // outermost extent of the glow
+  const rIn = r * 0.62;          // fully opaque core
+  let covered = 0;
+  for (let i = rings; i >= 1; i--) {
+    const u = i / rings;                        // 1 at the rim, 0 at the core
+    const t = 1 - u;
+    const want = t * t * (3 - 2 * t);           // smoothstep coverage
+    const alpha = (want - covered) / (1 - covered);
+    covered = want;
+    const rr = rIn + (rOut - rIn) * u;
+    slide.addShape('ellipse', {
+      x: cx - rr, y: cy - rr, w: rr * 2, h: rr * 2,
+      fill: { color: color, transparency: Math.round((1 - alpha) * 100) },
+      line: { type: 'none' },
+    });
+  }
+  slide.addShape('ellipse', {
+    x: cx - rIn, y: cy - rIn, w: rIn * 2, h: rIn * 2,
+    fill: { color: color }, line: { type: 'none' },
+  });
+}
+
+/** the cover/closing artwork: an indigo disc overlapped by a cyan one */
+function coverGlow(slide) {
+  blob(slide, 9.650, 5.626, 4.161, BLUE);
+  blob(slide, 10.352, 5.626, 4.364, CYAN);
+}
+
+/** grey plate standing in for a photograph */
+function photo(slide, x, y, w, h, tone, opt) {
+  const o = opt || {};
+  slide.addShape(o.shape || 'rect', Object.assign({
+    x: x, y: y, w: w, h: h, fill: { color: tone }, line: { type: 'none' },
+  }, o.props || {}));
+}
+
+/** small caps label above a headline */
+function eyebrow(slide, x, y, w, text, color, align) {
+  slide.addText([{ text: text, options: { fontFace: DMM, fontSize: 20, color: color || SLATE, charSpacing: 2 } }],
+    { x: x, y: y, w: w, h: 0.438, valign: 'top', align: align || 'left' });
+}
+
+/**
+ * Two tone headline. `parts` is a list of [text, colour] pairs; gradient text
+ * in the source is rendered with the gradient's first stop.
+ */
+function heading(slide, x, y, w, h, parts, opt) {
+  const o = opt || {};
+  slide.addText(parts.map((p) => ({
+    text: p[0],
+    options: { fontFace: SORA, fontSize: o.size || 60, bold: true, color: p[1], charSpacing: o.charSpacing === undefined ? 1 : o.charSpacing, breakLine: p[2] === 'br' },
+  })), { x: x, y: y, w: w, h: h, valign: 'top', align: o.align || 'left' });
+}
+
+/** grey justified paragraph copy */
+function body(slide, x, y, w, h, text, opt) {
+  const o = opt || {};
+  const paras = Array.isArray(text) ? text : [text];
+  slide.addText(paras.map((t, i) => ({
+    text: t,
+    options: {
+      fontFace: DM, fontSize: o.size || 18, color: o.color || MUTE,
+      charSpacing: o.charSpacing, breakLine: i < paras.length - 1,
+    },
+  })), {
+    x: x, y: y, w: w, h: h, valign: 'top',
+    align: o.align || 'justify', lineSpacingMultiple: o.line || 1.5,
+  });
+}
+
+/** "PAGE  -  07" footer; side is 'l' or 'r' */
+function pageFoot(slide, n, side, tail) {
+  const num = ('0' + n).slice(-2);
+  slide.addText([
+    { text: 'PAGE', options: { fontFace: DMS, fontSize: 18, color: MUTE, charSpacing: 1 } },
+    { text: '    -   ' + num, options: { fontFace: DMS, fontSize: 18, color: tail || BLUE, charSpacing: 1 } },
+  ], { x: side === 'l' ? 0.64 : 17.41, y: 10.514, w: 1.95, h: 0.404, valign: 'top', align: 'center' });
+}
+
+/** rounded gradient call to action button */
+function button(slide, x, y, w, h, label) {
+  slide.addShape('roundRect', {
+    x: x, y: y, w: w, h: h, rectRadius: Math.min(w, h) * 0.238,
+    fill: { color: MID }, line: { type: 'none' },
+  });
+  slide.addText([{ text: label, options: { fontFace: DMS, fontSize: 18, color: WHITE, charSpacing: 1 } }],
+    { x: x, y: y, w: w, h: h, valign: 'middle', align: 'center' });
+}
+
+/* decorative "+" confetti clusters, one per slide corner */
+const PLUS_CLUSTERS = {
+  tl: { flipH: true, marks: [[0.757, 0.509, 0.921], [-0.650, -0.198, 1.332], [-0.039, 0.999, 0.921], [0.422, -0.421, 0.921]] },
+  tr: { rotate: 0, marks: [[18.329, 0.509, 0.921], [19.325, -0.198, 1.332], [19.125, 0.999, 0.921], [18.665, -0.453, 0.921]] },
+  br: { rotate: 90, marks: [[18.199, 9.786, 0.921], [19.334, 10.137, 1.332], [18.339, 10.790, 0.921], [18.948, 9.285, 0.921]] },
+  bl: { rotate: 270, flipH: true, marks: [[0.896, 9.786, 0.921], [-0.650, 10.137, 1.332], [0.756, 10.790, 0.921], [0.147, 9.285, 0.921]] },
+};
+
+function plusCluster(slide, corner, color) {
+  const c = PLUS_CLUSTERS[corner];
+  c.marks.forEach((m) => {
+    slide.addShape('mathPlus', {
+      x: m[0], y: m[1], w: m[2], h: m[2], rotate: c.rotate || 0, flipH: !!c.flipH,
+      fill: { color: color || MID, transparency: color ? 0 : 30 }, line: { type: 'none' },
+    });
+  });
+}
+
+/** white disc with a simple medical-cross glyph - stands in for the icon art */
+function iconDisc(slide, x, y, d, glyphColor) {
+  slide.addShape('ellipse', { x: x, y: y, w: d, h: d, fill: { color: WHITE }, line: { type: 'none' } });
+  slide.addShape('mathPlus', {
+    x: x + d * 0.26, y: y + d * 0.26, w: d * 0.48, h: d * 0.48,
+    fill: { color: glyphColor || MID }, line: { type: 'none' },
+  });
+}
+
+/** the blue ink-splash mark that sits in the middle of the infographic wheels */
+const SPLASH_DOTS = [
+  [0.10, 0.30, 0.42], [0.42, 0.06, 0.36], [0.62, 0.34, 0.40], [0.24, 0.56, 0.44],
+  [0.56, 0.58, 0.34], [0.02, 0.10, 0.20], [0.80, 0.12, 0.16], [0.86, 0.62, 0.14],
+  [0.34, 0.86, 0.16], [0.66, 0.86, 0.11], [0.00, 0.72, 0.12],
+];
+function splash(slide, x, y, w, h) {
+  SPLASH_DOTS.forEach((d) => {
+    slide.addShape('ellipse', {
+      x: x + d[0] * w, y: y + d[1] * h, w: d[2] * w, h: d[2] * h,
+      fill: { color: MID }, line: { type: 'none' },
+    });
+  });
+}
+
+/** the repeated "eyebrow + two tone headline" block used by most slides */
+function slideHead(slide, x, y, w, kicker, parts, opt) {
+  const o = opt || {};
+  eyebrow(slide, x, y, w, kicker, o.kickerColor, o.align);
+  heading(slide, x, y + 0.438, w, o.h || 2.121, parts, o);
+}
+
+/* ── shared copy ────────────────────────────────────────────────────────── */
+const LOREM_LONG =
+  'PLACEHOLDER' +
+  'PLACEHOLDER' +
+  'PLACEHOLDER';
+const LOREM_MED =
+  'PLACEHOLDER' +
+  'PLACEHOLDER';
+const LOREM_SHORT = 'PLACEHOLDER';
+const LOREM_TINY = 'PLACEHOLDER';
+const LOREM_CARD = 'Lorem ipsum dolor sit amet consectetur adipiscing';
+
+/* ══ 01 · cover ═════════════════════════════════════════════════════════ */
+function slide01(s) {
+  coverGlow(s);
+  s.addText([{ text: 'MEDIKARE', options: { fontFace: SORA, fontSize: 130, bold: true, color: WHITE, charSpacing: 2 } }],
+    { x: 4.741, y: 4.178, w: 10.519, h: 2.289, align: 'center', valign: 'middle', wrap: false });
+  s.addText([{ text: 'Medical Presentation Template', options: { fontFace: DMM, fontSize: 20, color: WHITE, charSpacing: 1 } }],
+    { x: 6.446, y: 6.466, w: 7.108, h: 0.438, align: 'center', valign: 'top' });
+  button(s, 8.542, 7.472, 2.917, 0.875, 'LEARN MORE');
+  s.addText([{ text: 'www.medikare.com', options: { fontFace: DMM, fontSize: 20, color: BLUE, charSpacing: 1 } }],
+    { x: 0.875, y: 10.302, w: 4.253, h: 0.56, valign: 'top', lineSpacingMultiple: 1.5 });
+  s.addText([{ text: 'Version 1.0', options: { fontFace: DMM, fontSize: 20, color: BLUE, charSpacing: 1 } }],
+    { x: 14.872, y: 10.302, w: 4.253, h: 0.56, align: 'right', valign: 'top', lineSpacingMultiple: 1.5 });
+}
+
+/* ══ 02 · about us / welcome ════════════════════════════════════════════ */
+function slide02(s) {
+  ramp(s, 0, 0, 5.143, 11.25);
+  photo(s, 1.195, 1.26, 7.884, 8.73, PH1, { shape: 'round2SameRect', props: { rectRadius: 3.94 } });
+  s.addShape('mathPlus', { x: 8.565, y: 1.26, w: 1.061, h: 1.061, fill: { color: MID }, line: { type: 'none' } });
+  slideHead(s, 10.921, 2.734, 7.238, 'About Us', [['Welcome to Our ', INK], ['Clinic', BLUE]]);
+  body(s, 10.921, 6.184, 7.238, 2.332, LOREM_LONG);
+  pageFoot(s, 2, 'r');
+}
+
+/* ══ 03 · give the best to patients ═════════════════════════════════════ */
+function slide03(s) {
+  ramp(s, 0, 0, 5.143, 11.25);
+  photo(s, 1.206, 2.011, 7.884, 6.208, PH2, { shape: 'roundRect', props: { rectRadius: 0.198 } });
+  s.addShape('roundRect', {
+    x: 1.893, y: 6.566, w: 6.5, h: 2.673, rectRadius: 0.207,
+    fill: { color: MID }, line: { type: 'none' },
+  });
+  body(s, 2.159, 6.964, 5.968, 1.877,
+    'PLACEHOLDER' +
+    'PLACEHOLDER', { color: WHITE });
+  slideHead(s, 10.921, 2.741, 7.238, 'About Us', [['Give the Best To ', INK], ['Patients', BLUE]]);
+  body(s, 10.921, 6.178, 7.238, 2.332, LOREM_LONG);
+  pageFoot(s, 3, 'r');
+}
+
+/* ══ 04 · reasons to choose us ══════════════════════════════════════════ */
+function slide04(s) {
+  photo(s, 1.841, 1.841, 8.159, 4.93, PH1, { shape: 'roundRect', props: { rectRadius: 0.157 } });
+  slideHead(s, 11.841, 1.892, 6.317, 'About Us', [['Reasons', BLUE], [' To Choose Us', INK]]);
+  s.addShape('roundRect', {
+    x: 4.469, y: 5.333, w: 11.062, h: 4.075, rectRadius: 0.242,
+    fill: { color: MID }, line: { type: 'none' },
+  });
+  [['We are the Best Hospital', 5.168], ['We Have The Best Doctors', 10.291]].forEach((col) => {
+    s.addText([{ text: col[0], options: { fontFace: DMM, fontSize: 18, color: WHITE, charSpacing: 2 } }],
+      { x: col[1], y: 6.231, w: 4.541, h: 0.404, valign: 'top' });
+    body(s, col[1], 6.634, 4.541, 1.877,
+      'PLACEHOLDER',
+      { color: WHITE });
+  });
+  pageFoot(s, 4, 'l');
+}
+
+/* ══ 05 · making life healthier ═════════════════════════════════════════ */
+function slide05(s) {
+  ramp(s, 11.067, 1.65, 7.181, 7.95);
+  photo(s, 11.492, 2.661, 6.332, 6.006, PH2, { shape: 'heart' });
+  plusCluster(s, 'tl'); plusCluster(s, 'br');
+  slideHead(s, 1.764, 2.207, 7.547, 'About Us', [['Making Life ', INK], ['Healthier', BLUE]]);
+  [['01', 5.73, 5.548, 'Best Vitamins for the Body'],
+  ['02', 7.824, 7.638, "Vitamins for the Body's Immune"]].forEach((r) => {
+    s.addShape('roundRect', { x: 1.851, y: r[1], w: 1.033, h: 1.033, rectRadius: 0.16, fill: { color: MID }, line: { type: 'none' } });
+    s.addText([{ text: r[0], options: { fontFace: SORA, fontSize: 20, bold: true, color: WHITE } }],
+      { x: 1.851, y: r[1], w: 1.033, h: 1.033, align: 'center', valign: 'middle' });
+    s.addText([{ text: r[3], options: { fontFace: DMM, fontSize: 20, color: BLUE, charSpacing: 2 } }],
+      { x: 3.352, y: r[2], w: 5.96, h: 0.438, valign: 'top' });
+    body(s, 3.352, r[2] + 0.438, 5.96, 0.968, LOREM_SHORT);
+  });
+  pageFoot(s, 5, 'l');
+}
+
+/* ══ 06 · advancing health together ═════════════════════════════════════ */
+function slide06(s) {
+  ramp(s, 10.921, 1.375, 9.079, 8.5);
+  photo(s, 11.379, 1.141, 8.621, 8.967, PH1, { shape: 'round1Rect', props: { rectRadius: 0.4 } });
+  slideHead(s, 1.841, 2.349, 7.402, 'About Us',
+    [['Advancing ', INK], ['Health', BLUE], [' Together', INK]], { h: 2.6 });
+  body(s, 1.841, 5.396, 7.402, 2.332,
+    'PLACEHOLDER' +
+    'PLACEHOLDER' +
+    'PLACEHOLDER');
+  button(s, 1.841, 8.232, 2.498, 0.758, 'LEARN MORE');
+  pageFoot(s, 6, 'l');
+}
+
+/* ══ 07 · protects from viruses ═════════════════════════════════════════ */
+function slide07(s) {
+  s.addShape('ellipse', { x: 5.416, y: 1.886, w: 3.171, h: 3.171, fill: { color: MID }, line: { type: 'none' } });
+  s.addShape('ellipse', { x: -1.676, y: 7.194, w: 3.023, h: 3.023, fill: { color: MID }, line: { type: 'none' } });
+  photo(s, -5.581, 1.841, 14.327, 7.567, PH2, { shape: 'roundRect', props: { rectRadius: 3.78 } });
+  slideHead(s, 11.063, 2.06, 7.096, 'About Us', [['Protects from ', INK], ['Viruses', BLUE]]);
+  [[5.499, 'Best Vitamins for the Body'], [7.784, "Vitamins for the Body's Immune"]].forEach((r) => {
+    s.addText([{ text: r[1], options: { fontFace: DMM, fontSize: 20, color: BLUE, charSpacing: 2 } }],
+      { x: 11.063, y: r[0], w: 7.096, h: 0.438, valign: 'top' });
+    body(s, 11.063, r[0] + 0.437, 7.096, 0.968,
+      'PLACEHOLDER');
+  });
+  pageFoot(s, 7, 'r');
+}
+
+/* ══ 08 · give the best to patients (grey wedge) ════════════════════════ */
+function slide08(s) {
+  s.addShape('custGeom', {
+    x: 10.146, y: 2.982, w: 9.854, h: 8.268, fill: { color: PH2 }, line: { type: 'none' },
+    points: [{ x: 9.854, y: 0 }, { x: 9.854, y: 4.043 }, { x: 4.73, y: 8.268 }, { x: 0, y: 8.268 }, { close: true }],
+  });
+  s.addShape('ellipse', { x: 10.921, y: 2.26, w: 6.729, h: 6.729, fill: { color: PH1 }, line: { type: 'none' } });
+  s.addShape('ellipse', { x: 14.479, y: 2.128, w: 3.171, h: 3.171, fill: { color: MID }, line: { type: 'none' } });
+  slideHead(s, 1.841, 2.982, 7.238, 'About Us',
+    [['Give the Best ', INK, 'br'], ['to ', INK], ['Patients', BLUE]]);
+  body(s, 1.841, 6.165, 7.238, 2.332, LOREM_LONG);
+  pageFoot(s, 8, 'l');
+}
+
+/* ══ 09 · we are the best clinic ════════════════════════════════════════ */
+function slide09(s) {
+  const g = 0.24, cell = (7.739 - g) / 2;
+  [[0, 0, PH1], [1, 0, PH1], [0, 1, PH1], [1, 1, PH1]].forEach((c) => {
+    photo(s, 1.75 + c[0] * (cell + g), 1.758 + c[1] * (cell + g), cell, cell, c[2],
+      { shape: 'roundRect', props: { rectRadius: 0.12 } });
+  });
+  slideHead(s, 11.238, 1.837, 6.921, 'About Us', [['We are the Best ', INK], ['Clinic', BLUE]]);
+  body(s, 11.238, 5.25, 6.921, 0.968,
+    'PLACEHOLDER');
+  [['Clinic Rating', '4,5', 11.238, 11.568, 2.352], ['Patient Ratings', '4,7', 15.146, 15.257, 2.791]].forEach((c) => {
+    s.addShape('roundRect', { x: c[2], y: 6.618, w: 3.012, h: 2.791, rectRadius: 0.43, fill: { color: MID }, line: { type: 'none' } });
+    s.addText([{ text: c[0], options: { fontFace: DMM, fontSize: 20, color: WHITE, charSpacing: 2 } }],
+      { x: c[3], y: 7.095, w: c[4], h: 0.438, align: 'center', valign: 'top' });
+    s.addText([{ text: c[1], options: { fontFace: SORA, fontSize: 70, bold: true, color: WHITE, charSpacing: 1 } }],
+      { x: c[3], y: 7.652, w: c[4], h: 1.279, align: 'center', valign: 'top' });
+  });
+  pageFoot(s, 9, 'r');
+}
+
+/* ══ 10 · doctors at medikare (four portraits) ══════════════════════════ */
+function slide10(s) {
+  const docs = [
+    [2.158, PH1, 'Dr. Albert Alex', 'Dentist'],
+    [6.394, PH2, 'Dr. Melisa Liana', 'Pediatrician'],
+    [10.630, PH1, 'Dr. Kingder M', 'Obstetricians'],
+    [14.866, PH2, 'Dr. Rain Hillya', 'Neurologist'],
+  ];
+  eyebrow(s, 4.841, 1.685, 10.317, 'Team', INK, 'center');
+  heading(s, 4.841, 2.123, 10.317, 1.111, [['Doctors at ', INK], ['Medikare', BLUE]], { align: 'center' });
+  docs.forEach((d) => {
+    // the accent disc sits behind the portrait plate, as in the source deck
+    s.addShape('ellipse', { x: d[0] + 0.86, y: 5.625, w: 1.256, h: 1.256, fill: { color: MID }, line: { type: 'none' } });
+    photo(s, d[0], 4.216, 2.976, 4.024, d[1]);
+    s.addShape('line', { x: d[0], y: 8.276, w: 2.976, h: 0, line: { color: MID, width: 3 } });
+    s.addText([{ text: d[2], options: { fontFace: DMM, fontSize: 20, color: BLUE, charSpacing: 2 } }],
+      { x: d[0], y: 8.718, w: 2.976, h: 0.438, align: 'center', valign: 'top' });
+    s.addText([{ text: d[3], options: { fontFace: DM, fontSize: 18, color: MUTE, charSpacing: 2 } }],
+      { x: d[0], y: 9.161, w: 2.976, h: 0.404, align: 'center', valign: 'top' });
+  });
+  plusCluster(s, 'tl'); plusCluster(s, 'br');
+  pageFoot(s, 10, 'l');
+}
+
+/* ══ 11 · medikare best doctor (three portraits) ════════════════════════ */
+function slide11(s) {
+  const docs = [
+    [2.272, PH1, 'Dr. Thomas Charless', 'Dermatologist', 8.273],
+    [7.979, PH2, 'Dr. Shofia Isabella ', 'Surgeon', 8.252],
+    [13.687, PH1, 'Dr. Edward Partrick ', 'Ophthalmologists', 8.252],
+  ];
+  eyebrow(s, 4.841, 1.886, 10.317, 'Team', INK, 'center');
+  heading(s, 4.841, 2.323, 10.317, 1.111, [['Medikare Best ', INK], ['Doctor', BLUE]], { align: 'center' });
+  docs.forEach((d) => {
+    photo(s, d[0], 3.964, 4.042, 4.028, d[1], { shape: 'roundRect', props: { rectRadius: 0.145 } });
+    s.addShape('line', { x: d[0], y: d[4], w: 4.042, h: 0, line: { color: MID, width: 3 } });
+    s.addText([{ text: d[2], options: { fontFace: DMM, fontSize: 20, color: BLUE, charSpacing: 2 } }],
+      { x: d[0], y: 8.518, w: 4.042, h: 0.438, align: 'center', valign: 'top' });
+    s.addText([{ text: d[3], options: { fontFace: DM, fontSize: 18, color: MUTE, charSpacing: 2 } }],
+      { x: d[0], y: 8.961, w: 4.042, h: 0.404, align: 'center', valign: 'top' });
+  });
+  plusCluster(s, 'tr'); plusCluster(s, 'bl');
+  pageFoot(s, 11, 'r');
+}
+
+/* ══ 12 · providing the best care ═══════════════════════════════════════ */
+function slide12(s) {
+  [[1.841, 1.995, PH2, 5.281, 'Dr. Isabella Chloe', 'Internal Medicine'],
+  [10.921, 11.074, PH1, 14.360, 'Dr. Briant Antony', 'Pharmacist']].forEach((c) => {
+    s.addShape('ellipse', { x: c[0], y: 6.1, w: 2.841, h: 2.841, fill: { type: 'none' }, line: { color: MID, width: 2.25 } });
+    s.addShape('ellipse', { x: c[1], y: 6.254, w: 2.534, h: 2.534, fill: { color: c[2] }, line: { type: 'none' } });
+    s.addText([{ text: c[4], options: { fontFace: DMM, fontSize: 20, color: BLUE, charSpacing: 2 } }],
+      { x: c[3], y: 7.097, w: 3.799, h: 0.438, valign: 'top' });
+    s.addText([{ text: c[5], options: { fontFace: DM, fontSize: 18, color: MUTE, charSpacing: 2 } }],
+      { x: c[3], y: 7.54, w: 3.799, h: 0.404, valign: 'top' });
+  });
+  slideHead(s, 1.841, 2.309, 7.238, 'Team', [['Providing the Best ', INK], ['Care', BLUE]]);
+  body(s, 10.921, 2.649, 7.238, 1.877, LOREM_MED);
+  plusCluster(s, 'tl'); plusCluster(s, 'br');
+  pageFoot(s, 12, 'l');
+}
+
+/* ══ 13 · owner profile ═════════════════════════════════════════════════ */
+function slide13(s) {
+  s.addShape('ellipse', { x: 2.54, y: 2.79, w: 6.211, h: 6.211, fill: { color: CYAN }, line: { type: 'none' } });
+  photo(s, 1.292, 0, 8.708, 11.25, PH2);
+  eyebrow(s, 10.921, 2.064, 7.238, 'Team');
+  heading(s, 10.921, 2.505, 7.238, 2.121, [['Ryder ', INK], ['Jackson', BLUE], [' Vishawn', INK]]);
+  s.addText([{ text: 'Owner of Medikare Clinic', options: { fontFace: DMM, fontSize: 20, color: BLUE, charSpacing: 1 } }],
+    { x: 10.921, y: 5.509, w: 7.238, h: 0.438, valign: 'top' });
+  body(s, 10.921, 5.946, 7.238, 1.423,
+    'PLACEHOLDER' +
+    'PLACEHOLDER');
+  s.addText([{ text: 'Financess', options: { fontFace: DMM, fontSize: 20, color: BLUE, charSpacing: 1 } }],
+    { x: 10.921, y: 8.039, w: 7.238, h: 0.438, valign: 'top' });
+  s.addShape('roundRect', {
+    x: 10.922, y: 8.73, w: 7.204, h: 0.455, rectRadius: 0.2275,
+    fill: { color: WHITE }, line: { color: 'F2F2F2', width: 0.75 },
+  });
+  s.addShape('roundRect', { x: 11.087, y: 8.862, w: 5.72, h: 0.2, rectRadius: 0.1, fill: { color: MID }, line: { type: 'none' } });
+  s.addText([{ text: '90%', options: { fontFace: DMM, fontSize: 20, color: '000000' } }],
+    { x: 10.922, y: 8.73, w: 7.204, h: 0.455, align: 'right', valign: 'middle' });
+  plusCluster(s, 'tr');
+  pageFoot(s, 13, 'r');
+}
+
+/* ══ 14 · service cards, 2x2 grid ═══════════════════════════════════════ */
+function slide14(s) {
+  const cards = [
+    [9.852, 1.549, 'Emergency Services'], [14.570, 1.549, 'Midwifery Services'],
+    [9.852, 5.915, 'Outpatient Services'], [14.570, 5.915, 'Dental Care Services'],
+  ];
+  slideHead(s, 1.731, 2.906, 6.381, 'Service', [['Providing the Best ', INK], ['Service', BLUE]]);
+  body(s, 1.731, 6.058, 6.381, 2.332,
+    'PLACEHOLDER' +
+    'PLACEHOLDER');
+  cards.forEach((c) => {
+    s.addShape('roundRect', { x: c[0], y: c[1], w: 4.244, h: 3.785, rectRadius: 0.585, fill: { color: MID }, line: { type: 'none' } });
+    iconDisc(s, c[0] + 1.380, c[1] + 0.326, 1.485);
+    s.addText([{ text: c[2], options: { fontFace: DMM, fontSize: 20, color: WHITE, charSpacing: 2 } }],
+      { x: c[0] + 0.266, y: c[1] + 2.055, w: 3.713, h: 0.438, align: 'center', valign: 'top' });
+    body(s, c[0] + 0.266, c[1] + 2.491, 3.713, 0.968, LOREM_CARD, { color: WHITE, align: 'center' });
+  });
+  pageFoot(s, 14, 'l');
+}
+
+/* ══ 15 · medikare best service, 3 columns ══════════════════════════════ */
+function slide15(s) {
+  const cols = [[2.272, 4.532, 'Emergency Services'], [7.979, 4.451, 'Outpatient Services'], [13.687, 4.369, 'Dental Care Services']];
+  eyebrow(s, 4.683, 1.95, 10.635, 'Service', SLATE, 'center');
+  heading(s, 4.683, 2.387, 10.635, 1.111, [['Medikare Best ', INK], ['Service', BLUE]], { align: 'center' });
+  cols.forEach((c, i) => {
+    s.addShape('line', { x: c[0], y: 4.246, w: 4.042, h: 0, line: { color: MID, width: 3 } });
+    s.addShape('roundRect', { x: c[0], y: 4.532, w: 4.042, h: 4.028, rectRadius: 0.185, fill: { color: MID }, line: { type: 'none' } });
+    s.addShape('line', { x: c[0], y: 8.841, w: 4.042, h: 0, line: { color: MID, width: 3 } });
+    iconDisc(s, c[0] + 1.278, c[1] + 0.447, 1.485);
+    s.addText([{ text: c[2], options: { fontFace: DMM, fontSize: 20, color: WHITE, charSpacing: 2 } }],
+      { x: c[0] + 0.164, y: c[1] + 2.176, w: 3.713, h: 0.438, align: 'center', valign: 'top' });
+    body(s, c[0] + 0.164, c[1] + 2.612, 3.713, 0.968, LOREM_CARD, { color: WHITE, align: 'center' });
+  });
+  plusCluster(s, 'tl'); plusCluster(s, 'br');
+  pageFoot(s, 15, 'r');
+}
+
+/* ══ 16 · providing the best service (photo left) ═══════════════════════ */
+function slide16(s) {
+  photo(s, 0, 0, 10, 10.062, PH1, { shape: 'round2SameRect', props: { rectRadius: 0.33, rotate: 180 } });
+  slideHead(s, 11.143, 1.896, 6.317, 'Service', [['Providing the Best ', INK], ['Service', BLUE]]);
+  [[7.905, 5.341, 'Emergency Services'], [13.612, 5.341, 'Outpatient Services']].forEach((c) => {
+    s.addShape('roundRect', { x: c[0], y: c[1], w: 4.547, h: 4.013, rectRadius: 0.184, fill: { color: MID }, line: { type: 'none' } });
+    iconDisc(s, c[0] + 1.531, c[1] + 0.481, 1.485);
+    s.addText([{ text: c[2], options: { fontFace: DMM, fontSize: 20, color: WHITE, charSpacing: 2 } }],
+      { x: c[0] + 0.417, y: c[1] + 2.21, w: 3.713, h: 0.438, align: 'center', valign: 'top' });
+    body(s, c[0] + 0.417, c[1] + 2.646, 3.713, 0.968, LOREM_CARD, { color: WHITE, align: 'center' });
+  });
+  pageFoot(s, 16, 'r');
+}
+
+/* ══ 17 · emergency service ═════════════════════════════════════════════ */
+function slide17(s) {
+  s.addShape('ellipse', { x: 10.921, y: 2.006, w: 7.238, h: 7.238, fill: { color: MID }, line: { type: 'none' } });
+  s.addShape('mathPlus', { x: 12.731, y: 3.816, w: 3.619, h: 3.619, fill: { color: WHITE }, line: { type: 'none' } });
+  slideHead(s, 1.841, 2.344, 7.238, 'Service', [['Emergency', BLUE], [' Service', INK]]);
+  body(s, 1.841, 5.486, 7.238, 2.332,
+    'PLACEHOLDER' +
+    'PLACEHOLDER' +
+    'adipiscingi eiusmod tempor incididunt ut labore');
+  button(s, 1.841, 8.196, 2.498, 0.758, 'LEARN MORE');
+  pageFoot(s, 17, 'r');
+}
+
+/* ══ 18 · break slide ═══════════════════════════════════════════════════ */
+function slide18(s) {
+  s.background = { color: WHITE };
+  ramp(s, 0, 0, 20, 11.25, { fade: 0.15, cells: 16 });
+  blob(s, 10, 5.625, 6.125, WHITE);
+  s.addText([{ text: 'BREAK SLIDE', options: { fontFace: SORA, fontSize: 130, bold: true, color: BLUE, charSpacing: 2 } }],
+    { x: 3.645, y: 4.178, w: 12.71, h: 2.289, align: 'center', valign: 'middle', wrap: false });
+  s.addText([{ text: 'Return to the Place After 30 Minutes', options: { fontFace: DMM, fontSize: 20, color: BLUE, charSpacing: 1 } }],
+    { x: 4.351, y: 6.635, w: 11.297, h: 0.438, align: 'center', valign: 'top' });
+  button(s, 8.542, 7.472, 2.917, 0.875, 'LEARN MORE');
+  plusCluster(s, 'tl', WHITE); plusCluster(s, 'br', WHITE);
+}
+
+/* ══ 19 · medikare portfolio ════════════════════════════════════════════ */
+function slide19(s) {
+  photo(s, 0, 0, 5.175, 11.25, PH1);
+  slideHead(s, 6.643, 1.841, 5.111, 'Portolio ', [['Medikare', BLUE], [' Portfolio', INK]]);
+  body(s, 13.454, 1.968, 4.651, 1.877,
+    'PLACEHOLDER');
+  photo(s, 6.786, 5.159, 5.111, 4.25, PH2, { shape: 'roundRect', props: { rectRadius: 0.184 } });
+  photo(s, 13.508, 5.159, 4.651, 4.25, PH1, { shape: 'roundRect', props: { rectRadius: 0.184 } });
+  pageFoot(s, 19, 'r');
+}
+
+/* ══ 20 · weekly activities ═════════════════════════════════════════════ */
+function slide20(s) {
+  slideHead(s, 1.841, 1.841, 9.109, 'Portolio ', [['Weekly', BLUE], [' Activities', INK]], { h: 1.111 });
+  body(s, 1.841, 3.883, 9.109, 1.423,
+    'PLACEHOLDER' +
+    'PLACEHOLDER');
+  body(s, 6.175, 6.642, 4.775, 2.332,
+    'PLACEHOLDER' +
+    'aliquat enim ad minimi ai consectetur adipiscing');
+  photo(s, 12.792, 1.841, 5.367, 7.567, PH2, { shape: 'roundRect', props: { rectRadius: 0.165 } });
+  photo(s, 1.841, 6.206, 3.45, 3.202, PH1, { shape: 'roundRect', props: { rectRadius: 0.1 } });
+  pageFoot(s, 20, 'l');
+}
+
+/* ══ 21 · our monthly activities ════════════════════════════════════════ */
+function slide21(s) {
+  ramp(s, 0, 0, 6, 11.25);
+  photo(s, 1.146, 1.458, 6.229, 3.695, PH2, { shape: 'roundRect', props: { rectRadius: 0.115 } });
+  photo(s, 2.850, 5.713, 6.229, 3.695, PH1, { shape: 'roundRect', props: { rectRadius: 0.115 } });
+  slideHead(s, 10.921, 2.741, 7.238, 'Portfolio', [['Our', BLUE], [' Monthly Activities', INK]]);
+  body(s, 10.921, 6.178, 7.238, 2.332,
+    'PLACEHOLDER' +
+    'PLACEHOLDER' +
+    'adipiscingi eiusmod tell in incididunt ut labore et');
+  pageFoot(s, 21, 'r');
+}
+
+/* ══ 22 · medikare gallery ══════════════════════════════════════════════ */
+function slide22(s) {
+  slideHead(s, 12.364, 1.841, 5.795, 'Portolio ', [['Medikare', BLUE], [' Gallery', INK]]);
+  const R = { shape: 'roundRect', props: { rectRadius: 0.14 } };
+  photo(s, 1.841, 1.841, 4.606, 7.567, PH2, R);
+  photo(s, 7.103, 1.841, 4.606, 3.456, PH1, R);
+  photo(s, 7.103, 5.953, 4.606, 3.456, PH2, R);
+  photo(s, 12.364, 5.139, 5.795, 4.27, PH1, R);
+  pageFoot(s, 22, 'l');
+}
+
+/* ══ 23 · medikare best gallery ═════════════════════════════════════════ */
+function slide23(s) {
+  ramp(s, 0, 0, 6, 11.25);
+  photo(s, 1.841, 1.841, 7.238, 3.388, PH1, { shape: 'roundRect', props: { rectRadius: 0.348 } });
+  photo(s, 1.841, 5.833, 7.238, 3.575, PH2, { shape: 'roundRect', props: { rectRadius: 0.42 } });
+  photo(s, 9.684, 5.229, 8.475, 4.18, PH1, { shape: 'roundRect', props: { rectRadius: 0.44 } });
+  slideHead(s, 10.921, 1.841, 7.238, 'Portolio ', [['Medikare', BLUE], [' Best Gallery', INK]]);
+  pageFoot(s, 23, 'r');
+}
+
+/* ══ 24 · medikare best gallery (banner) ════════════════════════════════ */
+function slide24(s) {
+  eyebrow(s, 4.683, 1.432, 10.635, 'Portfolio', SLATE, 'center');
+  heading(s, 4.683, 1.869, 10.635, 1.111, [['Medikare Best ', INK], ['Gallery', BLUE]], { align: 'center' });
+  photo(s, 1.841, 3.418, 7.96, 3.293, PH1, { shape: 'roundRect', props: { rectRadius: 0.197 } });
+  photo(s, 10.199, 3.418, 7.96, 3.293, PH2, { shape: 'roundRect', props: { rectRadius: 0.17 } });
+  photo(s, 1.841, 7.108, 16.317, 2.71, PH2, { shape: 'roundRect', props: { rectRadius: 0.181 } });
+  pageFoot(s, 24, 'l');
+}
+
+/* ══ 25 · application development (desktop mockup) ══════════════════════ */
+function slide25(s) {
+  // iMac-style monitor drawn from primitives
+  s.addShape('roundRect', { x: 1.841, y: 2.677, w: 7.238, h: 4.426, rectRadius: 0.12, fill: { color: '181818' }, line: { type: 'none' } });
+  s.addShape('rect', { x: 2.123, y: 2.978, w: 6.675, h: 3.821, fill: { color: '0C0D11' }, line: { type: 'none' } });
+  photo(s, 2.155, 3.011, 6.611, 3.756, PH1);
+  s.addShape('ellipse', { x: 5.411, y: 2.794, w: 0.099, h: 0.1, fill: { color: '0A0A0A' }, line: { type: 'none' } });
+  s.addShape('ellipse', { x: 5.444, y: 2.823, w: 0.032, h: 0.039, fill: { color: '2C99B4' }, line: { type: 'none' } });
+  s.addShape('roundRect', { x: 1.853, y: 7.103, w: 7.215, h: 0.696, rectRadius: 0.1, fill: { color: 'D2D3D5' }, line: { type: 'none' } });
+  s.addShape('trapezoid', { x: 4.231, y: 7.699, w: 2.459, h: 0.852, fill: { color: 'D2D3D5' }, line: { type: 'none' } });
+  s.addShape('trapezoid', { x: 4.466, y: 7.699, w: 1.988, h: 0.852, fill: { color: 'A8A9AA' }, line: { type: 'none' } });
+  s.addShape('rect', { x: 4.242, y: 8.473, w: 2.436, h: 0.1, fill: { color: '181818' }, line: { type: 'none' } });
+  slideHead(s, 10.921, 2.143, 7.238, 'Mockup Device', [['Application', BLUE], [' Development', INK]]);
+  body(s, 10.921, 5.301, 7.238, 2.332,
+    'PLACEHOLDER' +
+    'PLACEHOLDER' +
+    'adipiscingi ei tempor incididunt ut labore et dolore mi labore');
+  button(s, 10.921, 8.232, 2.498, 0.758, 'GET APP');
+  pageFoot(s, 25, 'r');
+}
+
+/* ── laptop mockup, reused on slide 26 ─────────────────────────────────── */
+function laptop(s, x, y, w, h) {
+  s.addShape('roundRect', { x: x + w * 0.115, y: y, w: w * 0.77, h: h * 0.79, rectRadius: 0.06, fill: { color: '333438' }, line: { type: 'none' } });
+  s.addShape('rect', { x: x + w * 0.135, y: y + h * 0.045, w: w * 0.73, h: h * 0.68, fill: { color: PH1 }, line: { type: 'none' } });
+  s.addShape('trapezoid', { x: x, y: y + h * 0.79, w: w, h: h * 0.13, fill: { color: 'D2D3D5' }, line: { type: 'none' } });
+  s.addShape('roundRect', { x: x + w * 0.42, y: y + h * 0.85, w: w * 0.16, h: h * 0.03, rectRadius: 0.02, fill: { color: 'A8A9AA' }, line: { type: 'none' } });
+}
+
+/* ── phone mockup, reused on slide 27 ──────────────────────────────────── */
+function phone(s, x, y, w, h, screen) {
+  s.addShape('roundRect', { x: x, y: y, w: w, h: h, rectRadius: w * 0.11, fill: { color: WHITE }, line: { color: 'E4E4E4', width: 1 } });
+  s.addShape('rect', { x: x + w * 0.06, y: y + h * 0.09, w: w * 0.88, h: h * 0.75, fill: { color: screen }, line: { type: 'none' } });
+  s.addShape('ellipse', { x: x + w * 0.42, y: y + h * 0.878, w: w * 0.16, h: w * 0.16 * (w / h) * (h / w), fill: { color: WHITE }, line: { color: 'D9D9D9', width: 1 } });
+  s.addShape('roundRect', { x: x + w * 0.36, y: y + h * 0.048, w: w * 0.28, h: h * 0.008, rectRadius: 0.02, fill: { color: 'BFBFBF' }, line: { type: 'none' } });
+}
+
+/* ══ 26 · medikare app rating ═══════════════════════════════════════════ */
+function slide26(s) {
+  eyebrow(s, 4.851, 1.839, 10.635, 'Mockup Device', SLATE, 'center');
+  heading(s, 4.851, 2.277, 10.635, 1.111, [['Medikare App ', INK], ['Rating', BLUE]], { align: 'center' });
+  photo(s, 1.672, 3.893, 4.152, 5.518, PH2, { shape: 'roundRect', props: { rectRadius: 0.427 } });
+  laptop(s, 6.709, 4.319, 7.475, 5.088);
+  [['App Rating', '4,5', 3.893, 4.308, 4.865], ['Service App', '4,5', 6.741, 7.156, 7.713]].forEach((c) => {
+    s.addShape('roundRect', { x: 15.068, y: c[2], w: 3.259, h: 2.666, rectRadius: 0.41, fill: { color: MID }, line: { type: 'none' } });
+    s.addText([{ text: c[0], options: { fontFace: DMM, fontSize: 20, color: WHITE, charSpacing: 2 } }],
+      { x: 15.522, y: c[3], w: 2.352, h: 0.438, align: 'center', valign: 'top' });
+    s.addText([{ text: c[1], options: { fontFace: SORA, fontSize: 70, bold: true, color: WHITE, charSpacing: 1 } }],
+      { x: 15.522, y: c[4], w: 2.352, h: 1.279, align: 'center', valign: 'top' });
+  });
+  pageFoot(s, 26, 'l');
+}
+
+/* ══ 27 · best health application ═══════════════════════════════════════ */
+function slide27(s) {
+  phone(s, 2.076, 1.903, 3.636, 7.445, PH2);
+  phone(s, 5.961, 1.903, 3.636, 7.445, PH1);
+  phone(s, 3.824, 1.504, 4.026, 8.242, PH2);
+  slideHead(s, 11.841, 2.283, 6.317, 'Mockup Device',
+    [['Best', INK], [' Health ', BLUE], ['Application', INK]]);
+  body(s, 11.841, 5.521, 6.317, 2.332,
+    'PLACEHOLDER' +
+    'PLACEHOLDER');
+  button(s, 11.841, 8.299, 2.917, 0.875, 'GET APP');
+  plusCluster(s, 'tr'); plusCluster(s, 'bl');
+  pageFoot(s, 27, 'r');
+}
+
+/* ── SWOT title block shared by slides 28-32 ───────────────────────────── */
+function swotTitle(s, yKicker, yTitle) {
+  eyebrow(s, 3.552, yKicker, 12.897, 'Infographics', SLATE, 'center');
+  heading(s, 3.564, yTitle, 12.897, 1.111, [['SWOT Analysis ', INK], ['Infographics', BLUE]], { align: 'center' });
+}
+
+/* ── "Our Infographics" title block shared by slides 33-35 ─────────────── */
+function ourTitle(s, yKicker, kicker, parts) {
+  eyebrow(s, 3.875, yKicker, 12.25, kicker, SLATE, 'center');
+  heading(s, 3.875, yKicker + 0.438, 12.25, 1.111, parts, { align: 'center', charSpacing: 0 });
+}
+
+/* ══ 28 · SWOT with progress card ═══════════════════════════════════════ */
+function slide28(s) {
+  s.addShape('roundRect', { x: 1.335, y: 0.841, w: 8.497, h: 8.892, rectRadius: 0.548, fill: { color: LILAC }, line: { type: 'none' } });
+  eyebrow(s, 2.045, 1.676, 7.078, 'Infographics');
+  heading(s, 2.045, 2.113, 7.078, 2.121, [['SWOT Analysis ', INK], ['Infographics', BLUE]]);
+  body(s, 2.045, 4.996, 7.078, 2.332,
+    'PLACEHOLDER' +
+    'PLACEHOLDER' +
+    'and adipiscingi eiusmod tell in incididunt ut');
+  s.addShape('roundRect', { x: 2.045, y: 7.841, w: 7.078, h: 0.455, rectRadius: 0.2275, fill: { color: WHITE }, line: { color: 'F2F2F2', width: 0.75 } });
+  s.addShape('roundRect', { x: 2.226, y: 7.973, w: 5.727, h: 0.191, rectRadius: 0.095, fill: { color: MID }, line: { type: 'none' } });
+  s.addText([{ text: '90%', options: { fontFace: DM, fontSize: 18, color: '000000' } }],
+    { x: 2.045, y: 7.841, w: 7.078, h: 0.455, align: 'right', valign: 'middle' });
+  s.addText([{ text: 'Business', options: { fontFace: DMM, fontSize: 20, color: BLUE, charSpacing: 2 } }],
+    { x: 2.045, y: 8.544, w: 6.959, h: 0.471, valign: 'middle', margin: 0 });
+
+  // four petal blocks pin-wheeled around the middle
+  const petals = [
+    [12.247, 1.553, 11.209, 2.195, BLUE, CYAN, 'S', false],   // top-left
+    [15.749, 1.553, 14.711, 2.195, CYAN, BLUE, 'W', true],   // top-right
+    [12.247, 7.738, 11.209, 5.373, CYAN, BLUE, 'O', true],   // bottom-left
+    [15.749, 7.738, 14.711, 5.373, BLUE, CYAN, 'T', false],  // bottom-right
+  ];
+  petals.forEach((p) => {
+    s.addShape('round2DiagRect', {
+      x: p[2], y: p[3], w: 3.36, h: 3.007, rectRadius: 0.9, flipH: p[7],
+      fill: { color: p[5] }, line: { type: 'none' },
+    });
+  });
+  s.addShape('ellipse', { x: 13.094, y: 3.741, w: 3.092, h: 3.092, fill: { color: WHITE, transparency: 25 }, line: { type: 'none' } });
+  s.addShape('ellipse', { x: 13.329, y: 3.977, w: 2.621, h: 2.621, fill: { color: LILAC }, line: { type: 'none' } });
+  splash(s, 13.989, 4.664, 1.3, 1.246);
+  petals.forEach((p) => {
+    s.addShape('ellipse', { x: p[0], y: p[1], w: 1.284, h: 1.284, fill: { color: WHITE }, line: { type: 'none' } });
+    s.addShape('ellipse', { x: p[0] + 0.157, y: p[1] + 0.157, w: 0.97, h: 0.97, fill: { color: p[4] }, line: { type: 'none' } });
+    s.addText([{ text: p[6], options: { fontFace: SORA, fontSize: 36, bold: true, color: WHITE } }],
+      { x: p[0] + 0.157, y: p[1] + 0.157, w: 0.97, h: 0.97, align: 'center', valign: 'middle' });
+  });
+  // small icon badges inside each petal
+  [[11.649, 3.566], [15.509, 3.567], [11.650, 6.697], [15.509, 6.697]].forEach((g) => {
+    s.addShape('mathPlus', { x: g[0], y: g[1], w: 0.957, h: 0.957, fill: { color: WHITE }, line: { type: 'none' } });
+  });
+  pageFoot(s, 28, 'r');
+}
+
+/* ══ 29 · SWOT donut ════════════════════════════════════════════════════ */
+function slide29(s) {
+  swotTitle(s, 1.421, 1.855);
+  // ring quadrants: outer r 2.56", inner r 1.10", 2 deg gaps on the axes
+  const quads = [
+    [7.449, 4.096, CYAN, 'S', 182, 268, BLUE, 7.199, 4.625],
+    [10.068, 4.096, BLUE, 'W', 272, 358, CYAN, 11.879, 4.625],
+    [7.449, 6.715, BLUE, 'O', 92, 178, CYAN, 7.199, 7.747],
+    [10.068, 6.715, CYAN, 'T', 2, 88, BLUE, 11.879, 7.747],
+  ];
+  quads.forEach((q) => {
+    s.addShape('blockArc', {
+      x: 7.452, y: 4.099, w: 5.12, h: 5.12,
+      angleRange: [q[4], q[5]], arcThicknessRatio: 0.57,
+      fill: { color: q[2] }, line: { type: 'none' },
+    });
+  });
+  quads.forEach((q) => {
+    s.addText([{ text: q[3], options: { fontFace: SORA, fontSize: 54, bold: true, color: WHITE } }],
+      { x: q[0], y: q[1], w: 2.507, h: 2.507, align: 'center', valign: 'middle' });
+    s.addShape('ellipse', { x: q[7], y: q[8], w: 0.947, h: 0.947, fill: { color: q[6] }, line: { type: 'none' } });
+    s.addShape('mathPlus', { x: q[7] + 0.19, y: q[8] + 0.19, w: 0.567, h: 0.567, fill: { color: WHITE }, line: { type: 'none' } });
+  });
+  const cards = [
+    [1.541, 3.555, 2.141, 4.059, 'Strenghts', 'right'],
+    [13.064, 3.555, 13.664, 4.059, 'Weaknesses', 'left'],
+    [1.541, 7.077, 2.141, 7.581, 'Opportunities', 'right'],
+    [13.064, 7.077, 13.664, 7.581, 'Threats', 'left'],
+  ];
+  cards.forEach((c) => {
+    s.addShape('roundRect', { x: c[0], y: c[1], w: 5.395, h: 2.686, rectRadius: 0.206, fill: { color: LILAC }, line: { type: 'none' } });
+    s.addText([{ text: c[4], options: { fontFace: DMM, fontSize: 18, color: BLUE, charSpacing: 2 } }],
+      { x: c[2], y: c[3], w: 4.195, h: 0.404, align: c[5], valign: 'top' });
+    body(s, c[2], c[3] + 0.403, 4.195, 1.422, LOREM_TINY, { align: c[5] });
+  });
+  pageFoot(s, 29, 'l');
+}
+
+/* ══ 30 · SWOT four-point star ══════════════════════════════════════════ */
+function slide30(s) {
+  swotTitle(s, 1.333, 1.773);
+  s.addShape('star4', { x: 7.163, y: 3.341, w: 5.674, h: 5.685, adjustment: 20, fill: { color: BLUE }, line: { type: 'none' } });
+  const lobes = [
+    [9.061, 3.391, CYAN, 'W'], [10.902, 5.231, CYAN, 'T'],
+    [9.061, 7.090, CYAN, 'O'], [7.213, 5.231, CYAN, 'S'],
+  ];
+  lobes.forEach((l) => {
+    s.addShape('ellipse', { x: l[0], y: l[1], w: 1.886, h: 1.886, fill: { color: WHITE }, line: { color: BLUE, width: 1 } });
+    s.addShape('ellipse', { x: l[0] + 0.336, y: l[1] + 0.336, w: 1.214, h: 1.214, fill: { color: LILAC }, line: { type: 'none' } });
+    s.addShape('ellipse', { x: l[0] + 0.401, y: l[1] + 0.401, w: 1.083, h: 1.083, fill: { color: l[2] }, line: { type: 'none' } });
+    s.addText([{ text: l[3], options: { fontFace: SORA, fontSize: 45, bold: true, color: WHITE } }],
+      { x: l[0] + 0.401, y: l[1] + 0.401, w: 1.083, h: 1.083, align: 'center', valign: 'middle' });
+  });
+  // thin grey elbow leaders out to the labels
+  [[5.782, 3.841, 3.35, 1], [14.218, 3.841, -3.35, 1],
+  [5.791, 8.284, 3.35, -1], [14.218, 8.284, -3.35, -1]].forEach((e) => {
+    s.addShape('line', { x: e[0], y: e[1], w: e[2], h: 0, line: { color: MUTE, width: 0.75 } });
+  });
+  const labels = [
+    [1.846, 3.660, 'Strenghts', 'right'], [14.483, 3.660, 'Weaknesses', 'left'],
+    [1.846, 6.866, 'Opportunities', 'right'], [14.423, 6.866, 'Threats', 'left'],
+  ];
+  labels.forEach((l) => {
+    s.addText([{ text: l[2], options: { fontFace: DMM, fontSize: 20, color: BLUE, charSpacing: 2 } }],
+      { x: l[0], y: l[1], w: 3.67, h: 0.438, align: l[3], valign: 'top' });
+    body(s, l[0], l[1] + 0.434, 3.67, 1.422, LOREM_TINY, { align: l[3] });
+  });
+  pageFoot(s, 30, 'r');
+}
+
+/* ══ 31 · SWOT arrows ═══════════════════════════════════════════════════ */
+function slide31(s) {
+  swotTitle(s, 0.887, 1.255);
+  const rows = [
+    [3.261, 2.975, 'left', 2.054, 3.236, BLUE, CYAN, 5.344, 3.503, 'Strenghts', 'left'],
+    [10.281, 2.975, 'right', 15.326, 3.236, CYAN, BLUE, 10.999, 3.503, 'Weaknesses', 'right'],
+    [3.261, 6.337, 'left', 2.054, 6.623, CYAN, BLUE, 5.344, 6.864, 'Opportunities', 'left'],
+    [10.281, 6.337, 'right', 15.326, 6.623, BLUE, CYAN, 10.939, 6.864, 'Threats', 'right'],
+  ];
+  rows.forEach((r) => {
+    s.addShape('roundRect', { x: r[0], y: r[1], w: 6.423, h: 2.734, rectRadius: 0.209, fill: { color: LILAC }, line: { type: 'none' } });
+    const pointsRight = r[2] === 'left';
+    s.addShape(pointsRight ? 'rightArrow' : 'leftArrow', {
+      x: r[3], y: r[4], w: 2.621, h: 1.910, fill: { color: r[5] }, line: { type: 'none' },
+    });
+    s.addShape('round1Rect', {
+      x: pointsRight ? r[3] : r[3] + 1.634, y: r[4] + 1.290, w: 0.987, h: 0.904, rectRadius: 0.44,
+      rotate: pointsRight ? 90 : 180, fill: { color: r[6] }, line: { type: 'none' },
+    });
+    s.addText([{ text: r[9], options: { fontFace: DMM, fontSize: 20, color: BLUE, charSpacing: 2 } }],
+      { x: r[7], y: r[8], w: 3.67, h: 0.438, align: r[10], valign: 'top' });
+    body(s, r[7], r[8] + 0.404, 3.67, 1.422, LOREM_TINY, { align: r[10] });
+  });
+  pageFoot(s, 31, 'l');
+}
+
+/* ══ 32 · SWOT hexagon banners ══════════════════════════════════════════ */
+function slide32(s) {
+  swotTitle(s, 0.988, 1.425);
+  const rows = [
+    [4.012, 3.190, CYAN, 'left', 3.133, 2.887, 4.514, BLUE, 'S', 5.740, 3.530, 'Strenghts', 'left'],
+    [7.253, 4.931, BLUE, 'right', 14.981, 15.322, 14.674, CYAN, 'W', 7.670, 5.271, 'Weaknesses', 'right'],
+    [4.012, 6.673, CYAN, 'left', 3.133, 2.887, 4.514, BLUE, 'O', 5.739, 6.977, 'Opportunities', 'left'],
+    [7.253, 8.414, BLUE, 'right', 14.981, 15.322, 14.674, CYAN, 'T', 7.668, 8.754, 'Threats', 'right'],
+  ];
+  rows.forEach((r) => {
+    const y = r[1], right = r[3] === 'right';
+    s.addShape('rect', { x: r[0], y: y, w: 8.735, h: 1.633, fill: { color: r[2] }, line: { type: 'none' } });
+    s.addShape('homePlate', {
+      x: r[6], y: y + 0.173, w: 0.811, h: 1.287, flipH: right,
+      fill: { color: WHITE, transparency: 70 }, line: { type: 'none' },
+    });
+    s.addShape('hexagon', { x: r[5], y: y - 0.215, w: 1.791, h: 2.063, fill: { type: 'none' }, line: { color: r[7] === BLUE ? BLUE : CYAN, width: 1 } });
+    s.addShape('hexagon', { x: r[4], y: y, w: 1.886, h: 1.633, fill: { color: LILAC }, line: { type: 'none' } });
+    s.addText([{ text: r[8], options: { fontFace: SORA, fontSize: 70, bold: true, color: r[7] } }],
+      { x: r[4], y: y, w: 1.886, h: 1.633, align: 'center', valign: 'middle' });
+    s.addText([{ text: r[11], options: { fontFace: DMM, fontSize: 20, color: WHITE, charSpacing: 2 } }],
+      { x: r[9], y: r[10], w: 6.593, h: 0.438, align: r[12], valign: 'top' });
+    body(s, r[9], r[10] + 0.44, 6.593, 0.514,
+      'Lorem ipsum dolor sit amet consectetur adipiscing elit', { color: WHITE, align: r[12] });
+  });
+  pageFoot(s, 32, 'r');
+}
+
+/* ══ 33 · petal pie wheel ═══════════════════════════════════════════════ */
+function slide33(s) {
+  ourTitle(s, 1.342, 'Infographics', [['Our ', INK], ['Infographics', BLUE]]);
+  s.addShape('ellipse', { x: 7.611, y: 3.817, w: 4.778, h: 4.778, fill: { color: LILAC }, line: { type: 'none' } });
+  // six petals of differing radius, mirrored like the original
+  // six petals of alternating hue and radius, sweeping clockwise from 0 deg
+  const wedges = [
+    [6.871, 3.077, 6.259, 348, 380, CYAN],
+    [6.433, 2.639, 7.134, 20, 77, BLUE],
+    [7.243, 3.450, 5.513, 111, 147, CYAN],
+    [6.871, 3.077, 6.259, 147, 201, BLUE],
+    [6.299, 2.505, 7.403, 201, 235, CYAN],
+    [6.871, 3.077, 6.259, 302, 338, BLUE],
+  ];
+  wedges.forEach((w) => {
+    s.addShape('pie', {
+      x: w[0], y: w[1], w: w[2], h: w[2],
+      angleRange: [w[3], w[4]], fill: { color: w[5] }, line: { type: 'none' },
+    });
+  });
+  s.addShape('ellipse', { x: 8.725, y: 4.931, w: 2.55, h: 2.55, fill: { color: WHITE }, line: { type: 'none' } });
+  splash(s, 9.35, 5.583, 1.3, 1.246);
+  const labels = [
+    [1.846, 3.764, 'right'], [14.483, 3.764, 'left'],
+    [1.846, 6.970, 'right'], [14.423, 6.970, 'left'],
+  ];
+  labels.forEach((l) => {
+    s.addText([{ text: 'Your Title', options: { fontFace: DMM, fontSize: 20, color: BLUE, charSpacing: 2 } }],
+      { x: l[0], y: l[1], w: 3.67, h: 0.438, align: l[2], valign: 'top' });
+    body(s, l[0], l[1] + 0.438, 3.67, 1.422, LOREM_TINY, { align: l[2] });
+  });
+  pageFoot(s, 33, 'l');
+}
+
+/* ══ 34 · six segment donut ═════════════════════════════════════════════ */
+function slide34(s) {
+  ourTitle(s, 1.641, 'Infographics', [['Our ', INK], ['Infographics', BLUE]]);
+  const ring = { x: 7.015, y: 3.126, w: 5.98, h: 5.98 };
+  const seg = [[226, 270, CYAN], [271, 315, BLUE], [316, 360, CYAN], [46, 90, BLUE], [91, 135, CYAN], [136, 180, BLUE]];
+  seg.forEach((g) => {
+    s.addShape('pie', {
+      x: ring.x, y: ring.y, w: ring.w, h: ring.h,
+      angleRange: [g[0], g[1]], fill: { color: g[2] }, line: { type: 'none' },
+    });
+  });
+  s.addShape('ellipse', { x: 8.474, y: 4.577, w: 3.068, h: 3.068, fill: { color: WHITE }, line: { type: 'none' } });
+  s.addShape('ellipse', { x: 8.657, y: 4.766, w: 2.695, h: 2.695, fill: { color: LILAC }, line: { type: 'none' } });
+  s.addShape('ellipse', { x: 8.819, y: 4.922, w: 2.377, h: 2.378, fill: { color: BLUE }, line: { type: 'none' } });
+  s.addShape('ellipse', { x: 8.992, y: 5.105, w: 2.033, h: 2.032, fill: { color: WHITE }, line: { type: 'none' } });
+  splash(s, 9.486, 5.622, 1.043, 1.0);
+  // small white glyph badges sitting on the segments
+  [[7.550, 4.873], [7.551, 6.559], [8.922, 7.896], [10.468, 7.826], [11.946, 6.716], [11.815, 4.902]].forEach((g) => {
+    s.addShape('mathPlus', { x: g[0], y: g[1], w: 0.751, h: 0.751, fill: { color: WHITE }, line: { type: 'none' } });
+  });
+  [[12.191, 4.436, 1.587, BLUE], [12.334, 6.594, 1.444, CYAN], [11.154, 8.750, 2.625, BLUE],
+  [6.222, 4.436, -1.700, CYAN], [6.222, 6.594, -1.509, BLUE], [6.222, 8.750, -2.604, CYAN]].forEach((c) => {
+    s.addShape('line', { x: c[2] < 0 ? c[0] + c[2] : c[0], y: c[1], w: Math.abs(c[2]), h: 0, line: { color: c[3], width: 1.5 } });
+  });
+  [[1.639, 'right'], [14.276, 'left']].forEach((col) => {
+    [3.765, 5.923, 8.079].forEach((y) => {
+      s.addText([{ text: 'Your Title', options: { fontFace: DMM, fontSize: 20, color: BLUE, charSpacing: 2 } }],
+        { x: col[0], y: y, w: 4.085, h: 0.438, align: col[1], valign: 'top' });
+      body(s, col[0], y + 0.438, 4.085, 0.968,
+        'Lorem ipsum dolor sit amet consectetur adipiscing elit sed', { align: col[1] });
+    });
+  });
+  pageFoot(s, 34, 'r');
+}
+
+/* ══ 35 · numbered list tiles ═══════════════════════════════════════════ */
+function slide35(s) {
+  ourTitle(s, 0.868, 'Infographics', [['Our ', INK], ['Infographics', BLUE]]);
+  const cols = [[3.039, 2.396, 4.133, ['01', '02', '03']], [11.732, 11.089, 12.826, ['04', '05', '06']]];
+  const ys = [3.236, 5.464, 7.692];
+  cols.forEach((c, ci) => {
+    c[3].forEach((num, ri) => {
+      const y = ys[ri];
+      const flip = (ci + ri) % 2 === 1;
+      s.addShape('rect', { x: c[0], y: y, w: 5.872, h: 1.676, fill: { color: LILAC }, line: { type: 'none' } });
+      s.addShape('rect', { x: c[1], y: y - 0.258, w: 1.292, h: 1.292, fill: { color: flip ? BLUE : CYAN }, line: { type: 'none' } });
+      s.addShape('rtTriangle', { x: c[1], y: y + 1.034, w: 0.643, h: 0.643, rotate: 180, fill: { color: flip ? CYAN : BLUE }, line: { type: 'none' } });
+      s.addText([{ text: num, options: { fontFace: SORA, fontSize: 22, bold: true, color: WHITE } }],
+        { x: c[1], y: y - 0.258, w: 1.292, h: 1.292, align: 'center', valign: 'middle' });
+      body(s, c[2], y + 0.127, 4.333, 1.423,
+        'PLACEHOLDER');
+    });
+  });
+  pageFoot(s, 35, 'l');
+}
+
+/* ══ 36 · pricing table ═════════════════════════════════════════════════ */
+function slide36(s) {
+  ourTitle(s, 1.454, 'Pricing Table', [['Our ', INK], ['Pricing Table', BLUE]]);
+  const plans = [
+    [1.770, 1.912, 2.336, 2.096, 3.834, 'Basic', '$15 ', ['Get 100 Download Everyweek', '25 GB Cloud Strorage', 'Fast Support 24/7']],
+    [7.508, 7.650, 8.074, 7.834, 4.234, 'Medium', '$55 ', ['Get 200 Download Everyweek', '50 GB Cloud Strorage', 'Fast Support 24/7']],
+    [13.232, 13.388, 13.812, 13.572, 3.834, 'Premium', '$75 ', ['Get 500 Download Everyweek', '100 GB Cloud Strorage', 'Fast Support 24/7']],
+  ];
+  plans.forEach((p) => {
+    const top = p[4];
+    s.addShape('roundRect', { x: p[0], y: top, w: 3.6, h: 1.72, rectRadius: 0.2, fill: { color: MID }, line: { type: 'none' } });
+    s.addShape('roundRect', { x: p[1], y: top - 0.166, w: 4.841, h: 5.728, rectRadius: 0.218, fill: { color: MID }, line: { type: 'none' } });
+    s.addText([{ text: p[5], options: { fontFace: DMM, fontSize: 24, color: WHITE, charSpacing: 1 } }],
+      { x: p[2], y: top + 0.46, w: 3.993, h: 0.505, align: 'center', valign: 'top' });
+    s.addText([
+      { text: p[6], options: { fontFace: SORA, fontSize: 55, bold: true, color: WHITE } },
+      { text: '/', options: { fontFace: SORA, fontSize: 20, bold: true, color: WHITE } },
+      { text: 'month', options: { fontFace: SORA, fontSize: 16, bold: true, color: WHITE } },
+    ], { x: p[2], y: top + 1.176, w: 3.993, h: 1.027, align: 'center', valign: 'top' });
+    p[7].forEach((line, i) => {
+      s.addText([{ text: line, options: { fontFace: DM, fontSize: 18, color: WHITE } }], {
+        x: p[3], y: top + 2.744 + i * 0.807, w: 4.473, h: 0.514,
+        align: 'center', valign: 'top', lineSpacingMultiple: 1.5,
+        bullet: { characterCode: '2022', indent: 22.5 },
+      });
+    });
+  });
+  pageFoot(s, 36, 'r');
+}
+
+/* ══ 37 · contact ═══════════════════════════════════════════════════════ */
+function slide37(s) {
+  ramp(s, 12.432, 4.159, 4.149, 2.932);
+  photo(s, 10.621, 1.561, 3.646, 7.230, PH1, { shape: 'roundRect', props: { rectRadius: 0.2 } });
+  photo(s, 14.747, 2.459, 3.412, 7.230, PH2, { shape: 'roundRect', props: { rectRadius: 0.19 } });
+  eyebrow(s, 1.793, 2.484, 7.275, 'Contact');
+  heading(s, 1.793, 2.888, 7.275, 1.952, [['Get In Touch With ', INK], ['Medikare', BLUE]], { size: 55 });
+  const items = [
+    [1.793, 5.592, 2.409, 2.834, 'Phone', ['+1234 5678 890', '(+1234) 56789']],
+    [5.757, 5.592, 6.469, 2.711, 'Address', ['Medikare Street 12,', 'Anycity']],
+    [1.793, 7.490, 2.402, 2.933, 'Email', ['mail@Medikare.com Info@ Medikare.com ']],
+    [5.757, 7.490, 6.469, 2.714, 'Office', ['Monday - Saturday', '08.00 – 20.00']],
+  ];
+  items.forEach((it) => {
+    s.addShape('roundRect', { x: it[0], y: it[1], w: 0.507, h: 0.507, rectRadius: 0.1, fill: { color: MID }, line: { type: 'none' } });
+    s.addShape('mathPlus', { x: it[0] + 0.13, y: it[1] + 0.13, w: 0.247, h: 0.247, fill: { color: WHITE }, line: { type: 'none' } });
+    s.addText([{ text: it[4], options: { fontFace: DMM, fontSize: 20, color: BLUE, charSpacing: 2 } }],
+      { x: it[2], y: it[1], w: it[3], h: 0.438, valign: 'top' });
+    body(s, it[2], it[1] + 0.42, it[3], 0.968, it[5], { align: 'left', charSpacing: 1 });
+  });
+  pageFoot(s, 37, 'l');
+}
+
+/* ══ 38 · thanks ════════════════════════════════════════════════════════ */
+function slide38(s) {
+  s.background = { color: WHITE };
+  coverGlow(s);
+  s.addText([{ text: 'THANKS', options: { fontFace: SORA, fontSize: 130, bold: true, color: WHITE, charSpacing: 2 } }],
+    { x: 5.717, y: 4.178, w: 8.566, h: 2.289, align: 'center', valign: 'middle', wrap: false });
+  s.addText([{ text: 'Thank You for Your Time', options: { fontFace: DMM, fontSize: 20, color: WHITE, charSpacing: 1 } }],
+    { x: 7.176, y: 6.349, w: 5.649, h: 0.438, align: 'center', valign: 'top' });
+  button(s, 8.542, 7.472, 2.917, 0.875, 'LEARN MORE');
+  s.addText([{ text: 'www.medikare.com', options: { fontFace: DMM, fontSize: 20, color: BLUE, charSpacing: 1 } }],
+    { x: 0.875, y: 10.302, w: 4.253, h: 0.56, valign: 'top', lineSpacingMultiple: 1.5 });
+  s.addText([{ text: 'Version 1.0', options: { fontFace: DMM, fontSize: 20, color: BLUE, charSpacing: 1 } }],
+    { x: 14.872, y: 10.302, w: 4.253, h: 0.56, align: 'right', valign: 'top', lineSpacingMultiple: 1.5 });
+}
+
+/* ══ 39 & 40 · icon sheets ══════════════════════════════════════════════ */
+const ICON_COLS = [3.87, 4.97, 6.08, 7.18, 8.32, 9.42, 10.55, 11.61, 12.72, 13.82, 14.93, 16.03];
+const ICON_ROWS = [2.83, 3.92, 5.05, 6.15, 7.26, 8.38];
+const ICON_GLYPHS = ['mathPlus', 'ellipse', 'roundRect', 'triangle', 'chevron', 'hexagon',
+  'star5', 'moon', 'donut', 'teardrop', 'pie', 'diamond'];
+
+function iconSheet(s, color) {
+  const d = 0.6;
+  ICON_ROWS.forEach((cy, r) => {
+    ICON_COLS.forEach((cx, c) => {
+      s.addShape(ICON_GLYPHS[(r * 5 + c) % ICON_GLYPHS.length], {
+        x: cx - d / 2, y: cy - d / 2, w: d, h: d,
+        fill: { color: color }, line: { type: 'none' },
+      });
+    });
+  });
+}
+
+function slide39(s) {
+  ramp(s, 0, 0, 20, 11.25);
+  iconSheet(s, WHITE);
+  s.addText([
+    { text: 'PAGE', options: { fontFace: DMS, fontSize: 18, color: MUTE, charSpacing: 1 } },
+    { text: '    -   39', options: { fontFace: DMS, fontSize: 18, color: WHITE, charSpacing: 1 } },
+  ], { x: 0.64, y: 10.514, w: 1.948, h: 0.404, valign: 'top', align: 'center' });
+}
+
+function slide40(s) {
+  iconSheet(s, MID);
+  pageFoot(s, 40, 'r');
+}
+
+/* ── assemble & write ───────────────────────────────────────────────────── */
+const BUILDERS = [
+  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
+  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
+  slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29, slide30,
+  slide31, slide32, slide33, slide34, slide35, slide36, slide37, slide38, slide39, slide40,
+];
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'MEDIKARE', width: SLIDE_W, height: SLIDE_H });
+  pptx.layout = 'MEDIKARE';
+  pptx.author = 'MEDIKARE';
+  pptx.title = 'MEDIKARE - Medical Presentation Template';
+  BUILDERS.forEach((fn) => fn(pptx.addSlide()));
+  return pptx.writeFile({ fileName: path.join(__dirname, '115081cf-0aed-4763-b282-ea2a740134c7_grok_final.pptx') });
+}
+
+build().then((f) => console.log('wrote ' + f)).catch((e) => { console.error(e); process.exit(1); });

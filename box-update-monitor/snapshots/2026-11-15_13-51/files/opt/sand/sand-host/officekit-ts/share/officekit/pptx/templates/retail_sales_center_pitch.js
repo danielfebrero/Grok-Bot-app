@@ -1,0 +1,1084 @@
+/**
+ * "Sales Center" — Business Sales PowerPoint Template (51 slides, 26.665in x 15in).
+ * Standalone pptxgenjs re-creation of the reference deck.
+ * Photographs in the original are replaced by labelled placeholder rectangles.
+ */
+'use strict';
+
+const PptxGenJS = require('pptxgenjs');
+const path = require('path');
+
+/* ------------------------------------------------------------------ theme */
+const BLUE = '2C2BE2';   // accent 1
+const ORANGE = 'F8700E'; // accent 2
+const INK = '1F2023';    // text 1
+const BG = 'EDEFF4';     // background 1
+const WHITE = 'FFFFFF';
+const NUMGRAY = '8C8D8D'; // slide-number tint
+const LILAC = 'D5D5F9';   // table banding
+const PALE = 'F8F9FB';    // table banding (alt)
+
+const HEAD = 'Sora Semibold';
+const BODY = 'Sora Light';
+const FA = 'Font Awesome 5 Free Solid';
+const FAB = 'Font Awesome 5 Brands Regular';
+
+const SLIDE_W = 26.6649;
+const SLIDE_H = 15;
+
+// The template's photo frames are empty picture placeholders with a pale
+// checkerboard pattern fill; these stand in for them.
+const PHOTO_FILL = 'E7E9EF';
+const PHOTO_LABEL = 'BFC4D0';
+
+/* ------------------------------------------------------- generic helpers */
+
+/** Text insets given in inches -> pptxgenjs `margin` array (points, [l,r,b,t]). */
+const ins = (l, r, t, b) => [l * 72, r * 72, b * 72, t * 72];
+
+/** Text with the deck's defaults applied. */
+function T(slide, text, opts) {
+    slide.addText(text, Object.assign({ fontFace: BODY, color: INK, margin: 0 }, opts));
+}
+
+function rect(slide, x, y, w, h, color, opts) {
+    slide.addShape('rect', Object.assign({ x, y, w, h, fill: { color }, line: { type: 'none' } }, opts));
+}
+
+/** Solid circle / ellipse. */
+function oval(slide, x, y, w, h, color) {
+    slide.addShape('ellipse', { x, y, w, h, fill: { color }, line: { type: 'none' } });
+}
+
+/** Outlined (hollow) circle. */
+function ring(slide, x, y, d, color, width) {
+    slide.addShape('ellipse', { x, y, w: d, h: d, fill: { type: 'none' }, line: { color, width: width || 4 } });
+}
+
+function hline(slide, x, y, w, color, width, dash) {
+    slide.addShape('line', { x, y, w, h: 0, line: { color, width, dashType: dash } });
+}
+
+/** The 0.787in colour bars that bleed off the left / right slide edges. */
+const LEFT_BAR = 0;
+const RIGHT_BAR = 25.878;
+function edgeBar(slide, x, y, h, color) {
+    rect(slide, x, y, 0.787, h, color);
+}
+
+/** Small square accent block used all over the deck. */
+function square(slide, x, y, color) {
+    rect(slide, x, y, 1.575, 1.576, color);
+}
+
+/** Short thick underline under a lead paragraph. */
+function tick(slide, x, y, w, h, color) {
+    rect(slide, x, y, w, h, color);
+}
+
+/**
+ * "Selico" logo. The mark is a square ring with cut corners: four orange bars
+ * around an empty centre. Drawn inside the 3.937 x 1.0in logo placeholder.
+ */
+function logo(slide) {
+    const x = 2.308, y = 1.207;
+    const t = 0.193;   // bar thickness
+    const span = 0.58; // length of each bar / size of the hole
+    rect(slide, x + t, y, span, t, ORANGE);                     // top
+    rect(slide, x + t, y + t + span, span, t, ORANGE);          // bottom
+    rect(slide, x, y + t, t, span, ORANGE);                     // left
+    rect(slide, x + t + span, y + t, t, span, ORANGE);          // right
+    T(slide, 'Selico', { x: x + 1.28, y: y - 0.07, w: 2.7, h: 1.12, fontSize: 62, bold: true, fontFace: 'Open Sans', color: INK, valign: 'middle' });
+}
+
+function pageNum(slide, n) {
+    T(slide, String(n), { x: 25.144, y: 13.788, w: 0.788, h: 0.799, fontSize: 36, color: NUMGRAY, align: 'center', valign: 'middle' });
+}
+
+/** Logo + page number + edge bars — every slide but the cover has them. */
+function chrome(slide, n, bars) {
+    logo(slide);
+    pageNum(slide, n);
+    (bars || []).forEach(b => edgeBar(slide, b[0], b[1], b[2], b[3]));
+}
+
+/** Placeholder standing in for a photograph in the original template. */
+function photo(slide, x, y, w, h, line) {
+    slide.addShape('rect', { x, y, w, h, fill: { color: PHOTO_FILL }, line: line || { type: 'none' } });
+    T(slide, '[image]', { x, y, w, h, fontSize: 32, color: PHOTO_LABEL, align: 'center', valign: 'middle' });
+}
+
+/** Circular photo placeholder (team / partner avatars). */
+function photoCircle(slide, x, y, d) {
+    slide.addShape('ellipse', { x, y, w: d, h: d, fill: { color: PHOTO_FILL }, line: { type: 'none' } });
+    T(slide, '[image]', { x, y, w: d, h: d, fontSize: 32, color: PHOTO_LABEL, align: 'center', valign: 'middle' });
+}
+
+/** Font-Awesome glyph inside a filled circle. */
+function iconCircle(slide, x, y, d, glyph, opts) {
+    const o = opts || {};
+    slide.addText(glyph, {
+        shape: 'ellipse', x, y, w: d, h: d,
+        fill: o.bg ? { color: o.bg } : { type: 'none' },
+        line: o.ring ? { color: o.ring, width: o.ringWidth || 4 } : { type: 'none' },
+        fontFace: o.brand ? FAB : FA, fontSize: o.size || 60, color: o.fg || WHITE,
+        align: 'center', valign: o.valign || 'middle', margin: 0
+    });
+}
+
+/** Regular grid of small dots (the template's halftone decoration). */
+function dotGrid(slide, x, y, cols, rows, color) {
+    const pitch = 0.4905, d = 0.116;
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) oval(slide, x + c * pitch, y + r * pitch, d, d, color || BLUE);
+    }
+}
+
+/** Concentric hair-line arcs forming the pale striped disc on the cover. */
+function stripedDisc(slide, cx, cy, d) {
+    const n = 22, step = d / (n + 1);
+    for (let i = 1; i <= n; i++) {
+        const s = i * step;
+        slide.addShape('ellipse', {
+            x: cx - s / 2, y: cy - s / 2, w: s, h: s,
+            fill: { type: 'none' }, line: { color: WHITE, width: 1.5 }
+        });
+    }
+}
+
+/* ------------------------------------------------------------ slide parts */
+
+/** Big centred section heading (136 pt) used by most content slides. */
+function bigTitle(slide, text, y, h, color, x, w) {
+    T(slide, text, {
+        x: x === undefined ? 2.308 : x, y, w: w === undefined ? 22.049 : w, h,
+        fontSize: 136, fontFace: HEAD, color: color || BLUE,
+        align: 'center', lineSpacingMultiple: 0.8
+    });
+}
+
+/** Left-aligned 112 pt headline. */
+function headline(slide, text, x, y, w, h, color, opts) {
+    T(slide, text, Object.assign({
+        x, y, w, h, fontSize: 112, fontFace: HEAD, color: color || INK,
+        lineSpacingMultiple: 0.85, margin: ins(0, 0, 0.197, 0)
+    }, opts || {}));
+}
+
+/** 36 pt body copy. */
+function body36(slide, text, x, y, w, h, opts) {
+    T(slide, text, Object.assign({ x, y, w, h, fontSize: 36, lineSpacingMultiple: 1.2 }, opts || {}));
+}
+
+/** Numbered timeline bubble: white circle with a number and a month below. */
+function timelineBubble(slide, x, y, num, month, color) {
+    T(slide, num, {
+        shape: 'ellipse', x, y, w: 2.756, h: 2.756, fill: { color: WHITE }, line: { type: 'none' },
+        fontSize: 88, fontFace: HEAD, color, align: 'center',
+        margin: ins(0.157, 0.157, 0.197, 0.472)
+    });
+    T(slide, month, { x, y: y + 1.718, w: 2.756, h: 0.727, fontSize: 36, align: 'center', lineSpacingMultiple: 0.9 });
+}
+
+/* ---------------------------------------------------------------- slide 1 */
+function slide01(s) {
+    stripedDisc(s, 12.721 + 4.331 / 2, 4.589 + 4.331 / 2, 4.331);
+    square(s, 14.120, 10.649, ORANGE);
+    T(s, 'Sales Center', {
+        x: 2.308, y: 3.580, w: 11.023, h: 4.501, fontSize: 172, fontFace: HEAD, color: BLUE,
+        lineSpacingMultiple: 0.75, margin: ins(0, 0, 0.197, 0)
+    });
+    T(s, 'Business Sales\nPowerPoint Template', {
+        x: 3.882, y: 8.288, w: 9.450, h: 1.629, fontSize: 44, lineSpacingMultiple: 1.1, margin: ins(0.394, 0, 0, 0)
+    });
+    [[1.521, '\uF0E0', false], [10.182, '\uF245', false], [18.871, '\uF39E', true]].forEach(([x, g, brand]) => {
+        iconCircle(s, x, 13.012, 0.984, g, { bg: BLUE, fg: BG, size: 36, brand });
+    });
+    [[2.768, 5.052, 'Your@name.com'], [11.431, 5.024, 'Yourwebsite.com'], [20.120, 4.222, 'Companyname']]
+        .forEach(([x, w, t]) => T(s, t, { x, y: 13.255, w, h: 0.539, fontSize: 32, valign: 'middle' }));
+    logo(s);
+    rect(s, 18.057, 1.988, 5.512, 0.788, BLUE);
+    rect(s, 23.571, 2.787, 0.786, 7.087, BLUE);
+    tick(s, 2.306, 8.632, 1.575, 0.079, ORANGE);
+    oval(s, 24.352, 1.200, 0.787, 0.787, ORANGE);
+    dotGrid(s, 20.764, 11.983, 8, 2);
+    photo(s, 14.908, 2.774, 8.661, 8.661);
+}
+
+/* ---------------------------------------------------------------- slide 2 */
+function slide02(s) {
+    chrome(s, 2, [[LEFT_BAR, 6.712, 8.288, BLUE], [RIGHT_BAR, 0, 6.712, ORANGE]]);
+    bigTitle(s, 'Table of contents', 3.583, 1.831, BLUE, 3.095, 20.474);
+    const items = [['Introduction', '02', 11.757, 6.991], ['Stories', '04', 9.542, 9.206],
+                   ['Infographics', '28', 11.861, 6.887], ['Summary', '44', 10.389, 8.359],
+                   ['Contacts', '48', 10.389, 8.359]];
+    T(s, items.map(i => i[0]).join('\n'), { x: 6.245, y: 6.712, w: 10.236, h: 5.554, fontSize: 60, lineSpacingMultiple: 1.1 });
+    T(s, items.map(i => i[1]).join('\n'), { x: 18.845, y: 6.712, w: 2.363, h: 5.554, fontSize: 60, lineSpacingMultiple: 1.1, margin: ins(0.039, 0, 0, 0) });
+    items.forEach((it, i) => hline(s, it[2], 7.500 + i * 1.0925, it[3], INK, 4, 'sysDot'));
+}
+
+/* ---------------------------------------------------------------- slide 3 */
+function slide03(s) {
+    chrome(s, 3, [[LEFT_BAR, 5.925, 9.075, ORANGE], [RIGHT_BAR, 0, 5.925, BLUE]]);
+    bigTitle(s, 'Agenda', 3.583, 1.831);
+    const cards = [
+        [3.095, 5.925, '2:00\nPM', 6.732, 6.404, 6.600, 'Maecenas id diam vestibulum, fringilla velit non, malesuada nunc.'],
+        [14.118, 5.925, '3:00\nPM', 17.751, 6.404, 6.607, 'Vestibulum eu augue facilisis, iaculis sem viverra, dignissim turpis.'],
+        [3.095, 9.863, '4:00\nPM', 6.732, 10.347, 6.600, 'Duis sagittis dui vel blandit suscipit. Nam nec nunc tortor.'],
+        [14.118, 9.863, '5:00\nPM', 17.751, 10.347, 6.607, 'Suspendisse lobortis non dui posuere euismod. Mauris a nisl.']
+    ];
+    cards.forEach(([cx, cy, time, tx, ty, tw, txt]) => {
+        T(s, time, {
+            x: cx, y: cy, w: 3.150, h: 3.150, fill: { color: WHITE }, fontSize: 48, fontFace: HEAD, color: BLUE,
+            align: 'center', valign: 'middle', lineSpacingMultiple: 0.9, margin: ins(0.394, 0.394, 0.394, 0.197)
+        });
+        body36(s, txt, tx, ty, tw, 2.181, { valign: 'middle' });
+    });
+}
+
+/* --------------------------------------------------------- slides 4 and 5 */
+function slide04(s) {
+    square(s, 23.570, 3.315, BLUE);
+    chrome(s, 4);
+    T(s, 'Please come in and have a look at our best sellers', {
+        x: 2.309, y: 4.103, w: 22.049, h: 6.794, fill: { color: WHITE }, fontSize: 112, fontFace: HEAD,
+        valign: 'middle', lineSpacingMultiple: 0.85, margin: ins(1.969, 0.787, 1.181, 0.787)
+    });
+    square(s, 1.520, 10.109, ORANGE);
+}
+
+function slide05(s) {
+    photo(s, 0, 0, SLIDE_W, SLIDE_H);
+    chrome(s, 5);
+    square(s, 23.570, 4.099, ORANGE);
+    T(s, 'You are sure to buy a bargain at the market', {
+        x: 2.309, y: 4.887, w: 22.049, h: 5.225, fill: { color: WHITE, transparency: 20 }, fontSize: 112, fontFace: HEAD,
+        valign: 'middle', lineSpacingMultiple: 0.85, margin: ins(1.969, 0.787, 1.181, 0.787)
+    });
+    square(s, 1.520, 9.324, BLUE);
+}
+
+/* --------------------------------------------------------- slides 6 and 7 */
+function slide06(s) {
+    square(s, 14.912, 10.659, ORANGE);
+    chrome(s, 6, [[LEFT_BAR, 5.925, 9.075, BLUE]]);
+    headline(s, 'Don\u2019t miss this opportunity', 2.309, 5.925, 12.599, 3.238, INK, { valign: 'middle', margin: 0 });
+    body36(s, 'Donec vestibulum accumsan metus et convallis. Aenean quis augue sapien. Pellentesque egestas '
+        + 'lobortis neque, quis posuere tortor aliquam sit amet. Praesent nibh augue, maximus id nisi et, vestibulum interdum risus.',
+        15.694, 3.553, 8.663, 8.054, { fill: { color: BLUE }, color: WHITE, margin: ins(0.787, 0.787, 0.787, 0.709) });
+    rect(s, 18.850, 2.754, 5.512, 0.788, WHITE);
+    rect(s, 24.364, 3.553, 0.786, 7.087, WHITE);
+    oval(s, 25.145, 1.965, 0.787, 0.787, ORANGE);
+}
+
+function slide07(s) {
+    photo(s, 10.970, 0, 15.694, SLIDE_H);
+    chrome(s, 7);
+    headline(s, 'Our reputation goes with it', 2.309, 4.479, 14.960, 4.596, INK,
+        { fill: { color: WHITE }, valign: 'bottom', margin: ins(1.181, 1.181, 0.787, 0.591) });
+    body36(s, 'Quisque at eros vitae nisi sodales tempor. Sed nec odio congue, aliquam urna ac, tincidunt tellus.',
+        2.307, 9.075, 14.962, 3.044, { fill: { color: BLUE }, color: WHITE, margin: ins(1.181, 1.181, 0.787, 0.787) });
+    dotGrid(s, 1.292, 12.509, 8, 2);
+    dotGrid(s, 1.292, 8.568, 2, 8);
+}
+
+/* --------------------------------------------------------- slides 8 and 9 */
+/** Two-column body text: the reference splits the copy across two columns. */
+function twoColBody(s, x, y, w, h, left, right) {
+    const colW = (w - 2.362 - 1.181) / 2;
+    body36(s, '', x, y, w, h, { fill: { color: BLUE } });
+    body36(s, left, x + 1.181, y + 0.787, colW, h - 1.496, { color: WHITE });
+    body36(s, right, x + 1.181 + colW + 1.181, y + 0.787, colW, h - 1.496, { color: WHITE });
+}
+
+function slide08(s) {
+    chrome(s, 8, [[LEFT_BAR, 7.5, 7.5, BLUE], [RIGHT_BAR, 0, 7.5, ORANGE]]);
+    headline(s, 'Perfect from beginning to end', 3.882, 2.871, 19.688, 4.629, INK,
+        { fill: { color: WHITE }, valign: 'bottom', margin: ins(1.181, 1.181, 0.787, 0.591) });
+    twoColBody(s, 3.882, 7.500, 19.687, 4.726,
+        'Phasellus ultricies ante eu ante auctor iaculis. Phasellus vel nisl sed nisi aliquet ultrices ac at nisi. Cras id consequat lacus.',
+        'Aenean sit amet gravida orci, ac rhoncus nulla. In hac habitasse platea dictumst. Aenean vitae ornare lacus, ac mollis nunc.');
+}
+
+function slide09(s) {
+    photo(s, 0, 0, 15.694, SLIDE_H);
+    square(s, 24.357, 3.685, ORANGE);
+    chrome(s, 9);
+    headline(s, 'Ideal choice', 8.608, 4.473, 16.538, 3.027, INK,
+        { fill: { color: WHITE }, valign: 'bottom', margin: ins(1.181, 1.181, 0.787, 0.591) });
+    twoColBody(s, 8.608, 7.500, 16.538, 4.726,
+        'Nam tempor, orci vel sodales pellentesque, neque augue sodales nisl, quis aliquam augue urna.',
+        'Mauris consectetur porta risus, sit amet ultricies justo bibendum eu. Sed sodales velit eget lacus.');
+}
+
+/* ------------------------------------------------------- slides 10 and 11 */
+function slide10(s) {
+    photo(s, 14.908, 2.774, 8.661, 9.451);
+    chrome(s, 10, [[LEFT_BAR, 7.5, 7.5, BLUE], [RIGHT_BAR, 0, 3.580, ORANGE]]);
+    headline(s, 'Be modest, Be social', 2.308, 3.580, 11.023, 3.436, BLUE);
+    T(s, 'Morbi porta rutrum elit ut cursus. Sed id dolor erat. Proin sed mi enim. '
+        + 'Sed condimentum purus eros, nec lacinia arcu convallis et.',
+        { x: 3.882, y: 7.508, w: 9.450, h: 4.039, fontSize: 44, lineSpacingMultiple: 1.1, margin: ins(0.394, 0, 0, 0) });
+    square(s, 14.120, 11.436, ORANGE);
+    rect(s, 18.057, 1.988, 5.512, 0.788, BLUE);
+    rect(s, 23.571, 2.787, 0.786, 7.087, BLUE);
+    tick(s, 2.306, 7.852, 1.575, 0.079, ORANGE);
+}
+
+function slide11(s) {
+    stripedDisc(s, 9.474 + 1.496, 1.286 + 1.496, 2.992);
+    photo(s, 2.307, 2.774, 8.661, 9.451);
+    chrome(s, 11, [[LEFT_BAR, 9.075, 5.925, BLUE], [RIGHT_BAR, 0, 3.562, ORANGE]]);
+    headline(s, 'Perfect from beginning \nto end', 13.332, 3.580, 11.023, 5.039, BLUE);
+    T(s, 'Fusce sagittis sem sit amet quam imperdiet tempor. Morbi eget sem cursus.',
+        { x: 14.905, y: 9.085, w: 9.450, h: 2.410, fontSize: 44, lineSpacingMultiple: 1.1, margin: ins(0.394, 0, 0, 0) });
+    square(s, 10.188, 11.423, ORANGE);
+    tick(s, 13.333, 9.432, 1.575, 0.079, ORANGE);
+}
+
+/* ------------------------------------------------- slides 12-15: image+text */
+function imageTextSlide(s, n, cfg) {
+    photo(s, cfg.img[0], cfg.img[1], cfg.img[2], cfg.img[3]);
+    chrome(s, n, cfg.bars);
+    headline(s, cfg.title, cfg.t[0], cfg.t[1], cfg.t[2], cfg.t[3]);
+    body36(s, cfg.body, cfg.b[0], cfg.b[1], cfg.b[2], cfg.b[3]);
+}
+
+function slide12(s) {
+    imageTextSlide(s, 12, {
+        img: [14.908, 0, 11.757, SLIDE_H],
+        bars: [[LEFT_BAR, 12.226, 2.774, BLUE], [RIGHT_BAR, 0, 2.774, ORANGE]],
+        title: 'A chance of new business', t: [1.522, 3.580, 11.023, 3.436],
+        body: 'Nam malesuada vulputate lectus non tristique. Proin sit amet vehicula elit. Ut aliquet urna at neque '
+            + 'feugiat, sed lacinia eros rhoncus. Nunc felis libero, suscipit at justo a, pretium elementum orci.',
+        b: [1.520, 7.508, 11.025, 4.854]
+    });
+}
+
+function slide13(s) {
+    imageTextSlide(s, 13, {
+        img: [0, 0, 11.757, SLIDE_H],
+        bars: [[LEFT_BAR, 12.226, 2.774, ORANGE], [RIGHT_BAR, 0, 2.774, BLUE]],
+        title: 'Speeded up marketing', t: [14.120, 3.580, 11.023, 3.436],
+        body: 'Morbi porta rutrum elit ut cursus. Sed id dolor erat. Proin sed mi enim. Sed condimentum purus eros, '
+            + 'nec lacinia arcu convallis et. Duis elementum mattis ante id mattis. Sed dapibus felis quam.',
+        b: [14.118, 7.508, 11.025, 3.635]
+    });
+}
+
+function slide14(s) {
+    imageTextSlide(s, 14, {
+        img: [0, 0, SLIDE_W, 6.712],
+        bars: [[LEFT_BAR, 10.655, 4.345, BLUE], [RIGHT_BAR, 0, 2.774, ORANGE]],
+        title: 'Connect with your clients', t: [2.308, 8.297, 21.261, 1.834],
+        body: 'Duis volutpat bibendum dui, in placerat risus malesuada et. Curabitur mollis efficitur ex, eget euismod '
+            + 'neque convallis vitae. Donec a libero a lorem pellentesque tempor. Proin non rutrum justo, sed iaculis.',
+        b: [2.306, 10.655, 21.263, 2.410]
+    });
+}
+
+function slide15(s) {
+    imageTextSlide(s, 15, {
+        img: [0, 8.288, SLIDE_W, 6.712],
+        bars: [[LEFT_BAR, 12.226, 2.774, ORANGE], [RIGHT_BAR, 0, 2.774, BLUE]],
+        title: 'Buy with confidence', t: [2.308, 2.774, 21.261, 1.834],
+        body: 'Curabitur nec vulputate urna, fringilla fermentum odio. Nullam id libero at velit viverra euismod. Nullam vitae sem et.',
+        b: [2.306, 5.132, 21.263, 1.596]
+    });
+}
+
+/* --------------------------------------------------------------- slide 16 */
+function slide16(s) {
+    ring(s, 2.781, 6.013, 6.929, BLUE);
+    ring(s, 16.954, 6.013, 6.929, BLUE);
+    iconCircle(s, 3.095, 6.332, 6.299, '\uF0A1', { bg: WHITE, fg: BLUE, size: 112, valign: 'top' });
+    iconCircle(s, 17.269, 6.332, 6.299, '\uF218', { bg: WHITE, fg: BLUE, size: 112, valign: 'top' });
+    chrome(s, 16, [[LEFT_BAR, 9.863, 5.137, BLUE], [RIGHT_BAR, 0, 4.351, ORANGE]]);
+    bigTitle(s, 'What we do', 2.774, 1.831);
+    [[3.882, 4.726, 'Marketing'], [18.057, 4.726, 'Sales']].forEach(([x, w, t]) =>
+        T(s, t, { x, y: 10.024, w, h: 0.740, fontSize: 44, fontFace: HEAD, align: 'center' }));
+    T(s, 'Business\nanalysis', { x: 10.183, y: 10.024, w: 6.300, h: 1.481, fontSize: 44, fontFace: HEAD, align: 'center' });
+    slideCenterDisc(s);
+    ring(s, 8.844, 4.989, 8.976, ORANGE);
+}
+/** Slide 16's big middle circle (white disc + orange icon). */
+function slideCenterDisc(s) {
+    s.addText('\uF0B1', {
+        shape: 'ellipse', x: 9.002, y: 5.151, w: 8.661, h: 8.661,
+        fill: { color: WHITE }, line: { color: BG, width: 20 },
+        fontFace: FA, fontSize: 144, color: ORANGE, align: 'center', valign: 'top',
+        margin: ins(0, 0, 0.866, 0)
+    });
+}
+
+/* --------------------------------------------------------------- slide 17 */
+function slide17(s) {
+    chrome(s, 17, [[LEFT_BAR, 10.629, 4.371, ORANGE], [RIGHT_BAR, 0, 4.351, BLUE]]);
+    bigTitle(s, 'Our goals', 2.774, 1.900);
+    [[2.308, 8.293, 'Continuous training'], [18.056, 8.293, 'Customer orientation'],
+     [10.183, 5.955, 'Work-life balance']].forEach(([x, y, t]) =>
+        T(s, t, { x, y, w: 6.300, h: 2.020, fontSize: 60, fontFace: HEAD, align: 'center', valign: 'bottom' }));
+    // the wide semicircular arc and the two short diagonals that flank it
+    s.addShape('custGeom', {
+        x: 8.215, y: 9.863, w: 10.234, h: 5.120, fill: { type: 'none' }, line: { color: BLUE, width: 4 },
+        points: [{ x: 0, y: 5.120 },
+                 { x: 5.117, y: 0, curve: { type: 'cubic', x1: 0, y1: 2.293, x2: 2.292, y2: 0 } },
+                 { x: 10.234, y: 5.120, curve: { type: 'cubic', x1: 7.943, y1: 0, x2: 10.234, y2: 2.293 } }]
+    });
+    [[17.225, false], [2.293, true]].forEach(([x, flip]) => s.addShape('custGeom', {
+        x, y: 10.629, w: 7.147, h: 0.855, flipH: flip, fill: { type: 'none' }, line: { color: ORANGE, width: 4 },
+        points: [{ x: 0, y: 0.855 }, { x: 0.663, y: 0 }, { x: 7.147, y: 0 }]
+    }));
+    oval(s, 12.936, 9.469, 0.787, 0.787, ORANGE);
+    oval(s, 9.152, 11.200, 0.787, 0.787, ORANGE);
+    oval(s, 16.725, 11.200, 0.787, 0.787, ORANGE);
+    hline(s, 10.183, 8.291, 6.300, ORANGE, 4);
+    s.addShape('line', { x: 13.333, y: 8.291, w: 0, h: 1.572, line: { color: ORANGE, width: 4 } });
+}
+
+/* --------------------------------------------------------------- slide 18 */
+function slide18(s) {
+    chrome(s, 18, [[LEFT_BAR, 8.293, 6.707, BLUE], [RIGHT_BAR, 0, 5.137, ORANGE]]);
+    headline(s, 'Our values', 3.095, 3.562, 8.662, 4.090, BLUE, { fontSize: 136 });
+    T(s, 'Phasellus at orci vulputate, sollicitudin nisi quis sollicitudin. ',
+        { x: 4.670, y: 8.293, w: 7.087, h: 2.444, fontSize: 44, lineSpacingMultiple: 1.1, margin: ins(0.394, 0, 0, 0) });
+    const rows = [[13.333, 1.988, '01', 16.970, 2.466, 6.600, 'Maecenas id diam vestibulum, fringilla velit non, malesuada nunc.'],
+                  [14.905, 5.925, '02', 18.537, 6.404, 6.607, 'Vestibulum eu augue facilisis, iaculis sem viverra, dignissim turpis.'],
+                  [13.333, 9.863, '03', 16.969, 10.347, 6.600, 'Duis sagittis dui vel blandit suscipit. Nam nec nunc tortor.']];
+    rows.forEach(([cx, cy, num, tx, ty, tw, txt]) => {
+        T(s, num, { x: cx, y: cy, w: 3.150, h: 3.150, fill: { color: WHITE }, fontSize: 80, fontFace: HEAD, color: BLUE,
+            align: 'center', valign: 'middle', lineSpacingMultiple: 0.9, margin: ins(0.394, 0.394, 0.394, 0.197) });
+        body36(s, txt, tx, ty, tw, 2.181, { valign: 'middle' });
+    });
+    tick(s, 3.092, 8.658, 1.575, 0.079, ORANGE);
+    tick(s, 13.333, 4.980, 3.150, 0.157, ORANGE);
+}
+
+/* --------------------------------------------------------------- slide 19 */
+function slide19(s) {
+    const people = [[3.096, 'Jane Smith', 'Seller', BLUE], [10.577, 'John Doe', 'CEO', ORANGE], [18.056, 'Jane Doe', 'Manager', BLUE]];
+    people.forEach(([x]) => photoCircle(s, x, 5.925, 5.512));
+    chrome(s, 19, [[LEFT_BAR, 9.075, 5.925, ORANGE], [RIGHT_BAR, 0, 4.351, BLUE]]);
+    bigTitle(s, 'Our team', 2.774, 1.900);
+    people.forEach(([x, name, role, col], i) => {
+        T(s, name, { x: x - 0.001, y: 12.226 + (i === 2 ? 0.019 : 0), w: 5.512, h: 0.666, fontSize: 44, fontFace: HEAD, align: 'center', lineSpacingMultiple: 0.9 });
+        T(s, role, { x: x - 0.001, y: 13.025, w: 5.512, h: 0.727, fontSize: 36, align: 'center', lineSpacingMultiple: 1.2 });
+        ring(s, x - 0.197, 5.728, 5.906, col);
+    });
+}
+
+/* --------------------------------------------------------------- slide 20 */
+function slide20(s) {
+    const cards = [
+        [2.302, 3.090, 4.664, 'Aenean et metus ligula. Praesent tempus eget nisl eu consequat.', 'Jane Smith', ORANGE, ORANGE],
+        [10.183, 10.969, 12.544, 'Duis tincidunt massa eget nisi finibus, pulvinar tempor quam tincidunt.', 'John Doe', BLUE, BLUE],
+        [18.064, 18.852, 20.419, 'Suspendisse elit augue, maximus a iaculis eu, condimentum.', 'Jane Doe', ORANGE, ORANGE]
+    ];
+    cards.forEach(([x, nameX, iconX, quote, name, iconCol]) => {
+        T(s, quote, { x, y: 5.925, w: 6.299, h: 7.087, fill: { color: WHITE }, fontSize: 36, align: 'center',
+            valign: 'middle', lineSpacingMultiple: 1.1, margin: ins(0.394, 0.394, 0.394, 0.787) });
+        T(s, name, { x: nameX, y: 11.509, w: 4.724, h: 0.666, fontSize: 44, fontFace: HEAD, color: BLUE, align: 'center', lineSpacingMultiple: 0.9 });
+        iconCircle(s, iconX, 5.158, 1.575, '\uF10E', { bg: iconCol, fg: WHITE, size: 60 });
+    });
+    chrome(s, 20, [[LEFT_BAR, 5.925, 9.075, BLUE], [RIGHT_BAR, 0, 4.351, ORANGE]]);
+    bigTitle(s, 'Testimonials', 2.774, 1.900);
+    tick(s, 2.309, 12.854, 6.299, 0.157, ORANGE);
+    tick(s, 10.183, 12.854, 6.299, 0.157, BLUE);
+    tick(s, 18.064, 12.854, 6.299, 0.157, ORANGE);
+}
+
+/* --------------------------------------------------------------- slide 21 */
+function slide21(s) {
+    chrome(s, 21, [[LEFT_BAR, 9.075, 5.925, ORANGE], [RIGHT_BAR, 0, 4.351, BLUE]]);
+    bigTitle(s, 'Our partners', 2.774, 1.900);
+    [5.137, 9.081].forEach((y, r) => [3.095, 8.606, 14.117, 19.628].forEach(x =>
+        photo(s, x, y, 3.937, r === 0 ? 3.151 : 3.163)));
+}
+
+/* --------------------------------------------------------------- slide 22 */
+function slide22(s) {
+    photo(s, 10.970, 0, 15.694, SLIDE_H);
+    chrome(s, 22, [[RIGHT_BAR, 0, 3.572, ORANGE]]);
+    T(s, 'Success seems to be connected with action. Successful people keep moving. They make mistakes but they don\u2019t quit.',
+        { x: 2.309, y: 3.572, w: 14.960, h: 7.099, fill: { color: WHITE }, fontSize: 60, valign: 'bottom',
+          lineSpacingMultiple: 1.1, margin: ins(1.575, 0.787, 0.787, 0.787) });
+    T(s, 'John Doe', { x: 2.307, y: 10.671, w: 14.962, h: 1.684, fill: { color: BLUE }, fontSize: 44, fontFace: HEAD,
+        color: WHITE, align: 'right', lineSpacingMultiple: 1.2, margin: ins(1.575, 1.575, 0.394, 0.394) });
+    iconCircle(s, 1.520, 4.350, 1.575, '\uF10E', { bg: BLUE, fg: WHITE, size: 60 });
+    dotGrid(s, 1.292, 12.760, 8, 2);
+    dotGrid(s, 1.292, 8.818, 2, 8);
+}
+
+/* --------------------------------------------------- slides 23-26: gallery */
+function slide23(s) {
+    photo(s, 13.332, 0, 13.333, SLIDE_H);
+    chrome(s, 23, [[LEFT_BAR, 9.863, 5.137, ORANGE]]);
+    headline(s, 'Best offer', 2.307, 2.774, 10.238, 2.185, BLUE);
+    photo(s, 2.308, 5.937, 13.386, 7.874, { color: BG, width: 20 });
+}
+
+function slide24(s) {
+    photo(s, 0, 0, 9.396, SLIDE_H);
+    photo(s, 17.269, 0, 9.396, SLIDE_H);
+    chrome(s, 24, [[LEFT_BAR, 12.226, 2.774, ORANGE], [RIGHT_BAR, 0, 2.774, BLUE]]);
+    photo(s, 8.608, 6.726, 9.449, 7.087, { color: WHITE, width: 20 });
+    headline(s, 'Our best sellers', 8.480, 1.207, 9.730, 4.629, WHITE, {
+        fill: { color: BLUE }, line: { color: WHITE, width: 20 }, align: 'center', valign: 'top',
+        margin: ins(0.394, 0.394, 0.787, 0.591)
+    });
+}
+
+function slide25(s) {
+    [[0, 0], [0, 7.5], [17.269, 0], [17.269, 7.5]].forEach(([x, y]) => photo(s, x, y, 9.396, 7.5));
+    chrome(s, 25, [[LEFT_BAR, 12.226, 2.774, BLUE], [RIGHT_BAR, 0, 2.774, ORANGE]]);
+    headline(s, 'Special offers', 8.332, 2.883, 10.000, 4.629, WHITE, {
+        fill: { color: BLUE }, align: 'center', valign: 'bottom', margin: ins(0.787, 0.787, 0.787, 0.591)
+    });
+    T(s, 'With special offers like these, you had better be quick', {
+        x: 8.332, y: 7.512, w: 10.000, h: 4.877, fill: { color: WHITE }, fontSize: 60, align: 'center',
+        valign: 'top', lineSpacingMultiple: 1.1, margin: ins(0.787, 0.787, 0.787, 0.787)
+    });
+}
+
+function slide26(s) {
+    [[0, 0], [0, 7.5], [17.269, 0], [17.269, 7.5]].forEach(([x, y]) => photo(s, x, y, 9.396, 7.5));
+    chrome(s, 26, [[LEFT_BAR, 12.226, 2.774, ORANGE], [RIGHT_BAR, 0, 2.774, BLUE]]);
+    photo(s, 8.608, 6.726, 9.449, 7.087, { color: WHITE, width: 20 });
+    headline(s, 'Runout sale', 8.460, 1.200, 9.750, 4.629, WHITE, {
+        fill: { color: BLUE }, line: { color: WHITE, width: 20 }, align: 'center', valign: 'top',
+        margin: ins(0.394, 0.394, 0.787, 0.591)
+    });
+}
+
+/* --------------------------------------------------------------- slide 27 */
+function slide27(s) {
+    chrome(s, 27, [[LEFT_BAR, 9.075, 5.925, BLUE], [RIGHT_BAR, 0, 4.351, ORANGE]]);
+    bigTitle(s, 'Our progress', 2.774, 1.900);
+    // 88 / 12 split shown as a single full-width stacked bar
+    s.addChart('bar', [
+        { name: '88% growth', labels: [''], values: [88] },
+        { name: '12% growth', labels: [''], values: [12] }
+    ], {
+        x: 2.505, y: 5.637, w: 21.655, h: 2.970, barDir: 'bar', barGrouping: 'percentStacked',
+        barGapWidthPct: 10, chartColors: [BLUE, WHITE], catAxisHidden: true, valAxisHidden: true,
+        catAxisLineShow: false, valAxisLineShow: false, valGridLine: { style: 'none' }, catGridLine: { style: 'none' },
+        showLegend: false, showValue: false, showSerName: false
+    });
+    T(s, '88% growth', { x: 2.94, y: 5.82, w: 18.30, h: 2.58, fontSize: 66, fontFace: HEAD, bold: true,
+        color: BG, align: 'center', valign: 'middle' });
+    body36(s, 'Integer augue leo, pharetra non ultrices nec, interdum vitae felis. \n'
+        + 'Sed posuere hendrerit lacinia. Pellentesque malesuada condimentum.',
+        3.882, 9.108, 18.901, 1.454, { align: 'center' });
+}
+
+/* --------------------------------------------------------------- slide 28 */
+function slide28(s) {
+    rect(s, 3.095, 5.137, 9.450, 7.875, WHITE);
+    rect(s, 14.122, 5.137, 9.448, 7.875, WHITE);
+    chrome(s, 28, [[LEFT_BAR, 9.075, 5.925, ORANGE], [RIGHT_BAR, 0, 4.351, BLUE]]);
+    bigTitle(s, 'Ratio', 2.774, 1.900);
+    [[3.881, '80%', BLUE, 3.882, 'Aliquam sed purus ac massa semper malesuada id et velit. Sed dignissim, neque ut posuere pharetra.', 3.094],
+     [14.908, '20%', ORANGE, 14.909, 'Nulla hendrerit felis leo, vel auctor lacus pellentesque non. Sed porttitor volutpat vestibulum.', 14.122]
+    ].forEach(([nx, num, col, tx, txt, bx]) => {
+        T(s, num, { x: nx, y: 5.949, w: 7.876, h: 3.211, fontSize: 212, fontFace: HEAD, color: col, lineSpacingMultiple: 0.9 });
+        body36(s, txt, tx, 9.087, 7.875, 2.866);
+        tick(s, bx, 12.855, 9.450, 0.157, col);
+    });
+}
+
+/* --------------------------------------------------------------- slide 29 */
+function slide29(s) {
+    square(s, 20.420, 7.527, BLUE);
+    square(s, 4.670, 11.274, ORANGE);
+    chrome(s, 29, [[LEFT_BAR, 8.288, 6.712, BLUE], [RIGHT_BAR, 0, 7.5, ORANGE]]);
+    body36(s, 'Cras at metus nec lectus vehicula convallis pharetra vitae elit. Vestibulum quis ex quis mi gravida '
+        + 'vehicula. Aliquam condimentum egestas mi at facilisis.',
+        5.458, 8.303, 15.748, 3.771, { fill: { color: WHITE }, margin: ins(0.787, 0.787, 0.787, 0.787) });
+    T(s, '90%', { x: 4.670, y: 2.789, w: 17.325, h: 5.514, fontSize: 360, fontFace: HEAD, color: BLUE,
+        align: 'center', valign: 'middle', lineSpacingMultiple: 0.9 });
+}
+
+/* -------------------------------------------- slides 30-33: business charts */
+/** Axis / label styling shared by the four Cartesian charts. */
+const AXIS = {
+    catAxisLabelFontFace: BODY, catAxisLabelFontSize: 20, catAxisLabelColor: INK,
+    valAxisLabelFontFace: BODY, valAxisLabelFontSize: 20, valAxisLabelColor: INK,
+    showLegend: false, chartColors: [BLUE, ORANGE]
+};
+
+function slide30(s) {
+    chrome(s, 30, [[LEFT_BAR, 12.226, 2.774, ORANGE], [RIGHT_BAR, 0, 2.774, BLUE]]);
+    headline(s, 'Annual income', 14.120, 3.562, 9.450, 3.238);
+    body36(s, 'Cras at metus nec lectus vehicula convallis pharetra vitae elit. \n'
+        + 'Vestibulum quis ex quis mi gravida vehicula. Aliquam condimentum egestas mi at facilisis.',
+        14.120, 7.527, 9.450, 3.593);
+    s.addChart('bar', [{ name: 'Income', labels: ['2015', '2016', '2017', '2018'], values: [50, 90, 75, 80] }], Object.assign({}, AXIS, {
+        x: 2.307, y: 2.774, w: 10.630, h: 9.449, barDir: 'col', barGapWidthPct: 5,
+        chartColors: [BLUE, ORANGE, BLUE, ORANGE],
+        valAxisMinVal: 0, valAxisMaxVal: 100, valAxisMajorUnit: 25, valGridLine: { style: 'none' },
+        catAxisLineShow: true, valAxisLineShow: true, valAxisLineColor: INK, catAxisLineColor: INK,
+        showValue: true, dataLabelPosition: 'ctr', dataLabelColor: WHITE, dataLabelFontSize: 36,
+        dataLabelFontFace: HEAD, dataLabelFormatCode: '[$$-409]#,##0'
+    }));
+}
+
+function slide31(s) {
+    chrome(s, 31, [[LEFT_BAR, 12.226, 2.774, BLUE], [RIGHT_BAR, 0, 2.774, ORANGE]]);
+    headline(s, 'Data\nanalytics', 14.120, 3.596, 9.450, 3.238);
+    body36(s, 'Maecenas fringilla luctus massa vel lacinia. Nam aliquet elit in nisl mattis, \n'
+        + 'a hendrerit tellus ullamcorper. Nulla ornare magna a enim euismod, et pretium pulvinar.',
+        14.120, 7.527, 9.450, 3.593);
+    s.addChart('bar', [{
+        name: 'Value 2',
+        labels: ['January', 'February', 'March', 'April', 'May', 'June', 'July'],
+        values: [1200, 1400, 1500, 1350, 1220, 1620, 1050]
+    }], Object.assign({}, AXIS, {
+        x: 1.559, y: 2.774, w: 11.378, h: 9.449, barDir: 'bar', barGapWidthPct: 8, barOverlapPct: 8,
+        chartColors: [BLUE, ORANGE, BLUE, ORANGE, BLUE, ORANGE, BLUE],
+        valAxisMinVal: 0, valAxisMaxVal: 1800, valAxisMajorUnit: 500, valGridLine: { style: 'none' },
+        catAxisLineShow: true, valAxisLineShow: true, valAxisLineColor: INK, catAxisLineColor: INK,
+        showValue: true, dataLabelPosition: 'ctr', dataLabelColor: WHITE, dataLabelFontSize: 36,
+        dataLabelFontFace: HEAD, dataLabelFormatCode: '#0'
+    }));
+}
+
+function slide32(s) {
+    chrome(s, 32, [[LEFT_BAR, 12.226, 2.774, ORANGE], [RIGHT_BAR, 0, 2.774, BLUE]]);
+    headline(s, 'Total\nstatistics', 14.120, 3.574, 9.450, 3.238);
+    body36(s, 'Aliquam aliquam sem sapien, \n'
+        + 'a dignissim nulla fermentum non. Vivamus non lobortis lacus. Duis ut lacinia risus, et varius urna.',
+        14.120, 7.527, 9.450, 2.866);
+    s.addChart('line', [
+        { name: ' Income', labels: ['2016', '2017', '2018', '2019'], values: [4.3, 2.5, 3.5, 4.5] },
+        { name: ' Costs', labels: ['2016', '2017', '2018', '2019'], values: [2.4, 4.4, 0.5, 2.8] }
+    ], Object.assign({}, AXIS, {
+        x: 2.546, y: 2.802, w: 10.394, h: 9.451, lineSize: 12, lineDataSymbol: 'none',
+        valAxisMajorUnit: 1, valGridLine: { color: INK, size: 0.5 },
+        catAxisLineShow: true, valAxisLineShow: true, valAxisLineColor: INK, catAxisLineColor: INK,
+        showLegend: true, legendPos: 'b', legendFontFace: BODY, legendFontSize: 28, legendColor: INK
+    }));
+}
+
+function slide33(s) {
+    chrome(s, 33, [[LEFT_BAR, 12.226, 2.774, BLUE], [RIGHT_BAR, 0, 2.774, ORANGE]]);
+    headline(s, 'Return on investment', 14.120, 3.574, 9.450, 3.238);
+    body36(s, 'Vestibulum a vulputate quam. Quisque pellentesque, dolor et elementum elementum, tellus est mollis '
+        + 'nulla, ac consequat orci neque vel metus. Nulla laoreet ut.', 14.120, 7.527, 9.450, 3.593);
+    s.addChart('area', [
+        { name: 'Income', labels: ['2016', '2017', '2018', '2019', '2020'], values: [14, 18, 15, 20, 16] },
+        { name: 'Costs', labels: ['2016', '2017', '2018', '2019', '2020'], values: [10, 14, 8, 12, 10] }
+    ], Object.assign({}, AXIS, {
+        x: 2.410, y: 2.802, w: 10.630, h: 9.449, barGrouping: 'standard', valGridLine: { style: 'none' },
+        catAxisLineShow: true, valAxisLineShow: true, valAxisLineColor: INK, catAxisLineColor: INK,
+        showLegend: true, legendPos: 'b', legendFontFace: BODY, legendFontSize: 28, legendColor: INK
+    }));
+}
+
+/* ------------------------------------------------- slides 34-35: doughnuts */
+function slide34(s) {
+    chrome(s, 34, [[LEFT_BAR, 12.226, 2.774, ORANGE], [RIGHT_BAR, 0, 2.774, BLUE]]);
+    bigTitle(s, 'Sales summary', 2.774, 1.900);
+    s.addChart('doughnut', [{ name: 'Sales', labels: ['Goods', 'Services', 'Other'], values: [0.35, 0.40, 0.25] }], {
+        x: 7.819, y: 4.339, w: 11.812, h: 9.449, holeSize: 50, chartColors: [ORANGE, INK, BLUE],
+        dataBorder: { pt: 3, color: BG }, showValue: false, showPercent: true,
+        dataLabelColor: WHITE, dataLabelFontSize: 60, dataLabelFontFace: BODY, dataLabelPosition: 'ctr',
+        showLegend: true, legendPos: 'r', legendFontFace: BODY, legendFontSize: 36, legendColor: INK
+    });
+}
+
+function slide35(s) {
+    chrome(s, 35, [[LEFT_BAR, 11.438, 3.562, BLUE], [RIGHT_BAR, 0, 4.351, ORANGE]]);
+    bigTitle(s, 'Market share', 2.774, 1.900);
+    // the three rings sit inside 7.087in placeholders but only fill ~75% of them
+    [[2.304, 0.25], [9.790, 0.50], [17.276, 0.75]].forEach(([px, share]) => {
+        const d = 5.47, x = px + (7.087 - d) / 2, y = 5.139 + (7.072 - d) / 2;
+        s.addChart('doughnut', [{ name: 'Ratio', labels: ['share', 'rest'], values: [share, 1 - share] }], {
+            x, y, w: d, h: d, holeSize: 80, chartColors: [ORANGE, BLUE],
+            dataBorder: { pt: 1.5, color: BG }, showValue: false, showLegend: false, showPercent: false
+        });
+        T(s, Math.round(share * 100) + '%', { x, y, w: d, h: d, fontSize: 60, align: 'center', valign: 'middle' });
+    });
+}
+
+/* --------------------------------------------------------------- slide 36 */
+function slide36(s) {
+    chrome(s, 36);
+    bigTitle(s, 'List of items', 2.774, 1.900);
+    const cards = [
+        [1.521, 5.925, 7.879, '01', BLUE, 1.915, 8.288, 'Top world\nbrands', 9.871, 'Quisque nec lacus sed est dignissim feugiat. Nullam in eleifend leo.', 13.632, BLUE],
+        [7.558, 5.143, 7.863, '02', ORANGE, 7.952, 7.498, 'Sale\nproccess', 9.081, 'Cras mattis euismod pharetra. Quisque ut sem sit amet velit.', 12.855, ORANGE],
+        [13.595, 5.929, 7.875, '03', BLUE, 13.989, 8.288, 'Exclusive\nproposals', 9.871, 'Maecenas lobortis, mauris ac dapibus sagittis, ante mauris.', 13.632, BLUE],
+        [19.632, 5.143, 7.863, '04', ORANGE, 20.026, 7.498, 'Marketing\nshowcase', 9.081, 'Phasellus pharetra tempus ipsum, id vulputate sem.', 12.855, ORANGE]
+    ];
+    cards.forEach(([cx, cy, ch, num, numCol, tx, hy, head, by, copy, uy, uCol]) => {
+        T(s, num, { x: cx, y: cy, w: 5.512, h: ch, fill: { color: WHITE }, fontSize: 72, fontFace: HEAD, color: numCol,
+            valign: 'top', lineSpacingMultiple: 0.9, margin: ins(0.394, 0.394, 0.394, 0.394) });
+        T(s, head, { x: tx, y: hy, w: 4.724, h: 1.481, fontSize: 44, fontFace: HEAD, lineSpacingMultiple: 1.0 });
+        body36(s, copy, tx, by, 4.724, 2.866, { valign: 'top' });
+        tick(s, cx, uy, 5.512, 0.157, uCol);
+    });
+}
+
+/* --------------------------------------------------------------- slide 37 */
+function slide37(s) {
+    photo(s, 13.332, 0, 13.333, SLIDE_H);
+    s.addShape('rect', { x: 2.307, y: 2.774, w: 13.387, h: 11.026, fill: { color: BLUE }, line: { color: '161671', width: 1 } });
+    chrome(s, 37, [[LEFT_BAR, 10.649, 4.351, ORANGE], [RIGHT_BAR, 0, 5.925, BLUE]]);
+    [[3.604, 'Quisque pellentesque, dolor et elementum elementum, tellus est mollis nulla.', 3.886],
+     [7.137, 'Nulla ornare magna a enim euismod, et pretium urna pulvinar.', 7.419],
+     [10.670, 'Vestibulum eget ligula in tellus sagittis gravida nec vitae mauris.', 10.952]
+    ].forEach(([ty, txt, iy]) => {
+        body36(s, txt, 6.245, ty, 7.875, 2.139, { color: WHITE, valign: 'middle' });
+        iconCircle(s, 3.882, iy, 1.575, '\uF00C', { bg: WHITE, fg: BLUE, size: 60 });
+    });
+}
+
+/* --------------------------------------------------------------- slide 38 */
+function slide38(s) {
+    [3.883, 10.969, 18.056].forEach(x => photo(s, x, 5.138, 5.063, 5.906));
+    chrome(s, 38, [[LEFT_BAR, 11.438, 3.562, BLUE], [RIGHT_BAR, 0, 4.351, ORANGE]]);
+    bigTitle(s, 'List of images', 2.774, 1.900);
+    [[3.882, 4.724, 'Quisque mattis ex erat, eget facilisis dui elementum'],
+     [10.970, 4.724, 'Sed interdum libero id interdum aliquam.'],
+     [18.057, 4.725, 'Mauris ac quam varius velit efficitur cursus.']
+    ].forEach(([x, w, t]) => body36(s, t, x, 11.438, w, 2.139, { align: 'center' }));
+}
+
+/* --------------------------------------------------------------- slide 39 */
+function slide39(s) {
+    chrome(s, 39, [[LEFT_BAR, 10.649, 4.351, ORANGE], [RIGHT_BAR, 0, 2.774, BLUE]]);
+    headline(s, 'Our services', 2.309, 3.562, 8.662, 4.090, BLUE, { fontSize: 136 });
+    T(s, 'Phasellus at orci vulputate, sollicitudin nisi quis sollicitudin. ',
+        { x: 3.884, y: 8.293, w: 7.087, h: 2.444, fontSize: 44, lineSpacingMultiple: 1.1, margin: ins(0.394, 0, 0, 0) });
+    const nodes = [
+        [16.090, 0.807, '\uF5DA', BLUE, WHITE, 16.483, 3.861, 'Content\nStrategy', WHITE],
+        [16.090, 8.682, '\uF0A1', BLUE, WHITE, 16.483, 11.736, 'Digital\nMarketing', WHITE],
+        [11.757, 4.744, '\uF658', WHITE, BLUE, 12.150, 7.801, 'Email\nMarketing', BLUE],
+        [20.425, 4.744, '\uF87C', WHITE, BLUE, 20.820, 7.801, 'Trade\nshows', BLUE]
+    ];
+    nodes.forEach(([x, y, glyph, bg, fg, tx, ty, label, labCol]) => {
+        s.addText(glyph, {
+            shape: 'ellipse', x, y, w: 5.512, h: 5.512, fill: { color: bg },
+            line: bg === WHITE ? { color: BLUE, width: 4 } : { type: 'none' },
+            fontFace: FA, fontSize: 112, color: fg, align: 'center', valign: 'top', margin: ins(0, 0, 0.157, 0)
+        });
+        T(s, label, { x: tx, y: ty, w: 4.725, h: 1.333, fontSize: 44, fontFace: HEAD, color: labCol, align: 'center', lineSpacingMultiple: 0.9 });
+    });
+    tick(s, 2.306, 8.632, 1.575, 0.079, ORANGE);
+}
+
+/* --------------------------------------------------------------- slide 40 */
+function slide40(s) {
+    chrome(s, 40, [[LEFT_BAR, 10.649, 4.351, BLUE], [RIGHT_BAR, 0, 4.351, ORANGE]]);
+    bigTitle(s, 'Price table', 2.774, 1.900);
+    // side plans
+    [[2.331, 6.277, 'Basic', 3.500, 3.938, '$50', 3.118, 4.702, 'Nunc aliquet quam vitae metus euismod porta.'],
+     [18.056, 6.300, 'Pro', 19.237, 3.938, '$100', 18.855, 4.702, 'Mauris ac quam varius velit efficitur cursus.']
+    ].forEach(([cx, cw, name, px, pw, price, tx, tw, copy]) => {
+        T(s, name, { x: cx, y: 5.925, w: cw, h: 7.087, fill: { color: WHITE }, fontSize: 66, fontFace: HEAD,
+            align: 'center', valign: 'top', lineSpacingMultiple: 0.9, margin: ins(0.394, 0.394, 0.630, 0) });
+        T(s, price, { x: px, y: 11.226, w: pw, h: 1.000, fontSize: 66, fontFace: HEAD, align: 'center', lineSpacingMultiple: 0.9 });
+        body36(s, copy, tx, 8.288, tw, 2.181, { align: 'center', valign: 'middle' });
+    });
+    // highlighted middle plan
+    T(s, 'Premium', { x: 9.394, y: 5.137, w: 7.875, h: 8.662, fill: { color: BLUE }, fontSize: 66, fontFace: HEAD,
+        color: WHITE, align: 'center', valign: 'top', lineSpacingMultiple: 0.9, margin: ins(0.394, 0.394, 0.787, 0) });
+    T(s, '$500', { x: 10.182, y: 11.226, w: 6.300, h: 1.000, fontSize: 66, fontFace: HEAD, color: WHITE, align: 'center', lineSpacingMultiple: 0.9 });
+    body36(s, 'Sed eget mi malesuada, ullamcorper nisl eget, porttitor justo.', 10.182, 7.984, 6.300, 2.181,
+        { color: WHITE, align: 'center', valign: 'middle' });
+}
+
+/* --------------------------------------------------- slides 41-42: tables */
+function slide41(s) {
+    stripedDisc(s, 21.217 + 1.575, 10.646 + 1.575, 3.150);
+    chrome(s, 41, [[LEFT_BAR, 12.242, 2.758, ORANGE], [RIGHT_BAR, 0, 3.640, BLUE]]);
+    const head = ['Name', 'Property', 'Price'];
+    const rows = [
+        ['Lorem ipsum', 'Integer in ex varius ', '1000.00'],
+        ['Dolor', 'Consectetur lorem', '1500.00'],
+        ['Consectetur', 'Duis sit amet porta nisi', '3000.00'],
+        ['Adipiscing', 'Mauris non ultrices velit', '4500.00'],
+        ['Praesent', 'Aliquam mattis aliquam', '4750.00'],
+        ['Tristique', 'Praesent vitae tincidunt', '5000.00']
+    ];
+    const border = [{ pt: 1, color: INK }, { pt: 1, color: INK }, { pt: 1, color: INK }, { pt: 1, color: INK }];
+    const cell = (t, o) => Object.assign({ text: t, options: Object.assign({
+        fontFace: BODY, fontSize: 36, color: INK, valign: 'middle', margin: [5.7, 28.4, 5.7, 28.4], border }, o) });
+    const data = [head.map((h, i) => cell(h, { fill: { color: BLUE }, color: WHITE, fontFace: HEAD, fontSize: 48, align: i === 2 ? 'right' : 'left' }))];
+    rows.forEach((r, ri) => {
+        const bg = ri % 2 === 0 ? LILAC : WHITE;
+        data.push(r.map((t, ci) => cell(t, { fill: { color: bg }, align: ci === 2 ? 'right' : 'left' })));
+    });
+    s.addTable(data, { x: 3.882, y: 3.562, w: 18.901, colW: [4.728, 9.440, 4.733], rowH: [1.243, 1.237, 1.237, 1.237, 1.237, 1.237, 1.237] });
+}
+
+function slide42(s) {
+    chrome(s, 42, [[LEFT_BAR, 11.438, 3.562, BLUE], [RIGHT_BAR, 0, 3.566, ORANGE]]);
+    const rows = [
+        ['March', 'Integer in ex varius, congue ligula', '1000.00'],
+        ['April', 'Duis sit amet porta nisi mauris non', '1500.00'],
+        ['May', 'Aliquam mattis aliquam nibh praesent', '3000.00'],
+        ['June', 'Donec eros nisi, sagittis non nulla', '4500.00'],
+        ['July', 'Praesent placerat elit id erat rutrum ', '4750.00'],
+        ['August', 'Vestibulum convallis vehicula', '5000.00']
+    ];
+    const border = [{ pt: 1, color: INK }, { pt: 1, color: INK }, { pt: 1, color: INK }, { pt: 1, color: INK }];
+    const data = rows.map((r, ri) => {
+        const bg = ri % 2 === 0 ? LILAC : PALE;
+        return [
+            { text: r[0], options: { fill: { color: BLUE }, color: WHITE, fontFace: HEAD, fontSize: 48, valign: 'middle',
+                align: 'left', margin: [5.7, 28.4, 5.7, 28.4], border: [{ pt: 1, color: ri === 0 ? INK : BG }, { pt: 1, color: BLUE }, { pt: 1, color: ri === 5 ? INK : BG }, { pt: 1, color: INK }] } },
+            { text: r[1], options: { fill: { color: bg }, color: INK, fontFace: BODY, fontSize: 36, valign: 'middle',
+                align: 'left', margin: [5.7, 28.4, 5.7, 28.4], border: [{ pt: 1, color: INK }, { pt: 1, color: INK }, { pt: 1, color: INK }, { pt: 1, color: BLUE }] } },
+            { text: r[2], options: { fill: { color: bg }, color: INK, fontFace: BODY, fontSize: 36, valign: 'middle',
+                align: 'right', margin: [5.7, 28.4, 5.7, 28.4], border } }
+        ];
+    });
+    s.addTable(data, { x: 3.883, y: 3.566, w: 18.901, colW: [4.728, 10.640, 3.533], rowH: 1.312 });
+    dotGrid(s, 21.700, 10.400, 6, 4);
+}
+
+/* ---------------------------------------- slides 43-46: timeline variants */
+function verticalTimeline(s, entries, numColor) {
+    entries.forEach(([y, num, month, copy, ty]) => {
+        timelineBubble(s, 14.120, y, num, month, numColor);
+        body36(s, copy, 17.269, ty, 7.089, 2.181, { valign: 'middle' });
+    });
+}
+
+function slide43(s) {
+    chrome(s, 43, [[LEFT_BAR, 6.712, 8.288, ORANGE], [RIGHT_BAR, 0, 5.925, BLUE]]);
+    headline(s, 'Timeline', 2.323, 4.351, 9.434, 2.072, BLUE, { fontSize: 136, lineSpacingMultiple: 0.8, margin: 0 });
+    body36(s, 'Duis gravida, diam ut pulvinar pulvinar, metus elit vehicula ex, vel ultrices odio urna in ipsum. '
+        + 'Sed ultrices consequat dui ut porttitor.', 2.323, 6.712, 9.434, 2.908);
+    verticalTimeline(s, [
+        [2.973, '11', 'April', 'Quisque pellentesque, dolor et elementum elementum, tellus est molis.', 3.281],
+        [6.499, '12', 'April', 'Nulla ornare magna a enim euismod, et pretium urna pulvinar.', 6.807],
+        [10.025, '13', 'April', 'Vestibulum eget ligula in tellus sagittis gravida nec vitae mauris.', 10.334]
+    ], BLUE);
+}
+
+function slide44(s) {
+    photo(s, 0, 0, 11.757, SLIDE_H);
+    chrome(s, 44, [[LEFT_BAR, 9.075, 5.925, BLUE], [RIGHT_BAR, 0, 5.925, ORANGE]]);
+    verticalTimeline(s, [
+        [2.973, '15', 'April', 'Nam aliquet elit in nisl mattis, a hendrerit tellus ullamcorper.', 3.260],
+        [6.499, '16', 'April', 'Aenean nec neque vitae ipsum pellentesque sollicitudin vitae vel lacus.', 6.786],
+        [10.025, '17', 'April', 'Sed eget mi malesuada, ullamcorper nisl eget, porttitor justo.', 10.313]
+    ], BLUE);
+}
+
+function horizontalTimeline(s, entries) {
+    entries.forEach(([bx, num, tx, tw, copy]) => {
+        timelineBubble(s, bx, 7.876, num, 'April', ORANGE);
+        body36(s, copy, tx, 11.071, tw, 2.139, { align: 'center', valign: 'top' });
+    });
+}
+
+function slide45(s) {
+    chrome(s, 45, [[LEFT_BAR, 7.5, 7.5, ORANGE], [RIGHT_BAR, 0, 6.712, BLUE]]);
+    bigTitle(s, 'Chronology', 2.774, 2.194, ORANGE, 4.670, 17.325);
+    body36(s, 'Duis gravida, diam ut pulvinar pulvinar, metus elit vehicula ex, vel ultrices odio urna in ipsum. '
+        + 'Sed ultrices consequat dui ut porttitor.', 4.670, 5.137, 17.325, 1.412, { align: 'center' });
+    horizontalTimeline(s, [
+        [4.867, '21', 3.880, 4.727, 'Donec maximus tellus erat, id cursus nulla.'],
+        [11.955, '22', 10.970, 4.724, 'Aliquam aliquam sem sapien, a dignissim nulla.'],
+        [19.042, '23', 18.059, 4.724, 'Quisque pellentesque, dolor et.']
+    ]);
+}
+
+function slide46(s) {
+    square(s, 2.308, 6.674, ORANGE);
+    photo(s, 3.095, 2.774, 20.474, 4.726);
+    chrome(s, 46, [[LEFT_BAR, 8.250, 6.750, BLUE]]);
+    horizontalTimeline(s, [
+        [4.867, '24', 3.880, 4.727, 'Curabitur eleifend urna a augue vulpute, pulvinar.'],
+        [11.955, '25', 10.970, 4.724, 'Aenean nec neque vitae ipsum pellentesque.'],
+        [19.042, '26', 18.059, 4.724, 'Mauris ac quam varius velit efficitur cursus.']
+    ]);
+    rect(s, 18.845, 1.988, 4.724, 0.788, BLUE);
+    rect(s, 23.571, 2.787, 0.786, 3.139, BLUE);
+    oval(s, 24.352, 1.200, 0.787, 0.787, ORANGE);
+}
+
+/* --------------------------------------------------------------- slide 47 */
+function slide47(s) {
+    photo(s, 2.307, 2.774, 9.450, 9.451);
+    chrome(s, 47, [[LEFT_BAR, 7.5, 7.5, ORANGE], [RIGHT_BAR, 0, 7.5, BLUE]]);
+    headline(s, 'Strategy \nand planning', 13.332, 3.580, 11.023, 3.436, BLUE);
+    T(s, 'It\u2019s time for a new way to run the marketing operations of your business',
+        { x: 14.905, y: 7.500, w: 9.450, h: 2.410, fontSize: 44, lineSpacingMultiple: 1.1, margin: ins(0.394, 0, 0, 0) });
+    dotGrid(s, 8.291, 12.700, 10, 2);
+    dotGrid(s, 12.240, 9.760, 2, 6);
+    tick(s, 13.333, 7.852, 1.575, 0.079, ORANGE);
+}
+
+/* --------------------------------------------------------------- slide 48 */
+function slide48(s) {
+    square(s, 22.807, 6.674, ORANGE);
+    chrome(s, 48, [[RIGHT_BAR, 0, 6.712, ORANGE]]);
+    rect(s, 3.096, 12.224, 4.724, 0.788, BLUE);
+    rect(s, 2.317, 9.102, 0.786, 3.139, BLUE);
+    oval(s, 1.521, 13.001, 0.787, 0.787, ORANGE);
+    photo(s, 3.095, 7.500, 20.474, 4.726);
+    body36(s, 'Duis gravida, diam ut pulvinar pulvinar, metus elit vehicula ex, vel ultrices odio urna in ipsum. '
+        + 'Sed ultrices consequat dui ut porttitor.', 4.670, 5.137, 17.325, 1.412, { align: 'center' });
+    bigTitle(s, 'Discover our center', 2.774, 2.194);
+}
+
+/* --------------------------------------------- slide 49: dotted world map */
+/* Halftone world map for slide 49: one string per row, '#' = dot. */
+const WORLD_MAP = [
+    '                                          #',
+    '                                         #####',
+    '                           ######      ########',
+    '                          ########     ########',
+    '                         ########  ### #####',
+    '                        ########  ############# ##',
+    '                       # ####### #################                                   #',
+    '                       # ########################                    ##             ##',
+    '                      ###  #### ################            ###      #              ###',
+    '                       ########  ###############          ## ##                      ##',
+    '                       ######   ################          ###                        ###',
+    '                 #  # ####### ##################          ##                           ##',
+    '                 #   ##  #### ##################          ## #',
+    '               #         ###    ################           #                           ##',
+    '              ##  #  ### ###   ################                            ##          ####',
+    '                #### #  #         ##############                         ###         #######       ##',
+    '                ###  ## ####       ############                         ##         ########        ####',
+    '             ##                    #############                        #         ########',
+    '             ###   # # # #  #       ###########                         #       ############# ##    #',
+    '             ##### # ### ####       ###########                        #     #  ################    #',
+    '             ####### ### #####      ###########                        #    #################### ## ###',
+    '  ##           #####   # ######     ###########               ##        #   ##############################',
+    ' #######   ## # ##### ##  #  ###    ##########              #####         # ################################  ##',
+    '#################  #   ## ##  ##     ########              ######## #  # ### # ###################################',
+    '######################### ## ####   #######                ########## #############################################',
+    '##########################    ####   ######   # #         ####### #  ###############################################',
+    '########################### ####     ####     ####        ### ################################################### ##',
+    ' #######################  ##   ##    ####                ########################################################',
+    '########################     #        ##                #### ###################################################',
+    '#### ##################      ##        #                #### ############################################ ####',
+    ' ####   ###############      ##                         # ##  ######################################### # ##',
+    '  #       ##############     #####                  ##   ### #######################################     ###',
+    ' #         ###############   #####                  #     #  ######################################      ##',
+    '          ################# #######                # #   ###########################################     ##',
+    '            ############### ########               # ## #############################################    #',
+    '            ########################                #  #############################################',
+    '             ############ #######  ##                ###############################################',
+    '             #####################                    ############ ### ############################',
+    '             ####################                     #### #####   ### ############################ #',
+    '             ############ # ###                    ####   # ###  #  ## ##########################',
+    '              ################                     ###     # # #######  ##################### ##    #',
+    '              ###############                      ###   ##  # ######## ######################     #',
+    '               ##############                       ######        ###########################  # ###',
+    '                ############                       ########  #   #############################',
+    '                ####### #  #                       ################### #######################',
+    '                 #####     ##                     ############### #####  #####################',
+    '                   ###                           ########################   #################',
+    '  #                 ##   #  #                    ################# #######   ###### #####',
+    '                    #####   # ###                ################## #####     ####   ####',
+    '                        ###                      ################## ###       ##      ####   #',
+    '                          #                      ###################           #      ####',
+    '                          # ######                #####################        ##     # #     #',
+    '                             ######               ####################          #      #    #',
+    '                             ########                    #############                ##   ##',
+    '                            ##########                   ###########                   #  #####',
+    '                            #############                ##########                    ## ## #  ## ##  #',
+    '                            ###############               #########                     #          ### #',
+    '                            ###############               #########                         ## #    # #',
+    '                             #############                 ########                              #',
+    '                             ############                 #########   #                        #### ##',
+    '                               ##########                 ########  ##                        ########          #',
+    '                               ##########                 ########  ##                      ###########',
+    '                               ########                    #######  ##                     #############',
+    '                               #######                     ######                          #############',
+    '                               #######                      #####                           ############',
+    '                               ######                       ####                            #### #######',
+    '                              #######                       #                               #     ######',
+    '                              ######                                                                ###        #',
+    '                              ####                                                                             #',
+    '                              ###                                                                     #       ##',
+    '                              ###                                                                            ##',
+    '                              ##                                                                             #',
+    '                             ####',
+    '                             ###',
+    '                              ##',
+    '                              ##',
+];
+
+function slide49(s) {
+    const x0 = 2.9556, y0 = 0.7109, pitch = 0.17943, d = 0.1194;
+    WORLD_MAP.forEach((row, r) => {
+        for (let c = 0; c < row.length; c++) {
+            if (row[c] === '#') oval(s, x0 + c * pitch, y0 + r * pitch, d, d, LILAC);
+        }
+    });
+    // location pins
+    [[9.115, 6.225], [12.033, 5.658], [13.635, 7.375]].forEach(([x, y]) => s.addShape('custGeom', {
+        x, y, w: 0.658, h: 0.908, fill: { color: BLUE }, line: { type: 'none' },
+        points: [
+            { x: 0.331, y: 0 },
+            { x: 0, y: 0.325, curve: { type: 'cubic', x1: 0.147, y1: 0, x2: 0, y2: 0.146 } },
+            { x: 0.331, y: 0.908, curve: { type: 'cubic', x1: 0, y1: 0.508, x2: 0.331, y2: 0.908 } },
+            { x: 0.658, y: 0.325, curve: { type: 'cubic', x1: 0.331, y1: 0.908, x2: 0.658, y2: 0.508 } },
+            { x: 0.331, y: 0, curve: { type: 'cubic', x1: 0.658, y1: 0.146, x2: 0.511, y2: 0 } },
+            { close: true },
+            { x: 0.331, y: 0.521, moveTo: true },
+            { x: 0.117, y: 0.312, curve: { type: 'cubic', x1: 0.214, y1: 0.521, x2: 0.117, y2: 0.425 } },
+            { x: 0.331, y: 0.100, curve: { type: 'cubic', x1: 0.117, y1: 0.196, x2: 0.214, y2: 0.100 } },
+            { x: 0.541, y: 0.312, curve: { type: 'cubic', x1: 0.448, y1: 0.100, x2: 0.541, y2: 0.196 } },
+            { x: 0.331, y: 0.521, curve: { type: 'cubic', x1: 0.541, y1: 0.425, x2: 0.448, y2: 0.521 } },
+            { close: true }
+        ]
+    }));
+    chrome(s, 49, [[LEFT_BAR, 7.5, 7.5, ORANGE], [RIGHT_BAR, 0, 7.5, BLUE]]);
+    bigTitle(s, 'Our locations', 2.774, 1.900);
+    [[8.189, 7.133, 2.510, 'New York'], [11.375, 6.637, 1.974, 'London'], [13.206, 8.204, 1.515, 'Rome']]
+        .forEach(([x, y, w, t]) => T(s, t, { x, y, w, h: 0.685, fontSize: 36, fontFace: HEAD, align: 'center', lineSpacingMultiple: 1.2 }));
+}
+
+/* --------------------------------------------------------------- slide 50 */
+function slide50(s) {
+    chrome(s, 50, [[LEFT_BAR, 6.712, 8.288, BLUE], [RIGHT_BAR, 0, 6.712, ORANGE]]);
+    bigTitle(s, 'Follow us', 2.774, 1.900);
+    [[4.473, 3.882, 4.724, '\uF39E', 'Facebook'], [11.478, 10.970, 4.724, '\uF0E1', 'Linkedin'],
+     [18.648, 18.057, 4.725, '\uF16D', 'Instagram']].forEach(([ix, tx, tw, glyph, label]) => {
+        iconCircle(s, ix, 6.712, 3.543, glyph, { bg: BLUE, fg: WHITE, size: 96, brand: true });
+        T(s, label, { x: tx, y: 10.660, w: tw, h: 0.606, fontSize: 36, fontFace: HEAD, align: 'center' });
+    });
+}
+
+/* --------------------------------------------------------------- slide 51 */
+function slide51(s) {
+    photo(s, 2.307, 5.137, 9.450, 8.663);
+    chrome(s, 51, [[LEFT_BAR, 8.288, 6.712, ORANGE], [RIGHT_BAR, 0, 7.5, BLUE]]);
+    [[6.020, 'Address:', 6.735, '123 Street, City, State 45678', 5.937, '\uF3C5'],
+     [8.781, 'For more info call:', 9.485, '1234 56 7890', 8.699, '\uF879'],
+     [11.541, 'Visit my website:', 12.234, 'www.companyname.com', 11.459, '\uF0C1']
+    ].forEach(([ly, label, vy, value, iy, glyph]) => {
+        T(s, label, { x: 14.527, y: ly, w: 9.831, h: 0.606, fontSize: 36, valign: 'bottom' });
+        T(s, value, { x: 14.527, y: vy, w: 9.831, h: 0.666, fontSize: 44, fontFace: HEAD, color: BLUE, valign: 'top', lineSpacingMultiple: 0.9 });
+        iconCircle(s, 12.544, iy, 1.575, glyph, { bg: BLUE, fg: WHITE, size: 48 });
+    });
+    bigTitle(s, 'Contact us', 2.774, 1.900);
+}
+
+/* --------------------------------------------------------------- assemble */
+const BUILDERS = [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
+    slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
+    slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29, slide30,
+    slide31, slide32, slide33, slide34, slide35, slide36, slide37, slide38, slide39, slide40,
+    slide41, slide42, slide43, slide44, slide45, slide46, slide47, slide48, slide49, slide50, slide51];
+
+function build() {
+    const pptx = new PptxGenJS();
+    pptx.title = 'Sales Center';
+    pptx.defineLayout({ name: 'CUSTOM', width: SLIDE_W, height: SLIDE_H });
+    pptx.layout = 'CUSTOM';
+    pptx.defineSlideMaster({ title: 'BASE', background: { color: BG } });
+    BUILDERS.forEach(fn => fn(pptx.addSlide({ masterName: 'BASE' })));
+    return pptx.writeFile({ fileName: path.join(__dirname, '04ddeda6-05aa-408e-8f0f-1218d4593f1a_grok_final.pptx') });
+}
+
+build().then(f => console.log('wrote', f)).catch(e => { console.error(e); process.exit(1); });
