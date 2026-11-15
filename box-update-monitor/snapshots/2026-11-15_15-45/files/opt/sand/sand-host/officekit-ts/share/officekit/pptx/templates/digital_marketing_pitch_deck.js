@@ -1,0 +1,663 @@
+/**
+ * "The Power of Digital Marketing" — 20-slide pitch deck, rebuilt with pptxgenjs.
+ *
+ * Run:  node 130d8641-88df-49fb-b3d0-687baed631e9_grok_final.js
+ * Out:  130d8641-88df-49fb-b3d0-687baed631e9_grok_final.pptx  (next to this file)
+ *
+ * Slide size 13.333 x 7.5in (16:9). Dark theme, red accent, Space Grotesk / Manrope.
+ */
+
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+// ---------------------------------------------------------------- palette / type
+const C = {
+  bg: '201A1C',     // page background (theme tx2/dk2)
+  panel: '363233',  // dark card (theme accent2)
+  red: 'EF3E2C',    // accent (theme accent1)
+  white: 'FFFFFF',  // text (theme bg2/lt2)
+};
+
+// Sentinel fill: the 45-degree dark->red gradient, rendered by gradRect().
+const GRAD = 'grad';
+const HEAD = 'Space Grotesk Medium'; // theme major font
+const BODY = 'Manrope';              // theme minor font
+
+// ---------------------------------------------------------------- primitives
+
+/** Rectangle / round-rect / ellipse / diamond, positioned in inches. */
+function shp(s, geom, o) {
+  if (o.fill === GRAD) return gradRect(s, o);
+  const opt = {
+    x: o.x, y: o.y, w: o.w, h: o.h,
+    fill: o.fill ? { color: o.fill } : { type: 'none' },
+    line: o.line ? { color: o.line, width: o.lineW || 1 } : { type: 'none' },
+  };
+  if (o.r !== undefined) opt.rectRadius = o.r;
+  if (o.rot) opt.rotate = o.rot;
+  s.addShape(geom, opt);
+}
+
+/** Text box. Reference boxes are top-anchored and auto-sized to their content. */
+function txt(s, text, o) {
+  const runs = Array.isArray(text)
+    ? text.map(([t, color]) => ({ text: t, options: { color } }))
+    : text;
+  s.addText(runs, {
+    x: o.x, y: o.y, w: o.w, h: o.h,
+    fontSize: o.size, color: o.color, bold: !!o.bold,
+    fontFace: o.head ? HEAD : BODY,
+    align: o.align || 'left', valign: 'top',
+    lineSpacingMultiple: o.ls || null,
+    margin: [7.2, 7.2, 3.6, 3.6], // PowerPoint default text insets: 0.1in / 0.05in
+    wrap: true,
+  });
+}
+
+/** Card: solid round-rect used as the background of every content block. */
+function panel(s, o) {
+  shp(s, 'roundRect', { x: o.x, y: o.y, w: o.w, h: o.h, fill: o.fill, r: o.r === undefined ? 0.1 : o.r });
+}
+
+/**
+ * The deck's 45-degree dark->red linear gradient. pptxgenjs cannot emit
+ * <a:gradFill>, so it is composited from two banded ramps: opaque vertical
+ * bands across the width, then horizontal bands over the top at the opacity
+ * that averages the two into a true corner-to-corner diagonal. Bands are
+ * inset along the rounded corner arc so the tile keeps its round-rect
+ * silhouette. `rot: 180` swaps which corner is lit.
+ */
+function gradRect(s, o) {
+  const r = Math.min(o.r === undefined ? 0.1 : o.r, o.w / 2, o.h / 2);
+  const ramp = f => mix(C.bg, C.red, o.rot === 180 ? 1 - f : f);
+  const inset = d => (d >= r ? 0 : r - Math.sqrt(r * r - (r - d) * (r - d)));
+  const alpha = Math.round((100 * o.h) / (o.w + o.h));
+
+  // Band edges: dense over the corner arcs, ~0.09in apart along the flat middle.
+  const edges = len => {
+    const ARC = 9, out = [];
+    for (let i = 0; i < ARC; i++) out.push((r * i) / ARC);
+    const mid = Math.max(4, Math.round((len - 2 * r) / 0.09));
+    for (let i = 0; i <= mid; i++) out.push(r + ((len - 2 * r) * i) / mid);
+    for (let i = 1; i <= ARC; i++) out.push(len - r + (r * i) / ARC);
+    return out;
+  };
+
+  const ex = edges(o.w);
+  for (let i = 0; i < ex.length - 1; i++) {
+    const c = inset(Math.min(ex[i], o.w - ex[i + 1]));
+    shp(s, 'rect', {
+      x: o.x + ex[i], y: o.y + c, w: ex[i + 1] - ex[i] + 0.004, h: o.h - 2 * c,
+      fill: ramp((ex[i] + ex[i + 1]) / 2 / o.w),
+    });
+  }
+  const ey = edges(o.h);
+  for (let i = 0; i < ey.length - 1; i++) {
+    const c = inset(Math.min(ey[i], o.h - ey[i + 1]));
+    s.addShape('rect', {
+      x: o.x + c, y: o.y + ey[i], w: o.w - 2 * c, h: ey[i + 1] - ey[i] + 0.004,
+      fill: { color: ramp((ey[i] + ey[i + 1]) / 2 / o.h), transparency: 100 - alpha },
+      line: { type: 'none' },
+    });
+  }
+}
+
+/**
+ * Radial "lens flare" orb. The reference uses a shape-path gradient that fades
+ * linearly from red at the centre to the page colour at the rim; here that is
+ * stacked concentric circles.
+ */
+function glow(s, x, y, d) {
+  const RINGS = 26;
+  for (let i = RINGS; i >= 1; i--) {
+    const t = i / RINGS;                    // 1 = outermost ring
+    shp(s, 'ellipse', {
+      x: x + d * (1 - t) / 2, y: y + d * (1 - t) / 2, w: d * t, h: d * t,
+      fill: mix(C.red, C.bg, t),
+    });
+  }
+}
+
+/** Blend two hex colours, t = 0 -> a, t = 1 -> b. */
+function mix(a, b, t) {
+  let out = '';
+  for (let i = 0; i < 6; i += 2) {
+    const va = parseInt(a.substr(i, 2), 16);
+    const vb = parseInt(b.substr(i, 2), 16);
+    out += Math.round(va + (vb - va) * t).toString(16).padStart(2, '0');
+  }
+  return out.toUpperCase();
+}
+
+// ---------------------------------------------------------------- deck ornaments
+
+/** Tilted 3x3 hash of thin lines used as a corner texture. */
+function grid(s, cx, cy, len, angle, color) {
+  const rad = (angle * Math.PI) / 180;
+  const cos = Math.cos(rad), sin = Math.sin(rad);
+  const offs = [-0.25 * len, 0, 0.25 * len];
+  const line = { color: color || C.panel, width: 1 };
+  offs.forEach(o => {                                   // strokes along the tilt
+    const mx = cx + o * cos, my = cy + o * sin;
+    s.addShape('line', { x: mx, y: my - len / 2, w: 0, h: len, rotate: angle, line });
+  });
+  offs.forEach(o => {                                   // strokes across the tilt
+    const mx = cx - o * sin, my = cy + o * cos;
+    s.addShape('line', { x: mx - len / 2, y: my, w: len, h: 0, rotate: angle, line });
+  });
+}
+
+/** Thin arrow glyph: a shaft plus an open V head. rot 0 = up, 90 = right, 180 = down. */
+function arrow(s, x, y, w, h, rot) {
+  const cx = x + w / 2, cy = y + h / 2;
+  const a = (rot * Math.PI) / 180;
+  const at = (dx, dy) => [cx + dx * Math.cos(a) - dy * Math.sin(a), cy + dx * Math.sin(a) + dy * Math.cos(a)];
+  const seg = (p, q) => s.addShape('line', {
+    x: Math.min(p[0], q[0]), y: Math.min(p[1], q[1]),
+    w: Math.abs(q[0] - p[0]), h: Math.abs(q[1] - p[1]),
+    line: { color: C.white, width: 0.75 },
+    flipH: (q[0] - p[0]) * (q[1] - p[1]) < 0,
+  });
+  const barb = w * 0.48;
+  const tip = at(0, -h / 2);
+  seg(tip, at(0, h / 2));                      // shaft
+  seg(tip, at(-barb, -h / 2 + barb));          // left barb
+  seg(tip, at(barb, -h / 2 + barb));           // right barb
+}
+
+/** Round "compass" button: filled circle with a small diamond needle. */
+function compass(s, x, y, d, rot, ring, needle) {
+  shp(s, 'ellipse', { x, y, w: d, h: d, fill: ring });
+  shp(s, 'diamond', { x: x + d * 0.34, y: y + d * 0.213, w: d * 0.32, h: d * 0.574, fill: needle, rot });
+}
+
+/** Rounded chip in the top-left of every slide: red dot + "Pitch Deck". */
+function pill(s, y) {
+  shp(s, 'roundRect', { x: 0.7, y, w: 1.937, h: 0.391, fill: C.bg, line: C.red, r: 0.195 });
+  shp(s, 'ellipse', { x: 0.873, y: y + 0.13, w: 0.131, h: 0.131, fill: C.red });
+  txt(s, 'Pitch Deck', { x: 1.058, y: y + 0.059, w: 1.336, h: 0.269, size: 10, color: C.white });
+}
+
+/** 0.81in square step tile with a two-digit number. */
+function numTile(s, x, y, label, fill) {
+  shp(s, 'roundRect', { x, y, w: 0.81, h: 0.81, fill, r: 0.12 });
+  txt(s, label, { x: x + 0.13, y: y + 0.203, w: 0.549, h: 0.404, size: 18, color: C.white, head: 1, align: 'center' });
+}
+
+/**
+ * Image frame. The reference ships these as *empty* picture placeholders — the
+ * package contains no media at all — so they are drawn as a flat block just a
+ * shade off the page colour, matching how the reference renders.
+ */
+function photo(s, x, y, w, h) {
+  shp(s, 'roundRect', { x, y, w, h, fill: '231D1F', r: 0.35 });
+  txt(s, '[image]', { x, y: y + h / 2 - 0.15, w, h: 0.3, size: 11, color: '2A2426', align: 'center' });
+}
+
+/** Slide 10 doughnut chart (Sheet1 B2:B4 = 8.2 / 3.2 / 1.4). */
+function donut(s, x, y, w, h) {
+  s.addChart('doughnut', [{ name: 'Sales', labels: [['1st Qtr', '2nd Qtr', '3rd Qtr']], values: [8.2, 3.2, 1.4] }], {
+    x, y, w, h,
+    holeSize: 65, firstSliceAng: 0,
+    chartColors: [C.red, C.red, C.red],
+    dataBorder: { pt: 1.5, color: C.white },
+    dataNoEffects: true,
+    showValue: true, showLabel: false, showPercent: false, showLegend: false,
+    dataLabelColor: C.white, dataLabelFontSize: 12, dataLabelFontFace: BODY,
+    chartArea: { fill: { color: C.bg }, roundedCorners: false },
+    plotArea: { fill: { color: C.bg } },
+    layout: { x: 0.052, y: 0.059, w: 0.886, h: 0.878 },
+  });
+}
+
+// ================================================================ slides
+
+// Repeated body copy, lifted out so the slide builders stay readable.
+const L1 = 'Dui hac faucibus maecenas cubilia facilisi commodo. Ante quam luctus est praesent facilisi magna.\u00a0';
+const L2 = 'Dui hac faucibus maecenas cubilia facilisi commodo. Ante eu ligula quam luctus est praesent facilisi magna.\u00a0';
+const L3 = 'Euismod finibus quis eu convallis magna malesuada nunc. Dolor';
+const L4 = 'Dui hac faucibus maecenas cubilia facilisi commodo. Ante eu ligula quam luctus facilisi magna.\u00a0';
+const L5 = 'Dui hac faucibus cubilia facilisi commodo. Ante quam luctus est praesent facilisi magna edet es tui Maecenas due.\u00a0';
+const L6 = 'Dui hac faucibus maecenas cubilia facilisi commodo. Ante quam luctus est praesent facilisi magna.\u00a0Taciti vivamus nostra mollis iaculis rutrum parturient et.';
+
+// 1. Cover — The Power of Digital Marketing
+function slide01(s) {
+  photo(s, 8.625, 0.913, 3.664, 5.131);
+  grid(s, 12.49, 6.498, 2.892, 39.37, C.panel);
+  glow(s, 3.286, 0.797, 3.101);
+  txt(s, [['The Power of ', C.white], ['Digital ', C.red], ['Marketing', C.white]], { x:0.698, y:1.866, w:4.571, h:2.827, size:54, color:C.white, head:1 });
+  shp(s, 'roundRect', { x:7.294, y:1.992, w:0.976, h:1.218, fill:C.panel, r:0.145 });
+  compass(s, 7.588, 2.407, 0.387, 45, C.red, C.white);
+  pill(s, 1.182);
+  shp(s, 'roundRect', { x:0.698, y:5.32, w:4.454, h:0.489, fill:C.panel });
+  txt(s, 'Digital Marketing', { x:0.781, y:5.43, w:1.613, h:0.269, size:10, color:C.white });
+  shp(s, 'roundRect', { x:3.871, y:5.412, w:1.194, h:0.305, fill:GRAD, r:0.069 });
+  txt(s, 'Let\u2019s Started', { x:3.946, y:5.43, w:1.045, h:0.269, size:10, color:C.white, align:'center' });
+  panel(s, { x:7.296, y:4.881, w:2.321, h:1.542, fill:C.red, r:0.229 });
+  shp(s, 'roundRect', { x:7.558, y:5.977, w:1.796, h:0.18, fill:C.white, r:0.09 });
+  shp(s, 'roundRect', { x:7.558, y:5.643, w:1.796, h:0.18, fill:C.white, r:0.09 });
+  shp(s, 'roundRect', { x:7.558, y:5.977, w:1.516, h:0.18, fill:C.bg, r:0.09 });
+  shp(s, 'roundRect', { x:7.558, y:5.643, w:1.023, h:0.18, fill:C.bg, r:0.09 });
+  txt(s, '$8,999', { x:7.486, y:5.095, w:1.375, h:0.404, size:18, color:C.white, head:1 });
+  arrow(s, 9.043, 1.015, 0.32, 0.487, 270);
+}
+
+// 2. Table of Content
+function slide02(s) {
+  grid(s, 12.461, 0.691, 1.715, 39.37);
+  glow(s, -0.955, 2.25, 3.101);
+  numTile(s, 4.404, 1.951, '01', GRAD);
+  panel(s, { x:5.429, y:1.951, w:2.919, h:0.81, fill:C.panel });
+  txt(s, 'About Us', { x:5.688, y:2.154, w:2.4, h:0.37, size:16, color:C.red, head:1 });
+  numTile(s, 4.404, 3.515, '03', GRAD);
+  panel(s, { x:5.429, y:3.515, w:2.919, h:0.81, fill:C.red });
+  txt(s, 'Target Audience', { x:5.688, y:3.718, w:2.4, h:0.37, size:16, color:C.white, head:1 });
+  numTile(s, 4.404, 5.08, '05', GRAD);
+  panel(s, { x:5.429, y:5.08, w:2.919, h:0.81, fill:C.panel });
+  txt(s, 'Growth Strategy', { x:5.688, y:5.283, w:2.4, h:0.37, size:16, color:C.red, head:1 });
+  numTile(s, 8.784, 1.951, '02', GRAD);
+  panel(s, { x:9.809, y:1.951, w:2.919, h:0.81, fill:C.panel });
+  txt(s, 'Market Opportunity ', { x:10.069, y:2.154, w:2.4, h:0.37, size:16, color:C.red, head:1 });
+  numTile(s, 8.784, 3.515, '04', GRAD);
+  panel(s, { x:9.809, y:3.515, w:2.919, h:0.81, fill:C.red });
+  txt(s, 'Serviced Offered', { x:10.069, y:3.718, w:2.4, h:0.37, size:16, color:C.white, head:1 });
+  numTile(s, 8.784, 5.08, '06', GRAD);
+  panel(s, { x:9.809, y:5.08, w:2.919, h:0.81, fill:C.panel });
+  txt(s, 'Closing', { x:10.069, y:5.283, w:2.4, h:0.37, size:16, color:C.red, head:1 });
+  txt(s, 'Table of Content', { x:0.698, y:2.663, w:2.894, h:1.582, size:44, color:C.white, head:1 });
+  arrow(s, 0.856, 4.483, 0.164, 0.25, 90);
+  txt(s, L3, { x:1.335, y:4.423, w:2.049, h:0.832, size:10, color:C.white, ls:1.5 });
+  pill(s, 0.615);
+}
+
+// 3. About Us
+function slide03(s) {
+  photo(s, 6.788, 1.258, 3.397, 4.984);
+  grid(s, 6.858, 6.087, 1.715, 29.291);
+  panel(s, { x:0.815, y:3.082, w:4.88, h:1.214, fill:GRAD, rot:180 });
+  txt(s, 'About Us', { x:0.698, y:1.791, w:2.894, h:0.841, size:44, color:C.white, head:1 });
+  panel(s, { x:10.727, y:4.733, w:1.744, h:1.353, fill:C.panel });
+  arrow(s, 9.568, 1.283, 0.224, 0.341, 270);
+  txt(s, '150', { x:10.941, y:5.006, w:1.315, h:0.404, size:18, color:C.red, head:1 });
+  txt(s, 'Description', { x:10.941, y:5.409, w:1.315, h:0.327, size:10, color:C.white, ls:1.5 });
+  txt(s, 'Dolor rutrum ridiculus justo lobortis vestibulum hendrerit consectetur. Tortor id vestibulum iaculis molestie per luctus. nulla tempor maximus habitasse.\u00a0', { x:1.073, y:3.257, w:4.151, h:0.832, size:10, color:C.white, ls:1.5 });
+  panel(s, { x:10.727, y:1.373, w:1.744, h:1.353, fill:C.panel });
+  txt(s, '200+', { x:10.941, y:1.646, w:1.315, h:0.404, size:18, color:C.red, head:1 });
+  txt(s, 'Description', { x:10.941, y:2.05, w:1.315, h:0.327, size:10, color:C.white, ls:1.5 });
+  txt(s, 'Dolor rutrum ridiculus justo hendrerit. Tortor id vestibulum tempor maximus habitasse.\u00a0', { x:1.38, y:4.551, w:3.36, h:0.581, size:10, color:C.red, head:1, ls:1.5 });
+  glow(s, -0.481, 5.579, 2.617);
+  arrow(s, 0.856, 4.617, 0.164, 0.25, 90);
+  pill(s, 0.615);
+  panel(s, { x:9.855, y:3.074, w:1.744, h:1.353, fill:GRAD });
+  txt(s, '1K+', { x:10.069, y:3.346, w:1.315, h:0.404, size:18, color:C.white, head:1 });
+  txt(s, 'Description', { x:10.069, y:3.75, w:1.315, h:0.327, size:10, color:C.white, ls:1.5 });
+  compass(s, 11.977, 3.576, 0.387, 45, C.red, C.white);
+}
+
+// 4. Vision Statement
+function slide04(s) {
+  photo(s, 5.799, 3.981, 5.2, 2.333);
+  grid(s, 12.497, 6.506, 2.892, 39.37, C.panel);
+  glow(s, 11.325, -0.564, 2.617);
+  pill(s, 0.615);
+  txt(s, 'Vision Statement', { x:0.7, y:4.697, w:3.774, h:1.582, size:44, color:C.white, head:1 });
+  numTile(s, 0.764, 1.912, '01', GRAD);
+  panel(s, { x:1.789, y:1.912, w:3.582, h:1.406, fill:C.red, r:0.156 });
+  txt(s, L2, { x:2.13, y:2.173, w:3.002, h:0.832, size:10, color:C.white, ls:1.5 });
+  numTile(s, 6.392, 1.912, '02', GRAD);
+  panel(s, { x:7.417, y:1.912, w:3.582, h:1.406, fill:C.panel, r:0.156 });
+  txt(s, L2, { x:7.758, y:2.173, w:3.002, h:0.832, size:10, color:C.white, ls:1.5 });
+  arrow(s, 0.898, 4.091, 0.32, 0.487, 90);
+  compass(s, 5.484, 5.381, 0.658, 45, C.red, C.white);
+}
+
+// 5. Mission Statement
+function slide05(s) {
+  glow(s, 11.24, 0.403, 2.617);
+  pill(s, 0.615);
+  txt(s, 'Mission Statement', { x:0.7, y:1.895, w:3.774, h:1.582, size:44, color:C.white, head:1 });
+  panel(s, { x:6.077, y:1.722, w:3.856, h:1.864, fill:C.red, r:0.207 });
+  txt(s, 'Mission 01', { x:6.641, y:1.987, w:3.002, h:0.404, size:18, color:C.white, head:1 });
+  txt(s, L2, { x:6.641, y:2.44, w:3.002, h:0.832, size:10, color:C.white, ls:1.5 });
+  panel(s, { x:8.693, y:4.48, w:3.856, h:1.864, fill:C.panel, r:0.207 });
+  txt(s, 'Mission 03', { x:9.257, y:4.745, w:3.002, h:0.404, size:18, color:C.red, head:1 });
+  txt(s, L2, { x:9.257, y:5.198, w:3.002, h:0.832, size:10, color:C.white, ls:1.5 });
+  panel(s, { x:3.259, y:4.511, w:3.856, h:1.864, fill:C.panel, r:0.207 });
+  txt(s, 'Mission 02', { x:3.826, y:4.745, w:3.002, h:0.404, size:18, color:C.red, head:1 });
+  txt(s, L2, { x:3.826, y:5.198, w:3.002, h:0.832, size:10, color:C.white, ls:1.5 });
+  grid(s, 0.7, 6.755, 1.715, 29.291);
+  numTile(s, 5.683, 1.533, '01', C.panel);
+  numTile(s, 8.299, 4.291, '03', GRAD);
+  numTile(s, 2.867, 4.291, '02', GRAD);
+  arrow(s, 0.921, 3.625, 0.389, 0.591, 90);
+}
+
+// 6. Market Opportunity
+function slide06(s) {
+  glow(s, 11.538, 3.847, 2.617);
+  grid(s, 4.518, 6.016, 2.017, 29.291);
+  pill(s, 0.615);
+  txt(s, 'Market Opportunity', { x:8.297, y:4.296, w:4.342, h:1.582, size:44, color:C.white, head:1, align:'right' });
+  panel(s, { x:0.827, y:1.744, w:3.541, h:1.864, fill:C.panel, r:0.207 });
+  txt(s, 'Digital Ad Spend', { x:1.125, y:2.009, w:2.944, h:0.404, size:18, color:C.red, head:1 });
+  txt(s, L2, { x:1.125, y:2.462, w:2.944, h:0.832, size:10, color:C.white, ls:1.5 });
+  panel(s, { x:4.896, y:1.744, w:3.541, h:1.864, fill:C.panel, r:0.207 });
+  txt(s, 'Mobile Visit World ', { x:5.195, y:2.009, w:2.944, h:0.404, size:18, color:C.red, head:1 });
+  txt(s, L2, { x:5.195, y:2.462, w:2.944, h:0.832, size:10, color:C.white, ls:1.5 });
+  panel(s, { x:8.966, y:1.744, w:3.541, h:1.864, fill:C.panel, r:0.207 });
+  txt(s, 'Rise of Social Media', { x:9.264, y:2.009, w:2.944, h:0.404, size:18, color:C.red, head:1 });
+  txt(s, L2, { x:9.264, y:2.462, w:2.944, h:0.832, size:10, color:C.white, ls:1.5 });
+  panel(s, { x:0.827, y:4.223, w:4.811, h:1.864, fill:C.red, r:0.207 });
+  txt(s, 'E-Commerce Growth', { x:1.123, y:4.489, w:4.218, h:0.404, size:18, color:C.white, head:1 });
+  txt(s, 'Himenaeos eros nisi volutpat venenatis mus aliquet eros lectus. Eros hendrerit faucibus ex non phasellus maecenas. Cras cubilia present.', { x:1.123, y:4.942, w:4.218, h:0.832, size:10, color:C.white, ls:1.5 });
+  arrow(s, 9.857, 4.566, 0.164, 0.25, 270);
+  compass(s, 5.274, 4.22, 0.658, 45, C.panel, C.red);
+}
+
+// 7. Problem Statement
+function slide07(s) {
+  photo(s, 9.582, 1.177, 2.988, 5.489);
+  grid(s, 9.19, 5.668, 1.715, 39.37);
+  glow(s, -0.545, 5.517, 2.617);
+  pill(s, 0.615);
+  txt(s, 'Problem Statement ', { x:0.705, y:4.837, w:4.342, h:1.582, size:44, color:C.white, head:1 });
+  panel(s, { x:0.7, y:1.672, w:3.034, h:2.499, fill:C.red, r:0.263 });
+  txt(s, 'Problem 01', { x:0.956, y:2.475, w:2.523, h:0.37, size:16, color:C.white, head:1 });
+  txt(s, L4, { x:0.956, y:2.928, w:2.523, h:0.832, size:10, color:C.white, ls:1.5 });
+  txt(s, '01', { x:0.956, y:1.939, w:2.523, h:0.404, size:18, color:C.white, head:1 });
+  panel(s, { x:3.99, y:1.672, w:3.034, h:2.499, fill:C.panel, r:0.263 });
+  txt(s, 'Problem 02', { x:4.246, y:2.475, w:2.523, h:0.37, size:16, color:C.red, head:1 });
+  txt(s, L4, { x:4.246, y:2.928, w:2.523, h:0.832, size:10, color:C.white, ls:1.5 });
+  txt(s, '02', { x:4.246, y:1.939, w:2.523, h:0.404, size:18, color:C.red, head:1 });
+  panel(s, { x:7.281, y:1.672, w:3.034, h:2.499, fill:C.panel, r:0.263 });
+  txt(s, 'Problem 03', { x:7.536, y:2.475, w:2.523, h:0.37, size:16, color:C.red, head:1 });
+  txt(s, L4, { x:7.536, y:2.928, w:2.523, h:0.832, size:10, color:C.white, ls:1.5 });
+  txt(s, '03', { x:7.536, y:1.939, w:2.523, h:0.404, size:18, color:C.red, head:1 });
+  arrow(s, 4.824, 5.173, 0.164, 0.25, 90);
+  txt(s, L3, { x:5.303, y:5.113, w:2.049, h:0.832, size:10, color:C.white, ls:1.5 });
+  compass(s, 12.078, 1.012, 0.658, 45, C.red, C.white);
+}
+
+// 8. Our Solution
+function slide08(s) {
+  photo(s, 2.003, 3.004, 3.158, 3.398);
+  numTile(s, 6.352, 1.801, '01', GRAD);
+  grid(s, 12.461, 0.691, 1.715, 39.37);
+  glow(s, 0.494, 1.326, 1.708);
+  pill(s, 0.615);
+  txt(s, 'Our Solution', { x:0.7, y:1.709, w:3.967, h:0.841, size:44, color:C.white, head:1 });
+  panel(s, { x:7.529, y:1.463, w:5.104, h:1.491, fill:C.red, r:0.242 });
+  txt(s, 'Solution 01', { x:7.856, y:1.718, w:4.41, h:0.37, size:16, color:C.white, head:1 });
+  txt(s, L2, { x:7.856, y:2.122, w:4.41, h:0.58, size:10, color:C.white, ls:1.5 });
+  panel(s, { x:7.529, y:3.209, w:5.104, h:1.491, fill:C.panel, r:0.221 });
+  txt(s, 'Solution 02', { x:7.856, y:3.464, w:4.41, h:0.37, size:16, color:C.red, head:1 });
+  txt(s, L2, { x:7.856, y:3.868, w:4.41, h:0.58, size:10, color:C.white, ls:1.5 });
+  panel(s, { x:7.529, y:4.955, w:5.104, h:1.491, fill:C.panel, r:0.2 });
+  txt(s, 'Solution 03', { x:7.856, y:5.21, w:4.41, h:0.37, size:16, color:C.red, head:1 });
+  txt(s, L2, { x:7.856, y:5.614, w:4.41, h:0.58, size:10, color:C.white, ls:1.5 });
+  numTile(s, 6.352, 3.55, '02', GRAD);
+  numTile(s, 6.352, 5.296, '03', GRAD);
+  shp(s, 'roundRect', { x:0.7, y:4.095, w:0.976, h:1.218, fill:C.panel, r:0.145 });
+  compass(s, 0.995, 4.51, 0.387, 45, C.red, C.white);
+}
+
+// 9. Why Choose Us?
+function slide09(s) {
+  glow(s, 11.325, 5.364, 2.617);
+  pill(s, 0.615);
+  txt(s, 'Why Choose Us?', { x:0.7, y:1.832, w:3.774, h:1.582, size:44, color:C.white, head:1 });
+  panel(s, { x:9.167, y:1.639, w:3.467, h:1.969, fill:C.red, r:0.218 });
+  txt(s, 'Customized Strategies', { x:9.474, y:2.005, w:2.852, h:0.37, size:16, color:C.white, head:1 });
+  txt(s, L2, { x:9.474, y:2.409, w:2.852, h:0.832, size:10, color:C.white, ls:1.5 });
+  panel(s, { x:5.393, y:1.639, w:3.467, h:1.969, fill:C.red, r:0.218 });
+  txt(s, 'Data-Driven Decisions', { x:5.7, y:2.005, w:2.852, h:0.37, size:16, color:C.white, head:1 });
+  txt(s, L2, { x:5.7, y:2.409, w:2.852, h:0.832, size:10, color:C.white, ls:1.5 });
+  panel(s, { x:4.474, y:4.178, w:3.467, h:1.969, fill:C.panel, r:0.218 });
+  txt(s, 'Expert Team', { x:4.781, y:4.544, w:2.852, h:0.37, size:16, color:C.red, head:1 });
+  txt(s, L2, { x:4.781, y:4.948, w:2.852, h:0.832, size:10, color:C.white, ls:1.5 });
+  panel(s, { x:0.7, y:4.178, w:3.467, h:1.969, fill:C.panel, r:0.218 });
+  txt(s, 'Proven Results', { x:1.007, y:4.544, w:2.852, h:0.37, size:16, color:C.red, head:1 });
+  txt(s, L2, { x:1.007, y:4.948, w:2.852, h:0.832, size:10, color:C.white, ls:1.5 });
+  panel(s, { x:8.248, y:4.178, w:3.467, h:1.969, fill:C.panel, r:0.218 });
+  txt(s, 'Omnichannel Expertise', { x:8.555, y:4.544, w:2.852, h:0.37, size:16, color:C.red, head:1 });
+  txt(s, L2, { x:8.555, y:4.948, w:2.852, h:0.832, size:10, color:C.white, ls:1.5 });
+  arrow(s, 2.49, 2.081, 0.269, 0.409, 90);
+}
+
+// 10. Target Audience (doughnut chart)
+function slide10(s) {
+  grid(s, 0.7, 6.827, 1.715, 60);
+  pill(s, 0.615);
+  txt(s, 'Target Audience', { x:3.892, y:1.061, w:5.55, h:0.841, size:44, color:C.white, head:1, align:'center' });
+  panel(s, { x:5.263, y:2.417, w:7.229, h:1.603, fill:C.red, r:0.178 });
+  txt(s, 'Target Audience 01', { x:5.565, y:2.711, w:6.626, h:0.37, size:16, color:C.white, head:1 });
+  txt(s, 'Lectus eu venenatis morbi rutrum convallis eget. Duis aliquet ut velit commodo himenaeos neque platea montes. Sem elit fames nam maximus nibh adipiscing venenatis imperdiet.\u00a0', { x:5.565, y:3.114, w:6.626, h:0.58, size:10, color:C.white, ls:1.5 });
+  donut(s, 0.692, 2.407, 3.918, 3.951);
+  panel(s, { x:9.037, y:4.386, w:3.467, h:1.969, fill:C.panel, r:0.218 });
+  txt(s, 'Target Audience 03', { x:9.344, y:4.753, w:2.852, h:0.37, size:16, color:C.red, head:1 });
+  txt(s, L2, { x:9.344, y:5.157, w:2.852, h:0.832, size:10, color:C.white, ls:1.5 });
+  panel(s, { x:5.263, y:4.386, w:3.467, h:1.969, fill:C.panel, r:0.218 });
+  txt(s, 'Target Audience 02', { x:5.57, y:4.753, w:2.852, h:0.37, size:16, color:C.red, head:1 });
+  txt(s, L2, { x:5.57, y:5.157, w:2.852, h:0.832, size:10, color:C.white, ls:1.5 });
+  compass(s, 11.999, 2.137, 0.658, 45, C.panel, C.red);
+}
+
+// 11. Our Services
+function slide11(s) {
+  photo(s, 7.702, 3.243, 4.965, 2.929);
+  grid(s, 0.8, 6.532, 2.017, 29.291);
+  glow(s, 11.325, -0.821, 2.617);
+  pill(s, 0.615);
+  txt(s, 'Our Services', { x:7.31, y:1.955, w:5.356, h:0.841, size:44, color:C.white, head:1, align:'right' });
+  arrow(s, 12.083, 5.575, 0.32, 0.487, 270);
+  panel(s, { x:0.7, y:1.822, w:2.958, h:1.969, fill:C.red, r:0.218 });
+  txt(s, 'Web Design ', { x:0.926, y:2.189, w:2.507, h:0.37, size:16, color:C.white, head:1 });
+  txt(s, L1, { x:0.926, y:2.593, w:2.507, h:0.832, size:10, color:C.white, ls:1.5 });
+  panel(s, { x:3.934, y:4.202, w:2.958, h:1.969, fill:C.panel, r:0.218 });
+  txt(s, 'Influencer Marketing', { x:4.159, y:4.568, w:2.507, h:0.37, size:16, color:C.red, head:1 });
+  txt(s, L1, { x:4.159, y:4.972, w:2.507, h:0.832, size:10, color:C.white, ls:1.5 });
+  panel(s, { x:0.7, y:4.197, w:2.958, h:1.969, fill:C.red, r:0.218 });
+  txt(s, 'Email Marketing', { x:0.926, y:4.564, w:2.507, h:0.37, size:16, color:C.white, head:1 });
+  txt(s, L1, { x:0.926, y:4.968, w:2.507, h:0.832, size:10, color:C.white, ls:1.5 });
+  panel(s, { x:3.934, y:1.866, w:2.958, h:1.969, fill:C.panel, r:0.218 });
+  txt(s, 'Content Marketing', { x:4.159, y:2.233, w:2.507, h:0.37, size:16, color:C.red, head:1 });
+  txt(s, L1, { x:4.159, y:2.637, w:2.507, h:0.832, size:10, color:C.white, ls:1.5 });
+  compass(s, 7.373, 3.046, 0.658, 315, C.red, C.white);
+}
+
+// 12. Service Breakdown
+function slide12(s) {
+  photo(s, 7.483, 4.076, 4.458, 2.2);
+  grid(s, 12.461, 0.691, 1.715, 39.37);
+  glow(s, -0.371, 3.867, 2.617);
+  pill(s, 0.615);
+  txt(s, 'Service Breakdown', { x:1.669, y:4.36, w:3.944, h:1.582, size:44, color:C.white, head:1 });
+  panel(s, { x:0.7, y:1.625, w:3.097, h:1.969, fill:C.panel, r:0.218 });
+  txt(s, 'Social Media Marketing', { x:0.995, y:1.883, w:2.507, h:0.64, size:16, color:C.red, head:1 });
+  txt(s, L1, { x:0.995, y:2.528, w:2.507, h:0.832, size:10, color:C.white, ls:1.5 });
+  panel(s, { x:4.092, y:1.625, w:3.097, h:1.969, fill:C.panel, r:0.218 });
+  txt(s, 'Content Marketing', { x:4.387, y:1.992, w:2.507, h:0.37, size:16, color:C.red, head:1 });
+  txt(s, L1, { x:4.387, y:2.396, w:2.507, h:0.832, size:10, color:C.white, ls:1.5 });
+  panel(s, { x:7.483, y:1.625, w:5.068, h:1.969, fill:C.red, r:0.218 });
+  txt(s, 'Search Engine Optimization ', { x:7.815, y:1.992, w:4.406, h:0.37, size:16, color:C.white, head:1 });
+  txt(s, 'Finibus torquent ullamcorper dictum; hac efficitur posuere ornare consequat. Inceptos pharetra facilisi eleifend adipiscing inceptos efficitur aliquam mus.\u00a0', { x:7.815, y:2.396, w:4.406, h:0.832, size:10, color:C.white, ls:1.5 });
+  shp(s, 'roundRect', { x:11.576, y:4.542, w:0.976, h:1.218, fill:C.panel, r:0.145 });
+  compass(s, 11.87, 4.957, 0.387, 45, C.red, C.white);
+  arrow(s, 0.816, 4.974, 0.265, 0.403, 90);
+}
+
+// 13. Campaign Strategy
+function slide13(s) {
+  grid(s, 12.633, 0.808, 1.715, 60);
+  pill(s, 0.615);
+  txt(s, 'Campaign Strategy ', { x:6.524, y:1.167, w:6.254, h:0.841, size:44, color:C.white, head:1, align:'right' });
+  panel(s, { x:7.861, y:2.954, w:2.822, h:3.409, fill:C.panel, r:0.313 });
+  txt(s, 'Create Engaging Content', { x:8.117, y:3.803, w:2.309, h:0.64, size:16, color:C.red, head:1, bold:1 });
+  txt(s, L5, { x:8.117, y:4.557, w:2.309, h:1.085, size:10, color:C.white, ls:1.5 });
+  numTile(s, 7.597, 2.634, '03', GRAD);
+  panel(s, { x:4.413, y:2.954, w:2.822, h:3.409, fill:C.panel, r:0.313 });
+  txt(s, 'Set Clear Objectives', { x:4.669, y:3.803, w:2.309, h:0.64, size:16, color:C.red, head:1 });
+  txt(s, L5, { x:4.669, y:4.557, w:2.309, h:1.085, size:10, color:C.white, ls:1.5 });
+  numTile(s, 4.148, 2.634, '02', GRAD);
+  panel(s, { x:0.964, y:2.954, w:2.822, h:3.409, fill:C.red, r:0.313 });
+  txt(s, 'Understand Target Audience', { x:1.221, y:3.803, w:2.309, h:0.64, size:16, color:C.white, head:1 });
+  txt(s, L5, { x:1.221, y:4.557, w:2.309, h:1.085, size:10, color:C.white, ls:1.5 });
+  numTile(s, 0.7, 2.634, '01', C.panel);
+  glow(s, 11.227, 5.391, 2.617);
+  arrow(s, 12.083, 3.186, 0.32, 0.487, 270);
+}
+
+// 14. Content Creation
+function slide14(s) {
+  photo(s, 7.483, 3.414, 5.15, 2.709);
+  grid(s, 12.633, 0.808, 1.715, 60);
+  glow(s, 11.227, 5.391, 2.617);
+  pill(s, 0.615);
+  txt(s, 'Content Creation', { x:5.861, y:1.968, w:5.507, h:0.841, size:44, color:C.white, head:1 });
+  panel(s, { x:0.7, y:1.625, w:4.598, h:1.969, fill:C.red, r:0.218 });
+  txt(s, 'Content Objectives', { x:1.037, y:1.992, w:3.925, h:0.37, size:16, color:C.white, head:1 });
+  txt(s, L6, { x:1.037, y:2.396, w:3.925, h:0.832, size:10, color:C.white, ls:1.5 });
+  panel(s, { x:0.7, y:4.153, w:3.097, h:1.969, fill:C.panel, r:0.218 });
+  txt(s, 'Content Types', { x:0.995, y:4.52, w:2.507, h:0.37, size:16, color:C.red, head:1 });
+  txt(s, L1, { x:0.995, y:4.924, w:2.507, h:0.832, size:10, color:C.white, ls:1.5 });
+  panel(s, { x:4.092, y:4.153, w:3.097, h:1.969, fill:C.panel, r:0.218 });
+  txt(s, 'Content Distribution', { x:4.387, y:4.52, w:2.507, h:0.37, size:16, color:C.red, head:1 });
+  txt(s, L1, { x:4.387, y:4.924, w:2.507, h:0.832, size:10, color:C.white, ls:1.5 });
+  compass(s, 4.84, 1.389, 0.658, 45, C.panel, C.red);
+}
+
+// 15. Social Media Management
+function slide15(s) {
+  glow(s, 11.216, -0.603, 2.617);
+  pill(s, 0.615);
+  txt(s, 'Social Media Management', { x:4.856, y:1.74, w:4.633, h:1.582, size:44, color:C.white, head:1 });
+  panel(s, { x:4.856, y:3.934, w:3.622, h:2.296, fill:C.red, r:0.254 });
+  txt(s, 'Content Strategy', { x:5.201, y:4.427, w:2.932, h:0.37, size:16, color:C.white, head:1 });
+  txt(s, L1, { x:5.201, y:4.831, w:2.932, h:0.832, size:10, color:C.white, ls:1.5 });
+  panel(s, { x:0.7, y:1.64, w:3.622, h:3.064, fill:C.red, r:0.339 });
+  txt(s, 'Platform Selection', { x:1.095, y:2.819, w:2.932, h:0.37, size:16, color:C.white, head:1 });
+  txt(s, L1, { x:1.095, y:3.222, w:2.932, h:0.832, size:10, color:C.white, ls:1.5 });
+  panel(s, { x:9.011, y:3.934, w:3.622, h:2.296, fill:C.red, r:0.254 });
+  txt(s, 'Community Management', { x:9.356, y:4.427, w:2.932, h:0.37, size:16, color:C.white, head:1 });
+  txt(s, L1, { x:9.356, y:4.831, w:2.932, h:0.832, size:10, color:C.white, ls:1.5 });
+  compass(s, 1.198, 2.022, 0.5, 45, C.panel, C.red);
+  grid(s, 1.154, 6.601, 2.693, 39.37);
+  arrow(s, 3.8, 5.162, 0.32, 0.487, 90);
+  txt(s, L3, { x:9.798, y:1.951, w:2.835, h:0.58, size:10, color:C.white, ls:1.5 });
+}
+
+// 16. SEO & Analytic
+function slide16(s) {
+  grid(s, 12.633, 0.808, 1.715, 60);
+  glow(s, 11.227, 5.391, 2.617);
+  pill(s, 0.615);
+  txt(s, 'SEO & Analytic', { x:1.726, y:1.946, w:3.572, h:1.582, size:44, color:C.white, head:1 });
+  panel(s, { x:0.7, y:4.352, w:4.598, h:1.969, fill:C.red, r:0.218 });
+  txt(s, 'SEO Strategy', { x:1.037, y:4.719, w:3.925, h:0.37, size:16, color:C.white, head:1 });
+  txt(s, L6, { x:1.037, y:5.123, w:3.925, h:0.832, size:10, color:C.white, ls:1.5 });
+  compass(s, 4.84, 4.116, 0.658, 45, C.panel, C.red);
+  panel(s, { x:5.964, y:4.352, w:4.598, h:1.969, fill:C.red, r:0.218 });
+  txt(s, 'Analytics & Performance Tracking', { x:6.301, y:4.719, w:3.925, h:0.37, size:16, color:C.white, head:1 });
+  txt(s, L6, { x:6.301, y:5.123, w:3.925, h:0.832, size:10, color:C.white, ls:1.5 });
+  compass(s, 10.104, 4.116, 0.658, 45, C.panel, C.red);
+  arrow(s, 0.784, 2.12, 0.32, 0.487, 90);
+  panel(s, { x:5.964, y:1.778, w:5.643, h:1.969, fill:C.panel, r:0.218 });
+  txt(s, 'Reporting & Continuous Optimization', { x:6.322, y:2.145, w:4.926, h:0.37, size:16, color:C.white, head:1 });
+  txt(s, 'Condimentum ligula praesent nascetur mi nisi vestibulum commodo tempor. Molestie auctor varius dictumst scelerisque augue porta. Urna placerat scelerisque suscipit.', { x:6.322, y:2.549, w:4.926, h:0.832, size:10, color:C.white, ls:1.5 });
+  compass(s, 11.222, 1.542, 0.658, 30, C.red, C.white);
+}
+
+// 17. Industry Trends
+function slide17(s) {
+  photo(s, 9.903, 1.053, 2.778, 5.394);
+  glow(s, -1.452, 2.183, 3.179);
+  pill(s, 0.615);
+  txt(s, 'Industry Trends', { x:0.7, y:2.718, w:3.019, h:1.582, size:44, color:C.white, head:1 });
+  panel(s, { x:4.255, y:1.1, w:4.471, h:1.537, fill:C.panel, r:0.17 });
+  txt(s, 'AI and Automation', { x:4.61, y:1.373, w:3.759, h:0.37, size:16, color:C.red, head:1 });
+  txt(s, L1, { x:4.61, y:1.743, w:3.759, h:0.58, size:10, color:C.white, ls:1.5 });
+  panel(s, { x:5.035, y:2.982, w:4.471, h:1.537, fill:C.red, r:0.17 });
+  txt(s, 'Video Marketing Growth', { x:5.391, y:3.254, w:3.759, h:0.37, size:16, color:C.white, head:1 });
+  txt(s, L1, { x:5.391, y:3.625, w:3.759, h:0.58, size:10, color:C.white, ls:1.5 });
+  panel(s, { x:4.255, y:4.889, w:4.471, h:1.537, fill:C.panel, r:0.17 });
+  txt(s, 'Voice Search Optimization', { x:4.61, y:5.161, w:3.759, h:0.37, size:16, color:C.red, head:1 });
+  txt(s, L1, { x:4.61, y:5.532, w:3.759, h:0.58, size:10, color:C.white, ls:1.5 });
+  arrow(s, 0.956, 4.439, 0.32, 0.487, 90);
+}
+
+// 18. SWOT Analysis
+function slide18(s) {
+  pill(s, 0.615);
+  txt(s, 'SWOT Analysis', { x:4.315, y:1.296, w:4.703, h:0.841, size:44, color:C.white, head:1, align:'center' });
+  panel(s, { x:1.671, y:2.739, w:4.471, h:1.537, fill:C.red, r:0.17 });
+  txt(s, 'Strength ', { x:2.027, y:3.012, w:3.759, h:0.37, size:16, color:C.white, head:1 });
+  txt(s, L1, { x:2.027, y:3.382, w:3.759, h:0.58, size:10, color:C.white, ls:1.5 });
+  panel(s, { x:7.191, y:2.739, w:4.471, h:1.537, fill:C.red, r:0.17 });
+  txt(s, 'Weaknesses ', { x:7.547, y:3.012, w:3.759, h:0.37, size:16, color:C.white, head:1 });
+  txt(s, L1, { x:7.547, y:3.382, w:3.759, h:0.58, size:10, color:C.white, ls:1.5 });
+  panel(s, { x:8.094, y:4.668, w:4.471, h:1.537, fill:C.panel, r:0.17 });
+  txt(s, 'Threats ', { x:8.45, y:4.94, w:3.759, h:0.37, size:16, color:C.red, head:1 });
+  txt(s, L1, { x:8.45, y:5.311, w:3.759, h:0.58, size:10, color:C.white, ls:1.5 });
+  panel(s, { x:0.768, y:4.668, w:4.471, h:1.537, fill:C.panel, r:0.17 });
+  txt(s, 'Opportunity ', { x:1.124, y:4.94, w:3.759, h:0.37, size:16, color:C.red, head:1 });
+  txt(s, L1, { x:1.124, y:5.311, w:3.759, h:0.58, size:10, color:C.white, ls:1.5 });
+  grid(s, 12.275, 1.177, 2.693, 39.37);
+  arrow(s, 6.507, 5.27, 0.32, 0.487, 0);
+}
+
+// 19. Growth Strategy
+function slide19(s) {
+  glow(s, 11.227, -0.53, 2.617);
+  pill(s, 0.615);
+  txt(s, 'Growth Strategy', { x:3.949, y:1.175, w:5.435, h:0.841, size:44, color:C.white, head:1, align:'center' });
+  grid(s, 0.7, 6.755, 2.693, 39.37);
+  panel(s, { x:0.7, y:2.64, w:2.772, h:3.112, fill:C.red, r:0.307 });
+  txt(s, 'Market Expansion', { x:0.964, y:3.374, w:2.244, h:0.37, size:16, color:C.white, head:1, align:'center' });
+  txt(s, L1, { x:0.964, y:3.869, w:2.244, h:1.085, size:10, color:C.white, align:'center', ls:1.5 });
+  panel(s, { x:3.736, y:3.213, w:2.772, h:3.112, fill:C.panel, r:0.307 });
+  txt(s, 'Customer Acquisition', { x:4, y:3.864, w:2.244, h:0.64, size:16, color:C.red, head:1, align:'center' });
+  txt(s, L1, { x:4, y:4.568, w:2.244, h:1.085, size:10, color:C.white, align:'center', ls:1.5 });
+  panel(s, { x:6.772, y:2.64, w:2.772, h:3.112, fill:C.red, r:0.307 });
+  txt(s, 'Customer Retention', { x:7.036, y:3.291, w:2.244, h:0.64, size:16, color:C.white, head:1, align:'center' });
+  txt(s, L1, { x:7.036, y:3.995, w:2.244, h:1.085, size:10, color:C.white, align:'center', ls:1.5 });
+  panel(s, { x:9.808, y:3.213, w:2.772, h:3.112, fill:C.panel, r:0.307 });
+  txt(s, 'Upselling & Cross-Selling', { x:10.072, y:3.864, w:2.244, h:0.64, size:16, color:C.red, head:1, align:'center' });
+  txt(s, L1, { x:10.072, y:4.568, w:2.244, h:1.085, size:10, color:C.white, align:'center', ls:1.5 });
+}
+
+// 20. Thank You
+function slide20(s) {
+  photo(s, 7.833, 4.17, 4.889, 2.28);
+  shp(s, 'roundRect', { x:3.629, y:5.956, w:2.517, h:0.489, fill:GRAD, r:0.111 });
+  shp(s, 'roundRect', { x:0.698, y:5.956, w:2.517, h:0.489, fill:C.panel });
+  grid(s, 12.275, 1.177, 2.693, 39.37);
+  glow(s, -0.891, 1.316, 3.12);
+  pill(s, 0.615);
+  txt(s, 'Thank You for Your Time', { x:0.7, y:1.831, w:5.272, h:1.919, size:54, color:C.white, head:1 });
+  txt(s, 'Dui hac faucibus maecenas cubilia facilisi commodo. Ante quam luctus est facilisi magna.\u00a0', { x:8.874, y:2.068, w:3.759, h:0.58, size:10, color:C.white, align:'right', ls:1.5 });
+  txt(s, '@your email', { x:0.869, y:6.065, w:2.175, h:0.269, size:10, color:C.white, align:'center' });
+  arrow(s, 12.295, 5.993, 0.164, 0.25, 270);
+  txt(s, 'www.digitalmarketing.com', { x:3.8, y:6.065, w:2.175, h:0.269, size:10, color:C.white, align:'center' });
+  compass(s, 12.053, 2.888, 0.422, 45, C.red, C.white);
+}
+
+const SLIDES = [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20];
+
+// ---------------------------------------------------------------- build
+
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'WIDE', width: 13.333, height: 7.5 });
+pptx.layout = 'WIDE';
+pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
+pptx.title = 'The Power of Digital Marketing';
+
+SLIDES.forEach(build => {
+  const s = pptx.addSlide();
+  s.background = { color: C.bg };
+  build(s);
+});
+
+pptx.writeFile({ fileName: path.join(__dirname, '130d8641-88df-49fb-b3d0-687baed631e9_grok_final.pptx') })
+  .then(f => console.log('wrote ' + f));

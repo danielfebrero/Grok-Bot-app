@@ -1,0 +1,1085 @@
+/**
+ * NETTE deck — standalone pptxgenjs recreation of
+ * 17301c0a-91f1-4ce0-a25d-0ee85f8e2757.pptx  (25 slides, 13.333in x 7.5in).
+ *
+ * Run:  node 17301c0a-91f1-4ce0-a25d-0ee85f8e2757_grok_final.js
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+// ---------------------------------------------------------------- palette & type
+const C = {
+  ink: '000000',
+  white: 'FFFFFF',
+  bg: 'EBEBF1',      // slide background
+  mist: 'F5F6FA',    // panel tint
+  violet: '7A60F1',
+  lime: 'D9FE55',
+  pink: 'F79FFF',
+  grey: 'D9D9D9',
+  grey2: 'BFBFBF',
+  grey3: '808080',
+  slate: '595959',
+  slate2: '535353',
+  char: '404040',
+  slot: 'E4E4EA',   // stand-in block for raster art
+};
+
+const MONO = 'JetBrains Mono';
+const MED = 'JetBrains Mono Medium';
+const SYNE = 'Syne';
+
+function newSlide(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: C.bg };
+  return s;
+}
+
+// ---------------------------------------------------------------- primitives
+/** Plain shape. opts: fill, alpha, line{color,width}, rot, flipH/V, radius, arc, thick */
+function shp(s, geom, x, y, w, h, opts) {
+  const o = opts || {};
+  const cfg = { x, y, w, h };
+  cfg.fill = o.fill ? (o.alpha ? { color: o.fill, transparency: o.alpha } : { color: o.fill }) : { type: 'none' };
+  cfg.line = o.line ? { color: o.line.color, width: o.line.width } : { type: 'none' };
+  if (o.rot) cfg.rotate = o.rot;
+  if (o.flipH) cfg.flipH = true;
+  if (o.flipV) cfg.flipV = true;
+  if (o.radius) cfg.rectRadius = o.radius;
+  if (o.arc) { cfg.angleRange = o.arc; cfg.arcThicknessRatio = o.thick || 1e-9; }
+  s.addShape(geom, cfg);
+}
+
+/** Straight line / connector. opts: color, width, end (arrow head), flipH/V */
+function ln(s, x, y, w, h, o) {
+  const cfg = { x, y, w, h, line: { color: o.color, width: o.width } };
+  if (o.end) cfg.line.endArrowType = o.end;
+  if (o.flipH) cfg.flipH = true;
+  if (o.flipV) cfg.flipV = true;
+  s.addShape('line', cfg);
+}
+
+/**
+ * Text box. `body` is a string or an array of run objects {t, sz, c, f, br}.
+ * opts: sz, c, f, align, valign, lh (line-height multiple), m (margin 0), rot, bullet
+ */
+function txt(s, x, y, w, h, body, opts) {
+  const o = opts || {};
+  const cfg = {
+    x, y, w, h,
+    fontFace: o.f || MONO,
+    fontSize: o.sz || 18,
+    color: o.c || C.ink,
+    align: o.align || 'left',
+    valign: o.valign || 'top',
+    margin: o.m === 0 ? 0 : [7.2, 7.2, 3.6, 3.6],
+    wrap: true,
+  };
+  if (o.lh) cfg.lineSpacingMultiple = o.lh;
+  if (o.rot) cfg.rotate = o.rot;
+  if (o.bullet) cfg.bullet = { indent: o.bullet };
+  if (typeof body === 'string') {
+    s.addText(body, cfg);
+  } else {
+    s.addText(body.map(r => ({
+      text: r.t,
+      options: {
+        fontFace: r.f || cfg.fontFace,
+        fontSize: r.sz || cfg.fontSize,
+        color: r.c || cfg.color,
+        breakLine: !!r.br,
+      },
+    })), cfg);
+  }
+}
+
+/** Freeform polygon from normalised [0..1] points inside the x/y/w/h box. */
+function poly(s, x, y, w, h, pts, o) {
+  const opt = o || {};
+  s.addShape('custGeom', {
+    x, y, w, h,
+    points: pts.map((p, i) => ({ x: p[0] * w, y: p[1] * h, moveTo: i === 0 })).concat([{ close: true }]),
+    fill: opt.fill ? { color: opt.fill } : { type: 'none' },
+    line: opt.line ? { color: opt.line, width: opt.width || 1 } : { type: 'none' },
+    rotate: opt.rot || 0,
+  });
+}
+
+// ---------------------------------------------------------------- deck motifs
+const NAV_LINKS = [
+  ['Home', 5.637, 0.767],
+  ['Market', 6.855, 0.767],
+  ['Product', 8.074, 0.809],
+  ['Contact', 9.293, 0.809],
+  ['Login', 10.512, 0.767],
+];
+
+/** Top navigation strip — identical on all 25 slides. */
+function navBar(s) {
+  shp(s, 'ellipse', 0.675, 0.355, 0.145, 0.145, { fill: C.violet });
+  txt(s, 0.863, 0.208, 1.437, 0.438, 'NETTE', { sz: 20 });
+  NAV_LINKS.forEach(([label, x, w]) => txt(s, x, 0.292, w, 0.269, label, { sz: 10, align: 'center' }));
+  shp(s, 'roundRect', 11.687, 0.276, 1.089, 0.303, { fill: C.violet, radius: 0.1515 });
+  txt(s, 11.736, 0.292, 0.809, 0.269, 'Sign Up', { sz: 10, c: C.white, align: 'center' });
+  arrowGlyph(s, 12.562, 0.372, 0.115, 315, C.white);
+}
+
+/** 8-spoke asterisk built from thin rotated bars. */
+const SPARKLE_BARS = [
+  [0.161, 0.0, 0], [0.161, 0.198, 180], [0.258, 0.099, 90], [0.063, 0.099, 90],
+  [0.220, 0.022, 37.94], [0.101, 0.176, 37.94], [0.096, 0.026, 318.19], [0.226, 0.172, 318.19],
+];
+function sparkle(s, x, y) {
+  SPARKLE_BARS.forEach(([dx, dy, rot]) =>
+    shp(s, 'rect', x + dx, y + dy, 0.036, 0.162, { fill: C.pink, rot }));
+}
+
+/** Hand-drawn looping arrow (freeform curve + triangular head). */
+const DOODLE_CURVE = [
+  [1.0, 0.9263], [0.9497, 0.6039], [0.85, 0.4061], [0.7677, 0.3459], [0.6853, 0.2858],
+  [0.5568, 0.4806], [0.506, 0.5655], [0.4553, 0.6504], [0.4576, 0.7342], [0.4643, 0.8059],
+  [0.4711, 0.8775], [0.5057, 0.9722], [0.5463, 0.9955], [0.587, 1.0188], [0.6607, 0.9471],
+  [0.6791, 0.8832], [0.6974, 0.8193], [0.7073, 0.7639], [0.6565, 0.612], [0.6056, 0.4601],
+  [0.4672, 0.1306], [0.3637, 0.0386], [0.2602, -0.0535], [0.0911, 0.0463], [0.0353, 0.0599],
+];
+function doodle(s, gx, gy, gw, gh, grot) {
+  // curve occupies 94.5% x 63.5% of the group box, offset 5.5% / 36.5%
+  const cx = gx + gw / 2, cy = gy + gh / 2;
+  const place = (fx, fy, fw, fh, rot) => {
+    const bx = gx + fx * gw, by = gy + fy * gh, bw = fw * gw, bh = fh * gh;
+    const a = grot * Math.PI / 180;
+    const mx = bx + bw / 2 - cx, my = by + bh / 2 - cy;
+    return {
+      x: cx + mx * Math.cos(a) - my * Math.sin(a) - bw / 2,
+      y: cy + mx * Math.sin(a) + my * Math.cos(a) - bh / 2,
+      w: bw, h: bh, rot: (rot + grot) % 360,
+    };
+  };
+  const c = place(0.055, 0.3653, 0.945, 0.6347, 17.62);
+  s.addShape('custGeom', {
+    x: c.x, y: c.y, w: c.w, h: c.h, rotate: c.rot,
+    points: DOODLE_CURVE.map((p, i) => ({ x: p[0] * c.w, y: p[1] * c.h, moveTo: i === 0 })),
+    fill: { type: 'none' }, line: { color: C.ink, width: 1.5 },
+  });
+  const t = place(-0.0111, 0.0199, 0.1613, 0.2493, 282.87);
+  shp(s, 'triangle', t.x, t.y, t.w, t.h, { fill: C.bg, line: { color: C.ink, width: 0.75 }, rot: t.rot });
+}
+
+/** Chunky right-pointing arrow glyph used in the nav pill and checklist rows. */
+const ARROW_GLYPH = [
+  [0.7625, 0.5625], [0.0, 0.5625], [0.0, 0.4375], [0.7625, 0.4375], [0.4125, 0.0875],
+  [0.5, 0.0], [1.0, 0.5], [0.5, 1.0], [0.4125, 0.9125], [0.7625, 0.5625],
+];
+function arrowGlyph(s, x, y, w, rot, color) {
+  poly(s, x, y, w, w * 0.967, ARROW_GLYPH, { fill: color, rot });
+}
+
+/** Rounded-corner banner used behind the review / persona strips. */
+const RIBBON = [
+  [0, 0], [1, 0], [1, 1], [0.098, 1], [0.0439, 1], [0, 0.8637], [0, 0.6956], [0, 0],
+];
+function ribbon(s, x, y, w, h) {
+  poly(s, x, y, w, h, RIBBON, { fill: C.violet });
+}
+
+/**
+ * Picture frame. The source deck leaves these placeholders empty (no raster data
+ * is embedded anywhere in them), so the frame is reproduced unfilled, exactly as
+ * it presents. `label: 1` turns it into a visible stand-in block instead.
+ */
+function photo(s, x, y, w, h, opts) {
+  const o = opts || {};
+  shp(s, 'round2DiagRect', x, y, w, h,
+      o.label ? { fill: C.slot, radius: Math.min(w, h) * 0.16 } : { radius: Math.min(w, h) * 0.16 });
+  if (o.label) txt(s, x, y + h / 2 - 0.16, w, 0.32, '[image]', { sz: 10, c: C.grey2, align: 'center', valign: 'middle' });
+}
+
+/** Timeline pictogram stand-in (the source uses small raster icons here). */
+function iconDot(s, x, y, w) {
+  shp(s, 'roundRect', x + w * 0.16, y + w * 0.16, w * 0.68, w * 0.68,
+      { fill: C.slate2, radius: w * 0.14 });
+}
+
+/** Donut chart — native pptxgenjs doughnut, coloured slice + grey remainder. */
+function donut(s, x, y, w, h, pct, color) {
+  s.addChart('doughnut', [{ name: 'Sales', labels: ['1st Qtr', '2nd Qtr'], values: [pct, 100 - pct] }], {
+    x, y, w, h,
+    holeSize: 75,
+    chartColors: [color.replace('C.', ''), C.grey],
+    showLegend: false, showTitle: false, showValue: false,
+    dataBorder: { pt: 0, color: C.bg },
+  });
+}
+
+/** White KPI card: 5.0K headline, A++ grade chip and a 95% progress ring. */
+function statCard(s, x, y) {
+  shp(s, 'roundRect', x, y, 2.208, 2.66, { fill: C.white, radius: 0.0571 });
+  shp(s, 'roundRect', x + 1.721, y + 0.172, 0.343, 0.352, { fill: C.ink, radius: 0.0347 });
+  ln(s, x + 1.807, y + 0.26, 0.171, 0.176, { color: C.white, width: 1.25, end: 'arrow', flipV: 1 });
+  txt(s, x + 0.466, y + 0.383, 1.277, 0.404, '5.0K', { sz: 24, align: 'center', m: 0 });
+  txt(s, x, y + 0.933, 2.208, 0.532, 'Suspendisse interdum consectetur libe.', { sz: 11, align: 'center', lh: 1.5, m: 0 });
+  shp(s, 'roundRect', x - 0.536, y + 1.546, 0.873, 0.773, { fill: C.violet, radius: 0.0369 });
+  txt(s, x - 0.722, y + 1.672, 1.277, 0.236, 'A++', { sz: 14, c: C.white, align: 'center', m: 0 });
+  txt(s, x - 0.497, y + 1.88, 0.794, 0.255, 'Grade', { sz: 11, c: C.white, align: 'center', lh: 1.5, m: 0 });
+  shp(s, 'blockArc', x + 0.747, y + 1.669, 0.713, 0.713, { fill: C.ink, rot: 99.08, arc: [167.2, 85.97], thick: 0.1296 });
+  shp(s, 'blockArc', x + 0.747, y + 1.669, 0.713, 0.713, { fill: C.lime, rot: 210, arc: [323.98, 85.97], thick: 0.1296 });
+  txt(s, x + 0.759, y + 1.949, 0.689, 0.151, '95%', { sz: 9, align: 'center', m: 0 });
+  txt(s, x + 0.849, y + 2.098, 0.51, 0.093, 'Suspendisse ', { sz: 4, align: 'center', lh: 1.5, m: 0 });
+}
+
+/** Five lime stars plus the numeric score. */
+function starRating(s, x, y) {
+  for (let i = 0; i < 5; i++) shp(s, 'star5', x + i * 0.1805, y, 0.156, 0.168, { fill: C.lime });
+  txt(s, x + 0.953, y + 0.013, 0.262, 0.168, '5.0', { sz: 10, c: C.white, align: 'right', m: 0 });
+}
+
+/** Snipped-corner action button, optionally followed by a "Learn More" link. */
+function ctaButton(s, x, y, w, opts) {
+  const o = opts || {};
+  shp(s, 'snip2DiagRect', x, y, w, 0.514, { fill: o.fill || C.lime });
+  txt(s, x + 0.145, y + 0.164, o.lw || 1.159, 0.185, o.label || 'Explore Here',
+      { sz: 11, c: o.c, align: o.align, m: 0 });
+  ln(s, x + w - 0.434, y + 0.257, 0.288, 0, { color: o.arrow || C.ink, width: 0.25, end: 'triangle' });
+  if (o.more !== 0) txt(s, x + 2.149, y + 0.164, 0.999, 0.185, 'Learn More', { sz: 11, m: 0 });
+}
+
+/** Three KPI figures separated by hairlines (some slides show only the first one). */
+//                value      caption           caption dx / width
+const STAT_ITEMS = [
+  ['9213+', 'Best Company', -0.048, 1.191],
+  ['98%', 'Value Company', -0.089, 1.303],
+  ['8650+', 'Best Client ', -0.047, 1.191],
+];
+function statTrio(s, x, y, count) {
+  STAT_ITEMS.slice(0, count).forEach(([big, small, cdx, cw], i) => {
+    const dx = i * 1.705;
+    txt(s, x + dx, y, 1.097, 0.438, big, { sz: 20, align: 'center' });
+    txt(s, x + dx + cdx, y + 0.649, cw, 0.185, small, { sz: 11, align: 'center', m: 0 });
+    if (i) ln(s, x + dx - 0.304, y - 0.082, 0, 0.999, { color: C.grey2, width: 0.75 });
+  });
+}
+
+/** Halo circle + solid circle + number, used on maps and matrices. */
+function bubble(s, x, y, w, color, label, opts) {
+  const o = opts || {};
+  shp(s, 'ellipse', x, y, w, w, { fill: color, alpha: 59 });
+  shp(s, 'ellipse', x + w * 0.1446, y + w * 0.1446, w * 0.711, w * 0.711, { fill: color });
+  txt(s, x + w * 0.157, y + w * 0.3654, w * 0.687, 0.252, label,
+      { sz: o.sz || 9, c: o.c, align: 'center' });
+}
+
+/** Grey world map (slide 12) — continents as simplified freeform polygons. */
+const WORLD = [
+  { x: 0.602, y: 3.67, w: 2.665, h: 2.224, polys: [
+      [0.71,0.49,0.69,0.51,0.72,0.5,0.72,0.53,0.64,0.58,0.67,0.57,0.69,0.61,0.66,0.63,0.67,0.61,0.65,0.61,0.59,0.69,0.56,0.83,0.52,0.77,0.48,0.78,0.45,0.81,0.47,0.9,0.52,0.86,0.51,0.92,0.54,0.92,0.54,0.96,0.58,0.99,0.56,1.0,0.52,0.94,0.4,0.88,0.35,0.77,0.36,0.83,0.28,0.67,0.29,0.58,0.21,0.45,0.13,0.41,0.1,0.44,0.11,0.41,0.02,0.5,0.08,0.44,0.04,0.45,0.02,0.42,0.04,0.36,0.01,0.36,0.0,0.35,0.04,0.34,0.01,0.3,0.07,0.25,0.2,0.29,0.25,0.27,0.38,0.32,0.4,0.29,0.46,0.32,0.47,0.24,0.52,0.32,0.53,0.28,0.55,0.29,0.56,0.32,0.48,0.37,0.48,0.47,0.54,0.49,0.57,0.54,0.57,0.4,0.6,0.39,0.65,0.45,0.66,0.42],
+      [0.74,0.3,0.76,0.27,0.72,0.22,0.67,0.16,0.62,0.15,0.65,0.13,0.61,0.12,0.65,0.1,0.65,0.07,0.69,0.04,0.78,0.04,0.77,0.02,0.85,0.0,0.94,0.02,0.87,0.04,0.91,0.04,0.9,0.06,0.93,0.04,0.92,0.07,0.94,0.05,1.0,0.05,0.95,0.11,0.96,0.19,0.93,0.21,0.94,0.23,0.92,0.22,0.94,0.26,0.91,0.26,0.94,0.27,0.82,0.35,0.8,0.42,0.75,0.36],
+      [0.65,0.02,0.69,0.03,0.59,0.1,0.58,0.15,0.5,0.16,0.51,0.13,0.53,0.14,0.52,0.08,0.55,0.09,0.57,0.07,0.49,0.05,0.56,0.02],
+      [0.67,0.34,0.64,0.33,0.67,0.37,0.64,0.37,0.65,0.4,0.59,0.37,0.61,0.32,0.57,0.27,0.51,0.27,0.5,0.22,0.53,0.21,0.52,0.24,0.55,0.21,0.56,0.24,0.6,0.23,0.65,0.28],
+      [0.42,0.28,0.35,0.3,0.32,0.28,0.35,0.27,0.31,0.25,0.34,0.22,0.38,0.25,0.4,0.21]] },
+  { x: 3.112, y: 5.219, w: 1.174, h: 1.571, polys: [
+      [0.57,0.07,0.75,0.09,0.75,0.14,0.72,0.12,0.83,0.31,0.9,0.38,1.0,0.37,0.96,0.44,0.82,0.59,0.84,0.72,0.76,0.79,0.77,0.85,0.65,0.98,0.54,1.0,0.52,0.99,0.42,0.74,0.45,0.68,0.38,0.53,0.4,0.48,0.31,0.44,0.13,0.46,0.0,0.32,0.02,0.28,0.01,0.23,0.18,0.02,0.22,0.04,0.4,0.0,0.42,0.01,0.41,0.05,0.43,0.07,0.53,0.1],
+      [0.89,0.8,0.89,0.75,0.97,0.68,0.99,0.73,0.96,0.81,0.91,0.86,0.89,0.84]] },
+  { x: 2.113, y: 5.784, w: 0.802, h: 1.551, polys: [
+      [0.08,0.11,0.07,0.07,0.14,0.02,0.21,0.0,0.22,0.04,0.21,0.02,0.25,0.01,0.24,0.0,0.41,0.02,0.49,0.07,0.65,0.11,0.68,0.15,0.64,0.17,0.67,0.19,0.73,0.17,0.91,0.21,1.0,0.26,0.91,0.34,0.91,0.4,0.86,0.46,0.71,0.51,0.7,0.55,0.57,0.65,0.49,0.65,0.53,0.68,0.51,0.71,0.35,0.75,0.38,0.77,0.3,0.83,0.34,0.86,0.26,0.92,0.35,0.99,0.27,1.0,0.15,0.95,0.16,0.93,0.13,0.87,0.19,0.77,0.16,0.75,0.21,0.63,0.24,0.42,0.11,0.36,0.0,0.23,0.03,0.2,0.01,0.19,0.02,0.16]] },
+  { x: 3.25, y: 3.829, w: 0.707, h: 1.452, polys: [
+      [0.94,0.83,0.91,0.87,0.94,0.9,0.79,0.91,0.83,0.95,0.79,0.95,0.8,0.97,0.68,0.87,0.57,0.82,0.54,0.84,0.68,0.92,0.64,0.92,0.65,0.93,0.62,0.95,0.62,0.92,0.46,0.84,0.34,0.86,0.18,0.97,0.11,0.98,0.04,0.97,0.02,0.94,0.02,0.87,0.21,0.86,0.22,0.81,0.13,0.77,0.21,0.76,0.2,0.75,0.24,0.75,0.46,0.66,0.44,0.62,0.49,0.59,0.5,0.62,0.47,0.64,0.51,0.66,0.79,0.65,0.82,0.72,0.79,0.76,0.89,0.77,0.96,0.82],
+      [0.51,0.56,0.49,0.54,0.41,0.58,0.37,0.56,0.39,0.55,0.37,0.55,0.37,0.5,0.53,0.42,0.64,0.34,0.59,0.35,0.61,0.33,0.65,0.34,0.8,0.28,0.97,0.29,0.93,0.3,0.98,0.31,0.93,0.34,0.96,0.36,0.96,0.42,1.0,0.47,0.92,0.52,0.81,0.54,0.75,0.51,0.75,0.47,0.86,0.42,0.81,0.41,0.66,0.48,0.65,0.51,0.7,0.54,0.62,0.62,0.56,0.64],
+      [0.26,0.69,0.29,0.69,0.26,0.71,0.28,0.72,0.12,0.74,0.17,0.71,0.12,0.71,0.18,0.66,0.12,0.65,0.13,0.63,0.11,0.63,0.08,0.59,0.13,0.57,0.2,0.59,0.17,0.62],
+      [0.78,0.11,0.74,0.1,0.75,0.07,0.73,0.06,0.65,0.13,0.58,0.09,0.64,0.09,0.57,0.08,0.64,0.06,0.57,0.07,0.5,0.03,0.59,0.02,0.63,0.05,0.64,0.02,0.84,0.09],
+      [0.9,0.02,0.81,0.05,0.67,0.01]] },
+  { x: 5.205, y: 6.083, w: 1.138, h: 0.993, polys: [
+      [0.59,0.48,0.5,0.34,0.45,0.17,0.41,0.32,0.34,0.26,0.34,0.2,0.28,0.18,0.24,0.27,0.21,0.24,0.18,0.26,0.13,0.33,0.0,0.42,0.02,0.69,0.06,0.71,0.26,0.63,0.31,0.65,0.34,0.71,0.37,0.66,0.36,0.72,0.37,0.69,0.38,0.72,0.46,0.8,0.48,0.78,0.5,0.81,0.56,0.75,0.6,0.64],
+      [0.43,0.01,0.41,0.12,0.45,0.14,0.47,0.1,0.56,0.17,0.52,0.08],
+      [0.87,0.89,0.8,0.98,0.83,1.0,0.9,0.93,0.92,0.86,0.9,0.84],
+      [0.92,0.76,0.91,0.81,0.93,0.87,0.98,0.77,0.93,0.75,0.9,0.69]] },
+  { x: 3.583, y: 3.766, w: 2.929, h: 2.511, polys: [
+      [0.54,0.13,0.61,0.14,0.65,0.19,0.72,0.16,0.82,0.2,0.89,0.2,1.0,0.26,0.98,0.28,0.95,0.26,0.92,0.3,0.84,0.36,0.81,0.43,0.8,0.38,0.84,0.3,0.7,0.37,0.68,0.4,0.71,0.42,0.71,0.46,0.63,0.55,0.64,0.6,0.62,0.56,0.6,0.55,0.57,0.57,0.6,0.58,0.58,0.6,0.6,0.66,0.5,0.74,0.53,0.79,0.5,0.83,0.47,0.79,0.5,0.89,0.42,0.71,0.35,0.78,0.34,0.84,0.31,0.72,0.3,0.73,0.27,0.69,0.2,0.68,0.17,0.64,0.18,0.69,0.21,0.68,0.23,0.72,0.15,0.8,0.09,0.66,0.1,0.58,0.04,0.57,0.07,0.54,0.13,0.54,0.11,0.48,0.08,0.51,0.05,0.5,0.02,0.47,0.02,0.4,0.0,0.4,0.07,0.3,0.05,0.22,0.07,0.21,0.11,0.23,0.11,0.26,0.09,0.26,0.1,0.28,0.14,0.24,0.28,0.21,0.28,0.19,0.3,0.16,0.32,0.23,0.32,0.16,0.36,0.17,0.5,0.08,0.53,0.09,0.52,0.15]] },
+];
+function worldMap(s) {
+  WORLD.forEach(part => part.polys.forEach(flat => {
+    const pts = [];
+    for (let i = 0; i < flat.length; i += 2) pts.push([flat[i], flat[i + 1]]);
+    poly(s, part.x, part.y, part.w, part.h, pts, { fill: C.grey });
+  }));
+}
+
+/** Small rounded square containing a diagonal arrow. */
+function arrowBadge(s, x, y, w, color, opts) {
+  const o = opts || {};
+  shp(s, 'roundRect', x, y, w, w * 1.026, { fill: color, radius: w * 0.203 });
+  ln(s, x + w * 0.25, y + w * 0.256, w * 0.498, w * 0.513,
+     { color: o.arrow || C.white, width: 1.25, end: 'arrow', flipV: 1 });
+}
+
+
+// ---------------------------------------------------------------- slide 1
+function slide01(pptx) {
+  const s = newSlide(pptx);
+  photo(s, 10.261, 0, 3.073, 7.949);
+  photo(s, 8.029, 0.976, 3.666, 5.244);
+  navBar(s);
+  txt(s, 0.675, 1.05, 3.2, 0.808, 'Designed', { sz: 48, f: MED, m: 0 });
+  txt(s, 0.675, 1.736, 5.839, 0.808, [{ t: 'For ' }, { t: 'Efficiency', c: C.violet }], { sz: 48, f: MED, m: 0 });
+  txt(s, 0.675, 2.422, 6.013, 0.808, 'Delivered With', { sz: 48, f: MED, m: 0 });
+  shp(s, 'ellipse', 0.675, 3.193, 0.064, 0.064, { fill: C.white });
+  txt(s, 0.675, 3.108, 6.013, 0.808, 'Precision', { sz: 48, f: MED, m: 0 });
+  txt(s, 0.675, 4.2, 4.833, 0.576, 'The shoreline meets consectetur libero id fau nisl tinu Arcu risus quvarius qua.', { sz: 12, m: 0, lh: 1.5 });
+  sparkle(s, 5.508, 0.976);
+  ctaButton(s, 0.675, 5.122, 1.771);
+  statTrio(s, 0.666, 6.142, 3);
+  ribbon(s, 8.029, 5.796, 3.666, 1.18);
+  doodle(s, 5.432, 5.04, 1.503, 0.838, 159.65);
+  txt(s, 8.247, 6.147, 1.611, 0.185, 'Rate for Company', { sz: 11, c: C.white, m: 0 });
+  starRating(s, 8.247, 6.445);
+  shp(s, 'rect', 10.134, 6.232, 1.343, 0.382, { fill: C.pink });
+  txt(s, 10.226, 6.33, 1.159, 0.185, 'Explore Here', { sz: 11, c: C.white, align: 'center', m: 0 });
+}
+
+
+// ---------------------------------------------------------------- slide 2
+function slide02(pptx) {
+  const s = newSlide(pptx);
+  txt(s, 0.675, 1.472, 6.947, 0.808, [{ t: 'Welcome ' }, { t: 'Massage', c: C.violet }], { sz: 48, f: MED, m: 0 });
+  shp(s, 'ellipse', 0.675, 3.431, 0.064, 0.064, { fill: C.white });
+  sparkle(s, 6.869, 2.733);
+  statTrio(s, 0.722, 5.954, 2);
+  txt(s, 0.675, 2.934, 2.091, 0.337, 'Best Seller', { sz: 20, m: 0 });
+  txt(s, 0.675, 3.544, 3.648, 0.879, 'Suspendisse interdum consectetur libero id faucis nisl tinu Arcu risus quvarius qua quisque.', { sz: 12, m: 0, lh: 1.5 });
+  txt(s, 4.786, 3.541, 3.288, 0.576, 'Suspendisse interdum consecur libero id faucis nisl.', { sz: 12, m: 0, lh: 1.5 });
+  doodle(s, 7.851, 2.812, 1.038, 0.579, 121.02);
+  arrowGlyph(s, 3.462, 5.2, 0.359, 136.59, C.ink);
+  statCard(s, 5.018, 4.491);
+  txt(s, 7.723, 5.126, 5.174, 0.879, 'Suspendisse interdum consectetur libero id faucis nisl tinu Arcu risus interdum consectetur libero  faucis nisl tinu Arcu risus.', { sz: 12, m: 0, lh: 1.5 });
+  ctaButton(s, 7.723, 6.644, 1.771);
+  navBar(s);
+  photo(s, 9.646, 1.429, 3.129, 2.689);
+}
+
+
+// ---------------------------------------------------------------- slide 3
+function slide03(pptx) {
+  const s = newSlide(pptx);
+  txt(s, 0.675, 1.564, 3.754, 0.808, [{ t: 'Table ' }, { t: 'Of', c: C.violet }], { sz: 48, f: MED, m: 0 });
+  txt(s, 0.675, 2.25, 3.754, 0.808, 'Content', { sz: 48, f: MED, m: 0 });
+  shp(s, 'ellipse', 0.675, 3.197, 0.064, 0.064, { fill: C.white });
+  sparkle(s, 11.963, 1.672);
+  txt(s, 1.768, 5.169, 2.091, 0.337, 'Content One', { sz: 20, m: 0 });
+  txt(s, 1.768, 5.746, 3.648, 0.879, 'Suspendisse interdum consectetur libero id faucis nisl tinu Arcu risus quvarius qua quisque.', { sz: 12, m: 0, lh: 1.5 });
+  txt(s, 0.7, 5.135, 0.666, 0.404, '01', { sz: 24, m: 0 });
+  txt(s, 9.454, 5.169, 2.457, 0.337, 'Content Three', { sz: 20, m: 0 });
+  txt(s, 9.454, 5.746, 3.648, 0.879, 'Suspendisse interdum consectetur libero id faucis nisl tinu Arcu risus quvarius qua quisque.', { sz: 12, m: 0, lh: 1.5 });
+  txt(s, 8.386, 5.135, 0.666, 0.404, '03', { sz: 24, m: 0 });
+  txt(s, 9.454, 2.684, 2.091, 0.337, 'Content Two', { sz: 20, m: 0 });
+  txt(s, 9.454, 3.261, 3.648, 0.879, 'Suspendisse interdum consectetur libero id faucis nisl tinu Arcu risus quvarius qua quisque.', { sz: 12, m: 0, lh: 1.5 });
+  txt(s, 8.386, 2.65, 0.666, 0.404, '02', { sz: 24, m: 0 });
+  doodle(s, 6.363, 5.896, 1.038, 0.579, 169.56);
+  txt(s, 0.675, 3.502, 3.648, 0.879, 'Suspendisse interdum consectetur libero id faucis nisl tinu Arcu risus quvarius qua quisque.', { sz: 12, m: 0, lh: 1.5 });
+  statCard(s, 5.553, 2.475);
+  navBar(s);
+}
+
+
+// ---------------------------------------------------------------- slide 4
+function slide04(pptx) {
+  const s = newSlide(pptx);
+  txt(s, 6.667, 1.38, 6.622, 0.808, 'Dedication Make ', { sz: 48, m: 0 });
+  txt(s, 6.667, 2.188, 6.622, 0.808, [{ t: 'Us ' }, { t: 'Different As', c: C.violet }], { sz: 48, m: 0 });
+  txt(s, 6.667, 2.996, 4.397, 0.808, 'A Company', { sz: 48, m: 0 });
+  txt(s, 0.675, 4.2, 4.833, 0.576, 'The shoreline meets consectetur libero id fau nisl tinu Arcu risus quvarius qua.', { sz: 12, m: 0, lh: 1.5 });
+  ctaButton(s, 0.675, 5.122, 1.771);
+  statTrio(s, 0.666, 6.142, 3);
+  statCard(s, 10.412, 4.399);
+  doodle(s, 5.098, 5.192, 0.983, 0.548, 169.56);
+  sparkle(s, 5.779, 3.84);
+  navBar(s);
+  photo(s, 0.671, 1.19, 4.549, 2.32);
+  photo(s, 6.764, 4.399, 2.84, 2.66);
+}
+
+
+// ---------------------------------------------------------------- slide 5
+function slide05(pptx) {
+  const s = newSlide(pptx);
+  txt(s, 0.675, 1.545, 5.07, 0.808, 'Best Product', { sz: 48, m: 0 });
+  txt(s, 0.675, 2.352, 4.397, 0.808, [{ t: 'Comes ' }, { t: 'From', c: C.violet }], { sz: 48, m: 0 });
+  txt(s, 0.675, 3.16, 4.397, 0.808, 'Dedication', { sz: 48, m: 0 });
+  txt(s, 0.864, 5.97, 5.641, 0.879, 'Suspendisse interdum consectetur libero id faucis nisl tinu Arcu risus interdum consectetur libero id faucis consectetur libero id faucis nisl tinu Arcu risus.', { sz: 12, m: 0, lh: 1.5 });
+  ctaButton(s, 1.923, 4.648, 1.771);
+  statTrio(s, 8.221, 6.142, 3);
+  doodle(s, 6.175, 4.106, 0.983, 0.548, 169.56);
+  sparkle(s, 5.961, 2.756);
+  navBar(s);
+  photo(s, 8.174, 1.196, 4.601, 4.464);
+}
+
+
+// ---------------------------------------------------------------- slide 6
+function slide06(pptx) {
+  const s = newSlide(pptx);
+  txt(s, 0.621, 1.457, 5.992, 0.808, 'Experienced In', { sz: 48, f: MED, m: 0 });
+  txt(s, 0.621, 2.143, 4.289, 0.808, [{ t: 'Our ' }, { t: 'Fields', c: C.violet }], { sz: 48, f: MED, m: 0 });
+  statCard(s, 10.568, 1.457);
+  statTrio(s, 0.668, 6.142, 3);
+  txt(s, 0.636, 3.601, 5.174, 0.879, 'Suspendisse interdum consectetur libero id faucis nisl tinu Arcu risus interdum consectetur libero  faucis nisl tinu Arcu risus.', { sz: 12, m: 0, lh: 1.5 });
+  ctaButton(s, 0.675, 5.054, 1.771);
+  doodle(s, 8.709, 1.97, 0.983, 0.548, 300.59);
+  sparkle(s, 7.179, 2.585);
+  navBar(s);
+  photo(s, 6.212, 3.637, 3.129, 3.381);
+  photo(s, 9.647, 4.548, 3.129, 2.429);
+}
+
+
+// ---------------------------------------------------------------- slide 7
+function slide07(pptx) {
+  const s = newSlide(pptx);
+  txt(s, 0.675, 1.164, 6.539, 0.808, [{ t: 'Product ' }, { t: 'Process', c: C.violet }], { sz: 48, f: MED, m: 0 });
+  ln(s, 4.141, 2.629, 8.007, 4.514, { color: C.grey3, width: 0.25, flipV: 1 });
+  shp(s, 'roundRect', 7.12, 3.568, 1.608, 1.246, { fill: C.violet });
+  txt(s, 3.054, 4.424, 2.147, 0.286, 'Variety', { sz: 11, align: 'center', rot: 270 });
+  ln(s, 4.128, 2.495, 0, 1.357, { color: C.grey3, width: 0.75, end: 'triangle', flipV: 1 });
+  ln(s, 4.128, 5.282, 0, 1.862, { color: C.grey3, width: 0.75 });
+  txt(s, 7.41, 7.009, 2.147, 0.286, 'Volume', { sz: 11, align: 'center' });
+  ln(s, 4.125, 7.144, 3.733, 0, { color: C.grey3, width: 0.75 });
+  ln(s, 9.11, 7.144, 3.59, 0, { color: C.grey3, width: 0.75, end: 'triangle' });
+  shp(s, 'roundRect', 5.135, 2.495, 1.608, 1.246, { fill: C.lime });
+  shp(s, 'roundRect', 9.14, 4.634, 1.608, 1.246, { fill: C.pink });
+  shp(s, 'roundRect', 11.091, 5.64, 1.608, 1.246, { fill: C.grey });
+  txt(s, 5.051, 2.719, 1.778, 0.236, 'Process One', { sz: 14, f: SYNE, align: 'center', m: 0 });
+  txt(s, 5.163, 3.083, 1.552, 0.432, 'Suspendisse interd consectetur.', { sz: 9, align: 'center', m: 0, lh: 1.5 });
+  txt(s, 7.035, 3.793, 1.778, 0.236, 'Process Two', { sz: 14, c: C.white, f: SYNE, align: 'center', m: 0 });
+  txt(s, 7.148, 4.157, 1.552, 0.432, 'Suspendisse interd consectetur.', { sz: 9, c: C.white, align: 'center', m: 0, lh: 1.5 });
+  txt(s, 9.055, 4.859, 1.778, 0.236, 'Process Three', { sz: 14, c: C.white, f: SYNE, align: 'center', m: 0 });
+  txt(s, 9.168, 5.223, 1.552, 0.432, 'Suspendisse interd consectetur.', { sz: 9, c: C.white, align: 'center', m: 0, lh: 1.5 });
+  txt(s, 11.006, 5.865, 1.778, 0.236, 'Process  Four', { sz: 14, f: SYNE, align: 'center', m: 0 });
+  txt(s, 11.119, 6.229, 1.552, 0.432, 'Suspendisse interd consectetur.', { sz: 9, align: 'center', m: 0, lh: 1.5 });
+  txt(s, 0.747, 2.881, 3.237, 0.879, 'Suspendisse interdum consectr libero id faucis nisl t Arcu risus interdum consecte.', { sz: 12, m: 0, lh: 1.5 });
+  ctaButton(s, 0.747, 4.47, 1.771, { more: 0 });
+  doodle(s, 1.808, 6.062, 0.983, 0.548, 177.07);
+  sparkle(s, 10.333, 1.646);
+  navBar(s);
+}
+
+
+// ---------------------------------------------------------------- slide 8
+function slide08(pptx) {
+  const s = newSlide(pptx);
+  txt(s, 0.675, 4.635, 5.992, 0.808, 'Attention To', { sz: 48, f: MED, m: 0 });
+  txt(s, 0.675, 5.321, 5.992, 0.808, [{ t: 'Every ' }, { t: 'Details', c: C.violet }], { sz: 48, f: MED, m: 0 });
+  txt(s, 2.844, 2.402, 2.091, 0.337, 'Detail One', { sz: 20, m: 0 });
+  txt(s, 2.844, 2.979, 4.107, 0.879, 'Suspendisse interdum consectetur libero id faucis nisl tinu Arcu risus quvarius qua quisque interdum consec.', { sz: 12, m: 0, lh: 1.5 });
+  txt(s, 2.844, 1.734, 0.666, 0.404, '01', { sz: 24, m: 0 });
+  txt(s, 8.669, 2.402, 2.091, 0.337, 'Detail Two', { sz: 20, m: 0 });
+  txt(s, 8.669, 2.979, 4.107, 0.879, 'Suspendisse interdum consectetur libero id faucis nisl tinu Arcu risus quvarius qua quisque interdum consec.', { sz: 12, m: 0, lh: 1.5 });
+  txt(s, 8.669, 1.734, 0.666, 0.404, '02', { sz: 24, m: 0 });
+  txt(s, 8.667, 5.539, 2.091, 0.337, 'Detail Three', { sz: 20, m: 0 });
+  txt(s, 8.667, 6.116, 4.107, 0.879, 'Suspendisse interdum consectetur libero id faucis nisl tinu Arcu risus quvarius qua quisque interdum consec.', { sz: 12, m: 0, lh: 1.5 });
+  txt(s, 8.667, 4.871, 0.666, 0.404, '03', { sz: 24, m: 0 });
+  doodle(s, 1.126, 3.261, 0.869, 0.485, 180);
+  sparkle(s, 1.682, 1.959);
+  ctaButton(s, 0.675, 6.483, 1.771);
+  navBar(s);
+}
+
+
+// ---------------------------------------------------------------- slide 9
+function slide09(pptx) {
+  const s = newSlide(pptx);
+  txt(s, 7.342, 5.296, 5.992, 0.808, 'Experienced', { sz: 48, f: MED, m: 0 });
+  txt(s, 7.342, 5.982, 5.992, 0.808, [{ t: 'In Our ' }, { t: 'Fields', c: C.violet }], { sz: 48, f: MED, m: 0 });
+  txt(s, 4.122, 2.017, 5.174, 0.879, 'Suspendisse interdum consectetur libero id faucis nisl tinu Arcu risus interdum consectetur libero id faucis nisl tinu Arcu risus.', { sz: 12, m: 0, lh: 1.5 });
+  ctaButton(s, 4.122, 3.461, 1.771);
+  statTrio(s, 0.668, 6.142, 3);
+  statCard(s, 10.568, 1.566);
+  doodle(s, 5.119, 4.999, 0.869, 0.485, 180);
+  sparkle(s, 8.527, 4.235);
+  navBar(s);
+  photo(s, 0.675, 1.57, 2.95, 3.966);
+}
+
+
+// ---------------------------------------------------------------- slide 10
+function slide10(pptx) {
+  const s = newSlide(pptx);
+  txt(s, 0.675, 1.421, 5.992, 0.808, 'We Build The', { sz: 48, f: MED, m: 0 });
+  txt(s, 0.675, 2.107, 5.992, 0.808, [{ t: 'Best ' }, { t: 'Product', c: C.violet }], { sz: 48, f: MED, m: 0 });
+  ctaButton(s, 0.675, 3.851, 1.865, { label: 'Product One', more: 0 });
+  ctaButton(s, 4.57, 3.851, 1.865, { fill: C.pink, label: 'Product One', c: C.white, arrow: C.white, more: 0 });
+  ctaButton(s, 8.466, 3.75, 1.865, { fill: C.violet, label: 'Product One', c: C.white, arrow: C.white, more: 0 });
+  txt(s, 7.819, 2.214, 5.022, 0.879, 'Suspendisse interdum consectetur libero id faucis nisl tinu Arcu risus interdum consectetur libero faucis nisl tinu Arcu risus.', { sz: 12, m: 0, lh: 1.5 });
+  doodle(s, 3, 3.283, 0.869, 0.485, 180);
+  sparkle(s, 6.667, 1.839);
+  navBar(s);
+  photo(s, 0.675, 4.607, 3.504, 2.339);
+  photo(s, 4.57, 4.607, 3.504, 2.339);
+  photo(s, 8.466, 4.506, 4.31, 2.339);
+}
+
+
+// ---------------------------------------------------------------- slide 11
+function slide11(pptx) {
+  const s = newSlide(pptx);
+  txt(s, 0.675, 1.421, 3.529, 0.808, 'SWOT', { sz: 48, f: MED, m: 0 });
+  txt(s, 0.675, 2.107, 3.95, 0.808, 'Analysis', { sz: 48, c: C.violet, f: MED, m: 0 });
+  shp(s, 'snip2DiagRect', 5.385, 1.936, 1.05, 0.686, { fill: C.lime });
+  txt(s, 5.488, 2.044, 0.844, 0.471, 'S', { sz: 28, f: MED, align: 'center', m: 0 });
+  txt(s, 5.385, 2.823, 2.091, 0.337, 'Strength', { sz: 20, m: 0 });
+  txt(s, 5.385, 3.344, 3.315, 0.879, 'Suspendisse interdum consectetur libero id faucis nisl tinu Arcu risus quvarius qua quisqu.', { sz: 12, m: 0, lh: 1.5 });
+  shp(s, 'snip2DiagRect', 9.461, 1.936, 1.05, 0.686, { fill: C.violet });
+  txt(s, 9.564, 2.044, 0.844, 0.471, 'W', { sz: 28, c: C.white, f: MED, align: 'center', m: 0 });
+  txt(s, 9.461, 2.823, 2.091, 0.337, 'Weakness', { sz: 20, m: 0 });
+  txt(s, 9.461, 3.344, 3.315, 0.879, 'Suspendisse interdum consectetur libero id faucis nisl tinu Arcu risus quvarius qua quisqu.', { sz: 12, m: 0, lh: 1.5 });
+  shp(s, 'snip2DiagRect', 5.385, 4.711, 1.05, 0.686, { fill: C.pink });
+  txt(s, 5.488, 4.818, 0.844, 0.471, 'O', { sz: 28, c: C.white, f: MED, align: 'center', m: 0 });
+  txt(s, 5.385, 5.598, 2.091, 0.337, 'Opportunity', { sz: 20, m: 0 });
+  txt(s, 5.385, 6.118, 3.315, 0.879, 'Suspendisse interdum consectetur libero id faucis nisl tinu Arcu risus quvarius qua quisqu.', { sz: 12, m: 0, lh: 1.5 });
+  shp(s, 'snip2DiagRect', 9.461, 4.711, 1.05, 0.686, { fill: C.grey });
+  txt(s, 9.564, 4.818, 0.844, 0.471, 'T', { sz: 28, f: MED, align: 'center', m: 0 });
+  txt(s, 9.461, 5.598, 2.091, 0.337, 'Threat', { sz: 20, m: 0 });
+  txt(s, 9.461, 6.118, 3.315, 0.879, 'Suspendisse interdum consectetur libero id faucis nisl tinu Arcu risus quvarius qua quisqu.', { sz: 12, m: 0, lh: 1.5 });
+  txt(s, 0.675, 3.656, 3.932, 0.879, 'Suspendisse interdum consectetur libero id faucis nisl tinu Arcu risus interdum consectetur libero id faucis.', { sz: 12, m: 0, lh: 1.5 });
+  ctaButton(s, 0.675, 5.106, 1.771);
+  doodle(s, 3.119, 6.315, 0.869, 0.485, 180);
+  statTrio(s, 0.668, 6.142, 1);
+  sparkle(s, 12.263, 1.577);
+  navBar(s);
+}
+
+
+// ---------------------------------------------------------------- slide 12
+function slide12(pptx) {
+  const s = newSlide(pptx);
+  txt(s, 0.675, 1.218, 3.283, 0.808, 'Market', { sz: 48, f: MED, m: 0 });
+  txt(s, 0.675, 1.904, 3.766, 0.808, 'Overview', { sz: 48, c: C.violet, f: MED, m: 0 });
+  worldMap(s);
+  shp(s, 'roundRect', 7.822, 2.63, 4.947, 2.026, { fill: C.mist, radius: 0.115 });
+  donut(s, 7.847, 3.02, 1.409, 1.464, 64, C.lime);
+  txt(s, 8.175, 3.601, 0.752, 0.303, '64%', { sz: 12, align: 'center' });
+  txt(s, 9.655, 3.042, 2.374, 0.269, 'Asia', { sz: 16, m: 0, rot: 0.75 });
+  txt(s, 9.654, 3.443, 3.077, 0.879, 'Suspendisse interdum consect libero id faucibus nisl tinu risuua quisque id. ', { sz: 12, m: 0, lh: 1.5 });
+  shp(s, 'roundRect', 7.822, 5.046, 4.947, 2.026, { fill: C.mist, radius: 0.115 });
+  donut(s, 7.847, 5.437, 1.409, 1.464, 35, C.pink);
+  txt(s, 8.175, 6.017, 0.752, 0.303, '35%', { sz: 12, align: 'center' });
+  txt(s, 9.655, 5.458, 2.374, 0.269, 'Europa', { sz: 16, m: 0, rot: 0.75 });
+  bubble(s, 1.4, 4.59, 0.802, C.lime, '$2M');
+  bubble(s, 4.441, 4.422, 0.802, C.pink, '$5M', { c: C.white });
+  txt(s, 9.654, 5.968, 3.077, 0.879, 'Suspendisse interdum consect libero id faucibus nisl tinu risuua quisque id. ', { sz: 12, m: 0, lh: 1.5 });
+  doodle(s, 6.078, 2.065, 0.869, 0.485, 189.56);
+  sparkle(s, 0.569, 6.579);
+  navBar(s);
+}
+
+
+// ---------------------------------------------------------------- slide 13
+function slide13(pptx) {
+  const s = newSlide(pptx);
+  txt(s, 5.637, 1.475, 4.962, 0.808, 'Attention To', { sz: 48, f: MED, m: 0 });
+  txt(s, 5.637, 2.161, 5.38, 0.808, [{ t: 'Every' }, { t: ' Details', c: C.violet }], { sz: 48, f: MED, m: 0 });
+  txt(s, 0.675, 4.94, 4.529, 0.879, 'Suspendisse interdum consectetur libero id fu nisl tinu Arcu risus interdum consecter le faucis nisl tinu Arcu risus.', { sz: 12, m: 0, lh: 1.5 });
+  statCard(s, 5.637, 4.344);
+  txt(s, 8.383, 5.506, 1.24, 0.471, '$190K', { sz: 28, m: 0 });
+  txt(s, 8.383, 6.13, 2.175, 0.576, 'Suspendisse interd consectetur.', { sz: 12, m: 0, lh: 1.5 });
+  sparkle(s, 11.875, 3.226);
+  doodle(s, 8.858, 3.662, 0.869, 0.485, 189.56);
+  ctaButton(s, 0.675, 6.508, 1.771);
+  navBar(s);
+  photo(s, 0.721, 1.151, 4.194, 3.154);
+  photo(s, 10.603, 4.341, 2.158, 2.68);
+}
+
+
+// ---------------------------------------------------------------- slide 14
+function slide14(pptx) {
+  const s = newSlide(pptx);
+  shp(s, 'blockArc', 9.259, 3.706, 3.064, 3.064, { fill: C.grey, rot: 343.31, arc: [219.422, 354.019], thick: 0.07 });
+  shp(s, 'blockArc', 6.643, 3.321, 3.064, 3.064, { fill: C.grey, rot: 165, arc: [219.422, 354.019], thick: 0.07 });
+  shp(s, 'blockArc', 3.894, 3.675, 3.064, 3.064, { fill: C.grey, rot: 343.31, arc: [219.422, 354.019], thick: 0.07 });
+  shp(s, 'blockArc', 1.209, 3.684, 3.064, 2.534, { fill: C.grey, rot: 165, arc: [219.422, 354.019], thick: 0.07 });
+  shp(s, 'ellipse', 1.008, 4.503, 1.033, 1.033, { fill: C.lime });
+  shp(s, 'ellipse', 3.652, 4.503, 1.033, 1.033, { fill: C.grey });
+  shp(s, 'ellipse', 6.296, 4.503, 1.033, 1.033, { fill: C.pink });
+  shp(s, 'ellipse', 8.939, 4.503, 1.033, 1.033, { fill: C.violet });
+  shp(s, 'ellipse', 11.583, 4.503, 1.033, 1.033, { fill: C.grey });
+  txt(s, 0.322, 3.504, 2.374, 0.177, 'YOUR TEXT HERE', { sz: 10.5, align: 'center', m: 0, rot: 0.75 });
+  txt(s, 0.307, 3.745, 2.405, 0.48, 'Suspendisse interdum consectetur libero id.', { sz: 10, align: 'center', m: 0, lh: 1.5 });
+  bubble(s, 1.089, 2.701, 0.694, C.lime, '01');
+  txt(s, 3.697, 6.624, 2.374, 0.177, 'YOUR TEXT HERE', { sz: 10.5, align: 'center', m: 0, rot: 0.75 });
+  txt(s, 3.681, 6.865, 2.405, 0.48, 'Suspendisse interdum consectetur libero id.', { sz: 10, align: 'center', m: 0, lh: 1.5 });
+  bubble(s, 4.483, 5.724, 0.694, C.grey, '02');
+  txt(s, 6.492, 3.504, 2.374, 0.177, 'YOUR TEXT HERE', { sz: 10.5, align: 'center', m: 0, rot: 0.75 });
+  txt(s, 6.477, 3.745, 2.405, 0.48, 'Suspendisse interdum consectetur libero id.', { sz: 10, align: 'center', m: 0, lh: 1.5 });
+  bubble(s, 7.278, 2.604, 0.694, C.pink, '03', { c: C.white });
+  txt(s, 8.923, 6.605, 2.374, 0.177, 'YOUR TEXT HERE', { sz: 10.5, align: 'center', m: 0, rot: 0.75 });
+  txt(s, 8.907, 6.846, 2.405, 0.48, 'Suspendisse interdum consectetur libero id.', { sz: 10, align: 'center', m: 0, lh: 1.5 });
+  bubble(s, 9.709, 5.705, 0.694, C.violet, '04', { c: C.white });
+  txt(s, 11.153, 2.94, 2.374, 0.177, 'YOUR TEXT HERE', { sz: 10.5, align: 'center', m: 0, rot: 0.75 });
+  txt(s, 11.138, 3.181, 2.405, 0.48, 'Suspendisse interdum consectetur libero id.', { sz: 10, align: 'center', m: 0, lh: 1.5 });
+  bubble(s, 11.939, 2.04, 0.694, C.grey, '05');
+  iconDot(s, 1.25, 4.744, 0.549);
+  iconDot(s, 3.894, 4.744, 0.549);
+  iconDot(s, 6.537, 4.744, 0.549);
+  iconDot(s, 9.181, 4.744, 0.549);
+  iconDot(s, 11.825, 4.744, 0.549);
+  txt(s, 3.818, 0.833, 5.697, 0.808, 'Product Launch', { sz: 48, f: MED, align: 'center', m: 0 });
+  txt(s, 2.615, 1.519, 8.103, 0.808, [{ t: 'Timeline', c: C.violet }, { t: ' Infographic' }], { sz: 48, f: MED, align: 'center', m: 0 });
+  doodle(s, 1.594, 2.035, 0.694, 0.387, 189.56);
+  sparkle(s, 10.768, 4.766);
+  navBar(s);
+}
+
+
+// ---------------------------------------------------------------- slide 15
+function slide15(pptx) {
+  const s = newSlide(pptx);
+  txt(s, 0.675, 4.519, 3.359, 0.808, 'Product', { sz: 48, f: MED, m: 0 });
+  txt(s, 0.675, 5.205, 2.732, 0.808, 'Launch', { sz: 48, c: C.violet, f: MED, m: 0 });
+  txt(s, 7.622, 5.196, 5.174, 0.879, 'Suspendisse interdum consectetur libero id faucis nisl tinu Arcu risus interdum consectetur libero id faucis nisl tinu Arcu risus.', { sz: 12, m: 0, lh: 1.5 });
+  ctaButton(s, 7.622, 6.639, 1.771);
+  txt(s, 0.675, 6.371, 4.732, 0.576, 'Suspendisse interdum consectetur libero  nisl tinu Arcu risus interdum consecte.', { sz: 12, m: 0, lh: 1.5 });
+  doodle(s, 5.672, 4.841, 0.939, 0.524, 189.56);
+  sparkle(s, 12.029, 4.126);
+  ctaButton(s, 0.675, 3.687, 1.865, { label: 'Product One', more: 0 });
+  ctaButton(s, 4.783, 3.687, 1.865, { fill: C.violet, label: 'Product Two', c: C.white, arrow: C.white, more: 0 });
+  ctaButton(s, 9.009, 3.687, 1.865, { fill: C.pink, label: 'Product Three', lw: 1.289, c: C.white, arrow: C.white, more: 0 });
+  navBar(s);
+  photo(s, 0.675, 1.183, 3.767, 2.176);
+  photo(s, 4.783, 1.204, 3.767, 2.176);
+  photo(s, 9.009, 1.183, 3.767, 2.176);
+}
+
+
+// ---------------------------------------------------------------- slide 16
+function slide16(pptx) {
+  const s = newSlide(pptx);
+  shp(s, 'snip2DiagRect', 6.41, 1.792, 2.473, 0.783, { fill: C.lime });
+  arrowBadge(s, 3.809, 3.431, 0.343, C.violet);
+  txt(s, 0.749, 3.478, 2.49, 0.236, 'Launch Plan', { sz: 14, m: 0 });
+  arrowBadge(s, 3.809, 5.028, 0.343, C.pink);
+  txt(s, 0.749, 5.075, 2.751, 0.236, 'Launch Communication', { sz: 14, m: 0 });
+  arrowBadge(s, 3.809, 6.588, 0.343, C.lime, { arrow: C.ink });
+  txt(s, 0.749, 6.635, 2.751, 0.236, 'Launch Risk', { sz: 14, m: 0 });
+  txt(s, 6.682, 2.015, 1.929, 0.337, 'Internal', { sz: 20, align: 'center', m: 0 });
+  txt(s, 6.41, 3.086, 2.713, 0.504, 'Suspendisse interdum conse libero id faucibus nisl.', { sz: 10.5, m: 0, lh: 1.5, bullet: 13.536 });
+  txt(s, 10.166, 3.086, 2.609, 0.239, 'Suspendisse interdum conse', { sz: 10.5, m: 0, lh: 1.5, bullet: 13.536 });
+  txt(s, 10.166, 3.539, 2.609, 0.504, 'Suspendisse interdum conse libero id faucibus nisl.', { sz: 10.5, m: 0, lh: 1.5, bullet: 13.536 });
+  txt(s, 6.41, 3.767, 2.713, 0.239, 'Suspendisse interdum conse', { sz: 10.5, m: 0, lh: 1.5, bullet: 13.536 });
+  txt(s, 6.41, 4.742, 2.713, 0.504, 'Suspendisse interdum conse libero id faucibus nisl.', { sz: 10.5, m: 0, lh: 1.5, bullet: 13.536 });
+  txt(s, 10.166, 4.742, 2.609, 0.239, 'Suspendisse interdum conse', { sz: 10.5, m: 0, lh: 1.5, bullet: 13.536 });
+  txt(s, 10.166, 5.196, 2.533, 0.504, 'Suspendisse interdum conse libero id faucibus nisl.', { sz: 10.5, m: 0, lh: 1.5, bullet: 13.536 });
+  txt(s, 6.41, 5.424, 2.533, 0.239, 'Suspendisse interdum conse', { sz: 10.5, m: 0, lh: 1.5, bullet: 13.536 });
+  txt(s, 6.41, 6.367, 2.713, 0.504, 'Suspendisse interdum conse libero id faucibus nisl.', { sz: 10.5, m: 0, lh: 1.5, bullet: 13.536 });
+  txt(s, 10.166, 6.367, 2.473, 0.239, 'Suspendisse interdum conse', { sz: 10.5, m: 0, lh: 1.5, bullet: 13.536 });
+  txt(s, 10.166, 6.821, 2.473, 0.504, 'Suspendisse interdum conse libero id faucibus nisl.', { sz: 10.5, m: 0, lh: 1.5, bullet: 13.536 });
+  txt(s, 6.41, 7.048, 2.473, 0.239, 'Suspendisse interdum conse', { sz: 10.5, m: 0, lh: 1.5, bullet: 13.536 });
+  ln(s, 0.675, 4.447, 12.588, 0, { color: C.slate, width: 0.25 });
+  ln(s, 0.675, 6.088, 12.588, 0, { color: C.slate, width: 0.25 });
+  ln(s, 0.675, 2.806, 12.588, 0, { color: C.slate, width: 0.25 });
+  arrowGlyph(s, 5.29, 3.482, 0.459, 328.86, C.violet);
+  arrowGlyph(s, 5.29, 5.022, 0.459, 328.86, C.pink);
+  arrowGlyph(s, 5.29, 6.562, 0.459, 328.86, C.lime);
+  txt(s, 0.672, 1.067, 4.687, 0.808, 'Checklist', { sz: 48, m: 0 });
+  shp(s, 'snip2DiagRect', 10.041, 1.786, 2.473, 0.783, { fill: C.pink });
+  txt(s, 10.313, 2.009, 1.929, 0.337, 'External', { sz: 20, c: C.white, align: 'center', m: 0 });
+  doodle(s, 4.179, 1.979, 0.685, 0.382, 189.56);
+  sparkle(s, 0.834, 2.205);
+  navBar(s);
+}
+
+
+// ---------------------------------------------------------------- slide 17
+function slide17(pptx) {
+  const s = newSlide(pptx);
+  txt(s, 0.675, 1.363, 3.359, 0.808, 'Calendar', { sz: 48, f: MED, m: 0 });
+  txt(s, 0.675, 2.049, 3.359, 0.808, 'Timeline', { sz: 48, c: C.violet, f: MED, m: 0 });
+  shp(s, 'roundRect', 11.662, 4.418, 1.05, 0.877, { fill: C.lime, radius: 0.061 });
+  shp(s, 'roundRect', 6.393, 6.193, 1.05, 0.877, { fill: C.white, radius: 0.061 });
+  shp(s, 'roundRect', 8.497, 5.316, 1.05, 0.877, { fill: C.pink, radius: 0.061 });
+  shp(s, 'roundRect', 7.45, 3.535, 1.05, 0.887, { fill: C.violet, radius: 0.062 });
+  shp(s, 'roundRect', 5.35, 2.049, 7.425, 0.599, { fill: C.violet, radius: 0.069 });
+  txt(s, 5.598, 2.219, 0.473, 0.236, 'Sun', { sz: 14, c: C.white, align: 'center', m: 0 });
+  ln(s, 6.4, 2.648, 0, 4.436, { color: C.grey, width: 0.25 });
+  ln(s, 7.45, 2.648, 0, 4.436, { color: C.grey2, width: 0.25 });
+  ln(s, 8.499, 2.648, 0, 4.436, { color: C.grey2, width: 0.25 });
+  ln(s, 9.549, 2.648, 0, 4.436, { color: C.grey2, width: 0.25 });
+  ln(s, 10.599, 2.648, 0, 4.436, { color: C.grey, width: 0.25 });
+  ln(s, 11.648, 2.648, 0, 4.436, { color: C.grey2, width: 0.25 });
+  ln(s, 12.698, 2.648, 0, 4.436, { color: C.grey, width: 0.25 });
+  txt(s, 6.497, 2.219, 0.763, 0.236, 'Month', { sz: 14, c: C.white, align: 'center', m: 0 });
+  txt(s, 7.688, 2.219, 0.473, 0.236, 'Tue', { sz: 14, c: C.white, align: 'center', m: 0 });
+  txt(s, 8.588, 2.219, 0.763, 0.236, 'Wed', { sz: 14, c: C.white, align: 'center', m: 0 });
+  txt(s, 9.778, 2.219, 0.473, 0.236, 'Thu', { sz: 14, c: C.white, align: 'center', m: 0 });
+  txt(s, 10.678, 2.219, 0.763, 0.236, 'Fri', { sz: 14, c: C.white, align: 'center', m: 0 });
+  txt(s, 11.869, 2.219, 0.473, 0.236, 'Sat', { sz: 14, c: C.white, align: 'center', m: 0 });
+  txt(s, 6.804, 2.935, 0.236, 0.236, '01', { sz: 14, align: 'center', m: 0 });
+  txt(s, 7.804, 2.938, 0.356, 0.236, '02', { sz: 14, align: 'center', m: 0 });
+  txt(s, 8.893, 2.933, 0.307, 0.236, '03', { sz: 14, align: 'center', m: 0 });
+  txt(s, 9.898, 2.951, 0.312, 0.236, '04', { sz: 14, align: 'center', m: 0 });
+  txt(s, 10.987, 2.946, 0.323, 0.236, '05', { sz: 14, align: 'center', m: 0 });
+  txt(s, 11.987, 2.948, 0.354, 0.236, '06', { sz: 14, align: 'center', m: 0 });
+  ln(s, 5.272, 7.083, 7.425, 0, { color: C.grey, width: 0.25 });
+  ln(s, 5.272, 6.196, 7.425, 0, { color: C.grey, width: 0.25 });
+  ln(s, 5.272, 5.309, 7.425, 0, { color: C.grey, width: 0.25 });
+  ln(s, 5.272, 4.422, 7.425, 0, { color: C.grey, width: 0.25 });
+  ln(s, 5.272, 3.535, 7.425, 0, { color: C.grey, width: 0.25 });
+  txt(s, 5.716, 3.813, 0.236, 0.236, '07', { sz: 14, align: 'center', m: 0 });
+  txt(s, 6.804, 3.807, 0.289, 0.236, '08', { sz: 14, align: 'center', m: 0 });
+  txt(s, 7.804, 3.81, 0.356, 0.236, '09', { sz: 14, c: C.white, align: 'center', m: 0 });
+  txt(s, 8.893, 3.805, 0.307, 0.236, '10', { sz: 14, align: 'center', m: 0 });
+  txt(s, 9.898, 3.823, 0.312, 0.236, '11', { sz: 14, align: 'center', m: 0 });
+  txt(s, 10.987, 3.818, 0.323, 0.236, '12', { sz: 14, align: 'center', m: 0 });
+  txt(s, 11.987, 3.82, 0.354, 0.236, '13', { sz: 14, align: 'center', m: 0 });
+  txt(s, 5.709, 4.685, 0.236, 0.236, '14', { sz: 14, align: 'center', m: 0 });
+  txt(s, 6.798, 4.679, 0.236, 0.236, '15', { sz: 14, align: 'center', m: 0 });
+  txt(s, 7.798, 4.682, 0.356, 0.236, '16', { sz: 14, align: 'center', m: 0 });
+  txt(s, 8.887, 4.677, 0.307, 0.236, '17', { sz: 14, align: 'center', m: 0 });
+  txt(s, 9.892, 4.695, 0.312, 0.236, '18', { sz: 14, align: 'center', m: 0 });
+  txt(s, 10.98, 4.69, 0.323, 0.236, '19', { sz: 14, align: 'center', m: 0 });
+  txt(s, 11.98, 4.692, 0.354, 0.236, '20', { sz: 14, align: 'center', m: 0 });
+  txt(s, 5.709, 5.557, 0.236, 0.236, '21', { sz: 14, align: 'center', m: 0 });
+  txt(s, 6.798, 5.551, 0.236, 0.236, '22', { sz: 14, align: 'center', m: 0 });
+  txt(s, 7.798, 5.554, 0.356, 0.236, '23', { sz: 14, align: 'center', m: 0 });
+  txt(s, 8.887, 5.549, 0.307, 0.236, '24', { sz: 14, c: C.white, align: 'center', m: 0 });
+  txt(s, 9.892, 5.567, 0.312, 0.236, '25', { sz: 14, align: 'center', m: 0 });
+  txt(s, 10.98, 5.562, 0.323, 0.236, '26', { sz: 14, align: 'center', m: 0 });
+  txt(s, 11.98, 5.564, 0.354, 0.236, '27', { sz: 14, align: 'center', m: 0 });
+  txt(s, 5.709, 6.429, 0.236, 0.236, '28', { sz: 14, align: 'center', m: 0 });
+  txt(s, 6.798, 6.423, 0.236, 0.236, '29', { sz: 14, align: 'center', m: 0 });
+  txt(s, 7.798, 6.426, 0.356, 0.236, '30', { sz: 14, align: 'center', m: 0 });
+  txt(s, 8.887, 6.421, 0.307, 0.236, '31', { sz: 14, align: 'center', m: 0 });
+  shp(s, 'roundRect', 0.675, 3.707, 3.713, 0.599, { fill: C.violet, radius: 0.069 });
+  arrowBadge(s, 3.92, 3.829, 0.343, C.slate2);
+  txt(s, 0.86, 3.876, 0.554, 0.269, '1-9 ', { sz: 16, c: C.white, m: 0 });
+  txt(s, 1.713, 3.918, 2.24, 0.185, 'Customers Analysis', { sz: 11, c: C.white, m: 0 });
+  shp(s, 'roundRect', 0.675, 4.581, 3.713, 0.599, { fill: C.lime, radius: 0.069 });
+  arrowBadge(s, 3.92, 4.702, 0.343, C.slate2);
+  txt(s, 0.86, 4.749, 0.7, 0.269, '10-20', { sz: 16, m: 0 });
+  txt(s, 1.713, 4.791, 2.24, 0.185, 'Competitive Analysis', { sz: 11, m: 0 });
+  shp(s, 'roundRect', 0.675, 5.454, 3.713, 0.599, { fill: C.pink, radius: 0.069 });
+  arrowBadge(s, 3.92, 5.576, 0.343, C.slate2);
+  txt(s, 0.86, 5.623, 0.7, 0.269, '21-24', { sz: 16, c: C.white, m: 0 });
+  txt(s, 1.713, 5.665, 2.24, 0.185, 'Product Development', { sz: 11, c: C.white, m: 0 });
+  shp(s, 'roundRect', 0.675, 6.328, 3.713, 0.599, { fill: C.white, radius: 0.069 });
+  arrowBadge(s, 3.92, 6.449, 0.343, C.slate2);
+  txt(s, 0.86, 6.497, 0.7, 0.269, '25-29', { sz: 16, m: 0 });
+  txt(s, 1.713, 6.539, 2.24, 0.185, 'Social Media Campaign', { sz: 11, m: 0 });
+  doodle(s, 4.065, 2.953, 0.787, 0.439, 180);
+  sparkle(s, 12.05, 6.533);
+  navBar(s);
+}
+
+
+// ---------------------------------------------------------------- slide 18
+function slide18(pptx) {
+  const s = newSlide(pptx);
+  txt(s, 9.52, 5.352, 3.359, 0.808, 'Timeline', { sz: 48, f: MED, m: 0 });
+  txt(s, 9.52, 6.038, 3.606, 0.808, 'Summary', { sz: 48, c: C.violet, f: MED, m: 0 });
+  doodle(s, 7.276, 2.348, 0.939, 0.524, 189.56);
+  ln(s, 0, 4.353, 13.333, 0, { color: C.slate, width: 0.25 });
+  shp(s, 'roundRect', 5.751, 4.053, 2.639, 0.599, { fill: C.lime, radius: 0.069 });
+  arrowBadge(s, 7.87, 4.175, 0.343, C.slate2);
+  txt(s, 5.936, 4.222, 1.778, 0.252, 'JANUARY 2030', { sz: 15, m: 0 });
+  shp(s, 'roundRect', 0.564, 4.227, 0.159, 0.248, { fill: C.violet });
+  txt(s, 0.564, 5.368, 1.778, 0.269, 'Build Product', { sz: 16, m: 0 });
+  shp(s, 'roundRect', 3.237, 4.263, 0.159, 0.248, { fill: C.slate });
+  txt(s, 3.237, 2.541, 1.778, 0.269, 'Build Product', { sz: 16, m: 0 });
+  txt(s, 3.237, 3.04, 2.163, 0.769, 'Suspendisse interdum r libero id faucibus nisl   risus quvarius qua.', { sz: 10.5, m: 0, lh: 1.5 });
+  txt(s, 5.751, 5.068, 2.163, 0.606, 'Launch Our Best  Product', { m: 0 });
+  txt(s, 5.751, 5.901, 2.639, 0.769, 'Suspendisse interdum consur libero id faucibus nisl tincidu  risus quvarius qua.', { sz: 10.5, m: 0, lh: 1.5 });
+  txt(s, 0.564, 5.901, 2.163, 0.769, 'Suspendisse interdum r libero id faucibus nisl   risus quvarius qua.', { sz: 10.5, m: 0, lh: 1.5 });
+  shp(s, 'roundRect', 10.127, 4.258, 0.159, 0.248, { fill: C.pink });
+  txt(s, 10.127, 2.541, 2.566, 0.269, 'Marketing Promotion', { sz: 16, m: 0 });
+  txt(s, 10.127, 3.04, 2.779, 0.769, 'Suspendisse interdum r libero faucibus nisl   risus quvarius qua interdum r libero .', { sz: 10.5, m: 0, lh: 1.5 });
+  sparkle(s, 3.769, 5.368);
+  arrowGlyph(s, 0.634, 2.143, 0.459, 35.61, C.slate);
+  navBar(s);
+}
+
+
+// ---------------------------------------------------------------- slide 19
+function slide19(pptx) {
+  const s = newSlide(pptx);
+  txt(s, 3.243, 1.222, 6.848, 0.808, [{ t: 'Product ' }, { t: 'Roadmap', c: C.violet }], { sz: 48, f: MED, align: 'center', m: 0 });
+  shp(s, 'roundRect', 0.675, 2.863, 12.101, 4.167, { fill: C.white, radius: 0.085 });
+  txt(s, 1.072, 3.161, 1.073, 0.269, 'Product', { sz: 16, m: 0 });
+  txt(s, 3.823, 3.161, 0.545, 0.185, 'Jan', { sz: 11, align: 'center', m: 0 });
+  txt(s, 4.572, 3.161, 0.545, 0.185, 'Feb', { sz: 11, align: 'center', m: 0 });
+  txt(s, 5.321, 3.169, 0.545, 0.185, 'Mar', { sz: 11, align: 'center', m: 0 });
+  txt(s, 6.071, 3.169, 0.545, 0.185, 'Apr', { sz: 11, align: 'center', m: 0 });
+  txt(s, 6.82, 3.17, 0.545, 0.185, 'May', { sz: 11, align: 'center', m: 0 });
+  txt(s, 7.57, 3.17, 0.545, 0.185, 'Jun', { sz: 11, align: 'center', m: 0 });
+  txt(s, 8.319, 3.178, 0.545, 0.185, 'Jul', { sz: 11, align: 'center', m: 0 });
+  txt(s, 9.068, 3.178, 0.545, 0.185, 'Aug', { sz: 11, align: 'center', m: 0 });
+  txt(s, 9.818, 3.171, 0.545, 0.185, 'Sep', { sz: 11, align: 'center', m: 0 });
+  txt(s, 10.567, 3.171, 0.545, 0.185, 'Oct', { sz: 11, align: 'center', m: 0 });
+  txt(s, 11.317, 3.179, 0.545, 0.185, 'Nov', { sz: 11, align: 'center', m: 0 });
+  txt(s, 12.066, 3.179, 0.545, 0.185, 'Dec', { sz: 11, align: 'center', m: 0 });
+  txt(s, 1.072, 3.846, 2.451, 0.185, 'Review Product Strategy', { sz: 11, m: 0 });
+  txt(s, 1.072, 4.301, 2.451, 0.185, 'Customer Research', { sz: 11, m: 0 });
+  txt(s, 1.074, 4.756, 2.451, 0.185, 'Future Definition', { sz: 11, m: 0 });
+  txt(s, 1.074, 5.21, 2.451, 0.185, 'Custom Branding', { sz: 11, m: 0 });
+  txt(s, 1.07, 5.665, 2.451, 0.185, 'Launch Planning', { sz: 11, m: 0 });
+  txt(s, 1.07, 6.12, 2.451, 0.185, 'Review Product Strategy', { sz: 11, m: 0 });
+  txt(s, 1.072, 6.574, 2.451, 0.185, 'Customer Research', { sz: 11, m: 0 });
+  shp(s, 'rect', 0.865, 3.857, 0.081, 0.591, { fill: C.violet });
+  shp(s, 'rect', 0.865, 4.753, 0.081, 0.591, { fill: C.lime });
+  shp(s, 'rect', 0.865, 5.67, 0.081, 0.591, { fill: C.pink });
+  shp(s, 'rect', 0.87, 6.469, 0.072, 0.355, { fill: C.slate });
+  ln(s, 1.089, 4.179, 11.705, 0, { color: C.slate, width: 0.75 });
+  ln(s, 1.089, 5.096, 11.705, 0, { color: C.slate, width: 0.75 });
+  ln(s, 1.089, 5.554, 11.705, 0, { color: C.slate, width: 0.75 });
+  ln(s, 1.089, 6.013, 11.705, 0, { color: C.slate, width: 0.75 });
+  ln(s, 1.089, 6.472, 11.705, 0, { color: C.slate, width: 0.75 });
+  ln(s, 1.089, 4.637, 11.705, 0, { color: C.slate, width: 0.75 });
+  shp(s, 'round2SameRect', 4.266, 3.315, 0.36, 1.248, { fill: C.grey, rot: 90 });
+  shp(s, 'rect', 3.823, 3.759, 0.587, 0.36, { fill: C.violet });
+  shp(s, 'round2SameRect', 5.009, 3.039, 0.36, 2.733, { fill: C.grey, rot: 90 });
+  shp(s, 'rect', 3.823, 4.226, 2.044, 0.36, { fill: C.violet });
+  shp(s, 'round2SameRect', 6.943, 3.136, 0.36, 3.483, { fill: C.grey, rot: 90 });
+  shp(s, 'rect', 5.381, 4.697, 2.733, 0.36, { fill: C.lime });
+  shp(s, 'round2SameRect', 7.669, 2.877, 0.36, 4.935, { fill: C.grey, rot: 90 });
+  shp(s, 'rect', 5.381, 5.164, 2.034, 0.36, { fill: C.lime });
+  shp(s, 'round2SameRect', 9.893, 4.755, 0.36, 2.079, { fill: C.grey, rot: 90 });
+  shp(s, 'rect', 9.033, 5.615, 1.33, 0.36, { fill: C.pink });
+  shp(s, 'round2SameRect', 10.494, 5.122, 0.36, 2.278, { fill: C.grey, rot: 90 });
+  shp(s, 'rect', 9.535, 6.081, 1.741, 0.36, { fill: C.pink });
+  shp(s, 'round2SameRect', 10.951, 5.524, 0.36, 2.451, { fill: C.grey, rot: 90 });
+  shp(s, 'rect', 9.906, 6.57, 2.16, 0.36, { fill: C.slate });
+  txt(s, 5.369, 3.846, 1.298, 0.185, 'Product 1', { sz: 11, m: 0 });
+  txt(s, 6.766, 4.301, 1.298, 0.185, 'Product 2', { sz: 11, m: 0 });
+  txt(s, 9.041, 4.78, 1.298, 0.185, 'Product 3', { sz: 11, m: 0 });
+  txt(s, 10.438, 5.234, 1.298, 0.185, 'Product 4', { sz: 11, m: 0 });
+  txt(s, 7.523, 5.702, 1.298, 0.185, 'Product 5', { sz: 11, align: 'right', m: 0 });
+  txt(s, 8.07, 6.168, 1.298, 0.185, 'Product 6', { sz: 11, align: 'right', m: 0 });
+  txt(s, 8.392, 6.657, 1.298, 0.185, 'Product 7', { sz: 11, align: 'right', m: 0 });
+  doodle(s, 2.327, 1.753, 0.767, 0.428, 276.11);
+  sparkle(s, 11.242, 1.16);
+  navBar(s);
+}
+
+
+// ---------------------------------------------------------------- slide 20
+function slide20(pptx) {
+  const s = newSlide(pptx);
+  photo(s, 0.518, 2.711, 3.666, 3.747);
+  txt(s, 0.563, 1.318, 7.824, 0.808, [{ t: 'Customer ' }, { t: 'Persona', c: C.violet }], { sz: 48, m: 0 });
+  ribbon(s, 0.518, 5.796, 3.666, 1.18);
+  txt(s, 0.736, 6.008, 1.611, 0.269, 'Aaron Loeb', { sz: 16, c: C.white, m: 0 });
+  starRating(s, 0.736, 6.483);
+  shp(s, 'rect', 2.623, 6.232, 1.343, 0.382, { fill: C.pink });
+  txt(s, 2.715, 6.33, 1.159, 0.185, 'Explore Here', { sz: 11, c: C.white, align: 'center', m: 0 });
+  txt(s, 4.723, 3.016, 2.091, 0.337, 'Biography', { sz: 20, m: 0 });
+  txt(s, 4.723, 3.626, 3.387, 0.879, 'Suspendisse interdum consectetur libero id faucis nisl tinu Arcu risus quvarius qua quisque.', { sz: 12, m: 0, lh: 1.5 });
+  txt(s, 9.389, 3.626, 3.387, 0.879, 'Suspendisse interdum consectetur libero id faucis nisl tinu Arcu risus quvarius qua quisque.', { sz: 12, m: 0, lh: 1.5 });
+  txt(s, 4.723, 5.084, 2.091, 0.337, 'Technology', { sz: 20, m: 0 });
+  shp(s, 'roundRect', 4.723, 5.951, 3.352, 0.35, { fill: C.grey });
+  shp(s, 'roundRect', 4.696, 5.944, 2.79, 0.35, { fill: C.pink, radius: 0 });
+  txt(s, 4.695, 5.626, 2.091, 0.185, 'Software', { sz: 11, m: 0 });
+  shp(s, 'roundRect', 4.721, 6.808, 3.352, 0.35, { fill: C.grey });
+  shp(s, 'roundRect', 4.695, 6.802, 2.09, 0.35, { fill: C.pink, radius: 0 });
+  txt(s, 4.694, 6.484, 2.091, 0.185, 'Mobile Apps', { sz: 11, m: 0 });
+  txt(s, 9.415, 5.079, 2.091, 0.337, 'Skill', { sz: 20, m: 0 });
+  shp(s, 'roundRect', 9.415, 5.946, 3.352, 0.35, { fill: C.grey });
+  shp(s, 'roundRect', 9.389, 5.939, 2.79, 0.35, { fill: C.lime, radius: 0 });
+  txt(s, 9.388, 5.622, 2.091, 0.185, 'Leadership', { sz: 11, m: 0 });
+  shp(s, 'roundRect', 9.414, 6.803, 3.352, 0.35, { fill: C.grey });
+  shp(s, 'roundRect', 9.388, 6.797, 2.09, 0.35, { fill: C.lime, radius: 0 });
+  txt(s, 9.387, 6.479, 2.091, 0.185, 'Managing Strategy', { sz: 11, m: 0 });
+  doodle(s, 11.606, 1.892, 0.767, 0.428, 276.11);
+  sparkle(s, 8.24, 4.899);
+  navBar(s);
+}
+
+
+// ---------------------------------------------------------------- slide 21
+function slide21(pptx) {
+  const s = newSlide(pptx);
+  txt(s, 0.705, 1.051, 8.111, 0.808, [{ t: 'Competitor ' }, { t: 'Analysis', c: C.violet }], { sz: 48, f: MED, m: 0 });
+  shp(s, 'roundRect', 1.011, 2.49, 4.004, 2.106, { fill: C.white, radius: 0.121 });
+  shp(s, 'roundRect', 1.011, 4.758, 4.004, 2.106, { fill: C.grey, radius: 0.121 });
+  shp(s, 'roundRect', 5.173, 2.49, 4.004, 2.106, { fill: C.grey, radius: 0.103 });
+  shp(s, 'roundRect', 5.173, 4.758, 4.004, 2.106, { fill: C.white, radius: 0.121 });
+  txt(s, -0.469, 4.427, 2.147, 0.269, 'MARKET GROWTH', { sz: 10, align: 'center', rot: 270 });
+  ln(s, 0.605, 2.49, 0, 1.357, { color: C.slate, width: 0.75, end: 'triangle', flipV: 1 });
+  ln(s, 0.605, 5.277, 0, 1.862, { color: C.slate, width: 0.75 });
+  txt(s, 3.888, 7.004, 2.147, 0.269, 'MARKET SHARE', { sz: 10, align: 'center' });
+  ln(s, 0.602, 7.139, 3.733, 0, { color: C.slate, width: 0.75 });
+  ln(s, 5.587, 7.139, 3.59, 0, { color: C.slate, width: 0.75, end: 'triangle' });
+  txt(s, 2.051, 2.636, 1.924, 0.286, 'PRODUCT', { sz: 11, align: 'center' });
+  txt(s, 6.213, 2.632, 1.924, 0.286, 'PRICE', { sz: 11, align: 'center' });
+  txt(s, 2.051, 4.922, 1.924, 0.286, 'PROMOTION', { sz: 11, align: 'center' });
+  txt(s, 6.213, 4.918, 1.924, 0.286, 'PLACE', { sz: 11, align: 'center' });
+  bubble(s, 1.667, 3.341, 0.802, C.lime, '02');
+  bubble(s, 4.729, 3.051, 0.802, C.violet, '01', { c: C.white });
+  bubble(s, 2.362, 5.569, 0.802, C.white, '05');
+  bubble(s, 3.412, 5.569, 0.802, C.char, '06', { c: C.white });
+  bubble(s, 5.869, 5.569, 0.802, C.pink, '03', { c: C.white });
+  bubble(s, 7.421, 5.942, 0.802, C.grey2, '04');
+  shp(s, 'roundRect', 9.478, 2.49, 3.308, 0.677, { fill: C.violet, radius: 0.121 });
+  shp(s, 'roundRect', 9.478, 3.221, 3.308, 0.677, { fill: C.lime, radius: 0.103 });
+  shp(s, 'roundRect', 9.478, 3.953, 3.308, 0.677, { fill: C.pink, radius: 0.086 });
+  shp(s, 'roundRect', 9.478, 4.685, 3.308, 0.677, { fill: C.grey2, radius: 0.103 });
+  shp(s, 'roundRect', 9.478, 5.417, 3.308, 0.677, { fill: C.white, radius: 0.086 });
+  shp(s, 'roundRect', 9.478, 6.149, 3.308, 0.677, { fill: C.char, radius: 0.086 });
+  txt(s, 10.17, 2.66, 1.924, 0.303, '1. OUR BUSINESS', { sz: 12, c: C.white, align: 'center' });
+  txt(s, 10.17, 3.392, 1.924, 0.303, '2. COMPETITOR ONE', { sz: 12, align: 'center' });
+  txt(s, 10.17, 4.153, 1.924, 0.303, '3. COMPETITOR TWO', { sz: 12, c: C.white, align: 'center' });
+  txt(s, 10.016, 4.874, 2.499, 0.303, '4. COMPETITOR THREE', { sz: 12, align: 'center' });
+  txt(s, 10.17, 5.635, 2.152, 0.303, '5. COMPETITOR FOUR', { sz: 12, align: 'center' });
+  txt(s, 10.17, 6.311, 2.152, 0.303, '6. COMPETITOR FIVE', { sz: 12, c: C.white, align: 'center' });
+  doodle(s, 11.799, 1.225, 0.89, 0.496, 304.28);
+  sparkle(s, 3.92, 0.481);
+  navBar(s);
+}
+
+
+// ---------------------------------------------------------------- slide 22
+function slide22(pptx) {
+  const s = newSlide(pptx);
+  txt(s, 0.675, 1.305, 5.525, 0.808, 'One For Every', { sz: 48, f: MED, m: 0 });
+  txt(s, 0.675, 2.126, 3.658, 0.808, 'Solution', { sz: 48, c: C.violet, f: MED, m: 0 });
+  txt(s, 0.675, 3.187, 5.158, 0.576, 'The shoreline meets consectetur libero id faucibus nisl tinu Arcu risus quvarius qua qui.', { sz: 12, m: 0, lh: 1.5 });
+  statCard(s, 1.196, 4.344);
+  statTrio(s, 3.881, 6.142, 3);
+  txt(s, 3.893, 4.581, 4.642, 0.879, 'Suspendisse interdum consectetur libero id fs nisl tinu Arcu risus quvarius qua quisque inm consectetur consectetur libero.', { sz: 12, m: 0, lh: 1.5 });
+  doodle(s, 6.723, 3.187, 0.89, 0.496, 189.03);
+  sparkle(s, 7.637, 1.483);
+  navBar(s);
+  photo(s, 9, 1.133, 3.78, 6.019);
+}
+
+
+// ---------------------------------------------------------------- slide 23
+function slide23(pptx) {
+  const s = newSlide(pptx);
+  txt(s, 0.675, 1.206, 8.064, 0.808, [{ t: 'Product ' }, { t: 'Positioning', c: C.violet }], { sz: 48, f: MED, m: 0 });
+  shp(s, 'roundRect', 1.909, 3.024, 0.757, 0.757, { fill: C.violet });
+  arrowBadge(s, 2.398, 3.016, 0.268, C.slate2);
+  ln(s, 2.46, 3.079, 0.145, 0.149, { color: C.white, width: 1.25, end: 'arrow', flipV: 1 });
+  txt(s, 2.954, 3.026, 1.486, 0.202, 'Target Audience', { sz: 12, f: SYNE, m: 0 });
+  txt(s, 2.963, 3.376, 2.162, 0.508, 'Suspendisse interdum consectetur libero id.', { sz: 10.5, f: SYNE, m: 0, lh: 1.5 });
+  txt(s, 1.998, 3.284, 0.517, 0.404, '01', { sz: 24, c: C.white, f: SYNE, align: 'center', m: 0 });
+  shp(s, 'roundRect', 6.756, 3.024, 0.757, 0.757, { fill: C.pink });
+  arrowBadge(s, 7.245, 3.016, 0.268, C.slate2);
+  ln(s, 7.306, 3.079, 0.145, 0.149, { color: C.white, width: 1.25, end: 'arrow', flipV: 1 });
+  txt(s, 7.759, 2.977, 1.947, 0.202, 'Unique Saling Propositions', { sz: 12, f: SYNE, m: 0 });
+  txt(s, 7.759, 3.411, 2.162, 0.508, 'Suspendisse interdum consectetur libero id.', { sz: 10.5, f: SYNE, m: 0, lh: 1.5 });
+  txt(s, 6.845, 3.284, 0.517, 0.404, '02', { sz: 24, c: C.white, f: SYNE, align: 'center', m: 0 });
+  shp(s, 'roundRect', 4.294, 4.612, 0.757, 0.757, { fill: C.lime });
+  arrowBadge(s, 4.783, 4.604, 0.268, C.slate2);
+  ln(s, 4.845, 4.667, 0.145, 0.149, { color: C.white, width: 1.25, end: 'arrow', flipV: 1 });
+  txt(s, 5.298, 4.565, 1.486, 0.202, 'Product Benefits', { sz: 12, f: SYNE, m: 0 });
+  txt(s, 5.298, 4.999, 2.162, 0.508, 'Suspendisse interdum consectetur libero id.', { sz: 10.5, f: SYNE, m: 0, lh: 1.5 });
+  txt(s, 4.383, 4.872, 0.517, 0.404, '03', { sz: 24, f: SYNE, align: 'center', m: 0 });
+  shp(s, 'roundRect', 9.14, 4.612, 0.757, 0.757, { fill: C.grey2 });
+  arrowBadge(s, 9.63, 4.604, 0.268, C.slate2);
+  ln(s, 9.691, 4.667, 0.145, 0.149, { color: C.white, width: 1.25, end: 'arrow', flipV: 1 });
+  txt(s, 10.144, 4.565, 1.486, 0.404, 'Positioning Statement', { sz: 12, f: SYNE, m: 0 });
+  txt(s, 10.144, 4.999, 2.162, 0.508, 'Suspendisse interdum consectetur libero id.', { sz: 10.5, f: SYNE, m: 0, lh: 1.5 });
+  txt(s, 9.23, 4.872, 0.517, 0.404, '04', { sz: 24, f: SYNE, align: 'center', m: 0 });
+  shp(s, 'roundRect', 1.95, 6.152, 0.757, 0.757, { fill: C.grey });
+  arrowBadge(s, 2.44, 6.144, 0.268, C.slate2);
+  ln(s, 2.501, 6.207, 0.145, 0.149, { color: C.white, width: 1.25, end: 'arrow', flipV: 1 });
+  txt(s, 2.954, 6.105, 1.486, 0.202, 'Promotion', { sz: 12, f: SYNE, m: 0 });
+  txt(s, 2.954, 6.539, 2.162, 0.508, 'Suspendisse interdum consectetur libero id.', { sz: 10.5, f: SYNE, m: 0, lh: 1.5 });
+  txt(s, 2.039, 6.411, 0.517, 0.404, '05', { sz: 24, f: SYNE, align: 'center', m: 0 });
+  shp(s, 'roundRect', 6.797, 6.152, 0.757, 0.757, { fill: C.white });
+  arrowBadge(s, 7.286, 6.144, 0.268, C.slate2);
+  ln(s, 7.347, 6.207, 0.145, 0.149, { color: C.white, width: 1.25, end: 'arrow', flipV: 1 });
+  txt(s, 7.8, 6.105, 1.486, 0.202, 'Competitors', { sz: 12, f: SYNE, m: 0 });
+  txt(s, 7.8, 6.539, 2.162, 0.508, 'Suspendisse interdum consectetur libero id.', { sz: 10.5, f: SYNE, m: 0, lh: 1.5 });
+  txt(s, 6.886, 6.411, 0.517, 0.404, '06', { sz: 24, f: SYNE, align: 'center', m: 0 });
+  ln(s, 1.454, 2.622, 10.34, 0, { color: C.char, width: 0.25 });
+  ln(s, 1.526, 4.164, 10.268, 0.003, { color: C.char, width: 0.25, flipV: 1 });
+  shp(s, 'blockArc', 10.902, 2.717, 1.696, 1.35, { line: { color: C.char, width: 0.25 }, rot: 90, arc: [182.448, 355.615], thick: 0 });
+  ln(s, 1.454, 5.699, 10.34, 0, { color: C.char, width: 0.25 });
+  ln(s, 5.934, 7.24, 5.861, 0, { color: C.char, width: 0.25 });
+  shp(s, 'blockArc', 10.902, 5.794, 1.696, 1.35, { line: { color: C.char, width: 0.25 }, rot: 90, arc: [182.448, 355.615], thick: 0 });
+  shp(s, 'blockArc', 0.735, 4.26, 1.696, 1.35, { line: { color: C.char, width: 0.25 }, rot: 270, arc: [187.034, 355.615], thick: 0 });
+  shp(s, 'ellipse', 1.283, 2.544, 0.171, 0.156, { fill: C.char });
+  shp(s, 'ellipse', 5.798, 7.163, 0.171, 0.156, { fill: C.char });
+  doodle(s, 12.072, 1.307, 0.767, 0.428, 276.11);
+  sparkle(s, 0.753, 6.469);
+  navBar(s);
+}
+
+
+// ---------------------------------------------------------------- slide 24
+function slide24(pptx) {
+  const s = newSlide(pptx);
+  txt(s, 0.675, 1.057, 7.399, 0.808, [{ t: 'Budget ' }, { t: 'Estimation', c: C.violet }], { sz: 48, f: MED, m: 0 });
+  shp(s, 'round2SameRect', 5.38, 1.283, 0.777, 2.803, { fill: C.violet, rot: 270 });
+  shp(s, 'round2SameRect', 10.986, 1.283, 0.777, 2.803, { fill: C.pink, rot: 90 });
+  shp(s, 'rect', 7.17, 2.296, 2.803, 0.777, { fill: C.lime });
+  txt(s, 4.879, 2.532, 1.778, 0.337, 'Qty', { sz: 20, c: C.white, align: 'center', m: 0 });
+  txt(s, 7.63, 2.532, 1.778, 0.337, 'Price', { sz: 20, align: 'center', m: 0 });
+  txt(s, 10.495, 2.537, 1.778, 0.337, 'Amount', { sz: 20, c: C.white, align: 'center', m: 0 });
+  txt(s, 0.675, 3.474, 1.778, 0.303, 'Frist Item', { m: 0 });
+  txt(s, 0.675, 4.277, 2.549, 0.303, 'Second One Here', { m: 0 });
+  txt(s, 0.675, 5.194, 2.277, 0.303, 'Third Item Now', { m: 0 });
+  txt(s, 0.675, 5.997, 2.549, 0.303, 'Last Thing Here', { m: 0 });
+  ln(s, 0.675, 4, 12.162, 0, { color: C.slate, width: 0.25 });
+  ln(s, 0.675, 4.861, 12.162, 0, { color: C.slate, width: 0.25 });
+  ln(s, 0.675, 5.722, 12.162, 0, { color: C.slate, width: 0.25 });
+  ln(s, 0.675, 6.583, 12.162, 0, { color: C.slate, width: 0.25 });
+  txt(s, 4.963, 3.479, 1.778, 0.269, '70', { sz: 16, align: 'center', m: 0 });
+  txt(s, 4.577, 4.282, 2.549, 0.269, '70', { sz: 16, align: 'center', m: 0 });
+  txt(s, 4.713, 5.199, 2.277, 0.269, '70', { sz: 16, align: 'center', m: 0 });
+  txt(s, 4.577, 6.002, 2.549, 0.269, '70', { sz: 16, align: 'center', m: 0 });
+  txt(s, 7.8, 3.474, 1.778, 0.269, '$1.200.00', { sz: 16, m: 0 });
+  txt(s, 7.8, 4.277, 2.549, 0.269, '$ 1.200.00', { sz: 16, m: 0 });
+  txt(s, 7.8, 5.194, 2.277, 0.269, '$ 1.200.00', { sz: 16, m: 0 });
+  txt(s, 7.8, 5.997, 2.549, 0.269, '$ 1.200.00', { sz: 16, m: 0 });
+  txt(s, 10.582, 3.474, 1.778, 0.269, '$350.000', { sz: 16, m: 0 });
+  txt(s, 10.582, 4.277, 2.549, 0.269, '$ 350.000', { sz: 16, m: 0 });
+  txt(s, 10.582, 5.194, 2.277, 0.269, '$ 350.000', { sz: 16, m: 0 });
+  txt(s, 10.582, 5.997, 2.549, 0.269, '$ 350.000', { sz: 16, m: 0 });
+  txt(s, 4.622, 6.912, 2.549, 0.337, 'TOTAL', { sz: 20, c: C.violet, align: 'center', m: 0 });
+  txt(s, 10.578, 6.912, 2.549, 0.337, '$5.350.000.00', { sz: 20, m: 0 });
+  doodle(s, 1.176, 2.147, 0.767, 0.428, 276.11);
+  sparkle(s, 3.77, 6.901);
+  navBar(s);
+}
+
+
+// ---------------------------------------------------------------- slide 25
+function slide25(pptx) {
+  const s = newSlide(pptx);
+  txt(s, 0.675, 1.571, 5.525, 0.808, 'Thank You', { sz: 48, f: MED, m: 0 });
+  txt(s, 0.675, 2.392, 5.258, 0.808, [{ t: 'For' }, { t: ' Attention', c: C.violet }], { sz: 48, f: MED, m: 0 });
+  txt(s, 8.136, 5.821, 2.551, 0.303, 'Telephone    :', { sz: 18, c: C.ink, valign: 'middle', m: 0 });
+  txt(s, 8.136, 6.495, 2.098, 0.185, '+4411-7973-4300', { sz: 11, c: C.ink, valign: 'middle', m: 0 });
+  txt(s, 8.136, 6.847, 2.246, 0.185, '+4411-8733-4310', { sz: 11, c: C.ink, valign: 'middle', m: 0 });
+  txt(s, 4.016, 5.821, 2.865, 0.303, 'Location          :', { sz: 18, c: C.ink, valign: 'middle', m: 0 });
+  txt(s, 4.016, 6.527, 3.683, 0.528, [{ t: '28 Alma Vale Rd, Clifton, ' }, { t: 'BristolBS8 2HY, United Kingdom', br: 1 }], { sz: 11, c: C.ink, valign: 'middle', m: 0, lh: 1.5 });
+  txt(s, 10.912, 5.821, 2.472, 0.303, 'Website    :', { sz: 18, c: C.ink, valign: 'middle', m: 0 });
+  txt(s, 10.912, 6.495, 2.098, 0.185, 'Companyhere.co', { sz: 11, c: C.ink, valign: 'middle', m: 0 });
+  txt(s, 10.912, 6.847, 2.246, 0.185, 'www.companyhere.co ', { sz: 11, c: C.ink, valign: 'middle', m: 0 });
+  doodle(s, 6.85, 2.47, 1.099, 0.613, 207.6);
+  ctaButton(s, 3.946, 4.492, 1.771);
+  statCard(s, 1.273, 4.491);
+  txt(s, 0.675, 3.489, 5.158, 0.576, 'The shoreline meets consectetur libero id faucibus nisl tinu Arcu risus quvarius qua qui.', { sz: 12, m: 0, lh: 1.5 });
+  sparkle(s, 3.913, 0.885);
+  navBar(s);
+  photo(s, 8.836, 1.064, 3.94, 3.685);
+}
+
+
+// ---------------------------------------------------------------- assemble
+const BUILDERS = [
+  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09,
+  slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18,
+  slide19, slide20, slide21, slide22, slide23, slide24, slide25,
+];
+
+const pptx = new PptxGenJS();
+// 13 1/3 x 7 1/2 in — exactly the source deck's 12192000 x 6858000 EMU
+pptx.defineLayout({ name: 'NETTE_16x9', width: 40 / 3, height: 7.5 });
+pptx.layout = 'NETTE_16x9';
+pptx.title = 'PowerPoint Presentation';
+pptx.author = 'Microsoft Office User';
+BUILDERS.forEach(build => build(pptx));
+
+const out = path.join(__dirname, '17301c0a-91f1-4ce0-a25d-0ee85f8e2757_grok_final.pptx');
+pptx.writeFile({ fileName: out }).then(() => console.log('wrote ' + out));

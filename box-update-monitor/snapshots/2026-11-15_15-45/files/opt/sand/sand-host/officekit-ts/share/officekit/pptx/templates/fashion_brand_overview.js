@@ -1,0 +1,1104 @@
+/* ---------------------------------------------------------------------------
+ * T-Outvit — Fashion Presentation (40 slides, 20 x 11.25 in)
+ * Rebuilt with pptxgenjs. Photographs in the source deck are replaced with
+ * flat grey placeholder shapes of the same size / corner radius.
+ * ------------------------------------------------------------------------ */
+'use strict';
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ---- palette ---------------------------------------------------------- */
+const GREEN    = '3C684D';   // brand green
+const GREEN_DK = '184025';   // eyebrow label
+const INK      = '0D0D0D';   // headline
+const MUTED    = 'BFBFBF';   // body copy
+const WHITE    = 'FFFFFF';
+const RULE     = '808080';   // eyebrow tick
+const MID      = '959595';   // photo placeholder tones
+const LIGHT    = 'C3C3C3';
+const DARK     = '7F7F7F';
+
+/* ---- typography ------------------------------------------------------- */
+const SERIF    = 'Playfair Display';
+const SANS     = 'Manrope';
+const SANS_MED = 'Manrope Medium';
+
+/* ---- shared values ---------------------------------------------------- */
+const NOLINE = { type: 'none' };
+const SOFT   = { type: 'outer', color: '000000', opacity: 0.1, blur: 35, offset: 20, angle: 100 };
+const GHOST  = { color: GREEN, transparency: 80 };   // 20 % green wash
+
+/* ---- primitives ------------------------------------------------------- */
+function shp(s, kind, x, y, w, h, fill, o) {
+  s.addShape(kind, Object.assign({ x, y, w, h, fill: fill || undefined,
+                                   line: NOLINE }, o || {}));
+}
+const rect = (s, x, y, w, h, fill, o) => shp(s, 'rect', x, y, w, h, fill, o);
+const ell  = (s, x, y, w, h, fill, o) => shp(s, 'ellipse', x, y, w, h, fill, o);
+const rr   = (s, x, y, w, h, r, fill, o) =>
+  shp(s, 'roundRect', x, y, w, h, fill, Object.assign({ rectRadius: r }, o || {}));
+const pill = (s, x, y, w, h, fill, o) => rr(s, x, y, w, h, Math.min(w, h) / 2, fill, o);
+
+/* Custom outline. `pts` holds plain numbers:
+ *   [x, y]                    -> line to (first entry = move to)
+ *   ['M', x, y]               -> start a new sub-path
+ *   [cx1, cy1, cx2, cy2, x, y]-> cubic bezier
+ *   'Z'                       -> close sub-path
+ * All coordinates are fractions of the shape's own box.                    */
+function poly(s, x, y, w, h, pts, fill, o) {
+  const out = [];
+  pts.forEach(p => {
+    if (p === 'Z') { out.push({ close: true }); return; }
+    if (p[0] === 'M') { out.push({ x: p[1] * w, y: p[2] * h, moveTo: true }); return; }
+    if (p.length === 6) {
+      out.push({ x: p[4] * w, y: p[5] * h,
+                 curve: { type: 'cubic', x1: p[0] * w, y1: p[1] * h,
+                                         x2: p[2] * w, y2: p[3] * h } });
+      return;
+    }
+    out.push({ x: p[0] * w, y: p[1] * h });
+  });
+  s.addShape('custGeom', Object.assign({ x, y, w, h, points: out,
+                                         fill: fill || undefined, line: NOLINE }, o || {}));
+}
+
+/* Elbow connector: horizontal, vertical, horizontal. */
+function elbow(s, x1, y1, x2, y2, kneeFrac) {
+  const ox = Math.min(x1, x2), oy = Math.min(y1, y2);
+  const kx = x1 + (x2 - x1) * kneeFrac;
+  s.addShape('custGeom', {
+    x: ox, y: oy, w: Math.abs(x2 - x1) || 0.01, h: Math.abs(y2 - y1) || 0.01,
+    points: [{ x: x1 - ox, y: y1 - oy }, { x: kx - ox, y: y1 - oy },
+             { x: kx - ox, y: y2 - oy }, { x: x2 - ox, y: y2 - oy }],
+    fill: { type: 'none' }, line: { color: GREEN, width: 0.75 },
+  });
+}
+
+/* ---- text ------------------------------------------------------------- */
+/* o: f font, sz size, c colour, b bold, i italic, spc letter-spacing,
+ *    al align, lh line-height multiple, nowrap, mid (vertical centre),
+ *    bullet, fill                                                          */
+function T(s, x, y, w, h, body, o) {
+  o = o || {};
+  s.addText(body, {
+    x, y, w, h,
+    fontFace: o.f || SANS,
+    fontSize: o.sz || 20,
+    color: o.c || MUTED,
+    bold: !!o.b,
+    italic: !!o.i,
+    charSpacing: o.spc || undefined,
+    align: o.al || 'left',
+    valign: o.mid ? 'middle' : 'top',
+    lineSpacingMultiple: o.lh || undefined,
+    wrap: !o.nowrap,
+    bullet: o.bullet ? { indent: 27 } : false,
+    fill: o.fill ? (typeof o.fill === 'string' ? { color: o.fill } : o.fill) : undefined,
+    margin: [7.2, 7.2, 3.6, 3.6],
+    isTextBox: true,
+  });
+}
+
+/* ---- recurring furniture ---------------------------------------------- */
+/* The three stacked ticks that sit against the left or right edge. */
+function ticks(s, side, band, color) {
+  const c = color || GREEN;
+  const x = side === 'R' ? 18.714 : 0.565;
+  const dx = side === 'R' ? 0.225 : 0.225;
+  const y = { top: 5.105, mid: 5.584, bot: 6.060 }[band];
+  const dots = { top: [5.809, 6.288], mid: [4.880, 6.288], bot: [4.880, 5.356] }[band];
+  pill(s, x, y, 0.752, 0.082, c, { rotate: 90 });
+  dots.forEach(dy => pill(s, x + dx, dy, 0.302, 0.082,
+                          { color: c, transparency: 80 }, { rotate: 90 }));
+}
+
+/* Wordmark top corner + url bottom corner. */
+function chrome(s, side) {
+  const al = side === 'R' ? 'right' : 'left';
+  const xTop = side === 'R' ? 17.702 : 0.869;
+  const xBot = side === 'R' ? 16.507 : 0.869;
+  T(s, xTop, 0.869, 1.429, 0.438, 'T-OUTVIT', { c: GREEN, b: 1, spc: 1, al, nowrap: 1 });
+  T(s, xBot, 9.944, 2.624, 0.438, 'www.T-Outvit.com', { c: GREEN, spc: 1, al, nowrap: 1 });
+}
+
+/* Eyebrow: grey tick + small green label. */
+function eyebrow(s, x, y, w, label, al) {
+  rect(s, x, y, 0.061, 0.438, RULE);
+  T(s, x + (al === 'center' ? 0.408 : 0.227), y + 0.015, w, 0.438, label,
+    { c: GREEN_DK, nowrap: 1, al: al || 'left' });
+}
+
+/* Photo placeholder: flat tone block with the source's corner radius. */
+function photo(s, x, y, w, h, r, tone) {
+  if (r > 0.004) rr(s, x, y, w, h, r, tone);
+  else rect(s, x, y, w, h, tone);
+}
+
+/* ---- body copy reused across the deck --------------------------------- */
+const BODY1 =
+  'Lorem Ipsum\u00a0is simply dummy text of the printing and';
+const BODY2 =
+  'Lorem Ipsum\u00a0is simply dummy text of the printing and typesetting industry. Lorem Ipsum has';
+const BODY3 =
+  'Lorem Ipsum\u00a0is simply dummy text of the printing';
+const BODY4 =
+  'Lorem Ipsum\u00a0is simply dummy text of the';
+const BODY5 =
+  'Lorem Ipsum\u00a0is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry\'s standard dummy text ever';
+const BODY6 =
+  'Lorem Ipsum\u00a0is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s, when an unknown printer took a galley';
+const BODY7 =
+  'Lorem Ipsum\u00a0is simply dummy text of ';
+const BODY8 =
+  'Lorem Ipsum\u00a0is simply dummy text of the printing ';
+const BODY9 =
+  'Lorem Ipsum\u00a0is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry\'s standard dummy text ever since the';
+
+/* Serif headline (72 pt). */
+function title(s, x, y, w, h, text, o) {
+  o = o || {};
+  T(s, x, y, w, h, text,
+    { f: SERIF, sz: 72, c: INK, b: o.b === 0 ? 0 : 1,
+      spc: o.spc === 0 ? undefined : 2, al: o.al });
+}
+
+/* ---- vector art reused across slides ---------------------------------- */
+/* storefront icon (Our Service) */
+const ICONSTORE_PTS = [
+  [0.8889,0.4412], [0.8889,0.4735,0.8639,0.5,0.8333,0.5], [0.8028,0.5,0.7778,0.4735,0.7778,0.4412], [0.7778,0.3824], [0.75,0.0882],
+  [0.8611,0.0882], [0.8889,0.3824], [0.8889,0.4412], 'Z', ['M',0.6667,0.4412],
+  [0.6667,0.4735,0.6417,0.5,0.6111,0.5], [0.5806,0.5,0.5556,0.4735,0.5556,0.4412], [0.5556,0.3824], [0.5417,0.0882], [0.6528,0.0882],
+  [0.6667,0.3824], [0.6667,0.4412], 'Z', ['M',0.4444,0.3824], [0.4444,0.4412],
+  [0.4444,0.4735,0.4194,0.5,0.3889,0.5], [0.3583,0.5,0.3333,0.4735,0.3333,0.4412], [0.3333,0.3824], [0.3472,0.0882], [0.4583,0.0882],
+  [0.4444,0.3824], 'Z', ['M',0.3889,0.8529], [0.1667,0.8529], [0.1667,0.6176],
+  [0.3889,0.6176], [0.3889,0.8529], 'Z', ['M',0.1111,0.4412], [0.1111,0.3824],
+  [0.1389,0.0882], [0.25,0.0882], [0.2222,0.3824], [0.2222,0.4412], [0.2222,0.4735,0.1972,0.5,0.1667,0.5],
+  [0.1361,0.5,0.1111,0.4735,0.1111,0.4412], 'Z', ['M',0.9444,0], [0.0556,0], [0,0.3824],
+  [0,0.4412], [0,0.4735,0.025,0.5,0.0556,0.5], [0.0556,1], [0.5278,1], [0.5278,0.6176],
+  [0.8333,0.6176], [0.8333,1], [0.9444,1], [0.9444,0.5], [0.975,0.5,1,0.4735,1,0.4412],
+  [1,0.3824], [0.9444,0], 'Z'
+];
+const iconStore = (s, x, y, w, h, fill) => poly(s, x, y, w, h, ICONSTORE_PTS, fill);
+
+/* price-tag icon (Our Service) */
+const ICONTAG_PTS = [
+  [0.5212,0.8473], [0.4732,0.7993], [0.799,0.4734], [0.847,0.5214], [0.5212,0.8473],
+  'Z', ['M',0.3532,0.6792], [0.679,0.3533], [0.727,0.4014], [0.4012,0.7273],
+  [0.3532,0.6792], 'Z', ['M',0.2332,0.5592], [0.5589,0.2333], [0.6069,0.2813],
+  [0.2812,0.6072], [0.2332,0.5592], 'Z', ['M',0.1372,0.2058], [0.0994,0.2058,0.0686,0.175,0.0686,0.1372],
+  [0.0686,0.0995,0.0994,0.0686,0.1372,0.0686], [0.1749,0.0686,0.2057,0.0995,0.2057,0.1372], [0.2057,0.175,0.1749,0.2058,0.1372,0.2058], 'Z', ['M',0.9807,0.5009],
+  [0.5006,0.0206], [0.4869,0.0069,0.4698,0,0.4526,0], [0.1372,0], [0.0617,0,0,0.0617,0,0.1372], [0,0.4511],
+  [0,0.47,0.0069,0.4871,0.0206,0.4991], [0.5006,0.9794], [0.5281,1.0069,0.5709,1.0069,0.5984,0.9794], [0.9807,0.5969], [1.0064,0.5712,1.0064,0.5266,0.9807,0.5009],
+  'Z'
+];
+const iconTag = (s, x, y, w, h, fill) => poly(s, x, y, w, h, ICONTAG_PTS, fill);
+
+/* paper-plane icon (Our Service) */
+const ICONPLANE_PTS = [
+  [1,0.725], [1,0.6125], [0.5735,0.3563], [0.5735,0.1125], [0.5735,0.0638,0.5441,0,0.5,0],
+  [0.4574,0,0.4265,0.0638,0.4265,0.1125], [0.4265,0.3563], [0,0.6125], [0,0.725], [0.4265,0.5438],
+  [0.4265,0.8163], [0.2794,0.925], [0.2794,1], [0.5,0.925], [0.7206,1],
+  [0.7206,0.925], [0.5735,0.8163], [0.5735,0.5438], [1,0.725], 'Z'
+];
+const iconPlane = (s, x, y, w, h, fill) => poly(s, x, y, w, h, ICONPLANE_PTS, fill);
+
+/* full-bleed band with two rounded notches (break slide) */
+const BAND_PTS = [
+  [0.3845,0], [1,0], [1,1], [0.3845,1], [0.386,0.9545],
+  [0.3865,0.9283,0.3868,0.9017,0.3868,0.8749], [0.3868,0.625,0.3868,0.375,0.3868,0.1251], [0.3868,0.0983,0.3865,0.0717,0.386,0.0455], 'Z', ['M',0,0],
+  [0.072,0], [0.0706,0.0455], [0.0701,0.0717,0.0698,0.0983,0.0698,0.1251], [0.0698,0.8749], [0.0698,0.9017,0.0701,0.9283,0.0706,0.9545],
+  [0.072,1], [0,1], 'Z'
+];
+
+/* four-lobe clover ring (infographic) */
+const CLOVER_PTS = [
+  [0.477,0.347], [0.476,0.348], [0.438,0.355,0.378,0.378,0.354,0.455], [0.349,0.478],
+  [0.349,0.481], [0.35,0.486,0.35,0.492,0.35,0.498], [0.35,0.504,0.35,0.51,0.349,0.516], [0.349,0.518],
+  [0.349,0.523], [0.357,0.564,0.385,0.633,0.479,0.65], [0.489,0.651], [0.501,0.651],
+  [0.511,0.651], [0.52,0.65], [0.558,0.643,0.624,0.619,0.647,0.539], [0.652,0.52],
+  [0.651,0.516], [0.65,0.51,0.65,0.504,0.65,0.498], [0.65,0.492,0.65,0.486,0.651,0.481], [0.651,0.479],
+  [0.649,0.468], [0.629,0.382,0.566,0.356,0.526,0.348], [0.524,0.347], [0.519,0.348],
+  [0.513,0.349,0.507,0.349,0.501,0.349], [0.495,0.349,0.489,0.349,0.483,0.348], 'Z', ['M',0.501,0],
+  [0.597,0,0.676,0.078,0.676,0.175], [0.676,0.181,0.675,0.187,0.675,0.192], [0.674,0.195], [0.675,0.201],
+  [0.683,0.242,0.708,0.305,0.794,0.322], [0.809,0.325], [0.825,0.324], [0.922,0.324,1,0.402,1,0.498],
+  [1,0.595,0.922,0.673,0.825,0.673], [0.815,0.672], [0.805,0.673], [0.707,0.688,0.681,0.758,0.675,0.8],
+  [0.674,0.804], [0.675,0.808], [0.675,0.813,0.676,0.819,0.676,0.825], [0.676,0.922,0.597,1,0.501,1],
+  [0.404,1,0.326,0.922,0.326,0.825], [0.327,0.808], [0.327,0.807], [0.312,0.703,0.236,0.678,0.194,0.673],
+  [0.189,0.672], [0.175,0.673], [0.078,0.673,0,0.595,0,0.498], [0,0.402,0.078,0.324,0.175,0.324],
+  [0.191,0.325], [0.195,0.324], [0.299,0.309,0.322,0.23,0.326,0.189], [0.326,0.188],
+  [0.326,0.175], [0.326,0.078,0.404,0,0.501,0], 'Z'
+];
+const clover = (s, x, y, w, h, fill) => poly(s, x, y, w, h, CLOVER_PTS, fill);
+
+/* six-wedge segmented ring (infographic) */
+const SEGRING_PTS = [
+  [0.508,0.4323], [0.8474,0.8342], [0.7595,0.9351,0.6398,0.9971,0.508,1], 'Z', ['M',0.492,0.4323],
+  [0.492,1], [0.3602,0.9971,0.2405,0.9351,0.1514,0.8342], 'Z', ['M',0.5189,0.4193], [1,0.4193],
+  [0.9975,0.5749,0.9438,0.7161,0.8584,0.8213], 'Z', ['M',0,0.4193], [0.4811,0.4193], [0.1404,0.8213],
+  [0.0549,0.7161,0.0025,0.5749,0,0.4193], 'Z', ['M',0.8584,0], [0.9438,0.1038,0.9975,0.245,1,0.4006], [0.5189,0.4006],
+  'Z', ['M',0.1404,0], [0.4811,0.4006], [0,0.4006], [0.0025,0.245,0.0549,0.1038,0.1404,0],
+  'Z'
+];
+const segRing = (s, x, y, w, h, fill) => poly(s, x, y, w, h, SEGRING_PTS, fill);
+
+/* Rounded-corner cover art for the title / thank-you photo bleeds:
+ * a full-bleed rectangle with a pill-shaped bite out of one edge. */
+const COVER_PTS = [
+  [0, 0], [1, 0], [1, 0.28], [0.5707, 0.28],
+  [0.5067, 0.28, 0.4539, 0.3666, 0.4476, 0.4775], [0.447, 0.5],
+  [0.4476, 0.5225, 0.5067, 0.72, 0.5707, 0.72], [1, 0.72], [1, 1], [0, 1], 'Z',
+];
+const COVER_FLIP_PTS = [
+  [0, 0], [1, 0], [1, 1], [0, 1], [0, 0.72], [0.4292, 0.72],
+  [0.4975, 0.72, 0.5529, 0.6215, 0.5529, 0.5],
+  [0.5529, 0.3785, 0.4975, 0.28, 0.4292, 0.28], [0, 0.28], 'Z',
+];
+
+/* Scalloped square used for the "New Portfolio" photo (slide 22). */
+const SCALLOP_PTS = [
+  [0.2585, 0], [0.2967, 0], [0.2967, 0.0337],
+  [0.2967, 0.1526, 0.3877, 0.2491, 0.5, 0.2491],
+  [0.6123, 0.2491, 0.7033, 0.1526, 0.7033, 0.0337], [0.7033, 0], [0.7415, 0],
+  [0.8843, 0, 1, 0.1226, 1, 0.2738], [1, 0.2877], [0.9682, 0.2877],
+  [0.8559, 0.2877, 0.7648, 0.3841, 0.7648, 0.503],
+  [0.7648, 0.622, 0.8559, 0.7184, 0.9682, 0.7184], [1, 0.7184], [1, 0.7262],
+  [1, 0.8774, 0.8843, 1, 0.7415, 1], [0.7033, 1], [0.7033, 0.9663],
+  [0.7033, 0.8474, 0.6123, 0.7509, 0.5, 0.7509],
+  [0.3877, 0.7509, 0.2967, 0.8474, 0.2967, 0.9663], [0.2967, 1], [0.2585, 1],
+  [0.1157, 1, 0, 0.8774, 0, 0.7262], [0, 0.7153], [0.0318, 0.7153],
+  [0.1441, 0.7153, 0.2352, 0.6189, 0.2352, 0.5],
+  [0.2352, 0.3811, 0.1441, 0.2847, 0.0318, 0.2847], [0, 0.2847], [0, 0.2738],
+  [0, 0.1226, 0.1157, 0, 0.2585, 0], 'Z',
+];
+
+/* One quadrant of the SWOT pinwheel; mirrored to build all four. */
+const PINWHEEL_PTS = [
+  [0, 0], [0.0029, 0.1296, 0.0296, 0.2533, 0.0764, 0.3665],
+  [0.0805, 0.3665, 0.0847, 0.3663, 0.0889, 0.3663],
+  [0.2182, 0.3663, 0.3229, 0.4712, 0.3229, 0.6005],
+  [0.3229, 0.6366, 0.3148, 0.6709, 0.3, 0.7016],
+  [0.4803, 0.8813, 0.727, 0.9943, 1, 1], [1, 0.3805],
+  [0.7951, 0.3694, 0.6307, 0.2052, 0.6195, 0], 'Z',
+];
+
+/* Ribbon tab with an arrow head (SWOT arrow slide) and its end badge. */
+const TAB_PTS = [
+  [0.6042, 0], [0.6042, 0.1626], [0.234, 0.1626],
+  [0.1049, 0.1626, 0, 0.3064, 0, 0.4836], [0, 1],
+  [0, 0.8228, 0.1049, 0.6789, 0.234, 0.6789], [0.6042, 0.6789],
+  [0.6042, 0.8548], [0.9992, 0.4288],
+  [1, 0.4281, 1, 0.4267, 0.9992, 0.426], [0.6042, 0], 'Z',
+];
+const BADGE_PTS = [
+  [0.6214, 0], [0.2784, 0, 0, 0.3033, 0, 0.6787], [0, 1], [0.4941, 1],
+  [0.7731, 1, 1, 0.7529, 1, 0.4474], [1, 0], 'Z',
+];
+
+/* Circular-sector slice, used for the pie-fan infographic (slide 33).
+ * `a1`/`a2` are clock angles in degrees measured from 3 o'clock. */
+function wedge(s, x, y, w, h, a1, a2, fill) {
+  s.addShape('pie', { x, y, w, h, angleRange: [a1, a2], flipH: true,
+                      fill, line: NOLINE });
+}
+
+/* Monochrome pictogram stand-in for the deck's small line icons.
+ * The shape is picked from the box position so a group of icons still reads
+ * as a set of different symbols rather than a row of identical marks. */
+const GLYPHS = ['star5', 'heart', 'diamond', 'plus', 'hexagon', 'triangle'];
+
+function glyph(s, x, y, w, h, color) {
+  const kind = GLYPHS[Math.round((x + y) * 3) % GLYPHS.length];
+  s.addShape(kind, { x, y, w, h, fill: { type: 'none' },
+                     line: { color, width: 1.5 } });
+}
+
+/* Device mock-ups (the source deck uses photographs of hardware). */
+function laptop(s, x, y, w, h) {
+  const bodyH = h * 0.9;
+  rr(s, x + w * 0.05, y, w * 0.9, bodyH, 0.12, '111111');
+  rect(s, x + w * 0.075, y + bodyH * 0.045, w * 0.85, bodyH * 0.9, MID);
+  rr(s, x, y + bodyH, w, h - bodyH, (h - bodyH) / 2, 'C9CBCE');
+}
+function phone(s, x, y, w, h) {
+  rr(s, x, y, w, h, w * 0.11, '111111');
+  rr(s, x + w * 0.045, y + h * 0.022, w * 0.91, h * 0.956, w * 0.075, MID);
+  rr(s, x + w * 0.33, y + h * 0.028, w * 0.34, h * 0.022, 0.03, '111111');
+}
+function monitor(s, x, y, w, h) {
+  const scrH = h * 0.78;
+  rr(s, x, y, w, scrH, 0.1, '222222');
+  rect(s, x + w * 0.02, y + scrH * 0.035, w * 0.96, scrH * 0.925, MID);
+  rect(s, x + w * 0.47, y + scrH, w * 0.06, h * 0.13, '222222');
+  rr(s, x + w * 0.3, y + h * 0.9, w * 0.4, h * 0.07, 0.05, '222222');
+}
+
+/* ======================= SLIDES ======================================== */
+
+/* --- 01. Title --- */
+function slide01(s) {
+  poly(s, 0,0,20,11.25, COVER_PTS, MID);
+  pill(s, 9.145,3.312,13.515,4.625, GREEN, { shadow: SOFT });
+  T(s, 11.015,4.354,7.114,2.036, 'T-Outvit', { f: SERIF, sz: 115, c: WHITE, b: 1, spc: 3, nowrap: 1 });
+  T(s, 11.015,6.391,5.924,0.505, 'FASHION PRESENTATION', { sz: 24, c: WHITE, spc: 6, nowrap: 1 });
+  T(s, 0.869,9.944,4.159,0.438, [{ text: 'T-OUTVITSTD-' }, { text: '2024', options: { bold: true, fontFace: SANS } }], { f: SANS_MED, c: GREEN, spc: 6, nowrap: 1 });
+  T(s, 0.869,0.869,4.916,0.438, 'FASHION HOLIC IN SWISS', { f: SANS_MED, c: GREEN, spc: 6, nowrap: 1 });
+  ticks(s, 'L', 'mid');
+}
+
+/* --- 02. About us — welcome --- */
+function slide02(s) {
+  chrome(s, 'R');
+  ticks(s, 'R', 'mid');
+  pill(s, 8.821,2.116,3.425,5.025, GREEN);
+  title(s, 0.869,3.012,6.911,2.524, 'Welcome to T-Outvit');
+  eyebrow(s, 0.869,2.575,1.391, 'About Us');
+  T(s, 0.93,6.607,6.88,2.068, BODY6, { al: 'justify', lh: 1.5 });
+  T(s, 0.93,6.102,5.149,0.505, 'Write your awesome title here', { f: SANS_MED, sz: 24, c: GREEN });
+  photo(s, 9.211,2.116,4.467,7.017, 2.234, MID);
+  photo(s, 13.825,2.116,4.467,7.017, 2.234, LIGHT);
+}
+
+/* --- 03. About us — intro --- */
+function slide03(s) {
+  chrome(s, 'L');
+  ticks(s, 'L', 'bot');
+  rr(s, 1.583,5.437,2.379,3.186, 0.518, GREEN);
+  title(s, 11.184,3.983,7.915,1.313, 'About T-Outvit');
+  eyebrow(s, 11.184,3.545,1.391, 'About Us');
+  T(s, 11.184,5.637,6.88,2.068, BODY6, { al: 'justify', lh: 1.5 });
+  photo(s, 1.861,2.627,8.139,5.62, 1.223, MID);
+}
+
+/* --- 04. About us — style --- */
+function slide04(s) {
+  pill(s, 15.309,3.799,2.177,5.059, GREEN);
+  chrome(s, 'R');
+  title(s, 1.156,1.758,8.046,3.736, 'It\u2019s Not About Brand It\u2019s About Style');
+  eyebrow(s, 1.156,1.321,1.391, 'About Us');
+  T(s, 1.156,6.48,6.88,1.563, BODY9, { al: 'justify', lh: 1.5 });
+  T(s, 1.156,5.975,5.149,0.505, 'Write your awesome title here', { f: SANS_MED, sz: 24, c: GREEN });
+  T(s, 1.156,8.871,6.88,1.058, BODY2, { al: 'justify', lh: 1.5 });
+  ticks(s, 'R', 'top');
+  photo(s, 10.511,-1.561,6.758,10.228, 1.471, MID);
+}
+
+/* --- 05. About us — attitude --- */
+function slide05(s) {
+  pill(s, 2.403,2.166,3.356,6.132, GREEN);
+  chrome(s, 'L');
+  ticks(s, 'L', 'mid');
+  title(s, 8.801,2.638,10.47,2.524, 'Style is Reflection of Your Attitude');
+  eyebrow(s, 8.801,2.201,1.391, 'About Us');
+  T(s, 8.862,5.6,6.88,1.563, BODY9, { al: 'justify', lh: 1.5 });
+  T(s, 8.862,7.991,6.88,1.058, BODY2, { al: 'justify', lh: 1.5 });
+  photo(s, 2.771,-2.432,5.019,10.731, 2.509, MID);
+}
+
+/* --- 06. Vision & mission --- */
+function slide06(s) {
+  pill(s, 15.987,3.095,2.177,5.059, GREEN);
+  chrome(s, 'R');
+  title(s, 0.869,3.234,10.47,2.524, 'Our Vision and Mission T-Outvit');
+  eyebrow(s, 0.869,2.796,1.391, 'About Us');
+  T(s, 0.869,6.385,5.149,0.505, 'Write your awesome title here', { f: SANS_MED, sz: 24, c: GREEN });
+  T(s, 0.869,6.89,4.668,1.563, BODY2, { al: 'justify', lh: 1.5 });
+  T(s, 7.434,6.385,5.149,0.505, 'Write your awesome title here', { f: SANS_MED, sz: 24, c: GREEN });
+  T(s, 7.434,6.89,4.668,1.563, BODY2, { al: 'justify', lh: 1.5 });
+  ticks(s, 'R', 'bot');
+  photo(s, 12.877,1.492,4.825,8.265, 2.412, MID);
+}
+
+/* --- 07. Brand concept --- */
+function slide07(s) {
+  rect(s, 3.988,0,4.924,11.25, GREEN);
+  chrome(s, 'L');
+  title(s, 10.204,3.359,8.895,2.524, 'The T-Outvit Brand Concept');
+  eyebrow(s, 10.204,2.922,1.391, 'About Us');
+  T(s, 10.204,6.26,6.88,2.068, BODY6, { al: 'justify', lh: 1.5 });
+  ticks(s, 'L', 'top');
+  photo(s, 2.048,2.116,5.987,7.017, 1.877, MID);
+}
+
+/* --- 08. Brand building process --- */
+function slide08(s) {
+  pill(s, 10.196,-1.314,2.379,10.837, GREEN);
+  chrome(s, 'R');
+  ticks(s, 'R', 'mid');
+  title(s, 0.869,2.803,8.129,2.524, 'Brand Building Process');
+  eyebrow(s, 0.869,2.366,1.391, 'About Us');
+  T(s, 0.869,7.321,6.88,1.563, BODY9, { al: 'justify', lh: 1.5 });
+  T(s, 0.93,5.648,6.88,1.058, BODY2, { al: 'justify', lh: 1.5 });
+  photo(s, 10.198,2.694,7.708,5.863, 1.276, MID);
+}
+
+/* --- 09. Choose fashion --- */
+function slide09(s) {
+  chrome(s, 'L');
+  rr(s, 5.59,1.401,2.577,6.024, 0.561, GREEN);
+  title(s, 9.947,2.975,8.605,3.736, 'Choose Fashion With the T-Outvit Brand');
+  eyebrow(s, 9.947,2.538,1.391, 'About Us');
+  T(s, 9.947,7.149,6.88,1.563, BODY9, { al: 'justify', lh: 1.5 });
+  ticks(s, 'L', 'bot');
+  photo(s, 2.039,1.893,5.581,7.956, 1.214, MID);
+}
+
+/* --- 10. Team — two portraits --- */
+function slide10(s) {
+  pill(s, 0.869,5.776,15.957,3.312, GREEN);
+  chrome(s, 'R');
+  ticks(s, 'R', 'top');
+  title(s, 0.869,2.572,8.129,2.524, 'The T-Outvit Team');
+  eyebrow(s, 0.869,2.134,1.455, 'Our Team');
+  T(s, 5.494,6.961,3.19,0.505, 'RACHEL AMANTA', { f: SANS_MED, sz: 24, c: WHITE, spc: 1 });
+  T(s, 5.494,7.466,2.746,0.438, 'Professional Model', { f: SANS_MED, c: WHITE, i: 1 });
+  T(s, 8.683,3.347,3.337,0.505, 'MICHAEL BORNEO', { f: SANS_MED, sz: 24, c: GREEN, spc: 1 });
+  T(s, 8.683,3.852,2.484,0.438, 'Photographer', { f: SANS_MED, i: 1 });
+  photo(s, 12.603,2.162,5.536,3.312, 1.656, MID);
+  photo(s, 12.603,5.776,5.536,3.312, 1.656, LIGHT);
+}
+
+/* --- 11. Team — three cards --- */
+function slide11(s) {
+  photo(s, 1.583,2.613,3.19,6.024, 0.694, MID);
+  photo(s, 8.257,2.613,3.19,6.024, 0.694, DARK);
+  photo(s, 4.92,2.613,3.19,6.024, 0.694, LIGHT);
+  chrome(s, 'L');
+  ticks(s, 'L', 'mid');
+  pill(s, 1.583,6.89,3.19,1.159, GREEN);
+  T(s, 1.861,7.013,2.634,0.909, 'RACHEL OTWELL', { f: SANS_MED, sz: 24, c: WHITE, spc: 1, al: 'center' });
+  title(s, 12.394,3.601,6.706,2.524, 'Our Creative Team');
+  eyebrow(s, 12.394,3.164,1.455, 'Our Team');
+  T(s, 12.394,6.523,6.706,1.563, BODY5, { al: 'justify', lh: 1.5 });
+  pill(s, 4.92,6.89,3.19,1.159, GREEN);
+  T(s, 5.198,7.013,2.634,0.909, 'ANNISA RAMDAN', { f: SANS_MED, sz: 24, c: WHITE, spc: 1, al: 'center' });
+  pill(s, 8.257,6.89,3.19,1.159, GREEN);
+  T(s, 8.535,7.013,2.634,0.909, 'JUSTIN RAQUE', { f: SANS_MED, sz: 24, c: WHITE, spc: 1, al: 'center' });
+}
+
+/* --- 12. Team — pair --- */
+function slide12(s) {
+  rr(s, 9.442,-0.816,2.593,5.724, 0.564, GREEN);
+  chrome(s, 'R');
+  ticks(s, 'R', 'bot');
+  T(s, 14.908,1.97,2.634,0.505, 'YESSI DELIN', { f: SANS_MED, sz: 24, c: GREEN, spc: 1, al: 'center' });
+  T(s, 14.983,2.475,2.484,0.438, 'Fashion Designer', { f: SANS_MED, i: 1, al: 'center' });
+  T(s, 9.437,8.34,3.952,0.505, 'BISMA AR ROUDHOH', { f: SANS_MED, sz: 24, c: GREEN, spc: 1, al: 'center' });
+  T(s, 10.171,8.845,2.484,0.438, 'Influencer', { f: SANS_MED, i: 1, al: 'center' });
+  title(s, 0.869,3.834,8.129,2.524, 'Our T-Outvit Team');
+  eyebrow(s, 0.869,3.396,1.455, 'Our Team');
+  T(s, 0.869,6.796,6.706,1.058, 'Lorem Ipsum\u00a0is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been', { al: 'justify', lh: 1.5 });
+  photo(s, 9.437,1.967,3.952,5.993, 1.976, LIGHT);
+  photo(s, 14.249,3.287,3.952,5.993, 1.976, MID);
+}
+
+/* --- 13. Team — profile with skill bars --- */
+function slide13(s) {
+  chrome(s, 'L');
+  ticks(s, 'L', 'top');
+  rr(s, 6.75,5.48,2.34,3.807, 0.509, GREEN);
+  title(s, 10.01,2.853,9.096,1.313, 'Silvya Willona');
+  eyebrow(s, 10.01,2.416,1.455, 'Our Team');
+  T(s, 10,4.431,3.653,0.505, 'CEO. FASHION.CO', { f: SANS_MED, sz: 24, c: GREEN, spc: 1 });
+  pill(s, 10,5.956,7.574,0.637, null, { line: {color:GREEN,width:1.5} });
+  pill(s, 10,5.956,6.741,0.637, GREEN);
+  T(s, 10.509,6.055,2.634,0.438, 'Your Skills Here', { f: SANS_MED, c: WHITE });
+  T(s, 17.877,6.088,0.957,0.505, '90%', { f: SANS_MED, sz: 24, c: GREEN });
+  pill(s, 10.01,7.076,7.574,0.637, null, { line: {color:GREEN,width:1.5} });
+  pill(s, 10.01,7.076,5.324,0.637, GREEN);
+  T(s, 10.519,7.176,2.634,0.438, 'Your Skills Here', { f: SANS_MED, c: WHITE });
+  T(s, 17.887,7.209,0.957,0.505, '80%', { f: SANS_MED, sz: 24, c: GREEN });
+  pill(s, 10.019,8.197,7.574,0.637, null, { line: {color:GREEN,width:1.5} });
+  pill(s, 10.019,8.197,4.177,0.637, GREEN);
+  T(s, 10.529,8.297,2.634,0.438, 'Your Skills Here', { f: SANS_MED, c: WHITE });
+  T(s, 17.897,8.329,0.957,0.505, '70%', { f: SANS_MED, sz: 24, c: GREEN });
+  photo(s, 1.644,1.963,7.086,6.887, 1.499, MID);
+}
+
+/* --- 14. Service — list --- */
+function slide14(s) {
+  ell(s, 0.667,8.175,0.97,0.97, {color:GREEN,transparency:80});
+  ell(s, 0.667,6.048,0.97,0.97, {color:GREEN,transparency:80});
+  ell(s, 0.667,3.92,0.97,0.97, {color:GREEN,transparency:80});
+  pill(s, 11.849,-3.178,3.55,9.179, GREEN);
+  chrome(s, 'R');
+  ticks(s, 'R', 'mid');
+  title(s, 0.869,1.949,10.753,1.313, 'Our Service T-Outvit');
+  eyebrow(s, 0.869,1.511,1.697, 'Our Service');
+  T(s, 2.046,3.92,5.149,0.505, 'Good Market', { f: SANS_MED, sz: 24, c: GREEN });
+  T(s, 2.046,4.425,6.675,1.058, BODY2, { al: 'justify', lh: 1.5 });
+  T(s, 2.046,6.048,5.149,0.505, 'Cotton 100%', { f: SANS_MED, sz: 24, c: GREEN });
+  T(s, 2.046,6.553,6.675,1.058, BODY2, { al: 'justify', lh: 1.5 });
+  T(s, 2.046,8.175,5.149,0.505, 'Over The World', { f: SANS_MED, sz: 24, c: GREEN });
+  T(s, 2.046,8.68,6.675,1.058, BODY2, { al: 'justify', lh: 1.5 });
+  iconStore(s, 0.919,4.185,0.466,0.44, GREEN);
+  iconTag(s, 0.924,6.305,0.455,0.455, WHITE);
+  iconPlane(s, 0.915,8.381,0.474,0.558, GREEN);
+  photo(s, 12.381,-3.178,4.946,11.956, 2.473, MID);
+}
+
+/* --- 15. Service — three columns --- */
+function slide15(s) {
+  chrome(s, 'L');
+  ticks(s, 'L', 'bot');
+  title(s, 10.399,2.909,8.697,2.524, 'Our Best Service T-Outvit');
+  eyebrow(s, 10.399,2.471,1.697, 'Our Service');
+  T(s, 2.923,7.688,4.165,0.505, 'Good Market', { f: SANS_MED, sz: 24, c: GREEN });
+  T(s, 2.923,8.193,4.165,1.058, BODY3, { al: 'justify', lh: 1.5 });
+  ell(s, 1.583,7.985,0.97,0.97, {color:GREEN,transparency:80});
+  iconStore(s, 1.835,8.25,0.466,0.44, GREEN);
+  T(s, 9.111,7.688,4.005,0.505, 'Cotton 100%', { f: SANS_MED, sz: 24, c: GREEN });
+  T(s, 9.111,8.193,4.066,1.058, BODY3, { al: 'justify', lh: 1.5 });
+  ell(s, 7.765,7.985,0.97,0.97, {color:GREEN,transparency:80});
+  iconTag(s, 8.023,8.242,0.455,0.455, GREEN);
+  T(s, 15.193,7.688,4.159,0.505, 'Over The World', { f: SANS_MED, sz: 24, c: GREEN });
+  T(s, 15.193,8.193,4.159,1.058, BODY3, { al: 'justify', lh: 1.5 });
+  iconPlane(s, 14.102,8.191,0.474,0.558, GREEN);
+  ell(s, 13.854,7.985,0.97,0.97, {color:GREEN,transparency:80});
+  photo(s, 1.583,1.999,8.018,4.666, 1.015, MID);
+}
+
+/* --- 16. Service — three circles --- */
+function slide16(s) {
+  chrome(s, 'R');
+  ticks(s, 'R', 'top');
+  title(s, 2.426,2.266,14.541,1.313, 'Great Service About T-Outvit', { al: 'center' });
+  eyebrow(s, 8.734,1.829,1.697, 'Our Service');
+  ell(s, 13.829,4.922,4.499,4.499, {color:GREEN,transparency:80});
+  ell(s, 1.672,4.922,4.499,4.499, {color:GREEN,transparency:80});
+  T(s, 14.638,6.919,2.881,0.505, 'Over The World', { f: SANS_MED, sz: 24, c: GREEN, al: 'center' });
+  T(s, 13.999,7.424,4.159,1.058, BODY3, { c: WHITE, al: 'center', lh: 1.5 });
+  T(s, 2.761,6.919,2.32,0.505, 'Good Market', { f: SANS_MED, sz: 24, c: GREEN, al: 'center' });
+  T(s, 1.839,7.424,4.165,1.058, BODY3, { c: WHITE, al: 'center', lh: 1.5 });
+  iconStore(s, 3.546,5.604,0.75,0.708, GREEN);
+  ell(s, 7.751,4.92,4.499,4.499, GREEN);
+  T(s, 8.61,6.916,2.781,0.505, 'Cotton 100%', { f: SANS_MED, sz: 24, c: WHITE, al: 'center' });
+  T(s, 7.967,7.421,4.066,1.058, BODY3, { c: WHITE, al: 'center', lh: 1.5 });
+  iconTag(s, 9.696,5.652,0.608,0.607, WHITE);
+  iconPlane(s, 15.724,5.541,0.708,0.833, GREEN);
+}
+
+/* --- 17. Service — three cards --- */
+function slide17(s) {
+  photo(s, 1.768,1.949,4.539,3.577, 0.779, MID);
+  photo(s, 6.528,1.949,4.539,3.577, 0.779, LIGHT);
+  photo(s, 4.148,5.724,4.539,3.577, 0.779, DARK);
+  chrome(s, 'L');
+  ticks(s, 'L', 'mid');
+  title(s, 12.326,3.549,6.805,2.524, 'Great Service T-Outvit');
+  eyebrow(s, 12.326,3.112,1.697, 'Our Service');
+  T(s, 12.326,6.575,6.706,1.563, BODY5, { al: 'justify', lh: 1.5 });
+  pill(s, 4.148,7.991,4.539,0.932, GREEN);
+  T(s, 5.184,8.205,2.466,0.505, 'Service Three', { f: SANS_MED, sz: 24, c: WHITE, al: 'center' });
+  pill(s, 1.768,4.21,4.539,0.932, GREEN);
+  T(s, 2.805,4.424,2.466,0.505, 'Service One', { f: SANS_MED, sz: 24, c: WHITE, al: 'center' });
+  pill(s, 6.528,4.21,4.539,0.932, GREEN);
+  T(s, 7.564,4.424,2.466,0.505, 'Service Two', { f: SANS_MED, sz: 24, c: WHITE, al: 'center' });
+}
+
+/* --- 18. Break slide --- */
+function slide18(s) {
+  poly(s, 0,3.573,20,4.104, BAND_PTS, GREEN);
+  T(s, 9.131,4.354,8.736,2.036, 'Break Slide', { f: SERIF, sz: 115, c: WHITE, b: 1, nowrap: 1, fill: GREEN });
+  T(s, 9.131,6.391,5.643,0.505, 'TAKE A 5 MINUTE AGAIN', { sz: 24, c: WHITE, spc: 6, nowrap: 1 });
+  photo(s, 1.543,1.147,6.046,8.956, 3.023, MID);
+}
+
+/* --- 19. Portfolio — intro --- */
+function slide19(s) {
+  chrome(s, 'R');
+  ticks(s, 'R', 'bot');
+  title(s, 1.406,1.509,12.478,3.736, 'There are Many Options and Brands Available in The Portfolio');
+  eyebrow(s, 1.406,1.072,1.843, 'Our Portfolio');
+  pill(s, 5.84,5.771,4.288,3.97, GREEN);
+  photo(s, 0.997,6.004,8.875,3.503, 1.751, MID);
+  photo(s, 10.128,6.004,8.875,3.503, 1.751, LIGHT);
+}
+
+/* --- 20. Portfolio — styles --- */
+function slide20(s) {
+  pill(s, 10.641,6.447,7.17,3.401, GREEN);
+  chrome(s, 'L');
+  ticks(s, 'L', 'top');
+  title(s, 10.641,1.772,8.465,3.736, 'Have Various Types of Styles in The Portfolio');
+  eyebrow(s, 10.641,1.335,1.843, 'Our Portfolio');
+  rr(s, 3.189,3.103,4.829,5.044, 1.051, null, { line: {color:GREEN,width:3} });
+  T(s, 12.336,7.017,3.92,0.505, [{ text: 'WOMAN' }, { text: ' ', options: { bold: true } }, { text: 'COLLECTION' }], { f: SANS_MED, sz: 24, c: WHITE });
+  pill(s, 12.197,8.029,3.853,1.248, null, { line: {color:WHITE,width:1.5} });
+  T(s, 12.737,8.4,2.771,0.505, 'SHOP NOW', { f: SANS_MED, sz: 24, c: WHITE, spc: 6, al: 'center' });
+  photo(s, 1.996,1.988,3.754,3.921, 0.817, MID);
+  photo(s, 5.457,5.341,3.754,3.921, 0.817, LIGHT);
+}
+
+/* --- 21. Portfolio — project grid --- */
+function slide21(s) {
+  photo(s, 14.693,1.505,3.754,7.246, 0.817, DARK);
+  chrome(s, 'R');
+  ticks(s, 'R', 'mid');
+  title(s, 1.049,1.698,12.433,2.524, 'T-Outvit Portfolio Project');
+  eyebrow(s, 1.049,1.26,1.843, 'Our Portfolio');
+  T(s, 2.403,8.98,3.508,0.505, 'MINIMAL T-OUTVIT', { f: SANS_MED, sz: 24, c: GREEN, spc: 1, al: 'center' });
+  T(s, 3.255,9.485,1.804,0.505, '$24.00', { f: SANS_MED, sz: 24, i: 1, al: 'center' });
+  T(s, 9.222,8.98,3.508,0.505, 'BLACK FASHION', { f: SANS_MED, sz: 24, c: GREEN, spc: 1, al: 'center' });
+  T(s, 10.074,9.485,1.804,0.505, '$564.00', { f: SANS_MED, sz: 24, i: 1, al: 'center' });
+  rr(s, 14.687,5.128,3.754,3.623, 0.788, GREEN);
+  T(s, 14.816,6.434,3.508,0.505, 'WHITE MINIMAL', { f: SANS_MED, sz: 24, c: WHITE, spc: 1, al: 'center' });
+  T(s, 15.668,6.939,1.804,0.505, '$60.00', { f: SANS_MED, sz: 24, c: WHITE, i: 1, al: 'center' });
+  photo(s, 1.049,5.222,6.216,3.529, 0.768, MID);
+  photo(s, 7.868,5.222,6.216,3.529, 0.768, LIGHT);
+}
+
+/* --- 22. Portfolio — scalloped --- */
+function slide22(s) {
+  pill(s, 2.142,4.729,7.047,1.793, GREEN);
+  chrome(s, 'L');
+  ticks(s, 'L', 'bot');
+  title(s, 11.089,3.242,8.007,2.524, 'The T-Outvit of New Portfolio');
+  eyebrow(s, 11.089,2.805,1.843, 'Our Portfolio');
+  T(s, 11.089,6.882,6.706,1.563, BODY5, { al: 'justify', lh: 1.5 });
+  T(s, 11.089,6.377,4.066,0.505, 'Portfolio', { f: SANS_MED, sz: 24, c: GREEN });
+  poly(s, 1.57,1.758,8.191,7.733, SCALLOP_PTS, MID);
+}
+
+/* --- 23. Portfolio — fashion --- */
+function slide23(s) {
+  pill(s, 6.236,6.57,3.508,1.793, GREEN);
+  chrome(s, 'R');
+  ticks(s, 'R', 'top');
+  title(s, 4.765,3.877,12.433,2.524, 'The T-Outvit Fashion Portfolio');
+  eyebrow(s, 4.765,3.44,1.843, 'Our Portfolio');
+  T(s, 10.161,8.125,3.508,0.505, 'OUTER WEARS', { f: SANS_MED, sz: 24, c: GREEN, spc: 1, al: 'center' });
+  T(s, 11.012,8.63,1.804,0.505, '$55.00', { f: SANS_MED, sz: 24, i: 1, al: 'center' });
+  T(s, 3.239,0.996,4.012,0.505, 'HYPEBEAST LEGGINGS', { f: SANS_MED, sz: 24, c: GREEN, spc: 1, al: 'center' });
+  T(s, 4.091,1.501,1.804,0.505, '$20.00', { f: SANS_MED, sz: 24, i: 1, al: 'center' });
+  photo(s, 8.323,-2.304,8.875,5.307, 2.653, LIGHT);
+  photo(s, 0.869,6.879,8.875,3.503, 1.751, MID);
+}
+
+/* --- 24. Portfolio — gallery --- */
+function slide24(s) {
+  photo(s, 1.583,3.144,4.554,6.774, 2.277, MID);
+  chrome(s, 'L');
+  ticks(s, 'L', 'mid');
+  pill(s, 4.92,1.332,4.554,6.774, GREEN);
+  title(s, 10.818,3.54,8.281,2.524, 'T-Outvit Fashion Gallery');
+  eyebrow(s, 10.818,3.102,1.843, 'Our Portfolio');
+  T(s, 10.818,6.585,6.706,1.563, BODY5, { al: 'justify', lh: 1.5 });
+  photo(s, 5.412,1.676,4.554,6.774, 2.277, LIGHT);
+}
+
+/* --- 25. Mockup — laptop --- */
+function slide25(s) {
+  pill(s, 11.007,-1.53,2.661,10.727, GREEN);
+  chrome(s, 'R');
+  ticks(s, 'R', 'bot');
+  laptop(s, 11.068,3.371,7.576,4.508);
+  title(s, 0.869,3.196,9.542,2.524, 'Fashion T-Outvit Display in Mockup');
+  eyebrow(s, 0.869,2.759,1.759, 'Our Mockup');
+  T(s, 0.869,6.423,6.88,2.068, BODY6, { al: 'justify', lh: 1.5 });
+  photo(s, 11.829,3.542,6.085,3.894, 0.1, MID);
+}
+
+/* --- 26. Mockup — phone --- */
+function slide26(s) {
+  chrome(s, 'L');
+  ticks(s, 'L', 'top');
+  pill(s, 5.393,1.404,2.096,6.785, GREEN);
+  phone(s, 2.06,1.273,4.381,8.705);
+  title(s, 8.639,1.938,9.542,2.524, 'T-Outvit Service Mockup');
+  eyebrow(s, 8.639,1.501,1.759, 'Our Mockup');
+  T(s, 8.639,5.064,1.978,0.505, 'Consulting', { f: SANS_MED, sz: 24, c: GREEN });
+  T(s, 8.639,5.569,4.668,1.563, BODY2, { al: 'justify', lh: 1.5 });
+  T(s, 14.438,5.064,2.623,0.505, 'Fashion Design', { f: SANS_MED, sz: 24, c: GREEN });
+  T(s, 14.438,5.569,4.668,1.563, BODY2, { al: 'justify', lh: 1.5 });
+  T(s, 8.639,7.681,2.604,0.505, 'Merchandising', { f: SANS_MED, sz: 24, c: GREEN });
+  T(s, 8.639,8.186,4.668,1.563, BODY2, { al: 'justify', lh: 1.5 });
+  T(s, 14.438,7.681,2.623,0.505, 'Manufacturing', { f: SANS_MED, sz: 24, c: GREEN });
+  T(s, 14.438,8.186,4.668,1.563, BODY2, { al: 'justify', lh: 1.5 });
+  photo(s, 2.381,1.568,3.744,8.128, 0.215, MID);
+}
+
+/* --- 27. Mockup — monitor --- */
+function slide27(s) {
+  rr(s, 9.661,0,5.308,11.25, 0, {color:GREEN,transparency:80});
+  chrome(s, 'R');
+  ticks(s, 'R', 'mid');
+  monitor(s, 11.214,2.958,6.915,5.333);
+  title(s, 1.058,2.745,7.682,2.524, 'Try Our Mobile App');
+  eyebrow(s, 1.058,2.307,1.759, 'Our Mockup');
+  T(s, 1.058,5.692,6.706,1.563, BODY5, { al: 'justify', lh: 1.5 });
+  pill(s, 1.058,8.01,4.539,0.932, GREEN);
+  T(s, 1.076,8.224,4.504,0.505, 'DOWNLOAD NOW', { f: SANS_MED, sz: 24, c: WHITE, spc: 1, al: 'center' });
+  photo(s, 11.363,3.171,6.627,3.825, 0.098, MID);
+}
+
+/* --- 28. SWOT — petals --- */
+function slide28(s) {
+  chrome(s, 'L');
+  ticks(s, 'L', 'bot');
+  shp(s, 'round2DiagRect', 14.653,2.533,3.36,3.007, {color:GREEN,transparency:80}, { rectRadius: 0.899 });
+  shp(s, 'round2DiagRect', 14.653,5.711,3.36,3.007, GREEN, { rectRadius: 0.899, flipH: true });
+  shp(s, 'round2DiagRect', 11.151,2.533,3.36,3.007, GREEN, { rectRadius: 0.899, flipH: true });
+  shp(s, 'round2DiagRect', 11.151,5.711,3.36,3.007, {color:GREEN,transparency:80}, { rectRadius: 0.899 });
+  ell(s, 15.691,1.891,1.284,1.284, WHITE);
+  ell(s, 15.848,2.048,0.97,0.97, GREEN);
+  T(s, 15.848,2.048,0.97,0.97, 'W', { f: SANS_MED, sz: 36, c: WHITE, al: 'center', mid: 1 });
+  ell(s, 15.691,8.076,1.284,1.284, WHITE);
+  ell(s, 15.848,8.233,0.97,0.97, {color:GREEN,transparency:80});
+  T(s, 15.848,8.233,0.97,0.97, 'T', { f: SANS_MED, sz: 36, c: GREEN, al: 'center', mid: 1 });
+  ell(s, 12.189,1.891,1.284,1.284, WHITE);
+  ell(s, 12.346,2.048,0.97,0.97, {color:GREEN,transparency:80});
+  T(s, 12.346,2.048,0.97,0.97, 'S', { f: SANS_MED, sz: 36, c: GREEN, al: 'center', mid: 1 });
+  ell(s, 12.189,8.076,1.284,1.284, WHITE);
+  ell(s, 12.346,8.233,0.97,0.97, GREEN);
+  T(s, 12.346,8.233,0.97,0.97, 'O', { f: SANS_MED, sz: 36, c: WHITE, al: 'center', mid: 1 });
+  ell(s, 13.036,4.079,3.092,3.092, {color:WHITE,transparency:75});
+  ell(s, 13.271,4.315,2.621,2.621, 'F7F7F8');
+  glyph(s, 12.314,3.581,0.689,0.959, WHITE);
+  glyph(s, 16.219,3.582,0.592,0.957, GREEN);
+  glyph(s, 12.341,6.712,0.603,0.957, GREEN);
+  glyph(s, 16.111,6.712,0.802,0.957, WHITE);
+  T(s, 13.271,5.205,2.621,0.841, 'SWOT', { f: SANS_MED, sz: 44, c: GREEN, al: 'center' });
+  pill(s, 1.987,8.339,7.078,0.455, WHITE, { shadow: SOFT, line: {color:'F2F2F2',width:1} });
+  T(s, 1.987,8.339,7.078,0.455, '90%', { f: SANS_MED, c: GREEN, spc: 1, al: 'right', mid: 1 });
+  pill(s, 2.142,8.471,5.727,0.191, GREEN);
+  T(s, 2.168,5.117,7.078,2.068, BODY6, { al: 'justify', lh: 1.5 });
+  title(s, 2.164,2.328,8.141,2.524, 'SWOT Analysis Infographic', { b: 0, spc: 0 });
+  eyebrow(s, 2.142,1.875,1.398, 'Our Swot');
+}
+
+/* --- 29. SWOT — pinwheel --- */
+function slide29(s) {
+  rect(s, 12.901,7.378,5.484,2.734, WHITE, { shadow: SOFT });
+  T(s, 13.467,7.941,3.439,0.505, 'Threats ', { f: SANS_MED, sz: 24, c: GREEN });
+  T(s, 13.429,8.491,4.427,1.058, BODY1, { lh: 1.5 });
+  chrome(s, 'R');
+  ticks(s, 'R', 'top');
+  rect(s, 12.901,4.022,5.484,2.734, WHITE, { shadow: SOFT });
+  rect(s, 1.615,7.391,5.484,2.734, WHITE, { shadow: SOFT });
+  rect(s, 1.616,4.046,5.484,2.734, WHITE, { shadow: SOFT });
+  title(s, 3.087,1.563,13.827,1.313, 'Swot Analysis Infographic', { al: 'center', spc: 0 });
+  poly(s, 10.061,7.128,2.507,2.507, PINWHEEL_PTS, {color:GREEN,transparency:80}, { flipH: true });
+  T(s, 10.061,7.128,2.507,2.507, 'T', { f: SANS_MED, sz: 54, c: GREEN, al: 'center', mid: 1 });
+  ell(s, 11.872,8.16,0.947,0.947, GREEN);
+  poly(s, 10.061,4.509,2.507,2.507, PINWHEEL_PTS, GREEN, { flipH: true, flipV: true });
+  T(s, 10.061,4.509,2.507,2.507, 'W', { f: SANS_MED, sz: 54, c: WHITE, al: 'center', mid: 1 });
+  ell(s, 11.872,5.037,0.947,0.947, {color:GREEN,transparency:80});
+  poly(s, 7.442,7.128,2.507,2.507, PINWHEEL_PTS, GREEN);
+  T(s, 7.442,7.128,2.507,2.507, 'O', { f: SANS_MED, sz: 54, c: WHITE, al: 'center', mid: 1 });
+  ell(s, 7.191,8.16,0.947,0.947, {color:GREEN,transparency:80});
+  poly(s, 7.442,4.509,2.507,2.507, PINWHEEL_PTS, {color:GREEN,transparency:80}, { flipV: true });
+  T(s, 7.442,4.509,2.507,2.507, 'S', { f: SANS_MED, sz: 54, c: GREEN, al: 'center', mid: 1 });
+  ell(s, 7.191,5.037,0.947,0.947, GREEN);
+  glyph(s, 7.444,5.207,0.431,0.6, WHITE);
+  glyph(s, 12.17,5.249,0.37,0.535, GREEN);
+  glyph(s, 7.464,8.308,0.377,0.598, GREEN);
+  glyph(s, 12.089,8.333,0.502,0.598, WHITE);
+  T(s, 3.145,7.953,3.439,0.505, 'Opportunities', { f: SANS_MED, sz: 24, c: GREEN, al: 'right' });
+  T(s, 2.124,8.503,4.466,1.058, BODY1, { al: 'right', lh: 1.5 });
+  T(s, 13.434,4.574,3.439,0.505, 'Weaknesses ', { f: SANS_MED, sz: 24, c: GREEN });
+  T(s, 13.434,5.145,4.417,1.058, BODY1, { lh: 1.5 });
+  T(s, 3.14,4.609,3.439,0.505, 'Strengths', { f: SANS_MED, sz: 24, c: GREEN, al: 'right' });
+  T(s, 2.134,5.159,4.447,1.058, BODY1, { al: 'right', lh: 1.5 });
+  eyebrow(s, 9.008,1.11,1.398, 'Our Swot', 'center');
+}
+
+/* --- 30. SWOT — clover --- */
+function slide30(s) {
+  chrome(s, 'L');
+  ticks(s, 'L', 'mid');
+  elbow(s, 10.867,4.942, 14.218,5.445, 0.168);
+  elbow(s, 12.837,7.233, 14.218,8.172, 0.588);
+  elbow(s, 5.791,8.185, 9.141,9.384, 0.168);
+  elbow(s, 5.782,4.942, 7.163,7.246, 0.59);
+  clover(s, 7.163,4.442,5.674,5.685, GREEN);
+  ell(s, 9.061,4.491,1.886,1.886, WHITE);
+  ell(s, 9.462,4.893,1.083,1.083, {color:GREEN,transparency:80});
+  T(s, 9.462,4.893,1.083,1.083, 'W', { f: SANS_MED, sz: 50, c: GREEN, al: 'center', mid: 1 });
+  ell(s, 10.902,6.332,1.886,1.886, WHITE);
+  ell(s, 11.303,6.733,1.084,1.084, {color:GREEN,transparency:80});
+  T(s, 11.303,6.733,1.084,1.084, 'T', { f: SANS_MED, sz: 50, c: GREEN, al: 'center', mid: 1 });
+  ell(s, 9.061,8.191,1.886,1.886, WHITE);
+  ell(s, 9.462,8.592,1.083,1.083, {color:GREEN,transparency:80});
+  T(s, 9.462,8.592,1.083,1.083, 'O', { f: SANS_MED, sz: 50, c: GREEN, al: 'center', mid: 1 });
+  ell(s, 7.213,6.332,1.885,1.886, WHITE);
+  ell(s, 7.614,6.733,1.084,1.084, {color:GREEN,transparency:80});
+  T(s, 7.614,6.733,1.084,1.084, 'S', { f: SANS_MED, sz: 50, c: GREEN, al: 'center', mid: 1 });
+  T(s, 1.824,4.562,3.439,0.505, 'Strengths', { f: SANS_MED, sz: 24, c: GREEN, al: 'right', fill: WHITE });
+  T(s, 0.982,5.146,4.291,1.058, BODY3, { al: 'right', lh: 1.5 });
+  T(s, 1.824,8.084,3.439,0.505, 'Opportunities', { f: SANS_MED, sz: 24, c: GREEN, al: 'right', fill: WHITE });
+  T(s, 0.982,8.668,4.291,1.058, BODY3, { al: 'right', lh: 1.5 });
+  T(s, 14.758,4.562,3.439,0.505, 'Weaknesses ', { f: SANS_MED, sz: 24, c: GREEN, fill: WHITE });
+  T(s, 14.736,5.146,4.282,1.058, BODY3, { lh: 1.5 });
+  T(s, 14.758,8.084,3.439,0.505, 'Threats ', { f: SANS_MED, sz: 24, c: GREEN, fill: WHITE });
+  T(s, 14.736,8.668,4.282,1.058, BODY3, { lh: 1.5 });
+  title(s, 3.087,1.563,13.827,1.313, 'Swot Analysis Infographic', { al: 'center', spc: 0 });
+  eyebrow(s, 9.008,1.11,1.398, 'Our Swot', 'center');
+}
+
+/* --- 31. SWOT — arrows --- */
+function slide31(s) {
+  rect(s, 10.281,7.474,6.423,2.734, WHITE, { shadow: SOFT });
+  chrome(s, 'R');
+  ticks(s, 'R', 'bot');
+  rect(s, 10.281,4.113,6.423,2.734, WHITE, { shadow: SOFT });
+  rect(s, 3.261,4.113,6.423,2.734, WHITE, { shadow: SOFT });
+  rect(s, 3.261,7.474,6.423,2.734, WHITE, { shadow: SOFT });
+  poly(s, 16.959,9.095,0.987,0.904, BADGE_PTS, {color:GREEN,transparency:80}, { flipH: true });
+  poly(s, 15.326,7.805,2.62,1.91, TAB_PTS, GREEN, { flipH: true });
+  poly(s, 16.959,5.707,0.987,0.904, BADGE_PTS, {color:GREEN,transparency:80}, { flipH: true });
+  poly(s, 15.326,4.417,2.62,1.91, TAB_PTS, GREEN, { flipH: true });
+  poly(s, 2.053,5.707,0.987,0.904, BADGE_PTS, {color:GREEN,transparency:80});
+  poly(s, 2.053,4.417,2.621,1.91, TAB_PTS, GREEN);
+  poly(s, 2.053,9.095,0.987,0.904, BADGE_PTS, {color:GREEN,transparency:80});
+  poly(s, 2.053,7.805,2.621,1.91, TAB_PTS, GREEN);
+  T(s, 5.393,4.684,3.439,0.505, 'Strengths', { f: SANS_MED, sz: 24, c: GREEN });
+  T(s, 5.393,5.216,4.153,1.058, BODY1, { lh: 1.5 });
+  T(s, 5.393,8.057,3.439,0.505, 'Opportunities', { f: SANS_MED, sz: 24, c: GREEN });
+  T(s, 5.393,8.566,4.153,1.058, BODY1, { lh: 1.5 });
+  T(s, 11.151,4.684,3.439,0.505, 'Weaknesses ', { f: SANS_MED, sz: 24, c: GREEN, al: 'right' });
+  T(s, 10.42,5.216,4.17,1.058, BODY1, { al: 'right', lh: 1.5 });
+  T(s, 11.151,8.057,3.439,0.505, 'Threats ', { f: SANS_MED, sz: 24, c: GREEN, al: 'right' });
+  T(s, 10.42,8.566,4.17,1.058, BODY1, { al: 'right', lh: 1.5 });
+  title(s, 3.087,1.563,13.827,1.313, 'Swot Analysis Infographic', { al: 'center', spc: 0 });
+  eyebrow(s, 9.007,1.11,1.398, 'Our Swot', 'center');
+}
+
+/* --- 32. SWOT — hexagons --- */
+function slide32(s) {
+  chrome(s, 'L');
+  ticks(s, 'L', 'top');
+  rect(s, 4.012,3.223,8.735,1.633, GREEN);
+  shp(s, 'homePlate', 4.514,3.396,0.811,1.287, {color:WHITE,transparency:70});
+  shp(s, 'hexagon', 2.887,3.008,1.791,2.063, null, { line: { color: GREEN, width: 1 } });
+  shp(s, 'hexagon', 3.133,3.223,1.886,1.633, 'F9F8FD');
+  T(s, 3.133,3.223,1.886,1.633, 'S', { f: SANS_MED, sz: 60, c: GREEN, al: 'center', mid: 1 });
+  rect(s, 4.012,6.706,8.735,1.633, GREEN);
+  shp(s, 'homePlate', 4.514,6.878,0.811,1.288, {color:WHITE,transparency:70});
+  shp(s, 'hexagon', 2.887,6.491,1.791,2.063, null, { line: { color: GREEN, width: 1 } });
+  shp(s, 'hexagon', 3.133,6.706,1.886,1.633, 'F9F8FD');
+  T(s, 3.133,6.706,1.886,1.633, 'O', { f: SANS_MED, sz: 60, c: GREEN, al: 'center', mid: 1 });
+  rect(s, 7.253,4.964,8.735,1.633, {color:GREEN,transparency:80});
+  shp(s, 'homePlate', 14.674,5.137,0.811,1.287, {color:WHITE,transparency:70}, { flipH: true });
+  shp(s, 'hexagon', 15.322,4.75,1.791,2.063, null, { line: { color: GREEN, width: 1 } });
+  shp(s, 'hexagon', 14.981,4.964,1.886,1.633, 'F9F8FD');
+  T(s, 14.981,4.964,1.886,1.633, 'W', { f: SANS_MED, sz: 60, c: GREEN, al: 'center', mid: 1 });
+  rect(s, 7.253,8.447,8.735,1.633, {color:GREEN,transparency:80});
+  shp(s, 'homePlate', 14.674,8.62,0.811,1.287, {color:WHITE,transparency:70}, { flipH: true });
+  shp(s, 'hexagon', 15.322,8.232,1.791,2.063, null, { line: { color: GREEN, width: 1 } });
+  shp(s, 'hexagon', 14.981,8.447,1.886,1.633, 'F9F8FD');
+  T(s, 14.981,8.447,1.886,1.633, 'T', { f: SANS_MED, sz: 60, c: GREEN, al: 'center', mid: 1 });
+  T(s, 5.572,3.502,2.92,0.505, 'Strengths', { f: SANS_MED, sz: 24, c: WHITE });
+  T(s, 5.572,4.018,6.928,0.554, BODY8, { c: WHITE, lh: 1.5 });
+  T(s, 5.572,6.985,3.808,0.505, 'Opportunities', { f: SANS_MED, sz: 24, c: WHITE });
+  T(s, 5.572,7.5,6.928,0.56, BODY8, { c: WHITE, lh: 1.5 });
+  T(s, 11.016,5.243,3.412,0.505, 'Weaknesses ', { f: SANS_MED, sz: 24, c: GREEN, al: 'right' });
+  T(s, 7.5,5.759,6.928,0.56, BODY8, { c: GREEN, al: 'right', lh: 1.5 });
+  T(s, 12.095,8.726,2.332,0.505, 'Threats ', { f: SANS_MED, sz: 24, c: GREEN, al: 'right' });
+  T(s, 7.5,9.242,6.928,0.56, BODY8, { c: GREEN, al: 'right', lh: 1.5 });
+  title(s, 3.087,1.408,13.827,1.313, 'Swot Analysis Infographic', { al: 'center', spc: 0 });
+  eyebrow(s, 9.007,0.955,1.398, 'Our Swot', 'center');
+}
+
+/* --- 33. Infographic — pie fan --- */
+function slide33(s) {
+  chrome(s, 'R');
+  ticks(s, 'R', 'mid');
+  ell(s, 7.611,4.397,4.778,4.778, {color:GREEN,transparency:80}, { flipH: true });
+  wedge(s, 6.871,3.686,6.259,6.259, 305.283, 351.319, GREEN);
+  wedge(s, 6.871,3.686,6.259,6.259, 103.324, 170.884, GREEN);
+  wedge(s, 6.299,2.814,7.403,7.403, 160.504, 192.004, {color:GREEN,transparency:80});
+  wedge(s, 6.433,2.948,7.134,7.134, 339.663, 33.396, {color:GREEN,transparency:80});
+  T(s, 2.295,4.061,2.895,0.505, 'Your Title', { f: SANS_MED, sz: 24, c: GREEN, al: 'right' });
+  T(s, 1.19,4.605,3.997,1.058, BODY1, { al: 'right', lh: 1.5 });
+  T(s, 2.295,7.583,2.895,0.505, 'Your Title', { f: SANS_MED, sz: 24, c: GREEN, al: 'right' });
+  T(s, 1.19,8.127,3.997,1.058, BODY1, { al: 'right', lh: 1.5 });
+  T(s, 14.81,4.061,3.514,0.505, 'Your Title', { f: SANS_MED, sz: 24, c: GREEN });
+  T(s, 14.813,4.605,3.997,1.058, BODY1, { lh: 1.5 });
+  T(s, 14.81,7.583,3.514,0.505, 'Your Title', { f: SANS_MED, sz: 24, c: GREEN });
+  T(s, 14.813,8.127,3.997,1.058, BODY1, { lh: 1.5 });
+  wedge(s, 6.871,3.686,6.259,6.259, 202.46, 238.076, GREEN);
+  wedge(s, 7.243,4.059,5.513,5.513, 27.538, 69.034, GREEN);
+  ell(s, 8.725,5.511,2.55,2.55, WHITE, { flipH: true });
+  title(s, 3.087,1.563,13.827,1.313, 'Analysis Infographic', { al: 'center', spc: 0 });
+  eyebrow(s, 9.008,1.11,2.206, 'Our Infographic', 'center');
+}
+
+/* --- 34. Infographic — segmented ring --- */
+function slide34(s) {
+  shp(s, 'line', 6.222,4.833,1.7,0, null, { line: { color: GREEN, width: 1.5 } });
+  shp(s, 'line', 6.222,6.991,1.509,0, null, { line: { color: GREEN, width: 1.5 } });
+  shp(s, 'line', 6.222,9.146,2.604,0, null, { line: { color: GREEN, width: 1.5 } });
+  shp(s, 'line', 12.191,4.833,1.587,0, null, { line: { color: GREEN, width: 1.5 } });
+  shp(s, 'line', 12.334,6.991,1.444,0, null, { line: { color: GREEN, width: 1.5 } });
+  shp(s, 'line', 11.154,9.146,2.625,0, null, { line: { color: GREEN, width: 1.5 } });
+  chrome(s, 'L');
+  ticks(s, 'L', 'bot');
+  poly(s, 11.536,6.472,1.459,0.072, [[0.0001,0], [0.0001,0.1554,0.0038,0.3812,0.0038,0.5367], [0.0038,0.6891,0.0001,0.8446,0.0001,0.9971], [1,0.9971], [1,0.6891,0.9959,0.3812,0.9959,0], 'Z'], 'E8E8E9');
+  poly(s, 7.015,4.417,2.906,2.055, [[0.293,0], [0.1149,0.2602,0.0039,0.6124,0,0.9999], [1,0.9999], [0.293,0], 'Z'], {color:GREEN,transparency:80});
+  poly(s, 7.015,6.544,2.906,2.055, [[0,0], [0.0039,0.3902,0.1149,0.7424,0.293,0.9999], [1,0], 'Z'], {color:GREEN,transparency:80});
+  poly(s, 10.094,6.544,2.901,2.055, [[0,0], [0.7063,0.9999], [0.8867,0.7424,0.998,0.3902,1,0], 'Z'], {color:GREEN,transparency:80});
+  poly(s, 7.917,6.594,2.054,2.906, [[0.9999,0], [0,0.7068], [0.2573,0.8851,0.6096,0.9961,0.9999,1], [0.9999,0], 'Z'], {color:GREEN,transparency:80});
+  poly(s, 10.094,4.417,2.901,2.055, [[0.7063,0], [0,0.9999], [1,0.9999], [0.998,0.6124,0.8867,0.2602,0.7063,0], 'Z'], {color:GREEN,transparency:80});
+  poly(s, 10.044,6.594,2.049,2.906, [[0,0], [0,1], [0.3884,0.9961,0.7418,0.8851,1,0.7068], [0,0], 'Z'], {color:GREEN,transparency:80});
+  segRing(s, 7.728,4.924,4.56,3.864, GREEN);
+  ell(s, 8.474,4.974,3.068,3.068, WHITE);
+  ell(s, 8.657,5.163,2.695,2.695, GREEN);
+  ell(s, 8.819,5.319,2.377,2.378, GREEN);
+  ell(s, 8.992,5.502,2.033,2.032, {color:WHITE,transparency:4});
+  glyph(s, 7.722,5.269,0.407,0.751, WHITE);
+  glyph(s, 7.618,6.956,0.618,0.751, WHITE);
+  glyph(s, 8.922,8.292,0.51,0.618, WHITE);
+  glyph(s, 10.531,8.223,0.626,0.751, WHITE);
+  glyph(s, 11.946,7.113,0.438,0.595, WHITE);
+  glyph(s, 11.894,5.299,0.595,0.751, WHITE);
+  T(s, 1.914,8.356,3.439,0.505, 'Your Title', { f: SANS_MED, sz: 24, c: GREEN, al: 'right' });
+  T(s, 1.914,8.888,3.439,1.058, BODY4, { al: 'right', lh: 1.5 });
+  T(s, 1.914,6.206,3.439,0.505, 'Your Title', { f: SANS_MED, sz: 24, c: GREEN, al: 'right' });
+  T(s, 1.914,6.738,3.439,1.058, BODY4, { al: 'right', lh: 1.5 });
+  T(s, 1.914,4.055,3.439,0.505, 'Your Title', { f: SANS_MED, sz: 24, c: GREEN, al: 'right' });
+  T(s, 2.298,4.587,3.056,1.058, BODY4, { al: 'right', lh: 1.5 });
+  T(s, 14.647,8.356,3.439,0.505, 'Your Title', { f: SANS_MED, sz: 24, c: GREEN });
+  T(s, 14.647,8.888,3.439,1.058, BODY4, { lh: 1.5 });
+  T(s, 14.647,6.206,3.439,0.505, 'Your Title', { f: SANS_MED, sz: 24, c: GREEN });
+  T(s, 14.647,6.738,3.439,1.058, BODY4, { lh: 1.5 });
+  T(s, 14.647,4.055,3.439,0.505, 'Your Title', { f: SANS_MED, sz: 24, c: GREEN });
+  T(s, 14.647,4.587,3.439,1.058, BODY4, { lh: 1.5 });
+  title(s, 3.087,1.756,13.827,1.313, 'Analysis Infographic', { al: 'center', spc: 0 });
+  eyebrow(s, 9.007,1.303,2.206, 'Our Infographic', 'center');
+}
+
+/* --- 35. Infographic — numbered cards --- */
+function slide35(s) {
+  rect(s, 11.626,8.623,5.872,1.676, WHITE, { shadow: SOFT });
+  chrome(s, 'R');
+  ticks(s, 'R', 'top');
+  shp(s, 'rtTriangle', 2.502,4.956,0.643,0.643, {color:GREEN,transparency:80}, { rotate: 180 });
+  shp(s, 'rtTriangle', 2.502,7.184,0.643,0.643, {color:GREEN,transparency:80}, { rotate: 180 });
+  shp(s, 'rtTriangle', 10.983,4.956,0.643,0.643, {color:GREEN,transparency:80}, { rotate: 180 });
+  shp(s, 'rtTriangle', 10.983,7.172,0.643,0.643, {color:GREEN,transparency:80}, { rotate: 180 });
+  rect(s, 3.145,3.909,5.872,1.676, WHITE, { shadow: SOFT });
+  T(s, 2.502,3.666,1.292,1.292, '01', { f: SANS_MED, sz: 24, c: WHITE, spc: 1, al: 'center', mid: 1, fill: GREEN });
+  rect(s, 3.145,6.137,5.872,1.676, WHITE, { shadow: SOFT });
+  T(s, 2.502,5.894,1.292,1.292, '02', { f: SANS_MED, sz: 24, c: WHITE, spc: 1, al: 'center', mid: 1, fill: GREEN });
+  rect(s, 11.626,3.909,5.872,1.676, WHITE, { shadow: SOFT });
+  T(s, 10.983,3.666,1.292,1.292, '04', { f: SANS_MED, sz: 24, c: WHITE, spc: 1, al: 'center', mid: 1, fill: GREEN });
+  rect(s, 11.626,6.138,5.872,1.676, WHITE, { shadow: SOFT });
+  T(s, 10.983,5.88,1.292,1.292, '05', { f: SANS_MED, sz: 24, c: WHITE, spc: 1, al: 'center', mid: 1, fill: GREEN });
+  T(s, 4.357,6.446,4.421,1.058, BODY1, { lh: 1.5 });
+  T(s, 12.837,4.218,4.421,1.058, BODY1, { lh: 1.5 });
+  shp(s, 'rtTriangle', 2.502,9.669,0.643,0.643, {color:GREEN,transparency:80}, { rotate: 180 });
+  shp(s, 'rtTriangle', 10.983,9.657,0.643,0.643, {color:GREEN,transparency:80}, { rotate: 180 });
+  rect(s, 3.145,8.622,5.872,1.676, WHITE, { shadow: SOFT });
+  T(s, 2.502,8.379,1.292,1.292, '03', { f: SANS_MED, sz: 24, c: WHITE, spc: 1, al: 'center', mid: 1, fill: GREEN });
+  T(s, 10.983,8.365,1.292,1.292, '06', { f: SANS_MED, sz: 24, c: WHITE, spc: 1, al: 'center', mid: 1, fill: GREEN });
+  T(s, 4.357,8.931,4.421,1.058, BODY1, { lh: 1.5 });
+  T(s, 12.917,6.447,4.421,1.058, BODY1, { lh: 1.5 });
+  T(s, 12.917,8.932,4.421,1.058, BODY1, { lh: 1.5 });
+  T(s, 4.359,4.218,4.421,1.058, BODY1, { lh: 1.5 });
+  title(s, 3.087,1.563,13.827,1.313, 'Analysis Infographic', { al: 'center', spc: 0 });
+  eyebrow(s, 9.007,1.11,2.206, 'Our Infographic', 'center');
+}
+
+/* --- 36. Pricing package --- */
+function slide36(s) {
+  pill(s, 8.661,-0.821,10.471,4.218, {color:GREEN,transparency:80});
+  chrome(s, 'L');
+  ticks(s, 'L', 'mid');
+  title(s, 12.657,4.582,5.479,2.524, 'Pricing Package');
+  eyebrow(s, 12.657,4.144,1.62, 'Our Pricing');
+  rr(s, 2.328,2.452,4.07,6.345, 0.539, GREEN);
+  rr(s, 6.626,2.452,4.07,6.345, 0.539, GREEN);
+  pill(s, 2.988,3.101,2.751,0.802, WHITE);
+  T(s, 3.281,3.249,2.165,0.505, 'STANDART', { f: SANS_MED, sz: 24, c: GREEN, spc: 1, al: 'center' });
+  T(s, 3.477,4.394,1.773,0.841, '$350', { sz: 44, c: WHITE, b: 1, spc: 1, al: 'center', nowrap: 1 });
+  T(s, 2.433,5.984,3.861,1.058, BODY7, { c: WHITE, al: 'center', lh: 1.5, bullet: 1 });
+  T(s, 2.433,7.204,3.861,1.058, BODY7, { c: WHITE, al: 'center', lh: 1.5, bullet: 1 });
+  pill(s, 7.281,3.101,2.751,0.802, WHITE);
+  T(s, 7.574,3.249,2.165,0.505, 'PREMIUM', { f: SANS_MED, sz: 24, c: GREEN, spc: 1, al: 'center' });
+  T(s, 7.769,4.394,1.774,0.841, '$550', { sz: 44, c: WHITE, b: 1, spc: 1, al: 'center', nowrap: 1 });
+  T(s, 6.726,5.984,3.861,1.058, BODY7, { c: WHITE, al: 'center', lh: 1.5, bullet: 1 });
+  T(s, 6.726,7.204,3.861,1.058, BODY7, { c: WHITE, al: 'center', lh: 1.5, bullet: 1 });
+}
+
+/* --- 37. Contact --- */
+function slide37(s) {
+  photo(s, 0,0,20,11.25, 0, MID);
+  rect(s, 0,0,20,11.25, {color:GREEN,transparency:80});
+  pill(s, 4.448,6.709,11.104,2.405, WHITE);
+  pill(s, 4.448,2.135,11.104,6.979, {color:WHITE,transparency:80});
+  title(s, 5.746,3.982,7.682,1.313, 'Our Contact Us');
+  eyebrow(s, 5.746,3.544,1.799, 'Our Contact');
+  T(s, 5.746,7.13,2.604,0.505, 'New York', { f: SANS_MED, sz: 24, c: GREEN });
+  T(s, 5.746,7.635,4.668,1.058, 'Neu House Road 36, Ringroad San Fransisco 33414, USA', { al: 'justify', lh: 1.5 });
+  T(s, 11.65,7.13,2.604,0.505, '+342 224 334', { f: SANS_MED, sz: 24, c: GREEN });
+  glyph(s, 11.65,8.252,0.539,0.442, GREEN);
+  glyph(s, 12.718,8.252,0.432,0.442, GREEN);
+  glyph(s, 13.679,8.252,0.439,0.442, GREEN);
+  chrome(s, 'R');
+  ticks(s, 'R', 'bot');
+}
+
+/* --- 38. Thank you --- */
+function slide38(s) {
+  poly(s, 0,0,20,11.25, COVER_FLIP_PTS, MID);
+  pill(s, -2.66,3.312,13.515,4.625, GREEN, { shadow: SOFT });
+  T(s, 1.278,4.354,8.299,2.036, 'Thank You', { f: SERIF, sz: 115, c: WHITE, b: 1, nowrap: 1 });
+  T(s, 1.278,6.391,5.728,0.505, 'FASHION PRESENTATION', { sz: 24, c: WHITE, spc: 6, nowrap: 1 });
+  ticks(s, 'L', 'top', WHITE);
+  T(s, 0.869,9.944,4.159,0.438, [{ text: 'T-OUTVITSTD-' }, { text: '2024', options: { bold: true, fontFace: SANS } }], { f: SANS_MED, c: GREEN, spc: 6, nowrap: 1 });
+  T(s, 0.869,0.869,5.342,0.438, 'FASHION HOLIC IN SWISS', { f: SANS_MED, c: GREEN, spc: 6, nowrap: 1 });
+}
+
+/* --- 39. Icon sheet — light --- */
+/* The source deck ends with two 12 x 6 grids of outline pictograms. The
+ * originals are hand-drawn glyphs; here each cell gets one of twelve simple
+ * outline shapes so the sheets read the same at a glance. */
+const SHEET_SHAPES = [
+  'roundRect', 'ellipse', 'triangle', 'diamond', 'pentagon', 'hexagon',
+  'octagon', 'star5', 'heart', 'donut', 'plus', 'cloud',
+];
+const SHEET_ROWS = [2.54, 3.64, 4.73, 5.84, 6.89, 7.96];
+const SHEET_X0 = 3.86, SHEET_STEP = 1.105, SHEET_SIZE = 0.62;
+
+function iconSheet(s, color) {
+  SHEET_ROWS.forEach((y, r) => {
+    for (let c = 0; c < 12; c++) {
+      const kind = SHEET_SHAPES[(c + r * 5) % SHEET_SHAPES.length];
+      s.addShape(kind, {
+        x: SHEET_X0 - SHEET_SIZE / 2 + c * SHEET_STEP, y,
+        w: SHEET_SIZE, h: SHEET_SIZE,
+        fill: { type: 'none' }, line: { color, width: 1.25 },
+      });
+    }
+  });
+}
+
+function slide39(s) {
+  iconSheet(s, GREEN);
+}
+
+/* --- 40. Icon sheet — dark --- */
+function slide40(s) {
+  rect(s, 0, 0, 20, 11.25, GREEN);
+  iconSheet(s, WHITE);
+}
+
+/* ======================= BUILD ========================================= */
+const BUILDERS = [
+  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08,
+  slide09, slide10, slide11, slide12, slide13, slide14, slide15, slide16,
+  slide17, slide18, slide19, slide20, slide21, slide22, slide23, slide24,
+  slide25, slide26, slide27, slide28, slide29, slide30, slide31, slide32,
+  slide33, slide34, slide35, slide36, slide37, slide38, slide39, slide40,
+];
+
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'WIDE20', width: 20, height: 11.25 });
+pptx.layout = 'WIDE20';
+pptx.author = 'T-Outvit';
+pptx.title = 'T-Outvit Fashion Presentation';
+
+BUILDERS.forEach(build => build(pptx.addSlide()));
+
+pptx.writeFile({ fileName: path.join(__dirname, '03204cfc-c99f-489a-b0de-204441c5cd78_grok_final.pptx') })
+  .then(f => console.log('wrote ' + f));

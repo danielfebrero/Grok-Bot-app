@@ -1,0 +1,778 @@
+/**
+ * "Moviexa" - Film Making and Cinematography Presentation Template
+ * Rebuilt with pptxgenjs. 25 slides, 13.333in x 7.5in (16:9).
+ *
+ * Raster artwork from the original deck (photo placeholders, device mockups,
+ * icon bitmaps) is redrawn here with native shapes / labelled boxes.
+ */
+
+const PptxGenJS = require('pptxgenjs');
+const path = require('path');
+
+/* ------------------------------------------------------------------ *
+ * Design tokens
+ * ------------------------------------------------------------------ */
+
+const SLIDE_W = 13.333333;
+const SLIDE_H = 7.5;
+
+const C = {
+    bg: '000000',       // deck background (theme tx1)
+    panel: '262626',    // tx1 @ 15% lighter - card / section panels
+    red: 'F65149',      // accent
+    redDeep: 'DF4842',  // accent gradient start
+    redMid: 'EA4D45',   // flat stand-in for the DF4842 -> F65149 gradient
+    white: 'FFFFFF',
+    gray: '7F7F7F'
+};
+
+const FONT = {
+    display: 'Russo One',  // headlines & numbers
+    medium: 'Inter Medium',// labels / eyebrows
+    body: 'Inter'          // paragraphs
+};
+
+const SZ = { display: 32, hero: 96, label: 14, small: 12, body: 10 };
+
+/* Lorem copy reused across the deck (kept verbatim from the template). */
+const L = {
+    intro: 'Cum sociis natoque penatibus et magnis dis parturient. Massa eget egestas purus viverra accumsan. Risus feugiat in ante metus',
+    welcome: 'Cum sociis natoque penatibus et magnis dis parturient. Massa eget egestas purus viverra accumsan. Risus feugiat in ante metus dictum ateras tempor commodo. Posuere sollicitudin aliquam ultrices sagittis. Blandit libero',
+    studio: 'Cum sociis natoque penatibus et magnis diserase parturient. Massa eget egestas purus viverra accumsan. Risus feugiat in ante metus dictum ateras tempor commodo. Posuere sollicitudin aliquam ultrices sagittis. Blandit liberorease volutpat sed cras ornare arcu dui. Mauris ultrices eros in cursus',
+    core1: 'Cum sociis natoque penatibus et magnis diserase parturient. Massa eget egestas purus viverra accumsan. Risus feugiat in ante metus dictum ateras tempor commodo. Posuere sollicitudin aliquam ultrices sagittis. Blandit liberorease volutpat sed cras',
+    core2: 'Cum sociis natoque penatibus et magnis diserase parturient. Massa eget egestas purus viverra accumsan. Risus feugiat in ante metus dictum ateras tempor commodo. Posuere sollicitudin aliquam ultrices sagittis. Blandit liberorease volutpat sed cras ornare arcu dui. Mauris ultrices eros in cursus turpis massa tincidunt duienenatis',
+    wide: 'Cum sociis natoque penatibus et magnis diserase parturient. Massa ioras eget egestas purus viverra accumsan. Risus feugiat in ante metus dictum ateras temporeras commodo. Posuere sollicitudin aliquam ultrices sagittis. Blandit liberorease volutpat sederas raes cras ornare arcu dui. Mauris ultrices eros in cursus turpis massa tincidunt duienenatis ioraeas eairaeasa',
+    aboutHere: 'Cum sociis natoquerea penatibus etioea ras magnis dis parturient. Massa egetera opras egestas purus viverra accumsan. Risus opra feugiater in ante metus',
+    history: 'Cum sociis natoque penatibus et magnis diserase parturient. Massa iorasr eget egestaeras purus viverra accumsan. Risus feugiat in ante metus dictum ateras temporeras commodo. ',
+    year: 'Cum sociis natoque penatibus et magnis diserase parturient. Massa ioras eget egestas purus viverra accumsan. Risus',
+    team: 'Cumera sociis natoque penatibus et magnis diserase parturient. Massa ioras eget egestas purus viverra accumsan. Risuseas feugiat inera ante metus dictum ateras temporeras commodo. Posuere sollicitudin aliquam ultrices sagittis. Blandit',
+    spec: 'Cumera sociis natoque penatibus et magnis diserase parturient. Massa ioras eget egestas purus viverra accumsan. Risuseas feugiat inera ante metus dictum ateras',
+    specShort: 'Cumera sociis natoque penatibus et magnis diserase parturi ent. Massa ioras eget egestas purus viverra',
+    crew: 'Cum sociis natoque penatibus et magnis dis parturient. Massa eget egestas purus viverra accumsan. Risus feugiat in ante',
+    essay: 'Cum sociis natoque penatibus et magnis dis parturient. Massa eget egestas purus viverra accumsan. Risus feugiat in ante metus dictum at tempor commodo. Posuere sollicitudin aliquam ultrices sagittis. Blandit libero volutpat sed cras ornare arcu dui. Mauris ultrices eros in cursus turpis massa tincidunt dui. Venenatis urna cursus eget nunc scelerisque viverra mauris. Eget duis at tellus at urna. Justo donec enim diam vulputate ut pharetra sit amet. Nisl vel pretium lectus quam id leo. Duis ut diam quam nulla porttitor massa id neque. Elementum nisi quis eleifend quam adipiscing. Lobortis elementum nibh tellus molestie nunc. Aliquam faucibus purus in massa. Risus sed vulputate odio ut enim. Consequat id porta nibh venenatis cras. Sagittis id consectetur purus ut faucibus.',
+    svc: 'Cum sociis natoque penatibus et magnis dis parturi ent. Massa eget egestas purus viverra accumsan. Risusioras feugiat in ante metus dictum at tempor',
+    svcLong: 'Cum sociis natoque penatibus et magnis dise parturient. Massa eget egestas purus viverra accumsan. Risuseas feugiat in ante metus dictum at tempor commodo. Posuere sollicitudin aliquam ultrices sagittis. Blandit libero volutpat sed cras ornare arcu dui. Mauris ultrices eros in cursus turpis massa tincidunt dui. ',
+    svcTiny: 'Cum sociis natoque penatibus etieora magnis dis parturient. Massa egete',
+    svcCard: 'Cum sociis natoque penatibus et magnis diserioa parturient. Massa eget egestas purus viverraioras accumsan. Risusioras feugiat in ante metusio',
+    svcWide: 'Cum sociis natoque penatibus et magnis dise parturient. Massa eget egestas purus viverra accumsan. Risuseas feugiat in ante metus dictum at tempor commodo. Posuere sollicitudin aliquam ultrices sagittis. Blandit libero volutpat sed cras ornare arcu dui. Mauris ultrices eros in cursus turpis massa',
+    svcMini: 'Cum sociis natoque penatibus et magnis dise parturient. Massa eget egestas purus viverra accumsan. ',
+    mockup: 'Cum sociis natoque penatibus et magnis dis parturient. Massa eget egestas purus viverra accumsan. Risus feugiat in ante metus dictum at tempor commodo. Posuere sollicitudin aliquam ultrices sagittis. Blandit libero volutpat sed cras ornare arcu dui. Mauris ultrices eros in cursus turpis massa tincidunt dui. Venenatis urna',
+    mockupLong: 'Cum sociis natoque penatibus et magnis dis parturient. Massa eget egestas purus viverra accumsan. Risus feugiat in ante metus dictum at tempor commodo. Posuere sollicitudin aliquam ultrices sagittis. Blandit libero volutpat sed cras ornare arcu dui. Mauris ultrices eros in cursus turpis massa tincidunt dui. Venenatis urna cursus eget nunc scelerisque viverra mauris. Eget duis at tellus at',
+    mockupCol: 'Cum sociis natoque penatibus et magnis dise partu rient. Massa eget egestas purus viverra accumsan. Risuseas feugiat in ante metus dictum at tempor',
+    galleryTall: 'Cum sociis natoque penatibus etas magnis dis parturient. Massa eget egestas purus viverrar accumsan. Risus feugiat in ante metus dictum aeraseaet tempor commodo. Posuere sollicitudin aliquam ultrices sagittis. Blandite libero volutpat',
+    galleryShort: 'Cum sociis natoque penatibus et magnis dis parturient. Massa eget egestas purus viverra accumsan. Risus feugiat in ante metus dictum at tempor',
+    galleryItem: 'Cum sociis natoque penatibus etas magniseras dis parturient. Massa eget egestas purus viverrar accumsan. Risus feugiat in',
+    galleryCol: 'Cum sociis natoque penatibus et magnis dis parturient. Massa eget egestas purus viverra accumsan. Risus feugiat in ante metus dictum at tempor commodo. Posuere sollicitudin aliquam ultrices sagittis. Blandit libero volutpat sed cras ornare arcu',
+    galleryWide: 'Cum sociis natoque penatibus et magnis dis parturient. Massa eget egestas purus viverra accumsan. Risus feugiat in ante metus dictum at tempor commodo. Posuere sollicitudin aliquam ultrices sagittis. Blandit libero volutpat sed cras ornare arcu dui. Mauris ultrices eros in cursus',
+    contact: 'Cum sociis natoque penatibusa et'
+};
+
+/* ------------------------------------------------------------------ *
+ * Primitive helpers
+ * ------------------------------------------------------------------ */
+
+let pptx; // assigned in build(); helpers reach for pptx.ShapeType
+
+const S = () => pptx.ShapeType;
+
+function rect(slide, x, y, w, h, fill, extra) {
+    slide.addShape(S().rect, Object.assign({ x, y, w, h, fill: { color: fill }, line: { type: 'none' } }, extra));
+}
+
+function mix(c1, c2, t) {
+    const ch = i => Math.round(parseInt(c1.substr(i, 2), 16) * (1 - t) + parseInt(c2.substr(i, 2), 16) * t);
+    return [ch(0), ch(2), ch(4)].map(v => v.toString(16).padStart(2, '0').toUpperCase()).join('');
+}
+
+/**
+ * The template paints every red surface with a left-to-right DF4842 -> F65149
+ * gradient. pptxgenjs only fills flat colours, so band it into vertical slices.
+ */
+function redBand(slide, x, y, w, h) {
+    const steps = Math.max(4, Math.min(16, Math.round(w * 4)));
+    const sw = w / steps;
+    for (let i = 0; i < steps; i++) {
+        // slices overlap slightly so LibreOffice/PowerPoint show no hairlines
+        rect(slide, x + i * sw, y, sw + 0.006, h, mix(C.redDeep, C.red, (i + 0.5) / steps));
+    }
+}
+
+function outlineRect(slide, x, y, w, h, color, width) {
+    slide.addShape(S().rect, { x, y, w, h, fill: { type: 'none' }, line: { color, width: width || 1 } });
+}
+
+function circle(slide, x, y, d, fill) {
+    slide.addShape(S().ellipse, { x, y, w: d, h: d, fill: { color: fill }, line: { type: 'none' } });
+}
+
+function ring(slide, x, y, d, color, width) {
+    slide.addShape(S().ellipse, { x, y, w: d, h: d, fill: { type: 'none' }, line: { color, width: width || 1 } });
+}
+
+function hLine(slide, x, y, w, color, width) {
+    slide.addShape(S().line, { x, y, w, h: 0, line: { color, width: width || 1 } });
+}
+
+/** Short accent dash that trails every eyebrow label. */
+function dash(slide, x, y, w) {
+    hLine(slide, x, y, w === undefined ? 0.418 : w, C.red, 1);
+}
+
+/* Text -------------------------------------------------------------- */
+
+function text(slide, runs, x, y, w, h, opt) {
+    // `fit: resize` emits <a:spAutoFit/>, which every text frame in the source deck carries
+    slide.addText(runs, Object.assign({
+        x, y, w, h, valign: 'top', fit: 'resize', color: C.white, fontFace: FONT.body, fontSize: SZ.body
+    }, opt));
+}
+
+/** 32pt Russo One section headline. */
+function heading(slide, str, x, y, w, h, opt) {
+    text(slide, str, x, y, w, h || 1.178, Object.assign({ fontFace: FONT.display, fontSize: SZ.display }, opt));
+}
+
+/** 14pt Inter Medium kicker above a headline (and its red dash). */
+function eyebrow(slide, str, x, y, w, opt) {
+    text(slide, str, x, y, w, 0.337, Object.assign({ fontFace: FONT.medium, fontSize: SZ.label, wrap: false }, opt));
+}
+
+/** 14pt Inter Medium inline label. */
+function label(slide, str, x, y, w, h, opt) {
+    text(slide, str, x, y, w, h || 0.337, Object.assign({ fontFace: FONT.medium, fontSize: SZ.label, wrap: false }, opt));
+}
+
+/** 10pt Inter paragraph on 150% leading. */
+function para(slide, str, x, y, w, h, opt) {
+    text(slide, str, x, y, w, h, Object.assign({ align: 'justify', lineSpacingMultiple: 1.5 }, opt));
+}
+
+/** Big red statistic, e.g. "150+" / "23K+" / "89%". */
+function stat(slide, value, suffix, x, y, w) {
+    const runs = [{ text: value, options: { fontSize: 35 } }];
+    if (suffix) runs.push({ text: suffix, options: { fontSize: 25 } });
+    text(slide, runs, x, y, w || 1.277, 0.69, { fontFace: FONT.display, color: C.red, fontSize: 35 });
+}
+
+/* Icon glyphs -------------------------------------------------------- */
+
+/** Bare "->" arrow. */
+function arrow(slide, x, y, size, color) {
+    slide.addShape(S().line, {
+        x, y: y + size / 2, w: size, h: 0,
+        line: { color: color || C.white, width: 1, endArrowType: 'triangle' }
+    });
+}
+
+/** Arrow inside a thin outlined circle. */
+function arrowCircle(slide, x, y, d, ringColor, arrowColor) {
+    ring(slide, x, y, d, ringColor, 1);
+    arrow(slide, x + d * 0.24, y + d * 0.24, d * 0.52, arrowColor || ringColor);
+}
+
+/** Red ring with a check mark - the "Movie Scene Services" bullet. */
+function checkBadge(slide, x, y, d) {
+    ring(slide, x, y, d, C.red, 0.75);
+    slide.addShape(S().line, { x: x + 0.26 * d, y: y + 0.50 * d, w: 0.16 * d, h: 0.16 * d, line: { color: C.red, width: 1 } });
+    slide.addShape(S().line, { x: x + 0.42 * d, y: y + 0.34 * d, w: 0.32 * d, h: 0.32 * d, flipV: true, line: { color: C.red, width: 1 } });
+}
+
+/** Ring gauge used by the "Specialize" percentages. */
+function donut(slide, x, y, d, pct, trackColor, sweepDeg) {
+    ring(slide, x, y, d, trackColor, 2.5);
+    slide.addShape(S().arc, {
+        x, y, w: d, h: d, fill: { type: 'none' },
+        angleRange: [270, (270 + sweepDeg) % 360],
+        line: { color: C.red, width: 6 }
+    });
+    text(slide, pct, x, y + d * 0.277, d, 0.404, { align: 'center', fontFace: FONT.display, fontSize: 18 });
+}
+
+/** Clapper board (title slide corner mark): slanted striped lid over a body. */
+function clapper(slide, x, y, w, h) {
+    rect(slide, x, y + h * 0.38, w, h * 0.62, C.redMid);
+    rect(slide, x + w * 0.02, y + h * 0.16, w * 0.02, h * 0.26, C.redMid);   // hinge
+    rect(slide, x, y + h * 0.09, w, h * 0.24, C.redMid, { rotate: 349 });    // lid
+    for (let i = 0; i < 4; i++) {
+        slide.addShape(S().line, {
+            x: x + 0.06 + i * w * 0.22, y: y + h * 0.06 - i * h * 0.045, w: w * 0.09, h: h * 0.2,
+            flipV: true, line: { color: C.bg, width: 1.5 }
+        });
+    }
+    rect(slide, x + w * 0.22, y + h * 0.60, w * 0.5, h * 0.16, C.bg);        // slate slot
+}
+
+/** Director's chair pictogram: backrest, armrest bar, seat and crossed legs. */
+function chairIcon(slide, x, y, w, h, color) {
+    rect(slide, x + w * 0.20, y + h * 0.03, w * 0.63, h * 0.29, color); // backrest
+    rect(slide, x + w * 0.03, y + h * 0.32, w * 0.96, h * 0.06, color); // armrest bar
+    [0.10, 0.87].forEach(t => rect(slide, x + w * t, y + h * 0.38, w * 0.06, h * 0.14, color)); // armrest posts
+    rect(slide, x + w * 0.10, y + h * 0.46, w * 0.83, h * 0.13, color); // seat
+    [false, true].forEach(flip => slide.addShape(S().line, {
+        x: x + w * 0.20, y: y + h * 0.60, w: w * 0.63, h: h * 0.40, flipH: flip, line: { color, width: 1.5 }
+    }));
+}
+
+/** Red hexagon badge (the template rotates the preset 90 degrees). */
+function hexBadge(slide, x, y, w, h) {
+    slide.addShape(S().hexagon, { x, y, w, h, rotate: 90, fill: { color: C.redMid }, line: { type: 'none' } });
+}
+
+/** Film strip pictogram. */
+function filmIcon(slide, x, y, w, h, color) {
+    rect(slide, x, y, w, h, color);
+    for (let i = 0; i < 3; i++) {
+        rect(slide, x + w * 0.14, y + h * (0.16 + i * 0.28), w * 0.16, h * 0.14, C.red);
+        rect(slide, x + w * 0.70, y + h * (0.16 + i * 0.28), w * 0.16, h * 0.14, C.red);
+    }
+}
+
+/** Cinema screen with three seated silhouettes in front of it. */
+function seatsIcon(slide, x, y, w, h, color) {
+    rect(slide, x, y, w, h * 0.68, color);                              // screen
+    [0.19, 0.50, 0.81].forEach(t => {
+        circle(slide, x + w * (t - 0.065), y + h * 0.68, w * 0.13, color);  // head
+        slide.addShape(S().roundRect, {
+            x: x + w * (t - 0.13), y: y + h * 0.81, w: w * 0.26, h: h * 0.19,
+            rectRadius: w * 0.07, fill: { color }, line: { type: 'none' }
+        });
+    });
+}
+
+/** Three tiny social glyphs (twitter bird / facebook "f" / instagram camera). */
+function socialRow(slide, x, y, d) {
+    slide.addShape(S().triangle, { x, y: y + d * 0.15, w: d * 1.15, h: d * 0.7, rotate: 105, fill: { color: C.red }, line: { type: 'none' } });
+    text(slide, 'f', x + d * 1.9, y - d * 0.28, d * 0.8, d * 1.5,
+        { align: 'center', color: C.red, fontFace: FONT.medium, fontSize: 8, bold: true });
+    slide.addShape(S().roundRect, { x: x + d * 3.3, y, w: d, h: d, rectRadius: d * 0.28, fill: { type: 'none' }, line: { color: C.red, width: 0.75 } });
+    ring(slide, x + d * 3.6, y + d * 0.3, d * 0.4, C.red, 0.75);
+}
+
+/** Open corner bracket used on the break slide. */
+function cornerBracket(slide, x, y, s, mirrored) {
+    const vx = mirrored ? x + s : x;
+    slide.addShape(S().line, { x: vx, y, w: 0, h: s, line: { color: C.white, width: 2.5 } });
+    slide.addShape(S().line, { x, y: mirrored ? y : y + s, w: s, h: 0, line: { color: C.white, width: 2.5 } });
+}
+
+/* Photo / mockup stand-ins ------------------------------------------- */
+
+/** Tall phone body; only its top half is on-slide in the original. Hollow so
+ *  the dark band behind it shows through the screen, as in the reference. */
+function phoneMockup(slide, x, y, w, h) {
+    slide.addShape(S().roundRect, { x, y, w, h, rectRadius: 0.30, fill: { type: 'none' }, line: { color: '8E9BA8', width: 3.5 } });
+    rect(slide, x + w * 0.31, y + 0.015, w * 0.36, 0.03, '46505C');            // earpiece slot
+    [[0.20, 0.037], [0.273, 0.072], [0.368, 0.074]]                            // side keys
+        .forEach(([t, kh]) => rect(slide, x - 0.035, y + h * t, 0.035, h * kh, '58626E'));
+    text(slide, '[image]', x, y + h * 0.30, w, 0.3, { align: 'center', color: '4A4A4A', fontSize: 8 });
+}
+
+/** Laptop: dark screen in a thin bezel, sitting on a wide silver base. */
+function laptopMockup(slide, x, y, w, h) {
+    rect(slide, x + w * 0.0915, y, w * 0.814, h * 0.936, '020202', { line: { color: '6E7176', width: 1 } });
+    rect(slide, x + w * 0.005, y + h * 0.936, w * 0.99, h * 0.033, 'D6D8DB');   // lit front lip
+    rect(slide, x + w * 0.02, y + h * 0.969, w * 0.96, h * 0.031, '6E7075');    // shaded underside
+    text(slide, '[image]', x, y + h * 0.42, w, 0.3, { align: 'center', color: '4A4A4A', fontSize: 8 });
+}
+
+/* Contact icons ------------------------------------------------------ */
+
+function phoneIcon(slide, x, y, d) {
+    slide.addShape(S().roundRect, { x: x + d * 0.28, y: y + d * 0.1, w: d * 0.44, h: d * 0.8, rectRadius: d * 0.12, rotate: 35, fill: { type: 'none' }, line: { color: C.red, width: 1.25 } });
+}
+
+function planeIcon(slide, x, y, d) {
+    slide.addShape(S().triangle, { x: x + d * 0.1, y: y + d * 0.2, w: d * 0.8, h: d * 0.6, rotate: 90, fill: { type: 'none' }, line: { color: C.red, width: 1.25 } });
+}
+
+function globeIcon(slide, x, y, d) {
+    ring(slide, x, y, d, C.red, 1.25);
+    hLine(slide, x, y + d / 2, d, C.red, 1.25);
+    slide.addShape(S().ellipse, { x: x + d * 0.30, y, w: d * 0.40, h: d, fill: { type: 'none' }, line: { color: C.red, width: 1.25 } });
+}
+
+/* ------------------------------------------------------------------ *
+ * Slides
+ * ------------------------------------------------------------------ */
+
+function slide01(deck) { // Cover
+    const s = deck.addSlide({ masterName: 'MOVIEXA' });
+    clapper(s, 12.176, 0.63, 0.527, 0.458);
+    text(s, [
+        { text: 'Mo', options: { color: C.white } },
+        { text: 'vie', options: { color: C.red } },
+        { text: 'xa', options: { color: C.white } }
+    ], 6.881, 2.505, 5.822, 1.717, { fontFace: FONT.display, fontSize: SZ.hero, align: 'right', wrap: false });
+    text(s, 'Film Making and Cinematography Presentation Template', 5.645, 4.052, 7.058, 0.404,
+        { fontFace: FONT.medium, fontSize: 18, align: 'right', wrap: false });
+
+    circle(s, 11.743, 4.777, 0.115, C.gray);
+    circle(s, 12.068, 4.777, 0.115, C.gray);
+    circle(s, 12.392, 4.741, 0.198, C.redMid);
+
+    label(s, 'Great Cinematography Here', 9.413, 6.503, 2.846, 0.337, { align: 'right' });
+    arrowCircle(s, 12.307, 6.473, 0.397, C.white);
+
+    slideLine(s);
+    [['About Us', 0.262, 5.69, 1.073], ['Our Crew', 0.251, 4.371, 1.094],
+     ['Services', 0.292, 3.084, 1.012], ['Get In Touch', 0.095, 1.64, 1.406]]
+        .forEach(([str, x, y, w]) => label(s, str, x, y, w, 0.337, { align: 'center', rotate: 270 }));
+
+    function slideLine(sl) { sl.addShape(S().line, { x: 1.26, y: 1.105, w: 0, h: 5.289, line: { color: C.red, width: 1 } }); }
+}
+
+function slide02(deck) { // Introduction / welcome message
+    const s = deck.addSlide({ masterName: 'MOVIEXA' });
+    rect(s, 4.424, 3.646, 8.28, 3.217, C.panel);
+
+    ring(s, 0.736, 5.116, 0.792, C.red, 1);
+    text(s, 'CEO of Moviexa', 1.599, 5.172, 1.321, 0.324, { lineSpacingMultiple: 1.5 });
+    text(s, 'Ahsani Abrareae', 1.599, 5.498, 1.866, 0.353, { fontFace: FONT.medium, fontSize: 15, wrap: false });
+    text(s, L.intro, 0.63, 6.034, 3.164, 0.829, { lineSpacingMultiple: 1.5 });
+
+    eyebrow(s, 'Introduction', 4.735, 3.961, 1.348);
+    dash(s, 6.179, 4.14);
+    heading(s, 'Best Movie Studio With The Great Cinematic Ways', 4.735, 4.294, 7.654);
+    label(s, 'Welcome Message', 4.735, 5.643, 1.983);
+    para(s, L.welcome, 4.735, 5.982, 7.654, 0.576);
+}
+
+function slide03(deck) { // About us + 3 statistics
+    const s = deck.addSlide({ masterName: 'MOVIEXA' });
+    redBand(s, 0, 0, 3.569, SLIDE_H);                    // layout: red side panel
+
+    eyebrow(s, 'About Us', 7.173, 0.941, 1.073);
+    dash(s, 8.306, 1.12);
+    heading(s, 'Cinematic Scene Made From Best Taste', 7.173, 1.278, 5.524);
+    label(s, 'Our Studio Cinematic', 7.166, 2.756, 2.204);
+    para(s, L.studio, 7.166, 3.093, 5.537, 1.081);
+
+    [[7.169, '150', '+'], [9.194, '23K', ''], [11.219, '89%', '']].forEach(([x, value, suffix]) => {
+        rect(s, x + 0.262, 4.807, 0.472, 0.472, C.panel);
+        chairIcon(s, x + 0.133, 4.971, 0.421, 0.472, C.red);
+        dash(s, x + 0.133, 5.598);
+        stat(s, value, suffix, x, 5.662);
+        text(s, 'Great Title Here', x, 6.252, 1.478, 0.303, { fontFace: FONT.medium, fontSize: SZ.small, wrap: false });
+    });
+}
+
+function slide04(deck) { // About us + core value bar
+    const s = deck.addSlide({ masterName: 'MOVIEXA' });
+    redBand(s, 4.062, 0.63, 0.315, 6.24);               // layout: red divider bar
+
+    eyebrow(s, 'About Us', 5.007, 1.26, 1.073);
+    dash(s, 6.14, 1.439);
+    heading(s, 'Cinematic Scene Made From Best Taste', 5.007, 1.596, 5.831);
+
+    rect(s, 5.007, 3.036, 5.831, 0.655, C.panel);
+    arrowCircle(s, 5.327, 3.147, 0.432, C.red, C.white);
+    label(s, 'Core Value For Best Scene Cinematic Movies', 5.972, 3.195, 4.441);
+
+    para(s, L.core1, 5.007, 4.083, 5.831, 0.829);
+    para(s, L.core2, 5.007, 5.159, 5.831, 1.081);
+}
+
+function slide05(deck) { // Photo mosaic + two columns
+    const s = deck.addSlide({ masterName: 'MOVIEXA' });
+    [[0.63, 0, 2.518, 1.692], [3.463, 0, 2.518, 1.692],
+     [0.63, 2.007, 2.518, 3.871], [3.463, 2.007, 2.518, 3.871],
+     [0.63, 6.193, 2.518, 1.307], [3.463, 6.193, 2.518, 1.307]]
+        .forEach(([x, y, w, h]) => rect(s, x, y, w, h, C.panel));
+
+    eyebrow(s, 'About Us', 6.61, 1.26, 1.073);
+    dash(s, 7.743, 1.439);
+    heading(s, 'Cinematic Scene Made From Best Taste', 6.61, 1.596, 5.934);
+    para(s, L.wide, 6.61, 3.175, 6.093, 1.334);
+
+    [6.61, 9.814].forEach(x => {
+        label(s, 'About Here', x, 4.822, 1.275);
+        para(s, L.aboutHere, x, 5.159, 2.889, 1.081);
+    });
+}
+
+function slide06(deck) { // History timeline
+    const s = deck.addSlide({ masterName: 'MOVIEXA' });
+    redBand(s, 10.725, 0, 2.608, SLIDE_H);              // layout: red side panel
+
+    eyebrow(s, 'About Us', 0.63, 0.945, 1.073);
+    dash(s, 1.773, 1.124);
+    heading(s, 'Cinematic Scene Made From Best Taste', 0.63, 1.276, 5.934);
+    label(s, 'Historical Cinematic Studio', 0.63, 2.819, 2.749);
+    para(s, L.history, 0.63, 3.155, 6.319, 0.576);
+
+    [['2012', 4.166, 0.837], ['2019', 5.107, 0.899], ['2023', 6.048, 0.899]].forEach(([year, y, w]) => {
+        text(s, year, 0.63, y, w, 0.438, { fontFace: FONT.display, fontSize: 20 });
+        hLine(s, 1.731, y + 0.219, 0.705, C.red, 1);
+        text(s, L.year, 2.689, y - 0.07, 4.26, 0.576, { lineSpacingMultiple: 1.5 });
+    });
+}
+
+function slide07(deck) { // Full-bleed band
+    const s = deck.addSlide({ masterName: 'MOVIEXA' });
+    redBand(s, 0, 6.007, 2.52, 1.493);                  // layout: red corner blocks
+    redBand(s, 10.814, 0.63, 2.52, 0.863);
+
+    eyebrow(s, 'About Us', 6.667, 1.808, 1.073);
+    dash(s, 7.799, 1.987);
+    heading(s, 'Cinematic Scene Made From Best Taste', 6.667, 2.151, 5.502);
+    para(s, L.wide, 6.667, 3.571, 6.037, 1.334);
+    arrow(s, 6.802, 5.383, 0.136, C.white);
+    label(s, 'Core Value For Best Scene Cinematic Movies', 7.135, 5.283, 4.441);
+}
+
+function slide08(deck) { // Director profile + gauges
+    const s = deck.addSlide({ masterName: 'MOVIEXA' });
+    rect(s, 7.877, 0, 0.63, 5.61, C.panel);
+    redBand(s, 8.188, 0, 0.63, 3.726);
+
+    eyebrow(s, 'Our Team', 0.49, 0.945, 1.128);
+    dash(s, 1.623, 1.124);
+    heading(s, 'Andy Moreease – Movie Scene Director', 0.49, 1.281, 5.255);
+    para(s, L.team, 0.49, 2.705, 6.757, 0.829);
+
+    [['78%', 4.042, 290.4, 'Specialize 01', 1.433], ['81%', 5.52, 302.2, 'Specialize 02', 1.461]]
+        .forEach(([pct, y, sweep, name, w]) => {
+            donut(s, 0.664, y, 0.906, pct, C.panel, sweep);
+            label(s, name, 1.851, y - 0.13, w);
+            para(s, L.spec, 1.851, y + 0.207, 5.395, 0.829);
+        });
+}
+
+function slide09(deck) { // Team panel + crew cards
+    const s = deck.addSlide({ masterName: 'MOVIEXA' });
+    rect(s, 2.134, 0.63, 6.172, 6.24, C.panel);
+
+    eyebrow(s, 'Our Team', 2.606, 1.104, 1.128);
+    dash(s, 3.739, 1.283);
+    heading(s, 'Amazing Team For Movie Project', 2.606, 1.442, 5.227);
+
+    [['78%', 2.970, 'Specialize 01', 1.433], ['82%', 4.228, 'Specialize 02', 1.461], ['68%', 5.487, 'Specialize 03', 1.466]]
+        .forEach(([pct, y, name, w]) => {
+            donut(s, 2.779, y, 0.906, pct, C.bg, 290.4);
+            label(s, name, 3.977, y - 0.004, w);
+            para(s, L.specShort, 3.977, y + 0.333, 3.856, 0.576);
+        });
+
+    [['Ledger Roe', 8.556, 2.816, 8.845, 1.275], ['Ryan Pora', 10.771, 2.816, 11.121, 1.154],
+     ['Sterling Kan', 8.556, 6.006, 8.811, 1.341], ['Annisa Oer', 10.771, 6.006, 11.081, 1.235]]
+        .forEach(([name, cx, cy, tx, tw]) => {
+            redBand(s, cx, cy, 1.853, 0.774);
+            label(s, name, tx, cy + 0.1, tw, 0.337, { align: 'center' });
+            text(s, 'Main Crew', cx + 0.372, cy + 0.351, 1.108, 0.324, { align: 'center', lineSpacingMultiple: 1.5 });
+        });
+}
+
+function slide10(deck) { // Centred team header
+    const s = deck.addSlide({ masterName: 'MOVIEXA' });
+    redBand(s, 0, 0.002, SLIDE_W, 1.252);               // layout: red top / bottom bands
+    redBand(s, 0, 6.24, SLIDE_W, 1.26);
+    rect(s, 0.63, 0.63, 12.073, 6.312, C.panel);
+
+    eyebrow(s, 'Our Team', 6.103, 1.26, 1.128, { align: 'center' });
+    dash(s, 5.635, 1.428);
+    dash(s, 7.28, 1.428);
+    heading(s, 'Amazing Team For Movie Project', 2.435, 1.602, 8.463, 0.64, { align: 'center' });
+    para(s, L.team, 2.435, 5.664, 8.463, 0.576, { align: 'center' });
+}
+
+function slide11(deck) { // Crew list + long essay
+    const s = deck.addSlide({ masterName: 'MOVIEXA' });
+    [0.63, 2.813, 5.0].forEach(y => rect(s, 0.63, y, 6.613, 1.87, C.panel));
+
+    [['Adam Maruipoe', 1.068, 1.685], ['Bambang Atmojo', 3.177, 1.81], ['Miriam Ampara', 5.286, 1.622]]
+        .forEach(([name, y, w]) => {
+            para(s, 'Job Position', 2.491, y, 1.138, 0.324);
+            label(s, name, 2.491, y + 0.291, w);
+            para(s, L.crew, 2.491, y + 0.57, 4.437, 0.576);
+            socialRow(s, 6.282, y - 0.122, 0.142);
+        });
+
+    eyebrow(s, 'Our Team', 7.873, 1.266, 1.128);
+    dash(s, 9.005, 1.446);
+    heading(s, 'Amazing Team For Movie Project', 7.873, 1.603, 4.831);
+    para(s, L.essay, 7.873, 3.133, 4.831, 3.101);
+}
+
+function slide12(deck) { // Break slide
+    const s = deck.addSlide({ masterName: 'MOVIEXA' });
+    rect(s, 0.001, 0.001, 1.57, 1.57, C.panel);
+    rect(s, 11.759, 5.925, 1.575, 1.575, C.panel);
+    redBand(s, 11.129, 0, 2.205, 2.205);
+    redBand(s, 0, 5.295, 2.205, 2.205);
+    cornerBracket(s, 0.63, 6.24, 0.63, false);
+    cornerBracket(s, 12.07, 0.628, 0.63, true);
+
+    text(s, [
+        { text: 'Break', options: { color: C.white } },
+        { text: 'Slide', options: { color: C.red } }
+    ], 3.157, 3.713, 7.02, 1.582, { fontFace: FONT.display, fontSize: 88, align: 'center', wrap: false });
+    label(s, 'Let’s Take A Break For A While And Rest A Bit', 4.433, 6.219, 4.467, 0.337, { align: 'center' });
+}
+
+function slide13(deck) { // Two services with hexagon icons
+    const s = deck.addSlide({ masterName: 'MOVIEXA' });
+    eyebrow(s, 'Our Services', 0.63, 4.825, 1.408);
+    dash(s, 2.056, 5.004);
+    heading(s, 'Start Your Big Movie Project ', 0.63, 5.162, 3.65);
+
+    [[4.91, 'Services 01', 1.284, 4.941, chairIcon, 5.275, 0.393, 4.604],
+     [8.964, 'Services 02', 1.312, 8.996, filmIcon, 9.375, 0.301, 4.592]]
+        .forEach(([x, name, w, hexX, icon, iconX, iconW, iconY]) => {
+            hexBadge(s, hexX, 4.367, 1.059, 0.913);
+            icon(s, iconX, iconY, iconW, 0.43, C.white);
+            label(s, name, x, 5.505, w);
+            para(s, L.svc, x, 5.842, 3.739, 0.829);
+            arrow(s, x + 0.139, 6.734, 0.136, C.white);
+        });
+}
+
+function slide14(deck) { // Four service cards
+    const s = deck.addSlide({ masterName: 'MOVIEXA' });
+    [[4.799, 3.559], [8.83, 3.559], [4.799, 5.293], [8.83, 5.293]]
+        .forEach(([x, y]) => rect(s, x, y, 3.874, 1.577, C.panel));
+
+    eyebrow(s, 'Our Services', 0.63, 1.573, 1.408);
+    dash(s, 2.056, 1.752);
+    heading(s, 'Start Your Big Movie Project ', 0.63, 1.905, 3.539);
+    checkBadge(s, 0.714, 3.427, 0.318);
+    label(s, 'Movie Scene Services', 1.075, 3.417, 2.274);
+    para(s, L.svcLong, 0.63, 4.088, 3.539, 1.839);
+
+    [['Services 01', 4.921, 4.015, 1.284], ['Services 02', 8.952, 4.015, 1.312],
+     ['Services 03', 4.921, 5.749, 1.317], ['Services 04', 8.952, 5.749, 1.319]]
+        .forEach(([name, hx, hy, w]) => {
+            hexBadge(s, hx, hy, 0.772, 0.666);
+            filmIcon(s, hx + 0.271, hy + 0.169, 0.228, 0.326, C.white);
+            label(s, name, hx + 0.831, hy - 0.101, w);
+            text(s, L.svcTiny, hx + 0.831, hy + 0.235, 2.742, 0.576, { lineSpacingMultiple: 1.5 });
+            arrow(s, hx + 3.437, hy - 0.293, 0.136, C.white);
+        });
+}
+
+function slide15(deck) { // Split services + statistic
+    const s = deck.addSlide({ masterName: 'MOVIEXA' });
+    rect(s, 0.63, 0.63, 7.643, 1.975, C.panel);
+    rect(s, 0.63, 4.895, 7.643, 1.975, C.panel);
+
+    [[0.897, 1.285, 1.947, 0.9, 'Services 01', 1.284], [4.036, 5.55, 5.086, 5.165, 'Services 02', 1.312]]
+        .forEach(([hx, hy, tx, ty, name, w]) => {
+            hexBadge(s, hx, hy, 0.772, 0.666);
+            seatsIcon(s, hx + 0.188, hy + 0.18, 0.394, 0.305, C.white);
+            label(s, name, tx, ty, w);
+            text(s, L.svcCard, tx, ty + 0.354, 2.87, 1.081, { lineSpacingMultiple: 1.5 });
+        });
+
+    eyebrow(s, 'Our Services', 8.902, 1.075, 1.408);
+    dash(s, 10.328, 1.254);
+    heading(s, 'Start Your Big Movie Project ', 8.902, 1.415, 3.539);
+    stat(s, '150', '+', 8.902, 2.91);
+    text(s, 'Great Title Here', 8.902, 3.5, 1.478, 0.303, { fontFace: FONT.medium, fontSize: SZ.small, wrap: false });
+    label(s, 'Movie Scene Services', 8.902, 4.203, 2.274);
+    para(s, L.svcWide, 8.902, 4.539, 3.801, 1.586);
+    arrow(s, 9.013, 6.289, 0.136, C.white);
+}
+
+function slide16(deck) { // Four stacked service tiles
+    const s = deck.addSlide({ masterName: 'MOVIEXA' });
+    eyebrow(s, 'Our Services', 0.626, 0.63, 1.408);
+    dash(s, 2.051, 0.809);
+    heading(s, 'Start Your Big Movie Project ', 0.626, 0.971, 3.539);
+    label(s, 'Movie Scene Services', 4.795, 0.634, 2.274);
+    para(s, L.svcLong, 4.795, 0.975, 7.909, 0.829);
+    arrow(s, 4.938, 1.945, 0.136, C.white);
+
+    [['Services 01', 0.63, 1.58, 1.868, 0.893, 1.379, 1.324, 1.284],
+     ['Services 02', 3.727, 4.677, 4.965, 3.99, 4.462, 4.421, 1.312],
+     ['Services 03', 6.82, 7.77, 8.058, 7.083, 7.552, 7.514, 1.317],
+     ['Services 04', 9.921, 10.871, 11.159, 10.184, 10.653, 10.615, 1.319]]
+        .forEach(([name, cardX, hexX, iconX, bodyX, labelX, ruleX, labelW]) => {
+            rect(s, cardX, 2.78, 2.782, 2.606, C.panel);
+            hLine(s, ruleX, 3.093, 1.394, C.red, 1);
+            label(s, name, labelX, 3.31, labelW, 0.337, { align: 'center' });
+            text(s, L.svcMini, bodyX, 3.653, 2.256, 1.081, { align: 'center', lineSpacingMultiple: 1.5 });
+            hexBadge(s, hexX, 5.006, 0.882, 0.761);
+            chairIcon(s, iconX, 5.214, 0.306, 0.343, C.white);
+        });
+}
+
+function slide17(deck) { // Phone mockup
+    const s = deck.addSlide({ masterName: 'MOVIEXA' });
+    rect(s, 0, 3.176, SLIDE_W, 3.694, C.panel);         // layout: dark band
+    phoneMockup(s, 0.728, 0.673, 3.733, 8.50);
+
+    eyebrow(s, 'Mockup Devices', 5.19, 1.26, 1.759);
+    dash(s, 6.966, 1.439);
+    heading(s, 'Big Movie Cinematic Show By Our App', 5.19, 1.597, 5.04);
+    para(s, L.mockup, 5.19, 3.581, 7.514, 0.829);
+
+    [[5.19, '150'], [9.104, '23K']].forEach(([x, value]) => {
+        stat(s, value, '+', x, 4.668, 1.477);
+        label(s, 'Movie Scene Services', x, 5.305, 2.274);
+        para(s, L.mockupCol, x, 5.64, 3.599, 0.829);
+    });
+}
+
+function slide18(deck) { // Laptop mockups
+    const s = deck.addSlide({ masterName: 'MOVIEXA' });
+    eyebrow(s, 'Mockup Devices', 3.685, 0.63, 1.759);
+    dash(s, 5.462, 0.809);
+    heading(s, 'Big Movie Cinematic Show By Our App', 3.685, 0.967, 5.379);
+    para(s, L.mockupLong, 3.685, 2.462, 9.018, 0.829);
+
+    [3.685, 8.352].forEach(x => {
+        checkBadge(s, x + 0.093, 3.708, 0.318);
+        label(s, 'Movie Scene Services', x + 0.454, 3.699, 2.274);
+        laptopMockup(s, x, 4.351, 4.351, 2.519);
+    });
+}
+
+function slide19(deck) { // Gallery intro
+    const s = deck.addSlide({ masterName: 'MOVIEXA' });
+    eyebrow(s, 'Portfolio Gallery', 0.63, 0.63, 1.713);
+    dash(s, 2.406, 0.809);
+    heading(s, 'Our Value Cinematic Show Studio Gallery', 0.63, 0.967, 5.379);
+    label(s, 'Movie Scene Services', 0.63, 2.545, 2.274);
+    para(s, L.mockup, 0.63, 2.882, 6.855, 1.081);
+
+    [0.63, 4.215].forEach(x => {
+        checkBadge(s, x, 6.541, 0.318);
+        label(s, 'Movie Scene Services', x + 0.361, 6.532, 2.274);
+    });
+}
+
+function slide20(deck) { // Tall gallery columns
+    const s = deck.addSlide({ masterName: 'MOVIEXA' });
+    eyebrow(s, 'Portfolio Gallery', 8.819, 0.63, 1.759);
+    dash(s, 10.595, 0.809);
+    heading(s, 'Our Value Cinematic Show Studio Gallery', 8.819, 0.967, 3.885, 1.717);
+
+    [8.931, 11.117].forEach((x, i) => {
+        rect(s, x, 3.084, 0.984, 0.984, C.panel);
+        seatsIcon(s, x + 0.215, 3.362, 0.554, 0.428, C.red);
+        label(s, 'Great Title Here', i === 0 ? 8.819 : 11.004, 4.245, 1.699);
+    });
+
+    para(s, L.galleryTall, 8.819, 4.86, 3.885, 1.334);
+    checkBadge(s, 8.931, 6.543, 0.318);
+    label(s, 'Movie Scene Services', 9.292, 6.533, 2.274);
+}
+
+function slide21(deck) { // Outlined frame + two features
+    const s = deck.addSlide({ masterName: 'MOVIEXA' });
+    outlineRect(s, 0.63, 0.63, 12.073, 6.24, C.red, 1);
+
+    eyebrow(s, 'Portfolio Gallery', 6.57, 1.26, 1.759);
+    dash(s, 8.347, 1.439);
+    heading(s, 'Our Value Cinematic Show Studio Gallery', 6.57, 1.601, 5.379);
+
+    [3.132, 4.398].forEach(y => {
+        rect(s, 6.893, y + 0.063, 0.585, 0.585, C.panel);
+        chairIcon(s, 6.734, y + 0.265, 0.521, 0.585, C.red);
+        label(s, 'Great Title Here', 7.803, y, 1.699);
+        para(s, L.galleryItem, 7.803, y + 0.336, 4.271, 0.576);
+    });
+
+    para(s, L.galleryShort, 6.57, 5.664, 5.503, 0.576);
+}
+
+function slide22(deck) { // Three thumbnails with red captions
+    const s = deck.addSlide({ masterName: 'MOVIEXA' });
+    rect(s, 0, 5.439, SLIDE_W, 2.061, C.panel);         // layout: dark bottom band
+
+    eyebrow(s, 'Portfolio Gallery', 0.635, 0.63, 1.759);
+    dash(s, 2.412, 0.809);
+    heading(s, 'Our Value Cinematic Show Studio Gallery', 0.635, 0.973, 5.379);
+    para(s, L.galleryCol, 0.63, 2.388, 5.722, 0.829);
+
+    [0.63, 2.051].forEach(y => {
+        label(s, 'Great Title Here', 6.982, y, 1.699);
+        para(s, L.galleryCol, 6.982, y + 0.337, 5.716, 0.829);
+    });
+
+    [1.629, 5.701, 9.783].forEach(x => redBand(s, x, 3.85, 1.921, 0.337));
+}
+
+function slide23(deck) { // Wide gallery + check list
+    const s = deck.addSlide({ masterName: 'MOVIEXA' });
+    rect(s, 0.001, 0.001, 13.332, 1.219, C.panel);      // layout: dark top band
+
+    eyebrow(s, 'Portfolio Gallery', 0.63, 4.521, 1.759);
+    dash(s, 2.406, 4.701);
+    heading(s, 'Our Value Cinematic Show Studio Gallery', 0.63, 4.858, 4.917);
+    label(s, 'Great Title Here', 6.183, 4.521, 1.699);
+    para(s, L.galleryWide, 6.183, 4.858, 6.52, 0.829);
+
+    [[6.298, 6.005, 6.659, 6.017], [6.298, 6.552, 6.659, 6.564],
+     [9.26, 6.002, 9.621, 6.013], [9.26, 6.549, 9.621, 6.56]]
+        .forEach(([bx, by, tx, ty]) => {
+            checkBadge(s, bx, by, 0.318);
+            text(s, 'Movie Scene Services', tx, ty, 1.971, 0.303, { fontFace: FONT.medium, fontSize: SZ.small, wrap: false });
+        });
+}
+
+function slide24(deck) { // Contact
+    const s = deck.addSlide({ masterName: 'MOVIEXA' });
+    rect(s, 0, 0.945, SLIDE_W, 5.61, C.panel);          // layout: dark plate + red tabs
+    redBand(s, 0, 0.63, 4.047, 0.315);
+    redBand(s, 11.76, 6.556, 1.573, 0.315);
+
+    eyebrow(s, 'Get In Touch', 11.297, 1.573, 1.406, { align: 'right' });
+    dash(s, 10.909, 1.741);
+    heading(s, 'Contact Us To Know More', 8.54, 1.909, 4.163, 1.178, { align: 'right' });
+
+    const rows = [
+        { name: 'Cellphone', y: 3.748, w: 1.149, x: 10.351, icon: phoneIcon, ix: 12.107, iy: 3.713, id: 0.596 },
+        { name: 'Location', y: 4.545, w: 1.012, x: 10.488, icon: planeIcon, ix: 12.102, iy: 4.557, id: 0.596 },
+        { name: 'Website', y: 5.389, w: 0.977, x: 10.523, icon: globeIcon, ix: 12.168, iy: 5.424, id: 0.465 }
+    ];
+    rows.forEach(r => {
+        dash(s, 11.549, r.y + 0.27);
+        label(s, r.name, r.x, r.y, r.w, 0.337, { align: 'right' });
+        text(s, L.contact, 8.967, r.y + 0.215, 2.537, 0.324, { align: 'right', lineSpacingMultiple: 1.5 });
+        r.icon(s, r.ix, r.iy, r.id);
+    });
+}
+
+function slide25(deck) { // Thank you
+    const s = deck.addSlide({ masterName: 'MOVIEXA' });
+    redBand(s, 0, 1.75, 0.63, 4.0);                     // layout: red edge bars
+    redBand(s, 12.703, 1.75, 0.63, 4.0);
+
+    ring(s, 5.679, 2.631, 0.261, C.white, 1);
+    s.addShape(S().line, { x: 5.742, y: 2.761, w: 0.134, h: 0, flipH: true, line: { color: C.white, width: 1, endArrowType: 'triangle' } });
+    circle(s, 6.243, 2.704, 0.115, C.white);
+    circle(s, 6.568, 2.662, 0.198, C.redMid);
+    circle(s, 6.976, 2.704, 0.115, C.white);
+    ring(s, 7.394, 2.631, 0.261, C.white, 1);
+    s.addShape(S().line, { x: 7.457, y: 2.761, w: 0.134, h: 0, line: { color: C.white, width: 1, endArrowType: 'triangle' } });
+
+    text(s, [
+        { text: 'Thank', options: { color: C.white } },
+        { text: 'You', options: { color: C.red } }
+    ], 3.188, 2.892, 6.957, 1.717, { fontFace: FONT.display, fontSize: SZ.hero, align: 'center', wrap: false });
+    label(s, 'Thanks For Your Attention!', 5.299, 4.607, 2.735, 0.337, { align: 'center' });
+    label(s, 'Film Making and Cinematography Presentation Template', 3.897, 6.533, 5.54, 0.337, { align: 'center' });
+}
+
+/* ------------------------------------------------------------------ *
+ * Build
+ * ------------------------------------------------------------------ */
+
+const BUILDERS = [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09,
+    slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19,
+    slide20, slide21, slide22, slide23, slide24, slide25];
+
+function build() {
+    pptx = new PptxGenJS();
+    pptx.title = 'Moviexa - Film Making and Cinematography Presentation Template';
+    pptx.author = 'Moviexa';
+    pptx.defineLayout({ name: 'MOVIEXA_16x9', width: SLIDE_W, height: SLIDE_H });
+    pptx.layout = 'MOVIEXA_16x9';
+    pptx.defineSlideMaster({ title: 'MOVIEXA', background: { color: C.bg } });
+
+    BUILDERS.forEach(fn => fn(pptx));
+
+    return pptx.writeFile({ fileName: path.join(__dirname, '0e794302-0db1-4b08-b8e7-64b8a9f0a3d4_grok_final.pptx') });
+}
+
+build().then(f => console.log('Wrote ' + f)).catch(err => { console.error(err); process.exit(1); });
