@@ -1,0 +1,253 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+if [ "$#" -lt 3 ]; then
+	echo "usage: supervise-sand-supervisor.sh <status-file> <child-log> <launcher> [args...]" >&2
+	exit 64
+fi
+
+status_file="$1"
+child_log="$2"
+launcher="$3"
+shift 3
+
+child_pid=""
+ticker_pid=""
+backoff_pid=""
+escalator_pid=""
+stopping=0
+restart_delay_s=1
+restart_count=0
+restart_cause="supervisor_exited"
+consecutive_quick_failures=0
+telemetry_log="${SAND_BOX_TELEMETRY_LOG:-/tmp/sand-box-telemetry.log}"
+stale_after_s="${SAND_SUPERVISOR_STALE_S:-180}"
+startup_grace_s="${SAND_SUPERVISOR_STARTUP_GRACE_S:-120}"
+max_quick_failures="${SAND_SUPERVISOR_MAX_QUICK_FAILURES:-8}"
+check_interval_s="${SAND_SUPERVISOR_CHECK_INTERVAL_S:-5}"
+# Staleness counts consecutive liveness checks that saw no status write instead of comparing the status mtime to the wall clock, so a box thawed after a cgroup freeze (or one whose clock jumped) is not read as stale: https://docs.kernel.org/admin-guide/cgroup-v2.html#core-interface-files
+if [[ "${check_interval_s}" =~ ^[0-9]+$ ]] && [ "${check_interval_s}" -gt 0 ]; then
+	stale_after_checks=$((stale_after_s / check_interval_s))
+else
+	stale_after_checks="${stale_after_s}"
+fi
+if [ "${stale_after_checks}" -lt 1 ]; then
+	stale_after_checks=1
+fi
+stop_grace_s="${SAND_SUPERVISOR_STOP_GRACE_S:-5}"
+restart_intent_file="${SAND_SUPERVISOR_RESTART_INTENT:-${status_file%/*}/restart-intent}"
+intent_ready_interval_s="${SAND_SUPERVISOR_INTENT_READY_INTERVAL_S:-0.5}"
+launch_stamp="${status_file%/*}/launch-stamp"
+restart_intent=0
+
+emit_restart_event() {
+	local runtime_s="$1"
+	local child_status="$2"
+	local cause="$3"
+	printf '{"kind":"supervisor_restart","restartAttempt":%s,"runtimeS":%s,"cause":"%s","exitStatus":%s,"at":%s}\n' \
+		"${restart_count}" "${runtime_s}" "${cause}" "${child_status}" "${EPOCHREALTIME}" >>"${telemetry_log}"
+}
+
+stop_supervisor() {
+	stopping=1
+	if [ -n "${ticker_pid}" ]; then
+		kill -TERM -- "-${ticker_pid}" 2>/dev/null || true
+	fi
+	if [ -n "${backoff_pid}" ]; then
+		kill -TERM "${backoff_pid}" 2>/dev/null || true
+	fi
+	if [ -n "${child_pid}" ]; then
+		kill -TERM -- "-${child_pid}" 2>/dev/null ||
+			kill -TERM "${child_pid}" 2>/dev/null ||
+			true
+		if [ -z "${escalator_pid}" ]; then
+			setsid bash -c '
+				sleep "$1"
+				if kill -0 -- "-$2" 2>/dev/null; then
+					echo "[sand-supervisor-supervise] t=${EPOCHREALTIME} child ignored TERM for $1s, killed pid=$2" >&2
+					kill -KILL -- "-$2" 2>/dev/null || kill -KILL "$2" 2>/dev/null
+				fi
+			' escalator "${stop_grace_s}" "${child_pid}" &
+			escalator_pid=$!
+		fi
+	fi
+}
+trap stop_supervisor TERM INT
+trap ':' USR1
+
+start_ticker() {
+	local interval_s="$1"
+	stop_ticker
+	setsid bash -c 'while sleep "$1"; do kill -USR1 "$2" 2>/dev/null || exit 0; done' ticker "${interval_s}" "$$" &
+	ticker_pid=$!
+}
+
+stop_ticker() {
+	if [ -n "${ticker_pid}" ]; then
+		kill -TERM -- "-${ticker_pid}" 2>/dev/null || kill -TERM "${ticker_pid}" 2>/dev/null || true
+		wait "${ticker_pid}" 2>/dev/null || true
+		ticker_pid=""
+	fi
+}
+
+status_mtime_s() {
+	stat -c %Y "${status_file}" 2>/dev/null || echo 0
+}
+
+stop_unhealthy_child() {
+	local reason="$1"
+	restart_cause="${reason}"
+	echo "[sand-supervisor-supervise] t=${EPOCHREALTIME} liveness failed (${reason}); restarting pid=${child_pid}" >&2
+	kill -TERM -- "-${child_pid}" 2>/dev/null ||
+		kill -TERM "${child_pid}" 2>/dev/null ||
+		true
+	for _ in $(seq 1 10); do
+		if ! kill -0 -- "-${child_pid}" 2>/dev/null; then
+			return
+		fi
+		sleep 0.5
+	done
+	kill -KILL -- "-${child_pid}" 2>/dev/null ||
+		kill -KILL "${child_pid}" 2>/dev/null ||
+		true
+}
+
+kill_supervisor_group_not_host() {
+	kill -KILL -- "-${child_pid}" 2>/dev/null || true
+}
+
+consume_restart_intent() {
+	local marker_mtime_s
+	restart_intent=0
+	marker_mtime_s="$(stat -c %Y "${restart_intent_file}" 2>/dev/null || true)"
+	if [ -z "${marker_mtime_s}" ]; then
+		return
+	fi
+	rm -f "${restart_intent_file}"
+	if [ "${marker_mtime_s}" -ge "${started_at_s}" ]; then
+		restart_intent=1
+	else
+		echo "[sand-supervisor-supervise] t=${EPOCHREALTIME} stale restart intent ignored (written before attempt=${restart_count} started)" >&2
+	fi
+}
+
+while [ "${stopping}" = "0" ]; do
+	started_at_s="$(date +%s)"
+	restart_count=$((restart_count + 1))
+	restart_cause="supervisor_exited"
+	fast_ready="${restart_intent}"
+	restart_intent=0
+	echo "[sand-supervisor-supervise] t=${EPOCHREALTIME} launching attempt=${restart_count}"
+	mkdir -p "${launch_stamp%/*}" 2>/dev/null || true
+	touch "${launch_stamp}" 2>/dev/null || true
+	setsid "${launcher}" "$@" >>"${child_log}" 2>&1 &
+	child_pid=$!
+	if [ "${stopping}" = "1" ]; then
+		stop_supervisor
+	fi
+
+	became_ready=0
+	child_reaped=0
+	last_status_mtime_s=0
+	unchanged_status_checks=0
+	if [ "${fast_ready}" = "1" ]; then
+		start_ticker "${intent_ready_interval_s}"
+	else
+		start_ticker "${check_interval_s}"
+	fi
+	while kill -0 "${child_pid}" 2>/dev/null; do
+		now_s="$(date +%s)"
+		if [ "${status_file}" -nt "${launch_stamp}" ]; then
+			if [ "${became_ready}" = "0" ]; then
+				echo "[sand-supervisor-supervise] t=${EPOCHREALTIME} ready pid=${child_pid} attempt=${restart_count}"
+				if [ "${fast_ready}" = "1" ]; then
+					fast_ready=0
+					start_ticker "${check_interval_s}"
+				fi
+			fi
+			became_ready=1
+			mtime_s="$(status_mtime_s)"
+			if [ "${mtime_s}" -gt 0 ] && [ "${mtime_s}" = "${last_status_mtime_s}" ]; then
+				unchanged_status_checks=$((unchanged_status_checks + 1))
+			else
+				unchanged_status_checks=0
+			fi
+			if [ "${mtime_s}" -gt 0 ]; then
+				last_status_mtime_s="${mtime_s}"
+			fi
+			if [ "${unchanged_status_checks}" -ge "${stale_after_checks}" ]; then
+				echo "[sand-supervisor-supervise] t=${EPOCHREALTIME} status unchanged for ${unchanged_status_checks} checks (${check_interval_s}s apart; mtime=${mtime_s})" >&2
+				stop_unhealthy_child "status_stale"
+			fi
+		elif [ "${became_ready}" = "0" ] &&
+			[ $((now_s - started_at_s)) -ge "${startup_grace_s}" ]; then
+			stop_unhealthy_child "startup_status_timeout"
+		fi
+
+		exited_pid=""
+		wait -p exited_pid "${child_pid}" 2>/dev/null
+		waited_status=$?
+		if [ "${stopping}" = "1" ]; then
+			break
+		fi
+		if [ "${exited_pid:-}" = "${child_pid}" ]; then
+			child_status="${waited_status}"
+			child_reaped=1
+			break
+		fi
+	done
+	stop_ticker
+
+	if [ "${child_reaped}" = "0" ]; then
+		wait "${child_pid}" 2>/dev/null
+		child_status=$?
+	fi
+	kill_supervisor_group_not_host
+	child_pid=""
+	if [ "${stopping}" = "1" ]; then
+		if [ -n "${escalator_pid}" ]; then
+			kill -TERM -- "-${escalator_pid}" 2>/dev/null || true
+		fi
+		echo "[sand-supervisor-supervise] t=${EPOCHREALTIME} stopped"
+		exit 0
+	fi
+
+	runtime_s=$(( $(date +%s) - started_at_s ))
+	if [ "${runtime_s}" -lt 0 ]; then
+		runtime_s=0
+	fi
+	consume_restart_intent
+	if [ "${restart_intent}" = "1" ]; then
+		restart_cause="restart_intent"
+		consecutive_quick_failures=0
+		restart_delay_s=1
+		emit_restart_event "${runtime_s}" "${child_status}" "${restart_cause}"
+		echo "[sand-supervisor-supervise] t=${EPOCHREALTIME} supervisor exited status=${child_status} runtime_s=${runtime_s} cause=${restart_cause} restart_in_s=0" >&2
+		continue
+	fi
+	emit_restart_event "${runtime_s}" "${child_status}" "${restart_cause}"
+	echo "[sand-supervisor-supervise] t=${EPOCHREALTIME} supervisor exited status=${child_status} runtime_s=${runtime_s} cause=${restart_cause} restart_in_s=${restart_delay_s}" >&2
+
+	if [ "${runtime_s}" -lt 60 ]; then
+		consecutive_quick_failures=$((consecutive_quick_failures + 1))
+	else
+		consecutive_quick_failures=0
+		restart_delay_s=1
+	fi
+	if [ "${consecutive_quick_failures}" -ge "${max_quick_failures}" ]; then
+		emit_restart_event "${runtime_s}" "${child_status}" "gave_up"
+		echo "[sand-supervisor-supervise] t=${EPOCHREALTIME} giving up after ${consecutive_quick_failures} consecutive quick failures; ending the box" >&2
+		exit 1
+	fi
+
+	sleep "${restart_delay_s}" &
+	backoff_pid=$!
+	wait "${backoff_pid}" 2>/dev/null || true
+	backoff_pid=""
+	if [ "${restart_delay_s}" -lt 30 ]; then
+		restart_delay_s=$((restart_delay_s * 2))
+		if [ "${restart_delay_s}" -gt 30 ]; then
+			restart_delay_s=30
+		fi
+	fi
+done

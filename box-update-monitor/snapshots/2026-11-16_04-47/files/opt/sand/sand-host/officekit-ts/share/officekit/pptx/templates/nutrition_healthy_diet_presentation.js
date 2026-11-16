@@ -1,0 +1,722 @@
+/**
+ * Standalone pptxgenjs re-creation of a 30-slide product/portfolio template.
+ *
+ *   node 16b17040-78d6-474d-8234-6c880b761d59_grok_final.js
+ *
+ * Photographs in the original deck are replaced by flat grey placeholder
+ * rectangles (see `photo()`), everything else is built from native shapes.
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+// ---------------------------------------------------------------- design tokens
+const HEAD = 'Poppins';        // theme major font
+const BODY = 'Open Sans';      // theme minor font
+
+const LIME = 'BFBF00';         // accent1
+const LIME_MID = '8F8F00';
+const LIME_DARK = '606000';
+const GREEN = '496356';        // accent2
+const GREEN_MID = '374A40';
+const GREEN_DARK = '24322B';
+const INK = '2B2B2B';          // text1
+const DARK = '404040';
+const MUTED = '959595';
+const GREY = '606060';
+const WHITE = 'FFFFFF';
+const PLACEHOLDER = 'D9D9D9';  // stand-in colour for photographs
+const FRAME = 'FFFFFF';        // empty picture placeholders (blank in the original)
+
+const SLIDE_W = 13.333;
+const SLIDE_H = 7.5;
+
+
+// ---------------------------------------------------------------- helpers
+
+/** Grey block standing in for a photograph / device mockup in the original deck. */
+function photo(s, x, y, w, h) {
+  s.addShape('rect', { x, y, w, h, fill: { color: PLACEHOLDER }, line: { type: 'none' } });
+  s.addText('[image]', {
+    x, y, w, h, align: 'center', valign: 'middle',
+    fontFace: BODY, fontSize: 10, color: '8A8A8A',
+  });
+}
+
+/**
+ * Empty picture placeholder inherited from the slide layout. The template ships
+ * them without any picture, so they stay near-invisible on a white slide.
+ */
+function photoFrame(s, x, y, w, h) {
+  s.addShape('rect', { x, y, w, h, fill: { color: FRAME }, line: { type: 'none' } });
+}
+
+/** Three stacked rules used as the deck's "menu" mark. */
+function hamburger(s, x, y, w, h) {
+  for (let i = 0; i < 3; i++) {
+    s.addShape('line', {
+      x, y: y + (h / 2) * i, w, h: 0,
+      line: { color: MUTED, width: 1.5 },
+    });
+  }
+}
+
+/** "Price  :   $00.00" caption, repeated all over the deck. */
+function price(s, x, y, amount, opts = {}) {
+  s.addText('Price  :           ' + amount, {
+    x, y, w: 1.34, h: 0.3,
+    align: opts.align || 'justify', valign: 'top',
+    rotate: opts.rotate,
+    lineSpacingMultiple: 1.5,
+    fontFace: BODY, fontSize: opts.size || 9, color: GREY,
+  });
+}
+
+/** Numbered, underlined mini-heading with a small paragraph beneath it. */
+function service(s, x, y, w, num, title, blurb, opts = {}) {
+  s.addText(num + '  :  ' + title, {
+    x, y, w, h: 0.38, valign: 'top',
+    lineSpacingMultiple: 1.5,
+    fontFace: HEAD, fontSize: opts.titleSize || 12, color: DARK,
+    underline: { style: 'sng' },
+  });
+  s.addText(blurb, {
+    x, y: y + (opts.gap || 0.52), w: opts.blurbW || w, h: opts.blurbH || 0.48,
+    align: opts.blurbAlign || 'justify', valign: 'top',
+    lineSpacingMultiple: 1.5,
+    fontFace: BODY, fontSize: opts.blurbSize || 8, color: MUTED,
+  });
+}
+
+/** One column of the pricing tables on slides 23 and 24. */
+function pricingCard(s, x, y, tier, amount, accent) {
+  const W = 2.46;
+  s.addShape('rect', { x, y, w: W, h: 1.3, fill: { color: accent }, line: { type: 'none' } });
+  s.addText(tier, {
+    x, y: y + 0.2, w: W, h: 0.3, align: 'center', valign: 'top', margin: 0,
+    fontFace: HEAD, fontSize: 11, color: WHITE,
+  });
+  s.addText(
+    [
+      { text: '$', options: { fontSize: 24, baseline: 600, color: WHITE, fontFace: HEAD } },
+      { text: amount.replace('$', ''), options: { fontSize: 24, color: WHITE, fontFace: HEAD } },
+    ],
+    { x, y: y + 0.52, w: W, h: 0.5, align: 'center', valign: 'top' }
+  );
+
+  const ROWS = ['First  Service', 'Second  Service', 'Third  Service', 'Forth  Service', 'Fifth  Service'];
+  ROWS.forEach((label, i) => {
+    const ry = y + 1.3 + i * 0.42;
+    s.addShape('rect', {
+      x, y: ry, w: W, h: 0.42,
+      fill: { color: i % 2 ? 'F7F7F7' : 'E9E9E9' }, line: { type: 'none' },
+    });
+    s.addText(label, {
+      x, y: ry, w: W, h: 0.42, align: 'center', valign: 'middle',
+      fontFace: BODY, fontSize: 9, color: '161616',
+      bullet: { characterCode: '2022', indent: 13.5 },
+    });
+  });
+
+  s.addShape('rect', { x, y: y + 3.39, w: W, h: 0.95, fill: { color: 'F7F7F7' }, line: { type: 'none' } });
+  s.addShape('rect', {
+    x: x + 0.4, y: y + 3.64, w: 1.67, h: 0.45,
+    fill: { color: 'F7F7F7' }, line: { color: accent, width: 2 },
+  });
+  s.addText('Order now', {
+    x: x + 0.4, y: y + 3.64, w: 1.67, h: 0.45, align: 'center', valign: 'middle',
+    fontFace: HEAD, fontSize: 9, color: DARK,
+  });
+}
+
+/** Shared look for the three native charts. */
+const CHART_BASE = {
+  showLegend: false,
+  showTitle: false,
+  chartColors: [LIME, 'E9E9E9', GREEN],
+  catAxisLabelFontFace: BODY, catAxisLabelFontSize: 8, catAxisLabelColor: '757575',
+  valAxisLabelFontFace: BODY, valAxisLabelFontSize: 8, valAxisLabelColor: '757575',
+  catAxisLineColor: 'D9D9D9', valAxisLineColor: 'D9D9D9',
+  catAxisMajorTickMark: 'none', valAxisMajorTickMark: 'none',
+  catAxisLabelPos: 'nextTo',
+  valGridLine: { color: 'D9D9D9', size: 1 },
+  catGridLine: { style: 'none' },
+  border: { pt: 0, color: 'FFFFFF' },
+};
+
+
+// ------------------------------------------------- shared copy (repeated verbatim)
+const HEADLINE = 'Your Diet Is A Bank Account. Good Food Choices Are Good Investments.';
+const HEADLINE_1 = 'Your Diet Is A Bank Account. Good Food Choices ';
+const SUBHEAD =
+  'By Eating Many Fruits And Vegetables In Place Of Fast Food And Junk Food, People Could Avoid ' +
+  'Obesity.';
+const BODY1 =
+  'PLACEHOLDER' +
+  'PLACEHOLDER';
+const BODY2 =
+  'PLACEHOLDER' +
+  'nedasase mana sanis hansani';
+const BODY3 =
+  'PLACEHOLDER' +
+  'PLACEHOLDER' +
+  'PLACEHOLDER';
+const BODY4 =
+  'PLACEHOLDER' +
+  'PLACEHOLDER' +
+  'PLACEHOLDER' +
+  'PLACEHOLDER';
+const BLURB1 = 'PLACEHOLDER';
+const BLURB2 = 'PLACEHOLDER';
+const BLURB3 =
+  'PLACEHOLDER' +
+  'dunda';
+const BLURB4 = 'PLACEHOLDER';
+const BLURB5 = 'PLACEHOLDER';
+const BLURB6 = 'PLACEHOLDER';
+const BLURB7 = 'PLACEHOLDER';
+const BLURB8 =
+  'PLACEHOLDER' +
+  'danis';
+const BLURB9 = 'sapien tincidunt anive analasas';
+const BLURB10 =
+  'PLACEHOLDER' +
+  'hanisi';
+
+// Excel serial numbers for 1/5/2002 .. 1/9/2002 (the area chart's date axis).
+const DATE_SERIAL = [37261, 37262, 37263, 37264, 37265];
+
+
+// ---------------------------------------------------------------- slides
+
+function slide01(s) {
+  photoFrame(s, 3.438, 1.167, 3.229, 5.167);
+  photoFrame(s, 6.667, 1.167, 3.229, 5.167);
+  s.addText('Mariin', { x: 4.423, y: 3.094, w: 4.476, h: 1.313, valign: 'top', align: 'center', fontFace: HEAD, fontSize: 72, color: WHITE, bold: true, underline: { style: 'sng' } });
+  hamburger(s, 12.263, 0.607, 0.414, 0.297);
+  price(s, 10.919, 5.957, '$33.22');
+  price(s, 10.919, 5.356, '$20.17');
+  s.addText([
+    { text: BODY1, options: { align: 'justify', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 8, color: MUTED, breakLine: true } },
+    { text: '', options: { align: 'justify', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 8, color: MUTED, breakLine: true } },
+    { text: BODY2, options: { align: 'justify', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 8, color: MUTED } },
+  ], { x: 0.809, y: 1.24, w: 1.755, h: 2.301, valign: 'top' });
+  s.addText('presentation template', { x: 5.676, y: 4.272, w: 1.982, h: 0.269, valign: 'top', align: 'center', fontFace: HEAD, fontSize: 10, color: WHITE });
+  price(s, 10.919, 4.752, '$12.09');
+  s.addShape('rect', { x: 0, y: 7.139, w: 1.667, h: 0.361, fill: { color: LIME }, line: { type: 'none' } });
+}
+
+function slide02(s) {
+  photoFrame(s, 0, 0, 13.333, 5.708);
+  s.addText('PLACEHOLDER', { x: 4.08, y: 6.293, w: 3.943, h: 0.531, valign: 'top', align: 'justify', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 9, color: MUTED });
+  hamburger(s, 12.259, 0.607, 0.414, 0.297);
+  price(s, 1.153, 6.489, '$33.22');
+  s.addShape('custGeom', { x: 11.753, y: 1.589, w: 1.581, h: 4.119, fill: { color: DARK, transparency: 56 }, line: { type: 'none' }, points: [{ x: 1.581, y: 0 }, { x: 1.581, y: 4.119 }, { x: 0.633, y: 4.119 }, { x: 0.633, y: 3.015 }, { x: 0, y: 3.015 }, { close: true }] });
+  s.addShape('custGeom', { x: 0, y: 0, w: 6.385, h: 5.708, fill: { color: DARK, transparency: 56 }, line: { type: 'none' }, points: [{ x: 0.563, y: 0 }, { x: 6.385, y: 0 }, { x: 3.427, y: 5.708 }, { x: 0, y: 5.708 }, { x: 0, y: 1.085 }, { close: true }] });
+  s.addShape('ellipse', { x: 0.747, y: 0.646, w: 1.421, h: 1.421, fill: { color: LIME }, line: { type: 'none' } });
+  s.addText(HEADLINE, { x: 1.128, y: 1.019, w: 2.862, h: 2.524, valign: 'top', fontFace: HEAD, fontSize: 24, color: WHITE, bold: true });
+  s.addShape('line', { x: 1.236, y: 4.604, w: 1.131, h: 0, line: { color: WHITE, width: 1.5 } });
+  photoFrame(s, 8.667, 4.768, 1.714, 2.003);
+  photoFrame(s, 10.535, 4.768, 1.714, 2.003);
+}
+
+function slide03(s) {
+  s.addText(SUBHEAD, { x: 9.134, y: 1.901, w: 3.134, h: 1.616, valign: 'top', fontFace: HEAD, fontSize: 18, color: DARK, bold: true });
+  hamburger(s, 0.573, 0.523, 0.414, 0.297);
+  s.addShape('line', { x: 9.251, y: 4.137, w: 1.324, h: 0, line: { color: DARK, width: 1.5 } });
+  s.addShape('rect', { x: 8.128, y: 0, w: 4.476, h: 0.753, fill: { color: LIME }, line: { type: 'none' } });
+  price(s, 10.643, 5.233, '$33.22');
+  price(s, 10.643, 5.983, '$20.17');
+  s.addText([
+    { text: BODY1, options: { align: 'justify', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 10, color: MUTED, breakLine: true } },
+    { text: '', options: { align: 'justify', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 10, color: MUTED, breakLine: true } },
+    { text: BODY2, options: { align: 'justify', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 10, color: MUTED } },
+  ], { x: 0.97, y: 2.686, w: 2.127, h: 2.851, valign: 'top' });
+  s.addText('About Us', { x: 0.959, y: 6.173, w: 1.929, h: 0.467, valign: 'top', lineSpacingMultiple: 1.5, fontFace: HEAD, fontSize: 16, color: DARK, underline: { style: 'sng' } });
+  photoFrame(s, 4.114, 1.75, 4.014, 5.75);
+  photoFrame(s, 7.003, 4.88, 2.248, 1.761);
+}
+
+function slide04(s) {
+  s.addShape('rect', { x: 9.521, y: 6.747, w: 3.812, h: 0.753, fill: { color: LIME }, line: { type: 'none' } });
+  price(s, 2.059, 5.106, '$33.22');
+  price(s, 4.014, 5.106, '$20.17');
+  s.addText(SUBHEAD, { x: 9.685, y: 2.824, w: 3.567, h: 1.616, valign: 'top', rotate: 90, fontFace: HEAD, fontSize: 18, color: DARK, bold: true });
+  s.addText('PLACEHOLDER', { x: 1.711, y: 5.973, w: 5.917, h: 0.758, valign: 'top', align: 'justify', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 9, color: MUTED });
+  s.addShape('line', { x: 10.771, y: 1.344, w: 1.422, h: 0, line: { color: DARK, width: 1.5 } });
+  hamburger(s, 0.518, 6.863, 0.305, 0.219);
+  photoFrame(s, 0.854, 0, 8.667, 3.691);
+  photoFrame(s, 3.788, 2.691, 1.795, 2);
+  photoFrame(s, 1.833, 2.691, 1.795, 2);
+}
+
+function slide05(s) {
+  photoFrame(s, 5.635, 0.781, 6.032, 6.719);
+  s.addShape('rect', { x: 5.635, y: 5.423, w: 6.032, h: 1.227, fill: { color: DARK, transparency: 40 }, line: { type: 'none' } });
+  s.addText([
+    { text: 'PLACEHOLDER', options: { align: 'justify', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 9, color: WHITE, breakLine: true } },
+    { text: 'velas aliqueta nibhasi handa nusan', options: { align: 'justify', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 9, color: WHITE } },
+  ], { x: 6.995, y: 5.657, w: 3.558, h: 0.758, valign: 'top' });
+  s.addShape('ellipse', { x: 0.876, y: 0.782, w: 1.421, h: 1.421, fill: { color: LIME, transparency: 30 }, line: { type: 'none' } });
+  s.addText(HEADLINE, { x: 1.256, y: 1.154, w: 2.862, h: 2.524, valign: 'top', fontFace: HEAD, fontSize: 24, color: DARK, bold: true });
+  s.addShape('line', { x: 1.347, y: 4.438, w: 1.131, h: 0, line: { color: DARK, width: 1.5 } });
+  hamburger(s, 12.332, 0.607, 0.414, 0.297);
+  price(s, 11.867, 4.425, '$33.22', { rotate: 90 });
+  price(s, 11.867, 2.348, '$20.17', { rotate: 90 });
+  photoFrame(s, 1.347, 5.423, 2.679, 1.227);
+}
+
+function slide06(s) {
+  hamburger(s, 0.573, 0.523, 0.414, 0.297);
+  s.addShape('rect', { x: 0.697, y: 6.747, w: 5.97, h: 0.753, fill: { color: LIME }, line: { type: 'none' } });
+  s.addShape('line', { x: 1.243, y: 3.989, w: 1.268, h: 0, line: { color: DARK, width: 1.5 } });
+  s.addText('PLACEHOLDER', { x: 1.138, y: 1.721, w: 2.292, h: 1.213, valign: 'top', align: 'justify', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 9, color: MUTED });
+  s.addText('PLACEHOLDER', { x: 3.682, y: 1.721, w: 2.292, h: 1.213, valign: 'top', align: 'justify', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 9, color: MUTED });
+  price(s, 7.368, 5.628, '$20.17');
+  price(s, 7.373, 4.909, '$33.22');
+  s.addText([
+    { text: HEADLINE_1, options: { fontFace: HEAD, fontSize: 24, color: DARK, bold: true, breakLine: true } },
+    { text: 'Are Good Investments.', options: { fontFace: HEAD, fontSize: 24, color: DARK, bold: true } },
+  ], { x: 1.138, y: 4.764, w: 4.975, h: 1.313, valign: 'top' });
+  photoFrame(s, 6.667, 1.356, 1.942, 1.942);
+  photoFrame(s, 8.716, 1.356, 1.942, 1.942);
+  photoFrame(s, 9.688, 0, 3.646, 7.5);
+}
+
+function slide07(s) {
+  s.addShape('ellipse', { x: 0.766, y: 0.79, w: 1.421, h: 1.421, fill: { color: LIME, transparency: 30 }, line: { type: 'none' } });
+  s.addText(HEADLINE, { x: 1.146, y: 1.163, w: 2.862, h: 2.524, valign: 'top', fontFace: HEAD, fontSize: 24, color: DARK, bold: true });
+  s.addShape('line', { x: 1.268, y: 4.447, w: 1.131, h: 0, line: { color: DARK, width: 1.5 } });
+  s.addText(BODY3, { x: 1.146, y: 5.206, w: 2.645, h: 1.44, valign: 'top', align: 'justify', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 9, color: MUTED });
+  hamburger(s, 12.259, 0.607, 0.414, 0.297);
+  service(s, 10.333, 1.538, 2.068, '01', 'Service One', BLURB1);
+  service(s, 10.333, 3.074, 2.068, '02', 'Service Two', 'sapien tincidunt anive analas elita sedasail cursus misanial', { blurbSize: 10, blurbH: 0.579, blurbAlign: 'left' });
+  photoFrame(s, 4.917, 0, 4.508, 7.5);
+  photoFrame(s, 10.361, 4.819, 2.04, 1.931);
+}
+
+function slide08(s) {
+  photoFrame(s, 3.871, 3.676, 8.673, 3.071);
+  s.addShape('rect', { x: 9.588, y: 3.676, w: 2.956, h: 3.071, fill: { color: DARK, transparency: 40 }, line: { type: 'none' } });
+  hamburger(s, 12.384, 0.565, 0.414, 0.297);
+  service(s, 4.849, 1.703, 2.068, '01', 'Service One', BLURB6);
+  service(s, 7.52, 1.703, 2.068, '02', 'Service Two', BLURB6);
+  service(s, 10.191, 1.703, 2.068, '03', 'Service Three', BLURB6);
+  s.addText(HEADLINE, { x: 0.952, y: 4.332, w: 2.089, h: 1.919, valign: 'top', fontFace: HEAD, fontSize: 18, color: DARK, bold: true });
+  s.addShape('line', { x: 1.053, y: 6.747, w: 1.359, h: 0, line: { color: DARK, width: 1.5 } });
+  s.addText([
+    { text: 'PLACEHOLDER', options: { align: 'justify', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 9, color: WHITE, breakLine: true } },
+    { text: 'velas aliqueta atil nibhasi handa nusan', options: { align: 'justify', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 9, color: WHITE } },
+  ], { x: 10.24, y: 4.384, w: 1.653, h: 1.667, valign: 'top' });
+  photoFrame(s, 0.952, 0.903, 2.919, 2.773);
+}
+
+function slide09(s) {
+  photoFrame(s, 0, 0, 6.667, 7.5);
+  photoFrame(s, 5.682, 4.729, 1.969, 1.875);
+  photoFrame(s, 3.581, 4.729, 1.969, 1.875);
+  s.addText('PLACEHOLDER', { x: 8.746, y: 5.081, w: 3.692, h: 1.213, valign: 'top', align: 'justify', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 9, color: MUTED });
+  hamburger(s, 12.486, 0.537, 0.299, 0.215);
+  s.addShape('ellipse', { x: 0.763, y: 0.821, w: 1.421, h: 1.421, fill: { color: LIME }, line: { type: 'none' } });
+  s.addText(HEADLINE, { x: 1.144, y: 1.194, w: 2.862, h: 2.524, valign: 'top', fontFace: HEAD, fontSize: 24, color: WHITE, bold: true });
+  s.addShape('line', { x: 1.252, y: 4.611, w: 1.131, h: 0, line: { color: WHITE, width: 1.5 } });
+  service(s, 7.698, 1.289, 2.068, '01', 'Service One', BLURB1);
+  service(s, 10.369, 1.289, 2.068, '02', 'Service Two', BLURB1);
+  service(s, 7.698, 2.81, 2.068, '03', 'Service Three', BLURB1);
+  service(s, 10.369, 2.81, 2.068, '04', 'Service Four', BLURB1);
+}
+
+function slide10(s) {
+  photoFrame(s, 5.708, 0.762, 3.815, 5.976);
+  hamburger(s, 0.697, 0.607, 0.414, 0.297);
+  s.addText(BLURB7, { x: 10.293, y: 1.874, w: 1.929, h: 0.831, valign: 'top', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 10, color: WHITE });
+  s.addText('Service', { x: 10.293, y: 1.328, w: 1.929, h: 0.421, valign: 'top', lineSpacingMultiple: 1.5, fontFace: HEAD, fontSize: 14, color: WHITE, bold: true });
+  s.addText(BLURB7, { x: 10.293, y: 3.687, w: 1.929, h: 0.831, valign: 'top', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 10, color: WHITE });
+  s.addText('Service', { x: 10.293, y: 3.141, w: 1.929, h: 0.421, valign: 'top', lineSpacingMultiple: 1.5, fontFace: HEAD, fontSize: 14, color: WHITE, bold: true });
+  s.addText(BLURB7, { x: 10.293, y: 5.501, w: 1.929, h: 0.831, valign: 'top', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 10, color: WHITE });
+  s.addText('Service', { x: 10.293, y: 4.955, w: 1.929, h: 0.421, valign: 'top', lineSpacingMultiple: 1.5, fontFace: HEAD, fontSize: 14, color: WHITE, bold: true });
+  s.addShape('rect', { x: 0.825, y: 6.747, w: 4.642, h: 0.753, fill: { color: LIME }, line: { type: 'none' } });
+  service(s, 1.711, 1.465, 2.068, '01', 'Service One', BLURB8, { blurbW: 2.635 });
+  service(s, 1.711, 3.081, 2.068, '02', 'Service Two', BLURB8, { blurbW: 2.635 });
+  service(s, 1.711, 4.696, 2.068, '03', 'Service Three', BLURB8, { blurbW: 2.635 });
+  s.addText(HEADLINE, { x: 6.442, y: 1.496, w: 2.411, h: 1.178, valign: 'top', fontFace: HEAD, fontSize: 16, color: DARK, bold: true });
+  photoFrame(s, 9.738, 0.762, 2.77, 5.976);
+}
+
+function slide11(s) {
+  s.addText('PLACEHOLDER', { x: 9.069, y: 1.841, w: 2.653, h: 2.576, valign: 'top', align: 'justify', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 9, color: MUTED });
+  hamburger(s, 12.259, 0.607, 0.414, 0.297);
+  s.addShape('rect', { x: 5.322, y: 3.145, w: 2.216, h: 2.216, fill: { color: 'F2F2F2' }, line: { type: 'none' } });
+  s.addText(HEADLINE, { x: 0.966, y: 6.175, w: 5.374, h: 0.707, valign: 'top', fontFace: HEAD, fontSize: 18, color: DARK, bold: true });
+  s.addShape('line', { x: 6.667, y: 6.754, w: 0.865, h: 0, line: { color: DARK, width: 1.5 } });
+  service(s, 1.264, 3.579, 1.26, '01', 'Service', BLURB2, { blurbH: 0.887 });
+  service(s, 3.584, 1.335, 1.26, '02', 'Service', BLURB2, { blurbH: 0.887 });
+  service(s, 5.8, 3.575, 1.26, '03', 'Service', BLURB2, { blurbH: 0.887 });
+  photoFrame(s, 0.89, 0.929, 2.216, 2.216);
+  photoFrame(s, 3.106, 3.145, 2.216, 2.216);
+  photoFrame(s, 5.322, 0.929, 2.216, 2.216);
+  photoFrame(s, 9.682, 5.742, 3.652, 1.758);
+}
+
+function slide12(s) {
+  photoFrame(s, 8.688, 0, 4.646, 7.5);
+  hamburger(s, 0.697, 0.607, 0.414, 0.297);
+  price(s, 5.473, 6.536, '$33.22');
+  price(s, 3.605, 6.536, '$22.17');
+  s.addShape('line', { x: 0.979, y: 6.743, w: 1.359, h: 0, line: { color: DARK, width: 1.5 } });
+  s.addShape('rect', { x: 8.687, y: 3.086, w: 4.646, h: 2.806, fill: { color: DARK, transparency: 40 }, line: { type: 'none' } });
+  s.addText('PLACEHOLDER', { x: 9.555, y: 3.655, w: 2.911, h: 1.667, valign: 'top', align: 'justify', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 9, color: WHITE });
+  s.addText(SUBHEAD, { x: 0.904, y: 3.673, w: 3.417, h: 1.784, valign: 'top', fontFace: HEAD, fontSize: 20, color: DARK, bold: true });
+  photoFrame(s, 3.528, 0, 4.875, 2.806);
+  photoFrame(s, 5.597, 3.086, 2.806, 2.806);
+}
+
+function slide13(s) {
+  hamburger(s, 12.259, 0.607, 0.414, 0.297);
+  s.addText('PLACEHOLDER', { x: 9.137, y: 1.636, w: 3.123, h: 1.894, valign: 'top', align: 'justify', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 9, color: MUTED });
+  s.addShape('rect', { x: 0.854, y: 6.84, w: 2.979, h: 0.66, fill: { color: LIME }, line: { type: 'none' } });
+  s.addText(SUBHEAD, { x: 0.854, y: 4.667, w: 2.889, h: 1.447, valign: 'top', fontFace: HEAD, fontSize: 16, color: DARK, bold: true });
+  price(s, 3.776, 2.108, '$33.22', { rotate: 90 });
+  price(s, 7.954, 5.963, '$22.17', { rotate: 90 });
+  price(s, 12.115, 5.963, '$18.20', { rotate: 90 });
+  photoFrame(s, 5.031, 0.771, 2.979, 2.979);
+  photoFrame(s, 0.854, 0.771, 2.979, 2.979);
+  photoFrame(s, 5.031, 4.729, 2.979, 2.771);
+  photoFrame(s, 9.208, 4.729, 2.979, 2.771);
+}
+
+function slide14(s) {
+  s.addShape('ellipse', { x: 0.66, y: 0.704, w: 1.219, h: 1.219, fill: { color: LIME, transparency: 30 }, line: { type: 'none' } });
+  s.addText(HEADLINE, { x: 1.024, y: 0.923, w: 6.844, h: 0.808, valign: 'top', fontFace: HEAD, fontSize: 21, color: DARK, bold: true });
+  s.addText('PLACEHOLDER', { x: 8.269, y: 6.384, w: 3.215, h: 0.483, valign: 'top', align: 'justify', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 8, color: MUTED });
+  price(s, 3.747, 6.558, '$33.22', { align: 'center' });
+  hamburger(s, 12.259, 0.607, 0.414, 0.297);
+  service(s, 1.024, 2.795, 2.068, '01', 'Portfolio One', BLURB9, { titleSize: 11, blurbW: 1.852, blurbH: 0.281, gap: 0.454 });
+  service(s, 1.024, 3.985, 2.068, '02', 'Portfolio Two', BLURB9, { titleSize: 11, blurbW: 1.852, blurbH: 0.281, gap: 0.454 });
+  service(s, 1.024, 5.176, 2.068, '03', 'Portfolio Three', BLURB9, { titleSize: 11, blurbW: 1.852, blurbH: 0.281, gap: 0.454 });
+  photoFrame(s, 9.976, 2.509, 1.852, 3.402);
+  photoFrame(s, 7.93, 2.509, 1.852, 3.402);
+  photoFrame(s, 5.884, 2.94, 1.852, 4.56);
+  photoFrame(s, 3.838, 2.509, 1.852, 3.402);
+}
+
+function slide15(s) {
+  price(s, 0.228, 3.919, '$33.22', { rotate: 90, align: 'center' });
+  price(s, 0.228, 2.165, '$22.17', { rotate: 90, align: 'center' });
+  s.addShape('rect', { x: 1.916, y: 0, w: 3.871, h: 0.538, fill: { color: LIME }, line: { type: 'none' } });
+  service(s, 2.51, 5.849, 2.068, '01', 'Service One', BLURB10, { blurbW: 2.683 });
+  service(s, 6.918, 5.849, 2.068, '02', 'Service Two', BLURB10, { blurbW: 2.683 });
+  s.addText(SUBHEAD, { x: 9.684, y: 3.093, w: 4.225, h: 1.245, valign: 'top', rotate: 90, fontFace: HEAD, fontSize: 17, color: DARK, bold: true });
+  s.addShape('line', { x: 11.182, y: 1.258, w: 1.232, h: 0, line: { color: DARK, width: 1.5 } });
+  hamburger(s, 0.78, 6.525, 0.305, 0.219);
+  photoFrame(s, 6.324, 1.258, 3.871, 3.871);
+  photoFrame(s, 1.916, 1.258, 3.871, 3.871);
+}
+
+function slide16(s) {
+  hamburger(s, 12.259, 0.607, 0.414, 0.297);
+  s.addText(HEADLINE, { x: 0.941, y: 4.39, w: 2.089, h: 1.919, valign: 'top', fontFace: HEAD, fontSize: 18, color: DARK, bold: true });
+  s.addShape('line', { x: 1.041, y: 6.759, w: 1.336, h: 0, line: { color: DARK, width: 1.5 } });
+  s.addShape('rect', { x: 7.144, y: 6.962, w: 5.529, h: 0.538, fill: { color: LIME }, line: { type: 'none' } });
+  s.addText('PLACEHOLDER', { x: 8.063, y: 4.645, w: 3.692, h: 1.44, valign: 'top', align: 'justify', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 9, color: MUTED });
+  price(s, 10.999, 3.14, '$33.22', { align: 'center' });
+  price(s, 10.999, 2.258, '$22.17', { align: 'center' });
+  photoFrame(s, 7.144, 0, 2.865, 3.606);
+  photoFrame(s, 0.941, 0.741, 5.837, 2.865);
+  photoFrame(s, 3.913, 3.894, 2.865, 3.606);
+}
+
+function slide17(s) {
+  price(s, 6.169, 1.536, '$33.22', { rotate: 270, align: 'center' });
+  price(s, 6.169, 3.598, '$22.17', { rotate: 270, align: 'center' });
+  price(s, 6.171, 5.671, '$12.10', { rotate: 270, align: 'center' });
+  s.addShape('line', { x: 1.189, y: 4.252, w: 1.359, h: 0, line: { color: DARK, width: 1.5 } });
+  s.addText(SUBHEAD, { x: 1.086, y: 1.44, w: 3.908, h: 1.952, valign: 'top', fontFace: HEAD, fontSize: 22, color: DARK, bold: true });
+  s.addText('PLACEHOLDER', { x: 1.086, y: 5.06, w: 3.908, h: 1.667, valign: 'top', align: 'justify', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 9, color: MUTED });
+  s.addShape('rect', { x: 0.989, y: 0, w: 4.07, h: 0.538, fill: { color: LIME }, line: { type: 'none' } });
+  photoFrame(s, 7.656, 2.828, 4.427, 1.855);
+  photoFrame(s, 7.656, 0.76, 4.427, 1.855);
+  photoFrame(s, 7.656, 4.895, 4.427, 1.855);
+}
+
+function slide18(s) {
+  s.addShape('ellipse', { x: 0.846, y: 0.744, w: 0.97, h: 0.97, fill: { color: LIME, transparency: 30 }, line: { type: 'none' } });
+  s.addText(HEADLINE, { x: 1.14, y: 1.04, w: 2.089, h: 1.919, valign: 'top', fontFace: HEAD, fontSize: 18, color: DARK, bold: true });
+  s.addText('PLACEHOLDER', { x: 5.082, y: 4.739, w: 3.692, h: 1.44, valign: 'top', align: 'justify', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 9, color: MUTED });
+  hamburger(s, 12.511, 0.548, 0.326, 0.234);
+  service(s, 7.805, 1.575, 1.26, '01', 'Portfolio', BLURB2, { titleSize: 10, blurbH: 0.887, gap: 0.467 });
+  service(s, 9.514, 1.575, 1.26, '02', 'Portfolio', BLURB2, { titleSize: 10, blurbH: 0.887, gap: 0.467 });
+  service(s, 11.223, 1.575, 1.26, '03', 'Portfolio', BLURB2, { titleSize: 10, blurbH: 0.887, gap: 0.467 });
+  price(s, 2, 7.006, '$33.22', { align: 'center' });
+  price(s, 10.341, 7.006, '$33.22', { align: 'center' });
+  photoFrame(s, 4.09, 0, 2.838, 3.75);
+  photoFrame(s, 1.253, 3.75, 2.838, 3.006);
+  photoFrame(s, 9.594, 3.75, 2.838, 3.006);
+}
+
+function slide19(s) {
+  photoFrame(s, 4.557, 2.54, 4.248, 2.727);
+  photo(s, 3.948, 2.408, 5.437, 3.173);
+  hamburger(s, 12.259, 0.607, 0.414, 0.297);
+  s.addText(HEADLINE, { x: 3.181, y: 0.767, w: 6.972, h: 0.774, valign: 'top', align: 'center', fontFace: HEAD, fontSize: 20, color: DARK, bold: true });
+  s.addText('PLACEHOLDER', { x: 10.311, y: 2.843, w: 1.88, h: 2.121, valign: 'top', align: 'justify', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 9, color: MUTED });
+  s.addText('PLACEHOLDER', { x: 4.197, y: 6.233, w: 4.939, h: 0.531, valign: 'top', align: 'center', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 9, color: MUTED });
+  price(s, 1.107, 6.346, '$33.22');
+  price(s, 10.825, 6.346, '$21.17', { align: 'right' });
+  photoFrame(s, 1.136, 2.843, 1.834, 2.353);
+}
+
+function slide20(s) {
+  photoFrame(s, 6.611, 1.576, 2.382, 5.046);
+  photo(s, 6.494, 1.431, 2.645, 5.336);
+  hamburger(s, 12.259, 0.607, 0.414, 0.297);
+  s.addShape('ellipse', { x: 0.95, y: 5.24, w: 1.111, h: 1.111, fill: { color: LIME, transparency: 30 }, line: { type: 'none' } });
+  s.addText([
+    { text: HEADLINE_1, options: { fontFace: HEAD, fontSize: 20, color: DARK, bold: true, breakLine: true } },
+    { text: 'Are Good Investments.', options: { fontFace: HEAD, fontSize: 20, color: DARK, bold: true } },
+  ], { x: 1.302, y: 5.491, w: 4.16, h: 1.111, valign: 'top' });
+  s.addText('PLACEHOLDER', { x: 1.302, y: 2.542, w: 2.645, h: 1.667, valign: 'top', align: 'justify', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 9, color: MUTED });
+  service(s, 10.116, 1.93, 2.068, '01', 'Service One', BLURB3, { blurbW: 2.143, blurbH: 0.685 });
+  service(s, 10.116, 3.545, 2.068, '02', 'Service Two', BLURB3, { blurbW: 2.143, blurbH: 0.685 });
+  service(s, 10.116, 5.161, 2.068, '03', 'Service Three', BLURB3, { blurbW: 2.143, blurbH: 0.685 });
+  photoFrame(s, 0, 0, 3.902, 1.792);
+}
+
+function slide21(s) {
+  photoFrame(s, 4.625, 2.125, 3.052, 4.083);
+  photo(s, 4.474, 1.653, 3.418, 5.042);
+  s.addText(SUBHEAD, { x: 9.023, y: 2.004, w: 3.134, h: 1.616, valign: 'top', fontFace: HEAD, fontSize: 18, color: DARK, bold: true });
+  hamburger(s, 0.573, 0.523, 0.414, 0.297);
+  s.addShape('line', { x: 9.126, y: 4.42, w: 1.324, h: 0, line: { color: DARK, width: 1.5 } });
+  s.addShape('rect', { x: 8.128, y: 0, w: 4.476, h: 0.753, fill: { color: LIME }, line: { type: 'none' } });
+  price(s, 9.023, 5.336, '$33.22');
+  price(s, 9.023, 6.086, '$20.17');
+  s.addText([
+    { text: BODY1, options: { align: 'justify', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 10, color: MUTED, breakLine: true } },
+    { text: '', options: { align: 'justify', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 10, color: MUTED, breakLine: true } },
+    { text: BODY2, options: { align: 'justify', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 10, color: MUTED } },
+  ], { x: 1.144, y: 2.436, w: 2.127, h: 2.851, valign: 'top' });
+  s.addText('Mockup', { x: 1.132, y: 5.923, w: 1.929, h: 0.467, valign: 'top', lineSpacingMultiple: 1.5, fontFace: HEAD, fontSize: 16, color: DARK, underline: { style: 'sng' } });
+  price(s, 10.818, 5.336, '$33.22');
+  price(s, 10.818, 6.086, '$20.17');
+}
+
+function slide22(s) {
+  photoFrame(s, 5.931, 1.458, 4.892, 2.786);
+  photo(s, 5.715, 0.534, 5.333, 5.333);
+  s.addShape('ellipse', { x: 0.876, y: 0.806, w: 1.421, h: 1.421, fill: { color: LIME, transparency: 30 }, line: { type: 'none' } });
+  s.addText(HEADLINE, { x: 1.257, y: 1.178, w: 2.862, h: 2.524, valign: 'top', fontFace: HEAD, fontSize: 24, color: DARK, bold: true });
+  s.addShape('line', { x: 1.379, y: 4.462, w: 1.131, h: 0, line: { color: DARK, width: 1.5 } });
+  s.addText(BODY3, { x: 1.257, y: 5.222, w: 2.645, h: 1.44, valign: 'top', align: 'justify', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 9, color: MUTED });
+  hamburger(s, 12.259, 0.607, 0.414, 0.297);
+  price(s, 6.746, 6.398, '$33.22');
+  price(s, 8.673, 6.398, '$20.17');
+}
+
+function slide23(s) {
+  pricingCard(s, 9.462, 1.972, 'Platinum', '$199,99', LIME);
+  pricingCard(s, 6.492, 1.972, 'Basic', '$99,99', INK);
+  hamburger(s, 12.259, 0.607, 0.414, 0.297);
+  s.addShape('line', { x: 1.189, y: 4.3, w: 1.359, h: 0, line: { color: DARK, width: 1.5 } });
+  s.addText(SUBHEAD, { x: 1.086, y: 1.614, w: 3.908, h: 1.952, valign: 'top', fontFace: HEAD, fontSize: 22, color: DARK, bold: true });
+  s.addText('PLACEHOLDER', { x: 1.086, y: 5.06, w: 3.908, h: 1.44, valign: 'top', align: 'justify', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 9, color: MUTED });
+  s.addShape('rect', { x: 0.989, y: 0, w: 4.07, h: 0.538, fill: { color: LIME }, line: { type: 'none' } });
+}
+
+function slide24(s) {
+  hamburger(s, 12.259, 0.607, 0.414, 0.297);
+  s.addShape('ellipse', { x: 0.66, y: 0.537, w: 1.219, h: 1.219, fill: { color: LIME, transparency: 30 }, line: { type: 'none' } });
+  s.addText(HEADLINE, { x: 1.024, y: 0.757, w: 6.844, h: 0.808, valign: 'top', fontFace: HEAD, fontSize: 21, color: DARK, bold: true });
+  pricingCard(s, 10.045, 2.457, 'Diamond', '$399,99', LIME);
+  pricingCard(s, 7.292, 2.457, 'Gold', '$299,99', INK);
+  pricingCard(s, 4.54, 2.457, 'Platinum', '$199,99', LIME);
+  pricingCard(s, 1.787, 2.457, 'Basic', '$99,99', INK);
+}
+
+function slide25(s) {
+  s.addChart('bar', [
+    { name: 'Series 1', labels: ['1', '2', '3'], values: [4.3, 2.5, 3.5] },
+    { name: 'Series 2', labels: ['1', '2', '3'], values: [2.4, 4.4, 1.8] },
+    { name: 'Series 3', labels: ['1', '2', '3'], values: [2, 2, 3] },
+  ], Object.assign({}, CHART_BASE, {
+    x: 0.84, y: 0.74, w: 5.9, h: 5.38,
+    barDir: 'col', barGrouping: 'clustered', barGapWidthPct: 219, barOverlapPct: -27,
+    valAxisLineShow: false,
+  }));
+  hamburger(s, 12.259, 0.607, 0.414, 0.297);
+  price(s, 1.427, 6.462, '$33.22', { size: 8 });
+  price(s, 3.213, 6.462, '$20.17', { size: 8 });
+  s.addShape('line', { x: 8.161, y: 4.106, w: 1.359, h: 0, line: { color: DARK, width: 1.5 } });
+  s.addText(SUBHEAD, { x: 8.057, y: 1.5, w: 3.908, h: 1.952, valign: 'top', fontFace: HEAD, fontSize: 22, color: DARK, bold: true });
+  s.addText('PLACEHOLDER', { x: 8.057, y: 4.688, w: 3.908, h: 1.213, valign: 'top', align: 'justify', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 9, color: MUTED });
+  s.addShape('rect', { x: 7.981, y: 7.136, w: 4.116, h: 0.35, fill: { color: LIME }, line: { type: 'none' } });
+  price(s, 5.015, 6.462, '$33.22', { size: 8 });
+}
+
+function slide26(s) {
+  // Wrapped in the multi-type form so the area meets both edges of the plot
+  // (crossBetween="midCat"), exactly as in the reference deck.
+  s.addChart([{
+    type: 'area',
+    data: [
+      { name: 'Series 1', labels: DATE_SERIAL, values: [32, 32, 28, 12, 15] },
+      { name: 'Series 2', labels: DATE_SERIAL, values: [12, 12, 12, 21, 28] },
+    ],
+    options: { barGrouping: 'stacked', chartColors: [DARK, LIME] },
+  }], Object.assign({}, CHART_BASE, {
+    x: 6.529, y: 2.508, w: 5.937, h: 4.275,
+    barGrouping: 'stacked', chartColors: [DARK, LIME],
+    catLabelFormatCode: 'm/d/yyyy', catAxisMajorTickMark: 'out',
+  }));
+  hamburger(s, 12.259, 0.607, 0.414, 0.297);
+  s.addText(HEADLINE, { x: 2.542, y: 0.799, w: 7.667, h: 0.841, valign: 'top', align: 'center', fontFace: HEAD, fontSize: 22, color: DARK, bold: true });
+  s.addShape('line', { x: 1.143, y: 2.66, w: 1.359, h: 0, line: { color: DARK, width: 1.5 } });
+  s.addText(BODY4, { x: 1.04, y: 3.396, w: 4.726, h: 1.213, valign: 'top', align: 'justify', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 9, color: MUTED });
+  service(s, 1.04, 5.199, 2.068, '01', 'Service One', BLURB3, { blurbW: 2.143, blurbH: 0.685 });
+  service(s, 3.622, 5.199, 2.068, '02', 'Service Two', BLURB3, { blurbW: 2.143, blurbH: 0.685 });
+}
+
+function slide27(s) {
+  s.addChart('doughnut', [
+    { name: 'Sales', labels: ['1st Qtr', '2nd Qtr', '3rd Qtr', '4th Qtr'], values: [8.2, 3.2, 1.4, 1.2] },
+  ], Object.assign({}, CHART_BASE, {
+    x: -0.12, y: 1.57, w: 7.63, h: 5.09,
+    holeSize: 75, dataBorder: { pt: 1.5, color: WHITE },
+    chartColors: [LIME, DARK, 'BFBFBF', '959595'],
+    showValue: false,
+  }));
+  hamburger(s, 12.259, 0.607, 0.414, 0.297);
+  service(s, 7.339, 3.802, 2.068, '01', 'Service One', BLURB4, { blurbW: 2.143 });
+  service(s, 9.922, 3.802, 2.068, '02', 'Service Two', BLURB4, { blurbW: 2.143 });
+  service(s, 7.339, 5.333, 2.068, '01', 'Service One', BLURB4, { blurbW: 2.143 });
+  service(s, 9.922, 5.333, 2.068, '02', 'Service Two', BLURB4, { blurbW: 2.143 });
+  s.addText(BODY4, { x: 7.339, y: 1.913, w: 4.726, h: 1.213, valign: 'top', align: 'justify', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 9, color: MUTED });
+  s.addShape('rect', { x: 0.729, y: 0, w: 5.938, h: 0.607, fill: { color: LIME }, line: { type: 'none' } });
+  s.addText(SUBHEAD, { x: 2.442, y: 3.469, w: 2.511, h: 1.279, valign: 'top', align: 'center', fontFace: HEAD, fontSize: 14, color: DARK, bold: true });
+}
+
+function slide28(s) {
+  s.addShape('custGeom', { x: 3.142, y: 3.36, w: 0.449, h: 1.051, fill: { color: GREEN_DARK }, line: { type: 'none' }, points: [{ x: 0, y: 1.051 }, { x: 0.449, y: 0.768 }, { x: 0.449, y: 0 }, { x: 0, y: 0.285 }, { x: 0, y: 1.051 }, { close: true }] });
+  s.addShape('custGeom', { x: 2.895, y: 3.488, w: 0.247, h: 0.924, fill: { color: GREEN_MID }, line: { type: 'none' }, points: [{ x: 0.247, y: 0.924 }, { x: 0, y: 0.768 }, { x: 0, y: 0 }, { x: 0.247, y: 0.157 }, { x: 0.247, y: 0.924 }, { close: true }] });
+  s.addShape('custGeom', { x: 5.177, y: 3.488, w: 0.191, h: 0.886, fill: { color: GREEN_MID }, line: { type: 'none' }, points: [{ x: 0.191, y: 0.886 }, { x: 0, y: 0.768 }, { x: 0, y: 0 }, { x: 0.191, y: 0.119 }, { x: 0.191, y: 0.886 }, { close: true }] });
+  s.addShape('custGeom', { x: 3.846, y: 2.649, w: 0.191, h: 0.394, fill: { color: GREEN_MID }, line: { type: 'none' }, points: [{ x: 0.191, y: 0.394 }, { x: 0, y: 0.274 }, { x: 0, y: 0 }, { x: 0.191, y: 0.12 }, { x: 0.191, y: 0.394 }, { close: true }] });
+  s.addShape('custGeom', { x: 3.591, y: 3.36, w: 0.894, h: 1.331, fill: { color: GREEN_MID }, line: { type: 'none' }, points: [{ x: 0.894, y: 1.331 }, { x: 0, y: 0.768 }, { x: 0, y: 0 }, { x: 0.894, y: 0.565 }, { x: 0.894, y: 1.331 }, { close: true }] });
+  s.addShape('custGeom', { x: 4.485, y: 3.488, w: 0.692, h: 1.203, fill: { color: GREEN_DARK }, line: { type: 'none' }, points: [{ x: 0, y: 1.203 }, { x: 0.692, y: 0.768 }, { x: 0.692, y: 0 }, { x: 0, y: 0.438 }, { x: 0, y: 1.203 }, { close: true }] });
+  s.addShape('custGeom', { x: 2.895, y: 2.649, w: 2.472, h: 1.276, fill: { color: GREEN }, line: { type: 'none' }, points: [{ x: 2.442, y: 0.019 }, { x: 0.951, y: 0 }, { x: 1.141, y: 0.12 }, { x: 0, y: 0.838 }, { x: 0.247, y: 0.995 }, { x: 0.696, y: 0.711 }, { x: 1.59, y: 1.276 }, { x: 2.282, y: 0.838 }, { x: 2.472, y: 0.957 }, { x: 2.442, y: 0.019 }, { close: true }] });
+  s.addShape('custGeom', { x: 4.041, y: 4.277, w: 0.692, h: 1.05, fill: { color: LIME_DARK }, line: { type: 'none' }, points: [{ x: 0, y: 1.05 }, { x: 0.692, y: 0.615 }, { x: 0.692, y: 0 }, { x: 0, y: 0.438 }, { x: 0, y: 1.05 }, { close: true }] });
+  s.addShape('custGeom', { x: 2.698, y: 4.151, w: 0.449, h: 0.898, fill: { color: LIME_DARK }, line: { type: 'none' }, points: [{ x: 0, y: 0.898 }, { x: 0.449, y: 0.614 }, { x: 0.449, y: 0 }, { x: 0, y: 0.284 }, { x: 0, y: 0.898 }, { close: true }] });
+  s.addShape('custGeom', { x: 2.451, y: 4.277, w: 0.247, h: 0.772, fill: { color: LIME_MID }, line: { type: 'none' }, points: [{ x: 0.247, y: 0.772 }, { x: 0, y: 0.615 }, { x: 0, y: 0 }, { x: 0.247, y: 0.157 }, { x: 0.247, y: 0.772 }, { close: true }] });
+  s.addShape('custGeom', { x: 3.147, y: 4.151, w: 0.894, h: 1.177, fill: { color: LIME_MID }, line: { type: 'none' }, points: [{ x: 0.894, y: 1.177 }, { x: 0, y: 0.614 }, { x: 0, y: 0 }, { x: 0.894, y: 0.564 }, { x: 0.894, y: 1.177 }, { close: true }] });
+  s.addShape('custGeom', { x: 2.451, y: 3.558, w: 2.282, h: 1.157, fill: { color: LIME }, line: { type: 'none' }, points: [{ x: 0.696, y: 0.592 }, { x: 1.589, y: 1.157 }, { x: 2.282, y: 0.719 }, { x: 1.14, y: 0 }, { x: 0, y: 0.719 }, { x: 0.247, y: 0.876 }, { x: 0.696, y: 0.592 }, { close: true }] });
+  s.addShape('custGeom', { x: 3.594, y: 5.068, w: 0.693, h: 0.896, fill: { color: GREEN_DARK }, line: { type: 'none' }, points: [{ x: 0, y: 0.896 }, { x: 0.693, y: 0.461 }, { x: 0.693, y: 0 }, { x: 0, y: 0.438 }, { x: 0, y: 0.896 }, { close: true }] });
+  s.addShape('custGeom', { x: 2.254, y: 4.942, w: 0.448, h: 0.744, fill: { color: GREEN_DARK }, line: { type: 'none' }, points: [{ x: 0, y: 0.744 }, { x: 0.448, y: 0.46 }, { x: 0.448, y: 0 }, { x: 0, y: 0.284 }, { x: 0, y: 0.744 }, { close: true }] });
+  s.addShape('custGeom', { x: 2.702, y: 4.942, w: 0.893, h: 1.023, fill: { color: GREEN_MID }, line: { type: 'none' }, points: [{ x: 0.893, y: 1.023 }, { x: 0, y: 0.46 }, { x: 0, y: 0 }, { x: 0.893, y: 0.564 }, { x: 0.893, y: 1.023 }, { close: true }] });
+  s.addShape('custGeom', { x: 2.005, y: 5.068, w: 0.249, h: 0.618, fill: { color: GREEN_MID }, line: { type: 'none' }, points: [{ x: 0.249, y: 0.618 }, { x: 0, y: 0.461 }, { x: 0, y: 0 }, { x: 0.249, y: 0.157 }, { x: 0.249, y: 0.618 }, { close: true }] });
+  s.addShape('custGeom', { x: 2.005, y: 4.349, w: 2.283, h: 1.157, fill: { color: GREEN }, line: { type: 'none' }, points: [{ x: 0.697, y: 0.592 }, { x: 1.59, y: 1.157 }, { x: 2.283, y: 0.719 }, { x: 1.142, y: 0 }, { x: 0, y: 0.719 }, { x: 0.249, y: 0.876 }, { x: 0.697, y: 0.592 }, { close: true }] });
+  s.addShape('custGeom', { x: 2.702, y: 5.859, w: 1.141, h: 1.026, fill: { color: LIME_DARK }, line: { type: 'none' }, points: [{ x: 0, y: 1.026 }, { x: 1.141, y: 0.307 }, { x: 1.141, y: 0 }, { x: 0, y: 0.719 }, { x: 0, y: 1.026 }, { x: 0, y: 1.026 }, { close: true }] });
+  s.addShape('custGeom', { x: 1.561, y: 5.859, w: 1.14, h: 1.026, fill: { color: LIME_MID }, line: { type: 'none' }, points: [{ x: 1.14, y: 1.026 }, { x: 0, y: 0.307 }, { x: 0, y: 0 }, { x: 1.14, y: 0.719 }, { x: 1.14, y: 1.026 }, { x: 1.14, y: 1.026 }, { close: true }] });
+  s.addShape('custGeom', { x: 1.561, y: 5.139, w: 2.282, h: 1.44, fill: { color: LIME }, line: { type: 'none' }, points: [{ x: 0, y: 0.72 }, { x: 1.14, y: 0 }, { x: 2.282, y: 0.72 }, { x: 1.14, y: 1.44 }, { x: 0, y: 0.72 }, { close: true }] });
+  s.addText('02', { x: 3.274, y: 4.774, w: 0.716, h: 0.716, valign: 'middle', margin: 0, align: 'center', fontFace: HEAD, fontSize: 24, color: WHITE });
+  s.addText('03', { x: 3.72, y: 3.983, w: 0.716, h: 0.716, valign: 'middle', margin: 0, align: 'center', fontFace: HEAD, fontSize: 24, color: WHITE });
+  s.addText('01', { x: 2.83, y: 5.565, w: 0.716, h: 0.716, valign: 'middle', margin: 0, align: 'center', fontFace: HEAD, fontSize: 24, color: WHITE });
+  s.addText('04', { x: 4.164, y: 3.193, w: 0.716, h: 0.716, valign: 'middle', margin: 0, align: 'center', fontFace: HEAD, fontSize: 24, color: WHITE });
+  hamburger(s, 12.259, 0.607, 0.414, 0.297);
+  service(s, 7.033, 4.072, 2.068, '01', 'Service One', BLURB1);
+  service(s, 9.704, 4.072, 2.068, '02', 'Service Two', BLURB1);
+  service(s, 7.033, 5.594, 2.068, '03', 'Service Three', BLURB1);
+  service(s, 9.704, 5.594, 2.068, '04', 'Service Four', BLURB1);
+  s.addText('PLACEHOLDER', { x: 7.033, y: 2.685, w: 4.739, h: 0.758, valign: 'top', align: 'justify', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 9, color: MUTED });
+  s.addShape('ellipse', { x: 0.871, y: 0.695, w: 1.219, h: 1.219, fill: { color: LIME, transparency: 30 }, line: { type: 'none' } });
+  s.addText(HEADLINE, { x: 1.235, y: 0.914, w: 6.844, h: 0.808, valign: 'top', fontFace: HEAD, fontSize: 21, color: DARK, bold: true });
+  price(s, 9.122, 1.421, '$33.22', { size: 7 });
+  price(s, 10.679, 1.421, '$20.17', { size: 7 });
+}
+
+function slide29(s) {
+  s.addShape('custGeom', { x: 6.661, y: 2.952, w: 1.267, h: 0.987, fill: { color: GREEN_DARK }, line: { type: 'none' }, points: [{ x: 1.267, y: 0 }, { x: 0.819, y: 0.928 }, { x: 0, y: 0.987 }, { x: 0.424, y: 0.06 }, { x: 1.267, y: 0 }, { close: true }] });
+  s.addShape('custGeom', { x: 6.143, y: 2.305, w: 0.941, h: 1.651, fill: { color: GREEN_MID }, line: { type: 'none' }, points: [{ x: 0.941, y: 0.707 }, { x: 0.509, y: 1.651 }, { x: 0, y: 0.916 }, { x: 0.404, y: 0 }, { x: 0.941, y: 0.707 }, { close: true }] });
+  s.addShape('custGeom', { x: 6.547, y: 2.295, w: 1.381, h: 0.717, fill: { color: GREEN }, line: { type: 'none' }, points: [{ x: 1.381, y: 0.657 }, { x: 0.809, y: 0 }, { x: 0, y: 0.01 }, { x: 0.537, y: 0.717 }, { x: 1.381, y: 0.657 }, { close: true }] });
+  s.addShape('custGeom', { x: 6.382, y: 3.147, w: 1.384, h: 2.6, fill: { color: LIME_MID }, line: { type: 'none' }, points: [{ x: 0.807, y: 0 }, { x: 1.384, y: 0.759 }, { x: 0.485, y: 2.6 }, { x: 0, y: 1.872 }, { x: 0.807, y: 0 }, { close: true }] });
+  s.addShape('custGeom', { x: 7.188, y: 3.088, w: 1.488, h: 0.818, fill: { color: LIME }, line: { type: 'none' }, points: [{ x: 0.577, y: 0.818 }, { x: 1.488, y: 0.725 }, { x: 0.857, y: 0 }, { x: 0, y: 0.059 }, { x: 0.577, y: 0.818 }, { close: true }] });
+  s.addShape('custGeom', { x: 6.867, y: 3.813, w: 1.809, h: 1.934, fill: { color: LIME_DARK }, line: { type: 'none' }, points: [{ x: 1.809, y: 0 }, { x: 0.899, y: 0.093 }, { x: 0.899, y: 0.093 }, { x: 0, y: 1.934 }, { x: 0.832, y: 1.783 }, { x: 1.809, y: 0 }, { close: true }] });
+  s.addShape('custGeom', { x: 5.093, y: 3.023, w: 1.822, h: 1.936, fill: { color: LIME_DARK }, line: { type: 'none' }, points: [{ x: 0.797, y: 0.074 }, { x: 1.822, y: 0 }, { x: 1.043, y: 1.668 }, { x: 0, y: 1.936 }, { x: 0.797, y: 0.074 }, { close: true }] });
+  s.addShape('custGeom', { x: 4.657, y: 2.319, w: 1.233, h: 2.64, fill: { color: LIME_MID }, line: { type: 'none' }, points: [{ x: 0.667, y: 0 }, { x: 0, y: 1.919 }, { x: 0.435, y: 2.64 }, { x: 1.233, y: 0.777 }, { x: 0.667, y: 0 }, { close: true }] });
+  s.addShape('custGeom', { x: 5.324, y: 2.307, w: 1.59, h: 0.79, fill: { color: LIME }, line: { type: 'none' }, points: [{ x: 0.566, y: 0.788 }, { x: 1.59, y: 0.716 }, { x: 1.043, y: 0 }, { x: 0, y: 0.012 }, { x: 0.566, y: 0.79 }, { x: 0.566, y: 0.788 }, { close: true }] });
+  s.addShape('custGeom', { x: 5.183, y: 3.233, w: 1.386, h: 2.725, fill: { color: GREEN_MID }, line: { type: 'none' }, points: [{ x: 0.807, y: 0 }, { x: 0.805, y: 0 }, { x: 0, y: 1.877 }, { x: 0.513, y: 2.725 }, { x: 1.386, y: 0.796 }, { x: 0.807, y: 0 }, { close: true }] });
+  s.addShape('custGeom', { x: 5.99, y: 3.16, w: 1.608, h: 0.868, fill: { color: GREEN }, line: { type: 'none' }, points: [{ x: 1.028, y: 0 }, { x: 0, y: 0.072 }, { x: 0.58, y: 0.868 }, { x: 1.608, y: 0.763 }, { x: 1.608, y: 0.763 }, { x: 1.028, y: 0 }, { close: true }] });
+  s.addShape('custGeom', { x: 5.696, y: 3.924, w: 1.901, h: 2.034, fill: { color: GREEN_DARK }, line: { type: 'none' }, points: [{ x: 0.873, y: 0.105 }, { x: 0, y: 2.034 }, { x: 0.994, y: 1.855 }, { x: 1.901, y: 0 }, { x: 0.873, y: 0.105 }, { close: true }] });
+  s.addText('1', { x: 5.9, y: 2.357, w: 0.37, h: 0.572, valign: 'top', fontFace: HEAD, fontSize: 28, color: WHITE });
+  s.addText('2', { x: 7.05, y: 2.329, w: 0.407, h: 0.572, valign: 'top', fontFace: HEAD, fontSize: 28, color: WHITE });
+  s.addText('3', { x: 7.727, y: 3.177, w: 0.412, h: 0.572, valign: 'top', fontFace: HEAD, fontSize: 28, color: WHITE });
+  s.addText('4', { x: 6.564, y: 3.248, w: 0.447, h: 0.64, valign: 'top', fontFace: HEAD, fontSize: 32, color: WHITE });
+  hamburger(s, 12.259, 0.607, 0.414, 0.297);
+  s.addText(HEADLINE, { x: 2.986, y: 0.771, w: 7.361, h: 0.774, valign: 'top', align: 'center', fontFace: HEAD, fontSize: 20, color: DARK, bold: true });
+  service(s, 1.391, 2.534, 2.068, '01', 'Service One', BLURB5, { blurbH: 0.685 });
+  service(s, 1.391, 4.52, 2.068, '02', 'Service Two', BLURB5, { blurbH: 0.685 });
+  service(s, 9.874, 2.528, 2.068, '03', 'Service Three', BLURB5, { blurbH: 0.685 });
+  service(s, 9.874, 4.515, 2.068, '04', 'Service Four', BLURB5, { blurbH: 0.685 });
+  s.addText('PLACEHOLDER', { x: 2.998, y: 6.624, w: 7.349, h: 0.304, valign: 'top', align: 'center', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 9, color: MUTED });
+}
+
+function slide30(s) {
+  photoFrame(s, 3.438, 1.167, 3.229, 5.167);
+  s.addText('Thanks', { x: 4.437, y: 3.094, w: 4.476, h: 1.313, valign: 'top', align: 'center', fontFace: HEAD, fontSize: 72, color: WHITE, bold: true, underline: { style: 'sng' } });
+  hamburger(s, 12.263, 0.607, 0.414, 0.297);
+  price(s, 10.919, 5.957, '$33.22');
+  price(s, 10.919, 5.356, '$20.17');
+  s.addText([
+    { text: BODY1, options: { align: 'justify', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 8, color: MUTED, breakLine: true } },
+    { text: '', options: { align: 'justify', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 8, color: MUTED, breakLine: true } },
+    { text: BODY2, options: { align: 'justify', lineSpacingMultiple: 1.5, fontFace: BODY, fontSize: 8, color: MUTED } },
+  ], { x: 0.809, y: 1.24, w: 1.755, h: 2.301, valign: 'top' });
+  s.addText('presentation template', { x: 5.676, y: 4.272, w: 1.982, h: 0.269, valign: 'top', align: 'center', fontFace: HEAD, fontSize: 10, color: WHITE });
+  price(s, 10.919, 4.752, '$12.09');
+  s.addShape('rect', { x: 0, y: 7.139, w: 1.667, h: 0.361, fill: { color: LIME }, line: { type: 'none' } });
+  photoFrame(s, 6.667, 1.167, 3.229, 5.167);
+}
+
+
+// ---------------------------------------------------------------- assembly
+const SLIDES = [
+  slide01,
+  slide02,
+  slide03,
+  slide04,
+  slide05,
+  slide06,
+  slide07,
+  slide08,
+  slide09,
+  slide10,
+  slide11,
+  slide12,
+  slide13,
+  slide14,
+  slide15,
+  slide16,
+  slide17,
+  slide18,
+  slide19,
+  slide20,
+  slide21,
+  slide22,
+  slide23,
+  slide24,
+  slide25,
+  slide26,
+  slide27,
+  slide28,
+  slide29,
+  slide30,
+];
+
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'DECK', width: SLIDE_W, height: SLIDE_H });
+pptx.layout = 'DECK';
+pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
+
+SLIDES.forEach(build => build(pptx.addSlide()));
+
+pptx.writeFile({ fileName: path.join(__dirname, '16b17040-78d6-474d-8234-6c880b761d59_grok_final.pptx') })
+  .then(f => console.log('wrote ' + f));

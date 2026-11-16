@@ -1,0 +1,792 @@
+/**
+ * CAPPE — Coffee Shop Brand Guidelines deck (25 slides, 13.333in x 7.5in).
+ * Rebuilt with pptxgenjs only. Photographs in the original are replaced by
+ * flat "[image]" placeholder rectangles.
+ *
+ * Run: node 1410215c-093c-4b7d-aa60-ddc038699cf6_grok_final.js
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ palette */
+const INK = '0A0A0A'; // near-black
+const CREAM = 'FBF8EF'; // paper
+const SAGE = 'BEC9C3'; // muted green
+const GOLD = 'D1B37D'; // loyalty gold card
+const STAR = 'FFC000'; // filled rating star
+const PHOTO = '6B8D8C'; // stand-in colour for the removed photographs
+
+const SERIF = 'Cormorant Garamond';
+const SCRIPT = 'Parisienne';
+
+/* Google-Slides text insets used throughout the source deck, in points:
+   0.1in left/right and 0.05in top/bottom. */
+const INSET = [7.2, 7.2, 3.6, 3.6]; // [left, right, bottom, top]
+
+/* ------------------------------------------------------- text-style helpers */
+// Every text box in the deck is one of these five roles.
+const STYLE = {
+  head: { fontFace: SERIF, fontSize: 36, bold: true }, // 36pt display heading
+  script: { fontFace: SCRIPT, fontSize: 36 }, // 36pt Parisienne accent
+  sub: { fontFace: SERIF, fontSize: 18, bold: true }, // 18pt sub heading
+  label: { fontFace: SERIF, fontSize: 14, bold: true }, // 14pt column label
+  body: { fontFace: SERIF, fontSize: 12 }, // 12pt paragraph
+};
+
+function box(slide, runs, opts) {
+  slide.addText(runs, Object.assign({ margin: INSET, valign: 'top', isTextBox: true }, opts));
+}
+
+/**
+ * Heading: array of paragraphs, each paragraph an array of [text, 'b'|'s'] runs
+ * where 'b' = bold serif and 's' = Parisienne script.
+ */
+function heading(slide, x, y, w, h, paragraphs, color, align) {
+  const runs = [];
+  paragraphs.forEach((para, pi) => {
+    para.forEach(([text, kind], ri) => {
+      runs.push({
+        text,
+        options: Object.assign({ color }, kind === 's' ? STYLE.script : STYLE.head, {
+          breakLine: ri === para.length - 1 && pi < paragraphs.length - 1,
+        }),
+      });
+    });
+  });
+  box(slide, runs, { x, y, w, h, align: align || 'left' });
+}
+
+/** 12pt paragraph copy, 1.5 line spacing (`lines` may be an array of paragraphs). */
+function body(slide, x, y, w, h, lines, color, align, size) {
+  const paras = Array.isArray(lines) ? lines : [lines];
+  const runs = paras.map((text, i) => ({
+    text,
+    options: Object.assign({ color }, STYLE.body, { fontSize: size || 12, breakLine: i < paras.length - 1 }),
+  }));
+  box(slide, runs, { x, y, w, h, align: align || 'left', lineSpacingMultiple: 1.5 });
+}
+
+/** 14pt / 18pt bold caption; `lines` may hold several stacked paragraphs. */
+function label(slide, x, y, w, h, lines, color, align, style) {
+  const paras = Array.isArray(lines) ? lines : [lines];
+  const base = style || STYLE.label;
+  const runs = paras.map((text, i) => ({
+    text,
+    options: Object.assign({ color }, base, { breakLine: i < paras.length - 1 }),
+  }));
+  box(slide, runs, { x, y, w, h, align: align || 'left' });
+}
+
+/* ---------------------------------------------------------- shape  helpers */
+function rect(slide, x, y, w, h, fill, lineColor) {
+  slide.addShape('rect', {
+    x, y, w, h,
+    fill: fill ? { color: fill } : { type: 'none' },
+    line: lineColor ? { color: lineColor, width: 1 } : { type: 'none' },
+  });
+}
+
+/** Fully rounded "pill" button (roundRect with adj = 50%). */
+function pill(slide, x, y, w, h, fill, lineColor) {
+  slide.addShape('roundRect', {
+    x, y, w, h,
+    rectRadius: Math.min(w, h) / 2,
+    fill: fill ? { color: fill } : { type: 'none' },
+    line: lineColor ? { color: lineColor, width: 1 } : { type: 'none' },
+  });
+}
+
+/** Thin rule; `dir` 'left' puts the stealth arrow head on the left-hand end. */
+function arrow(slide, x, y, w, dir) {
+  slide.addShape('line', {
+    x, y, w, h: 0,
+    line: Object.assign(
+      { color: INK, width: 1 },
+      dir === 'right' ? { endArrowType: 'stealth' } : { beginArrowType: 'stealth' }
+    ),
+  });
+}
+
+/** Plain hairline used by the grid-system diagram on slide 9. */
+function rule(slide, x, y, w, h, color) {
+  slide.addShape('line', { x, y, w, h, line: { color, width: 1 } });
+}
+
+/** Stand-in for a photograph that was stripped out of the source deck. */
+function photo(slide, x, y, w, h) {
+  slide.addShape('rect', { x, y, w, h, fill: { color: PHOTO }, line: { type: 'none' } });
+  slide.addText('[image]', {
+    x, y, w, h, align: 'center', valign: 'middle', margin: 0,
+    fontFace: SERIF, fontSize: 12, color: CREAM,
+  });
+}
+
+/* --------------------------------------------------------------- vector art
+ * Two custom-geometry drawings are reused all over the deck: the CAPPE cup
+ * mark and the pair of coffee beans. Both are stored as normalised outlines
+ * (0..1 inside their own bounding box, offsets are shape-relative) in a
+ * compact token stream:
+ *   'm' x y            move to
+ *   'l' x y            line to
+ *   'c' x1 y1 x2 y2 x y  cubic bezier
+ *   'z'                close sub-path
+ */
+function vectorArt(slide, x, y, w, h, outlines, color, rotate) {
+  outlines.forEach((tokens) => {
+    const points = [];
+    for (let i = 0; i < tokens.length; ) {
+      const op = tokens[i++];
+      if (op === 'z') {
+        points.push({ close: true });
+      } else if (op === 'c') {
+        points.push({
+          x: tokens[i + 4] * w, y: tokens[i + 5] * h,
+          curve: {
+            type: 'cubic',
+            x1: tokens[i] * w, y1: tokens[i + 1] * h,
+            x2: tokens[i + 2] * w, y2: tokens[i + 3] * h,
+          },
+        });
+        i += 6;
+      } else {
+        points.push({ x: tokens[i] * w, y: tokens[i + 1] * h, moveTo: op === 'm' });
+        i += 2;
+      }
+    }
+    slide.addShape('custGeom', {
+      x, y, w, h, points, rotate: rotate || 0,
+      fill: { color }, line: { type: 'none' },
+    });
+  });
+}
+
+const CUP_ART = [
+  // handle ring (outer + inner loop)
+  [
+    'm', 0.896, 0.688, 'c', 0.892, 0.688, 0.888, 0.688, 0.884, 0.687, 'c', 0.83, 0.678, 0.797, 0.616, 0.801, 0.564,
+    'c', 0.805, 0.526, 0.825, 0.491, 0.855, 0.471, 'c', 0.881, 0.452, 0.912, 0.447, 0.941, 0.458,
+    'c', 0.983, 0.476, 1.003, 0.53, 0.999, 0.573, 'c', 0.996, 0.609, 0.98, 0.642, 0.954, 0.664,
+    'c', 0.938, 0.679, 0.917, 0.687, 0.896, 0.688, 'z', 'm', 0.913, 0.488,
+    'c', 0.898, 0.489, 0.885, 0.494, 0.873, 0.502, 'c', 0.852, 0.516, 0.837, 0.54, 0.834, 0.568,
+    'c', 0.832, 0.602, 0.855, 0.646, 0.889, 0.651, 'c', 0.905, 0.654, 0.921, 0.648, 0.934, 0.637,
+    'c', 0.952, 0.62, 0.964, 0.597, 0.967, 0.571, 'l', 0.967, 0.571, 'c', 0.969, 0.541, 0.956, 0.503, 0.929, 0.492,
+    'c', 0.924, 0.49, 0.918, 0.488, 0.912, 0.488, 'z'
+  ],
+  // cup bowl and saucer
+  [
+    'm', 0.785, 0.54, 'c', 0.785, 0.535, 0.785, 0.53, 0.785, 0.525, 'l', 0.785, 0.325,
+    'c', 0.784, 0.309, 0.772, 0.297, 0.758, 0.298, 'c', 0.757, 0.298, 0.756, 0.298, 0.755, 0.298,
+    'c', 0.599, 0.32, 0.442, 0.327, 0.285, 0.321, 'c', 0.207, 0.317, 0.133, 0.311, 0.064, 0.303,
+    'c', 0.034, 0.297, 0.006, 0.32, 0.001, 0.353, 'c', 0, 0.355, 0, 0.358, 0, 0.36, 'l', 0, 0.525,
+    'c', 0, 0.529, 0, 0.534, 0, 0.538, 'c', -0.004, 0.641, 0.031, 0.742, 0.097, 0.815,
+    'c', 0.155, 0.877, 0.23, 0.917, 0.311, 0.929, 'c', 0.282, 0.962, 0.242, 0.979, 0.201, 0.976,
+    'c', 0.182, 0.989, 0.201, 0.997, 0.201, 0.997, 'c', 0.201, 0.997, 0.29, 0.994, 0.388, 0.99,
+    'c', 0.485, 0.986, 0.577, 1.008, 0.588, 0.997, 'c', 0.6, 0.985, 0.588, 0.977, 0.588, 0.977,
+    'c', 0.546, 0.977, 0.504, 0.961, 0.471, 0.93, 'c', 0.551, 0.92, 0.626, 0.882, 0.685, 0.822,
+    'c', 0.754, 0.748, 0.79, 0.645, 0.785, 0.54, 'z'
+  ],
+  // left steam curl
+  [
+    'm', 0.361, 0.042, 'c', 0.352, 0.039, 0.342, 0.042, 0.336, 0.05, 'c', 0.329, 0.059, 0.324, 0.07, 0.322, 0.081,
+    'c', 0.319, 0.093, 0.318, 0.104, 0.32, 0.116, 'c', 0.321, 0.124, 0.326, 0.132, 0.332, 0.136,
+    'c', 0.336, 0.138, 0.343, 0.139, 0.351, 0.144, 'c', 0.359, 0.149, 0.365, 0.156, 0.37, 0.164,
+    'c', 0.379, 0.18, 0.383, 0.198, 0.381, 0.215, 'c', 0.377, 0.251, 0.349, 0.277, 0.316, 0.274,
+    'c', 0.313, 0.273, 0.311, 0.27, 0.311, 0.267, 'c', 0.311, 0.264, 0.313, 0.262, 0.316, 0.261, 'l', 0.316, 0.261,
+    'c', 0.337, 0.256, 0.352, 0.237, 0.353, 0.213, 'c', 0.353, 0.203, 0.35, 0.192, 0.344, 0.184,
+    'c', 0.342, 0.18, 0.339, 0.177, 0.336, 0.175, 'c', 0.333, 0.173, 0.327, 0.172, 0.319, 0.168,
+    'c', 0.303, 0.159, 0.292, 0.141, 0.29, 0.121, 'c', 0.288, 0.104, 0.29, 0.087, 0.296, 0.072,
+    'c', 0.301, 0.056, 0.31, 0.042, 0.322, 0.032, 'c', 0.335, 0.02, 0.354, 0.02, 0.368, 0.032,
+    'c', 0.37, 0.034, 0.37, 0.039, 0.368, 0.041, 'c', 0.368, 0.041, 0.368, 0.041, 0.368, 0.041,
+    'c', 0.366, 0.043, 0.364, 0.044, 0.361, 0.043, 'z'
+  ],
+  // right steam curl
+  [
+    'm', 0.47, 0.018, 'c', 0.451, 0.01, 0.434, 0.036, 0.432, 0.058, 'c', 0.431, 0.069, 0.433, 0.08, 0.437, 0.091,
+    'c', 0.441, 0.101, 0.448, 0.109, 0.457, 0.115, 'c', 0.463, 0.12, 0.469, 0.126, 0.474, 0.133,
+    'c', 0.479, 0.139, 0.484, 0.146, 0.488, 0.153, 'c', 0.497, 0.168, 0.501, 0.186, 0.5, 0.204,
+    'c', 0.497, 0.223, 0.485, 0.239, 0.469, 0.247, 'c', 0.455, 0.253, 0.44, 0.254, 0.425, 0.251,
+    'c', 0.422, 0.25, 0.42, 0.246, 0.421, 0.243, 'c', 0.421, 0.24, 0.424, 0.238, 0.426, 0.238, 'l', 0.426, 0.238,
+    'c', 0.438, 0.237, 0.449, 0.233, 0.459, 0.225, 'c', 0.467, 0.22, 0.472, 0.211, 0.473, 0.201,
+    'c', 0.472, 0.19, 0.468, 0.18, 0.462, 0.171, 'c', 0.458, 0.166, 0.455, 0.161, 0.451, 0.156,
+    'c', 0.448, 0.152, 0.444, 0.148, 0.439, 0.145, 'c', 0.426, 0.136, 0.415, 0.121, 0.409, 0.105,
+    'c', 0.403, 0.088, 0.402, 0.07, 0.406, 0.053, 'c', 0.409, 0.036, 0.418, 0.02, 0.431, 0.01,
+    'c', 0.444, -0.003, 0.464, -0.003, 0.478, 0.009, 'c', 0.48, 0.011, 0.48, 0.015, 0.478, 0.018,
+    'c', 0.476, 0.02, 0.474, 0.02, 0.471, 0.019, 'z'
+  ],
+];
+
+const BEAN_ART = [
+  // back bean
+  [
+    'm', 0.746, 0.279, 'c', 0.792, 0.249, 0.836, 0.216, 0.877, 0.18, 'c', 0.882, 0.175, 0.888, 0.169, 0.893, 0.163,
+    'c', 0.899, 0.157, 0.908, 0.154, 0.917, 0.155, 'c', 0.926, 0.155, 0.934, 0.16, 0.939, 0.167,
+    'c', 0.971, 0.216, 0.99, 0.271, 0.996, 0.328, 'c', 0.997, 0.337, 0.998, 0.346, 0.998, 0.354,
+    'c', 0.999, 0.432, 0.994, 0.501, 0.962, 0.572, 'c', 0.959, 0.581, 0.955, 0.59, 0.951, 0.6,
+    'c', 0.93, 0.647, 0.903, 0.693, 0.871, 0.735, 'c', 0.712, 0.945, 0.458, 1.043, 0.264, 0.982,
+    'c', 0.25, 0.977, 0.243, 0.964, 0.246, 0.951, 'c', 0.31, 0.697, 0.469, 0.471, 0.695, 0.312,
+    'c', 0.712, 0.301, 0.729, 0.29, 0.746, 0.279, 'z'
+  ],
+  // front bean
+  [
+    'm', 0.814, 0.055, 'c', 0.828, 0.064, 0.841, 0.073, 0.853, 0.084, 'c', 0.863, 0.093, 0.864, 0.107, 0.856, 0.117,
+    'c', 0.814, 0.166, 0.757, 0.204, 0.701, 0.241, 'c', 0.684, 0.252, 0.667, 0.263, 0.651, 0.274,
+    'c', 0.425, 0.434, 0.264, 0.659, 0.196, 0.912, 'c', 0.192, 0.925, 0.178, 0.933, 0.164, 0.93,
+    'c', 0.161, 0.93, 0.158, 0.928, 0.155, 0.927, 'l', 0.155, 0.927, 'c', -0.042, 0.802, -0.055, 0.505, 0.127, 0.265,
+    'c', 0.309, 0.024, 0.616, -0.07, 0.814, 0.055, 'z'
+  ],
+];
+
+/** The CAPPE cup mark. */
+function cupMark(slide, x, y, w, h, color) {
+  vectorArt(slide, x, y, w, h, CUP_ART, color);
+}
+
+/**
+ * Coffee-bean cluster: a large upright bean plus a smaller one tilted 300deg
+ * above and to its left. (x, y) is the top-left of the large bean.
+ */
+function beans(slide, x, y) {
+  vectorArt(slide, x, y, 0.535, 0.585, BEAN_ART, INK);
+  vectorArt(slide, x - 0.416, y - 0.221, 0.394, 0.431, BEAN_ART, INK, 300);
+}
+
+/* ------------------------------------------------------------- slide chrome
+ * Four master variants exist; they differ only in colour scheme and which
+ * navigation item is underlined.
+ */
+const NAV = [
+  { text: 'Home', x: 3.327, w: 0.614, ux: 3.285, uw: 0.689 },
+  { text: 'About', x: 4.603, w: 0.633, ux: 4.569, uw: 0.689 },
+  { text: 'Brand Guide', x: 5.896, w: 1.054, ux: 5.838, uw: 1.149 },
+  { text: 'Contacts', x: 7.615, w: 0.793, ux: 7.536, uw: 0.915 },
+];
+
+const MASTERS = {
+  1: { bg: SAGE, fg: CREAM, tag: INK, tagText: CREAM, active: 'Home' },
+  2: { bg: CREAM, fg: INK, tag: SAGE, tagText: INK, active: 'About' },
+  3: { bg: CREAM, fg: INK, tag: SAGE, tagText: INK, active: 'Brand Guide' },
+  4: { bg: CREAM, fg: INK, tag: SAGE, tagText: INK, active: 'Contacts' },
+};
+
+function newSlide(pptx, masterId) {
+  const m = MASTERS[masterId];
+  const slide = pptx.addSlide();
+  slide.background = { color: m.bg };
+
+  cupMark(slide, 0.76, 0.601, 0.432, 0.392, m.fg);
+  box(slide, [{ text: 'CAPPE', options: { fontFace: SERIF, fontSize: 18, bold: true, color: m.fg } }],
+    { x: 1.192, y: 0.589, w: 0.973, h: 0.404 });
+  box(slide, [{ text: 'Fresh Coffee Shop', options: { fontFace: SERIF, fontSize: 7, color: m.fg } }],
+    { x: 1.192, y: 0.855, w: 0.905, h: 0.219 });
+
+  pill(slide, 9.473, 0.61, 3.1, 0.383, m.tag);
+  box(slide, [{ text: 'Brand Guidelines Presentation', options: { fontFace: SERIF, fontSize: 12, color: m.tagText } }],
+    { x: 9.918, y: 0.662, w: 2.211, h: 0.303, align: 'center' });
+
+  NAV.forEach((item) => {
+    const on = item.text === m.active;
+    box(slide, [{ text: item.text, options: { fontFace: SERIF, fontSize: 12, bold: on, color: m.fg } }],
+      { x: item.x, y: 0.662, w: item.w, h: 0.303, align: 'center' });
+    if (on) rule(slide, item.ux, 0.971, item.uw, 0, m.fg);
+  });
+  return slide;
+}
+
+/* ------------------------------------------------------------- filler copy
+ * The source deck recycles a handful of lorem-ipsum blocks; naming them keeps
+ * the slide builders readable.
+ */
+const LOREM_DOLOR = 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor';
+const LOREM = LOREM_DOLOR + '. Aenean massa. Cum sociis';
+const LOREM_SOCIIS = LOREM + '.';
+const LOREM_MONTES = LOREM + ' natoque penatibus et magnis dis parturient montes';
+const LOREM_SHORT = LOREM + ' natoque penatibus et magnis dis parturient.';
+const LOREM_MAGNIS = LOREM + ' natoque penatibus et Magnis.';
+const LOREM_DIS = LOREM + ' natoque penatibus et magnis dis.';
+const LOREM_FELIS = LOREM_MONTES + ', nascetur ridiculus mus. Donec quam felis.';
+const LOREM_FULL = LOREM_MONTES +
+  ', nascetur ridiculus mus. Donec quam felis, ultricies nec, pellentesque eu, pretium quis, sem. Nulla consequat massa quis enim.';
+
+const DONEC = 'Donec pede justo, fringilla vel, aliquet nec, vulputate eget, arcu. In enim justo';
+const DONEC_JUSTO = DONEC + '.';
+const DONEC_ABYSS = DONEC + ', rhoncus ut, abyss imperdiet a, venenatis.';
+const DONEC_VENENATIS = DONEC + ', rhoncus ut, imperdiet a, venenatis.';
+const DONEC_VITAE = DONEC + ', rhoncus ut, imperdiet a, venenatis vitae, justo.';
+const DONEC_FELIS = DONEC_VITAE + ' Nullam dictum felis.';
+const DONEC_PEDE = DONEC_VITAE + ' Nullam dictum felis eu pede.';
+const DONEC_MOLLIS = DONEC_VITAE + ' Nullam dictum felis eu pede mollis.';
+const DONEC_INTEGER = DONEC_VITAE + ' Nullam dictum felis eu pede mollis pretium. Integer.';
+const DONEC_DAPIBUS = DONEC_VITAE + ' Nullam dictum felis eu pede mollis pretium. Integer tincidunt. Cras dapibus.';
+
+/* ================================================================= slides */
+
+// 1 — Cover: sage backdrop, headline + CTA pill, tall photo on the right.
+function slide01(pptx) {
+  const s = newSlide(pptx, 1);
+  heading(s, 0.634, 2.763, 6.753, 1.313,
+    [[['Sip, Savor, and Create Moments,', 'b']], [['In our ', 'b'], ['Coffee Sanctuary.', 's']]], CREAM);
+  beans(s, 7.712, 2.397);
+  body(s, 0.634, 4.172, 6.033, 0.679, LOREM_MONTES, CREAM);
+  pill(s, 0.76, 5.237, 2.756, 0.376, INK);
+  body(s, 1.1, 5.273, 2.076, 0.303, 'Let’s start the journey now!', CREAM, 'center');
+  arrow(s, 3.989, 5.432, 1.441, 'left');
+  photo(s, 9.043, 1.387, 4.29, 5.512);
+}
+
+// 2 — "Our Brands" intro, two stacked photos on the left.
+function slide02(pptx) {
+  const s = newSlide(pptx, 2);
+  pill(s, 5.823, 5.763, 2.677, 0.549, null, INK);
+  heading(s, 5.727, 2.566, 5.705, 1.313,
+    [[['We would like to Introduce ', 'b'], ['Our Brands', 's']]], INK);
+  body(s, 5.727, 3.878, 6.033, 1.285, LOREM_FULL, INK);
+  beans(s, 12.062, 2.314);
+  pill(s, 7.92, 5.742, 4.273, 0.592, INK);
+  body(s, 8.175, 5.886, 3.845, 0.303, 'We deliver a unique ways to make a good coffee brands.', CREAM, 'center');
+  arrow(s, 6.126, 6.037, 1.616, 'right');
+  photo(s, 1.14, 1.387, 3.957, 5.512);
+  photo(s, 0.76, 3.75, 2.766, 3.149);
+}
+
+// 3 — Mission statement with a Mission / Value pair of columns.
+function slide03(pptx) {
+  const s = newSlide(pptx, 2);
+  heading(s, 0.634, 1.957, 3.931, 0.707, [[['Mission ', 'b'], ['Statement', 's']]], INK);
+  label(s, 7.28, 5.0, 0.805, 0.337, 'Mission', INK);
+  label(s, 9.849, 5.0, 0.649, 0.337, 'Value', INK);
+  body(s, 0.634, 2.664, 6.033, 0.679, LOREM_SHORT, INK);
+  body(s, 7.271, 5.412, 2.441, 1.285, DONEC_ABYSS, INK);
+  body(s, 9.849, 5.412, 2.441, 1.285, DONEC_ABYSS, INK);
+  beans(s, 5.069, 1.848);
+  photo(s, 0.76, 3.739, 5.906, 3.172);
+  photo(s, 5.903, 1.387, 6.67, 3.172);
+}
+
+// 4 — Manager profile: portrait left, name plate under the copy.
+function slide04(pptx) {
+  const s = newSlide(pptx, 2);
+  photo(s, 0.76, 1.387, 4.336, 5.512);
+  heading(s, 5.763, 2.699, 4.614, 1.313,
+    [[['Meet our Coffee Shop', 'b']], [['Best Manager', 's']]], INK);
+  body(s, 5.763, 4.148, 6.809, 0.982, LOREM_FELIS, INK);
+  beans(s, 11.549, 2.371);
+  rect(s, 4.498, 5.742, 2.766, 1.157, INK);
+  label(s, 4.966, 6.008, 1.831, 0.404, 'Steve Alexander', CREAM, 'center', STYLE.sub);
+  label(s, 5.154, 6.342, 1.431, 0.337, 'CEO of CAPPE', CREAM, 'center', { fontFace: SERIF, fontSize: 14 });
+}
+
+// 5 — Team grid: three staff cards, each a photo with a caption block below.
+function slide05(pptx) {
+  const s = newSlide(pptx, 2);
+  const team = [
+    { name: 'Elisa Octaviana', role: 'Head Barista', fill: SAGE, photo: [6.864, 1.866, 2.719, 1.827],
+      card: [6.864, 3.693, 2.719, 0.728], nm: [7.525, 3.79, 1.398], rl: [7.682, 4.027, 1.047] },
+    { name: 'Alexander Reza', role: 'Staff Member', fill: INK, photo: [9.854, 3.118, 2.329, 1.555],
+      card: [9.854, 4.673, 2.329, 0.674], nm: [10.131, 4.748, 1.774], rl: [10.257, 4.985, 1.522] },
+    { name: 'Aquilya Alexia', role: 'Accountant', fill: INK, photo: [7.254, 4.673, 2.329, 1.555],
+      card: [7.254, 6.228, 2.329, 0.674], nm: [7.531, 6.303, 1.774], rl: [7.657, 6.54, 1.522] },
+  ];
+  heading(s, 0.656, 2.703, 5.217, 1.313,
+    [[['We Introduce our Coffee', 'b']], [['Shops ', 'b'], ['Superior Team', 's']]], INK);
+  team.forEach((t) => {
+    photo(s, t.photo[0], t.photo[1], t.photo[2], t.photo[3]);
+    rect(s, t.card[0], t.card[1], t.card[2], t.card[3], t.fill);
+    label(s, t.nm[0], t.nm[1], t.nm[2], 0.337, t.name, CREAM, 'center');
+    label(s, t.rl[0], t.rl[1], t.rl[2], 0.303, t.role, CREAM, 'center', STYLE.body);
+  });
+  beans(s, 12.038, 2.182);
+  body(s, 0.666, 4.04, 5.217, 0.982, LOREM_FELIS, INK);
+  pill(s, 0.746, 5.604, 2.677, 0.549, null, INK);
+  pill(s, 2.361, 5.583, 3.168, 0.592, INK);
+  body(s, 2.667, 5.727, 2.62, 0.303, 'We are very happy with our member', CREAM, 'center');
+  arrow(s, 1.121, 5.878, 1.062, 'right');
+}
+
+// 6 — Logo usage: two spec columns plus a dark "space requirements" panel.
+function slide06(pptx) {
+  const s = newSlide(pptx, 3);
+  rect(s, 0.76, 5.301, 5.089, 1.599, INK);
+  heading(s, 6.548, 2.473, 2.672, 0.707, [[['Logo ', 'b'], ['Usage', 's']]], INK);
+  label(s, 0.645, 2.688, 2.151, 0.337, 'Logo Specify Size', INK);
+  label(s, 3.408, 2.721, 1.452, 0.337, 'Logo Placement', INK);
+  label(s, 1.008, 5.592, 3.033, 0.337, 'Logo Space Requirements', CREAM);
+  body(s, 0.645, 3.106, 2.441, 1.285, DONEC_ABYSS, INK);
+  body(s, 3.408, 3.106, 2.441, 1.285, DONEC_ABYSS, INK);
+  body(s, 1.008, 6.002, 4.562, 0.606, DONEC_ABYSS, CREAM);
+  pill(s, 9.895, 2.544, 2.677, 0.549, null, INK);
+  arrow(s, 10.199, 2.818, 2.059, 'left');
+  photo(s, 6.667, 3.75, 5.906, 3.149);
+}
+
+// 7 — Colour palette: three hex swatches over three logo-colour swatches.
+function slide07(pptx) {
+  const s = newSlide(pptx, 3);
+  // Top row: bare colour chips captioned with their hex value.
+  const swatches = [
+    { hex: '#FBF8EF', fill: CREAM, outline: INK, x: 6.665, cap: [6.999, 3.795, 0.933] },
+    { hex: '#BEC9C3', fill: SAGE, outline: null, x: 8.799, cap: [9.115, 3.752, 0.966] },
+    { hex: '#0A0A0A', fill: INK, outline: null, x: 10.974, cap: [11.242, 3.752, 1.005] },
+  ];
+  // Bottom row: same three colours, this time carrying the cup mark.
+  const marks = [
+    { name: 'Logo Color 1', fill: SAGE, outline: null, mark: CREAM, x: 6.667,
+      cup: [7.034, 4.895], cap: [6.866, 6.225, 1.199] },
+    { name: 'Logo Color 2', fill: INK, outline: null, mark: SAGE, x: 8.842,
+      cup: [9.199, 4.905], cap: [8.991, 6.182, 1.213] },
+    { name: 'Logo Color 3', fill: CREAM, outline: INK, mark: INK, x: 10.974,
+      cup: [11.333, 4.905], cap: [11.138, 6.182, 1.212] },
+  ];
+  photo(s, 0.76, 2.175, 5.141, 2.424);
+  heading(s, 0.634, 4.346, 2.917, 0.707, [[['Color ', 'b'], ['Palette', 's']]], INK);
+  swatches.forEach((c) => {
+    rect(s, c.x, 2.154, 1.599, 1.599, c.fill, c.outline);
+    label(s, c.cap[0], c.cap[1], c.cap[2], 0.337, c.hex, INK, 'center');
+  });
+  marks.forEach((m) => {
+    rect(s, m.x, 4.584, 1.599, 1.599, m.fill, m.outline);
+    cupMark(s, m.cup[0], m.cup[1], 1.047, 0.951, m.mark);
+    label(s, m.cap[0], m.cap[1], m.cap[2], 0.337, m.name, INK, 'center');
+  });
+  label(s, 0.634, 5.155, 2.867, 0.404, 'Why we Choose this Color', INK, 'left', STYLE.sub);
+  body(s, 0.634, 5.626, 5.267, 0.679, DONEC_FELIS, INK);
+  beans(s, 5.642, 4.645);
+}
+
+// 8 — Primary typeface specimen.
+function slide08(pptx) {
+  const s = newSlide(pptx, 3);
+  heading(s, 6.618, 2.263, 2.879, 0.707, [[['Font ', 'b'], ['Primary', 's']]], INK);
+  label(s, 6.618, 2.97, 2.041, 0.337, 'Purposes and Typefaces', INK);
+  body(s, 6.618, 3.459, 5.964, 1.285, LOREM_FULL, INK);
+  heading(s, 0.699, 4.516, 1.336, 0.707, [[['AaBb', 'b']]], INK);
+  label(s, 0.699, 5.178, 2.814, 0.337, 'Font Uses: Cormorant Garamond', INK);
+  const weights = [
+    { text: 'Regular', x: 0.699, y: 5.822, w: 0.998, bold: false, italic: false },
+    { text: 'Bold', x: 2.658, y: 5.886, w: 0.672, bold: true, italic: false },
+    { text: 'Regular Italic', x: 0.699, y: 6.29, w: 1.576, bold: false, italic: true },
+    { text: 'Bold Italic', x: 2.658, y: 6.29, w: 1.25, bold: true, italic: true },
+  ];
+  weights.forEach((wt) => {
+    box(s, [{ text: wt.text, options: { fontFace: SERIF, fontSize: 18, bold: wt.bold, italic: wt.italic, color: INK } }],
+      { x: wt.x, y: wt.y, w: wt.w, h: 0.404 });
+  });
+  beans(s, 11.651, 2.09);
+  photo(s, 0.76, 1.805, 5.141, 2.361);
+  photo(s, 6.667, 5.301, 5.915, 1.633);
+}
+
+// 9 — Grid system: the cup mark over a sage construction grid.
+function slide09(pptx) {
+  const s = newSlide(pptx, 3);
+  // [x, y, w, h] hairlines forming the construction grid.
+  const grid = [
+    [7.307, 3.607, 4.524, 0], [7.307, 5.863, 4.524, 0], [7.307, 6.123, 4.524, 0],
+    [7.882, 2.555, 0, 4.13], [10.988, 2.531, 0, 4.155],
+    [9.017, 2.555, 0, 1.018], [9.394, 2.555, 0, 1.018],
+    [9.471, 2.469, 0, 1.045], [9.865, 2.469, 0, 1.045],
+    [11.036, 4.03, 0, 1.102], [11.836, 4.044, 0, 1.087],
+    [8.95, 2.617, 0.496, 0], [8.95, 3.527, 0.496, 0],
+    [9.419, 2.531, 0.504, 0], [9.419, 3.454, 0.504, 0],
+    [10.911, 4.154, 1.044, 0], [10.911, 5.007, 1.044, 0],
+  ];
+  heading(s, 0.634, 2.098, 2.69, 0.707, [[['Grid ', 'b'], ['System', 's']]], INK);
+  body(s, 0.634, 2.805, 4.463, 0.982, LOREM_SHORT, INK);
+  cupMark(s, 7.882, 2.539, 3.949, 3.587, INK);
+  grid.forEach((g) => rule(s, g[0], g[1], g[2], g[3], SAGE));
+  beans(s, 5.642, 2.032);
+  photo(s, 0.76, 4.559, 5.141, 2.361);
+}
+
+// 10 — Tone of voice: two text columns beside overlapping photos.
+function slide10(pptx) {
+  const s = newSlide(pptx, 3);
+  heading(s, 6.591, 2.492, 3.193, 0.707, [[['Tone of ', 'b'], ['Voices', 's']]], INK);
+  label(s, 6.591, 3.464, 1.769, 0.572, ['Vintage-Moderns to', 'Represents'], INK);
+  label(s, 9.558, 3.464, 1.925, 0.572, ['Simple Brands to', 'Represents'], INK);
+  body(s, 6.602, 4.171, 2.441, 2.194, DONEC_DAPIBUS, INK);
+  body(s, 9.545, 4.171, 2.441, 2.194, DONEC_DAPIBUS, INK);
+  beans(s, 10.875, 2.199);
+  photo(s, 1.923, 2.957, 3.929, 3.942);
+  photo(s, 0.76, 2.161, 3.929, 3.342);
+}
+
+// 11 — Imagery of the brands: three mockup photos on the left.
+function slide11(pptx) {
+  const s = newSlide(pptx, 3);
+  heading(s, 7.311, 2.667, 3.098, 1.313, [[['Imagery of the', 'b']], [['Brands', 's']]], INK);
+  label(s, 7.311, 4.301, 2.0, 0.337, 'Brand Item Mockup', INK);
+  body(s, 7.311, 4.68, 5.261, 1.285, LOREM_FULL, INK);
+  beans(s, 11.647, 2.439);
+  photo(s, 3.589, 4.186, 3.078, 2.344);
+  photo(s, 2.191, 2.161, 3.078, 2.344);
+  photo(s, 0.761, 4.176, 3.183, 2.044);
+}
+
+// 12 — Interior design: intro copy plus two feature columns.
+function slide12(pptx) {
+  const s = newSlide(pptx, 3);
+  heading(s, 6.594, 2.01, 3.261, 0.707, [[['Interior ', 'b'], ['Design', 's']]], INK);
+  body(s, 6.594, 2.717, 5.288, 0.679, LOREM_MAGNIS, INK);
+  label(s, 0.726, 4.096, 2.266, 0.572, ['We Always Bring Comfort', 'For the Customers'], INK);
+  label(s, 3.584, 4.096, 2.266, 0.572, 'Interior Design Style with a Vintage Style', INK);
+  body(s, 0.726, 4.76, 2.441, 1.891, DONEC_INTEGER, INK);
+  body(s, 3.573, 4.76, 2.441, 1.891, DONEC_INTEGER, INK);
+  beans(s, 11.882, 1.928);
+  photo(s, 0.76, 1.387, 5.279, 2.363);
+  photo(s, 6.675, 3.75, 2.766, 2.363);
+  photo(s, 6.675, 6.233, 2.766, 0.667);
+  photo(s, 9.541, 3.75, 3.032, 3.149);
+}
+
+// 13 — Staff uniforms: two captioned blocks around three photos.
+function slide13(pptx) {
+  const s = newSlide(pptx, 3);
+  heading(s, 0.634, 2.486, 3.177, 0.707, [[['Staff ', 'b'], ['Uniforms', 's']]], INK);
+  label(s, 8.943, 2.486, 1.596, 0.404, 'Good-Quality', INK, 'left', STYLE.sub);
+  body(s, 8.943, 2.96, 3.265, 1.212, DONEC_INTEGER, INK);
+  label(s, 5.022, 4.96, 1.536, 0.404, 'Neat-Designs', INK, 'left', STYLE.sub);
+  body(s, 5.022, 5.475, 3.229, 1.212, DONEC_INTEGER, INK);
+  beans(s, 11.673, 1.812);
+  photo(s, 0.76, 3.779, 3.55, 3.12);
+  photo(s, 5.066, 2.228, 3.177, 2.304);
+  photo(s, 9.023, 4.595, 3.177, 2.304);
+}
+
+// 14 — Social media stats, copy and a CTA pill.
+function slide14(pptx) {
+  const s = newSlide(pptx, 3);
+  heading(s, 7.41, 3.001, 3.876, 0.707, [[['Our ', 'b'], ['Social Media', 's']]], INK);
+  body(s, 7.41, 3.795, 5.163, 1.285, LOREM_FULL, INK);
+  label(s, 0.662, 2.285, 1.419, 0.337, '150k+ Followers', INK);
+  label(s, 0.662, 2.519, 1.366, 0.337, '95+ Media Post', INK);
+  label(s, 0.662, 6.165, 1.303, 0.337, '@cappe_shops', INK);
+  label(s, 4.313, 6.165, 1.669, 0.337, '#cappe_collections', INK);
+  beans(s, 11.79, 2.453);
+  pill(s, 7.41, 5.604, 2.677, 0.549, null, INK);
+  pill(s, 9.29, 5.583, 2.903, 0.592, INK);
+  body(s, 9.505, 5.668, 2.515, 0.376, 'We use social media for promotion.', CREAM, 'center');
+  arrow(s, 7.785, 5.878, 1.24, 'right');
+  photo(s, 4.313, 2.169, 2.348, 2.372);
+  photo(s, 0.76, 3.75, 5.132, 2.372);
+}
+
+// 15 — Promotions: a 2x2 grid of short captioned blocks.
+function slide15(pptx) {
+  const s = newSlide(pptx, 3);
+  // Each block is a bold caption ([x, y, w]) over a short paragraph ([x, y]).
+  const blocks = [
+    { title: 'Objectives', cap: [7.143, 3.223, 1.024], copy: [7.143, 3.615] },
+    { title: 'Promotion Types', cap: [0.643, 5.507, 1.552], copy: [0.634, 5.916] },
+    { title: 'Target Audience', cap: [7.142, 5.508, 1.511], copy: [7.142, 5.917] },
+  ];
+  heading(s, 0.634, 2.354, 3.396, 1.313, [[['Promotions and', 'b']], [['Campaigns', 's']]], INK);
+  body(s, 0.634, 3.646, 5.228, 0.679, LOREM_MAGNIS, INK);
+  blocks.forEach((b) => {
+    label(s, b.cap[0], b.cap[1], b.cap[2], 0.337, b.title, INK);
+    body(s, b.copy[0], b.copy[1], 2.816, 0.982, DONEC_VENENATIS, INK);
+  });
+  beans(s, 5.529, 2.354);
+  photo(s, 3.666, 5.323, 2.398, 1.579);
+  photo(s, 10.175, 5.367, 2.398, 1.579);
+  photo(s, 10.175, 3.021, 2.398, 1.579);
+}
+
+// 16 — Full-bleed sage quote break.
+function slide16(pptx) {
+  const s = newSlide(pptx, 1);
+  heading(s, 2.642, 3.094, 8.049, 1.313,
+    [[['“Before we continue this journey,', 'b']], [['Let’s take a moment for a coffee break.”', 'b']]], CREAM, 'center');
+  beans(s, 10.787, 2.801);
+  pill(s, 4.291, 4.601, 4.752, 0.551, INK);
+  label(s, 4.83, 4.674, 3.673, 0.404, 'Steve Alexander – CEO of CAPPE', CREAM, 'center', STYLE.sub);
+}
+
+// 17 — Community & engagement: two columns left, headline and CTA right.
+function slide17(pptx) {
+  const s = newSlide(pptx, 3);
+  heading(s, 7.091, 2.683, 3.661, 1.313,
+    [[['Best Community', 'b']], [['and ', 'b'], ['Engagement', 's']]], INK);
+  body(s, 7.091, 4.237, 5.163, 0.679, LOREM_MAGNIS, INK);
+  label(s, 0.76, 4.322, 1.177, 0.337, 'Partnerships', INK);
+  label(s, 3.513, 4.322, 1.357, 0.337, 'Collaborations', INK);
+  body(s, 0.76, 4.76, 2.441, 1.891, DONEC_INTEGER, INK);
+  body(s, 3.513, 4.76, 2.441, 1.891, DONEC_INTEGER, INK);
+  pill(s, 9.665, 5.466, 2.903, 0.549, null, INK);
+  pill(s, 7.14, 5.444, 4.366, 0.592, INK);
+  body(s, 7.423, 5.529, 3.751, 0.376, 'We provided a good Partnership and Collaborations', CREAM, 'center');
+  arrow(s, 11.654, 5.74, 0.598, 'left');
+  beans(s, 11.79, 2.453);
+  photo(s, 0.782, 2.161, 2.419, 1.601);
+  photo(s, 3.513, 2.184, 2.441, 1.579);
+}
+
+// 18 — Sustainability: two stacked captioned paragraphs.
+function slide18(pptx) {
+  const s = newSlide(pptx, 3);
+  heading(s, 0.634, 2.441, 2.847, 0.707, [[['Sustainibility', 'b']]], INK);
+  label(s, 6.536, 3.994, 1.948, 0.337, 'Eco-Friendly Practices', INK);
+  body(s, 6.543, 4.404, 6.03, 0.679, DONEC_INTEGER, INK);
+  label(s, 6.536, 5.596, 2.301, 0.337, 'High-Quality Coffee Beans', INK);
+  body(s, 6.536, 6.006, 6.037, 0.679, DONEC_INTEGER, INK);
+  beans(s, 4.287, 2.148);
+  photo(s, 0.76, 3.738, 5.111, 3.161);
+  photo(s, 6.667, 1.419, 5.906, 1.576);
+}
+
+// 19 — Loyalty programme: three tier descriptions plus three stacked cards.
+function slide19(pptx) {
+  const s = newSlide(pptx, 3);
+  // Left column: tier name + blurb.
+  const tiers = [
+    { name: 'Loyalty Bronze', nx: 2.923, nw: 1.373, ny: 2.395, by: 2.773 },
+    { name: 'Loyalty Silver', nx: 2.945, nw: 1.268, ny: 4.101, by: 4.486 },
+    { name: 'Loyalty Gold', nx: 2.945, nw: 1.213, ny: 5.801, by: 6.098 },
+  ];
+  // Right side: staircase of tier cards, tallest (gold) on the right.
+  const cards = [
+    { x: 6.667, y: 5.362, h: 1.542, fill: INK, name: 'Loyalty Bronze', nx: 6.863, nw: 1.373, ny: 5.653,
+      dx: 7.12, dy: 6.057, off: '10% Off', ox: 6.992, ow: 1.057, oy: 6.331, benefits: [] },
+    { x: 8.75, y: 4.66, h: 2.244, fill: SAGE, name: 'Loyalty Silver', nx: 8.996, nw: 1.268, ny: 4.971,
+      dx: 9.2, dy: 5.309, off: '20% Off', ox: 9.058, ow: 1.14, oy: 5.595,
+      benefits: [{ x: 8.909, y: 6.09, text: 'Customer Benefits 1' }] },
+    { x: 10.814, y: 3.97, h: 2.934, fill: GOLD, name: 'Loyalty Gold', nx: 11.123, nw: 1.213, ny: 4.263,
+      dx: 11.295, dy: 4.587, off: '30% Off', ox: 11.156, ow: 1.114, oy: 4.827,
+      benefits: [{ x: 10.973, y: 5.327, text: 'Customer Benefits 1' }, { x: 10.973, y: 6.09, text: 'Customer Benefits 2' }] },
+  ];
+  cards.forEach((c) => rect(s, c.x, c.y, 1.758, c.h, c.fill));
+  heading(s, 6.591, 1.837, 3.701, 0.707, [[['Loyalty ', 'b'], ['Programs', 's']]], INK);
+  label(s, 6.591, 2.694, 1.517, 0.404, 'Point System', INK, 'left', STYLE.sub);
+  body(s, 6.591, 3.098, 5.569, 0.679, LOREM_DIS, INK);
+  tiers.forEach((t) => {
+    label(s, t.nx, t.ny, t.nw, 0.337, t.name, INK);
+    body(s, 2.945, t.by, 2.983, 0.606, DONEC_JUSTO, INK);
+  });
+  cards.forEach((c) => {
+    label(s, c.nx, c.ny, c.nw, 0.337, c.name, CREAM, 'center');
+    label(s, c.dx, c.dy, 0.859, 0.303, 'Discounts', CREAM, 'center', { fontFace: SERIF, fontSize: 12, bold: true });
+    label(s, c.ox, c.oy, c.ow, 0.404, c.off, CREAM, 'center', { fontFace: SCRIPT, fontSize: 18, bold: true });
+    c.benefits.forEach((b) => {
+      rect(s, b.x, b.y, 1.459, 0.644, INK);
+      label(s, b.x + 0.162, b.y + 0.074, 1.135, 0.505, b.text, CREAM, 'center',
+        { fontFace: SERIF, fontSize: 12, bold: true });
+    });
+  });
+  photo(s, 0.76, 2.266, 1.995, 1.261);
+  photo(s, 0.76, 3.97, 1.995, 1.261);
+  photo(s, 0.76, 5.638, 1.995, 1.261);
+}
+
+// 20 — Events & sponsorships.
+function slide20(pptx) {
+  const s = newSlide(pptx, 3);
+  heading(s, 0.634, 2.032, 4.639, 0.707, [[['Event and ', 'b'], ['Sponsorships', 's']]], INK);
+  label(s, 7.375, 3.471, 2.376, 0.337, 'Free 1 Coffee Every Sundays', INK);
+  body(s, 7.382, 3.86, 4.772, 0.982, DONEC_MOLLIS, INK);
+  label(s, 7.375, 5.3, 1.268, 0.337, 'Sponsorship 1', INK);
+  body(s, 7.375, 5.711, 4.777, 0.982, DONEC_MOLLIS, INK);
+  beans(s, 11.79, 2.237);
+  photo(s, 0.76, 3.738, 5.111, 3.161);
+  photo(s, 3.484, 2.968, 3.183, 2.387);
+}
+
+// 21 — Customer feedback: two testimonial cards with star ratings.
+function slide21(pptx) {
+  const s = newSlide(pptx, 3);
+  const cards = [
+    { x: 3.763, fill: INK, tx: 4.016, name: 'Lize Alexander', nw: 1.706, role: 'Contect Creator', rw: 1.489,
+      photo: 0.76, star: 4.037, starFill: STAR, fg: CREAM },
+    { x: 9.885, fill: SAGE, tx: 10.089, name: 'Arthur Permograts', nw: 2.123, role: 'Influencer', rw: 1.01,
+      photo: 6.882, star: 10.213, starFill: CREAM, fg: CREAM },
+  ];
+  cards.forEach((c) => {
+    photo(s, c.photo, 2.967, 3.003, 4.002);
+    rect(s, c.x, 2.967, 2.688, 4.002, c.fill);
+    label(s, c.tx, 3.346, c.nw, 0.404, c.name, c.fg, 'left', STYLE.sub);
+    label(s, c.tx, 3.672, c.rw, 0.337, c.role, c.fg);
+    body(s, c.tx, 4.263, 2.167, 1.891, '“' + DONEC_MOLLIS + '”', c.fg);
+    [0, 0.44, 0.879, 1.324, 1.769].forEach((dx) => {
+      s.addShape('star5', { x: c.star + dx, y: 6.407, w: 0.332, h: 0.332, fill: { color: c.starFill }, line: { type: 'none' } });
+    });
+  });
+  heading(s, 6.806, 1.956, 4.344, 0.707, [[['Customers ', 'b'], ['Feedback', 's']]], INK);
+  pill(s, 0.76, 2.035, 1.713, 0.549, null, INK);
+  arrow(s, 1.064, 2.309, 1.035, 'right');
+  body(s, 2.666, 1.946, 3.785, 0.679, LOREM_DOLOR + '.', INK);
+  beans(s, 11.848, 1.758);
+}
+
+// 22 — Legal considerations.
+function slide22(pptx) {
+  const s = newSlide(pptx, 3);
+  heading(s, 0.656, 2.669, 3.955, 0.707, [[['Legal ', 'b'], ['Considerations', 's']]], INK);
+  body(s, 0.692, 3.376, 4.772, 0.679, LOREM_SOCIIS, INK);
+  label(s, 0.685, 5.034, 2.381, 0.337, 'Intellectual Property Rights', INK);
+  body(s, 0.692, 5.468, 4.581, 0.982, DONEC_MOLLIS, INK);
+  label(s, 5.768, 5.034, 2.984, 0.337, 'Disclaimers Regarding Brand Usage', INK);
+  body(s, 5.768, 5.468, 4.586, 0.982, DONEC_MOLLIS, INK);
+  beans(s, 5.141, 2.311);
+  photo(s, 9.032, 1.393, 3.541, 5.507);
+  photo(s, 5.857, 2.172, 4.777, 2.444);
+}
+
+// 23 — Conclusions: three points, the middle one on a sage band.
+function slide23(pptx) {
+  const s = newSlide(pptx, 3);
+  const points = [
+    { title: 'Concluision Point 1', tx: 0.694, tw: 1.722, ty: 2.382, bx: 0.697, bw: 5.33, by: 2.738, color: INK, text: DONEC_PEDE },
+    { title: 'Conclusion Point 2', tx: 1.061, tw: 1.685, ty: 4.118, bx: 1.061, bw: 5.336, by: 4.504, color: CREAM, text: DONEC_PEDE },
+    { title: 'Conclusion Point 3', tx: 0.694, tw: 1.683, ty: 5.907, bx: 0.694, bw: 5.336, by: 6.283, color: INK, text: DONEC_PEDE },
+  ];
+  rect(s, 0.76, 3.75, 5.906, 1.721, SAGE);
+  heading(s, 7.361, 2.688, 3.251, 0.707, [[['Our ', 'b'], ['Conclusions', 's']]], INK);
+  points.forEach((p) => {
+    label(s, p.tx, p.ty, p.tw, 0.337, p.title, p.color);
+    body(s, p.bx, p.by, p.bw, 0.606, p.text, p.color);
+  });
+  beans(s, 11.609, 2.382);
+  photo(s, 7.441, 3.75, 5.132, 3.149);
+}
+
+// 24 — Contact details, with a dark card holding the digital contacts.
+function slide24(pptx) {
+  const s = newSlide(pptx, 4);
+  heading(s, 0.645, 2.275, 3.521, 1.313, [[['Don’t hesitate to', 'b']], [['Contact us', 's']]], INK);
+  body(s, 0.692, 3.657, 4.772, 0.679, '“' + LOREM_SOCIIS + '”', INK);
+  label(s, 0.656, 4.767, 1.408, 0.404, 'Cappe.Shop', INK, 'left', STYLE.sub);
+  body(s, 0.656, 5.199, 1.343, 0.982, ['Sixthy Avenue', 'Libbey', '2913 - Grapetown'], INK);
+  beans(s, 5.036, 2.087);
+  rect(s, 2.701, 4.969, 2.447, 1.382, INK);
+  body(s, 2.964, 5.199, 1.711, 0.376, 'Cappe.shop@emai.com', CREAM);
+  body(s, 2.964, 5.472, 1.568, 0.376, 'www.cappeshop.com', CREAM);
+  body(s, 2.964, 5.775, 1.263, 0.376, '+11 222 3333 4444', CREAM);
+  photo(s, 6.681, 1.376, 5.892, 5.523);
+}
+
+// 25 — Closing slide, back to the sage cover styling.
+function slide25(pptx) {
+  const s = newSlide(pptx, 1);
+  heading(s, 4.982, 3.067, 6.488, 0.707, [[['Thank You For Your ', 'b'], ['Attention', 's']]], CREAM);
+  body(s, 4.982, 3.882, 7.591, 1.044,
+    '"Stepping out, but leaving a hint of warmth behind. Until our next pour-over of moments, may your journey be as rich ' +
+    'as our espresso and as comforting as your favorite brew. Farewell, coffee companion."', CREAM, 'left', 14);
+  beans(s, 11.898, 2.482);
+  pill(s, 5.085, 5.63, 4.482, 0.376, INK);
+  body(s, 5.321, 5.667, 4.01, 0.303, 'www.cappeshop.com / @cappe_shop / #cappe_collections', CREAM, 'center');
+  arrow(s, 10.186, 5.826, 1.441, 'left');
+  photo(s, 0.0, 1.387, 4.287, 5.512);
+}
+
+/* ------------------------------------------------------------------- build */
+const BUILDERS = [
+  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09,
+  slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18,
+  slide19, slide20, slide21, slide22, slide23, slide24, slide25,
+];
+
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'WIDE', width: 13.333, height: 7.5 });
+pptx.layout = 'WIDE';
+BUILDERS.forEach((build) => build(pptx));
+pptx.writeFile({ fileName: path.join(__dirname, '1410215c-093c-4b7d-aa60-ddc038699cf6_grok_final.pptx') });
