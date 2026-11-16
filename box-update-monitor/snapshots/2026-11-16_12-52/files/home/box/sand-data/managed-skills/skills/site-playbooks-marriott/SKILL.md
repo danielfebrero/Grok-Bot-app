@@ -1,0 +1,161 @@
+---
+name: site-playbooks-marriott
+description: >-
+  Marriott site playbook: hotel search, rates, or booking; not points or
+  existing stays.
+---
+# Site playbook: Marriott
+
+Read this before you dispatch a computerUse subagent to this site. Follow the Fastest path, fill in every URL you know, then paste the Dispatch snippet into the Task text as written. The subagent does not read skills, so every rule it needs is in the snippet, including the ground rules at its end. Secrets never go in the Task text. They come through `RequestUserForm`.
+
+Jobs in this file: Marriott hotel search; Marriott hotel rates; Marriott booking a picked room.
+
+## Marriott hotel search
+
+### When to use
+
+The user wants Marriott Bonvoy hotels (Courtyard, Westin, Sheraton, The Ritz-Carlton, and the other brands) for a place and dates, with cash or points prices. The parent needs the destination as city, state or region, and country, check-in and check-out dates, rooms, adults, each child's age, and any brand, sort, or points wish. The user gets each hotel's name, distance, rating and review count, lowest nightly rate with what it includes, points per stay when asked, and its property code. One hotel's rooms and rates are the next section.
+
+### Fastest path
+
+The search link opens results with no form. The site resolves the free-text destination itself, and the DESTINATION box shows the place it chose, such as "Portland, OR, USA" for a bare "Portland", so send city, state, and country. A place with no Marriott within 50 miles shows a red "Let's try something else" banner under that DESTINATION instead of a results heading, after up to about 25 seconds, and text the site cannot place shows the same banner.
+
+```
+https://www.marriott.com/search/findHotels.mi
+  ?destinationAddress.destination={CITY, STATE, COUNTRY}
+  &fromDate={MM/DD/YYYY}
+  &toDate={MM/DD/YYYY}
+  &roomCount={ROOMS}
+  &numAdultsPerRoom={ADULTS}   # all adults in the stay, despite the name
+  &childrenCount={CHILDREN}    # all children in the stay
+  &childrenAges={AGE,AGE}      # one per child; omit with no children
+  &isSearch=true
+  &showFullPrice=true          # optional: prices with taxes and all fees
+  &useRewardsPoints=true       # optional: points per stay beside cash
+  &marriottBrands={CODES}      # optional: comma-joined, CY Courtyard, RI Residence Inn
+  &currency=USD                # optional: convert from the hotel's currency
+```
+
+Adult and child counts are totals for the stay whatever the room count: two rooms with three adults and one child read "2 Rooms, 4 Guests". Results take 10 to 20 seconds and read "0 - 0 of 0 Results" while they load. They list 40 per page out to 50 miles, sorted by Distance. Sort by has no URL parameter: open it and pick Price (Low-to-High), Price (High-to-Low), City, or Brand. A price sort reaches hotels 40 miles out, so read each distance. The Brands chip opens logo tiles named like "Courtyard Hotels", and Apply puts their codes in `marriottBrands`.
+
+Put the property codes a report returns into the rates and booking sections' links.
+
+### Dispatch snippet
+
+```
+Close the "Notice" privacy popup with its X when it shows.
+Open https://www.marriott.com/search/findHotels.mi?destinationAddress.destination=<CITY, STATE, COUNTRY>&fromDate=<MM/DD/YYYY>&toDate=<MM/DD/YYYY>&roomCount=<ROOMS>&numAdultsPerRoom=<TOTAL ADULTS>&childrenCount=<TOTAL CHILDREN><&childrenAges=AGE,AGE one per child>&isSearch=true<&showFullPrice=true><&useRewardsPoints=true><&marriottBrands=CODES><&currency=USD>
+Wait up to 40 s for the heading "N - N of N Results" with N above 0 or a "Let's try something else" banner; "0 - 0 of 0" means still loading. On the banner, report no_hotels_nearby with what DESTINATION shows and stop. If neither appears, report results_timeout with the heading text seen and one screenshot path, and stop.
+Check DESTINATION names the same place as <CITY, STATE, COUNTRY>, CHECK IN and CHECK OUT show the dates, and ROOMS & GUESTS shows <ROOMS> room(s) and <TOTAL ADULTS + CHILDREN> guests. If not, report search_mismatch with what it shows and stop.
+When this task sets a sort, open Sort by, pick it, and wait for the count again. When it names brands, open Brands, pick each tile by name, and press Apply.
+Skip promo blocks between cards. For each card read name, rating and review count, "N mi from destination", the price and currency per night, "Includes N USD Destination Fee" or "Taxes & fees included", "N Points / Stay" and PointSavers when shown, labels such as Sold Out or "won't allow that many guests", and the propertyCode in its View Rates link.
+Return a table, the results count, the page URL, and one screenshot path. Read only. Never press Select or Sign In.
+If Access Denied, a captcha, sign-in or password, 2FA, or payment wall appears, stop and report the URL.
+Ground rules for this Task. A Timeout or a net::ERR_* code from browser_navigate means the box cannot reach that host. Do not retry it, even if the tool result says to, and do not run DNS or connectivity checks. Move to the next source this Task names, or report the code and URL. An HTTP block (403, 419, 429, 503) follows this Task's own rule. Work in the tab you start in. Do not open a second tab, and switch tabs only when a tool result names a page you did not intend. In-page tabs are part of the page. A page script is an async (page) => function: run it with browser_run_code if you hold it. Without it, read rendered text from browser_snapshot or browser_find, read a <script> tag from the HTML that curl fetches in the box shell, and report a field neither yields as unreadable, never visible text in its place. Name the read you used. Snapshot a page state once. After a click, a scroll, or a wait this Task calls for, take one new snapshot. Do not snapshot the same state twice. Report as soon as the stop rule above is met, one line per item, only the fields asked for, no page dumps.
+```
+
+### Read the result
+
+Each card shows the name, which carries the brand ("Courtyard by Marriott ...", "..., Autograph Collection"), a rating out of 5 with the review count, the distance from the destination, a one-line blurb, and the lowest average nightly rate for the stay in the hotel's currency, such as "196USD / Night" or "260EUR / Night". That rate is often a member or prepaid non-refundable rate before taxes, with any destination fee folded in and named ("Includes 30 USD Destination Fee"). With `showFullPrice=true` it includes taxes and all fees and reads "Taxes & fees included". With `useRewardsPoints=true` each card adds "N Points / Stay", marked PointSavers on discounted awards. Cards can also read NEW, FULLY RENOVATED, Sold Out with View Other Dates, or "This property won't allow that many guests in one room."
+
+The View Rates link is `/search/availabilityCalendar.mi?propertyCode=<CODE>` and the reviews link `/en-US/hotels/<code>-<slug>/reviews/`. The five-letter code, such as CHIJW, is what the rates and booking links take. A card's member and non-member prices, and the AAA/CAA, Senior Discount, Government & Military, and Corp/Promo Code rates from the SPECIAL RATES menu, show on the hotel's rate page.
+
+### When blocked
+
+- Marriott runs Akamai Bot Manager. Tells of a wall are Access Denied or a captcha. A page that shows neither a results heading nor the banner in time is a slow load, not a wall.
+- After `no_hotels_nearby` on the intended place, widen the area or the dates by one step as the `accommodation-booking` skill says and dispatch once more; on another place, or after `search_mismatch`, send the destination as city, state or region, and country. After `results_timeout`, dispatch the same link once more. Only Access Denied or a captcha is a block: then do not dispatch to Marriott again; hand the user the search link and look the hotels up with the Booking.com or Expedia playbook.
+- This page access was checked only from a test browser outside Grok Bot's production network, not from the box, so the box may meet a challenge or block that never appeared there. Treat a challenge that does not clear on its own reload as a block.
+- If the page asks for a password, 2FA code, captcha, or payment, stop. Do not solve or bypass. Report which wall appeared and the URL it was on.
+
+## Marriott hotel rates
+
+### When to use
+
+The user names a Marriott hotel, or picked one from the search, and wants its rooms, rate plans, cancellation terms, and totals for dates. The parent needs the five-letter property code (from a search report or the hotel's marriott.com URL, `/hotels/<code>-<slug>/`), the dates, rooms, adults, and each child's age. The user gets each room type's rate plans with member and non-member prices per night and per stay, cancellation terms, and the destination or resort fee, with taxes when asked.
+
+### Fastest path
+
+The property link opens the hotel's rate page with no search. It redirects to `/reservation/rateListMenu.mi`, which keeps the stay in the session, not the URL, so reopen the property link to change dates or guests. A fresh session can show a grey skeleton for up to 30 seconds before the rooms fill in.
+
+```
+https://www.marriott.com/reservation/availabilitySearch.mi
+  ?propertyCode={CODE}
+  &isSearch=true
+  &fromDate={MM/DD/YYYY}
+  &toDate={MM/DD/YYYY}
+  &numberOfRooms={ROOMS}
+  &numberOfAdults={ADULTS}     # all adults in the stay
+  &numberOfChildren={CHILDREN} # all children in the stay
+  &childrenAges={AGE,AGE}      # one per child; omit with no children
+  &useRewardsPoints=true       # optional: adds the points rate
+```
+
+### Dispatch snippet
+
+```
+Close the "Notice" privacy popup with its X when it shows.
+Open https://www.marriott.com/reservation/availabilitySearch.mi?propertyCode=<CODE>&isSearch=true&fromDate=<MM/DD/YYYY>&toDate=<MM/DD/YYYY>&numberOfRooms=<ROOMS>&numberOfAdults=<TOTAL ADULTS>&numberOfChildren=<TOTAL CHILDREN><&childrenAges=AGE,AGE one per child><&useRewardsPoints=true>
+Wait up to 40 s for room rows; if none appear, report results_timeout with what the page shows and one screenshot path, and stop. Check STAY DATES shows <CHECK-IN> to <CHECK-OUT> and ROOMS & GUESTS shows <ROOMS> room(s) and <TOTAL ADULTS + CHILDREN> guests. If not, report search_mismatch with what it shows and stop.
+When this task asks for totals with taxes, make sure "Show with taxes and fees" is checked.
+For each room row read its name, the "Rates from" price per night, Total Per Room, and the fee line. Press its View Rates and read each rate plan: name, terms line, the "Free cancellation before or on" date or refund wording, fee line, and each Member Rate, Non-Member Rate, Package Rate, or Points / Stay price with per night and Total Per Room.
+Return a table per room, the hotel name and address, and one screenshot path. Read only. Never press Select or Sign In.
+If Access Denied, a captcha, sign-in or password, 2FA, or payment wall appears, stop and report the URL.
+Ground rules for this Task. A Timeout or a net::ERR_* code from browser_navigate means the box cannot reach that host. Do not retry it, even if the tool result says to, and do not run DNS or connectivity checks. Move to the next source this Task names, or report the code and URL. An HTTP block (403, 419, 429, 503) follows this Task's own rule. Work in the tab you start in. Do not open a second tab, and switch tabs only when a tool result names a page you did not intend. In-page tabs are part of the page. A page script is an async (page) => function: run it with browser_run_code if you hold it. Without it, read rendered text from browser_snapshot or browser_find, read a <script> tag from the HTML that curl fetches in the box shell, and report a field neither yields as unreadable, never visible text in its place. Name the read you used. Snapshot a page state once. After a click, a scroll, or a wait this Task calls for, take one new snapshot. Do not snapshot the same state twice. Report as soon as the stop rule above is met, one line per item, only the fields asked for, no page dumps.
+```
+
+### Read the result
+
+The header shows the hotel name, address, phone, and rating, then STAY DATES (N NIGHTS) and ROOMS & GUESTS. Each room row shows "Rates from" with the lowest average nightly rate, its Total Per Room for the stay, and "Includes 30 USD Destination Fee" or "59 USD daily Resort Fee" where one applies. View Rates opens the room's plans: Flexible Rate, Prepay Non-refundable with its change and refund terms, member offers, and packages that name what they include. Each plan prices a Member Rate and a Non-Member Rate, or one Package Rate, as an average per night and a Total Per Room, and plans that allow it say "Free cancellation before or on <date>". With points on, a Redemption plan shows "N Points / Stay".
+
+Prices leave out taxes until "Show with taxes and fees" is checked, which switches them to totals with taxes and all fees, marked "Taxes and all fees included", and closes any open room. The booking page itemizes each night, the destination or resort fee, estimated taxes, the cancellation deadline with the fee after it, and parking charges.
+
+A Member Rate needs a Marriott Bonvoy sign-in or a new account to book, and points need a sign-in. Present the Non-Member Rate as what a guest pays without an account. With more than one room, the link takes the stay's total adults and children, and each Total Per Room covers one room.
+
+### When blocked
+
+- Same tells as the search section.
+- After `search_mismatch`, check the property code, the dates, and the total guest counts in the link and dispatch once more. After `results_timeout`, dispatch the same link once more. Only Access Denied or a captcha is a block: then do not dispatch to Marriott again; send the user the property link and price the hotel with the Booking.com or Expedia playbook.
+- If the page asks for a password, 2FA code, captcha, or payment, stop. Do not solve or bypass. Report which wall appeared and the URL it was on.
+
+## Marriott booking a picked room
+
+### When to use
+
+The user picked a Marriott room and rate, from the rates section or a pasted link, and none of your tools books it in chat. The parent needs the property code, dates, rooms, adults, each child's age, the room name, the rate plan, and Member Rate, Non-Member Rate, or Package Rate. The subagent selects that rate and stops at the first page that asks for guest details, a sign-in, or payment. Fill that page as the `accommodation-booking` skill says and resume the same subagent, which stops again before Book now.
+
+A Non-Member Rate opens `/reservation/reviewguestinformation.mi`, "Complete Your Booking", as a guest with no sign-in. A "Room(s) held for" countdown starts at 15 minutes, so send guest details as soon as the subagent reports. The page asks first and last name, email, an optional Member Number, a mobile phone with a country code menu ((+1) USA preset, options such as "(+44) United Kingdom"), Country/Region (USA preset), Address Line 1, an optional second line, City, State/Province, and Zip/Postal Code. Outside the US, State/Province becomes a text box. Address Line 1 and City show "Enter a valid address." and "City is required." when left empty.
+
+With USA, "Join Marriott Bonvoy now for free." and an email marketing consent box start checked, and unchecking Join removes the consent box. With another country, the sign-up box starts checked and asks for a password, and two consent boxes (offers by email, sharing data with licensees) start unchecked. Joining needs a password the user types, so the subagent unchecks sign-up unless told to join and says when sign-up asked for one.
+
+Payment Details on the same page says "A valid form of payment must be presented at check-in" and asks Card Number, Expiration Date, CVV Number, and the card's Zip/Postal Code in embedded secure fields. Summary of Charges shows Room, Est. Taxes and Fees, and Total for Stay in the hotel's currency; opening Total for Stay lists each night, the destination or resort fee, taxes, and additional charges such as parking. Cancel Policy gives the deadline and the fee after it, or says a prepaid rate is non-refundable after its deadline. The final button is Book now.
+
+A Member Rate opens the same page with "To complete your booking, sign in or create a free account below." and Password and Confirm Password under Join, and a points rate opens a Sign In dialog. Offer the Non-Member Rate of the same plan, or follow the `accommodation-booking` skill's sign-in step.
+
+### Fastest path
+
+There is no link past the rate page, so the rate is selected there: the property link from the rates section, the room's View Rates, then Select under the plan's Member Rate, Non-Member Rate, or Package Rate. Guest details, payment, and Book now share one page.
+
+### Dispatch snippet
+
+```
+Close the "Notice" privacy popup with its X when it shows.
+Open https://www.marriott.com/reservation/availabilitySearch.mi?propertyCode=<CODE>&isSearch=true&fromDate=<MM/DD/YYYY>&toDate=<MM/DD/YYYY>&numberOfRooms=<ROOMS>&numberOfAdults=<TOTAL ADULTS>&numberOfChildren=<TOTAL CHILDREN><&childrenAges=AGE,AGE one per child>
+Wait up to 40 s for room rows; if none appear, report results_timeout with what the page shows and one screenshot path, and stop. If STAY DATES differs from <CHECK-IN> to <CHECK-OUT> or ROOMS & GUESTS from <ROOMS> room(s) and <TOTAL ADULTS + CHILDREN> guests, report search_mismatch and stop.
+Press View Rates on <ROOM NAME> and find the <RATE PLAN> plan. If either is missing, report rate_not_available with the rooms and plans offered and stop. Press Select under its <Member Rate | Non-Member Rate | Package Rate>.
+Stop at the first page that asks for guest details, a sign-in, or payment. On a Sign In dialog, or a page that asks you to sign in or create an account, report sign_in_required and stop. Otherwise report the URL, the hold timer, the room and rate, each field and whether it is filled, each checkbox and whether it is checked, Summary of Charges after opening Total for Stay, the Cancel Policy, and the button at the bottom, with one screenshot path.
+When resumed with guest details, set Country/Region and the phone country code from them, then fill only empty fields. Uncheck every marketing or data-sharing box unless this task asks for marketing email. Uncheck the Marriott Bonvoy sign-up box unless this task says to join; if it asks for a password, uncheck it and say so. Report the same items plus the payment fields, with Book now unpressed. If the page is no longer Complete Your Booking, report hold_expired with the URL and stop. Never press Book now or type a card unless a later message says to.
+On Access Denied, a captcha, or a 2FA prompt, stop and report the URL.
+Ground rules for this Task. A Timeout or a net::ERR_* code from browser_navigate means the box cannot reach that host. Do not retry it, even if the tool result says to, and do not run DNS or connectivity checks. Move to the next source this Task names, or report the code and URL. An HTTP block (403, 419, 429, 503) follows this Task's own rule. Work in the tab you start in. Do not open a second tab, and switch tabs only when a tool result names a page you did not intend. In-page tabs are part of the page. A page script is an async (page) => function: run it with browser_run_code if you hold it. Without it, read rendered text from browser_snapshot or browser_find, read a <script> tag from the HTML that curl fetches in the box shell, and report a field neither yields as unreadable, never visible text in its place. Name the read you used. Snapshot a page state once. After a click, a scroll, or a wait this Task calls for, take one new snapshot. Do not snapshot the same state twice. Report as soon as the stop rule above is met, one line per item, only the fields asked for, no page dumps.
+```
+
+### When blocked
+
+- Same tells as the search section.
+- After `search_mismatch` or `rate_not_available`, show the user what the subagent reported and get a new pick before dispatching again. After `hold_expired`, or once after `results_timeout`, resume the same subagent and have it start again from the property link with the same pick and guest details. After `sign_in_required`, offer the Non-Member Rate or the sign-in step. Only Access Denied or a captcha is a block: then, or after a site error, do not dispatch again; send the user the property link.
+- If the page asks for a password, 2FA code, captcha, or payment, stop. Do not solve or bypass. Report which wall appeared and the URL it was on.
+
+## Working with the subagent
+
+Recipe steps name actions, not tools. A page script, a scroll, or a fill lands on whichever browser tools the subagent holds, and the ground rules say how, so paste the snippet as written. A subagent without a page-script tool reads what the snapshot or a shell fetch shows and names that read in its report.
+
+Fill in every URL you know before you dispatch. A dispatch that changes something on the site (a cart, a booking, a form) never goes out without its URL. A read-only lookup may start from a name and a place when its section allows it. When the Fastest path is a shell call, run it with a short timeout and never queue a second lookup behind it. A failed call follows the section's own rule for that response (a single retry, a fresh key, or stop and report); when the section has no rule for it, or the call hangs, dispatch the subagent at once. When the section says the call is unreliable from the box, dispatch in the same round and stop the subagent with `StopSubagent` if the call returns first. A change to a job in flight goes to the same subagent, with `MessageSubagent` while it runs and `Task` with `resume` after it reports. A fresh dispatch spends rounds finding a tab and re-reading the page before it does anything.
