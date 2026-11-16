@@ -1,0 +1,23 @@
+{
+  "description": "Get a draft by ID, including its content, status, and scheduled send time.",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "draftId": {
+        "description": "Draft ID, from list_drafts or create_draft",
+        "type": "string"
+      },
+      "inboxId": {
+        "description": "Inbox ID: the inbox's email address, from list_inboxes",
+        "type": "string"
+      }
+    },
+    "required": [
+      "inboxId",
+      "draftId"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_draft"
+}

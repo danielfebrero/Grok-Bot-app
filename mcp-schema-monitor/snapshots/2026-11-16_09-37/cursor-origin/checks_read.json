@@ -1,0 +1,58 @@
+{
+  "description": "Read checks for one target in an Origin-hosted repository: a pull request, commit, suite, or run. A top-level ref, sha, or pull number is accepted in place of target. Rollup covers materialized check runs on the current page only and is omitted when nextPageToken is present. A run with isRerequestable can be run again with rerun_checks. Does not fetch external provider logs.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "name": {
+        "description": "Origin repository name within that namespace",
+        "type": "string"
+      },
+      "owner": {
+        "description": "Origin namespace (owner) slug, taken from list_namespaces or an earlier Origin result. A GitHub owner or org name is not an Origin namespace unless list_namespaces returns it.",
+        "type": "string"
+      },
+      "pageSize": {
+        "type": "number"
+      },
+      "pageToken": {
+        "type": "string"
+      },
+      "target": {
+        "properties": {
+          "checkRunId": {
+            "description": "Check run id, for a run target",
+            "type": "string"
+          },
+          "checkSuiteId": {
+            "description": "Check suite id, for a suite target",
+            "type": "string"
+          },
+          "number": {
+            "description": "Pull request number, for a pull_request target",
+            "type": "number"
+          },
+          "sha": {
+            "description": "Commit SHA, for a commit target",
+            "type": "string"
+          },
+          "type": {
+            "description": "pull_request, commit, suite, or run",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "type": "object"
+      }
+    },
+    "required": [
+      "owner",
+      "name",
+      "target"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "checks_read"
+}

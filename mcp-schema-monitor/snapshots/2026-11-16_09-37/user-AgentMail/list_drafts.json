@@ -1,0 +1,46 @@
+{
+  "description": "List drafts in an inbox, most recently updated first, paginated. Each comes with its recipients, subject, preview, labels, and scheduled send time and status; filter by labels (e.g. \"scheduled\") to find scheduled drafts.",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "after": {
+        "description": "Only items at or after this time, as ISO 8601 with a timezone (e.g. 2026-04-01T09:00:00Z)",
+        "type": "string"
+      },
+      "ascending": {
+        "description": "Sort by oldest first instead of most recent first",
+        "type": "boolean"
+      },
+      "before": {
+        "description": "Only items before this time, as ISO 8601 with a timezone (e.g. 2026-04-01T09:00:00Z)",
+        "type": "string"
+      },
+      "inboxId": {
+        "description": "Inbox ID: the inbox's email address, from list_inboxes",
+        "type": "string"
+      },
+      "labels": {
+        "description": "Only items carrying all of these labels, such as unread or your own",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "limit": {
+        "default": 10,
+        "description": "Number of items per page",
+        "type": "number"
+      },
+      "pageToken": {
+        "description": "nextPageToken from the previous page's result; omit for the first page",
+        "type": "string"
+      }
+    },
+    "required": [
+      "inboxId"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "list_drafts"
+}

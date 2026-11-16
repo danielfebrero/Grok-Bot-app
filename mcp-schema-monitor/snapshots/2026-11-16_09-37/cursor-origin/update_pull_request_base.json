@@ -1,0 +1,35 @@
+{
+  "description": "Retarget a pull request's base branch, stack it on another pull request, or move it off its stack. With parentPullNumber, the base becomes that pull request's head branch and the stack parent is set in the same update. With base, the pull request is retargeted to that branch: the head branch of an open pull request makes that pull request the parent, and the default branch or a branch with no open pull request moves it off its stack. Stacking is allowed only when this pull request's branch was built on the parent, meaning the two share a commit beyond the parent's own base; a branch built off trunk or from unrelated history is rejected with the rebase to run. A branch that has fallen behind the parent is accepted and the response carries needsRestack, because the pull request cannot land until it is restacked. This tool stacks and unstacks but never restacks: no commit is rebased or replayed. Returns the stored base and head refs, plus stackParent when stacked.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "base": {
+        "description": "Branch to retarget onto. The default branch or a branch with no open pull request unstacks; the head branch of an open pull request stacks on it. Send this or parentPullNumber.",
+        "type": "string"
+      },
+      "name": {
+        "description": "Origin repository name within that namespace",
+        "type": "string"
+      },
+      "number": {
+        "type": "number"
+      },
+      "owner": {
+        "description": "Origin namespace (owner) slug, taken from list_namespaces or an earlier Origin result. A GitHub owner or org name is not an Origin namespace unless list_namespaces returns it.",
+        "type": "string"
+      },
+      "parentPullNumber": {
+        "description": "Pull request to stack on, by number. Its head branch becomes the base. Send this or base.",
+        "type": "number"
+      }
+    },
+    "required": [
+      "owner",
+      "name",
+      "number"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "update_pull_request_base"
+}

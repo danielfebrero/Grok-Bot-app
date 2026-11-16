@@ -1,0 +1,19 @@
+{
+  "description": "Send product feedback to the SpaceXAI team on the user's behalf. Use this ONLY when the user explicitly asks to file, send, or pass along feedback about Grok Bot. Summarize their feedback faithfully in their own words; never invent feedback and never send it unprompted. Never include code, credentials, file contents, or content drawn from connectors unless the user dictated it as part of their feedback. Feedback filed with this tool is read as product feedback but never receives a support response. Do not ask whether the user wants a reply and do not promise one. If they need help from support, tell them to email support@x.ai. The user reviews the exact message on an approval card and nothing is sent unless they approve. If the result says you were rate-limited, tell the user when to retry instead of retrying yourself.",
+  "inputSchema": {
+    "properties": {
+      "message": {
+        "description": "The user's feedback, in their own words.",
+        "maxLength": 4000,
+        "minLength": 1,
+        "type": "string"
+      }
+    },
+    "required": [
+      "message"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "SendFeedback"
+}

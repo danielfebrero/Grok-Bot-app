@@ -1,0 +1,45 @@
+{
+  "description": "Retrieves a list of Communities matching the specified search query.",
+  "inputSchema": {
+    "properties": {
+      "community.fields": {
+        "description": "A comma separated list of Community fields to display.",
+        "items": {
+          "enum": [
+            "access",
+            "created_at",
+            "description",
+            "id",
+            "join_policy",
+            "member_count",
+            "name"
+          ],
+          "type": "string"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "max_results": {
+        "default": 10,
+        "maximum": 100,
+        "minimum": 10,
+        "type": "integer"
+      },
+      "next_token": {
+        "type": "string"
+      },
+      "pagination_token": {
+        "type": "string"
+      },
+      "query": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "search_communities"
+}

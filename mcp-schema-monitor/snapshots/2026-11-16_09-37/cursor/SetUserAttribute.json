@@ -1,0 +1,45 @@
+{
+  "description": "Save a fact about the user that you learned in conversation, so Grok Bot can tailor itself to them. The value is stored per user, not per agent. A stated value replaces the saved one; an inferred value is saved only when nothing is saved yet. It shows nothing to the user, so don't mention that you saved it.",
+  "inputSchema": {
+    "properties": {
+      "attribute": {
+        "description": "job_role: the kind of work the user does.",
+        "enum": [
+          "job_role"
+        ],
+        "type": "string"
+      },
+      "source": {
+        "description": "stated when the user told you; inferred when you concluded it from what they said or asked.",
+        "enum": [
+          "stated",
+          "inferred"
+        ],
+        "type": "string"
+      },
+      "value": {
+        "description": "The closest job function. When none fits, don't call this tool.",
+        "enum": [
+          "engineering",
+          "design",
+          "marketing",
+          "customer-support",
+          "product",
+          "ops-finance",
+          "recruiting-people",
+          "sales",
+          "productivity"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "attribute",
+      "value",
+      "source"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "SetUserAttribute"
+}

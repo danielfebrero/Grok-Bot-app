@@ -1,0 +1,47 @@
+{
+  "description": "POST /repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}/events: submit the caller's pending review as APPROVE, REQUEST_CHANGES, or COMMENT, publishing every comment added to it. `body` is the review summary (required by GitHub for REQUEST_CHANGES and COMMENT when the pending review has no body).",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "additionalProperties": false,
+    "properties": {
+      "body": {
+        "type": "string"
+      },
+      "event": {
+        "enum": [
+          "APPROVE",
+          "REQUEST_CHANGES",
+          "COMMENT"
+        ],
+        "type": "string"
+      },
+      "owner": {
+        "description": "Repository owner (user or org login).",
+        "type": "string"
+      },
+      "pull_number": {
+        "description": "Pull request number.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "repo": {
+        "description": "Repository name.",
+        "type": "string"
+      },
+      "review_id": {
+        "description": "The pending review's id (from create_pull_request_review). Looked up when omitted: the caller's one PENDING review on the pull request.",
+        "minimum": 1,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "owner",
+      "repo",
+      "pull_number",
+      "event"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "submit_pending_pull_request_review"
+}

@@ -1,0 +1,17 @@
+{
+  "description": "Unarchives a Chat conversation for the authenticated user only. Unarchiving a conversation that is not archived changes nothing. Works for group and 1:1 conversations. For 1:1 conversations, provide the recipient's user ID; the server constructs the canonical conversation ID from the authenticated user and recipient.",
+  "inputSchema": {
+    "properties": {
+      "id": {
+        "description": "The ID of the conversation: a group ID starting with `g`, the other user's ID for a 1:1 conversat...",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "unarchive_chat_conversation"
+}

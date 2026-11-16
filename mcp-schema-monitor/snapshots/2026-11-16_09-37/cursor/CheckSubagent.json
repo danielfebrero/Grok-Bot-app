@@ -1,0 +1,14 @@
+{
+  "description": "Check how a background subagent you dispatched (via Task) is doing without waiting for it to finish. Returns its status, how long it has been running, the tool calls it has made recently, and where to read its full play-by-play. Pass its id as subagent_id (the \"Agent ID:\" line of the Task result), or omit it to list every running subagent. Use this when a subagent, especially a computerUse one driving the box desktop, is taking a long time or might be stuck or looping, so you can decide whether to MessageSubagent it or StopSubagent it. This is read-only; it's not polling for completion (you're revived automatically when a subagent finishes).",
+  "inputSchema": {
+    "properties": {
+      "subagent_id": {
+        "description": "The subagent's id, from the \"Agent ID:\" line of the Task result that dispatched it. Omit to list every subagent currently running.",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "CheckSubagent"
+}

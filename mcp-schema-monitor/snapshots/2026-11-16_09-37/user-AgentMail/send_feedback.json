@@ -1,0 +1,26 @@
+{
+  "description": "Records feedback about this MCP server, including unexpected tool failures, unhelpful responses, or missing capabilities observed by the agent or reported by the user.",
+  "inputSchema": {
+    "properties": {
+      "content": {
+        "description": "The feedback content, stripped of any PII.",
+        "type": "string"
+      },
+      "source": {
+        "description": "Who initiated the feedback: \"user\" or \"model\".",
+        "enum": [
+          "user",
+          "model"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "content",
+      "source"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "send_feedback"
+}

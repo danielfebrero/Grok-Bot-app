@@ -1,0 +1,77 @@
+{
+  "description": "GET /repos/{owner}/{repo}/issues: one page of issues. GitHub includes pull requests here (they carry a `pull_request` key).",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "additionalProperties": false,
+    "properties": {
+      "assignee": {
+        "description": "Login, `none`, or `*` for any assignee.",
+        "type": "string"
+      },
+      "creator": {
+        "type": "string"
+      },
+      "direction": {
+        "enum": [
+          "asc",
+          "desc"
+        ],
+        "type": "string"
+      },
+      "labels": {
+        "description": "Comma-separated label names.",
+        "type": "string"
+      },
+      "mentioned": {
+        "type": "string"
+      },
+      "owner": {
+        "description": "Repository owner (user or org login).",
+        "type": "string"
+      },
+      "page": {
+        "description": "1-based page number.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "per_page": {
+        "description": "Results per page (GitHub's default is 30, max 100).",
+        "maximum": 100,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "repo": {
+        "description": "Repository name.",
+        "type": "string"
+      },
+      "since": {
+        "description": "ISO 8601 timestamp.",
+        "type": "string"
+      },
+      "sort": {
+        "enum": [
+          "created",
+          "updated",
+          "comments"
+        ],
+        "type": "string"
+      },
+      "state": {
+        "description": "Default open.",
+        "enum": [
+          "open",
+          "closed",
+          "all"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "repo"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "list_issues"
+}

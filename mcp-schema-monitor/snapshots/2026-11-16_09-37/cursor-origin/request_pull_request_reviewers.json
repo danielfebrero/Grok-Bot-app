@@ -1,0 +1,66 @@
+{
+  "description": "Request reviewers on a pull request. users take a public user_… id or email and groups a grp_… id, qualified slug, or slug. reviewers take { kind, id } entries, the shape this tool returns: kind user, group, or service_account, with a user_…, grp_…, or sa_… id; a service_account must be a bot whose owner is on the repository's team, and a personal bot may not review a pull request its owner authored. Returns the reviewers this call requested, each with displayName and handle when Origin resolves them; a group's are its name and organization/slug from the repository's reviewer roster.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "groups": {
+        "description": "Group identifiers: public grp_… id, qualified slug, or slug",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "name": {
+        "description": "Origin repository name within that namespace",
+        "type": "string"
+      },
+      "number": {
+        "type": "number"
+      },
+      "owner": {
+        "description": "Origin namespace (owner) slug, taken from list_namespaces or an earlier Origin result. A GitHub owner or org name is not an Origin namespace unless list_namespaces returns it.",
+        "type": "string"
+      },
+      "reviewers": {
+        "description": "Reviewers by kind and public id, the shape this tool and pull_request_read return; a service_account is the sa_… id of a bot whose owner is on the repository's team",
+        "items": {
+          "properties": {
+            "id": {
+              "description": "Public id: user_…, grp_…, or sa_…",
+              "type": "string"
+            },
+            "kind": {
+              "enum": [
+                "user",
+                "group",
+                "service_account"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "id"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "users": {
+        "description": "User identifiers: public user_… id or email",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "owner",
+      "name",
+      "number"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "request_pull_request_reviewers"
+}

@@ -1,0 +1,33 @@
+{
+  "description": "GET /repos/{owner}/{repo}/contents/{path} with the raw media type: the file's bytes as text (not the base64 JSON envelope). For a directory GitHub answers with the JSON listing instead.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "additionalProperties": false,
+    "properties": {
+      "owner": {
+        "description": "Repository owner (user or org login).",
+        "type": "string"
+      },
+      "path": {
+        "description": "Path within the repository.",
+        "type": "string"
+      },
+      "ref": {
+        "description": "Branch, tag, or commit SHA (default branch when omitted).",
+        "type": "string"
+      },
+      "repo": {
+        "description": "Repository name.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "repo",
+      "path"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_file_contents"
+}

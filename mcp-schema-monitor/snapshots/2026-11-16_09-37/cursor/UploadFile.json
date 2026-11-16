@@ -1,0 +1,53 @@
+{
+  "description": "Send a file from your computer to one of the user's connected services using the account they already connected. The file's bytes go straight from your computer to the service: you never read or paste them, so this works for any size or type up to the limit, and it is the right tool whenever the user wants a file you made or downloaded to land in one of these services. Do not read a file and re-create it with that service's own tools; upload it. The result names the created item and, where the service provides one, a link you can hand to the user.\nconnection is the connection's identifier: the same one GetMcpServerStatus lists and that connection's own tools are prefixed with (for example user-onedrive, dashboard-team-1-Google-drive, user-SharePoint-xai or user-Gmail--personal). The service short name (google-drive, onedrive, sharepoint, gmail or outlook) is accepted when exactly one account of that service is connected; with several accounts, name the identifier so the right account is used. Supported today:\n- Google Drive: destination.path is a folder path from My Drive root (e.g. \"Reports/2026\"; the folders must already exist), or destination.folderId is a Drive folder id from the Drive listing tools. Omit both for My Drive root. A new file is always created; Drive allows several files with one name. destination.convertToGoogleFormat, when true, asks Drive to import a convertible Office or text file as native Docs, Sheets, or Slides on that same create (pptx → Slides, docx → Docs, xlsx → Sheets). Types Drive cannot import stay as the original file. The result mimeType tells you which landed. Default false.\n- OneDrive: destination.path is a folder path from the OneDrive root (e.g. \"Documents/Reports\"; the folders must already exist), or destination.folderId is a folder item id from list_drive_items. Omit both for the root. An existing file with the same name fails the upload unless destination.overwrite is true.\n- Gmail: destination.draftId is the id create_draft returned (or one from list_drafts); the file is attached and the id stays the same, so then send that draftId with send_draft (send_message on Google's hosted Gmail). Attach last: Gmail's update_draft removes every attachment it is not handed again, so finish recipients, subject and body before calling UploadFile, and never call update_draft on a draft that already has an attachment (make a new draft and attach again instead). The draft with its attachments must stay under 25 MB.\n- Outlook: on the Outlook connection, destination.draftId is the id create_draft returned; then send_draft it. send_mail cannot carry this file. A Gmail or Outlook draft here carries a file; it is not how you draft for review.\n- SharePoint: destination.folderId is the drive id from sharepoint_list_drives and is required. destination.path is the folder under that drive (for example \"Reports/2026\") and is passed together with folderId; omit path to use the drive root. An existing file with the same name fails unless destination.overwrite is true.\ndestination.name sets the file name; it defaults to the source file's name. Never put a file's contents into a mail tool's attachments argument yourself; that path cannot carry a real file. A connection that cannot receive files answers with the ones that can.",
+  "inputSchema": {
+    "properties": {
+      "connection": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "destination": {
+        "description": "Where the file lands; which fields apply depends on the connection.",
+        "properties": {
+          "convertToGoogleFormat": {
+            "description": "Google Drive only: if the file has a Google Workspace equivalent, upload it as that native type on this create (pptx/ppt/odp → Slides, docx/doc/odt/rtf/html/md/txt → Docs, xlsx/xls/ods/csv/tsv → Sheets). Types Drive cannot import stay as the original file. Default false. Other connections ignore this.",
+            "type": "boolean"
+          },
+          "draftId": {
+            "description": "Gmail and Outlook only: the id of an unsent draft to attach the file to. Not combined with path or folderId.",
+            "type": "string"
+          },
+          "folderId": {
+            "description": "Provider folder id, when you already have one from that connection's listing tools. Google Drive and OneDrive take at most one of path or folderId. SharePoint needs folderId (the drive id) and takes path alongside it.",
+            "type": "string"
+          },
+          "name": {
+            "description": "File name at the destination. Defaults to the source file's name.",
+            "type": "string"
+          },
+          "overwrite": {
+            "description": "OneDrive and SharePoint only: replace a file that already exists at the destination. Default false: an existing file makes the upload fail so you can pick another name.",
+            "type": "boolean"
+          },
+          "path": {
+            "description": "Folder path inside the destination service, e.g. \"Reports/2026\". Omit to use the service root. For SharePoint this is the folder under the drive named by folderId.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "sourcePath": {
+        "description": "Absolute path of the file on your computer, e.g. the path a Shell command or CopyToBox produced. Only files under /workspace or your own agent directory (/home/box/agent-data/agents/<your id>) can be sent; directories are not accepted.",
+        "minLength": 1,
+        "type": "string"
+      }
+    },
+    "required": [
+      "connection",
+      "sourcePath"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "UploadFile"
+}

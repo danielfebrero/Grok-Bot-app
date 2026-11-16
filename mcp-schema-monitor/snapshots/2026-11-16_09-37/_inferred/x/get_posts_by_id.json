@@ -1,0 +1,160 @@
+{
+  "namespace": "x",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-11-16T09:33:02+01:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "data": {
+          "properties": {
+            "edit_history_tweet_ids": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "id": {
+              "type": "string"
+            },
+            "referenced_tweets": {
+              "items": {
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "type"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "text": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "edit_history_tweet_ids",
+            "id",
+            "referenced_tweets",
+            "text",
+            "url"
+          ],
+          "type": "object"
+        },
+        "includes": {
+          "properties": {
+            "media": {
+              "items": {
+                "properties": {
+                  "duration_ms": {
+                    "type": "integer"
+                  },
+                  "media_key": {
+                    "type": "string"
+                  },
+                  "preview_image_url": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string"
+                  },
+                  "variants": {
+                    "items": {
+                      "properties": {
+                        "bit_rate": {
+                          "type": "integer"
+                        },
+                        "content_type": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "content_type",
+                        "url"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "duration_ms",
+                  "media_key",
+                  "preview_image_url",
+                  "type",
+                  "variants"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "tweets": {
+              "items": {
+                "properties": {
+                  "attachments": {
+                    "properties": {
+                      "media_keys": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      }
+                    },
+                    "required": [
+                      "media_keys"
+                    ],
+                    "type": "object"
+                  },
+                  "edit_history_tweet_ids": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "attachments",
+                  "edit_history_tweet_ids",
+                  "id",
+                  "text"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "media",
+            "tweets"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "includes"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "get_posts_by_id"
+}

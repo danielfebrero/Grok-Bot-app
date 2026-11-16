@@ -1,0 +1,146 @@
+{
+  "description": "Reply to a message in its thread; the reply is sent right away and cannot be recalled. It quotes the original and goes to the original's Reply-To or sender unless you set to; set replyAll to include all original recipients.",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "attachments": {
+        "description": "Attachments. Each item must specify exactly one of content (base64) or url",
+        "items": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "content": {
+                  "description": "Base64 encoded content",
+                  "type": "string"
+                },
+                "contentDisposition": {
+                  "description": "inline to show it in the HTML body, attachment to offer it as a download",
+                  "enum": [
+                    "inline",
+                    "attachment"
+                  ],
+                  "type": "string"
+                },
+                "contentId": {
+                  "description": "ID the HTML body references as cid:<contentId> to show it inline",
+                  "type": "string"
+                },
+                "contentType": {
+                  "description": "MIME type, e.g. application/pdf; inferred when omitted",
+                  "type": "string"
+                },
+                "filename": {
+                  "description": "File name recipients see, e.g. report.pdf",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "content"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "contentDisposition": {
+                  "description": "inline to show it in the HTML body, attachment to offer it as a download",
+                  "enum": [
+                    "inline",
+                    "attachment"
+                  ],
+                  "type": "string"
+                },
+                "contentId": {
+                  "description": "ID the HTML body references as cid:<contentId> to show it inline",
+                  "type": "string"
+                },
+                "contentType": {
+                  "description": "MIME type, e.g. application/pdf; inferred when omitted",
+                  "type": "string"
+                },
+                "filename": {
+                  "description": "File name recipients see, e.g. report.pdf",
+                  "type": "string"
+                },
+                "url": {
+                  "description": "Publicly accessible URL to fetch the attachment from",
+                  "format": "uri",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "url"
+              ],
+              "type": "object"
+            }
+          ],
+          "description": "Attachment: provide exactly one of content (base64) or url"
+        },
+        "type": "array"
+      },
+      "bcc": {
+        "description": "Override BCC recipients. Cannot be combined with replyAll",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "cc": {
+        "description": "Override CC recipients. Cannot be combined with replyAll",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "html": {
+        "description": "HTML body for formatted mail; inline images use cid:<contentId>",
+        "type": "string"
+      },
+      "inboxId": {
+        "description": "Inbox ID: the inbox's email address, from list_inboxes",
+        "type": "string"
+      },
+      "labels": {
+        "description": "Your own labels for the message; AgentMail sets system labels such as sent",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "messageId": {
+        "description": "Message ID with its angle brackets, from list_messages, search_messages, or get_thread",
+        "type": "string"
+      },
+      "replyAll": {
+        "description": "Reply to all original recipients. Mutually exclusive with to, cc, and bcc — the API rejects the request if both are set",
+        "type": "boolean"
+      },
+      "replyTo": {
+        "description": "Addresses that replies should go to instead of this inbox",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "text": {
+        "description": "Plain-text body; include it even with html, since no text version is generated from html",
+        "type": "string"
+      },
+      "to": {
+        "description": "Recipients, replacing the default: the original's Reply-To, else its sender (for a message this inbox sent, that is this inbox). Cannot be combined with replyAll",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "inboxId",
+      "messageId"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "reply_to_message"
+}

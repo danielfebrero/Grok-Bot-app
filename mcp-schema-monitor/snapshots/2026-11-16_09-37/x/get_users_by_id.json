@@ -1,0 +1,109 @@
+{
+  "description": "Retrieves details of a specific User by their ID. Requires the numeric user id, not a username.",
+  "inputSchema": {
+    "properties": {
+      "expansions": {
+        "description": "A comma separated list of fields to expand.",
+        "items": {
+          "enum": [
+            "affiliation",
+            "most_recent_post_id",
+            "pinned_post_id"
+          ],
+          "type": "string"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "id": {
+        "type": "string"
+      },
+      "post.fields": {
+        "description": "A comma separated list of Post fields to display.",
+        "items": {
+          "enum": [
+            "article",
+            "article_title",
+            "attachments",
+            "card_uri",
+            "community_id",
+            "context_annotations",
+            "conversation_id",
+            "created_at",
+            "display_text_range",
+            "edit_controls",
+            "entities",
+            "geo",
+            "id",
+            "lang",
+            "matched_media_notes",
+            "media_metadata",
+            "non_public_metrics",
+            "note_post",
+            "note_request_suggestions",
+            "organic_metrics",
+            "paid_partnership",
+            "possibly_sensitive",
+            "promoted_metrics",
+            "public_metrics",
+            "reply_settings",
+            "rest_id",
+            "scopes",
+            "source",
+            "suggested_source_links",
+            "suggested_source_links_with_counts",
+            "text",
+            "withheld"
+          ],
+          "type": "string"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "user.fields": {
+        "description": "A comma separated list of User fields to display.",
+        "items": {
+          "enum": [
+            "active_follower_count",
+            "confirmed_email",
+            "connection_status",
+            "created_at",
+            "description",
+            "entities",
+            "id",
+            "is_identity_verified",
+            "location",
+            "name",
+            "org_only",
+            "parody",
+            "profile_banner_url",
+            "profile_image_url",
+            "protected",
+            "public_metrics",
+            "receives_your_chat",
+            "receives_your_dm",
+            "subscriber_count",
+            "subscribes_to_you",
+            "subscription",
+            "subscription_type",
+            "url",
+            "username",
+            "verified",
+            "verified_followers_count",
+            "verified_type",
+            "withheld"
+          ],
+          "type": "string"
+        },
+        "minItems": 1,
+        "type": "array"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_users_by_id"
+}

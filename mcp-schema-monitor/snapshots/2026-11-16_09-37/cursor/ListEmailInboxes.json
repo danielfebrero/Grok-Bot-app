@@ -1,0 +1,9 @@
+{
+  "description": "List the email addresses you own. These are the inboxes you can search with SearchEmailThreads and draft from with DraftExternalMessage (providerIdentifier grok-bot-agent-inbox).\nRead-only, takes no parameters. Call it when you need to know your own address, or before scoping a search to one inbox.",
+  "inputSchema": {
+    "properties": {},
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "ListEmailInboxes"
+}

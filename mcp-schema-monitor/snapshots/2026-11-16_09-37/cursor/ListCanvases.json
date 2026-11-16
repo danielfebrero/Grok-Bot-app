@@ -1,0 +1,24 @@
+{
+  "description": "List the Cursor pages (canvases) in your Library, newest first. The Library is the user's whole store: pages written by this run, by earlier runs, by other bots and threads, and by the person, so a listed page is not necessarily this run's output. Each entry carries canvas_id, url, sharing (private, team, or public: who can open it), and when it was updated. Filter by title `query` or `updated_after`. Read a page with ReadCanvas, or change one with EditCanvas, by its canvas_id.",
+  "inputSchema": {
+    "properties": {
+      "limit": {
+        "description": "Most pages to return, 1-50. Default 20.",
+        "maximum": 50,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "query": {
+        "description": "Case-insensitive substring to match against page titles.",
+        "type": "string"
+      },
+      "updated_after": {
+        "description": "Only pages updated at or after this RFC 3339 timestamp.",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "ListCanvases"
+}

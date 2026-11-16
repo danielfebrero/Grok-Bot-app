@@ -1,0 +1,60 @@
+{
+  "description": "Create a new email draft in the user's Gmail account. The draft is saved but NOT sent. The user can review and send it from Gmail. Use this tool to compose emails on behalf of the user. The draft-first approach ensures the user can review the email before it is sent. To reply to an existing email thread: 1. First use gmail_get_message to read the original message 2. Set reply_to_message_id to the original message's message_id or rfc_message_id 3. The subject should start with 'Re: ' followed by the original subject After creating the draft, tell the user the draft has been saved and they can find it in their Gmail Drafts folder to review and send.",
+  "inputSchema": {
+    "properties": {
+      "bcc": {
+        "description": "List of BCC recipient email addresses (optional)",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "body": {
+        "description": "Plain text body of the email",
+        "type": "string"
+      },
+      "body_html": {
+        "description": "Optional: HTML body. If provided, email is sent as multipart/alternative with both plain text and HTML.",
+        "type": "string"
+      },
+      "cc": {
+        "description": "List of CC recipient email addresses (optional)",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "from": {
+        "description": "Optional: sender email address for aliases or delegated accounts. If omitted, uses the account's default address.",
+        "type": "string"
+      },
+      "reply_to_message_id": {
+        "description": "Optional: the message this replies to (creates a threaded reply). Use either message_id or rfc_message_id from gmail_get_message; the In-Reply-To and References headers recipients thread on are read from that message.",
+        "type": "string"
+      },
+      "subject": {
+        "description": "Email subject line",
+        "type": "string"
+      },
+      "thread_id": {
+        "description": "Optional: thread ID to associate this draft with. Derived from reply_to_message_id when omitted.",
+        "type": "string"
+      },
+      "to": {
+        "description": "List of recipient email addresses (To field)",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "to",
+      "subject",
+      "body"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "create_draft"
+}

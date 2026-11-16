@@ -1,0 +1,84 @@
+{
+  "namespace": "user-tavily",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-19T09:18:19+02:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "answer": {
+          "type": "null"
+        },
+        "auth_mode": {
+          "type": "string"
+        },
+        "follow_up_questions": {
+          "type": "null"
+        },
+        "images": {
+          "items": {},
+          "type": "array"
+        },
+        "keyless_notice": {
+          "type": "string"
+        },
+        "query": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "response_time": {
+          "type": "number"
+        },
+        "results": {
+          "items": {
+            "properties": {
+              "content": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "raw_content": {
+                "type": "null"
+              },
+              "score": {
+                "type": "number"
+              },
+              "title": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "content",
+              "id",
+              "raw_content",
+              "score",
+              "title",
+              "url"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "answer",
+        "auth_mode",
+        "follow_up_questions",
+        "images",
+        "keyless_notice",
+        "query",
+        "request_id",
+        "response_time",
+        "results"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "tavily_search"
+}

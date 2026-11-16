@@ -1,0 +1,17 @@
+{
+  "description": "Create a new custom Gmail label. Returns the label ID and name. Use this when the user wants to organize emails with a new label that doesn't exist yet. After creating, use gmail_modify_labels or gmail_batch_modify_labels to apply it to messages.",
+  "inputSchema": {
+    "properties": {
+      "name": {
+        "description": "Name for the new custom label",
+        "type": "string"
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "create_label"
+}

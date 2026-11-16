@@ -1,0 +1,36 @@
+{
+  "description": "DELETE /repos/{owner}/{repo}/issues/{issue_number}/sub_issue: detach a sub-issue from its parent (the issue itself is kept).",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "additionalProperties": false,
+    "properties": {
+      "issue_number": {
+        "description": "Issue number.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "owner": {
+        "description": "Repository owner (user or org login).",
+        "type": "string"
+      },
+      "repo": {
+        "description": "Repository name.",
+        "type": "string"
+      },
+      "sub_issue_id": {
+        "description": "The sub-issue's `id` (the numeric id on the issue object, not its number).",
+        "minimum": 1,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "owner",
+      "repo",
+      "issue_number",
+      "sub_issue_id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "remove_sub_issue"
+}

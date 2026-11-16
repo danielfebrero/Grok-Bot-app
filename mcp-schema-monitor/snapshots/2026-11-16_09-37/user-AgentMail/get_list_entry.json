@@ -1,0 +1,43 @@
+{
+  "description": "Get one entry from one of an inbox's allow or block lists, by the email address or domain it holds: whether it is an address or a domain, why it was added, whether AgentMail added it (readOnly), and when.",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "direction": {
+        "description": "Which traffic the list governs: send filters the recipients of outbound mail; receive filters the senders of new inbound mail; reply filters the senders of inbound mail that continues a thread this inbox already replied to",
+        "enum": [
+          "send",
+          "receive",
+          "reply"
+        ],
+        "type": "string"
+      },
+      "entry": {
+        "description": "The email address (name@example.com) or domain (example.com) the entry matches",
+        "minLength": 1,
+        "type": "string"
+      },
+      "inboxId": {
+        "description": "Inbox ID: the inbox's email address, from list_inboxes",
+        "type": "string"
+      },
+      "listType": {
+        "description": "allow: once the list has an entry, only listed addresses pass; block: listed addresses are blocked",
+        "enum": [
+          "allow",
+          "block"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "inboxId",
+      "direction",
+      "listType",
+      "entry"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_list_entry"
+}

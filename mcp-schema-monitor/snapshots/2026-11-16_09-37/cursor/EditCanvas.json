@@ -1,0 +1,58 @@
+{
+  "description": "Change an existing canvas without rewriting it: replace exact strings in its source. Pass canvas_id and either one replacement (old_string, new_string, optional replace_all) or several in edits; they apply in order against the current source, with one recompile and one publish for the whole call, so put every change one request needs into one call. Each old_string is copied verbatim from the current source and must occur exactly once unless replace_all is true; a token that appears in several places is one replacement with replace_all: true. If any replacement does not match, nothing is written and the result names each failed one with the nearest text: fix those and resend the whole batch. A compile or type error leaves the previous revision in place and names what to fix. The result shows the source around each change, so no ReadCanvas is needed between edits. To rename the page, change the title on its root <Page>: the page's name in the library and its cards follow it, while the page's web address stays the same. Prefer EditCanvas over WriteCanvas for a page that already exists; use WriteCanvas for a new page or when the change is spread through the file.",
+  "inputSchema": {
+    "properties": {
+      "canvas_id": {
+        "description": "The id of the canvas to edit, as a ReadCanvas, WriteCanvas or EditCanvas result names it.",
+        "minLength": 1,
+        "type": "string"
+      },
+      "edits": {
+        "description": "Several replacements applied in order to the same canvas, with one recompile and one publish. Use it instead of old_string/new_string whenever one request changes more than one place. All apply or none does.",
+        "items": {
+          "properties": {
+            "new_string": {
+              "description": "The text that replaces old_string. Empty deletes it.",
+              "type": "string"
+            },
+            "old_string": {
+              "description": "Exact text copied verbatim from the current source; it must occur exactly once unless replace_all is true.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "replace_all": {
+              "description": "Replace every occurrence of old_string, as the top-level replace_all does.",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "old_string",
+            "new_string"
+          ],
+          "type": "object"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "new_string": {
+        "description": "The text that replaces old_string. Empty deletes old_string.",
+        "type": "string"
+      },
+      "old_string": {
+        "description": "The exact text to replace, copied verbatim from the current source (whitespace and indentation included). It must occur exactly once unless replace_all is true; include surrounding lines to make it unique.",
+        "minLength": 1,
+        "type": "string"
+      },
+      "replace_all": {
+        "description": "Replace every occurrence of old_string instead of requiring exactly one. Use it for a rename that appears in several places, with old_string as the bare token. Matching is by substring, so occurrences inside longer words and identifiers change too; include surrounding text when that is wrong.",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "canvas_id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "EditCanvas"
+}

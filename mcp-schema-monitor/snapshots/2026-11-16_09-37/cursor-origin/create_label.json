@@ -1,0 +1,36 @@
+{
+  "description": "Create a repository label so update_pull_request_labels can apply it. label is the name: 1-50 characters, trimmed, and unique in the repository by exact, case-sensitive spelling, so Bug and bug are different labels; reuse an existing label that differs only in case instead of creating another. color is six hex digits with an optional leading #, such as d73a4a; it defaults to ededed. description is optional, at most 255 characters. A name that already exists returns a conflict; apply that label instead.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "color": {
+        "description": "Six hex digits, optional leading #; defaults to ededed",
+        "type": "string"
+      },
+      "description": {
+        "description": "Label description, at most 255 characters",
+        "type": "string"
+      },
+      "label": {
+        "description": "Label name to create, 1-50 characters",
+        "type": "string"
+      },
+      "name": {
+        "description": "Origin repository name within that namespace",
+        "type": "string"
+      },
+      "owner": {
+        "description": "Origin namespace (owner) slug, taken from list_namespaces or an earlier Origin result. A GitHub owner or org name is not an Origin namespace unless list_namespaces returns it.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "name",
+      "label"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "create_label"
+}

@@ -1,0 +1,47 @@
+{
+  "description": "Update a pull request's title, description, and lifecycle through the public fields. Omit title or body to leave that field unchanged; pass an empty body to clear the description. Lifecycle is state (open or closed) plus draft, sent independently: state closed closes and ignores draft; state open reopens, and without draft true marks ready and publishes an existing draft; draft true reopens as a draft, alone or together with state open; draft false marks ready and reopens a closed pull request. Send one lifecycle field, both, or neither, so a metadata-only update is valid. Metadata and lifecycle together send one public UpdatePullRequest. Origin applies present fields in its documented order; a failure can leave some fields applied, so re-read after an error. merged is not writable, and ready is draft false or state open rather than a state value.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "body": {
+        "description": "New description. Omit to leave unchanged. Pass \"\" to clear.",
+        "type": "string"
+      },
+      "draft": {
+        "description": "Draft flag. Omit to leave unchanged.",
+        "type": "boolean"
+      },
+      "name": {
+        "description": "Origin repository name within that namespace",
+        "type": "string"
+      },
+      "number": {
+        "type": "number"
+      },
+      "owner": {
+        "description": "Origin namespace (owner) slug, taken from list_namespaces or an earlier Origin result. A GitHub owner or org name is not an Origin namespace unless list_namespaces returns it.",
+        "type": "string"
+      },
+      "state": {
+        "description": "open or closed. Omit to leave unchanged.",
+        "enum": [
+          "open",
+          "closed"
+        ],
+        "type": "string"
+      },
+      "title": {
+        "description": "New title. Omit to leave unchanged.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "name",
+      "number"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "update_pull_request"
+}

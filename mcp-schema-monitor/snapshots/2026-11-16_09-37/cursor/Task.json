@@ -1,0 +1,49 @@
+{
+  "description": "Start a subagent: a separate agent that works on one task and reports back to you.\n- It cannot see the user. A new executor picks up from the parent conversation; any other subagent cannot see it, so its prompt must be self-contained: the goal, the context and exact values it needs, and what to report back.\n- To follow up with an agent that finished, pass its ID as resume; it keeps its context. Without resume, each call starts a new agent.\n- Its final message comes back to you, not the user. Trust it.\n\nAvailable subagent_types and descriptions are listed in <available_subagent_types> in the initial user-info message at the start of this conversation.\n\nAvailable model slugs for subagents are listed in <available_subagent_models> in the initial user-info message at the start of this conversation.\n\nWhen an agent runs in the background, you will be automatically notified when it completes after you end your own turn - do NOT AwaitShell or poll it. Continue with other work or end your turn instead. Don't mention this to the user.",
+  "inputSchema": {
+    "properties": {
+      "description": {
+        "description": "A short, user-friendly title for the subagent. This appears in the UI as the subagent's name. Make it concrete and distinct, consider recent titles to avoid reuse. For resumed subagents which you are prompting to work on a separate task, give an updated description based on the latest work the subagent is performing. (Do not rename if the subagent is continuing work on the same high-level task.)",
+        "type": "string"
+      },
+      "file_attachments": {
+        "description": "Optional array of file paths to images or videos to attach to the subagent. Files are read and attached to the subagent's context. Use to forward relevant media to any subagent (e.g. pass a user-attached image's saved file path so the subagent sees the actual image rather than a prose description).",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "model": {
+        "description": "Optional effort level for a new executor. Choose a listed level based on task difficulty, or omit it for the default. It is ignored for other subagent types and resumed executors.",
+        "type": "string"
+      },
+      "prompt": {
+        "description": "The task for the agent to perform",
+        "type": "string"
+      },
+      "resume": {
+        "description": "Optional agent ID to resume from. If provided, sends a follow-up message to the agent after it has completed. Requests to a currently running asynchronous agent fail; wait for completion before resuming.",
+        "type": "string"
+      },
+      "subagent_type": {
+        "description": "Subagent type to use for this task. Must be one of: executor, videoReview, watchVideo, computerUse, knowledgeWork.",
+        "enum": [
+          "executor",
+          "videoReview",
+          "watchVideo",
+          "computerUse",
+          "knowledgeWork"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "description",
+      "prompt",
+      "subagent_type"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "Task"
+}

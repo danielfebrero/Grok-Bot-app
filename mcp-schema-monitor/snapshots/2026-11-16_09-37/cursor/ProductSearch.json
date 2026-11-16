@@ -1,0 +1,43 @@
+{
+  "description": "Search store catalogs for products to buy and get structured listings: title, brand, description, specs, images, price, list price, seller and its rating, stock, condition, shipping, deal labels, promo codes, rating, review summary, variants such as color or size, product page links. Results can be incomplete, so use this alongside WebSearch and WebFetch, and keep using those when the listings are missing or not enough to answer.",
+  "inputSchema": {
+    "properties": {
+      "country": {
+        "description": "Two-letter ISO country code of the buyer (default US).",
+        "pattern": "^[A-Za-z]{2}$",
+        "type": "string"
+      },
+      "dealsOnly": {
+        "description": "True keeps only offers with a deal-site promo or a markdown off the store's list price and drops every other offer and product, so it can return fewer products than asked and miss cheaper items that are not discounted. Set it when the user wants discounted items, not just a low price.",
+        "type": "boolean"
+      },
+      "numResults": {
+        "description": "How many products to return (default 10, max 20).",
+        "maximum": 20,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "query": {
+        "description": "What the user wants to buy, in shopping words, with any brand, size, or budget they gave (e.g. \"insulated travel mug 20 oz under $30\").",
+        "maxLength": 1000,
+        "minLength": 1,
+        "type": "string"
+      },
+      "sites": {
+        "description": "Only when the user limits shopping to certain stores: their domains, e.g. [\"walmart.com\"] for \"on Walmart\", [\"amazon.com\", \"target.com\"] for \"from Amazon or Target\" (max 20). Returns only those stores' offers.",
+        "items": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "maxItems": 20,
+        "type": "array"
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "ProductSearch"
+}

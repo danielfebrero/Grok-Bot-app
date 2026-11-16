@@ -1,0 +1,76 @@
+{
+  "description": "Add an inline comment to the caller's pending (unsubmitted) review on a pull request, via GraphQL addPullRequestReviewThread. Start the review with create_pull_request_review and no `event`, add comments one at a time here, then submit_pending_pull_request_review. The reply is the new review thread with its first comment.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "additionalProperties": false,
+    "properties": {
+      "body": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "line": {
+        "description": "Line in the diff the comment applies to (the last line of a range).",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "owner": {
+        "description": "Repository owner (user or org login).",
+        "type": "string"
+      },
+      "path": {
+        "description": "File path relative to the repository root.",
+        "type": "string"
+      },
+      "pull_number": {
+        "description": "Pull request number.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "repo": {
+        "description": "Repository name.",
+        "type": "string"
+      },
+      "review_id": {
+        "description": "The pending review's id (from create_pull_request_review). Looked up when omitted: the caller's one PENDING review on the pull request.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "side": {
+        "enum": [
+          "LEFT",
+          "RIGHT"
+        ],
+        "type": "string"
+      },
+      "start_line": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "start_side": {
+        "enum": [
+          "LEFT",
+          "RIGHT"
+        ],
+        "type": "string"
+      },
+      "subject_type": {
+        "description": "LINE (default; needs `line`) or FILE for a whole-file comment.",
+        "enum": [
+          "LINE",
+          "FILE"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "repo",
+      "pull_number",
+      "path",
+      "body"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "add_comment_to_pending_review"
+}

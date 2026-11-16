@@ -1,0 +1,59 @@
+{
+  "description": "List commits from a branch or starting ref in an Origin-hosted repository, optionally filtered by lists of exact git author or committer emails, by inclusive since and until bounds on committer time, and by a repository path as `git log --full-history -- <path>` does, without following renames, so a merge is listed when the path differs from any of its parents. A commit matches a list when its email equals any listed email, and must match every list, bound, and path that is given. A directory path matches when any descendant changes. A filtered page can be short while nextPageToken is present, and is empty with nextPageToken only after 100,000 commits were searched without a match. Keep paging to reach older matches. Each item is sha, full message, author, committer, parents, and tree. Omits patches. Continuation calls reuse the filters stored in pageToken.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "authorEmails": {
+        "description": "Only commits whose git author email equals any listed email, case-insensitive. Not names or partial matches. At most 100 distinct emails.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "committerEmails": {
+        "description": "Only commits whose git committer email equals any listed email, case-insensitive. At most 100 distinct emails. Combined with authorEmails, a commit must match both lists.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "name": {
+        "description": "Origin repository name within that namespace",
+        "type": "string"
+      },
+      "owner": {
+        "description": "Origin namespace (owner) slug, taken from list_namespaces or an earlier Origin result. A GitHub owner or org name is not an Origin namespace unless list_namespaces returns it.",
+        "type": "string"
+      },
+      "pageSize": {
+        "type": "number"
+      },
+      "pageToken": {
+        "type": "string"
+      },
+      "path": {
+        "description": "Only commits that change this repository path, without following renames. A merge is listed when the path differs from any of its parents, as `git log --full-history -- <path>` does. A directory matches when any descendant changes. Surrounding whitespace and empty and . segments are ignored, so leading, trailing, and repeated slashes do not matter; a .. segment is rejected. Combined with email and time filters, a commit must match every filter that is set.",
+        "type": "string"
+      },
+      "ref": {
+        "description": "Branch or starting commit",
+        "type": "string"
+      },
+      "since": {
+        "description": "Only commits whose git committer time is at or after this RFC 3339 timestamp, such as 2026-08-01T00:00:00Z. The bound is inclusive and uses committer time, which a rebase or cherry-pick rewrites, not author time.",
+        "type": "string"
+      },
+      "until": {
+        "description": "Only commits whose git committer time is at or before this RFC 3339 timestamp, such as 2026-08-31T23:59:59Z. The bound is inclusive. Combined with since and the email filters, a commit must match every filter that is set.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "name"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "list_commits"
+}

@@ -1,0 +1,29 @@
+{
+  "description": "GET /repos/{owner}/{repo}/branches/{branch}: one branch with its head commit and protection summary.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "additionalProperties": false,
+    "properties": {
+      "branch": {
+        "description": "Branch name (may contain `/`).",
+        "type": "string"
+      },
+      "owner": {
+        "description": "Repository owner (user or org login).",
+        "type": "string"
+      },
+      "repo": {
+        "description": "Repository name.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "repo",
+      "branch"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "get_branch"
+}

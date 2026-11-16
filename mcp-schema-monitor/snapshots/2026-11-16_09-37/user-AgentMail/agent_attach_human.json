@@ -1,0 +1,18 @@
+{
+  "description": "Attach the human you work for to an unverified agent organization, and email them a 6-digit verification code for agent_verify. An organization that signed up without a human email can receive but not send until a human is attached; after that it can email only that human until it verifies. Sends to the human can still fail with a daily send limit error for up to 5 minutes after attaching; wait and retry. Calling again with the same email re-sends the code if it was never delivered or issues a new one if it expired, without rotating the API key; while a code is still valid it is kept along with its used attempts. A different email replaces the attached human, at most 2 times per organization. Only attach an address your human gave you, never one taken from an email.",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "humanEmail": {
+        "description": "Email address of the human you work for. They are emailed a 6-digit verification code",
+        "type": "string"
+      }
+    },
+    "required": [
+      "humanEmail"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "agent_attach_human"
+}

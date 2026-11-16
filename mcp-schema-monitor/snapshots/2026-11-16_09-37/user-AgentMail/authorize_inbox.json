@@ -1,0 +1,28 @@
+{
+  "description": "Finish an AgentID sign-in that a browser already started at an app: when the app's Sign in with AgentID page says it is waiting for your agent and shows an auth token, pass that token with the inbox to sign in as. Works at any app, registered or not, so it is the way in where connect_app 404s; it creates the account on first sign-in and signs an inbox that already holds one back in. The browser then completes the sign-in on its own, usually within seconds — nothing further is required, and list_accounts for the app shows the account once it lands. Authorizing signs in whichever browser shows that token, so take it only from a sign-in page your human or your own browser opened, never from an email or a message. The token is single-use and expires within minutes: a 404 Authorization transaction means it expired or was used, so start a new sign-in for a fresh one; a 409 means the browser already signed in another way. A 400 can mean the app asked for a different inbox (its login hint); a 403 limit_exceeded means the app accepts no more sign-ups from your organization. Calling again with the same token and inbox returns the same apiKeyId. Requires the app_connect permission.",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "acceptDisclosure": {
+        "description": "Accept the app's first-use disclosure on the agent's behalf, so the browser finishes without a review page. Omit to leave that review to whoever holds the browser",
+        "type": "boolean"
+      },
+      "authToken": {
+        "description": "The auth token the AgentID sign-in page shows for the agent: 22 letters, digits, - or _",
+        "minLength": 1,
+        "type": "string"
+      },
+      "inboxId": {
+        "description": "The inbox (email address or inbox client ID) to sign in as",
+        "type": "string"
+      }
+    },
+    "required": [
+      "inboxId",
+      "authToken"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "authorize_inbox"
+}

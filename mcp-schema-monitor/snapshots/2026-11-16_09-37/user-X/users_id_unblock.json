@@ -1,0 +1,20 @@
+{
+  "description": "Causes the source User to unblock the target User. Unblocking does not restore any follow the block removed, so blocking and then unblocking a follower removes them as a follower: do that only for followers the authenticated User approved removing.",
+  "inputSchema": {
+    "properties": {
+      "source_user_id": {
+        "type": "string"
+      },
+      "target_user_id": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "source_user_id",
+      "target_user_id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "users_id_unblock"
+}

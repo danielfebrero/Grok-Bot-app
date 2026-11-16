@@ -1,0 +1,27 @@
+{
+  "description": "Create a new agent (a new teammate assistant) for your user, with a name, an optional persona/description, and an optional sidebar section id from ListSections. Returns the new agent's id so you can immediately message it with SendToAgent. Use this to spin up a focused teammate for a job. You have no tool to delete an agent, so only create one when it is genuinely useful; the user can delete an agent themselves from the sidebar (right-click the agent, then \"Delete\").",
+  "inputSchema": {
+    "properties": {
+      "description": {
+        "description": "The new agent's persona / instructions: what it is for and how it should behave. This becomes its profile and shapes its replies. Optional but strongly recommended.",
+        "type": "string"
+      },
+      "name": {
+        "description": "A short, human-readable name for the new agent.",
+        "minLength": 1,
+        "type": "string"
+      },
+      "section_id": {
+        "description": "Optional sidebar section id from ListSections. Omit it to leave the new agent unassigned.",
+        "minLength": 1,
+        "type": "string"
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "CreateAgent"
+}
