@@ -1,0 +1,1236 @@
+/**
+ * Bernice - Barbershop Presentation Template (40 slides, 13.333 x 7.5 in).
+ *
+ * Standalone reconstruction of the reference deck with pptxgenjs only.
+ * Photographs / device mock-ups from the original are replaced by flat
+ * placeholder rectangles; the two bitmap charts are rebuilt as native charts.
+ *
+ *   node <this file>   ->  writes the .pptx next to this script
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ palette */
+const BG     = '282A2E'; // deck background (theme accent3)
+const PANEL  = '3A3D44'; // dark card / thin rules
+const PANEL2 = '595C65'; // lighter card (pricing columns)
+const RED    = 'EA1C22'; // theme accent1
+const WHITE  = 'FFFFFF';
+const LIGHT  = 'F2F2F2';
+const GREY   = 'BFBFBF'; // body copy
+const DIM    = '7F7F7F'; // captions / quotes
+const NUMC   = '595959'; // big "#01" numerals
+const PHOTO  = '989898'; // stand-in for photographic images
+const SCREEN = 'D2D3D5'; // stand-in for device mock-ups
+
+/* -------------------------------------------------------------- typography */
+const OSWALD = 'Oswald';
+const SANS   = 'Open Sans';
+const POPPINS = 'Poppins';
+
+/** Oswald bold - headlines, labels, buttons. */
+const H  = (text, color = WHITE, fontSize = 40, more) => ({ text, options: Object.assign({ fontFace: OSWALD, bold: true, color, fontSize }, more) });
+/** Oswald regular - prices, plan names, contact headings. */
+const Hr = (text, color = WHITE, fontSize = 40, more) => ({ text, options: Object.assign({ fontFace: OSWALD, color, fontSize }, more) });
+/** Open Sans regular - body copy. */
+const B  = (text, color = GREY, fontSize = 11, more) => ({ text, options: Object.assign({ fontFace: SANS, color, fontSize }, more) });
+/** Open Sans bold - "INSERT YOUR TEXT" style kickers. */
+const Bb = (text, color = LIGHT, fontSize = 12, more) => ({ text, options: Object.assign({ fontFace: SANS, bold: true, color, fontSize }, more) });
+/** Open Sans italic - pull quotes. */
+const Bi = (text, color = DIM, fontSize = 11, more) => ({ text, options: Object.assign({ fontFace: SANS, italic: true, color, fontSize }, more) });
+/** Poppins - chart axis labels. */
+const Pp = (text, color = WHITE, fontSize = 12, more) => ({ text, options: Object.assign({ fontFace: POPPINS, color, fontSize }, more) });
+
+/* ------------------------------------------------------------ filler copy */
+const LOREM =
+  'Re paragone creatura acerbita ai guardava lasciami vi. Entro tue forza miele mazzo per pur ' +
+  'oltre sul. Lo ti il gabbie quanto lancio. Fato mare arme tu anch vi mine riso. Poi affannata ' +
+  'ami cresciuto melagrani una abbandona brillanti. Far aspettando nel voluttuosa sei turbamento ' +
+  'tra. Grappoli tuo inquieta cio orribile dissolve scoperto. Alzeremo voi parlando pei qualcuno ' +
+  'serbatoi mio bellezza. Impregnato voi san esaltavano dal dal sfaldavano.';
+const LOREM_RETAO = LOREM.replace('creatura acerbita', 'creatura retao acerbita');
+const LOREM_SHORT = LOREM.slice(0, 325) + '.';
+const LOREM_DOTS  = LOREM.slice(0, 131) + '..';
+const QUOTE = '\u00abRe paragone creatura acerbita ai guardava lasciami vi. Entro tue forza\u00bb';
+const TAG   = 'BARBERSHOP PRESENTATION TEMPLATES';
+
+/* ------------------------------------------------------------ draw helpers */
+/** Text box. Google-Slides boxes use 0.1"/0.05" insets and never auto-shrink. */
+function text(s, x, y, w, h, runs, opts = {}) {
+  s.addText(runs, Object.assign({
+    x, y, w, h,
+    margin: [7.2, 7.2, 3.6, 3.6], // pptxgenjs order: l,r,b,t (points) == 0.1" / 0.05"
+    valign: 'top',
+    align: 'left',
+    fit: 'none',
+  }, opts));
+}
+
+/** Filled/outlined preset shape. */
+function shape(s, geo, x, y, w, h, opts = {}) {
+  s.addShape(geo, Object.assign({ x, y, w, h }, opts));
+}
+
+/** Free-form polygon (device outlines, arrows, cropped photo frames). */
+function poly(s, x, y, w, h, opts, points) {
+  s.addShape('custGeom', Object.assign({ x, y, w, h, points }, opts));
+}
+
+/** Hairline rule - the thin vertical/horizontal guides of the master. */
+function rule(s, x, y, w, h, line) {
+  s.addShape('line', { x, y, w, h, line });
+}
+
+/** Grey block standing in for a photograph. */
+function photo(s, x, y, w, h) {
+  s.addShape('rect', { x, y, w, h, fill: { color: PHOTO } });
+}
+
+/** Photo stand-in clipped to a free-form frame. */
+function photoPath(s, x, y, w, h, points) {
+  s.addShape('custGeom', { x, y, w, h, fill: { color: PHOTO }, points });
+}
+
+/** Light block standing in for a device mock-up: body plus darker screen. */
+function device(s, x, y, w, h, rotate = 0) {
+  const pad = Math.min(w, h) * 0.07;
+  s.addShape('roundRect', { x, y, w, h, rectRadius: 0.08, fill: { color: SCREEN }, rotate });
+  s.addShape('rect', { x: x + pad, y: y + pad, w: w - 2 * pad, h: h - 2 * pad, fill: { color: PHOTO }, rotate });
+}
+
+/** Vertical "WEST" / "2020" corner tag: small dot plus rotated word. */
+function sideTag(s, x, y, label, color = RED, dot = WHITE) {
+  const up = label === 'WEST';
+  shape(s, 'ellipse', x, y, 0.192, 0.192, { fill: { color: dot } });
+  text(s, x + (up ? -0.528 : -0.54), y + (up ? -0.747 : 0.539), 1.248, 0.438,
+    [H(label, color, 20)], { align: 'center', rotate: up ? 270 : 90 });
+}
+
+/** Red call-to-action button (bar + centred caption). */
+function button(s, x, y, w, label) {
+  shape(s, 'rect', x, y, w, 0.507, { fill: { color: RED } });
+  text(s, x, y + 0.102, w, 0.303, [H(label, WHITE, 12)], { align: 'center' });
+}
+
+/** Round tick used in feature/price lists: disc plus a cut-out check mark. */
+const CHECK_PATH = [[0.346, 0.431], [0.445, 0.523], [0.654, 0.322],
+                    [0.742, 0.414], [0.445, 0.697], [0.258, 0.525]];
+function checkIcon(s, x, y, color = RED, hole = BG, d = 0.26) {
+  shape(s, 'ellipse', x, y, d, d, { fill: { color } });
+  poly(s, x, y, d, d, { fill: { color: hole } },
+    CHECK_PATH.map(([px, py], i) => ({ x: px * d, y: py * d, moveTo: i === 0 }))
+      .concat([{ close: true }]));
+}
+
+/** Small white pictogram inside the contact-card circles. */
+function glyph(s, x, y, w, ch, size) {
+  text(s, x - 0.1, y - 0.08, w + 0.2, w + 0.16, [{ text: ch, options: { fontFace: SANS, color: WHITE, fontSize: size } }],
+    { align: 'center', valign: 'middle' });
+}
+
+/** Title/closing "licence plate": rounded dark panel with four bolt holes. */
+function namePlate(s, x, y, w, h) {
+  shape(s, 'roundRect', x, y, w, h, { rectRadius: 0.12, fill: { color: '333333' } });
+  const d = 0.345, inset = 0.39;
+  [[x + inset, y + inset], [x + w - inset - d, y + inset],
+   [x + inset, y + h - inset - d], [x + w - inset - d, y + h - inset - d]]
+    .forEach(([cx, cy]) => shape(s, 'ellipse', cx, cy, d, d, { fill: { color: '4B4B4B' } }));
+}
+
+/* ------------------------------------------------------------ native charts */
+const CHART_BASE = {
+  chartColors: [RED, '8F4325', BG, 'FFC000'],
+  showLegend: true, legendPos: 'b', legendColor: WHITE, legendFontFace: POPPINS, legendFontSize: 8,
+  catAxisLabelColor: WHITE, catAxisLabelFontFace: POPPINS, catAxisLabelFontSize: 8,
+  valAxisLabelColor: WHITE, valAxisLabelFontFace: POPPINS, valAxisLabelFontSize: 8,
+  catAxisLineColor: WHITE, valAxisLineShow: false,
+  showValue: false, dataBorder: { pt: 0, color: BG },
+};
+
+/** Multi-series line chart (slide 36). */
+function lineChart(s, x, y, w, h) {
+  const cats = ['Category 1', 'Category 2', 'Category 3', 'Category 4'];
+  s.addChart('line', [
+    { name: 'Series 1', labels: cats, values: [4.3, 2.5, 3.5, 4.5] },
+    { name: 'Series 2', labels: cats, values: [2.4, 4.4, 1.8, 2.8] },
+    { name: 'Series 3', labels: cats, values: [2, 2, 3, 5] },
+  ], Object.assign({}, CHART_BASE, {
+    x, y, w, h,
+    chartColors: [RED, '770B0E', '8D929C'],
+    lineSize: 2, lineSmooth: false, showMarker: false,
+    valAxisMaxVal: 6, valAxisMinVal: 0, valAxisMajorUnit: 1,
+    valGridLine: { style: 'solid', size: 1, color: WHITE },
+    plotArea: { fill: { color: BG } }, chartArea: { fill: { color: BG } },
+  }));
+}
+
+/** Pie chart "Sales" (slide 37). */
+function pieChart(s, x, y, w, h) {
+  s.addChart('pie', [{
+    name: 'Sales',
+    labels: ['1st Qtr', '2nd Qtr', '3rd Qtr', '4th Qtr'],
+    values: [8.2, 3.2, 1.4, 1.2],
+  }], Object.assign({}, CHART_BASE, {
+    x, y, w, h,
+    showTitle: true, title: 'Sales', titleColor: WHITE, titleFontFace: POPPINS, titleFontSize: 10,
+    firstSliceAng: 0,
+    plotArea: { fill: { color: BG } }, chartArea: { fill: { color: BG } },
+  }));
+}
+
+/** Stacked area chart over dates (slide 38). */
+function areaChart(s, x, y, w, h) {
+  const cats = ['5/1/2002', '6/1/2002', '7/1/2002', '8/1/2002', '9/1/2002'];
+  s.addChart('area', [
+    { name: 'Series 1', labels: cats, values: [32, 32, 28, 15, 14] },
+    { name: 'Series 2', labels: cats, values: [12, 12, 12, 21, 28] },
+  ], Object.assign({}, CHART_BASE, {
+    x, y, w, h,
+    chartColors: [RED, '8F4325'],
+    valAxisMaxVal: 35, valAxisMinVal: 0, valAxisMajorUnit: 5,
+    valGridLine: { style: 'solid', size: 1, color: WHITE },
+    plotArea: { fill: { color: BG } }, chartArea: { fill: { color: BG } },
+  }));
+}
+
+/* ======================================================== slide builders */
+
+/** Slide 1 - Bernice */
+function slide01(s) {
+  photo(s, 0, 0, 13.333, 7.5);
+  namePlate(s, 2.783, 2.232, 7.87, 2.981);
+  text(s, 3.773, 2.5, 5.888, 2.036, [Hr('Bernice', WHITE, 115, { underline: true })], { align: 'center' });
+  text(s, 4.216, 4.442, 5.003, 0.303, [H(TAG, RED, 12)], { align: 'center' });
+  sideTag(s, 4.159, 3.626, 'WEST', WHITE, WHITE);
+  sideTag(s, 9.202, 3.627, '2020', WHITE, WHITE);
+}
+
+/** Slide 2 - Have The Power To Give You A */
+function slide02(s) {
+  sideTag(s, 0.514, 1.395, 'WEST', RED, WHITE);
+  sideTag(s, 12.687, 6.003, '2020', RED, WHITE);
+  text(s, 1.192, 3.381, 4.825, 2.015, [B(LOREM)], { align: 'justify', lineSpacingMultiple: 1.5 });
+  text(s, 1.192, 1.108, 4.988, 2.12, [H('BARBERS', RED), H(' HAVE THE POWER TO GIVE YOU A '), H('DISHEVELED', RED), H(' LOOK')], {});
+  button(s, 3.927, 6.214, 2.09, 'DISCOVER MORE');
+  text(s, 1.192, 5.37, 4.825, 0.627, [B(LOREM_DOTS)], { align: 'justify', lineSpacingMultiple: 1.5 });
+  photo(s, 7.153, 0.581, 5.158, 6.339);
+}
+
+/** Slide 3 - Mental State To Your */
+function slide03(s) {
+  text(s, 0.801, 4.542, 10.349, 2.322,
+    [H('Just Express ', WHITE, 44), H('Your', RED, 44), H(' Mental State To Your ', WHITE, 44), H('Barber', RED, 44), H(', He Will ', WHITE, 44), H('Understand', RED, 44), H(' What Haircut Will ', WHITE, 44), H('Suit', RED, 44), H(' You In This State', WHITE, 44)], { align: 'right' });
+  sideTag(s, 12.687, 6.003, '2020', RED, WHITE);
+  photo(s, 0, 1.254, 10.952, 2.992);
+}
+
+/** Slide 4 - Make Your Dream */
+function slide04(s) {
+  shape(s, 'rect', 0, 3.4, 13.333, 0.157, { fill: { color: RED } });
+  text(s, 5.511, 1.108, 6.344, 2.12,
+    [H('TO BE HONEST '), H('MAKE YOUR DREAM ', RED), H('COMES TRUE '), H('IN ', RED), H('OUR'), H(' BARBERSHOP', RED)], {});
+  text(s, 5.511, 0.771, 5.003, 0.303, [H(TAG, WHITE, 12)], {});
+  text(s, 5.511, 3.961, 6.894, 1.46, [B(LOREM)], { align: 'justify', lineSpacingMultiple: 1.5 });
+  text(s, 5.511, 5.662, 6.894, 0.904, [B(LOREM.slice(0, 233))], { align: 'justify', lineSpacingMultiple: 1.5 });
+  photo(s, 0.524, 0.771, 4.076, 6.729);
+}
+
+/** Slide 5 - Best Hairstylish */
+function slide05(s) {
+  sideTag(s, 0.514, 1.395, 'WEST', RED, WHITE);
+  photoPath(s, 7.153, 0, 6.181, 7.5, [
+    { x: 0.195, y: 0, moveTo: true },
+    { x: 6.181, y: 0 },
+    { x: 6.181, y: 7.5 },
+    { close: true },
+    { x: 0, y: 0, moveTo: true },
+    { x: 5.986, y: 7.5 },
+    { x: 0, y: 7.5 },
+    { close: true }
+  ]);
+  text(s, 0.985, 2.824, 2.167, 0.303, [Bb('INSERT YOUR TEXT', RED)], {});
+  shape(s, 'rtTriangle', 7.157, 0, 5.986, 7.5, { fill: { color: RED, transparency: 50 } });
+  text(s, 0.985, 1.615, 4.769, 0.774, [H('BEST HAIRSTYLISH')], {});
+  text(s, 0.985, 1.279, 5.003, 0.303, [H(TAG, RED, 12)], {});
+  text(s, 0.985, 3.098, 5.003, 1.46,
+    [B('Re paragone creatura acerbita ai guardava lasciami vi. Entro tue forza miele mazzo per pur oltre sul. Lo ti il gabbie quanto lancio. Fato mare arme tu anch vi mine riso. Poi affannata ami cresciuto melagrani una abbandona brillanti. Far aspettando nel voluttuosa sei turbamento tra. Grappoli tuo inquieta cio orribile dissolve.')], { align: 'justify', lineSpacingMultiple: 1.5 });
+  text(s, 0.985, 4.828, 2.167, 0.303, [Bb('INSERT YOUR TEXT', RED)], {});
+  text(s, 0.985, 5.102, 5.003, 1.46,
+    [B('Re paragone creatura acerbita ai guardava lasciami vi. Entro tue forza miele mazzo per pur oltre sul. Lo ti il gabbie quanto lancio. Fato mare arme tu anch vi mine riso. Poi affannata ami cresciuto melagrani una abbandona brillanti. Far aspettando nel voluttuosa sei turbamento tra. Grappoli tuo inquieta cio orribile dissolve.')], { align: 'justify', lineSpacingMultiple: 1.5 });
+}
+
+/** Slide 6 - Best Hairstylish */
+function slide06(s) {
+  photo(s, 0, 0, 7.614, 7.5);
+  shape(s, 'rect', 5.435, 0, 7.899, 6.926, { fill: { color: PANEL } });
+  shape(s, 'rect', 7.681, 1.131, 3.261, 1.42, { line: { color: RED, width: 2.25 } });
+  text(s, 6.782, 1.454, 4.769, 0.774, [H('BEST HAIRSTYLISH')], { align: 'center', fill: { color: PANEL } });
+  sideTag(s, 6.686, 2.341, 'WEST', WHITE, RED);
+  sideTag(s, 11.426, 1.17, '2020', RED, WHITE);
+  text(s, 8.158, 0.783, 2.307, 0.303, [H('PREMIUM STYLE', RED, 12)], { align: 'center' });
+  text(s, 8.158, 2.698, 2.307, 0.303, [H('HIGH QUALITY', WHITE, 12)], { align: 'center' });
+  text(s, 6.667, 3.406, 5.289, 1.46,
+    [B('Re paragone creatura acerbita ai guardava lasciami vi. Entro tue forza miele mazzo per pur oltre sul. Lo ti il gabbie quanto lancio. Fato mare arme tu anch vi mine riso. Poi affannata ami cresciuto melagrani una abbandona brillanti. Far aspettando nel voluttuosa sei turbamento tra. Grappoli tuo inquieta cio orribile dissolve.')], { align: 'center', lineSpacingMultiple: 1.5 });
+  text(s, 6.667, 4.989, 5.289, 0.627, [B(LOREM.slice(0, 142))], { align: 'center', lineSpacingMultiple: 1.5 });
+  button(s, 8.357, 5.862, 2.09, 'EXPLORE');
+}
+
+/** Slide 7 - Premium Pride */
+function slide07(s) {
+  rule(s, 0.541, 0, 0, 3.663, { color: PANEL, width: 0.75 });
+  rule(s, 1.28, 5.98, 0, 1.547, { color: PANEL, width: 0.75 });
+  rule(s, 5.837, -0.106, 0, 1.547, { color: PANEL, width: 0.75 });
+  photoPath(s, 6.667, 0, 6.667, 6.986, [
+    { x: 0, y: 5.043, moveTo: true },
+    { x: 6.667, y: 5.043 },
+    { x: 6.667, y: 6.986 },
+    { x: 0, y: 6.986 },
+    { close: true },
+    { x: 0, y: 2.143, moveTo: true },
+    { x: 6.667, y: 2.143 },
+    { x: 6.667, y: 4.843 },
+    { x: 0, y: 4.843 },
+    { close: true },
+    { x: 1.991, y: 0, moveTo: true },
+    { x: 6.667, y: 0 },
+    { x: 6.667, y: 1.943 },
+    { x: 1.991, y: 1.943 },
+    { close: true },
+    { x: 0, y: 0, moveTo: true },
+    { x: 1.752, y: 0 },
+    { x: 1.752, y: 1.943 },
+    { x: 0, y: 1.943 },
+    { close: true }
+  ]);
+  text(s, 0.985, 0.981, 4.769, 0.774, [H('PREMIUM PRIDE')], {});
+  text(s, 0.985, 1.755, 5.003, 0.303, [H(TAG, RED, 12)], {});
+  shape(s, 'rect', 2.86, 4.111, 4.797, 2.409, { fill: { color: PANEL } });
+  text(s, 3.153, 4.312, 1.063, 0.438, [H('#01', RED, 20)], {});
+  text(s, 0.985, 2.29, 5.003, 1.46,
+    [B('Re paragone creatura acerbita ai guardava lasciami vi. Entro tue forza miele mazzo per pur oltre sul. Lo ti il gabbie quanto lancio. Fato mare arme tu anch vi mine riso. Poi affannata ami cresciuto melagrani una abbandona brillanti. Far aspettando nel voluttuosa sei turbamento tra. Grappoli tuo inquieta cio orribile dissolve.')], { align: 'justify', lineSpacingMultiple: 1.5 });
+  text(s, 3.877, 4.369, 2.167, 0.303, [Bb('INSERT YOUR TEXT')], {});
+  text(s, 3.877, 4.643, 3.491, 0.627, [B(LOREM.slice(0, 86))], { lineSpacingMultiple: 1.5 });
+  text(s, 3.153, 5.335, 1.063, 0.438, [H('#02', RED, 20)], {});
+  text(s, 3.877, 5.392, 2.167, 0.303, [Bb('INSERT YOUR TEXT')], {});
+  text(s, 3.877, 5.666, 3.491, 0.627, [B(LOREM.slice(0, 86))], { lineSpacingMultiple: 1.5 });
+  sideTag(s, 2.425, 6.225, 'WEST', RED, WHITE);
+  sideTag(s, 12.687, 0.373, '2020', RED, WHITE);
+}
+
+/** Slide 8 - Have The Power To Give You A */
+function slide08(s) {
+  rule(s, 11.778, 0, 0, 3.663, { color: PANEL, width: 0.75 });
+  rule(s, 12.517, 5.98, 0, 1.547, { color: PANEL, width: 0.75 });
+  text(s, 7.526, 1.533, 4.988, 2.12, [H('BARBERS', RED), H(' HAVE THE POWER TO GIVE YOU A '), H('DISHEVELED', RED), H(' LOOK')], {});
+  button(s, 7.526, 0.931, 2.09, 'DISCOVER MORE');
+  text(s, 7.511, 3.832, 5.003, 1.46,
+    [B('Re paragone creatura acerbita ai guardava lasciami vi. Entro tue forza miele mazzo per pur oltre sul. Lo ti il gabbie quanto lancio. Fato mare arme tu anch vi mine riso. Poi affannata ami cresciuto melagrani una abbandona brillanti. Far aspettando nel voluttuosa sei turbamento tra. Grappoli tuo inquieta cio orribile dissolve.')], { align: 'justify', lineSpacingMultiple: 1.5 });
+  text(s, 7.511, 5.421, 5.003, 0.627, [B(LOREM.slice(0, 117))], { align: 'justify', lineSpacingMultiple: 1.5 });
+  text(s, 3.018, 6.246, 3.025, 0.627, [Bi(QUOTE)], { lineSpacingMultiple: 1.5 });
+  photo(s, 1.186, 1.137, 4.986, 4.911);
+  photo(s, 0.657, 4.918, 1.771, 1.745);
+  photo(s, 4.414, 0.523, 2.648, 2.608);
+}
+
+/** Slide 9 - Premium Pride */
+function slide09(s) {
+  photo(s, 0, 0, 13.333, 3.75);
+  text(s, 3.231, 4.263, 2.167, 0.303, [Bb('INSERT YOUR TEXT', RED)], {});
+  text(s, 3.231, 4.537, 3.929, 1.46, [B(LOREM.slice(0, 247))], { align: 'justify', lineSpacingMultiple: 1.5 });
+  shape(s, 'rect', -0.84, 2.379, 5.302, 1.664, { fill: { color: PANEL }, rotate: 270 });
+  text(s, -0.725, 2.542, 4.769, 0.774, [H('PREMIUM PRIDE')], { rotate: 270 });
+  text(s, -0.304, 2.66, 5.003, 0.303, [H(TAG, RED, 12)], { rotate: 270 });
+  shape(s, 'ellipse', 2.106, 5.436, 0.192, 0.192, { fill: { color: WHITE }, rotate: 270 });
+  text(s, 0.954, 5.313, 1.248, 0.438, [H('WEST', RED, 20)], { align: 'center', rotate: 180 });
+  text(s, 3.231, 6.017, 3.929, 0.627, [B(LOREM.slice(0, 90))], { align: 'justify', lineSpacingMultiple: 1.5 });
+  text(s, 7.935, 4.263, 2.167, 0.303, [Bb('INSERT YOUR TEXT', RED)], {});
+  text(s, 7.935, 4.537, 3.929, 1.46, [B(LOREM.slice(0, 247))], { align: 'justify', lineSpacingMultiple: 1.5 });
+  text(s, 7.935, 6.017, 3.929, 0.627, [B(LOREM.slice(0, 90))], { align: 'justify', lineSpacingMultiple: 1.5 });
+}
+
+/** Slide 10 - Best Hairstylish */
+function slide10(s) {
+  shape(s, 'rect', 9.809, 3.304, 4.044, 1.405, { fill: { color: WHITE, transparency: 70 }, rotate: 270 });
+  shape(s, 'rect', 6.447, 1.604, 4.044, 1.405, { fill: { color: WHITE, transparency: 70 }, rotate: 270 });
+  rule(s, 0.541, 0, 0, 3.663, { color: PANEL, width: 0.75 });
+  rule(s, 1.28, 5.98, 0, 1.547, { color: PANEL, width: 0.75 });
+  checkIcon(s, 1.554, 4.473, RED);
+  text(s, 1.964, 4.393, 4.079, 0.675, [B(LOREM.slice(0, 90), GREY, 12)], { lineSpacingMultiple: 1.5 });
+  text(s, 1.318, 1.615, 4.769, 0.774, [H('BEST HAIRSTYLISH')], {});
+  text(s, 1.318, 1.279, 5.003, 0.303, [H(TAG, RED, 12)], {});
+  text(s, 1.318, 2.595, 5.003, 1.46,
+    [B('Re paragone creatura acerbita ai guardava lasciami vi. Entro tue forza miele mazzo per pur oltre sul. Lo ti il gabbie quanto lancio. Fato mare arme tu anch vi mine riso. Poi affannata ami cresciuto melagrani una abbandona brillanti. Far aspettando nel voluttuosa sei turbamento tra. Grappoli tuo inquieta cio orribile dissolve.')], { align: 'justify', lineSpacingMultiple: 1.5 });
+  checkIcon(s, 1.554, 5.526, RED);
+  text(s, 1.964, 5.446, 4.079, 0.675, [B(LOREM.slice(0, 90), GREY, 12)], { lineSpacingMultiple: 1.5 });
+  text(s, 7.983, 5.783, 3.025, 0.627, [Bi(QUOTE)], { align: 'right', lineSpacingMultiple: 1.5 });
+  sideTag(s, 12.687, 0.373, '2020', RED, WHITE);
+  photo(s, 8.157, 0.609, 3.986, 4.911);
+}
+
+/** Slide 11 - Premium Pride */
+function slide11(s) {
+  text(s, 0.657, 0.614, 4.769, 0.774, [H('PREMIUM PRIDE')], {});
+  text(s, 0.657, 1.388, 5.003, 0.303, [H(TAG, RED, 12)], {});
+  text(s, 5.19, 1.054, 2.167, 0.303, [Bb('INSERT YOUR TEXT', RED)], {});
+  text(s, 5.19, 1.328, 3.631, 1.182, [B(LOREM.slice(0, 187))], { align: 'justify', lineSpacingMultiple: 1.5 });
+  text(s, 9.045, 1.054, 2.167, 0.303, [Bb('INSERT YOUR TEXT', RED)], {});
+  text(s, 9.045, 1.328, 3.631, 1.182, [B(LOREM.slice(0, 187))], { align: 'justify', lineSpacingMultiple: 1.5 });
+  text(s, 5.19, 2.644, 3.631, 0.627, [B(LOREM.slice(0, 90))], { align: 'justify', lineSpacingMultiple: 1.5 });
+  text(s, 9.045, 2.644, 3.631, 0.627, [B(LOREM.slice(0, 90))], { align: 'justify', lineSpacingMultiple: 1.5 });
+  photo(s, 0, 3.857, 13.333, 3.643);
+  photo(s, 0.657, 1.975, 3.986, 4.911);
+}
+
+/** Slide 12 - Barbers Have The Power To Give You A Disheve */
+function slide12(s) {
+  rule(s, 0.541, 0, 0, 3.663, { color: PANEL, width: 0.75 });
+  rule(s, 1.28, 5.98, 0, 1.547, { color: PANEL, width: 0.75 });
+  photoPath(s, 7.71, 0, 5.624, 7.5, [
+    { x: 2.362, y: 5.233, moveTo: true },
+    { x: 2.362, y: 7.5 },
+    { x: 0.266, y: 7.5 },
+    { close: true },
+    { x: 0, y: 5.171, moveTo: true },
+    { x: 2.214, y: 5.171 },
+    { x: 0.062, y: 7.5 },
+    { x: 0, y: 7.5 },
+    { close: true },
+    { x: 2.362, y: 2.648, moveTo: true },
+    { x: 2.362, y: 5.043 },
+    { x: 0.148, y: 5.043 },
+    { close: true },
+    { x: 0, y: 2.586, moveTo: true },
+    { x: 2.214, y: 2.586 },
+    { x: 0, y: 4.981 },
+    { close: true },
+    { x: 2.362, y: 0.062, moveTo: true },
+    { x: 2.362, y: 2.457 },
+    { x: 0.148, y: 2.457 },
+    { close: true },
+    { x: 0, y: 0, moveTo: true },
+    { x: 2.214, y: 0 },
+    { x: 0, y: 2.395 },
+    { close: true },
+    { x: 2.519, y: 0, moveTo: true },
+    { x: 5.624, y: 0 },
+    { x: 5.624, y: 7.5 },
+    { x: 2.519, y: 7.5 },
+    { close: true }
+  ]);
+  shape(s, 'rect', 0.78, 1.156, 5.886, 2.594, { fill: { color: RED, transparency: 50 }, line: { color: WHITE } });
+  text(s, 1.23, 1.393, 4.988, 2.12, [H('BARBERS HAVE THE POWER TO GIVE YOU A DISHEVELED LOOK')], { align: 'center' });
+  text(s, 1.079, 4.069, 5.289, 1.46,
+    [B('Re paragone creatura acerbita ai guardava lasciami vi. Entro tue forza miele mazzo per pur oltre sul. Lo ti il gabbie quanto lancio. Fato mare arme tu anch vi mine riso. Poi affannata ami cresciuto melagrani una abbandona brillanti. Far aspettando nel voluttuosa sei turbamento tra. Grappoli tuo inquieta cio orribile dissolve.')], { align: 'center', lineSpacingMultiple: 1.5 });
+  text(s, 1.079, 5.653, 5.289, 0.627, [B(LOREM.slice(0, 142))], { align: 'center', lineSpacingMultiple: 1.5 });
+  button(s, 10.743, 6.481, 2.09, 'READ MORE');
+}
+
+/** Slide 13 - Harley Rasmussen */
+function slide13(s) {
+  shape(s, 'rect', -0.81, 1.447, 6.03, 3.734, { fill: { color: WHITE, transparency: 70 }, rotate: 270 });
+  shape(s, 'rect', 12.996, 0, 0.337, 7.5, { fill: { color: RED }, rotate: 180, flipH: true });
+  shape(s, 'roundRect', 6.151, 4.209, 3.939, 0.125, { fill: { color: RED }, rectRadius: 0.062 });
+  text(s, 10.375, 4.127, 1.251, 0.301, [H('HAIRCUT', LIGHT, 12)], {});
+  shape(s, 'roundRect', 6.151, 4.616, 3.576, 0.125, { fill: { color: RED }, rectRadius: 0.062 });
+  text(s, 10.375, 4.534, 1.1, 0.303, [H('SHAVE', LIGHT, 12)], {});
+  shape(s, 'roundRect', 6.151, 5.016, 3.005, 0.125, { fill: { color: RED }, rectRadius: 0.062 });
+  text(s, 10.375, 4.934, 1.251, 0.301, [H('TRIM', LIGHT, 12)], {});
+  text(s, 5.992, 1.119, 5.138, 0.774, [H('HARLEY RASMUSSEN')], {});
+  text(s, 5.992, 1.893, 5.003, 0.303, [H('STAFF LEADER OF BERNICE', RED, 12)], {});
+  text(s, 5.992, 2.35, 5.003, 1.46,
+    [B('Re paragone creatura acerbita ai guardava lasciami vi. Entro tue forza miele mazzo per pur oltre sul. Lo ti il gabbie quanto lancio. Fato mare arme tu anch vi mine riso. Poi affannata ami cresciuto melagrani una abbandona brillanti. Far aspettando nel voluttuosa sei turbamento tra. Grappoli tuo inquieta cio orribile dissolve.')], { align: 'justify', lineSpacingMultiple: 1.5 });
+  text(s, 5.992, 5.557, 5.003, 0.904, [B(LOREM.slice(0, 170))], { align: 'justify', lineSpacingMultiple: 1.5 });
+  sideTag(s, 12.521, 0.373, '2020', RED, WHITE);
+  photo(s, 0.729, 0.623, 4.229, 6.291);
+}
+
+/** Slide 14 - Manager Of Bernice */
+function slide14(s) {
+  shape(s, 'rect', 2.068, -1.289, 4.144, 7.377, { fill: { color: WHITE, transparency: 70 }, rotate: 270 });
+  shape(s, 'rect', 0.786, 0.643, 10.271, 5.157, { fill: { color: PANEL } });
+  text(s, 1.829, 1.424, 5.335, 0.774, [H('MANAGER OF BERNICE')], { align: 'center' });
+  text(s, 1.995, 2.198, 5.003, 0.303, [H(TAG, RED, 12)], { align: 'center' });
+  text(s, 1.543, 2.679, 5.906, 0.904,
+    [B('This is a barbershop, not a hair salon. You come in here not trying to impress anyone. It\'s a place just to talk, to hang out with the fellows, talk about sports, women, relationships')], { align: 'center', lineSpacingMultiple: 1.5 });
+  text(s, 2.829, 4.759, 3.335, 0.303, [H('BRANDEN', WHITE, 12), H(' DEMARCO', RED, 12)], { align: 'center' });
+  shape(s, 'ellipse', 5.683, 4.814, 0.192, 0.192, { fill: { color: WHITE } });
+  shape(s, 'ellipse', 3.066, 4.814, 0.192, 0.192, { fill: { color: WHITE } });
+  text(s, 1.829, 3.579, 5.335, 0.904,
+    [B('No matter what barbershop you go to, there\'s always that guy who\'s just hanging around and doesn\'t do much, but knows everything that\'s going on in the community')], { align: 'center', lineSpacingMultiple: 1.5 });
+  photo(s, 8.314, 2.303, 3.986, 4.911);
+}
+
+/** Slide 15 - Staff Of Bernice */
+function slide15(s) {
+  shape(s, 'rect', 1.438, 2.743, 2.4, 0.886, { fill: { color: PANEL } });
+  shape(s, 'rect', 6.838, 2.743, 2.4, 0.886, { fill: { color: PANEL } });
+  shape(s, 'rect', 4.138, 6.029, 2.4, 0.886, { fill: { color: PANEL } });
+  shape(s, 'rect', 9.538, 6.029, 2.4, 0.886, { fill: { color: PANEL } });
+  sideTag(s, 0.514, 1.395, 'WEST', RED, WHITE);
+  sideTag(s, 12.687, 6.003, '2020', RED, WHITE);
+  text(s, 3.999, 0.729, 5.335, 0.774, [H('STAFF OF BERNICE')], { align: 'center' });
+  text(s, 4.165, 1.503, 5.003, 0.303, [H(TAG, RED, 12)], { align: 'center' });
+  text(s, 0.971, 3.046, 3.335, 0.303, [H('MONROE STEGALL', WHITE, 12)], { align: 'center' });
+  text(s, 6.371, 3.046, 3.335, 0.303, [H('RODGER PALMA', WHITE, 12)], { align: 'center' });
+  text(s, 3.668, 6.308, 3.335, 0.303, [H('ALEXIS GRISSOM', WHITE, 12)], { align: 'center' });
+  text(s, 9.071, 6.308, 3.335, 0.303, [H('DARELL HUYNH', WHITE, 12)], { align: 'center' });
+  photo(s, 1.438, 3.871, 2.4, 3.043);
+  photo(s, 4.138, 2.743, 2.4, 3.043);
+  photo(s, 6.838, 3.871, 2.4, 3.043);
+  photo(s, 9.538, 2.743, 2.4, 3.043);
+}
+
+/** Slide 16 - Premium Services */
+function slide16(s) {
+  shape(s, 'rect', 0, 0, 0.571, 7.5, { fill: { color: RED }, rotate: 180, flipH: true });
+  text(s, 6.971, 1.021, 4.769, 0.774, [H('PREMIUM SERVICES')], {});
+  text(s, 6.971, 0.684, 5.003, 0.303, [H(TAG, RED, 12)], {});
+  text(s, 6.971, 2.007, 1.063, 0.572, [H('#01', NUMC, 28)], {});
+  text(s, 6.933, 2.142, 2.167, 0.303, [Bb('INSERT YOUR TEXT')], {});
+  text(s, 6.971, 2.579, 5.003, 0.904, [B(LOREM.slice(0, 183))], { align: 'justify', lineSpacingMultiple: 1.5 });
+  text(s, 6.971, 3.708, 1.063, 0.572, [H('#02', NUMC, 28)], {});
+  text(s, 6.933, 3.842, 2.167, 0.303, [Bb('INSERT YOUR TEXT')], {});
+  text(s, 6.971, 4.28, 5.003, 0.904, [B(LOREM.slice(0, 183))], { align: 'justify', lineSpacingMultiple: 1.5 });
+  text(s, 6.971, 5.319, 1.063, 0.572, [H('#03', NUMC, 28)], {});
+  text(s, 6.933, 5.454, 2.167, 0.303, [Bb('INSERT YOUR TEXT')], {});
+  text(s, 6.971, 5.891, 5.003, 0.904, [B(LOREM.slice(0, 183))], { align: 'justify', lineSpacingMultiple: 1.5 });
+  text(s, 0.954, 5.891, 3.025, 0.627, [Bi(QUOTE)], { lineSpacingMultiple: 1.5 });
+  photoPath(s, 0.571, 0, 5.829, 5.663, [
+    { x: 0, y: 2.9, moveTo: true },
+    { x: 5.829, y: 2.9 },
+    { x: 5.829, y: 5.663 },
+    { x: 0, y: 5.663 },
+    { close: true },
+    { x: 0, y: 0, moveTo: true },
+    { x: 2.812, y: 0 },
+    { x: 2.812, y: 2.763 },
+    { x: 0, y: 2.763 },
+    { close: true },
+    { x: 2.914, y: 0, moveTo: true },
+    { x: 5.829, y: 0 },
+    { x: 5.829, y: 2.763 },
+    { x: 2.914, y: 2.763 },
+    { close: true }
+  ]);
+}
+
+/** Slide 17 - Premium Services */
+function slide17(s) {
+  photo(s, 5.719, 0, 7.614, 7.5);
+  photo(s, 6.667, 4.166, 2.648, 2.608);
+  photo(s, 9.957, 4.166, 2.648, 2.608);
+  shape(s, 'rect', 0.436, 0.976, 5.881, 6.009, { fill: { color: PANEL } });
+  text(s, 1.004, 1.49, 2.167, 0.303, [Bb('INSERT YOUR TEXT')], {});
+  text(s, 1.041, 1.735, 4.406, 0.904, [B(LOREM.slice(0, 173))], { align: 'justify', lineSpacingMultiple: 1.5 });
+  rule(s, 2.931, 1.014, 0, 3.663, { color: DIM, width: 0.75 });
+  text(s, 1.004, 3.218, 2.167, 0.303, [Bb('INSERT YOUR TEXT', RED)], {});
+  text(s, 1.041, 3.463, 4.406, 0.904, [B(LOREM.slice(0, 173))], { align: 'justify', lineSpacingMultiple: 1.5 });
+  rule(s, 2.931, 2.743, 0, 3.663, { color: DIM, width: 0.75 });
+  text(s, 1.004, 4.984, 2.167, 0.303, [Bb('INSERT YOUR TEXT')], {});
+  text(s, 1.041, 5.229, 4.406, 0.904, [B(LOREM.slice(0, 173))], { align: 'justify', lineSpacingMultiple: 1.5 });
+  rule(s, 2.931, 4.509, 0, 3.663, { color: DIM, width: 0.75 });
+  button(s, 3.376, 0.666, 2.09, 'READ MORE');
+  text(s, 6.667, 3.018, 4.769, 0.774, [H('PREMIUM SERVICES')], {});
+  text(s, 6.667, 2.682, 5.003, 0.303, [H(TAG, RED, 12)], {});
+}
+
+/** Slide 18 - Best Services */
+function slide18(s) {
+  shape(s, 'rect', 0, 4.957, 4.271, 2.543, { fill: { color: RED }, rotate: 180, flipH: true });
+  text(s, 7.483, 4.151, 4.769, 0.774, [H('BEST SERVICES')], {});
+  text(s, 7.483, 4.925, 5.003, 0.303, [H(TAG, RED, 12)], {});
+  checkIcon(s, 1.207, 0.92, RED);
+  text(s, 1.616, 1.122, 4.079, 0.675, [B(LOREM.slice(0, 90), GREY, 12)], { lineSpacingMultiple: 1.5 });
+  text(s, 1.647, 0.92, 2.167, 0.303, [Bb('INSERT YOUR TEXT')], {});
+  checkIcon(s, 1.207, 1.998, RED);
+  text(s, 1.616, 2.2, 4.079, 0.675, [B(LOREM.slice(0, 90), GREY, 12)], { lineSpacingMultiple: 1.5 });
+  text(s, 1.647, 1.998, 2.167, 0.303, [Bb('INSERT YOUR TEXT')], {});
+  text(s, 7.483, 5.335, 4.56, 0.904, [B(LOREM.slice(0, 173))], { align: 'justify', lineSpacingMultiple: 1.5 });
+  button(s, 9.867, 6.415, 2.09, 'DISCOVER');
+  photo(s, 6.871, 0, 6.081, 3.614);
+  photo(s, 0.381, 3.614, 6.462, 3.614);
+}
+
+/** Slide 19 - Best Services */
+function slide19(s) {
+  shape(s, 'rect', 1.5, 3.75, 11.833, 3.75, { fill: { color: PANEL } });
+  text(s, 2.025, 5.235, 1.251, 0.301, [H('HAIRCUT', LIGHT, 12)], {});
+  text(s, 2.001, 5.463, 3.327, 1.182, [B(LOREM.slice(0, 170))], { align: 'justify', lineSpacingMultiple: 1.5 });
+  text(s, 4.265, 6.645, 1.063, 0.572, [H('#01', NUMC, 28)], { align: 'right' });
+  text(s, 5.627, 5.235, 1.251, 0.301, [H('SHAVE', LIGHT, 12)], {});
+  text(s, 5.603, 5.463, 3.327, 1.182, [B(LOREM.slice(0, 170))], { align: 'justify', lineSpacingMultiple: 1.5 });
+  text(s, 7.867, 6.645, 1.063, 0.572, [H('#02', NUMC, 28)], { align: 'right' });
+  text(s, 9.253, 5.235, 1.251, 0.301, [H('TRIM', LIGHT, 12)], {});
+  text(s, 9.229, 5.463, 3.327, 1.182, [B(LOREM.slice(0, 170))], { align: 'justify', lineSpacingMultiple: 1.5 });
+  text(s, 11.493, 6.645, 1.063, 0.572, [H('#03', NUMC, 28)], { align: 'right' });
+  text(s, 2.025, 0.725, 4.769, 0.774, [H('BEST SERVICES')], {});
+  text(s, 2.025, 1.499, 5.003, 0.303, [H(TAG, RED, 12)], {});
+  sideTag(s, 12.687, 0.373, '2020', RED, WHITE);
+  photo(s, 3.909, 2.152, 2.648, 2.608);
+  photo(s, 0.552, 2.152, 2.648, 2.608);
+  photo(s, 7.267, 2.152, 2.648, 2.608);
+}
+
+/** Slide 20 - Break */
+function slide20(s) {
+  photo(s, 0.405, 0.358, 12.524, 6.784);
+  shape(s, 'rect', 0.812, 0.652, 6.442, 6.196, { fill: { color: RED, transparency: 50 } });
+  text(s, 3.9, 2.5, 5.888, 2.036, [Hr('BREAK', WHITE, 115, { underline: true })], { align: 'center' });
+  text(s, 4.343, 4.442, 5.003, 0.303, [H(TAG, WHITE, 12)], { align: 'center' });
+  sideTag(s, 4.286, 3.626, 'WEST', WHITE, WHITE);
+  sideTag(s, 9.329, 3.627, '2020', WHITE, WHITE);
+}
+
+/** Slide 21 - Have The Power To Give You A */
+function slide21(s) {
+  shape(s, 'rect', 6.462, 3.614, 6.871, 3.886, { fill: { color: PANEL } });
+  text(s, 0.7, 4.998, 4.988, 2.12, [H('BARBERS', RED), H(' HAVE THE POWER TO GIVE YOU A '), H('DISHEVELED', RED), H(' LOOK')], {});
+  button(s, 0.7, 4.395, 2.09, 'DISCOVER MORE');
+  text(s, 8.073, 3.992, 1.063, 0.572, [H('#01', NUMC, 28)], {});
+  text(s, 8.036, 4.127, 2.167, 0.303, [Bb('INSERT YOUR TEXT')], {});
+  text(s, 8.073, 4.564, 4.705, 0.904, [B(LOREM.slice(0, 183))], { align: 'justify', lineSpacingMultiple: 1.5 });
+  text(s, 8.073, 5.603, 1.063, 0.572, [H('#02', NUMC, 28)], {});
+  text(s, 8.036, 5.738, 2.167, 0.303, [Bb('INSERT YOUR TEXT')], {});
+  text(s, 8.073, 6.176, 4.705, 0.904, [B(LOREM.slice(0, 183))], { align: 'justify', lineSpacingMultiple: 1.5 });
+  photo(s, 0, 0, 6.462, 3.614);
+  photo(s, 6.683, 0, 3.191, 3.614);
+  photo(s, 10.143, 0, 3.191, 3.614);
+  photo(s, 5.138, 2.31, 2.648, 2.608);
+}
+
+/** Slide 22 - Premium Galery */
+function slide22(s) {
+  shape(s, 'rect', 0.391, 1.078, 6.737, 2.341, { fill: { color: PANEL } });
+  shape(s, 'rect', 10.191, 0, 3.143, 7.5, { fill: { color: RED }, rotate: 180, flipH: true });
+  shape(s, 'rect', 0.391, 4.767, 6.737, 2.341, { fill: { color: PANEL } });
+  photo(s, 8.238, 0.393, 4.524, 6.714);
+  photo(s, 0.714, 4.082, 2.397, 2.341);
+  photo(s, 0.714, 0.393, 2.397, 2.341);
+  text(s, 3.362, 1.391, 2.167, 0.303, [Bb('INSERT YOUR TEXT')], {});
+  text(s, 3.399, 1.702, 3.379, 1.182, [B(LOREM.slice(0, 173))], { align: 'justify', lineSpacingMultiple: 1.5 });
+  text(s, 3.362, 5.28, 2.167, 0.303, [Bb('INSERT YOUR TEXT')], {});
+  text(s, 3.399, 5.591, 3.379, 1.182, [B(LOREM.slice(0, 173))], { align: 'justify', lineSpacingMultiple: 1.5 });
+  shape(s, 'rect', 9.301, 1.82, 5.302, 1.664, { fill: { color: PANEL }, rotate: 90 });
+  text(s, 9.72, 2.546, 4.769, 0.774, [H('PREMIUM GALERY')], { rotate: 90 });
+  text(s, 9.064, 2.899, 5.003, 0.303, [H(TAG, RED, 12)], { rotate: 90 });
+  shape(s, 'ellipse', 11.466, 0.234, 0.192, 0.192, { fill: { color: WHITE }, rotate: 90 });
+  text(s, 11.562, 0.111, 1.248, 0.438, [H('WEST', RED, 20)], { align: 'center' });
+}
+
+/** Slide 23 - Premium Galery */
+function slide23(s) {
+  shape(s, 'rect', 12.809, 0, 0.524, 7.5, { fill: { color: RED }, rotate: 180, flipH: true });
+  photo(s, 5.984, 0, 6.825, 4.222);
+  shape(s, 'rect', 6.196, 3.968, 6.401, 3.278, { fill: { color: PANEL } });
+  text(s, 0.657, 1.002, 4.769, 0.774, [H('PREMIUM GALERY')], {});
+  text(s, 0.657, 1.776, 5.003, 0.303, [H(TAG, RED, 12)], {});
+  checkIcon(s, 0.748, 2.402, RED);
+  text(s, 1.157, 2.603, 4.079, 0.675, [B(LOREM.slice(0, 90), GREY, 12)], { lineSpacingMultiple: 1.5 });
+  text(s, 1.188, 2.402, 2.167, 0.303, [Bb('INSERT YOUR TEXT')], {});
+  photo(s, 0, 4.222, 5.984, 3.278);
+  photo(s, 6.667, 4.429, 2.397, 2.357);
+  photo(s, 9.746, 4.429, 2.397, 2.357);
+}
+
+/** Slide 24 - Black Friday Now */
+function slide24(s) {
+  rule(s, 6.938, 0, 0, 3.663, { color: PANEL, width: 0.75 });
+  rule(s, 7.677, 5.98, 0, 1.547, { color: PANEL, width: 0.75 });
+  rule(s, 12.827, 0, 0, 3.663, { color: PANEL, width: 0.75 });
+  text(s, 7.689, 0.811, 4.769, 0.774, [H('BLACK FRIDAY NOW')], {});
+  text(s, 7.689, 1.585, 5.003, 0.303, [H(TAG, RED, 12)], {});
+  text(s, 7.726, 2.225, 1.063, 0.572, [H('#01', NUMC, 28)], {});
+  text(s, 7.689, 2.36, 2.167, 0.303, [Bb('INSERT YOUR TEXT')], {});
+  text(s, 7.726, 2.797, 4.705, 0.904, [B(LOREM.slice(0, 183))], { align: 'justify', lineSpacingMultiple: 1.5 });
+  rule(s, 7.726, 4.021, 3.321, 0, { color: DIM, width: 0.75, dashType: 'dash' });
+  button(s, 11.354, 3.767, 1.028, 'READ');
+  text(s, 7.726, 4.417, 1.063, 0.572, [H('#02', NUMC, 28)], {});
+  text(s, 7.689, 4.551, 2.167, 0.303, [Bb('INSERT YOUR TEXT')], {});
+  text(s, 7.726, 4.989, 4.705, 0.904, [B(LOREM.slice(0, 183))], { align: 'justify', lineSpacingMultiple: 1.5 });
+  rule(s, 7.726, 6.213, 3.321, 0, { color: DIM, width: 0.75, dashType: 'dash' });
+  button(s, 11.354, 5.959, 1.028, 'READ');
+  photoPath(s, 0.538, 0.524, 5.987, 6.532, [
+    { x: 3.065, y: 0.65, moveTo: true },
+    { x: 5.987, y: 0.65 },
+    { x: 5.987, y: 6.532 },
+    { x: 3.065, y: 6.532 },
+    { close: true },
+    { x: 0, y: 0, moveTo: true },
+    { x: 2.922, y: 0 },
+    { x: 2.922, y: 5.882 },
+    { x: 0, y: 5.882 },
+    { close: true }
+  ]);
+}
+
+/** Slide 25 - Black Friday Events Now Arrival */
+function slide25(s) {
+  sideTag(s, 0.514, 1.395, 'WEST', RED, WHITE);
+  sideTag(s, 12.687, 6.003, '2020', RED, WHITE);
+  text(s, 8.003, 4.01, 4.769, 2.12, [H('BLACK FRIDAY EVENTS NOW ARRIVAL')], {});
+  text(s, 8.003, 3.551, 5.003, 0.303, [H(TAG, RED, 12)], {});
+  text(s, 8.003, 2.333, 4.705, 0.904, [B(LOREM.slice(0, 183))], { align: 'justify', lineSpacingMultiple: 1.5 });
+  text(s, 1.333, 5.889, 3.025, 0.627, [Bi(QUOTE)], { lineSpacingMultiple: 1.5 });
+  photo(s, 4.778, 0, 2.921, 6.516);
+  photo(s, 1.333, 0.393, 3.889, 2.341);
+  photo(s, 1.333, 3.454, 3.889, 2.341);
+}
+
+/** Slide 26 - Black Friday Events Now Arrival */
+function slide26(s) {
+  photo(s, 6.746, 0.984, 5.524, 6.516);
+  shape(s, 'rect', 9.429, 3.854, 2.587, 3.496, { fill: { color: RED, transparency: 50 } });
+  text(s, 0.637, 2.024, 5.41, 0.774, [H('BERNICE EVENTS')], {});
+  text(s, 0.637, 1.564, 5.003, 0.303, [H(TAG, RED, 12)], {});
+  text(s, 0.637, 3.08, 5.41, 2.015, [B(LOREM)], { align: 'justify', lineSpacingMultiple: 1.5 });
+  text(s, 0.637, 5.139, 5.41, 0.904, [B(LOREM.slice(0, 197))], { align: 'justify', lineSpacingMultiple: 1.5 });
+  sideTag(s, 11.503, 4.334, '2020', WHITE, WHITE);
+  text(s, 8.469, 5.383, 4.082, 1.717, [H('BLACK FRIDAY EVENTS NOW ARRIVAL', WHITE, 32)], { rotate: 90 });
+  rule(s, 0.79, 6.465, 5.258, 0, { color: DIM, width: 0.75, dashType: 'dash' });
+  text(s, 0.691, 6.574, 3.025, 0.627, [Bi(QUOTE)], { lineSpacingMultiple: 1.5 });
+}
+
+/** Slide 27 - Our Mockup */
+function slide27(s) {
+  device(s, -2.065, 2.611, 8.856, 4.667);
+  sideTag(s, 0.514, 1.395, 'WEST', RED, WHITE);
+  sideTag(s, 12.687, 6.003, '2020', RED, WHITE);
+  rule(s, 6.938, 0, 0, 3.663, { color: PANEL, width: 0.75 });
+  rule(s, 7.677, 5.98, 0, 1.547, { color: PANEL, width: 0.75 });
+  rule(s, 12.827, 0, 0, 3.663, { color: PANEL, width: 0.75 });
+  text(s, 7.145, 1.443, 5.41, 0.774, [H('OUR MOCKUP')], {});
+  text(s, 7.145, 1.079, 5.003, 0.303, [H(TAG, RED, 12)], {});
+  text(s, 7.145, 2.36, 5.41, 0.904, [B(LOREM.slice(0, 197))], { align: 'justify', lineSpacingMultiple: 1.5 });
+  checkIcon(s, 7.216, 3.599, RED);
+  text(s, 7.626, 3.8, 4.079, 0.675, [B(LOREM.slice(0, 90), GREY, 12)], { lineSpacingMultiple: 1.5 });
+  text(s, 7.657, 3.599, 2.167, 0.303, [Bb('INSERT YOUR TEXT')], {});
+  checkIcon(s, 7.216, 4.676, RED);
+  text(s, 7.626, 4.878, 4.079, 0.675, [B(LOREM.slice(0, 90), GREY, 12)], { lineSpacingMultiple: 1.5 });
+  text(s, 7.657, 4.676, 2.167, 0.303, [Bb('INSERT YOUR TEXT')], {});
+  checkIcon(s, 7.216, 5.754, RED);
+  text(s, 7.626, 5.955, 4.079, 0.675, [B(LOREM.slice(0, 90), GREY, 12)], { lineSpacingMultiple: 1.5 });
+  text(s, 7.657, 5.754, 2.167, 0.303, [Bb('INSERT YOUR TEXT')], {});
+  photoPath(s, -1.907, 2.162, 7.615, 3.876, [
+    { x: 4.16, y: 0, moveTo: true },
+    { x: 7.615, y: 1.532 },
+    { x: 3.486, y: 3.876 },
+    { x: 0, y: 2.013 },
+    { x: 4.16, y: 0 },
+    { close: true }
+  ]);
+}
+
+/** Slide 28 - Have The Power To Give You A */
+function slide28(s) {
+  shape(s, 'rect', 9.746, 2.279, 3.587, 5.221, { fill: { color: RED }, flipH: true });
+  device(s, 6.722, 0.933, 4.696, 5.101);
+  shape(s, 'roundRect', 1.065, 3.552, 3.939, 0.125, { fill: { color: RED }, rectRadius: 0.062 });
+  text(s, 5.289, 3.47, 1.251, 0.301, [H('HAIRCUT', LIGHT, 12)], {});
+  shape(s, 'roundRect', 1.065, 3.959, 3.576, 0.125, { fill: { color: RED }, rectRadius: 0.062 });
+  text(s, 5.289, 3.877, 1.1, 0.303, [H('SHAVE', LIGHT, 12)], {});
+  text(s, 0.986, 0.97, 4.988, 2.12, [H('BARBERS', RED), H(' HAVE THE POWER TO GIVE YOU A '), H('DISHEVELED', RED), H(' LOOK')], {});
+  button(s, 4.244, 6.697, 2.09, 'DISCOVER MORE');
+  text(s, 0.945, 4.558, 5.41, 2.015, [B(LOREM)], { align: 'justify', lineSpacingMultiple: 1.5 });
+  sideTag(s, 12.687, 6.003, '2020', WHITE, WHITE);
+  photoPath(s, 9.124, 1.165, 2.149, 3.392, [
+    { x: 0.09, y: 1.25, moveTo: true },
+    { x: 2.149, y: 0 },
+    { x: 2.126, y: 2.677 },
+    { x: 0, y: 3.392 },
+    { x: 0.09, y: 1.25 },
+    { close: true }
+  ]);
+}
+
+/** Slide 29 - Our Mockup */
+function slide29(s) {
+  device(s, 0.14, 0.347, 5.402, 7.447);
+  text(s, 6.667, 2.95, 5.289, 1.46,
+    [B('Re paragone creatura acerbita ai guardava lasciami vi. Entro tue forza miele mazzo per pur oltre sul. Lo ti il gabbie quanto lancio. Fato mare arme tu anch vi mine riso. Poi affannata ami cresciuto melagrani una abbandona brillanti. Far aspettando nel voluttuosa sei turbamento tra. Grappoli tuo inquieta cio orribile dissolve.')], { align: 'center', lineSpacingMultiple: 1.5 });
+  text(s, 6.667, 4.534, 5.289, 0.627, [B(LOREM.slice(0, 142))], { align: 'center', lineSpacingMultiple: 1.5 });
+  shape(s, 'rect', 5.749, 1.828, 7.124, 3.843, { line: { color: RED, width: 2.25 } });
+  text(s, 7.432, 1.538, 3.759, 0.774, [H('OUR MOCKUP')], { align: 'center', fill: { color: BG } });
+  text(s, 6.81, 2.312, 5.003, 0.303, [H(TAG, RED, 12)], { align: 'center' });
+  photoPath(s, 1.888, 1.675, 3.509, 4.32, [
+    { x: 2.649, y: 0, moveTo: true },
+    { x: 3.509, y: 3.358 },
+    { x: 0.904, y: 4.32 },
+    { x: 0, y: 0.64 },
+    { close: true }
+  ]);
+}
+
+/** Slide 30 - Premium Mockup */
+function slide30(s) {
+  shape(s, 'rect', 0, 4.115, 13.333, 0.157, { fill: { color: RED } });
+  device(s, 4.02, 1.224, 1.686, 4.961, 342.34);
+  device(s, 1.525, 1.091, 1.943, 5.716, 342.34);
+  sideTag(s, 0.514, 1.395, 'WEST', RED, WHITE);
+  sideTag(s, 12.687, 6.003, '2020', RED, WHITE);
+  text(s, 6.938, 5.011, 5.41, 0.774, [H('PREMIUM MOCKUP')], {});
+  text(s, 6.938, 4.646, 5.003, 0.303, [H(TAG, RED, 12)], {});
+  text(s, 6.432, 1.549, 1.063, 0.572, [H('#01', NUMC, 28)], {});
+  text(s, 6.395, 1.684, 2.167, 0.303, [Bb('INSERT YOUR TEXT')], {});
+  text(s, 6.432, 2.122, 2.952, 1.46, [B(LOREM.slice(0, 183))], { align: 'justify', lineSpacingMultiple: 1.5 });
+  text(s, 9.591, 1.549, 1.063, 0.572, [H('#02', NUMC, 28)], {});
+  text(s, 9.554, 1.684, 2.167, 0.303, [Bb('INSERT YOUR TEXT')], {});
+  text(s, 9.591, 2.122, 2.952, 1.46, [B(LOREM.slice(0, 183))], { align: 'justify', lineSpacingMultiple: 1.5 });
+  photoPath(s, 3.833, 1.995, 2.562, 3.709, [
+    { x: 0, y: 0, moveTo: true },
+    { x: 1.531, y: 0.127 },
+    { x: 2.562, y: 3.329 },
+    { x: 1.175, y: 3.709 },
+    { x: 0, y: 0 },
+    { close: true }
+  ]);
+  photoPath(s, 1.313, 1.978, 2.952, 4.273, [
+    { x: 0, y: 0, moveTo: true },
+    { x: 1.764, y: 0.146 },
+    { x: 2.952, y: 3.836 },
+    { x: 1.354, y: 4.273 },
+    { x: 0, y: 0 },
+    { close: true }
+  ]);
+}
+
+/** Slide 31 - Have The Power To Give You A */
+function slide31(s) {
+  poly(s, 3.933, 6.52, 3.353, 0.148, { fill: { color: 'B3B4B5' } }, [
+    { x: 0, y: 0.061, moveTo: true },
+    { x: 0.296, y: 0.148, curve: { type: 'cubic', x1: 0, y1: 0.087, x2: 0.114, y2: 0.148 } },
+    { x: 3.353, y: 0.148, curve: { type: 'cubic', x1: 0.477, y1: 0.148, x2: 3.353, y2: 0.148 } },
+    { x: 3.353, y: 0, curve: { type: 'cubic', x1: 3.353, y1: 0, x2: 3.353, y2: 0 } },
+    { x: 0, y: 0, curve: { type: 'cubic', x1: 0, y1: 0, x2: 0, y2: 0 } },
+    { x: 0, y: 0.061 },
+    { close: true }
+  ]);
+  poly(s, 7.237, 6.52, 3.353, 0.148, { fill: { color: 'B3B4B5' } }, [
+    { x: 3.353, y: 0.061, moveTo: true },
+    { x: 3.057, y: 0.148, curve: { type: 'cubic', x1: 3.353, y1: 0.087, x2: 3.239, y2: 0.148 } },
+    { x: 0, y: 0.148, curve: { type: 'cubic', x1: 2.875, y1: 0.148, x2: 0, y2: 0.148 } },
+    { x: 0, y: 0, curve: { type: 'cubic', x1: 0, y1: 0, x2: 0, y2: 0 } },
+    { x: 3.353, y: 0, curve: { type: 'cubic', x1: 3.353, y1: 0, x2: 3.353, y2: 0 } },
+    { x: 3.353, y: 0.061 },
+    { close: true }
+  ]);
+  poly(s, 4.589, 2.836, 5.394, 3.696, { fill: { color: 'D2D3D5' } }, [
+    { x: 5.223, y: 0, moveTo: true },
+    { x: 0.171, y: 0, curve: { type: 'cubic', x1: 0.171, y1: 0, x2: 0.171, y2: 0 } },
+    { x: 0, y: 0.171, curve: { type: 'cubic', x1: 0.076, y1: 0, x2: 0, y2: 0.076 } },
+    { x: 0, y: 0.827, curve: { type: 'cubic', x1: 0, y1: 0.827, x2: 0, y2: 0.827 } },
+    { x: 0, y: 3.525, curve: { type: 'cubic', x1: 0, y1: 3.525, x2: 0, y2: 3.525 } },
+    { x: 0.171, y: 3.696, curve: { type: 'cubic', x1: 0, y1: 3.62, x2: 0.076, y2: 3.696 } },
+    { x: 5.223, y: 3.696, curve: { type: 'cubic', x1: 5.223, y1: 3.696, x2: 5.223, y2: 3.696 } },
+    { x: 5.394, y: 3.525, curve: { type: 'cubic', x1: 5.318, y1: 3.696, x2: 5.394, y2: 3.62 } },
+    { x: 5.394, y: 0.171, curve: { type: 'cubic', x1: 5.394, y1: 0.171, x2: 5.394, y2: 0.171 } },
+    { x: 5.223, y: 0, curve: { type: 'cubic', x1: 5.394, y1: 0.076, x2: 5.318, y2: 0 } },
+    { close: true }
+  ]);
+  poly(s, 4.608, 2.855, 5.36, 3.658, { fill: { color: 'D8D8D8' } }, [
+    { x: 0.152, y: 3.658, moveTo: true },
+    { x: 0, y: 3.506, curve: { type: 'cubic', x1: 0.068, y1: 3.658, x2: 0, y2: 3.59 } },
+    { x: 0, y: 0.152, curve: { type: 'cubic', x1: 0, y1: 0.152, x2: 0, y2: 0.152 } },
+    { x: 0.152, y: 0, curve: { type: 'cubic', x1: 0, y1: 0.068, x2: 0.068, y2: 0 } },
+    { x: 5.205, y: 0, curve: { type: 'cubic', x1: 5.205, y1: 0, x2: 5.205, y2: 0 } },
+    { x: 5.36, y: 0.152, curve: { type: 'cubic', x1: 5.292, y1: 0, x2: 5.36, y2: 0.068 } },
+    { x: 5.36, y: 3.506, curve: { type: 'cubic', x1: 5.36, y1: 3.506, x2: 5.36, y2: 3.506 } },
+    { x: 5.205, y: 3.658, curve: { type: 'cubic', x1: 5.36, y1: 3.59, x2: 5.292, y2: 3.658 } },
+    { x: 0.152, y: 3.658 },
+    { close: true }
+  ]);
+  shape(s, 'rect', 3.933, 6.459, 6.657, 0.121, { fill: { color: LIGHT } });
+  poly(s, 6.782, 6.459, 0.956, 0.068, { fill: { color: 'B3B4B5' } }, [
+    { x: 0, y: 0, moveTo: true },
+    { x: 0.083, y: 0.068, curve: { type: 'cubic', x1: 0.008, y1: 0.038, x2: 0.042, y2: 0.068 } },
+    { x: 0.873, y: 0.068, curve: { type: 'cubic', x1: 0.873, y1: 0.068, x2: 0.873, y2: 0.068 } },
+    { x: 0.956, y: 0, curve: { type: 'cubic', x1: 0.914, y1: 0.068, x2: 0.948, y2: 0.038 } },
+    { x: 0, y: 0 },
+    { close: true }
+  ]);
+  shape(s, 'rect', 4.786, 3.086, 5.003, 3.16, { fill: { color: LIGHT } });
+  shape(s, 'ellipse', 7.256, 2.954, 0.057, 0.057, { fill: { color: '2C2C2C' } });
+  shape(s, 'ellipse', 7.256, 2.95, 0.057, 0.053, { fill: { color: '0A0A0A' } });
+  shape(s, 'ellipse', 7.267, 2.957, 0.034, 0.038, { fill: { color: '000000' } });
+  shape(s, 'ellipse', 7.275, 2.969, 0.019, 0.019, { fill: { color: '2C99B4' } });
+  poly(s, 7.282, 2.973, 0.004, 0.008, { fill: { color: WHITE } }, [
+    { x: 0.004, y: 0.004, moveTo: true },
+    { x: 0.004, y: 0.008 },
+    { x: 0, y: 0.004 },
+    { x: 0.004, y: 0 },
+    { x: 0.004, y: 0.004 },
+    { close: true }
+  ]);
+  text(s, 4.754, 0.525, 4.988, 2.12, [H('BARBERS', RED), H(' HAVE THE POWER TO GIVE YOU A '), H('DISHEVELED', RED), H(' LOOK')], { align: 'center' });
+  text(s, 9.295, 3.831, 3.033, 1.178, [H('BLACK FRIDAY EVENTS NOW', WHITE, 32)], { rotate: 90 });
+  text(s, 1.12, 3.008, 3.212, 3.404, [B(LOREM_RETAO)], { align: 'justify', lineSpacingMultiple: 1.5 });
+  button(s, 2.242, 2.397, 2.09, 'DISCOVER MORE');
+  photo(s, 4.754, 3.078, 5.046, 3.234);
+}
+
+/** Slide 32 - Desktop Mockup */
+function slide32(s) {
+  shape(s, 'round2SameRect', 0.715, 2.202, 6.18, 0.4, { fill: { color: LIGHT } });
+  shape(s, 'ellipse', 0.934, 2.365, 0.089, 0.089, { fill: { color: 'FF0000' } });
+  shape(s, 'ellipse', 1.075, 2.365, 0.089, 0.089, { fill: { color: 'FFC000' } });
+  shape(s, 'ellipse', 1.215, 2.365, 0.089, 0.089, { fill: { color: '92D050' } });
+  text(s, 1.566, 2.31, 2.898, 0.2, [Pp('http://www.website.com', GREY, 6)], { align: 'center', valign: 'middle', fill: { color: WHITE }, shape: 'roundRect', rectRadius: 0.033 });
+  sideTag(s, 0.514, 1.395, 'WEST', RED, WHITE);
+  sideTag(s, 12.687, 6.003, '2020', RED, WHITE);
+  photo(s, 0.715, 2.603, 6.18, 3.617);
+  text(s, 7.616, 2.319, 4.769, 0.774, [H('DESKTOP MOCKUP')], {});
+  text(s, 7.616, 3.093, 5.003, 0.303, [H(TAG, RED, 12)], {});
+  text(s, 7.616, 3.464, 4.527, 0.904, [B(LOREM.slice(0, 183))], { align: 'justify', lineSpacingMultiple: 1.5 });
+  checkIcon(s, 7.755, 4.711, RED);
+  text(s, 8.165, 4.631, 4.079, 0.675, [B(LOREM.slice(0, 90), GREY, 12)], { lineSpacingMultiple: 1.5 });
+  checkIcon(s, 7.755, 5.625, RED);
+  text(s, 8.165, 5.545, 4.079, 0.675, [B(LOREM.slice(0, 90), GREY, 12)], { lineSpacingMultiple: 1.5 });
+  shape(s, 'rect', 1.87, 5.305, 4.797, 1.734, { fill: { color: PANEL } });
+  text(s, 2.078, 5.582, 4.38, 1.182, [Bi(LOREM.slice(0, 211), GREY)], { align: 'center', lineSpacingMultiple: 1.5 });
+}
+
+/** Slide 33 - Desktop Mockup */
+function slide33(s) {
+  device(s, 4.57, 2.485, 8.327, 4.401);
+  text(s, 6.014, 1.029, 4.769, 0.774, [H('DESKTOP MOCKUP')], {});
+  text(s, 6.014, 1.803, 5.003, 0.303, [H(TAG, RED, 12)], {});
+  text(s, 0.689, 2.446, 2.167, 0.303, [Bb('INSERT YOUR TEXT', RED)], {});
+  text(s, 0.726, 2.725, 4.506, 0.904, [B(LOREM.slice(0, 173))], { align: 'justify', lineSpacingMultiple: 1.5 });
+  rule(s, 0.726, 3.948, 3.321, 0, { color: DIM, width: 0.75, dashType: 'dash' });
+  text(s, 0.689, 4.268, 2.167, 0.303, [Bb('INSERT YOUR TEXT', RED)], {});
+  text(s, 0.726, 4.546, 4.506, 0.904, [B(LOREM.slice(0, 173))], { align: 'justify', lineSpacingMultiple: 1.5 });
+  rule(s, 0.726, 5.77, 3.321, 0, { color: DIM, width: 0.75, dashType: 'dash' });
+  photo(s, 6.014, 2.86, 5.433, 3.424);
+}
+
+/** Slide 34 - Pricing Plans */
+function slide34(s) {
+  sideTag(s, 0.514, 1.395, 'WEST', RED, WHITE);
+  sideTag(s, 12.687, 6.003, '2020', RED, WHITE);
+  rule(s, 6.938, 0, 0, 3.663, { color: PANEL, width: 0.75 });
+  rule(s, 7.677, 5.98, 0, 1.547, { color: PANEL, width: 0.75 });
+  rule(s, 12.827, 0, 0, 3.663, { color: PANEL, width: 0.75 });
+  shape(s, 'roundRect', 0.997, 2.397, 3.263, 4.365, { fill: { color: PANEL2 }, rectRadius: 0.095 });
+  text(s, 0.283, 5.455, 1.38, 0.337, [Hr('Purchase Now', WHITE, 12)], { align: 'center', valign: 'middle', rotate: 270, fill: { color: RED }, shape: 'roundRect', rectRadius: 0.05 });
+  text(s, 1.738, 2.6, 1.655, 0.438, [Hr('BASIC PLANS', WHITE, 20)], { align: 'center' });
+  text(s, 1.363, 3.66, 2.569, 0.864, [Hr('$', WHITE, 40, { baseline: 600 }), Hr('45,12')], { align: 'center', lineSpacingMultiple: 1.2 });
+  text(s, 2.804, 3.598, 1.129, 0.286, [Hr('/ HAIRCUT', WHITE, 11)], {});
+  rule(s, 1.363, 3.178, 2.339, 0, { color: DIM, width: 0.75, dashType: 'dash' });
+  text(s, 4.084, 0.545, 4.769, 0.774, [H('PRICING PLANS')], { align: 'center' });
+  text(s, 3.967, 1.319, 5.003, 0.303, [H(TAG, RED, 12)], { align: 'center' });
+  checkIcon(s, 3.561, 4.937, WHITE, PANEL2);
+  text(s, 1.392, 4.839, 1.382, 0.456, [Hr('SHAVE + TRIM', WHITE, 16)], { lineSpacingMultiple: 1.5 });
+  rule(s, 3.283, 4.934, 0, 1.416, { color: DIM, width: 0.75, dashType: 'dash' });
+  checkIcon(s, 3.561, 5.434, RED, PANEL2);
+  text(s, 1.392, 5.336, 1.382, 0.456, [Hr('TRIM + SHAVE', WHITE, 16)], { lineSpacingMultiple: 1.5 });
+  checkIcon(s, 3.561, 5.992, RED, PANEL2);
+  text(s, 1.392, 5.894, 1.744, 0.456, [Hr('HAIRCUT + SHAVE', WHITE, 16)], { lineSpacingMultiple: 1.5 });
+  shape(s, 'roundRect', 4.847, 2.397, 3.263, 4.365, { fill: { color: PANEL2 }, rectRadius: 0.095 });
+  text(s, 4.133, 5.455, 1.38, 0.337, [Hr('Purchase Now', WHITE, 12)], { align: 'center', valign: 'middle', rotate: 270, fill: { color: RED }, shape: 'roundRect', rectRadius: 0.05 });
+  text(s, 5.213, 2.6, 2.406, 0.438, [Hr('MEDIUM PLANS', WHITE, 20)], { align: 'center' });
+  text(s, 5.213, 3.66, 2.569, 0.864, [Hr('$', WHITE, 40, { baseline: 600 }), Hr('75,12')], { align: 'center', lineSpacingMultiple: 1.2 });
+  text(s, 6.654, 3.598, 1.129, 0.286, [Hr('/ HAIRCUT', WHITE, 11)], {});
+  rule(s, 5.213, 3.178, 2.339, 0, { color: DIM, width: 0.75, dashType: 'dash' });
+  checkIcon(s, 7.411, 4.937, WHITE, PANEL2);
+  text(s, 5.242, 4.839, 1.382, 0.456, [Hr('SHAVE + TRIM', WHITE, 16)], { lineSpacingMultiple: 1.5 });
+  rule(s, 7.132, 4.934, 0, 1.416, { color: DIM, width: 0.75, dashType: 'dash' });
+  checkIcon(s, 7.411, 5.434, WHITE, PANEL2);
+  text(s, 5.242, 5.336, 1.382, 0.456, [Hr('TRIM + SHAVE', WHITE, 16)], { lineSpacingMultiple: 1.5 });
+  checkIcon(s, 7.411, 5.992, RED, PANEL2);
+  text(s, 5.242, 5.894, 1.744, 0.456, [Hr('HAIRCUT + SHAVE', WHITE, 16)], { lineSpacingMultiple: 1.5 });
+  shape(s, 'roundRect', 8.697, 2.397, 3.263, 4.365, { fill: { color: PANEL2 }, rectRadius: 0.095 });
+  text(s, 7.983, 5.455, 1.38, 0.337, [Hr('Purchase Now', WHITE, 12)], { align: 'center', valign: 'middle', rotate: 270, fill: { color: RED }, shape: 'roundRect', rectRadius: 0.05 });
+  text(s, 9.549, 3.312, 1.475, 0.202, [B('Recommended', WHITE, 9)], { align: 'center', valign: 'middle', fill: { color: 'E7E6E6', transparency: 100 }, line: { color: 'D8D8D8' }, shape: 'roundRect', rectRadius: 0.039 });
+  text(s, 9.011, 2.6, 2.51, 0.438, [Hr('PREMIUM PLANS', WHITE, 20)], { align: 'center' });
+  text(s, 9.062, 3.835, 2.569, 0.864, [Hr('$', WHITE, 40, { baseline: 600 }), Hr('125,12')], { align: 'center', lineSpacingMultiple: 1.2 });
+  text(s, 10.502, 3.773, 1.129, 0.286, [Hr('/ HAIRCUT', WHITE, 11)], {});
+  rule(s, 9.062, 3.178, 2.339, 0, { color: DIM, width: 0.75, dashType: 'dash' });
+  checkIcon(s, 11.261, 4.937, WHITE, PANEL2);
+  text(s, 9.091, 4.839, 1.382, 0.456, [Hr('SHAVE + TRIM', WHITE, 16)], { lineSpacingMultiple: 1.5 });
+  rule(s, 10.982, 4.934, 0, 1.416, { color: DIM, width: 0.75, dashType: 'dash' });
+  checkIcon(s, 11.261, 5.434, WHITE, PANEL2);
+  text(s, 9.091, 5.336, 1.382, 0.456, [Hr('TRIM + SHAVE', WHITE, 16)], { lineSpacingMultiple: 1.5 });
+  checkIcon(s, 11.261, 5.992, WHITE, PANEL2);
+  text(s, 9.091, 5.894, 1.744, 0.456, [Hr('HAIRCUT + SHAVE', WHITE, 16)], { lineSpacingMultiple: 1.5 });
+}
+
+/** Slide 35 - Our Charts */
+function slide35(s) {
+  shape(s, 'roundRect', 1.014, 1.504, 0.431, 2.946, { fill: { color: 'ACB8CA', transparency: 76 }, rotate: 180, rectRadius: 0.215 });
+  shape(s, 'roundRect', 1.014, 2.427, 0.431, 2.023, { fill: { color: '8D929C' }, rotate: 180, rectRadius: 0.215 });
+  text(s, 0.883, 1.028, 0.693, 0.33, [Hr('65%', WHITE, 12)], { align: 'center', lineSpacingMultiple: 1.2 });
+  shape(s, 'roundRect', 2.136, 1.504, 0.431, 2.946, { fill: { color: 'ACB8CA', transparency: 76 }, rotate: 180, rectRadius: 0.215 });
+  shape(s, 'roundRect', 2.136, 2.587, 0.431, 1.863, { fill: { color: RED }, rotate: 180, rectRadius: 0.215 });
+  text(s, 2.005, 1.028, 0.693, 0.33, [Hr('63%', WHITE, 12)], { align: 'center', lineSpacingMultiple: 1.2 });
+  shape(s, 'roundRect', 3.259, 1.504, 0.431, 2.946, { fill: { color: 'ACB8CA', transparency: 76 }, rotate: 180, rectRadius: 0.215 });
+  shape(s, 'roundRect', 3.259, 1.692, 0.431, 2.758, { fill: { color: '8D929C' }, rotate: 180, rectRadius: 0.215 });
+  text(s, 3.128, 1.028, 0.693, 0.33, [Hr('97%', WHITE, 12)], { align: 'center', lineSpacingMultiple: 1.2 });
+  shape(s, 'roundRect', 4.381, 1.504, 0.431, 2.946, { fill: { color: 'ACB8CA', transparency: 76 }, rotate: 180, rectRadius: 0.215 });
+  shape(s, 'roundRect', 4.381, 1.885, 0.431, 2.565, { fill: { color: RED }, rotate: 180, rectRadius: 0.215 });
+  text(s, 4.25, 1.028, 0.693, 0.33, [Hr('91%', WHITE, 12)], { align: 'center', lineSpacingMultiple: 1.2 });
+  shape(s, 'roundRect', 5.503, 1.504, 0.431, 2.946, { fill: { color: 'ACB8CA', transparency: 76 }, rotate: 180, rectRadius: 0.215 });
+  shape(s, 'roundRect', 5.503, 3.587, 0.431, 0.863, { fill: { color: '8D929C' }, rotate: 180, rectRadius: 0.215 });
+  text(s, 5.372, 1.028, 0.693, 0.33, [Hr('24%', WHITE, 12)], { align: 'center', lineSpacingMultiple: 1.2 });
+  text(s, 7.166, 0.808, 4.769, 0.774, [H('OUR CHARTS')], {});
+  text(s, 7.166, 1.582, 5.003, 0.303, [H(TAG, RED, 12)], {});
+  checkIcon(s, 1.118, 5.115, RED);
+  text(s, 1.528, 5.035, 4.079, 0.675, [B(LOREM.slice(0, 90), GREY, 12)], { lineSpacingMultiple: 1.5 });
+  checkIcon(s, 1.118, 6.029, RED);
+  text(s, 1.528, 5.949, 4.079, 0.675, [B(LOREM.slice(0, 90), GREY, 12)], { lineSpacingMultiple: 1.5 });
+  checkIcon(s, 6.944, 5.115, RED);
+  text(s, 7.354, 5.035, 4.079, 0.675, [B(LOREM.slice(0, 90), GREY, 12)], { lineSpacingMultiple: 1.5 });
+  checkIcon(s, 6.944, 6.029, RED);
+  text(s, 7.354, 5.949, 4.079, 0.675, [B(LOREM.slice(0, 90), GREY, 12)], { lineSpacingMultiple: 1.5 });
+  text(s, 7.074, 2.174, 5.41, 2.015, [B(LOREM)], { align: 'justify', lineSpacingMultiple: 1.5 });
+}
+
+/** Slide 36 - Our Charts */
+function slide36(s) {
+  text(s, 8.477, 3.448, 0.43, 0.303, [Pp('Jul')], { align: 'center' });
+  text(s, 9.194, 3.448, 0.535, 0.303, [Pp('Aug')], { align: 'center' });
+  text(s, 9.993, 3.448, 0.517, 0.303, [Pp('Sep')], { align: 'center' });
+  text(s, 10.8, 3.448, 0.503, 0.303, [Pp('Oct')], { align: 'center' });
+  rule(s, 8.347, 3.328, 3.788, 0, { color: RED, transparency: 80 });
+  rule(s, 8.349, 3.02, 3.786, 0, { color: RED, transparency: 80 });
+  rule(s, 8.349, 2.712, 3.786, 0, { color: RED, transparency: 80 });
+  rule(s, 8.348, 2.404, 3.786, 0, { color: RED, transparency: 80 });
+  rule(s, 8.348, 2.096, 3.786, 0, { color: RED, transparency: 80 });
+  rule(s, 8.35, 1.787, 3.784, 0, { color: RED, transparency: 80 });
+  rule(s, 8.35, 1.477, 3.784, 0, { color: RED, transparency: 80 });
+  rule(s, 8.35, 1.123, 3.784, 0.045, { color: RED, transparency: 80 });
+  rule(s, 8.35, 0.859, 3.784, 0, { color: RED, transparency: 80 });
+  text(s, 7.346, 3.194, 0.618, 0.303, [Pp('$0')], {});
+  text(s, 7.346, 2.591, 0.838, 0.303, [Pp('$143.819')], {});
+  text(s, 7.346, 1.975, 0.929, 0.303, [Pp('$243.926')], {});
+  text(s, 7.346, 1.373, 0.87, 0.303, [Pp('$462.971')], {});
+  text(s, 7.346, 0.733, 0.896, 0.303, [Pp('$725.725')], {});
+  text(s, 11.575, 3.448, 0.524, 0.303, [Pp('Nov')], { align: 'center' });
+  shape(s, 'rect', 11.676, 1.168, 0.321, 2.159, { fill: { color: RED }, flipH: true });
+  shape(s, 'rect', 10.877, 1.425, 0.321, 1.902, { fill: { color: '6B321B' }, flipH: true });
+  shape(s, 'rect', 10.102, 1.771, 0.321, 1.556, { fill: { color: 'EC3036' }, flipH: true });
+  shape(s, 'rect', 9.268, 2.067, 0.321, 1.26, { fill: { color: '8F4325' }, flipH: true });
+  shape(s, 'rect', 8.511, 2.31, 0.321, 1.017, { fill: { color: 'EF5257' }, flipH: true });
+  lineChart(s, 7.03, 3.908, 5.396, 3.281);
+  text(s, 0.981, 0.901, 4.769, 0.774, [H('OUR CHARTS')], {});
+  text(s, 0.981, 1.675, 5.003, 0.303, [H(TAG, RED, 12)], {});
+  text(s, 0.888, 2.268, 5.41, 1.182, [B(LOREM.slice(0, 283))], { align: 'justify', lineSpacingMultiple: 1.5 });
+  text(s, 0.881, 3.707, 1.063, 0.572, [H('#01', NUMC, 28)], {});
+  text(s, 0.843, 3.841, 2.167, 0.303, [Bb('INSERT YOUR TEXT')], {});
+  text(s, 0.881, 4.279, 4.705, 0.904, [B(LOREM.slice(0, 183))], { align: 'justify', lineSpacingMultiple: 1.5 });
+  text(s, 0.881, 5.318, 1.063, 0.572, [H('#02', NUMC, 28)], {});
+  text(s, 0.843, 5.452, 2.167, 0.303, [Bb('INSERT YOUR TEXT')], {});
+  text(s, 0.881, 5.89, 4.705, 0.904, [B(LOREM.slice(0, 183))], { align: 'justify', lineSpacingMultiple: 1.5 });
+}
+
+/** Slide 37 - Our Charts */
+function slide37(s) {
+  pieChart(s, 0.633, 1.956, 6.004, 4.003);
+  text(s, 6.978, 1.956, 4.769, 0.774, [H('OUR CHARTS')], {});
+  text(s, 6.978, 2.731, 5.003, 0.303, [H(TAG, RED, 12)], {});
+  text(s, 6.885, 3.323, 5.41, 2.015, [B(LOREM)], { align: 'justify', lineSpacingMultiple: 1.5 });
+}
+
+/** Slide 38 - Our Charts */
+function slide38(s) {
+  areaChart(s, 6.667, 1.299, 6.218, 5.324);
+  text(s, 1.036, 1.372, 4.769, 0.774, [H('OUR CHARTS')], {});
+  text(s, 1.036, 2.146, 5.003, 0.303, [H(TAG, RED, 12)], {});
+  text(s, 0.943, 2.738, 5.41, 2.015, [B(LOREM)], { align: 'justify', lineSpacingMultiple: 1.5 });
+  text(s, 0.943, 4.944, 1.063, 0.572, [H('#01', NUMC, 28)], {});
+  text(s, 0.906, 5.079, 2.167, 0.303, [Bb('INSERT YOUR TEXT')], {});
+  text(s, 0.943, 5.517, 4.705, 0.904, [B(LOREM.slice(0, 183))], { align: 'justify', lineSpacingMultiple: 1.5 });
+}
+
+/** Slide 39 - Contact Us Now */
+function slide39(s) {
+  rule(s, 6.938, 0, 0, 3.663, { color: PANEL, width: 0.75 });
+  rule(s, 7.677, 5.98, 0, 1.547, { color: PANEL, width: 0.75 });
+  rule(s, 12.827, 0, 0, 3.663, { color: PANEL, width: 0.75 });
+  rule(s, 2.538, 0, 0, 3.663, { color: PANEL, width: 0.75 });
+  rule(s, 3.277, 5.98, 0, 1.547, { color: PANEL, width: 0.75 });
+  rule(s, 8.427, 0, 0, 3.663, { color: PANEL, width: 0.75 });
+  sideTag(s, 0.514, 1.395, 'WEST', RED, WHITE);
+  sideTag(s, 12.687, 6.003, '2020', RED, WHITE);
+  photo(s, 0.932, 0.358, 11.469, 4.671);
+  shape(s, 'rect', 7.28, 2.693, 4.039, 4.379, { fill: { color: PANEL } });
+  text(s, 8.272, 3.139, 1.82, 0.303, [Hr('ADDRESS COMPANY', WHITE, 12)], {});
+  text(s, 8.272, 3.373, 2.391, 0.671,
+    [B('76 United Street Ca,', GREY, 12, { breakLine: true }), B('California, CA 62 71593', GREY, 12)], { lineSpacingMultiple: 1.5 });
+  text(s, 8.272, 4.207, 1.82, 0.303, [Hr('PHONE & EMAIL', WHITE, 12)], {});
+  shape(s, 'ellipse', 7.666, 3.187, 0.473, 0.471, { fill: { color: '8D929C' } });
+  poly(s, 7.781, 3.316, 0.223, 0.206, { fill: { color: WHITE } }, [
+    { x: 0.222, y: 0.001, moveTo: true },
+    { x: 0.219, y: 0, curve: { type: 'cubic', x1: 0.221, y1: -0, x2: 0.22, y2: -0 } },
+    { x: 0.002, y: 0.116 },
+    { x: 0, y: 0.12, curve: { type: 'cubic', x1: 0, y1: 0.117, x2: -0, y2: 0.119 } },
+    { x: 0.002, y: 0.121, curve: { type: 'cubic', x1: 0.001, y1: 0.121, x2: 0.001, y2: 0.121 } },
+    { x: 0.068, y: 0.144 },
+    { x: 0.07, y: 0.145 },
+    { x: 0.088, y: 0.204 },
+    { x: 0.091, y: 0.206, curve: { type: 'cubic', x1: 0.089, y1: 0.205, x2: 0.09, y2: 0.206 } },
+    { x: 0.091, y: 0.206, curve: { type: 'cubic', x1: 0.091, y1: 0.206, x2: 0.091, y2: 0.206 } },
+    { x: 0.093, y: 0.205, curve: { type: 'cubic', x1: 0.092, y1: 0.206, x2: 0.093, y2: 0.206 } },
+    { x: 0.133, y: 0.166 },
+    { x: 0.191, y: 0.186 },
+    { x: 0.193, y: 0.186, curve: { type: 'cubic', x1: 0.191, y1: 0.186, x2: 0.192, y2: 0.186 } },
+    { x: 0.194, y: 0.184, curve: { type: 'cubic', x1: 0.194, y1: 0.185, x2: 0.194, y2: 0.184 } },
+    { x: 0.223, y: 0.003 },
+    { x: 0.222, y: 0.001, curve: { type: 'cubic', x1: 0.223, y1: 0.002, x2: 0.223, y2: 0.001 } },
+    { close: true },
+    { x: 0.01, y: 0.118, moveTo: true },
+    { x: 0.199, y: 0.017 },
+    { x: 0.199, y: 0.017, curve: { type: 'cubic', x1: 0.199, y1: 0.017, x2: 0.199, y2: 0.017 } },
+    { x: 0.199, y: 0.017, curve: { type: 'cubic', x1: 0.199, y1: 0.017, x2: 0.199, y2: 0.017 } },
+    { x: 0.071, y: 0.139 },
+    { x: 0.01, y: 0.118 },
+    { x: 0.01, y: 0.118, curve: { type: 'cubic', x1: 0.01, y1: 0.118, x2: 0.01, y2: 0.118 } },
+    { x: 0.01, y: 0.118, curve: { type: 'cubic', x1: 0.01, y1: 0.118, x2: 0.01, y2: 0.118 } },
+    { close: true },
+    { x: 0.075, y: 0.143, moveTo: true },
+    { x: 0.201, y: 0.023 },
+    { x: 0.201, y: 0.023, curve: { type: 'cubic', x1: 0.201, y1: 0.023, x2: 0.201, y2: 0.023 } },
+    { x: 0.201, y: 0.023, curve: { type: 'cubic', x1: 0.201, y1: 0.023, x2: 0.201, y2: 0.023 } },
+    { x: 0.103, y: 0.152 },
+    { x: 0.102, y: 0.152, curve: { type: 'cubic', x1: 0.102, y1: 0.152, x2: 0.102, y2: 0.152 } },
+    { x: 0.091, y: 0.193 },
+    { x: 0.091, y: 0.193, curve: { type: 'cubic', x1: 0.091, y1: 0.193, x2: 0.091, y2: 0.193 } },
+    { x: 0.091, y: 0.193, curve: { type: 'cubic', x1: 0.091, y1: 0.193, x2: 0.091, y2: 0.193 } },
+    { close: true },
+    { x: 0.097, y: 0.193, moveTo: true },
+    { x: 0.107, y: 0.157 },
+    { x: 0.127, y: 0.164 },
+    { x: 0.097, y: 0.194 },
+    { x: 0.097, y: 0.194, curve: { type: 'cubic', x1: 0.097, y1: 0.194, x2: 0.097, y2: 0.194 } },
+    { x: 0.097, y: 0.193, curve: { type: 'cubic', x1: 0.097, y1: 0.193, x2: 0.097, y2: 0.193 } },
+    { close: true },
+    { x: 0.189, y: 0.179, moveTo: true },
+    { x: 0.11, y: 0.152 },
+    { x: 0.215, y: 0.014 },
+    { x: 0.215, y: 0.014, curve: { type: 'cubic', x1: 0.215, y1: 0.014, x2: 0.215, y2: 0.014 } },
+    { x: 0.215, y: 0.014, curve: { type: 'cubic', x1: 0.215, y1: 0.014, x2: 0.215, y2: 0.014 } },
+    { x: 0.189, y: 0.179 },
+    { x: 0.189, y: 0.179, curve: { type: 'cubic', x1: 0.189, y1: 0.179, x2: 0.189, y2: 0.179 } },
+    { x: 0.189, y: 0.179, curve: { type: 'cubic', x1: 0.189, y1: 0.179, x2: 0.189, y2: 0.179 } },
+    { close: true }
+  ]);
+  shape(s, 'ellipse', 7.666, 4.252, 0.473, 0.471, { fill: { color: RED } });
+  poly(s, 7.788, 4.373, 0.228, 0.229, { fill: { color: WHITE } }, [
+    { x: 0.225, y: 0.179, moveTo: true },
+    { x: 0.185, y: 0.14 },
+    { x: 0.168, y: 0.139, curve: { type: 'cubic', x1: 0.18, y1: 0.135, x2: 0.172, y2: 0.135 } },
+    { x: 0.167, y: 0.14, curve: { type: 'cubic', x1: 0.168, y1: 0.14, x2: 0.167, y2: 0.14 } },
+    { x: 0.146, y: 0.162 },
+    { x: 0.138, y: 0.162, curve: { type: 'cubic', x1: 0.144, y1: 0.164, x2: 0.14, y2: 0.164 } },
+    { x: 0.067, y: 0.091 },
+    { x: 0.067, y: 0.082, curve: { type: 'cubic', x1: 0.065, y1: 0.089, x2: 0.065, y2: 0.085 } },
+    { x: 0.089, y: 0.061 },
+    { x: 0.089, y: 0.043, curve: { type: 'cubic', x1: 0.094, y1: 0.056, x2: 0.094, y2: 0.048 } },
+    { x: 0.089, y: 0.043, curve: { type: 'cubic', x1: 0.089, y1: 0.043, x2: 0.089, y2: 0.043 } },
+    { x: 0.049, y: 0.004 },
+    { x: 0.041, y: 0, curve: { type: 'cubic', x1: 0.047, y1: 0.001, x2: 0.044, y2: 0 } },
+    { x: 0.032, y: 0.004, curve: { type: 'cubic', x1: 0.038, y1: 0, x2: 0.034, y2: 0.001 } },
+    { x: 0.009, y: 0.026 },
+    { x: 0, y: 0.047, curve: { type: 'cubic', x1: 0.004, y1: 0.032, x2: 0, y2: 0.039 } },
+    { x: 0.007, y: 0.084, curve: { type: 'cubic', x1: -0, y1: 0.059, x2: 0.002, y2: 0.072 } },
+    { x: 0.024, y: 0.114, curve: { type: 'cubic', x1: 0.011, y1: 0.094, x2: 0.017, y2: 0.104 } },
+    { x: 0.111, y: 0.204, curve: { type: 'cubic', x1: 0.047, y1: 0.149, x2: 0.077, y2: 0.18 } },
+    { x: 0.129, y: 0.215, curve: { type: 'cubic', x1: 0.117, y1: 0.208, x2: 0.123, y2: 0.212 } },
+    { x: 0.175, y: 0.229, curve: { type: 'cubic', x1: 0.143, y1: 0.223, x2: 0.159, y2: 0.227 } },
+    { x: 0.177, y: 0.229, curve: { type: 'cubic', x1: 0.175, y1: 0.229, x2: 0.176, y2: 0.229 } },
+    { x: 0.204, y: 0.217, curve: { type: 'cubic', x1: 0.187, y1: 0.229, x2: 0.197, y2: 0.225 } },
+    { x: 0.224, y: 0.197 },
+    { x: 0.228, y: 0.188, curve: { type: 'cubic', x1: 0.227, y1: 0.195, x2: 0.228, y2: 0.191 } },
+    { x: 0.225, y: 0.179, curve: { type: 'cubic', x1: 0.228, y1: 0.185, x2: 0.227, y2: 0.181 } },
+    { close: true },
+    { x: 0.036, y: 0.008, moveTo: true },
+    { x: 0.041, y: 0.006, curve: { type: 'cubic', x1: 0.037, y1: 0.007, x2: 0.039, y2: 0.006 } },
+    { x: 0.045, y: 0.008, curve: { type: 'cubic', x1: 0.043, y1: 0.006, x2: 0.044, y2: 0.007 } },
+    { x: 0.085, y: 0.047 },
+    { x: 0.085, y: 0.056, curve: { type: 'cubic', x1: 0.088, y1: 0.05, x2: 0.088, y2: 0.054 } },
+    { x: 0.085, y: 0.057, curve: { type: 'cubic', x1: 0.085, y1: 0.057, x2: 0.085, y2: 0.057 } },
+    { x: 0.077, y: 0.065 },
+    { x: 0.028, y: 0.016 },
+    { close: true },
+    { x: 0.2, y: 0.213, moveTo: true },
+    { x: 0.2, y: 0.213 },
+    { x: 0.2, y: 0.214 },
+    { x: 0.177, y: 0.223, curve: { type: 'cubic', x1: 0.194, y1: 0.22, x2: 0.186, y2: 0.223 } },
+    { x: 0.175, y: 0.223, curve: { type: 'cubic', x1: 0.177, y1: 0.223, x2: 0.176, y2: 0.223 } },
+    { x: 0.132, y: 0.21, curve: { type: 'cubic', x1: 0.16, y1: 0.222, x2: 0.145, y2: 0.218 } },
+    { x: 0.114, y: 0.199, curve: { type: 'cubic', x1: 0.126, y1: 0.207, x2: 0.12, y2: 0.203 } },
+    { x: 0.114, y: 0.199 },
+    { x: 0.114, y: 0.199 },
+    { x: 0.028, y: 0.111, curve: { type: 'cubic', x1: 0.08, y1: 0.175, x2: 0.051, y2: 0.145 } },
+    { x: 0.012, y: 0.082, curve: { type: 'cubic', x1: 0.022, y1: 0.102, x2: 0.016, y2: 0.092 } },
+    { x: 0.006, y: 0.047, curve: { type: 'cubic', x1: 0.009, y1: 0.072, x2: 0.005, y2: 0.06 } },
+    { x: 0.006, y: 0.047 },
+    { x: 0.006, y: 0.047 },
+    { x: 0.013, y: 0.03, curve: { type: 'cubic', x1: 0.006, y1: 0.041, x2: 0.009, y2: 0.035 } },
+    { x: 0.013, y: 0.03 },
+    { x: 0.014, y: 0.03 },
+    { x: 0.024, y: 0.02 },
+    { x: 0.073, y: 0.069 },
+    { x: 0.063, y: 0.078 },
+    { x: 0.063, y: 0.095, curve: { type: 'cubic', x1: 0.058, y1: 0.083, x2: 0.058, y2: 0.09 } },
+    { x: 0.134, y: 0.166 },
+    { x: 0.15, y: 0.166, curve: { type: 'cubic', x1: 0.138, y1: 0.17, x2: 0.146, y2: 0.17 } },
+    { x: 0.16, y: 0.156 },
+    { x: 0.209, y: 0.205 },
+    { close: true },
+    { x: 0.22, y: 0.193, moveTo: true },
+    { x: 0.213, y: 0.2 },
+    { x: 0.164, y: 0.152 },
+    { x: 0.171, y: 0.144 },
+    { x: 0.181, y: 0.144, curve: { type: 'cubic', x1: 0.174, y1: 0.141, x2: 0.178, y2: 0.141 } },
+    { x: 0.181, y: 0.144, curve: { type: 'cubic', x1: 0.181, y1: 0.144, x2: 0.181, y2: 0.144 } },
+    { x: 0.221, y: 0.183 },
+    { x: 0.22, y: 0.193, curve: { type: 'cubic', x1: 0.223, y1: 0.186, x2: 0.223, y2: 0.19 } },
+    { close: true }
+  ]);
+  text(s, 8.272, 4.717, 2.391, 0.375, [B('@bernice.official.com', GREY, 12)], { lineSpacingMultiple: 1.5 });
+  text(s, 8.272, 4.442, 2.305, 0.375, [B('+65 457 7251 6241', GREY, 12)], { lineSpacingMultiple: 1.5 });
+  shape(s, 'ellipse', 7.666, 5.412, 0.473, 0.471, { fill: { color: '8D929C' } });
+  checkIcon(s, 7.778, 5.523, WHITE);
+  text(s, 8.272, 5.413, 1.82, 0.303, [Hr('MORE INFORMATION', WHITE, 12)], {});
+  text(s, 8.272, 5.648, 2.816, 0.978, [B(LOREM.slice(0, 96), GREY, 12)], { lineSpacingMultiple: 1.5 });
+  text(s, 1.43, 5.413, 4.769, 0.774, [H('CONTACT US NOW')], {});
+  text(s, 1.43, 6.187, 5.003, 0.303, [H(TAG, RED, 12)], {});
+  button(s, 9.047, 2.369, 2.09, 'CALL US');
+}
+
+/** Slide 40 - Thanks */
+function slide40(s) {
+  photo(s, 0, 0, 13.333, 7.5);
+  namePlate(s, 2.783, 2.232, 7.87, 2.981);
+  text(s, 3.773, 2.5, 5.888, 2.036, [Hr('THANKS', WHITE, 115, { underline: true })], { align: 'center' });
+  text(s, 4.216, 4.442, 5.003, 0.303, [H(TAG, RED, 12)], { align: 'center' });
+  sideTag(s, 4.08, 3.626, 'WEST', WHITE, WHITE);
+  sideTag(s, 9.202, 3.627, '2020', WHITE, WHITE);
+}
+
+const SLIDES = [
+  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08,
+  slide09, slide10, slide11, slide12, slide13, slide14, slide15, slide16,
+  slide17, slide18, slide19, slide20, slide21, slide22, slide23, slide24,
+  slide25, slide26, slide27, slide28, slide29, slide30, slide31, slide32,
+  slide33, slide34, slide35, slide36, slide37, slide38, slide39, slide40,
+];
+
+/* ------------------------------------------------------------------- build */
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'WIDE', width: 13.333, height: 7.5 });
+  pptx.layout = 'WIDE';
+  pptx.theme = { headFontFace: OSWALD, bodyFontFace: SANS };
+
+  SLIDES.forEach(fn => {
+    const s = pptx.addSlide();
+    s.background = { color: BG };
+    fn(s);
+  });
+
+  return pptx.writeFile({ fileName: path.join(__dirname, '02ec4005-caf0-47cf-a75b-7178b3860bed_grok_final.pptx') });
+}
+
+build().then(f => console.log('wrote', f)).catch(err => { console.error(err); process.exit(1); });

@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+LOG_PATH="/tmp/sand-orbitd.log"
+
+args=(run)
+
+if [[ -n "${SAND_ORBITD_CHANNEL+x}" ]]; then
+	args+=(--channel "$SAND_ORBITD_CHANNEL")
+fi
+
+if [[ -n "${SAND_ORBITD_UPDATE_CHECK_INTERVAL_SECONDS+x}" ]]; then
+	args+=(--update-check-interval-seconds "$SAND_ORBITD_UPDATE_CHECK_INTERVAL_SECONDS")
+fi
+
+args+=(orbitd)
+
+exec /usr/local/bin/box-bounded-log --run "$LOG_PATH" -- \
+	env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+	/usr/local/libexec/sand/sand-daemon-supervisor "${args[@]}"
