@@ -1,0 +1,105 @@
+---
+name: site-playbooks-american-airlines
+description: >-
+  American Airlines site playbook: fares or booking a flight; not check-in or
+  awards.
+---
+# Site playbook: American Airlines
+
+Read this before you dispatch a computerUse subagent to this site. Follow the Fastest path, fill in every URL you know, then paste the Dispatch snippet into the Task text as written. The subagent does not read skills, so every rule it needs is in the snippet, including the ground rules at its end. Secrets never go in the Task text. They come through `RequestUserForm`.
+
+Jobs in this file: American Airlines flight search; American Airlines booking a picked flight.
+
+## American Airlines flight search
+
+### When to use
+
+The user wants American's cash fares and schedules for a route and date. The parent needs origin and destination IATA codes, dates, the adult and child counts, the count of children under 2 with their own seat, and cabin. The user gets each outbound flight's times, duration, stops, flight numbers, and the price in each fare column. AAdvantage award searches need the user's sign-in and are out of scope. Multi-carrier fare shopping belongs in the Google Flights playbook.
+
+### Fastest path
+
+Load `https://www.aa.com/homePage.do` first, then `browser_navigate` the search deep link in the same tab; cold loads of the deep link often hit a human check. The link redirects to a session-bound `/booking/choose-flights/1` with results. `slices` is a JSON array with one object per direction, and `type=RoundTrip` needs exactly two.
+
+```
+https://www.aa.com/booking/search
+  ?locale=en_US
+  &type={OneWay|RoundTrip}
+  &searchType=Revenue                  # cash fares
+  &adult={ADULTS}                      # seniors count as adults
+  &child={CHILDREN}                    # omit with no children
+  &infantInSeat={INFANTS_IN_SEAT}      # under 2 with a seat; omit if none
+  &cabin=                              # empty, BUSINESS, FIRST, or BUSINESS,FIRST
+  &carriers=ALL
+  &slices=[{"orig":"{ORIGIN}","origNearby":false,"dest":"{DEST}","destNearby":false,"date":"{YYYY-MM-DD}"}]
+```
+
+One-way example.
+
+```
+https://www.aa.com/booking/search?locale=en_US&type=OneWay&searchType=Revenue&adult=1&cabin=&carriers=ALL&slices=%5B%7B%22orig%22:%22DFW%22,%22origNearby%22:false,%22dest%22:%22LGA%22,%22destNearby%22:false,%22date%22:%222026-12-10%22%7D%5D
+```
+
+For a round trip add a second slice with origin and destination swapped and the return date. `cabin` filters only to business and first; any other value shows all cabins, and there is no premium economy filter. aa.com cannot add lap infants before booking, so they are not part of the search. The link also takes `senior` and `youth` counts. Unverified: which ages `child` and `youth` each cover.
+
+### Dispatch snippet
+
+```
+Open https://www.aa.com/homePage.do and wait 3 s, then open https://www.aa.com/booking/search?locale=en_US&type=<OneWay|RoundTrip>&searchType=Revenue&adult=<ADULTS>&child=<CHILDREN>&infantInSeat=<INFANTS IN SEAT>&cabin=<empty, BUSINESS, FIRST, or BUSINESS,FIRST>&carriers=ALL&slices=%5B%7B%22orig%22:%22<ORIGIN>%22,%22origNearby%22:false,%22dest%22:%22<DEST>%22,%22destNearby%22:false,%22date%22:%22<YYYY-MM-DD>%22%7D<round trip: a comma and the same slice with <DEST> and <ORIGIN> swapped and <RETURN>>%5D in the same tab. Omit child or infantInSeat when its count is 0.
+Wait 4 s, then snapshot. Dismiss a Privacy and cookies popup if it shows. If a search form shows instead of results, check it has <ORIGIN>, <DEST>, the dates, the trip type, and the passenger counts; fix any field that differs once and press search once.
+Wait until flight rows with prices appear (up to 10 s), then snapshot. Read the fare column names off the page header, usually Main, Main Extra, and Premium, and include every column shown.
+For each outbound row read depart and arrive times (+1 = next day), duration, stops with connecting airports, flight numbers (AA nnnn), and the price in each column. A sold-out or missing cell is not available.
+If the page says no flights match, report an empty result. If the grid stays empty after the wait, report empty_grid with the URL and stop.
+Return a table sorted by price plus the page URL and one screenshot path. Read only. Never click a fare or Continue.
+If you see Access Denied, Challenge Validation, a captcha, sign-in or password, 2FA, or payment wall, stop and report the URL.
+Ground rules for this Task. A Timeout or a net::ERR_* code from browser_navigate means the box cannot reach that host. Do not retry it, even if the tool result says to, and do not run DNS or connectivity checks. Move to the next source this Task names, or report the code and URL. An HTTP block (403, 419, 429, 503) follows this Task's own rule. Work in the tab you start in. Do not open a second tab, and switch tabs only when a tool result names a page you did not intend. In-page tabs are part of the page. A page script is an async (page) => function: run it with browser_run_code if you hold it. Without it, read rendered text from browser_snapshot or browser_find, read a <script> tag from the HTML that curl fetches in the box shell, and report a field neither yields as unreadable, never visible text in its place. Name the read you used. Snapshot a page state once. After a click, a scroll, or a wait this Task calls for, take one new snapshot. Do not snapshot the same state twice. Report as soon as the stop rule above is met, one line per item, only the fields asked for, no page dumps.
+```
+
+### Read the result
+
+On the domestic routes checked, the columns were Main, Main Extra, and Premium, and with `cabin=BUSINESS` only Premium showed; other routes may show other columns, so take the names from the header. Each cell reads "One way from $X", the cheapest fare in that family. A "more fare options" expander lists the fares inside it, which this search does not open. Prices are per traveler unless the page says total. Round trip pages show outbound rows first; return rows render only after an outbound is picked, which this search must not do.
+
+### When blocked
+
+- Akamai fronts aa.com. A browser that exposes automation gets an "Access Denied" page with a Reference number. A cold load of the deep link in plain Chrome often gets a "Challenge Validation" page asking "Please confirm you're a human"; loading the homepage first avoided it in a live check from a residential connection, not yet from a box.
+- After a block or `empty_grid`, do not dispatch the deep link again. Hand the route to the Google Flights playbook and read American's rows there.
+- If the page asks for a password, 2FA code, captcha, or payment, stop. Do not solve or bypass. Report which wall appeared and the URL it was on.
+
+## American Airlines booking a picked flight
+
+### When to use
+
+The user picked an American Airlines flight, from FlightSearch, a card, or the search section, and none of your tools books it in chat. The parent needs the flight numbers and departure time of each leg, the dates, the fare column, and the adult, child, and seated-infant counts. Children and infants with their own seat go in the search link. aa.com adds lap infants only after booking, so tell the user up front to add them from the trip's Manage reservation page ("Add infant in lap"), or at the airport on some itineraries. Fill `<CHECKOUT LINK>` with the `checkoutUrl` in the user's Book request only when its host is aa.com or a subdomain of it; otherwise leave the slot as is. Fill `<EXTRAS>` as the `flight-booking` skill's extras step says. The subagent selects those fares and stops at the first page that asks for travelers, a sign-in, or payment. The parent fills that page as the `flight-booking` skill says and resumes the same subagent.
+
+The search shows only the cheapest fare in each column, so the subagent selects that fare and reports its name. Name that fare to the user before the payment widget.
+
+### Fastest path
+
+Start from `<CHECKOUT LINK>` when it is filled in; it should open on those exact flights. When it is not filled in, or opens neither a trip summary nor the search page, start the way the search section does, homepage first, with the same route, dates, trip type, and passenger counts. There is no deep link past the results, so selecting the flight and fare takes clicks.
+
+### Dispatch snippet
+
+```
+If <CHECKOUT LINK> is an aa.com link, open it and dismiss any cookie banner. On a trip summary with flights <AA flight numbers> and a <fare column> fare already selected, go to the summary-page line below. On an aa.com search form or results, stay there and skip the Open line. On anything else, also report checkout_link_failed with its URL.
+Open https://www.aa.com/homePage.do and wait 3 s, then open https://www.aa.com/booking/search?locale=en_US&type=<OneWay|RoundTrip>&searchType=Revenue&adult=<ADULTS>&child=<CHILDREN>&infantInSeat=<INFANTS IN SEAT>&cabin=&carriers=ALL&slices=%5B%7B%22orig%22:%22<ORIGIN>%22,%22origNearby%22:false,%22dest%22:%22<DEST>%22,%22destNearby%22:false,%22date%22:%22<YYYY-MM-DD>%22%7D<round trip: a comma and the same slice with <DEST> and <ORIGIN> swapped and <RETURN>>%5D in the same tab. Omit child or infantInSeat when its count is 0.
+If a search form shows, fix what differs and search once. Wait for flight rows (up to 10 s).
+If the outbound row for <AA flight numbers> at <HH:MM> is missing or its <fare column> cell is sold out, report fare_not_available with the URL and stop.
+Click that cell; if fare options open, select the cheapest and report its name. Pick a return row the same way.
+Continue past each summary page.
+Extras, before or after the traveler page: add exactly <EXTRAS> and decline every other offer, upgrade, and insurance. If one won't add, report extra_unavailable with the page's reason and continue.
+Stop at the first page that asks for traveler details, a sign-in, or payment. Report its URL, the fields it shows, the flights and fares selected, each extra's price, and the total shown, with one screenshot path.
+If the total isn't for <ADULTS + CHILDREN + INFANTS IN SEAT> seated travelers or a flight differs from the ones above, report the difference and stop. If you see Access Denied, Challenge Validation, a captcha, password, or 2FA prompt, stop and report the URL.
+Ground rules for this Task. A Timeout or a net::ERR_* code from browser_navigate means the box cannot reach that host. Do not retry it, even if the tool result says to, and do not run DNS or connectivity checks. Move to the next source this Task names, or report the code and URL. An HTTP block (403, 419, 429, 503) follows this Task's own rule. Work in the tab you start in. Do not open a second tab, and switch tabs only when a tool result names a page you did not intend. In-page tabs are part of the page. A page script is an async (page) => function: run it with browser_run_code if you hold it. Without it, read rendered text from browser_snapshot or browser_find, read a <script> tag from the HTML that curl fetches in the box shell, and report a field neither yields as unreadable, never visible text in its place. Name the read you used. Snapshot a page state once. After a click, a scroll, or a wait this Task calls for, take one new snapshot. Do not snapshot the same state twice. Report as soon as the stop rule above is met, one line per item, only the fields asked for, no page dumps.
+```
+
+### When blocked
+
+- Same Akamai tells as the search section.
+- If the passenger page rejects a child's date of birth for the `child` type, the age falls under another type such as `youth`. Report it to the user rather than guessing a type.
+- After a block, a site error, a stop code, or the user skipping a help request, do not dispatch again. Send the user the link the `flight-booking` skill's stopped-booking step names.
+- If the page asks for a password, 2FA code, captcha, or payment, stop. Do not solve or bypass. Report which wall appeared and the URL it was on.
+
+## Working with the subagent
+
+Recipe steps name actions, not tools. A page script, a scroll, or a fill lands on whichever browser tools the subagent holds, and the ground rules say how, so paste the snippet as written. A subagent without a page-script tool reads what the snapshot or a shell fetch shows and names that read in its report.
+
+Fill in every URL you know before you dispatch. A dispatch that changes something on the site (a cart, a booking, a form) never goes out without its URL. A read-only lookup may start from a name and a place when its section allows it. When the Fastest path is a shell call, run it with a short timeout and never queue a second lookup behind it. A failed call follows the section's own rule for that response (a single retry, a fresh key, or stop and report); when the section has no rule for it, or the call hangs, dispatch the subagent at once. When the section says the call is unreliable from the box, dispatch in the same round and stop the subagent with `StopSubagent` if the call returns first. A change to a job in flight goes to the same subagent, with `MessageSubagent` while it runs and `Task` with `resume` after it reports. A fresh dispatch spends rounds finding a tab and re-reading the page before it does anything.

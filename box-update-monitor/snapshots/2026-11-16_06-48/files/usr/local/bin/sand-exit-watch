@@ -1,0 +1,622 @@
+#!/usr/bin/python3
+
+import ctypes
+import errno
+import json
+import os
+import re
+import signal
+import subprocess
+import sys
+import time
+from dataclasses import dataclass
+from enum import Enum, auto
+
+WINDOW_MS_ENV = "SAND_EXIT_WATCH_WINDOW_MS"
+DEFAULT_WINDOW_MS = 60_000
+MAX_COUNT_PER_SIGNATURE = 10_000
+MAX_TELEMETRY_LOG_BYTES = 8 * 1024 * 1024
+
+DAEMON_SUPERVISOR_STOP_GRACE_SECONDS_ENV = (
+    "SAND_EXIT_WATCH_DAEMON_SUPERVISOR_STOP_GRACE_SECONDS"
+)
+DEFAULT_DAEMON_SUPERVISOR_STOP_GRACE_SECONDS = 50
+DAEMON_SUPERVISOR_RESTART_INITIAL_SECONDS = 1
+DAEMON_SUPERVISOR_RESTART_MAXIMUM_SECONDS = 60
+DAEMON_SUPERVISOR_RESTART_RESET_SECONDS = 10 * 60
+IDLE_WAIT_SECONDS = 1.0
+
+CONFIGURATION_ERROR_EXIT_CODE = 78
+USAGE_ERROR_EXIT_CODE = 2
+PERMANENT_LAUNCH_ERRNOS = frozenset((errno.EACCES, errno.ENOENT, errno.ENOEXEC))
+SERVICE_PATTERN = re.compile(r"^[a-z][a-z0-9-]{0,31}$")
+USAGE = (
+    "usage: sand-exit-watch --telemetry-log PATH --exec-owner PID "
+    "[--supervise-owner PID] [--daemon-launcher SERVICE=PATH]..."
+)
+
+KNOWN_BINARIES = frozenset(
+    [
+        "cursor",
+        "cursor-nightly",
+        "cursor-lab",
+        "chrome",
+        "node",
+        "exec-daemon",
+        "xvfb",
+        "xfwm4",
+        "picom",
+        "x11vnc",
+        "websockify",
+        "plank",
+        "thunar",
+        "xfce4-terminal",
+    ]
+)
+
+FAULT_SIGNALS = frozenset(
+    [
+        signal.SIGILL,
+        signal.SIGSEGV,
+        signal.SIGABRT,
+        signal.SIGBUS,
+        signal.SIGFPE,
+        signal.SIGTRAP,
+        signal.SIGSYS,
+        signal.SIGQUIT,
+        signal.SIGXCPU,
+        signal.SIGXFSZ,
+    ]
+)
+
+SIGNAL_ENUM = {
+    signal.SIGILL: "sigill",
+    signal.SIGSEGV: "sigsegv",
+    signal.SIGABRT: "sigabrt",
+    signal.SIGBUS: "sigbus",
+}
+
+
+@dataclass(frozen=True)
+class DaemonLauncher:
+    service: str
+    path: str
+
+
+@dataclass(frozen=True)
+class Arguments:
+    telemetry_log: str
+    exec_owner: int
+    supervise_owner: int | None
+    daemon_launchers: tuple[DaemonLauncher, ...]
+
+
+@dataclass
+class ManagedDaemonSupervisor:
+    launcher: DaemonLauncher
+    process: subprocess.Popen | None = None
+    restart_attempt: int = 0
+    next_start_at_monotonic: float = 0.0
+    started_at_monotonic: float | None = None
+    disabled: bool = False
+
+
+class DaemonSupervisorStopPhase(Enum):
+    ACTIVE = auto()
+    STOPPING = auto()
+    STOPPED = auto()
+
+
+def log(line):
+    print("[sand-exit-watch] %s" % line, file=sys.stderr, flush=True)
+
+
+def best_effort_prctl():
+    # prctl(2) option 15 is PR_SET_NAME and 36 is PR_SET_CHILD_SUBREAPER:
+    # https://github.com/torvalds/linux/blob/v6.15/include/uapi/linux/prctl.h
+    try:
+        libc = ctypes.CDLL(None, use_errno=True)
+        libc.prctl(15, b"sand-exit-watch", 0, 0, 0)
+        libc.prctl(36, 1, 0, 0, 0)
+    except Exception:
+        pass
+
+
+def read_comm(pid):
+    # /proc/<pid>/stat still exists for an unreaped zombie and writes comm (field
+    # 2) in parentheses unescaped, so it is read before waitpid and up to the
+    # last ")": https://man7.org/linux/man-pages/man5/proc_pid_stat.5.html and
+    # https://github.com/torvalds/linux/blob/v6.15/fs/proc/array.c
+    try:
+        with open("/proc/%d/stat" % pid, "rb") as handle:
+            stat = handle.read(4096)
+        start = stat.index(b"(")
+        end = stat.rindex(b")")
+        return stat[start + 1 : end].decode("utf-8", "replace")
+    except Exception:
+        return ""
+
+
+def classify_binary(comm):
+    normalized = comm.strip().lower()
+    return normalized if normalized in KNOWN_BINARIES else "other"
+
+
+def classify_signal(signo):
+    return SIGNAL_ENUM.get(signo, "other")
+
+
+def wait_status_exit_code(code, status):
+    if code == os.CLD_EXITED:
+        return status & 0xFF
+    return 128 + (status & 0x7F)
+
+
+def monotonic_ms():
+    return int(time.monotonic() * 1000)
+
+
+def daemon_supervisor_restart_delay_seconds(attempt: int) -> int:
+    maximum_exponent = DAEMON_SUPERVISOR_RESTART_MAXIMUM_SECONDS.bit_length()
+    return min(
+        DAEMON_SUPERVISOR_RESTART_MAXIMUM_SECONDS,
+        DAEMON_SUPERVISOR_RESTART_INITIAL_SECONDS
+        * (2 ** min(attempt, maximum_exponent)),
+    )
+
+
+class CrashWindow:
+    def __init__(self, telemetry_log, window_ms):
+        self.telemetry_log = telemetry_log
+        self.window_ms = window_ms
+        self.opened_at_ms = None
+        self.counts = {}
+        self.log_full_reported = False
+
+    def record(self, binary, signal_name):
+        if self.opened_at_ms is None:
+            self.opened_at_ms = monotonic_ms()
+        key = (binary, signal_name)
+        self.counts[key] = min(MAX_COUNT_PER_SIGNATURE, self.counts.get(key, 0) + 1)
+
+    def remaining_ms(self):
+        if self.opened_at_ms is None:
+            return None
+        return max(0, self.opened_at_ms + self.window_ms - monotonic_ms())
+
+    def flush_if_due(self):
+        if self.opened_at_ms is not None and self.remaining_ms() == 0:
+            self.flush()
+
+    def flush(self):
+        counts, self.counts, self.opened_at_ms = self.counts, {}, None
+        for (binary, signal_name), count in sorted(counts.items()):
+            record = {
+                "kind": "process_crash",
+                "binary": binary,
+                "signal": signal_name,
+                "count": count,
+            }
+            try:
+                if os.path.exists(self.telemetry_log):
+                    if os.stat(self.telemetry_log).st_size > MAX_TELEMETRY_LOG_BYTES:
+                        if not self.log_full_reported:
+                            self.log_full_reported = True
+                            log("telemetry log over size cap; dropping crash records")
+                        continue
+                with open(self.telemetry_log, "a", encoding="utf-8") as handle:
+                    handle.write(json.dumps(record, sort_keys=True) + "\n")
+            except Exception as error:
+                log("crash record append failed: %r" % (error,))
+
+
+class ExitWatch:
+    def __init__(
+        self,
+        *,
+        telemetry_log: str,
+        exec_owner: int,
+        supervise_owner: int | None,
+        daemon_launchers: tuple[DaemonLauncher, ...],
+        window_ms: int,
+        daemon_supervisor_stop_grace_seconds: int,
+    ):
+        self.supervise_owner = supervise_owner
+        self.lifecycle_owners = {
+            pid for pid in (exec_owner, supervise_owner) if pid is not None
+        }
+        self.daemon_supervisors = {
+            launcher.service: ManagedDaemonSupervisor(launcher)
+            for launcher in daemon_launchers
+        }
+        self.daemon_supervisor_by_pid = {}
+        self.window = CrashWindow(telemetry_log, window_ms)
+        self.daemon_supervisor_stop_signal_pending = False
+        self.daemon_supervisor_stop_phase = DaemonSupervisorStopPhase.ACTIVE
+        self.daemon_supervisor_stop_deadline_monotonic = None
+        self.daemon_supervisor_stop_grace_seconds = daemon_supervisor_stop_grace_seconds
+
+    def end_box_for_owner(self, owner_exit_code):
+        self.signal_running_daemon_supervisors(signal.SIGKILL)
+        self.window.flush()
+        if self.supervise_owner is not None:
+            print(
+                "[start-sand-box] a box lifecycle owner exited (status %d); ending the box"
+                % owner_exit_code,
+                file=sys.stderr,
+                flush=True,
+            )
+            raise SystemExit(1)
+        raise SystemExit(owner_exit_code)
+
+    def end_box_owner_untraceable(self):
+        self.end_box_for_owner(127)
+
+    def record_crash(self, info):
+        if info.si_code in (os.CLD_KILLED, os.CLD_DUMPED):
+            signo = info.si_status
+            if signo in FAULT_SIGNALS:
+                self.window.record(
+                    classify_binary(read_comm(info.si_pid)), classify_signal(signo)
+                )
+
+    def handle_daemon_supervisor_exit(self, info, daemon_supervisor):
+        self.daemon_supervisor_by_pid.pop(info.si_pid, None)
+        exit_code = wait_status_exit_code(info.si_code, info.si_status)
+        if daemon_supervisor.process is not None:
+            daemon_supervisor.process.returncode = (
+                info.si_status if info.si_code == os.CLD_EXITED else -info.si_status
+            )
+        daemon_supervisor.process = None
+        if self.daemon_supervisor_stop_phase != DaemonSupervisorStopPhase.ACTIVE:
+            self.advance_daemon_supervisor_stop()
+            return
+        if exit_code in (USAGE_ERROR_EXIT_CODE, CONFIGURATION_ERROR_EXIT_CODE):
+            daemon_supervisor.disabled = True
+            log(
+                "%s exited with configuration status %d; keeping it down"
+                % (daemon_supervisor.launcher.service, exit_code)
+            )
+            return
+        uptime = (
+            0
+            if daemon_supervisor.started_at_monotonic is None
+            else time.monotonic() - daemon_supervisor.started_at_monotonic
+        )
+        if uptime >= DAEMON_SUPERVISOR_RESTART_RESET_SECONDS:
+            daemon_supervisor.restart_attempt = 0
+        delay_seconds = daemon_supervisor_restart_delay_seconds(
+            daemon_supervisor.restart_attempt
+        )
+        daemon_supervisor.restart_attempt += 1
+        daemon_supervisor.next_start_at_monotonic = time.monotonic() + delay_seconds
+        log(
+            "%s exited with status %d; restarting in %ds"
+            % (daemon_supervisor.launcher.service, exit_code, delay_seconds)
+        )
+
+    def reap_all(self):
+        while True:
+            try:
+                info = os.waitid(os.P_ALL, 0, os.WEXITED | os.WNOWAIT | os.WNOHANG)
+            except ChildProcessError:
+                self.end_box_owner_untraceable()
+            except InterruptedError:
+                continue
+            if info is None:
+                return
+            self.record_crash(info)
+            daemon_supervisor = self.daemon_supervisor_by_pid.get(info.si_pid)
+            was_owner = info.si_pid in self.lifecycle_owners
+            self.lifecycle_owners.discard(info.si_pid)
+            try:
+                os.waitpid(info.si_pid, 0)
+            except (ChildProcessError, InterruptedError):
+                pass
+            if daemon_supervisor is not None:
+                self.handle_daemon_supervisor_exit(info, daemon_supervisor)
+            elif was_owner:
+                self.end_box_for_owner(
+                    wait_status_exit_code(info.si_code, info.si_status)
+                )
+
+    def check_owner_liveness(self):
+        # kill(2) with signal 0 sends nothing but still runs the existence and
+        # permission checks, so EPERM means the pid exists:
+        # https://man7.org/linux/man-pages/man2/kill.2.html
+        for pid in list(self.lifecycle_owners):
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                self.lifecycle_owners.discard(pid)
+                self.end_box_owner_untraceable()
+            except PermissionError:
+                pass
+
+    def signal_running_daemon_supervisors(self, signal_number):
+        for pid in set(self.daemon_supervisor_by_pid):
+            try:
+                os.kill(pid, signal_number)
+            except (ProcessLookupError, PermissionError):
+                pass
+
+    def note_daemon_supervisor_stop_request(self):
+        self.daemon_supervisor_stop_signal_pending = True
+
+    def begin_daemon_supervisor_stop_if_requested(self):
+        if not self.daemon_supervisor_stop_signal_pending:
+            return
+        self.daemon_supervisor_stop_signal_pending = False
+        if self.daemon_supervisor_stop_phase != DaemonSupervisorStopPhase.ACTIVE:
+            return
+        self.daemon_supervisor_stop_phase = DaemonSupervisorStopPhase.STOPPING
+        if not self.daemon_supervisor_by_pid:
+            self.daemon_supervisor_stop_phase = DaemonSupervisorStopPhase.STOPPED
+            log("box shutdown requested; no managed daemon supervisors to stop")
+            return
+        self.daemon_supervisor_stop_deadline_monotonic = (
+            time.monotonic() + self.daemon_supervisor_stop_grace_seconds
+        )
+        log("box shutdown requested; stopping managed daemon supervisors")
+        self.signal_running_daemon_supervisors(signal.SIGTERM)
+
+    def start_daemon_supervisor(self, daemon_supervisor):
+        previous_mask = signal.pthread_sigmask(signal.SIG_UNBLOCK, {signal.SIGCHLD})
+        try:
+            process = subprocess.Popen(
+                [daemon_supervisor.launcher.path],
+                stdin=subprocess.DEVNULL,
+            )
+        except OSError as error:
+            self.begin_daemon_supervisor_stop_if_requested()
+            if self.daemon_supervisor_stop_phase != DaemonSupervisorStopPhase.ACTIVE:
+                return
+            if error.errno in PERMANENT_LAUNCH_ERRNOS:
+                daemon_supervisor.disabled = True
+                log(
+                    "could not start %s: %r; keeping it down"
+                    % (daemon_supervisor.launcher.service, error)
+                )
+                return
+            delay_seconds = daemon_supervisor_restart_delay_seconds(
+                daemon_supervisor.restart_attempt
+            )
+            daemon_supervisor.restart_attempt += 1
+            daemon_supervisor.next_start_at_monotonic = time.monotonic() + delay_seconds
+            log(
+                "could not start %s: %r; retrying in %ds"
+                % (daemon_supervisor.launcher.service, error, delay_seconds)
+            )
+            return
+        except Exception as error:
+            self.begin_daemon_supervisor_stop_if_requested()
+            if self.daemon_supervisor_stop_phase != DaemonSupervisorStopPhase.ACTIVE:
+                return
+            daemon_supervisor.disabled = True
+            log(
+                "could not start %s: unexpected error %r; keeping it down"
+                % (daemon_supervisor.launcher.service, error)
+            )
+            return
+        finally:
+            signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
+        daemon_supervisor.process = process
+        daemon_supervisor.started_at_monotonic = time.monotonic()
+        self.daemon_supervisor_by_pid[process.pid] = daemon_supervisor
+        log(
+            "%s daemon supervisor started as pid %d"
+            % (daemon_supervisor.launcher.service, process.pid)
+        )
+        self.begin_daemon_supervisor_stop_if_requested()
+
+    def start_due_daemon_supervisors(self):
+        self.begin_daemon_supervisor_stop_if_requested()
+        if self.daemon_supervisor_stop_phase != DaemonSupervisorStopPhase.ACTIVE:
+            return
+        now = time.monotonic()
+        for service in sorted(self.daemon_supervisors):
+            if (
+                self.daemon_supervisor_stop_signal_pending
+                or self.daemon_supervisor_stop_phase != DaemonSupervisorStopPhase.ACTIVE
+            ):
+                self.begin_daemon_supervisor_stop_if_requested()
+                break
+            daemon_supervisor = self.daemon_supervisors[service]
+            if (
+                not daemon_supervisor.disabled
+                and daemon_supervisor.process is None
+                and daemon_supervisor.next_start_at_monotonic <= now
+            ):
+                self.start_daemon_supervisor(daemon_supervisor)
+
+    def next_daemon_supervisor_restart_delay_seconds(self):
+        if self.daemon_supervisor_stop_phase != DaemonSupervisorStopPhase.ACTIVE:
+            return None
+        delays = [
+            max(
+                0.0,
+                daemon_supervisor.next_start_at_monotonic - time.monotonic(),
+            )
+            for daemon_supervisor in self.daemon_supervisors.values()
+            if not daemon_supervisor.disabled and daemon_supervisor.process is None
+        ]
+        return None if not delays else min(delays)
+
+    def advance_daemon_supervisor_stop(self):
+        if self.daemon_supervisor_stop_phase != DaemonSupervisorStopPhase.STOPPING:
+            return
+        if not self.daemon_supervisor_by_pid:
+            self.daemon_supervisor_stop_phase = DaemonSupervisorStopPhase.STOPPED
+            self.daemon_supervisor_stop_deadline_monotonic = None
+            log("managed daemon supervisors stopped")
+            return
+        if self.daemon_supervisor_stop_deadline_monotonic is None:
+            return
+        if time.monotonic() < self.daemon_supervisor_stop_deadline_monotonic:
+            return
+        log("shutdown grace expired; forwarding SIGKILL")
+        self.signal_running_daemon_supervisors(signal.SIGKILL)
+        self.daemon_supervisor_stop_deadline_monotonic = None
+
+    def next_wait_seconds(self):
+        waits = [IDLE_WAIT_SECONDS]
+        remaining_ms = self.window.remaining_ms()
+        if remaining_ms is not None:
+            waits.append(remaining_ms / 1000)
+        restart_delay = self.next_daemon_supervisor_restart_delay_seconds()
+        if restart_delay is not None:
+            waits.append(restart_delay)
+        if self.daemon_supervisor_stop_deadline_monotonic is not None:
+            waits.append(
+                max(
+                    0.05,
+                    self.daemon_supervisor_stop_deadline_monotonic - time.monotonic(),
+                )
+            )
+        return max(0.05, min(waits))
+
+    def run(self):
+        signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGCHLD})
+        self.check_owner_liveness()
+        while True:
+            try:
+                self.begin_daemon_supervisor_stop_if_requested()
+                self.reap_all()
+                self.start_due_daemon_supervisors()
+                self.window.flush_if_due()
+                self.advance_daemon_supervisor_stop()
+                try:
+                    signal.sigtimedwait([signal.SIGCHLD], self.next_wait_seconds())
+                except InterruptedError:
+                    pass
+                self.check_owner_liveness()
+            except SystemExit:
+                raise
+            except Exception as error:
+                log("watch iteration failed: %r" % (error,))
+                time.sleep(1)
+
+
+def parse_args(argv):
+    telemetry_log = None
+    exec_owner = None
+    supervise_owner = None
+    daemon_launchers = []
+    daemon_services = set()
+    index = 1
+    while index < len(argv):
+        flag = argv[index]
+        value = argv[index + 1] if index + 1 < len(argv) else None
+        if flag == "--telemetry-log" and value is not None:
+            telemetry_log = value
+        elif flag == "--exec-owner":
+            exec_owner = positive_integer(value)
+        elif flag == "--supervise-owner":
+            supervise_owner = positive_integer(value)
+        elif flag == "--daemon-launcher":
+            launcher = parse_daemon_launcher(value, daemon_services)
+            if launcher is not None:
+                daemon_services.add(launcher.service)
+                daemon_launchers.append(launcher)
+        else:
+            raise SystemExit(USAGE)
+        index += 2
+    if telemetry_log is None or exec_owner is None:
+        raise SystemExit(USAGE)
+    return Arguments(
+        telemetry_log=telemetry_log,
+        exec_owner=exec_owner,
+        supervise_owner=supervise_owner,
+        daemon_launchers=tuple(daemon_launchers),
+    )
+
+
+def parse_daemon_launcher(
+    value: str | None,
+    daemon_services: set[str],
+) -> DaemonLauncher | None:
+    if value is None or "=" not in value:
+        log("ignoring daemon launcher: expected SERVICE=PATH")
+        return None
+
+    service, path = value.split("=", 1)
+    if SERVICE_PATTERN.fullmatch(service) is None:
+        log("ignoring daemon launcher: invalid service name")
+        return None
+    if service in daemon_services:
+        log("ignoring daemon launcher for %s: duplicate service" % service)
+        return None
+    if not os.path.isabs(path):
+        log("ignoring daemon launcher for %s: path is not absolute" % service)
+        return None
+    if not os.path.isfile(path):
+        log("ignoring daemon launcher for %s: path is not a regular file" % service)
+        return None
+    if not os.access(path, os.X_OK):
+        log("ignoring daemon launcher for %s: path is not executable" % service)
+        return None
+
+    return DaemonLauncher(service, path)
+
+
+def positive_integer(value):
+    if value is None or not value.isdigit():
+        raise SystemExit(USAGE)
+    parsed = int(value)
+    if parsed <= 0:
+        raise SystemExit(USAGE)
+    return parsed
+
+
+def positive_environment_integer(env, name, fallback):
+    raw = env.get(name, "")
+    if raw.isdigit():
+        parsed = int(raw)
+        if parsed > 0:
+            return parsed
+    return fallback
+
+
+def parse_window_ms(env):
+    return positive_environment_integer(
+        env,
+        WINDOW_MS_ENV,
+        DEFAULT_WINDOW_MS,
+    )
+
+
+def parse_daemon_supervisor_stop_grace_seconds(env):
+    return positive_environment_integer(
+        env,
+        DAEMON_SUPERVISOR_STOP_GRACE_SECONDS_ENV,
+        DEFAULT_DAEMON_SUPERVISOR_STOP_GRACE_SECONDS,
+    )
+
+
+def main():
+    arguments = parse_args(sys.argv)
+    best_effort_prctl()
+    # Python turns SIGINT into KeyboardInterrupt unless the parent changed it
+    # (https://docs.python.org/3/library/signal.html), and pid 1 receives only
+    # signals it has handlers for (https://man7.org/linux/man-pages/man2/kill.2.html),
+    # so SIG_DFL keeps SIGINT undeliverable to the box's pid 1.
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
+    watcher = ExitWatch(
+        telemetry_log=arguments.telemetry_log,
+        exec_owner=arguments.exec_owner,
+        supervise_owner=arguments.supervise_owner,
+        daemon_launchers=arguments.daemon_launchers,
+        window_ms=parse_window_ms(os.environ),
+        daemon_supervisor_stop_grace_seconds=(
+            parse_daemon_supervisor_stop_grace_seconds(os.environ)
+        ),
+    )
+    signal.signal(
+        signal.SIGTERM,
+        lambda _signum, _frame: watcher.note_daemon_supervisor_stop_request(),
+    )
+    watcher.run()
+
+
+if __name__ == "__main__":
+    main()

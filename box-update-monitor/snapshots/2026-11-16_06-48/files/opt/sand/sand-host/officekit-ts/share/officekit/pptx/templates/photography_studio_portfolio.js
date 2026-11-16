@@ -1,0 +1,660 @@
+#!/usr/bin/env node
+/**
+ * "SIMPLY - Photography Presentation" - 30 slide deck rebuilt with pptxgenjs.
+ * Raster photos in the source deck are re-drawn here as native vector mockups.
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ---------------------------------------------------------------- palette */
+
+const INK = '262626'; // theme accent1 - near black
+const GRAY = '595959'; // theme accent2 - mid gray
+const PALE = 'F2F2F2'; // theme accent3 - off white
+const WHITE = 'FFFFFF';
+
+const HEAD = 'Inter'; // headline face
+const BODY = 'Source Sans Pro'; // running text face
+const ALT = 'Open Sans'; // sub-heading / button face
+
+const W = 13.333; // slide width  (inches)
+const H = 7.5; // slide height (inches)
+
+/* -------------------------------------------------------- shared snippets */
+
+const LOREM = {
+  short: 'Lorem ipsum dolor. ',
+  card: 'Lorem ipsum dolor sita met, adipiscing elit. ',
+  folio: 'Lorem ipsum dolor sita met, adipi scing elit. ipsum dolor sita ipsum',
+  stat: 'Lorem ipsum dolor sit amet, adipiscing',
+  rate: 'Lorem ipsum dolor sit amet, consectetuer adipi scin dolor g elit. adipi',
+  magna: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas, magna',
+  port: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor',
+  mock: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas ipsum dolor sit porttmassa. ',
+  osuere:
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas, magna sed pulvinar osuere, magna',
+  osuere2:
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas, magna sed pulvinar osuere, magna posuere, ',
+  osuere3:
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas, magna sed pulvinar osuere, magna posuere, magna sed',
+  vision:
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing dolor sit amet, consectetuer adipiscing dolor sit amet, consectetuer adipiscing elit. Maecenas, magna sed pulvinar osuere, magna posuere, ',
+  fusce:
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere congue massa. ',
+  fusce2:
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere congue massa. Fusce posuere, ',
+  fusce3:
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere congue massa. Fusce posuere, magna',
+  fusce4:
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere congue massa. Fusce posuere, magna sed pulvinar osuere, posuere',
+  fusce5:
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere congue massa. Fusce posuere, magna sed pulvinar osuere, posuere. ',
+  fusce6:
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere congue massa. Fusce posuere, magna sed pulvinar osuere, posuere congue massa. ',
+  long:
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere congue massa. Fusce posuere, magna sed pulvinar osuere, posuere congue massa. Fusce posuere, magna sed pulvinaposuere congue. ',
+  long2:
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere congue massa. Fusce posuere, magna sed pulvinar osuere, posuere sed pulvinar osuere, posuere congue massa. Fusce posuere, magna sed congue. ',
+  long3:
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere congue massa. Fusce posuere, magna sed pulvinar osuere, posuere sed pulvinar osuere, posuere',
+  long4:
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere congue massa. Fusce posuere, magna sed pulvinar osuere, posuere magna sed pulvinar osuere, posuere magna sed pulvinar osuere, posuere sed pulvinar osuere, posuere congue massa. Fusce posuere, magna sed congue. ',
+  about:
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere congue porttitor congue massa. Fusce posuere congue porttitor congue massa. Fusce posuere congue',
+};
+
+/* ---------------------------------------------------------------- helpers */
+
+/** Flat filled rectangle, no outline. */
+function box(s, x, y, w, h, color, opts) {
+  s.addShape('rect', Object.assign({ x, y, w, h, fill: { color }, line: { type: 'none' } }, opts));
+}
+
+/** The short 0.58" rule that sits above every headline. */
+function rule(s, x, y, color) {
+  box(s, x, y, 0.583, 0.05, color);
+}
+
+/** Inter bold headline. */
+function headline(s, text, x, y, w, h, opts) {
+  opts = opts || {};
+  s.addText(text, {
+    x, y, w, h,
+    fontFace: HEAD, fontSize: opts.size || 32, bold: true,
+    color: opts.color || INK, align: opts.align || 'left', valign: 'top',
+  });
+}
+
+/** 11pt running paragraph (justified, 1.5 line spacing by default). */
+function para(s, text, x, y, w, h, opts) {
+  opts = opts || {};
+  s.addText(text, {
+    x, y, w, h,
+    fontFace: opts.font || BODY, fontSize: opts.size || 11, bold: !!opts.bold,
+    italic: !!opts.italic, color: opts.color || INK,
+    align: opts.align || 'justify', valign: 'top',
+    lineSpacingMultiple: opts.lnSpc === undefined ? 1.5 : opts.lnSpc,
+  });
+}
+
+/** Plain (non line-spaced) label such as "About Us" or "Stage 01". */
+function label(s, text, x, y, w, h, opts) {
+  opts = opts || {};
+  s.addText(text, {
+    x, y, w, h,
+    fontFace: opts.font || ALT, fontSize: opts.size || 14, bold: opts.bold !== false,
+    italic: !!opts.italic, color: opts.color || INK,
+    align: opts.align || 'left', valign: 'top',
+  });
+}
+
+/** Filled square holding a step number ("01", "02", ...). */
+function numberChip(s, text, x, y, size, fill) {
+  s.addText(text, {
+    x, y, w: size, h: size, shape: 'rect', fill: { color: fill }, line: { type: 'none' },
+    fontFace: BODY, fontSize: 14, color: WHITE, align: 'center', valign: 'middle',
+  });
+}
+
+/** Solid call-to-action button. */
+function button(s, text, x, y, w, h, fill, color) {
+  s.addText(text, {
+    x, y, w, h, shape: 'rect', fill: { color: fill }, line: { type: 'none' },
+    fontFace: ALT, fontSize: 12, bold: true, color: color || WHITE,
+    align: 'center', valign: 'middle',
+  });
+}
+
+/**
+ * Header / footer furniture repeated on every slide:
+ * the small square top-right, the "SIMPLY" wordmark and the running footer.
+ */
+function chrome(s, square, mark, footer) {
+  box(s, 12.75, 0, 0.583, 0.583, square);
+  s.addText('SIMPLY', {
+    x: 0.436, y: 0.382, w: 0.761, h: 0.278,
+    fontFace: HEAD, fontSize: 10.5, bold: true, color: mark, valign: 'top', wrap: false,
+  });
+  if (footer) {
+    s.addText('Photography Presentation', {
+      x: 10.938, y: 6.813, w: 1.964, h: 0.338,
+      fontFace: BODY, fontSize: 10.5, color: footer,
+      align: 'right', valign: 'top', lineSpacingMultiple: 1.5,
+    });
+  }
+}
+
+/**
+ * Line-art pictograms used on the "Studio Service" slides. The source deck
+ * stores them as freeform paths; here they are drawn from preset shapes and
+ * straight segments so the file stays vector-only.
+ */
+function icon(s, kind, x, y, w, h, color) {
+  const stroke = { color, width: 1.5 };
+  const outline = { fill: { type: 'none' }, line: stroke };
+  const seg = function (x1, y1, x2, y2, arrow) {
+    s.addShape('line', {
+      x: x1, y: y1, w: x2 - x1, h: y2 - y1,
+      line: arrow ? { color, width: 1.5, endArrowType: 'triangle' } : stroke,
+    });
+  };
+  if (kind === 'plane') {
+    s.addShape('rtTriangle', Object.assign({ x, y, w, h, rotate: 105 }, outline));
+    seg(x + w * 0.62, y + h * 0.18, x + w * 0.2, y + h * 0.68);
+  } else if (kind === 'bell') {
+    s.addShape('flowChartDelay', Object.assign(
+      { x: x + w * 0.1, y: y + h * 0.08, w: w * 0.8, h: h * 0.7, rotate: 270 }, outline));
+    seg(x, y + h * 0.78, x + w, y + h * 0.78);
+    s.addShape('blockArc', Object.assign(
+      { x: x + w * 0.33, y: y + h * 0.76, w: w * 0.34, h: h * 0.3, rotate: 180 }, outline));
+  } else if (kind === 'chart') {
+    seg(x, y, x, y + h);
+    seg(x, y + h, x + w, y + h);
+    seg(x + w * 0.13, y + h * 0.72, x + w * 0.38, y + h * 0.44);
+    seg(x + w * 0.38, y + h * 0.44, x + w * 0.58, y + h * 0.66);
+    seg(x + w * 0.58, y + h * 0.66, x + w * 0.92, y + h * 0.1, true);
+  } else {
+    s.addShape('snip1Rect', Object.assign(
+      { x, y, w, h, rectRadius: 0.3, rotate: 180, flipH: true }, outline));
+    s.addShape('ellipse', {
+      x: x + w * 0.16, y: y + h * 0.16, w: w * 0.16, h: w * 0.16,
+      fill: { color }, line: { type: 'none' },
+    });
+    s.addShape('triangle', {
+      x: x + w * 0.14, y: y + h * 0.44, w: w * 0.7, h: h * 0.38,
+      fill: { color }, line: { type: 'none' },
+    });
+  }
+}
+
+/* ------------------------------------------------- vector device "photos" */
+/* The reference deck embeds three product photographs (tablet / phone /      */
+/* desktop monitor). They are rebuilt below out of preset shapes instead of   */
+/* being embedded as image data.                                              */
+
+function tabletMockup(s, x, y, w, h) {
+  const side = w * 0.1, top = h * 0.088, bottom = h * 0.1;
+  s.addShape('roundRect', {
+    x, y, w, h, fill: { color: '26262A' }, rectRadius: 0.06, line: { type: 'none' },
+  });
+  box(s, x + side, y + top, w - 2 * side, h - top - bottom, WHITE);
+  s.addShape('ellipse', {
+    x: x + w / 2 - 0.03, y: y + top * 0.35, w: 0.06, h: 0.06,
+    fill: { color: '3F3F45' }, line: { type: 'none' },
+  });
+  s.addShape('ellipse', {
+    x: x + w / 2 - 0.06, y: y + h - bottom * 0.72, w: 0.12, h: 0.12,
+    fill: { color: '4A4A50' }, line: { type: 'none' },
+  });
+}
+
+function phoneMockup(s, x, y, w, h) {
+  const bezel = h * 0.127;
+  s.addShape('roundRect', {
+    x, y, w, h, fill: { color: 'BEBEBE' }, rectRadius: 0.085, line: { type: 'none' },
+  });
+  s.addShape('roundRect', {
+    x: x + 0.04, y: y + 0.045, w: w - 0.08, h: h - 0.09,
+    fill: { color: '020202' }, rectRadius: 0.07, line: { type: 'none' },
+  });
+  // brushed-metal highlight running down each side rail
+  box(s, x + 0.07, y + 0.3, 0.035, h - 0.6, 'C8C8C8');
+  box(s, x + w - 0.105, y + 0.3, 0.035, h - 0.6, 'C8C8C8');
+  box(s, x + 0.277, y + bezel, w - 0.57, h - 2 * bezel, '1D2129');
+  s.addShape('roundRect', {
+    x: x + w * 0.35, y: y + 0.53, w: w * 0.3, h: 0.05,
+    fill: { color: '4A4A4A' }, rectRadius: 0.5, line: { type: 'none' },
+  });
+  s.addShape('ellipse', {
+    x: x + w * 0.235, y: y + 0.525, w: 0.07, h: 0.07,
+    fill: { color: '1E2833' }, line: { type: 'none' },
+  });
+}
+
+function monitorMockup(s, x, y, w, h) {
+  const bezel = 0.25;
+  box(s, x, y, w, h, '070707');
+  box(s, x + bezel, y + bezel, w - 2 * bezel, h - 2 * bezel, '232323');
+  s.addShape('ellipse', {
+    x: x + w / 2 - 0.03, y: y + bezel * 0.35, w: 0.06, h: 0.06,
+    fill: { color: '2E2E2E' }, line: { type: 'none' },
+  });
+  box(s, x, y + h, w + 0.132, 0.67, 'C4C5C9');
+  s.addShape('trapezoid', {
+    x: x + w * 0.377, y: y + h + 0.67, w: w * 0.275, h: 0.44,
+    fill: { color: 'BEBFC3' }, line: { type: 'none' },
+  });
+  box(s, x + w * 0.238, y + h + 1.11, w * 0.535, 0.05, '8C8C8C');
+}
+
+/* --------------------------------------------------------------- content  */
+
+const AGENDA = [
+  ['01. About Us', 1.491], ['02. Content', 1.491],
+  ['03. Our Target', 1.491], ['04. Portfolio', 1.647],
+  ['05. Pricing Table', 1.73], ['06. Contact Us', 1.647],
+];
+
+const TEAM5 = ['Taylor Alonso', 'Olivia Wilson', 'Pedro Fernandes', 'Reese Miller', 'Rufus Stewart'];
+
+const PRICES = [
+  ['$ 150.000', 'Regular', INK],
+  ['$ 200.000', 'Medium', GRAY],
+  ['$ 450.000', 'Premium', INK],
+  ['$ 700.000', 'Platinum', GRAY],
+];
+
+const CONTACT = [
+  ['Website', 'www.nameyourwebsite.com', 1.908, 3.45, 1.05, 2.338],
+  ['Telephone', '+999 0000 0000 0000', 4.852, 3.45, 1.455, 1.959],
+  ['Office Address', 'City 001122, Country 001122', 1.908, 4.676, 1.697, 2.338],
+  ['Social Media', '@nameyoursosmed', 4.852, 4.676, 1.455, 1.959],
+];
+
+/* --------------------------------------------------------- slide builders */
+
+function slide01(s) {
+  s.background = { color: INK };
+  chrome(s, GRAY, WHITE, null);
+  s.addText('SIMPLY', {
+    x: 1.051, y: 1.945, w: 4.188, h: 1.363,
+    fontFace: HEAD, fontSize: 75, bold: true, color: WHITE, valign: 'top', wrap: false,
+  });
+  para(s, 'Photography Presentation', 1.072, 1.606, 2.636, 0.372, { size: 12, color: WHITE, align: 'left' });
+  rule(s, 1.197, 3.379, WHITE);
+  para(s, LOREM.osuere, 1.072, 5.209, 4.029, 0.627, { color: WHITE });
+}
+
+function slide02(s) {
+  chrome(s, INK, WHITE, WHITE);
+  rule(s, 7.585, 1.432, INK);
+  headline(s, 'Welcome To Our Simply Studio', 7.481, 1.525, 3.891, 1.178);
+  para(s, LOREM.long, 7.481, 3.332, 4.851, 1.183);
+  para(s, LOREM.osuere3, 1.114, 5.99, 4.851, 0.656);
+}
+
+function slide03(s) {
+  chrome(s, INK, INK, INK);
+  rule(s, 1.274, 1.557, INK);
+  headline(s, 'Content Today', 1.169, 1.65, 3.891, 0.64);
+  box(s, 1.16, 2.875, 6.305, 4.625, INK);
+  AGENDA.forEach(function (item, i) {
+    const x = i % 2 === 0 ? 2.185 : 4.716;
+    const y = 3.567 + Math.floor(i / 2) * 1.254;
+    para(s, item[0], x, y, item[1], 0.372, { size: 12, bold: true, color: WHITE });
+    para(s, LOREM.short, x - 0.005, y + 0.313, 1.736, 0.349, { color: WHITE });
+  });
+}
+
+function slide04(s) {
+  chrome(s, INK, INK, INK);
+  rule(s, 7.585, 1.619, INK);
+  headline(s, 'Studio Vision', 7.481, 1.712, 3.891, 0.64);
+  box(s, 1.326, 1.264, 4.705, 4.705, WHITE);
+  [[2.995, INK], [4.773, GRAY]].forEach(function (row, i) {
+    numberChip(s, '0' + (i + 1), 7.585, row[0], 0.646, row[1]);
+    para(s, LOREM.vision, 8.511, row[0] - 0.083, 3.697, 1.183);
+  });
+}
+
+function slide05(s) {
+  chrome(s, INK, INK, INK);
+  rule(s, 1.274, 1.432, INK);
+  headline(s, 'Studio Mission', 1.169, 1.525, 3.891, 0.64);
+  [INK, GRAY, INK].forEach(function (fill, i) {
+    const y = 2.75 + i * 1.278;
+    numberChip(s, '0' + (i + 1), 1.16, y, 0.646, fill);
+    para(s, LOREM.osuere2, 2.086, y - 0.083, 3.247, 0.934);
+  });
+}
+
+function slide06(s) {
+  chrome(s, INK, INK, WHITE);
+  rule(s, 7.564, 1.494, INK);
+  headline(s, 'What Photography Styles Do We Use?', 7.46, 1.587, 4.477, 1.178);
+  para(s, LOREM.fusce6, 1.112, 4.889, 3.784, 1.183);
+}
+
+function slide07(s) {
+  chrome(s, INK, INK, INK);
+  rule(s, 1.162, 1.515, INK);
+  headline(s, 'Studio Project', 1.058, 1.608, 3.891, 0.64);
+  [INK, GRAY, INK, GRAY].forEach(function (fill, i) {
+    const y = 2.544 + i * 0.965;
+    numberChip(s, '0' + (i + 1), 1.16, y, 0.544, fill);
+    para(s, LOREM.magna, 1.946, y - 0.096, 3.247, 0.627);
+  });
+}
+
+function slide08(s) {
+  chrome(s, INK, INK, WHITE);
+  box(s, 0, 3.778, 0.979, 3.75, INK);
+  rule(s, 1.274, 1.536, INK);
+  headline(s, 'Our Studio Is The Biggest Photo Studio In This City', 1.169, 1.629, 6.185, 1.178);
+  box(s, 8.271, 1.536, 3.882, 3.75, INK);
+  label(s, 'About Us', 8.985, 2.121, 2.452, 0.337, { color: WHITE });
+  para(s, LOREM.about, 8.985, 2.538, 2.452, 2.016, { color: WHITE });
+}
+
+function slide09(s) {
+  chrome(s, INK, INK, INK);
+  rule(s, 1.274, 1.453, INK);
+  headline(s, 'Our Facilities', 1.169, 1.545, 3.122, 0.64);
+  para(s, LOREM.magna, 1.169, 2.287, 3.247, 0.627);
+  [6.771, 9.896].forEach(function (x, i) {
+    label(s, 'Facilities 0' + (i + 1), x, 4.673, 2.25, 0.337);
+    para(s, LOREM.port, x, 5.027, 2.25, 0.905);
+  });
+}
+
+function slide10(s) {
+  chrome(s, INK, INK, INK);
+  rule(s, 7.585, 1.494, INK);
+  headline(s, 'How Do Our Clients Rate?', 7.481, 1.587, 3.891, 1.178);
+  para(s, LOREM.fusce5, 7.481, 3.159, 4.851, 0.905);
+  [[7.481, '84%'], [10.22, '70%']].forEach(function (col) {
+    para(s, col[1], col[0], 4.565, 1.155, 0.572, { size: 28, bold: true, align: 'left', lnSpc: 1 });
+    para(s, LOREM.rate, col[0], 5.133, 1.964, 0.934);
+  });
+}
+
+function slide11(s) {
+  chrome(s, INK, INK, INK);
+  rule(s, 1.274, 1.515, INK);
+  headline(s, 'Why Should You Choose To Use The Services Of Our Photo Studio?', 1.169, 1.608, 6.414, 1.717);
+  para(s, LOREM.fusce4, 1.169, 4.085, 4.564, 0.905);
+  button(s, 'Learn More', 1.264, 5.345, 1.714, 0.606, INK);
+}
+
+function slide12(s) {
+  chrome(s, INK, WHITE, INK);
+  rule(s, 7.585, 1.432, INK);
+  headline(s, 'The Minimalism Style That We Promote', 7.481, 1.525, 3.891, 1.717);
+  para(s, LOREM.fusce4, 7.481, 3.75, 4.686, 0.905);
+  para(s, LOREM.fusce4, 7.481, 5.08, 4.686, 0.905);
+}
+
+function slide13(s) {
+  chrome(s, INK, INK, INK);
+  rule(s, 1.274, 1.515, INK);
+  headline(s, 'Stages in Photography', 1.169, 1.608, 5.497, 0.64);
+  for (let i = 0; i < 6; i++) {
+    const x = [1.169, 4.053, 6.937][i % 3];
+    const y = i < 3 ? 2.797 : 4.721;
+    label(s, 'Stage 0' + (i + 1), x, y, 2.25, 0.337);
+    para(s, LOREM.port, x, y + 0.354, 2.25, 0.905);
+  }
+}
+
+function slide14(s) {
+  chrome(s, INK, INK, INK);
+  rule(s, 1.21, 1.453, INK);
+  headline(s, 'Meet Our Team', 1.106, 1.545, 3.891, 0.64);
+  para(s, LOREM.fusce2, 6.667, 1.515, 5.498, 0.627);
+  TEAM5.forEach(function (name, i) {
+    const x = 1.19 + i * 2.266;
+    box(s, x, 5.286, 1.935, 0.825, i % 2 === 0 ? GRAY : INK);
+    label(s, name, x + 0.008, 5.444, 1.927, 0.303, { size: 12, color: WHITE, align: 'center' });
+    label(s, 'Photographer', x, 5.701, 1.935, 0.269, { size: 10, bold: false, color: WHITE, align: 'center' });
+  });
+}
+
+function slide15(s) {
+  chrome(s, INK, INK, INK);
+  rule(s, 1.274, 1.515, INK);
+  headline(s, 'Meet Our Team', 1.169, 1.608, 3.891, 0.64);
+  [['Reese Miller', 6.667, INK], ['Rufus Stewart', 9.645, GRAY]].forEach(function (card) {
+    box(s, card[1], 5.027, 2.543, 1.084, card[2]);
+    label(s, card[0], card[1] + 0.009, 5.234, 2.534, 0.337, { color: WHITE, align: 'center' });
+    label(s, 'Photographer', card[1], 5.572, 2.543, 0.278, { size: 10.5, bold: false, color: WHITE, align: 'center' });
+  });
+  [['Reese Miller', 2.81], ['Rufus Stewart', 4.726]].forEach(function (row) {
+    label(s, row[0], 1.197, row[1], 3.863, 0.337);
+    para(s, LOREM.fusce3, 1.197, row[1] + 0.355, 3.863, 0.905);
+  });
+}
+
+function slide16(s) {
+  chrome(s, INK, WHITE, INK);
+  headline(s, 'Break', 7.37, 1.366, 4.705, 1.717, { size: 96 });
+  rule(s, 7.537, 1.432, INK);
+  headline(s, 'Slide', 7.37, 2.717, 4.705, 1.717, { size: 96 });
+  para(s, LOREM.long, 7.448, 4.844, 4.851, 1.183);
+}
+
+function slide17(s) {
+  s.background = { color: INK };
+  chrome(s, GRAY, WHITE, WHITE);
+  const cards = [
+    [1.146, PALE, INK, 'plane', 2.32, 0.413],
+    [3.906, GRAY, WHITE, 'bell', 5.095, 0.382],
+    [6.667, PALE, INK, 'chart', 7.811, 0.472],
+    [9.427, GRAY, WHITE, 'image', 10.632, 0.351],
+  ];
+  cards.forEach(function (c, i) {
+    box(s, c[0], 2.632, 2.76, 2.615, c[1]);
+    icon(s, c[3], c[4], 3.113, c[5], 0.413, c[2]);
+    para(s, 'Service 0' + (i + 1), c[0] + 0.397, 3.752, 1.966, 0.303,
+      { size: 12, bold: true, color: c[2], align: 'center', lnSpc: 1 });
+    para(s, LOREM.card, c[0] + 0.397, 4.094, 1.966, 0.656, { color: c[2], align: 'center' });
+  });
+  rule(s, 6.375, 1.432, GRAY);
+  headline(s, 'Studio Service', 4.721, 1.525, 3.891, 0.64, { color: WHITE, align: 'center' });
+  para(s, LOREM.fusce6, 2.717, 5.565, 7.899, 0.627, { color: WHITE, align: 'center' });
+}
+
+function slide18(s) {
+  chrome(s, INK, INK, INK);
+  rule(s, 1.273, 1.494, INK);
+  headline(s, 'Studio Service', 1.168, 1.587, 3.891, 0.64);
+  const cards = [
+    [1.146, 3.75, INK, 'plane', 2.32, 4.196, 0.413],
+    [3.906, 3.75, GRAY, 'bell', 5.095, 4.196, 0.382],
+    [6.667, 1.357, INK, 'chart', 7.811, 1.833, 0.472],
+    [9.427, 1.357, GRAY, 'image', 10.632, 1.804, 0.351],
+  ];
+  cards.forEach(function (c, i) {
+    box(s, c[0], c[1], 2.76, 2.393, c[2]);
+    icon(s, c[3], c[4], c[5], c[6], 0.413, WHITE);
+    para(s, 'Service 0' + (i + 1), c[0] + 0.397, c[1] + 1.002, 1.966, 0.303,
+      { size: 12, bold: true, color: WHITE, align: 'center', lnSpc: 1 });
+    para(s, LOREM.card, c[0] + 0.397, c[1] + 1.303, 1.966, 0.656, { color: WHITE, align: 'center' });
+  });
+  para(s, LOREM.fusce, 1.197, 2.367, 4.699, 0.627);
+  para(s, LOREM.long, 7.448, 4.615, 4.851, 1.183);
+}
+
+function slide19(s) {
+  chrome(s, INK, INK, INK);
+  [[1.146, 1.357, 'plane', 2.32, 1.762, 0.413], [3.906, 3.746, 'image', 5.111, 4.15, 0.351]]
+    .forEach(function (c, i) {
+      box(s, c[0], c[1], 2.76, 2.393, INK);
+      icon(s, c[2], c[3], c[4], c[5], 0.413, WHITE);
+      para(s, 'Service 0' + (i + 1), c[0] + 0.397, c[1] + 0.981, 1.966, 0.303,
+        { size: 12, bold: true, color: WHITE, align: 'center', lnSpc: 1 });
+      para(s, LOREM.card, c[0] + 0.397, c[1] + 1.323, 1.966, 0.656, { color: WHITE, align: 'center' });
+    });
+  rule(s, 8.293, 1.494, INK);
+  headline(s, 'Studio Service', 8.189, 1.587, 3.891, 0.64);
+  para(s, LOREM.long2, 8.189, 2.709, 3.998, 1.46);
+  para(s, LOREM.long2, 8.189, 4.685, 3.998, 1.46);
+}
+
+function slide20(s) {
+  chrome(s, INK, INK, INK);
+  rule(s, 1.273, 1.515, INK);
+  headline(s, 'Our Studio Portfolio', 1.168, 1.608, 3.891, 1.178);
+  para(s, LOREM.long4, 5.918, 1.64, 6.247, 1.183);
+}
+
+function slide21(s) {
+  chrome(s, INK, INK, INK);
+  [[1.587, 1.953], [4.333, 4.297], [7.079, 1.953], [9.824, 4.297]].forEach(function (p, i) {
+    para(s, 'Portfolio 0' + (i + 1), p[0], p[1], 1.966, 0.303,
+      { size: 12, bold: true, align: 'center', lnSpc: 1 });
+    para(s, LOREM.folio, p[0], p[1] + 0.342, 1.966, 0.905, { align: 'center' });
+  });
+}
+
+function slide22(s) {
+  chrome(s, INK, INK, INK);
+  rule(s, 7.585, 1.453, INK);
+  headline(s, 'Studio Portfolio', 7.481, 1.545, 4.707, 0.64);
+  para(s, LOREM.fusce, 7.481, 2.326, 4.707, 0.627);
+}
+
+function slide23(s) {
+  tabletMockup(s, 9.417, 1.417, 2.777, 3.611);
+  chrome(s, INK, INK, INK);
+  rule(s, 1.274, 1.515, INK);
+  headline(s, 'Mockup Section', 1.169, 1.608, 3.891, 0.64);
+  tabletMockup(s, 7.444, 2.528, 2.777, 3.611);
+  for (let i = 0; i < 4; i++) {
+    const y = 2.535 + i * 0.982;
+    para(s, '0' + (i + 1), 1.197, y + 0.019, 0.795, 0.572, { size: 28, bold: true, align: 'left', lnSpc: 1 });
+    para(s, LOREM.mock, 2.062, y, 3.678, 0.627);
+  }
+}
+
+function slide24(s) {
+  chrome(s, INK, INK, INK);
+  rule(s, 7.585, 1.515, INK);
+  headline(s, 'Mockup Section', 7.481, 1.608, 4.269, 0.64);
+  phoneMockup(s, 1.181, 1.375, 4.208, 8.55);
+  para(s, LOREM.long2, 7.481, 2.709, 4.707, 1.183);
+  [4.353, 5.439].forEach(function (y, i) {
+    para(s, '0' + (i + 1), 7.481, y + 0.019, 0.795, 0.572, { size: 28, bold: true, align: 'left', lnSpc: 1 });
+    para(s, LOREM.mock, 8.346, y, 3.678, 0.627);
+  });
+}
+
+function slide25(s) {
+  chrome(s, INK, INK, INK);
+  rule(s, 1.274, 1.515, INK);
+  headline(s, 'Mockup Section', 1.169, 1.608, 2.226, 1.178);
+  monitorMockup(s, 6.081, 1.467, 6.09, 3.47);
+  para(s, LOREM.long2, 1.169, 3.219, 3.247, 1.738);
+  button(s, 'Learn More', 1.264, 5.354, 1.714, 0.606, INK);
+}
+
+function slide26(s) {
+  chrome(s, INK, INK, INK);
+  PRICES.forEach(function (p, i) {
+    const x = 0.997 + i * 2.892;
+    box(s, x, 2.707, 2.69, 3.384, p[2]);
+    para(s, p[0], x + 0.275, 3.06, 2.148, 0.572,
+      { size: 28, bold: true, color: WHITE, align: 'center', lnSpc: 1 });
+    para(s, p[1], x + 0.275, 3.565, 2.148, 0.37,
+      { size: 16, bold: true, italic: true, color: WHITE, align: 'center', lnSpc: 1 });
+    [0, 1].forEach(function (r) {
+      box(s, x + 0.585, 4.295 + r * 0.363, 0.087, 0.087, WHITE);
+      para(s, 'Get Service Class 00' + (r + 1), x + 0.69, 4.2 + r * 0.363, 1.883, 0.278,
+        { size: 10.5, color: WHITE, align: 'left', lnSpc: 1 });
+    });
+    s.addText('Order Now', {
+      x: x + 0.354, y: 5.229, w: 1.991, h: 0.542, shape: 'rect',
+      fill: { color: WHITE }, line: { type: 'none' },
+      fontFace: BODY, fontSize: 14, bold: true, color: p[2], align: 'center', valign: 'middle',
+    });
+  });
+  rule(s, 6.375, 1.39, INK);
+  headline(s, 'Pricing Table', 4.313, 1.483, 4.707, 0.64, { align: 'center' });
+}
+
+/** Number / caption block used by both infographic slides. */
+function statCard(s, x, y, fill, value, caption) {
+  box(s, x, y, 3.039, 2.051, fill);
+  para(s, value, x + 0.089, y + 0.259, 2.861, 0.707,
+    { size: 36, bold: true, color: WHITE, align: 'center', lnSpc: 1 });
+  para(s, caption, x + 0.349, y + 0.825, 2.34, 0.364,
+    { size: 14, color: WHITE, align: 'center', lnSpc: 1.2 });
+  para(s, LOREM.stat, x + 0.354, y + 1.187, 2.33, 0.582,
+    { color: WHITE, align: 'center', lnSpc: 1.3 });
+}
+
+function slide27(s) {
+  chrome(s, INK, INK, INK);
+  rule(s, 1.274, 1.432, INK);
+  headline(s, 'Infographic Section', 1.169, 1.525, 3.643, 1.447, { size: 40 });
+  statCard(s, 9.146, 1.415, INK, '870+', 'Total Clients');
+  statCard(s, 5.167, 2.706, GRAY, '778+', 'Total Clients');
+  statCard(s, 1.188, 3.997, INK, '567+', 'Total Clients');
+  para(s, LOREM.long3, 9.0, 4.627, 3.247, 1.46);
+}
+
+function slide28(s) {
+  chrome(s, INK, INK, INK);
+  statCard(s, 1.188, 4.018, INK, '89%', 'Tittle Here');
+  statCard(s, 5.168, 4.018, GRAY, '75%', 'Tittle Here');
+  statCard(s, 9.148, 4.018, INK, '99%', 'Tittle Here');
+  [4.227, 8.207].forEach(function (x) {
+    s.addShape('line', { x, y: 5.044, w: 0.941, h: 0, line: { color: INK, width: 1 } });
+  });
+  rule(s, 6.375, 1.494, INK);
+  headline(s, 'Infographic Section', 3.688, 1.587, 5.958, 0.64, { align: 'center' });
+  para(s, LOREM.long2, 1.812, 2.568, 9.708, 0.627, { align: 'center' });
+}
+
+function slide29(s) {
+  box(s, 9.833, 0, 3.5, 7.5, INK);
+  chrome(s, GRAY, INK, WHITE);
+  rule(s, 1.274, 1.619, INK);
+  headline(s, 'Contact Us', 1.169, 1.712, 3.891, 0.64);
+  box(s, 1.197, 2.84, 6.278, 3.271, INK);
+  CONTACT.forEach(function (c) {
+    para(s, c[0], c[2], c[3], c[4], 0.303, { size: 12, bold: true, color: WHITE, align: 'left', lnSpc: 1 });
+    [0, 1].forEach(function (r) {
+      para(s, c[1], c[2], c[3] + 0.27 + r * 0.27, c[5], 0.286, { color: WHITE, align: 'left', lnSpc: 1 });
+    });
+  });
+}
+
+function slide30(s) {
+  chrome(s, INK, INK, INK);
+  box(s, 1.189, 1.41, 10.966, 4.705, INK, { fill: { color: INK, transparency: 50 } });
+  rule(s, 6.375, 3.015, WHITE);
+  headline(s, 'THANK YOU', 2.938, 3.108, 7.458, 1.313, { size: 72, color: WHITE, align: 'center' });
+}
+
+const SLIDES = [
+  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
+  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
+  slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29, slide30,
+];
+
+/* ------------------------------------------------------------------ build */
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'WIDE', width: W, height: H });
+  pptx.layout = 'WIDE';
+  pptx.title = 'Simply - Photography Presentation';
+  SLIDES.forEach(function (fn) { fn(pptx.addSlide()); });
+  return pptx.writeFile({
+    fileName: path.join(__dirname, '06615f42-e002-40a7-97cc-d74fe15fd2ed_grok_final.pptx'),
+  });
+}
+
+build().then(function (f) { console.log('wrote ' + f); });
