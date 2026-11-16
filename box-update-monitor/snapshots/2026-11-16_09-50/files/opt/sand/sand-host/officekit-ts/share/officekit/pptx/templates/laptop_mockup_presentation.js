@@ -1,0 +1,735 @@
+/**
+ * "Sleek Mockup" laptop-mockup deck, rebuilt with pptxgenjs.
+ *
+ * 15 slides at 13.333 x 7.5 in.  Dark charcoal radial-gradient background,
+ * Manrope / Manrope Light type, mint (#96FDCB) accent.
+ * Every photograph in the source deck is replaced by a programmatic
+ * placeholder drawn from native shapes (see LAPTOP_ART below).
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ================================================================== theme */
+
+const SLIDE_W = 13.333333; // 12192000 EMU
+const SLIDE_H = 7.5;
+
+const C = {
+	white: 'FFFFFF',
+	mint: '96FDCB', // theme accent1
+	near: '2F343B', // theme tx2 - light corner of the background gradient
+	far: '171A1E', // tx2 @ lumMod 50% - dark corner of the background gradient
+	card: '23272C', // translucent "glass" card fill
+	badge: '2F343A', // icon disc
+	tooltip: 'F2F2F2',
+	tooltipInk: '2F343B',
+	rule: '595959', // divider between the 67/75/89 columns
+	spark: '828589', // sparkline stroke
+	grid: '404040', // chart grid rules
+};
+
+const F_MAJOR = 'Manrope'; // theme major font (headings, numerals)
+const F_MINOR = 'Manrope Light'; // theme minor font (body copy)
+
+/* Placeholder copy, verbatim from the source deck. */
+const T = {
+	short: 'Lorem ipsum dolor sit',
+	amet: 'Lorem ipsum dolor sit amet, consectetuer',
+	sm: 'Lorem ipsum dolor sit amet, adipiscing elit. Aenean commodo',
+	cons: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. ',
+	consAenean: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean',
+	consCommodo: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo',
+	consEget: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget',
+	adipLong: 'Lorem ipsum dolor sit amet, adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. ',
+	consLong: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa.',
+};
+
+/* ================================================= low level draw helpers */
+
+/** Linear blend between two "RRGGBB" strings. */
+function mix(from, to, t) {
+	const rgb = (h) => [0, 2, 4].map((i) => parseInt(h.substr(i, 2), 16));
+	const a = rgb(from);
+	const b = rgb(to);
+	return a
+		.map((v, i) => Math.round(v + (b[i] - v) * t))
+		.map((v) => v.toString(16).padStart(2, '0').toUpperCase())
+		.join('');
+}
+
+/**
+ * The deck's master background is a radial gradient (dark at the top-left,
+ * lighter at the bottom-right).  pptxgenjs has no gradient API, so it is
+ * approximated with banded stripes laid perpendicular to that diagonal.
+ */
+function backgroundBands() {
+	const angle = 50.9; // diagonal direction of a 13.333 x 7.5 slide
+	const count = 22;
+	const rad = (angle * Math.PI) / 180;
+	const reach = SLIDE_W * Math.cos(rad) + SLIDE_H * Math.sin(rad);
+	const thick = reach / count;
+	const long = 24; // longer than the slide diagonal so bands always cover it
+	const bands = [];
+	for (let i = 0; i < count; i++) {
+		const d = (i + 0.5) * thick;
+		bands.push({
+			rect: {
+				x: d * Math.cos(rad) - long / 2,
+				y: d * Math.sin(rad) - thick / 2,
+				w: long,
+				h: thick,
+				rotate: angle - 90,
+				fill: { color: mix(C.far, C.near, (i + 0.5) / count) },
+				line: { type: 'none' },
+			},
+		});
+	}
+	return bands;
+}
+
+/** Closed polygon from a flat [x0,y0, x1,y1, ...] list of 0..1 fractions. */
+function polygon(slide, box, color, frac) {
+	const pts = [];
+	for (let i = 0; i < frac.length; i += 2) {
+		pts.push({ x: frac[i] * box.w, y: frac[i + 1] * box.h });
+	}
+	pts.push({ close: true });
+	slide.addShape('custGeom', {
+		x: box.x, y: box.y, w: box.w, h: box.h, rotate: box.rotate,
+		fill: { color }, line: { type: 'none' }, points: pts,
+	});
+}
+
+/* =================================================== text style shortcuts */
+
+/** 54pt Manrope display heading, 110% leading. */
+function heading(slide, text, x, y, w, o = {}) {
+	slide.addText(text, {
+		x, y, w, h: o.h || 2.05, fontFace: F_MAJOR, fontSize: 54, color: C.white,
+		align: o.align || 'left', valign: 'top', lineSpacingMultiple: 1.1, rotate: o.rotate,
+	});
+}
+
+/** Mint eyebrow that sits above every heading. */
+function eyebrow(slide, x, y, o = {}) {
+	slide.addText('For a brighter future.', {
+		x, y, w: 4.016, h: 0.337, fontFace: F_MAJOR, fontSize: 14, color: C.mint,
+		align: o.align || 'left', valign: 'top', rotate: o.rotate,
+	});
+}
+
+/** 14pt Manrope Light body copy, 130% leading, 8pt space-before. */
+function body(slide, text, x, y, w, h, o = {}) {
+	slide.addText(text, {
+		x, y, w, h, fontFace: F_MINOR, fontSize: o.fontSize || 14, color: o.color || C.white,
+		align: o.align || 'left', valign: 'top', paraSpaceBefore: 8,
+		lineSpacingMultiple: o.lineSpacing === undefined ? 1.3 : o.lineSpacing,
+	});
+}
+
+/** 24pt Manrope numeral ("01", "67%", "853+"). */
+function stat(slide, text, x, y, w, o = {}) {
+	slide.addText(text, {
+		x, y, w, h: 0.505, fontFace: F_MAJOR, fontSize: 24, color: o.color || C.mint,
+		align: o.align || 'left', valign: 'top', paraSpaceBefore: 8,
+	});
+}
+
+/** 16pt Manrope card sub-heading. */
+function cardTitle(slide, text, x, y, w, align) {
+	slide.addText(text, {
+		x, y, w, h: 0.37, fontFace: F_MAJOR, fontSize: 16, color: C.white,
+		align: align || 'left', valign: 'top', paraSpaceBefore: 8,
+	});
+}
+
+/* ======================================================= reusable objects */
+
+/** Translucent charcoal "glass" card.  `adj` is the PowerPoint roundRect adj. */
+function card(slide, x, y, w, h, adj) {
+	slide.addShape('roundRect', {
+		x, y, w, h,
+		rectRadius: (adj === undefined ? 0.16667 : adj) * Math.min(w, h),
+		fill: { color: C.card, transparency: 5 },
+		line: { type: 'none' },
+	});
+}
+
+/**
+ * Flat vector icons standing in for the deck's SVG glyphs.  Every part is a
+ * polygon `p` (or ellipse `e`) in 0..1 icon-box coordinates; `c: 0` marks the
+ * parts painted in the background colour so they read as cut-outs.
+ */
+const ICON_ART = {
+	note: [ // rounded note tile with a pencil stroke cut out of it
+		{ r: [0.0, 0.0, 1.0, 1.0, 0.26] },
+		{ p: [0.62, 1.0, 0.62, 0.62, 1.0, 0.62], c: 0 },
+		{ p: [0.17, 0.75, 0.72, 0.10, 0.86, 0.22, 0.31, 0.87], c: 0 },
+		{ p: [0.17, 0.75, 0.31, 0.87, 0.14, 0.90], c: 0 },
+	],
+	people: [ // three-person group
+		{ e: [0.02, 0.10, 0.28, 0.28] }, { e: [0.70, 0.10, 0.28, 0.28] },
+		{ e: [0.34, 0.26, 0.32, 0.32] },
+		{ p: [0.0, 0.66, 0.06, 0.44, 0.26, 0.44, 0.32, 0.66] },
+		{ p: [0.68, 0.66, 0.74, 0.44, 0.94, 0.44, 1.0, 0.66] },
+		{ p: [0.24, 0.92, 0.30, 0.64, 0.70, 0.64, 0.76, 0.92] },
+	],
+	check: [{ p: [0.10, 0.46, 0.22, 0.34, 0.40, 0.52, 0.78, 0.14, 0.90, 0.26, 0.40, 0.76] }],
+	arrowNE: [{ p: [0.30, 0.14, 0.86, 0.14, 0.86, 0.70, 0.72, 0.70, 0.72, 0.38, 0.24, 0.86, 0.14, 0.76, 0.62, 0.28, 0.30, 0.28] }],
+	briefcase: [
+		{ p: [0.38, 0.22, 0.62, 0.22, 0.62, 0.40, 0.53, 0.40, 0.53, 0.31, 0.47, 0.31, 0.47, 0.40, 0.38, 0.40] },
+		{ p: [0.14, 0.38, 0.86, 0.38, 0.86, 0.78, 0.14, 0.78] },
+		{ p: [0.14, 0.55, 0.86, 0.55, 0.86, 0.62, 0.14, 0.62], c: 0 },
+	],
+	megaphone: [
+		{ p: [0.10, 0.42, 0.48, 0.24, 0.48, 0.76, 0.10, 0.58] },
+		{ p: [0.48, 0.18, 0.60, 0.14, 0.60, 0.86, 0.48, 0.82] },
+		{ p: [0.18, 0.56, 0.30, 0.56, 0.27, 0.88, 0.18, 0.88] },
+		{ p: [0.70, 0.30, 0.88, 0.24, 0.90, 0.32, 0.72, 0.38] },
+		{ p: [0.72, 0.46, 0.90, 0.46, 0.90, 0.54, 0.72, 0.54] },
+		{ p: [0.72, 0.62, 0.90, 0.68, 0.88, 0.76, 0.70, 0.70] },
+	],
+	monitor: [
+		{ p: [0.02, 0.10, 0.98, 0.10, 0.98, 0.66, 0.02, 0.66] },
+		{ p: [0.40, 0.66, 0.60, 0.66, 0.60, 0.86, 0.40, 0.86] },
+		{ p: [0.24, 0.86, 0.76, 0.86, 0.76, 0.96, 0.24, 0.96] },
+	],
+};
+
+/** Draws one ICON_ART entry inside the square (x, y, d). */
+function icon(slide, name, x, y, d, fg, bg) {
+	ICON_ART[name].forEach((part) => {
+		const color = part.c === 0 ? bg : fg;
+		if (part.e) {
+			slide.addShape('ellipse', {
+				x: x + part.e[0] * d, y: y + part.e[1] * d, w: part.e[2] * d, h: part.e[3] * d,
+				fill: { color }, line: { type: 'none' },
+			});
+		} else if (part.r) {
+			slide.addShape('roundRect', {
+				x: x + part.r[0] * d, y: y + part.r[1] * d, w: part.r[2] * d, h: part.r[3] * d,
+				rectRadius: part.r[4] * d, fill: { color }, line: { type: 'none' },
+			});
+		} else {
+			polygon(slide, { x, y, w: d, h: d }, color, part.p);
+		}
+	});
+}
+
+/** Icon badge: soft disc with a small icon centred on it. */
+function badge(slide, x, y, size, name, o = {}) {
+	slide.addShape('ellipse', {
+		x, y, w: size, h: size, fill: { color: C.badge }, line: { type: 'none' },
+	});
+	const d = size * (o.scale || 0.38);
+	icon(slide, name, x + (size - d) / 2, y + (size - d) / 2, d, o.color || C.mint, C.badge);
+}
+
+/** Ring gauge: faint full circle plus a mint value arc with a rounded tip. */
+function ring(slide, x, y, size, endAngle, label) {
+	slide.addShape('ellipse', {
+		x, y, w: size, h: size,
+		fill: { type: 'none' }, line: { color: C.white, width: 3, transparency: 86 },
+	});
+	slide.addShape('arc', {
+		x, y, w: size, h: size, angleRange: [270, endAngle],
+		line: { color: C.mint, width: 3, endArrowType: 'oval' },
+	});
+	slide.addText(label, {
+		x: x + 0.2, y: y + size / 2 - 0.2, w: size - 0.4, h: 0.4,
+		fontFace: F_MAJOR, fontSize: 18, color: C.mint,
+		align: 'center', valign: 'middle', margin: 0,
+	});
+}
+
+/**
+ * The five laptop photographs in the source deck, redrawn as flat polygons.
+ * Each entry is [fill, [x0,y0, x1,y1, ...]] with coordinates as fractions of
+ * the placeholder box, painted back to front.
+ */
+const LAPTOP_ART = {
+	// head-on laptop, lid open.  The display is a hollow frame in the original
+	// artwork, so only the bezel and the base are painted.
+	front: [
+		['0B0C0D', [0.09, 0.000, 0.91, 0.000, 0.91, 0.058, 0.09, 0.058]],
+		['141517', [0.09, 0.058, 0.12, 0.058, 0.12, 0.874, 0.09, 0.874]],
+		['141517', [0.88, 0.058, 0.91, 0.058, 0.91, 0.874, 0.88, 0.874]],
+		['0B0C0D', [0.09, 0.874, 0.91, 0.874, 0.91, 0.928, 0.09, 0.928]],
+		['CECFD2', [0.00, 0.932, 1.00, 0.932, 1.00, 0.968, 0.00, 0.968]],
+		['9EA0A4', [0.44, 0.955, 0.56, 0.955, 0.56, 0.968, 0.44, 0.968]],
+		['64656B', [0.02, 0.968, 0.98, 0.968, 0.95, 0.995, 0.05, 0.995]],
+	],
+	// laptop floating at an angle, lid nearly flat, seen from the lower left
+	angled: [
+		['C6C7C9', [0.55, 0.67, 0.66, 0.75, 0.06, 1.00, 0.00, 0.96]], // open base
+		['3B3C3E', [0.52, 0.69, 0.61, 0.75, 0.23, 0.91, 0.15, 0.86]], // keyboard deck
+		['9FA0A2', [0.52, 0.66, 0.99, 0.53, 0.99, 0.58, 0.52, 0.71]], // hinge edge
+		['D4D4D4', [0.52, 0.32, 0.99, 0.02, 0.99, 0.55, 0.52, 0.69]], // display
+	],
+	// dark laptop shot straight from above: screen top, keyboard bottom
+	topDark: [
+		['24262A', [0.06, 0.00, 0.94, 0.01, 0.94, 0.46, 0.05, 0.46]],
+		['6C6E70', [0.00, 0.465, 1.00, 0.475, 0.94, 0.53, 0.06, 0.52]],
+		['4B4B4C', [0.06, 0.52, 0.94, 0.53, 0.94, 0.99, 0.06, 0.99]],
+		['2C2C2D', [0.10, 0.56, 0.90, 0.565, 0.88, 0.78, 0.12, 0.775]],
+		['3E3E3F', [0.36, 0.82, 0.64, 0.825, 0.64, 0.96, 0.36, 0.955]],
+	],
+	// silver laptop from above, tilted a few degrees
+	topSilver: [
+		['343434', [0.01, 0.16, 0.93, 0.01, 0.98, 0.02, 0.93, 0.23, 0.80, 0.29, 0.12, 0.38]],
+		['D0D2D3', [0.13, 0.39, 0.90, 0.28, 0.99, 0.85, 0.23, 0.99]],
+		['3C3C3E', [0.20, 0.45, 0.86, 0.35, 0.90, 0.62, 0.25, 0.73]],
+		['E4E5E6', [0.31, 0.78, 0.58, 0.74, 0.62, 0.92, 0.34, 0.96]],
+	],
+	// three-quarter view of an open white laptop resting on a desk
+	open34: [
+		['2E2E30', [0.62, 0.00, 0.65, 0.07, 0.68, 0.57, 0.99, 0.75, 0.99, 0.77, 0.33, 0.99, 0.06, 0.74, 0.00, 0.11]],
+		['F3F3F3', [0.01, 0.11, 0.62, 0.02, 0.67, 0.54, 0.06, 0.69]],
+		['C6C5C5', [0.66, 0.58, 0.99, 0.77, 0.32, 0.98, 0.07, 0.75]],
+		['595858', [0.64, 0.61, 0.67, 0.72, 0.31, 0.82, 0.17, 0.74]],
+		['E2E1E1', [0.40, 0.86, 0.60, 0.81, 0.66, 0.87, 0.45, 0.93]],
+	],
+};
+
+/**
+ * Draws a stand-in for one of the deck's photographs: the laptop silhouette
+ * plus a small "[image]" caption so the substitution stays obvious.
+ */
+function imagePlaceholder(slide, box) {
+	LAPTOP_ART[box.kind].forEach((part) => polygon(slide, box, part[0], part[1]));
+	const left = Math.max(0.1, box.x);
+	const right = Math.min(SLIDE_W - 0.1, box.x + box.w);
+	const cy = Math.min(SLIDE_H - 0.5, Math.max(0.1, box.y + box.h / 2));
+	slide.addText('[image]', {
+		x: (left + right) / 2 - 0.6, y: cy - 0.16, w: 1.2, h: 0.32,
+		fontFace: F_MINOR, fontSize: 9, color: '9BA0A5',
+		align: 'center', valign: 'middle', margin: 0,
+	});
+}
+
+/** 67% / 75% / 89% figure strip (slides 4 and 8). */
+function statStrip(slide, x, y) {
+	card(slide, x, y, 5.739, 1.58, 0.18645);
+	[
+		{ dx: 0.36, value: '67%', label: 'Innovation' },
+		{ dx: 2.133, value: '75%', label: 'Strategy' },
+		{ dx: 3.906, value: '89%', label: 'Adaptability' },
+	].forEach((col, i) => {
+		stat(slide, col.value, x + col.dx, y + 0.367, 1.487, { align: 'center' });
+		body(slide, col.label, x + col.dx - 0.123, y + 0.878, 1.718, 0.337,
+			{ align: 'center', lineSpacing: 1.0 });
+		if (i > 0) {
+			slide.addShape('line', {
+				x: x + col.dx - 0.377, y: y + 0.452, w: 0, h: 0.678,
+				line: { color: C.rule, width: 0.75 },
+			});
+		}
+	});
+}
+
+/** "01 / 02" card with a title and a paragraph (slides 5, 11 and 14). */
+function numberedCard(slide, o) {
+	card(slide, o.x, o.y, 3.844, 1.646);
+	stat(slide, o.num, o.numX, o.y + 0.571, 0.766);
+	cardTitle(slide, o.title, o.textX, o.y + 0.257, 2.758, o.align);
+	body(slide, T.cons, o.textX, o.y + 0.702, 2.758, 0.689, { align: o.align });
+}
+
+/* ================================================================= slides */
+
+function slide1(pptx) {
+	const s = pptx.addSlide({ masterName: 'BASE' });
+	imagePlaceholder(s, { kind: 'front', x: 2.086, y: 2.35, w: 11.267, h: 6.5 });
+
+	// title block rotated to read bottom-to-top along the left edge
+	heading(s, 'Sleek Mockup', -1.137, 3.42, 5.625, { h: 1.05, rotate: 270 });
+	eyebrow(s, -0.941, 4.581, { rotate: 270 });
+
+	[
+		{ badgeX: 3.43, textX: 4.478, icon: 'note' },
+		{ badgeX: 8.373, textX: 9.421, icon: 'people' },
+	].forEach((item) => {
+		badge(s, item.badgeX, 0.881, 0.803, item.icon, { scale: 0.33 });
+		body(s, T.sm, item.textX, 0.938, 3.162, 0.689);
+	});
+}
+
+function slide2(pptx) {
+	const s = pptx.addSlide({ masterName: 'BASE' });
+	imagePlaceholder(s, { kind: 'front', x: 7.272, y: 1.272, w: 8.954, h: 5.166 });
+
+	eyebrow(s, 0.75, 0.787);
+	heading(s, 'Realistic Laptop Mockup', 0.75, 1.091, 5.712);
+
+	// chart panel: rounded card plus the small tab that hangs off the left edge
+	card(s, 1.67, 3.525, 5.29, 3.011, 0.0784);
+	s.addShape('custGeom', {
+		x: -0.017, y: 3.525, w: 1.45, h: 3.011,
+		fill: { color: C.card, transparency: 5 }, line: { type: 'none' },
+		points: [
+			{ x: 0, y: 0 }, { x: 1.152, y: 0 },
+			{ x: 1.45, y: 0.298, curve: { type: 'cubic', x1: 1.317, y1: 0, x2: 1.45, y2: 0.133 } },
+			{ x: 1.45, y: 2.713 },
+			{ x: 1.152, y: 3.011, curve: { type: 'cubic', x1: 1.45, y1: 2.878, x2: 1.317, y2: 3.011 } },
+			{ x: 0, y: 3.011 }, { close: true },
+		],
+	});
+
+	icon(s, 'monitor', 0.523, 4.837, 0.388, C.white, C.card);
+
+	// five horizontal grid rules behind the sparkline
+	for (let i = 0; i < 5; i++) {
+		s.addShape('line', {
+			x: 2.159, y: 3.987 + i * 0.4384, w: 4.012, h: 0,
+			line: { color: C.grid, width: 0.75, transparency: 20 },
+		});
+	}
+	s.addShape('custGeom', {
+		x: 2.159, y: 3.905, w: 4.012, h: 1.561,
+		fill: { type: 'none' }, line: { color: C.spark, width: 2 },
+		points: sparkline(4.012, 1.561),
+	});
+
+	// "USD 596" tooltip, its pointer, and the marker dot on the curve
+	s.addShape('roundRect', {
+		x: 2.912, y: 4.056, w: 1.385, h: 0.509, rectRadius: 0.1,
+		fill: { color: C.tooltip }, line: { type: 'none' },
+	});
+	s.addShape('triangle', {
+		x: 3.533, y: 4.565, w: 0.143, h: 0.087, rotate: 180,
+		fill: { color: C.tooltip }, line: { type: 'none' },
+	});
+	s.addText('USD 596', {
+		x: 3.025, y: 4.126, w: 1.158, h: 0.37, fontFace: F_MINOR, fontSize: 16,
+		color: C.tooltipInk, align: 'center', valign: 'top', margin: 0,
+	});
+	s.addShape('ellipse', {
+		x: 3.536, y: 4.766, w: 0.206, h: 0.21, fill: { color: C.mint }, line: { type: 'none' },
+	});
+
+	['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'].forEach((month, i) => {
+		s.addText(month, {
+			x: 1.873 + i * 0.638, y: 5.85, w: 0.676, h: 0.303,
+			fontFace: F_MINOR, fontSize: 12, color: C.white,
+			align: 'center', valign: 'top', margin: 0,
+		});
+	});
+}
+
+/** Cubic-bezier control points of the slide-2 sparkline (0..1 fractions). */
+function sparkline(w, h) {
+	const seq = [
+		0.0482, 0.1772, 0.0963, 0.0955, 0.1253, 0.0920,
+		0.1544, 0.0885, 0.1553, 0.2233, 0.1741, 0.2381,
+		0.1929, 0.2529, 0.2147, 0.1181, 0.2382, 0.1807,
+		0.2616, 0.2433, 0.2936, 0.5425, 0.3148, 0.6138,
+		0.3359, 0.6852, 0.3512, 0.5773, 0.3649, 0.6086,
+		0.3786, 0.6399, 0.3888, 0.7495, 0.3969, 0.8017,
+		0.4051, 0.8539, 0.4071, 0.9000, 0.4136, 0.9217,
+		0.4201, 0.9435, 0.4271, 0.9295, 0.4359, 0.9322,
+		0.4448, 0.9348, 0.4559, 1.0800, 0.4666, 0.9374,
+		0.4773, 0.7947, 0.4861, 0.2207, 0.5000, 0.0764,
+		0.5139, -0.0680, 0.5346, 0.0772, 0.5501, 0.0711,
+		0.5501, 0.0711, 0.5745, -0.0654, 0.5933, 0.0398,
+		0.6121, 0.1451, 0.6416, 0.6017, 0.6630, 0.7026,
+		0.6843, 0.8034, 0.7080, 0.6347, 0.7214, 0.6452,
+		0.7349, 0.6556, 0.7314, 0.7286, 0.7437, 0.7652,
+		0.7560, 0.8017, 0.7744, 0.9356, 0.7953, 0.8643,
+		0.8162, 0.7930, 0.8463, 0.3581, 0.8691, 0.3373,
+		0.8918, 0.3164, 0.9136, 0.6834, 0.9318, 0.7391,
+		0.9499, 0.7947, 0.9663, 0.6695, 0.9777, 0.6712,
+		0.9891, 0.6730, 0.9945, 0.7112, 1.0000, 0.7495,
+	];
+	const pts = [{ x: 0, y: 0.259 * h }];
+	for (let i = 0; i < seq.length; i += 6) {
+		pts.push({
+			x: seq[i + 4] * w, y: seq[i + 5] * h,
+			curve: {
+				type: 'cubic',
+				x1: seq[i] * w, y1: seq[i + 1] * h,
+				x2: seq[i + 2] * w, y2: seq[i + 3] * h,
+			},
+		});
+	}
+	return pts;
+}
+
+function slide3(pptx) {
+	const s = pptx.addSlide({ masterName: 'BASE' });
+	imagePlaceholder(s, { kind: 'angled', x: 4.126, y: 0.811, w: 5.428, h: 5.854 });
+
+	eyebrow(s, 0.75, 1.242);
+	heading(s, 'Floating Laptop Mockup', 0.75, 1.547, 5.807);
+	cardTitle(s, T.short, 0.75, 4.302, 4.25);
+	body(s, T.consEget, 0.75, 4.8, 4.25, 0.689);
+
+	[
+		{ y: 1.095, textY: 2.811, end: 132.07, label: '67%' },
+		{ y: 4.0, textY: 5.717, end: 56.01, label: '45%' },
+	].forEach((g) => {
+		ring(s, 10.605, g.y, 1.478, g.end, g.label);
+		body(s, T.amet, 10.218, g.textY, 2.253, 0.689, { align: 'center' });
+	});
+}
+
+function slide4(pptx) {
+	const s = pptx.addSlide({ masterName: 'BASE' });
+	imagePlaceholder(s, { kind: 'front', x: -3.07, y: 1.768, w: 7.209, h: 4.159 });
+	imagePlaceholder(s, { kind: 'front', x: 9.266, y: 1.768, w: 7.209, h: 4.159 });
+
+	eyebrow(s, 4.659, 1.03, { align: 'center' });
+	heading(s, 'Laptop with Dark UI', 4.473, 1.282, 4.388, { align: 'center' });
+	statStrip(s, 3.797, 3.766);
+	body(s, T.sm, 5.085, 5.781, 3.162, 0.689, { align: 'center' });
+}
+
+function slide5(pptx) {
+	const s = pptx.addSlide({ masterName: 'BASE' });
+	imagePlaceholder(s, { kind: 'topDark', x: 7.462, y: 0.072, w: 5.676, h: 7.686, rotate: 12.5 });
+
+	eyebrow(s, 0.75, 1.346);
+	heading(s, 'Laptop with Reflections', 0.75, 1.651, 5.807);
+
+	card(s, 4.766, 4.507, 3.844, 1.646);
+	[
+		{ num: '01', numX: 0.75, textX: 1.516 },
+		{ num: '02', numX: 4.984, textX: 5.75 },
+	].forEach((col) => {
+		stat(s, col.num, col.numX, 5.078, 0.766);
+		cardTitle(s, 'Innovation', col.textX, 4.764, 2.758);
+		body(s, T.cons, col.textX, 5.209, 2.758, 0.689);
+	});
+}
+
+function slide6(pptx) {
+	const s = pptx.addSlide({ masterName: 'BASE' });
+	[-1.104, 2.139, 5.382].forEach((y, i) => {
+		imagePlaceholder(s, {
+			kind: 'front', x: 7.585 + i * 0.716, y, w: 5.068, h: 2.924, rotate: 347.56,
+		});
+	});
+
+	eyebrow(s, 0.75, 1.163);
+	heading(s, 'Floating Laptop Mockup', 0.75, 1.468, 5.807);
+	s.addText('The Essence of Business Success:', {
+		x: 0.75, y: 4.425, w: 5.089, h: 0.404, fontFace: F_MAJOR, fontSize: 18,
+		color: C.mint, valign: 'top', paraSpaceBefore: 8,
+	});
+
+	[
+		{ x: 0.75, y: 5.152, text: 'In today\u2019s fast-paced world' },
+		{ x: 0.75, y: 5.584, text: 'Businesses embrace' },
+		{ x: 0.75, y: 6.015, text: 'Optimize processes' },
+		{ x: 4.266, y: 5.152, text: 'Long-term success' },
+		{ x: 4.266, y: 5.584, text: 'Delivering value expectations' },
+	].forEach((b) => {
+		badge(s, b.x, b.y, 0.308, 'check', { scale: 0.45 });
+		body(s, b.text, b.x + 0.362, b.y - 0.014, 2.99, 0.337, { lineSpacing: 1.0 });
+	});
+}
+
+function slide7(pptx) {
+	const s = pptx.addSlide({ masterName: 'BASE' });
+	imagePlaceholder(s, { kind: 'open34', x: 0.653, y: 1.498, w: 6.613, h: 5.325 });
+
+	eyebrow(s, 5.851, 0.871);
+	heading(s, 'Laptop on Desk', 5.851, 1.176, 6.343, { h: 1.05 });
+	s.addText('Sleek Mockup for Stunning Presentation', {
+		x: 5.851, y: 2.888, w: 2.875, h: 0.707, fontFace: F_MAJOR, fontSize: 18,
+		color: C.white, valign: 'top', paraSpaceBefore: 8,
+	});
+
+	[2.637, 4.932].forEach((y) => {
+		card(s, 9.151, y, 3.432, 1.818, 0.12787);
+		badge(s, 11.814, y + 0.215, 0.529, 'arrowNE', { scale: 0.31 });
+		body(s, T.consAenean, 9.392, y + 0.608, 2.227, 0.995);
+	});
+}
+
+function slide8(pptx) {
+	const s = pptx.addSlide({ masterName: 'BASE' });
+	imagePlaceholder(s, { kind: 'angled', x: 6.809, y: 0.559, w: 5.926, h: 6.391 });
+
+	eyebrow(s, 0.75, 1.01);
+	heading(s, 'High-Resolution Mockup ', 0.75, 1.315, 7.142);
+	body(s, T.sm, 0.748, 3.786, 3.147, 0.689);
+	statStrip(s, 0.75, 4.91);
+}
+
+function slide9(pptx) {
+	const s = pptx.addSlide({ masterName: 'BASE' });
+	imagePlaceholder(s, { kind: 'topSilver', x: 7.852, y: 0.762, w: 6.181, h: 5.609 });
+
+	eyebrow(s, 0.75, 1.01);
+	heading(s, 'Mockup Branding', 0.75, 1.315, 4.329);
+	body(s, T.consCommodo, 4.962, 1.921, 2.926, 0.995);
+
+	card(s, 0.75, 4.136, 7.131, 2.6, 0.15591);
+	[
+		{ num: '01', y: 4.544, textW: 4.665 },
+		{ num: '02', y: 5.669, textW: 4.811 },
+	].forEach((row, i) => {
+		stat(s, row.num, 1.111, row.y, 0.766);
+		body(s, T.adipLong, 1.876, row.y - 0.015, row.textW, 0.689);
+		badge(s, 6.992, row.y, 0.529, 'arrowNE', { scale: 0.31 });
+		if (i === 0) {
+			s.addShape('line', {
+				x: 1.152, y: 5.457, w: 6.369, h: 0,
+				line: { color: C.white, width: 0.75, transparency: 84 },
+			});
+		}
+	});
+}
+
+function slide10(pptx) {
+	const s = pptx.addSlide({ masterName: 'BASE' });
+	imagePlaceholder(s, { kind: 'front', x: 7.527, y: 3.771, w: 5.027, h: 2.9 });
+
+	eyebrow(s, 0.75, 0.975);
+	heading(s, 'Laptop Mockup Scene', 0.75, 1.28, 5.531);
+
+	[1.28, 2.405].forEach((y, i) => {
+		stat(s, i === 0 ? '01' : '02', 7.557, y + 0.015, 0.766);
+		body(s, T.consEget, 8.322, y, 4.152, 0.689);
+		if (i === 0) {
+			s.addShape('line', {
+				x: 7.557, y: 2.208, w: 4.917, h: 0,
+				line: { color: C.white, width: 0.75, transparency: 84 },
+			});
+		}
+	});
+
+	card(s, 4.418, 3.817, 2.55, 2.642, 0.11372);
+	stat(s, '73%', 4.636, 4.068, 1.177);
+	body(s, T.cons, 4.636, 4.671, 2.115, 0.995);
+	body(s, '**' + T.short, 4.636, 5.887, 2.115, 0.322, { fontSize: 11 });
+}
+
+function slide11(pptx) {
+	const s = pptx.addSlide({ masterName: 'BASE' });
+	imagePlaceholder(s, { kind: 'front', x: 1.753, y: 2.714, w: 9.928, h: 5.728 });
+
+	eyebrow(s, 4.659, 0.722, { align: 'center' });
+	heading(s, 'Ultra-Minimal Mockup', 0.75, 1.027, 11.833, { h: 1.05, align: 'center' });
+
+	numberedCard(s, { x: 0.75, y: 4.382, num: '01', numX: 3.727, textX: 0.924, title: 'Innovation', align: 'right' });
+	numberedCard(s, { x: 8.74, y: 4.382, num: '02', numX: 8.958, textX: 9.724, title: 'Expectations' });
+}
+
+function slide12(pptx) {
+	const s = pptx.addSlide({ masterName: 'BASE' });
+	imagePlaceholder(s, { kind: 'front', x: 0.784, y: 3.519, w: 5.488, h: 3.166 });
+	imagePlaceholder(s, { kind: 'front', x: 7.036, y: 0.75, w: 5.488, h: 3.166 });
+
+	eyebrow(s, 0.75, 0.75);
+	heading(s, 'Versatile Laptop Mockup', 0.75, 1.055, 5.748);
+
+	// dashed leader from the upper laptop down to the sales figure
+	s.addShape('line', {
+		x: 9.683, y: 3.519, w: 0, h: 1.422,
+		line: { color: C.mint, width: 1, dashType: 'dash' },
+	});
+	s.addShape('ellipse', {
+		x: 9.614, y: 5.09, w: 0.138, h: 0.138, fill: { color: C.mint }, line: { type: 'none' },
+	});
+	body(s, 'Selling Product', 9.743, 4.982, 1.941, 0.337, { lineSpacing: 1.0 });
+	s.addText('$6,548,00', {
+		x: 9.494, y: 5.359, w: 2.447, h: 0.572,
+		fontFace: F_MAJOR, fontSize: 28, color: C.mint, valign: 'top',
+	});
+	body(s, '300 Sold in a month', 9.494, 5.986, 2.447, 0.337, { lineSpacing: 1.0 });
+	body(s, 'www.yoursite.com/topics', 6.113, 5.145, 2.567, 0.337, { color: C.mint, lineSpacing: 1.0 });
+}
+
+function slide13(pptx) {
+	const s = pptx.addSlide({ masterName: 'BASE' });
+	imagePlaceholder(s, { kind: 'open34', x: 0.68, y: 0.982, w: 6.795, h: 5.471 });
+
+	eyebrow(s, 6.782, 1.026);
+	heading(s, 'Versatile', 6.782, 1.33, 5.712, { h: 1.05 });
+
+	card(s, 6.782, 2.73, 2.55, 2.642, 0.11372);
+	stat(s, '73%', 7.0, 2.981, 1.177);
+	body(s, T.cons, 7.0, 3.584, 2.115, 0.995);
+	body(s, '**' + T.short, 7.0, 4.799, 2.115, 0.322, { fontSize: 11 });
+
+	badge(s, 10.235, 3.149, 0.69, 'note', { scale: 0.33 });
+	stat(s, '2025', 10.235, 4.055, 1.177, { color: C.white });
+	body(s, T.short, 10.235, 4.617, 2.115, 0.337, { lineSpacing: 1.0 });
+	body(s, T.consLong + ' Cum sociis', 6.782, 5.722, 5.712, 0.689);
+}
+
+function slide14(pptx) {
+	const s = pptx.addSlide({ masterName: 'BASE' });
+	imagePlaceholder(s, { kind: 'front', x: 3.118, y: 1.117, w: 7.17, h: 4.137 });
+
+	[
+		{ badgeX: 2.705, badgeY: 2.413, icon: 'briefcase', value: '853+', valueX: 1.416, label: 'Continuous learn', labelX: 0.633, labelW: 1.96, align: 'right' },
+		{ badgeX: 9.826, badgeY: 2.456, icon: 'megaphone', value: '568+', valueX: 10.74, label: 'Strong leadership', labelX: 10.74, labelW: 1.843, align: 'left' },
+	].forEach((it) => {
+		badge(s, it.badgeX, it.badgeY, 0.803, it.icon, { color: C.white, scale: 0.36 });
+		stat(s, it.value, it.valueX, 2.545, 1.177, { align: it.align });
+		body(s, it.label, it.labelX, 3.082, it.labelW, 0.337, { align: it.align, lineSpacing: 1.0 });
+	});
+
+	numberedCard(s, { x: 0.764, y: 5.114, num: '01', numX: 0.983, textX: 1.749, title: 'Creativity' });
+	numberedCard(s, { x: 8.74, y: 5.114, num: '02', numX: 8.958, textX: 9.724, title: 'Resilience' });
+}
+
+function slide15(pptx) {
+	const s = pptx.addSlide({ masterName: 'BASE' });
+	imagePlaceholder(s, { kind: 'front', x: 6.92, y: 1.025, w: 9.398, h: 5.422 });
+
+	eyebrow(s, 0.75, 1.802);
+	heading(s, 'Versatile Laptop Mockup', 0.75, 2.107, 5.765);
+	body(s, T.consLong + ' Cum sociis natoque', 0.75, 4.703, 4.675, 0.995);
+
+	// "Text Here" card with a four-bar mini chart
+	card(s, 6.966, 4.36, 3.334, 0.997, 0.14912);
+	[
+		{ x: 7.484, y: 4.662, h: 0.455, color: C.mint, transparency: 0 },
+		{ x: 7.670, y: 4.763, h: 0.355, color: C.white, transparency: 80 },
+		{ x: 7.857, y: 4.870, h: 0.248, color: C.white, transparency: 80 },
+		{ x: 7.297, y: 4.971, h: 0.147, color: C.white, transparency: 80 },
+	].forEach((bar) => {
+		s.addShape('line', {
+			x: bar.x, y: bar.y, w: 0, h: bar.h,
+			line: { color: bar.color, width: 6.5, transparency: bar.transparency },
+		});
+	});
+	cardTitle(s, 'Text Here', 8.01, 4.502, 1.519);
+	body(s, T.short, 8.01, 4.879, 2.101, 0.337, { lineSpacing: 1.0 });
+}
+
+/* =================================================================== main */
+
+function build() {
+	const pptx = new PptxGenJS();
+	pptx.defineLayout({ name: 'DECK', width: SLIDE_W, height: SLIDE_H });
+	pptx.layout = 'DECK';
+	pptx.theme = { headFontFace: F_MAJOR, bodyFontFace: F_MINOR };
+	pptx.defineSlideMaster({
+		title: 'BASE',
+		background: { color: C.far },
+		objects: backgroundBands(),
+		slideNumber: {
+			x: 12.13, y: 6.98, w: 0.64, h: 0.29, align: 'right',
+			fontFace: F_MINOR, fontSize: 10.5, color: C.white,
+		},
+	});
+
+	[slide1, slide2, slide3, slide4, slide5, slide6, slide7, slide8,
+		slide9, slide10, slide11, slide12, slide13, slide14, slide15]
+		.forEach((buildSlide) => buildSlide(pptx));
+
+	return pptx.writeFile({
+		fileName: path.join(__dirname, '026ac573-2da7-4709-bfdb-86cfbedbb21c_grok_final.pptx'),
+	});
+}
+
+build().then((f) => console.log('wrote', f)).catch((err) => {
+	console.error(err);
+	process.exit(1);
+});

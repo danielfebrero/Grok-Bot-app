@@ -1,0 +1,1222 @@
+/**
+ * Pharmedic — medical pitch deck, 40 slides at 26.66" x 15" (16:9, oversized).
+ *
+ * Everything below is plain pptxgenjs: a small set of drawing helpers, one
+ * builder function per slide layout, one builder function per slide.
+ * Raster photography in the source deck is replaced by flat grey `photo()`
+ * placeholders and the icon artwork by `glyph()` crosses.
+ *
+ *   node <thisfile>.js   ->   writes <thisfile>.pptx next to itself
+ */
+'use strict';
+
+const pptxgen = require('pptxgenjs');
+const path = require('path');
+
+/* ----------------------------- design tokens ----------------------------- */
+
+const GREEN  = '39967E';   // brand green
+const GREEN2 = '4B967D';   // underline green
+const DEEP   = '205E7F';   // deep petrol blue
+const MINT   = 'E5FBD4';   // pale mint accents
+const LIME   = 'DDE296';
+const SAGE   = '95C3B3';
+const ICE    = 'D0ECEE';
+const TEAL   = '0F7375';
+const GRAY   = '595959';   // body copy
+const SILVER = '7F7F7F';   // muted copy / nav
+const PALE   = 'F2F2F2';   // copy on green
+const WHITE  = 'FFFFFF';
+const PHOTO  = '7F7F7F';   // fill used for image placeholders
+
+const PD      = 'Playfair Display';
+const PDX     = 'Playfair Display ExtraBold';
+const PDS     = 'Playfair Display SemiBold';
+const PDM     = 'Playfair Display Medium';
+const LATO    = 'Lato';
+const MERRI   = 'Merriweather';
+const POPPINS = 'Poppins SemiBold';
+
+// soft drop shadow used on cards, buttons and colour blocks
+// (a fresh object every time: pptxgenjs rewrites the one it is handed)
+const SHADOW = () => ({ type: 'outer', color: '000000', opacity: 0.15, blur: 40, offset: 18, angle: 45 });
+
+// text-box insets of the source deck: 0.10" sides, 0.05" top/bottom (in points)
+const INSET = [7.2, 7.2, 3.6, 3.6];
+
+const NONE = { type: 'none' };
+
+/* ------------------------------- primitives ------------------------------ */
+
+// `adj` values are OOXML shape-guide units; pptxgenjs exposes them as an inch radius
+const radius = (adj, w, h) => (adj * Math.min(w, h)) / 100000;
+
+function paint(fill, alpha) {
+  if (!fill) return { type: 'none' };
+  return alpha == null ? { color: fill } : { color: fill, transparency: Math.round(100 - alpha) };
+}
+
+function shape(s, kind, x, y, w, h, fill, o) {
+  o = o || {};
+  const opt = { x, y, w, h, fill: paint(fill, o.alpha), line: o.line || NONE };
+  if (o.adj) opt.rectRadius = radius(o.adj, w, h);
+  if (o.rot) opt.rotate = o.rot;
+  if (o.flipH) opt.flipH = true;
+  if (o.flipV) opt.flipV = true;
+  if (o.shadow) opt.shadow = SHADOW();
+  s.addShape(kind, opt);
+}
+
+const rect = (s, x, y, w, h, fill, o) => shape(s, 'rect', x, y, w, h, fill, o);
+const oval = (s, x, y, w, h, fill, o) => shape(s, 'ellipse', x, y, w, h, fill, o);
+
+// free-form outline; `pts` are fractions of the w x h box, `flip` mirrors horizontally
+function poly(s, x, y, w, h, fill, pts, o) {
+  o = o || {};
+  const pt = pts.map(([px, py]) => ({ x: w * (o.flipH ? 1 - px : px), y: h * py }));
+  s.addShape('custGeom', {
+    x, y, w, h, points: pt.concat([{ close: true }]),
+    fill: paint(fill), line: NONE, shadow: o.shadow ? SHADOW() : undefined,
+  });
+}
+
+// block arrow with a notched tail (slide 32)
+function notchArrow(s, x, y, w, h, fill, o) {
+  poly(s, x, y, w, h, fill, [[0, 0.178], [0.63, 0.178], [0.63, 0], [1, 0.5],
+                             [0.63, 1], [0.63, 0.822], [0, 0.822], [0.238, 0.5]], o);
+}
+
+// solid block with a triangular callout head on its right edge (slide 34)
+function calloutArrow(s, x, y, w, h, fill, o) {
+  poly(s, x, y, w, h, fill, [[0, 0], [0.698, 0], [0.698, 0.337], [0.76, 0.337], [0.76, 0.193],
+                             [1, 0.5], [0.76, 0.807], [0.76, 0.663], [0.698, 0.663],
+                             [0.698, 1], [0, 1]], o);
+}
+
+function line(s, x, y, w, h, color, width, o) {
+  o = o || {};
+  s.addShape('line', {
+    x, y, w, h,
+    line: { color, width, endArrowType: o.tail || undefined },
+    rotate: o.rot || undefined, flipH: o.flipH || undefined,
+  });
+}
+
+/* --------------------------------- text ---------------------------------- */
+
+// string -> one paragraph, [str, str] -> one paragraph each, [{text,options}] -> runs
+function paragraphs(t) {
+  if (!Array.isArray(t)) return t;
+  if (typeof t[0] === 'object') return t;
+  return t.map((p, i) => ({ text: p, options: { breakLine: i < t.length - 1 } }));
+}
+
+function txt(s, x, y, w, h, t, o) {
+  o = o || {};
+  s.addText(paragraphs(t), {
+    x, y, w, h,
+    fontFace: o.face || LATO, fontSize: o.size || 18, color: o.color || GRAY,
+    bold: !!o.bold, italic: !!o.italic,
+    align: o.align || 'left', valign: o.valign || 'top',
+    lineSpacingMultiple: o.ls || undefined,
+    rotate: o.rotate || undefined,
+    fill: o.fill ? { color: o.fill } : undefined,
+    shadow: o.shadow ? SHADOW() : undefined,
+    margin: INSET, wrap: true, isTextBox: true,
+  });
+}
+
+// the four recurring type styles of the deck
+const title = (s, x, y, w, h, a, b, o) =>
+  txt(s, x, y, w, h, [{ text: a }, { text: b, options: { italic: true } }],
+      Object.assign({ size: 71.98, face: PDX, color: GREEN }, o));
+const head    = (s, x, y, w, h, t, o) => txt(s, x, y, w, h, t, Object.assign({ size: 27.99, face: PDS, color: GREEN }, o));
+const body    = (s, x, y, w, h, t, o) => txt(s, x, y, w, h, t, Object.assign({ size: 21.99, face: LATO, color: GRAY, ls: 1.5 }, o));
+const cap     = (s, x, y, w, h, t, o) => txt(s, x, y, w, h, t, Object.assign({ size: 20, face: MERRI, color: SILVER, ls: 1.5 }, o));
+const capHead = (s, x, y, w, h, t, o) => txt(s, x, y, w, h, t, Object.assign({ size: 28, face: PDS, color: GREEN, bold: true }, o));
+
+/* ---------------------------- image stand-ins ---------------------------- */
+
+// stands in for a photograph in the original deck
+function photo(s, x, y, w, h, o) {
+  o = o || {};
+  shape(s, o.geom || 'rect', x, y, w, h, PHOTO, { adj: o.adj });
+}
+
+/* The medical icon set of the source deck, redrawn from primitives.
+   Each icon fills the w x h box it is given. */
+
+function heart(s, x, y, w, h, c) {
+  shape(s, 'heart', x, y + h * 0.04, w, h * 0.9, c);
+}
+
+function stetho(s, x, y, w, h, c) {          // stethoscope
+  shape(s, 'blockArc', x + w * 0.1, y - h * 0.34, w * 0.62, h * 0.96, c,
+        { line: { color: c, width: 1 } });
+  rect(s, x + w * 0.12, y + h * 0.04, w * 0.06, h * 0.24, c);
+  rect(s, x + w * 0.62, y + h * 0.04, w * 0.06, h * 0.24, c);
+  oval(s, x + w * 0.24, y + h * 0.6, w * 0.32, h * 0.32, null, { line: { color: c, width: 3 } });
+  oval(s, x + w * 0.72, y + h * 0.3, w * 0.2, h * 0.2, null, { line: { color: c, width: 3 } });
+  rect(s, x + w * 0.8, y + h * 0.44, w * 0.035, h * 0.16, c);
+}
+
+function pill(s, x, y, w, h, c) {            // pill bottle
+  rect(s, x + w * 0.26, y + h * 0.04, w * 0.42, h * 0.14, c);
+  shape(s, 'roundRect', x + w * 0.2, y + h * 0.2, w * 0.54, h * 0.72, c, { adj: 12000 });
+  rect(s, x + w * 0.3, y + h * 0.36, w * 0.1, h * 0.28, WHITE);
+  rect(s, x + w * 0.21, y + h * 0.46, w * 0.28, h * 0.1, WHITE);
+  shape(s, 'roundRect', x + w * 0.62, y + h * 0.68, w * 0.3, h * 0.16, c, { adj: 50000 });
+}
+
+function ambulance(s, x, y, w, h, c) {       // ambulance
+  rect(s, x + w * 0.06, y + h * 0.24, w * 0.56, h * 0.46, c);
+  shape(s, 'round2SameRect', x + w * 0.6, y + h * 0.38, w * 0.34, h * 0.32, c, { adj: 22000 });
+  rect(s, x + w * 0.2, y + h * 0.34, w * 0.08, h * 0.24, WHITE);
+  rect(s, x + w * 0.12, y + h * 0.42, w * 0.24, h * 0.08, WHITE);
+  rect(s, x + w * 0.64, y + h * 0.44, w * 0.2, h * 0.14, WHITE);
+  oval(s, x + w * 0.16, y + h * 0.64, w * 0.18, h * 0.18, c);
+  oval(s, x + w * 0.64, y + h * 0.64, w * 0.18, h * 0.18, c);
+  rect(s, x + w * 0.3, y + h * 0.16, w * 0.1, h * 0.08, c);
+}
+
+function mail(s, x, y, w, h, c) {            // envelope
+  rect(s, x, y + h * 0.2, w, h * 0.6, c);
+  poly(s, x + w * 0.06, y + h * 0.24, w * 0.88, h * 0.34, WHITE,
+       [[0, 0], [1, 0], [0.5, 1]]);
+}
+
+function call(s, x, y, w, h, c) {            // telephone handset
+  shape(s, 'teardrop', x + w * 0.05, y + h * 0.05, w * 0.9, h * 0.9, c, { adj: 100000, rot: 225 });
+  oval(s, x + w * 0.3, y + h * 0.3, w * 0.4, h * 0.4, WHITE);
+}
+
+function place(s, x, y, w, h, c) {           // folded map
+  poly(s, x, y + h * 0.1, w, h * 0.8, c,
+       [[0, 0.12], [0.34, 0], [0.66, 0.14], [1, 0], [1, 0.88], [0.66, 1], [0.34, 0.86], [0, 1]]);
+  rect(s, x + w * 0.32, y + h * 0.18, w * 0.03, h * 0.66, WHITE);
+  rect(s, x + w * 0.64, y + h * 0.2, w * 0.03, h * 0.66, WHITE);
+}
+
+// generic fallback: the medical cross used throughout the deck
+function glyph(s, x, y, w, h, color) {
+  const k = 0.74;
+  shape(s, 'plus', x + (w * (1 - k)) / 2, y + (h * (1 - k)) / 2, w * k, h * k, color, { adj: 33452 });
+}
+
+/* --------------------------- device mock-ups ----------------------------- */
+
+function tablet(s, x, y, w, h) {
+  shape(s, 'roundRect', x, y, w, h, '0E0E0E', { adj: 4200, shadow: 1 });
+  rect(s, x + 0.36, y + 0.37, w - 0.73, h - 0.74, PHOTO);
+  rect(s, x + w / 2 - 0.64, y + 0.12, 1.28, 0.05, '262626');
+}
+
+function phone(s, x, y, w, h) {
+  shape(s, 'roundRect', x, y, w, h, '141414', { adj: 12500, shadow: 1 });
+  shape(s, 'roundRect', x + 0.21, y + 0.2, w - 0.42, h - 0.4, PHOTO, { adj: 11729 });
+  shape(s, 'roundRect', x + 1.85, y + 0.38, 1.27, 0.39, '100E11', { adj: 49000 });
+  rect(s, x + 0.04, y + 2.31, 0.06, 0.35, 'A6A299');   // mute switch
+  rect(s, x + 0.04, y + 2.94, 0.08, 0.77, 'A6A299');   // volume up
+  rect(s, x + 0.04, y + 3.87, 0.08, 0.77, 'A6A299');   // volume down
+  rect(s, x + w - 0.1, y + 3.5, 0.08, 1.14, 'A6A299'); // power
+}
+
+function laptop(s, x, y, w, h) {
+  rect(s, x + 1.2, y, 12.73, 8.73, '707A82');           // lid
+  rect(s, x + 1.25, y + 0.03, 12.64, 8.66, '262A2D');
+  rect(s, x + 1.37, y + 0.17, 12.39, 8.18, PHOTO);      // screen
+  rect(s, x + 6.2, y + 0.02, 1.5, 0.12, '000201');      // camera bar
+  rect(s, x, y + 8.65, w, 0.38, '5B626C');              // base
+  rect(s, x + 6.2, y + 8.7, 2.74, 0.14, '9EA4B4');      // trackpad notch
+  rect(s, x + 0.83, y + 9.02, 1.68, 0.09, '030603');
+  rect(s, x + 12.63, y + 9.02, 1.68, 0.09, '030603');
+}
+
+/* ------------- chrome drawn by the slide master on every slide ------------ */
+
+function master(s, page) {
+  rect(s, 0, 0, 0.56, 15, GREEN);
+  txt(s, -0.84, 12.73, 2.25, 0.8, 'Page  ' + page,
+      { size: 16, face: LATO, color: PALE, rotate: 270, valign: 'middle' });
+  txt(s, 1.33, 14.17, 2.99, 0.4, 'yourwebsite.com', { size: 18, face: PDM, color: SILVER });
+  txt(s, 23.08, 0.33, 2.25, 0.4, 'Pharmedic', { size: 18, face: PDM, color: GREEN, align: 'right' });
+  txt(s, 1.33, 0.33, 1.5, 0.4, 'About', { size: 18, face: PDM, color: SILVER });
+  txt(s, 3.17, 0.33, 1.5, 0.4, 'Services', { size: 18, face: PDM, color: SILVER });
+  txt(s, 5.02, 0.33, 1.5, 0.4, 'Teams', { size: 18, face: PDM, color: SILVER });
+  txt(s, 6.75, 0.33, 1.5, 0.4, 'Portfolio', { size: 18, face: PDM, color: SILVER });
+}
+const T = {
+  loremConsectetuerAdipi:
+    'Lorem ipsum dolor sit amet, consectetuer adipiscinged elit. Maecenas porttitor congue massa magna sed elite.',
+  loremConsectetuerAdipi2:
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit vivera. Maecenas porttitor congue massa. Fusce posuere, magna sedet pulvinar ultricies, purus lectus malesuada libero, sit amet',
+  loremConsectetuerAdipi3:
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna. Nunc viverra imperdiet enim. Fusce est. Vivamus a tellus.',
+  loremConsectetuerAdipi4:
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas sed porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, ae purus lectus malesuada libero, sit amet commodo magna eros quis.',
+  loremConsectetuerAdipi5:
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue',
+  loremConsectetuerAdipi6:
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit est sed. Maecenas porttitor congue massa. Fusce posuere, magna',
+  loremConsectetuerAdipi7:
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor dolor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna. Nunc viverra imperdiet enim. ',
+  loremConsectetuerAdipi8:
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue ultricies, purus lectus malesuada libero.',
+  loremConsecteturAdipis:
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, ',
+  loremNisiConsectetur:
+    'Lorem ipsum dolor sit amet, nisi consectetur adipiscing elit',
+  loremNisiConsectetur2:
+    'Lorem ipsum dolor sit amet, nisi consectetur adipiscing elit sed',
+  loremSedConsectetuer:
+    'Lorem ipsum dolor sit amet, sed consectetuer adipiscing elited. ',
+  maecenasPorttitorCongu:
+    'Maecenas porttitor congue massa. Fusce posuere, magna sed',
+  maecenasPorttitorCongu2:
+    'Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada',
+  nuncViverraImperdiet:
+    'Nunc viverra imperdiet enim. Fusce est. Vivamus a tellus.',
+  pellentesqueHabitantMo:
+    'Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Proin pharetra nonummy pede. Mauris et orci.',
+  pellentesqueHabitantMo2:
+    'PLACEHOLDER',
+  pellentesqueHabitantMo3:
+    'Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Proin pharetra nonummy',
+  utEnimAd:
+    'Ut enim ad minim veniam, quis nostrud exercitation',
+};/* ---- slide-layout decoration (shared by the slides that use it) ---- */
+// L2  (slides 1, 19, 40)
+function L2(s) {
+  rect(s,24.83,6.75,1.83,8.23,GREEN);
+  shape(s,'plus',1.5,13.07,0.42,0.42,MINT,{adj:33452});
+  shape(s,'plus',1.5,12.35,0.42,0.42,MINT,{adj:33452});
+  shape(s,'plus',1.5,11.63,0.42,0.42,MINT,{adj:33452});
+}
+// L3  (slides 2, 39)
+function L3(s) {
+  rect(s,0,0,8.83,8.29,GREEN);
+  txt(s,1.33,0.33,1.5,0.4,'About',{size:18,face:PDM,color:PALE});
+  txt(s,3.18,0.33,1.5,0.4,'Services',{size:18,face:PDM,color:PALE});
+  txt(s,5.02,0.33,1.5,0.4,'Teams',{size:18,face:PDM,color:PALE});
+  txt(s,6.75,0.33,1.5,0.4,'Portfolio',{size:18,face:PDM,color:PALE});
+  shape(s,'plus',11.24,12.75,0.42,0.42,MINT,{adj:33452});
+  shape(s,'plus',11.24,13.47,0.42,0.42,MINT,{adj:33452});
+  shape(s,'plus',11.24,14.13,0.42,0.42,MINT,{adj:33452});
+  shape(s,'plus',21.58,11.24,4.5,4.5,MINT,{adj:33452,alpha:44.7});
+}
+// L4  (slides 3)
+function L4(s) {
+  rect(s,0,0,9.58,15,GREEN);
+  rect(s,13.31,12.75,11.27,2.25,GREEN);
+  shape(s,'plus',11.99,12.25,0.42,0.42,MINT,{adj:33452});
+  shape(s,'plus',11.99,12.97,0.42,0.42,MINT,{adj:33452});
+  shape(s,'plus',11.99,13.63,0.42,0.42,MINT,{adj:33452});
+  txt(s,1.33,0.33,1.5,0.4,'About',{size:18,face:PDM,color:PALE});
+  txt(s,3.18,0.33,1.5,0.4,'Services',{size:18,face:PDM,color:PALE});
+  txt(s,5.02,0.33,1.5,0.4,'Teams',{size:18,face:PDM,color:PALE});
+  txt(s,6.75,0.33,1.5,0.4,'Portfolio',{size:18,face:PDM,color:PALE});
+}
+// L5  (slides 4)
+function L5(s) {
+  txt(s,1.33,14.17,2.99,0.4,'yourwebsite.com',{size:18,face:PDM,color:PALE});
+  rect(s,15.58,0,6,6.75,GREEN);
+  rect(s,16.33,12.5,9.75,2.5,GREEN);
+  shape(s,'plus',1.5,1.67,0.42,0.42,MINT,{adj:33452});
+  shape(s,'plus',1.5,2.38,0.42,0.42,MINT,{adj:33452});
+  shape(s,'plus',1.5,3.05,0.42,0.42,MINT,{adj:33452});
+}
+// L6  (slides 5)
+function L6(s) {
+  rect(s,11.41,0,1.92,6,GREEN);
+  shape(s,'plus',25.5,13,0.42,0.42,MINT,{adj:33452});
+  shape(s,'plus',25.5,13.72,0.42,0.42,MINT,{adj:33452});
+  shape(s,'plus',25.5,14.38,0.42,0.42,MINT,{adj:33452});
+}
+// L1  (slides 6, 20, 28, 31)
+function L1() {}
+// L7  (slides 7)
+function L7(s) {
+  rect(s,16.33,6,10.32,6.75,GREEN);
+  shape(s,'plus',2.25,10.67,0.42,0.42,MINT,{adj:33452});
+  shape(s,'plus',2.25,11.38,0.42,0.42,MINT,{adj:33452});
+  shape(s,'plus',2.25,12.05,0.42,0.42,MINT,{adj:33452});
+}
+// L8  (slides 8)
+function L8(s) {
+  rect(s,0.56,0,26.1,15.01,GREEN,{flipH:true});
+  txt(s,1.33,14.17,2.99,0.4,'yourwebsite.com',{size:18,face:PDM,color:PALE});
+  txt(s,1.33,0.33,1.5,0.4,'About',{size:18,face:PDM,color:PALE});
+  txt(s,3.18,0.33,1.5,0.4,'Services',{size:18,face:PDM,color:PALE});
+  txt(s,5.02,0.33,1.5,0.4,'Teams',{size:18,face:PDM,color:PALE});
+  txt(s,6.75,0.33,1.5,0.4,'Portfolio',{size:18,face:PDM,color:PALE});
+  rect(s,14.83,12,10.5,2.25,GREEN,{shadow:1});
+}
+// L9  (slides 9, 10)
+function L9(s) {
+  shape(s,'plus',25.49,12.44,0.42,0.42,MINT,{adj:33452});
+  shape(s,'plus',25.49,13.16,0.42,0.42,MINT,{adj:33452});
+  shape(s,'plus',25.49,13.83,0.42,0.42,MINT,{adj:33452});
+}
+// L10  (slides 11)
+function L10(s) {
+  rect(s,7.33,10.5,6,4.5,GREEN);
+}
+// L11  (slides 12, 22)
+function L11(s) {
+  rect(s,17.83,12,7.5,2.25,GREEN);
+}
+// L12  (slides 13)
+function L12(s) {
+  rect(s,13.33,5.83,6.75,2.45,GREEN);
+  shape(s,'plus',1.49,9.19,0.42,0.42,MINT,{adj:33452});
+  shape(s,'plus',1.49,9.91,0.42,0.42,MINT,{adj:33452});
+  shape(s,'plus',1.49,10.58,0.42,0.42,MINT,{adj:33452});
+}
+// L13  (slides 14)
+function L13(s) {
+  rect(s,5.08,12.42,5.25,1.83,GREEN);
+  rect(s,15.58,0,10.5,6,GREEN);
+}
+// L14  (slides 15)
+function L14(s) {
+  rect(s,0.56,0,10.52,15,GREEN);
+  txt(s,1.33,14.17,2.99,0.4,'yourwebsite.com',{size:18,face:PDM,color:PALE});
+  txt(s,1.33,0.33,1.5,0.4,'About',{size:18,face:PDM,color:PALE});
+  txt(s,3.18,0.33,1.5,0.4,'Services',{size:18,face:PDM,color:PALE});
+  txt(s,5.02,0.33,1.5,0.4,'Teams',{size:18,face:PDM,color:PALE});
+  txt(s,6.75,0.33,1.5,0.4,'Portfolio',{size:18,face:PDM,color:PALE});
+}
+// L15  (slides 16)
+function L15(s) {
+  shape(s,'plus',25.5,12.75,0.42,0.42,LIME,{adj:33452});
+  shape(s,'plus',25.5,13.47,0.42,0.42,LIME,{adj:33452});
+  shape(s,'plus',25.5,14.13,0.42,0.42,LIME,{adj:33452});
+  rect(s,0.56,12.75,26.1,2.25,GREEN);
+  txt(s,1.33,14.17,2.99,0.4,'yourwebsite.com',{size:18,face:PDM,color:PALE});
+}
+// L16  (slides 17)
+function L16(s) {
+  rect(s,16.33,0,10.33,5.25,GREEN);
+  shape(s,'plus',25.49,12.44,0.42,0.42,MINT,{adj:33452});
+  shape(s,'plus',25.49,13.16,0.42,0.42,MINT,{adj:33452});
+  shape(s,'plus',25.49,13.83,0.42,0.42,MINT,{adj:33452});
+}
+// L17  (slides 18)
+function L17(s, page) {
+  rect(s,0.03,0,26.63,15,GREEN);
+  txt(s,-0.84,12.73,2.25,0.8,'Page  '+page,{size:16,face:LATO,color:PALE,valign:'middle',rotate:270});
+  txt(s,1.33,14.17,2.99,0.4,'yourwebsite.com',{size:18,face:PDM,color:PALE});
+  shape(s,'plus',25.49,12,0.42,0.42,MINT,{adj:33452});
+  shape(s,'plus',25.49,12.72,0.42,0.42,MINT,{adj:33452});
+  shape(s,'plus',25.49,13.38,0.42,0.42,MINT,{adj:33452});
+  txt(s,1.33,0.33,1.5,0.4,'About',{size:18,face:PDM,color:PALE});
+  txt(s,3.18,0.33,1.5,0.4,'Services',{size:18,face:PDM,color:PALE});
+  txt(s,5.02,0.33,1.5,0.4,'Teams',{size:18,face:PDM,color:PALE});
+  txt(s,6.75,0.33,1.5,0.4,'Portfolio',{size:18,face:PDM,color:PALE});
+  txt(s,23.08,0.33,2.25,0.4,'Pharmedic',{size:18,face:PDM,color:PALE,align:'right'});
+}
+// L18  (slides 21)
+function L18(s) {
+  rect(s,0.56,9.75,8.27,5.3,GREEN);
+  shape(s,'plus',1.5,12.33,0.42,0.42,MINT,{adj:33452});
+  shape(s,'plus',1.5,13.05,0.42,0.42,MINT,{adj:33452});
+  shape(s,'plus',1.5,13.72,0.42,0.42,MINT,{adj:33452});
+}
+// L19  (slides 23)
+function L19(s) {
+  rect(s,0.41,0,26.25,15,GREEN);
+}
+// L20  (slides 24)
+function L20(s) {
+  rect(s,8.05,12,5.28,3.04,GREEN,{flipH:true});
+  rect(s,14.11,1.5,5.98,2.25,GREEN,{flipH:true});
+  shape(s,'plus',25.5,1.67,0.42,0.42,MINT,{adj:33452});
+  shape(s,'plus',25.5,2.38,0.42,0.42,MINT,{adj:33452});
+  shape(s,'plus',25.5,3.05,0.42,0.42,MINT,{adj:33452});
+}
+// L21  (slides 25)
+function L21(s) {
+  rect(s,1.33,8.29,4,5.21,GREEN,{flipH:true});
+}
+// L22  (slides 26)
+function L22(s) {
+  rect(s,17.84,11.75,8.25,2.5,GREEN);
+  rect(s,6.58,12,4.51,3,GREEN);
+}
+// L23  (slides 27)
+function L23(s) {
+  rect(s,0.56,0,8.27,15,GREEN);
+  shape(s,'plus',1.5,1.75,0.42,0.42,MINT,{adj:33452});
+  shape(s,'plus',1.5,2.47,0.42,0.42,MINT,{adj:33452});
+  shape(s,'plus',1.5,3.13,0.42,0.42,MINT,{adj:33452});
+  txt(s,1.33,14.17,2.99,0.4,'yourwebsite.com',{size:18,face:PDM,color:PALE});
+  txt(s,1.33,0.33,1.5,0.4,'About',{size:18,face:PDM,color:PALE});
+  txt(s,3.18,0.33,1.5,0.4,'Services',{size:18,face:PDM,color:PALE});
+  txt(s,5.02,0.33,1.5,0.4,'Teams',{size:18,face:PDM,color:PALE});
+  txt(s,6.75,0.33,1.5,0.4,'Portfolio',{size:18,face:PDM,color:PALE});
+}
+// L24  (slides 29)
+function L24(s) {
+  rect(s,17.08,0,9.58,15,GREEN);
+  txt(s,23.08,0.33,2.25,0.4,'Pharmedic',{size:18,face:PDM,color:PALE,align:'right'});
+}
+// L25  (slides 30)
+function L25(s, page) {
+  rect(s,0,0,26.65,15,GREEN);
+  shape(s,'plus',25.49,12.44,0.42,0.42,MINT,{adj:33452});
+  shape(s,'plus',25.49,13.16,0.42,0.42,MINT,{adj:33452});
+  shape(s,'plus',25.49,13.83,0.42,0.42,MINT,{adj:33452});
+  txt(s,-0.84,12.73,2.25,0.8,'Page  '+page,{size:16,face:LATO,color:PALE,valign:'middle',rotate:270});
+  txt(s,1.33,14.17,2.99,0.4,'yourwebsite.com',{size:18,face:PDM,color:PALE});
+  txt(s,1.33,0.33,1.5,0.4,'About',{size:18,face:PDM,color:PALE});
+  txt(s,3.18,0.33,1.5,0.4,'Services',{size:18,face:PDM,color:PALE});
+  txt(s,5.02,0.33,1.5,0.4,'Teams',{size:18,face:PDM,color:PALE});
+  txt(s,6.75,0.33,1.5,0.4,'Portfolio',{size:18,face:PDM,color:PALE});
+  txt(s,23.08,0.33,2.25,0.4,'Pharmedic',{size:18,face:PDM,color:PALE,align:'right'});
+}
+// L26  (slides 32, 33, 34, 35, 36, 37, 38)
+function L26(s) {
+  shape(s,'plus',25.49,12.44,0.42,0.42,MINT,{adj:33452});
+  shape(s,'plus',25.49,13.16,0.42,0.42,MINT,{adj:33452});
+  shape(s,'plus',25.49,13.83,0.42,0.42,MINT,{adj:33452});
+  shape(s,'plus',1.5,1.67,0.42,0.42,MINT,{adj:33452});
+  shape(s,'plus',1.5,2.38,0.42,0.42,MINT,{adj:33452});
+}/* ------------------------- the 40 slides ------------------------- */
+function s1(s) {
+  photo(s,11.08,1.5,14.25,13.48);
+  rect(s,2.83,4.46,5.22,2.29,MINT,{shadow:1});
+  txt(s,2.87,4.46,20.96,3.97,[{text:'Phar',options:{bold:true}},{text:'medic',options:{italic:true,bold:true}}],{size:229.94,face:PD,color:GREEN,bold:true});
+  body(s,2.87,11.28,5.97,1.69,T.pellentesqueHabitantMo3);
+  line(s,2.99,11,2.84,0,GREEN,1);
+  line(s,3.02,8,15.34,0,GREEN2,6);
+}
+function s2(s) {
+  title(s,14.87,3.59,9.75,1.31,'Welcome ','Slides');
+  body(s,14.87,5.73,9.75,3.91,[T.loremConsectetuerAdipi3,'',T.pellentesqueHabitantMo]);
+  shape(s,'roundRect',15.03,10.51,3.75,0.9,GREEN,{adj:50000,shadow:1});
+  txt(s,15.7,10.73,2.74,0.44,'VIEW MORE',{size:20,face:PDS,color:WHITE,bold:true,align:'center'});
+  oval(s,14.58,10.43,1.05,1.05,WHITE,{shadow:1});
+  shape(s,'plus',14.8,10.66,0.61,0.61,DEEP,{adj:33452});
+  photo(s,1.33,2.25,11.21,11.25,{geom:'plus',adj:19985});
+}
+function s3(s) {
+  title(s,13.33,2.25,11.27,1.31,'About ','Us');
+  body(s,13.33,4.44,11.27,4.47,['Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor lectus congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna. Nunc viverra imperdiet enim. Fusce est. Vivamus a tellus. Pellentesque habitant morbi tristique senectus et netus.','','Nunc viverra imperdiet enim. Fusce est. Vivamus a tellus. Pellentesque habitant sed morbi tristique senectus et netus et malesuada fames ac turpis egestas pharetra ae libero, sit amet commodo magna eros quis urna. Nunc viverra imperdiet enim. ']);
+  shape(s,'roundRect',13.68,9.69,3.75,0.9,GREEN,{adj:50000,shadow:1});
+  txt(s,14.35,9.91,2.74,0.44,'VIEW MORE',{size:20,face:PDS,color:WHITE,bold:true,align:'center'});
+  oval(s,13.23,9.61,1.05,1.05,WHITE,{shadow:1});
+  shape(s,'plus',13.45,9.84,0.61,0.61,DEEP,{adj:33452});
+  line(s,17.16,13.92,6.67,0,WHITE,1);
+  txt(s,14.18,13.68,3,0.4,'YOUR TITTLE',{size:18,face:PDM,color:WHITE});
+  photo(s,1.35,1.5,9.73,12,{geom:'round2DiagRect',adj:16667});
+}
+function s4(s) {
+  title(s,3.58,7.5,9.75,1.31,'About ','Us');
+  body(s,3.58,9.69,9.75,1.69,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas elite porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, sed purus lectus malesuada libero, sit amet commodo magna.');
+  line(s,20.08,13.95,5.25,0,WHITE,1);
+  txt(s,17.09,13.68,3,0.4,'YOUR TITTLE',{size:18,face:PDM,color:WHITE});
+  shape(s,'roundRect',3.91,12.16,3.75,0.9,GREEN,{adj:50000,shadow:1});
+  txt(s,4.58,12.38,2.74,0.44,'VIEW MORE',{size:20,face:PDS,color:WHITE,bold:true,align:'center'});
+  oval(s,3.46,12.08,1.05,1.05,WHITE,{shadow:1});
+  shape(s,'plus',3.68,12.3,0.61,0.61,DEEP,{adj:33452});
+  photo(s,16.33,1.5,9.75,11.25,{geom:'round1Rect',adj:15202});
+  photo(s,3.58,1.5,9.75,5.25);
+}
+function s5(s) {
+  photo(s,1.33,6.75,5.26,6.75);
+  title(s,14.84,2,9.76,1.31,'About ','Us');
+  body(s,14.83,4.17,9.76,1.69,T.loremConsectetuerAdipi4);
+  body(s,16.84,7.22,7.74,1.14,T.loremConsectetuerAdipi);
+  head(s,16.85,6.58,7.75,0.57,'Your Tittle Here');
+  body(s,16.84,9.78,7.74,1.14,T.loremConsectetuerAdipi);
+  head(s,16.85,9.06,7.75,0.57,'Your Tittle Here');
+  body(s,16.84,12.31,7.74,1.14,T.loremConsectetuerAdipi);
+  head(s,16.85,11.58,7.75,0.57,'Your Tittle Here');
+  body(s,7.38,12.09,3.02,1.14,'Lorem ipsum dolor sit amet, ae elit.');
+  line(s,6.2,12.66,0.93,0,GREEN,2.25);
+  body(s,7.38,10.08,4.5,1.14,'Lorem ipsum dolor sit amet, ae consectetur adipiscing elit, sed');
+  line(s,5.58,10.74,1.55,0,GREEN,2.25);
+  txt(s,10.33,7.17,2.25,1.31,'150',{size:71.98,face:PDX,color:GREEN,align:'center'});
+  txt(s,12.1,6.75,1.4,1.31,'+',{size:71.98,face:PDX,color:GREEN,bold:true});
+  body(s,10.33,8.65,2.25,0.58,'Project Done',{align:'center'});
+  txt(s,7.33,7.17,2.25,1.31,'75',{size:71.98,face:PDX,color:GREEN,align:'center'});
+  txt(s,8.85,6.75,1.4,1.31,'+',{size:71.98,face:PDX,color:GREEN,bold:true});
+  body(s,7.33,8.65,2.25,0.58,'Networks',{align:'center'});
+  photo(s,1.33,0,10.5,6);
+  oval(s,14.66,6.73,1.69,1.69,DEEP,{shadow:1});
+  heart(s,14.92,7.08,1.17,1.17,WHITE);
+  oval(s,14.66,9.2,1.69,1.69,GREEN,{shadow:1});
+  stetho(s,14.92,9.46,1.17,1.17,WHITE);
+  oval(s,14.66,11.7,1.69,1.69,DEEP,{shadow:1});
+  pill(s,14.92,11.96,1.17,1.17,WHITE);
+}
+function s6(s) {
+  title(s,14.83,2.36,9.75,2.52,'Wanna Know Our ','Medic Company?');
+  body(s,14.83,5.78,9.75,1.69,'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do dolor sed eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut');
+  body(s,14.83,9.03,9.75,1.14,T.pellentesqueHabitantMo);
+  head(s,14.83,8.36,9.75,0.57,'Tittle Here');
+  body(s,2.08,11.2,11.25,1.69,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor dolor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna. Nunc viverra imperdiet enim.');
+  head(s,2.08,10.5,11.25,0.57,'Your Great Tittle Place Here');
+  body(s,14.83,11.61,9.75,1.14,T.pellentesqueHabitantMo);
+  head(s,14.83,10.92,9.75,0.57,'Tittle Here');
+  photo(s,0,1.5,13.33,8.25);
+}
+function s7(s) {
+  photo(s,13.33,1.5,12,7.5);
+  photo(s,8.05,10.5,6.78,4.5);
+  title(s,2.09,2.27,9.75,2.52,'About Our ','Company');
+  body(s,2.09,5.69,9.75,3.36,[T.loremConsectetuerAdipi4,'','Pellentesque habitant morbi tristique senectus et netus et malesuadase fames ac turpis egestas. Proin pharetra nonummy pede. Mauris et orci.']);
+  body(s,17.83,10.45,7.5,1.14,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa magna sed',{color:PALE});
+  head(s,17.83,9.78,7.5,0.57,'Your Tittle Here',{color:WHITE});
+  rect(s,4.33,10.5,3,4.67,null,{line:{color:GREEN,width:1}});
+  txt(s,5.17,10.85,4.5,1.72,'PRM',{size:95.98,face:PDX,color:SAGE});
+  line(s,4.33,11.75,1.08,0,GREEN,1);
+  shape(s,'plus',11.08,-0.75,4.5,4.5,MINT,{adj:33452,alpha:74.9,shadow:1});
+}
+function s8(s) {
+  title(s,2.08,2.45,11.25,2.52,'About Our Medic ','Company Here',{color:WHITE});
+  body(s,2.08,5.86,11.25,5.02,['Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor dolor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna. Nunc viverra imperdiet enim. Fusce est. Vivamus a tellus. Pellentesque habitant morbi tristique senectus et netus et ae malesuada fames ac turpis egestas. Proin pharetra nonummy pede. Mauris et orci.','','Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor tellus congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna. Nunc viverra imperdiet enim. '],{color:PALE});
+  txt(s,14.83,12.92,3,0.4,'YOUR TITTLE',{size:18,face:PDM,color:WHITE});
+  line(s,17.33,13.08,5.92,0,WHITE,1);
+  txt(s,23.58,12.67,1.75,0.86,'Lorem ipsum dolor sit amet,',{size:16,face:LATO,color:PALE,ls:1.5});
+  shape(s,'roundRect',2.45,11.61,3.75,0.9,MINT,{adj:50000,shadow:1});
+  txt(s,3.12,11.83,2.74,0.44,'VIEW MORE',{size:20,face:PDS,color:GRAY,bold:true,align:'center'});
+  oval(s,2,11.53,1.05,1.05,WHITE,{shadow:1});
+  shape(s,'plus',2.22,11.75,0.61,0.61,DEEP,{adj:33452});
+  photo(s,14.83,0,10.5,12);
+}
+function s9(s) {
+  rect(s,10.66,11.25,0.78,0.57,MINT);
+  rect(s,17.41,11.25,0.78,0.57,MINT);
+  photo(s,17.46,4.17,5.23,6.33);
+  photo(s,3.97,4.17,5.23,6.33);
+  photo(s,10.72,4.17,5.23,6.33);
+  rect(s,3.91,11.25,0.78,0.57,MINT);
+  line(s,19.33,13.85,7.33,0,WHITE,1);
+  title(s,1.35,1.67,23.98,1.31,'See Our ','Amazing Team',{align:'center'});
+  body(s,3.97,12.49,5.23,1.14,T.pellentesqueHabitantMo2);
+  head(s,3.98,11.25,5.22,0.57,'Sarah Emillia');
+  line(s,4.14,12.25,4.05,0,GREEN,1);
+  body(s,17.46,12.49,5.23,1.14,T.pellentesqueHabitantMo2);
+  head(s,17.47,11.25,5.22,0.57,'Sam Herman');
+  line(s,17.63,12.25,4.05,0,GREEN,1);
+  body(s,10.72,12.49,5.23,1.14,T.pellentesqueHabitantMo2);
+  head(s,10.72,11.25,5.22,0.57,'Petter Brown');
+  line(s,10.88,12.25,4.05,0,GREEN,1);
+  shape(s,'plus',21.58,1.93,4.5,4.5,MINT,{adj:33452,alpha:74.9,shadow:1});
+}
+function s10(s) {
+  title(s,1.35,1.67,23.98,1.31,'See Our ','Amazing Team',{align:'center'});
+  body(s,3.97,12.49,5.23,1.14,T.pellentesqueHabitantMo2);
+  line(s,4.14,12.25,4.05,0,GREEN,1);
+  body(s,17.46,12.49,5.23,1.14,T.pellentesqueHabitantMo2);
+  photo(s,3.97,4.17,5.23,6.33,{geom:'round2DiagRect',adj:16667});
+  photo(s,10.72,4.17,5.23,6.33,{geom:'round2DiagRect',adj:16667});
+  photo(s,17.46,4.17,5.23,6.33,{geom:'round2DiagRect',adj:16667});
+  line(s,17.63,12.25,4.05,0,GREEN,1);
+  body(s,10.72,12.49,5.23,1.14,T.pellentesqueHabitantMo2);
+  line(s,10.88,12.25,4.05,0,GREEN,1);
+  rect(s,10.66,11.25,0.78,0.57,MINT);
+  rect(s,17.41,11.25,0.78,0.57,MINT);
+  rect(s,3.91,11.25,0.78,0.57,MINT);
+  head(s,3.98,11.25,5.22,0.57,'Sarah Emillia');
+  head(s,17.47,11.25,5.22,0.57,'Sam Herman');
+  head(s,10.72,11.25,5.22,0.57,'Petter Brown');
+  shape(s,'plus',21.58,1.93,4.5,4.5,MINT,{adj:33452,alpha:74.9,shadow:1});
+}
+function s11(s) {
+  body(s,1.35,12.72,5.21,0.58,'Sales Marketing',{align:'center'});
+  head(s,1.35,12,5.21,0.57,'Veronica',{align:'center'});
+  body(s,14.12,12.72,5.21,0.58,'Website Developer',{align:'center'});
+  head(s,14.12,12,5.21,0.57,'Joerge Carl',{align:'center'});
+  body(s,20.08,12.72,5.25,0.58,'Copywriting Expert',{align:'center'});
+  head(s,20.08,12,5.25,0.57,'George Peter',{align:'center'});
+  body(s,7.32,13.44,6,0.58,'Graphic Designer',{color:PALE,align:'center'});
+  head(s,7.32,12.75,6,0.57,'Sam Herman',{color:WHITE,align:'center'});
+  title(s,1.35,1.67,23.98,1.31,'See Our ','Amazing Team',{align:'center'});
+  photo(s,20.07,4.5,5.25,6.75,{geom:'roundRect',adj:16667});
+  photo(s,14.12,4.5,5.21,6.75,{geom:'roundRect',adj:16667});
+  photo(s,7.33,4.5,6,7.5,{geom:'roundRect',adj:16667});
+  photo(s,1.33,4.5,5.25,6.75,{geom:'roundRect',adj:16667});
+}
+function s12(s) {
+  photo(s,16.33,1.5,9,11.25,{geom:'round1Rect',adj:16667});
+  title(s,2.86,2.52,10.5,2.52,'Our Personal ','Portfolios Here');
+  body(s,2.83,5.57,10.5,1.69,'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do dolor eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut');
+  body(s,2.86,8.78,4.48,1.14,T.loremNisiConsectetur);
+  head(s,2.86,8.15,4.48,0.57,'Tittle Here');
+  body(s,8.05,11.36,5.25,1.14,'Lorem ipsum dolor sit amet, nisi amet consectetur adipiscing elit, sed do');
+  head(s,8.05,10.7,5.25,0.57,'Tittle Here');
+  body(s,2.86,11.36,4.48,1.14,T.loremNisiConsectetur);
+  head(s,2.86,10.7,4.48,0.57,'Tittle Here');
+  shape(s,'round1Rect',8.05,7.78,8.28,2.42,GREEN,{adj:16667,flipH:true});
+  body(s,8.41,8.75,4.89,1.14,'Lorem ipsum dolor sit amet, nisi ae amet consectetur adipiscing sed',{color:PALE});
+  head(s,8.41,8.12,4.47,0.57,'Tittle Here',{color:WHITE});
+  txt(s,18.58,13.25,1.78,0.45,'TITTLE',{size:20.99,face:PDM,color:WHITE});
+  line(s,20.53,13.5,4.8,0,WHITE,1,{rot:180});
+  shape(s,'plus',14.08,0,4.5,4.5,MINT,{adj:33452,alpha:74.9,shadow:1});
+}
+function s13(s) {
+  title(s,2.83,9.03,9.75,1.31,'Our ','Services');
+  body(s,2.83,11.2,9.75,1.69,[T.pellentesqueHabitantMo,T.nuncViverraImperdiet]);
+  body(s,20.85,5.61,4.49,1.14,T.loremNisiConsectetur2);
+  head(s,20.85,4.95,4.49,0.57,'Tittle Here');
+  txt(s,16.33,6.73,3,0.86,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. ',{size:16,face:LATO,color:PALE,ls:1.5});
+  line(s,14.12,7.17,1.79,0,WHITE,1);
+  body(s,16.36,12.75,2.97,1.14,'Pellentesque  sed habitant morbi ae',{align:'right'});
+  body(s,13.38,9.64,6.7,1.69,T.pellentesqueHabitantMo);
+  head(s,13.38,9,6.71,0.57,'Your Tittle Here');
+  line(s,19.63,13.33,1.53,0,GREEN,2.25);
+  body(s,20.85,3.03,4.49,1.14,T.loremNisiConsectetur2);
+  head(s,20.85,2.36,4.49,0.57,'Tittle Here');
+  photo(s,1.33,1.49,11.25,6.8);
+  photo(s,20.85,7.5,4.46,6.75);
+  photo(s,13.35,1.5,6.73,4.5);
+}
+function s14(s) {
+  body(s,12.58,12.86,3.75,1.14,T.utEnimAd);
+  head(s,12.59,11.62,3.75,0.57,'Your Tittle Here');
+  line(s,12.74,12.62,2.91,0,GREEN,1);
+  body(s,17.1,12.86,3.75,1.14,T.utEnimAd);
+  head(s,17.11,11.62,3.75,0.57,'Your Tittle Here');
+  line(s,17.27,12.62,2.91,0,GREEN,1);
+  body(s,21.61,12.86,3.72,1.14,T.utEnimAd);
+  head(s,21.61,11.62,3.72,0.57,'Your Tittle Here');
+  line(s,21.77,12.62,2.89,0,GREEN,1);
+  title(s,2.09,3.09,8.24,1.31,'Our ','Services');
+  body(s,2.09,5.25,8.24,2.25,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor amet  congue sed massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet ae commodo magna eros quis urna. Nunc viverra');
+  txt(s,5.5,13.31,3,0.4,'YOUR TITTLE',{size:18,face:PDM,color:WHITE});
+  line(s,8,13.48,1.75,0,WHITE,1);
+  photo(s,12.61,0.75,12.72,6.75);
+  photo(s,2.11,8.29,8.22,4.46);
+  oval(s,12.58,8.56,2.27,2.27,DEEP,{shadow:1});
+  heart(s,12.93,8.91,1.57,1.57,WHITE);
+  oval(s,17.06,8.56,2.27,2.27,GREEN,{shadow:1});
+  stetho(s,17.41,8.91,1.57,1.57,WHITE);
+  oval(s,21.61,8.56,2.27,2.27,DEEP,{shadow:1});
+  pill(s,21.96,8.91,1.57,1.57,WHITE);
+}
+function s15(s) {
+  txt(s,2.83,11.25,5.25,1.43,'Pellentesque habitant morbi tristique senectus et netus ',{size:27.99,face:PDM,color:WHITE,italic:true,ls:1.5});
+  body(s,16.35,11.61,3.74,1.14,T.utEnimAd);
+  head(s,16.35,10.37,3.74,0.57,'Your Tittle Here');
+  line(s,16.51,11.37,2.9,0,GREEN,1);
+  body(s,20.84,11.61,3.74,1.14,T.utEnimAd);
+  head(s,20.85,10.37,3.74,0.57,'Your Tittle Here');
+  line(s,21.01,11.37,2.93,0,GREEN,1);
+  txt(s,1.25,9.91,1.5,3.92,'“',{size:173,face:PDM,color:MINT,italic:true,ls:1.5});
+  title(s,16.34,1.5,8.24,2.52,'Our Amazing ','Services Here');
+  body(s,16.36,5.58,8.25,1.69,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit sed. Maecenas porttitor congue massa. Fusce posuere, magna sit sed pulvinar ultricies, purus lectus malesuada libero');
+  head(s,16.36,4.86,8.24,0.57,'Your Tittle Here');
+  photo(s,1.33,1.5,7.5,9);
+  photo(s,9.58,1.5,5.25,6.79);
+  photo(s,9.58,9,5.25,6);
+  heart(s,16.12,8.25,1.69,1.69,DEEP);
+  stetho(s,20.66,8.25,1.69,1.69,GREEN);
+}
+function s16(s) {
+  title(s,9.25,1.5,9.75,2.52,'Best Services in ','Medic Company');
+  body(s,9.25,4.92,9.75,3.91,[T.loremConsectetuerAdipi3,'',T.pellentesqueHabitantMo]);
+  body(s,9.25,10.3,4.54,1.14,T.loremSedConsectetuer);
+  head(s,9.25,9.58,4.54,0.57,'Your Tittle Here');
+  txt(s,5.84,13.68,3,0.4,'YOUR TITTLE',{size:18,face:PDM,color:WHITE});
+  line(s,8.5,13.85,8.59,0,WHITE,1);
+  txt(s,17.41,13.42,1.92,0.86,'Lorem ipsum dolor sit amet, ',{size:16,face:LATO,color:PALE,ls:1.5});
+  body(s,14.5,10.3,4.5,1.14,T.loremSedConsectetuer);
+  head(s,14.5,9.58,4.5,0.57,'Your Tittle Here');
+  photo(s,20.1,1.54,6,8.21);
+  photo(s,1.33,1.5,6.72,10.5);
+  photo(s,20.1,10.5,6,4.5);
+}
+function s17(s) {
+  title(s,14.12,9.01,10.46,2.52,'See Our Amazing ','Services Here');
+  body(s,14.12,12.47,10.46,1.69,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus sed malesuada libero, sit amet commodo magna eros quis urna viverra enim. ');
+  body(s,2.84,11.7,3.74,1.14,T.utEnimAd);
+  head(s,2.84,10.45,3.74,0.57,'Your Tittle Here');
+  line(s,3,11.45,2.9,0,GREEN,1);
+  body(s,7.34,5.61,3.74,1.14,T.utEnimAd);
+  head(s,7.34,4.37,3.74,0.57,'Your Tittle Here');
+  line(s,7.5,5.37,2.93,0,GREEN,1);
+  photo(s,2.08,1.5,4.48,6);
+  photo(s,14.12,1.5,11.21,6.79);
+  photo(s,7.33,7.5,5.25,7.5);
+  shape(s,'plus',21.58,-0.75,4.5,4.5,MINT,{adj:33452,alpha:74.9,shadow:1});
+  heart(s,7.14,2.18,1.69,1.69,DEEP);
+  stetho(s,2.75,8.25,1.69,1.69,GREEN);
+}
+function s18(s) {
+  title(s,2.42,2.92,9.74,1.31,'Our ','Services Here',{color:WHITE});
+  body(s,2.42,5.19,9.74,1.69,T.loremConsectetuerAdipi4,{color:PALE});
+  body(s,4.42,8.32,7.74,1.14,T.loremConsectetuerAdipi,{color:PALE});
+  head(s,4.42,7.67,7.74,0.57,'Your Tittle Here',{color:PALE});
+  body(s,4.42,10.91,7.74,1.14,T.loremConsectetuerAdipi,{color:PALE});
+  head(s,4.42,10.17,7.74,0.57,'Your Tittle Here',{color:PALE});
+  photo(s,14.12,1.54,10.46,12);
+  oval(s,2.24,7.69,1.69,1.69,ICE,{shadow:1});
+  heart(s,2.5,7.95,1.17,1.17,GREEN);
+  oval(s,2.24,10.17,1.69,1.69,MINT,{shadow:1});
+  stetho(s,2.5,10.43,1.17,1.17,GREEN);
+}
+function s19(s) {
+  photo(s,11.08,1.5,14.25,13.48);
+  rect(s,2.83,4.46,4.92,2.29,MINT,{shadow:1});
+  txt(s,2.87,4.46,20.96,3.97,[{text:'Break ',options:{bold:true}},{text:'Slides',options:{italic:true,bold:true}}],{size:229.94,face:PD,color:GREEN,bold:true});
+  shape(s,'plus',21.6,11.25,4.5,4.5,MINT,{adj:33452,alpha:74.9,shadow:1});
+  body(s,2.87,11.28,5.97,1.69,T.pellentesqueHabitantMo3);
+  line(s,2.99,11,2.84,0,GREEN,1);
+  line(s,3.02,8,15.34,0,GREEN2,6);
+}
+function s20(s) {
+  photo(s,1.33,1.5,8.25,4.5);
+  photo(s,4.33,6.79,5.25,7.46);
+  photo(s,10.35,1.5,4.46,6);
+  photo(s,10.35,8.29,4.46,5.96);
+  photo(s,20.87,8.29,4.46,5.96);
+  rect(s,-0.9,9.02,6.71,2.26,null,{rot:270,line:{color:GREEN,width:1}});
+  txt(s,0.51,7.67,3.75,1.58,'PRM',{size:87.98,face:PDX,color:SAGE,rotate:270});
+  line(s,2.41,10.08,0,3.42,GREEN,1,{rot:90});
+  title(s,16.33,2.08,9,1.31,'Our ','Portfolios');
+  body(s,16.33,4.28,9,2.8,'Lorem ipsum dolor sit amet, consectetuer adipiscing elites viverra. Maecenas porttitor congue massa. Fusce posuere, magna sed quis pulvinar ultricies, purus lectus malesuada libero, sit amet magnet commodo magna eros quis urna. Nunc viverra imperdiet enim orci. Fusce est. Vivamus a tellus. Mauris et orci.');
+  body(s,16.33,11.47,3,1.14,'Lorem ipsum dolore sit amet, consectetur');
+  line(s,14.66,11.86,1.25,0,GREEN,2.25);
+  body(s,16.33,9,3,1.69,'Lorem ipsum dolore sit amet, consectetur adipiscing elit, sed ae');
+  line(s,13.74,9.39,2.17,0,GREEN,2.25);
+}
+function s21(s) {
+  photo(s,7.33,1.5,3.75,6);
+  photo(s,2.83,8.29,9,5.21);
+  title(s,14.83,1.56,10.53,2.52,'See Our Amazing ','Portfolios Here');
+  body(s,14.83,4.97,10.53,1.14,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus');
+  body(s,2.83,2.25,3,1.14,'Lorem ipsum dolore sit amet, consectetur',{align:'right'});
+  body(s,2.83,4.11,3,1.14,'Lorem ipsum dolore sit amet, consectetur',{align:'right'});
+  line(s,6.25,4.5,1.58,0,GREEN,2.25);
+  line(s,6.25,2.61,2.17,0,GREEN,2.25);
+  shape(s,'plus',8.84,-0.75,4.5,4.5,MINT,{adj:33452,alpha:74.9,shadow:1});
+  shape(s,'roundRect',14.16,6.75,11.2,3,WHITE,{adj:0,shadow:1});
+  body(s,15.92,8.03,8.66,1.14,T.loremConsectetuerAdipi6);
+  head(s,15.92,7.39,8.65,0.57,'Your Tittle Here');
+  oval(s,13.3,7.44,1.69,1.69,DEEP,{shadow:1});
+  heart(s,13.56,7.7,1.17,1.17,WHITE);
+  shape(s,'roundRect',14.16,10.5,11.2,3,WHITE,{adj:0,shadow:1});
+  body(s,15.92,11.7,8.66,1.14,T.loremConsectetuerAdipi6);
+  head(s,15.92,11.09,8.65,0.57,'Your Tittle Here');
+  oval(s,13.31,11.16,1.69,1.69,GREEN,{shadow:1});
+  stetho(s,13.57,11.42,1.17,1.17,WHITE);
+}
+function s22(s) {
+  title(s,2.83,2.62,11.29,2.52,'See Pharmedic Best ','Portfolios Here');
+  txt(s,18.58,13.25,1.78,0.45,'TITTLE',{size:20.99,face:PDM,color:WHITE});
+  line(s,20.53,13.5,4.8,0,WHITE,1,{rot:180});
+  body(s,2.83,6.03,11.29,1.69,T.loremConsectetuerAdipi7);
+  body(s,2.83,9.2,4.54,1.14,T.loremSedConsectetuer);
+  head(s,2.83,8.47,4.54,0.57,'Your Tittle Here');
+  body(s,8.07,9.2,6.05,1.14,T.loremConsectetuerAdipi5);
+  head(s,8.07,8.47,6.05,0.57,'Your Tittle Here');
+  photo(s,16.33,1.5,9,11.25,{geom:'round1Rect',adj:16667});
+  txt(s,5.84,11.1,2.25,1.31,'750',{size:71.98,face:PDX,color:GREEN,align:'center'});
+  txt(s,7.6,10.69,1.4,1.31,'+',{size:71.98,face:PDX,color:GREEN,bold:true});
+  body(s,5.84,12.58,2.25,0.58,'Product Sold',{align:'center'});
+  txt(s,2.83,11.1,2.25,1.31,'45',{size:71.98,face:PDX,color:GREEN,align:'center'});
+  txt(s,4.35,10.69,1.4,1.31,'+',{size:71.98,face:PDX,color:GREEN,bold:true});
+  body(s,2.83,12.58,2.25,0.58,'Members',{align:'center'});
+  txt(s,11.84,11.1,2.25,1.31,'360',{size:71.98,face:PDX,color:GREEN,align:'center'});
+  txt(s,13.61,10.69,1.4,1.31,'+',{size:71.98,face:PDX,color:GREEN,bold:true});
+  body(s,11.84,12.58,2.25,0.58,'Project Done',{align:'center'});
+  txt(s,8.84,11.1,2.25,1.31,'110',{size:71.98,face:PDX,color:GREEN,align:'center'});
+  txt(s,10.36,10.69,1.4,1.31,'+',{size:71.98,face:PDX,color:GREEN,bold:true});
+  body(s,8.84,12.58,2.25,0.58,'Networks',{align:'center'});
+  shape(s,'plus',14.08,-0.75,4.5,4.5,MINT,{adj:33452,alpha:74.9,shadow:1});
+}
+function s23(s) {
+  title(s,2.12,7.53,9.71,1.31,'Our ','Portfolios',{color:WHITE});
+  body(s,2.12,9.72,9.71,3.36,['Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna.','',T.pellentesqueHabitantMo],{color:PALE});
+  photo(s,2.08,0.73,9.75,6.02);
+  shape(s,'roundRect',14.1,0.79,11.21,3.21,WHITE,{adj:16667,shadow:1});
+  oval(s,13.24,1.55,1.69,1.69,DEEP,{shadow:1});
+  ambulance(s,13.5,1.81,1.17,1.17,WHITE);
+  body(s,15.85,1.87,8.66,1.69,T.loremConsectetuerAdipi2);
+  head(s,15.85,1.23,8.65,0.57,'Your Tittle Here');
+  shape(s,'roundRect',14.1,4.21,11.21,3.21,WHITE,{adj:16667,shadow:1});
+  oval(s,13.24,4.97,1.69,1.69,GREEN,{shadow:1});
+  heart(s,13.5,5.23,1.17,1.17,WHITE);
+  body(s,15.85,5.28,8.66,1.69,T.loremConsectetuerAdipi2);
+  head(s,15.85,4.65,8.65,0.57,'Your Tittle Here');
+  shape(s,'roundRect',14.1,7.62,11.21,3.21,WHITE,{adj:16667,shadow:1});
+  oval(s,13.24,8.38,1.69,1.69,DEEP,{shadow:1});
+  stetho(s,13.5,8.64,1.17,1.17,WHITE);
+  body(s,15.85,8.7,8.66,1.69,T.loremConsectetuerAdipi2);
+  head(s,15.85,8.07,8.65,0.57,'Your Tittle Here');
+  shape(s,'roundRect',14.1,11.04,11.21,3.21,WHITE,{adj:16667,shadow:1});
+  oval(s,13.24,11.8,1.69,1.69,GREEN,{shadow:1});
+  pill(s,13.5,12.06,1.17,1.17,WHITE);
+  body(s,15.85,12.12,8.66,1.69,T.loremConsectetuerAdipi2);
+  head(s,15.85,11.48,8.65,0.57,'Your Tittle Here');
+}
+function s24(s) {
+  txt(s,8.85,12.98,2.98,1.26,T.loremConsectetuerAdipi5,{size:16,face:LATO,color:PALE,ls:1.5});
+  line(s,8.96,12.75,1.74,0,WHITE,1,{rot:180});
+  txt(s,14.83,2.38,1.78,0.45,'TITTLE',{size:20.99,face:PDM,color:WHITE});
+  line(s,16.78,2.66,2.59,0,WHITE,1,{rot:180});
+  body(s,20.83,1.75,3.75,2.25,'Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. ');
+  body(s,2.08,7.48,4.48,1.14,T.loremConsecteturAdipis);
+  head(s,2.08,6.81,4.48,0.57,'Your Tittle Here');
+  body(s,2.08,10.25,4.48,1.14,T.loremConsecteturAdipis);
+  head(s,2.08,9.58,4.48,0.57,'Your Tittle Here');
+  body(s,2.08,12.92,4.48,0.58,'Lorem ipsum dolor sit amet, ');
+  head(s,2.08,12.24,4.48,0.57,'Your Tittle Here');
+  line(s,20.91,4.48,2.07,0,SAGE,1);
+  title(s,2.12,1.53,11.21,1.31,'Our ','Portfolios');
+  body(s,2.12,3.72,11.21,1.69,T.loremConsectetuerAdipi7);
+  photo(s,8.05,6.75,5.28,5.25);
+  photo(s,14.11,3.75,5.98,9.75);
+  photo(s,20.83,5.25,5.83,9.75);
+}
+function s25(s) {
+  txt(s,2.08,10.2,2.25,2.47,'Pellentesque  dolor habitant morbi ae tristique senectus et netus et malesuada fames ac turpis telus pharetra nonummy',{size:16,face:LATO,color:PALE,ls:1.5});
+  txt(s,2.08,9.05,2.25,0.54,'Your Tittle',{size:20,face:LATO,color:PALE,bold:true,ls:1.5});
+  line(s,2.19,9.96,1.32,0,WHITE,1,{rot:180});
+  title(s,14.12,1.53,10.46,1.31,'Our ','Portfolios');
+  body(s,14.12,3.72,10.46,3.36,['Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus amet malesuada libero, sit amet commodo magna eros quis urna.','',T.pellentesqueHabitantMo]);
+  photo(s,1.33,1.53,11.25,5.97);
+  photo(s,5.08,8.29,7.5,5.21);
+  photo(s,13.33,8.29,5.25,6.71);
+  photo(s,19.33,8.29,5.25,6.71);
+}
+function s26(s) {
+  txt(s,2.08,2.58,9,2.52,[{text:'See Our Latest '},{text:'Amazing',options:{italic:true}},{text:' '},{text:'Gallery',options:{italic:true}}],{size:71.98,face:PDX,color:GREEN});
+  body(s,11.85,2.81,5.23,1.69,'Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Proin pharetra');
+  head(s,11.83,1.56,5.26,0.57,'Your Tittle Here');
+  line(s,12.06,2.56,3.66,0,GREEN,1);
+  txt(s,7.33,12.98,2.98,1.26,T.loremConsectetuerAdipi5,{size:16,face:LATO,color:PALE,ls:1.5});
+  line(s,7.44,12.75,1.74,0,WHITE,1,{rot:180});
+  txt(s,18.58,12.92,1.78,0.45,'TITTLE',{size:20.99,face:PDM,color:WHITE});
+  line(s,20.53,13.17,4.8,0,WHITE,1,{rot:180});
+  photo(s,17.83,1.5,8.25,10.5);
+  photo(s,11.84,5.25,5.24,9.75);
+  photo(s,1.33,6.75,4.5,8.25);
+  photo(s,6.58,6.75,4.5,5.25);
+}
+function s27(s) {
+  tablet(s,2.83,1.68,8.92,11.64);
+  title(s,14.12,3,9.71,1.31,'Our ','Mockup Here');
+  body(s,14.12,5.2,9.71,1.69,[T.pellentesqueHabitantMo,T.nuncViverraImperdiet]);
+  body(s,16.09,8.31,7.74,1.14,T.loremConsectetuerAdipi);
+  head(s,16.1,7.67,7.75,0.57,'Your Tittle Here');
+  body(s,16.09,10.86,7.74,1.14,T.loremConsectetuerAdipi);
+  head(s,16.1,10.14,7.75,0.57,'Your Tittle Here');
+  oval(s,13.91,10.25,1.69,1.69,GREEN,{shadow:1});
+  pill(s,14.17,10.51,1.17,1.17,WHITE);
+  oval(s,13.91,7.73,1.69,1.69,DEEP,{shadow:1});
+  stetho(s,14.17,7.99,1.17,1.17,WHITE);
+}
+function s28(s) {
+  title(s,2.09,3,8.23,1.31,'Our ','Mockup');
+  body(s,2.09,5.2,8.23,1.69,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit sit. Maecenas porttitor congue massa. Fusce posuere, magna aesed pulvinar ultricies, purus lectus malesuada libero');
+  body(s,2.08,8.31,8.24,1.14,T.loremConsectetuerAdipi);
+  head(s,2.08,7.67,8.25,0.57,'Your Tittle Here');
+  body(s,2.08,10.86,8.24,1.14,T.loremConsectetuerAdipi);
+  head(s,2.09,10.14,8.24,0.57,'Your Tittle Here');
+  tablet(s,11.77,1.68,8.92,11.64);
+  tablet(s,21.23,1.68,8.92,11.64);
+}
+function s29(s) {
+  phone(s,14.05,2.52,4.98,9.98);
+  phone(s,19.51,2.56,4.98,9.98);
+  title(s,2.83,3.59,9.75,1.31,'Phone ','Mockups');
+  body(s,2.83,5.73,9.75,3.91,[T.loremConsectetuerAdipi3,'',T.pellentesqueHabitantMo]);
+  shape(s,'roundRect',3,10.51,3.75,0.9,GREEN,{adj:50000,shadow:1});
+  txt(s,3.67,10.73,2.74,0.44,'VIEW MORE',{size:20,face:PDS,color:WHITE,bold:true,align:'center'});
+  oval(s,2.55,10.43,1.05,1.05,WHITE,{shadow:1});
+  shape(s,'plus',2.77,10.66,0.61,0.61,DEEP,{adj:33452});
+}
+function s30(s) {
+  title(s,1.35,1.67,23.98,1.31,'See Our Amazing ','Phone Mockups',{color:WHITE,align:'center'});
+  phone(s,2.3,3.86,4.98,9.98);
+  phone(s,7.93,3.85,4.98,9.98);
+  phone(s,13.61,3.84,4.98,9.98);
+  phone(s,19.52,3.84,4.98,9.98);
+}
+function s31(s) {
+  title(s,2.12,3.97,8.21,1.31,'Laptop ','Mockup');
+  body(s,2.12,6.12,8.21,2.25,'Lorem ipsum dolor sit amet, consectetuer adipiscing elit sed. Maecenas porttitor congue massa. Fusce posuere, magna ae sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna.');
+  shape(s,'roundRect',2.28,9.27,3.75,0.9,GREEN,{adj:50000,shadow:1});
+  txt(s,2.95,9.5,2.74,0.44,'VIEW MORE',{size:20,face:PDS,color:WHITE,bold:true,align:'center'});
+  oval(s,1.83,9.2,1.05,1.05,WHITE,{shadow:1});
+  shape(s,'plus',2.05,9.42,0.61,0.61,DEEP,{adj:33452});
+  laptop(s,12.16,2.9,15.13,9.1);
+  shape(s,'plus',11.25,0.75,4.5,4.5,MINT,{adj:33452,alpha:74.9,shadow:1});
+}
+function s32(s) {
+  notchArrow(s,2.82,4.67,4.61,3.71,DEEP,{shadow:1});
+  notchArrow(s,6.51,4.67,4.61,3.71,GREEN,{shadow:1});
+  notchArrow(s,10.23,4.67,4.61,3.71,DEEP,{shadow:1});
+  txt(s,4.32,6.22,2.25,0.6,'STEP ONE',{size:21.99,face:POPPINS,color:WHITE,ls:1.5});
+  txt(s,8.05,6.22,2.25,0.6,'STEP TWO',{size:21.99,face:POPPINS,color:WHITE,ls:1.5});
+  txt(s,11.81,6.22,2.25,0.6,'STEP THREE',{size:21.99,face:POPPINS,color:WHITE,ls:1.5});
+  notchArrow(s,11.82,9.63,4.61,3.71,GREEN,{flipH:true,shadow:1});
+  notchArrow(s,15.52,9.63,4.61,3.71,DEEP,{flipH:true,shadow:1});
+  notchArrow(s,19.23,9.63,4.61,3.71,GREEN,{flipH:true,shadow:1});
+  txt(s,12.59,11.17,2.25,0.6,'STEP FOUR',{size:21.99,face:POPPINS,color:WHITE,ls:1.5,align:'right'});
+  txt(s,16.33,11.17,2.25,0.6,'STEP FIVE',{size:21.99,face:POPPINS,color:WHITE,ls:1.5,align:'right'});
+  txt(s,20.08,11.17,2.25,0.6,'STEP SIX',{size:21.99,face:POPPINS,color:WHITE,ls:1.5,align:'right'});
+  title(s,1.33,1.54,24,1.31,'Our Best ','Infographics Here',{align:'center'});
+  body(s,15.61,6.5,5.98,1.69,T.loremConsectetuerAdipi8);
+  head(s,15.58,5.25,6,0.57,'Your Tittle Here');
+  line(s,15.81,6.25,4.14,0,GREEN,1,{rot:180,flipH:true});
+  body(s,4.34,11.01,5.98,1.69,T.loremConsectetuerAdipi8,{align:'right'});
+  head(s,4.32,9.77,6,0.57,'Your Tittle Here',{align:'right'});
+  line(s,6,10.77,4.14,0,GREEN,1,{rot:180,flipH:true});
+}
+function s33(s) {
+  line(s,3.89,8.77,0,0.83,GREEN,3,{tail:'oval'});
+  line(s,8.39,8.77,0,1.58,DEEP,3,{tail:'oval'});
+  line(s,12.89,8.77,0,0.83,GREEN,3,{tail:'oval'});
+  line(s,17.38,8.77,0,1.58,DEEP,3,{tail:'oval'});
+  line(s,21.91,8.77,0,0.83,GREEN,3,{tail:'oval'});
+  shape(s,'chevron',1.69,4.78,5.2,3.32,DEEP,{adj:33494,shadow:1});
+  shape(s,'chevron',6.21,4.78,5.2,3.32,GREEN,{adj:33494,shadow:1});
+  shape(s,'chevron',10.73,4.78,5.2,3.32,DEEP,{adj:33494,shadow:1});
+  shape(s,'chevron',15.25,4.78,5.2,3.32,GREEN,{adj:33494,shadow:1});
+  shape(s,'chevron',19.77,4.78,5.2,3.32,DEEP,{adj:33494,shadow:1});
+  txt(s,3.26,5.83,2.28,1.2,'01',{size:47.99,face:POPPINS,color:WHITE,ls:1.5,align:'center'});
+  txt(s,7.76,5.83,2.28,1.2,'02',{size:47.99,face:POPPINS,color:WHITE,ls:1.5,align:'center'});
+  txt(s,12.28,5.83,2.28,1.2,'03',{size:47.99,face:POPPINS,color:WHITE,ls:1.5,align:'center'});
+  txt(s,16.78,5.83,2.28,1.2,'04',{size:47.99,face:POPPINS,color:WHITE,ls:1.5,align:'center'});
+  txt(s,21.27,5.83,2.21,1.2,'05',{size:47.99,face:POPPINS,color:WHITE,ls:1.5,align:'center'});
+  cap(s,2,10.8,3.79,1.56,T.maecenasPorttitorCongu,{align:'center'});
+  capHead(s,1.99,10.19,3.77,0.57,'Your Tittle',{align:'center'});
+  cap(s,10.95,10.8,3.79,1.56,T.maecenasPorttitorCongu,{align:'center'});
+  capHead(s,10.95,10.19,3.77,0.57,'Your Tittle',{align:'center'});
+  cap(s,19.95,10.8,3.79,1.56,T.maecenasPorttitorCongu,{align:'center'});
+  capHead(s,19.95,10.19,3.77,0.57,'Your Tittle',{align:'center'});
+  cap(s,6.49,11.47,3.79,1.56,T.maecenasPorttitorCongu,{align:'center'});
+  capHead(s,6.49,10.86,3.77,0.57,'Your Tittle',{align:'center'});
+  cap(s,15.47,11.47,3.79,1.56,T.maecenasPorttitorCongu,{align:'center'});
+  capHead(s,15.47,10.86,3.77,0.57,'Your Tittle',{align:'center'});
+  line(s,3.3,12.74,1.18,0,GREEN,4.5);
+  line(s,7.8,13.42,1.18,0,GREEN,4.5);
+  line(s,12.26,12.74,1.18,0,GREEN,4.5);
+  line(s,21.26,12.74,1.18,0,GREEN,4.5);
+  line(s,16.77,13.42,1.18,0,GREEN,4.5);
+  title(s,1.33,1.54,24,1.31,'Our Best ','Infographics Here',{align:'center'});
+}
+function s34(s) {
+  calloutArrow(s,18.41,5.23,6.01,3.75,GREEN,{shadow:1});
+  line(s,4.46,8.63,0,0.83,DEEP,3,{tail:'oval'});
+  line(s,9.67,9.36,0,0.83,GREEN,3,{tail:'oval'});
+  line(s,14.96,8.63,0,0.83,DEEP,3,{tail:'oval'});
+  line(s,20.14,9.36,0,0.83,GREEN,3,{tail:'oval'});
+  cap(s,2.58,10.56,3.79,1.56,T.maecenasPorttitorCongu,{align:'center'});
+  calloutArrow(s,13.03,4.5,6.01,3.75,DEEP,{shadow:1});
+  capHead(s,2.58,9.95,3.77,0.57,'Your Tittle',{align:'center'});
+  cap(s,13.08,10.56,3.79,1.56,T.maecenasPorttitorCongu,{align:'center'});
+  capHead(s,13.08,9.95,3.77,0.57,'Your Tittle',{align:'center'});
+  cap(s,7.8,11.65,3.79,1.56,T.maecenasPorttitorCongu,{align:'center'});
+  capHead(s,7.8,11.05,3.77,0.57,'Your Tittle',{align:'center'});
+  cap(s,18.21,11.65,3.79,1.56,T.maecenasPorttitorCongu,{align:'center'});
+  capHead(s,18.2,11.05,3.77,0.57,'Your Tittle',{align:'center'});
+  line(s,3.88,12.67,1.18,0,GREEN,4.5);
+  line(s,9.11,13.75,1.18,0,GREEN,4.5);
+  line(s,14.38,12.67,1.18,0,GREEN,4.5);
+  calloutArrow(s,7.63,5.23,6.01,3.75,GREEN,{shadow:1});
+  line(s,19.51,13.75,1.18,0,GREEN,4.5);
+  txt(s,13.46,5.78,3.75,1.2,'03',{size:47.99,face:POPPINS,color:WHITE,ls:1.5,align:'center'});
+  txt(s,18.91,6.51,3.75,1.2,'04',{size:47.99,face:POPPINS,color:WHITE,ls:1.5,align:'center'});
+  txt(s,8.07,6.51,3.75,1.2,'02',{size:47.99,face:POPPINS,color:WHITE,ls:1.5,align:'center'});
+  calloutArrow(s,2.24,4.5,6.01,3.75,DEEP,{shadow:1});
+  txt(s,2.62,5.78,3.75,1.2,'01',{size:47.99,face:POPPINS,color:WHITE,ls:1.5,align:'center'});
+  title(s,1.33,1.54,24,1.31,'Our Best ','Infographics Here',{align:'center'});
+}
+function s35(s) {
+  shape(s,'hexagon',8.35,4.61,5.15,4.44,WHITE,{adj:25000,rot:90,shadow:1});
+  shape(s,'hexagon',13.09,4.61,5.15,4.44,WHITE,{adj:25000,rot:90,shadow:1});
+  shape(s,'hexagon',5.98,8.92,5.15,4.44,WHITE,{adj:25000,rot:90,shadow:1});
+  shape(s,'hexagon',10.72,8.92,5.15,4.44,GREEN,{adj:25000,rot:90,shadow:1});
+  shape(s,'hexagon',15.46,8.92,5.15,4.44,WHITE,{adj:25000,rot:90,shadow:1});
+  txt(s,9.59,5.87,2.66,1.21,'567',{size:65.98,face:PD,color:GREEN,bold:true,align:'center'});
+  txt(s,9.1,7.23,3.79,0.72,'Your Tittle Here',{size:28,face:PD,color:GREEN,ls:1.5,align:'center'});
+  txt(s,14.26,5.87,2.66,1.21,'180',{size:65.98,face:PD,color:GREEN,bold:true,align:'center'});
+  txt(s,13.76,7.23,3.79,0.72,'Your Tittle Here',{size:28,face:PD,color:GREEN,ls:1.5,align:'center'});
+  txt(s,7.15,10.18,2.66,1.21,'456',{size:65.98,face:PD,color:GREEN,bold:true,align:'center'});
+  txt(s,6.66,11.54,3.79,0.72,'Your Tittle Here',{size:28,face:PD,color:GREEN,ls:1.5,align:'center'});
+  txt(s,11.89,10.14,2.66,1.21,'456',{size:65.98,face:PD,color:WHITE,bold:true,align:'center'});
+  txt(s,11.4,11.49,3.79,0.64,'Your Tittle Here',{size:23.99,face:MERRI,color:PALE,ls:1.5,align:'center'});
+  cap(s,2.51,6.35,5.24,1.56,T.maecenasPorttitorCongu2,{align:'right'});
+  capHead(s,2.51,5.74,5.24,0.57,'Your Tittle Here',{align:'right'});
+  cap(s,1.75,10.66,3.74,1.56,T.pellentesqueHabitantMo2,{align:'right'});
+  capHead(s,1.75,10.05,3.74,0.57,'Your Tittle',{align:'right'});
+  cap(s,18.91,6.35,5.24,1.56,T.maecenasPorttitorCongu2);
+  capHead(s,18.91,5.74,5.24,0.57,'Your Tittle Here');
+  cap(s,21.16,10.66,3.74,1.56,T.pellentesqueHabitantMo2);
+  capHead(s,21.16,10.05,3.74,0.57,'Your Tittle');
+  title(s,1.33,1.54,24,1.31,'Our Best ','Infographics Here',{align:'center'});
+  heart(s,16.86,9.96,2.35,2.35,DEEP);
+}
+function s36(s) {
+  title(s,1.33,1.54,24,1.31,'Our Best ','Infographics Here',{align:'center'});
+  cap(s,3.43,10.23,3.79,1.56,T.maecenasPorttitorCongu,{align:'center'});
+  capHead(s,3.44,9.62,3.77,0.57,'Your Tittle',{align:'center'});
+  cap(s,13.85,10.23,3.79,1.56,T.maecenasPorttitorCongu,{align:'center'});
+  capHead(s,13.85,9.62,3.77,0.57,'Your Tittle',{align:'center'});
+  cap(s,8.64,11.39,3.79,1.56,T.maecenasPorttitorCongu,{align:'center'});
+  capHead(s,8.65,10.78,3.77,0.57,'Your Tittle',{align:'center'});
+  cap(s,19.05,11.39,3.79,1.56,T.maecenasPorttitorCongu,{align:'center'});
+  capHead(s,19.06,10.78,3.77,0.57,'Your Tittle',{align:'center'});
+  line(s,9.95,13.5,1.18,0,GREEN,4.5);
+  line(s,4.74,12.33,1.18,0,GREEN,4.5);
+  line(s,20.36,13.5,1.18,0,GREEN,4.5);
+  line(s,15.15,12.33,1.18,0,GREEN,4.5);
+  shape(s,'hexagon',13.57,5.08,4.35,3.75,DEEP,{adj:25000,alpha:94.9,shadow:1});
+  shape(s,'hexagon',16.61,7.37,1.69,1.45,WHITE,{adj:25000});
+  txt(s,16.61,7.37,1.69,1.45,'03',{size:48,face:PD,color:GREEN,bold:true,align:'center',valign:'middle',shadow:1});
+  shape(s,'hexagon',14.02,5.47,3.43,2.96,null,{adj:25000,line:{color:WHITE,width:1}});
+  heart(s,15.03,6.24,1.43,1.43,WHITE);
+  shape(s,'hexagon',3.15,5.08,4.35,3.75,DEEP,{adj:25000,alpha:94.9,shadow:1});
+  shape(s,'hexagon',6.21,7.37,1.69,1.45,WHITE,{adj:25000});
+  txt(s,6.21,7.37,1.69,1.45,'01',{size:48,face:PD,color:GREEN,bold:true,align:'center',valign:'middle',shadow:1});
+  shape(s,'hexagon',3.61,5.47,3.43,2.96,null,{adj:25000,line:{color:WHITE,width:1}});
+  ambulance(s,4.61,6.24,1.43,1.43,WHITE);
+  shape(s,'hexagon',8.37,6.24,4.35,3.75,GREEN,{adj:25000,alpha:94.9,shadow:1});
+  shape(s,'hexagon',11.42,8.54,1.69,1.45,WHITE,{adj:25000});
+  txt(s,11.42,8.54,1.69,1.45,'02',{size:48,face:PD,color:DEEP,bold:true,align:'center',valign:'middle',shadow:1});
+  shape(s,'hexagon',8.83,6.63,3.43,2.96,null,{adj:25000,line:{color:WHITE,width:1}});
+  stetho(s,9.83,7.4,1.43,1.43,WHITE);
+  shape(s,'hexagon',18.77,6.24,4.35,3.75,GREEN,{adj:25000,alpha:94.9,shadow:1});
+  shape(s,'hexagon',21.82,8.54,1.69,1.45,WHITE,{adj:25000});
+  txt(s,21.82,8.54,1.69,1.45,'04',{size:48,face:PD,color:DEEP,bold:true,align:'center',valign:'middle',shadow:1});
+  shape(s,'hexagon',19.23,6.63,3.43,2.96,null,{adj:25000,line:{color:WHITE,width:1}});
+  pill(s,20.23,7.4,1.43,1.43,WHITE);
+}
+function s37(s) {
+  cap(s,18.57,6.27,5.24,1.56,T.maecenasPorttitorCongu2);
+  capHead(s,18.58,5.67,5.21,0.57,'Your Tittle Here');
+  cap(s,18.57,10.02,5.24,1.56,T.maecenasPorttitorCongu2);
+  capHead(s,18.58,9.42,5.21,0.57,'Your Tittle Here');
+  cap(s,2.85,6.27,5.24,1.56,T.maecenasPorttitorCongu2,{align:'right'});
+  capHead(s,2.85,5.67,5.24,0.57,'Your Tittle Here',{align:'right'});
+  cap(s,2.85,10.02,5.24,1.56,T.maecenasPorttitorCongu2,{align:'right'});
+  capHead(s,2.85,9.42,5.24,0.57,'Your Tittle Here',{align:'right'});
+  title(s,1.33,1.54,24,1.31,'Our Best ','Infographics Here',{align:'center'});
+  shape(s,'teardrop',13.6,9.13,4.21,4.21,DEEP,{adj:112897,rot:270,shadow:1});
+  shape(s,'teardrop',9.13,9.13,3.96,3.96,GREEN,{adj:112897,shadow:1});
+  shape(s,'teardrop',13.6,4.67,3.96,3.96,GREEN,{adj:112897,rot:270,flipH:true,shadow:1});
+  shape(s,'teardrop',9.4,4.94,3.69,3.69,DEEP,{adj:112897,rot:180,flipH:true,shadow:1});
+  heart(s,10.39,10.4,1.43,1.43,WHITE);
+  ambulance(s,10.53,6.07,1.43,1.43,WHITE);
+  stetho(s,14.87,5.93,1.43,1.43,WHITE);
+  pill(s,14.99,10.52,1.43,1.43,WHITE);
+}
+function s38(s) {
+  shape(s,'hexagon',11.48,3.95,3.63,3.23,DEEP,{adj:25000,shadow:1});
+  shape(s,'hexagon',11.48,10.85,3.63,3.23,GREEN,{adj:25000,shadow:1});
+  shape(s,'hexagon',8.46,9.13,3.63,3.23,DEEP,{adj:25000,shadow:1});
+  shape(s,'hexagon',14.56,9.13,3.63,3.23,DEEP,{adj:25000,shadow:1});
+  shape(s,'hexagon',8.46,5.66,3.63,3.23,GREEN,{adj:25000,shadow:1});
+  shape(s,'hexagon',14.56,5.66,3.63,3.23,GREEN,{adj:25000,shadow:1});
+  shape(s,'hexagon',11.48,7.43,3.63,3.23,WHITE,{adj:25000,shadow:1});
+  txt(s,12.59,5.01,1.42,1.11,'02',{size:59.99,face:POPPINS,color:WHITE,bold:true,align:'center',rotate:338.4});
+  txt(s,9.57,6.72,1.42,1.11,'01',{size:59.99,face:POPPINS,color:WHITE,bold:true,align:'center',rotate:338.4});
+  txt(s,15.67,6.72,1.42,1.11,'03',{size:59.99,face:POPPINS,color:WHITE,bold:true,align:'center',rotate:338.4});
+  txt(s,9.57,10.19,1.42,1.11,'06',{size:59.99,face:POPPINS,color:WHITE,bold:true,align:'center',rotate:338.4});
+  txt(s,15.67,10.19,1.42,1.11,'04',{size:59.99,face:POPPINS,color:WHITE,bold:true,align:'center',rotate:338.4});
+  txt(s,12.59,11.91,1.42,1.11,'05',{size:59.99,face:POPPINS,color:WHITE,bold:true,align:'center',rotate:338.4});
+  glyph(s,12.73,8.51,1.14,1.07,DEEP);
+  cap(s,19.35,5.36,5.24,1.56,T.maecenasPorttitorCongu2);
+  capHead(s,19.35,4.76,5.24,0.57,'Your Tittle Here');
+  cap(s,19.32,8.54,5.25,1.56,T.maecenasPorttitorCongu2);
+  capHead(s,19.35,7.94,5.22,0.57,'Your Tittle Here');
+  cap(s,19.35,11.71,5.24,1.56,T.maecenasPorttitorCongu2);
+  capHead(s,19.35,11.1,5.24,0.57,'Your Tittle Here');
+  cap(s,2.06,5.36,5.27,1.56,T.maecenasPorttitorCongu2,{align:'right'});
+  capHead(s,2.09,4.76,5.24,0.57,'Your Tittle Here',{align:'right'});
+  cap(s,2.09,8.54,5.24,1.56,T.maecenasPorttitorCongu2,{align:'right'});
+  capHead(s,2.09,7.94,5.24,0.57,'Your Tittle Here',{align:'right'});
+  cap(s,2.06,11.71,5.27,1.56,T.maecenasPorttitorCongu2,{align:'right'});
+  capHead(s,2.09,11.1,5.24,0.57,'Your Tittle Here',{align:'right'});
+  title(s,1.33,1.54,24,1.31,'Our Best ','Infographics Here',{align:'center'});
+}
+function s39(s) {
+  title(s,14.83,3.03,9.75,1.31,'Get In ','Touch!');
+  body(s,14.83,5.21,9.75,2.25,['Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas sed porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, ae purus lectus malesuada libero, sit amet commodo magna eros quis urna.',T.nuncViverraImperdiet]);
+  photo(s,1.33,2.25,11.21,11.25,{geom:'plus',adj:19985});
+  shape(s,'roundRect',15.25,8.17,6.33,1.37,WHITE,{adj:16667,shadow:1});
+  oval(s,14.72,8.28,1.16,1.16,DEEP,{shadow:1});
+  mail(s,15,8.56,0.6,0.6,WHITE);
+  shape(s,'roundRect',15.25,9.69,6.33,1.37,WHITE,{adj:16667,shadow:1});
+  oval(s,14.72,9.8,1.16,1.16,GREEN,{shadow:1});
+  call(s,15,10.08,0.6,0.6,WHITE);
+  place(s,15,11.62,0.6,0.6,WHITE);
+  shape(s,'roundRect',15.25,11.22,6.33,1.37,WHITE,{adj:16667,shadow:1});
+  oval(s,14.73,11.34,1.16,1.16,DEEP,{shadow:1});
+  txt(s,16.35,8.6,4.48,0.5,'Info@Pharmedic.com',{size:23.99,face:PDS,color:TEAL});
+  txt(s,16.35,10.12,4.48,0.5,'+00 1234 5678 90',{size:23.99,face:PDS,color:TEAL});
+  txt(s,16.35,11.65,4.48,0.5,'08 Highway St. New York',{size:23.99,face:PDS,color:TEAL});
+}
+function s40(s) {
+  photo(s,11.08,1.5,14.25,13.48);
+  shape(s,'plus',21.6,11.25,4.5,4.5,MINT,{adj:33452,alpha:74.9,shadow:1});
+  rect(s,2.83,4.46,4.92,2.29,MINT,{shadow:1});
+  body(s,2.87,11.28,5.97,1.69,T.pellentesqueHabitantMo3);
+  txt(s,2.87,4.46,20.96,3.97,[{text:'Thank ',options:{bold:true}},{text:'You',options:{italic:true,bold:true}}],{size:229.94,face:PD,color:GREEN,bold:true});
+  line(s,2.99,11,2.84,0,GREEN,1);
+  line(s,3.02,8,15.34,0,GREEN2,6);
+}const DECK = [
+  [L2, s1],
+  [L3, s2],
+  [L4, s3],
+  [L5, s4],
+  [L6, s5],
+  [L1, s6],
+  [L7, s7],
+  [L8, s8],
+  [L9, s9],
+  [L9, s10],
+  [L10, s11],
+  [L11, s12],
+  [L12, s13],
+  [L13, s14],
+  [L14, s15],
+  [L15, s16],
+  [L16, s17],
+  [L17, s18],
+  [L2, s19],
+  [L1, s20],
+  [L18, s21],
+  [L11, s22],
+  [L19, s23],
+  [L20, s24],
+  [L21, s25],
+  [L22, s26],
+  [L23, s27],
+  [L1, s28],
+  [L24, s29],
+  [L25, s30],
+  [L1, s31],
+  [L26, s32],
+  [L26, s33],
+  [L26, s34],
+  [L26, s35],
+  [L26, s36],
+  [L26, s37],
+  [L26, s38],
+  [L3, s39],
+  [L2, s40],
+];
+/* ------------------------------ assemble --------------------------------- */
+
+const deck = new pptxgen();
+deck.defineLayout({ name: 'PHARMEDIC', width: 26.66, height: 15 });
+deck.layout = 'PHARMEDIC';
+deck.author = 'Pharmedic';
+deck.title = 'Pharmedic';
+
+DECK.forEach(([decor, build], i) => {
+  const s = deck.addSlide();
+  s.background = { color: WHITE };
+  master(s, i + 1);
+  decor(s, i + 1);
+  build(s);
+});
+
+const out = path.join(__dirname, path.basename(__filename, '.js') + '.pptx');
+deck.writeFile({ fileName: out }).then(() => console.log('wrote ' + out));

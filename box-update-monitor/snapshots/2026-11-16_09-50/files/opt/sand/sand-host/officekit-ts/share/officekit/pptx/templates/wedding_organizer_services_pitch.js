@@ -1,0 +1,1877 @@
+/**
+ * "Wedding Organizer / WedCraft" deck - rebuilt with pptxgenjs.
+ *
+ * Run: node 0879877a-2c92-45bb-b73a-8f2f8a8d179f_grok_final.js
+ * Writes 0879877a-2c92-45bb-b73a-8f2f8a8d179f_grok_final.pptx next to this file.
+ *
+ * All measurements are inches on a 13.333 x 7.5 slide.
+ * Photographs in the original are redrawn as flat grey "[image]" placeholders.
+ */
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ theme */
+
+const BROWN = '755B33'; // accent2 - primary gold/brown
+const DARK = '4E4943'; // accent1 - warm charcoal
+const CREAM = 'F1EDE8'; // accent3 - background tint
+const INK = '262626'; // body copy
+const WHITE = 'FFFFFF';
+const RULE = 'BCB7B0'; // hairline rules under the nav bar
+const TAUPE = '9A9289';
+const SAND = 'C1A170';
+const STONE = 'BCB7B0';
+const DUNE = 'D5C0A0';
+const ESPRESSO = '3A2E1A'; // brown card shadow
+const SOOT = '272422'; // dark card shadow
+const COFFEE = '3A3732';
+const BARK = '584426';
+const IMG = 'CCCCCC'; // photo placeholder grey
+const IMG_LBL = 'A8A8A8';
+
+const SERIF = 'Playfair Display';
+const SANS = 'Open Sans';
+const MONO = 'Work Sans';
+
+const HAIR = 0.75; // pt - theme's thin outline weight
+const THIN = 1.0; // pt - explicit 1pt outlines
+
+/**
+ * pptxgenjs exposes preset-geometry adjust handles only through `angleRange`,
+ * which writes `deg * 60000` into <a:gd name="adj1|adj2">. Feeding it the raw
+ * OOXML values divided by 60000 round-trips them unchanged.
+ */
+const adj = (a1, a2) => ({ angleRange: [a1 / 60000, a2 / 60000] });
+const ARCH = adj(50000, 0); // round2SameRect: half-round top, square bottom
+const PILL = adj(50000, 50000); // round2SameRect: fully rounded both ends
+const TAB = adj(50000, 16667); // snipRoundRect: round left, snip right
+
+const solid = (color, transparency) =>
+	transparency ? { color, transparency } : { color };
+const stroke = (color, width) => ({ color, width: width || HAIR });
+
+/** Bezier handle length for a circular quarter arc of radius r. */
+const K = 0.5523;
+
+/** Quarter ring (outer radius s, inner radius r) hollowed at its top-left. */
+function quarterRing(s, r) {
+	return [
+		{ x: r, y: 0 },
+		{ x: s, y: 0 },
+		{ x: 0, y: s, curve: { type: 'cubic', x1: s, y1: s * K, x2: s * K, y2: s } },
+		{ x: 0, y: r },
+		{ x: r, y: 0, curve: { type: 'cubic', x1: r * K, y1: r, x2: r, y2: r * K } },
+		{ close: true },
+	];
+}
+
+/** Right triangle with the square corner softened - the pinwheel tile. */
+function foldedTile(s, r) {
+	return [
+		{ x: r, y: 0 },
+		{ x: s, y: 0 },
+		{ x: 0, y: s },
+		{ x: 0, y: r },
+		{
+			x: r,
+			y: 0,
+			curve: { type: 'cubic', x1: 0, y1: r * (1 - K), x2: r * (1 - K), y2: 0 },
+		},
+		{ close: true },
+	];
+}
+
+/** Card header tab: square on top, sweeping down-left into the card below. */
+function headerTab(w, h) {
+	return [
+		{ x: 0, y: 0 },
+		{ x: w, y: 0 },
+		{ x: w, y: 0.377 * h },
+		{
+			x: 0.759 * w,
+			y: 0.736 * h,
+			curve: { type: 'cubic', x1: w, y1: 0.575 * h, x2: 0.892 * w, y2: 0.736 * h },
+		},
+		{ x: 0.177 * w, y: 0.736 * h },
+		{
+			x: 0,
+			y: h,
+			curve: { type: 'cubic', x1: 0.079 * w, y1: 0.736 * h, x2: 0, y2: 0.854 * h },
+		},
+		{ close: true },
+	];
+}
+
+/* ---------------------------------------------------------------- helpers */
+
+/** Body copy / labels. `runs` is a string or an array of {text, options}. */
+function text(slide, runs, o) {
+	slide.addText(runs, {
+		x: o.x,
+		y: o.y,
+		w: o.w,
+		h: o.h,
+		fontFace: o.font || SANS,
+		fontSize: o.size || 10.5,
+		color: o.color || INK,
+		bold: o.bold || false,
+		italic: o.italic || false,
+		align: o.align || 'left',
+		valign: o.valign || 'top',
+		lineSpacingMultiple: o.lh || 1.0,
+		paraSpaceAfter: o.after || 0,
+		margin: [7.2, 7.2, 3.6, 3.6],
+		wrap: true,
+	});
+}
+
+/**
+ * Single-line caption. The original boxes are sized to the millimetre, which
+ * leaves no slack for renderer-to-renderer metric drift, so widen by a hair
+ * (symmetrically when centred) to guarantee the line never breaks.
+ */
+const SLACK = 0.3;
+function label(slide, str, o) {
+	const centred = o.align === 'center';
+	text(slide, str, {
+		...o,
+		x: centred ? o.x - SLACK / 2 : o.x,
+		w: o.w + SLACK,
+	});
+}
+
+/** Two-tone headline: black lead-in + brown accent (or the reverse). */
+function headline(slide, o) {
+	slide.addText(
+		o.parts.map((p) => ({ text: p[0], options: { color: p[1] || INK } })),
+		{
+			x: o.x,
+			y: o.y,
+			w: o.w,
+			h: o.h || 0.707,
+			fontFace: SERIF,
+			fontSize: o.size || 36,
+			align: o.align || 'left',
+			valign: 'top',
+			margin: [7.2, 7.2, 3.6, 3.6],
+		}
+	);
+}
+
+/** Centred caption inside a filled shape (pills, circles, badges). */
+function badge(slide, shape, o) {
+	slide.addShape(shape, {
+		x: o.x,
+		y: o.y,
+		w: o.w,
+		h: o.h,
+		fill: o.fill ? solid(o.fill) : null,
+		line: o.line || null,
+		...(o.geom || {}),
+		...(o.rectRadius ? { rectRadius: o.rectRadius } : {}),
+	});
+	if (o.label !== undefined) {
+		slide.addText(o.label, {
+			x: o.x,
+			y: o.y,
+			w: o.w,
+			h: o.h,
+			fontFace: SANS,
+			fontSize: o.size || 18,
+			bold: true,
+			color: o.labelColor || WHITE,
+			align: 'center',
+			valign: 'middle',
+			margin: 0,
+		});
+	}
+}
+
+/** Grey stand-in for a cropped photograph. */
+function photo(slide, o) {
+	slide.addShape(o.shape || 'rect', {
+		x: o.x,
+		y: o.y,
+		w: o.w,
+		h: o.h,
+		fill: solid(IMG),
+		line: null,
+		...(o.geom || {}),
+		...(o.rectRadius !== undefined ? { rectRadius: o.rectRadius } : {}),
+		...(o.rotate ? { rotate: o.rotate } : {}),
+		...(o.flipH ? { flipH: true } : {}),
+	});
+	if (o.w > 0.9 && o.h > 0.6) {
+		slide.addText('[image]', {
+			x: o.x,
+			y: o.y + o.h / 2 - 0.2,
+			w: o.w,
+			h: 0.4,
+			fontFace: SANS,
+			fontSize: 12,
+			color: IMG_LBL,
+			align: 'center',
+			valign: 'middle',
+			margin: 0,
+		});
+	}
+}
+
+/** The scattered cream diamonds used as confetti on the editorial slides. */
+function diamonds(slide, list) {
+	list.forEach(([x, y, w, h]) =>
+		slide.addShape('flowChartDecision', {
+			x,
+			y,
+			w,
+			h,
+			fill: solid(CREAM),
+			line: null,
+		})
+	);
+}
+
+/**
+ * Big background wash with one hugely rounded corner (bigger than any preset
+ * radius allows), assembled from two rectangles plus a quarter ellipse.
+ */
+function cornerWash(slide, o) {
+	const { x, y, w, h, rx, ry, color } = o;
+	const fill = solid(color);
+	slide.addShape('rect', { x: x + rx, y, w: w - rx, h, fill, line: null });
+	slide.addShape('rect', { x, y: y + ry, w, h: h - ry, fill, line: null });
+	slide.addShape('ellipse', {
+		x,
+		y,
+		w: rx * 2,
+		h: ry * 2,
+		fill,
+		line: null,
+	});
+}
+
+/* ------------------------------------------------------------------ icons */
+
+/**
+ * Line-art icons. Each part is placed in a 0..1 unit box and scaled on use.
+ *   s  shape name          o  stroke instead of fill      lw stroke pt
+ *   r  rotation degrees    v  flipV                       rr corner radius
+ *   a  [start,end] degrees th block-arc thickness ratio
+ *   ln [x0,y0,x1,y1,t]     straight stroke between two unit points
+ *   t  literal text
+ */
+const ICONS = {
+	bars: [
+		{ s: 'rect', x: 0, y: 0.95, w: 1, h: 0.05 },
+		{ s: 'rect', x: 0.07, y: 0.49, w: 0.16, h: 0.34, o: 1 },
+		{ s: 'rect', x: 0.29, y: 0.33, w: 0.15, h: 0.5, o: 1 },
+		{ s: 'rect', x: 0.48, y: 0.12, w: 0.16, h: 0.71, o: 1 },
+		{ s: 'rect', x: 0.7, y: 0.0, w: 0.16, h: 0.83, o: 1 },
+	],
+	trend: [
+		{ s: 'rect', x: 0, y: 0.95, w: 1, h: 0.05 },
+		{ ln: [0.03, 0.86, 0.28, 0.58, 0.06] },
+		{ ln: [0.28, 0.58, 0.48, 0.74, 0.06] },
+		{ ln: [0.48, 0.74, 0.87, 0.3, 0.06] },
+		{ s: 'triangle', x: 0.72, y: 0.06, w: 0.28, h: 0.26, r: 40 },
+	],
+	trophy: [
+		{ s: 'blockArc', x: -0.02, y: 0.1, w: 0.4, h: 0.42, a: [90, 270], th: 0.34 },
+		{ s: 'blockArc', x: 0.62, y: 0.1, w: 0.4, h: 0.42, a: [270, 90], th: 0.34 },
+		{ s: 'round2SameRect', x: 0.22, y: 0, w: 0.56, h: 0.56, v: 1 },
+		{ s: 'rect', x: 0.42, y: 0.5, w: 0.16, h: 0.2 },
+		{ s: 'roundRect', x: 0.24, y: 0.66, w: 0.52, h: 0.2, rr: 0.09 },
+		{ s: 'roundRect', x: 0.2, y: 0.82, w: 0.6, h: 0.18, rr: 0.05 },
+	],
+	gem: [
+		{ s: 'trapezoid', x: 0, y: 0, w: 1, h: 0.32, v: 1, o: 1 },
+		{ s: 'triangle', x: 0.055, y: 0.32, w: 0.89, h: 0.68, r: 180, o: 1 },
+		{ ln: [0.29, 0.02, 0.365, 0.32, 0.028] },
+		{ ln: [0.71, 0.02, 0.635, 0.32, 0.028] },
+		{ ln: [0.365, 0.33, 0.5, 0.98, 0.028] },
+		{ ln: [0.635, 0.33, 0.5, 0.98, 0.028] },
+	],
+	globe: [
+		{ s: 'ellipse', x: 0, y: 0, w: 1, h: 1, o: 1 },
+		{ s: 'ellipse', x: 0.31, y: 0, w: 0.38, h: 1, o: 1 },
+		{ s: 'rect', x: 0.03, y: 0.47, w: 0.94, h: 0.06 },
+	],
+	mail: [
+		{ s: 'rect', x: 0, y: 0, w: 1, h: 1, o: 1 },
+		{ ln: [0.03, 0.04, 0.5, 0.54, 0.05] },
+		{ ln: [0.5, 0.54, 0.97, 0.04, 0.05] },
+	],
+	gear: [
+		{ s: 'ellipse', x: 0.16, y: 0.16, w: 0.68, h: 0.68, o: 1, lw: 3.4 },
+		{ s: 'rect', x: 0.43, y: 0, w: 0.14, h: 0.18 },
+		{ s: 'rect', x: 0.43, y: 0.82, w: 0.14, h: 0.18 },
+		{ s: 'rect', x: 0, y: 0.43, w: 0.18, h: 0.14 },
+		{ s: 'rect', x: 0.82, y: 0.43, w: 0.18, h: 0.14 },
+		{ s: 'rect', x: 0.09, y: 0.14, w: 0.16, h: 0.14, r: 45 },
+		{ s: 'rect', x: 0.75, y: 0.14, w: 0.16, h: 0.14, r: -45 },
+		{ s: 'rect', x: 0.09, y: 0.72, w: 0.16, h: 0.14, r: -45 },
+		{ s: 'rect', x: 0.75, y: 0.72, w: 0.16, h: 0.14, r: 45 },
+	],
+	laptop: [
+		{ s: 'rect', x: 0.12, y: 0, w: 0.76, h: 0.72, o: 1 },
+		{ s: 'trapezoid', x: 0, y: 0.76, w: 1, h: 0.24 },
+	],
+	check: [
+		{ s: 'ellipse', x: 0.04, y: 0.04, w: 0.92, h: 0.92, o: 1, lw: 2.4 },
+		{ ln: [0.24, 0.52, 0.44, 0.72, 0.09] },
+		{ ln: [0.42, 0.72, 0.86, 0.2, 0.09] },
+	],
+	calendar: [
+		{ s: 'rect', x: 0.2, y: 0, w: 0.1, h: 0.2 },
+		{ s: 'rect', x: 0.7, y: 0, w: 0.1, h: 0.2 },
+		{ s: 'roundRect', x: 0, y: 0.1, w: 1, h: 0.9, o: 1, lw: 1.6, rr: 0.07 },
+		{ s: 'rect', x: 0.08, y: 0.18, w: 0.84, h: 0.18 },
+		{ t: '17', x: 0, y: 0.4, w: 1, h: 0.5 },
+	],
+	lock: [
+		{ s: 'blockArc', x: 0.2, y: 0, w: 0.6, h: 0.68, a: [180, 360], th: 0.28 },
+		{ s: 'roundRect', x: 0, y: 0.38, w: 1, h: 0.62, rr: 0.08 },
+	],
+	pie: [
+		{ s: 'pie', x: 0, y: 0.08, w: 0.92, h: 0.92, a: [300, 240] },
+		{ s: 'pie', x: 0.08, y: 0, w: 0.92, h: 0.92, a: [240, 300] },
+	],
+	people: [
+		{ s: 'ellipse', x: 0.37, y: 0, w: 0.28, h: 0.3 },
+		{ s: 'blockArc', x: 0.27, y: 0.3, w: 0.48, h: 0.7, a: [180, 360], th: 1 },
+		{ s: 'ellipse', x: 0.04, y: 0.1, w: 0.24, h: 0.26 },
+		{ s: 'ellipse', x: 0.72, y: 0.1, w: 0.24, h: 0.26 },
+		{ s: 'blockArc', x: -0.04, y: 0.38, w: 0.44, h: 0.62, a: [180, 360], th: 1 },
+		{ s: 'blockArc', x: 0.6, y: 0.38, w: 0.44, h: 0.62, a: [180, 360], th: 1 },
+	],
+	home: [
+		{ s: 'triangle', x: 0, y: 0, w: 1, h: 0.5 },
+		{ s: 'rect', x: 0.14, y: 0.46, w: 0.72, h: 0.54 },
+	],
+	phone: [
+		{ s: 'blockArc', x: 0, y: 0.1, w: 0.8, h: 0.9, r: -45, a: [120, 40], th: 0.55 },
+		{ s: 'blockArc', x: 0.4, y: -0.05, w: 0.62, h: 0.62, a: [270, 10], th: 0.12 },
+		{ s: 'blockArc', x: 0.52, y: 0.08, w: 0.4, h: 0.4, a: [270, 10], th: 0.18 },
+	],
+	coin: [{ s: 'ellipse', x: 0, y: 0, w: 1, h: 1, o: 1, lw: 1.6 }],
+};
+
+function icon(slide, name, x, y, w, h, color) {
+	ICONS[name].forEach((p) => {
+		if (p.ln) {
+			// straight stroke: a thin rect rotated onto the segment
+			const [x0, y0, x1, y1, t] = p.ln;
+			const dx = (x1 - x0) * w;
+			const dy = (y1 - y0) * h;
+			const len = Math.hypot(dx, dy);
+			slide.addShape('rect', {
+				x: x + ((x0 + x1) / 2) * w - len / 2,
+				y: y + ((y0 + y1) / 2) * h - (t * h) / 2,
+				w: len,
+				h: t * h,
+				rotate: (Math.atan2(dy, dx) * 180) / Math.PI,
+				fill: solid(color),
+				line: null,
+			});
+			return;
+		}
+		const box = { x: x + p.x * w, y: y + p.y * h, w: p.w * w, h: p.h * h };
+		if (p.t !== undefined) {
+			slide.addText(p.t, {
+				...box,
+				fontFace: SANS,
+				fontSize: Math.round(p.h * h * 62),
+				bold: true,
+				color,
+				align: 'center',
+				valign: 'middle',
+				margin: 0,
+			});
+			return;
+		}
+		slide.addShape(p.s, {
+			...box,
+			fill: p.o ? null : solid(color),
+			line: p.o ? stroke(color, p.lw || 1.25) : null,
+			...(p.r ? { rotate: p.r } : {}),
+			...(p.v ? { flipV: true } : {}),
+			...(p.rr ? { rectRadius: p.rr * Math.min(w, h) } : {}),
+			...(p.a ? { angleRange: p.a } : {}),
+			...(p.th ? { arcThicknessRatio: p.th } : {}),
+		});
+	});
+}
+
+/** Circle-framed currency/symbol glyph (slide 15). */
+function glyphIcon(slide, ch, x, y, size, color) {
+	icon(slide, 'coin', x, y, size, size, color);
+	slide.addText(ch, {
+		x,
+		y,
+		w: size,
+		h: size,
+		fontFace: SANS,
+		fontSize: Math.round(size * 42),
+		bold: true,
+		color,
+		align: 'center',
+		valign: 'middle',
+		margin: 0,
+	});
+}
+
+/* --------------------------------------------------- chrome on every page */
+
+function navBar(slide, o) {
+	const nav = [
+		['Home', 0.554, 0.258, 0.689, 10.5, false],
+		['WedCraft', 6.08, 0.249, 1.174, 12, true],
+		['Menu', 12.091, 0.258, 0.689, 10.5, false],
+	];
+	nav.forEach(([label, x, y, w, size, bold]) =>
+		text(slide, label, { x, y, w, h: 0.3, size, bold, color: INK })
+	);
+	slide.addShape('line', {
+		x: 0.639,
+		y: 0.768,
+		w: 12.055,
+		h: 0,
+		line: stroke(RULE),
+	});
+	if (o && o.rule2) {
+		slide.addShape('line', {
+			x: o.rule2[0],
+			y: o.rule2[1],
+			w: o.rule2[2],
+			h: 0,
+			line: stroke(RULE),
+		});
+	}
+}
+
+/** "Infographic Section" title shared by slides 9-18. */
+function sectionTitle(slide) {
+	headline(slide, {
+		x: 4.068,
+		y: 1.229,
+		w: 5.197,
+		align: 'center',
+		parts: [
+			['Infographic ', INK],
+			['Section', BROWN],
+		],
+	});
+}
+
+/* ---------------------------------------------------------- copy fragments */
+
+const LOREM = {
+	hero:
+		'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
+		'incididunt ut labore et dolore magna aliqua magna aliqua. Excepteur sint occaecat ' +
+		'cupidatat officia',
+	intro:
+		'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
+		'incididunt ut labore et dolore magna aliqua. Excepteur sint occaecat cupidatat ' +
+		'officia deserunt mollit anim id est laborum.',
+	short:
+		'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt',
+	vision:
+		'Lorem ipsum dolor sit amet, do eiusmod tempor incididunt ut cupidatat officia ' +
+		'deserunt mollit anim id est laborum. dolor sit amet, do eiusmod tempor incididunt ' +
+		'ut cupidatat officia deserunt mollit',
+	project:
+		'Lorem ipsum dolor sit amet, do eiusmod tempor incididunt ut cupidatat officia ' +
+		'deserunt mollit anim id est laborum. dolor sit amet, eiusmod tempor incididunt ut cupidatat',
+	facility:
+		'Lorem ipsum dolor sit amet, consectetur adipiscing dolor sit amet, do eiusmod ' +
+		'tempor incididunt ut dolor sit',
+	services:
+		'Lorem ipsum dolor sit amet, do eiusmod tempor incididunt ut cupidatat officia ' +
+		'deserunt mollit anim sit amet, do eiusmod tempor incididunt ut cupidatat officia',
+	service:
+		'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do dolore magna aliqua. ',
+	card:
+		'Lorem ipsum dolor sit amet, consec tetuer adipiscing elit. Maecenas porttitor congue',
+	wide:
+		'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas ipsum dolor sit ' +
+		'amet, ipsum dolor',
+	maec: 'Lorem ipsum dolor sit amet, consectetuer adipi scing elit. Maecenas',
+	half: 'Lorem ipsum dolor sit amet, consectetuer adipi',
+	tiny: 'Lorem ipsum dolor sit amet, Lorem',
+	scing: 'Lorem ipsum dolor sit amet, consectetuer adipi scing',
+	year:
+		'Lorem ipsum dolor sit amet, ipsum dolor sit amet, ipsum dolor sit amet, consect ip sum dolor ',
+	flag:
+		'Lorem ipsum dolor sit amet,consectetuer adipi scing elit. Lorem ipsum dolor sit ' +
+		'dolor sit dolor sit dolor sit ',
+	contact:
+		'Lorem ipsum dolor sit amet, do eiusmod tempor incididunt ut cupidatat officia ' +
+		'deserunt mollit anim id',
+	thanks:
+		'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do sit amet eiusmod ' +
+		'tempor incididunt ut labore et dolore magna aliqua. Excepteur sint occaecat cupidatat ' +
+		'officia consectetur adipiscing elit, sed do sit amet eiusmod tempor incididunt ut ' +
+		'labore et dolore magna aliqua. Excepteur sint occaecat cupidatat officia consectetur ' +
+		'adipiscing elit, sed do sit amet eiusmod',
+};
+
+/* ----------------------------------------------------------------- slides */
+
+// 1 - Title
+function slide01(pres) {
+	const s = pres.addSlide();
+	headline(s, {
+		x: 1.035,
+		y: 1.145,
+		w: 4.592,
+		h: 2.121,
+		size: 60,
+		parts: [
+			['Wedding', BROWN],
+			[' Organizer', INK],
+		],
+	});
+	navBar(s, { rule2: [0.639, 4.854, 12.055] });
+	text(s, LOREM.hero, {
+		x: 7.194,
+		y: 5.216,
+		w: 5.108,
+		h: 0.868,
+		align: 'justify',
+		lh: 1.5,
+	});
+	text(s, 'Wedding Presentation Template', {
+		x: 1.035,
+		y: 3.356,
+		w: 3.95,
+		h: 0.507,
+		size: 18,
+		italic: true,
+		color: BROWN,
+		lh: 1.5,
+	});
+	diamonds(s, [
+		[5.299, 5.232, 0.213, 0.328],
+		[4.575, 5.448, 0.47, 0.723],
+		[5.615, 5.396, 0.302, 0.464],
+	]);
+	badge(s, 'ellipse', {
+		x: 1.157,
+		y: 5.421,
+		w: 2.488,
+		h: 0.721,
+		fill: BROWN,
+		label: 'Start Now',
+	});
+	photo(s, {
+		x: 7.194,
+		y: 1.463,
+		w: 5.501,
+		h: 2.812,
+		shape: 'roundRect',
+		rectRadius: 1.406,
+	});
+	s.addShape('round2SameRect', {
+		x: 8.443,
+		y: 0.004,
+		w: 2.971,
+		h: 5.725,
+		rotate: 90,
+		fill: null,
+		line: stroke(BROWN, THIN),
+		...PILL,
+	});
+}
+
+// 2 - Make Every Moment Unforgettable!
+function slide02(pres) {
+	const s = pres.addSlide();
+	cornerWash(s, {
+		x: 5.097,
+		y: 5.313,
+		w: 8.475,
+		h: 2.175,
+		rx: 1.92,
+		ry: 2.04,
+		color: CREAM,
+	});
+	photo(s, { x: 8.836, y: 1.358, w: 3.341, h: 4.306, shape: 'round2SameRect', geom: ARCH });
+	s.addShape('round2SameRect', {
+		x: 8.836,
+		y: 1.358,
+		w: 3.341,
+		h: 4.306,
+		fill: null,
+		line: stroke(BROWN, THIN),
+		...adj(49561, 0),
+	});
+	headline(s, {
+		x: 1.038,
+		y: 1.256,
+		w: 6.019,
+		h: 1.313,
+		parts: [
+			['Make Every ', INK],
+			['Moment', BROWN],
+			[' Unforgettable!', INK],
+		],
+	});
+	text(s, LOREM.intro, {
+		x: 1.038,
+		y: 2.833,
+		w: 4.059,
+		h: 1.133,
+		align: 'justify',
+		lh: 1.5,
+	});
+	navBar(s);
+	diamonds(s, [
+		[7.458, 1.912, 0.244, 0.375],
+		[7.935, 1.249, 0.537, 0.827],
+	]);
+	badge(s, 'ellipse', {
+		x: 1.157,
+		y: 5.421,
+		w: 2.545,
+		h: 0.721,
+		fill: BROWN,
+		label: 'Next Slide',
+	});
+	text(s, LOREM.short, {
+		x: 1.038,
+		y: 4.228,
+		w: 4.059,
+		h: 0.603,
+		align: 'justify',
+		lh: 1.5,
+	});
+	photo(s, { x: 8.169, y: 3.75, w: 1.473, h: 2.392, shape: 'roundRect', rectRadius: 0.736 });
+	s.addShape('roundRect', {
+		x: 8.169,
+		y: 3.75,
+		w: 1.473,
+		h: 2.392,
+		fill: null,
+		line: stroke(BROWN, THIN),
+		rectRadius: 0.736,
+	});
+}
+
+// 3 - Vision & Mission
+function slide03(pres) {
+	const s = pres.addSlide();
+	s.addShape('round1Rect', {
+		x: 0,
+		y: 1.358,
+		w: 2.878,
+		h: 6.142,
+		fill: solid(CREAM),
+		line: null,
+		rectRadius: 1.439,
+	});
+	photo(s, { x: 1.857, y: 1.257, w: 3.537, h: 4.719, shape: 'ellipse', rotate: 16.4 });
+	[
+		[2.247, 1.424],
+		[1.857, 1.257],
+	].forEach(([x, y]) =>
+		s.addShape('ellipse', {
+			x,
+			y,
+			w: 3.537,
+			h: 4.719,
+			rotate: 16.4,
+			fill: null,
+			line: stroke(INK, THIN),
+		})
+	);
+	navBar(s);
+	headline(s, {
+		x: 7.344,
+		y: 1.223,
+		w: 4.447,
+		parts: [
+			['Vision ', INK],
+			['& Mission', BROWN],
+		],
+	});
+	[
+		['Our Vision', 2.398, 2.836],
+		['Our Mission', 4.566, 5.004],
+	].forEach(([title, yTitle, yBody]) => {
+		text(s, title, { x: 7.344, y: yTitle, w: 2.452, h: 0.404, size: 18, bold: true });
+		text(s, LOREM.vision, {
+			x: 7.344,
+			y: yBody,
+			w: 4.119,
+			h: 1.133,
+			align: 'justify',
+			lh: 1.5,
+		});
+	});
+	diamonds(s, [
+		[5.677, 5.795, 0.244, 0.375],
+		[6.154, 6.074, 0.537, 0.827],
+	]);
+}
+
+// 4 - Our Facilities
+function slide04(pres) {
+	const s = pres.addSlide();
+	cornerWash(s, {
+		x: 4.329,
+		y: 4.492,
+		w: 9.022,
+		h: 3.008,
+		rx: 2.1,
+		ry: 2.82,
+		color: CREAM,
+	});
+	const cards = [
+		{ x: 9.16, y: 1.379, fill: DARK, title: '02. Facilities', ty: 2.433, by: 2.909, tx: 9.524 },
+		{ x: 5.856, y: 1.996, fill: BROWN, title: '01. Facilities', ty: 3.05, by: 3.526, tx: 6.22 },
+	];
+	cards.forEach((c) =>
+		photo(s, { x: c.x, y: c.y, w: 3.049, h: 3.341, shape: 'round2SameRect', geom: adj(48363, 0) })
+	);
+	[
+		[5.856, 2.01, BROWN],
+		[9.16, 1.394, DARK],
+	].forEach(([x, y, color]) =>
+		s.addShape('round2SameRect', {
+			x,
+			y,
+			w: 3.049,
+			h: 3.341,
+			fill: solid(color, 10),
+			line: null,
+			...adj(48363, 0),
+		})
+	);
+	navBar(s, { rule2: [1.243, 6.108, 12.108] });
+	headline(s, {
+		x: 1.061,
+		y: 1.234,
+		w: 4.447,
+		parts: [
+			['Our ', INK],
+			['Facilities', BROWN],
+		],
+	});
+	[2.179, 3.954].forEach((y) =>
+		text(s, LOREM.vision, { x: 1.061, y, w: 3.301, h: 1.398, align: 'justify', lh: 1.5 })
+	);
+	cards.forEach((c) => {
+		text(s, c.title, { x: c.tx, y: c.ty, w: 2.321, h: 0.404, size: 18, bold: true, color: WHITE });
+		text(s, LOREM.facility, {
+			x: c.tx,
+			y: c.by,
+			w: 2.321,
+			h: 1.133,
+			color: WHITE,
+			align: 'justify',
+			lh: 1.5,
+		});
+	});
+}
+
+// 5 - Our Project
+function slide05(pres) {
+	const s = pres.addSlide();
+	s.addShape('round2SameRect', {
+		x: 0,
+		y: 1.365,
+		w: 6.468,
+		h: 6.135,
+		fill: solid(CREAM),
+		line: null,
+		...ARCH,
+	});
+	photo(s, { x: 7.738, y: 3.75, w: 4.416, h: 3.75, shape: 'round2SameRect', geom: ARCH });
+	photo(s, { x: 4.135, y: 3.75, w: 3.357, h: 3.75, shape: 'round2SameRect', geom: ARCH });
+	// round1Rect rounds the top-right corner, which is what this column needs
+	photo(s, { x: 1.179, y: 1.365, w: 2.71, h: 6.135, shape: 'round1Rect', rectRadius: 1.355 });
+	navBar(s);
+	headline(s, {
+		x: 7.381,
+		y: 1.218,
+		w: 2.905,
+		parts: [
+			['Our ', INK],
+			['Project', BROWN],
+		],
+	});
+	text(s, LOREM.project, {
+		x: 7.381,
+		y: 2.193,
+		w: 4.885,
+		h: 0.868,
+		align: 'justify',
+		lh: 1.5,
+	});
+	diamonds(s, [
+		[11.776, 6.15, 0.244, 0.375],
+		[11.898, 6.682, 0.537, 0.827],
+	]);
+	s.addShape('round2SameRect', {
+		x: 7.738,
+		y: 3.75,
+		w: 4.416,
+		h: 3.97,
+		fill: null,
+		line: stroke(BROWN, THIN),
+		...ARCH,
+	});
+	s.addShape('round1Rect', {
+		x: 1.179,
+		y: 1.365,
+		w: 2.71,
+		h: 6.354,
+		fill: null,
+		line: stroke(BROWN, THIN),
+		rectRadius: 1.355,
+	});
+	s.addShape('round2SameRect', {
+		x: 4.135,
+		y: 3.75,
+		w: 3.357,
+		h: 3.955,
+		fill: null,
+		line: stroke(BROWN, THIN),
+		...ARCH,
+	});
+}
+
+// 6 - Our Best Team
+function slide06(pres) {
+	const s = pres.addSlide();
+	s.addShape('round2SameRect', {
+		x: 6.678,
+		y: -0.005,
+		w: 6.113,
+		h: 3.75,
+		rotate: 180,
+		fill: solid(CREAM),
+		line: null,
+	});
+	s.addShape('round2SameRect', {
+		x: 0.554,
+		y: 3.75,
+		w: 6.113,
+		h: 3.75,
+		fill: solid(CREAM),
+		line: null,
+	});
+	const team = [
+		{ x: 1.092, name: 'Isabel Mercado', tx: 1.178 },
+		{ x: 3.915, name: 'Aldo Sitorus', tx: 4.001 },
+		{ x: 6.898, name: 'Kyrie Petrakis', tx: 6.985 },
+		{ x: 9.855, name: 'Morgan Maxwel', tx: 9.941 },
+	];
+	team.forEach((m) => photo(s, { x: m.x, y: 2.38, w: 2.253, h: 2.976, shape: 'ellipse', rotate: 16.4 }));
+	navBar(s);
+	headline(s, {
+		x: 4.443,
+		y: 1.229,
+		w: 4.447,
+		align: 'center',
+		parts: [
+			['Our Best ', INK],
+			['Team', BROWN],
+		],
+	});
+	diamonds(s, [
+		[1.178, 1.125, 0.244, 0.375],
+		[1.655, 1.404, 0.537, 0.827],
+	]);
+	team.forEach((m) => {
+		// two offset outlines give each portrait its double-ring look
+		[
+			[m.x + 0.28, 2.458],
+			[m.x + 0.035, 2.351],
+		].forEach(([x, y]) =>
+			s.addShape('ellipse', {
+				x,
+				y,
+				w: 2.172,
+				h: 3.035,
+				rotate: 16.4,
+				fill: null,
+				line: stroke(INK, THIN),
+			})
+		);
+		text(s, m.name, {
+			x: m.tx,
+			y: 5.774,
+			w: 2.321,
+			h: 0.404,
+			size: 18,
+			bold: true,
+			align: 'center',
+		});
+	});
+}
+
+// 7 - The Services
+function slide07(pres) {
+	const s = pres.addSlide();
+	photo(s, { x: 9.035, y: 1.257, w: 3.92, h: 6.243, shape: 'round2SameRect', geom: ARCH });
+	photo(s, { x: 6.667, y: 2.173, w: 2.114, h: 3.981, shape: 'roundRect', rectRadius: 1.057 });
+	navBar(s);
+	headline(s, {
+		x: 1.061,
+		y: 1.257,
+		w: 3.492,
+		parts: [
+			['The ', INK],
+			['Services', BROWN],
+		],
+	});
+	text(s, LOREM.services, {
+		x: 1.061,
+		y: 2.173,
+		w: 4.614,
+		h: 0.868,
+		align: 'justify',
+		lh: 1.5,
+	});
+	icon(s, 'check', 1.146, 3.434, 0.462, 0.451, BROWN);
+	icon(s, 'calendar', 1.183, 5.03, 0.387, 0.414, BROWN);
+	[
+		['01', 1.899, 3.409, 3.975, 3.775],
+		['02', 1.882, 4.986, 5.551, 3.792],
+	].forEach(([num, x, yTitle, yBody, wBody]) => {
+		s.addText(
+			[
+				{ text: num, options: { fontSize: 24 } },
+				{ text: '. Service', options: { fontSize: 18 } },
+			],
+			{
+				x,
+				y: yTitle,
+				w: 3.604,
+				h: 0.505,
+				fontFace: SANS,
+				bold: true,
+				color: COFFEE,
+				valign: 'top',
+				margin: [7.2, 7.2, 3.6, 3.6],
+			}
+		);
+		text(s, LOREM.service, { x, y: yBody, w: wBody, h: 0.603, align: 'justify', lh: 1.5 });
+	});
+	s.addShape('round2SameRect', {
+		x: 9.035,
+		y: 1.257,
+		w: 3.92,
+		h: 6.416,
+		fill: null,
+		line: stroke(BROWN, THIN),
+		...ARCH,
+	});
+	s.addShape('roundRect', {
+		x: 6.667,
+		y: 2.173,
+		w: 2.114,
+		h: 3.981,
+		fill: null,
+		line: stroke(BROWN, THIN),
+		rectRadius: 1.057,
+	});
+}
+
+// 8 - The Portofolio
+function slide08(pres) {
+	const s = pres.addSlide();
+	s.addShape('round2SameRect', {
+		x: 4.244,
+		y: 2.398,
+		w: 4.741,
+		h: 5.102,
+		fill: solid(BROWN),
+		line: null,
+		...ARCH,
+	});
+	photo(s, { x: 9.91, y: 1.351, w: 2.494, h: 4.806, shape: 'round2SameRect', geom: ARCH });
+	photo(s, { x: 4.554, y: 2.398, w: 4.741, h: 5.102, shape: 'round2SameRect', geom: ARCH });
+	photo(s, { x: 1.409, y: 2.209, w: 2.491, h: 3.94, shape: 'roundRect', rectRadius: 1.245 });
+	navBar(s);
+	headline(s, {
+		x: 4.443,
+		y: 1.229,
+		w: 4.447,
+		align: 'center',
+		parts: [
+			['The ', INK],
+			['Portofolio', BROWN],
+		],
+	});
+	s.addShape('roundRect', {
+		x: 1.169,
+		y: 2.209,
+		w: 2.491,
+		h: 3.94,
+		fill: null,
+		line: stroke(BROWN, THIN),
+		rectRadius: 1.245,
+	});
+	s.addShape('round2SameRect', {
+		x: 9.67,
+		y: 1.343,
+		w: 2.494,
+		h: 4.806,
+		fill: null,
+		line: stroke(DARK, THIN),
+		...ARCH,
+	});
+}
+
+// 9 - Infographic: four layered pill cards
+function slide09(pres) {
+	const s = pres.addSlide();
+	const cards = [
+		{ x: 0.901, y: 2.983, main: DARK, shade: SOOT, tx: 1.344, ty: 3.198 },
+		{ x: 7.162, y: 2.983, main: BROWN, shade: ESPRESSO, tx: 7.78, ty: 3.202 },
+		{ x: 0.901, y: 4.694, main: BROWN, shade: ESPRESSO, tx: 1.344, ty: 4.867 },
+		{ x: 7.162, y: 4.694, main: DARK, shade: SOOT, tx: 7.771, ty: 4.867 },
+	];
+	cards.forEach((c) => {
+		// two offset pills read as a soft drop shadow behind the main pill
+		s.addShape('roundRect', {
+			x: c.x + 2.481,
+			y: c.y + 0.262,
+			w: 2.79,
+			h: 1.181,
+			fill: solid(c.shade),
+			line: null,
+			rectRadius: 0.59,
+		});
+		s.addShape('roundRect', {
+			x: c.x,
+			y: c.y,
+			w: 2.79,
+			h: 1.181,
+			fill: solid(c.shade),
+			line: null,
+			rectRadius: 0.59,
+		});
+		s.addShape('roundRect', {
+			x: c.x + 0.042,
+			y: c.y + 0.079,
+			w: 5.197,
+			h: 1.276,
+			fill: solid(c.main),
+			line: null,
+			rectRadius: 0.638,
+		});
+		label(s, 'Title Here', {
+			x: c.tx,
+			y: c.ty,
+			w: 2.538,
+			h: 0.368,
+			size: 14,
+			bold: true,
+			color: WHITE,
+			lh: 1.2,
+			after: 6,
+		});
+		text(s, LOREM.card, {
+			x: c.tx + 0.009,
+			y: c.ty + 0.329,
+			w: 4.053,
+			h: 0.603,
+			color: WHITE,
+			align: 'justify',
+			lh: 1.5,
+		});
+	});
+	sectionTitle(s);
+	navBar(s);
+}
+
+// 10 - Infographic: two banner cards with letter medallions
+function slide10(pres) {
+	const s = pres.addSlide();
+	const cards = [
+		{ x: 1.132, y: 3.444, main: DARK, shade: SOOT, disc: 'DDDBD8', letter: 'A' },
+		{ x: 7.138, y: 3.452, main: BROWN, shade: ESPRESSO, disc: 'EAE0CF', letter: 'B' },
+	];
+	cards.forEach((c) => {
+		s.addShape('round2SameRect', {
+			x: c.x + 0.135,
+			y: c.y + 0.685,
+			w: 4.794,
+			h: 1.197,
+			flipV: true,
+			fill: solid(c.shade),
+			line: null,
+			...ARCH,
+		});
+		s.addShape('flowChartDocument', {
+			x: c.x,
+			y: c.y,
+			w: 5.063,
+			h: 1.685,
+			fill: solid(c.main),
+			line: null,
+		});
+		label(s, 'Your Tittle', {
+			x: c.x + 1.166,
+			y: c.y + 0.014,
+			w: 2.732,
+			h: 0.68,
+			size: 20,
+			bold: true,
+			color: WHITE,
+			align: 'center',
+			lh: 1.5,
+		});
+		text(s, LOREM.wide, {
+			x: c.x + 0.491,
+			y: c.y + 0.646,
+			w: 4.081,
+			h: 0.772,
+			color: WHITE,
+			align: 'center',
+			lh: 1.5,
+		});
+		badge(s, 'ellipse', {
+			x: c.x,
+			y: c.y - 0.494,
+			w: 1.0,
+			h: 1.0,
+			fill: c.disc,
+			label: c.letter,
+			size: 36,
+			labelColor: INK,
+		});
+	});
+	sectionTitle(s);
+	navBar(s);
+}
+
+// 11 - Infographic: serpentine U-turn arrows
+function slide11(pres) {
+	const s = pres.addSlide();
+	// four interlocking U-turn arrows; each is drawn upright then rotated
+	// a quarter turn so the hook opens left or right
+	[
+		{ x: 5.707, y: 1.639, h: 3.713, fill: DARK, rotate: 270 },
+		{ x: 6.638, y: 2.48, h: 3.408, fill: BROWN, rotate: 90, flipH: true },
+		{ x: 5.121, y: 3.602, h: 2.54, fill: DARK, rotate: 270 },
+		{ x: 6.848, y: 4.066, h: 2.988, fill: BROWN, rotate: 90, flipH: true },
+	].forEach((a) =>
+		s.addShape('uturnArrow', {
+			x: a.x,
+			y: a.y,
+			w: 1.103,
+			h: a.h,
+			rotate: a.rotate,
+			flipH: a.flipH || false,
+			fill: solid(a.fill),
+			line: null,
+		})
+	);
+	text(s, 'Start', { x: 4.999, y: 5.762, w: 0.674, h: 0.349, size: 11, bold: true, lh: 1.5 });
+	text(s, 'Finish', { x: 7.441, y: 2.944, w: 0.674, h: 0.349, size: 11, bold: true, lh: 1.5 });
+	[
+		{ x: 1.175, tx: 1.101, fill: DARK },
+		{ x: 10.147, tx: 10.073, fill: BROWN },
+	].forEach((c) => {
+		badge(s, 'roundRect', {
+			x: c.x,
+			y: 2.999,
+			w: 0.782,
+			h: 0.782,
+			fill: c.fill,
+			rectRadius: 0.391,
+			label: '01',
+		});
+		label(s, 'Your Title Here', {
+			x: c.tx + 0.001,
+			y: 4.009,
+			w: 1.777,
+			h: 0.303,
+			size: 12,
+			bold: true,
+			align: 'justify',
+		});
+		text(s, LOREM.maec, {
+			x: c.tx,
+			y: 4.362,
+			w: 2.162,
+			h: 0.934,
+			size: 11,
+			align: 'justify',
+			lh: 1.5,
+		});
+	});
+	sectionTitle(s);
+	navBar(s);
+}
+
+// 12 - Infographic: pinwheel of folded corners
+function slide12(pres) {
+	const s = pres.addSlide();
+	// seven folded-corner tiles rotated around a common centre
+	const tile = foldedTile(1.199, 0.2);
+	[
+		[6.319, 2.969, 90, SOOT],
+		[6.919, 3.421, 135, COFFEE],
+		[7.017, 4.168, 180, DARK],
+		[6.567, 4.768, 225, TAUPE],
+		[5.862, 4.912, 270, ESPRESSO],
+		[5.262, 4.519, 315, BARK],
+		[5.121, 3.815, 0, BROWN],
+	].forEach(([x, y, rotate, fill]) =>
+		s.addShape('custGeom', {
+			x,
+			y,
+			w: 1.199,
+			h: 1.199,
+			rotate,
+			fill: solid(fill),
+			line: null,
+			points: tile,
+		})
+	);
+	icon(s, 'globe', 6.927, 3.14, 0.374, 0.374, WHITE);
+	icon(s, 'gem', 7.594, 3.815, 0.466, 0.467, WHITE);
+	icon(s, 'bars', 7.559, 4.75, 0.653, 0.47, WHITE);
+	icon(s, 'mail', 6.934, 5.481, 0.466, 0.323, WHITE);
+	icon(s, 'trend', 6.037, 5.63, 0.42, 0.348, WHITE);
+	icon(s, 'gear', 5.322, 4.955, 0.406, 0.407, WHITE);
+	icon(s, 'trophy', 5.263, 3.988, 0.45, 0.416, WHITE);
+	[
+		{ x: 1.175, tx: 1.771, y: 2.978, num: '01', disc: DARK, title: DARK },
+		{ x: 1.175, tx: 1.771, y: 4.93, num: '02', disc: BROWN, title: BROWN },
+		{ x: 9.235, tx: 9.831, y: 2.978, num: '03', disc: BROWN, title: BROWN },
+		{ x: 9.235, tx: 9.831, y: 4.93, num: '04', disc: DARK, title: DARK },
+	].forEach((c) => {
+		badge(s, 'ellipse', {
+			x: c.x,
+			y: c.y,
+			w: 0.58,
+			h: 0.58,
+			fill: c.disc,
+			label: c.num,
+			size: 12,
+		});
+		label(s, 'Your Title Here', {
+			x: c.tx + 0.001,
+			y: c.y + 0.005,
+			w: 1.777,
+			h: 0.303,
+			size: 12,
+			bold: true,
+			color: c.title,
+			align: 'justify',
+		});
+		text(s, LOREM.maec, {
+			x: c.tx,
+			y: c.y + 0.358,
+			w: 2.448,
+			h: 0.934,
+			size: 11,
+			align: 'justify',
+			lh: 1.5,
+		});
+	});
+	sectionTitle(s);
+	navBar(s);
+}
+
+// 13 - Infographic: three tabbed cards
+function slide13(pres) {
+	const s = pres.addSlide();
+	[
+		{ x: 1.158, card: DARK, tab: TAUPE, num: '01', glyph: 'bars' },
+		{ x: 5.125, card: BROWN, tab: SAND, num: '02', glyph: 'trend' },
+		{ x: 9.091, card: DARK, tab: TAUPE, num: '03', glyph: 'trophy' },
+	].forEach((c) => {
+		s.addShape('roundRect', {
+			x: c.x,
+			y: 3.352,
+			w: 3.084,
+			h: 2.764,
+			fill: solid(c.card),
+			line: null,
+			rectRadius: 0.46,
+		});
+		// header tab: square on top, sweeping down-left into the card below
+		s.addShape('custGeom', {
+			x: c.x,
+			y: 2.966,
+			w: 2.732,
+			h: 0.842,
+			fill: solid(c.tab),
+			line: null,
+			points: headerTab(2.732, 0.842),
+		});
+		label(s, 'Title Here', {
+			x: c.x + 0.283,
+			y: 3.115,
+			w: 1.151,
+			h: 0.337,
+			size: 14,
+			bold: true,
+			color: WHITE,
+		});
+		text(s, c.num, {
+			x: c.x + 2.065,
+			y: 3.115,
+			w: 0.504,
+			h: 0.337,
+			size: 14,
+			bold: true,
+			color: WHITE,
+		});
+		icon(s, c.glyph, c.x + 1.15, 3.807, 0.785, 0.706, WHITE);
+		label(s, 'Title Here', {
+			x: c.x + 0.966,
+			y: 4.717,
+			w: 1.151,
+			h: 0.337,
+			size: 14,
+			bold: true,
+			color: WHITE,
+			align: 'center',
+		});
+		text(s, LOREM.maec, {
+			x: c.x + 0.284,
+			y: 4.962,
+			w: 2.517,
+			h: 0.934,
+			size: 11,
+			color: WHITE,
+			align: 'center',
+			lh: 1.5,
+		});
+	});
+	sectionTitle(s);
+	navBar(s);
+}
+
+// 14 - Infographic: quartered donut
+function slide14(pres) {
+	const s = pres.addSlide();
+	// donut = four quarter rings, each rotated a further 90 degrees
+	const q = 1.578;
+	const ring = quarterRing(q, 0.5);
+	[
+		{ x: 6.687, y: 4.59, rotate: 0, fill: BROWN }, // bottom-right
+		{ x: 5.109, y: 4.59, rotate: 90, fill: DARK }, // bottom-left
+		{ x: 5.109, y: 3.012, rotate: 180, fill: BROWN }, // top-left
+		{ x: 6.687, y: 3.012, rotate: 270, fill: DARK }, // top-right
+	].forEach((a) =>
+		s.addShape('custGeom', {
+			x: a.x,
+			y: a.y,
+			w: q,
+			h: q,
+			rotate: a.rotate,
+			fill: solid(a.fill),
+			line: null,
+			points: ring,
+		})
+	);
+	icon(s, 'laptop', 5.622, 3.75, 0.471, 0.316, WHITE);
+	icon(s, 'bars', 7.25, 3.671, 0.439, 0.395, WHITE);
+	icon(s, 'gem', 5.627, 5.094, 0.466, 0.467, WHITE);
+	icon(s, 'trophy', 7.139, 5.091, 0.55, 0.508, WHITE);
+	[
+		{ x: 1.484, y: 2.967, cxx: 1.156, tx: 1.972, card: DARK, disc: TAUPE, num: '01' },
+		{ x: 1.484, y: 4.965, cxx: 1.156, tx: 1.972, card: BROWN, disc: SAND, num: '02' },
+		{ x: 9.341, y: 2.967, cxx: 9.013, tx: 9.829, card: BROWN, disc: SAND, num: '03' },
+		{ x: 9.341, y: 4.965, cxx: 9.013, tx: 9.829, card: DARK, disc: TAUPE, num: '04' },
+	].forEach((c) => {
+		s.addShape('roundRect', {
+			x: c.x,
+			y: c.y,
+			w: 2.831,
+			h: 1.156,
+			fill: solid(c.card),
+			line: null,
+			rectRadius: 0.193,
+		});
+		badge(s, 'ellipse', {
+			x: c.cxx,
+			y: c.y + 0.186,
+			w: 0.787,
+			h: 0.787,
+			fill: c.disc,
+			label: c.num,
+			size: 20,
+		});
+		label(s, 'Title Here', {
+			x: c.tx,
+			y: c.y + 0.148,
+			w: 1.151,
+			h: 0.337,
+			size: 14,
+			bold: true,
+			color: WHITE,
+		});
+		text(s, LOREM.half, {
+			x: c.tx,
+			y: c.y + 0.392,
+			w: 2.225,
+			h: 0.627,
+			size: 11,
+			color: WHITE,
+			lh: 1.5,
+		});
+	});
+	sectionTitle(s);
+	navBar(s);
+}
+
+// 15 - Infographic: five arched columns
+function slide15(pres) {
+	const s = pres.addSlide();
+	[
+		{ x: 1.171, num: '01', card: DARK, disc: STONE, glyph: '$' },
+		{ x: 3.499, num: '02', card: BROWN, disc: DUNE, glyph: null },
+		{ x: 5.826, num: '03', card: DARK, disc: STONE, glyph: '\u00A5' },
+		{ x: 8.154, num: '04', card: BROWN, disc: DUNE, glyph: '\u20AC' },
+		{ x: 10.482, num: '05', card: DARK, disc: STONE, glyph: null },
+	].forEach((c, i) => {
+		s.addShape('round2SameRect', {
+			x: c.x,
+			y: 2.972,
+			w: 1.681,
+			h: 3.139,
+			fill: solid(c.card),
+			line: null,
+			...ARCH,
+		});
+		label(s, 'Title Here', {
+			x: c.x + 0.258,
+			y: 3.173,
+			w: 1.151,
+			h: 0.337,
+			size: 14,
+			bold: true,
+			color: WHITE,
+			align: 'center',
+		});
+		badge(s, 'ellipse', {
+			x: c.x + 0.433,
+			y: 3.548,
+			w: 0.815,
+			h: 0.815,
+			fill: c.disc,
+			label: c.num,
+			size: 20,
+		});
+		text(s, LOREM.tiny, {
+			x: c.x + 0.203,
+			y: 4.485,
+			w: 1.275,
+			h: 0.904,
+			size: 11,
+			color: WHITE,
+			align: 'center',
+			lh: 1.5,
+		});
+		if (c.glyph) glyphIcon(s, c.glyph, c.x + 0.636, 5.51, 0.41, WHITE);
+		else if (i === 1) icon(s, 'globe', c.x + 0.626, 5.508, 0.427, 0.412, WHITE);
+		else icon(s, 'gem', c.x + 0.642, 5.523, 0.396, 0.397, WHITE);
+	});
+	sectionTitle(s);
+	navBar(s);
+}
+
+// 16 - Infographic: year tabs plus two summary bars
+function slide16(pres) {
+	const s = pres.addSlide();
+	['2020', '2021', '2022', '2023', '2024', '2025'].forEach((year, i) => {
+		const x = 1.173 + i * 1.8838;
+		s.addShape('snipRoundRect', {
+			x,
+			y: 2.965,
+			w: 1.604,
+			h: 1.34,
+			fill: solid(i % 2 === 0 ? BROWN : DARK),
+			line: null,
+			...TAB,
+		});
+		text(s, year, {
+			x: x + 0.121,
+			y: 3.295,
+			w: 1.361,
+			h: 0.505,
+			size: 24,
+			bold: true,
+			color: WHITE,
+			align: 'center',
+		});
+		label(s, 'Your Tittle', {
+			x: x + 0.121,
+			y: 3.722,
+			w: 1.361,
+			h: 0.252,
+			size: 9,
+			bold: true,
+			color: WHITE,
+			align: 'center',
+		});
+	});
+	[
+		{ x: 1.182, fill: BROWN, num: '01.' },
+		{ x: 6.811, fill: DARK, num: '02.' },
+	].forEach((b) => {
+		s.addShape('snipRoundRect', {
+			x: b.x,
+			y: 4.535,
+			w: 5.345,
+			h: 1.583,
+			fill: solid(b.fill),
+			line: null,
+			...TAB,
+		});
+		text(s, b.num, {
+			x: b.x + 0.401,
+			y: 4.909,
+			w: 0.96,
+			h: 0.505,
+			size: 24,
+			bold: true,
+			color: WHITE,
+		});
+		label(s, 'Title Here', {
+			x: b.x + 0.967,
+			y: 5.022,
+			w: 1.262,
+			h: 0.337,
+			size: 14,
+			bold: true,
+			color: WHITE,
+		});
+		text(s, LOREM.year, {
+			x: b.x + 2.289,
+			y: 4.873,
+			w: 2.583,
+			h: 0.868,
+			color: WHITE,
+			align: 'justify',
+			lh: 1.5,
+		});
+	});
+	sectionTitle(s);
+	navBar(s);
+}
+
+// 17 - Infographic: pinned timeline
+function slide17(pres) {
+	const s = pres.addSlide();
+	s.addShape('roundRect', {
+		x: 1.151,
+		y: 5.282,
+		w: 11.027,
+		h: 0.062,
+		fill: solid(DARK),
+		line: null,
+		rectRadius: 0.031,
+	});
+	['01', '02', '03', '04'].forEach((num, i) => {
+		const x = 1.151 + i * 2.9808;
+		const fill = i % 2 === 0 ? DARK : BROWN;
+		s.addShape('flowChartAlternateProcess', {
+			x,
+			y: 2.954,
+			w: 2.054,
+			h: 1.254,
+			fill: solid(fill),
+			line: null,
+		});
+		s.addShape('triangle', {
+			x: x + 0.716,
+			y: 4.208,
+			w: 0.621,
+			h: 0.535,
+			rotate: 180,
+			fill: solid(fill),
+			line: null,
+		});
+		label(s, 'Title Here', {
+			x: x + 0.451,
+			y: 3.02,
+			w: 1.151,
+			h: 0.337,
+			size: 14,
+			bold: true,
+			color: WHITE,
+			align: 'center',
+		});
+		text(s, LOREM.scing, {
+			x: x + 0.129,
+			y: 3.249,
+			w: 1.795,
+			h: 0.904,
+			size: 11,
+			color: WHITE,
+			align: 'center',
+			lh: 1.5,
+		});
+		badge(s, 'ellipse', {
+			x: x + 0.71,
+			y: 5.074,
+			w: 0.628,
+			h: 0.628,
+			fill,
+			label: num,
+			size: 14,
+		});
+	});
+	sectionTitle(s);
+	navBar(s);
+}
+
+// 18 - Infographic: four corner-flag entries
+function slide18(pres) {
+	const s = pres.addSlide();
+	[
+		{ x: 1.163, y: 2.987, fill: SOOT, accent: DARK, dot: COFFEE, num: '01', glyph: 'lock' },
+		{ x: 7.855, y: 2.987, fill: ESPRESSO, accent: BROWN, dot: BARK, num: '03', glyph: 'people' },
+		{ x: 1.163, y: 4.811, fill: ESPRESSO, accent: BROWN, dot: BARK, num: '02', glyph: 'pie' },
+		{ x: 7.855, y: 4.811, fill: SOOT, accent: DARK, dot: COFFEE, num: '04', glyph: 'home' },
+	].forEach((c) => {
+		s.addShape('rtTriangle', {
+			x: c.x,
+			y: c.y,
+			w: 1.0,
+			h: 1.0,
+			fill: solid(c.fill),
+			line: null,
+		});
+		s.addShape('rtTriangle', {
+			x: c.x,
+			y: c.y,
+			w: 1.0,
+			h: 1.0,
+			rotate: 180,
+			fill: null,
+			line: stroke(c.accent),
+		});
+		text(s, c.num, {
+			x: c.x + 0.012,
+			y: c.y + 0.598,
+			w: 0.531,
+			h: 0.404,
+			size: 18,
+			bold: true,
+			color: WHITE,
+			align: 'center',
+		});
+		s.addShape('roundRect', {
+			x: c.x + 1.0,
+			y: c.y - 0.006,
+			w: 2.13,
+			h: 0.05,
+			fill: solid(c.accent),
+			line: null,
+			rectRadius: 0.025,
+		});
+		s.addShape('ellipse', {
+			x: c.x + 3.13,
+			y: c.y - 0.055,
+			w: 0.142,
+			h: 0.142,
+			fill: solid(c.dot),
+			line: null,
+		});
+		label(s, 'Title Here', {
+			x: c.x + 1.121,
+			y: c.y + 0.118,
+			w: 1.151,
+			h: 0.337,
+			size: 14,
+			bold: true,
+			color: c.accent,
+		});
+		text(s, LOREM.flag, {
+			x: c.x + 1.12,
+			y: c.y + 0.454,
+			w: 3.182,
+			h: 0.904,
+			size: 11,
+			lh: 1.5,
+		});
+	});
+	icon(s, 'lock', 1.787, 3.158, 0.227, 0.309, DARK);
+	icon(s, 'people', 8.37, 3.138, 0.408, 0.276, BROWN);
+	icon(s, 'pie', 1.708, 4.923, 0.35, 0.348, BROWN);
+	icon(s, 'home', 8.383, 4.907, 0.362, 0.332, DARK);
+	sectionTitle(s);
+	navBar(s);
+}
+
+// 19 - Contact Us
+function slide19(pres) {
+	const s = pres.addSlide();
+	s.addShape('round2SameRect', {
+		x: 1.182,
+		y: 1.182,
+		w: 3.694,
+		h: 4.936,
+		fill: solid(BROWN),
+		line: null,
+		...ARCH,
+	});
+	photo(s, { x: 1.962, y: 1.557, w: 3.679, h: 4.558, shape: 'round2SameRect', geom: ARCH });
+	const rows = [
+		{ y: 3.449, glyph: 'phone', label: '+123 4567 8910', w: 1.695 },
+		{ y: 4.496, glyph: 'globe', label: 'www.yourwebsite.com', w: 2.328 },
+		{ y: 5.543, glyph: 'home', label: '123 Anywhere St., Any City', w: 2.684 },
+	];
+	rows.forEach((r) =>
+		s.addShape('roundRect', {
+			x: 8.214,
+			y: r.y,
+			w: 2.965,
+			h: 0.587,
+			fill: solid(CREAM),
+			line: null,
+			rectRadius: 0.294,
+		})
+	);
+	navBar(s);
+	headline(s, {
+		x: 7.381,
+		y: 1.218,
+		w: 2.905,
+		parts: [
+			['Contact ', INK],
+			['Us', BROWN],
+		],
+	});
+	text(s, LOREM.contact, {
+		x: 7.381,
+		y: 2.193,
+		w: 4.885,
+		h: 0.603,
+		align: 'justify',
+		lh: 1.5,
+	});
+	rows.forEach((r) => {
+		s.addShape('ellipse', {
+			x: 7.473,
+			y: r.y,
+			w: 0.587,
+			h: 0.587,
+			fill: solid(BROWN),
+			line: null,
+		});
+		icon(s, r.glyph, 7.64, r.y + 0.167, 0.253, 0.253, CREAM);
+		text(s, r.label, {
+			x: 8.492,
+			y: r.y + 0.142,
+			w: r.w,
+			h: 0.278,
+			font: MONO,
+			bold: true,
+		});
+	});
+	s.addShape('round2SameRect', {
+		x: 1.773,
+		y: 1.557,
+		w: 3.679,
+		h: 4.558,
+		fill: null,
+		line: stroke(DARK, THIN),
+		...ARCH,
+	});
+	s.addShape('round2SameRect', {
+		x: 5.348,
+		y: 2.659,
+		w: 0.587,
+		h: 3.465,
+		fill: solid(CREAM),
+		line: null,
+		...ARCH,
+	});
+}
+
+// 20 - Thanks For Your Attention
+function slide20(pres) {
+	const s = pres.addSlide();
+	photo(s, {
+		x: 7.483,
+		y: 1.382,
+		w: 5.851,
+		h: 6.118,
+		shape: 'round1Rect',
+		rectRadius: 0.975,
+		flipH: true,
+	});
+	navBar(s);
+	headline(s, {
+		x: 1.052,
+		y: 1.202,
+		w: 5.57,
+		h: 1.582,
+		size: 44,
+		parts: [
+			['Thanks', BROWN],
+			[' For Your Attention', INK],
+		],
+	});
+	text(s, LOREM.thanks, {
+		x: 1.052,
+		y: 3.146,
+		w: 4.799,
+		h: 1.663,
+		align: 'justify',
+		lh: 1.5,
+	});
+	badge(s, 'ellipse', {
+		x: 1.213,
+		y: 5.391,
+		w: 2.488,
+		h: 0.721,
+		fill: BROWN,
+		label: 'End Slide',
+	});
+	diamonds(s, [
+		[6.574, 5.232, 0.213, 0.328],
+		[5.851, 5.448, 0.47, 0.723],
+		[6.891, 5.396, 0.302, 0.464],
+	]);
+	s.addShape('round1Rect', {
+		x: 7.254,
+		y: 1.382,
+		w: 6.207,
+		h: 6.3,
+		flipH: true,
+		fill: null,
+		line: stroke(BROWN, THIN),
+		rectRadius: 1.034,
+	});
+}
+
+/* ------------------------------------------------------------------- main */
+
+function build() {
+	const pres = new PptxGenJS();
+	pres.defineLayout({ name: 'WIDE', width: 13.333, height: 7.5 });
+	pres.layout = 'WIDE';
+	pres.author = 'WedCraft';
+	pres.title = 'Wedding Organizer';
+
+	[
+		slide01, slide02, slide03, slide04, slide05,
+		slide06, slide07, slide08, slide09, slide10,
+		slide11, slide12, slide13, slide14, slide15,
+		slide16, slide17, slide18, slide19, slide20,
+	].forEach((fn) => fn(pres));
+
+	return pres.writeFile({
+		fileName: path.join(
+			__dirname,
+			'0879877a-2c92-45bb-b73a-8f2f8a8d179f_grok_final.pptx'
+		),
+	});
+}
+
+build().then((f) => console.log('wrote', f));
