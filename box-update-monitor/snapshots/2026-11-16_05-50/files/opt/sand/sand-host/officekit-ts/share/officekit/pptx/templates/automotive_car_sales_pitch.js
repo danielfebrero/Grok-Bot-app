@@ -1,0 +1,572 @@
+/**
+ * NEXEVOL — automotive landing-page style deck (10 slides, 13.333in x 7.5in).
+ * Rebuilt from scratch with pptxgenjs: every shape, colour and string below is
+ * a plain literal. Photos in the original are replaced by flat placeholders.
+ *
+ *   node 0c041e6f-288b-4b40-b8dd-24c22a6fecac_grok_final.js
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ theme */
+
+const C = {
+  bg: '262626', // slide background (tx1 lumMod 85%)
+  bgAlt: '272727', // dk2 — background of slides 2..7
+  panel: '3D3D3D', // dk2 lumMod 90% — track / chip fills
+  navy: '0C3C56', // accent1
+  yellow: 'FFD101', // accent2
+  ink: 'F2F2F2', // bg1 lumMod 95% — body copy
+  white: 'FFFFFF',
+  muted: 'A6A6A6', // inactive nav item
+  dim: 'BFBFBF', // page number
+  dot: '808080', // inactive slider dot
+  black: '070707', // car "shadow" swoosh
+  photo: '2E2E2E' // stand-in panel where the original holds a photo
+};
+
+const F = { head: 'Russo One', body: 'Raleway' };
+
+const LOREM = {
+  full: 'Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor ' +
+    'incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, ',
+  long: 'Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor ' +
+    'incididunt ut labore et dolore',
+  mid: 'Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor ' +
+    'incididunt ut labore et dolore magna aliqua. Ut enim ad',
+  short: 'Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut',
+  tiny: 'Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do',
+  head: 'Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore',
+  quote: 'Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et',
+  car: 'Lorem ipsum dolor sit amet, consectetur adipisicing elit, , consectetur dolor sit amet, consectetur '
+};
+
+/* ---------------------------------------------------------------- helpers */
+
+/** Body/heading text box. Reference boxes are top-anchored, Raleway by default. */
+function tx(s, runs, o) {
+  s.addText(runs, Object.assign({ fontFace: F.body, color: C.ink, valign: 'top' }, o));
+}
+
+/** Heading text box (Russo One, bold, 36pt) built from coloured run pairs. */
+function heading(s, x, y, w, runs, size) {
+  tx(s, runs.map(r => ({ text: r[0], options: { color: r[1] } })),
+    { x: x, y: y, w: w, h: 1.313, fontFace: F.head, bold: true, fontSize: size || 36 });
+}
+
+function rect(s, o) { s.addShape('rect', o); }
+function oval(s, o) { s.addShape('ellipse', o); }
+
+/**
+ * Slanted "button" plate. The default lean matches PowerPoint's parallelogram
+ * preset (top edge shifted right by 0.25 * the shorter side), so the preset is
+ * used as-is; a custom `adj` is drawn as an explicit quad instead.
+ */
+function plate(s, x, y, w, h, o) {
+  const opt = Object.assign({ fill: { color: C.navy } }, o);
+  const adj = opt.adj;
+  delete opt.adj;
+  if (!adj) { s.addShape('parallelogram', Object.assign({ x: x, y: y, w: w, h: h }, opt)); return; }
+  const dx = (adj * Math.min(w, h)) / w;
+  poly(s, x, y, w, h, [[0, 1], [dx, 0], [1, 0], [1 - dx, 1]], opt);
+}
+
+/** custGeom polygon from fractional [x,y] pairs of the w x h box. */
+function poly(s, x, y, w, h, pts, o) {
+  s.addShape('custGeom', Object.assign({
+    x: x, y: y, w: w, h: h,
+    points: pts.map(p => ({ x: p[0] * w, y: p[1] * h })).concat([{ close: true }])
+  }, o));
+}
+
+/** Yellow "hazard" stripes — seven slanted bars drawn as one custom shape. */
+function stripes(s, x, y, w, h) {
+  const bar = 0.0529; // bar width as a fraction of the block width
+  const skew = 0.0723; // horizontal run of the slant
+  const points = [];
+  for (let i = 0; i < 7; i++) {
+    const l = i * 0.1458;
+    points.push({ x: l * w, y: h, moveTo: true },
+      { x: (l + skew) * w, y: 0 },
+      { x: (l + skew + bar) * w, y: 0 },
+      { x: (l + bar) * w, y: h },
+      { close: true });
+  }
+  s.addShape('custGeom', { x: x, y: y, w: w, h: h, fill: { color: C.yellow }, points: points });
+}
+
+/**
+ * The reference deck reserves several frames for photography but ships them
+ * empty, so they render as bare background. Kept as a no-fill marker rectangle
+ * to preserve the layout intent without inventing artwork.
+ */
+function photoFrame(s, x, y, w, h) {
+  rect(s, { x: x, y: y, w: w, h: h, fill: { type: 'none' } });
+}
+
+/* ------------------------------------------------------- chrome (per slide) */
+
+function logo(s) {
+  tx(s, [{ text: 'NEX', options: { color: C.yellow } }, { text: 'EVOL', options: { color: C.white } }],
+    { x: 0.099, y: 0.184, w: 1.528, h: 0.303, fontFace: F.head, fontSize: 12 });
+}
+
+function footerUrl(s) {
+  tx(s, 'www.yoursite.com', { x: 0.141, y: 7.007, w: 3.74, h: 0.286, fontSize: 11, charSpacing: 6 });
+}
+
+function pageNumber(s, n) {
+  tx(s, [
+    { text: 'PAGE', options: { fontSize: 12 } },
+    { text: ' ', options: { fontSize: 16, bold: true } },
+    { text: String(n), options: { fontSize: 14 } }
+  ], { x: 11.982, y: 6.991, w: 1.102, h: 0.37, align: 'right', fontFace: F.head, color: C.dim });
+}
+
+/** Round "person" glyph at the far right of the top bar. */
+function avatar(s, x, y, d) {
+  oval(s, { x: x, y: y, w: d, h: d, fill: { type: 'none' }, line: { color: C.white, width: 1.5 } });
+  oval(s, { x: x + d * 0.33, y: y + d * 0.2, w: d * 0.34, h: d * 0.34, fill: { color: C.white } });
+  poly(s, x + d * 0.17, y + d * 0.55, d * 0.66, d * 0.45,
+    [[0.5, 0], [0.85, 0.25], [1, 0.75], [0, 0.75], [0.15, 0.25]], { fill: { color: C.white } });
+}
+
+/** Yellow chevron pointing down, next to "Account". */
+function chevron(s, x, y, w, h) {
+  poly(s, x, y, w, h,
+    [[0.06, 0], [0.5, 0.55], [0.94, 0], [1, 0.42], [0.5, 1], [0, 0.42]], { fill: { color: C.yellow } });
+}
+
+/** Top-right account control: chevron + label + avatar. */
+function accountBar(s) {
+  avatar(s, 12.857, 0.217, 0.229);
+  tx(s, 'Account', {
+    x: 11.959, y: 0.106, w: 1.004, h: 0.366, fontSize: 12, color: C.white, lineSpacingMultiple: 1.5
+  });
+  chevron(s, 11.753, 0.283, 0.162, 0.097);
+}
+
+function sliderDots(s) {
+  oval(s, { x: 0.197, y: 3.458, w: 0.205, h: 0.205, fill: { type: 'none' }, line: { color: C.yellow, width: 1 } });
+  [[3.196, C.dot], [3.519, C.yellow], [3.841, C.dot], [4.164, C.dot]].forEach(d => {
+    oval(s, { x: 0.257, y: d[0], w: 0.084, h: 0.084, fill: { color: d[1] } });
+  });
+}
+
+/** Everything that repeats on (nearly) every slide. */
+function chrome(s, n, opts) {
+  const o = opts || {};
+  logo(s);
+  if (!o.noFooter) footerUrl(s);
+  if (!o.noAccount) accountBar(s);
+  if (!o.noDots) sliderDots(s);
+  pageNumber(s, n);
+}
+
+/* ------------------------------------------------------------ small icons */
+
+/** Double chevron ">>" made of two solid triangles (slides 3 and 4). */
+function doubleArrow(s, x, y, d, color) {
+  for (let i = 0; i < 2; i++) {
+    poly(s, x + i * d * 0.5, y + d * 0.09, d * 0.5, d * 0.82,
+      [[0, 0], [1, 0.5], [0, 1]], { fill: { color: color } });
+  }
+}
+
+/** Gear with a wrench stem — the small yellow glyph on slide 5. */
+function gearIcon(s, x, y, w, h) {
+  s.addShape('gear9', { x: x, y: y, w: w, h: w * 0.86, fill: { color: C.yellow } });
+  oval(s, {
+    x: x + w * 0.24, y: y + w * 0.19, w: w * 0.52, h: w * 0.5,
+    fill: { color: C.bgAlt }, line: { color: C.yellow, width: 1 }
+  });
+  rect(s, { x: x + w * 0.42, y: y + w * 0.4, w: w * 0.16, h: h - w * 0.4, fill: { color: C.yellow } });
+  rect(s, { x: x + w * 0.46, y: y + w * 0.28, w: w * 0.08, h: w * 0.2, fill: { color: C.bgAlt } });
+}
+
+/** Yellow tick inside a dark disc (slide 8 bullet list). */
+function checkIcon(s, x, y, d) {
+  poly(s, x, y, d, d,
+    [[0, 0.46], [0.18, 0.28], [0.38, 0.5], [0.82, 0.04], [1, 0.22], [0.38, 0.9]],
+    { fill: { color: C.yellow } });
+}
+
+/** Chunky five-pointed rating star (rounder than the `star5` preset). */
+function star(s, x, y, d) {
+  const pts = [];
+  for (let i = 0; i < 10; i++) {
+    const r = i % 2 ? 0.23 : 0.5; // alternate outer / inner radius
+    const a = (Math.PI / 5) * i - Math.PI / 2;
+    pts.push([0.5 + r * Math.cos(a), 0.5 + r * Math.sin(a) * 1.06]);
+  }
+  poly(s, x, y, d, d, pts, { fill: { color: C.yellow } });
+}
+
+/** Globe / credit-card / trolley glyphs in the slide-9 button row. */
+function globeIcon(s, x, y, d) {
+  oval(s, { x: x, y: y, w: d, h: d, fill: { color: C.white } });
+  // Two dark "continents" break up the disc the way the original glyph does.
+  poly(s, x + d * 0.1, y + d * 0.1, d * 0.46, d * 0.46,
+    [[0.45, 0], [0.75, 0.15], [1, 0.45], [0.6, 0.6], [0.35, 1], [0.1, 0.7], [0, 0.3]],
+    { fill: { color: C.panel } });
+  poly(s, x + d * 0.5, y + d * 0.5, d * 0.42, d * 0.42,
+    [[0.35, 0], [0.8, 0.2], [1, 0.5], [0.55, 0.95], [0.2, 0.7], [0, 0.3]],
+    { fill: { color: C.panel } });
+}
+
+function cardIcon(s, x, y, d) {
+  s.addShape('roundRect', {
+    x: x, y: y + d * 0.14, w: d, h: d * 0.72, rectRadius: 0.02,
+    fill: { type: 'none' }, line: { color: C.yellow, width: 1.5 }
+  });
+  rect(s, { x: x + d * 0.04, y: y + d * 0.2, w: d * 0.92, h: d * 0.19, fill: { color: C.yellow } });
+  rect(s, { x: x + d * 0.1, y: y + d * 0.62, w: d * 0.16, h: d * 0.08, fill: { color: C.yellow } });
+  rect(s, { x: x + d * 0.32, y: y + d * 0.62, w: d * 0.16, h: d * 0.08, fill: { color: C.yellow } });
+}
+
+function cartIcon(s, x, y, d) {
+  poly(s, x + d * 0.24, y + d * 0.22, d * 0.76, d * 0.4,
+    [[0, 0], [1, 0], [0.86, 1], [0.13, 1]], { fill: { color: C.white } });
+  s.addShape('line', {
+    x: x, y: y + d * 0.1, w: d * 0.3, h: d * 0.12, line: { color: C.white, width: 1.5 }
+  });
+  s.addShape('line', {
+    x: x + d * 0.3, y: y + d * 0.62, w: d * 0.5, h: d * 0.14, line: { color: C.white, width: 1.5 }
+  });
+  oval(s, { x: x + d * 0.28, y: y + d * 0.78, w: d * 0.16, h: d * 0.16, fill: { color: C.white } });
+  oval(s, { x: x + d * 0.68, y: y + d * 0.78, w: d * 0.16, h: d * 0.16, fill: { color: C.white } });
+}
+
+/* ============================================================== slide 1 */
+// Hero: NEXEVOL wordmark over the slanted yellow/navy car panel.
+
+function slide1(p) {
+  const s = p.addSlide();
+  s.background = { color: C.bg };
+
+  // Slanted colour panels on the right (drawn back to front).
+  plate(s, 7.53, 1.394, 1.719, 4.999, { adj: 0.77886, fill: { color: C.yellow } });
+  poly(s, 10.22, 1.415, 3.112, 4.999,
+    [[0.402, 0], [1, 0], [1, 1], [0, 1]], { fill: { color: C.navy } });
+  plate(s, 8.292, 1.408, 2.93, 4.999, { adj: 0.42971, fill: { color: C.yellow } });
+  // Car shadow: a thin dart lying across the panels.
+  poly(s, 7.521, 4.135, 1.781, 0.234, [
+    [1, 0.389], [0.855, 0.211], [0.686, 0.089], [0.405, 0.011], [0.05, 0], [0, 0.033],
+    [0.034, 0.189], [0.228, 0.244], [0.333, 0.322], [0.392, 0.622], [0.411, 0.889],
+    [0.422, 1], [0.436, 0.956], [0.469, 0.667], [0.531, 0.389], [0.583, 0.344],
+    [0.728, 0.356], [0.824, 0.356], [0.934, 0.356]
+  ], { fill: { color: C.black } });
+
+  // Top navigation.
+  [['News', 4.219, C.muted], ['Pricing', 6.126, C.ink], ['Models', 8.034, C.muted]].forEach(n => {
+    tx(s, n[0], { x: n[1], y: 0.184, w: 1.14, h: 0.303, fontSize: 12, color: n[2], align: 'center' });
+  });
+  s.addShape('line', { x: 6.411, y: 0.501, w: 0.568, h: 0, line: { color: C.yellow, width: 0.75 } });
+
+  heading(s, 1.439, 1.963, 5.571,
+    [['NEX', C.yellow], ['EVOL', C.white]], 72);
+  tx(s, LOREM.full, { x: 1.439, y: 3.531, w: 4.275, h: 0.978, fontSize: 12, lineSpacingMultiple: 1.5 });
+
+  // Spec pair: Power / Body.
+  tx(s, 'Power', { x: 1.439, y: 5.062, w: 1.355, h: 0.337, fontSize: 14, bold: true });
+  tx(s, [{ text: '250', options: { fontSize: 20 } }, { text: 'KM/H', options: { fontSize: 12 } }],
+    { x: 1.439, y: 5.394, w: 1.479, h: 0.438, fontFace: F.head, color: C.yellow });
+  tx(s, 'Body', { x: 2.817, y: 5.062, w: 1.355, h: 0.337, fontSize: 14, bold: true });
+  tx(s, 'Metalic', { x: 2.817, y: 5.394, w: 1.479, h: 0.404, fontFace: F.head, fontSize: 18 });
+
+  plate(s, 4.267, 5.231, 1.772, 0.518);
+  tx(s, 'Read More', {
+    x: 4.195, y: 5.322, w: 1.916, h: 0.337, fontFace: F.head, fontSize: 14, color: C.white, align: 'center'
+  });
+
+  stripes(s, 6.782, 1.209, 0.969, 0.171);
+  stripes(s, 0.341, 6.079, 0.665, 0.117);
+  chrome(s, 1);
+}
+
+/* ============================================================== slide 2 */
+// "Designed for Safe Drive" — two photo panels along the bottom.
+
+function slide2(p) {
+  const s = p.addSlide();
+  s.background = { color: C.bgAlt };
+
+  photoFrame(s, 1.886, 3.454, 5.376, 2.8);
+  photoFrame(s, 7.6, 3.454, 3.692, 2.8);
+
+  heading(s, 1.886, 1.183, 4.155,
+    [['Designed ', C.ink], ['for', C.yellow], [' ', C.navy], ['Safe Drive', C.ink]]);
+  tx(s, 'Innovation for Safety ', { x: 6.354, y: 1.121, w: 2.988, h: 0.337, fontFace: F.head, fontSize: 14 });
+  tx(s, LOREM.full, { x: 6.354, y: 1.548, w: 5.124, h: 0.978, fontSize: 12, lineSpacingMultiple: 1.5 });
+
+  plate(s, 9.663, 5.485, 2.054, 0.518);
+  tx(s, 'Our Collection', {
+    x: 9.732, y: 5.576, w: 1.916, h: 0.337, fontFace: F.head, fontSize: 14, color: C.white, align: 'center'
+  });
+
+  stripes(s, 11.349, 2.62, 0.969, 0.171);
+  stripes(s, 0.815, 5.742, 0.616, 0.109);
+  chrome(s, 2);
+}
+
+/* ============================================================== slide 3 */
+// "Some Product Speciality" — stat rows on the left, photo bottom-right.
+
+function slide3(p) {
+  const s = p.addSlide();
+  s.background = { color: C.bgAlt };
+
+  photoFrame(s, 1.643, 1.05, 4.804, 3.068);
+  photoFrame(s, 7.474, 4.154, 4.275, 3.346);
+
+  heading(s, 7.474, 1.05, 4.656, [['Some Product ', C.ink], ['Speciality', C.yellow]]);
+  tx(s, LOREM.head, { x: 7.474, y: 2.864, w: 4.275, h: 0.676, fontSize: 12, lineSpacingMultiple: 1.5 });
+
+  // Yellow badge with the double chevron, overlapping the photo edge.
+  rect(s, { x: 5.833, y: 1.331, w: 0.911, h: 0.911, fill: { color: C.yellow } });
+  doubleArrow(s, 6.129, 1.627, 0.318, C.bg);
+
+  [['90%', 'Strenght', C.yellow, 1.672, 4.689, 5.09, 2.825, 4.68],
+   ['810', 'Product ', C.ink, 1.713, 5.759, 6.172, 2.784, 5.757]].forEach(r => {
+    tx(s, r[0], { x: r[3], y: r[4], w: 1.112, h: 0.505, fontFace: F.head, fontSize: 24, color: r[2] });
+    tx(s, r[1], { x: r[3], y: r[5], w: 1.361, h: 0.337, fontSize: 14, bold: true, color: r[2] });
+    tx(s, LOREM.tiny, { x: r[6], y: r[7], w: 3.918, h: 0.671, fontSize: 12, lineSpacingMultiple: 1.5 });
+  });
+
+  stripes(s, 0.341, 1.54, 0.969, 0.171);
+  stripes(s, 12.04, 5.595, 0.611, 0.108);
+  chrome(s, 3);
+}
+
+/* ============================================================== slide 4 */
+// "Buy More Pay Less" — price/sold figures and a wide CTA plate.
+
+function slide4(p) {
+  const s = p.addSlide();
+  s.background = { color: C.bgAlt };
+
+  photoFrame(s, 5.663, 1.166, 4.341, 5.309);
+  photoFrame(s, 8.952, 1.166, 4.381, 5.309);
+
+  heading(s, 1.473, 1.72, 4.155, [['Buy ', C.ink], ['More', C.yellow], [' Pay Less', C.ink]]);
+  tx(s, LOREM.long, { x: 1.473, y: 3.588, w: 3.736, h: 0.974, fontSize: 12, lineSpacingMultiple: 1.5 });
+
+  [['Price', '$35000', C.ink, 1.473], ['Sold', '100K+', C.yellow, 3.048]].forEach(r => {
+    tx(s, r[0], { x: r[3], y: 5.081, w: 1.355, h: 0.37, fontSize: 16, bold: true });
+    tx(s, r[1], { x: r[3], y: 5.413, w: 1.479, h: 0.438, fontFace: F.head, fontSize: 20, color: r[2] });
+  });
+
+  plate(s, 7.744, 5.128, 3.48, 0.721);
+  tx(s, 'Greatest Price', { x: 8.148, y: 5.27, w: 2.129, h: 0.404, fontFace: F.head, fontSize: 18 });
+  doubleArrow(s, 10.277, 5.33, 0.318, C.ink);
+
+  stripes(s, 6.449, 0.793, 0.969, 0.171);
+  stripes(s, 0.358, 5.849, 0.581, 0.102);
+  chrome(s, 4);
+}
+
+/* ============================================================== slide 5 */
+// "Time to Get a New Car" — two slanted progress bars.
+
+function slide5(p) {
+  const s = p.addSlide();
+  s.background = { color: C.bgAlt };
+
+  photoFrame(s, 0, 1.486, 5.839, 2.317);
+  photoFrame(s, 0, 3.944, 6.581, 2.317);
+
+  heading(s, 7.494, 1.486, 4.155, [['Time', C.yellow], [' to Get a New Car', C.ink]]);
+
+  plate(s, 4.948, 2.143, 1.378, 0.833);
+  tx(s, '50+', {
+    x: 5.007, y: 2.307, w: 1.338, h: 0.505, fontFace: F.head, fontSize: 24,
+    bold: true, color: C.white, align: 'center'
+  });
+
+  gearIcon(s, 7.651, 3.536, 0.331, 0.454);
+  tx(s, LOREM.short, { x: 8.19, y: 3.259, w: 3.354, h: 0.974, fontSize: 12, lineSpacingMultiple: 1.5 });
+
+  // label / track / fill / percentage
+  [['Body', 4.631, 4.96, 3.62, C.white, '96%', 7.651, 10.068],
+   ['Tires', 5.478, 5.808, 2.092, C.yellow, '65%', 7.655, 10.071]].forEach(b => {
+    tx(s, b[0], { x: b[6], y: b[1], w: 1.479, h: 0.337, fontFace: F.head, fontSize: 14 });
+    plate(s, b[6], b[2], 3.995, 0.283, { fill: { color: C.panel } });
+    plate(s, b[6], b[2], b[3], 0.283, { fill: { color: b[4] } });
+    tx(s, b[5], {
+      x: b[7], y: b[1] + 0.033, w: 1.479, h: 0.303, fontFace: F.head, fontSize: 12, align: 'right'
+    });
+  });
+
+  stripes(s, 1.95, 0.943, 0.969, 0.171);
+  stripes(s, 12.091, 6.261, 0.74, 0.13);
+  chrome(s, 5, { noDots: true });
+}
+
+/* ============================================================== slide 6 */
+// "Designed for Special Journey" — testimonial with a slanted quote plate.
+
+function slide6(p) {
+  const s = p.addSlide();
+  s.background = { color: C.bgAlt };
+
+  photoFrame(s, 1.688, 1.062, 4.602, 5.522);
+
+  heading(s, 7.015, 1.204, 4.465, [['Designed for ', C.ink], ['Special', C.yellow], [' Journey', C.ink]]);
+  tx(s, LOREM.mid, { x: 7.015, y: 2.914, w: 4.275, h: 0.974, fontSize: 12, lineSpacingMultiple: 1.5 });
+  tx(s, 'Natan Enderson', {
+    x: 7.015, y: 4.457, w: 3.387, h: 0.438, fontFace: F.head, fontSize: 20, color: C.yellow
+  });
+  tx(s, 'Creative Director', { x: 7.015, y: 4.879, w: 3.387, h: 0.337, fontSize: 14 });
+
+  plate(s, 5.86, 5.407, 5.785, 0.974, { adj: 0.14308 });
+  tx(s, '\u201C', { x: 6.096, y: 5.215, w: 0.278, h: 1.082, fontSize: 44, lineSpacingMultiple: 1.5 });
+  tx(s, LOREM.quote, { x: 6.444, y: 5.558, w: 4.899, h: 0.671, fontSize: 12, lineSpacingMultiple: 1.5 });
+
+  stripes(s, 11.492, 1.118, 0.969, 0.171);
+  stripes(s, 0.825, 6.055, 0.561, 0.099);
+  chrome(s, 6);
+}
+
+/* ============================================================== slide 7 */
+// "The Power of Electric" — full-bleed photos, two buttons, no side rail.
+
+function slide7(p) {
+  const s = p.addSlide();
+  s.background = { color: C.bgAlt };
+
+  photoFrame(s, 6.507, 0, 6.827, 3.75);
+  photoFrame(s, 0, 3.275, 6.403, 4.225);
+
+  heading(s, 1.785, 1.323, 4.155, [['The ', C.ink], ['Power', C.yellow], [' of Electric', C.ink]]);
+  tx(s, LOREM.full, { x: 6.778, y: 4.441, w: 4.791, h: 0.978, fontSize: 12, lineSpacingMultiple: 1.5 });
+
+  plate(s, 6.931, 5.782, 2.054, 0.518);
+  tx(s, 'Our Collection', {
+    x: 7.0, y: 5.872, w: 1.916, h: 0.337, fontFace: F.head, fontSize: 14, color: C.white, align: 'center'
+  });
+  plate(s, 9.089, 5.782, 2.054, 0.518, { fill: { type: 'none' }, line: { color: C.yellow, width: 1 } });
+  tx(s, 'New Brand', {
+    x: 9.158, y: 5.872, w: 1.916, h: 0.337, fontFace: F.head, fontSize: 14, color: C.yellow, align: 'center'
+  });
+
+  stripes(s, 0.863, 0.995, 0.969, 0.171);
+  stripes(s, 11.569, 5.941, 0.743, 0.131);
+  chrome(s, 7, { noFooter: true, noAccount: true, noDots: true });
+}
+
+/* ============================================================== slide 8 */
+// "Our Promise For Customer" — 2x2 tick list under the photos.
+
+function slide8(p) {
+  const s = p.addSlide();
+  s.background = { color: C.bg };
+
+  photoFrame(s, 1.653, 1.299, 4.129, 3.556);
+  photoFrame(s, 5.928, 3.025, 3.152, 1.852);
+
+  heading(s, 6.372, 1.24, 4.833, [['Our ', C.ink], ['Promise ', C.yellow], ['For Customer', C.ink]]);
+  tx(s, 'Our Commitment', {
+    x: 9.355, y: 3.081, w: 2.031, h: 0.337, fontFace: F.head, fontSize: 14, color: C.yellow
+  });
+  tx(s, LOREM.short, { x: 9.355, y: 3.531, w: 2.492, h: 1.277, fontSize: 12, lineSpacingMultiple: 1.5 });
+
+  const promises = [
+    [1.668, 5.365, 3.488, 'Lorem ipsum dolor sit ipsum consectetur '],
+    [1.668, 5.942, 3.033, 'Lorem ipsum dolor sit ipsum '],
+    [5.55, 5.365, 3.488, 'Lorem ipsum dolor sit ipsum consectetur '],
+    [5.55, 5.942, 3.033, 'Lorem ipsum dolor sit ipsum ']
+  ];
+  promises.forEach(r => {
+    oval(s, { x: r[0], y: r[1], w: 0.275, h: 0.275, fill: { color: C.panel } });
+    checkIcon(s, r[0] + 0.042, r[1] + 0.042, 0.191);
+    tx(s, r[3], { x: r[0] + 0.378, y: r[1] - 0.029, w: r[2], h: 0.303, fontSize: 12 });
+  });
+
+  plate(s, 9.694, 5.572, 2.054, 0.518);
+  tx(s, 'Our Collection', {
+    x: 9.763, y: 5.662, w: 1.916, h: 0.337, fontFace: F.head, fontSize: 14, color: C.white, align: 'center'
+  });
+
+  stripes(s, 11.959, 4.799, 0.969, 0.171);
+  stripes(s, 1.093, 0.908, 0.617, 0.109);
+  chrome(s, 8);
+}
+
+/* ============================================================== slide 9 */
+// "Get Everyone Dream Car" — icon buttons and a five-star rating plate.
+
+function slide9(p) {
+  const s = p.addSlide();
+  s.background = { color: C.bg };
+
+  photoFrame(s, 5.825, 0, 7.508, 7.5);
+
+  heading(s, 1.673, 1.512, 4.028, [['Get ', C.ink], ['Everyone ', C.yellow], ['Dream Car', C.ink]]);
+  tx(s, 'Baracuda Machine', {
+    x: 1.673, y: 3.307, w: 2.468, h: 0.37, fontFace: F.head, fontSize: 16, color: C.yellow
+  });
+  tx(s, LOREM.car, { x: 1.673, y: 3.677, w: 4.028, h: 0.974, fontSize: 12, lineSpacingMultiple: 1.5 });
+
+  [[1.771, globeIcon], [2.761, cardIcon], [3.751, cartIcon]].forEach(b => {
+    s.addShape('roundRect', {
+      x: b[0], y: 5.035, w: 0.579, h: 0.579, rectRadius: 0.1, fill: { color: C.panel }
+    });
+    b[1](s, b[0] + 0.124, 5.16, 0.33);
+  });
+
+  plate(s, 5.395, 4.891, 3.412, 0.866, { adj: 0.24297 });
+  tx(s, 'Best Seller This Month', {
+    x: 5.889, y: 4.982, w: 2.497, h: 0.337, fontFace: F.head, fontSize: 14
+  });
+  for (let i = 0; i < 5; i++) star(s, 5.951 + i * 0.311, 5.386, 0.221);
+
+  stripes(s, 0.379, 0.922, 0.969, 0.171);
+  stripes(s, 5.092, 6.151, 0.787, 0.139);
+  chrome(s, 9, { noAccount: true });
+}
+
+/* ============================================================= slide 10 */
+// Closing "THANK YOU" slide.
+
+function slide10(p) {
+  const s = p.addSlide();
+  s.background = { color: C.bg };
+
+  photoFrame(s, 0.402, 1.017, 5.978, 5.65);
+
+  heading(s, 6.72, 2.023, 5.571, [['THANK ', C.ink], ['YOU', C.yellow]], 60);
+  tx(s, 'See You Next Time', {
+    x: 6.72, y: 3.519, w: 2.118, h: 0.337, fontFace: F.head, fontSize: 14, color: C.yellow
+  });
+  tx(s, LOREM.full, { x: 6.72, y: 3.866, w: 5.096, h: 0.978, fontSize: 12, lineSpacingMultiple: 1.5 });
+
+  plate(s, 6.834, 5.203, 1.772, 0.518);
+  tx(s, 'End Slide', {
+    x: 6.762, y: 5.294, w: 1.916, h: 0.337, fontFace: F.head, fontSize: 14, color: C.white, align: 'center'
+  });
+
+  stripes(s, 11.56, 1.679, 0.969, 0.171);
+  stripes(s, 5.459, 6.054, 0.727, 0.128);
+  chrome(s, 10);
+}
+
+/* -------------------------------------------------------------------- main */
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'NEXEVOL', width: 13.333, height: 7.5 });
+  pptx.layout = 'NEXEVOL';
+  pptx.theme = { headFontFace: F.head, bodyFontFace: F.body };
+  pptx.title = 'NEXEVOL';
+
+  [slide1, slide2, slide3, slide4, slide5, slide6, slide7, slide8, slide9, slide10]
+    .forEach(fn => fn(pptx));
+
+  return pptx.writeFile({
+    fileName: path.join(__dirname, '0c041e6f-288b-4b40-b8dd-24c22a6fecac_grok_final.pptx')
+  });
+}
+
+build().then(f => console.log('wrote ' + f)).catch(e => { console.error(e); process.exit(1); });

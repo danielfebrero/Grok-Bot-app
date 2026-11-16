@@ -1,0 +1,872 @@
+/**
+ * "Game Masters" gaming presentation template - 30 slides, 13.333in x 7.5in.
+ * Recreated with pptxgenjs only. The source deck's empty picture frames and
+ * photo mockups are represented by flat placeholder rectangles / shapes.
+ */
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ *
+ * palette / typography (theme "Game Masters")
+ * ------------------------------------------------------------------ */
+const MAGENTA = 'F402E4';   // accent1
+const PURPLE = '9A02F4';    // accent2
+const INDIGO = '533CE7';    // accent4
+const CYAN = '00C5EF';      // accent5
+const WHITE = 'FFFFFF';
+const GREY = '7F7F7F';      // body copy    (tx1 @ 50% lum)
+const GREY_DK = '595959';   // strong copy  (tx1 @ 65% lum)
+const GREY_LT = 'D9D9D9';   // hairlines    (bg1 @ 85% lum)
+const GREY_TRACK = 'F0F0F0';
+const GLOW = 'A855EC';      // colour of the deck's soft background blobs
+
+const HEAD = 'Ubuntu';
+const BODY = 'Roboto';
+
+const W = 13.333;
+const H = 7.5;
+
+/* the soft drop shadow shared by every white "card" */
+const CARD_SHADOW = { type: 'outer', blur: 36, offset: 3, angle: 45, color: '000000', opacity: 0.2 };
+const BIG_SHADOW = { type: 'outer', blur: 60, offset: 3, angle: 45, color: '000000', opacity: 0.2 };
+const MOCK_SHADOW = { type: 'outer', blur: 44, offset: 20, angle: 45, color: '000000', opacity: 0.12 };
+
+/* ------------------------------------------------------------------ *
+ * generic helpers
+ * ------------------------------------------------------------------ */
+const hx2 = (n) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0').toUpperCase();
+const rgb = (c) => [parseInt(c.slice(0, 2), 16), parseInt(c.slice(2, 4), 16), parseInt(c.slice(4, 6), 16)];
+const mix = (a, b, t) => {
+  const A = rgb(a), B = rgb(b);
+  return hx2(A[0] + (B[0] - A[0]) * t) + hx2(A[1] + (B[1] - A[1]) * t) + hx2(A[2] + (B[2] - A[2]) * t);
+};
+
+/** headline - Ubuntu bold italic, bottom aligned in its box */
+function title(s, text, x, y, w, h, o = {}) {
+  s.addText(text, {
+    x, y, w, h,
+    fontFace: HEAD, fontSize: o.size || 48, bold: true, italic: true,
+    color: o.color || MAGENTA, align: o.align || 'left', valign: 'bottom',
+    charSpacing: o.charSpacing || 0,
+  });
+}
+
+/** body copy - Roboto 12pt grey at 1.5 line spacing */
+function body(s, text, x, y, w, h, o = {}) {
+  s.addText(text, {
+    x, y, w, h,
+    fontFace: BODY, fontSize: o.size || 12, color: o.color || GREY,
+    align: o.align || 'left', valign: o.valign || 'middle',
+    lineSpacingMultiple: o.lineSpacingMultiple === undefined ? 1.5 : o.lineSpacingMultiple,
+    bold: o.bold, italic: o.italic, wrap: o.wrap,
+  });
+}
+
+/** white card with the deck's signature soft shadow */
+function card(s, x, y, w, h, o = {}) {
+  s.addShape(o.radius ? 'roundRect' : 'rect', {
+    x, y, w, h, rectRadius: o.radius,
+    fill: { color: o.color || WHITE }, line: { type: 'none' },
+    shadow: o.shadow || CARD_SHADOW,
+  });
+}
+
+/**
+ * Soft radial "blob". Almost every slide is decorated with a large,
+ * heavily soft-edged pink/violet circle. It is rebuilt as a stack of
+ * concentric translucent ellipses whose cumulative opacity follows a raised
+ * cosine, peak * cos^2.2, which matches the soft-edge falloff of the source.
+ */
+function glow(s, x, y, size, peak, o = {}) {
+  const N = Math.max(10, Math.min(34, Math.round(8 + peak * 28))); // keep per-ring alpha above 8-bit noise
+  const cos2 = (u) => (u >= 1 ? 0 : peak * Math.pow(0.5 * (1 + Math.cos(Math.PI * u)), 2.2));
+  const linear = (u) => Math.max(0, peak * (1 - u / 0.85));
+  const profile = o.profile === 'linear' ? linear : cos2;
+  let below = 0;
+  for (let k = N; k >= 1; k--) {
+    const want = profile((k - 1) / N);
+    const alpha = 1 - (1 - want) / (1 - below); // opacity this ring must add
+    below = want;
+    if (alpha <= 0.002) continue;
+    const d = (size * k) / N;
+    s.addShape(o.shape || 'ellipse', {
+      x: x + (size - d) / 2, y: y + (size - d) / 2, w: d, h: d,
+      fill: { color: o.color || GLOW, transparency: Math.round((1 - alpha) * 1000) / 10 },
+      line: { type: 'none' },
+    });
+  }
+}
+
+/** linear gradient painted as a strip of thin rectangles (pptxgenjs has no gradFill) */
+function gradRect(s, x, y, w, h, c0, c1, o = {}) {
+  const steps = o.steps || 30;
+  const vertical = o.vertical !== false;
+  const t0 = o.transparency0 === undefined ? 0 : o.transparency0;
+  const t1 = o.transparency1 === undefined ? t0 : o.transparency1;
+  for (let i = 0; i < steps; i++) {
+    const t = steps === 1 ? 0 : i / (steps - 1);
+    const seg = (vertical ? h : w) / steps;
+    s.addShape('rect', {
+      x: vertical ? x : x + i * seg,
+      y: vertical ? y + i * seg : y,
+      w: vertical ? w : seg + 0.015,
+      h: vertical ? seg + 0.015 : h,
+      fill: { color: mix(c0, c1, t), transparency: Math.round(t0 + (t1 - t0) * t) },
+      line: { type: 'none' },
+    });
+  }
+}
+
+/** bilinear (four-corner) gradient painted as a grid of tiles */
+function gradGrid(s, x, y, w, h, tl, tr, bl, br, nx = 22, ny = 12) {
+  for (let i = 0; i < nx; i++) {
+    for (let j = 0; j < ny; j++) {
+      const u = nx === 1 ? 0 : i / (nx - 1);
+      const v = ny === 1 ? 0 : j / (ny - 1);
+      s.addShape('rect', {
+        x: x + (i * w) / nx, y: y + (j * h) / ny, w: w / nx + 0.015, h: h / ny + 0.015,
+        fill: { color: mix(mix(tl, tr, u), mix(bl, br, u), v) }, line: { type: 'none' },
+      });
+    }
+  }
+}
+
+/** left-to-right gradient inside a rounded rectangle (stack of shrinking roundRects) */
+function gradRoundRect(s, x, y, w, h, radius, c0, c1, steps = 26) {
+  for (let i = steps; i >= 1; i--) {
+    s.addShape('roundRect', {
+      x, y, w: (w * i) / steps, h, rectRadius: radius,
+      fill: { color: mix(c0, c1, (i - 1) / (steps - 1)) },
+      line: { type: 'none' },
+      shadow: i === steps ? BIG_SHADOW : undefined,
+    });
+  }
+}
+
+/** grey block standing in for a photo / device mockup */
+function imagePlaceholder(s, x, y, w, h, o = {}) {
+  s.addShape(o.radius ? 'roundRect' : 'rect', {
+    x, y, w, h, rectRadius: o.radius,
+    fill: { color: o.color || 'F2F2F2' }, line: { type: 'none' },
+  });
+  s.addText('[image]', {
+    x, y, w, h, align: 'center', valign: 'middle',
+    fontFace: BODY, fontSize: o.labelSize || 12, color: o.labelColor || 'C9C9C9',
+  });
+}
+
+/* running header / footer / page number */
+function brand(s) {
+  s.addText('GAME MASTERS', {
+    x: 1.005, y: 0.668, w: 1.94, h: 0.303,
+    fontFace: HEAD, fontSize: 12, bold: true, italic: true, color: MAGENTA, valign: 'bottom',
+  });
+}
+function footer(s) {
+  s.addText('Gaming Presentation Template', {
+    x: 1.005, y: 6.686, w: 2.7, h: 0.269, fontFace: BODY, fontSize: 10, color: GREY, valign: 'middle',
+  });
+}
+function chrome(s, n, o = {}) {
+  if (o.brand !== false) brand(s);
+  if (o.footer !== false) footer(s);
+  if (o.num !== false) {
+    s.addText(String(n), {
+      x: o.numX === undefined ? 11.857 : o.numX, y: o.numY === undefined ? 6.686 : o.numY,
+      w: 0.472, h: 0.278, fontFace: BODY, fontSize: 10, color: o.numColor || GREY, align: 'right',
+    });
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * flat vector icons (the deck uses icon groups)
+ * ------------------------------------------------------------------ */
+function iconCrown(s, x, y, w, h, color) {
+  s.addShape('custGeom', {
+    x, y, w, h: h * 0.78, fill: { color }, line: { type: 'none' },
+    points: [{ x: 0, y: h * 0.16, moveTo: true }, { x: w * 0.24, y: h * 0.46 }, { x: w * 0.5, y: 0 },
+      { x: w * 0.76, y: h * 0.46 }, { x: w, y: h * 0.16 }, { x: w * 0.88, y: h * 0.78 },
+      { x: w * 0.12, y: h * 0.78 }, { close: true }],
+  });
+  s.addShape('rect', { x: x + w * 0.08, y: y + h * 0.84, w: w * 0.84, h: h * 0.16, fill: { color }, line: { type: 'none' } });
+  s.addShape('ellipse', { x: x + w * 0.42, y: y + h * 0.3, w: w * 0.16, h: h * 0.14, fill: { color: WHITE }, line: { type: 'none' } });
+}
+
+function iconShield(s, x, y, w, h, color) {
+  s.addShape('custGeom', {
+    x, y, w, h, fill: { color }, line: { type: 'none' },
+    points: [{ x: w * 0.5, y: 0, moveTo: true }, { x: w, y: h * 0.18 }, { x: w, y: h * 0.55 },
+      { x: w * 0.5, y: h }, { x: 0, y: h * 0.55 }, { x: 0, y: h * 0.18 }, { close: true }],
+  });
+  s.addShape('star5', { x: x + w * 0.26, y: y + h * 0.2, w: w * 0.48, h: h * 0.42, fill: { color: WHITE }, line: { type: 'none' } });
+}
+
+function iconGamepad(s, x, y, w, h, color) {
+  s.addShape('roundRect', { x, y: y + h * 0.18, w, h: h * 0.72, rectRadius: 0.45, fill: { color }, line: { type: 'none' } });
+  s.addShape('ellipse', { x: x - w * 0.04, y: y + h * 0.4, w: w * 0.4, h: h * 0.6, fill: { color }, line: { type: 'none' } });
+  s.addShape('ellipse', { x: x + w * 0.64, y: y + h * 0.4, w: w * 0.4, h: h * 0.6, fill: { color }, line: { type: 'none' } });
+  s.addShape('rect', { x: x + w * 0.13, y: y + h * 0.44, w: w * 0.22, h: h * 0.08, fill: { color: WHITE }, line: { type: 'none' } });
+  s.addShape('rect', { x: x + w * 0.2, y: y + h * 0.32, w: w * 0.08, h: h * 0.32, fill: { color: WHITE }, line: { type: 'none' } });
+  s.addShape('ellipse', { x: x + w * 0.67, y: y + h * 0.38, w: w * 0.12, h: h * 0.17, fill: { color: WHITE }, line: { type: 'none' } });
+  s.addShape('ellipse', { x: x + w * 0.78, y: y + h * 0.51, w: w * 0.12, h: h * 0.17, fill: { color: WHITE }, line: { type: 'none' } });
+}
+
+function iconPin(s, x, y, w, h, color) {
+  s.addShape('custGeom', {
+    x, y, w, h, fill: { color }, line: { type: 'none' },
+    points: [{ x: w * 0.5, y: h, moveTo: true }, { x: 0, y: h * 0.42 }, { x: 0, y: h * 0.28 },
+      { x: w * 0.5, y: 0 }, { x: w, y: h * 0.28 }, { x: w, y: h * 0.42 }, { close: true }],
+  });
+  s.addShape('ellipse', { x: x + w * 0.28, y: y + h * 0.18, w: w * 0.44, h: h * 0.32, fill: { color: WHITE }, line: { type: 'none' } });
+}
+
+function iconMail(s, x, y, w, h, color) {
+  s.addShape('rect', { x, y, w, h, fill: { color }, line: { type: 'none' } });
+  s.addShape('custGeom', {
+    x, y, w, h, fill: { color: WHITE }, line: { type: 'none' },
+    points: [{ x: w * 0.06, y: h * 0.16, moveTo: true }, { x: w * 0.5, y: h * 0.56 }, { x: w * 0.94, y: h * 0.16 },
+      { x: w * 0.94, y: h * 0.05 }, { x: w * 0.5, y: h * 0.42 }, { x: w * 0.06, y: h * 0.05 }, { close: true }],
+  });
+}
+
+function iconPhone(s, x, y, w, h, color) {
+  s.addShape('custGeom', {
+    x, y, w, h, fill: { color }, line: { type: 'none' },
+    points: [{ x: w * 0.06, y: 0, moveTo: true }, { x: w * 0.36, y: 0 }, { x: w * 0.46, y: h * 0.3 },
+      { x: w * 0.3, y: h * 0.44 }, { x: w * 0.56, y: h * 0.7 }, { x: w * 0.7, y: h * 0.54 },
+      { x: w, y: h * 0.64 }, { x: w, y: h * 0.94 }, { x: w * 0.8, y: h }, { x: w * 0.4, y: h * 0.86 },
+      { x: w * 0.12, y: h * 0.56 }, { x: 0, y: h * 0.2 }, { close: true }],
+  });
+}
+
+/** five rating stars, the last one faded out */
+function stars(s, x, y, color) {
+  for (let i = 0; i < 5; i++) {
+    s.addShape('star5', {
+      x: x + i * 0.4026, y, w: 0.279, h: 0.273,
+      fill: { color, transparency: i === 4 ? 60 : 0 }, line: { type: 'none' },
+    });
+  }
+}
+
+/* lorem strings reused throughout the template */
+const L1 = 'Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo';
+const L2 = L1 + ' inventore veritatis et quasi architecto beatae vitae dicta.';
+const L_SHORT = 'Sed ut perspiciatis unde omnis iste natus error sit voluptatem';
+const L_TINY = 'Sed ut perspiciatis unde.';
+const L_OPT = 'Sed ut perspiciatis unde omnis iste natus error sit voluptatem.';
+const L_CARD = 'Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium.';
+
+/* ------------------------------------------------------------------ *
+ * slides
+ * ------------------------------------------------------------------ */
+const slides = [];
+
+/* 1 - cover ------------------------------------------------------- */
+slides.push((s) => {
+  /* the cover backdrop is one huge pale-pink wash spanning the whole slide */
+  glow(s, 0.080, -2.836, 13.173, 0.42, { color: MAGENTA, profile: 'linear' });
+  const bracket = (x, flip) => s.addShape('custGeom', {
+    x, y: 2.196, w: 0.504, h: 3.108, flipH: flip, fill: { color: MAGENTA }, line: { type: 'none' },
+    points: [{ x: 0, y: 0, moveTo: true }, { x: 0.504, y: 0.504 }, { x: 0.504, y: 2.604 }, { x: 0, y: 3.108 }, { close: true }],
+  });
+  bracket(0, false);
+  bracket(12.830, true);
+  title(s, 'GAME MASTERS', 1.210, 2.589, 10.861, 1.717, { size: 96, color: WHITE, align: 'center', charSpacing: -3 });
+  s.addText('Gaming Presentation Template', {
+    x: 3.641, y: 4.339, w: 6.0, h: 0.572, fontFace: BODY, fontSize: 28, color: WHITE, align: 'center', valign: 'middle',
+  });
+});
+
+/* 2 - cover on magenta with wireframe globe ------------------------ */
+slides.push((s) => {
+  s.background = { color: MAGENTA };
+  /* two overlapping radial washes make a visible seam down the middle */
+  gradGrid(s, 0, 0, 6.7, H, 'F102E1', 'BA0BBF', 'B802C4', '9701E6', 22, 18);
+  gradGrid(s, 6.7, 0, 6.634, H, 'D902CE', 'B902C4', 'AA02CC', '9A01F1', 22, 18);
+  const cx = 6.42, cy = 3.40, R = 3.62;
+  const wire = { color: WHITE, width: 0.6, transparency: 78 };
+  for (let i = 0; i <= 6; i++) {
+    const rw = R * Math.cos((i * Math.PI) / 14);
+    s.addShape('ellipse', { x: cx - rw, y: cy - R, w: rw * 2, h: R * 2, fill: { type: 'none' }, line: wire, rotate: 18 });
+  }
+  for (let i = 1; i <= 5; i++) {
+    const rw = R * Math.sin((i * Math.PI) / 6);
+    s.addShape('ellipse', { x: cx - rw, y: cy - R + (R * 2 * i) / 6 - rw * 0.16, w: rw * 2, h: rw * 0.32, fill: { type: 'none' }, line: wire, rotate: 18 });
+  }
+  title(s, 'GAME MASTERS', 3.549, 1.762, 6.236, 3.332, { size: 96, color: WHITE, align: 'center', charSpacing: -3 });
+  s.addText('Gaming Presentation Template', {
+    x: 3.461, y: 5.099, w: 6.360, h: 0.640, fontFace: BODY, fontSize: 28, color: WHITE, align: 'center', valign: 'middle',
+  });
+});
+
+/* 3 - all about ---------------------------------------------------- */
+slides.push((s) => {
+  glow(s, 5.550, 3.523, 4.567, 0.20);
+  glow(s, 9.073, 0.543, 6.512, 0.95);
+  title(s, 'ALL ABOUT GAME MASTERS', 1.005, 2.255, 5.208, 1.717, { charSpacing: -3 });
+  body(s, 'Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo.',
+    1.005, 4.118, 5.790, 0.673);
+  chrome(s, 3);
+});
+
+/* 4 - welcome ------------------------------------------------------ */
+slides.push((s) => {
+  title(s, 'WELCOME TO GAME MASTERS', 1.005, 2.118, 6.468, 2.121, { size: 60, charSpacing: -3 });
+  body(s, L1 + ' inventore', 1.005, 4.406, 4.305, 0.976);
+  chrome(s, 4, { numX: 12.415, numY: 7.017 });
+});
+
+/* 5 - welcome over a gradient panel -------------------------------- */
+slides.push((s) => {
+  gradRect(s, 0, 0.608, 7.882, 6.892, WHITE, MAGENTA, { steps: 34 });
+  title(s, 'WELCOME TO GAME MASTERS', 7.197, 2.168, 4.576, 1.582, { size: 44, charSpacing: -3 });
+  body(s, L1 + ' inventore', 8.686, 3.861, 3.411, 1.279);
+  chrome(s, 5, { brand: false, footer: false });
+});
+
+/* 6 - insights ----------------------------------------------------- */
+slides.push((s) => {
+  glow(s, -0.953, 2.177, 4.495, 0.35);
+  glow(s, 5.776, 0.758, 1.569, 0.42);
+  imagePlaceholder(s, 1.082, 1.309, 5.478, 5.055, { color: 'E9E9E9', radius: 0.07, labelColor: 'BEBEBE' });
+  title(s, 'INSIGHTS INTO GAMING CULTURE', 7.454, 1.512, 4.797, 2.524);
+  body(s, L1 + ' inventore', 7.454, 4.204, 4.305, 0.976);
+  chrome(s, 6);
+});
+
+/* 7 - unveiling ---------------------------------------------------- */
+slides.push((s) => {
+  glow(s, 9.111, -1.960, 7.153, 0.65);
+  gradRoundRect(s, 7.242, 4.062, 5.042, 1.821, 0.217, 'FAA0F5', 'A877ED');
+  title(s, "UNVEILING GAMING'S SECRETS", 1.009, 1.512, 4.597, 2.524);
+  body(s, L2, 1.009, 4.446, 5.452, 0.976);
+  title(s, '29,000', 7.645, 4.619, 2.427, 0.707, { size: 36, color: WHITE });
+  body(s, L_SHORT, 9.512, 4.720, 2.552, 0.505, { color: WHITE, lineSpacingMultiple: 1.15 });
+  glow(s, -0.669, 4.972, 1.337, 0.30);
+  chrome(s, 7);
+});
+
+/* 8 - trends, two gradient columns --------------------------------- */
+slides.push((s) => {
+  gradRect(s, 5.879, 0, 3.727, 7.5, 'EDE0EC', 'E01FD1', { steps: 34 });
+  gradRect(s, 9.606, 0, 3.727, 7.5, 'E5D9EA', '9A29DC', { steps: 34 });
+  title(s, 'TRENDS IN THE GAMING INDUSTRY', 1.009, 1.512, 4.597, 2.524);
+  body(s, L2, 1.009, 4.144, 3.727, 1.582);
+  [['29,000', 6.715], ['49,000', 10.441]].forEach(([v, x]) => {
+    title(s, v, x, 5.541, 1.417, 0.505, { size: 24, color: WHITE });
+    body(s, 'Sed ut perspiciatis unde omnis iste natus error sit', x, 6.058, 2.056, 0.505, { color: WHITE, lineSpacingMultiple: 1.15 });
+  });
+  chrome(s, 8, { num: false });
+});
+
+/* 9 - trends with a purchase-price card ---------------------------- */
+slides.push((s) => {
+  glow(s, -1.070, 2.482, 4.149, 0.35);
+  card(s, 1.095, 4.271, 5.572, 1.654);
+  title(s, 'TRENDS IN THE GAMING INDUSTRY', 7.705, 1.512, 4.533, 2.524);
+  body(s, L2, 7.705, 4.295, 4.225, 1.279);
+  body(s, 'Purchase Price', 2.569, 4.715, 2.675, 0.303, { lineSpacingMultiple: 1 });
+  s.addText([
+    { text: '$393,654 ', options: { fontFace: HEAD, fontSize: 24, bold: true, italic: true, color: MAGENTA } },
+    { text: '@0.0754 BTC (+4,92%)', options: { fontFace: HEAD, fontSize: 14, italic: true, color: GREY } },
+  ], { x: 2.569, y: 5.018, w: 3.909, h: 0.505, valign: 'middle' });
+  iconCrown(s, 1.604, 4.770, 0.692, 0.707, MAGENTA);
+  glow(s, 6.005, 4.186, 1.337, 0.45);
+  chrome(s, 9);
+});
+
+/* 10 - beyond the screen ------------------------------------------- */
+slides.push((s) => {
+  glow(s, 5.075, 0.286, 4.149, 0.12);
+  card(s, 5.915, 4.207, 5.042, 1.821, { radius: 0.064, shadow: BIG_SHADOW });
+  title(s, '29,000', 6.318, 4.764, 2.427, 0.707, { size: 36 });
+  body(s, L_SHORT, 8.185, 4.865, 2.552, 0.505, { lineSpacingMultiple: 1.15 });
+  title(s, 'BEYOND THE SCREEN', 7.732, 2.114, 4.225, 1.717);
+  chrome(s, 10);
+});
+
+/* 11 - navigating -------------------------------------------------- */
+slides.push((s) => {
+  glow(s, -1.436, 1.700, 5.389, 0.30);
+  glow(s, 11.123, -0.861, 4.173, 0.10);
+  card(s, 0.954, 4.016, 5.042, 1.821, { radius: 0.049, shadow: BIG_SHADOW });
+  title(s, 'NAVIGATING THE GAMING LANDSCAPE', 1.005, 1.226, 4.941, 2.524);
+  body(s, '\u201cSed ut perspiciatis unde omnis iste natus error sit\u201d', 6.877, 1.203, 5.452, 0.415,
+    { size: 14, color: INDIGO, bold: true, italic: true });
+  s.addText([
+    { text: L2.replace('dicta.', 'dicta sunt explicabo. Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt. '), options: { breakLine: true } },
+    { text: ' ', options: { breakLine: true } },
+    { text: 'Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit, sed quia non numquam eius modi tempora incidunt ut labore et dolore magnam aliquam quaerat voluptatem. Ut enim ad minima veniam, quis nostrum exercitationem ullam corporis suscipit laboriosam, nisi ut aliquid ex ea commodi consequatur?' },
+  ], { x: 6.877, y: 2.134, w: 5.452, h: 3.702, fontFace: BODY, fontSize: 12, color: GREY, valign: 'middle', lineSpacingMultiple: 1.5 });
+  body(s, L2.replace('dicta.', 'dicta sunt explicabo.'), 1.259, 4.287, 4.433, 1.279);
+  chrome(s, 11);
+});
+
+/* 12 - feature slide ----------------------------------------------- */
+slides.push((s) => {
+  s.addShape('rect', { x: 9.125, y: 0, w: 4.208, h: 7.5, fill: { color: MAGENTA }, line: { type: 'none' } });
+  [['Option One', 1.251, iconCrown], ['Option Two', 3.221, iconShield], ['Option Three', 5.190, iconGamepad]]
+    .forEach(([label, y, icon]) => {
+      card(s, 8.594, y, 1.062, 1.059, { radius: 0.067 });
+      icon(s, 8.94, y + 0.31, 0.38, 0.42, MAGENTA);
+      body(s, label, 9.884, y, 1.383, 0.415, { size: 14, color: WHITE });
+      body(s, L_OPT, 9.884, y + 0.386, 2.641, 0.673, { color: WHITE });
+    });
+  title(s, 'GAME MASTERS FEATURE SLIDE', 1.005, 1.604, 4.917, 1.717, { charSpacing: -3 });
+  body(s, L2.replace('dicta.', 'dicta sunt.'), 1.005, 3.479, 2.673, 2.188);
+  chrome(s, 12, { numColor: WHITE });
+});
+
+/* 13 - special feature --------------------------------------------- */
+slides.push((s) => {
+  glow(s, 9.910, 1.342, 5.389, 0.72);
+  card(s, 5.710, 2.689, 6.895, 2.083, { radius: 0.275, shadow: BIG_SHADOW });
+  [['01', 'Option One', MAGENTA, 1.135, 1.283], ['02', 'Option Two', INDIGO, 3.188, 3.355], ['03', 'Option Three', CYAN, 5.279, 5.446]]
+    .forEach(([num, label, col, yText, yDot]) => {
+      s.addShape('ellipse', {
+        x: 6.524, y: yDot, w: 0.752, h: 0.752, fill: { color: WHITE }, line: { type: 'none' },
+        shadow: { type: 'outer', blur: 40, offset: 35, angle: 45, color: '000000', opacity: 0.14 },
+      });
+      s.addText(num, { x: 6.524, y: yDot, w: 0.752, h: 0.752, align: 'center', valign: 'middle', fontFace: BODY, fontSize: 14, bold: true, color: col });
+      body(s, label, 7.579, yText, 1.418, 0.415, { size: 14, color: col });
+      body(s, L_CARD, 7.579, yText + 0.39, 3.959, 0.673);
+    });
+  title(s, 'SPECIAL FEATURE SLIDE', 1.005, 1.935, 3.403, 2.524);
+  body(s, 'Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem.', 1.005, 4.589, 3.110, 0.976);
+  glow(s, -0.669, 0.734, 1.337, 0.28);
+  chrome(s, 13);
+});
+
+/* 14 - gallery ----------------------------------------------------- */
+slides.push((s) => {
+  glow(s, -0.539, 0.417, 4.173, 0.10);
+  glow(s, 7.844, 3.116, 5.389, 0.45);
+  title(s, 'GAME MASTERS GALLERY', 2.319, 0.777, 8.695, 0.909, { align: 'center' });
+  body(s, 'Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem.',
+    2.319, 6.176, 8.695, 0.370, { align: 'center' });
+});
+
+/* 15 - activity gallery -------------------------------------------- */
+slides.push((s) => {
+  glow(s, 5.192, -1.536, 5.389, 0.45);
+  title(s, 'ACTIVITY GALLERY', 1.005, 2.192, 3.403, 1.717);
+  body(s, L2.replace('dicta.', 'dicta sunt explicabo.'), 1.005, 4.029, 4.588, 1.279);
+  chrome(s, 15, { num: false });
+});
+
+/* 16 - testimonials ------------------------------------------------ */
+slides.push((s) => {
+  glow(s, -0.342, 1.972, 3.744, 0.30);
+  glow(s, 8.832, 0.850, 5.389, 0.55);
+  [[1.519, 'Jayden Perez', MAGENTA, 3.765], [6.667, 'Owen Scott', INDIGO, 8.905]].forEach(([x, name, col, sx]) => {
+    card(s, x, 3.955, 4.663, 2.175);
+    body(s, name, x + 0.284, 4.504, 1.846, 0.505, { size: 18, color: col });
+    body(s, 'PLACEHOLDER', x + 0.284, 5.043, 3.994, 0.673);
+    stars(s, sx, 4.620, col);
+  });
+  chrome(s, 16);
+});
+
+/* 17 - MVP / skill bars -------------------------------------------- */
+slides.push((s) => {
+  imagePlaceholder(s, 5.974, 0, 7.359, 6.230, { color: 'F3F3F3', labelColor: 'C4C4C4', labelSize: 14 });
+  glow(s, 4.582, 2.434, 5.389, 0.60);
+  card(s, 0.954, 4.120, 6.582, 1.717, { radius: 0.084, shadow: BIG_SHADOW });
+  [4.651, 5.128].forEach((y) => {
+    s.addShape('roundRect', { x: 2.489, y, w: 4.552, h: 0.050, rectRadius: 0.5, fill: { color: GREY_TRACK }, line: { type: 'none' } });
+    s.addShape('roundRect', { x: 2.489, y, w: 2.14, h: 0.050, rectRadius: 0.5, fill: { color: MAGENTA }, line: { type: 'none' } });
+    s.addShape('parallelogram', { x: 4.604, y: y - 0.066, w: 0.209, h: 0.181, fill: { color: MAGENTA }, line: { type: 'none' } });
+  });
+  body(s, 'Skill One', 1.486, 4.505, 1.217, 0.341, { lineSpacingMultiple: 1.3 });
+  body(s, 'Skill One', 1.486, 4.983, 1.217, 0.341, { lineSpacingMultiple: 1.3 });
+  title(s, 'THE MVP OF OUR TEAM', 1.005, 1.261, 4.941, 1.717);
+  body(s, L_CARD, 0.954, 2.992, 4.687, 0.673);
+  chrome(s, 17);
+});
+
+/* 18 - meet our player --------------------------------------------- */
+slides.push((s) => {
+  glow(s, -0.721, 3.095, 3.438, 0.22);
+  glow(s, 10.639, -1.458, 5.389, 0.45);
+  [['Jayden Perez', MAGENTA], ['Mia Garcia', INDIGO], ['Owen Scott', MAGENTA], ['Harper White', INDIGO]]
+    .forEach(([name, col], i) => {
+      const x = 1.163 + i * 2.8215;
+      card(s, x, 2.174, 2.543, 3.875, { radius: 0.165, shadow: { type: 'outer', blur: 40, offset: 3, angle: 45, color: '000000', opacity: 0.2 } });
+      body(s, name, x + 0.48, 4.887, 1.582, 0.462, { size: 16, color: col });
+      body(s, 'Sed ut perspiciatis', x + 0.48, 5.349, 1.582, 0.303, { lineSpacingMultiple: 1 });
+    });
+  title(s, 'LET\u2019S MEET OUR PLAYER', 2.268, 0.782, 8.798, 0.909, { align: 'center' });
+  chrome(s, 18, { brand: false });
+});
+
+/* 19 - agenda ------------------------------------------------------ */
+slides.push((s) => {
+  glow(s, 10.475, 3.131, 3.708, 0.35);
+  glow(s, -0.051, -2.695, 5.389, 0.45);
+  title(s, 'GAME MASTERS AGENDA SLIDE', 1.005, 1.908, 5.662, 1.717);
+  body(s, L2.replace('dicta.', 'dicta sunt explicabo. Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt.'),
+    1.005, 3.707, 5.042, 1.885);
+  s.addShape('line', { x: 7.826, y: 2.021, w: 0, h: 3.361, line: { color: GREY_LT, width: 1 } });
+  [1.934, 3.616, 5.298].forEach((y) => s.addShape('ellipse', { x: 7.778, y, w: 0.096, h: 0.096, fill: { color: GREY_LT }, line: { type: 'none' } }));
+  [['08 August', 1.303, false], ['10 August', 2.968, true], ['12 August', 4.664, false]].forEach(([date, y, hot]) => {
+    if (hot) gradRoundRect(s, 8.657, y, 3.672, 1.467, 0.193, 'D807E1', '4F3AE5');
+    else card(s, 8.657, y, 3.672, 1.467, { radius: 0.193, shadow: BIG_SHADOW });
+    card(s, 8.954, y + 0.119, 1.889, 0.525, { radius: 0.11, shadow: { type: 'outer', blur: 42, offset: 3, angle: 45, color: '000000', opacity: 0.2 } });
+    body(s, date, 9.108, y + 0.086, 1.582, 0.462, { size: 16, color: MAGENTA });
+    body(s, 'Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium.',
+      8.954, y + 0.606, 3.239, 0.673, { color: hot ? WHITE : GREY });
+  });
+  chrome(s, 19);
+});
+
+/* 20 - laptop mockup ----------------------------------------------- */
+slides.push((s) => {
+  glow(s, 0.841, 4.019, 3.941, 0.14);
+  glow(s, 7.944, 1.055, 5.389, 0.45);
+  s.addShape('roundRect', { x: 2.90, y: 2.80, w: 7.53, h: 4.70, rectRadius: 0.05, fill: { color: 'FCFCFC' }, line: { color: 'D6D6D6', width: 1 }, shadow: MOCK_SHADOW });
+  s.addShape('ellipse', { x: 6.62, y: 2.94, w: 0.09, h: 0.09, fill: { color: 'BBBBBB' }, line: { type: 'none' } });
+  imagePlaceholder(s, 3.156, 3.181, 7.015, 4.319, { color: 'C8C8C8', labelColor: 'E4E4E4', labelSize: 16 });
+  [[0.974, '$75.549', MAGENTA, 1.423, 1.521], [9.174, '$63.050', INDIGO, 9.623, 9.721]].forEach(([x, val, col, tx, cx]) => {
+    card(s, x, 4.431, 3.155, 1.445, { radius: 0.114, shadow: { type: 'outer', blur: 50, offset: 3, angle: 45, color: '000000', opacity: 0.2 } });
+    title(s, val, tx, 4.758, 2.256, 0.505, { size: 24, color: col, align: 'center' });
+    body(s, L_TINY, cx, 5.179, 2.158, 0.370, { align: 'center' });
+  });
+  title(s, 'LAPTOP MOCKUP SLIDE', 2.268, 1.055, 8.798, 0.909, { align: 'center' });
+  body(s, 'Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque.',
+    3.208, 1.964, 6.911, 0.370, { align: 'center' });
+});
+
+/* 21 - watch mockup ------------------------------------------------ */
+slides.push((s) => {
+  glow(s, 5.437, 2.047, 5.389, 0.45);
+  glow(s, 9.337, -1.879, 4.173, 0.10);
+  /* smart-watch stand-in for the product photo, tilted like the original */
+  s.addShape('roundRect', { x: 8.30, y: 1.35, w: 1.55, h: 4.90, rectRadius: 0.40, rotate: 28, fill: { color: 'E1E2E6' }, line: { type: 'none' } });
+  s.addShape('roundRect', { x: 7.22, y: 1.62, w: 3.35, h: 3.00, rectRadius: 0.26, rotate: 12, fill: { color: 'ECEDF1' }, line: { type: 'none' }, shadow: MOCK_SHADOW });
+  s.addShape('roundRect', { x: 7.55, y: 1.90, w: 2.42, h: 2.42, rectRadius: 0.14, rotate: 12, fill: { color: '2C2C2C' }, line: { type: 'none' } });
+  s.addShape('ellipse', { x: 10.42, y: 2.12, w: 0.30, h: 0.30, fill: { color: 'ECEDF1' }, line: { color: 'E06A9E', width: 1.2 } });
+  title(s, 'WATCH MOCKUP SLIDE', 1.005, 1.465, 5.299, 1.717);
+  body(s, L2.replace('dicta.', 'beatae.'), 1.005, 3.282, 5.042, 0.976);
+  card(s, 1.005, 4.609, 5.042, 1.426, { radius: 0.091, shadow: BIG_SHADOW });
+  title(s, '29,000', 1.407, 4.969, 2.427, 0.707, { size: 36 });
+  body(s, L_SHORT, 3.275, 4.986, 2.552, 0.673);
+  s.addShape('wedgeRectCallout', {
+    x: 9.928, y: 3.018, w: 2.401, h: 0.810, flipH: true, fill: { color: WHITE }, line: { type: 'none' },
+    shadow: { type: 'outer', blur: 85, offset: 24, angle: 90, color: '000000', opacity: 0.18 },
+  });
+  body(s, '@0.0754 BTC (+4,92%)', 9.928, 3.254, 2.340, 0.337, { size: 14, align: 'center', lineSpacingMultiple: 1 });
+  chrome(s, 21);
+});
+
+/* 22 - auction table ----------------------------------------------- */
+slides.push((s) => {
+  glow(s, -0.269, 0.370, 4.173, 0.30);
+  glow(s, 9.910, 1.342, 5.389, 0.45);
+  [[2.355, 2.486, 'Auctions', 2.079], [5.281, 1.564, 'Value Content', 5.003],
+    [7.281, 1.564, 'Value Content', 7.003], [9.374, 1.564, 'Current Bid', 9.098]]
+    .forEach(([x, w, label, ax]) => {
+      body(s, label, x, 1.372, w, 0.345, { align: 'center', lineSpacingMultiple: 1 });
+      s.addShape('triangle', { x: ax, y: 1.544, w: 0.147, h: 0.087, rotate: 180, fill: { color: MAGENTA }, line: { type: 'none' } });
+    });
+  [['Lipnoted', 'Value One', 'Mar 24, 2025', '2.00 Eth', 1.847, false],
+    ['Conference Art', 'Value One', 'Mar 24, 2025', '0.87 Eth', 2.566, false],
+    ['Dolious Fams', 'Value Two', 'Mar 24, 2025', '10.0 Eth', 3.285, false],
+    ['Uni Painting', 'Value Three', 'Mar 24, 2025', '3.43 Eth', 4.004, false],
+    ['Levity 101', 'Value Three', 'Mar 24, 2025', '0.065 Eth', 4.723, true],
+    ['Mark Tower', 'Value Two', 'Mar 24, 2025', '2.00 Eth', 5.537, false]]
+    .forEach(([name, v1, date, bid, y, hot]) => {
+      if (hot) {
+        gradRoundRect(s, 1.436, y, 10.462, 0.686, 0.159, MAGENTA, 'FD5CF2');
+      } else {
+        s.addShape('roundRect', {
+          x: 1.829, y, w: 9.675, h: 0.591, rectRadius: 0.137, fill: { color: WHITE },
+          line: { color: GREY_LT, width: 0.5 },
+          shadow: { type: 'outer', blur: 85, offset: 90, angle: 45, color: '000000', opacity: 0.1 },
+        });
+      }
+      const col = hot ? WHITE : GREY;
+      const xs = hot ? [2.156, 5.165, 7.165, 9.253] : [2.357, 5.281, 7.281, 9.374];
+      const ws = hot ? [2.885, 1.670, 1.670, 1.670] : [2.486, 1.439, 1.439, 1.439];
+      const cy = y + (hot ? 0.131 : 0.134);
+      const ch = hot ? 0.424 : 0.365;
+      [name, v1, date, bid].forEach((t, i) => {
+        body(s, t, xs[i], cy, ws[i], ch, { size: hot ? 14 : 12, color: col, align: 'center', bold: i === 0, lineSpacingMultiple: 1 });
+      });
+      for (let i = 0; i < 3; i++) {
+        s.addShape('ellipse', {
+          x: (hot ? 11.246 : 11.017) + i * (hot ? 0.125 : 0.108), y: cy + ch / 2 - 0.034, w: 0.068, h: 0.068,
+          fill: { color: hot ? WHITE : 'C9C9C9' }, line: { type: 'none' },
+        });
+      }
+    });
+  chrome(s, 22);
+});
+
+/* 23 - ETH area chart ---------------------------------------------- */
+const CHART_A = [5, 5, 8, 5, 9, 14, 11, 16, 14, 11, 7, 14, 20, 22, 28, 33, 56, 144, 134, 104, 110, 60, 45, 50, 40, 22, 12, 8, 10];
+const CHART_B = [10, 2, 2, 8, 13, 20, 19, 34, 12, 40, 22, 35, 35, 30, 33, 40, 80, 105, 80, 70, 40, 30, 35, 39, 37, 45, 30, 25, 20];
+slides.push((s) => {
+  glow(s, 9.410, -0.946, 5.389, 0.60);
+  card(s, 1.000, 1.503, 11.334, 3.195, { radius: 0.085, shadow: BIG_SHADOW });
+  const labels = CHART_A.map((_, i) => String(i + 1));
+  s.addChart([
+    { type: 'area',
+      data: [{ name: 'Category A', labels, values: CHART_A }, { name: 'Category B Fill', labels, values: CHART_B }],
+      options: { chartColors: [MAGENTA, INDIGO], chartColorsOpacity: 32 } },
+    { type: 'line',
+      data: [{ name: 'Category A Fill', labels, values: CHART_A }, { name: 'Category B', labels, values: CHART_B }],
+      options: { chartColors: [PURPLE, MAGENTA], lineSize: 1, lineDataSymbol: 'circle', lineDataSymbolSize: 4 } },
+  ], {
+    x: 1.278, y: 1.706, w: 10.778, h: 2.547,
+    showLegend: false, catAxisHidden: true, valAxisHidden: true, valAxisMaxVal: 160,
+    valGridLine: { style: 'none' }, catGridLine: { style: 'none' },
+    chartArea: { fill: { color: WHITE }, border: { pt: 0, color: WHITE } },
+    plotArea: { fill: { color: WHITE } },
+    layout: { x: 0.01, y: 0.01, w: 0.985, h: 0.93 },
+  });
+  for (let i = 0; i < 11; i++) {
+    body(s, 'Jan ' + (i + 1), 1.483 + i * 0.9715, 4.202, 0.71, 0.303, { color: 'A6A6A6', align: 'center', lineSpacingMultiple: 1 });
+  }
+  card(s, 1.613, 2.082, 2.959, 1.057, { radius: 0.173, shadow: BIG_SHADOW });
+  body(s, 'Purchase Price', 1.965, 2.230, 2.158, 0.303, { lineSpacingMultiple: 1 });
+  title(s, '2.976.88 ETH', 1.965, 2.487, 2.256, 0.505, { size: 24 });
+  card(s, 1.000, 4.902, 6.947, 0.949, { radius: 0.155, shadow: BIG_SHADOW });
+  title(s, '$128,569', 1.613, 5.124, 2.256, 0.505, { size: 24 });
+  body(s, 'Sed ut perspiciatis unde omnis iste natus error sit.', 3.419, 5.191, 4.072, 0.370);
+  body(s, L_CARD, 8.257, 4.973, 4.072, 0.673);
+  glow(s, 0.215, 2.614, 1.569, 0.42);
+  chrome(s, 23);
+});
+
+/* 24 - watch mockup + reports -------------------------------------- */
+/* the "Monthly Report" spark area is a freeform polyline in the source deck */
+const SPARK = [
+  [0.000, 0.569], [0.021, 0.546], [0.042, 0.777], [0.095, 0.328], [0.149, 0.943], [0.194, 0.581], [0.211, 0.690],
+  [0.239, 0.559], [0.259, 0.576], [0.278, 0.507], [0.304, 0.585], [0.321, 0.546], [0.351, 0.878], [0.378, 0.389],
+  [0.398, 0.712], [0.420, 0.681], [0.435, 0.755], [0.461, 0.703], [0.490, 0.825], [0.502, 0.590], [0.530, 0.590],
+  [0.545, 0.721], [0.575, 0.402], [0.587, 0.563], [0.616, 0.856], [0.644, 0.349], [0.663, 0.725], [0.701, 0.555],
+  [0.730, 0.664], [0.746, 0.493], [0.791, 0.616], [0.821, 0.533], [0.856, 0.419], [0.874, 0.799], [0.903, 0.677],
+  [0.940, 0.485], [0.948, 0.672], [0.986, 0.588], [1.000, 0.000], [0.000, 0.000],
+];
+slides.push((s) => {
+  glow(s, 4.376, -2.709, 5.389, 0.50);
+  card(s, 6.667, 2.889, 5.667, 3.426, { radius: 0.092, shadow: BIG_SHADOW });
+  for (let i = 0; i < 5; i++) {
+    s.addShape('line', { x: 7.962, y: 4.059 + i * 0.379, w: 3.727, h: 0, line: { color: GREY_LT, width: 0.75, dashType: 'dash' } });
+  }
+  const sw = 3.727, sh = 1.372;
+  s.addShape('custGeom', {
+    x: 7.962, y: 4.202, w: sw, h: sh,
+    fill: { color: PURPLE, transparency: 78 }, line: { color: PURPLE, width: 1 },
+    points: SPARK.map(([px, py], i) => ({ x: px * sw, y: (1 - py) * sh, moveTo: i === 0 })).concat([{ close: true }]),
+  });
+  ['Jan', 'Feb', 'Mar', 'Apr', 'May'].forEach((m, i) => {
+    body(s, m, 7.962 + i * 0.7535, 5.707, 0.714, 0.286, { size: 10.5, align: 'center', lineSpacingMultiple: 1 });
+  });
+  ['100', '75', '50', '25', '0'].forEach((v, i) => {
+    body(s, v, 7.311, 3.916 + i * 0.379, 0.562, 0.286, { size: 10.5, align: 'right', lineSpacingMultiple: 1 });
+  });
+  body(s, 'Monthly Report', 7.357, 3.210, 3.431, 0.404, { size: 18, bold: true, lineSpacingMultiple: 1 });
+  card(s, 6.667, 0.889, 5.667, 1.724, { radius: 0.092, shadow: BIG_SHADOW });
+  s.addChart('doughnut', [{ name: 'Sales', labels: ['1st Qtr', '2nd Qtr'], values: [22, 78] }], {
+    x: 7.077, y: 0.906, w: 1.450, h: 1.774, holeSize: 62, firstSliceAng: 0,
+    chartColors: ['F1F1F1', MAGENTA], showLegend: false, showTitle: false,
+    dataBorder: { pt: 0, color: WHITE },
+    chartArea: { fill: { color: WHITE }, border: { pt: 0, color: WHITE } },
+  });
+  s.addShape('ellipse', {
+    x: 7.311, y: 1.301, w: 0.982, h: 0.982, fill: { color: WHITE }, line: { type: 'none' },
+    shadow: { type: 'outer', blur: 65, offset: 3, angle: 90, color: '000000', opacity: 0.18 },
+  });
+  s.addText('75%', { x: 7.311, y: 1.301, w: 0.982, h: 0.982, align: 'center', valign: 'middle', fontFace: BODY, fontSize: 18, bold: true, color: GREY_DK });
+  s.addShape('triangle', { x: 8.860, y: 1.300, w: 0.235, h: 0.203, fill: { color: MAGENTA }, line: { type: 'none' } });
+  body(s, '1.42%', 9.099, 1.195, 1.207, 0.438, { size: 20, bold: true, color: MAGENTA, lineSpacingMultiple: 1 });
+  body(s, 'PLACEHOLDER', 8.715, 1.649, 3.153, 0.675);
+  title(s, 'WATCH MOCKUP SLIDE', 1.000, 1.280, 5.299, 1.717);
+  body(s, L2.replace('dicta.', 'dicta sunt explicabo. Nemo enim ipsam voluptatem quia.'), 1.000, 3.182, 5.042, 1.279);
+  card(s, 1.000, 4.906, 5.299, 1.426, { radius: 0.091, shadow: BIG_SHADOW });
+  body(s, 'Market Capitalization', 2.516, 5.182, 2.468, 0.303, { lineSpacingMultiple: 1 });
+  title(s, '$ 393,654,541,00', 2.516, 5.483, 3.353, 0.572, { size: 28 });
+  iconShield(s, 1.662, 5.278, 0.627, 0.702, MAGENTA);
+  glow(s, 0.127, 4.369, 1.569, 0.45);
+  chrome(s, 24);
+});
+
+/* 25 - rocket infographic ------------------------------------------ */
+slides.push((s) => {
+  glow(s, 10.639, 2.342, 5.389, 0.45);
+  /* exhaust plume: three nested smoke shapes, narrow at the nozzle and
+     flaring toward the floor (half-width profile sampled from the original) */
+  const PLUME = [[0, 0], [0.33, 0.215], [0.43, 0.35], [0.62, 0.41], [0.81, 0.75], [0.89, 0.80], [1, 1]];
+  [[7.853, 2.80, 5.48, 5.18, '4B1767'], [8.266, 3.03, 4.70, 4.70, '5D3077'], [8.708, 2.91, 3.87, 4.77, '6E4584']]
+    .forEach(([x, y, w, h, col]) => {
+      const right = PLUME.map(([t, hw], i) => ({ x: w * (0.5 + hw / 2), y: h * t, moveTo: i === 0 }));
+      const left = PLUME.slice().reverse().map(([t, hw]) => ({ x: w * (0.5 - hw / 2), y: h * t }));
+      s.addShape('custGeom', {
+        x, y, w, h, fill: { color: col }, line: { type: 'none' },
+        points: right.concat(left, [{ close: true }]),
+      });
+    });
+  s.addShape('ellipse', {
+    x: 10.229, y: 0.911, w: 0.772, h: 1.970, fill: { color: 'ECF0F3' }, line: { type: 'none' },
+    shadow: { type: 'outer', blur: 60, offset: 10, angle: 30, color: '000000', opacity: 0.18 },
+  });
+  [[10.902, 2.133, 0.537, 0.732], [9.792, 2.133, 0.537, 0.732], [10.295, 2.841, 0.645, 0.227],
+    [10.410, 1.453, 0.414, 0.414], [10.511, 2.018, 0.213, 0.213]]
+    .forEach(([x, y, w, h]) => s.addShape('ellipse', { x, y, w, h, fill: { color: 'C404B5' }, line: { type: 'none' } }));
+  [[11.423, 4.346, 0.236, MAGENTA], [11.819, 5.177, 0.186, INDIGO], [8.893, 5.972, 0.343, MAGENTA],
+    [9.699, 3.621, 0.186, INDIGO], [11.463, 1.619, 0.186, INDIGO], [10.238, 3.622, 0.518, 'E0D2EC']]
+    .forEach(([x, y, d, c]) => s.addShape('ellipse', { x, y, w: d, h: d, fill: { color: c, transparency: 35 }, line: { type: 'none' } }));
+  title(s, 'ROCKET INFOGRAPHIC', 1.005, 1.392, 7.507, 0.909);
+  body(s, 'Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore.',
+    1.005, 2.401, 6.275, 0.673);
+  [[1.118, '$75.549', MAGENTA, 1.568, 1.391, iconGamepad, 2.418, 4.058, 0.555, 0.431],
+    [4.491, '$63.050', INDIGO, 4.941, 4.813, iconShield, 5.834, 4.010, 0.469, 0.525]]
+    .forEach(([x, val, col, tx, cx, icon, ix, iy, iw, ih]) => {
+      card(s, x, 3.539, 3.155, 2.532, { radius: 0.20, shadow: { type: 'outer', blur: 50, offset: 3, angle: 45, color: '000000', opacity: 0.2 } });
+      title(s, val, tx, 4.854, 2.256, 0.505, { size: 24, color: col, align: 'center' });
+      body(s, L_TINY, cx, 5.275, 2.610, 0.370, { align: 'center' });
+      icon(s, ix, iy, iw, ih, col);
+    });
+  glow(s, 0.357, 3.968, 1.569, 0.25);
+  chrome(s, 25, { numColor: WHITE });
+});
+
+/* 26 - china map infographic --------------------------------------- */
+const CHINA = [
+  [5.69, 2.62], [6.30, 2.14], [7.22, 2.06], [8.32, 1.44], [9.62, 1.38], [10.72, 1.90], [11.32, 2.55],
+  [12.45, 2.96], [12.10, 3.46], [11.55, 3.34], [11.20, 3.86], [11.36, 4.34], [11.04, 4.80], [10.90, 5.34],
+  [10.46, 5.74], [10.06, 6.34], [9.56, 6.04], [9.20, 5.70], [8.60, 5.54], [8.34, 5.04], [7.60, 4.74],
+  [6.90, 4.60], [6.24, 4.30], [5.80, 3.70],
+];
+const CHINA_HL = [
+  [8.30, 3.36], [8.76, 2.86], [9.60, 2.60], [10.20, 2.24], [10.30, 1.44], [11.00, 1.40], [11.46, 2.06],
+  [11.56, 2.60], [11.20, 3.00], [9.70, 3.16], [9.10, 3.56], [8.56, 3.70],
+];
+slides.push((s) => {
+  glow(s, -1.353, 1.778, 3.919, 0.20);
+  glow(s, 10.954, 2.448, 4.608, 0.15);
+  const poly = (pts, fill) => s.addShape('custGeom', {
+    x: 0, y: 0, w: W, h: H, fill: { color: fill }, line: { color: WHITE, width: 0.75 },
+    points: pts.map(([px, py], i) => ({ x: px, y: py, moveTo: i === 0 })).concat([{ close: true }]),
+  });
+  poly(CHINA, 'F2F2F2');
+  /* province hairlines inside the landmass */
+  [[[6.5, 2.3], [7.5, 3.2], [7.0, 4.6]], [[8.4, 1.7], [8.2, 3.3], [8.9, 4.9]],
+    [[9.9, 3.4], [9.5, 4.6], [9.6, 6.0]], [[11.3, 3.0], [10.5, 4.2], [10.6, 5.4]]]
+    .forEach((pts) => s.addShape('custGeom', {
+      x: 0, y: 0, w: W, h: H, fill: { type: 'none' }, line: { color: 'FFFFFF', width: 0.75 },
+      points: pts.map(([px, py], i) => ({ x: px, y: py, moveTo: i === 0 })),
+    }));
+  poly(CHINA_HL, MAGENTA);
+  title(s, 'CHINA MAPS INFOGRAPHIC', 1.008, 1.431, 4.941, 1.717);
+  body(s, 'Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium,.',
+    1.008, 3.148, 4.294, 0.673);
+  card(s, 1.001, 4.053, 6.895, 2.083, { radius: 0.275, shadow: { type: 'outer', blur: 50, offset: 3, angle: 45, color: '000000', opacity: 0.2 } });
+  title(s, '87%', 1.682, 4.640, 1.761, 0.909, { color: INDIGO });
+  body(s, 'Connect Wallet', 3.932, 4.551, 1.975, 0.415, { size: 14, color: INDIGO, bold: true, italic: true });
+  body(s, 'Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium.', 3.932, 4.964, 3.165, 0.673);
+  chrome(s, 26);
+});
+
+/* 27 - puzzle infographic ------------------------------------------ */
+slides.push((s) => {
+  glow(s, -0.698, -0.283, 4.033, 0.25);
+  const PZ_X = 1.005, PZ_Y = 1.464, PZ_D = 4.784;
+  [[0, INDIGO], [90, MAGENTA], [180, INDIGO], [270, MAGENTA]].forEach(([a, c]) => {
+    s.addShape('blockArc', {
+      x: PZ_X, y: PZ_Y, w: PZ_D, h: PZ_D, angleRange: [a, a + 90], arcThicknessRatio: 0.52,
+      fill: { color: c }, line: { color: WHITE, width: 2.5 },
+    });
+  });
+  /* jigsaw knobs where one quadrant bulges across a seam */
+  [[0, -1, MAGENTA], [-1, 0, MAGENTA], [1, 0, MAGENTA], [0, 1, INDIGO]].forEach(([dx, dy, c]) => {
+    s.addShape('ellipse', {
+      x: PZ_X + PZ_D / 2 + dx * PZ_D * 0.375 - 0.22, y: PZ_Y + PZ_D / 2 + dy * PZ_D * 0.375 - 0.22,
+      w: 0.44, h: 0.44, fill: { color: c }, line: { color: WHITE, width: 2.5 },
+    });
+  });
+  title(s, 'PUZZLE INFOGRAPHIC', 7.287, 1.464, 4.941, 1.717);
+  s.addShape('wedgeRectCallout', {
+    x: 1.062, y: 1.540, w: 2.401, h: 0.810, flipH: true, fill: { color: WHITE }, line: { type: 'none' },
+    shadow: { type: 'outer', blur: 85, offset: 24, angle: 90, color: '000000', opacity: 0.18 },
+  });
+  body(s, '@0.0754 BTC (+4,92%)', 1.062, 1.777, 2.340, 0.337, { size: 14, align: 'center', lineSpacingMultiple: 1 });
+  body(s, 'Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam.',
+    7.287, 3.253, 5.042, 0.673);
+  card(s, 7.287, 4.187, 5.042, 1.649, { radius: 0.081, shadow: BIG_SHADOW });
+  s.addShape('line', { x: 5.192, y: 4.956, w: 1.878, h: 0, line: { color: 'BFBFBF', width: 1, dashType: 'sysDash' } });
+  s.addShape('ellipse', { x: 5.076, y: 4.899, w: 0.115, h: 0.115, fill: { color: 'BFBFBF' }, line: { type: 'none' } });
+  body(s, 'Market Capitalization', 8.131, 4.575, 2.468, 0.303, { lineSpacingMultiple: 1 });
+  title(s, '$ 393,654,541,00', 8.131, 4.877, 3.353, 0.572, { size: 28 });
+  glow(s, 11.207, 5.052, 1.569, 0.50);
+  chrome(s, 27);
+});
+
+/* 28 - four stack -------------------------------------------------- */
+slides.push((s) => {
+  glow(s, 10.561, 1.929, 5.389, 0.45);
+  glow(s, -2.059, -0.400, 4.113, 0.08);
+  [[7.510, 2.794, 3.854, 'B400A8', 8.011, 2.881, 2.854, MAGENTA],
+    [7.859, 2.089, 3.158, '4A36D0', 8.268, 2.159, 2.338, INDIGO],
+    [8.232, 1.589, 2.411, 'B400A8', 8.545, 1.643, 1.786, MAGENTA],
+    [8.423, 0.851, 2.028, '4A36D0', 8.686, 0.897, 1.502, INDIGO]]
+    .forEach(([ox, oy, ow, oc, ix, iy, iw, ic]) => {
+      s.addShape('rect', {
+        x: ox, y: oy, w: ow, h: ow, fill: { color: oc }, line: { type: 'none' },
+        shadow: { type: 'outer', blur: 90, offset: 55, angle: 130, color: '000000', opacity: 0.1 },
+      });
+      s.addShape('rect', { x: ix, y: iy, w: iw, h: iw, fill: { color: ic }, line: { type: 'none' } });
+    });
+  title(s, 'FOUR STACK INFOGRAPHIC', 1.008, 1.230, 4.941, 1.717);
+  [['First Stack', INDIGO, 1.005, 3.315], ['Second Stack', MAGENTA, 3.574, 3.315],
+    ['Third Stack', MAGENTA, 1.005, 4.493], ['Fourth Stack', INDIGO, 3.574, 4.493]]
+    .forEach(([label, col, x, y]) => {
+      card(s, x, y, 2.427, 1.050, { radius: 0.067 });
+      s.addText(label, { x: x + 0.139, y: y + 0.189, w: 1.57, h: 0.337, fontFace: HEAD, fontSize: 14, bold: true, italic: true, color: col, valign: 'bottom' });
+      body(s, L_TINY, x + 0.139, y + 0.525, 2.088, 0.303, { lineSpacingMultiple: 1 });
+    });
+  s.addShape('line', { x: 9.502, y: 2.752, w: 2.119, h: 0, line: { color: 'BFBFBF', width: 1, dashType: 'sysDash' } });
+  s.addShape('ellipse', { x: 9.386, y: 2.694, w: 0.115, h: 0.115, fill: { color: 'BFBFBF' }, line: { type: 'none' } });
+  s.addShape('ellipse', { x: 11.620, y: 2.399, w: 0.706, h: 0.706, fill: { color: WHITE }, line: { type: 'none' }, shadow: CARD_SHADOW });
+  iconGamepad(s, 11.828, 2.615, 0.29, 0.24, MAGENTA);
+  chrome(s, 28);
+});
+
+/* 29 - contact ----------------------------------------------------- */
+slides.push((s) => {
+  glow(s, 10.612, 1.867, 5.442, 0.36);
+  glow(s, -0.878, 1.867, 3.765, 0.10);
+  card(s, 7.449, 3.349, 5.042, 1.821, { radius: 0.089, shadow: BIG_SHADOW });
+  title(s, 'GET IN TOUCH', 7.449, 2.145, 4.941, 0.909);
+  iconPin(s, 8.216, 3.652, 0.155, 0.215, MAGENTA);
+  iconMail(s, 8.196, 4.199, 0.194, 0.136, MAGENTA);
+  iconPhone(s, 8.205, 4.679, 0.176, 0.176, MAGENTA);
+  [['123 Anywhere St., Any City 12345', 3.601], ['gamemasters@yoursite.com', 4.123], ['+123 456 7890XXX', 4.615]]
+    .forEach(([t, y]) => body(s, t, 8.828, y, 3.5, 0.303, { lineSpacingMultiple: 1, wrap: false }));
+  chrome(s, 29, { brand: false, footer: false });
+});
+
+/* 30 - thanks ------------------------------------------------------ */
+slides.push((s) => {
+  glow(s, -0.372, -1.257, 4.149, 0.30);
+  imagePlaceholder(s, 0.962, -0.637, 6.575, 6.575, { color: 'F3F3F3', labelColor: 'C4C4C4', labelSize: 14 });
+  title(s, 'THANKS FOR YOUR ATTENTION!', 6.146, 2.892, 6.183, 1.717);
+  glow(s, 12.435, 4.608, 1.796, 0.45);
+  chrome(s, 30, { brand: false });
+});
+
+/* ------------------------------------------------------------------ *
+ * build
+ * ------------------------------------------------------------------ */
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'GM_16x9', width: W, height: H });
+pptx.layout = 'GM_16x9';
+pptx.author = 'Game Masters';
+pptx.title = 'Game Masters - Gaming Presentation Template';
+
+slides.forEach((build) => build(pptx.addSlide()));
+
+pptx.writeFile({ fileName: path.join(__dirname, '07f10f48-52c0-40ed-978b-14779b58c531_grok_final.pptx') })
+  .then((f) => console.log('wrote ' + f));
