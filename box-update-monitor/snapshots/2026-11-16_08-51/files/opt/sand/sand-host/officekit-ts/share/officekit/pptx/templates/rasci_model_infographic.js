@@ -1,0 +1,900 @@
+/**
+ * "RASCI Model Infographic" - 20 slide deck (13.333in x 7.5in) rebuilt with pptxgenjs.
+ *
+ * The source deck's raster/vector icon glyphs are not embedded here; every one of
+ * them is drawn as a flat placeholder block (see `iconBox`) at the original
+ * position and size.
+ *
+ * Run:  node 1224426c-c197-4edd-842b-201ed0df81ca_grok_final.js
+ */
+'use strict';
+
+const path = require('node:path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ theme */
+
+const CLR = { R: '2B62E1', A: '009DD9', S: '0BD0D9', C: '10CF9B', I: '42CB84' };
+const KEYS = ['R', 'A', 'S', 'C', 'I'];
+const NAME = { R: 'Responsible ', A: 'Accountable ', S: 'Support ', C: 'Consulted ', I: 'Informed ' };
+
+// theme accent variants used by the artwork
+const PALE = { R: 'D5E0F9', A: 'C4EFFF', S: 'C9FAFC', C: 'CAFBED', I: 'D9F5E6' }; // lum 20% / +80%
+const LIGHT = { R: '80A1ED', A: '4FCEFF', S: '5EF0F7', C: '5FF3CA', I: '8EE0B5' }; // lum 60% / +40%
+const DARK = { R: '1947B0', A: '0076A3', S: '089CA3', C: '0C9B74', I: '2C9E63' }; // lum 75%
+const DEEP = { R: '112F75', A: '004E6C', S: '06686C', C: '08684E', I: '1D6942' }; // lum 50%
+
+const WHITE = 'FFFFFF';
+const BLACK = '000000';
+const ICEBLUE = 'DBEFF9';   // theme lt2, used for table rules
+const GRAY = 'BFBFBF';      // white @ 75% luminance
+const GRAY65 = 'A6A6A6';    // white @ 65% luminance
+const PAGEBG = 'FDFDFD';
+
+const HEAD = 'Montserrat SemiBold';  // theme major latin font
+const BODY = 'Montserrat Light';     // theme minor latin font
+
+const NOLINE = { type: 'none' };
+const NOFILL = { type: 'none' };
+const SOFT_SHADOW = { type: 'outer', color: BLACK, opacity: 0.05, blur: 35, offset: 10, angle: 50 };
+const DASH = (color, width) => ({ color, width: width || 1, dashType: 'lgDash' });
+
+/* ---------------------------------------------------------------- helpers */
+
+/**
+ * Heading text (Montserrat SemiBold). The source boxes are all "resize shape to
+ * fit text" with wrapping off, which centres the line over the given box.
+ */
+function head(sl, x, y, w, h, text, o) {
+	sl.addText(text, Object.assign(
+		{ x, y, w, h, fontFace: HEAD, fontSize: 18, color: BLACK, valign: 'top', wrap: false, fit: 'resize' }, o));
+}
+
+/** Body copy (Montserrat Light, wraps, 1.3 line spacing). */
+function body(sl, x, y, w, h, text, o) {
+	sl.addText(text, Object.assign(
+		{ x, y, w, h, fontFace: BODY, fontSize: 14, color: BLACK, valign: 'top', lineSpacingMultiple: 1.3 }, o));
+}
+
+/** Filled shape without an outline. */
+function shape(sl, kind, x, y, w, h, fill, o) {
+	sl.addShape(kind, Object.assign({ x, y, w, h, fill: { color: fill }, line: NOLINE }, o));
+}
+
+/**
+ * Free-form outline built from normalised commands:
+ *   ['M', x, y] ['L', x, y] ['C', x1, y1, x2, y2, x, y] ['Z']
+ * with every coordinate expressed as a 0..1 fraction of w / h.
+ */
+function freeform(sl, x, y, w, h, cmds, o) {
+	const pts = [];
+	for (const c of cmds) {
+		if (c[0] === 'Z') pts.push({ close: true });
+		else if (c[0] === 'C') pts.push({
+			x: c[5] * w, y: c[6] * h,
+			curve: { type: 'cubic', x1: c[1] * w, y1: c[2] * h, x2: c[3] * w, y2: c[4] * h }
+		});
+		else pts.push(Object.assign({ x: c[1] * w, y: c[2] * h }, c[0] === 'M' ? { moveTo: true } : {}));
+	}
+	sl.addShape('custGeom', Object.assign({ x, y, w, h, line: NOLINE, points: pts }, o));
+}
+
+/** Open poly-line through absolute slide coordinates (straight + elbow connectors). */
+function connector(sl, pts, line) {
+	const xs = pts.map(p => p[0]);
+	const ys = pts.map(p => p[1]);
+	const x = Math.min.apply(null, xs);
+	const y = Math.min.apply(null, ys);
+	const w = Math.max(Math.max.apply(null, xs) - x, 0.001);
+	const h = Math.max(Math.max.apply(null, ys) - y, 0.001);
+	sl.addShape('custGeom', {
+		x, y, w, h, fill: NOFILL, line,
+		points: pts.map((p, i) => Object.assign({ x: p[0] - x, y: p[1] - y }, i ? {} : { moveTo: true }))
+	});
+}
+
+/**
+ * Stand-in for one of the deck's white line-art icon glyphs: an outlined
+ * rounded square at the glyph's original position and size.
+ */
+function iconBox(sl, x, y, w, h) {
+	sl.addShape('roundRect', {
+		x, y, w, h, rectRadius: Math.min(w, h) * 0.22,
+		fill: NOFILL, line: { color: WHITE, width: 1.25 }
+	});
+}
+
+/* --------------------------------------------------- shared path fragments */
+
+const HEXAGON = [['M', 0.5, 1], ['L', 0, 0.751], ['L', 0, 0.25], ['L', 0.5, 0], ['L', 1, 0.25], ['L', 1, 0.751], ['Z']];
+const TRI_UP = [['M', 0.5, 0], ['L', 1, 1], ['L', 0, 1], ['Z']];
+const TRI_DOWN = [['M', 0.5, 1], ['L', 1, 0], ['L', 0, 0], ['Z']];
+// right half of a disc (slide 10)
+const HALF_DISC = [['M', 0.153, 0], ['L', 0.202, 0.004],
+	['C', 0.657, 0.051, 1, 0.254, 1, 0.497], ['C', 1, 0.74, 0.657, 0.943, 0.202, 0.99],
+	['L', 0.153, 0.994], ['Z']];
+// full circle, and a circle with a short stem on its left (slide 12 rings)
+const CIRCLE = [['M', 0.5, 0], ['C', 0.776, 0, 1, 0.224, 1, 0.5], ['C', 1, 0.776, 0.776, 1, 0.5, 1],
+	['C', 0.224, 1, 0, 0.776, 0, 0.5], ['C', 0, 0.224, 0.224, 0, 0.5, 0], ['Z']];
+const RING_WITH_STEM = [['M', 0.563, 0], ['C', 0.804, 0, 1, 0.224, 1, 0.5], ['C', 1, 0.776, 0.804, 1, 0.563, 1],
+	['C', 0.337, 1, 0.151, 0.803, 0.129, 0.551], ['L', 0.127, 0.515], ['L', 0.051, 0.515], ['L', 0.05, 0.518],
+	['C', 0.045, 0.526, 0.037, 0.531, 0.027, 0.531], ['C', 0.012, 0.531, 0, 0.517, 0, 0.5],
+	['C', 0, 0.483, 0.012, 0.469, 0.027, 0.469], ['C', 0.037, 0.469, 0.045, 0.474, 0.05, 0.483],
+	['L', 0.051, 0.485], ['L', 0.127, 0.485], ['L', 0.129, 0.449],
+	['C', 0.151, 0.197, 0.337, 0, 0.563, 0], ['Z']];
+
+/* ------------------------------------------------------------ presentation */
+
+const pres = new PptxGenJS();
+pres.layout = 'LAYOUT_WIDE';                 // 13.333 x 7.5 in
+pres.theme = { headFontFace: HEAD, bodyFontFace: BODY };
+pres.title = 'RASCI Model Infographic';
+
+pres.defineSlideMaster({
+	title: 'RASCI',
+	background: { color: PAGEBG },
+	slideNumber: { x: 6.357, y: 6.907, w: 0.616, h: 0.37, align: 'center', fontFace: HEAD, fontSize: 16, color: CLR.R }
+});
+
+/** Every slide carries the same headline and the two dots beside the page number. */
+function newSlide() {
+	const sl = pres.addSlide({ masterName: 'RASCI' });
+	shape(sl, 'ellipse', 6.302, 7.048, 0.089, 0.089, PALE.R);
+	shape(sl, 'ellipse', 6.943, 7.048, 0.089, 0.089, PALE.R);
+	sl.addText(
+		[{ text: 'RASCI Model ', options: { color: CLR.R } }, { text: 'Infographic', options: { color: BLACK } }],
+		{ x: 2.0, y: 0.521, w: 9.333, h: 0.572, fontFace: HEAD, fontSize: 28, align: 'center', valign: 'top' });
+	return sl;
+}
+
+/* ============================== 1: R A S C I speech-bubble row ============ */
+
+function slide1() {
+	const sl = newSlide();
+	// [key, box x, box y, box w, letter x, letter w, pointer x, pointer y, pointer up?]
+	const CARDS = [
+		['R', 1.702, 3.153, 1.871, 2.308, 0.660, 2.368, 2.835, true],
+		['A', 3.704, 3.144, 1.878, 4.307, 0.671, 4.378, 4.603, false],
+		['S', 5.711, 3.153, 1.871, 6.349, 0.594, 6.378, 2.835, true],
+		['C', 7.712, 3.144, 1.878, 8.323, 0.656, 8.386, 4.603, false],
+		['I', 9.755, 3.121, 1.878, 10.495, 0.395, 10.428, 2.804, true]
+	];
+	// caption blocks sit above the cards with an up pointer, below the others
+	const CAPS = {
+		R: [1.725, 1.630, 1.857, 1.627, 1.991],
+		A: [3.648, 5.206, 1.929, 3.586, 5.665],
+		S: [5.987, 1.630, 1.326, 5.624, 1.991],
+		C: [7.873, 5.206, 1.606, 7.651, 5.665],
+		I: [9.952, 1.630, 1.485, 9.669, 1.991]
+	};
+	CARDS.forEach(([k, bx, by, bw, tx, tw, px, py, up]) => {
+		freeform(sl, px, py, 0.535, 0.361, up ? TRI_UP : TRI_DOWN, { fill: { color: CLR[k] } });
+		shape(sl, 'roundRect', bx, by, bw, 1.502, CLR[k]);
+		head(sl, tx, by + 0.32, tw, 0.863, k, { fontSize: 48, color: WHITE });
+	});
+	KEYS.forEach(k => {
+		const [lx, ly, lw, bx, by] = CAPS[k];
+		head(sl, lx, ly, lw, 0.404, NAME[k], { color: CLR[k] });
+		body(sl, bx, by, 2.052, 0.686, 'Lorem Ipsum is simply dummy.', { align: 'center' });
+	});
+}
+
+/* ============================== 2: rising hexagon staircase =============== */
+
+function slide2() {
+	const sl = newSlide();
+	connector(sl, [[1.671, 6.775], [11.662, 1.525]],
+		{ color: GRAY, width: 2.25, beginArrowType: 'oval', endArrowType: 'oval' });
+
+	// [key, hex x, hex y, stem x, stem top, stem bottom, label x, label y, label w,
+	//  copy x, copy y, copy align]
+	const STEPS = [
+		['R', 2.377, 5.480, 3.438, 4.183, 5.813, 2.080, 3.094, 1.678, 2.080, 3.375, 'right'],
+		['A', 4.222, 4.514, 5.278, 3.215, 4.845, 3.796, 2.188, 1.734, 3.852, 2.470, 'center'],
+		['S', 6.111, 3.548, 7.172, 2.239, 3.869, 6.179, 1.244, 1.201, 5.702, 1.525, 'center'],
+		['C', 7.944, 2.581, 7.960, 3.483, 5.113, 7.771, 5.355, 1.448, 7.771, 5.671, 'left'],
+		['I', 9.838, 1.615, 9.851, 2.531, 4.161, 9.710, 4.382, 1.343, 9.710, 4.699, 'left']
+	];
+	STEPS.forEach(([k, hx, hy, sx, sy0, sy1, lx, ly, lw, cx, cy, algn]) => {
+		freeform(sl, hx, hy, 1.077, 1.242, HEXAGON, { fill: { color: CLR[k] } });
+		iconBox(sl, hx + 0.31, hy + 0.39, 0.47, 0.47);
+		connector(sl, [[sx, sy0], [sx, sy1]],
+			{ color: CLR[k], width: 2, dashType: 'sysDot', beginArrowType: 'oval' });
+		head(sl, lx, ly, lw, 0.370, NAME[k], { fontSize: 16, color: CLR[k], align: algn === 'right' ? 'right' : 'left' });
+		body(sl, cx, cy, 1.678, 0.602, 'Lorem Ipsum is simply dummy.', { fontSize: 12, align: algn });
+	});
+}
+
+/* ============================== 3: task / team-member matrix ============== */
+
+function slide3() {
+	const sl = newSlide();
+	const TASK_TOP = [2.493, 2.934, 3.369, 3.797, 4.240, 4.672, 5.101, 5.548];
+	const TASK_H = [0.449, 0.471, 0.428, 0.452, 0.447, 0.446, 0.441, 0.436];
+	const TASK_FILL = ['R', 'A', 'S', 'C', 'I', 'C', 'R', 'A'];
+	const TASK_LBL_Y = [2.533, 2.984, 3.398, 3.838, 4.279, 4.689, 5.087, 5.551];
+	TASK_TOP.forEach((y, i) => {
+		shape(sl, 'rect', 0.373, y, 2.109, TASK_H[i], CLR[TASK_FILL[i]]);
+		head(sl, 0.596, TASK_LBL_Y[i], 1.68, 0.370, 'Task name ' + (i + 1), { fontSize: 16, color: WHITE });
+	});
+
+	// column headers
+	const COL_X = [2.482, 3.989, 5.477, 6.965, 8.459, 9.959, 11.462];
+	const COL_FILL = ['R', 'A', 'S', 'C', 'I', 'C', 'R'];
+	COL_X.forEach((x, i) => {
+		shape(sl, 'rect', x, 1.482, 1.498, 1.011, CLR[COL_FILL[i]]);
+		sl.addText('Team member ', {
+			x: x + 0.047, y: 1.668, w: 1.403, h: 0.640,
+			fontFace: HEAD, fontSize: 16, color: WHITE, align: 'center', valign: 'top'
+		});
+	});
+
+	// assignment chips: [x, y, w, letter, role colour]
+	const CHIPS = [
+		[5.488, 2.502, 1.477, 'C', 'C'], [6.975, 2.502, 1.478, 'A', 'A'], [8.459, 2.502, 1.490, 'I', 'I'],
+		[9.955, 2.502, 1.487, 'I', 'I'], [11.457, 2.502, 1.487, 'R', 'R'],
+		[2.473, 2.939, 1.490, 'I', 'I'], [6.975, 2.944, 1.478, 'A', 'A'], [8.453, 2.940, 1.478, 'S', 'S'],
+		[9.949, 2.940, 1.478, 'S', 'S'],
+		[3.968, 3.382, 1.478, 'A', 'A'], [5.452, 3.378, 1.490, 'I', 'I'], [6.977, 3.377, 1.487, 'R', 'R'],
+		[8.462, 3.381, 1.478, 'A', 'A'], [9.955, 3.376, 1.487, 'I', 'I'],
+		[2.472, 3.817, 1.478, 'S', 'S'], [6.977, 3.823, 1.487, 'R', 'R'], [8.453, 3.817, 1.478, 'S', 'S'],
+		[2.473, 4.232, 1.490, 'I', 'I'], [3.968, 4.255, 1.478, 'A', 'A'], [5.452, 4.270, 1.490, 'I', 'I'],
+		[8.453, 4.254, 1.478, 'S', 'S'], [9.949, 4.254, 1.478, 'S', 'S'],
+		[6.977, 4.673, 1.487, 'R', 'R'], [8.462, 4.673, 1.478, 'A', 'A'],
+		[2.498, 5.121, 1.478, 'A', 'A'], [6.977, 5.119, 1.487, 'R', 'R'],
+		[2.498, 5.563, 1.478, 'A', 'A'], [5.488, 5.563, 1.477, 'C', 'C'], [11.457, 5.557, 1.487, 'R', 'R']
+	];
+	CHIPS.forEach(([x, y, w, letter, role]) => {
+		shape(sl, 'rect', x, y, w, 0.420, CLR[role]);
+		head(sl, x + 0.542, y + 0.042, 0.396, 0.337, letter,
+			{ fontSize: 14, color: WHITE, wrap: true, fit: null });
+	});
+
+	// legend
+	const LEGEND = [
+		[0.373, 'R', 'R= Responsible ', 0.450, 2.265],
+		[2.951, 'A', 'A= Accountable', 3.027, 2.267],
+		[5.585, 'S', 'S= Supportive ', 5.754, 2.081],
+		[8.234, 'C', 'C= Consulted ', 8.439, 2.009],
+		[10.794, 'I', 'I= Informed ', 11.111, 1.785]
+	];
+	LEGEND.forEach(([x, k, text, tx, tw]) => {
+		shape(sl, 'roundRect', x, 6.218, 2.419, 0.583, CLR[k]);
+		head(sl, tx, 6.308, tw, 0.404, text, { color: WHITE });
+	});
+}
+
+/* ============================== 4: isometric bar chart ==================== */
+
+function slide4() {
+	const sl = newSlide();
+	const TOP_FACE = [['M', 0.473, 1], ['L', 0, 0.466], ['L', 0.529, 0], ['L', 1, 0.531], ['Z']];
+	const leftFace = k => [['M', 0, 0], ['L', 1, k], ['L', 1, 1], ['L', 0, 1 - k], ['Z']];
+	const rightFace = k => [['M', 0, k], ['L', 1, 0], ['L', 1, 1 - k], ['L', 0, 1], ['Z']];
+
+	// [key, group x, group y, left-face height, right-face height]
+	const BARS = [
+		['R', 1.977, 2.158, 2.617, 2.571],
+		['A', 2.554, 3.055, 2.163, 2.120],
+		['S', 3.153, 3.921, 1.745, 1.699],
+		['C', 3.773, 4.863, 1.276, 1.233],
+		['I', 4.386, 5.614, 0.987, 0.943]
+	];
+	BARS.forEach(([k, gx, gy, lh, rh]) => {
+		freeform(sl, gx, gy + 0.319, 0.511, lh, leftFace(0.369 / lh), { fill: { color: CLR[k] } });
+		freeform(sl, gx + 0.511, gy + 0.363, 0.572, rh, rightFace(0.325 / rh), { fill: { color: DARK[k] } });
+		freeform(sl, gx, gy, 1.083, 0.687, TOP_FACE, { fill: { color: LIGHT[k] } });
+	});
+
+	// teardrop badges pinned to each bar top
+	const PINS = [
+		['R', 2.143, 1.691, 2.246, 0.487], ['A', 2.750, 2.525, 2.807, 0.488],
+		['S', 3.329, 3.377, 3.427, 0.473], ['C', 3.965, 4.304, 4.057, 0.484],
+		['I', 4.558, 5.085, 4.717, 0.428]
+	];
+	PINS.forEach(([k, x, y, tx, tw]) => {
+		sl.addShape('teardrop', {
+			x, y, w: 0.739, h: 0.741, rotate: 134.9,
+			fill: { color: CLR[k] }, line: { color: WHITE, width: 1 }
+		});
+		head(sl, tx, y + 0.078, tw, 0.619, k, { fontSize: 24, color: WHITE, align: 'center' });
+	});
+
+	// legend column with dashed leaders
+	const LEG = [
+		['R', 1.737, 1.627, 2.058, 1.972, 3.894, 3.040],
+		['A', 2.614, 2.511, 2.126, 2.856, 4.293, 3.846],
+		['S', 3.492, 3.415, 1.473, 3.760, 4.144, 4.324],
+		['C', 4.368, 4.266, 1.776, 4.654, 3.654, 4.898],
+		['I', 5.245, 5.160, 1.647, 5.548, 4.144, 5.568]
+	];
+	LEG.forEach(([k, chipY, ly, lw, cy, cw, leadX]) => {
+		shape(sl, 'roundRect', 7.361, chipY, 0.167, 0.611, CLR[k], { rectRadius: 0.03 });
+		connector(sl, [[leadX, chipY + 0.281], [7.097, chipY + 0.281]],
+			{ color: CLR[k], width: 1, dashType: 'dash', beginArrowType: 'oval', endArrowType: 'oval' });
+		head(sl, 7.760, ly, lw, 0.454, NAME[k], { fontSize: 16, color: CLR[k] });
+		body(sl, 7.760, cy, cw, 0.416, 'Lorem Ipsum is simply dummy.', { fontSize: 12 });
+	});
+}
+
+/* ============================== 5: hub with five branches ================= */
+
+function slide5() {
+	const sl = newSlide();
+	const HUB_LINE = DASH(GRAY);
+	connector(sl, [[6.667, 3.777], [6.667, 4.625]], HUB_LINE);
+	sl.addShape('ellipse', {
+		x: 5.637, y: 1.717, w: 2.059, h: 2.059,
+		fill: { color: WHITE }, line: NOLINE, shadow: SOFT_SHADOW
+	});
+	head(sl, 5.946, 2.461, 1.441, 0.572, 'RASCI', { fontSize: 28 });
+
+	// colours run R..I left to right, but the captions are in a different order
+	// [colour key, caption, chip x, label x, label w, branch x, icon-circle x, icon-circle y]
+	const BRANCH = [
+		['R', 'Accountable ', 1.144, 1.195, 1.929, 2.122, 1.746, 5.716],
+		['A', 'Support ', 3.452, 3.767, 1.326, 4.429, 4.054, 5.742],
+		['S', 'Consulted ', 5.741, 5.916, 1.606, 6.667, 6.343, 5.726],
+		['C', 'Responsible ', 8.011, 8.060, 1.857, 8.989, 8.613, 5.726],
+		['I', 'Informed ', 10.234, 10.535, 1.485, 11.212, 10.836, 5.742]
+	];
+	BRANCH.forEach(([k, caption, cx, lx, lw, bx, ox, oy]) => {
+		connector(sl, [[6.667, 4.625], [bx, 4.625], [bx, 4.904]], HUB_LINE);
+		shape(sl, 'roundRect', cx, 4.904, 1.956, 0.702, CLR[k]);
+		head(sl, lx, 5.053, lw, 0.404, caption, { color: WHITE });
+		sl.addShape('ellipse', {
+			x: ox, y: oy, w: 0.751, h: 0.751,
+			fill: { color: CLR[k] }, line: { color: PALE[k], width: 4 }
+		});
+		iconBox(sl, ox + 0.19, oy + 0.19, 0.37, 0.37);
+	});
+}
+
+/* ============================== 6: segmented donut ======================== */
+
+function slide6() {
+	const sl = newSlide();
+	// Five arc segments with chevron-notched ends; each is its own free-form.
+	// [key, x, y, w, h, path, letter x, letter y, letter w]
+	const SEG = [
+		['R', 4.811, 2.210, 2.033, 1.655, 5.583, 2.610, 0.489, [
+			['M', 0.44, 1], ['C', 0.505, 0.767, 0.69, 0.593, 0.908, 0.587], ['C', 1, 0.347, 1, 0.347, 1, 0.347],
+			['C', 0.859, 0, 0.859, 0, 0.859, 0], ['C', 0.467, 0.027, 0.136, 0.333, 0, 0.767],
+			['C', 0.212, 0.727, 0.212, 0.727, 0.212, 0.727], ['L', 0.44, 1], ['Z']]],
+		['A', 6.745, 2.210, 1.856, 1.909, 7.425, 2.878, 0.496, [
+			['M', 0.048, 0.514], ['C', 0.286, 0.555, 0.47, 0.74, 0.506, 0.965], ['C', 0.744, 1, 0.744, 1, 0.744, 1],
+			['C', 1, 0.763, 1, 0.763, 1, 0.763], ['C', 0.875, 0.335, 0.476, 0.017, 0, 0],
+			['C', 0.155, 0.301, 0.155, 0.301, 0.155, 0.301], ['L', 0.048, 0.514], ['Z']]],
+		['S', 7.142, 3.864, 1.525, 2.087, 7.680, 4.622, 0.449, [
+			['M', 1, 0.159], ['C', 1, 0.106, 0.993, 0.053, 0.986, 0], ['C', 0.688, 0.212, 0.688, 0.212, 0.688, 0.212],
+			['C', 0.355, 0.175, 0.355, 0.175, 0.355, 0.175], ['C', 0.348, 0.36, 0.21, 0.513, 0, 0.593],
+			['C', 0.072, 0.905, 0.072, 0.905, 0.072, 0.905], ['C', 0.319, 1, 0.319, 1, 0.319, 1],
+			['C', 0.725, 0.836, 1, 0.524, 1, 0.159], ['Z']]],
+		['C', 5.375, 5.067, 2.066, 1.127, 6.106, 5.334, 0.488, [
+			['M', 0.775, 0.088], ['C', 0.727, 0.118, 0.679, 0.137, 0.626, 0.137],
+			['C', 0.529, 0.137, 0.439, 0.088, 0.364, 0], ['C', 0.027, 0.324, 0.027, 0.324, 0.027, 0.324],
+			['C', 0, 0.588, 0, 0.588, 0, 0.588], ['C', 0.171, 0.843, 0.39, 1, 0.626, 1],
+			['C', 0.759, 1, 0.882, 0.951, 1, 0.873], ['C', 0.834, 0.706, 0.834, 0.706, 0.834, 0.706],
+			['L', 0.775, 0.088], ['Z']]],
+		['I', 4.667, 3.589, 1.304, 1.998, 5.066, 4.278, 0.326, [
+			['M', 1, 0.68], ['C', 0.847, 0.586, 0.754, 0.453, 0.754, 0.304],
+			['C', 0.754, 0.282, 0.754, 0.26, 0.763, 0.238], ['C', 0.39, 0, 0.39, 0, 0.39, 0],
+			['C', 0.059, 0.033, 0.059, 0.033, 0.059, 0.033], ['C', 0.025, 0.122, 0, 0.21, 0, 0.304],
+			['C', 0, 0.575, 0.161, 0.818, 0.432, 1], ['C', 0.466, 0.862, 0.466, 0.862, 0.466, 0.862],
+			['L', 1, 0.68], ['Z']]]
+	];
+	SEG.forEach(([k, x, y, w, h, lx, ly, lw, cmds]) => {
+		freeform(sl, x, y, w, h, cmds, { fill: { color: CLR[k] } });
+		head(sl, lx, ly, lw, 0.572, k, { fontSize: 28, color: WHITE });
+	});
+	head(sl, 5.946, 3.916, 1.441, 0.572, 'RASCI', { fontSize: 28 });
+
+	// captions - left column right-aligned, right column left-aligned
+	const CAPS = [
+		['Survey strategy ', CLR.R, 1.571, 2.330, 2.307, 1.744, 2.699, 'right'],
+		['Survey design ', CLR.A, 1.768, 3.643, 2.111, 1.744, 3.990, 'right'],
+		['Survey programming ', CLR.S, 0.821, 5.032, 3.058, 1.744, 5.390, 'right'],
+		['Survey administration ', CLR.R, 9.361, 2.330, 3.152, 9.361, 2.699, 'left'],
+		['Survey analysis ', CLR.A, 9.361, 3.737, 2.258, 9.361, 3.990, 'left'],
+		['Survey report ', CLR.S, 9.361, 5.032, 2.039, 9.361, 5.390, 'left']
+	];
+	CAPS.forEach(([text, color, lx, ly, lw, cx, cy, algn]) => {
+		head(sl, lx, ly, lw, 0.404, text, { color, align: algn });
+		body(sl, cx, cy, 2.052, 0.686, 'Lorem Ipsum is simply dummy', { align: algn });
+	});
+}
+
+/* ============================== 7: rising house-shaped columns ============ */
+
+function slide7() {
+	const sl = newSlide();
+	// homePlate rotated 270 degrees becomes an up-pointing "house"
+	// [key, rot-box x, rot-box y, rot-box w, title, title x, title y, title w,
+	//  badge x, copy x, copy y, leader x, leader y0, leader y1, leader x2]
+	const COLS = [
+		['I', 2.352, 4.486, 2.094, 'Managing director ', 2.271, 5.299, 2.257, 3.040, 0.916, 3.601, 3.398, 4.364, 3.944, 2.967],
+		['C', 4.244, 4.316, 2.434, 'Financial director ', 4.607, 4.921, 1.709, 5.103, 3.298, 3.123, 5.461, 4.024, 3.466, 5.349],
+		['S', 6.008, 4.080, 2.906, 'Facility manager ', 6.599, 4.756, 1.719, 7.103, 5.290, 2.726, 7.462, 3.551, 3.069, 7.342],
+		['A', 7.738, 3.797, 3.472, 'Chief it officer ', 8.678, 4.402, 1.591, 9.115, 7.210, 2.134, 9.474, 2.986, 2.477, 9.261],
+		['R', 9.493, 3.533, 4.000, 'HR director ', 10.697, 4.008, 1.590, 11.134, 9.231, 1.697, 11.493, 2.457, 2.039, 11.283]
+	];
+	const BADGE = { I: 'R', C: 'A', S: 'S', A: 'C', R: 'I' };
+	COLS.forEach(([k, rx, ry, rw, title, tx, ty, tw, bx, cx, cy, lx, ly0, ly1, lx2]) => {
+		sl.addShape('homePlate', {
+			x: rx, y: ry, w: rw, h: 1.849, rotate: 270, fill: { color: CLR[k] }, line: NOLINE
+		});
+		sl.addText(title, {
+			x: tx, y: ty, w: tw, h: 0.640, fontFace: HEAD, fontSize: 16, color: WHITE,
+			align: 'center', valign: 'top'
+		});
+		connector(sl, [[lx, ly0], [lx, ly1], [lx2, ly1]],
+			{ color: CLR[k], width: 1, dashType: 'lgDash', endArrowType: 'oval' });
+		body(sl, cx, cy, 2.052, 0.686, 'Lorem Ipsum is simply dummy.', { align: 'center' });
+		sl.addShape('ellipse', {
+			x: bx, y: 6.099, w: 0.717, h: 0.717,
+			fill: { color: CLR[k] }, line: { color: PALE[k], width: 5 }
+		});
+		head(sl, bx + 0.135, 6.205, 0.447, 0.505, BADGE[k], { fontSize: 24, color: WHITE, align: 'center' });
+	});
+}
+
+/* ============================== 8: three-level arrow diagram ============== */
+
+function slide8() {
+	const sl = newSlide();
+	const ROWS = [
+		['R', 1.818, 'STRATEGISCH NIVEAU', 1.071, 2.027, 2.677, 3.600, 2.027, 6.770, 0.745,
+			'VASTSTELLENT BEDRIJFSMODEL ', 4.206, 2.178, 4.606],
+		['A', 3.734, 'TACTISCH  NIVEAU', 1.191, 3.943, 2.438, 3.600, 4.171, 6.789, 0.251, null, 0, 0, 0],
+		['S', 5.613, 'OPERATIONEEL  NIVEAU', 0.917, 5.822, 2.986, 3.581, 5.839, 6.789, 0.745,
+			'OPTIMALISEREN BEDRIJFSPROCESSEN', 4.206, 5.974, 5.363]
+	];
+	ROWS.forEach(([k, cy, label, lx, ly, lw, ax, ay, aw, ah, text, tx, ty, tw]) => {
+		shape(sl, 'roundRect', 1.220, cy, 2.380, 1.125, CLR[k]);
+		sl.addText(label, {
+			x: lx, y: ly, w: lw, h: 0.707, fontFace: HEAD, fontSize: 18, color: WHITE,
+			align: 'center', valign: 'top'
+		});
+		shape(sl, 'homePlate', ax, ay, aw, ah, CLR[k]);
+		if (text) head(sl, tx, ty, tw, 0.404, text, { color: WHITE });
+	});
+
+	// numbered stations along the middle rail
+	[['R', 4.206, 4.377, 0.616, '01'], ['A', 6.339, 6.471, 0.695, '02'], ['S', 8.610, 8.742, 0.695, '03']]
+		.forEach(([k, ox, tx, tw, num]) => {
+			sl.addShape('ellipse', {
+				x: ox, y: 3.734, w: 0.958, h: 0.958,
+				fill: { color: WHITE }, line: { color: PALE[k], width: 3 }, shadow: SOFT_SHADOW
+			});
+			head(sl, tx, 3.927, tw, 0.572, num, { fontSize: 28, color: CLR[k] });
+		});
+
+	sl.addShape('ellipse', {
+		x: 9.814, y: 3.002, w: 2.603, h: 2.603, fill: { color: WHITE }, line: NOLINE, shadow: SOFT_SHADOW
+	});
+	sl.addText('GEMEEN- SCHAPPELIJK DOEL', {
+		x: 9.814, y: 3.799, w: 2.603, h: 1.010, fontFace: HEAD, fontSize: 18, align: 'center', valign: 'top'
+	});
+}
+
+/* ============================== 9 & 17: pyramid layouts =================== */
+
+/**
+ * Both slides show the same black pyramid with five labelled chips and five
+ * lettered dots; only the chip placement (and the whole group offset) differs.
+ * @param {Array} chips - [key, chip x, chip y, chip w, text x, text w]
+ * @param {number} dx - horizontal offset of the pyramid block
+ * @param {number} dy - vertical offset of the pyramid block
+ */
+function pyramidSlide(chips, dx, dy) {
+	const sl = newSlide();
+	shape(sl, 'triangle', 5.574 + dx, 2.138 + dy, 4.481, 5.047, BLACK);
+	chips.forEach(([k, cx, cy, cw, tx, tw]) => {
+		shape(sl, 'roundRect', cx, cy, cw, 0.854, CLR[k]);
+		head(sl, tx, cy + 0.225, tw, 0.404, NAME[k], { color: WHITE });
+	});
+	// dots march down the pyramid's right edge
+	const DOTS = [
+		['R', 7.613, 1.962, 7.622, 0.338], ['A', 8.039, 2.891, 8.045, 0.342],
+		['S', 8.488, 3.875, 8.513, 0.317], ['C', 8.892, 4.871, 8.902, 0.337],
+		['I', 9.354, 5.826, 9.427, 0.253]
+	];
+	DOTS.forEach(([k, x, y, tx, tw]) => {
+		shape(sl, 'ellipse', x + dx, y + dy, 0.404, 0.404, CLR[k]);
+		head(sl, tx + dx, y + 0.024 + dy, tw, 0.342, k, { fontSize: 16, color: WHITE, align: 'center' });
+	});
+	connector(sl, [[7.814 + dx, 2.366 + dy], [7.814 + dx, 7.185 + dy]], { color: ICEBLUE, width: 1 });
+	[['Visible ', 6.700, 5.369, 1.138], ['Plant ', 7.978, 5.358, 0.963],
+	['Activity ', 6.414, 6.447, 1.261], ['Plane ', 8.131, 6.447, 1.014]].forEach(([t, x, y, w]) => {
+		head(sl, x + dx, y + dy, w, 0.404, t, { color: WHITE });
+	});
+	return sl;
+}
+
+function slide9() {
+	pyramidSlide([
+		['R', 5.063, 1.711, 2.090, 5.180, 1.857],
+		['A', 4.525, 2.927, 2.097, 4.610, 1.929],
+		['S', 4.134, 4.120, 2.090, 4.517, 1.326],
+		['C', 3.745, 5.225, 2.097, 3.991, 1.606],
+		['I', 3.279, 6.331, 2.097, 3.586, 1.485]
+	], 0, 0);
+}
+
+function slide17() {
+	pyramidSlide([
+		['R', 4.066, 1.541, 2.090, 4.183, 1.857],
+		['A', 7.741, 1.575, 2.097, 7.826, 1.929],
+		['S', 3.346, 3.634, 2.090, 3.729, 1.326],
+		['C', 8.631, 3.700, 2.097, 8.877, 1.606],
+		['I', 2.606, 5.254, 2.097, 2.913, 1.485]
+	], -0.996, -0.170);
+}
+
+/* ============================== 10: half-disc row ========================= */
+
+function slide10() {
+	const sl = newSlide();
+	// laid out right-to-left: I, C, S, A, R
+	const CARDS = [
+		['I', 1.399, 1.262, 1.397, 1.510, 1.485, 2.149, 0.334],
+		['C', 3.536, 3.376, 3.507, 3.658, 1.606, 4.298, 0.294],
+		['S', 5.679, 5.526, 5.677, 5.764, 1.326, 6.393, 0.415],
+		['A', 7.756, 7.612, 7.747, 7.805, 1.929, 8.477, 0.415],
+		['R', 9.898, 9.744, 9.948, 10.019, 1.857, 10.668, 0.333]
+	];
+	const BADGE = { I: 'R', C: 'A', S: 'S', A: 'C', R: 'I' };
+	CARDS.forEach(([k, dx, ox, tx, lx, lw, ix, iw]) => {
+		freeform(sl, dx, 2.294, 1.373, 2.287, HALF_DISC, { fill: { color: CLR[k] } });
+		sl.addShape('ellipse', {
+			x: ox, y: 3.079, w: 0.717, h: 0.717,
+			fill: { color: CLR[k] }, line: { color: PALE[k], width: 5 }
+		});
+		head(sl, tx, 3.185, 0.45, 0.505, BADGE[k], { fontSize: 24, color: WHITE, align: 'center' });
+		iconBox(sl, ix, 3.287 - (iw - 0.334) / 2, iw, iw);
+		head(sl, lx, 4.802, lw, 0.404, NAME[k], { color: CLR[k] });
+		body(sl, lx, 5.344, 2.052, 0.686, 'Lorem Ipsum is simply dummy.');
+	});
+}
+
+/* ============================== 11: fan of chips from a ring ============== */
+
+function slide11() {
+	const sl = newSlide();
+	sl.addShape('ellipse', {
+		x: 2.326, y: 3.325, w: 2.625, h: 2.625, fill: { color: WHITE }, line: NOLINE, shadow: SOFT_SHADOW
+	});
+	sl.addShape('ellipse', { x: 2.076, y: 3.075, w: 3.125, h: 3.125, fill: NOFILL, line: DASH(GRAY) });
+	head(sl, 2.918, 4.351, 1.441, 0.572, 'RASCI', { fontSize: 28 });
+
+	// [key, dot x, dot y, leader end y, chip y, chip h-offsets]
+	const ROWS = [
+		['R', 4.106, 3.061, 2.172, 1.874, 6.810, 1.678, 1.808],
+		['A', 4.723, 3.522, 3.190, 2.892, 6.785, 1.734, 2.847],
+		['S', 5.050, 4.170, 4.226, 3.928, 7.048, 1.201, 3.886],
+		['C', 5.076, 4.843, 5.295, 4.997, 6.928, 1.448, 4.926],
+		['I', 4.756, 5.498, 6.299, 6.002, 6.981, 1.343, 5.965]
+	];
+	ROWS.forEach(([k, dx, dy, endY, chipY, tx, tw, copyY]) => {
+		connector(sl, [[dx + 0.226, dy + 0.132], [6.604, endY]], DASH(CLR[k]));
+		shape(sl, 'ellipse', dx, dy, 0.264, 0.264, CLR[k]);
+		shape(sl, 'roundRect', 6.604, chipY, 2.094, 0.595, CLR[k]);
+		head(sl, tx, chipY + 0.113, tw, 0.370, NAME[k], { fontSize: 16, color: WHITE });
+		body(sl, 9.065, copyY, 1.901, 0.686, 'Lorem Ipsum is simply dummy.');
+	});
+}
+
+/* ============================== 12: four open rings ======================= */
+
+function slide12() {
+	const sl = newSlide();
+	// [key, ring x, label x, label w, icon-circle x, icon x, icon w, copy x]
+	const RINGS = [
+		['R', 1.081, 1.717, 1.678, 2.153, 2.397, 0.318, 1.391],
+		['A', 3.822, 4.430, 1.734, 4.894, 5.093, 0.407, 4.131],
+		['S', 6.574, 7.325, 1.448, 7.647, 7.859, 0.381, 6.884],
+		['C', 9.302, 10.106, 1.343, 10.375, 10.597, 0.361, 9.622]
+	];
+	const CAPTION = { R: 'Responsible ', A: 'Accountable ', S: 'Consulted ', C: 'Informed ' };
+	RINGS.forEach(([k, rx, lx, lw, ox, ix, iw, cx]) => {
+		freeform(sl, rx, 2.531, 2.950, 2.577, RING_WITH_STEM, { fill: { color: CLR[k] }, rotate: 270 });
+		freeform(sl, rx + 0.367, 2.526, 2.216, 2.216, CIRCLE, { fill: { color: PAGEBG }, rotate: 270 });
+		head(sl, lx, 3.446, lw, 0.370, CAPTION[k], { fontSize: 16, color: CLR[k] });
+		shape(sl, 'ellipse', ox, 1.942, 0.805, 0.805, CLR[k]);
+		iconBox(sl, ix, 2.344 - iw / 2, iw, iw);
+		body(sl, cx, 5.372, 2.331, 0.769, 'Lorem Ipsum is simply dummy.', { fontSize: 16, align: 'center' });
+	});
+}
+
+/* ============================== 13: grey table with dots ================== */
+
+function slide13() {
+	const sl = newSlide();
+	const ROW_LABEL = ['Business case ', 'Finance plan ', ' implementation ', ' launch', ' event', ' video release'];
+	const ROW_Y = [2.509, 3.120, 3.712, 4.324, 4.916, 5.528];
+	const ROW_TX = [2.153, 2.206, 2.013, 2.513, 2.571, 2.191];
+	const ROW_TW = [1.669, 1.562, 1.953, 0.949, 0.833, 1.592];
+	ROW_Y.forEach((y, i) => {
+		sl.addShape('rect', {
+			x: 2.011, y, w: 1.953, h: 0.604, fill: { color: GRAY65 }, line: { color: WHITE, width: 1 }
+		});
+		head(sl, ROW_TX[i], y + 0.133, ROW_TW[i], 0.337, ROW_LABEL[i], { fontSize: 14, color: WHITE });
+	});
+
+	// column headers: [x, w, text, text x, text w, wraps?]
+	const COLS = [
+		[3.982, 1.226, 'Executive ', 3.972, 1.245, false],
+		[5.190, 1.226, 'Finance ', 5.272, 1.063, false],
+		[6.417, 1.226, 'Account lead ', 6.495, 1.096, true],
+		[7.643, 1.226, 'director', 7.778, 1.003, false],
+		[8.870, 1.379, 'Production ', 8.870, 1.389, false],
+		[10.249, 1.074, 'Sales ', 10.396, 0.779, false]
+	];
+	COLS.forEach(([x, w, text, tx, tw, wraps]) => {
+		sl.addShape('rect', {
+			x, y: 1.952, w, h: 0.604, fill: { color: GRAY65 }, line: { color: WHITE, width: 1 }
+		});
+		if (wraps) sl.addText(text, {
+			x: tx, y: 2.010, w: tw, h: 0.505, fontFace: HEAD, fontSize: 12, color: WHITE,
+			align: 'center', valign: 'top'
+		});
+		else head(sl, tx, 2.093, tw, 0.337, text, { fontSize: 14, color: WHITE });
+	});
+
+	// horizontal + right-hand rules
+	[3.133, 3.716, 4.324, 4.928, 5.542, 6.131].forEach(y => {
+		connector(sl, [[3.964, y], [11.322, y]], { color: ICEBLUE, width: 1 });
+	});
+	connector(sl, [[11.307, 2.254], [11.307, 6.131]], { color: ICEBLUE, width: 1 });
+
+	// lettered dots: [x, y, letter, colour key]
+	const DOTS = [
+		[4.152, 2.632, 'R', 'I'], [6.828, 2.632, 'A', 'C'], [9.205, 2.632, 'C', 'A'],
+		[4.152, 3.229, 'A', 'C'], [5.400, 3.229, 'R', 'I'], [9.205, 3.229, 'I', 'R'],
+		[4.152, 3.861, 'S', 'S'], [8.006, 3.861, 'I', 'R'],
+		[4.152, 4.424, 'C', 'A'],
+		[4.152, 5.051, 'I', 'R'], [8.015, 5.051, 'A', 'C'], [10.629, 5.051, 'C', 'A'],
+		[4.177, 5.660, 'R', 'I'], [8.015, 5.660, 'A', 'C'], [10.629, 5.660, 'R', 'I']
+	];
+	DOTS.forEach(([x, y, letter, k]) => {
+		shape(sl, 'ellipse', x, y, 0.404, 0.404, CLR[k]);
+		head(sl, x, y + 0.024, 0.404, 0.342, letter, { fontSize: 16, color: WHITE, align: 'center' });
+	});
+}
+
+/* ============================== 14: org-chart of five cards =============== */
+
+function slide14() {
+	const sl = newSlide();
+	sl.addShape('roundRect', {
+		x: 5.248, y: 1.778, w: 2.773, h: 1.092, rectRadius: 0.12,
+		fill: { color: WHITE }, line: NOLINE, shadow: SOFT_SHADOW
+	});
+	head(sl, 5.737, 1.970, 1.795, 0.707, 'RASCI', { fontSize: 36 });
+
+	// [key, x, w, title y, card y, copy card y, drop x, corner radius / height]
+	const CARDS = [
+		['R', 1.709, 1.871, 4.449, 5.564, 2.645, 0.0554],
+		['A', 3.696, 1.878, 4.439, 5.554, 4.635, 0.0779],
+		['S', 5.703, 1.871, 4.449, 5.564, 6.637, 0.0628],
+		['C', 7.704, 1.878, 4.439, 5.554, 8.643, 0.0779],
+		['I', 9.747, 1.878, 4.417, 5.569, 10.686, 0.0853]
+	];
+	CARDS.forEach(([k, cx, cw, cardY, copyCardY, dropX, rad]) => {
+		connector(sl, [[6.635, 2.869], [6.635, 3.938], [dropX, 3.938], [dropX, cardY]], DASH(GRAY));
+		shape(sl, 'roundRect', cx, cardY, cw, 0.902, CLR[k], { rectRadius: rad * 0.902 });
+		head(sl, cx + 0.1, cardY + 0.266, cw - 0.2, 0.370, NAME[k], { fontSize: 16, color: WHITE });
+		shape(sl, 'roundRect', cx, copyCardY, cw, 1.092, CLR[k], { rectRadius: rad * 1.092 });
+		body(sl, cx - 0.23, copyCardY + 0.203, 2.331, 0.686, 'Lorem Ipsum is simply dummy.',
+			{ color: WHITE, align: 'center' });
+	});
+}
+
+/* ============================== 15: overlapping arrow band ================ */
+
+function slide15() {
+	const sl = newSlide();
+	connector(sl, [[6.667, 2.451], [6.667, 3.115]], DASH(GRAY));
+	// the panels overlap, so they are drawn back to front: I first, S last
+	// [key, panel x, panel y, panel w, fold x, fold y, fold w, fold h, notch on right?]
+	const PANELS = [
+		['I', 10.014, 3.652, 2.235, 10.014, 5.201, 0.379, 0.297, false],
+		['C', 7.812, 3.356, 2.577, 7.812, 4.905, 0.309, 0.292, false],
+		['R', 0.375, 3.652, 3.211, null, 0, 0, 0, false],
+		['A', 3.276, 3.356, 2.577, 3.276, 5.197, 0.309, 0.297, true],
+		['S', 5.544, 3.059, 2.577, 5.544, 4.905, 0.309, 0.292, true]
+	];
+	const FOLD_R = [['M', 0, 0], ['L', 1, 0], ['L', 1, 1], ['Z']];
+	const FOLD_L = [['M', 1, 0], ['L', 0, 0], ['L', 0, 1], ['Z']];
+	// arrow head that closes the band on the right, drawn under the panels
+	sl.addShape('rtTriangle', {
+		x: 11.391, y: 3.776, w: 1.535, h: 1.600, rotate: 225, fill: { color: CLR.I }, line: NOLINE
+	});
+	PANELS.forEach(([k, px, py, pw, fx, fy, fw, fh, rightFold]) => {
+		shape(sl, 'rect', px, py, pw, 1.846, CLR[k]);
+		if (fx !== null) freeform(sl, fx, fy, fw, fh, rightFold ? FOLD_R : FOLD_L, { fill: { color: DEEP[k] } });
+	});
+
+	// [key, label x, label y, label w, stem x, stem y0, stem y1, copy x, copy y]
+	const LABELS = [
+		['R', 0.894, 4.364, 1.972, 2.297, 5.430, 6.084, 1.193, 6.281],
+		['A', 3.462, 4.067, 2.045, 4.565, 4.983, 5.734, 3.478, 5.914],
+		['S', 6.132, 3.771, 1.400, 6.832, 4.857, 5.116, 5.713, 5.484],
+		['C', 8.426, 4.015, 1.683, 9.100, 4.983, 5.734, 7.980, 5.914],
+		['I', 10.777, 4.263, 1.569, 11.373, 5.430, 6.084, 10.256, 6.281]
+	];
+	LABELS.forEach(([k, lx, ly, lw, sx, sy0, sy1, cx, cy]) => {
+		head(sl, lx, ly, lw, 0.422, NAME[k], { fontSize: 20, color: WHITE });
+		connector(sl, [[sx, sy0], [sx, sy1]], { color: CLR[k], width: 1.5, endArrowType: 'oval' });
+		body(sl, cx, cy, 2.250, 0.742, 'Lorem Ipsum is simply dummy.', { fontSize: 16, align: 'center' });
+	});
+
+	sl.addShape('roundRect', {
+		x: 5.522, y: 1.549, w: 2.290, h: 0.901, rectRadius: 0.12,
+		fill: { color: WHITE }, line: NOLINE, shadow: SOFT_SHADOW
+	});
+	head(sl, 5.926, 1.707, 1.441, 0.572, 'RASCI', { fontSize: 28 });
+}
+
+/* ============================== 16: flat five-chip row ==================== */
+
+function slide16() {
+	const sl = newSlide();
+	connector(sl, [[5.522, 2.000], [1.453, 2.000], [1.453, 3.566]], DASH(GRAY));
+	connector(sl, [[7.812, 2.000], [11.549, 2.000], [11.549, 3.566]], DASH(GRAY));
+	connector(sl, [[0.302, 4.104], [10.398, 4.104]], DASH(GRAY));
+
+	// [key, chip x, label x, label w, copy x]
+	const CHIPS = [
+		['R', 0.302, 0.467, 1.972, 0.204],
+		['A', 2.830, 2.959, 2.045, 2.754],
+		['S', 5.459, 5.910, 1.400, 5.459],
+		['C', 7.956, 8.266, 1.683, 7.956],
+		['I', 10.398, 10.764, 1.569, 10.398]
+	];
+	CHIPS.forEach(([k, cx, lx, lw, copyX]) => {
+		shape(sl, 'roundRect', cx, 3.566, 2.302, 1.075, CLR[k]);
+		head(sl, lx, 3.893, lw, 0.422, NAME[k], { fontSize: 20, color: WHITE });
+		body(sl, copyX, 4.928, 2.250, 0.742, 'Lorem Ipsum is simply dummy.', { fontSize: 16, align: 'center' });
+	});
+
+	sl.addShape('roundRect', {
+		x: 5.522, y: 1.549, w: 2.290, h: 0.901, rectRadius: 0.12,
+		fill: { color: WHITE }, line: NOLINE, shadow: SOFT_SHADOW
+	});
+	head(sl, 5.926, 1.707, 1.441, 0.572, 'RASCI', { fontSize: 28 });
+}
+
+/* ============================== 18: interlocking loops ==================== */
+
+function slide18() {
+	const sl = newSlide();
+	// hook shapes: a ring with a tail that wraps around the neighbouring ring
+	const HOOK_TL = [['M', 0, 0], ['L', 0, 0.123], ['L', 0.768, 0.123],
+		['C', 0.849, 0.123, 0.915, 0.217, 0.915, 0.333], ['C', 0.915, 0.449, 0.849, 0.544, 0.768, 0.544],
+		['L', 0.684, 0.544], ['C', 0.665, 0.544, 0.648, 0.526, 0.643, 0.499],
+		['C', 0.631, 0.434, 0.607, 0.375, 0.573, 0.326], ['C', 0.521, 0.252, 0.452, 0.211, 0.379, 0.211],
+		['C', 0.305, 0.211, 0.236, 0.252, 0.184, 0.326], ['C', 0.15, 0.375, 0.126, 0.434, 0.114, 0.499],
+		['C', 0.109, 0.526, 0.092, 0.544, 0.073, 0.544], ['L', 0, 0.544],
+		['C', 0, 0.544, 0, 0.667, 0, 0.667], ['L', 0.073, 0.667],
+		['C', 0.092, 0.667, 0.109, 0.685, 0.114, 0.712], ['C', 0.146, 0.878, 0.253, 1, 0.379, 1],
+		['C', 0.452, 1, 0.521, 0.959, 0.573, 0.884], ['C', 0.607, 0.836, 0.631, 0.776, 0.643, 0.712],
+		['C', 0.648, 0.685, 0.665, 0.667, 0.684, 0.667], ['L', 0.768, 0.667],
+		['C', 0.896, 0.667, 1, 0.517, 1, 0.333], ['C', 1, 0.15, 0.896, 0, 0.768, 0], ['L', 0, 0], ['Z']];
+	const HOOK_BR = [['M', 0.621, 0], ['C', 0.496, 0, 0.389, 0.122, 0.357, 0.289],
+		['C', 0.352, 0.315, 0.335, 0.333, 0.316, 0.333], ['L', 0.232, 0.333],
+		['C', 0.104, 0.333, 0, 0.483, 0, 0.667], ['C', 0, 0.85, 0.104, 1, 0.232, 1], ['L', 1, 1],
+		['L', 1, 0.877], ['L', 0.232, 0.877], ['C', 0.151, 0.877, 0.085, 0.783, 0.085, 0.667],
+		['C', 0.085, 0.55, 0.151, 0.456, 0.232, 0.456], ['L', 0.316, 0.456],
+		['C', 0.335, 0.456, 0.352, 0.474, 0.357, 0.501], ['C', 0.389, 0.667, 0.495, 0.789, 0.621, 0.789],
+		['C', 0.747, 0.789, 0.854, 0.667, 0.886, 0.501], ['C', 0.891, 0.474, 0.908, 0.456, 0.927, 0.456],
+		['L', 1, 0.456], ['C', 1, 0.456, 1, 0.333, 1, 0.333], ['L', 0.927, 0.333],
+		['C', 0.908, 0.333, 0.891, 0.315, 0.886, 0.289], ['C', 0.874, 0.224, 0.85, 0.164, 0.816, 0.116],
+		['C', 0.764, 0.041, 0.695, 0, 0.621, 0], ['Z']];
+	// ring with a straight bar running through it, tail to the right / to the left
+	const BAR_RING_R = [['M', 0.34, 0], ['C', 0.406, 0, 0.468, 0.052, 0.515, 0.147],
+		['C', 0.545, 0.208, 0.567, 0.284, 0.578, 0.366], ['C', 0.582, 0.399, 0.598, 0.422, 0.615, 0.422],
+		['L', 1, 0.422], ['L', 1, 0.578], ['L', 0.615, 0.578],
+		['C', 0.598, 0.578, 0.582, 0.601, 0.578, 0.635], ['C', 0.549, 0.845, 0.453, 1, 0.34, 1],
+		['C', 0.227, 1, 0.132, 0.845, 0.103, 0.635], ['C', 0.098, 0.601, 0.083, 0.578, 0.066, 0.578],
+		['L', 0, 0.578], ['L', 0, 0.422], ['L', 0.066, 0.422],
+		['C', 0.083, 0.422, 0.098, 0.399, 0.103, 0.366], ['C', 0.132, 0.155, 0.227, 0, 0.34, 0], ['Z']];
+	const BAR_RING_L = [['M', 0.663, 0], ['C', 0.729, 0, 0.79, 0.052, 0.836, 0.147],
+		['C', 0.866, 0.208, 0.888, 0.284, 0.899, 0.366], ['C', 0.903, 0.399, 0.918, 0.422, 0.935, 0.422],
+		['L', 1, 0.422], ['L', 1, 0.578], ['L', 0.935, 0.578],
+		['C', 0.918, 0.578, 0.903, 0.601, 0.899, 0.635], ['C', 0.87, 0.845, 0.775, 1, 0.663, 1],
+		['C', 0.551, 1, 0.457, 0.845, 0.428, 0.635], ['C', 0.423, 0.601, 0.409, 0.578, 0.391, 0.578],
+		['L', 0, 0.578], ['L', 0, 0.422], ['L', 0.391, 0.422],
+		['C', 0.409, 0.422, 0.423, 0.399, 0.428, 0.366], ['C', 0.457, 0.155, 0.551, 0, 0.663, 0], ['Z']];
+
+	freeform(sl, 4.181, 2.587, 2.409, 1.677, HOOK_BR, { fill: { color: CLR.S } });      // top-left hook
+	freeform(sl, 6.764, 4.059, 2.409, 1.677, HOOK_TL, { fill: { color: CLR.A } });      // bottom-right hook
+	freeform(sl, 6.764, 2.587, 2.681, 1.323, BAR_RING_R, { fill: { color: CLR.C } });   // top-right ring
+	shape(sl, 'homePlate', 9.496, 3.146, 2.462, 0.206, CLR.C);
+	freeform(sl, 3.884, 4.408, 2.709, 1.323, BAR_RING_L, { fill: { color: CLR.R } });   // bottom-left ring
+	sl.addShape('homePlate', {
+		x: 1.375, y: 4.967, w: 2.458, h: 0.206, fill: { color: CLR.R }, line: NOLINE, flipH: true
+	});
+	iconBox(sl, 5.385, 2.947, 0.602, 0.602);
+	iconBox(sl, 7.360, 2.899, 0.570, 0.570);
+	iconBox(sl, 5.434, 4.819, 0.501, 0.501);
+	iconBox(sl, 7.324, 4.748, 0.643, 0.643);
+
+	// [key, label x, label y, label w, copy x, copy y]
+	const LABELS = [
+		['S', 3.761, 1.722, 1.448, 3.039, 2.015],
+		['C', 8.419, 1.722, 1.343, 8.255, 2.015],
+		['R', 3.241, 5.320, 1.678, 2.889, 5.745],
+		['A', 8.460, 5.375, 1.734, 8.299, 5.745]
+	];
+	const TEXT = { S: 'Consulted ', C: 'Informed ', R: 'Responsible ', A: 'Accountable ' };
+	LABELS.forEach(([k, lx, ly, lw, cx, cy]) => {
+		head(sl, lx, ly, lw, 0.370, TEXT[k], { fontSize: 16, color: CLR[k] });
+		body(sl, cx, cy, 2.250, 0.742, 'Lorem Ipsum is simply dummy.', { fontSize: 16, align: 'center' });
+	});
+}
+
+/* ============================== 19: parallelogram ribbon ================== */
+
+function slide19() {
+	const sl = newSlide();
+	// [key, band x, label x, label w, badge x, copy x]
+	const BANDS = [
+		['R', 0.597, 1.512, 1.559, 1.714, 1.328],
+		['A', 2.848, 3.664, 1.611, 3.857, 3.745],
+		['S', 5.099, 6.233, 1.116, 6.124, 6.039],
+		['C', 7.350, 8.257, 1.345, 8.356, 8.456],
+		['I', 9.601, 10.569, 1.248, 10.614, 10.569]
+	];
+	BANDS.forEach(([k, bx, lx, lw, ox, cx]) => {
+		sl.addShape('parallelogram', {
+			x: bx, y: 3.779, w: 3.062, h: 0.881, rectRadius: 0.866,
+			fill: { color: CLR[k] }, line: NOLINE, flipV: true
+		});
+		head(sl, lx, 4.061, lw, 0.344, NAME[k], { fontSize: 16, color: WHITE });
+		sl.addShape('ellipse', {
+			x: ox, y: 2.585, w: 0.698, h: 0.698,
+			fill: { color: CLR[k] }, line: { color: PALE[k], width: 4 }
+		});
+		iconBox(sl, ox + 0.185, 2.770, 0.328, 0.328);
+		body(sl, cx, 5.032, 2.166, 0.686, 'Lorem Ipsum is simply dummy.', { align: 'center' });
+	});
+}
+
+/* ============================== 20: dashed card with five chips =========== */
+
+function slide20() {
+	const sl = newSlide();
+	sl.addShape('roundRect', {
+		x: 2.257, y: 2.802, w: 2.405, h: 1.852, rectRadius: 0.12, fill: NOFILL, line: DASH(GRAY)
+	});
+	sl.addShape('roundRect', {
+		x: 2.374, y: 2.906, w: 2.170, h: 1.671, rectRadius: 0.12,
+		fill: { color: WHITE }, line: NOLINE, shadow: SOFT_SHADOW
+	});
+	head(sl, 2.738, 3.455, 1.441, 0.572, 'RASCI', { fontSize: 28 });
+
+	// [key, chip y, chip w, label x, label w, copy y]
+	const ROWS = [
+		['R', 1.716, 2.090, 6.920, 1.678, 1.650],
+		['A', 2.734, 2.097, 6.895, 1.734, 2.689],
+		['S', 3.770, 2.090, 7.158, 1.201, 3.728],
+		['C', 4.839, 2.097, 7.038, 1.448, 4.768],
+		['I', 5.844, 2.097, 7.091, 1.343, 5.807]
+	];
+	ROWS.forEach(([k, cy, cw, lx, lw, copyY]) => {
+		connector(sl, [[4.661, 3.728], [5.687, 3.728], [5.687, cy + 0.298], [6.713, cy + 0.298]], DASH(GRAY));
+		shape(sl, 'roundRect', 6.714, cy, cw, 0.595, CLR[k]);
+		head(sl, lx, cy + 0.113, lw, 0.370, NAME[k], { fontSize: 16, color: WHITE });
+		body(sl, 9.175, copyY, 1.901, 0.686, 'Lorem Ipsum is simply dummy.');
+	});
+}
+
+/* --------------------------------------------------------------- assemble */
+
+[slide1, slide2, slide3, slide4, slide5, slide6, slide7, slide8, slide9, slide10,
+	slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19,
+	slide20].forEach(build => build());
+
+pres.writeFile({ fileName: path.join(__dirname, '1224426c-c197-4edd-842b-201ed0df81ca_grok_final.pptx') })
+	.then(f => console.log('wrote ' + f));

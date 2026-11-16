@@ -1,0 +1,756 @@
+/**
+ * "Race to Glory" pitch deck - rebuilt with pptxgenjs.
+ * Run: node 05242254-dc8e-43b9-bf2b-a1705abd5b56_grok_final.js
+ */
+const PptxGenJS = require('pptxgenjs');
+const path = require('path');
+
+/* ------------------------------------------------------------------ theme */
+const C = {
+  black: '000000',
+  white: 'FFFFFF',
+  maroon: '900616',   // accent1
+  red: 'B80411',      // accent2
+  red2: 'D3030D',     // accent3
+  redLt: 'FF1D1D',    // accent4
+  orange: 'F83702',   // accent5
+  orange2: 'E85D04',  // accent6
+  gray: 'E7E6E6',
+  grayLt: 'F3F2F2',
+  maroonDk: '9E020A'
+};
+const HEAD = 'Dela Gothic One';   // major theme font
+const BODY = 'Poppins';           // minor theme font
+
+/* --------------------------------------------------- normalised icon paths
+ * Each entry is a list of path commands in a 0..1 box:
+ *   ['M', x, y]  move   ['L', x, y]  line
+ *   ['C', x1, y1, x2, y2, x, y]  cubic bezier      ['Z']  close
+ */
+const FLAG = [
+  ['M',0.3097,0.6667], ['L',0.619,0.6667], ['L',0.5474,1], ['L',0.2381,1], ['Z'], ['M',0.6907,0.3336],
+  ['L',1,0.3336], ['L',0.9284,0.667], ['L',0.619,0.667], ['Z'], ['M',0.0716,0.3336], ['L',0.381,0.3336],
+  ['L',0.3093,0.667], ['L',0,0.667], ['Z'], ['M',0.4526,0], ['L',0.7619,0], ['L',0.6903,0.3333],
+  ['L',0.381,0.3333], ['Z']
+];
+const TRAFFIC = [
+  ['M',0.1875,0.1], ['L',0.1875,0.05], ['C',0.1875,0.0224,0.2155,0,0.25,0], ['L',0.75,0],
+  ['C',0.7845,0,0.8125,0.0224,0.8125,0.05], ['L',0.8125,0.1], ['L',1,0.1], ['C',1,0.225,0.8438,0.275,0.8125,0.275],
+  ['L',0.8125,0.4], ['L',1,0.4], ['C',1,0.525,0.8438,0.575,0.8125,0.575], ['L',0.8125,0.7], ['L',1,0.7],
+  ['C',1,0.825,0.8438,0.875,0.8125,0.875], ['L',0.8125,0.95], ['C',0.8125,0.9776,0.7845,1,0.75,1], ['L',0.25,1],
+  ['C',0.2155,1,0.1875,0.9776,0.1875,0.95], ['L',0.1875,0.875], ['C',0.1562,0.875,0,0.825,0,0.7], ['L',0.1875,0.7],
+  ['L',0.1875,0.575], ['C',0.1562,0.575,0,0.525,0,0.4], ['L',0.1875,0.4], ['L',0.1875,0.275],
+  ['C',0.1562,0.275,0,0.225,0,0.1], ['L',0.1875,0.1], ['Z'], ['M',0.5,0.9], ['C',0.569,0.9,0.625,0.8552,0.625,0.8],
+  ['C',0.625,0.7448,0.569,0.7,0.5,0.7], ['C',0.431,0.7,0.375,0.7448,0.375,0.8],
+  ['C',0.375,0.8552,0.431,0.9,0.5,0.9], ['Z'], ['M',0.5,0.6], ['C',0.569,0.6,0.625,0.5552,0.625,0.5],
+  ['C',0.625,0.4448,0.569,0.4,0.5,0.4], ['C',0.431,0.4,0.375,0.4448,0.375,0.5],
+  ['C',0.375,0.5552,0.431,0.6,0.5,0.6], ['Z'], ['M',0.5,0.3], ['C',0.569,0.3,0.625,0.2552,0.625,0.2],
+  ['C',0.625,0.1448,0.569,0.1,0.5,0.1], ['C',0.431,0.1,0.375,0.1448,0.375,0.2],
+  ['C',0.375,0.2552,0.431,0.3,0.5,0.3], ['Z']
+];
+const CAN = [
+  ['M',0.25,0.1905], ['L',0.9375,0.1905], ['C',0.972,0.1905,1,0.2118,1,0.2381], ['L',1,0.9524],
+  ['C',1,0.9787,0.972,1,0.9375,1], ['L',0.0625,1], ['C',0.028,1,0,0.9787,0,0.9524], ['L',0,0.4762],
+  ['L',0.25,0.1905], ['Z'], ['M',0.5625,0], ['L',0.875,0], ['C',0.9095,0,0.9375,0.0213,0.9375,0.0476],
+  ['L',0.9375,0.1429], ['L',0.5,0.1429], ['L',0.5,0.0476], ['C',0.5,0.0213,0.528,0,0.5625,0], ['Z'],
+  ['M',0.125,0.5238], ['L',0.125,0.8571], ['L',0.25,0.8571], ['L',0.25,0.5238], ['L',0.125,0.5238], ['Z']
+];
+const CONE = [
+  ['M',0.9198,0.8889], ['L',1,0.8889], ['L',1,1], ['L',0,1], ['L',0,0.8889], ['L',0.0802,0.8889],
+  ['L',0.1297,0.6667], ['L',0.8704,0.6667], ['L',0.9198,0.8889], ['Z'], ['M',0.7963,0.3333], ['L',0.8457,0.5555],
+  ['L',0.1543,0.5555], ['L',0.2037,0.3333], ['L',0.7962,0.3333], ['Z'], ['M',0.7716,0.2222], ['L',0.2283,0.2222],
+  ['L',0.2681,0.0435], ['C',0.2737,0.0181,0.2963,0,0.3223,0], ['L',0.6777,0],
+  ['C',0.7037,0,0.7262,0.0181,0.7319,0.0435], ['L',0.7716,0.2222], ['Z']
+];
+const SIGNAL = [
+  ['M',0.2058,0.9044], ['C',0.0764,0.8103,-0.0001,0.66,0,0.5], ['C',0,0.2238,0.2239,0,0.5,0],
+  ['C',0.7761,0,1,0.2238,1,0.5], ['C',1.0001,0.66,0.9236,0.8103,0.7942,0.9044], ['L',0.7434,0.8174],
+  ['C',0.9187,0.683,0.9518,0.4319,0.8174,0.2566], ['C',0.6829,0.0813,0.4318,0.0482,0.2566,0.1826],
+  ['C',0.0813,0.3171,0.0482,0.5682,0.1826,0.7435], ['C',0.2039,0.7712,0.2288,0.7961,0.2566,0.8174],
+  ['L',0.2058,0.9044], ['Z'], ['M',0.3075,0.7301], ['C',0.1804,0.6238,0.1636,0.4346,0.2699,0.3075],
+  ['C',0.3762,0.1804,0.5654,0.1636,0.6925,0.2699], ['C',0.8196,0.3762,0.8364,0.5654,0.7301,0.6925],
+  ['C',0.7187,0.7061,0.7061,0.7187,0.6925,0.7301], ['L',0.641,0.6418],
+  ['C',0.7193,0.5639,0.7197,0.4373,0.6418,0.359], ['C',0.564,0.2806,0.4373,0.2802,0.359,0.3581],
+  ['C',0.2807,0.436,0.2803,0.5626,0.3582,0.641], ['C',0.3584,0.6412,0.3587,0.6415,0.359,0.6418],
+  ['L',0.3075,0.7301], ['Z'], ['M',0.45,0.55], ['L',0.55,0.55], ['L',0.6,1], ['L',0.4,1], ['L',0.45,0.55], ['Z']
+];
+const COMPASS = [
+  ['M',0.5,1], ['C',0.2238,1,0,0.7762,0,0.5], ['C',0,0.2238,0.2238,0,0.5,0], ['C',0.7762,0,1,0.2238,1,0.5],
+  ['C',1,0.7762,0.7762,1,0.5,1], ['Z'], ['M',0.725,0.275], ['L',0.4,0.4], ['L',0.275,0.725], ['L',0.6,0.6],
+  ['L',0.725,0.275], ['Z'], ['M',0.5,0.55], ['C',0.4724,0.55,0.45,0.5276,0.45,0.5],
+  ['C',0.45,0.4724,0.4724,0.45,0.5,0.45], ['C',0.5276,0.45,0.55,0.4724,0.55,0.5],
+  ['C',0.55,0.5276,0.5276,0.55,0.5,0.55], ['Z']
+];
+const ARROW = [
+  ['M',0.9982,0.5544], ['C',0.9944,0.5466,0.9858,0.5415,0.9761,0.5415], ['L',0.715,0.5415], ['L',0.715,0.0208],
+  ['C',0.715,0.0093,0.7043,0,0.6912,0], ['L',0.3098,0], ['C',0.2967,0,0.286,0.0093,0.286,0.0208],
+  ['L',0.286,0.5415], ['L',0.0238,0.5415], ['C',0.0142,0.5415,0.0055,0.5466,0.0018,0.5543],
+  ['C',-0.0019,0.5621,0.0001,0.5711,0.007,0.577], ['L',0.4824,0.9939], ['C',0.4869,0.9978,0.493,1,0.4993,1],
+  ['C',0.5056,1,0.5117,0.9978,0.5162,0.9939], ['L',0.993,0.5771], ['C',0.9998,0.5711,1.0019,0.5621,0.9982,0.5544],
+  ['Z']
+];
+const CHECK = [
+  ['M',0.0125,0.5718], ['C',0.0125,0.5718,0.0125,0.5718,0.0125,0.5718], ['C',0,0.5569,0,0.5322,0.0125,0.5149],
+  ['C',0.0232,0.5,0.041,0.5,0.0535,0.5149], ['C',0.3209,0.8861,0.3209,0.8861,0.3209,0.8861],
+  ['C',0.9483,0.0149,0.9483,0.0149,0.9483,0.0149], ['C',0.959,0,0.9786,0,0.9893,0.0149],
+  ['C',0.9893,0.0149,0.9893,0.0149,0.9893,0.0149], ['C',1,0.0322,1,0.0569,0.9893,0.0718],
+  ['C',0.3209,1,0.3209,1,0.3209,1], ['L',0.0125,0.5718], ['Z']
+];
+const GEARQ = [
+  ['M',0.185,0.8484], ['C',0.0079,0.8937,0.0079,0.8937,0.0079,0.8937], ['C',0.0039,0.9291,0.002,0.9646,0,1],
+  ['C',0.5472,1,0.5472,1,0.5472,1], ['C',0.5551,0.7539,0.7539,0.5551,1,0.5472], ['C',1,0,1,0,1,0],
+  ['C',0.9646,0,0.9291,0.0039,0.8937,0.0079], ['C',0.8504,0.185,0.8504,0.185,0.8504,0.185],
+  ['C',0.815,0.1929,0.7795,0.2028,0.7441,0.2126], ['C',0.6181,0.0827,0.6181,0.0827,0.6181,0.0827],
+  ['C',0.5433,0.1142,0.4724,0.1555,0.4075,0.2028], ['C',0.4567,0.3799,0.4567,0.3799,0.4567,0.3799],
+  ['C',0.4291,0.4035,0.4035,0.4291,0.3799,0.4567], ['C',0.2047,0.4055,0.2047,0.4055,0.2047,0.4055],
+  ['C',0.1555,0.4705,0.1142,0.5413,0.0827,0.6181], ['C',0.2146,0.7441,0.2146,0.7441,0.2146,0.7441],
+  ['C',0.2047,0.7697,0.1969,0.7953,0.1909,0.8228], ['C',0.189,0.8307,0.187,0.8406,0.185,0.8484], ['Z']
+];
+const TROPHY = [
+  ['M',0.5455,0.7744], ['L',0.5455,0.8889], ['L',0.7727,0.8889], ['L',0.7727,1], ['L',0.2273,1],
+  ['L',0.2273,0.8889], ['L',0.4545,0.8889], ['L',0.4545,0.7744], ['C',0.2727,0.7463,0.1364,0.5573,0.1363,0.3333],
+  ['L',0.1363,0], ['L',0.8637,0], ['L',0.8637,0.3333], ['C',0.8636,0.5573,0.7273,0.7463,0.5455,0.7744], ['Z'],
+  ['M',0,0.1111], ['L',0.0909,0.1111], ['L',0.0909,0.3333], ['L',0,0.3333], ['L',0,0.1111], ['Z'],
+  ['M',0.9091,0.1111], ['L',1,0.1111], ['L',1,0.3333], ['L',0.9091,0.3333], ['L',0.9091,0.1111], ['Z']
+];
+const PHONE = [
+  ['M',0.9999,0.7456], ['L',0.9999,0.942], ['C',1,0.9712,0.9774,0.9954,0.9482,0.9975],
+  ['C',0.924,0.9991,0.9042,1,0.8888,1], ['C',0.3979,1,0,0.602,0,0.1111], ['C',0,0.0958,0.0008,0.076,0.0025,0.0517],
+  ['C',0.0046,0.0225,0.0288,0,0.058,0], ['L',0.2544,0], ['C',0.2687,0,0.2806,0.0108,0.2821,0.025],
+  ['C',0.2834,0.0378,0.2845,0.048,0.2856,0.0557], ['C',0.2967,0.1327,0.3193,0.2077,0.3527,0.278],
+  ['C',0.358,0.2891,0.3546,0.3024,0.3446,0.3094], ['L',0.2247,0.3951],
+  ['C',0.298,0.5659,0.4341,0.702,0.6049,0.7753], ['L',0.6905,0.6556],
+  ['C',0.6977,0.6456,0.7111,0.6421,0.7223,0.6474], ['C',0.7925,0.6808,0.8675,0.7033,0.9445,0.7144],
+  ['C',0.9522,0.7155,0.9624,0.7167,0.975,0.7179], ['C',0.9892,0.7194,1,0.7313,1,0.7456], ['Z']
+];
+const INSTA = [
+  ['M',0.5,0], ['C',0.6358,0,0.6528,0.0005,0.7061,0.003], ['C',0.7594,0.0055,0.7956,0.0138,0.8275,0.0262],
+  ['C',0.8605,0.0389,0.8883,0.0562,0.9161,0.0839], ['C',0.9415,0.1089,0.9612,0.1391,0.9738,0.1725],
+  ['C',0.9861,0.2044,0.9945,0.2406,0.997,0.2939], ['C',0.9994,0.3472,1,0.3642,1,0.5],
+  ['C',1,0.6358,0.9995,0.6528,0.997,0.7061], ['C',0.9945,0.7594,0.9861,0.7956,0.9738,0.8275],
+  ['C',0.9613,0.8609,0.9416,0.8911,0.9161,0.9161], ['C',0.8911,0.9415,0.8609,0.9612,0.8275,0.9738],
+  ['C',0.7956,0.9861,0.7594,0.9945,0.7061,0.997], ['C',0.6528,0.9994,0.6358,1,0.5,1],
+  ['C',0.3642,1,0.3472,0.9995,0.2939,0.997], ['C',0.2406,0.9945,0.2044,0.9861,0.1725,0.9738],
+  ['C',0.1391,0.9612,0.1089,0.9415,0.0839,0.9161], ['C',0.0585,0.8911,0.0388,0.8609,0.0262,0.8275],
+  ['C',0.0138,0.7956,0.0055,0.7594,0.003,0.7061], ['C',0.0006,0.6528,0,0.6358,0,0.5],
+  ['C',0,0.3642,0.0005,0.3472,0.003,0.2939], ['C',0.0055,0.2406,0.0138,0.2044,0.0262,0.1725],
+  ['C',0.0387,0.1391,0.0584,0.1089,0.0839,0.0839], ['C',0.1089,0.0585,0.1391,0.0388,0.1725,0.0262],
+  ['C',0.2044,0.0138,0.2406,0.0055,0.2939,0.003], ['C',0.3472,0.0006,0.3642,0,0.5,0], ['Z'], ['M',0.5,0.25],
+  ['C',0.3619,0.25,0.25,0.3619,0.25,0.5], ['C',0.25,0.6381,0.3619,0.75,0.5,0.75],
+  ['C',0.6381,0.75,0.75,0.6381,0.75,0.5], ['C',0.75,0.3619,0.6381,0.25,0.5,0.25], ['Z'], ['M',0.825,0.2375],
+  ['C',0.825,0.203,0.797,0.175,0.7625,0.175], ['C',0.728,0.175,0.7,0.203,0.7,0.2375],
+  ['C',0.7,0.272,0.728,0.3,0.7625,0.3], ['C',0.797,0.3,0.825,0.272,0.825,0.2375], ['Z'], ['M',0.5,0.35],
+  ['C',0.5828,0.35,0.65,0.4172,0.65,0.5], ['C',0.65,0.5828,0.5828,0.65,0.5,0.65],
+  ['C',0.4172,0.65,0.35,0.5828,0.35,0.5], ['C',0.35,0.4172,0.4172,0.35,0.5,0.35], ['Z']
+];
+const GLOBE = [
+  ['M',0,0.5506], ['L',0.2752,0.5506], ['C',0.2838,0.7109,0.3345,0.866,0.4222,1],
+  ['C',0.1964,0.9643,0.0229,0.7796,0,0.5506], ['Z'], ['M',0,0.4494], ['C',0.0229,0.2204,0.1964,0.0357,0.4222,0],
+  ['C',0.3345,0.134,0.2838,0.2891,0.2752,0.4494], ['L',0,0.4494], ['Z'], ['M',1,0.4494], ['L',0.7247,0.4494],
+  ['C',0.7162,0.2891,0.6654,0.134,0.5778,0], ['C',0.8036,0.0357,0.977,0.2204,1,0.4494], ['Z'], ['M',1,0.5506],
+  ['C',0.977,0.7796,0.8036,0.9643,0.5778,1], ['C',0.6654,0.866,0.7162,0.7109,0.7247,0.5506], ['L',1,0.5506], ['Z'],
+  ['M',0.3759,0.5506], ['L',0.6241,0.5506], ['C',0.6158,0.6872,0.5731,0.8194,0.5,0.9348],
+  ['C',0.4269,0.8194,0.3841,0.6872,0.3759,0.5506], ['Z'], ['M',0.3759,0.4494],
+  ['C',0.3841,0.3128,0.4269,0.1806,0.5,0.0652], ['C',0.5731,0.1806,0.6158,0.3128,0.6241,0.4494],
+  ['L',0.3759,0.4494], ['Z']
+];
+
+/* ------------------------------------------------------------- helpers */
+
+/** Scale a normalised icon path into pptxgenjs custGeom points at x,y,w,h. */
+function iconPoints(pathData, x, y, w, h) {
+  const pts = [];
+  for (const seg of pathData) {
+    if (seg[0] === 'M') pts.push({ x: x + seg[1] * w, y: y + seg[2] * h, moveTo: true });
+    else if (seg[0] === 'L') pts.push({ x: x + seg[1] * w, y: y + seg[2] * h });
+    else if (seg[0] === 'C') pts.push({
+      x: x + seg[5] * w, y: y + seg[6] * h,
+      curve: { type: 'cubic', x1: x + seg[1] * w, y1: y + seg[2] * h, x2: x + seg[3] * w, y2: y + seg[4] * h }
+    });
+    else pts.push({ close: true });
+  }
+  return pts;
+}
+
+/** Draw one of the normalised icon paths as a filled custom shape. */
+function icon(slide, pathData, x, y, w, h, color) {
+  slide.addShape('custGeom', { x, y, w, h, fill: { color },
+    points: iconPoints(pathData, 0, 0, w, h) });
+}
+
+/** Filled polygon from [x,y] pairs given in inches relative to (x,y). */
+function poly(slide, x, y, pts, opts) {
+  const points = pts.map((p, i) => ({ x: p[0], y: p[1], moveTo: i === 0 }));
+  points.push({ close: true });
+  return slide.addShape('custGeom', Object.assign({ x, y, w: 1, h: 1, points }, opts));
+}
+
+const MARGIN = [7.2, 7.2, 3.6, 3.6];        // [left, right, bottom, top] in points
+const MARGIN_FLUSH = [0, 0, 3.6, 3.6];      // slides 18-19 sit flush to the box edge
+
+/** Text box matching the deck's defaults (no auto-anchor, transparent, no inset shift). */
+function text(slide, content, o) {
+  slide.addText(content, Object.assign({
+    fontFace: BODY, color: C.white, valign: 'top', margin: MARGIN, isTextBox: true
+  }, o));
+}
+
+/** Heading text: two-tone (white part + accent part) in the display font. */
+function heading(slide, parts, o) {
+  text(slide, parts.map(p => ({ text: p[0], options: { color: p[1] } })),
+    Object.assign({ fontFace: HEAD, fontSize: 48, lineSpacingMultiple: 0.8 }, o));
+}
+
+/** Body copy: 130% leading, Poppins. */
+function body(slide, str, o) {
+  text(slide, str, Object.assign({ fontSize: 14, lineSpacingMultiple: 1.3 }, o));
+}
+
+/** Small bold-ish label in the display font. */
+function label(slide, str, o) {
+  text(slide, str, Object.assign({ fontFace: HEAD, fontSize: 16, lineSpacingMultiple: 0.8 }, o));
+}
+
+/** Blend `hex` over the black/maroon card behind it, so we can fake alpha in charts. */
+function blend(hex, over, alpha) {
+  const mix = i => Math.round(parseInt(hex.substr(i, 2), 16) * alpha + parseInt(over.substr(i, 2), 16) * (1 - alpha));
+  return [0, 2, 4].map(i => mix(i).toString(16).padStart(2, '0').toUpperCase()).join('');
+}
+
+/**
+ * Vertical fade drawn as stacked opaque bands (pptxgenjs has no gradient fill).
+ * Each band reaches the bottom edge and is painted over the one above it, so the
+ * steps never leave hairline seams.
+ */
+function verticalFade(slide, x, y, w, h, color, over, bands) {
+  const step = h / bands;
+  for (let i = 0; i < bands; i++) {
+    slide.addShape('rect', { x, y: y + step * i, w, h: h - step * i,
+      fill: { color: blend(color, over, (i + 0.5) / bands) } });
+  }
+}
+
+/* Shared page furniture from the slide master. */
+function footer(slide, pageNo) {
+  icon(slide, FLAG, 0.5799, 7.0639, 0.2721, 0.2338, C.maroon);
+  text(slide, 'Race to Glory', { x: 0.852, y: 6.9944, w: 1.5808, h: 0.345, fontSize: 12,
+    lineSpacingMultiple: 1.3, valign: 'middle' });
+  if (pageNo) text(slide, String(pageNo), { x: 11.6275, y: 7.0573, w: 1.0635, h: 0.3029,
+    fontSize: 12, align: 'right' });
+}
+
+/* The three "Pitch Deck / 2025 / Otomotive" strap-line items. */
+const STRAPLINE = [['Pitch Deck', 0.5799, 'left'], ['2025', 5.6029, 'center'], ['Otomotive ', 10.5634, 'right']];
+function strapline(slide, y) {
+  for (const [txt, x, align] of STRAPLINE) {
+    text(slide, txt, { x, y, w: 2.1275, h: 0.3702, fontFace: HEAD, fontSize: 20,
+      lineSpacingMultiple: 0.8, align });
+  }
+}
+
+/** Parallelogram; `off` is the horizontal skew in inches (default = preset 25%). */
+function paral(slide, x, y, w, h, fill, opts) {
+  const o = opts || {};
+  let off = o.off !== undefined ? o.off : 0.25 * Math.min(w, h);
+  if (o.flipH) off = -off;
+  const pts = off >= 0
+    ? [[off, 0], [w, 0], [w - off, h], [0, h]]
+    : [[0, 0], [w + off, 0], [w, h], [-off, h]];
+  return poly(slide, x, y, pts, { fill });
+}
+
+/** Circle-with-checkmark badge (replaces the small icon graphic in the original). */
+function checkBadge(slide, x, y, d, ringColor, tickColor) {
+  slide.addShape('ellipse', { x, y, w: d, h: d, fill: { color: ringColor } });
+  icon(slide, CHECK, x + d * 0.24, y + d * 0.35, d * 0.52, d * 0.30, tickColor);
+}
+
+/* =========================================================== slide builders */
+
+/* 1 - Cover */
+function slide01(s) {
+  footer(s, 1);
+  text(s, 'Race to Glory', { x: 1.1124, y: 0.9306, w: 11.1086, h: 1.3935, fontFace: HEAD,
+    fontSize: 96, color: C.red, align: 'center', lineSpacingMultiple: 0.8 });
+  body(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor.',
+    { x: 2.4583, y: 2.324, w: 8.4167, h: 0.3857, align: 'center' });
+  strapline(s, 6.4909);
+}
+
+/* 2 - Statement slide with diagonal colour blocks */
+function slide02(s) {
+  footer(s);
+  poly(s, 3.8616, 0, [[6.7167, 0], [9.4718, 0], [9.4718, 5.133], [7.3521, 7.5], [0, 7.5]],
+    { fill: { color: C.red2, transparency: 50 } });
+  poly(s, 9.8062, 3.6347, [[3.5782, 0], [3.5782, 3.8201], [3.5363, 3.8653], [0, 3.8653]],
+    { fill: { color: C.orange } });
+  heading(s, [['Speed demands perfection', C.white]],
+    { x: 6.8247, y: 3.75, w: 5.8663, h: 2.0397, align: 'right' });
+  body(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. ',
+    { x: 7.5831, y: 5.9529, w: 5.1079, h: 0.692, align: 'right' });
+  icon(s, FLAG, 11.4683, 2.4209, 1.2226, 1.0506, C.white);
+}
+
+/* 3 - Pull quote */
+function slide03(s) {
+  footer(s);
+  icon(s, FLAG, 0.5799, 1.5694, 1.2226, 1.0506, C.red);
+  heading(s, [['A ', C.white], ['legacy', C.red], [' is built one lap at a time', C.white]],
+    { x: 0.5799, y: 2.8752, w: 5.2822, h: 2.0397 });
+  poly(s, 0, 5.1847, [[0, 0], [6.044, 0], [5.8209, 0.892], [0, 0.892]],
+    { fill: { color: C.maroon } });
+  text(s, '-  Steve McQueen', { x: 0.7618, y: 5.3308, w: 2.6524, h: 0.3775, fontFace: HEAD,
+    fontSize: 14, lineSpacingMultiple: 1.3 });
+  body(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. ',
+    { x: 0.7618, y: 5.5856, w: 4.9961, h: 0.345, fontSize: 12 });
+}
+
+/* 4 - Introduction + speed stat */
+function slide04(s) {
+  footer(s, 4);
+  poly(s, 5.0606, 5.0172, [[0.4658, 0], [8.2727, 0], [8.2727, 1.8439], [0, 1.8439]],
+    { fill: { color: C.maroon } });
+  heading(s, [['Introduction ', C.white], ['to Car Racing', C.red]],
+    { x: 6.6359, y: 1.197, w: 5.2925, h: 1.2858, fontSize: 44 });
+  label(s, 'Subtitle here ', { x: 5.7961, y: 3.5895, w: 5.2465, h: 0.3164 });
+  body(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. ',
+    { x: 5.7961, y: 3.9059, w: 5.2465, h: 0.692 });
+  text(s, '375', { x: 5.7961, y: 5.3687, w: 6.0699, h: 0.828, fontFace: HEAD, fontSize: 54,
+    lineSpacingMultiple: 0.8 });
+  label(s, 'Km/H', { x: 7.8851, y: 5.781, w: 1.3971, h: 0.3164 });
+  body(s, 'Lorem ipsum dolor sit amet, adipiscing elit. Maecenas porttitor.',
+    { x: 5.7961, y: 6.124, w: 6.6919, h: 0.3857 });
+}
+
+/* 5 - Two headline percentages */
+function slide05(s) {
+  footer(s, 5);
+  heading(s, [['Understanding ', C.white], ['the Racing World', C.red]],
+    { x: 0.5799, y: 0.6389, w: 6.0868, h: 1.8782, fontSize: 44 });
+  const stats = [['81%', C.red, 0.5799], ['65%', C.orange, 3.3108]];
+  for (const [val, col, x] of stats) {
+    text(s, val, { x, y: 4.1524, w: 2.2297, h: 0.828, fontFace: HEAD, fontSize: 54,
+      color: col, lineSpacingMultiple: 0.8 });
+    label(s, 'Point text ', { x, y: 4.9804, w: 2.2297, h: 0.3164 });
+  }
+  label(s, 'Subtitle here ', { x: 0.5799, y: 5.6724, w: 5.2465, h: 0.3164 });
+  body(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. ',
+    { x: 0.5799, y: 5.9888, w: 5.2465, h: 0.692 });
+}
+
+/* 6 - Basics behind the speed */
+function slide06(s) {
+  footer(s, 6);
+  heading(s, [['The Basics ', C.white], ['Behind the Speed', C.red]],
+    { x: 7.0068, y: 0.9177, w: 6.0699, h: 2.0397 });
+  body(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere.',
+    { x: 7.0068, y: 3.4574, w: 5.6841, h: 0.692 });
+  poly(s, 7.1552, 4.5426, [[0, 0], [6.1782, 0], [6.1782, 2.3185], [0.4405, 2.3185]],
+    { fill: { color: C.maroon } });
+  label(s, 'Subtitle here ', { x: 7.9047, y: 4.8097, w: 5.4286, h: 0.3273 });
+  for (const y of [5.2741, 6.0187]) {
+    body(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere.',
+      { x: 8.3784, y, w: 4.8549, h: 0.6075, fontSize: 12 });
+    icon(s, FLAG, 8.0055, y + 0.13, 0.2923, 0.2512, C.white);
+  }
+}
+
+/* 7 - Tier list */
+function slide07(s) {
+  footer(s, 7);
+  heading(s, [['Ultimate ', C.white], ['F1 Tier List', C.red]],
+    { x: 0.6424, y: 0.9177, w: 12.0486, h: 0.7472, align: 'center' });
+  const tiers = [['2nd', 0.5968, 5.3096, 'left'], ['1st', 10.5377, 2.8083, 'right']];
+  for (const [rank, x, y, align] of tiers) {
+    text(s, rank, { x, y, w: 2.1532, h: 0.6395, fontFace: HEAD, fontSize: 40, color: C.red,
+      align, valign: 'bottom', lineSpacingMultiple: 0.8 });
+    body(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. ',
+      { x, y: y + 0.6619, w: 2.1532, h: 0.8701, fontSize: 12, align });
+  }
+}
+
+/* 8 - Race strategy masterclass */
+function slide08(s) {
+  footer(s, 8);
+  paral(s, -0.8448, 3.75, 6.5452, 2.4167, { color: C.red });
+  heading(s, [['Race Strategy ', C.white], ['Masterclass', C.red]],
+    { x: 0.5799, y: 1.3333, w: 5.4201, h: 2.0397 });
+  const rows = [
+    { y: 4.0595, glyph: TRAFFIC, gx: 0.8797, gy: 4.2873, gw: 0.2458, gh: 0.3073, title: 'Point text ' },
+    { y: 5.0526, glyph: CAN, gx: 0.8888, gy: 5.3056, gw: 0.2275, gh: 0.2986, title: 'Point text' }
+  ];
+  for (const r of rows) {
+    s.addShape('rect', { x: 0.7035, y: r.y + 0.0951, w: 0.5982, h: 0.5727,
+      fill: { color: C.orange } });
+    icon(s, r.glyph, r.gx, r.gy, r.gw, r.gh, C.white);
+    label(s, r.title, { x: 1.6123, y: r.y, w: 2.5397, h: 0.3164 });
+    body(s, 'Lorem ipsum dolor sit amet, adipiscing elit.',
+      { x: 1.6123, y: r.y + 0.1971, w: 2.5397, h: 0.6075, fontSize: 12 });
+  }
+}
+
+/* 9 - Driver profile */
+function slide09(s) {
+  footer(s, 9);
+  paral(s, 0.7988, 1.1876, 6.0273, 5.0903, { color: C.maroon }, { off: 1.8815 });
+  text(s, 'Best Driver ', { x: 6.9162, y: 1.4023, w: 2.8824, h: 0.4241, fontFace: HEAD,
+    fontSize: 24, lineSpacingMultiple: 0.8 });
+  heading(s, [['Louis ', C.white], ['Verstappen', C.red]],
+    { x: 6.9162, y: 1.9829, w: 5.6183, h: 1.555, fontSize: 54 });
+  body(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere.',
+    { x: 6.8262, y: 3.75, w: 6.0699, h: 0.692 });
+  label(s, 'Career ', { x: 6.9162, y: 4.654, w: 1.4171, h: 0.3164, color: C.red });
+  body(s, [0, 1].map(() => ({
+    text: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. ',
+    options: { breakLine: true, bullet: { characterCode: '2022', indent: 22.5 } }
+  })), { x: 6.8262, y: 5.0226, w: 4.969, h: 1.3046 });
+}
+
+/* 10 - Mechanics stats */
+function slide10(s) {
+  footer(s, 10);
+  paral(s, 0, 3.75, 6.6667, 2.6042, { color: C.maroon }, { off: 0.3752 });
+  paral(s, 6.6667, 3.75, 6.6667, 2.6042, { color: C.maroon }, { off: 0.3752 });
+  heading(s, [['Our Best ', C.white], ['Mechanics', C.red]],
+    { x: 1.25, y: 1.0271, w: 10.8333, h: 0.7472, align: 'center' });
+  body(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna.',
+    { x: 1.2083, y: 2.1059, w: 11.2381, h: 0.692, align: 'center' });
+  const cards = [['87%', 0.757, 4.1632, 2.1607], ['96%', 7.4236, 4.127, 2.188]];
+  for (const [pct, x, y, bw] of cards) {
+    text(s, 'Your text here ', { x, y, w: 2.2887, h: 0.2895, fontFace: HEAD, fontSize: 14,
+      lineSpacingMultiple: 0.8 });
+    text(s, pct, { x, y: y + 0.4592, w: 2.2887, h: 0.7472, fontFace: HEAD, fontSize: 48,
+      valign: 'bottom', lineSpacingMultiple: 0.8 });
+    body(s, 'Lorem ipsum dolor sit amet, adipiscing. ',
+      { x, y: y + 1.2339, w: bw, h: 0.6075, fontSize: 12 });
+  }
+}
+
+/* 11 - Unsung heroes: three icon+text bands */
+function slide11(s) {
+  footer(s, 11);
+  heading(s, [['The Unsung ', C.white], ['Heroes of Racing', C.red]],
+    { x: 0.5532, y: 0.9813, w: 5.6183, h: 2.2821, fontSize: 54 });
+  const bands = [
+    { y: 0.6389, glyph: CONE, gx: 6.8211, gy: 1.3893, g: 0.375, title: 'Point text 1' },
+    { y: 2.809, glyph: SIGNAL, gx: 6.8003, gy: 3.5386, g: 0.4167, title: 'Point text 2' },
+    { y: 4.9852, glyph: COMPASS, gx: 6.8003, gy: 5.7148, g: 0.4167, title: 'Point text 3' }
+  ];
+  for (const b of bands) {
+    paral(s, 6.8125, b.y, 5.7292, 1.8759, { color: C.red }, { off: 0.4690 });
+    paral(s, 6.3276, b.y + 0.4259, 1.3621, 1.0241, { color: C.orange }, { off: 0.2560 });
+    icon(s, b.glyph, b.gx, b.gy, b.g, b.g, C.white);
+    label(s, b.title, { x: 7.9691, y: b.y + 0.2762, w: 4.2378, h: 0.3164 });
+    body(s, 'Lorem ipsum dolor sit amet, elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies.',
+      { x: 7.9691, y: b.y + 0.6126, w: 4.2378, h: 0.9983 });
+  }
+  text(s, '$19.9M', { x: 0.5381, y: 5.0278, w: 6.0699, h: 0.828, fontFace: HEAD, fontSize: 54,
+    color: C.red, lineSpacingMultiple: 0.8 });
+  body(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa.',
+    { x: 0.5799, y: 5.8956, w: 5.1443, h: 0.692 });
+}
+
+/* 12 - Rally vs circuit: two comparison cards with segmented progress bars */
+function slide12(s) {
+  footer(s, 12);
+  heading(s, [['Rally vs ', C.white], ['Circuit Racing', C.red]],
+    { x: 1.25, y: 1.0165, w: 10.8333, h: 0.828, fontSize: 54, align: 'center' });
+  body(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna.',
+    { x: 1.2083, y: 1.7509, w: 11.2381, h: 0.692, align: 'center' });
+  const cards = [
+    { cx: 0.6424, tx: 1.43, lx: 1.9061, bx: 0.9635, bw: 5.1744, sx: 1.5574, px: 2.7668,
+      title: 'Point text 1', pct: '80%', filled: 8, dim: 80 },
+    { cx: 6.8743, tx: 7.6619, lx: 8.1381, bx: 7.1188, bw: 5.0881, sx: 7.7893, px: 8.9988,
+      title: 'Point text 2', pct: '50%', filled: 5, dim: 70 }
+  ];
+  for (const c of cards) {
+    s.addShape('rect', { x: c.cx, y: 3.3724, w: 5.8167, h: 3.1111, fill: { color: C.maroon } });
+    paral(s, c.tx, 2.9241, 4.2414, 0.8966, { color: C.orange }, { off: 0.2242 });
+    text(s, c.title, { x: c.lx, y: 3.2142, w: 3.2891, h: 0.3702, fontFace: HEAD, fontSize: 20,
+      align: 'center', lineSpacingMultiple: 0.8 });
+    text(s, c.pct, { x: c.px, y: 4.1604, w: 1.5677, h: 0.3164, fontFace: HEAD, fontSize: 16,
+      align: 'center', lineSpacingMultiple: 0.8 });
+    for (let i = 0; i < 10; i++) {
+      paral(s, c.sx + i * 0.3947, 4.5108, 0.4342, 0.3567,
+        { color: C.orange2, transparency: i < c.filled ? 0 : c.dim }, { off: 0.0892 });
+    }
+    body(s, 'Lorem ipsum dolor sit amet, elit. Maecenas porttitor congue massa. Fusce posuere, magna.',
+      { x: c.bx, y: 5.2516, w: c.bw, h: 0.692, align: 'center' });
+  }
+}
+
+/* 13 - Beyond the checkered flag */
+function slide13(s) {
+  footer(s, 13);
+  heading(s, [['Beyond the ', C.white], ['Checkered Flag', C.red]],
+    { x: 0.5799, y: 1.0165, w: 8.7822, h: 1.555, fontSize: 54 });
+  poly(s, 0, 3.2931, [[0, 0], [12.691, 0], [11.8, 3.568], [0, 3.568]],
+    { fill: { color: C.maroon } });
+  label(s, 'Your text here ', { x: 0.6424, y: 3.8072, w: 3.2714, h: 0.3164 });
+  body(s, [
+    { text: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna.', options: { breakLine: true } },
+    { text: ' ', options: { breakLine: true } },
+    { text: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa' }
+  ], { x: 0.6424, y: 4.1236, w: 6.5301, h: 2.2234 });
+  icon(s, FLAG, 10.8103, 3.7804, 0.9359, 0.8042, C.white);
+  label(s, 'Your text here ', { x: 8.1645, y: 5.0306, w: 3.5818, h: 0.3163, align: 'right' });
+  text(s, '+1345', { x: 8.1645, y: 5.5458, w: 3.5818, h: 0.828, fontFace: HEAD, fontSize: 54,
+    align: 'right', lineSpacingMultiple: 0.8 });
+}
+
+/* 14 - Racing strategy breakdown */
+function slide14(s) {
+  footer(s, 14);
+  /* the full-height maroon panel is painted over the master's footer */
+  s.addShape('rect', { x: 0, y: 0, w: 6.375, h: 7.5, fill: { color: C.maroon } });
+  heading(s, [['Racing Strategy ', C.white], ['Breakdown', C.red]],
+    { x: 7.182, y: 1.2398, w: 5.4208, h: 2.2821, fontSize: 54 });
+  const blocks = [{ y: 1.5947, glyph: SIGNAL, gy: 0.9621 }, { y: 4.6107, glyph: COMPASS, gy: 3.9781 }];
+  for (const b of blocks) {
+    icon(s, b.glyph, 0.9033, b.gy, 0.4167, 0.4167, C.white);
+    label(s, 'Your text here ', { x: 0.7305, y: b.y, w: 2.5643, h: 0.3164 });
+    body(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna.',
+      { x: 0.7305, y: b.y + 0.3163, w: 5.1186, h: 1.6109 });
+  }
+  paral(s, 7.1841, 4.6096, 6.6284, 1.9272, { color: C.orange }, { off: 0.4818, flipH: true });
+  text(s, '$99.9B', { x: 8.1909, y: 5.0247, w: 4.6963, h: 0.828, fontFace: HEAD, fontSize: 54,
+    lineSpacingMultiple: 0.8 });
+  label(s, 'Your text here ', { x: 8.1909, y: 5.8296, w: 2.5643, h: 0.3164 });
+}
+
+/* 15 - Area chart + three KPI cards */
+function slide15(s) {
+  footer(s, 15);
+  heading(s, [['The Data-Driven ', C.white], ['Grand Prix', C.maroon]],
+    { x: 0.9233, y: 1.2398, w: 7.7642, h: 1.3935 });
+  const cats = ['Data 1', 'Data 2', 'Data 3', 'Data 4', 'Data 5'];
+  /* passed as a one-entry combo list so the area meets both ends of the axis */
+  s.addChart([{ type: 'area', data: [
+    { name: 'Series 1', labels: cats, values: [4.3, 2.5, 3.5, 4.5, 2.4] },
+    { name: 'Series 2', labels: cats, values: [2.4, 4.4, 1.8, 2.8, 5] },
+    { name: 'Series 3', labels: cats, values: [2, 2, 3, 2, 2] }
+  ] }], {
+    x: 0.5799, y: 2.6552, w: 8.6011, h: 4.2059,
+    layout: { x: 0.0501, y: 0.0413, w: 0.9134, h: 0.8624 },  // plot box, fractions of the frame
+    chartColors: [C.orange, C.red2, C.maroon], showLegend: false,
+    catAxisLabelColor: C.white, catAxisLabelFontFace: BODY, catAxisLabelFontSize: 10,
+    catAxisLineColor: '262626',
+    valAxisLabelColor: C.white, valAxisLabelFontFace: BODY, valAxisLabelFontSize: 10,
+    valAxisLineShow: false, valGridLine: { style: 'none' }, catGridLine: { style: 'none' }
+  });
+  const kpis = [
+    { y: 1.2398, fill: C.orange, value: '$129', up: true },
+    { y: 3.0085, fill: C.red2, value: '35%', up: false },
+    { y: 4.8805, fill: C.maroon, value: '526+', up: true }
+  ];
+  for (const k of kpis) {
+    s.addShape('rect', { x: 9.1809, y: k.y, w: 3.2292, h: 1.5895, fill: { color: k.fill } });
+    text(s, k.value, { x: 9.3786, y: k.y + 0.0382, w: 2.8338, h: 0.8912, fontFace: HEAD, fontSize: 40,
+      lineSpacingMultiple: 1.3 });
+    body(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit',
+      { x: 9.3786, y: k.y + 0.8843, w: 2.7289, h: 0.5449, fontSize: 12 });
+    s.addShape('ellipse', { x: 11.6833, y: k.y + 0.2928, w: 0.4243, h: 0.3695,
+      fill: { color: C.white, transparency: 100 }, line: { color: C.white, transparency: 50, width: 0.5 } });
+    s.addShape('custGeom', { x: 11.8042, y: k.y + 0.3867, w: 0.1824, h: 0.1817, flipV: k.up,
+      fill: { color: C.white }, points: iconPoints(ARROW, 0, 0, 0.1824, 0.1817) });
+  }
+}
+
+/* 16 - Doughnut chart card + horizontal bar card */
+function slide16(s) {
+  footer(s, 16);
+  heading(s, [['Elevation Impact on ', C.white], ['Car Setup', C.maroon]],
+    { x: 6.089, y: 0.7576, w: 6.602, h: 2.0397 });
+
+  /* left card: doughnut */
+  s.addShape('rect', { x: 0.5799, y: 0.6689, w: 5.1458, h: 6.1622, fill: { color: C.maroon } });
+  text(s, 'Mini Value Data Chart', { x: 1.2922, y: 1.2082, w: 3.7211, h: 0.4202, fontFace: HEAD,
+    fontSize: 18, bold: true, align: 'center', lineSpacingMultiple: 0.9 });
+  s.addChart('doughnut', [{
+    name: 'Sales', labels: ['Data 1', 'Data 2', 'Data 3', 'Data 4'], values: [8.2, 3.2, 1.4, 1.2]
+  }], {
+    x: 0.8611, y: 1.8986, w: 4.5833, h: 4.3932, holeSize: 75,
+    chartColors: [1, 0.8, 0.6, 0.4].map(a => blend(C.white, C.maroon, a)),
+    dataBorder: { pt: 0, color: C.maroon },
+    showLegend: true, legendPos: 'b', legendColor: C.white, legendFontFace: BODY, legendFontSize: 12
+  });
+  text(s, '45%', { x: 2.1007, y: 3.4923, w: 2.1042, h: 0.8631, fontFace: HEAD, fontSize: 44,
+    bold: true, align: 'center', valign: 'middle', lineSpacingMultiple: 0.9 });
+  const tags = [
+    { x: 1.2922, y: 2.1575, w: 1.5625, fill: C.orange2, value: '$100.00', bx: 1.6367 },
+    { x: 3.5226, y: 4.7638, w: 1.6125, fill: C.orange, value: '$600.00', bx: 3.8781 }
+  ];
+  for (const t of tags) {
+    s.addShape('rect', { x: t.x, y: t.y, w: t.w, h: 0.5563, fill: { color: t.fill } });
+    checkBadge(s, t.x + 0.1635, t.y + 0.1552, 0.2458, C.white, t.fill);
+    text(s, t.value, { x: t.bx, y: t.y + 0.156, w: 1.0883, h: 0.2676, fontFace: HEAD, fontSize: 11,
+      valign: 'middle', lineSpacingMultiple: 0.9 });
+  }
+
+  /* right card: research bars over a percentage scale */
+  s.addShape('rect', { x: 6.0812, y: 3.2637, w: 6.6098, h: 3.5565, fill: { color: C.maroon } });
+  text(s, 'Research Total Group', { x: 6.3949, y: 3.5171, w: 5.7363, h: 0.4053, fontFace: HEAD,
+    fontSize: 16, bold: true, lineSpacingMultiple: 1.2 });
+  body(s, 'Lorem ipsum dolor sit amet ', { x: 6.4169, y: 3.9243, w: 5.4976, h: 0.345, fontSize: 12 });
+  const bars = [
+    { y: 4.5533, w: 4.8089, pct: '90%', opacity: 1.0, txt: C.maroon },
+    { y: 5.0455, w: 5.4121, pct: '70%', opacity: 0.6, txt: C.maroon },
+    { y: 5.5375, w: 3.9531, pct: '60%', opacity: 0.2, txt: C.white }
+  ];
+  for (const b of bars) {
+    s.addShape('rect', { x: 6.5024, y: b.y, w: b.w, h: 0.3001,
+      fill: { color: C.white, transparency: (1 - b.opacity) * 100 } });
+    text(s, b.pct, { x: 6.5024, y: b.y, w: b.w - 0.1, h: 0.3001, fontFace: HEAD, fontSize: 12,
+      color: b.txt, align: 'right', valign: 'middle' });
+  }
+  s.addShape('line', { x: 6.5981, y: 6.2219, w: 5.5219, h: 0, line: { color: C.white, width: 0.75 } });
+  for (let i = 0; i < 10; i++) {
+    const cx = 6.5297 + i * 0.6173;
+    s.addShape('ellipse', { x: cx, y: 6.1932, w: 0.0684, h: 0.0573, fill: { color: C.white } });
+    text(s, `${(i + 1) * 10}%`, { x: cx - 0.29, y: 6.3887, w: 0.65, h: 0.1767, fontSize: 10.5,
+      align: 'center', valign: 'middle', margin: 0 });
+  }
+}
+
+/* 17 - Bar + line combo chart with three value-point pills */
+function slide17(s) {
+  footer(s, 17);
+  heading(s, [['Overtake ', C.white], ['Efficiency Rankings', C.maroon]],
+    { x: 0.5799, y: 0.7576, w: 12.1111, h: 0.7472, align: 'center' });
+  const pills = ['Value Point A', 'Value Point B', 'Value Point C'];
+  pills.forEach((p, i) => {
+    const x = 0.5799 + i * 4.0474;
+    s.addShape('rect', { x, y: 2.04, w: 3.7527, h: 0.6373, fill: { color: C.red } });
+    text(s, p, { x: x + 0.6023, y: 2.1718, w: 2.2947, h: 0.3736, fontFace: HEAD, fontSize: 18,
+      lineSpacingMultiple: 0.9 });
+    checkBadge(s, x + 2.8864, 2.2266, 0.264, C.white, C.red);
+  });
+  s.addShape('rect', { x: 0.569, y: 2.96, w: 11.8368, h: 3.9011, fill: { color: C.maroon } });
+  text(s, 'Mini Value Data Chart', { x: 0.9484, y: 3.2163, w: 5.5477, h: 0.3736, fontFace: HEAD,
+    fontSize: 18, lineSpacingMultiple: 0.9 });
+  const years = ['2015', '2016', '2017', '2018', '2019', '2020', '2021', '2022', '2023', '2024', '2025', '2026'];
+  s.addChart([
+    { type: 'bar', data: [
+      { name: 'Series 1', labels: years, values: [15, 16, 30, 27, 44, 25, 16, 50, 15, 55, 68, 80] },
+      { name: 'Series 2', labels: years, values: [17, 14, 28, 15, 46, 27, 14, 48, 15, 57, 70, 82] }
+    ], options: { chartColors: [blend(C.white, C.maroon, 0.5), C.white], barGapWidthPct: 219, barOverlapPct: -27 } },
+    { type: 'line', data: [
+      { name: 'Series 3', labels: years, values: [34, 28, 56, 50, 72, 54, 28, 74, 30, 80, 87, 98] }
+    ], options: { chartColors: [C.white], lineSize: 1.5, lineDataSymbol: 'circle', lineDataSymbolSize: 5 } }
+  ], {
+    x: 0.9228, y: 3.7151, w: 11.1293, h: 2.7948,
+    showLegend: false, valAxisMaxVal: 100, valAxisMajorUnit: 10,
+    catAxisLabelColor: C.white, catAxisLabelFontFace: BODY, catAxisLabelFontSize: 8,
+    catAxisLineColor: 'BF6E75', catAxisLineSize: 0.25,
+    valAxisLabelColor: C.white, valAxisLabelFontFace: BODY, valAxisLabelFontSize: 8,
+    valAxisLineColor: 'BF6E75', valAxisLineSize: 0.25, valGridLine: { color: 'BF6E75', size: 0.25 }, catGridLine: { style: 'none' }
+  });
+}
+
+/* 18 - Gear infographic: four quadrant gears with icons and captions */
+function slide18(s) {
+  footer(s, 18);
+  heading(s, [['Gear ', C.white], ['Infographic', C.maroon]],
+    { x: 0.5799, y: 0.7576, w: 12.1111, h: 0.7472, align: 'center' });
+  /* quadrants: top-left, top-right, bottom-left, bottom-right */
+  const gears = [
+    { path: GEARQ, x: 4.3003, y: 2.0181, w: 2.3273, h: 2.3301, color: C.maroonDk },
+    { path: GEARQ, x: 6.7004, y: 2.0181, w: 2.3273, h: 2.3301, color: C.red2, flipH: true },
+    { path: GEARQ, x: 4.3003, y: 4.4210, w: 2.3273, h: 2.3273, color: C.orange2, flipV: true },
+    { path: GEARQ, x: 6.7004, y: 4.4210, w: 2.3273, h: 2.3273, color: C.orange, flipH: true, flipV: true }
+  ];
+  for (const g of gears) {
+    s.addShape('custGeom', { x: g.x, y: g.y, w: g.w, h: g.h, flipH: !!g.flipH, flipV: !!g.flipV,
+      fill: { color: g.color }, points: iconPoints(g.path, 0, 0, g.w, g.h) });
+  }
+  icon(s, CONE, 5.3792, 3.1713, 0.2917, 0.2917, C.white);
+  icon(s, SIGNAL, 7.6628, 3.155, 0.3241, 0.3241, C.white);
+  icon(s, COMPASS, 7.6787, 5.3009, 0.3241, 0.3241, C.white);
+  icon(s, TRAFFIC, 5.4014, 5.3535, 0.2337, 0.2921, C.white);
+  const captions = [
+    { x: 0.933, y: 2.4352, align: 'left', color: C.red, tick: 0.9427 },
+    { x: 10.0573, y: 2.4352, align: 'right', color: C.redLt, tick: 12.188 },
+    { x: 0.933, y: 5.1293, align: 'left', color: C.orange2, tick: 0.9427 },
+    { x: 10.0573, y: 5.1293, align: 'right', color: C.orange, tick: 12.188 }
+  ];
+  for (const c of captions) {
+    text(s, 'Your Option', { x: c.x, y: c.y, w: 2.3333, h: 0.3702, fontFace: HEAD, fontSize: 16,
+      color: c.color, charSpacing: 0.5, align: c.align, margin: MARGIN_FLUSH });
+    text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam commodo enim. ',
+      { x: c.x, y: c.y + 0.3336, w: 2.3333, h: 0.9812, fontSize: 12, color: C.grayLt,
+        lineSpacingMultiple: 1.5, align: c.align, margin: MARGIN_FLUSH });
+  }
+}
+
+/* 19 - Podium bar chart drawn as shapes + option list */
+function slide19(s) {
+  footer(s, 19);
+  heading(s, [['Data-Driven ', C.white], ['Driver Rankings', C.maroon]],
+    { x: 0.7828, y: 0.7576, w: 11.7677, h: 0.7472, align: 'center' });
+  const podium = [
+    { x: 0.9189, y: 6.1393, w: 1.4007, h: 0.7199, color: C.orange2, label: '4th', lx: 1.0857 },
+    { x: 2.3036, y: 5.4103, w: 1.4003, h: 1.4490, color: C.orange, label: '3rd', lx: 2.4807 },
+    { x: 3.6877, y: 4.8076, w: 1.6261, h: 2.0517, color: C.red2, label: '2nd', lx: 3.9777 },
+    { x: 5.2977, y: 3.8850, w: 1.8654, h: 2.9742, color: C.maroon, label: '1st', lx: 5.7154 }
+  ];
+  for (const p of podium) {
+    s.addShape('rect', { x: p.x, y: p.y, w: p.w, h: p.h, fill: { color: p.color } });
+    text(s, p.label, { x: p.lx, y: 6.0814, w: 1.0461, h: 0.6357, fontFace: HEAD, fontSize: 24,
+      color: C.gray, charSpacing: 0.5, align: 'center', lineSpacingMultiple: 1.5, margin: MARGIN_FLUSH });
+  }
+  icon(s, TROPHY, 5.5, 2.3654, 1.4608, 1.1952, C.maroon);
+  const options = [
+    { y: 1.8232, dot: C.maroon, glyph: CONE, gx: 8.0979, gy: 2.2136, g: 0.2917, cy: 1.9643 },
+    { y: 3.0882, dot: C.red2, glyph: SIGNAL, gx: 8.0695, gy: 3.466, g: 0.3241, cy: 3.2293 },
+    { y: 4.3492, dot: C.orange, glyph: COMPASS, gx: 8.0695, gy: 4.7387, g: 0.3241, cy: 4.4903 },
+    { y: 5.6102, dot: C.orange2, glyph: TRAFFIC, gx: 8.1269, gy: 6.0156, g: 0.2337, cy: 5.7513 }
+  ];
+  for (const o of options) {
+    s.addShape('ellipse', { x: 7.8333, y: o.cy, w: 0.8208, h: 0.8208, fill: { color: o.dot } });
+    icon(s, o.glyph, o.gx, o.gy, o.g, o.glyph === TRAFFIC ? 0.2921 : o.g, C.white);
+    text(s, 'Your Option', { x: 8.9609, y: o.y, w: 3.5391, h: 0.4712, fontFace: HEAD, fontSize: 16,
+      color: C.gray, charSpacing: 0.5, lineSpacingMultiple: 1.5, margin: MARGIN_FLUSH });
+    text(s, 'Lorem ipsum dolor sit amet, adipiscing elit. Maecenas porttitor congue massa. ',
+      { x: 8.9609, y: o.y + 0.433, w: 3.5391, h: 0.6782, fontSize: 12, color: C.grayLt,
+        lineSpacingMultiple: 1.5, margin: MARGIN_FLUSH });
+  }
+}
+
+/* 20 - Thank you */
+function slide20(s) {
+  footer(s);
+  /* maroon fading up into the black background (transparent at the top edge) */
+  verticalFade(s, -0.0443, -0.0249, 13.3776, 7.5249, C.maroon, C.black, 30);
+  strapline(s, 0.6389);
+  text(s, 'Thank You ', { x: 1.1123, y: 4.9224, w: 11.1086, h: 1.3935, fontFace: HEAD,
+    fontSize: 96, align: 'center', lineSpacingMultiple: 0.8 });
+  const contacts = [
+    { glyph: PHONE, gx: 0.6742, gy: 6.5418, gw: 0.2435, gh: 0.2435, tx: 0.9177, tw: 2.3494, txt: '+0987654321' },
+    { glyph: INSTA, gx: 5.7897, gy: 6.5583, gw: 0.2458, gh: 0.2458, tx: 6.0356, tw: 1.5081, txt: '@Race.to.Glory' },
+    { glyph: GLOBE, gx: 9.9236, gy: 6.5644, gw: 0.2692, gh: 0.2673, tx: 10.1928, tw: 2.4982, txt: 'racetoglory@email.com' }
+  ];
+  for (const c of contacts) {
+    icon(s, c.glyph, c.gx, c.gy, c.gw, c.gh, C.white);
+    text(s, c.txt, { x: c.tx, y: 6.4659, w: c.tw, h: 0.3954, fontSize: 14, valign: 'bottom', wrap: false });
+  }
+}
+
+/* ---------------------------------------------------------------- assemble */
+const BUILDERS = [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
+                  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20];
+
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'W16x9', width: 13.3333, height: 7.5 });
+pptx.layout = 'W16x9';
+pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
+pptx.author = 'Race to Glory';
+pptx.title = 'Race to Glory';
+
+for (const build of BUILDERS) {
+  const slide = pptx.addSlide();
+  slide.background = { color: C.black };
+  build(slide);
+}
+
+pptx.writeFile({ fileName: path.join(__dirname, '05242254-dc8e-43b9-bf2b-a1705abd5b56_grok_final.pptx') })
+  .then(f => console.log('wrote', f));

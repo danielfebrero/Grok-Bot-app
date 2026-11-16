@@ -1,0 +1,484 @@
+/**
+ * "Oto.Moto" motorbike pitch deck - rebuilt with pptxgenjs.
+ * Run: node 0a546738-5b21-4818-91fd-f29980a4368a_grok_final.js
+ */
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ theme */
+
+const SLIDE_W = 13.333;
+const SLIDE_H = 7.5;
+
+const INK = '1C1E21'; // deck background (theme tx2)
+const PANEL = '343537'; // raised panel (theme accent1)
+const LIME = 'E2FC31'; // brand accent (theme accent2)
+const WHITE = 'F2F2F2'; // bg1 lumMod 95%
+const GREY_D9 = 'D9D9D9'; // bg1 lumMod 85%
+const GREY_BF = 'BFBFBF'; // bg1 lumMod 75%
+const DARK_TX = '262626'; // tx1 lumMod 85% - used on lime cards
+
+const HEAD = 'Catamaran'; // display / headline face
+const HEAD_M = 'Catamaran Medium'; // headline face, medium weight
+const BODY = 'Open Sans'; // paragraph face
+
+/* ---------------------------------------------------------------- helpers */
+
+/** Text box. `runs` is a string or an array of pptxgenjs text objects. */
+function txt(s, runs, o) {
+  s.addText(runs, Object.assign({ valign: 'top', fit: 'resize', color: WHITE }, o));
+}
+
+/** Flat colour rectangle (background bands / cards). */
+function rect(s, x, y, w, h, color) {
+  s.addShape('rect', { x, y, w, h, fill: { color }, line: { type: 'none' } });
+}
+
+/** Thin horizontal rule. */
+function rule(s, x, y, w, color) {
+  s.addShape('line', { x, y, w, h: 0, line: { color: color || WHITE, width: 0.5 } });
+}
+
+/** "Oto.Moto" wordmark that sits in the top-left corner of every slide. */
+function brand(s) {
+  txt(s, [
+    { text: 'Oto.', options: { color: LIME } },
+    { text: 'Moto', options: { color: WHITE } },
+  ], { x: 0.405, y: 0.358, w: 1.45, h: 0.37, fontFace: HEAD_M, fontSize: 16 });
+}
+
+/**
+ * Four-pointed sparkle (the deck's signature ornament), drawn as a closed
+ * cubic-Bezier path on a 0..1 unit square.
+ */
+const SPARKLE = [
+  [0.9922, 0.4896], // start point
+  [0.6827, 0.4000, 0.6000, 0.3173, 0.5104, 0.0078],
+  [0.5074, -0.0026, 0.4926, -0.0026, 0.4896, 0.0078],
+  [0.4000, 0.3173, 0.3173, 0.4000, 0.0078, 0.4896],
+  [-0.0026, 0.4926, -0.0026, 0.5074, 0.0078, 0.5104],
+  [0.3173, 0.6000, 0.4000, 0.6827, 0.4896, 0.9922],
+  [0.4926, 1.0026, 0.5074, 1.0026, 0.5104, 0.9922],
+  [0.6000, 0.6827, 0.6827, 0.6000, 0.9922, 0.5104],
+  [1.0026, 0.5074, 1.0026, 0.4926, 0.9922, 0.4896],
+];
+
+function sparkle(s, x, y, size, color) {
+  const pts = [{ x: SPARKLE[0][0] * size, y: SPARKLE[0][1] * size, moveTo: true }];
+  for (let i = 1; i < SPARKLE.length; i++) {
+    const c = SPARKLE[i];
+    pts.push({
+      x: c[4] * size, y: c[5] * size,
+      curve: { type: 'cubic', x1: c[0] * size, y1: c[1] * size, x2: c[2] * size, y2: c[3] * size },
+    });
+  }
+  pts.push({ close: true });
+  s.addShape('custGeom', { x, y, w: size, h: size, fill: { color }, points: pts });
+}
+
+/** 2x2 block of 0.33" sparkles; `colors` is [topLeft, topRight, botLeft, botRight]. */
+function sparkleQuad(s, x, y, colors) {
+  const c = colors || [LIME, WHITE, LIME, LIME];
+  sparkle(s, x, y, 0.33, c[0]);
+  sparkle(s, x + 0.33, y, 0.33, c[1]);
+  sparkle(s, x, y + 0.33, 0.33, c[2]);
+  sparkle(s, x + 0.33, y + 0.33, 0.33, c[3]);
+}
+
+/**
+ * Pair of small triangles used as a rotating "play mark". The source deck
+ * groups them and spins the whole group, so the child centres are rotated
+ * about the group centre here by hand.
+ */
+function playMark(s, x, y, rotation) {
+  const cx = x + 0.157;
+  const cy = y + 0.159;
+  const rad = (rotation * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  [
+    { dx: 0.016, dy: -0.015, rot: 81.4448, color: LIME },
+    { dx: 0.134, dy: 0.107, rot: 7.9845, color: WHITE },
+  ].forEach(t => {
+    const px = x + t.dx + 0.09 - cx;
+    const py = y + t.dy + 0.1055 - cy;
+    s.addShape('triangle', {
+      x: cx + px * cos - py * sin - 0.09,
+      y: cy + px * sin + py * cos - 0.1055,
+      w: 0.18, h: 0.211,
+      fill: { color: t.color }, line: { type: 'none' },
+      rotate: (t.rot + rotation) % 360,
+    });
+  });
+}
+
+/** Turns a list of [x, y] pairs on a unit square into a filled custGeom. */
+function glyph(s, outline, x, y, size, color) {
+  s.addShape('custGeom', {
+    x, y, w: size, h: size, fill: { color }, line: { color, width: 0.0001 },
+    points: outline.map(([a, b], i) => ({ x: a * size, y: b * size, moveTo: i === 0 }))
+      .concat([{ close: true }]),
+  });
+}
+
+const ARROW_NE = [ // arrow pointing to the upper right
+  [0.2667, 0.7500], [0.2083, 0.6917], [0.6083, 0.2917], [0.2500, 0.2917],
+  [0.2500, 0.2083], [0.7500, 0.2083], [0.7500, 0.7083], [0.6667, 0.7083], [0.6667, 0.3500],
+];
+const CHECK = [
+  [0.3979, 0.7500], [0.1604, 0.5125], [0.2198, 0.4531], [0.3979, 0.6313],
+  [0.7802, 0.2490], [0.8396, 0.3083],
+];
+
+const arrowNE = (s, x, y, size, color) => glyph(s, ARROW_NE, x, y, size, color || WHITE);
+const check = (s, x, y, size, color) => glyph(s, CHECK, x, y, size, color || LIME);
+
+/** Label + underline + up-right arrow ("More Information", "See More", ...). */
+function linkRow(s, x, y, label, ruleW) {
+  txt(s, label, { x, y, w: 2.575, h: 0.37, fontFace: HEAD_M, fontSize: 16 });
+  rule(s, x + 0.079, y + 0.382, ruleW);
+  arrowNE(s, x + ruleW + 0.44, y + 0.031, 0.309);
+}
+
+/* ------------------------------------------------------------ small icons */
+
+/** Rounded-square social badges: facebook, twitter, instagram. */
+function socialRow(s, x, y, w, h, gap) {
+  const badge = i => ({ x: x + i * gap, y, w, h });
+  const b0 = badge(0), b1 = badge(1), b2 = badge(2);
+
+  s.addShape('roundRect', Object.assign({}, b0, { fill: { color: LIME }, line: { type: 'none' }, rectRadius: 0.03 }));
+  txt(s, 'f', { x: b0.x, y: b0.y - 0.02, w, h, align: 'center', valign: 'middle', fit: 'none', margin: 0, fontFace: HEAD, fontSize: h * 62, bold: true, color: INK });
+
+  s.addShape('roundRect', Object.assign({}, b1, { fill: { color: LIME }, line: { type: 'none' }, rectRadius: 0.03 }));
+  glyph(s, [[0.24, 0.72], [0.44, 0.62], [0.22, 0.42], [0.30, 0.24], [0.52, 0.36], [0.74, 0.26], [0.66, 0.44], [0.78, 0.38], [0.70, 0.52], [0.62, 0.68]],
+    b1.x, b1.y, Math.min(w, h), INK);
+
+  s.addShape('roundRect', Object.assign({}, b2, { fill: { color: LIME }, line: { type: 'none' }, rectRadius: 0.03 }));
+  s.addShape('roundRect', { x: b2.x + w * 0.2, y: b2.y + h * 0.2, w: w * 0.6, h: h * 0.6, line: { color: INK, width: 1.25 }, rectRadius: 0.02 });
+  s.addShape('ellipse', { x: b2.x + w * 0.36, y: b2.y + h * 0.36, w: w * 0.28, h: h * 0.28, line: { color: INK, width: 1.25 } });
+}
+
+/** Outlined shopping bag (top-right of the cover slide). */
+function bagIcon(s, x, y, size, color) {
+  s.addShape('blockArc', {
+    x: x + 0.26 * size, y: y + 0.16 * size, w: 0.48 * size, h: 0.48 * size,
+    fill: { color }, angleRange: [180, 360], arcThicknessRatio: 0.3,
+  });
+  s.addShape('roundRect', {
+    x: x + 0.14 * size, y: y + 0.36 * size, w: 0.72 * size, h: 0.52 * size,
+    line: { color, width: 1.5 }, rectRadius: 0.02 * size,
+  });
+}
+
+/** Outlined magnifier. */
+function searchIcon(s, x, y, size, color) {
+  s.addShape('ellipse', { x: x + 0.12 * size, y: y + 0.12 * size, w: 0.52 * size, h: 0.52 * size, line: { color, width: 1.5 } });
+  s.addShape('line', { x: x + 0.58 * size, y: y + 0.58 * size, w: 0.28 * size, h: 0.28 * size, line: { color, width: 1.5 } });
+}
+
+function phoneIcon(s, x, y, size, color) {
+  s.addShape('blockArc', {
+    x, y, w: size, h: size, fill: { color },
+    angleRange: [30, 190], arcThicknessRatio: 0.62,
+  });
+}
+
+function mailIcon(s, x, y, size, color) {
+  s.addShape('roundRect', { x, y: y + 0.16 * size, w: size, h: 0.68 * size, fill: { color }, line: { type: 'none' }, rectRadius: 0.06 * size });
+  s.addShape('line', { x: x + 0.08 * size, y: y + 0.24 * size, w: 0.42 * size, h: 0.34 * size, line: { color: INK, width: 1.5 } });
+  s.addShape('line', { x: x + 0.5 * size, y: y + 0.24 * size, w: 0.42 * size, h: 0.34 * size, line: { color: INK, width: 1.5 }, flipH: true });
+}
+
+function globeIcon(s, x, y, size, color) {
+  s.addShape('ellipse', { x, y, w: size, h: size, fill: { color }, line: { type: 'none' } });
+  s.addShape('ellipse', { x: x + 0.28 * size, y, w: 0.44 * size, h: size, line: { color: INK, width: 1.25 } });
+  s.addShape('line', { x, y: y + 0.32 * size, w: size, h: 0, line: { color: INK, width: 1.25 } });
+  s.addShape('line', { x, y: y + 0.68 * size, w: size, h: 0, line: { color: INK, width: 1.25 } });
+}
+
+/* ------------------------------------------------------------ slide 1..10 */
+
+function slide01(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: INK };
+
+  // lime wedge running down the right-hand side
+  s.addShape('custGeom', {
+    x: 6.814, y: 0, w: 6.519, h: 7.5, fill: { color: LIME }, line: { type: 'none' },
+    points: [{ x: 2.62, y: 0, moveTo: true }, { x: 6.519, y: 0 }, { x: 6.519, y: 7.5 }, { x: 0, y: 7.5 }, { close: true }],
+  });
+
+  brand(s);
+  playMark(s, 7.372, 1.105, 172.5);
+
+  txt(s, [
+    { text: 'Oto.', options: { color: LIME } },
+    { text: 'Moto', options: { color: WHITE } },
+  ], { x: 1.498, y: 1.3, w: 6.062, h: 1.717, fontFace: HEAD, fontSize: 96, bold: true });
+
+  txt(s, [
+    { text: '$', options: { superscript: true } },
+    { text: '998 ' },
+  ], { x: 1.549, y: 3.25, w: 2.089, h: 0.774, fontFace: HEAD_M, fontSize: 40 });
+  txt(s, '(Discounted Price)', { x: 2.783, y: 3.41, w: 2.208, h: 0.303, fontFace: BODY, fontSize: 12, color: LIME });
+
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut',
+    { x: 1.549, y: 3.912, w: 4.279, h: 0.675, fontFace: BODY, fontSize: 12, color: GREY_BF, lineSpacingMultiple: 1.5 });
+
+  // search pill + bag, top right
+  s.addShape('roundRect', { x: 10.976, y: 0.342, w: 1.474, h: 0.415, fill: { color: INK }, line: { type: 'none' }, rectRadius: 0.2075 });
+  txt(s, 'Search', { x: 10.988, y: 0.4, w: 1.075, h: 0.286, align: 'center', fontFace: BODY, fontSize: 11 });
+  searchIcon(s, 12.063, 0.413, 0.25, WHITE);
+  bagIcon(s, 12.549, 0.367, 0.358, INK);
+
+  socialRow(s, 0.56, 6.843, 0.179, 0.204, 0.3295);
+  sparkleQuad(s, 4.459, 5.682, [LIME, WHITE, LIME, WHITE]);
+}
+
+const TOC = [
+  ['01.', 'Introduction'], ['02.', 'Specification'], ['03.', 'Services'], ['04.', 'Designer Profile'],
+  ['05.', 'Product Price'], ['06.', 'Gallery'], ['07.', 'Quotes'], ['08.', 'Contact Us'],
+];
+
+function slide02(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: INK };
+  rect(s, 10.758, 0, 2.575, 7.5, PANEL);
+
+  brand(s);
+  playMark(s, 0.688, 2.333, 101.196);
+  sparkleQuad(s, 7.97, 6.199, [LIME, LIME, LIME, LIME]);
+
+  txt(s, [
+    { text: 'Table of ', options: { color: WHITE } },
+    { text: 'Content', options: { color: LIME } },
+  ], { x: 1.674, y: 1.287, w: 6.376, h: 1.01, fontFace: HEAD, fontSize: 54 });
+
+  TOC.forEach((item, i) => {
+    const col = i < 4 ? 0 : 1;
+    const y = 2.813 + (i % 4) * 1.0067;
+    const x = col === 0 ? 1.674 : 4.984;
+    txt(s, [
+      { text: item[0] + '  ', options: { color: WHITE } },
+      { text: item[1], options: { color: LIME } },
+    ], { x, y, w: 2.696, h: 0.37, fontFace: HEAD_M, fontSize: 16 });
+    arrowNE(s, x + 2.219, y + 0.051, 0.341);
+    rule(s, x + 0.096, y + 0.396, 2.463);
+  });
+}
+
+function slide03(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: INK };
+  rect(s, 7.356, 0, 4.974, 7.5, PANEL);
+
+  brand(s);
+  playMark(s, 11.148, 1.002, 177.441);
+  sparkleQuad(s, 3.017, 1.722);
+
+  txt(s, [
+    { text: 'Hello ', options: { color: WHITE } },
+    { text: 'Riders!', options: { color: LIME } },
+  ], { x: 3.846, y: 1.524, w: 9.07, h: 1.717, fontFace: HEAD_M, fontSize: 96 });
+
+  txt(s, 'Lorem ipsum dolor sit amet, elit, sed do eiusmod tempor incididunt ut labore.',
+    { x: 8.916, y: 4.309, w: 2.655, h: 0.978, fontFace: BODY, fontSize: 12, color: GREY_D9, lineSpacingMultiple: 1.5 });
+
+  linkRow(s, 8.916, 5.643, 'yourwebsite.com', 2.252);
+}
+
+function slide04(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: INK };
+  rect(s, 7.381, 3.024, 5.952, 4.476, PANEL);
+
+  brand(s);
+  playMark(s, 0.973, 4.385, 101.196);
+  sparkleQuad(s, 12.13, 6.379);
+
+  txt(s, [
+    { text: 'Rev Up Your Rise: ', options: { color: WHITE } },
+    { text: 'Unveiling The Future', options: { color: LIME } },
+    { text: ' of Motorcycling', options: { color: WHITE } },
+  ], { x: 1.668, y: 1.592, w: 5.094, h: 2.121, fontFace: HEAD, fontSize: 40 });
+
+  txt(s, 'Introducing Our New Motorbike Innovation',
+    { x: 1.668, y: 4.729, w: 3.999, h: 0.337, fontFace: HEAD_M, fontSize: 14 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud',
+    { x: 1.668, y: 5.225, w: 4.999, h: 0.978, fontFace: BODY, fontSize: 12, color: GREY_BF, lineSpacingMultiple: 1.5 });
+
+  txt(s, '1.200K+', { x: 8.101, y: 4.645, w: 3.999, h: 0.505, fontFace: HEAD_M, fontSize: 24 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore',
+    { x: 8.101, y: 5.225, w: 3.683, h: 0.978, fontFace: BODY, fontSize: 12, color: GREY_BF, lineSpacingMultiple: 1.5 });
+}
+
+const SERVICES = [
+  { name: 'One', ix: 1.828, iy: 4.135, tx: 2.075, ty: 4.128, by: 4.529 },
+  { name: 'Two', ix: 5.378, iy: 4.135, tx: 5.622, ty: 4.128, by: 4.529 },
+  { name: 'Three', ix: 8.925, iy: 4.135, tx: 9.184, ty: 4.132, by: 4.533 },
+  { name: 'Four', ix: 1.828, iy: 5.601, tx: 2.075, ty: 5.580, by: 5.981 },
+  { name: 'Five', ix: 5.378, iy: 5.601, tx: 5.622, ty: 5.564, by: 5.965 },
+  { name: 'Six', ix: 8.925, iy: 5.601, tx: 9.184, ty: 5.584, by: 5.985 },
+];
+
+function slide05(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: INK };
+  rect(s, 0, 3.583, 13.333, 3.917, PANEL);
+
+  brand(s);
+  playMark(s, 0.649, 2.435, 101.196);
+  sparkleQuad(s, 12.34, 4.137);
+
+  txt(s, [
+    { text: 'Explore Our ', options: { color: WHITE } },
+    { text: 'Services', options: { color: LIME } },
+  ], { x: 1.722, y: 1.223, w: 4.332, h: 1.717, fontFace: HEAD, fontSize: 48 });
+
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut',
+    { x: 7.271, y: 1.247, w: 4.332, h: 0.675, fontFace: BODY, fontSize: 12, color: GREY_D9, lineSpacingMultiple: 1.5 });
+  linkRow(s, 7.271, 2.171, 'More Information', 2.252);
+
+  SERVICES.forEach(item => {
+    check(s, item.ix, item.iy, 0.25);
+    txt(s, [
+      { text: 'Service ', options: { color: WHITE } },
+      { text: item.name, options: { color: LIME } },
+    ], { x: item.tx, y: item.ty, w: 3.218, h: 0.337, fontFace: HEAD_M, fontSize: 14 });
+    txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing',
+      { x: item.tx, y: item.by, w: 2.975, h: 0.675, fontFace: BODY, fontSize: 12, color: GREY_D9, lineSpacingMultiple: 1.5 });
+  });
+}
+
+function slide06(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: INK };
+  rect(s, 4.643, 3.75, 7.694, 3.75, PANEL);
+
+  brand(s);
+  playMark(s, 1.205, 3.055, 50.719);
+  sparkle(s, 10.91, 0.484, 1.97, PANEL);
+  sparkleQuad(s, 11.235, 6.397);
+
+  txt(s, [
+    { text: 'Jhonnatan ', options: { color: WHITE } },
+    { text: 'Andreas', options: { color: LIME } },
+  ], { x: 6.983, y: 1.423, w: 4.588, h: 1.919, fontFace: HEAD, fontSize: 54 });
+  txt(s, 'Oto.Moto Innovator',
+    { x: 6.983, y: 3.235, w: 3.999, h: 0.303, fontFace: BODY, fontSize: 12, italic: true });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud',
+    { x: 6.983, y: 4.424, w: 4.999, h: 0.978, fontFace: BODY, fontSize: 12, color: GREY_BF, lineSpacingMultiple: 1.5 });
+
+  socialRow(s, 7.102, 5.82, 0.258, 0.295, 0.475);
+}
+
+function slide07(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: INK };
+  rect(s, 0, 4.168, 6.167, 3.332, PANEL);
+
+  brand(s);
+  playMark(s, 12.51, 0.754, 174.966);
+  sparkleQuad(s, 5.836, 6.188);
+
+  txt(s, [
+    { text: 'Get Your Best ', options: { color: WHITE } },
+    { text: 'Deals', options: { color: LIME } },
+  ], { x: 1.811, y: 1.746, w: 3.761, h: 1.717, fontFace: HEAD, fontSize: 48 });
+
+  txt(s, 'Maximize Your Benefits with Credits',
+    { x: 1.811, y: 4.769, w: 3.761, h: 0.337, fontFace: HEAD_M, fontSize: 14 });
+  txt(s, '5,4%', { x: 1.799, y: 5.354, w: 0.951, h: 0.505, fontFace: HEAD_M, fontSize: 24, color: LIME });
+  txt(s, 'Lorem ipsum dolor sit amet, elit, sed do eiusmod.',
+    { x: 2.738, y: 5.265, w: 2.561, h: 0.675, fontFace: BODY, fontSize: 12, color: GREY_BF, lineSpacingMultiple: 1.5 });
+
+  // lime price card
+  rect(s, 8.724, 1.675, 3.333, 4.255, LIME);
+  txt(s, 'Unit Type R', { x: 9.205, y: 2.2, w: 2.498, h: 0.404, fontFace: HEAD_M, fontSize: 18, color: DARK_TX });
+  txt(s, '$', { x: 9.136, y: 2.745, w: 0.574, h: 0.574, fontFace: HEAD, fontSize: 30, bold: true, color: DARK_TX });
+  txt(s, [
+    { text: '299', options: { fontSize: 44, bold: true } },
+    { text: '/month', options: { fontSize: 14 } },
+  ], { x: 9.628, y: 2.681, w: 2.29, h: 0.841, fontFace: HEAD, color: DARK_TX });
+  [3.508, 3.833, 4.159].forEach((y, i) => {
+    check(s, i === 2 ? 9.295 : 9.282, y + 0.105, 0.25, '000000');
+    txt(s, 'Lorem ipsum dolor sit', { x: 9.545, y, w: 2.29, h: 0.372, fontFace: BODY, fontSize: 12, color: DARK_TX, lineSpacingMultiple: 1.5 });
+  });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit,',
+    { x: 9.205, y: 4.705, w: 2.713, h: 0.675, fontFace: BODY, fontSize: 12, color: DARK_TX, lineSpacingMultiple: 1.5 });
+  arrowNE(s, 11.334, 1.903, 0.534, DARK_TX);
+}
+
+function slide08(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: INK };
+
+  brand(s);
+  playMark(s, 5.8, 0.977, 101.196);
+
+  txt(s, [
+    { text: 'Our ', options: { color: WHITE } },
+    { text: 'Gallery', options: { color: LIME } },
+  ], { x: 1.811, y: 1.53, w: 4.856, h: 0.909, fontFace: HEAD, fontSize: 48 });
+
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut',
+    { x: 7.19, y: 1.192, w: 4.332, h: 0.675, fontFace: BODY, fontSize: 12, color: GREY_D9, lineSpacingMultiple: 1.5 });
+  linkRow(s, 7.19, 2.117, 'See More', 1.076);
+}
+
+function slide09(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: INK };
+
+  brand(s);
+  playMark(s, 7.808, 5.055, 101.196);
+  sparkle(s, 9.239, 0.817, 1.97, PANEL);
+
+  txt(s, [
+    { text: '\u201CLife may not be about your bike, but ', options: { color: WHITE } },
+    { text: 'it sure can help ', options: { color: LIME } },
+    { text: 'you get through it.\u201D', options: { color: WHITE } },
+  ], { x: 2.131, y: 1.525, w: 9.07, h: 2.524, fontFace: HEAD_M, fontSize: 48 });
+
+  txt(s, 'Alexando Martini', { x: 2.222, y: 5.288, w: 2.574, h: 0.438, fontFace: HEAD_M, fontSize: 20, color: LIME });
+  txt(s, 'Oto.Moto CEO', { x: 2.222, y: 5.708, w: 2.484, h: 0.303, fontFace: BODY, fontSize: 12, color: GREY_BF });
+}
+
+function slide10(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: INK };
+  sparkle(s, 10.56, 0.343, 2.367, PANEL);
+  rect(s, 0, 3.75, 6.428, 3.75, PANEL);
+
+  brand(s);
+  sparkleQuad(s, 6.052, 6.241);
+
+  txt(s, [
+    { text: 'Contact ', options: { color: WHITE } },
+    { text: 'Us!', options: { color: LIME } },
+  ], { x: 6.578, y: 1.953, w: 5.166, h: 1.212, fontFace: HEAD, fontSize: 66 });
+
+  phoneIcon(s, 7.978, 4.453, 0.196, LIME);
+  txt(s, '(123+) 345 678 910 ', { x: 8.483, y: 4.383, w: 2.459, h: 0.337, fontFace: HEAD_M, fontSize: 14, charSpacing: 2 });
+  mailIcon(s, 7.978, 5.051, 0.196, LIME);
+  txt(s, 'yourmail@example.com', { x: 8.483, y: 4.997, w: 3.076, h: 0.337, fontFace: HEAD_M, fontSize: 14, charSpacing: 2 });
+  globeIcon(s, 7.95, 5.65, 0.258, LIME);
+  txt(s, 'www.yourwebsite.com', { x: 8.483, y: 5.612, w: 3.076, h: 0.337, fontFace: HEAD_M, fontSize: 14, charSpacing: 2 });
+}
+
+/* -------------------------------------------------------------- assemble  */
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'DECK_16x9', width: SLIDE_W, height: SLIDE_H });
+  pptx.layout = 'DECK_16x9';
+  pptx.title = 'Oto.Moto';
+
+  [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10]
+    .forEach(fn => fn(pptx));
+
+  return pptx.writeFile({ fileName: path.join(__dirname, '0a546738-5b21-4818-91fd-f29980a4368a_grok_final.pptx') });
+}
+
+build().then(f => console.log('wrote ' + f));
